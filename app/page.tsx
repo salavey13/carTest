@@ -12,7 +12,7 @@ const SheetTitle = dynamic(() => import("@/components/ui/sheet").then((mod) => m
 const SheetTrigger = dynamic(() => import("@/components/ui/sheet").then((mod) => mod.SheetTrigger), { ssr: false })
 import UserInfo from "@/components/user-info"
 
-export default async function Home() {
+export default function Home() {
   const { user } = useTelegram()
 
 
