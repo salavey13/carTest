@@ -1,0 +1,7 @@
+id,make,model,description,daily_price,image_url,rent_link,is_test_result
+1,Tesla,Roadster,"Futuristic electric supercar with instant torque and autonomous driving features. Perfect for tech enthusiasts who want blistering acceleration (0-60mph in 1.9s) and cutting-edge technology.",999,"https://example.com/tesla.jpg","/rent/tesla-roadster",true
+2,Ferrari,SF90 Stradale,"Hybrid Italian masterpiece with 1000hp and aggressive styling. For drivers who value raw power and emotional driving experiences. Includes advanced aerodynamics and race-inspired handling.",1499,"https://example.com/ferrari.jpg","/rent/ferrari-sf90",true
+3,Porsche,911 GT3,"Track-focused sports car with precision engineering. Features a naturally aspirated 4.0L flat-6 engine and manual transmission option. Ideal for purists who love analog driving experiences.",899,"https://example.com/porsche.jpg","/rent/porsche-gt3",true
+4,Lamborghini,Huracán EVO,"V10-powered supercar with dramatic styling and razor-sharp handling. Comes with all-wheel drive and advanced driver aids. Perfect for exotic car enthusiasts wanting daily drivability.",1299,"https://example.com/lambo.jpg","/rent/huracan",false
+5,McLaren,720S,"Carbon fiber masterpiece with dihedral doors and 710hp twin-turbo V8. Features groundbreaking aerodynamics and a luxurious interior. Ideal for high-speed grand touring.",1199,"https://example.com/mclaren.jpg","/rent/720s",false
+
