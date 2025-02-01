@@ -1,4 +1,4 @@
-import { createAuthenticatedClient, supabase } from "@/lib/supabase";
+import { createAuthenticatedClient, supabase } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
 //import jwt from "jsonwebtoken";
 import axios from 'axios'

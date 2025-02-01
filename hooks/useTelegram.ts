@@ -85,7 +85,7 @@ export function useTelegram() {
       debugLogger.error("Failed to authenticate user:", err);
       setError(err instanceof Error ? err : new Error("Unknown error occurred"));
     }
-  }, []);*/
+  }, []);
 
   useEffect(() => {
     debugLogger.log("useTelegram: useEffect called for initTelegram");
