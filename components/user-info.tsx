@@ -25,7 +25,7 @@ export default function UserInfo({ user }: TelegramUser) {
   }
 
   return (
-    <Link href="/login">
+    <Link href="/buy-subscription">
       <Button variant="ghost" className="text-[#FF6B6B] hover:text-[#FF8E8E]">
         <User className="h-5 w-5" />
       </Button>

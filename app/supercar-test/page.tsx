@@ -105,38 +105,38 @@ export default function SupercarTest() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4">
-        <nav className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold">🚀 Supercar Match</h1>
-          {isAdmin && (
-            <Link href="/admin" className="bg-cyan-500 px-4 py-2 rounded-lg">
-              Панель администратора
-            </Link>
-          )}
-        </nav>
-
-        {testProgress && (
-          <div className="mb-4">
-            <button 
-              onClick={() => {
-                supabase
-                  .from('users')
-                  .update({ test_progress: null })
-                  .eq('id', user.id);
-                resetTest();
-              }}
-              className="bg-red-500 p-2 rounded"
-            >
-              Начать заново
-            </button>
-          </div>
+      <nav className="flex justify-between items-center mb-8">
+        <h1 className="text-2xl font-bold">🚀 Supercar Match</h1>
+        {isAdmin && (
+          <Link href="/admin" className="bg-cyan-500 px-4 py-2 rounded-lg">
+            Панель администратора
+          </Link>
         )}
+      </nav>
 
-        <Graph 
-          currentQuestion={currentQuestion} 
-          onSelect={handleAnswer}
-          theme={currentQuestion?.theme}
-        />
-      </div>
+      {testProgress && (
+        <div className="mb-4">
+          <button 
+            onClick={() => {
+              supabase
+                .from('users')
+                .update({ test_progress: null })
+                .eq('id', user.id);
+              resetTest();
+            }}
+            className="bg-red-500 p-2 rounded"
+          >
+            Начать заново
+          </button>
+        </div>
+      )}
+
+      <Graph 
+        currentQuestion={currentQuestion} 
+        onSelect={handleAnswer}
+        theme={currentQuestion.theme}
+      />
+    </div>
     {/*<div className="min-h-screen bg-black text-[#00ff9d] pt-20 relative overflow-hidden">
       <div className="absolute inset-0 opacity-10 pointer-events-none select-none overflow-hidden whitespace-nowrap text-[8px] leading-none binary-background">
         {Array(100).fill("01").join("")}
