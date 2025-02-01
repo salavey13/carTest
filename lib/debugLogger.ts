@@ -30,6 +30,20 @@ class DebugLogger {
     console.error(...args);
   }
 
+  warn(...args: any[]) {
+    const errorMessage = args.map(arg => 
+      typeof arg === 'object' ? JSON.stringify(arg) : arg
+    ).join(' ');
+    
+    this.logs.push(`WARN ${new Date().toISOString()}: ${errorMessage}`);
+    
+    if (this.logs.length > this.maxLogs) {
+      this.logs.shift();
+    }
+    
+    console.error(...args);
+  }
+
   getLogs() {
     return this.logs.join('\n');
   }

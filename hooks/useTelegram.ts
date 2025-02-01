@@ -1,4 +1,5 @@
 // hooks/useTelegram.ts
+"use client"
 import { useCallback, useEffect, useState } from "react";
 import { debugLogger } from "@/lib/debugLogger";
 import type { TelegramWebApp, WebAppUser } from "@/types/telegram";
@@ -76,7 +77,7 @@ export function useTelegram() {
       });
       if (authenticatedUser && token) {
         debugLogger.log("User authenticated successfully");
-        setJwtToken(token);
+        setJwtToken(await token);
         setDbUser(authenticatedUser);
       } else {
         throw new Error("Authentication failed");
@@ -94,7 +95,7 @@ export function useTelegram() {
 
 const getJwtToken = useCallback(() => jwtToken, [jwtToken]);
 
-  const shareUrl = useCallback(
+  /*const shareUrl = useCallback(
     (url: string) => {
       if (tg && isInTelegramContext) {
         tg.shareUrl(url)
@@ -104,7 +105,7 @@ const getJwtToken = useCallback(() => jwtToken, [jwtToken]);
       }
     },
     [tg, isInTelegramContext],
-  )
+  )*/
 
   const openLink = useCallback(
     (url: string) => {
@@ -128,13 +129,13 @@ const getJwtToken = useCallback(() => jwtToken, [jwtToken]);
   const isAuthenticated = !!dbUser
 
   // Add theme change handler
-  useEffect(() => {
+  /*useEffect(() => {
     if (tg) {
       const handleThemeChange = () => setTheme(tg.colorScheme)
       tg.onEvent('themeChanged', handleThemeChange)
       return () => tg.offEvent('themeChanged', handleThemeChange)
     }
-  }, [tg])
+  }, [tg])*/
 
   return {
     tg,
@@ -144,7 +145,7 @@ const getJwtToken = useCallback(() => jwtToken, [jwtToken]);
     isInTelegramContext,
     isAuthenticated,
     isLoading,
-    shareUrl,
+ //   shareUrl,
     openLink,
     error,
     isMockUser,

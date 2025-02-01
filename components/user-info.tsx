@@ -1,20 +1,15 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+//import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import { User } from "lucide-react"
-
+import type { TelegramWebApp, WebAppUser } from "@/types/telegram";
 const Button = dynamic(() => import("@/components/ui/button").then((mod) => mod.Button), { ssr: false })
 
 
-export default function UserInfo({ user }: TelegramUser) {
-  const router = useRouter()
-
-  const handleLogout = async () => {
-    await logout()
-    router.refresh()
-  }
+export default function UserInfo(user : WebAppUser) {
+  //const router = useRouter()
 
   if (user) {
     return (

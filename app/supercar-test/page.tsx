@@ -1,6 +1,6 @@
 // app/page.tsx
 'use client';
-import { useTelegram, TelegramUser } from '@/hooks/useTelegram';
+import { useTelegram } from '@/hooks/useTelegram';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/hooks/supabase';
@@ -121,7 +121,7 @@ export default function SupercarTest() {
               supabase
                 .from('users')
                 .update({ test_progress: null })
-                .eq('id', user.id);
+                .eq('id', user?.id);
               resetTest();
             }}
             className="bg-red-500 p-2 rounded"
@@ -137,7 +137,11 @@ export default function SupercarTest() {
         theme={currentQuestion.theme}
       />
     </div>
-    {/*<div className="min-h-screen bg-black text-[#00ff9d] pt-20 relative overflow-hidden">
+    
+  )
+}
+
+/*<div className="min-h-screen bg-black text-[#00ff9d] pt-20 relative overflow-hidden">
       <div className="absolute inset-0 opacity-10 pointer-events-none select-none overflow-hidden whitespace-nowrap text-[8px] leading-none binary-background">
         {Array(100).fill("01").join("")}
       </div>
@@ -164,7 +168,4 @@ export default function SupercarTest() {
           </CardContent>
         </Card>
       </div>
-    </div>*/}
-  )
-}
-
+    </div>*/
