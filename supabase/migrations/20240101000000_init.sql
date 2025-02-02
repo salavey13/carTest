@@ -38,9 +38,17 @@ CREATE TABLE public.questions (
     position INT NOT NULL
 );
 
--- Create cars table (id changed from UUID to TEXT)
+-- Create answers table (REMOVED direct car links, branching instead)
+CREATE TABLE public.answers (
+    id SERIAL PRIMARY KEY,
+    question_id INT REFERENCES public.questions(id) ON DELETE CASCADE,
+    text TEXT NOT NULL,
+    next_question INT -- Defines which question to jump to next (NULL = next in order)
+);
+
+-- Create cars table (test results)
 CREATE TABLE public.cars (
-    id TEXT PRIMARY KEY,  -- Changed from UUID to TEXT
+    id TEXT PRIMARY KEY,
     make TEXT NOT NULL,
     model TEXT NOT NULL,
     description TEXT NOT NULL,
@@ -48,14 +56,8 @@ CREATE TABLE public.cars (
     daily_price NUMERIC NOT NULL,
     image_url TEXT NOT NULL,
     rent_link TEXT NOT NULL,
-    is_test_result BOOLEAN DEFAULT FALSE
-);
-
--- Create answers table (REMOVED the 'result' column)
-CREATE TABLE public.answers (
-    id SERIAL PRIMARY KEY,
-    question_id INT REFERENCES public.questions(id) ON DELETE CASCADE,
-    text TEXT NOT NULL
+    is_test_result BOOLEAN DEFAULT FALSE,
+    specs JSONB DEFAULT '{}'
 );
 
 -- Create user_results table
@@ -113,40 +115,19 @@ BEGIN
 END;
 $$;
 
--- Wipe existing data (run in Supabase SQL editor)
-DROP TABLE IF EXISTS answers;
-DROP TABLE IF EXISTS questions;
-DROP TABLE IF EXISTS cars CASCADE;
 
--- Create questions table
-CREATE TABLE public.questions (
-    id SERIAL PRIMARY KEY,
-    text TEXT NOT NULL,
-    theme TEXT NOT NULL,
-    position INT NOT NULL
-);
 
--- Create answers table (REMOVED direct car links, branching instead)
-CREATE TABLE public.answers (
-    id SERIAL PRIMARY KEY,
-    question_id INT REFERENCES public.questions(id) ON DELETE CASCADE,
-    text TEXT NOT NULL,
-    next_question INT -- Defines which question to jump to next (NULL = next in order)
-);
 
--- Create cars table (test results)
-CREATE TABLE public.cars (
-    id TEXT PRIMARY KEY,
-    make TEXT NOT NULL,
-    model TEXT NOT NULL,
-    description TEXT NOT NULL,
-    embedding VECTOR(384),
-    daily_price NUMERIC NOT NULL,
-    image_url TEXT NOT NULL,
-    rent_link TEXT NOT NULL,
-    is_test_result BOOLEAN DEFAULT FALSE,
-    specs JSONB DEFAULT '{}'
-);
+
+
+
+
+
+
+
+
+
+
 
 -------------------------------------------------------
 -- SEED QUESTIONS & ANSWERS (BRANCHING LOGIC)
