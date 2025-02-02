@@ -1,4 +1,35 @@
 // utils/embeddingGenerator.ts
+/*Expected logs from "npx utils/embeddingGenerator.ts:
+🚀 Starting embedding generation for cars...
+✅ Fetched 10 car(s) from the DB.
+⏳ Loading embedding pipeline...
+dtype not specified for "model". Using the default dtype (fp32)
+for this device (cpu).
+✅ Embedding pipeline loaded successfully.
+🔍 Processing car with ID: tesla-roadster...
+✅ Successfully updated car with ID: tesla-roadster.
+🔍 Processing car with ID: ferrari-sf90...
+✅ Successfully updated car with ID: ferrari-sf90.
+🔍 Processing car with ID: porsche-911...
+✅ Successfully updated car with ID: porsche-911.
+🔍 Processing car with ID: lamborghini-huracan...
+✅ Successfully updated car with ID: lamborghini-huracan.
+🔍 Processing car with ID: mclaren-720s...
+✅ Successfully updated car with ID: mclaren-720s.
+🔍 Processing car with ID: 1...
+✅ Successfully updated car with ID: 1.
+🔍 Processing car with ID: 2...
+✅ Successfully updated car with ID: 2.
+🔍 Processing car with ID: 3...
+✅ Successfully updated car with ID: 3.
+🔍 Processing car with ID: 4...
+✅ Successfully updated car with ID: 4.
+🔍 Processing car with ID: 5...
+✅ Successfully updated car with ID: 5.
+🎉 Finished embedding generation for all cars.
+👌 Done.
+
+*/
 import { pipeline } from "@huggingface/transformers";
 import { supabaseAdmin } from "@/hooks/supabase";
 
@@ -65,3 +96,4 @@ if (require.main === module) {
     .then(() => console.log("👌 Done."))
     .catch((err) => console.error("💥 Fatal error:", err));
 }
+

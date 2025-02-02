@@ -1,4 +1,5 @@
-import { MapPin, ShoppingCart, Search } from "lucide-react"
+"use client"
+ import { MapPin, ShoppingCart, Search } from "lucide-react"
 import Link from "next/link"
 import dynamic from "next/dynamic"
 import { useTelegram } from '@/hooks/useTelegram';
@@ -135,6 +136,10 @@ export default function Home() {
           ))}
         </div>
       </div>
+
+      <footer className="mt-auto p-4 text-center text-sm text-gray-400">
+        Powered by Supercar Match © {new Date().getFullYear()}
+      </footer>
     </div>
   )
 }

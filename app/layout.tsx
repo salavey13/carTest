@@ -1,23 +1,31 @@
 // app/layout.tsx
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+"use client"; // ✅ Mark as a client component
+
+import { AnimatePresence, motion } from 'framer-motion';
+import { usePathname } from 'next/navigation';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
   return (
-    <html lang="en" className="h-full">
+    <html lang="en">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body className="h-full bg-gray-900 text-white antialiased">
-        <div className="min-h-full flex flex-col">
-          {children}
-          <footer className="mt-auto p-4 text-center text-sm text-gray-400">
-            Powered by Supercar Match © {new Date().getFullYear()}
-          </footer>
-        </div>
+      <body>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={pathname}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
       </body>
     </html>
   );
