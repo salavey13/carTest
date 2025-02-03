@@ -15,7 +15,7 @@ if '%errorlevel%' NEQ '0' (
     pushd "%CD%"
     CD /D "%~dp0"
 
-:: ASCII Art (Razor Scene Group Style)
+:: ASCII Art (Razor Scene Group Style with SALAVEY13)
 echo.
 echo     ________   ________   ________   ________   ________  
 echo    /_______/  /_______/  /_______/  /_______/  /_______/  
@@ -28,34 +28,11 @@ echo ============================================
 echo       Автоматизированный Установщик by Qwen
 echo ============================================
 
-:: Create temp directory
-set TEMP_DIR=%TEMP%\setup_temp
-if not exist "%TEMP_DIR%" mkdir "%TEMP_DIR%"
-
-:: Download URLs
-set GIT_URL=https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.2/Git-2.47.1.2-64-bit.exe
-set NODE_URL=https://nodejs.org/dist/v22.13.1/node-v22.13.1-x64.msi
-set NOTEPADPP_URL=https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.7.6/npp.8.7.6.Installer.x64.exe
-set VSCODE_URL=https://code.visualstudio.com/sha/download?build=stable&os=win32-x64-user
-
-:: File names
-set GIT_FILE=%TEMP_DIR%\Git-Installer.exe
-set NODE_FILE=%TEMP_DIR%\Node-Installer.msi
-set NOTEPADPP_FILE=%TEMP_DIR%\NotepadPP-Installer.exe
-set VSCODE_FILE=%TEMP_DIR%\VSCode-Installer.exe
-
-:: Tips Array
-set TIPS[0]="git pull" - Обновить локальный репозиторий с GitHub
-set TIPS[1]="git add ." - Подтвердить изменения для коммита
-set TIPS[2]="git commit -m 'сообщение'" - Сохранить изменения в локальном репозитории
-set TIPS[3]="git push" - Отправить изменения на GitHub
-set TIPS[4]="npm install" - Установить зависимости для Node.js проекта
-set TIPS[5]="npm run dev" - Запустить сервер разработки
-set TIPS[6]="npm start" - Запустить приложение в продакшене
-set TIPS[7]="Notepad++" - Быстрый текстовый редактор для сравнения файлов
-set TIPS[8]="VS Code" - Редактор кода с поддержкой Git через интерфейс
-set TIPS[9]="скачать.bat" - Скачивает обновления из GitHub (Easter Egg!)
-set TIPS[10]="залить.bat" - Отправляет изменения в GitHub (Easter Egg!)
+:: Configuration
+set REPO_URL=https://github.com/salavey13/cartest.git
+set PROJECTS_DIR=%USERPROFILE%\Documents\V0_Projects
+set REPO_DIR=%PROJECTS_DIR%\cartest
+set VERSION_FILE=%REPO_DIR%\VERSION
 
 :: Progress Bar Function
 :ProgressBar
@@ -108,79 +85,118 @@ exit /b 0
 echo Начинаем процесс установки...
 
 :: Step 1: Create V0_Projects Folder
-set PROJECTS_DIR=%USERPROFILE%\Documents\V0_Projects
 if not exist "%PROJECTS_DIR%" (
     echo Создание папки V0_Projects...
     mkdir "%PROJECTS_DIR%"
 )
 cd /d "%PROJECTS_DIR%"
 
-:: Step 2: Download Installers
-call :DownloadFile "%GIT_URL%" "%GIT_FILE%"
-call :ProgressBar 12 1
+:: Step 2: Check if Project Exists
+if not exist "%REPO_DIR%" (
+    echo 🛠️ Репозиторий не найден. Клонируем его...
+    git clone "%REPO_URL%" "%REPO_DIR%"
+    cd "%REPO_DIR%"
+    call :ProgressBar 15 1
+) else (
+    echo Репозиторий уже на месте. Всё готово!
+    cd "%REPO_DIR%"
+    call :ProgressBar 15 1
+)
 
-call :DownloadFile "%NODE_URL%" "%NODE_FILE%"
-call :ProgressBar 12 2
+:: Step 3: Pull Latest Changes
+echo 🔄 Обновляем репозиторий перед применением архива...
+git pull origin main
+call :ProgressBar 15 2
 
-call :DownloadFile "%NOTEPADPP_URL%" "%NOTEPADPP_FILE%"
-call :ProgressBar 12 3
+:: Step 4: Check for ZIP Files
+echo 🔍 Ищем ZIP-архивы с обновлениями...
+setlocal enabledelayedexpansion
+set ZIP_COUNT=0
+set LATEST_ZIP=
+for %%f in ("%REPO_DIR%\*.zip") do (
+    set /a ZIP_COUNT+=1
+    set LATEST_ZIP=%%~nxf
+)
 
-call :DownloadFile "%VSCODE_URL%" "%VSCODE_FILE%"
-call :ProgressBar 12 4
+if %ZIP_COUNT% equ 0 (
+    echo ⚠️ ZIP-архивов не найдено. Пожалуйста, загрузите архив из бота.
+    pause
+    explorer "%REPO_DIR%"
+    exit /b
+)
 
-:: Step 3: Install Software Silently
-call :InstallSilently "%GIT_FILE%" "/VERYSILENT /NORESTART /NOCANCEL"
-call :ProgressBar 12 5
+:: Step 5: Extract and Apply ZIP Updates
+if exist "%VERSION_FILE%" (
+    for /f "tokens=1-3" %%v in ('type "%VERSION_FILE%"') do (
+        set CURRENT_VERSION=%%v
+        set LAST_APPLIED_ZIP=%%w
+    )
+    echo Текущая версия проекта: %CURRENT_VERSION%, последний ZIP: %LAST_APPLIED_ZIP%
+) else (
+    set CURRENT_VERSION=0
+    set LAST_APPLIED_ZIP=
+    echo 0 > "%VERSION_FILE%"
+)
 
-call :InstallSilently "%NODE_FILE%" "/quiet"
-call :ProgressBar 12 6
+findstr /c:"%LATEST_ZIP%" "%VERSION_FILE%" >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    echo 🔄 ZIP "%LATEST_ZIP%" уже применён. Проверяем на изменения...
+    powershell -Command "Expand-Archive -Force '%REPO_DIR%\%LATEST_ZIP%' -DestinationPath .\temp_unzip"
+    for /d %%d in (temp_unzip\*) do set ROOT_UNPACKED_DIR=%%d
+    xcopy /s /y "!ROOT_UNPACKED_DIR!\*" "%REPO_DIR%\temp_git_check"
+    rmdir /s /q temp_unzip
+    git diff --quiet "%REPO_DIR%\temp_git_check" >nul 2>&1
+    if %ERRORLEVEL% equ 0 (
+        echo 🔄 ZIP "%LATEST_ZIP%" без изменений. Ничего не делаем!
+        rmdir /s /q "%REPO_DIR%\temp_git_check"
+        pause
+        exit /b
+    ) else (
+        echo ⚠️ ZIP "%LATEST_ZIP%" изменён. Применяем обновления.
+    )
+    rmdir /s /q "%REPO_DIR%\temp_git_check"
+)
 
-call :InstallSilently "%NOTEPADPP_FILE%" "/S"
-call :ProgressBar 12 7
+echo 🛠️ Распаковываем "%LATEST_ZIP%"...
+powershell -Command "Expand-Archive -Force '%REPO_DIR%\%LATEST_ZIP%' -DestinationPath .\temp_unzip"
+for /d %%d in (temp_unzip\*) do set ROOT_UNPACKED_DIR=%%d
+xcopy /s /y "!ROOT_UNPACKED_DIR!\*" "%REPO_DIR%"
+rmdir /s /q temp_unzip
 
-call :InstallSilently "%VSCODE_FILE%" "/verysilent /suppressmsgboxes"
-call :ProgressBar 12 8
+:: Update VERSION File
+set /a NEXT_VERSION=%CURRENT_VERSION%+1
+echo %NEXT_VERSION% %LATEST_ZIP% > "%VERSION_FILE%"
+call :ProgressBar 15 8
 
-:: Step 4: Clone GitHub Repository and Run Project
-echo Клонирование репозитория GitHub и настройка проекта...
-git clone https://github.com/salavey13/cartest.git
-cd cartest
-call :ProgressBar 12 9
+:: Step 6: Commit and Push Changes
+set COMMIT_MSG="💥 Обновления от %LATEST_ZIP% | Версия %NEXT_VERSION%"
+echo ✅ Создаём коммит с сообщением: %COMMIT_MSG%
 
-echo Установка зависимостей npm...
-npm install
-call :ProgressBar 12 10
+:: Create a New Branch
+set BRANCH_NAME=бот_%DATE:~-4%%DATE:~-7,2%%DATE:~-10,2%_%TIME:~0,2%%TIME:~3,2%
+git checkout -b %BRANCH_NAME%
+git add .
+git commit -m "%COMMIT_MSG%"
+call :ProgressBar 15 10
 
-echo Сборка проекта...
-npm run build
-call :ProgressBar 12 11
+echo 🚀 Отправляем изменения в GitHub...
+git push origin %BRANCH_NAME%
+call :ProgressBar 15 12
 
-echo Запуск проекта...
-start "" cmd.exe /k "npm start"
-call :ProgressBar 12 12
+:: Switch Back to Main Branch
+git checkout main
+git pull origin main
+call :ProgressBar 15 13
 
-:: Step 5: Create Scripts (скачать.bat and залить.bat)
-echo Создание скрипта скачать.bat...
-echo @echo off > "%PROJECTS_DIR%\скачать.bat"
-echo cd /d "%PROJECTS_DIR%\cartest" >> "%PROJECTS_DIR%\скачать.bat"
-echo git pull >> "%PROJECTS_DIR%\скачать.bat"
-
-echo Создание скрипта залить.bat...
-echo @echo off > "%PROJECTS_DIR%\залить.bat"
-echo cd /d "%PROJECTS_DIR%\cartest" >> "%PROJECTS_DIR%\залить.bat"
-echo git add . && git commit -m "update" && git push >> "%PROJECTS_DIR%\залить.bat"
-
-:: Easter Egg Tips
-echo.
-echo ====================== ПАСХАЛЬНЫЕ ЯЙЦА ======================
-echo "скачать.bat" - Автоматически скачивает обновления из GitHub!
-echo "залить.bat" - Автоматически отправляет изменения в GitHub!
-echo ============================================================
-echo.
+:: Step 7: Open Pull Request Page
+echo Открываем страницу Pull Request в браузере...
+start "" "https://github.com/salavey13/cartest/pulls"
+call :ProgressBar 15 14
 
 :: Cleanup
 echo Очистка временных файлов...
-if exist "%TEMP_DIR%" rmdir /s /q "%TEMP_DIR%"
+del /q "%REPO_DIR%\*.zip"
+call :ProgressBar 15 15
 
-echo Установка завершена успешно!
+echo Установка и обновление завершены успешно!
 pause
