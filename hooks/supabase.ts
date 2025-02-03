@@ -159,3 +159,30 @@ export async function uploadImage(bucketName: string, file: File, fileName?: str
   }
 }
 
+export async function createInvoice(userId: string, subscriptionId: number, amount: number) {
+  const { data, error } = await supabaseAdmin.rpc('create_invoice', {
+    user_id: userId,
+    subscription_id: subscriptionId,
+    amount,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function updateInvoiceStatus(invoiceId: number, newStatus: string) {
+  const { data, error } = await supabaseAdmin.rpc('update_invoice_status', {
+    invoice_id: invoiceId,
+    new_status: newStatus,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function getUserInvoices(userId: string) {
+  const { data, error } = await supabaseAdmin.rpc('get_user_invoices', {
+    user_id: userId,
+  });
+  if (error) throw error;
+  return data;
+}
+
