@@ -75,6 +75,150 @@ CREATE INDEX ON users USING gin (username gin_trgm_ops);
 ALTER TABLE cars ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public read" ON cars FOR SELECT USING (true);
 
+Paul:
+-- Enable Row-Level Security (RLS) for all tables
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE answers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cars ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_results ENABLE ROW LEVEL SECURITY;
+
+-- Users Table Policies
+CREATE POLICY "Users can read their own data"
+ON users
+FOR SELECT
+USING (auth.jwt() ->> 'chat_id' = user_id);
+
+CREATE POLICY "Users can update their own data"
+ON users
+FOR UPDATE
+USING (auth.jwt() ->> 'chat_id' = user_id);
+
+-- Questions Table Policies
+CREATE POLICY "Public can read questions"
+ON questions
+FOR SELECT
+USING (true);
+
+-- Answers Table Policies
+CREATE POLICY "Public can read answers"
+ON answers
+FOR SELECT
+USING (true);
+
+-- Cars Table Policies
+CREATE POLICY "Public can read cars"
+ON cars
+FOR SELECT
+USING (true);
+
+-- User Results Table Policies
+CREATE POLICY "Users can read their own results"
+ON user_results
+FOR SELECT
+USING (auth.jwt() ->> 'chat_id' = user_id);
+
+CREATE POLICY "Users can insert their own results"
+ON user_results
+FOR INSERT
+WITH CHECK (auth.jwt() ->> 'chat_id' = user_id);
+
+-- policy_init.sql
+-- Create a public bucket for car images
+CREATE OR REPLACE FUNCTION create_public_bucket(bucket_name TEXT)
+RETURNS void AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM storage.buckets WHERE name = bucket_name) THEN
+    INSERT INTO storage.buckets (name, public) VALUES (bucket_name, true);
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Call the function to create the bucket
+SELECT create_public_bucket('car-images');
+
+
+
+
+
+-- Create invoices table
+CREATE TABLE public.invoices (
+    id SERIAL PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES public.users(user_id) ON DELETE CASCADE,
+    subscription_id INT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    amount INT NOT NULL,
+    currency TEXT DEFAULT 'XTR',
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    CONSTRAINT check_status CHECK (status = ANY (ARRAY['pending'::text, 'paid'::text, 'failed'::text]))
+);
+
+-- Add indexes for performance
+CREATE INDEX ON invoices (user_id);
+CREATE INDEX ON invoices (status);
+
+-- Enable Row-Level Security (RLS)
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+
+-- Allow users to read their own invoices
+CREATE POLICY "Users can view their own invoices" ON invoices
+    FOR SELECT USING (auth.uid() = user_id);
+
+-- Allow users to insert their own invoices
+CREATE POLICY "Users can create their own invoices" ON invoices
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Allow users to update their own invoices
+CREATE POLICY "Users can update their own invoices" ON invoices
+    FOR UPDATE USING (auth.uid() = user_id);
+
+
+
+
+CREATE OR REPLACE FUNCTION create_invoice(
+    user_id TEXT,
+    subscription_id INT,
+    amount INT
+)
+RETURNS void AS $$
+BEGIN
+    INSERT INTO invoices (user_id, subscription_id, amount)
+    VALUES (user_id, subscription_id, amount);
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION update_invoice_status(
+    invoice_id INT,
+    new_status TEXT
+)
+RETURNS void AS $$
+BEGIN
+    UPDATE invoices
+    SET status = new_status, updated_at = now()
+    WHERE id = invoice_id;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION get_user_invoices(user_id TEXT)
+RETURNS TABLE (
+    id INT,
+    subscription_id INT,
+    status TEXT,
+    amount INT,
+    currency TEXT,
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT id, subscription_id, status, amount, currency, created_at, updated_at
+    FROM invoices
+    WHERE invoices.user_id = get_user_invoices.user_id;
+END;
+$$ LANGUAGE plpgsql;
+
+
 -- Create search function for cars
 CREATE OR REPLACE FUNCTION search_cars(query_embedding VECTOR(384), match_count INT)
 RETURNS TABLE (id TEXT, make TEXT, model TEXT, similarity FLOAT)
