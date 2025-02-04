@@ -268,30 +268,79 @@ echo [1] Vercel: %VERCEL_URL%
 echo [2] Supabase: %SUPABASE_URL%
 echo [3] GitHub: %GITHUB_URL%
 echo [4] v0.dev Проект: %V0_DEV_URL%
+echo [5] Qwen Chat: https://chat.qwenlm.ai
+echo [6] Supabase SQL Console: https://app.supabase.com/project/YOUR_PROJECT_ID/sql
 echo ============================================================
 echo.
 echo ====================== ДЕЙСТВИЯ ============================
 echo [A] Запустить сборку проекта (npm run build)
 echo [B] Запустить локальный сервер разработки (npm run dev)
-echo [C] Выход
+echo [C] Создать ветку и Pull Request (если есть изменения в Git)
+echo [D] Добавить случайные файлы в архив для обновления
+echo [E] Открыть полезные ссылки в браузере
+echo [F] Выход
 echo ============================================================
 set /p ACTION="Выберите действие: "
+
 if /i "%ACTION%"=="A" (
     echo Запуск сборки проекта...
     npm run build
     pause
     goto :Dashboard
 )
+
 if /i "%ACTION%"=="B" (
     echo Запуск локального сервера разработки...
     npm run dev
     pause
     goto :Dashboard
 )
+
 if /i "%ACTION%"=="C" (
+    echo Проверяем наличие изменений в Git...
+    git diff --quiet
+    if %ERRORLEVEL% neq 0 (
+        echo ✅ Обнаружены изменения. Создаём новую ветку и Pull Request...
+        set BRANCH_NAME=обновление_%DATE:~-4%%DATE:~-7,2%%DATE:~-10,2%_%TIME:~0,2%%TIME:~3,2%
+        git checkout -b %BRANCH_NAME%
+        git add .
+        set /p COMMIT_MSG="Введите сообщение коммита: "
+        git commit -m "%COMMIT_MSG%"
+        git push origin %BRANCH_NAME%
+        start "" "https://github.com/salavey13/cartest/pulls"
+    ) else (
+        echo ❌ Изменений нет. Нечего коммитить.
+    )
+    pause
+    goto :Dashboard
+)
+
+if /i "%ACTION%"=="D" (
+    echo Добавляем случайные файлы в архив...
+    set /p FILES="Введите имена файлов через пробел (например, file1.txt file2.js): "
+    powershell -Command "Compress-Archive -Path %FILES% -DestinationPath '%REPO_DIR%\update.zip' -Force"
+    echo Архив создан: update.zip
+    pause
+    goto :Dashboard
+)
+
+if /i "%ACTION%"=="E" (
+    echo Открываем полезные ссылки в браузере...
+    start "" "%VERCEL_URL%"
+    start "" "%SUPABASE_URL%"
+    start "" "%GITHUB_URL%"
+    start "" "%V0_DEV_URL%"
+    start "" "https://chat.qwenlm.ai"
+    start "" "https://app.supabase.com/project/YOUR_PROJECT_ID/sql"
+    pause
+    goto :Dashboard
+)
+
+if /i "%ACTION%"=="F" (
     echo До свидания!
     exit /b
 )
+
 echo Неверный выбор. Попробуйте снова.
 pause
 goto :Dashboard
