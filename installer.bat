@@ -108,14 +108,15 @@ echo 🔄 Обновляем репозиторий перед применен�
 git pull origin main
 call :ProgressBar 15 2
 
-:: Step 4: Check for ZIP Files
+:: Step 4: Check for ZIP Files in Multiple Locations
 echo 🔍 Ищем ZIP-архивы с обновлениями...
 setlocal enabledelayedexpansion
 set ZIP_COUNT=0
 set LATEST_ZIP=
-for %%f in ("%REPO_DIR%\*.zip") do (
+for %%f in ("%REPO_DIR%\*.zip" "%~dp0*.zip" "%USERPROFILE%\Desktop\*.zip") do (
     set /a ZIP_COUNT+=1
     set LATEST_ZIP=%%~nxf
+    set LATEST_ZIP_PATH=%%~ff
 )
 
 if %ZIP_COUNT% equ 0 (
@@ -124,6 +125,8 @@ if %ZIP_COUNT% equ 0 (
     explorer "%REPO_DIR%"
     exit /b
 )
+
+echo ✅ Найден архив: %LATEST_ZIP%
 
 :: Step 5: Extract and Apply ZIP Updates
 if exist "%VERSION_FILE%" (
@@ -141,7 +144,7 @@ if exist "%VERSION_FILE%" (
 findstr /c:"%LATEST_ZIP%" "%VERSION_FILE%" >nul 2>&1
 if %ERRORLEVEL% equ 0 (
     echo 🔄 ZIP "%LATEST_ZIP%" уже применён. Проверяем на изменения...
-    powershell -Command "Expand-Archive -Force '%REPO_DIR%\%LATEST_ZIP%' -DestinationPath .\temp_unzip"
+    powershell -Command "Expand-Archive -Force '%LATEST_ZIP_PATH%' -DestinationPath .\temp_unzip"
     for /d %%d in (temp_unzip\*) do set ROOT_UNPACKED_DIR=%%d
     xcopy /s /y "!ROOT_UNPACKED_DIR!\*" "%REPO_DIR%\temp_git_check"
     rmdir /s /q temp_unzip
@@ -158,7 +161,7 @@ if %ERRORLEVEL% equ 0 (
 )
 
 echo 🛠️ Распаковываем "%LATEST_ZIP%"...
-powershell -Command "Expand-Archive -Force '%REPO_DIR%\%LATEST_ZIP%' -DestinationPath .\temp_unzip"
+powershell -Command "Expand-Archive -Force '%LATEST_ZIP_PATH%' -DestinationPath .\temp_unzip"
 for /d %%d in (temp_unzip\*) do set ROOT_UNPACKED_DIR=%%d
 xcopy /s /y "!ROOT_UNPACKED_DIR!\*" "%REPO_DIR%"
 rmdir /s /q temp_unzip
@@ -195,8 +198,15 @@ call :ProgressBar 15 14
 
 :: Cleanup
 echo Очистка временных файлов...
-del /q "%REPO_DIR%\*.zip"
+del /q "%LATEST_ZIP_PATH%"
 call :ProgressBar 15 15
 
-echo Установка и обновление завершены успешно!
+:: Final Tips
+echo ====================== TIPS FOR NOOBS ======================
+echo 1. Бот создаёт централизованную резервную копию вашего проекта на GitHub.
+echo 2. Архивы можно загружать прямо из бота и автоматически применять их.
+echo 3. Бот имеет функцию предпросмотра для тестирования изменений.
+echo 4. Этот скрипт автоматически создаёт Pull Request для новых обновлений.
+echo 5. Всё, что вам нужно сделать, это загрузить архив и запустить этот скрипт!
+echo ============================================================
 pause
