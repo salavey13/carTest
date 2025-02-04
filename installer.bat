@@ -257,6 +257,7 @@ if exist "%VERSION_FILE%" (
     )
 )
 
+
 :: Gamified Welcome Message
 :WelcomeMessage
 cls
@@ -331,7 +332,10 @@ echo [E] Открыть полезные ссылки в браузере
 echo [F] Настроить Vercel (развернуть проект)
 echo [G] Настроить Supabase (создать базу данных)
 echo [H] Настроить Telegram Bot (установить токен и чат ID)
-echo [I] Выход
+echo [I] Подключить Vercel к Supabase через расширение
+echo [J] Применить собственные данные из seed.sql
+echo [K] Применить демо-данные из supabase/migrations
+echo [L] Выход
 echo ============================================================
 set /p ACTION="Выберите действие: "
 
@@ -450,6 +454,43 @@ if /i "%ACTION%"=="H" (
 )
 
 if /i "%ACTION%"=="I" (
+    echo Подключение Vercel к Supabase через расширение...
+    echo Pro Tip: Перейдите в настройки проекта Vercel -> Расширения -> Supabase Integration.
+    echo Просто выберите ваш Supabase проект и GitHub репозиторий. Это автоматически синхронизирует переменные окружения!
+    echo После подключения нажмите любую клавишу, чтобы продолжить...
+    pause
+    echo 🎖️ BADASS Achievement Unlocked: Vercel + Supabase Integration Complete!
+    pause
+    goto :Dashboard
+)
+
+if /i "%ACTION%"=="J" (
+    echo Применение собственных данных из seed.sql...
+    set /p SEED_FILE="Введите путь к SQL файлу (по умолчанию: seed.sql): "
+    if "%SEED_FILE%"=="" set SEED_FILE=seed.sql
+    if exist "%REPO_DIR%\%SEED_FILE%" (
+        echo Применение %SEED_FILE% к базе данных...
+        supabase db reset --sql "%REPO_DIR%\%SEED_FILE%"
+    ) else (
+        echo ❌ Файл %SEED_FILE% не найден. Пропускаем...
+    )
+    pause
+    goto :Dashboard
+)
+
+if /i "%ACTION%"=="K" (
+    echo Применение демо-данных из supabase/migrations...
+    if exist "%REPO_DIR%\supabase\migrations\init.sql" (
+        echo Применение init.sql к базе данных...
+        supabase db reset --sql "%REPO_DIR%\supabase\migrations\init.sql"
+    ) else (
+        echo ❌ Файл init.sql не найден в supabase/migrations. Пропускаем...
+    )
+    pause
+    goto :Dashboard
+)
+
+if /i "%ACTION%"=="L" (
     echo До свидания!
     exit /b
 )
