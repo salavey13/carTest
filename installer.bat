@@ -33,6 +33,10 @@ set REPO_URL=https://github.com/salavey13/cartest.git
 set PROJECTS_DIR=%USERPROFILE%\Documents\V0_Projects
 set REPO_DIR=%PROJECTS_DIR%\cartest
 set VERSION_FILE=%REPO_DIR%\VERSION
+set V0_DEV_URL=https://v0.dev/chat/fork-of-rastaman-shop-KvYJosUCML9
+set VERCEL_URL=https://vercel.com
+set SUPABASE_URL=https://supabase.com
+set GITHUB_URL=https://github.com/salavey13/cartest
 
 :: Progress Bar Function
 :ProgressBar
@@ -81,7 +85,43 @@ if %ERRORLEVEL% NEQ 0 (
 )
 exit /b 0
 
+:: Check if Everything is Already Installed
+:CheckInstallation
+echo Проверяем установленные компоненты...
+where git >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    echo ✅ Git уже установлен.
+) else (
+    echo ❌ Git не установлен. Будет выполнен процесс установки.
+    set NEED_INSTALL=1
+)
+
+where node >nul 2>&1
+if %ERRORLEVEL% equ 0 (
+    echo ✅ Node.js уже установлен.
+) else (
+    echo ❌ Node.js не установлен. Будет выполнен процесс установки.
+    set NEED_INSTALL=1
+)
+
+if exist "%REPO_DIR%" (
+    echo ✅ Репозиторий уже клонирован.
+) else (
+    echo ❌ Репозиторий не найден. Будет выполнен процесс клонирования.
+    set NEED_INSTALL=1
+)
+
+if defined NEED_INSTALL (
+    echo Необходимо выполнить установку компонентов.
+    pause
+    goto :MainScript
+) else (
+    echo Всё уже установлено! Переходим к панели управления...
+    goto :Dashboard
+)
+
 :: Main Script Execution
+:MainScript
 echo Начинаем процесс установки...
 
 :: Step 1: Create V0_Projects Folder
@@ -201,12 +241,57 @@ echo Очистка временных файлов...
 del /q "%LATEST_ZIP_PATH%"
 call :ProgressBar 15 15
 
-:: Final Tips
-echo ====================== TIPS FOR NOOBS ======================
-echo 1. Бот создаёт централизованную резервную копию вашего проекта на GitHub.
-echo 2. Архивы можно загружать прямо из бота и автоматически применять их.
-echo 3. Бот имеет функцию предпросмотра для тестирования изменений.
-echo 4. Этот скрипт автоматически создаёт Pull Request для новых обновлений.
-echo 5. Всё, что вам нужно сделать, это загрузить архив и запустить этот скрипт!
+:: Go to Dashboard
+goto :Dashboard
+
+:: Dashboard
+:Dashboard
+cls
+echo.
+echo     ________   ________   ________   ________   ________  
+echo    /_______/  /_______/  /_______/  /_______/  /_______/  
+echo    |  ___  |  |  ___  |  |  ___  |  |  ___  |  |  ___  |  
+echo    | /   \ |  | /   \ |  | /   \ |  | /   \ |  | /   \ |  
+echo    |/_____\|  |/_____\|  |/_____\|  |/_____\|  |/_____\|  
+echo    SALAVEY13 SALAVEY13 SALAVEY13 SALAVEY13 SALAVEY13      
+echo.
+echo ============================================
+echo          ПАНЕЛЬ УПРАВЛЕНИЯ ПРОЕКТОМ
+echo ============================================
+echo 1. Версия проекта: %NEXT_VERSION%
+echo 2. Последний применённый ZIP: %LATEST_ZIP%
+echo 3. Статус Git:
+git status
+echo.
+echo ====================== БЫСТРЫЕ ССЫЛКИ ======================
+echo [1] Vercel: %VERCEL_URL%
+echo [2] Supabase: %SUPABASE_URL%
+echo [3] GitHub: %GITHUB_URL%
+echo [4] v0.dev Проект: %V0_DEV_URL%
 echo ============================================================
+echo.
+echo ====================== ДЕЙСТВИЯ ============================
+echo [A] Запустить сборку проекта (npm run build)
+echo [B] Запустить локальный сервер разработки (npm run dev)
+echo [C] Выход
+echo ============================================================
+set /p ACTION="Выберите действие: "
+if /i "%ACTION%"=="A" (
+    echo Запуск сборки проекта...
+    npm run build
+    pause
+    goto :Dashboard
+)
+if /i "%ACTION%"=="B" (
+    echo Запуск локального сервера разработки...
+    npm run dev
+    pause
+    goto :Dashboard
+)
+if /i "%ACTION%"=="C" (
+    echo До свидания!
+    exit /b
+)
+echo Неверный выбор. Попробуйте снова.
 pause
+goto :Dashboard
