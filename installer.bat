@@ -254,6 +254,7 @@ if exist "%VERSION_FILE%" (
         if "%%a"=="SUPABASE_PROJECT_ID" set SUPABASE_PROJECT_ID=%%b
         if "%%a"=="TELEGRAM_BOT_TOKEN" set TELEGRAM_BOT_TOKEN=%%b
         if "%%a"=="ADMIN_CHAT_ID" set ADMIN_CHAT_ID=%%b
+        if "%%a"=="VERCEL_URL" set VERCEL_URL=%%b
     )
 )
 
@@ -297,6 +298,11 @@ if defined VERCEL_PROJECT_URL (
 ) else (
     echo ❌ Vercel URL: Не настроен (используется демо-проект v0.dev)
 )
+if defined VERCEL_URL (
+    echo ✅ Vercel Deployment URL: %VERCEL_URL%
+) else (
+    echo ❌ Vercel Deployment URL: Не настроен
+)
 if defined SUPABASE_PROJECT_ID (
     echo ✅ Supabase Project ID: %SUPABASE_PROJECT_ID%
 ) else (
@@ -335,7 +341,8 @@ echo [H] Настроить Telegram Bot (установить токен и ч�
 echo [I] Подключить Vercel к Supabase через расширение
 echo [J] Применить собственные данные из seed.sql
 echo [K] Применить демо-данные из supabase/migrations
-echo [L] Выход
+echo [L] Настроить Webhook для Telegram Bot
+echo [M] Выход
 echo ============================================================
 set /p ACTION="Выберите действие: "
 
@@ -490,7 +497,31 @@ if /i "%ACTION%"=="K" (
     goto :Dashboard
 )
 
+
 if /i "%ACTION%"=="L" (
+    echo Настройка Webhook для Telegram Bot...
+    if not defined TELEGRAM_BOT_TOKEN (
+        echo ❌ Telegram Bot Token не настроен. Пожалуйста, настройте его сначала.
+        pause
+        goto :Dashboard
+    )
+    if not defined VERCEL_URL (
+        echo Попытка получить Vercel URL автоматически...
+        for /f "tokens=*" %%i in ('vercel inspect --scope') do set VERCEL_URL=%%i
+        if not defined VERCEL_URL (
+            set /p VERCEL_URL="Введите URL вашего Vercel проекта (например, https://your-project.vercel.app): "
+        )
+        echo VERCEL_URL=%VERCEL_URL% >> "%VERSION_FILE%"
+    )
+    echo ✅ Используем Vercel URL: %VERCEL_URL%
+    echo Установка Webhook...
+    set WEBHOOK_URL=https://%VERCEL_URL%/api/telegramWebhook
+    npx tsx scripts/setWebhook.ts
+    pause
+    goto :Dashboard
+)
+
+if /i "%ACTION%"=="M" (
     echo До свидания!
     exit /b
 )
