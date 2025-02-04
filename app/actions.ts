@@ -351,49 +351,28 @@ export const generateEmbeddings = async () => {
 };
 
 export async function sendTelegramInvoice(
-  token: string,
-  chatId: string,
-  title: string,
-  description: string,
-  payload: string,
-  amount: number,
-) {
-  try {
-    const user = await verifyJwtToken(token)
-    if (!user) {
-      throw new Error("Unauthorized")
-    }
+// app/actions.ts
+export async function setTelegramWebhook() {
+  const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+  const WEBHOOK_URL = https://${process.env.VERCEL_URL}/api/telegramWebhook;
 
-    const TEST_PROVIDER_TOKEN = process.env.TEST_PROVIDER_TOKEN
-    if (!TEST_PROVIDER_TOKEN) {
-      throw new Error("Missing TEST_PROVIDER_TOKEN")
-    }
-
-    const response = await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendInvoice`, {
-      chat_id: chatId,
-      title,
-      description,
-      payload,
-      provider_token: TEST_PROVIDER_TOKEN,
-      currency: "XTR",
-      prices: [{ label: "Tip", amount }],
-      start_parameter: "pay",
-      need_shipping_address: false,
-      is_flexible: false,
-    })
-
-    const { error } = await supabaseAnon
-      .from("tips")
-      .insert([{ user_id: chatId, message: description, amount, payload, tip_paid: false }])
-
-    if (error) throw error
-
-    logger.info("Invoice sent and tip information saved successfully")
-    return { success: true, data: response.data }
-  } catch (error) {
-    logger.error("Error in sendTelegramInvoice:", error)
-    return { success: false, error: "Failed to send invoice" }
+  if (!TELEGRAM_BOT_TOKEN) {
+    throw new Error("Missing TELEGRAM_BOT_TOKEN");
   }
+
+  const url = https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url: WEBHOOK_URL }),
+  });
+
+  const result = await response.json();
+  if (!result.ok) {
+    throw new Error("Failed to set webhook");
+  }
+
+  return result;
 }
 
 export async function checkInvoiceStatus(token: string, invoiceId: string) {
