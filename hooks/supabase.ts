@@ -10,7 +10,7 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "eyJhbGciOiJIUzI
 
 
 // Create anonymous client
-const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey);
+export const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey);
 
 // Create authenticated client on the fly
 const createAuthenticatedClient = async (chatId: string) => {
@@ -21,7 +21,7 @@ const createAuthenticatedClient = async (chatId: string) => {
 };
 
 // Create admin client
-const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+export const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
 // Fetch all questions
 export const fetchQuestions = async () => {
