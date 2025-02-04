@@ -241,11 +241,52 @@ echo Очистка временных файлов...
 del /q "%LATEST_ZIP_PATH%"
 call :ProgressBar 15 15
 
-:: Go to Dashboard
-goto :Dashboard
+@echo off
+:: Check for administrative privileges
+>nul 2>&1 "%SYSTEMROOT%\system32\cacls.exe" "%SYSTEMROOT%\system32\config\system"
+if '%errorlevel%' NEQ '0' (
+    echo Запрашиваю права администратора...
+    goto :UACPrompt
+) else ( goto :AdminAccess )
+:UACPrompt
+    echo Set UAC = CreateObject^("Shell.Application"^) > "%temp%\getadmin.vbs"
+    echo UAC.ShellExecute "%~s0", "", "", "runas", 1 >> "%temp%\getadmin.vbs"
+    "%temp%\getadmin.vbs"
+    exit /B
+:AdminAccess
+    if exist "%temp%\getadmin.vbs" ( del "%temp%\getadmin.vbs" )
+    pushd "%CD%"
+    CD /D "%~dp0"
 
-:: Dashboard
-:Dashboard
+:: ASCII Art (Razor Scene Group Style with SALAVEY13)
+echo.
+echo     ________   ________   ________   ________   ________  
+echo    /_______/  /_______/  /_______/  /_______/  /_______/  
+echo    |  ___  |  |  ___  |  |  ___  |  |  ___  |  |  ___  |  
+echo    | /   \ |  | /   \ |  | /   \ |  | /   \ |  | /   \ |  
+echo    |/_____\|  |/_____\|  |/_____\|  |/_____\|  |/_____\|  
+echo    SALAVEY13 SALAVEY13 SALAVEY13 SALAVEY13 SALAVEY13      
+echo.
+echo ============================================
+echo       Автоматизированный Установщик by Qwen
+echo ============================================
+
+:: Configuration
+set TELEGRAM_BOT_TOKEN=
+set ADMIN_CHAT_ID=
+
+:: Load VERSION.ini
+if exist "%VERSION_FILE%" (
+    for /f "tokens=1,2 delims==" %%a in (%VERSION_FILE%) do (
+        if "%%a"=="VERCEL_PROJECT_URL" set VERCEL_PROJECT_URL=%%b
+        if "%%a"=="SUPABASE_PROJECT_ID" set SUPABASE_PROJECT_ID=%%b
+        if "%%a"=="TELEGRAM_BOT_TOKEN" set TELEGRAM_BOT_TOKEN=%%b
+        if "%%a"=="ADMIN_CHAT_ID" set ADMIN_CHAT_ID=%%b
+    )
+)
+
+:: Gamified Welcome Message
+:WelcomeMessage
 cls
 echo.
 echo     ________   ________   ________   ________   ________  
@@ -256,12 +297,49 @@ echo    |/_____\|  |/_____\|  |/_____\|  |/_____\|  |/_____\|
 echo    SALAVEY13 SALAVEY13 SALAVEY13 SALAVEY13 SALAVEY13      
 echo.
 echo ============================================
+if not defined VERCEL_PROJECT_URL (
+    echo 🌟 Добро пожаловать, новичок! Начните с настройки Vercel.
+) else if not defined SUPABASE_PROJECT_ID (
+    echo 🚀 Хорошая работа! Теперь настройте Supabase для базы данных.
+) else if not defined TELEGRAM_BOT_TOKEN (
+    echo 🔥 Почти готово! Настройте Telegram Bot для уведомлений.
+) else (
+    echo 🎉 Поздравляем! Ваш проект полностью настроен и готов к работе!
+)
+echo ============================================
+
+:: Dashboard
+:Dashboard
+echo.
 echo          ПАНЕЛЬ УПРАВЛЕНИЯ ПРОЕКТОМ
 echo ============================================
 echo 1. Версия проекта: %NEXT_VERSION%
 echo 2. Последний применённый ZIP: %LATEST_ZIP%
 echo 3. Статус Git:
 git status
+echo.
+echo ====================== КОНФИГУРАЦИЯ ======================
+if defined VERCEL_PROJECT_URL (
+    echo ✅ Vercel URL: %VERCEL_PROJECT_URL%
+) else (
+    echo ❌ Vercel URL: Не настроен (используется демо-проект v0.dev)
+)
+if defined SUPABASE_PROJECT_ID (
+    echo ✅ Supabase Project ID: %SUPABASE_PROJECT_ID%
+) else (
+    echo ❌ Supabase Project ID: Не настроен (используются демо-данные)
+)
+if defined TELEGRAM_BOT_TOKEN (
+    echo ✅ Telegram Bot Token: Настроен
+) else (
+    echo ❌ Telegram Bot Token: Не настроен
+)
+if defined ADMIN_CHAT_ID (
+    echo ✅ Admin Chat ID: Настроен
+) else (
+    echo ❌ Admin Chat ID: Не настроен
+)
+echo ============================================================
 echo.
 echo ====================== БЫСТРЫЕ ССЫЛКИ ======================
 echo [1] Vercel: %VERCEL_URL%
@@ -278,7 +356,10 @@ echo [B] Запустить локальный сервер разработки
 echo [C] Создать ветку и Pull Request (если есть изменения в Git)
 echo [D] Добавить случайные файлы в архив для обновления
 echo [E] Открыть полезные ссылки в браузере
-echo [F] Выход
+echo [F] Настроить Vercel (развернуть проект)
+echo [G] Настроить Supabase (создать базу данных)
+echo [H] Настроить Telegram Bot (установить токен и чат ID)
+echo [I] Выход
 echo ============================================================
 set /p ACTION="Выберите действие: "
 
@@ -337,6 +418,66 @@ if /i "%ACTION%"=="E" (
 )
 
 if /i "%ACTION%"=="F" (
+    echo Развертывание проекта на Vercel...
+    if not defined VERCEL_PROJECT_URL (
+        vercel login
+        cd "%REPO_DIR%"
+        vercel projects create cartest --yes
+        vercel deploy --prod
+        for /f "tokens=*" %%i in ('vercel inspect --scope') do set VERCEL_PROJECT_URL=%%i
+        echo VERCEL_PROJECT_URL=%VERCEL_PROJECT_URL% >> "%VERSION_FILE%"
+    ) else (
+        echo ✅ Vercel уже настроен: %VERCEL_PROJECT_URL%
+    )
+    pause
+    goto :WelcomeMessage
+)
+
+if /i "%ACTION%"=="G" (
+    echo Настройка Supabase...
+    if not defined SUPABASE_PROJECT_ID (
+        cd "%REPO_DIR%"
+        supabase init
+        supabase start
+        supabase db reset
+        for /f "tokens=*" %%i in ('supabase status ^| findstr "API URL"') do set SUPABASE_PROJECT_ID=%%i
+        echo SUPABASE_PROJECT_ID=%SUPABASE_PROJECT_ID% >> "%VERSION_FILE%"
+    ) else (
+        echo ✅ Supabase уже настроен: %SUPABASE_PROJECT_ID%
+    )
+    pause
+    goto :WelcomeMessage
+)
+
+if /i "%ACTION%"=="H" (
+    echo Настройка Telegram Bot...
+    if not defined TELEGRAM_BOT_TOKEN (
+        set /p TELEGRAM_BOT_TOKEN="Введите токен вашего Telegram бота: "
+        echo TELEGRAM_BOT_TOKEN=%TELEGRAM_BOT_TOKEN% >> "%VERSION_FILE%"
+    ) else (
+        echo ✅ Telegram Bot Token уже настроен.
+    )
+    if not defined ADMIN_CHAT_ID (
+        set /p ADMIN_CHAT_ID="Введите ID админского чата: "
+        echo ADMIN_CHAT_ID=%ADMIN_CHAT_ID% >> "%VERSION_FILE%"
+    ) else (
+        echo ✅ Admin Chat ID уже настроен.
+    )
+    if defined VERCEL_PROJECT_URL (
+        if defined TELEGRAM_BOT_TOKEN (
+            echo Обновляем переменную TELEGRAM_BOT_TOKEN в Vercel...
+            vercel env add TELEGRAM_BOT_TOKEN %TELEGRAM_BOT_TOKEN% production
+        )
+        if defined ADMIN_CHAT_ID (
+            echo Обновляем переменную ADMIN_CHAT_ID в Vercel...
+            vercel env add ADMIN_CHAT_ID %ADMIN_CHAT_ID% production
+        )
+    )
+    pause
+    goto :WelcomeMessage
+)
+
+if /i "%ACTION%"=="I" (
     echo До свидания!
     exit /b
 )
