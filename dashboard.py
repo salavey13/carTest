@@ -2,6 +2,7 @@ import os
 import subprocess
 import tkinter as tk
 from tkinter import messagebox, filedialog, ttk
+from datetime import datetime
 
 # Configuration
 PROJECTS_DIR = os.path.expanduser("~/Documents/V0_Projects")
@@ -21,28 +22,33 @@ if os.path.exists(VERSION_FILE):
                 key, value = line.strip().split("=", 1)
                 config[key] = value
 
+
 def save_config():
     """Save configuration to VERSION.ini."""
     with open(VERSION_FILE, "w") as f:
         for key, value in config.items():
             f.write(f"{key}={value}\n")
 
+
 def run_command(command, success_message="Success", error_message="Error"):
     """Run a shell command and show output."""
     try:
-        result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True)
+        result = subprocess.run(
+            command, shell=True, check=True, capture_output=True, text=True
+        )
         messagebox.showinfo("Успех", success_message + "\n" + result.stdout)
         return True
     except subprocess.CalledProcessError as e:
         messagebox.showerror("Ошибка", error_message + "\n" + e.stderr)
         return False
 
+
 def apply_zip_updates():
     """Handle ZIP updates."""
     zip_path = filedialog.askopenfilename(
         title="Выберите ZIP файл",
         filetypes=[("ZIP Files", "*.zip")],
-        initialdir=REPO_DIR
+        initialdir=REPO_DIR,
     )
     if not zip_path:
         messagebox.showwarning("Внимание", "ZIP файл не выбран.")
@@ -51,8 +57,16 @@ def apply_zip_updates():
     # Extract ZIP and apply updates
     try:
         extract_dir = os.path.join(os.path.dirname(zip_path), "temp_unzip")
-        subprocess.run(f"powershell -Command \"Expand-Archive -Force '{zip_path}' -DestinationPath '{extract_dir}'\"", shell=True, check=True)
-        subprocess.run(f"xcopy /s /y \"{extract_dir}\\*\" \"{REPO_DIR}\"", shell=True, check=True)
+        subprocess.run(
+            f"powershell -Command \"Expand-Archive -Force '{zip_path}' -DestinationPath '{extract_dir}'\"",
+            shell=True,
+            check=True,
+        )
+        subprocess.run(
+            f"xcopy /s /y \"{extract_dir}\\*\" \"{REPO_DIR}\"",
+            shell=True,
+            check=True,
+        )
         subprocess.run(f"rmdir /s /q \"{extract_dir}\"", shell=True, check=True)
 
         # Update version file
@@ -72,10 +86,10 @@ def apply_zip_updates():
         subprocess.run("git checkout main", shell=True, check=True)
         subprocess.run("git pull origin main", shell=True, check=True)
         subprocess.Popen(["start", "https://github.com/salavey13/cartest/pulls"], shell=True)
-
         messagebox.showinfo("Успех", "ZIP обновления применены успешно и создан Pull Request.")
     except subprocess.CalledProcessError as e:
         messagebox.showerror("Ошибка", f"Не удалось применить ZIP обновления: {e.stderr}")
+
 
 def reset_supabase_db(sql_file=None):
     """Reset Supabase database with optional SQL file."""
@@ -83,7 +97,7 @@ def reset_supabase_db(sql_file=None):
         sql_file = filedialog.askopenfilename(
             title="Выберите SQL файл",
             filetypes=[("SQL Files", "*.sql")],
-            initialdir=REPO_DIR
+            initialdir=REPO_DIR,
         )
         if not sql_file:
             messagebox.showwarning("Внимание", "SQL файл не выбран.")
@@ -93,7 +107,12 @@ def reset_supabase_db(sql_file=None):
     if not messagebox.askyesno("Подтверждение", "Сброс базы данных удалит все текущие данные. Продолжить?"):
         return
 
-    run_command(f"supabase db reset --sql \"{sql_file}\"", "База данных сброшена успешно.", "Не удалось сбросить базу данных.")
+    run_command(
+        f"supabase db reset --sql \"{sql_file}\"",
+        "База данных сброшена успешно.",
+        "Не удалось сбросить базу данных.",
+    )
+
 
 def configure_vercel():
     """Configure Vercel deployment."""
@@ -111,6 +130,7 @@ def configure_vercel():
         messagebox.showinfo("Успех", f"Vercel настроен успешно: {vercel_url}")
     except subprocess.CalledProcessError as e:
         messagebox.showerror("Ошибка", f"Не удалось настроить Vercel: {e.stderr}")
+
 
 def configure_telegram_bot():
     """Configure Telegram Bot token and admin chat ID."""
@@ -138,6 +158,7 @@ def configure_telegram_bot():
         if "ADMIN_CHAT_ID" in config:
             run_command(f"vercel env add ADMIN_CHAT_ID {config['ADMIN_CHAT_ID']} production")
 
+
 def set_webhook():
     """Set webhook for Telegram Bot."""
     if "VERCEL_PROJECT_URL" not in config:
@@ -145,7 +166,27 @@ def set_webhook():
         return
 
     webhook_url = f"https://{config['VERCEL_PROJECT_URL']}/api/telegramWebhook"
-    run_command(f"npx tsx scripts/setWebhook.ts", "Webhook установлен успешно.", "Не удалось установить webhook.")
+    run_command(
+        f"npx tsx scripts/setWebhook.ts",
+        "Webhook установлен успешно.",
+        "Не удалось установить webhook.",
+    )
+
+
+def generate_embeddings():
+    """Regenerate embeddings for semantic search."""
+    if not messagebox.askyesno(
+        "Подтверждение",
+        "Это перегенерирует все вложения для семантического поиска. Это может занять некоторое время. Продолжить?",
+    ):
+        return
+
+    run_command(
+        "npx tsx utils/embeddingsGenerator.ts",
+        "Вложения успешно перегенерированы.",
+        "Не удалось перегенерировать вложения.",
+    )
+
 
 def generate_achievements():
     """Generate gamified achievements based on customization progress."""
@@ -160,75 +201,136 @@ def generate_achievements():
         achievements.append("🌱 Данные загружены через seed.sql!")
     if not achievements:
         achievements.append("✨ Начните с настройки Vercel!")
-
     return achievements
+
 
 # GUI Setup
 root = tk.Tk()
 root.title("Панель управления проектом")
 root.geometry("800x600")
-root.configure(bg="#2d2d2d")  # Dark theme background
+root.configure(bg="#000")  # Dark theme background
 
 style = ttk.Style()
 style.theme_use("clam")
-style.configure("TLabel", background="#2d2d2d", foreground="#ffffff", font=("Arial", 12))
-style.configure("TButton", background="#4d4d4d", foreground="#ffffff", font=("Arial", 12))
-style.configure("TFrame", background="#2d2d2d")
 
-def refresh_dashboard():
-    """Refresh the dashboard UI."""
-    for widget in root.winfo_children():
-        widget.destroy()
+# Dark theme styling inspired by global.css
+style.configure(
+    "TLabel",
+    background="#000",
+    foreground="#fff",
+    font=("Orbitron", 12),
+)
+style.configure(
+    "TButton",
+    background="#ff6b6b",
+    foreground="#fff",
+    font=("Orbitron", 12),
+    borderwidth=0,
+    relief="flat",
+)
+style.map(
+    "TButton",
+    background=[("active", "#ff4d4d")],
+)
+style.configure(
+    "TFrame",
+    background="#000",
+)
 
-    # Header
-    header_frame = ttk.Frame(root)
-    header_frame.pack(fill=tk.X, padx=20, pady=10)
-    ttk.Label(header_frame, text="Панель управления проектом", font=("Arial", 24)).pack()
+# Header Frame
+header_frame = ttk.Frame(root)
+header_frame.pack(fill=tk.X, padx=20, pady=10)
+ttk.Label(
+    header_frame,
+    text="Панель управления проектом",
+    font=("Orbitron", 24),
+    style="cyber-text.TLabel",
+).pack()
 
-    # Progress Section
-    progress_frame = ttk.Frame(root)
-    progress_frame.pack(fill=tk.X, padx=20, pady=10)
-    ttk.Label(progress_frame, text="Прогресс настройки:", font=("Arial", 16)).pack(anchor=tk.W)
-    achievements = generate_achievements()
-    for achievement in achievements:
-        ttk.Label(progress_frame, text=f"✅ {achievement}", font=("Arial", 12)).pack(anchor=tk.W)
+# Progress Section
+progress_frame = ttk.Frame(root)
+progress_frame.pack(fill=tk.X, padx=20, pady=10)
+ttk.Label(
+    progress_frame,
+    text="Прогресс настройки:",
+    font=("Orbitron", 16),
+).pack(anchor=tk.W)
 
-    # Actions Section
-    actions_frame = ttk.Frame(root)
-    actions_frame.pack(fill=tk.X, padx=20, pady=10)
-    ttk.Label(actions_frame, text="Действия:", font=("Arial", 16)).pack(anchor=tk.W)
+achievements = generate_achievements()
+for achievement in achievements:
+    ttk.Label(
+        progress_frame,
+        text=f"✅ {achievement}",
+        font=("Orbitron", 12),
+    ).pack(anchor=tk.W)
 
-    def add_button(text, command, warning=None):
-        """Helper function to add buttons with optional warnings."""
-        def safe_command():
-            if warning and not messagebox.askyesno("Подтверждение", warning):
-                return
-            command()
-        ttk.Button(actions_frame, text=text, command=safe_command).pack(fill=tk.X, padx=10, pady=5)
+# Actions Section
+actions_frame = ttk.Frame(root)
+actions_frame.pack(fill=tk.X, padx=20, pady=10)
+ttk.Label(
+    actions_frame,
+    text="Действия:",
+    font=("Orbitron", 16),
+).pack(anchor=tk.W)
 
-    add_button("Применить ZIP обновления", apply_zip_updates, "Это перезапишет текущие файлы. Продолжить?")
-    add_button("Сбросить базу данных Supabase", reset_supabase_db, "Это удалит все текущие данные. Продолжить?")
-    add_button("Настроить Vercel", configure_vercel)
-    add_button("Настроить Telegram бот", configure_telegram_bot)
-    add_button("Установить Webhook", set_webhook)
 
-    # Links Section
-    links_frame = ttk.Frame(root)
-    links_frame.pack(fill=tk.X, padx=20, pady=10)
-    ttk.Label(links_frame, text="Полезные ссылки:", font=("Arial", 16)).pack(anchor=tk.W)
-    links = [
-        ("Vercel", VERCEL_URL),
-        ("Supabase", SUPABASE_URL),
-        ("GitHub", GITHUB_URL),
-        ("v0.dev Проект", V0_DEV_URL),
-        ("Qwen Chat", "https://chat.qwenlm.ai"),
-        ("Supabase SQL Console", "https://app.supabase.com/project/YOUR_PROJECT_ID/sql"),
-    ]
-    for name, url in links:
-        ttk.Button(links_frame, text=name, command=lambda u=url: subprocess.Popen(["start", u], shell=True)).pack(fill=tk.X, padx=10, pady=2)
+def add_button(text, command, warning=None):
+    """Helper function to add buttons with optional warnings."""
 
-    # Exit Button
-    ttk.Button(root, text="Выход", command=root.quit).pack(fill=tk.X, padx=20, pady=10)
+    def safe_command():
+        if warning and not messagebox.askyesno("Подтверждение", warning):
+            return
+        command()
 
-refresh_dashboard()
+    btn = ttk.Button(actions_frame, text=text, command=safe_command)
+    btn.pack(fill=tk.X, padx=10, pady=5)
+    return btn
+
+
+add_button(
+    "Применить ZIP обновления",
+    apply_zip_updates,
+    "Это перезапишет текущие файлы. Продолжить?",
+)
+add_button(
+    "Сбросить базу данных Supabase",
+    reset_supabase_db,
+    "Это удалит все текущие данные. Продолжить?",
+)
+add_button("Настроить Vercel", configure_vercel)
+add_button("Настроить Telegram бот", configure_telegram_bot)
+add_button("Установить Webhook", set_webhook)
+add_button(
+    "Включить семантический поиск (перегенерировать вложения)",
+    generate_embeddings,
+)
+
+# Links Section
+links_frame = ttk.Frame(root)
+links_frame.pack(fill=tk.X, padx=20, pady=10)
+ttk.Label(
+    links_frame,
+    text="Полезные ссылки:",
+    font=("Orbitron", 16),
+).pack(anchor=tk.W)
+
+links = [
+    ("Vercel", VERCEL_URL),
+    ("Supabase", SUPABASE_URL),
+    ("GitHub", GITHUB_URL),
+    ("v0.dev Проект", V0_DEV_URL),
+    ("Qwen Chat", "https://chat.qwenlm.ai"),
+    ("Supabase SQL Console", "https://app.supabase.com/project/YOUR_PROJECT_ID/sql"),
+]
+
+for name, url in links:
+    ttk.Button(
+        links_frame,
+        text=name,
+        command=lambda u=url: subprocess.Popen(["start", u], shell=True),
+    ).pack(fill=tk.X, padx=10, pady=2)
+
+# Exit Button
+ttk.Button(root, text="Выход", command=root.quit).pack(fill=tk.X, padx=20, pady=10)
+
 root.mainloop()
