@@ -1,8 +1,7 @@
 import os
 import subprocess
 import tkinter as tk
-from tkinter import messagebox, filedialog
-from datetime import datetime
+from tkinter import messagebox, filedialog, ttk
 
 # Configuration
 PROJECTS_DIR = os.path.expanduser("~/Documents/V0_Projects")
@@ -32,21 +31,21 @@ def run_command(command, success_message="Success", error_message="Error"):
     """Run a shell command and show output."""
     try:
         result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True)
-        messagebox.showinfo("Success", success_message + "\n" + result.stdout)
+        messagebox.showinfo("Успех", success_message + "\n" + result.stdout)
         return True
     except subprocess.CalledProcessError as e:
-        messagebox.showerror("Error", error_message + "\n" + e.stderr)
+        messagebox.showerror("Ошибка", error_message + "\n" + e.stderr)
         return False
 
 def apply_zip_updates():
     """Handle ZIP updates."""
     zip_path = filedialog.askopenfilename(
-        title="Select ZIP File",
+        title="Выберите ZIP файл",
         filetypes=[("ZIP Files", "*.zip")],
         initialdir=REPO_DIR
     )
     if not zip_path:
-        messagebox.showwarning("Warning", "No ZIP file selected.")
+        messagebox.showwarning("Внимание", "ZIP файл не выбран.")
         return
 
     # Extract ZIP and apply updates
@@ -67,35 +66,39 @@ def apply_zip_updates():
         branch_name = f"update-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         subprocess.run(f"git checkout -b {branch_name}", shell=True, check=True)
         subprocess.run("git add .", shell=True, check=True)
-        commit_msg = f"Applied ZIP update: {os.path.basename(zip_path)} | Version {next_version}"
+        commit_msg = f"Обновления от {os.path.basename(zip_path)} | Версия {next_version}"
         subprocess.run(f"git commit -m \"{commit_msg}\"", shell=True, check=True)
         subprocess.run(f"git push origin {branch_name}", shell=True, check=True)
         subprocess.run("git checkout main", shell=True, check=True)
         subprocess.run("git pull origin main", shell=True, check=True)
         subprocess.Popen(["start", "https://github.com/salavey13/cartest/pulls"], shell=True)
 
-        messagebox.showinfo("Success", "ZIP updates applied successfully and pull request created.")
+        messagebox.showinfo("Успех", "ZIP обновления применены успешно и создан Pull Request.")
     except subprocess.CalledProcessError as e:
-        messagebox.showerror("Error", f"Failed to apply ZIP updates: {e.stderr}")
+        messagebox.showerror("Ошибка", f"Не удалось применить ZIP обновления: {e.stderr}")
 
 def reset_supabase_db(sql_file=None):
     """Reset Supabase database with optional SQL file."""
     if sql_file is None:
         sql_file = filedialog.askopenfilename(
-            title="Select SQL File",
+            title="Выберите SQL файл",
             filetypes=[("SQL Files", "*.sql")],
             initialdir=REPO_DIR
         )
         if not sql_file:
-            messagebox.showwarning("Warning", "No SQL file selected.")
+            messagebox.showwarning("Внимание", "SQL файл не выбран.")
             return
 
-    run_command(f"supabase db reset --sql \"{sql_file}\"", "Database reset successfully.", "Failed to reset database.")
+    # Warn about resetting the database
+    if not messagebox.askyesno("Подтверждение", "Сброс базы данных удалит все текущие данные. Продолжить?"):
+        return
+
+    run_command(f"supabase db reset --sql \"{sql_file}\"", "База данных сброшена успешно.", "Не удалось сбросить базу данных.")
 
 def configure_vercel():
     """Configure Vercel deployment."""
     if "VERCEL_PROJECT_URL" in config:
-        messagebox.showinfo("Info", f"Vercel already configured: {config['VERCEL_PROJECT_URL']}")
+        messagebox.showinfo("Информация", f"Vercel уже настроен: {config['VERCEL_PROJECT_URL']}")
         return
 
     try:
@@ -105,29 +108,29 @@ def configure_vercel():
         vercel_url = subprocess.check_output("vercel inspect --scope", shell=True, text=True).strip()
         config["VERCEL_PROJECT_URL"] = vercel_url
         save_config()
-        messagebox.showinfo("Success", f"Vercel configured successfully: {vercel_url}")
+        messagebox.showinfo("Успех", f"Vercel настроен успешно: {vercel_url}")
     except subprocess.CalledProcessError as e:
-        messagebox.showerror("Error", f"Failed to configure Vercel: {e.stderr}")
+        messagebox.showerror("Ошибка", f"Не удалось настроить Vercel: {e.stderr}")
 
 def configure_telegram_bot():
     """Configure Telegram Bot token and admin chat ID."""
     if "TELEGRAM_BOT_TOKEN" not in config:
-        bot_token = tk.simpledialog.askstring("Input", "Enter your Telegram Bot Token:")
+        bot_token = tk.simpledialog.askstring("Ввод", "Введите токен вашего Telegram бота:")
         if bot_token:
             config["TELEGRAM_BOT_TOKEN"] = bot_token
             save_config()
-            messagebox.showinfo("Success", "Telegram Bot Token configured successfully.")
+            messagebox.showinfo("Успех", "Токен Telegram бота настроен успешно.")
         else:
-            messagebox.showwarning("Warning", "Telegram Bot Token not set.")
+            messagebox.showwarning("Внимание", "Токен Telegram бота не установлен.")
 
     if "ADMIN_CHAT_ID" not in config:
-        admin_chat_id = tk.simpledialog.askstring("Input", "Enter Admin Chat ID:")
+        admin_chat_id = tk.simpledialog.askstring("Ввод", "Введите ID админского чата:")
         if admin_chat_id:
             config["ADMIN_CHAT_ID"] = admin_chat_id
             save_config()
-            messagebox.showinfo("Success", "Admin Chat ID configured successfully.")
+            messagebox.showinfo("Успех", "ID админского чата настроен успешно.")
         else:
-            messagebox.showwarning("Warning", "Admin Chat ID not set.")
+            messagebox.showwarning("Внимание", "ID админского чата не установлен.")
 
     if "VERCEL_PROJECT_URL" in config:
         if "TELEGRAM_BOT_TOKEN" in config:
@@ -138,32 +141,39 @@ def configure_telegram_bot():
 def set_webhook():
     """Set webhook for Telegram Bot."""
     if "VERCEL_PROJECT_URL" not in config:
-        messagebox.showerror("Error", "Vercel URL is not configured.")
+        messagebox.showerror("Ошибка", "URL Vercel не настроен.")
         return
 
     webhook_url = f"https://{config['VERCEL_PROJECT_URL']}/api/telegramWebhook"
-    run_command(f"npx tsx scripts/setWebhook.ts", "Webhook set successfully.", "Failed to set webhook.")
+    run_command(f"npx tsx scripts/setWebhook.ts", "Webhook установлен успешно.", "Не удалось установить webhook.")
 
 def generate_achievements():
     """Generate gamified achievements based on customization progress."""
     achievements = []
     if "VERCEL_PROJECT_URL" in config:
-        achievements.append("🌟 Vercel Setup Complete!")
+        achievements.append("🌟 Vercel настроен!")
     if "SUPABASE_PROJECT_ID" in config:
-        achievements.append("🚀 Supabase Database Ready!")
+        achievements.append("🚀 База данных Supabase готова!")
     if "TELEGRAM_BOT_TOKEN" in config and "ADMIN_CHAT_ID" in config:
-        achievements.append("🔥 Telegram Bot Configured!")
+        achievements.append("🔥 Telegram бот настроен!")
     if os.path.exists(os.path.join(REPO_DIR, "seed.sql")):
-        achievements.append("🌱 Custom Data Uploaded via seed.sql!")
+        achievements.append("🌱 Данные загружены через seed.sql!")
     if not achievements:
-        achievements.append("✨ Start Your Journey: Configure Vercel First!")
+        achievements.append("✨ Начните с настройки Vercel!")
 
     return achievements
 
 # GUI Setup
 root = tk.Tk()
-root.title("Project Dashboard")
+root.title("Панель управления проектом")
 root.geometry("800x600")
+root.configure(bg="#2d2d2d")  # Dark theme background
+
+style = ttk.Style()
+style.theme_use("clam")
+style.configure("TLabel", background="#2d2d2d", foreground="#ffffff", font=("Arial", 12))
+style.configure("TButton", background="#4d4d4d", foreground="#ffffff", font=("Arial", 12))
+style.configure("TFrame", background="#2d2d2d")
 
 def refresh_dashboard():
     """Refresh the dashboard UI."""
@@ -171,44 +181,54 @@ def refresh_dashboard():
         widget.destroy()
 
     # Header
-    header = tk.Label(root, text="Project Dashboard", font=("Arial", 24), pady=10)
-    header.pack()
+    header_frame = ttk.Frame(root)
+    header_frame.pack(fill=tk.X, padx=20, pady=10)
+    ttk.Label(header_frame, text="Панель управления проектом", font=("Arial", 24)).pack()
 
     # Progress Section
-    progress_frame = tk.Frame(root)
+    progress_frame = ttk.Frame(root)
     progress_frame.pack(fill=tk.X, padx=20, pady=10)
-    tk.Label(progress_frame, text="Customization Progress:", font=("Arial", 16)).pack(anchor=tk.W)
+    ttk.Label(progress_frame, text="Прогресс настройки:", font=("Arial", 16)).pack(anchor=tk.W)
     achievements = generate_achievements()
     for achievement in achievements:
-        tk.Label(progress_frame, text=f"✅ {achievement}", font=("Arial", 12)).pack(anchor=tk.W)
+        ttk.Label(progress_frame, text=f"✅ {achievement}", font=("Arial", 12)).pack(anchor=tk.W)
 
     # Actions Section
-    actions_frame = tk.Frame(root)
+    actions_frame = ttk.Frame(root)
     actions_frame.pack(fill=tk.X, padx=20, pady=10)
-    tk.Label(actions_frame, text="Actions:", font=("Arial", 16)).pack(anchor=tk.W)
-    tk.Button(actions_frame, text="Apply ZIP Updates", command=apply_zip_updates).pack(fill=tk.X, padx=10, pady=5)
-    tk.Button(actions_frame, text="Reset Supabase DB", command=reset_supabase_db).pack(fill=tk.X, padx=10, pady=5)
-    tk.Button(actions_frame, text="Configure Vercel", command=configure_vercel).pack(fill=tk.X, padx=10, pady=5)
-    tk.Button(actions_frame, text="Configure Telegram Bot", command=configure_telegram_bot).pack(fill=tk.X, padx=10, pady=5)
-    tk.Button(actions_frame, text="Set Webhook", command=set_webhook).pack(fill=tk.X, padx=10, pady=5)
+    ttk.Label(actions_frame, text="Действия:", font=("Arial", 16)).pack(anchor=tk.W)
+
+    def add_button(text, command, warning=None):
+        """Helper function to add buttons with optional warnings."""
+        def safe_command():
+            if warning and not messagebox.askyesno("Подтверждение", warning):
+                return
+            command()
+        ttk.Button(actions_frame, text=text, command=safe_command).pack(fill=tk.X, padx=10, pady=5)
+
+    add_button("Применить ZIP обновления", apply_zip_updates, "Это перезапишет текущие файлы. Продолжить?")
+    add_button("Сбросить базу данных Supabase", reset_supabase_db, "Это удалит все текущие данные. Продолжить?")
+    add_button("Настроить Vercel", configure_vercel)
+    add_button("Настроить Telegram бот", configure_telegram_bot)
+    add_button("Установить Webhook", set_webhook)
 
     # Links Section
-    links_frame = tk.Frame(root)
+    links_frame = ttk.Frame(root)
     links_frame.pack(fill=tk.X, padx=20, pady=10)
-    tk.Label(links_frame, text="Quick Links:", font=("Arial", 16)).pack(anchor=tk.W)
+    ttk.Label(links_frame, text="Полезные ссылки:", font=("Arial", 16)).pack(anchor=tk.W)
     links = [
         ("Vercel", VERCEL_URL),
         ("Supabase", SUPABASE_URL),
         ("GitHub", GITHUB_URL),
-        ("v0.dev Project", V0_DEV_URL),
+        ("v0.dev Проект", V0_DEV_URL),
         ("Qwen Chat", "https://chat.qwenlm.ai"),
         ("Supabase SQL Console", "https://app.supabase.com/project/YOUR_PROJECT_ID/sql"),
     ]
     for name, url in links:
-        tk.Button(links_frame, text=name, command=lambda u=url: subprocess.Popen(["start", u], shell=True)).pack(fill=tk.X, padx=10, pady=2)
+        ttk.Button(links_frame, text=name, command=lambda u=url: subprocess.Popen(["start", u], shell=True)).pack(fill=tk.X, padx=10, pady=2)
 
     # Exit Button
-    tk.Button(root, text="Exit", command=root.quit).pack(fill=tk.X, padx=20, pady=10)
+    ttk.Button(root, text="Выход", command=root.quit).pack(fill=tk.X, padx=20, pady=10)
 
 refresh_dashboard()
 root.mainloop()
