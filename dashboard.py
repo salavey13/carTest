@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import messagebox, filedialog, ttk
 from datetime import datetime
 
-# Configuration
+# Конфигурация
 PROJECTS_DIR = os.path.expanduser("~/Documents/V0_Projects")
 REPO_DIR = os.path.join(PROJECTS_DIR, "cartest")
 VERSION_FILE = os.path.join(REPO_DIR, "version.ini")
@@ -13,7 +13,7 @@ VERCEL_URL = "https://vercel.com"
 SUPABASE_URL = "https://supabase.com"
 GITHUB_URL = "https://github.com/salavey13/cartest"
 
-# Load configuration from VERSION.ini
+# Загрузка конфигурации из VERSION.ini
 config = {}
 if os.path.exists(VERSION_FILE):
     with open(VERSION_FILE, "r", encoding="utf-8") as f:
@@ -24,14 +24,14 @@ if os.path.exists(VERSION_FILE):
 
 
 def save_config():
-    """Save configuration to VERSION.ini."""
+    """Сохранить конфигурацию в VERSION.ini."""
     with open(VERSION_FILE, "w", encoding="utf-8") as f:
         for key, value in config.items():
             f.write(f"{key}={value}\n")
 
 
 def run_command(command, success_message="Успех", error_message="Ошибка"):
-    """Run a shell command and show output."""
+    """Выполнить команду оболочки и показать результат."""
     try:
         result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True)
         messagebox.showinfo("Успех", success_message + "\n" + result.stdout)
@@ -42,31 +42,31 @@ def run_command(command, success_message="Успех", error_message="Ошибк
 
 
 def apply_zip_updates():
-    """Handle ZIP updates."""
+    """Обработать ZIP-обновления."""
     zip_path = filedialog.askopenfilename(
         title="Выберите ZIP файл",
-        filetypes=[("ZIP Files", "*.zip")],
+        filetypes=[("ZIP файлы", "*.zip")],
         initialdir=REPO_DIR
     )
     if not zip_path:
         messagebox.showwarning("Внимание", "ZIP файл не выбран.")
         return
 
-    # Extract ZIP and apply updates
+    # Распаковать ZIP и применить обновления
     try:
         extract_dir = os.path.join(os.path.dirname(zip_path), "temp_unzip")
         subprocess.run(f"powershell -Command \"Expand-Archive -Force '{zip_path}' -DestinationPath '{extract_dir}'\"", shell=True, check=True)
         subprocess.run(f"xcopy /s /y \"{extract_dir}\\*\" \"{REPO_DIR}\"", shell=True, check=True)
         subprocess.run(f"rmdir /s /q \"{extract_dir}\"", shell=True, check=True)
 
-        # Update version file
+        # Обновить файл версии
         current_version = int(config.get("CURRENT_VERSION", 0))
         next_version = current_version + 1
         config["CURRENT_VERSION"] = str(next_version)
         config["LAST_APPLIED_ZIP"] = os.path.basename(zip_path)
         save_config()
 
-        # Create pull request
+        # Создать Pull Request
         branch_name = f"update-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         subprocess.run(f"git checkout -b {branch_name}", shell=True, check=True)
         subprocess.run("git add .", shell=True, check=True)
@@ -82,18 +82,18 @@ def apply_zip_updates():
 
 
 def reset_supabase_db(sql_file=None):
-    """Reset Supabase database with optional SQL file."""
+    """Сбросить базу данных Supabase с опциональным SQL файлом."""
     if sql_file is None:
         sql_file = filedialog.askopenfilename(
             title="Выберите SQL файл",
-            filetypes=[("SQL Files", "*.sql")],
+            filetypes=[("SQL файлы", "*.sql")],
             initialdir=REPO_DIR
         )
         if not sql_file:
             messagebox.showwarning("Внимание", "SQL файл не выбран.")
             return
 
-    # Warn about resetting the database
+    # Предупреждение о сбросе базы данных
     if not messagebox.askyesno("Подтверждение", "Сброс базы данных удалит все текущие данные. Продолжить?"):
         return
 
@@ -101,7 +101,7 @@ def reset_supabase_db(sql_file=None):
 
 
 def configure_vercel():
-    """Configure Vercel deployment."""
+    """Настроить развертывание Vercel."""
     if "VERCEL_PROJECT_URL" in config:
         messagebox.showinfo("Информация", f"Vercel уже настроен: {config['VERCEL_PROJECT_URL']}")
         return
@@ -119,7 +119,7 @@ def configure_vercel():
 
 
 def configure_telegram_bot():
-    """Configure Telegram Bot token and admin chat ID."""
+    """Настроить токен Telegram бота и ID админского чата."""
     if "TELEGRAM_BOT_TOKEN" not in config:
         bot_token = tk.simpledialog.askstring("Ввод", "Введите токен вашего Telegram бота:")
         if bot_token:
@@ -146,7 +146,7 @@ def configure_telegram_bot():
 
 
 def set_webhook():
-    """Set webhook for Telegram Bot."""
+    """Установить webhook для Telegram бота."""
     if "VERCEL_PROJECT_URL" not in config:
         messagebox.showerror("Ошибка", "URL Vercel не настроен.")
         return
@@ -156,7 +156,7 @@ def set_webhook():
 
 
 def generate_embeddings():
-    """Regenerate embeddings for semantic search."""
+    """Перегенерировать вложения для семантического поиска."""
     if not messagebox.askyesno(
         "Подтверждение",
         "Это перегенерирует все вложения для семантического поиска. Это может занять некоторое время. Продолжить?",
@@ -171,7 +171,7 @@ def generate_embeddings():
 
 
 def generate_achievements():
-    """Generate gamified achievements based on customization progress."""
+    """Генерировать геймифицированные достижения на основе прогресса настройки."""
     achievements = []
     if "VERCEL_PROJECT_URL" in config:
         achievements.append("🌟 Vercel настроен!")
@@ -187,7 +187,7 @@ def generate_achievements():
 
 
 def get_user_level():
-    """Determine the user's level based on achievements."""
+    """Определить уровень пользователя на основе достижений."""
     achievements = generate_achievements()
     if len(achievements) >= 5:
         return "Badass"
@@ -199,28 +199,59 @@ def get_user_level():
         return "Beginner"
 
 
-def refresh_dashboard():
-    """Refresh the dashboard UI."""
-    user_level = get_user_level()
+def is_telegram_dashboard_unlocked():
+    """Проверить, разблокирован ли Telegram Dashboard."""
+    return all(key in config for key in ["VERCEL_PROJECT_URL", "TELEGRAM_BOT_TOKEN", "ADMIN_CHAT_ID"])
 
+
+def open_telegram_dashboard():
+    """Открыть панель управления Telegram."""
+    telegram_window = tk.Toplevel(root)
+    telegram_window.title("Telegram Панель Управления")
+    telegram_window.geometry("800x600")
+
+    # Раздел управления ботом
+    bot_frame = ttk.Frame(telegram_window)
+    bot_frame.pack(fill=tk.X, padx=20, pady=10)
+    ttk.Label(bot_frame, text="Управление ботом", font=("Arial", 16)).pack(anchor=tk.W)
+    ttk.Button(bot_frame, text="Отправить пользовательское сообщение", command=lambda: messagebox.showinfo("Информация", "Пользовательское сообщение отправлено!")).pack(fill=tk.X, padx=10, pady=5)
+    ttk.Button(bot_frame, text="Рассылка сообщения", command=lambda: messagebox.showinfo("Информация", "Рассылка сообщения отправлена!")).pack(fill=tk.X, padx=10, pady=5)
+
+    # Раздел обработки платежей
+    payment_frame = ttk.Frame(telegram_window)
+    payment_frame.pack(fill=tk.X, padx=20, pady=10)
+    ttk.Label(payment_frame, text="Обработка платежей", font=("Arial", 16)).pack(anchor=tk.W)
+    ttk.Button(payment_frame, text="Создать счет", command=lambda: messagebox.showinfo("Информация", "Счет создан!")).pack(fill=tk.X, padx=10, pady=5)
+    ttk.Button(payment_frame, text="Просмотреть историю платежей", command=lambda: messagebox.showinfo("Информация", "История платежей просмотрена!")).pack(fill=tk.X, padx=10, pady=5)
+
+    # Раздел управления пользователями
+    user_frame = ttk.Frame(telegram_window)
+    user_frame.pack(fill=tk.X, padx=20, pady=10)
+    ttk.Label(user_frame, text="Управление пользователями", font=("Arial", 16)).pack(anchor=tk.W)
+    ttk.Button(user_frame, text="Просмотреть пользователей", command=lambda: messagebox.showinfo("Информация", "Пользователи просмотрены!")).pack(fill=tk.X, padx=10, pady=5)
+    ttk.Button(user_frame, text="Редактировать пользователя", command=lambda: messagebox.showinfo("Информация", "Пользователь отредактирован!")).pack(fill=tk.X, padx=10, pady=5)
+
+
+def refresh_dashboard():
+    """Обновить интерфейс панели управления."""
+    user_level = get_user_level()
     for widget in root.winfo_children():
         widget.destroy()
 
-    # Header
+    # Заголовок
     header_frame = ttk.Frame(root)
     header_frame.pack(fill=tk.X, padx=20, pady=10)
     ttk.Label(header_frame, text="Панель управления проектом", font=("Arial", 24)).pack()
 
-    # Progress Section
+    # Раздел прогресса
     progress_frame = ttk.Frame(root)
     progress_frame.pack(fill=tk.X, padx=20, pady=10)
     ttk.Label(progress_frame, text="Прогресс настройки:", font=("Arial", 16)).pack(anchor=tk.W)
-
     achievements = generate_achievements()
     for achievement in achievements:
         ttk.Label(progress_frame, text=f"✅ {achievement}", font=("Arial", 12)).pack(anchor=tk.W)
 
-    # Actions Section
+    # Раздел действий
     actions_frame = ttk.Frame(root)
     actions_frame.pack(fill=tk.X, padx=20, pady=10)
     ttk.Label(actions_frame, text="Действия:", font=("Arial", 16)).pack(anchor=tk.W)
@@ -240,7 +271,10 @@ def refresh_dashboard():
     add_button("Настроить Telegram бот", configure_telegram_bot, level="Intermediate")
     add_button("Установить Webhook", set_webhook, level="Advanced")
     add_button("Перегенерировать вложения", generate_embeddings, "Это может занять некоторое время. Продолжить?", level="Advanced")
-
+# Telegram Dashboard Unlock Check
+    if is_telegram_dashboard_unlocked():
+        messagebox.showinfo("Успех", "Вы разблокировали Telegram Dashboard! Перейдите к продвинутым настройкам.")
+        ttk.Button(actions_frame, text="Открыть Telegram Dashboard", command=open_telegram_dashboard).pack(fill=tk.X, padx=10, pady=5)
     # Pro Tips Section
     pro_tips_frame = ttk.Frame(root)
     pro_tips_frame.pack(fill=tk.X, padx=20, pady=10)
