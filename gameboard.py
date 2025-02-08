@@ -71,6 +71,77 @@ def stop_timer(start_time):
     """Stop the timer and return the elapsed time in seconds."""
     return round(time.time() - start_time)
 
+
+def show_landing_page():
+    """Display the landing page with project details."""
+    # Create a new window for the landing page
+    landing_window = tk.Toplevel()
+    landing_window.title("О проекте")
+    landing_window.geometry("800x600")
+    landing_window.resizable(False, False)
+
+    # Header Section
+    header_frame = ttk.Frame(landing_window)
+    header_frame.pack(fill=tk.X, padx=20, pady=10)
+    
+    # ASCII Art Logo
+    ascii_art = """
+   / ___//   |  / /   /   | |  / / ____/\ \/ <  /__  /
+   \__ \/ /| | / /   / /| | | / / __/    \  // / /_ < 
+  ___/ / ___ |/ /___/ ___ | |/ / /	/ // /___/ / 
+ /____/_/  |_/_____/_/  |_|___/_____/   /_//_//____/  
+    """
+    ttk.Label(header_frame, text=ascii_art, font=("Courier", 10), justify=tk.CENTER).pack()
+
+    # Title and Description
+    title_frame = ttk.Frame(landing_window)
+    title_frame.pack(fill=tk.X, padx=20, pady=10)
+    ttk.Label(title_frame, text="Проект: Self-Evolving Developer Dashboard", font=("Arial", 18, "bold")).pack()
+    ttk.Label(title_frame, text="Автоматизируйте всё, геймифицируйте что угодно!", font=("Arial", 14)).pack()
+
+    # Features Section
+    features_frame = ttk.Frame(landing_window)
+    features_frame.pack(fill=tk.X, padx=20, pady=10)
+    ttk.Label(features_frame, text="Основные возможности:", font=("Arial", 16, "bold")).pack(anchor=tk.W)
+    features = [
+        "• Автоматическое обновление через ZIP-архивы",
+        "• Интеграция с Vercel и Supabase",
+        "• Геймифицированная панель управления",
+        "• Настройка Telegram бота для уведомлений",
+        "• Создание Pull Requests в GitHub"
+    ]
+    for feature in features:
+        ttk.Label(features_frame, text=feature, font=("Arial", 12)).pack(anchor=tk.W)
+
+    # Quick Links Section
+    links_frame = ttk.Frame(landing_window)
+    links_frame.pack(fill=tk.X, padx=20, pady=10)
+    ttk.Label(links_frame, text="Быстрые ссылки:", font=("Arial", 16, "bold")).pack(anchor=tk.W)
+    links = {
+        "Vercel": "https://vercel.com",
+        "Supabase": "https://supabase.com",
+        "GitHub": "https://github.com/salavey13/cartest",
+        "v0.dev Проект": "https://v0.dev/chat/fork-of-rastaman-shop-KvYJosUCML9",
+        "Qwen Chat": "https://chat.qwenlm.ai"
+    }
+    for name, url in links.items():
+        link_label = ttk.Label(links_frame, text=f"• {name}", font=("Arial", 12), foreground="blue", cursor="hand2")
+        link_label.pack(anchor=tk.W)
+        link_label.bind("<Button-1>", lambda e, u=url: open_link(u))
+
+    # Close Button
+    close_button = ttk.Button(landing_window, text="Закрыть", command=landing_window.destroy)
+    close_button.pack(pady=20)
+
+def open_link(url):
+    """Open a URL in the default web browser."""
+    import webbrowser
+    webbrowser.open(url)
+
+    
+
+
+    
 # Supabase User Management
 def create_user(user_id):
     """Create a new user in Supabase."""
@@ -285,7 +356,11 @@ def refresh_dashboard():
     header_frame = ttk.Frame(root)
     header_frame.pack(fill=tk.X, padx=20, pady=10)
     ttk.Label(header_frame, text="Панель управления проектом", font=("Arial", 24)).pack()
-
+    
+    # Add an "About" button to trigger the landing page
+    about_button = ttk.Button(root, text="О проекте", command=show_landing_page)
+    about_button.pack(pady=20)
+    
     # Progress Section
     progress_frame = ttk.Frame(root)
     progress_frame.pack(fill=tk.X, padx=20, pady=10)
