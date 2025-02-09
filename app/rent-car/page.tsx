@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabase } from "@/hooks/supabase";  // Ensure you import supabase for fetching data
+import { supabaseAnon } from "@/hooks/supabase";  // Ensure you import supabase for fetching data
 import SemanticSearch from "@/components/SemanticSearch";  // Assuming the search component is available
 
 export default function RentCar() {
@@ -18,7 +18,7 @@ export default function RentCar() {
   // Fetch cars from Supabase
   useEffect(() => {
     const fetchCars = async () => {
-      const { data, error } = await supabase.from("cars").select("*");
+      const { data, error } = await supabaseAnon.from("cars").select("*");
       if (error) {
         console.error("Error fetching cars:", error);
       } else {
@@ -30,7 +30,7 @@ export default function RentCar() {
 
   const handleRent = () => {
     if (selectedCar) {
-      alert(`Вы арендовали ${selectedCar.name} на ${rentDays} дней за ${selectedCar.price * rentDays}¥`);
+      alert(`Вы арендовали ${selectedCar.name} на ${rentDays} дней за ${selectedCar.daily_price * rentDays}¥`);
     }
   };
 

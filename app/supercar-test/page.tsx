@@ -1,20 +1,10 @@
-// app/test/page.tsx
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
-import {
-  fetchQuestions,
-  fetchAnswers,
-  saveTestProgress,
-  loadTestProgress,
-  searchCars,
-  getSimilarCars,
-} from '@/hooks/supabase'; // Import specific Supabase functions
+import { supabaseAdmin } from '@/hooks/supabase';
 import { useTelegram } from '@/hooks/useTelegram';
 import { useWorker } from '@/hooks/useWorker';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
 import { Graph } from '@/components/Graph';
 import { ProgressIndicator } from '@/components/ProgressIndicator';
 import ResultDisplay from '@/components/ResultDisplay';
@@ -26,12 +16,14 @@ interface QuestionData {
   theme: string;
   position: number;
 }
+
 interface AnswerData {
   id: number;
   question_id: number;
   text: string;
   questionText?: string;
 }
+
 interface CarResult {
   id: string;
   make: string;
@@ -44,176 +36,283 @@ interface CarResult {
 }
 
 export default function SupercarTest() {
-  const { user, isAuthenticated, isAdmin } = useTelegram();
+  const { user } = useTelegram();
   const { generateEmbedding } = useWorker();
+
   const [questions, setQuestions] = useState<QuestionData[]>([]);
   const [allAnswers, setAllAnswers] = useState<AnswerData[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<AnswerData[]>([]);
-  const [testProgress, setTestProgress] = useState(null);
+  const [testProgress, setTestProgress] = useState<any>(null);
   const [result, setResult] = useState<CarResult | null>(null);
   const [similarCars, setSimilarCars] = useState<CarResult[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  // Fetch questions on mount
+  const [mode, setMode] = useState<'question' | 'preview'>('question');
+  const [previewCars, setPreviewCars] = useState<CarResult[]>([]);
+  // Use a MotionValue for modeProgress instead of a plain number.
+  const modeProgress = useMotionValue(0);
+
+  // 1. Fetch questions on mount
   useEffect(() => {
-    const fetchQuestionsData = async () => {
-      try {
-        const data = await fetchQuestions(); // Use imported function
-        if (data) setQuestions(data);
-      } catch (error) {
+    const fetchQuestions = async () => {
+      const { data, error } = await supabaseAdmin
+        .from('questions')
+        .select('*')
+        .order('position', { ascending: true });
+      if (error) {
         console.error('Error fetching questions:', error);
+      } else if (data) {
+        setQuestions(data);
       }
     };
-    fetchQuestionsData();
+    fetchQuestions();
   }, []);
 
-  // Fetch all answers on mount
+  // 2. Fetch all answers on mount
   useEffect(() => {
-    const fetchAnswersData = async () => {
-      try {
-        const data = await fetchAnswers(); // Use imported function
-        if (data) setAllAnswers(data);
-      } catch (error) {
+    const fetchAnswers = async () => {
+      const { data, error } = await supabaseAdmin.from('answers').select('*');
+      if (error) {
         console.error('Error fetching answers:', error);
+      } else if (data) {
+        setAllAnswers(data);
       }
     };
-    fetchAnswersData();
+    fetchAnswers();
   }, []);
 
-  // Load stored test progress
+  // 3. Load stored test progress
   useEffect(() => {
     const loadProgress = async () => {
-      if (isAuthenticated && user?.id) {
-        try {
-          const progress = await loadTestProgress(user.id); // Use imported function
-          if (progress) {
-            setCurrentQuestionIndex(progress.currentQuestionIndex || 0);
-            setSelectedAnswers(progress.selectedAnswers || []);
-            setTestProgress(progress);
-          }
-        } catch (error) {
-          console.error('Error loading test progress:', error);
+      if (user?.id) {
+        const { data } = await supabaseAdmin
+          .from('users')
+          .select('test_progress')
+          .eq('user_id', user.id)
+          .single();
+        if (data?.test_progress) {
+          setCurrentQuestionIndex(data.test_progress.currentQuestionIndex);
+          setSelectedAnswers(data.test_progress.selectedAnswers);
+          setTestProgress(data.test_progress);
         }
       }
     };
     loadProgress();
-  }, [isAuthenticated, user]);
+  }, [user]);
 
-  // Save test progress after each answer
-  const saveProgress = async (progress: any) => {
-    if (isAuthenticated && user?.id) {
-      try {
-        await saveTestProgress(user.id, progress); // Use imported function
-      } catch (error) {
-        console.error('Error saving test progress:', error);
+  // 4. Check if user is admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (user?.id) {
+        const { data } = await supabaseAdmin
+          .from('users')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+        setIsAdmin(data?.role === 'admin');
       }
-    }
-  };
+    };
+    checkAdmin();
+  }, [user]);
 
-  // Handle answer selection
+  // 5. Real-time preview updates
+  useEffect(() => {
+    const updatePreview = async () => {
+      if (selectedAnswers.length > 0) {
+        const searchText = selectedAnswers
+          .map(a => `${a.questionText} ${a.text}`)
+          .join(' ');
+        try {
+          const embedding = await generateEmbedding(searchText);
+          const { data, error } = await supabaseAdmin.rpc('search_cars', {
+            query_embedding: embedding,
+            match_count: 3,
+          });
+          if (error) throw error;
+          setPreviewCars(data || []);
+        } catch (err) {
+          console.error('Error updating preview:', err);
+        }
+      }
+    };
+
+    if (mode === 'preview') {
+      updatePreview();
+    }
+  }, [selectedAnswers, mode, generateEmbedding]);
+
+  // 6. Handle answer selection
   const handleAnswer = async (answer: AnswerData) => {
+    // Augment answer with the current question text
     const currentQuestion = questions[currentQuestionIndex];
     const augmentedAnswer: AnswerData = {
       ...answer,
-      questionText: currentQuestion?.text || '',
+      questionText: currentQuestion?.text || ''
     };
+
     const updatedAnswers = [...selectedAnswers, augmentedAnswer];
     const nextIndex = currentQuestionIndex + 1;
 
     if (nextIndex >= questions.length) {
       // End of test: aggregate answers, generate embedding, and fetch final result
       try {
-        const searchText = updatedAnswers.map(a => `${a.questionText} ${a.text}`).join(' ');
+        const searchText = updatedAnswers
+          .map(a => `${a.questionText} ${a.text}`)
+          .join(' ');
         const embedding = await generateEmbedding(searchText);
-        const { data: searchResults } = await searchCars(embedding, 1); // Use imported function
-        if (searchResults && searchResults.length > 0) {
-          const topResult = searchResults[0];
+        const { data, error } = await supabaseAdmin.rpc('search_cars', {
+          query_embedding: embedding,
+          match_count: 1,
+        });
+        if (error) throw error;
+        if (data && data.length > 0) {
+          const topResult = data[0];
           setResult(topResult);
-          const { data: similar } = await getSimilarCars(topResult.id, 3); // Use imported function
+          const { data: similar, error: similarError } = await supabaseAdmin.rpc('similar_cars', {
+            car_id: topResult.id,
+            match_count: 3,
+          });
+          if (similarError) throw similarError;
           if (similar) {
+            // Remove top result from similar cars if it appears there
             const filteredSimilar = similar.filter((car: CarResult) => car.id !== topResult.id);
             setSimilarCars(filteredSimilar);
           }
         } else {
-          throw new Error('No matching car found');
+          throw new Error("No matching car found");
         }
-        // Clear progress after test completion
-        await saveTestProgress(user.id, null); // Use imported function
       } catch (err) {
-        console.error('Error determining final car:', err);
+        console.error("Error determining final car:", err);
       }
+      // Clear stored progress for a fresh start next time
+      await supabaseAdmin
+        .from('users')
+        .update({ test_progress: null })
+        .eq('user_id', user?.id);
     } else {
-      // Update progress in the database
+      // Otherwise, update progress in the database
       const progress = {
         currentQuestionIndex: nextIndex,
         selectedAnswers: updatedAnswers,
       };
-      await saveProgress(progress);
+      await supabaseAdmin
+        .from('users')
+        .update({ test_progress: progress })
+        .eq('user_id', user?.id);
       setSelectedAnswers(updatedAnswers);
       setCurrentQuestionIndex(nextIndex);
     }
   };
 
-  // Reset test
+  // 7. Reset test
   const resetTest = async () => {
     setCurrentQuestionIndex(0);
     setSelectedAnswers([]);
     setTestProgress(null);
     setResult(null);
     setSimilarCars([]);
-    if (isAuthenticated && user?.id) {
-      await saveTestProgress(user.id, null); // Use imported function
-    }
+    setMode('question');
+    modeProgress.set(0);
+    await supabaseAdmin
+      .from('users')
+      .update({ test_progress: null })
+      .eq('user_id', user?.id);
   };
 
   if (questions.length === 0) {
-    return <div className="min-h-screen bg-black text-white">Loading questions...</div>;
+    return (
+      <div className="min-h-screen bg-gray-900 text-white p-4 flex items-center justify-center">
+        Loading questions...
+      </div>
+    );
+  }
+
+  if (result) {
+    return (
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="min-h-[100vh - 16] pt-16 bg-gray-900 text-white p-4"
+      >
+        <nav className="flex justify-between items-center mb-8 pt-24">
+          <h1 className="text-2xl font-bold">🚀 Supercar Match</h1>
+          {isAdmin && (
+            <Link href="/admin" className="bg-cyan-500 px-4 py-2 rounded-lg">
+              Admin Panel
+            </Link>
+          )}
+        </nav>
+        <button
+          onClick={resetTest}
+          className="bg-red-500 p-2 rounded mb-4"
+        >
+          Restart Test
+        </button>
+        <ResultDisplay result={result} similarCars={similarCars} />
+      </motion.div>
+    );
   }
 
   const totalQuestions = questions.length;
   const currentQuestionData = questions[currentQuestionIndex];
 
   return (
-    <div className="min-h-screen bg-black text-white relative overflow-hidden">
-      {/* Binary Background */}
-      <div className="absolute inset-0 opacity-10 pointer-events-none select-none overflow-hidden whitespace-nowrap text-[8px] leading-none binary-background">
-        {Array(100).fill('01').join('')}
-      </div>
-      {/* Header */}
-      <Header user={user} />
-      {/* Main Content */}
-      <div className="pt-20 relative container mx-auto px-4">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#FF6B6B] to-[#4ECDC4] font-mono mb-8">
-          🚀 Supercar Match
-        </h1>
-        {isAdmin && (
-          <Link href="/admin" className="text-cyan-400 hover:text-cyan-500">
-            Admin Panel
-          </Link>
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="min-h-screen bg-gray-900 text-white pt-24 flex flex-col"
+    >
+      <nav className="flex-shrink-0 mb-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">🚀 Supercar Match</h1>
+          {isAdmin && (
+            <Link href="/admin" className="bg-cyan-500 px-4 py-2 rounded-lg">
+              Admin Panel
+            </Link>
+          )}
+        </div>
+      </nav>
+
+      <ProgressIndicator
+        current={currentQuestionIndex}
+        total={totalQuestions}
+        answered={selectedAnswers.map(a =>
+          questions.findIndex(q => q.id === a.question_id)
         )}
-        {result ? (
-          <ResultDisplay
-            result={result}
-            similarCars={similarCars}
-            onRestart={resetTest}
-          />
-        ) : (
-          <>
-            <ProgressIndicator
-              total={totalQuestions}
-              current={currentQuestionIndex + 1}
-            />
-            <Graph
-              currentQuestion={currentQuestionData.id}
-              questionText={currentQuestionData.text}
-              onSelect={handleAnswer}
-              answers={allAnswers.filter(a => a.question_id === currentQuestionData.id)}
-            />
-          </>
-        )}
+        mode={mode}
+        modeProgress={modeProgress}
+      />
+
+      <div className="flex-grow relative overflow-hidden">
+        <Graph
+          currentQuestion={questions[currentQuestionIndex].id}
+          questionText={questions[currentQuestionIndex].text}
+          theme={questions[currentQuestionIndex].theme}
+          onSelect={handleAnswer}
+          mode={mode}
+          onModeChange={setMode}
+          previewCars={previewCars}
+          answers={allAnswers}
+          setModeProgress={modeProgress.set}
+        />
       </div>
-      {/* Footer */}
-      <Footer />
-    </div>
+
+      <AnimatePresence>
+        {mode === 'preview' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="text-center mt-4 text-sm text-gray-400"
+          >
+            Swipe up to return to questions
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
+

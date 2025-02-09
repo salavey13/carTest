@@ -1,47 +1,39 @@
-// app/admin/page.tsx (Admin Page)
-'use client';
-import { useTelegram } from '@/hooks/useTelegram';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from "@/hooks/supabase"
+// app/admin/page.tsx
+"use client";
+import { useEffect } from 'react'
+import { useTelegram } from "@/hooks/useTelegram";
+import { useRouter } from "next/navigation";
+import { CarSubmissionForm } from "@/components/CarSubmissionForm";
+import Link from "next/link";
 
 export default function AdminPage() {
-  const { user } = useTelegram();
+  const { dbUser, isAdmin } = useTelegram();
   const router = useRouter();
-  const [isVerifiedAdmin, setIsVerifiedAdmin] = useState(false);
 
   useEffect(() => {
-    const verifyAdmin = async () => {
-      if (!user?.id) {
-        router.push('/');
-        return;
-      }
+    if (!dbUser || !isAdmin()) {
+      router.push("/");
+    }
+  }, [dbUser, isAdmin, router]);
 
-      const { data } = await supabase
-        .from('users')
-        .select('role')
-        .eq('user_id', user.id)
-        .single();
-
-      if (data?.role !== 'admin') {
-        router.push('/');
-      } else {
-        setIsVerifiedAdmin(true);
-      }
-    };
-
-    verifyAdmin();
-  }, [user, router]);
-
-  if (!isVerifiedAdmin) return <div className="min-h-screen bg-gray-900" />;
+  if (!dbUser || !isAdmin()) {
+    return <div className="min-h-screen bg-gray-900" />;
+  }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4">
-      <div className="max-w-md mx-auto">
-        <h1 className="text-2xl font-bold mb-6">Admin Panel</h1>
+    <div className="min-h-screen bg-black text-white relative overflow-hidden">
+      {/* Binary Background */}
+      <div className="absolute inset-0 opacity-10 pointer-events-none select-none overflow-hidden whitespace-nowrap text-[8px] leading-none binary-background">
+        {Array(100).fill("01").join("")}
+      </div>
+
+      <div className="pt-20 relative container mx-auto px-4">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#FF6B6B] to-[#4ECDC4] font-mono mb-8">
+          Admin Panel
+        </h1>
         <CarSubmissionForm />
         <Link href="/" className="mt-4 inline-block text-cyan-400">
-          ← Back to Test
+          ← Back to Main Page
         </Link>
       </div>
     </div>
