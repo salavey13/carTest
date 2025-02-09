@@ -73,12 +73,11 @@ def stop_timer(start_time):
 
 
 
-
 def show_leaderboard():
     """Display the leaderboard in a new window."""
     leaderboard_window = tk.Toplevel()
     leaderboard_window.title("Таблица лидеров")
-    leaderboard_window.geometry("600x400")
+    leaderboard_window.geometry("800x600")
 
     # Header Section
     header_frame = ttk.Frame(leaderboard_window)
@@ -98,8 +97,11 @@ def show_leaderboard():
         if response.status_code == 200:
             users = response.json()
             for idx, user in enumerate(users[:10]):  # Top 10 users
+                nickname = user['metadata'].get('nickname', 'Неизвестный')
                 total_time = user['metadata'].get('total_time', 'N/A')
-                ttk.Label(body_frame, text=f"{idx + 1}. {user['user_id']} - {total_time} секунд", font=("Arial", 12)).pack(anchor=tk.W)
+                achievements = ", ".join(user['metadata'].get('achievements', []))
+                ttk.Label(body_frame, text=f"{idx + 1}. {nickname} ({user['user_id']}) - {total_time} секунд", font=("Arial", 14, "bold")).pack(anchor=tk.W)
+                ttk.Label(body_frame, text=f"   🏆 Достижения: {achievements}", font=("Arial", 12)).pack(anchor=tk.W)
         else:
             ttk.Label(body_frame, text="Не удалось загрузить таблицу лидеров.", font=("Arial", 12)).pack()
     except Exception as e:
