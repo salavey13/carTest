@@ -675,3 +675,4 @@ INSERT INTO public.cars (id, make, model, description, daily_price, image_url, r
     "topSpeed": "95mph"
   }'::jsonb
 );
+

@@ -3,6 +3,9 @@ import subprocess
 import tkinter as tk
 from tkinter import messagebox, filedialog, ttk
 from datetime import datetime
+import time
+import uuid
+import requests
 
 # Configuration
 PROJECTS_DIR = os.path.expanduser("~/Documents/V0_Projects")
@@ -13,11 +16,40 @@ VERCEL_URL = "https://vercel.com"
 SUPABASE_URL = "https://supabase.com"
 GITHUB_URL = "https://github.com/salavey13/cartest"
 TEMP_DIR = os.path.join(os.getenv("TEMP"), "setup_temp")
+# Default configuration template for version.ini
+DEFAULT_CONFIG = """CURRENT_VERSION=0
+LAST_APPLIED_ZIP=
+VERCEL_PROJECT_URL=
+SUPABASE_PROJECT_ID=
+TELEGRAM_BOT_TOKEN=
+ADMIN_CHAT_ID=
+"""
+
+def ensure_version_file():
+    """
+    Ensure that the V0_Projects folder and version.ini file exist.
+    If version.ini is missing, create it with default values.
+    """
+    # Create V0_Projects folder if it doesn't exist
+    if not os.path.exists(PROJECTS_DIR):
+        os.makedirs(PROJECTS_DIR)
+        print(f"Папка {PROJECTS_DIR} создана.")
+
+    # Check if version.ini exists, if not, create it with default values
+    if not os.path.exists(VERSION_FILE):
+        with open(VERSION_FILE, "w", encoding="utf-8") as f:
+            f.write(DEFAULT_CONFIG)
+        print(f"Файл {VERSION_FILE} создан с базовыми настройками.")
+    else:
+        print(f"Файл {VERSION_FILE} уже существует.")
+# Supabase Configuration
+SUPABASE_API_URL = "https://inmctohsodgdohamhzag.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzMzk1ODUsImV4cCI6MjA1MzkxNTU4NX0.AdNu5CBn6pp-P5M2lZ6LjpcqTXrhOdTOYMCiQrM_Ud4"
+SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODMzOTU4NSwiZXhwIjoyMDUzOTE1NTg1fQ.xD91Es2o8T1vM-2Ok8iKCn4jGDA5TwBbapD5eqhblLM"
+
 
 # Load configuration from VERSION.ini
-config = {
-    "TOOLS_INSTALLED": []  # List of tools that have been installed
-}
+config = {"TOOLS_INSTALLED": []}
 if os.path.exists(VERSION_FILE):
     with open(VERSION_FILE, "r", encoding="utf-8") as f:
         for line in f:
@@ -25,24 +57,79 @@ if os.path.exists(VERSION_FILE):
                 key, value = line.strip().split("=", 1)
                 config[key] = value
 
+
 # URLs for downloads
 DOWNLOAD_URLS = {
     "Git": "https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.2/Git-2.47.1.2-64-bit.exe",
     "Node.js": "https://nodejs.org/dist/v22.13.1/node-v22.13.1-x64.msi",
     "Notepad++": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.7.6/npp.8.7.6.Installer.x64.exe",
-    "VS Code": "https://code.visualstudio.com/sha/download?build=stable&os=win32-x64-user",
-    "Vercel CLI": "https://vercel.com/install/cli",
-    "Supabase CLI": "https://github.com/supabase/cli/releases/latest/download/supabase_windows_x64.zip"
+    "VS Code": "https://code.visualstudio.com/sha/download?build=stable&os=win32-x64-user"
 }
 
+# Save configuration to VERSION.ini
 def save_config():
-    """Save configuration to VERSION.ini."""
     with open(VERSION_FILE, "w", encoding="utf-8") as f:
         for key, value in config.items():
-            if isinstance(value, list):  # Handle lists (e.g., TOOLS_INSTALLED)
+            if isinstance(value, list):
                 f.write(f"{key}={','.join(value)}\n")
             else:
                 f.write(f"{key}={value}\n")
+
+# Timer Logic
+active_timers = {}
+# Initialize User
+config["USER_ID"] = "413553377"
+#str(uuid.uuid4())
+# Assuming create_user function exists and is defined elsewhere
+# create_user(config["USER_ID"])
+
+# Actions Section
+def add_button(text, command, warning=None, level="Beginner"):
+    def safe_command():
+        if warning and not messagebox.askyesno("Подтверждение", warning):
+            return
+        start_timer(config["USER_ID"])
+        try:
+            command()
+        finally:
+            elapsed_time = stop_timer(config["USER_ID"], is_manual_stop=True)
+            messagebox.showinfo("Время", f"Затраченное время: {elapsed_time} секунд.")
+    ttk.Button(actions_frame, text=text, command=safe_command).pack(fill=tk.X, padx=10, pady=5)
+    
+def start_timer(user_id):
+    start_time = time.time()
+    active_timers[user_id] = {"start_time": start_time, "is_running": True}
+    return start_time
+
+def stop_timer(user_id, is_manual_stop=True):
+    if user_id not in active_timers or not active_timers[user_id]["is_running"]:
+        return None
+    start_time = active_timers[user_id]["start_time"]
+    elapsed_time = round(time.time() - start_time)
+    active_timers[user_id]["is_running"] = False
+    update_user_metadata(user_id, "total_time", elapsed_time, is_manual_stop)
+    return elapsed_time
+
+def update_user_metadata(user_id, key, value, is_manual_stop=True):
+    url = f"{SUPABASE_API_URL}/rest/v1/users?user_id=eq.{user_id}"
+    headers = {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+    }
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        user_data = response.json()[0]
+        metadata = user_data.get("metadata", {})
+        total_time = metadata.get("total_time", 0)
+        if key == "total_time":
+            metadata["total_time"] = total_time + value
+            metadata["last_action"] = "manual_stop" if is_manual_stop else "timer_expired"
+        payload = {"metadata": metadata}
+        response = requests.patch(url, json=payload, headers=headers)
+        if response.status_code != 200:
+            print("Failed to update user metadata:", response.text)
 
 def run_command(command, success_message="Успех", error_message="Ошибка"):
     """Run a shell command and show output."""
@@ -55,44 +142,33 @@ def run_command(command, success_message="Успех", error_message="Ошибк
         return False
 
 def create_project_folder():
-    """Create the V0_Projects folder."""
+    """Create the V0_Projects folder and clone the cartest repository if Git is installed."""
+    # Check if Git is installed
+    git_installed = subprocess.run("where git", shell=True, capture_output=True, text=True)
+    if git_installed.returncode != 0:
+        messagebox.showwarning("Внимание", "Git не установлен. Пожалуйста, установите Git перед клонированием репозитория.")
+        return
+
+    # Create the V0_Projects folder if it doesn't exist
     if not os.path.exists(PROJECTS_DIR):
         os.makedirs(PROJECTS_DIR)
         messagebox.showinfo("Успех", f"Папка {PROJECTS_DIR} создана.")
     else:
         messagebox.showinfo("Информация", f"Папка {PROJECTS_DIR} уже существует.")
 
-def download_and_install(tool_name):
-    """Download and install a tool."""
-    url = DOWNLOAD_URLS.get(tool_name)
-    if not url:
-        messagebox.showerror("Ошибка", f"URL для {tool_name} не найден.")
-        return
-    file_path = os.path.join(TEMP_DIR, f"{tool_name.replace(' ', '_')}-Installer.exe")
-    if not os.path.exists(TEMP_DIR):
-        os.makedirs(TEMP_DIR)
-    # Download
-    if not run_command(f'powershell -Command "Invoke-WebRequest -Uri \'{url}\' -OutFile \'{file_path}\'"', 
-                       f"{tool_name} скачан успешно.", f"Не удалось скачать {tool_name}."):
-        return
-    # Install
-    install_args = {
-        "Git": "/VERYSILENT /NORESTART /NOCANCEL",
-        "Node.js": "/quiet",
-        "Notepad++": "/S",
-        "VS Code": "/verysilent /suppressmsgboxes"
-    }
-    args = install_args.get(tool_name, "")
-    if not run_command(f'"{file_path}" {args}', 
-                       f"{tool_name} установлен успешно.", f"Не удалось установить {tool_name}."):
-        return
-    # Add to installed tools and save config
-    if tool_name not in config.get("TOOLS_INSTALLED", []):
-        config.setdefault("TOOLS_INSTALLED", []).append(tool_name)
-        save_config()
-    messagebox.showinfo("Успех", f"{tool_name} успешно установлен.")
-    # Generate achievement
-    generate_installation_achievement(tool_name)
+    # Check if the cartest repository is already cloned
+    if not os.path.exists(REPO_DIR):
+        # Clone the cartest repository
+        repo_url = "https://github.com/salavey13/cartest.git"
+        try:
+            subprocess.run(f"cd \"{PROJECTS_DIR}\" && git clone {repo_url}", shell=True, check=True)
+            messagebox.showinfo("Успех", "Репозиторий cartest успешно клонирован.")
+        except subprocess.CalledProcessError as e:
+            messagebox.showerror("Ошибка", f"Не удалось клонировать репозиторий cartest: {e.stderr}")
+    else:
+        messagebox.showinfo("Информация", "Репозиторий cartest уже клонирован.")
+    ensure_version_file()
+
 
 def add_ascii_art():
     """Add ASCII art to the dashboard."""
@@ -281,11 +357,116 @@ def open_telegram_dashboard():
     ttk.Button(user_frame, text="View Users", command=lambda: messagebox.showinfo("Info", "Users viewed!")).pack(fill=tk.X, padx=10, pady=5)
     ttk.Button(user_frame, text="Edit User", command=lambda: messagebox.showinfo("Info", "User edited!")).pack(fill=tk.X, padx=10, pady=5)
 
+def download_and_install(tool_name):
+    """Download and install a tool with timing."""
+    
+    # Check if the tool is already installed
+    if tool_name == "Vercel CLI":
+        result = subprocess.run("vercel --version", shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            messagebox.showinfo("Информация", "Vercel CLI уже установлен.")
+            return
+    
+    if tool_name == "Supabase CLI":
+        result = subprocess.run("supabase --version", shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            messagebox.showinfo("Информация", "Supabase CLI уже установлен.")
+            return
+
+    # Install via npm
+    if tool_name in ["Vercel CLI", "Supabase CLI"]:
+        command = f"npm install -g {tool_name.lower().replace(' ', '')}"
+        start_time = config["USER_ID"]
+        
+        if not run_command(command, f"{tool_name} установлен успешно.", f"Не удалось установить {tool_name}."):
+            return
+        
+        elapsed_time = stop_timer(start_time)
+        update_user_metadata(config["USER_ID"], f"{tool_name.lower()}_installed", elapsed_time)
+        
+        # Add to installed tools and save config
+        if tool_name not in config.get("TOOLS_INSTALLED", []):
+            config.setdefault("TOOLS_INSTALLED", []).append(tool_name)
+            save_config()
+        
+        messagebox.showinfo("Успех", f"{tool_name} успешно установлен за {elapsed_time} секунд.")
+        generate_installation_achievement(tool_name)
+        return
+
+    # For other tools, proceed with the existing installation logic
+    url = DOWNLOAD_URLS.get(tool_name)
+    if not url:
+        messagebox.showerror("Ошибка", f"URL для {tool_name} не найден.")
+        return
+    
+    file_path = os.path.join(TEMP_DIR, f"{tool_name.replace(' ', '_')}-Installer.exe")
+    if not os.path.exists(TEMP_DIR):
+        os.makedirs(TEMP_DIR)
+
+    # Download
+    start_time = config["USER_ID"]
+    if not run_command(f'powershell -Command "Invoke-WebRequest -Uri \'{url}\' -OutFile \'{file_path}\'"',
+                       f"{tool_name} скачан успешно.", f"Не удалось скачать {tool_name}."):
+        return
+
+    # Install
+    install_args = {
+        "Git": "/VERYSILENT /NORESTART /NOCANCEL",
+        "Node.js": "/quiet",
+        "Notepad++": "/S",
+        "VS Code": "/verysilent /suppressmsgboxes"
+    }
+    args = install_args.get(tool_name, "")
+    if not run_command(f'"{file_path}" {args}',
+                       f"{tool_name} установлен успешно.", f"Не удалось установить {tool_name}."):
+        return
+
+    elapsed_time = stop_timer(start_time)
+    update_user_metadata(config["USER_ID"], f"{tool_name.lower()}_installed", elapsed_time)
+
+    # Add to installed tools and save config
+    if tool_name not in config.get("TOOLS_INSTALLED", []):
+        config.setdefault("TOOLS_INSTALLED", []).append(tool_name)
+        save_config()
+
+    messagebox.showinfo("Успех", f"{tool_name} успешно установлен за {elapsed_time} секунд.")
+    generate_installation_achievement(tool_name)
+ 
+# Leaderboard Display
+def show_leaderboard():
+    leaderboard_window = tk.Toplevel()
+    leaderboard_window.title("Таблица лидеров")
+    leaderboard_window.geometry("800x600")
+    header_frame = ttk.Frame(leaderboard_window)
+    header_frame.pack(fill=tk.X, padx=20, pady=10)
+    ttk.Label(header_frame, text="Лидеры настройки проекта", font=("Arial", 18, "bold")).pack()
+    body_frame = ttk.Frame(leaderboard_window)
+    body_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+    try:
+        response = requests.get(
+            f"{SUPABASE_API_URL}/rest/v1/users?select=user_id,metadata&status=eq.admin",
+            headers={"apikey": SUPABASE_ANON_KEY}
+        )
+        if response.status_code == 200:
+            users = response.json()
+            users.sort(key=lambda x: x['metadata'].get('total_time', float('inf')))
+            for idx, user in enumerate(users[:10]):
+                nickname = user['metadata'].get('nickname', 'Неизвестный')
+                total_time = user['metadata'].get('total_time', 'N/A')
+                achievements = ", ".join(user['metadata'].get('achievements', []))
+                ttk.Label(body_frame, text=f"{idx + 1}. {nickname} ({user['user_id']}) - {total_time} секунд", font=("Arial", 14, "bold")).pack(anchor=tk.W)
+                ttk.Label(body_frame, text=f"   🏆 Достижения: {achievements}", font=("Arial", 12)).pack(anchor=tk.W)
+        else:
+            ttk.Label(body_frame, text="Не удалось загрузить таблицу лидеров.", font=("Arial", 12)).pack()
+    except Exception as e:
+        ttk.Label(body_frame, text=f"Ошибка: {str(e)}", font=("Arial", 12)).pack()
+        
 def refresh_dashboard():
     """Refresh the dashboard UI."""
     user_level = get_user_level()
     for widget in root.winfo_children():
         widget.destroy()
+    
     # Header
     header_frame = ttk.Frame(root)
     header_frame.pack(fill=tk.X, padx=20, pady=10)
@@ -320,13 +501,16 @@ def refresh_dashboard():
             ttk.Button(actions_frame, text=text, command=safe_command).pack(fill=tk.X, padx=10, pady=5)
 
     add_envbutton("Создать папку проекта", create_project_folder)
-    add_envbutton("Скачать и установить Git", lambda: download_and_install("Git"))
-    add_envbutton("Скачать и установить Node.js", lambda: download_and_install("Node.js"))
-    add_envbutton("Скачать и установить Notepad++", lambda: download_and_install("Notepad++"))
-    add_envbutton("Скачать и установить VS Code", lambda: download_and_install("VS Code"))
-    add_envbutton("Скачать и установить Vercel CLI", lambda: download_and_install("Vercel CLI"))
-    add_envbutton("Скачать и установить Supabase CLI", lambda: download_and_install("Supabase CLI"))
+    # Tool Installation Buttons
+    installed_tools = config.get("TOOLS_INSTALLED", [])
+    tools_to_install = ["Git", "Node.js", "Notepad++", "VS Code", "Vercel CLI", "Supabase CLI"]
 
+    for tool in tools_to_install:
+        if tool not in installed_tools:
+            add_envbutton(f"Скачать и установить {tool}", lambda t=tool: download_and_install(t))
+
+    # Leaderboard Button
+    add_button("Показать таблицу лидеров", show_leaderboard)
     add_button("Применить ZIP обновления", apply_zip_updates, "Это перезапишет текущие файлы. Продолжить?", level="Beginner")
     add_button("Сбросить базу данных Supabase", reset_supabase_db, "Это удалит все текущие данные. Продолжить?", level="Intermediate")
     add_button("Настроить Vercel", configure_vercel, level="Beginner")
@@ -356,15 +540,15 @@ def refresh_dashboard():
         ("GitHub", GITHUB_URL),
         ("v0.dev Проект", V0_DEV_URL),
         ("Qwen Chat", "https://chat.qwenlm.ai"),
-        ("Supabase SQL Console", "https://app.supabase.com/project/YOUR_PROJECT_ID/sql"),
+        ("Supabase SQL Console", "https://supabase.com/dashboard/project/inmctohsodgdohamhzag/sql/new"),
     ]
     for name, url in links:
         ttk.Button(links_frame, text=name, command=lambda u=url: subprocess.Popen(["start", u], shell=True)).pack(fill=tk.X, padx=10, pady=2)
 
     # Exit Button
-    ttk.Button(root, text="Выход", command=root.quit).pack(fill=tk.X, padx=20, pady=10)
+    #ttk.Button(root, text="Выход", command=root.quit).pack(fill=tk.X, padx=20, pady=10)
 
- # ASCII Art
+    # ASCII Art
     add_ascii_art()
 
 # GUI Setup
