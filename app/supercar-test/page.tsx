@@ -288,15 +288,15 @@ export default function SupercarTest() {
 
       <div className="flex-grow relative overflow-hidden">
         <Graph
-          currentQuestion={questions[currentQuestionIndex].id}
-          questionText={questions[currentQuestionIndex].text}
-          theme={questions[currentQuestionIndex].theme}
+          currentQuestion={questions[currentQuestionIndex].id, questions[currentQuestionIndex].text}
+          /*questionText={questions[currentQuestionIndex].text}
+          theme={questions[currentQuestionIndex].theme}*/
           onSelect={handleAnswer}
-          mode={mode}
+          /*mode={mode}
           onModeChange={setMode}
-          previewCars={previewCars}
+          previewCars={previewCars}*/
           answers={allAnswers}
-          setModeProgress={modeProgress.set}
+          //setModeProgress={modeProgress.set}
         />
       </div>
 
