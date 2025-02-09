@@ -1,7 +1,7 @@
 import type { Database } from "@/types/database.types"
 import { createClient } from "@supabase/supabase-js"
 import { generateJwtToken } from "@/lib/auth"
-import type { WebAppUser } from "@/types/webApp.types"
+import type { WebAppUser } from "@/types/telegram.d"
 
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "https://inmctohsodgdohamhzag.supabase.co"
