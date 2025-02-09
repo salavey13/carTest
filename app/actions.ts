@@ -1,7 +1,7 @@
 // app/actions.ts
 'use server';
 
-import { createAuthenticatedClient, supabase , createAdminClient} from "@/hooks/supabase";
+import { createAuthenticatedClient, supabaseAdmin} from "@/hooks/supabase";
 
 import { revalidatePath } from "next/cache"
 import axios from "axios"
@@ -24,7 +24,6 @@ export async function createOrUpdateUser(user: {
   language_code?: string;
   photo_url?: string;
 }) {
-  const supabaseAdmin = createAdminClient();
   try {
     const { data: existingUser, error: fetchError } = await supabaseAdmin
       .from("users")
@@ -41,7 +40,7 @@ export async function createOrUpdateUser(user: {
       .insert({
         user_id: user.id,
         username: user.username,
-        full_name: ${user.first_name ?? ""} ${user.last_name ?? ""}.trim(),
+        full_name: `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim(),
         avatar_url: user.photo_url,
         language_code: user.language_code,
       })
@@ -58,7 +57,6 @@ export async function createOrUpdateUser(user: {
 }
 
 export async function authenticateUser(chatId: string, userInfo?: Partial<WebAppUser>) {
-  const supabaseAdmin = createAdminClient();
   try {
     const { data: user, error } = await supabaseAdmin
       .from("users")
@@ -66,7 +64,7 @@ export async function authenticateUser(chatId: string, userInfo?: Partial<WebApp
         {
           user_id: chatId,
           username: userInfo?.username,
-          full_name: ${userInfo?.first_name || ""} ${userInfo?.last_name || ""}.trim(),
+          full_name: `${userInfo?.first_name || ""} ${userInfo?.last_name || ""}`.trim(),
           avatar_url: userInfo?.photo_url,
           language_code: userInfo?.language_code,
         },
@@ -83,10 +81,7 @@ export async function authenticateUser(chatId: string, userInfo?: Partial<WebApp
     throw new Error("Authentication failed");
   }
 }
-// app/actions.ts
-import axios from "axios";
-import { supabaseAdmin } from "@/hooks/supabase";
-import logger from "@/lib/logger";
+
 
 export async function sendTelegramInvoice(
   chatId: string,
@@ -101,7 +96,7 @@ export async function sendTelegramInvoice(
 
     // Send invoice via Telegram API
     const response = await axios.post(
-      https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendInvoice,
+      `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendInvoice`,
       {
         chat_id: chatId,
         title,
@@ -122,11 +117,11 @@ export async function sendTelegramInvoice(
       .insert([{ id: payload, user_id: chatId, status: "pending" }]);
 
     if (error) {
-      logger.error(Failed to save invoice for user ${chatId}:, error.message);
-      throw new Error(Database error: ${error.message});
+      logger.error(`Failed to save invoice for user ${chatId}:`, error.message);
+      throw new Error(`Database error: ${error.message}`);
     }
 
-    logger.info(Invoice sent and saved successfully for user ${chatId}: ${payload});
+    logger.info(`Invoice sent and saved successfully for user ${chatId}: ${payload}`);
     return { success: true, data: response.data };
   } catch (error) {
     logger.error("Error in sendTelegramInvoice:", error);
@@ -139,7 +134,7 @@ export async function handleWebhookUpdate(update: any) {
     if (update.pre_checkout_query) {
       // Confirm pre-checkout
       await axios.post(
-        https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery,
+        `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery`,
         {
           pre_checkout_query_id: update.pre_checkout_query.id,
           ok: true,
@@ -157,8 +152,8 @@ export async function handleWebhookUpdate(update: any) {
         .eq("id", invoice_payload);
 
       if (updateError) {
-        logger.error(Failed to update invoice status for payload ${invoice_payload}:, updateError.message);
-        throw new Error(Database error: ${updateError.message});
+        logger.error(`Failed to update invoice status for payload ${invoice_payload}:`, updateError.message);
+        throw new Error(`Database error: ${updateError.message}`);
       }
 
       // Get user details
@@ -170,14 +165,14 @@ export async function handleWebhookUpdate(update: any) {
         .single();
 
       if (userError) {
-        logger.error(Failed to fetch user data for user ${userId}:, userError.message);
-        throw new Error(Database error: ${userError.message});
+        logger.error(`Failed to fetch user data for user ${userId}:`, userError.message);
+        throw new Error(`Database error: ${userError.message}`);
       }
 
       // Determine subscription type based on amount
       let newStatus = "pro";
       let newRole = "subscriber";
-      if (total_amount === 14600) {
+      if (total_amount === 420) {
         // VIP subscription
         newStatus = "admin";
         newRole = "admin";
@@ -190,12 +185,12 @@ export async function handleWebhookUpdate(update: any) {
         .eq("user_id", userId);
 
       if (updateUserError) {
-        logger.error(Failed to update user ${userId} status/role:, updateUserError.message);
-        throw new Error(Database error: ${updateUserError.message});
+        logger.error(`Failed to update user ${userId} status/role:`, updateUserError.message);
+        throw new Error(`Database error: ${updateUserError.message}`);
       }
 
       // Notify the user
-      const telegramBotUrl = https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage;
+      const telegramBotUrl = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`;
       await axios.post(telegramBotUrl, {
         chat_id: userId,
         text: "🎉 Payment successful! Thank you for your purchase.",
@@ -208,10 +203,10 @@ export async function handleWebhookUpdate(update: any) {
         .eq("role", "admin");
      if (adminError) {
         logger.error("Failed to fetch admin users:", adminError.message);
-        throw new Error(Database error: ${adminError.message});
+        throw new Error(`Database error: ${adminError.message}`);
       }
 
-      const adminMessage = 🔔 User ${userData.username || userData.user_id} has upgraded to ${newStatus.toUpperCase()}!;
+      const adminMessage = `🔔 User ${userData.username || userData.user_id} has upgraded to ${newStatus.toUpperCase()}!`;
 
       for (const admin of admins) {
         await axios.post(telegramBotUrl, {
@@ -233,7 +228,7 @@ export async function confirmPayment(preCheckoutQueryId: string) {
     throw new Error("Missing TELEGRAM_BOT_TOKEN");
   }
 
-  const url = https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery;
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery`;
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -272,7 +267,6 @@ export async function validateToken(token: string) {
 
 export async function saveUser(tgUser: TelegramUser) {
   try {
-    const supabaseAdmin = createAdminClient()
     const { data, error } = await supabaseAdmin
       .from('users')
       .upsert({
@@ -323,7 +317,6 @@ export async function sendResult(chatId: string, result: any) {
 }
 
 export const generateEmbeddings = async () => {
-  const supabaseAdmin = createAdminClient();
   const { data: cars } = await supabaseAdmin
     .from('cars')
     .select('id,description')
@@ -350,17 +343,15 @@ export const generateEmbeddings = async () => {
   }
 };
 
-export async function sendTelegramInvoice(
-// app/actions.ts
 export async function setTelegramWebhook() {
   const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-  const WEBHOOK_URL = https://${process.env.VERCEL_URL}/api/telegramWebhook;
+  const WEBHOOK_URL = `https://${process.env.VERCEL_URL}/api/telegramWebhook`;
 
   if (!TELEGRAM_BOT_TOKEN) {
     throw new Error("Missing TELEGRAM_BOT_TOKEN");
   }
 
-  const url = https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook;
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook`;
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -394,31 +385,9 @@ export async function checkInvoiceStatus(token: string, invoiceId: string) {
 }
 
 
-export async function setTelegramWebhook() {
-  const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-  const WEBHOOK_URL = https://${process.env.VERCEL_URL}/api/telegramWebhook;
 
-  if (!TELEGRAM_BOT_TOKEN) {
-    throw new Error("Missing TELEGRAM_BOT_TOKEN");
-  }
-
-  const url = https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url: WEBHOOK_URL }),
-  });
-
-  const result = await response.json();
-  if (!result.ok) {
-    throw new Error("Failed to set webhook");
-  }
-
-  return result;
-}
 // app/actions.ts old openai embeddings(don't use)
 export async function findSimilarCars(resultEmbedding: number[]) {
-  const supabaseAdmin = createAdminClient();
   const { data, error } = await supabaseAdmin.rpc('search_cars', {
     query_embedding: resultEmbedding,
     match_count: 3

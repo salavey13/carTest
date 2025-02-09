@@ -1,36 +1,30 @@
-// /app/info/[id]/page.tsx
-import { notFound } from 'next/navigation';
-import { supabase } from '@/hooks/supabase';
-import RentCarInterface from '@/components/RentCarInterface';
-import { motion } from 'framer-motion';
+import { notFound } from "next/navigation"
+import { fetchCarById } from "@/hooks/supabase"
+import  RentCarInterface  from "@/components/RentCarInterface"
+import { motion } from "framer-motion"
 
 export default async function RentCarPage({ params }: { params: { id: string } }) {
-  const { data: car, error } = await supabase
-    .from('cars')
-    .select('*')
-    .eq('id', params.id)
-    .single();
+  const car = await fetchCarById(params.id)
 
-  if (error || !car) return notFound();
+  if (!car) return notFound()
 
-  // Use the new jsonb field 'specs' to display extended car details
   const specs = car.specs || {
-    version: 'v12',
+    version: "v12",
     electric: false,
-    color: 'Cyber Blue',
-    theme: 'cyber',
+    color: "Cyber Blue",
+    theme: "cyber",
     horsepower: 900,
-    torque: '750Nm',
-    acceleration: '2.9s 0-60mph',
-    topSpeed: '210mph'
-  };
+    torque: "750Nm",
+    acceleration: "2.9s 0-60mph",
+    topSpeed: "210mph",
+  }
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="min-h-screen bg-gray-900 text-white p-4"
+      className="min-h-screen bg-gray-900 text-white p-4 pt-20"
     >
       <RentCarInterface preselectedCar={car} />
       <section className="mt-8">
@@ -42,7 +36,7 @@ export default async function RentCarPage({ params }: { params: { id: string } }
               <span className="text-cyan-400">Version:</span> {specs.version}
             </p>
             <p>
-              <span className="text-cyan-400">Electric:</span> {specs.electric ? 'Yes' : 'No'}
+              <span className="text-cyan-400">Electric:</span> {specs.electric ? "Yes" : "No"}
             </p>
             <p>
               <span className="text-cyan-400">Horsepower:</span> {specs.horsepower}
@@ -65,11 +59,10 @@ export default async function RentCarPage({ params }: { params: { id: string } }
             <p>
               <span className="text-cyan-400">Theme:</span> {specs.theme}
             </p>
-            {/* Add additional aesthetic specs as desired */}
           </div>
         </div>
       </section>
     </motion.div>
-  );
+  )
 }
 
