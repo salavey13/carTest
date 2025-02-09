@@ -8,7 +8,7 @@ from datetime import datetime
 PROJECTS_DIR = os.path.expanduser("~/Documents/V0_Projects")
 REPO_DIR = os.path.join(PROJECTS_DIR, "cartest")
 VERSION_FILE = os.path.join(REPO_DIR, "version.ini")
-V0_DEV_URL = "https://v0.dev/chat/fork-of-rastaman-shop-KvYJosUCML9"
+V0_DEV_URL = "https://v0.dev/chat/cartest-tupabase-template-hdQdrfzkTFA"
 VERCEL_URL = "https://vercel.com"
 SUPABASE_URL = "https://supabase.com"
 GITHUB_URL = "https://github.com/salavey13/cartest"
@@ -289,7 +289,7 @@ def refresh_dashboard():
     # Header
     header_frame = ttk.Frame(root)
     header_frame.pack(fill=tk.X, padx=20, pady=10)
-    ttk.Label(header_frame, text="Панель управления проектом", font=("Arial", 24)).pack()
+    ttk.Label(header_frame, text="Панель управления проектом", font=("Arial", 16)).pack()
     # Progress Section (continued)
     progress_frame = ttk.Frame(root)
     progress_frame.pack(fill=tk.X, padx=20, pady=10)
@@ -298,8 +298,7 @@ def refresh_dashboard():
     for achievement in achievements:
         ttk.Label(progress_frame, text=f"✅ {achievement}", font=("Arial", 12)).pack(anchor=tk.W)
 
-        # ASCII Art
-    add_ascii_art()
+       
 
     # Actions Section
     actions_frame = ttk.Frame(root, style="Dark.TFrame")
@@ -343,9 +342,9 @@ def refresh_dashboard():
     # Pro Tips Section
     pro_tips_frame = ttk.Frame(root)
     pro_tips_frame.pack(fill=tk.X, padx=20, pady=10)
-    ttk.Label(pro_tips_frame, text="Pro Tips:", font=("Arial", 16)).pack(anchor=tk.W)
-    ttk.Label(pro_tips_frame, text="• Интеграция Vercel + Supabase: Перейдите в настройки проекта Vercel -> Расширения -> Supabase Integration.", font=("Arial", 12)).pack(anchor=tk.W)
-    ttk.Label(pro_tips_frame, text="• Автоматизация: Используйте GitHub Actions для автоматического деплоя изменений.", font=("Arial", 12)).pack(anchor=tk.W)
+    ttk.Label(pro_tips_frame, text="Pro Tips:", font=("Arial", 13)).pack(anchor=tk.W)
+    ttk.Label(pro_tips_frame, text="• Интеграция Vercel + Supabase: Перейдите в настройки проекта Vercel -> Расширения -> Supabase Integration.", font=("Arial", 10)).pack(anchor=tk.W)
+    ttk.Label(pro_tips_frame, text="• Автоматизация: Используйте GitHub Actions для автоматического деплоя изменений.", font=("Arial", 10)).pack(anchor=tk.W)
 
     # Links Section
     links_frame = ttk.Frame(root)
@@ -365,15 +364,17 @@ def refresh_dashboard():
     # Exit Button
     ttk.Button(root, text="Выход", command=root.quit).pack(fill=tk.X, padx=20, pady=10)
 
+ # ASCII Art
+    add_ascii_art()
+
 # GUI Setup
 root = tk.Tk()
 root.title("Панель управления проектом")
-root.geometry("800x600")
-root.configure(bg="#2d2d2d")  # Dark theme background
+root.configure(bg="#1d1d1d")  # Dark theme background
 style = ttk.Style()
 style.theme_use("clam")
-style.configure("TLabel", background="#2d2d2d", foreground="#ffffff", font=("Arial", 12))
-style.configure("TButton", background="#4d4d4d", foreground="#ffffff", font=("Arial", 12))
+style.configure("TLabel", background="#2d2d2d", foreground="#ffffff", font=("Arial", 8))
+style.configure("TButton", background="#4d4d4d", foreground="#ffffff", font=("Arial", 8))
 style.configure("TFrame", background="#2d2d2d")
 
 refresh_dashboard()
