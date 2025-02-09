@@ -72,8 +72,41 @@ def stop_timer(start_time):
     return round(time.time() - start_time)
 
 
+
+
+def show_leaderboard():
+    """Display the leaderboard in a new window."""
+    leaderboard_window = tk.Toplevel()
+    leaderboard_window.title("Таблица лидеров")
+    leaderboard_window.geometry("600x400")
+
+    # Header Section
+    header_frame = ttk.Frame(leaderboard_window)
+    header_frame.pack(fill=tk.X, padx=20, pady=10)
+    ttk.Label(header_frame, text="Лидеры настройки проекта", font=("Arial", 18, "bold")).pack()
+
+    # Body Section
+    body_frame = ttk.Frame(leaderboard_window)
+    body_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+    # Fetch and Display Leaderboard Data
+    try:
+        response = requests.get(
+            f"{SUPABASE_API_URL}/rest/v1/users?select=user_id,metadata&status=eq.admin",
+            headers={"apikey": SUPABASE_ANON_KEY}
+        )
+        if response.status_code == 200:
+            users = response.json()
+            for idx, user in enumerate(users[:10]):  # Top 10 users
+                total_time = user['metadata'].get('total_time', 'N/A')
+                ttk.Label(body_frame, text=f"{idx + 1}. {user['user_id']} - {total_time} секунд", font=("Arial", 12)).pack(anchor=tk.W)
+        else:
+            ttk.Label(body_frame, text="Не удалось загрузить таблицу лидеров.", font=("Arial", 12)).pack()
+    except Exception as e:
+        ttk.Label(body_frame, text=f"Ошибка: {str(e)}", font=("Arial", 12)).pack()
+
 def show_landing_page():
-    """Display the landing page with project details."""
+    """Display the landing page with project details and leaderboard integration."""
     # Create a new window for the landing page
     landing_window = tk.Toplevel()
     landing_window.title("О проекте")
@@ -83,7 +116,7 @@ def show_landing_page():
     # Header Section
     header_frame = ttk.Frame(landing_window)
     header_frame.pack(fill=tk.X, padx=20, pady=10)
-    
+
     # ASCII Art Logo
     ascii_art = """
    / ___//   |  / /   /   | |  / / ____/\ \/ <  /__  /
@@ -129,14 +162,15 @@ def show_landing_page():
         link_label.pack(anchor=tk.W)
         link_label.bind("<Button-1>", lambda e, u=url: open_link(u))
 
+    # Leaderboard Button
+    leaderboard_button = ttk.Button(landing_window, text="Показать таблицу лидеров", command=show_leaderboard)
+    leaderboard_button.pack(pady=10)
+
     # Close Button
     close_button = ttk.Button(landing_window, text="Закрыть", command=landing_window.destroy)
     close_button.pack(pady=20)
 
-def open_link(url):
-    """Open a URL in the default web browser."""
-    import webbrowser
-    webbrowser.open(url)
+
 
     
 
@@ -177,21 +211,6 @@ def update_user_metadata(user_id, key, value):
     if response.status_code != 200:
         print("Failed to update user metadata:", response.text)
 
-def fetch_leaderboard():
-    """Fetch and display the leaderboard."""
-    url = f"{SUPABASE_API_URL}/rest/v1/users?select=user_id,metadata&status=eq.admin"
-    headers = {
-        "apikey": SUPABASE_ANON_KEY,
-        "Authorization": f"Bearer {SUPABASE_ANON_KEY}"
-    }
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        users = response.json()
-        print("Leaderboard:")
-        for user in users:
-            print(f"User: {user['user_id']}, Timings: {user['metadata']}")
-    else:
-        print("Failed to fetch leaderboard:", response.text)
 
 # Gamification
 def generate_achievements(metadata):
