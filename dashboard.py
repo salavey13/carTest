@@ -349,7 +349,11 @@ def refresh_dashboard():
     # Links Section
     links_frame = ttk.Frame(root)
     links_frame.pack(fill=tk.X, padx=20, pady=10)
+
+    # Title for the links section
     ttk.Label(links_frame, text="Полезные ссылки:", font=("Arial", 16)).pack(anchor=tk.W)
+
+    # List of links
     links = [
         ("Vercel", VERCEL_URL),
         ("Supabase", SUPABASE_URL),
@@ -358,9 +362,19 @@ def refresh_dashboard():
         ("Qwen Chat", "https://chat.qwenlm.ai"),
         ("Supabase SQL Console", "https://app.supabase.com/project/YOUR_PROJECT_ID/sql"),
     ]
-    for name, url in links:
-        ttk.Button(links_frame, text=name, command=lambda u=url: subprocess.Popen(["start", u], shell=True)).pack(fill=tk.X, padx=10, pady=2)
 
+    # Create a sub-frame for the horizontal buttons
+    horizontal_frame = ttk.Frame(links_frame)
+    horizontal_frame.pack(fill=tk.X, pady=5)
+
+    for name, url in links:
+        # Use `side=tk.LEFT` to place buttons horizontally
+        ttk.Button(
+            horizontal_frame,
+            text=name,
+            command=lambda u=url: subprocess.Popen(["start", u], shell=True)
+        ).pack(side=tk.LEFT, padx=5)  # Add padding between buttons
+        
     # Exit Button
     ttk.Button(root, text="Выход", command=root.quit).pack(fill=tk.X, padx=20, pady=10)
 
