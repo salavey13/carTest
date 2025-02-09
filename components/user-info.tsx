@@ -1,20 +1,32 @@
 "use client"
-
 import Link from "next/link"
-//import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import { User } from "lucide-react"
-import type { TelegramWebApp, WebAppUser } from "@/types/telegram";
+import Image from "next/image"
+import { useAppContext } from "@/contexts/AppContext"
+
 const Button = dynamic(() => import("@/components/ui/button").then((mod) => mod.Button), { ssr: false })
 
+export default function UserInfo() {
+  const { dbUser, isLoading } = useAppContext()
 
-export default function UserInfo(user : WebAppUser) {
-  //const router = useRouter()
+  if (isLoading) {
+    return <div>Loading...</div>
+  }
 
-  if (user) {
+  if (dbUser) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-[#4ECDC4] font-mono text-sm">{user.id}</span>
+        {dbUser.avatar_url && (
+          <Image
+            src={dbUser.avatar_url || "/placeholder.svg"}
+            alt="Avatar"
+            width={32}
+            height={32}
+            className="rounded-full"
+          />
+        )}
+        <span className="text-[#4ECDC4] font-mono text-sm">{dbUser.username || dbUser.full_name}</span>
       </div>
     )
   }
