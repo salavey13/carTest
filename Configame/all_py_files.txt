@@ -1,0 +1,2991 @@
+#advhooks.py 
+``` 
+# advhooks.py
+import os
+import subprocess
+import requests
+from flask import jsonify
+
+# Configuration
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")  # Ensure this is set in your environment variables
+
+# Generate Embeddings for Semantic Search
+def generate_embeddings(project_name: str):
+    """
+    Regenerate embeddings for semantic search using a script.
+    Returns a JSON response indicating success or failure.
+    """
+    project_dir = os.path.join(os.path.expanduser("~/Documents/V0_Projects"), project_name)
+    embeddings_script = os.path.join(project_dir, "utils", "embeddingsGenerator.ts")
+    
+    if not os.path.exists(embeddings_script):
+        return jsonify({
+            "message": f"Embeddings generator script not found in {project_dir}",
+            "success": False
+        }), 404  # Return 404 for missing script
+    
+    try:
+        subprocess.run(
+            ["npx", "tsx", embeddings_script],
+            check=True,
+            cwd=project_dir,
+        )
+        return jsonify({
+            "message": "Embeddings successfully regenerated.",
+            "success": True
+        }), 200  # Return 200 for success
+    except subprocess.CalledProcessError as e:
+        return jsonify({
+            "message": f"Failed to regenerate embeddings: {str(e)}",
+            "success": False
+        }), 500  # Return 500 for server error
+
+# Create Pull Request in GitHub
+def create_pull_request(project_name: str, branch_name: str, title: str, body: str):
+    """
+    Create a pull request in GitHub for the specified branch.
+    Returns a JSON response indicating success or failure.
+    """
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json",
+    }
+    payload = {
+        "title": title,
+        "body": body,
+        "head": branch_name,
+        "base": "main",  # Assuming 'main' is the default branch
+    }
+    repo_url = f"https://api.github.com/repos/salavey13/{project_name}/pulls"
+    
+    try:
+        response = requests.post(repo_url, json=payload, headers=headers)
+        if response.status_code == 201:
+            return jsonify({
+                "message": f"Pull request created successfully: {response.json()['html_url']}",
+                "success": True
+            }), 201  # Return 201 for successful creation
+        else:
+            return jsonify({
+                "message": f"Failed to create pull request: {response.text}",
+                "success": False
+            }), response.status_code  # Return the actual status code from GitHub
+    except Exception as e:
+        return jsonify({
+            "message": f"An error occurred while creating the pull request: {str(e)}",
+            "success": False
+        }), 500  # Return 500 for server error``` 
+ 
+ 
+#cyberui.py 
+``` 
+HTML_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🎮 Cyberpunk Skillz 🤖</title>
+    <style>
+        body {
+            background: radial-gradient(circle,  {{ colors.cyberpunk.purple }}, #000000);
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        .skill-tree {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .skill-node {
+            position: absolute;
+            width: 113px;
+            height: 69px;
+            cursor: grab;
+            touch-action: none;
+        }
+        .skill-box {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(145deg, #ff6f61, #ff1493);
+            border: 2px solid #ff1493;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 10px rgba(255, 20, 147, 0.8);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .skill-box.unlocked {
+            background: linear-gradient(145deg, #006900, #00ffff);
+            border-color: #00ffff;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.8);
+        }
+        .header {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 13px;
+            border-bottom: 2px solid {{ colors.cyberpunk.purple }};
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            width: 100%;
+            justify-content: space-around;
+            z-index: 10;
+        }
+        .header h1 {
+            text-align: center;
+            font-size: 3rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+            background: linear-gradient(90deg, {{ colors.cyberpunk.neon }}, {{ colors.cyberpunk.pink }});
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        #project-select, #reset-button, #close-button {
+            background: rgba(0, 0, 0, 0.5);
+            color: {{ colors.cyberpunk.neon }};
+            border: 2px solid {{ colors.cyberpunk.neon }};
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        #reset-button {
+            background: rgba(0, 0, 0, 0.5);
+            color: {{ colors.cyberpunk.pink }};
+            border: 2px solid {{ colors.cyberpunk.pink }};
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.3rem;
+        }
+        #project-select:hover, #reset-button:hover , #close-button:hover {
+            box-shadow: 0 0 20px {{ colors.cyberpunk.neon }};
+        }
+        #reset-button:hover , #close-button:hover {
+            box-shadow: 0 0 20px {{ colors.cyberpunk.pink }};
+        }
+        .container {
+            width: 95%;
+            max-width: 1200px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        
+        .skill-box.locked {
+            background: linear-gradient(45deg, rgba(255, 255, 0, 0.05), rgba(0, 0, 0, 0.9));
+            border: 2px solid {{ colors.btn }};
+        }
+        .skill-box.unlocked {
+            background: linear-gradient(45deg, rgba(0, 69, 0, 0.05), rgba(148, 0, 211, 0.9));
+        }
+        .skill-box.completed {
+            background: linear-gradient(45deg, rgba(0, 142, 0, 0.05), rgba(148, 0, 211, 0.9));
+            border: 2px solid lime;
+        }
+        .skill-box.new-unlocked {
+            transform: scale(1.13); /* Enlarge new unlocked skills */
+            box-shadow: 0 0 20px {{ colors.cyberpunk.neon }};
+            animation: pulse 2s infinite;
+        }
+        .skill-box:hover {
+            transform: scale(1.1) rotate(2deg);
+            box-shadow: 0 0 20px {{ colors.cyberpunk.purple }};
+        }
+        .skill-icon {
+            font-size: 1.5em;
+            margin-bottom: 5px;
+        }
+        .skill-label {
+            font-size: 1rem;
+            text-align: center;
+        }
+        .skill-connection {
+            position: absolute;
+            width: 2px;
+            border-radius: 1px;
+            
+            z-index: -2;
+        }
+        .skill-connection.dimmed {
+            opacity: 0.42;
+
+        }
+        .particle {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            border-radius: 50%;
+            animation: moveParticle 3s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
+        }
+        @keyframes moveParticle {
+            0% { transform: translate(0, 0); opacity: 1; }
+            100% { transform: translate(var(--end-x), var(--end-y)); opacity: 1; }
+        }
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+
+        }
+        .legend-item {
+                        
+                         
+            display: flex;
+                                   
+            align-items: center;
+            gap: 5px;
+        }
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .skill-connection.active {
+            opacity: 0.9;
+            animation: pulse 2s infinite;
+        }
+
+        .skill-box:hover .tooltip {
+            display: block;
+        }
+        @media (max-width: 1024px) {
+            h1 {
+                font-size: 2rem;
+            }
+
+        }
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 1.4rem;
+            }
+        }
+        /* Dark Mode Enhancements */
+        .skill-box {
+            background: linear-gradient(145deg, #4b0082, #8a2be2);
+            border-color: #8a2be2;
+            box-shadow: 0 0 10px rgba(138, 43, 226, 0.8);
+        }
+
+        .skill-box:hover {
+            box-shadow: 0 0 15px rgba(138, 43, 226, 1);
+                               
+                                         
+                                                          
+                          
+                                
+                         
+                         
+                      
+                                         
+                        
+        }
+        .skill-box.unlocked:hover {
+            box-shadow: 0 0 15px rgba(50, 205, 50, 1);
+        }
+
+        .particle {
+            background: {{ colors.cyberpunk.neon }};
+                                                                    
+                         
+             
+                        
+                                  
+             
+        }
+        .tooltip {
+            display: none;
+            position: absolute;
+            background: rgba(0, 0, 0, 1);
+            border: 2px solid {{ colors.cyberpunk.neon }};
+            padding: 15px;
+            border-radius: 16px;
+            width: 250px;
+            bottom: -13%;
+            left: 50%;
+            transform: translateX(-100%);
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+    <div id="toast-container"></div>
+    <div id="notifications" style="position: fixed; bottom: 10px; right: 10px; background: #1a1a1a; color: #fff; padding: 10px; border-radius: 5px; max-width: 300px;">
+        <h4>Уведомления</h4>
+        <ul id="notification-list"></ul>
+    </div>
+    <div class="header">
+        <select id="project-select">
+            {% for project in projects %}
+            <option value="{{ project }}" {% if project == current_project %}selected{% endif %}>
+                {{ project }}
+            </option>
+            {% endfor %}
+        </select>
+        <h1>🎮 Cyberpunk Skillz 🤖</h1>
+        <button id="reset-button">♻</button>
+        
+    </div>
+    
+    <!-- Leaderboard Section -->
+    <div id="leaderboard-section" style="display: none; margin-top: 20px;">
+        <h2 style="color: #ff0000; text-align: center;">🏆 Таблица Лидеров 🏆</h2>
+        <div id="leaderboard-content" style="padding: 20px; background-color: #1a1a1a; color: #ffffff;">
+            <!-- Leaderboard content will be dynamically populated here -->
+        </div>
+    </div>
+    
+    
+    <div class="skill-tree" id="skillTree">
+        
+    </div>
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-dot" style="background:  white;"></div>
+            <span>Настройка проекта</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background: yellow;"></div>
+            <span>Контроль версий</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background: blue;"></div>
+            <span>Управление базой данных</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background: {{ colors.cyberpunk.pink }};"></div>
+            <span>Развертывание</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background: {{ colors.cyberpunk.purple }};"></div>
+            <span>Интеграция</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background: {{ colors.cyberpunk.neon }};"></div>
+            <span>Продвинутые возможности</span>
+        </div>
+        <!-- Git Status for Intermediate and Above -->
+        {% if user_level in ['Intermediate', 'Advanced', 'Badass'] %}
+        <div class="legend-item">
+            <div class="legend-dot" style="background: {{ git_status_color }};"></div>
+            <span>Статус Git: {{ git_status }}</span>
+        </div>
+        {% endif %}
+        <!-- Current User Level -->
+        <div>
+            Ваш текущий уровень: <strong>{{ user_level }}</strong>
+        </div>
+    </div>
+
+    <script>
+        var skill_data = {{ skill_data | tojson | safe }};
+        console.log(skill_data);
+        var colors = {{ colors | tojson | safe }};
+        
+        /**
+         * Function to determine particle color based on skill type and dependencies.
+         */
+        function getParticleColor(skillName, colors) {
+            return "cyan"; // Default to white text color
+            // Define base colors for skill categories using the passed `colors` object
+            const CATEGORY_COLORS = {
+                "ProjectSetup": colors.cyberpunk.pink, // Pink (Project setup)
+                "VersionControl": colors.cyberpunk.purple, // Purple (Git-related)
+                "DatabaseManagement": colors.cyberpunk.neon, // Cyan (Supabase-related)
+                "Deployment": colors.cyberpunk.pink, // Pink (Vercel-related)
+                "Integration": colors.cyberpunk.purple, // Purple (Telegram/Webhook-related)
+                "AdvancedFeatures": colors.cyberpunk.neon, // Cyan (Embeddings/Leaderboard)
+            };
+
+            // Map skills to their categories based on SKILL_DEPENDENCIES
+            const SKILL_CATEGORIES = {
+                "Создать папку проекта": "ProjectSetup",
+                "Установить Git": "VersionControl",
+                "Установить Node.js": "ProjectSetup",
+                "Установить VS Code": "ProjectSetup",
+                "Установить Notepad++": "ProjectSetup",
+                "Клонировать репозиторий": "VersionControl",
+                "Применить ZIP обновления": "VersionControl",
+                "Создать Pull Request": "VersionControl",
+                "Установить Supabase CLI": "DatabaseManagement",
+                "Инициализировать Supabase": "DatabaseManagement",
+                "Сбросить базу данных Supabase": "DatabaseManagement",
+                "Загрузить демо данные Supabase": "DatabaseManagement",
+                "Применить custom.sql": "DatabaseManagement",
+                "Установить Vercel CLI": "Deployment",
+                "Настроить Vercel": "Deployment",
+                "Синхронизировать переменные окружения": "Deployment",
+                "Настроить Telegram бот": "Integration",
+                "Установить Webhook": "Integration",
+                "Показать таблицу лидеров": "AdvancedFeatures",
+                "Генерировать вложения": "AdvancedFeatures",
+            };
+
+            // Get the category of the skill
+            const category = SKILL_CATEGORIES[skillName];
+
+            // If the skill has dependencies, blend its color with the dependencies' colors
+            const dependencies = SKILL_DEPENDENCIES[skillName] || [];
+            if (dependencies.length > 0) {
+                const dependencyColors = dependencies.map(dep => CATEGORY_COLORS[SKILL_CATEGORIES[dep]]);
+                return blendColors([CATEGORY_COLORS[category], ...dependencyColors]);
+            }
+
+            // Default to the category color if no dependencies
+            return CATEGORY_COLORS[category] || colors.fg; // Default to white text color
+        }
+
+        function blendColors(colors) {
+            let r = 0, g = 0, b = 0;
+            colors.forEach(color => {
+                r += parseInt(color.slice(1, 3), 16);
+                g += parseInt(color.slice(3, 5), 16);
+                b += parseInt(color.slice(5, 7), 16);
+            });
+            r = Math.floor(r / colors.length);
+            g = Math.floor(g / colors.length);
+            b = Math.floor(b / colors.length);
+            return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+        }
+        
+        function drawSkillTree() {
+            
+            const container = document.querySelector('.skill-tree');
+            // Clear existing connections and particles
+            //document.querySelectorAll('.skill-node, skill-box, skill-icon, skill-label').forEach(el => el.remove());
+            const gridSize = { rows: 11, cols: 11 };
+            const cellSize = { width: window.innerWidth / gridSize.cols, height: window.innerHeight / gridSize.rows };
+
+            // Create nodes
+            for (const [skillName, skill] of Object.entries(skill_data)) {  
+                const node = document.createElement('div');
+                node.className = 'skill-node';
+                node.style.top = `${skill.position.row * cellSize.height}px`;
+                node.style.left = `${skill.position.col * cellSize.width}px`;
+
+                const box = document.createElement('div');
+                box.className = `skill-box ${skill.unlocked ? 'unlocked' : 'locked'} ${skill.completed ? 'completed' : ''} ${skill.unlocked && !skill.completed ? 'new-unlocked' : ''} data-skill=${ skill.name }`;
+                box.dataset.skill = skillName;
+
+                // Create tooltip
+                const tooltip = document.createElement('div');
+                tooltip.className = 'tooltip';
+                tooltip.innerHTML = `
+                    <div style="color: ${colors.cyberpunk.neon}; margin-bottom: 10px;">
+                        ${skill.label} (${skill.unlocked ? '✨ ДОСТУПНО' : '🔒 ЗАБЛОКИРОВАНО'})
+                    </div>
+                    <div>${skill.description}</div>
+                    ${skill.dependencies && skill.dependencies.length > 0 ? `
+                        <div style="margin-top: 10px; color: ${colors.cyberpunk.neon};">
+                            Требуется:
+                            <ul style="margin: 5px 0; padding-left: 20px;">
+                                ${skill.dependencies.map(dep => `<li>${dep}</li>`).join('')}
+                            </ul>
+                        </div>` : ''
+                    }
+                `;           
+                                                                              
+                // Create skill icon & label
+                const icon = document.createElement('div');
+                icon.className = 'skill-icon';
+                icon.innerHTML = skill.icon;
+
+                const label = document.createElement('div');
+                label.className = 'skill-label';
+                label.innerText = skill.label;
+
+                // Assemble elements
+                box.appendChild(tooltip);
+                box.appendChild(icon);
+                box.appendChild(label);
+                node.appendChild(box);
+                container.appendChild(node);
+                                                  
+
+                // Make nodes draggable
+                let isDragging = false;
+                let offsetX, offsetY;
+                                                                                              
+                      
+                                             
+                                          
+                                                
+
+                const startDrag = (e) => {
+                    isDragging = true;
+                    const rect = node.getBoundingClientRect();
+                    offsetX = e.touches ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
+                    offsetY = e.touches ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+                    box.classList.add('dragging');
+                };
+
+                const moveDrag = (e) => {
+                    if (!isDragging) return;
+                    const x = e.touches ? e.touches[0].clientX - offsetX : e.clientX - offsetX;
+                    const y = e.touches ? e.touches[0].clientY - offsetY : e.clientY - offsetY;
+
+                    // Snap to grid
+                    const gridX = Math.round(x / cellSize.width) * cellSize.width;
+                    const gridY = Math.round(y / cellSize.height) * cellSize.height;
+                                                                                                       
+                                                                                                     
+                                                      
+                      
+
+                    node.style.left = `${gridX}px`;
+                    node.style.top = `${gridY}px`;
+                                                                                                   
+                                                                                                   
+
+                    // Update skill position
+                    skill.position.col = Math.round(gridX / cellSize.width);
+                    skill.position.row = Math.round(gridY / cellSize.height);
+
+                    // Redraw connections and particles
+                    redrawConnectionsAndParticles();
+                };
+
+                const endDrag = () => {
+                    isDragging = false;
+                    box.classList.remove('dragging');
+                };
+
+                box.addEventListener('mousedown', startDrag);
+                box.addEventListener('touchstart', startDrag);
+                      
+
+                document.addEventListener('mousemove', moveDrag);
+                document.addEventListener('touchmove', moveDrag);
+                                                         
+                      
+
+                                                                 
+                                                                  
+                                                                     
+                document.addEventListener('mouseup', endDrag);
+                                                                  
+                document.addEventListener('touchend', endDrag);
+
+            }
+            /**
+             * Function to redraw connections and particles between skills.
+             */
+            function redrawConnectionsAndParticles() {
+                // Clear existing connections and particles
+                document.querySelectorAll('.skill-connection, .particle').forEach(el => el.remove());
+
+                // Redraw connections and particles
+                for (const [skillName, skill] of Object.entries(skill_data)) {
+                    if (skill.dependencies.length > 0) {
+                        skill.dependencies.forEach(depName => {
+                            const depSkill = skill_data[depName];
+                            if (!depSkill) return;
+
+                            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                            svg.setAttribute("class", `skill-connection ${!skill.unlocked ? 'dimmed' : ''}`);
+                            svg.style.position = "absolute";
+                            svg.style.left = "0";
+                            svg.style.top = "0";
+                            svg.style.width = "100%";
+                            svg.style.height = "100%";
+                            svg.style.overflow = "visible";
+
+                            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+
+                            // Calculate connection points
+                            const x1 = (depSkill.position.col + 0.5) * cellSize.width;
+                            const y1 = (depSkill.position.row + 0.5) * cellSize.height;
+                            const x2 = (skill.position.col + 0.5) * cellSize.width;
+                            const y2 = (skill.position.row + 0.5) * cellSize.height;
+
+                            // Add slight randomness for curved lines
+                            const cp1x = x1 + (x2 - x1) * 0.3 + Math.random() * 50 - 25;
+                            const cp1y = y1 + (y2 - y1) * 0.3 + Math.random() * 50 - 25;
+                            const cp2x = x2 - (x2 - x1) * 0.3 + Math.random() * 50 - 25;
+                            const cp2y = y2 - (y2 - y1) * 0.3 + Math.random() * 50 - 25;
+
+                            path.setAttribute("d", `M ${x1},${y1} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${x2},${y2}`);
+                            path.setAttribute("stroke", "#ff1493"); // Default color
+                            path.setAttribute("stroke-width", "1.5");
+                            path.setAttribute("fill", "none");
+                            path.setAttribute("stroke-linecap", "round");
+
+                            svg.appendChild(path);
+                            container.appendChild(svg);
+
+                            // Add animated particles along the connection
+                            const particleCount = 20;
+                            for (let i = 0; i < particleCount; i++) {
+                                const particle = document.createElement('div');
+                                particle.className = 'particle';
+                                particle.style.left = `${x1}px`;
+                                particle.style.top = `${y1}px`;
+                                particle.style.background = getParticleColor(skillName);
+                                particle.style.animationDelay = `${Math.random() * 2}s`;
+
+                                const dx = x2 - x1;
+                                const dy = y2 - y1;
+                                const jitterX = Math.random() * 30 - 15; // Random jitter for natural movement
+                                const jitterY = Math.random() * 30 - 15;
+
+                                particle.style.setProperty('--end-x', `${dx + jitterX}px`);
+                                particle.style.setProperty('--end-y', `${dy + jitterY}px`);
+
+                                container.appendChild(particle);
+                            }
+                        });
+                    }
+                }
+            }
+            
+            // Initial creation of connections
+            //redrawConnectionsAndParticles();
+        
+        
+            /**
+             * Function to determine particle color based on skill type.
+             
+            function getParticleColorOld(skillName) {
+                if (skillName.includes("Git")) return "#ff1493"; // CMYK Magenta
+                if (skillName.includes("Supabase")) return "#00ffff"; // CMYK Cyan
+                if (skillName.includes("Vercel")) return "#ff6f61"; // CMYK Yellow
+                return "#ffffff"; // Default White
+            }*/
+
+            // Initial creation of skill nodes and connections
+            
+            redrawConnectionsAndParticles();
+
+            // Handle window resize events to redraw the skill tree
+            window.addEventListener('resize', () => {
+                // Recalculate cell size
+                cellSize.width = window.innerWidth / gridSize.cols;
+                cellSize.height = window.innerHeight / gridSize.rows;
+
+                // Redraw everything
+                //drawSkillTree()
+                redrawConnectionsAndParticles();
+            });
+        }
+    
+    
+        drawSkillTree()
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        // Function to fetch and display leaderboard data
+        async function fetchLeaderboard() {
+            const response = await fetch('/api/leaderboard');
+            const data = await response.json();
+            const leaderboardContent = document.getElementById('leaderboard-content');
+            leaderboardContent.innerHTML = ''; // Clear previous content
+
+            if (data.length === 0) {
+                leaderboardContent.innerHTML = '<p>Таблица лидеров пуста.</p>';
+                return;
+            }
+
+            data.forEach((entry, index) => {
+                const entryDiv = document.createElement('div');
+                entryDiv.style.marginBottom = '10px';
+                entryDiv.innerHTML = `
+                    <strong>${index + 1}. ${entry.nickname} (${entry.user_id})</strong> - ${entry.total_time} секунд<br>
+                    <span style="color: #8e44ad;">🏆 Достижения: ${entry.achievements.join(', ')}</span>
+                `;
+                leaderboardContent.appendChild(entryDiv);
+            });
+
+            // Show the leaderboard section
+            document.getElementById('leaderboard-section').style.display = 'block';
+        }
+        
+        function showToast(message, type = "info") {
+            const colors = {
+                info: "#007bff",
+                success: "#28a745",
+                error: "#dc3545",
+                warning: "#ffc107"
+            };
+            Toastify({
+                text: message,
+                duration: 3000,
+                close: true,
+                gravity: "top",
+                position: "right",
+                backgroundColor: colors[type] || "#007bff",
+            }).showToast();
+        }
+    
+        function executeSkill(skillName) {
+            fetch(`/execute/?skill=${encodeURIComponent(skillName)}`, { method: 'GET' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.refresh) {
+                        location.reload(); // Refresh the page if needed
+                    } else {
+                        alert(data.message); // Show a message to the user
+                    }
+                })
+                .catch(error => console.error('Ошибка при выполнении навыка:', error));
+        }
+        
+        function handleSkill(skillBox) {
+            const skillName = skillBox.dataset.skill;
+            const isLocked = skillBox.classList.contains('locked');
+
+            if (isLocked) {
+                alert('Сначала изучите необходимые навыки!');
+                return;
+            }
+
+            executeSkill(skillName)
+        }
+        
+        
+
+        document.querySelectorAll('.skill-box').forEach(box => {
+            box.addEventListener('click', () => handleSkill(box));
+        });
+
+        document.getElementById('project-select').addEventListener('change', function() {
+            window.location.href = '/?project=' + this.value;
+        });
+
+        document.getElementById('reset-button').addEventListener('click', function() {
+            if (confirm('Сбросить весь прогресс и начать заново?')) {
+                fetch('/reset_progress')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.message) {
+                            alert(data.message);
+                        }
+                        location.reload();
+                    });
+            }
+        });
+
+    
+    
+    
+    
+    
+    
+        
+        
+        
+        
+    </script>
+</body>
+</html>
+'''
+#{/*<button onclick="closeApp()" id="close-button">❌ Закрыть</button>*/}``` 
+ 
+ 
+#main.py 
+``` 
+import os
+import sys
+import threading
+
+from skillboard import app, setup_tray_icon, open_browser
+
+
+if __name__ == '__main__':
+    # Redirect stdout and stderr to os.devnull if running without a console
+#    if not sys.stdout:
+#        sys.stdout = open(os.devnull, 'w')
+#        sys.stderr = open(os.devnull, 'w')
+    
+                # Create the image
+                #img = create_image()
+
+                # Save the image to a file
+                #img.save("tray_icon.png")
+
+    # Start a thread to open the browser
+    threading.Thread(target=open_browser, daemon=True).start()
+    
+    # Start the tray icon in a separate thread
+    threading.Thread(target=setup_tray_icon, daemon=True).start()
+    
+    app.run(host='0.0.0.0', port=1313, debug=True)``` 
+ 
+ 
+#musthooks.py 
+``` 
+from flask import request, jsonify
+# musthooks.py
+import shutil
+import os
+import sys
+import pythoncom
+from win32com.shell import shell, shellcon
+import subprocess
+import time
+import uuid
+from datetime import datetime
+from tkinter import messagebox
+import winreg
+import webbrowser
+import json
+from tkinter import filedialog
+
+# load_projects                     +
+# load_config                       +
+# apply_zip_updates                 +
+# download_and_install              +
+# save_config                       +
+# run_command                       +
+# create_project                    +
+# switch_project                    +
+# mark_step_completed               +
+# generate_installation_achievement +
+# clone_repository                  +
+# is_tool_installed                 +
+# is_npm_package_installed          +
+# ensure_v0_projects_dir            +
+# ensure_default_project            +
+# pull_git_updates                  +
+# check_git_status                  +
+# get_npm_path                      +
+# update_environment_variable       +
+# verify_github_login               +
+# guide_user_to_create_github_token +
+# install_cli_tool                  +
+# create_project_folder             +
+# initialize_login_checklist        +                  
+
+
+# Configuration
+PROJECTS_DIR = os.path.expanduser("~/Documents/V0_Projects")
+DEFAULT_PROJECT_NAME = "cartest"  # Default project name
+REPO_DIR = os.path.join(PROJECTS_DIR, DEFAULT_PROJECT_NAME)  # Dynamic repo path
+V0_DEV_URL = "https://v0.dev/chat/fork-of-rastaman-shop-KvYJosUCML9"
+VERCEL_URL = "https://vercel.com"
+SUPABASE_URL = "https://supabase.com"
+GITHUB_URL = f"https://github.com/salavey13/{DEFAULT_PROJECT_NAME}"
+TEMP_DIR = os.path.join(os.getenv("TEMP"), "setup_temp")
+# URLs for downloads
+DOWNLOAD_URLS = {
+    "Git": "https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.2/Git-2.47.1.2-64-bit.exe",
+    "Node.js": "https://nodejs.org/dist/v22.13.1/node-v22.13.1-x64.msi",
+    "Notepad++": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.7.6/npp.8.7.6.Installer.x64.exe",
+    "VS Code": "https://code.visualstudio.com/sha/download?build=stable&os=win32-x64-user",
+}
+
+
+
+def get_npm_path():
+    # Find the full path to node
+    node_path = shutil.which("node")
+    if not node_path:
+        raise FileNotFoundError("Node.js is not installed or not found in PATH.")
+    
+    # Derive the npm path by replacing 'node' with 'npm'
+    npm_path = node_path.replace("node.exe", "npm")
+    
+    # Verify that the derived npm path exists
+    if not os.path.exists(npm_path):
+        raise FileNotFoundError(f"npm not found at the expected location: {npm_path}")
+    
+    return npm_path 
+    
+def update_environment_variable(key, value):
+    """
+    Update the environment variable for the current session and persist it in the Windows registry.
+    """
+    # Update for the current session
+    os.environ[key] = value
+    
+    try:
+        # Open the registry key for environment variables
+        reg_key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            "Environment",
+            0,
+            winreg.KEY_SET_VALUE
+        )
+        
+        # Set the environment variable in the registry
+        winreg.SetValueEx(reg_key, key, 0, winreg.REG_SZ, value)
+        winreg.CloseKey(reg_key)
+        
+        # Notify the system of the environment change
+        windll.user32.SendMessageW(0xFFFF, 0x1A, 0, 0)  # Broadcast WM_SETTINGCHANGE
+        
+        return json.dumps({
+            "status": "success",
+            "message": f"Environment variable {key} updated and saved."
+        })
+    except Exception as e:
+        return json.dumps({
+            "status": "error",
+            "message": f"Failed to save environment variable: {str(e)}"
+        })
+
+def verify_github_login():
+    """
+    Verify if the GitHub token is set in the environment variables.
+    If not, guide the user to create one and optionally update the environment.
+    """
+    github_token = os.getenv("GITHUB_TOKEN")
+    
+    if github_token:
+        # Token found, mark GitHub as completed
+        config["github"] = "completed"
+        save_config(current_project, config)
+        return json.dumps({
+            "status": "success",
+            "message": "GitHub successfully configured!"
+        })
+    else:
+        return json.dumps({
+            "status": "info",
+            "message": "GitHub token not found. Please configure it manually."
+        })
+
+def guide_user_to_create_github_token():
+    """
+    Guide the user step-by-step to create a GitHub Personal Access Token (PAT).
+    """
+    instructions = (
+        "To create a GitHub token:\n"
+        "1. Go to GitHub settings: https://github.com/settings/tokens\n"
+        "2. Click 'Generate new token'.\n"
+        "3. Select necessary permissions (e.g., repo, read:org).\n"
+        "4. Copy the generated token (you won't see it again!).\n\n"
+        "Would you like us to automatically update your GITHUB_TOKEN environment variable?"
+    )
+    
+    return json.dumps({
+        "status": "info",
+        "message": instructions
+    })
+
+def pull_git_updates():
+    try:
+        subprocess.run(["git", "pull"], check=True)
+        generate_installation_achievement("Git Update Pulled", current_project)
+        return json.dumps({
+            "status": "success",
+            "message": "Updates applied successfully!"
+        })
+    except subprocess.CalledProcessError as e:
+        return json.dumps({
+            "status": "error",
+            "message": f"Failed to apply updates: {e.stderr}"
+        })
+
+def install_cli_tool(tool_name, current_project):
+    config = load_config(current_project)
+    
+    # Check if the tool is already installed
+    if tool_name.lower() in config.get("TOOLS_INSTALLED", []):
+        return json.dumps({
+            "status": "info",
+            "message": f"{tool_name} is already installed."
+        })
+    
+    # Ensure Node.js and npm are installed
+    if not is_tool_installed("node"):
+        return json.dumps({
+            "status": "error",
+            "message": "Node.js must be installed before installing this tool."
+        })
+    
+    try:
+        # Get the full path to npm
+        npm_path = get_npm_path()
+        
+        # Install globally if supported
+        if tool_name.lower() != "supabase":
+            subprocess.run([npm_path, "install", "-g", tool_name], check=True)
+            config.setdefault("TOOLS_INSTALLED", []).append(tool_name.lower())
+            save_config(current_project, config)
+            message = f"{tool_name} installed globally."
+        else:
+            # Install Supabase CLI locally
+            project_dir = os.path.join(PROJECTS_DIR, current_project)
+            if not os.path.exists(project_dir):
+                return json.dumps({
+                    "status": "error",
+                    "message": "Project folder does not exist."
+                })
+            subprocess.run([npm_path, "install", tool_name], cwd=project_dir, check=True)
+            config.setdefault("TOOLS_INSTALLED", []).append(tool_name.lower())
+            save_config(current_project, config)
+            message = f"{tool_name} installed locally in the project folder."
+        
+        generate_installation_achievement(f"{tool_name} CLI Installed", current_project)
+        return json.dumps({
+            "status": "success",
+            "message": message
+        })
+    except subprocess.CalledProcessError as e:
+        return json.dumps({
+            "status": "error",
+            "message": f"Failed to install {tool_name}: {e.stderr}"
+        })
+
+def is_npm_package_installed(package_name, current_project):
+    config = load_config(current_project)
+    task_key = f"{package_name.lower()}_installed"
+    
+    # Check if the installation status is cached
+    if task_key in config and config[task_key] == "True":
+        return json.dumps({
+            "status": "success",
+            "message": f"{package_name} is already installed."
+        })
+    
+    try:
+        # Get the full path to npm
+        npm_path = get_npm_path()
+        
+        # Step 1: Check globally installed packages
+        try:
+            result = subprocess.run(
+                [npm_path, "list", "-g", "--depth=0"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            is_globally_installed = package_name in result.stdout
+            if is_globally_installed:
+                config[task_key] = "True"
+                save_config(current_project, config)
+                return json.dumps({
+                    "status": "success",
+                    "message": f"{package_name} is globally installed."
+                })
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to list globally installed npm packages: {e.stderr}")
+        
+        # Step 2: Check locally installed packages (within the project directory)
+        project_dir = os.path.join(PROJECTS_DIR, current_project)
+        if os.path.exists(os.path.join(project_dir, "package.json")):
+            try:
+                result = subprocess.run(
+                    [npm_path, "list", "--depth=0"],
+                    cwd=project_dir,  # Ensure we're in the project directory
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                is_locally_installed = package_name in result.stdout
+                if is_locally_installed:
+                    config[task_key] = "True"
+                    save_config(current_project, config)
+                    return json.dumps({
+                        "status": "success",
+                        "message": f"{package_name} is locally installed."
+                    })
+            except subprocess.CalledProcessError as e:
+                print(f"Failed to list locally installed npm packages: {e.stderr}")
+        
+        # If no checks succeeded, return False
+        return json.dumps({
+            "status": "info",
+            "message": f"{package_name} is not installed."
+        })
+    except Exception as e:
+        return json.dumps({
+            "status": "error",
+            "message": f"Error checking installation of package {package_name}: {str(e)}"
+        })
+        
+def is_tool_installed(tool_name, current_project):
+    config = load_config(current_project)
+    
+    # Check if the tool installation status is already saved in version.ini
+    task_key = f"{tool_name.lower()}_installed"
+    if task_key in config and config[task_key] == "True":
+        return True
+    
+    # Proceed with the actual check if not found in version.ini
+    try:
+        subprocess.run([tool_name, "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        # Save the result to version.ini to avoid future checks
+        config[task_key] = "True"
+        save_config(current_project, config)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+
+def ensure_v0_projects_dir():
+    projects_dir = os.path.expanduser("~/Documents/V0_Projects")
+    if not os.path.exists(projects_dir):
+        os.makedirs(projects_dir)
+    return projects_dir
+
+def ensure_default_project():
+    default_project_dir = os.path.join(PROJECTS_DIR, DEFAULT_PROJECT_NAME)
+    version_file = os.path.join(default_project_dir, "version.ini")
+    if not os.path.exists(default_project_dir):
+        os.makedirs(default_project_dir)
+    if not os.path.exists(version_file):
+        with open(version_file, "w") as f:
+            f.write("[DEFAULT]\nсоздать_папку_проекта=complete\n")
+    return default_project_dir
+    
+def clone_repository(project_name: str):
+    config = load_config(project_name)
+    targetDir = os.path.join(PROJECTS_DIR, project_name)  # Dynamic repo path
+    if not os.path.exists(REPO_DIR):
+        run_command(f"git clone {GITHUB_URL} \"{targetDir}\"", "Репозиторий успешно клонирован.", "Не удалось клонировать репозиторий.")
+        config["REPO_CLONED_COMPLETED"] = "True"
+        save_config(project_name, config)
+
+# Create New Project
+def create_project():
+    github_url = simpledialog.askstring("Создать проект", "Введите URL репозитория GitHub:")
+    if not github_url:
+        messagebox.showerror("Ошибка", "URL репозитория не может быть пустым.")
+        return
+    project_name = github_url.split("/")[-1].replace(".git", "")
+    project_dir = os.path.join(PROJECTS_DIR, project_name)
+    if os.path.exists(project_dir):
+        messagebox.showerror("Ошибка", f"Проект '{project_name}' уже существует.")
+        return
+    os.makedirs(project_dir)
+    subprocess.run(["git", "clone", github_url, project_dir], check=True)
+    # Initialize version.ini with login checklist
+    initialize_login_checklist(project_name)
+    load_projects()
+    #projects_combobox["values"] = projects
+    #projects_combobox.set(project_name)
+    #refresh_dashboard()
+    
+# Switch Project
+def switch_project(event):
+    selected_project = projects_combobox.get()
+    if selected_project:
+        current_project = selected_project
+        refresh_dashboard()
+        
+# Create the V0_Projects folder
+def create_project_folder():
+    """Create the V0_Projects folder."""
+    projects_dir = os.path.expanduser("~/Documents/V0_Projects")
+    config = load_config(DEFAULT_PROJECT_NAME)
+
+    if not os.path.exists(projects_dir):
+        os.makedirs(projects_dir)
+        config["project_folder_created"] = "True"
+        save_config(DEFAULT_PROJECT_NAME, config)
+        return jsonify({
+            "status": "success",
+            "message": f"Папка {projects_dir} успешно создана."
+        })
+    elif "project_folder_created" not in config:
+        config["project_folder_created"] = "True"
+        save_config(DEFAULT_PROJECT_NAME, config)
+        return jsonify({
+            "status": "info",
+            "message": f"Папка {projects_dir} уже существует. Ярлык создан на рабочем столе."
+        })
+    else:
+        return jsonify({
+            "status": "info",
+            "message": f"Папка {projects_dir} уже существует."
+        })
+
+# Load Configuration for Selected Project
+def load_config(project_name):
+    config_file = os.path.join(PROJECTS_DIR, project_name, "version.ini")
+    config = {}
+    if os.path.exists(config_file):
+        with open(config_file, "r", encoding="utf-8") as f:
+            for line in f:
+                if "=" in line:
+                    key, value = line.strip().split("=", 1)
+                    config[key] = value
+    return config
+
+# Save Configuration for Selected Project
+def save_config(project_name, config):
+    config_file = os.path.join(PROJECTS_DIR, project_name, "version.ini")
+    with open(config_file, "w", encoding="utf-8") as f:
+        for key, value in config.items():
+            f.write(f"{key}={value}\n")
+            
+def load_projects():
+    projects_dir = os.path.expanduser("~/Documents/V0_Projects")
+    if not os.path.exists(projects_dir):
+        os.makedirs(projects_dir)
+    projects = [d for d in os.listdir(projects_dir) 
+               if os.path.isdir(os.path.join(projects_dir, d))]
+    if not projects:
+        ensure_default_project()
+        projects = ["cartest"]
+    return projects
+
+# Mark Step as Completed
+def mark_step_completed(step):
+    config = load_config(current_project)
+    config[step] = "completed"
+    save_config(current_project, config)
+
+# Download and Install Tools
+def is_tool_installed(tool_name):
+    """
+    Check if a tool is installed by verifying its presence in the system PATH.
+    """
+    return shutil.which(tool_name) is not None
+
+# Initialize Login Checklist
+def initialize_login_checklist(project_name):
+    """
+    Initialize the login checklist only if it hasn't been set before.
+    """
+    config = load_config(project_name)
+    
+    # Check if the checklist has already been initialized
+    if "github" in config and "vercel" in config and "supabase" in config:
+        return json.dumps({
+            "status": "info",
+            "message": "Лист проверки входа уже настроен."
+        })
+    
+    # Initialize checklist only if not already set
+    login_checklist = {
+        "github": "not_started",
+        "vercel": "not_started",
+        "v0_dev": "not_started",
+        "supabase": "not_started",
+        "config_start_time": str(int(time.time())),  # Record the start timestamp
+        "user_id": str(uuid.uuid4()),  # Create a unique user ID
+    }
+    
+    # Update config only for keys that don't exist yet
+    for key, value in login_checklist.items():
+        if key not in config:
+            config[key] = value
+    
+    save_config(project_name, config)
+    
+    # Inform the user and open login pages in browser
+    webbrowser.open("https://github.com/login")
+    webbrowser.open("https://vercel.com/login")
+    webbrowser.open("https://v0.dev/login")
+    webbrowser.open("https://supabase.com/dashboard/login")
+    
+    # Check GitHub login immediately after opening the page
+    verify_github_login()
+    
+    return json.dumps({
+        "status": "success",
+        "message": "Открываю страницы для входа..."
+    })
+
+
+def download_and_install(tool_name, current_project):
+    config = load_config(current_project)
+    
+    # Check if the tool is already installed
+    if is_tool_installed(tool_name.lower()):
+        return json.dumps({
+            "status": "info",
+            "message": f"{tool_name} уже установлен.",
+            "refresh": False
+        }), 200
+    
+    url = DOWNLOAD_URLS.get(tool_name)
+    if not url:
+        return json.dumps({
+            "status": "error",
+            "message": f"URL для {tool_name} не найден.",
+            "refresh": False
+        }), 404
+    
+    file_path = os.path.join(TEMP_DIR, f"{tool_name.replace(' ', '_')}-Installer.exe")
+    if not os.path.exists(TEMP_DIR):
+        os.makedirs(TEMP_DIR)
+    
+    # Download with progress
+    try:
+        import requests
+        response = requests.get(url, stream=True)
+        total_size = int(response.headers.get('content-length', 0))
+        block_size = 1024  # 1 KB
+        downloaded = 0
+        
+        with open(file_path, 'wb') as f:
+            for data in response.iter_content(block_size):
+                downloaded += len(data)
+                f.write(data)
+                progress = int(50 * downloaded / total_size)
+                print(f"\r[{'#' * progress}{'.' * (50 - progress)}] {downloaded / 1024:.2f}/{total_size / 1024:.2f} KB", end="")
+        
+        print("\nDownload completed.")
+    except Exception as e:
+        return json.dumps({
+            "status": "error",
+            "message": f"Не удалось скачать {tool_name}: {str(e)}",
+            "refresh": False
+        }), 500
+    
+    # Install
+    install_args = {
+        "Git": "/VERYSILENT /NORESTART /NOCANCEL",
+        "Node.js": "/quiet",
+        "Notepad++": "/S",
+        "VS Code": "/verysilent /suppressmsgboxes"
+    }
+    args = install_args.get(tool_name, "")
+    if not run_command(f'"{file_path}" {args}', 
+                       f"{tool_name} установлен успешно.", f"Не удалось установить {tool_name}."):
+        return json.dumps({
+            "status": "error",
+            "message": f"Не удалось установить {tool_name}.",
+            "refresh": False
+        }), 500
+    
+    # Add to installed tools and save config
+    config.setdefault("TOOLS_INSTALLED", []).append(tool_name)
+    save_config(current_project, config)
+    return json.dumps({
+        "status": "success",
+        "message": f"{tool_name} успешно установлен.",
+        "refresh": True
+    }), 200
+
+
+def run_command(command, success_message="Успех", error_message="Ошибка"):
+    try:
+        result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True)
+        return json.dumps({
+            "status": "success",
+            "message": success_message + "\n" + result.stdout
+        })
+    except subprocess.CalledProcessError as e:
+        return json.dumps({
+            "status": "error",
+            "message": error_message + "\n" + e.stderr
+        })
+
+
+def apply_zip_updates(project_name: str):
+    config = load_config(project_name)
+    zip_path = filedialog.askopenfilename(
+        title="Выберите ZIP файл",
+        filetypes=[("ZIP Files", "*.zip")],
+        initialdir=REPO_DIR,
+    )
+    if not zip_file or zip_file.filename == '':
+        return jsonify({"status": "warning", "message": "ZIP файл не выбран."})
+
+    try:
+        # Save the uploaded ZIP file temporarily
+        temp_dir = os.path.join(os.getenv("TEMP"), "setup_temp")
+        os.makedirs(temp_dir, exist_ok=True)
+        zip_path = os.path.join(temp_dir, zip_file.filename)
+        zip_file.save(zip_path)
+
+        # Extract the ZIP file
+        extract_dir = os.path.join(temp_dir, "temp_unzip")
+        subprocess.run(
+            f"powershell -Command \"Expand-Archive -Force '{zip_path}' -DestinationPath '{extract_dir}'\"",
+            shell=True,
+            check=True,
+        )
+
+        # Copy extracted files to the repository directory
+        repo_dir = os.path.join(PROJECTS_DIR, project_name)
+        subprocess.run(f"xcopy /s /y \"{extract_dir}\\*\" \"{repo_dir}\"", shell=True, check=True)
+        subprocess.run(f"rmdir /s /q \"{extract_dir}\"", shell=True, check=True)
+
+        # Update version file
+        current_version = int(config.get("CURRENT_VERSION", 0))
+        next_version = current_version + 1
+        config["CURRENT_VERSION"] = str(next_version)
+        config["LAST_APPLIED_ZIP"] = zip_file.filename
+        save_config(project_name, config)
+
+        # Create pull request
+        branch_name = f"update-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        subprocess.run(f"git checkout -b {branch_name}", shell=True, check=True)
+        subprocess.run("git add .", shell=True, check=True)
+        commit_msg = f"Обновления от {zip_file.filename} | Версия {next_version}"
+        subprocess.run(f"git commit -m \"{commit_msg}\"", shell=True, check=True)
+        subprocess.run(f"git push origin {branch_name}", shell=True, check=True)
+        subprocess.run("git checkout main", shell=True, check=True)
+        subprocess.run("git pull origin main", shell=True, check=True)
+
+        return jsonify({
+            "status": "success",
+            "message": "ZIP обновления применены успешно и создан Pull Request."
+        })
+
+    except subprocess.CalledProcessError as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Не удалось применить ZIP обновления: {e.stderr}"
+        }), 500
+
+
+def generate_installation_achievement(achievement_name, current_project):
+    config = load_config(current_project)
+    task_key = achievement_name.lower().replace(" ", "_")
+    if task_key not in config or config[task_key] != "completed":
+        config[task_key] = "completed"
+        save_config(current_project, config)
+        return json.dumps({
+            "status": "success",
+            "message": f"🏆 {achievement_name}"
+        })
+    return json.dumps({
+        "status": "info",
+        "message": f"Достижение {achievement_name} уже разблокировано."
+    })
+
+
+# musthooks.py
+
+def check_git_status(current_project):
+    """
+    Check the Git status for the specified project directory.
+    """
+    project_dir = os.path.join(PROJECTS_DIR, current_project)
+    
+    # Ensure the project directory exists
+    if not os.path.exists(project_dir):
+        return "❌ Git: Project directory not found."
+
+    try:
+        # Switch to the project directory
+        result = subprocess.run(
+            ["git", "status", "-uno"],
+            cwd=project_dir,  # Set the working directory to the project folder
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        
+        # Analyze the output
+        if "Your branch is up to date" in result.stdout:
+            return "✅"
+        elif "Your branch is behind" in result.stdout:
+            return "⚠️ Есть обнова"
+        else:
+            return f"❓ Git: {result.stdout.strip()}"
+    except subprocess.CalledProcessError as e:
+        # Handle errors (e.g., Git not initialized in the project folder)
+        return "❌ Git: Not initialized or error occurred."
+
+
+def create_desktop_shortcut(target_path, shortcut_name):
+    """
+    Create a desktop shortcut for the given target path using pywin32.
+    """
+    desktop = shell.SHGetFolderPath(0, shellcon.CSIDL_DESKTOP, 0, 0)
+    shortcut_path = os.path.join(desktop, f"{shortcut_name}.lnk")
+    
+    shortcut = pythoncom.CoCreateInstance(
+        shell.CLSID_ShellLink,
+        None,
+        pythoncom.CLSCTX_INPROC_SERVER,
+        shell.IID_IShellLink
+    )
+    
+    shortcut.SetPath(target_path)
+    shortcut.SetWorkingDirectory(os.path.dirname(target_path))
+    shortcut.SetIconLocation(sys.executable, 0)
+    
+    persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)
+    persist_file.Save(shortcut_path, 0)
+    
+    return json.dumps({
+        "status": "success",
+        "message": f"Shortcut created successfully at: {shortcut_path}"
+    })``` 
+ 
+ 
+#promohooks.py 
+``` 
+from flask import request, jsonify
+# promohooks.py
+from skill_config import get_skill_data, SKILL_DESCRIPTIONS
+# show_landing_page         +
+# generate_achievements     +
+# calculate_progress
+# show_leaderboard          +
+# display_achievements      +
+# calculate_user_level      +
+
+RARITY_COLORS = {
+    "Common": "#808080",       # Gray
+    "Rare": "#3498db",         # Blue
+    "Epic": "#8e44ad",         # Purple
+    "Legendary": "#e67e22",    # Orange
+    "MYTHIC": "#ff0000",       # Red (Ultimate)
+}
+
+
+def calculate_user_level(config):
+    """Determine the user's level based on achievements."""
+    achievements = generate_achievements(config)
+    print(f"Completed achievements: {achievements}")
+    if len(achievements) >= 5:
+        return "Badass"
+    elif len(achievements) >= 3:
+        return "Advanced"
+    elif len(achievements) >= 1:
+        return "Intermediate"
+    else:
+        return "Beginner"
+
+
+        
+# Progress Calculation
+def calculate_progress(config):
+    """Calculate user progress based on completed achievements."""
+    total_achievements = 13 #sum(len(category) for category in ACHIEVEMENTS.values())
+    #completed_achievements = sum(
+    #    1 for category in ACHIEVEMENTS.values() for achievement in category if achievement["key"] in config
+    #)
+    completed_achievements = len(generate_achievements(config))
+    return int((completed_achievements / total_achievements) * 100)
+
+            
+def generate_achievements(config):
+    """
+    Generate a list of achievements based on the user's progress stored in the config.
+    Each achievement is represented as a tuple: (achievement_message, rarity).
+    """
+    achievements = []
+
+    # Helper function to simplify appending achievements
+    def add_achievement(condition, message, rarity):
+        if condition:
+            achievements.append((message, rarity))
+
+    # Basic Setup Achievements
+    add_achievement("создать_папку_проекта" in config, "✅ Project Folder настроен!", "Common")
+    add_achievement("установить_git" in config, "🔧 Git настроен!", "Common")
+    add_achievement("установить_node.js" in config, "🔧 Node.js настроен!", "Common")
+    add_achievement("установить_vs_code" in config, "💻 VS Code настроен!", "Common")
+    add_achievement("установить_notepad++" in config, "📝 Notepad++ настроен!", "Common")
+
+    # Vercel Integration
+    add_achievement(config.get("VERCEL_PROJECT_URL"), "🌟 Vercel настроен!", "Rare")
+
+    # Supabase Integration
+    if config.get("SUPABASE_PROJECT_ID"):
+        if not is_using_demo_database(config):
+            add_achievement(True, "🚀 Собственная база данных Supabase готова!", "Rare")
+        else:
+            add_achievement(True, "🌟 Демо-база данных Supabase настроена!", "Common")
+
+    # Telegram Bot Integration
+    add_achievement(
+        config.get("TELEGRAM_BOT_TOKEN") and config.get("ADMIN_CHAT_ID"),
+        "🔥 Telegram бот настроен!",
+        "Epic"
+    )
+
+    # Advanced Features
+    add_achievement("webhook_set" in config, "🔗 Webhook Set!", "Epic")
+    add_achievement("embeddings_generated" in config, "🧠 Embeddings Generated!", "Legendary")
+    add_achievement("pull_request_created" in config, "🎉 Pull Request Created!", "Legendary")
+
+    # Leaderboard Unlock
+    add_achievement("leaderboard_unlocked" in config, "🏆 Leaderboard Unlocked!", "MYTHIC")
+
+    # Login Checklist
+    add_achievement(config.get("github") == "completed", "✅ GitHub залогиненен!", "Common")
+    add_achievement(config.get("vercel") == "completed", "✅ Vercel залогиненен!", "Common")
+    add_achievement(config.get("v0_dev") == "completed", "✅ v0.dev залогиненен!", "Common")
+    add_achievement(config.get("supabase") == "completed", "✅ Supabase залогиненен!", "Common")
+
+    # Dynamically Generate Achievements for All Skills in SKILL_DESCRIPTIONS
+    for skill_name, skill_info in SKILL_DESCRIPTIONS.items():
+        skill_key = skill_name.lower().replace(" ", "_")
+        if skill_key in config and config[skill_key] == "completed":
+            achievements.append((f"✨ {skill_info['label']} разблокирован!", "Common"))
+
+    # Default Achievement if No Progress
+    if not achievements:
+        achievements.append(("✨ Начните с логина в GitHub!", "Common"))
+
+    return achievements
+    
+``` 
+ 
+ 
+#skillboard.py 
+``` 
+from flask import Flask, render_template_string, jsonify, request
+import os
+import json
+import sys
+import threading
+import time
+import webbrowser
+import logging
+import pystray
+from PIL import Image, ImageDraw
+import requests
+
+from cyberui import HTML_TEMPLATE
+from skill_config import get_skill_data, SKILL_DEPENDENCIES
+
+# Global Colors configuration
+COLORS = {
+    "bg": "#1a1a1a",        # Dark background
+    "fg": "#ffffff",        # White text
+    "btn": "#4d4d4d",      # Button/line color
+    "cyberpunk": {
+        "neon": "#0ff",     # Cyan neon
+        "pink": "#ff1493",  # Deep pink
+        "purple": "#9400d3", # Dark violet
+    }
+}
+# Imports for modularized hooks
+from musthooks import (
+    create_project_folder,
+    clone_repository,       # Clone the repository
+    apply_zip_updates,
+    download_and_install,
+    save_config,
+    run_command,
+    load_config,
+    load_projects,
+    initialize_login_checklist,
+    create_project,
+    switch_project,
+    mark_step_completed,
+    is_tool_installed,
+    is_npm_package_installed,
+    ensure_v0_projects_dir,
+    ensure_default_project,
+    install_cli_tool,         
+    is_npm_package_installed,
+    pull_git_updates,
+    check_git_status,
+)
+from vercehooks import (
+    configure_vercel,       # Configure Vercel deployment
+    #complete_deployment,    # Finalize deployment steps
+    sync_env_vars,
+)
+from supahooks import (
+    reset_supabase_db,      # Reset the Supabase database
+    initialize_supabase,    # Initialize Supabase connection
+    apply_demo_data,        # Apply demo data to the database
+    apply_custom_sql,       # Apply custom SQL scripts
+    save_admin_to_database,
+    create_or_update_user,
+    calculate_elapsed_time,
+) 
+from telehooks import (
+    # local configure_telegram_bot, # Configure Telegram bot token and admin chat ID
+    set_webhook,            # Set webhook for Telegram bot
+    # set_admin_chat_id,      # Set admin chat ID for notifications
+)
+from promohooks import (
+    RARITY_COLORS,
+    #local show_landing_page,      # Display the landing page with project details
+    generate_achievements,  # Generate gamified achievements
+    calculate_progress,     # Calculate user progress
+    # local show_leaderboard,       # Display the leaderboard
+    # loacl display_achievements,    # Display the Achievements
+    calculate_user_level,
+)
+from advhooks import (
+    generate_embeddings,    # Regenerate embeddings for semantic search
+    create_pull_request,    # Create a pull request in GitHub
+)
+# Global Variables
+current_project = None
+projects = []
+DEFAULT_PROJECT_NAME = "cartest"  # Default project name
+
+# Configuration
+PROJECTS_DIR = os.path.expanduser("~/Documents/V0_Projects")
+VERSION_FILE = os.path.join(PROJECTS_DIR, "version.ini")  # Moved outside the repo
+
+REPO_DIR = os.path.join(PROJECTS_DIR, DEFAULT_PROJECT_NAME)  # Dynamic repo path
+V0_DEV_URL = "https://v0.dev/chat/fork-of-rastaman-shop-KvYJosUCML9"
+VERCEL_URL = "https://vercel.com"
+SUPABASE_URL = "https://supabase.com"
+GITHUB_URL = f"https://github.com/salavey13/{DEFAULT_PROJECT_NAME}"
+TEMP_DIR = os.path.join(os.getenv("TEMP"), "setup_temp")
+# Supabase Configuration
+SUPABASE_URL = "https://inmctohsodgdohamhzag.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzMzk1ODUsImV4cCI6MjA1MzkxNTU4NX0.AdNu5CBn6pp-P5M2lZ6LjpcqTXrhOdTOYMCiQrM_Ud4"
+SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODMzOTU4NSwiZXhwIjoyMDUzOTE1NTg1fQ.xD91Es2o8T1vM-2Ok8iKCn4jGDA5TwBbapD5eqhblLM"
+
+LEVELS = {
+    "Beginner": 1,
+    "Intermediate": 2,
+    "Advanced": 3,
+    "Badass": 4
+}
+
+# Grouped Actions with User Level Checks
+grouped_actions = {
+    "Project Management": [
+        ("Создать папку проекта", create_project_folder, "Beginner"),
+        ("Установить Git", lambda: download_and_install("Git", current_project), "Beginner"),
+        ("Установить Node.js", lambda: download_and_install("Node.js", current_project), "Beginner"),
+        ("Установить VS Code", lambda: download_and_install("VS Code", current_project), "Beginner"),
+        ("Установить Notepad++", lambda: download_and_install("Notepad++", current_project), "Beginner"),
+        ("Клонировать репозиторий", lambda: clone_repository(current_project), "Intermediate"),
+        ("Применить ZIP обновления", lambda: apply_zip_updates(current_project), "Badass"),
+    ],
+    "Vercel Integration": [
+        ("Установить Supabase CLI", lambda: install_cli_tool("supabase", current_project), "Intermediate"),
+        ("Настроить Vercel", lambda: configure_vercel(current_project), "Intermediate"),
+        ("Синхронизировать переменные окружения", lambda: sync_env_vars(current_project), "Intermediate"),
+    ],
+    "Supabase Integration": [
+        ("Установить Vercel CLI", lambda: install_cli_tool("vercel", current_project), "Intermediate"),
+        ("Генерировать вложения", lambda: generate_embeddings(current_project), "Badass"),
+        ("Сбросить базу данных Supabase", lambda: reset_supabase_db(current_project), "Intermediate"),
+        ("Инициализировать Supabase", lambda: initialize_supabase(current_project), "Intermediate"),
+        ("Загрузить демо данные Supabase", lambda: apply_demo_data(current_project), "Intermediate"),
+        ("Применить custom.sql", lambda: apply_custom_sql(current_project), "Intermediate"),
+    ],
+    "Telegram Integration": [
+        ("Настроить Telegram бот", lambda: configure_telegram_bot(current_project), "Advanced"),
+        ("Установить Webhook", lambda: set_webhook(current_project), "Advanced"),
+    ],
+    "Advanced Features": [
+        ("Показать таблицу лидеров", lambda: unlock_leaderboard(current_project), "Badass"),
+        ("Создать Pull Request", lambda: create_pull_request(current_project, "update", "Обновления", "Автоматические обновления"), "Badass"),
+        ("Применить обновления Git", pull_git_updates, "Intermediate"),
+    ],
+}
+
+def unlock_leaderboard(current_project):
+    """
+    Unlock the leaderboard by checking completion of all tasks and updating the config.
+    """
+    config = load_config(current_project)
+    total_tasks = 13  # Adjust this number based on the total tasks in your system
+    completed_tasks = len(generate_achievements(config))
+    
+    if completed_tasks >= total_tasks:
+        config["leaderboard_unlocked"] = "completed"
+        save_config(current_project, config)
+        return True
+    else:
+        raise Exception("Не все задачи выполнены для разблокировки таблицы лидеров.")
+        
+
+        
+
+       
+
+    
+def create_image():
+    # Create a simple black-and-white image for the tray icon
+    width, height = 64, 64
+    image = Image.new('RGB', (width, height), COLORS["bg"])
+    dc = ImageDraw.Draw(image)
+    dc.rectangle((width // 2, 0, width, height // 2), fill=COLORS["cyberpunk"]["purple"])
+    dc.rectangle((0, height // 2, width // 2, height), fill=COLORS["cyberpunk"]["pink"])
+    
+
+    # Optionally, add a neon border or other elements
+    dc.rectangle(
+        (0, 0, width, height),                # Full border
+        outline=COLORS["cyberpunk"]["neon"], # Neon outline
+        width=2                               # Border thickness
+    )
+    return image
+
+def on_clicked(icon, item):
+    if str(item) == "Exit":
+        icon.stop()
+         # Directly shut down the Flask server
+        shutdown_server()
+
+def setup_tray_icon():
+    icon = pystray.Icon("Cyberpunk Skill Tree")
+    icon.icon = create_image()
+    icon.title = "Cyberpunk Skill Tree"
+    icon.menu = pystray.Menu(
+        pystray.MenuItem("Exit", on_clicked)
+    )
+    icon.run()
+
+def open_browser():
+    # Wait for the server to start before opening the browser
+    time.sleep(1)
+    webbrowser.open("http://127.0.0.1:1313")
+
+
+
+
+app = Flask(__name__)
+
+# Suppress Werkzeug logs
+log = logging.getLogger('werkzeug')
+#log.setLevel(logging.ERROR)
+
+
+@app.route('/')
+def index():
+    current_project = request.args.get('project', DEFAULT_PROJECT_NAME)
+    projects = load_projects()
+    config = load_config(current_project)
+    
+    # Calculate user level
+    user_level = calculate_user_level(config)
+    
+    # Check Git status
+    git_status = check_git_status(current_project)
+    git_status_color = "green" if git_status == '✅' else "red"
+    
+    # Pass user_level, git_status, and git_status_color to the template
+    return render_template_string(
+        HTML_TEMPLATE,
+        colors=COLORS,
+        projects=projects,
+        current_project=current_project,
+        skill_data=get_skill_data(config),
+        SKILL_DEPENDENCIES=SKILL_DEPENDENCIES,
+        user_level=user_level,
+        git_status=git_status,
+        git_status_color=git_status_color
+    )
+
+@app.route('/shutdown', methods=['POST'])
+def shutdown():
+    threading.Thread(target=shutdown_server).start()
+    return jsonify({"message": "Завершение работы сервера..."})
+    
+@app.route('/execute/')
+def execute_skill():
+    current_project = request.args.get('project', DEFAULT_PROJECT_NAME)
+    skill = request.args.get('skill')  # Ensure skill is retrieved from query parameters
+    if not skill:
+        return jsonify({
+            "message": "Название навыка не указано.",
+            "refresh": False
+        }), 400  # Return 400 if skill name is missing
+
+    config = load_config(current_project)
+    skill_key = skill.lower().replace(" ", "_")
+
+    # Check if the skill is already completed
+    if skill_key in config:
+        return jsonify({
+            "message": f"Навык '{skill}' уже был освоен ранее.",
+            "refresh": False
+        }), 400  # Return 400 if the skill was already completed
+
+    # Calculate the user's current level
+    user_level = calculate_user_level(config)
+
+    # Find the skill in grouped_actions and check its required level
+    for category, actions in grouped_actions.items():
+        for action_name, action_func, required_level in actions:
+            if action_name == skill:
+                # Check if the user's level meets the required level for the skill
+                if LEVELS[user_level] >= LEVELS[required_level]:
+                    try:
+                        # Pass query parameters to the skill function
+                        action_func()
+                        config[skill_key] = "completed"
+                        save_config(current_project, config)
+                        return jsonify({
+                            "message": f"🎉 Навык '{skill}' освоен!",
+                            "refresh": True
+                        })
+                    except Exception as e:
+                        return jsonify({
+                            "message": f"Ошибка при выполнении навыка '{skill}': {str(e)}",
+                            "refresh": False
+                        }), 500  # Return 500 for server errors
+                else:
+                    return jsonify({
+                        "message": f"❌ Уровень '{required_level}' требуется для освоения навыка '{skill}'. Ваш текущий уровень: '{user_level}'.",
+                        "refresh": False
+                    }), 403  # Return 403 for forbidden access
+
+    # If the skill is not found in grouped_actions
+    return jsonify({
+        "message": f"Навык '{skill}' не найден.",
+        "refresh": False
+    }), 404  # Return 404 if the skill is not found
+    
+    
+
+
+    # Find the skill in grouped_actions and check its required level
+    for category, actions in grouped_actions.items():
+        for action_name, action_func, required_level in actions:
+            if action_name == skill:
+                # Check if the user's level meets the required level for the skill
+                if LEVELS[user_level] >= LEVELS[required_level]:
+                    try:
+                        # Execute the skill's function
+                        
+                        
+                        
+                        
+                        
+                        #### TEST TEST TEST #####
+                        #########################
+                        
+                        #####action_func()
+                        
+                        #########################
+                        #### TEST TEST TEST #####
+
+
+
+
+
+
+                        config[skill_key] = "completed"
+                        save_config(current_project, config)
+                        return jsonify({
+                            "message": f"🎉 Навык '{skill}' освоен!",
+                            "refresh": True
+                        })
+                    except Exception as e:
+                        return jsonify({
+                            "message": f"Ошибка при выполнении навыка '{skill}': {str(e)}",
+                            "refresh": False
+                        }), 500  # Return 500 for server errors
+                else:
+                    return jsonify({
+                        "message": f"❌ Уровень '{required_level}' требуется для освоения навыка '{skill}'. Ваш текущий уровень: '{user_level}'.",
+                        "refresh": False
+                    }), 403  # Return 403 for forbidden access
+
+    # If the skill is not found in grouped_actions
+    return jsonify({
+        "message": f"Навык '{skill}' не найден.",
+        "refresh": False
+    }), 404  # Return 404 if the skill is not found
+
+@app.route('/reset_progress')
+def reset_progress():
+    current_project = request.args.get('project', DEFAULT_PROJECT_NAME)
+    config = {"создать_папку_проекта": "completed"}
+    save_config(current_project, config)
+
+    return jsonify({
+        "message": "Прогресс сброшен. Начните свое приключение заново!",
+        "refresh": True
+    })
+    
+@app.route('/api/leaderboard')
+def api_leaderboard():
+    try:
+        response = requests.get(
+            f"{SUPABASE_URL}/rest/v1/users?select=user_id,metadata&status=eq.admin",
+            headers={"apikey": SUPABASE_KEY}
+        )
+        if response.status_code == 200:
+            users = response.json()
+            leaderboard_data = []
+            for idx, user in enumerate(users[:10]):  # Top 10 users
+                nickname = user['metadata'].get('nickname', 'Неизвестный')
+                total_time = user['metadata'].get('total_time', 'N/A')
+                achievements = user['metadata'].get('achievements', [])
+                leaderboard_data.append({
+                    "rank": idx + 1,
+                    "nickname": nickname,
+                    "user_id": user['user_id'],
+                    "total_time": total_time,
+                    "achievements": achievements
+                })
+            return jsonify(leaderboard_data)
+        else:
+            return jsonify([]), 500  # Return empty list if there's an error
+    except Exception as e:
+        print(f"Error fetching leaderboard data: {str(e)}")
+        return jsonify([]), 500
+        
+@app.route('/api/git_status')
+def api_git_status():
+    current_project = request.args.get('project', DEFAULT_PROJECT_NAME)
+    status = check_git_status(current_project)
+    return jsonify({
+        "status": status
+    })``` 
+ 
+ 
+#skill_config.py 
+``` 
+# Описания навыков для всплывающих подсказок в стиле RPG
+SKILL_DATA = {
+    "Создать папку проекта": {
+        "icon": "📁",
+        "label": "Основа проекта",
+        "description": "Создайте базовую директорию для вашего проекта. Это первый шаг к организации вашего рабочего пространства.",
+        "unlocked": True,
+        "dependencies": [],
+        "position": {"row": 3, "col": 3}
+    },
+    "Установить Git": {
+        "icon": "⚙️",
+        "label": "Контроль версий",
+        "description": "Настройте Git для управления изменениями в вашем коде. Без этого вы рискуете потеряться в хаосе файлов.",
+        "unlocked": False,
+        "dependencies": [],
+        "position": {"row": 2, "col": 2}
+    },
+    "Установить VS Code": {
+        "icon": "💻",
+        "label": "Редактор кода",
+        "description": "Установите Visual Studio Code — мощный инструмент для написания и отладки кода.",
+        "unlocked": False,
+        "dependencies": [],
+        "position": {"row": 2, "col": 4}
+    },
+    "Установить Node.js": {
+        "icon": "🌐",
+        "label": "JavaScript-движок",
+        "description": "Установите Node.js для работы с JavaScript вне браузера. Это основа современной веб-разработки.",
+        "unlocked": False,
+        "dependencies": [],
+        "position": {"row": 4, "col": 2}
+    },
+    "Установить Notepad++": {
+        "icon": "📝",
+        "label": "Текстовый редактор",
+        "description": "Установите Notepad++ для быстрого редактирования текстовых файлов. Простой, но эффективный инструмент.",
+        "unlocked": False,
+        "dependencies": [],
+        "position": {"row": 4, "col": 4}
+    },
+    "Клонировать репозиторий": {
+        "icon": "⬇️",
+        "label": "Клонирование репозитория",
+        "description": "Скопируйте удаленный репозиторий на свой компьютер. Требуется: Git.",
+        "unlocked": False,
+        "dependencies": ["Установить Git", "Создать папку проекта"],
+        "position": {"row": 2, "col": 3}
+    },
+    "Применить ZIP обновления": {
+        "icon": "📦",
+        "label": "Обновление из ZIP",
+        "description": "Примените обновления из ZIP-архива. Требуется: Клонировать репозиторий.",
+        "unlocked": False,
+        "dependencies": ["Клонировать репозиторий"],
+        "position": {"row": 0, "col": 9}
+    },
+    "Создать Pull Request": {
+        "icon": "📤",
+        "label": "Отправка изменений",
+        "description": "Отправьте свои изменения в основной репозиторий для проверки. Требуется: Git, репозиторий.",
+        "unlocked": False,
+        "dependencies": ["Клонировать репозиторий"],
+        "position": {"row": 1, "col": 3}
+    },
+    "Установить Supabase CLI": {
+        "icon": "🔑",
+        "label": "Supabase CLI",
+        "description": "Установите инструмент командной строки для работы с базой данных Supabase. Требуется: Node.js.",
+        "unlocked": False,
+        "dependencies": ["Установить Node.js"],
+        "position": {"row": 2, "col": 5}
+    },
+    "Инициализировать Supabase": {
+        "icon": "🎲",
+        "label": "Инициализация базы данных",
+        "description": "Подключитесь к базе данных Supabase и начните работу. Требуется: Supabase CLI, репозиторий.",
+        "unlocked": False,
+        "dependencies": ["Установить Supabase CLI", "Клонировать репозиторий"],
+        "position": {"row": 1, "col": 4}
+    },
+    "Сбросить базу данных Supabase": {
+        "icon": "🔄",
+        "label": "Сброс базы данных",
+        "description": "Очистите базу данных и вернитесь к начальному состоянию. Требуется: Supabase CLI.",
+        "unlocked": False,
+        "dependencies": ["Инициализировать Supabase"],
+        "position": {"row": 1, "col": 5}
+    },
+    "Загрузить демо данные Supabase": {
+        "icon": "📋",
+        "label": "Демо-данные",
+        "description": "Загрузите тестовые данные в базу данных Supabase. Требуется: Supabase CLI.",
+        "unlocked": False,
+        "dependencies": ["Инициализировать Supabase"],
+        "position": {"row": 0, "col": 4}
+    },
+    "Применить custom.sql": {
+        "icon": "📜",
+        "label": "Пользовательский SQL",
+        "description": "Выполните собственный SQL-скрипт для настройки базы данных. Требуется: Supabase CLI.",
+        "unlocked": False,
+        "dependencies": ["Инициализировать Supabase"],
+        "position": {"row": 0, "col": 5}
+    },
+    "Установить Vercel CLI": {
+        "icon": "🚀",
+        "label": "Vercel CLI",
+        "description": "Установите инструмент командной строки для развертывания приложений на Vercel. Требуется: Node.js.",
+        "unlocked": False,
+        "dependencies": ["Установить Node.js"],
+        "position": {"row": 3, "col": 1}
+    },
+    "Настроить Vercel": {
+        "icon": "☁️",
+        "label": "Облачное развертывание",
+        "description": "Настройте проект для развертывания на платформе Vercel. Требуется: Vercel CLI, репозиторий.",
+        "unlocked": False,
+        "dependencies": ["Установить Vercel CLI", "Клонировать репозиторий"],
+        "position": {"row": 3, "col": 5}
+    },
+    "Синхронизировать переменные окружения": {
+        "icon": "🔗",
+        "label": "Синхронизация переменных",
+        "description": "Синхронизируйте переменные окружения между Vercel и Supabase. Требуется: Vercel CLI, Supabase.",
+        "unlocked": False,
+        "dependencies": ["Настроить Vercel", "Инициализировать Supabase"],
+        "position": {"row": 0, "col": 6}
+    },
+    "Настроить Telegram бот": {
+        "icon": "🤖",
+        "label": "Telegram-бот",
+        "description": "Создайте и настройте Telegram-бота для автоматизации задач. Требуется: Vercel.",
+        "unlocked": False,
+        "dependencies": ["Настроить Vercel"],
+        "position": {"row": 3, "col": 0}
+    },
+    "Установить Webhook": {
+        "icon": "📡",
+        "label": "Webhook",
+        "description": "Настройте автоматические уведомления через Webhook. Требуется: Telegram-бот.",
+        "unlocked": False,
+        "dependencies": ["Настроить Telegram бот"],
+        "position": {"row": 3, "col": 6}
+    },
+    "Показать таблицу лидеров": {
+        "icon": "🏆",
+        "label": "Таблица лидеров",
+        "description": "Просмотрите таблицу лидеров для мотивации и анализа прогресса. Требуется: Admin Chat ID.",
+        "unlocked": False,
+        "dependencies": ["Настроить Telegram бот"],
+        "position": {"row": 0, "col": 7}
+    },
+    "Генерировать вложения": {
+        "icon": "🧠",
+        "label": "Генерация вложений",
+        "description": "Создайте семантические вложения для поиска. Требуется: Node.js.",
+        "unlocked": False,
+        "dependencies": ["Установить Node.js"],
+        "position": {"row": 0, "col": 8}
+    },
+    "hidden_achievement_1": {
+        "icon": "🎮",
+        "label": "Секретное достижение",
+        "description": "Вы нашли скрытое достижение! Продолжайте исследовать возможности системы.",
+        "unlocked": False,
+        "dependencies": [],
+        "position": {"row": 5, "col": 9}
+    },
+    "hidden_achievement_2": {
+        "icon": "🎨",
+        "label": "UI-мастер",
+        "description": "Еще одно секретное достижение! Вы внимательны и любопытны.",
+        "unlocked": False,
+        "dependencies": [],
+        "position": {"row": 6, "col": 9}
+    }
+}
+
+
+
+
+
+SKILL_DESCRIPTIONS = {
+    "Создать папку проекта": {
+        "icon": "🏰",
+        "label": "Камень фундамента",
+        "desc": "Создайте мистическое хранилище для ваших артефактов проекта. Это начало вашего пути!"
+    },
+    # Основные инструменты (Внутреннее кольцо)
+    "Установить Git": {
+        "icon": "⚡",
+        "label": "Ткач времени",
+        "desc": "Овладейте древним искусством контроля версий."
+    },
+    "Установить VS Code": {
+        "icon": "⚔️",
+        "label": "Страж кода",
+        "desc": "Получите легендарный редактор кода."
+    },
+    "Установить Node.js": {
+        "icon": "🌐",
+        "label": "Асинхронный чародей",
+        "desc": "Призовите силу асинхронной магии."
+    },
+    "Установить Notepad++": {
+        "icon": "📝",
+        "label": "Маг текста",
+        "desc": "Расширьте свои возможности редактирования текста."
+    },
+    # Ветвь контроля версий
+    "Клонировать репозиторий": {
+        "icon": "🌌",
+        "label": "Повелитель порталов",
+        "desc": "Создайте магический портал в удаленное хранилище кода. Требуется: Git"
+    },
+    "Применить ZIP обновления": {
+        "icon": "📦",
+        "label": "Алхимик обновлений",
+        "desc": "Примените магические обновления из ZIP-архива. Требуется: Git"
+    },
+    "Создать Pull Request": {
+        "icon": "🎭",
+        "label": "Кодовый дипломат",
+        "desc": "Отправьте свои изменения на суд старейшин. Требуется: Git, репозиторий"
+    },
+    # Ветвь базы данных
+    "Установить Supabase CLI": {
+        "icon": "🗝️",
+        "label": "Рыцарь базы данных",
+        "desc": "Получите контроль над базой данных через командную строку. Требуется: Node.js"
+    },
+    "Инициализировать Supabase": {
+        "icon": "🎲",
+        "label": "Призыватель базы данных",
+        "desc": "Пробудите силу базы данных. Требуется: Supabase CLI, репозиторий"
+    },
+    "Сбросить базу данных Supabase": {
+        "icon": "🔄",
+        "label": "Обнулитель базы данных",
+        "desc": "Сбросьте базу данных до начального состояния. Требуется: Supabase CLI"
+    },
+    "Загрузить демо данные Supabase": {
+        "icon": "📋",
+        "label": "Загрузчик демо-данных",
+        "desc": "Загрузите демо-данные в базу данных. Требуется: Supabase CLI"
+    },
+    "Применить custom.sql": {
+        "icon": "📜",
+        "label": "Волшебник SQL",
+        "desc": "Примените пользовательский SQL-скрипт. Требуется: Supabase CLI"
+    },
+    # Ветвь развертывания
+    "Установить Vercel CLI": {
+        "icon": "🚀",
+        "label": "Рыцарь Vercel",
+        "desc": "Получите контроль над облачным развертыванием через командную строку. Требуется: Node.js"
+    },
+    "Настроить Vercel": {
+        "icon": "☁️",
+        "label": "Всадник облаков",
+        "desc": "Откройте врата в облачное развертывание. Требуется: Node.js, репозиторий"
+    },
+    "Синхронизировать переменные окружения": {
+        "icon": "🔗",
+        "label": "Синхронизатор окружения",
+        "desc": "Синхронизируйте переменные окружения с Vercel. Требуется: Vercel CLI, Supabase"
+    },
+    # Интеграция с Telegram
+    "Настроить Telegram бот": {
+        "icon": "🤖",
+        "label": "Призыватель бота",
+        "desc": "Создайте магического помощника в Telegram. Требуется: Vercel"
+    },
+    "Установить Webhook": {
+        "icon": "📡",
+        "label": "Ткач Webhook",
+        "desc": "Настройте автоматические уведомления через Webhook. Требуется: Telegram бот"
+    },
+    # Дополнительные возможности
+    "Показать таблицу лидеров": {
+        "icon": "🏆",
+        "label": "Наблюдатель таблицы лидеров",
+        "desc": "Просмотрите таблицу лидеров. Требуется: Admin Chat ID"
+    },
+    "Генерировать вложения": {
+        "icon": "🧠",
+        "label": "Генератор вложений",
+        "desc": "Генерируйте семантические вложения для поиска. Требуется: Node.js"
+    }
+}
+
+# Пасхалки (специальные скрытые возможности)
+EASTER_EGG_SKILLS = {
+    "hidden_achievement_1": {
+        "icon": "🎮",
+        "label": "Властелин игры",
+        "desc": "Вы нашли секретное достижение! Продолжайте исследовать дерево навыков...",
+        # Перенесли пасхалку в правый нижний угол, чтобы избежать пересечения
+        "position": {"row": 8, "col": 9}
+    },
+    "hidden_achievement_2": {
+        "icon": "🎨",
+        "label": "UI-чародей",
+        "desc": "Еще одна пасхалка! Вы точно внимательный исследователь!",
+        "position": {"row": 8, "col": 10}
+    }
+}
+
+# Конфигурация зависимостей навыков
+SKILL_DEPENDENCIES = {
+    "Создать папку проекта": [],  # Центральный узел
+    "Установить Git": [],
+    "Установить Node.js": [],
+    "Установить VS Code": [],
+    "Установить Notepad++": [],
+    "Клонировать репозиторий": ["Установить Git", "Создать папку проекта"],
+    "Применить ZIP обновления": ["Клонировать репозиторий"],
+    "Создать Pull Request": ["Клонировать репозиторий"],
+    "Установить Supabase CLI": ["Установить Node.js"],
+    "Инициализировать Supabase": ["Установить Supabase CLI", "Клонировать репозиторий"],
+    "Сбросить базу данных Supabase": ["Инициализировать Supabase"],
+    "Загрузить демо данные Supabase": ["Инициализировать Supabase"],
+    "Применить custom.sql": ["Инициализировать Supabase"],
+    "Установить Vercel CLI": ["Установить Node.js"],
+    "Настроить Vercel": ["Установить Vercel CLI", "Клонировать репозиторий"],
+    "Синхронизировать переменные окружения": ["Настроить Vercel", "Инициализировать Supabase"],
+    "Настроить Telegram бот": ["Настроить Vercel"],
+    "Установить Webhook": ["Настроить Telegram бот"],
+    "Показать таблицу лидеров": ["Настроить Telegram бот"],
+    "Генерировать вложения": ["Установить Node.js", "Синхронизировать переменные окружения"]
+}
+
+# Улучшенное позиционирование узлов на сетке (расширенная схема для уменьшения наложений)
+SKILL_POSITIONS = {
+    # Root Node
+    "Создать папку проекта": {"row": 8, "col": 5}, 
+    
+    # Level 1 (Direct dependencies of root)
+    "Установить Git": {"row": 7, "col": 4},
+    "Установить VS Code": {"row": 8, "col": 2},
+    "Установить Node.js": {"row": 6, "col": 4},
+    "Установить Notepad++": {"row": 8, "col": 1},
+    
+    # Level 2 (Dependencies of level 1 nodes)
+    "Клонировать репозиторий": {"row": 7, "col": 6},
+    "Установить Supabase CLI": {"row": 5, "col": 3},
+    "Установить Vercel CLI": {"row": 5, "col": 6},
+    
+    # Level 3 (Dependencies of level 2 nodes)
+    "Создать Pull Request": {"row": 2, "col": 10},
+    "Инициализировать Supabase": {"row": 4, "col": 4},
+    "Настроить Vercel": {"row": 4, "col": 7},
+    
+    # Level 4 (Dependencies of level 3 nodes)
+    "Сбросить базу данных Supabase": {"row": 3, "col": 3},
+    "Загрузить демо данные Supabase": {"row": 3, "col": 4},
+    "Применить custom.sql": {"row": 3, "col": 5},
+    "Синхронизировать переменные окружения": {"row": 3, "col": 7},
+    "Настроить Telegram бот": {"row": 3, "col": 8},
+    
+    # Level 5 (Dependencies of level 4 nodes)
+    "Установить Webhook": {"row": 2, "col": 8},
+    "Показать таблицу лидеров": {"row": 2, "col": 9},
+    "Генерировать вложения": {"row": 2, "col": 1},
+    
+    # Easter Eggs
+    "hidden_achievement_1": {"row": 8, "col": 9},
+    "hidden_achievement_2": {"row": 8, "col": 10},
+    
+    "Применить ZIP обновления": {"row": 8, "col": 7},
+}
+# Обновлённые позиции для узлов-заполнителей (placeholders) — размещены в свободных областях
+placeholder_positions = [
+    {"row": 10, "col": 5},
+    #{"row": 6, "col": 1},
+]
+  
+def is_skill_visible(skill_name, config):
+    """Определяет, должен ли навык быть видимым, исходя из зависимостей."""
+    if skill_name == "Создать папку проекта":
+        return True
+
+    dependencies = SKILL_DEPENDENCIES.get(skill_name, [])
+    if not dependencies:
+        return True
+
+    for dep in dependencies:
+        dep_key = dep.lower().replace(" ", "_")
+        if config.get(dep_key, "not_started") == "completed":
+            return True
+    return False
+
+def is_skill_unlocked(skill_name, config):
+    """Определяет, разблокирован ли навык (все зависимости завершены)."""
+    if skill_name == "Создать папку проекта":
+        return True
+
+    dependencies = SKILL_DEPENDENCIES.get(skill_name, [])
+    for dep in dependencies:
+        dep_key = dep.lower().replace(" ", "_")
+        if config.get(dep_key, "not_started") != "completed":
+            return False
+    return True
+    
+# Helper function to determine if a skill is completed
+def is_completed(skill_name, config):
+    skill_key = skill_name.lower().replace(" ", "_")
+    return config.get(skill_key) == "completed"
+
+def get_skill_data(config):
+    """Возвращает все видимые навыки с их метаданными."""
+    skill_data = {}
+
+    # Add all skills from SKILL_DESCRIPTIONS
+    for skill_name, skill_info in SKILL_DESCRIPTIONS.items():
+        skill_key = skill_name.lower().replace(" ", "_")
+        unlocked = is_skill_unlocked(skill_name, config)
+        completed = is_completed(skill_name, config)
+
+        skill_data[skill_name] = {
+            "name": skill_name,
+            "icon": skill_info["icon"],
+            "label": skill_info["label"],
+            "description": skill_info["desc"],
+            "unlocked": unlocked,
+            "position": SKILL_POSITIONS.get(skill_name, {"row": 0, "col": 0}),
+            "dependencies": SKILL_DEPENDENCIES.get(skill_name, []),
+            "completed": completed
+        }
+
+    # Add Easter eggs
+    for egg_id, egg_info in EASTER_EGG_SKILLS.items():
+        completed = is_completed(egg_id, config)
+
+        skill_data[egg_id] = {
+            "name": egg_id,
+            "icon": egg_info["icon"],
+            "label": egg_info["label"],
+            "description": egg_info["desc"],
+            "position": egg_info["position"],
+            "unlocked": True,
+            "dependencies": [],
+            "is_easter_egg": True,
+            "completed": completed
+        }
+
+    # Add placeholder nodes
+    for i, pos in enumerate(placeholder_positions):
+        placeholder_id = f"future_skill_{i}"
+
+        skill_data[placeholder_id] = {
+            "name": placeholder_id,
+            "icon": "🔧",
+            "label": "Future Skill",
+            "description": "Предложите свой навык для добавления в дерево!",
+            "unlocked": True,
+            "position": pos,
+            "dependencies": [],
+            "is_placeholder": True,
+            "completed": False
+        }
+
+    return skill_data``` 
+ 
+ 
+#supahooks.py 
+``` 
+from flask import request, jsonify
+import os
+import time
+import requests
+from datetime import datetime
+from musthooks import load_config, save_config, run_command
+from promohooks import generate_achievements  # Generate gamified achievements
+from tkinter import messagebox
+
+# Configuration
+PROJECTS_DIR = os.path.expanduser("~/Documents/V0_Projects")
+# Supabase Configuration
+SUPABASE_URL = "https://inmctohsodgdohamhzag.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzMzk1ODUsImV4cCI6MjA1MzkxNTU4NX0.AdNu5CBn6pp-P5M2lZ6LjpcqTXrhOdTOYMCiQrM_Ud4"
+
+def show_nag_screen(config, current_project):
+    """
+    Show the nag screen to encourage the user to configure their own Supabase database.
+    Returns a JSON response that the frontend can use to display the nag screen.
+    """
+    if is_using_demo_database(config):
+        time.sleep(2)  # 2-second delay
+        
+        # Calculate the elapsed time since configuration started
+        start_time = int(config.get("config_start_time", 0))
+        elapsed_time = round((time.time() - start_time) / 3600, 2)  # Convert to hours
+        
+        # Prepare the nag screen message
+        nag_message = (
+            f"Вы уже потратили {elapsed_time} часов на настройку этого шедевра!\n\n"
+            "Подсчитайте, сколько времени вы бы потратили, делая это вручную. "
+            "Чаевые больше не будут поступать на мой демо Telegram-бот или сервер от вашей тестовой аудитории. "
+            "Вы смогли перенастроить всё, вы великолепный ублюдок! "
+            "Пожалуйста, поддержите меня, поставив лайк на моём видео на YouTube! :)"
+        )
+        
+        # Return the nag screen message as a JSON response
+        return jsonify({
+            "message": nag_message,
+            "show_nag_screen": True
+        }), 200
+    
+    else:
+        # Disable the nag screen if the user has configured their own database
+        config["SHOW_NAG_SCREEN"] = "False"
+        save_config(current_project, config)
+        
+        return jsonify({
+            "message": "Nag screen disabled.",
+            "show_nag_screen": False
+        }), 200
+
+def apply_demo_data(project_name: str):
+    config = load_config(project_name)
+    if not is_using_demo_database(config):
+        return jsonify({"message": "Применение демо-данных доступно только для Вашей демо-базы данных.", "success": False}), 400
+    
+    demo_sql_path = os.path.join(PROJECTS_DIR, "supabase", "migrations", "20240101000000_init.sql")
+    if os.path.exists(demo_sql_path):
+        result = run_command(f"supabase db reset --sql {demo_sql_path}", "20240101000000_init SQL применён успешно.", "Не удалось применить 20240101000000_init SQL.")
+        if result:
+            config["CUSTOM_SQL_APPLIED_COMPLETED"] = "True"
+            save_config(project_name, config)
+            return jsonify({"message": "Демо-данные успешно применены.", "success": True}), 200
+        else:
+            return jsonify({"message": "Не удалось применить демо-данные.", "success": False}), 500
+    else:
+        return jsonify({"message": "Файл демо-данных не найден.", "success": False}), 404
+
+def apply_custom_sql(project_name: str):
+    config = load_config(project_name)
+    custom_sql_path = os.path.join(REPO_DIR, "custom.sql")
+    if os.path.exists(custom_sql_path):
+        result = run_command(f"supabase db reset --sql {custom_sql_path}", "Custom SQL применён успешно.", "Не удалось применить Custom SQL.")
+        if result:
+            config["CUSTOM_SQL_APPLIED_COMPLETED"] = "True"
+            save_config(project_name, config)
+            return jsonify({"message": "Custom SQL успешно применён.", "success": True}), 200
+        else:
+            return jsonify({"message": "Не удалось применить Custom SQL.", "success": False}), 500
+    else:
+        return jsonify({"message": "Custom SQL файл не найден.", "success": False}), 404
+
+def initialize_supabase(project_name: str):
+    config = load_config(project_name)
+    if "SUPABASE_PROJECT_ID" not in config:
+        result = run_command("supabase init", "Supabase инициализирован успешно.", "Не удалось инициализировать Supabase.")
+        if result:
+            config["SUPABASE_PROJECT_ID"] = "initialized"
+            save_config(project_name, config)
+            return jsonify({"message": "Supabase успешно инициализирован.", "success": True}), 200
+        else:
+            return jsonify({"message": "Не удалось инициализировать Supabase.", "success": False}), 500
+    else:
+        return jsonify({"message": "Supabase уже инициализирован.", "success": True}), 200
+
+def is_using_demo_database(config):
+    default_supabase_url = "https://inmctohsodgdohamhzag.supabase.co"
+    default_supabase_project_id = "inmctohsodgdohamhzag"
+    supabase_url = config.get("SUPABASE_URL", "")
+    supabase_project_id = config.get("SUPABASE_PROJECT_ID", "")
+    return supabase_url == default_supabase_url or supabase_project_id == default_supabase_project_id
+    
+# Reset Supabase database
+def reset_supabase_db(project_name: str):
+    """
+    Reset the Supabase database with an optional SQL file.
+    This function integrates with Flask to handle file uploads and user confirmation via HTTP requests.
+    """
+    config = load_config(project_name)
+    
+    # Check if the user is using the demo database
+    if is_using_demo_database(config):
+        return jsonify({
+            "message": "Сброс базы данных отключен для демо-базы данных. Пожалуйста, настройте собственную базу данных Supabase.",
+            "success": False
+        }), 403  # Forbidden status code
+    
+    # Get the SQL file from the request
+    sql_file = request.form.get('sql_file')
+    if not sql_file:
+        return jsonify({
+            "message": "SQL файл не выбран.",
+            "success": False
+        }), 400  # Bad Request status code
+    
+    # Confirm the reset action
+    confirmation = request.form.get('confirmation')
+    if confirmation != 'yes':
+        return jsonify({
+            "message": "Сброс базы данных отменён пользователем.",
+            "success": False
+        }), 400  # Bad Request status code
+    
+    # Run the reset command
+    try:
+        result = run_command(
+            f"supabase db reset --sql \"{sql_file}\"",
+            "База данных сброшена успешно.",
+            "Не удалось сбросить базу данных."
+        )
+        if result:
+            return jsonify({
+                "message": "База данных успешно сброшена.",
+                "success": True
+            }), 200  # Success status code
+        else:
+            return jsonify({
+                "message": "Не удалось сбросить базу данных.",
+                "success": False
+            }), 500  # Internal Server Error status code
+    except Exception as e:
+        return jsonify({
+            "message": f"Ошибка при сбросе базы данных: {str(e)}",
+            "success": False
+        }), 500  # Internal Server Error status code
+
+def calculate_elapsed_time(project_name: str):
+    config = load_config(project_name)
+    if "project_creation_date" not in config:
+        config["project_creation_date"] = datetime.now().isoformat()
+        save_config(project_name, config)
+    creation_date = datetime.fromisoformat(config["project_creation_date"])
+    elapsed_time = (datetime.now() - creation_date).total_seconds()
+    return jsonify({"elapsed_time": round(elapsed_time)}), 200
+
+def save_admin_to_database(admin_chat_id: str, elapsed_time, project_name: str):
+    config = load_config(project_name)
+    url = f"{SUPABASE_URL}/rest/v1/users"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Content-Type": "application/json",
+    }
+    data = {
+        "user_id": admin_chat_id,
+        "role": "admin",
+        "metadata": {
+            "nickname": f"New Admin from {project_name}",
+            "total_time": elapsed_time,
+            "achievements": generate_achievements(config),
+        },
+    }
+    response = requests.post(url, json=data, headers=headers)
+    if response.status_code == 201:
+        return jsonify({"message": "Администратор успешно добавлен в базу данных.", "success": True}), 200
+    else:
+        return jsonify({"message": "Не удалось добавить администратора в базу данных.", "success": False}), 500
+
+def create_or_update_user(user_id, elapsed_time, project_name: str):
+    config = load_config(project_name)
+    url = f"{SUPABASE_URL}/rest/v1/users"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+    }
+    payload = {
+        "user_id": user_id,
+        "metadata": {
+            "total_time": elapsed_time,
+            "achievements": generate_achievements(config),
+            "nickname": f"New User from {project_name}"
+        }
+    }
+    response = requests.post(url, json=payload, headers=headers)
+    if response.status_code == 201:
+        return jsonify({"message": "Пользователь успешно создан/обновлён.", "success": True}), 200
+    else:
+        return jsonify({"message": "Не удалось создать/обновить пользователя.", "success": False}), 500``` 
+ 
+ 
+#telehooks.py 
+``` 
+from flask import request, jsonify
+from musthooks import save_config, load_config
+from supahooks import save_admin_to_database
+# telehooks.py
+
+import uuid
+# configure_telegram_bot    +!
+# set_webhook               +
+# set_admin_chat_id         -!
+
+import os
+
+
+def set_webhook(current_project):
+    """
+    Set webhook for Telegram Bot.
+    Returns a JSON response indicating success or failure.
+    """
+    config = load_config(current_project)
+
+    # Check if VERCEL_PROJECT_URL is configured
+    if "VERCEL_PROJECT_URL" not in config:
+        return jsonify({
+            "message": "URL Vercel не настроен.",
+            "status": "error"
+        }), 400
+
+    # Construct the webhook URL
+    webhook_url = f"https://{config['VERCEL_PROJECT_URL']}/api/telegramWebhook"
+
+    try:
+        # Run the command to set the webhook
+        result = subprocess.run(
+            ["npx", "tsx", "scripts/setWebhook.ts"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+
+        # Return success response
+        return jsonify({
+            "message": "Webhook установлен успешно.",
+            "status": "success",
+            "details": result.stdout
+        }), 200
+
+    except subprocess.CalledProcessError as e:
+        # Return error response
+        return jsonify({
+            "message": f"Не удалось установить webhook: {e.stderr}",
+            "status": "error"
+        }), 500
+
+
+
+def set_admin_chat_id(current_project, admin_chat_id):
+    """
+    Set the admin chat ID for Telegram notifications.
+    Returns a JSON response indicating success or failure.
+    """
+    config = load_config(current_project)
+
+    # Validate admin_chat_id
+    if not admin_chat_id:
+        return jsonify({
+            "message": "ID админского чата не может быть пустым.",
+            "status": "error"
+        }), 400
+
+    # Save the admin chat ID to the configuration
+    config["ADMIN_CHAT_ID"] = admin_chat_id
+    save_config(current_project, config)
+
+    return jsonify({
+        "message": "ID админского чата успешно настроен.",
+        "status": "success"
+    }), 200
+    
+
+
+def configure_telegram_bot(current_project):
+    """
+    Configure Telegram Bot token and admin chat ID.
+    Returns a JSON response indicating success or failure.
+    """
+    if not current_project:
+        return jsonify({
+            "message": "Проект не выбран.",
+            "status": "error"
+        }), 400
+
+    config = load_config(current_project)
+
+    # Step 1: Configure Telegram Bot Token
+    if "TELEGRAM_BOT_TOKEN" not in config:
+        bot_token = request.args.get("bot_token")  # Retrieve token from query parameters
+        if not bot_token:
+            return jsonify({
+                "message": "Токен Telegram бота не указан.",
+                "status": "error"
+            }), 400
+
+        config["TELEGRAM_BOT_TOKEN"] = bot_token
+        save_config(current_project, config)
+
+        return jsonify({
+            "message": "Токен Telegram бота настроен успешно.",
+            "status": "success"
+        }), 200
+
+    # Step 2: Configure Admin Chat ID
+    if "ADMIN_CHAT_ID" not in config:
+        admin_chat_id = request.args.get("admin_chat_id")  # Retrieve admin chat ID from query parameters
+        if not admin_chat_id:
+            return jsonify({
+                "message": "ID админского чата не указан.",
+                "status": "error"
+            }), 400
+
+        # Save the Admin Chat ID to the configuration
+        config["ADMIN_CHAT_ID"] = admin_chat_id
+        config["TELEGRAM_BOT_CONFIGURED"] = "True"
+        save_config(current_project, config)
+
+        # Create or update user in Supabase when ADMIN_CHAT_ID is set
+        elapsed_time = calculate_elapsed_time(current_project)
+        save_admin_to_database(admin_chat_id, elapsed_time, current_project)
+
+        # Enable the nag screen
+        config["SHOW_NAG_SCREEN"] = "True"
+        save_config(current_project, config)
+
+        return jsonify({
+            "message": "ID админского чата настроен успешно.",
+            "status": "success"
+        }), 200
+
+    # Step 3: Add environment variables to Vercel if VERCEL_PROJECT_URL is configured
+    if "VERCEL_PROJECT_URL" in config:
+        try:
+            if "TELEGRAM_BOT_TOKEN" in config:
+                run_command(f"vercel env add TELEGRAM_BOT_TOKEN {config['TELEGRAM_BOT_TOKEN']} production")
+            if "ADMIN_CHAT_ID" in config:
+                run_command(f"vercel env add ADMIN_CHAT_ID {config['ADMIN_CHAT_ID']} production")
+
+            return jsonify({
+                "message": "Переменные окружения Telegram добавлены в Vercel.",
+                "status": "success"
+            }), 200
+        except Exception as e:
+            return jsonify({
+                "message": f"Ошибка при добавлении переменных окружения в Vercel: {str(e)}",
+                "status": "error"
+            }), 500
+
+    return jsonify({
+        "message": "Конфигурация Telegram бота завершена.",
+        "status": "success"
+    }), 200
+``` 
+ 
+ 
+#vercehooks.py 
+``` 
+from flask import request, jsonify
+from musthooks import save_config, load_config
+import subprocess
+import os
+
+# Configuration
+PROJECTS_DIR = os.path.expanduser("~/Documents/V0_Projects")
+
+# Configure Vercel deployment
+def configure_vercel(project_name: str):
+    config = load_config(project_name)
+    REPO_DIR = os.path.join(PROJECTS_DIR, project_name)  # Dynamic repo path
+
+    if "VERCEL_PROJECT_URL" in config:
+        return jsonify({
+            "message": f"Vercel уже настроен: {config['VERCEL_PROJECT_URL']}",
+            "status": "info"
+        }), 200
+
+    try:
+        # Log in to Vercel
+        subprocess.run("vercel login", shell=True, check=True)
+
+        # Create a new Vercel project
+        subprocess.run(f"cd \"{REPO_DIR}\" && vercel projects create {project_name} --yes", shell=True, check=True)
+
+        # Deploy the project to Vercel
+        subprocess.run(f"cd \"{REPO_DIR}\" && vercel deploy --prod", shell=True, check=True)
+
+        # Fetch and save the Vercel project URL
+        vercel_url = get_vercel_project_url(project_name)
+        if vercel_url:
+            config["VERCEL_PROJECT_URL"] = vercel_url
+            save_config(project_name, config)
+            return jsonify({
+                "message": f"Vercel настроен успешно: {vercel_url}",
+                "status": "success"
+            }), 200
+        else:
+            return jsonify({
+                "message": "Не удалось получить URL проекта Vercel.",
+                "status": "error"
+            }), 500
+
+    except subprocess.CalledProcessError as e:
+        return jsonify({
+            "message": f"Не удалось настроить Vercel: {e.stderr}",
+            "status": "error"
+        }), 500
+
+
+def get_vercel_project_url(project_name):
+    try:
+        result = subprocess.run(
+            ["vercel", "inspect", project_name, "--scope"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        vercel_url = result.stdout.strip()
+        return vercel_url
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to fetch Vercel project URL: {e.stderr}")
+        return None
+
+
+def sync_env_vars(current_project):
+    config = load_config(current_project)
+
+    if "VERCEL_PROJECT_URL" not in config or "SUPABASE_PROJECT_ID" not in config:
+        return jsonify({
+            "message": "Vercel и Supabase должны быть настроены перед синхронизацией переменных окружения.",
+            "status": "error"
+        }), 400
+
+    try:
+        # Pull environment variables from Vercel
+        subprocess.run("vercel env pull .env.production", shell=True, check=True)
+
+        # Update configuration
+        config["env_vars_synced"] = "True"
+        save_config(current_project, config)
+
+        # Generate installation achievement
+        generate_installation_achievement("Sync Env Vars", current_project)
+
+        return jsonify({
+            "message": "Переменные окружения успешно синхронизированы с Vercel.",
+            "status": "success"
+        }), 200
+
+    except subprocess.CalledProcessError as e:
+        return jsonify({
+            "message": f"Не удалось синхронизировать переменные окружения: {e.stderr}",
+            "status": "error"
+        }), 500``` 
+ 
+ 
