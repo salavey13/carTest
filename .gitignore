@@ -27,3 +27,5 @@ yarn-error.log*
 next-env.d.ts
 /version.ini
 version.ini
+/Configame/build
+/Configame/dist/configame.exe
