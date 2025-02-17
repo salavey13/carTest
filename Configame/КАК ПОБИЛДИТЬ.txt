@@ -1,9 +1,11 @@
 0) установить node.js и git
 
-1) запустить гит консоль
+1) запустить гит консоль  и станови `pyinstaller`: "npm pyinstaller"
 
-2) перейти в папку распакованного zip архива
+2) перейти в папку `Configame` 
 
-3) выплнить команду:
+3) скопируй `skilltree.spec` в `Configame.spec`
 
-pyinstaller Configame.spec
+4) выполни команду:
+
+`pyinstaller Configame.spec`
