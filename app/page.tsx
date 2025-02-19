@@ -1,14 +1,28 @@
-// app/page.tsx
-"use client";
+"use client"
 
-import { useTelegram } from "@/hooks/useTelegram";
-import Link from "next/link";
-import dynamic from "next/dynamic";
-
-const Button = dynamic(() => import("@/components/ui/button").then((mod) => mod.Button), { ssr: false });
+import { useEffect } from "react"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { debugLogger } from "@/lib/debugLogger"
+import { useAppContext } from "@/contexts/AppContext"
 
 export default function Home() {
-  const { user, dbUser, isAuthenticated, isLoading } = useTelegram();
+  const { dbUser, telegramUser, isAuthenticated, isLoading, error, isInTelegramContext } = useAppContext()
+
+  useEffect(() => {
+    debugLogger.log("Home component mounted", { isLoading, isInTelegramContext, telegramUser, dbUser, error })
+  }, [isLoading, isInTelegramContext, telegramUser, dbUser, error])
+
+  if (isLoading) {
+    return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>
+  }
+
+  if (error) {
+    debugLogger.error("Error in Home component:", error)
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">Error: {error.message}</div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden">
@@ -87,6 +101,6 @@ export default function Home() {
         </div>
       )}
     </div>
-  );
+  )
 }
 

@@ -5,8 +5,8 @@ import dynamic from "next/dynamic"
 import { useState } from "react"
 import UserInfo from "@/components/user-info"
 
-const Button = dynamic(() => import("@/components/ui/button").then((mod) => mod.Button), { ssr: false })
-const Input = dynamic(() => import("@/components/ui/input").then((mod) => mod.Input), { ssr: false })
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 export default function Header() {
   const [isSearchOpen, setIsSearchOpen] = useState(false)

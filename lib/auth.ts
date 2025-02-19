@@ -1,11 +1,8 @@
-import { createAuthenticatedClient, supabaseAdmin } from "@/hooks/supabase";
-import { logger } from "@/lib/logger";
-//import jwt from "jsonwebtoken";
-import axios from 'axios'
-const JWT_SECRET = process.env.SUPABASE_JWT_SECRET || process.env.NEXT_PUBLIC_SUPABASE_JWT_SECRET;
+import { logger } from "@/lib/logger"
+const JWT_SECRET = process.env.SUPABASE_JWT_SECRET || process.env.NEXT_PUBLIC_SUPABASE_JWT_SECRET
 
 if (!JWT_SECRET) {
-  logger.warn("Missing JWT secret. Authentication features may not work.");
+  logger.warn("Missing JWT secret. Authentication features may not work.")
 }
 
 /*export async function getUserFromChatId(chatId: string) {

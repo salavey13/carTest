@@ -1,12 +1,12 @@
 // app/buy-subscription/page.tsx
-"use client";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { useTelegram } from "@/hooks/useTelegram";
-import { sendTelegramInvoice } from "@/app/actions";
+"use client"
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from "@/components/ui/label"
+import { useTelegram } from "@/hooks/useTelegram"
+import { sendTelegramInvoice } from "@/app/actions"
 
 const SUBSCRIPTIONS = [
   { id: 1, name: "БАЗОВЫЙ", price: 13, features: ["ДОСТУП_К_СТАНДАРТНЫМ_МАШИНАМ", "БАЗОВАЯ_ТЕХПОДЕРЖКА"] },
@@ -22,52 +22,52 @@ const SUBSCRIPTIONS = [
     price: 420,
     features: ["ДОСТУП_КО_ВСЕМ_МАШИНАМ", "КРУГЛОСУТОЧНАЯ_ПОДДЕРЖКА", "ПЕРСОНАЛЬНЫЙ_МЕНЕДЖЕР"],
   },
-];
+]
 
 export default function BuySubscription() {
-  const { user, isAuthenticated } = useTelegram();
-  const [selectedSubscription, setSelectedSubscription] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { user, isAuthenticated } = useTelegram()
+  const [selectedSubscription, setSelectedSubscription] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handlePurchase = async () => {
     if (!isAuthenticated || !user) {
-      setError("You must be logged in to purchase a subscription.");
-      return;
+      setError("You must be logged in to purchase a subscription.")
+      return
     }
 
     if (!selectedSubscription) {
-      setError("Please select a subscription.");
-      return;
+      setError("Please select a subscription.")
+      return
     }
 
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
 
     try {
-      const payload = `subscription_${user.id}_${Date.now()}`;
+      const payload = `subscription_${user.id}_${Date.now()}`
       const response = await sendTelegramInvoice(
-        process.env.JWT_SECRET!,
+        process.env.SUPABASE_JWT_SECRET!,
         user.id.toString(),
         `${selectedSubscription.name} Subscription`,
         "Unlock premium features with this subscription!",
         payload,
-        selectedSubscription.price
-      );
+        selectedSubscription.price,
+      )
 
       if (!response.success) {
-        throw new Error(response.error || "Failed to send invoice");
+        throw new Error(response.error || "Failed to send invoice")
       }
 
-      setSuccess(true);
+      setSuccess(true)
     } catch (err) {
-      console.error("Error during purchase:", err);
-      setError("An unexpected error occurred.");
+      console.error("Error during purchase:", err)
+      setError("An unexpected error occurred.")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <div className="min-h-screen bg-black text-[#00ff9d] pt-20">
@@ -87,13 +87,17 @@ export default function BuySubscription() {
                 <p className="text-2xl font-bold mb-4 font-mono">{sub.price} XTR</p>
                 <ul className="list-disc list-inside mb-4">
                   {sub.features.map((feature, index) => (
-                    <li key={index} className="font-mono">{feature}</li>
+                    <li key={index} className="font-mono">
+                      {feature}
+                    </li>
                   ))}
                 </ul>
                 <RadioGroup onValueChange={() => setSelectedSubscription(sub)}>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value={sub.id.toString()} id={`sub-${sub.id}`} />
-                    <Label htmlFor={`sub-${sub.id}`} className="font-mono">ВЫБРАТЬ</Label>
+                    <Label htmlFor={`sub-${sub.id}`} className="font-mono">
+                      ВЫБРАТЬ
+                    </Label>
                   </div>
                 </RadioGroup>
               </CardContent>
@@ -111,6 +115,6 @@ export default function BuySubscription() {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
