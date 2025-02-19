@@ -25,9 +25,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-/version.ini
-version.ini
-/Configame/build
-/Configame/dist/Configame.exe
-/Configame/dist/ConfigameDemo.exe
-/Configame/__pycache__/

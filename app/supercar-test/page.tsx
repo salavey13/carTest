@@ -1,6 +1,5 @@
 "use client"
 import { useEffect, useState } from "react"
-import Link from "next/link"
 import { motion, AnimatePresence, useMotionValue } from "framer-motion"
 import { supabaseAdmin } from "@/hooks/supabase"
 import { useTelegram } from "@/hooks/useTelegram"
@@ -201,37 +200,33 @@ export default function SupercarTest() {
       <div className="min-h-screen bg-gray-900 text-white p-4 flex items-center justify-center">
         Loading questions...
       </div>
-    );
+    )
   }
 
   if (result) {
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="min-h-screen bg-gray-900 text-white"
       >
-        <Header isAdmin={isAdmin} />
-        <button
-          onClick={resetTest}
-          className="bg-red-500 p-2 rounded mb-4 mx-auto block"
-        >
+        <button onClick={resetTest} className="bg-red-500 p-2 rounded mb-4 mx-auto block">
           Restart Test
         </button>
         <ResultDisplay result={result} similarCars={similarCars} />
       </motion.div>
-    );
+    )
   }
 
-  const totalQuestions = questions.length;
-  const currentQuestionData = questions[currentQuestionIndex];
+  const totalQuestions = questions.length
+  const currentQuestionData = questions[currentQuestionIndex]
 
   // Filter answers to only show those for the current question
-  const answersForCurrentQuestion = allAnswers.filter(answer => answer.question_id === currentQuestionData.id);
+  const answersForCurrentQuestion = allAnswers.filter((answer) => answer.question_id === currentQuestionData.id)
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -242,9 +237,7 @@ export default function SupercarTest() {
           <ProgressIndicator
             current={currentQuestionIndex}
             total={totalQuestions}
-            answered={selectedAnswers.map(a => 
-              questions.findIndex(q => q.id === a.question_id)
-            )}
+            answered={selectedAnswers.map((a) => questions.findIndex((q) => q.id === a.question_id))}
             mode={mode}
             modeProgress={modeProgress}
           />
@@ -259,7 +252,7 @@ export default function SupercarTest() {
         </div>
 
         <AnimatePresence>
-          {mode === 'preview' && (
+          {mode === "preview" && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -272,6 +265,6 @@ export default function SupercarTest() {
         </AnimatePresence>
       </div>
     </motion.div>
-  );
+  )
 }
 

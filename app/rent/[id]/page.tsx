@@ -1,6 +1,8 @@
+"use client"
+
 import { notFound } from "next/navigation"
 import { fetchCarById } from "@/hooks/supabase"
-import  RentCarInterface  from "@/components/RentCarInterface"
+import RentCarInterface from "@/components/RentCarInterface"
 import { motion } from "framer-motion"
 
 export default async function RentCarPage({ params }: { params: { id: string } }) {
@@ -24,40 +26,40 @@ export default async function RentCarPage({ params }: { params: { id: string } }
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="min-h-screen bg-gray-900 text-white p-4 pt-20"
+      className="min-h-screen bg-black text-[#00ff9d] p-4 pt-20"
     >
       <RentCarInterface preselectedCar={car} />
       <section className="mt-8">
-        <h2 className="text-2xl font-bold cyber-text mb-6">Car Specifications</h2>
+        <h2 className="text-2xl font-bold cyber-text mb-6">Характеристики автомобиля</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-gray-800 p-4 rounded-lg shadow-lg">
-            <h3 className="text-xl font-semibold mb-3">Performance</h3>
+          <div className="bg-black/50 border-[#00ff9d]/20 p-4 rounded-lg shadow-lg">
+            <h3 className="text-xl font-semibold mb-3">Производительность</h3>
             <p>
-              <span className="text-cyan-400">Version:</span> {specs.version}
+              <span className="text-[#ff00ff]">Версия:</span> {specs.version}
             </p>
             <p>
-              <span className="text-cyan-400">Electric:</span> {specs.electric ? "Yes" : "No"}
+              <span className="text-[#ff00ff]">Электрический:</span> {specs.electric ? "Да" : "Нет"}
             </p>
             <p>
-              <span className="text-cyan-400">Horsepower:</span> {specs.horsepower}
+              <span className="text-[#ff00ff]">Мощность:</span> {specs.horsepower} л.с.
             </p>
             <p>
-              <span className="text-cyan-400">Torque:</span> {specs.torque}
+              <span className="text-[#ff00ff]">Крутящий момент:</span> {specs.torque}
             </p>
             <p>
-              <span className="text-cyan-400">0-60mph:</span> {specs.acceleration}
+              <span className="text-[#ff00ff]">Разгон 0-100 км/ч:</span> {specs.acceleration}
             </p>
             <p>
-              <span className="text-cyan-400">Top Speed:</span> {specs.topSpeed}
+              <span className="text-[#ff00ff]">Максимальная скорость:</span> {specs.topSpeed}
             </p>
           </div>
-          <div className="bg-gray-800 p-4 rounded-lg shadow-lg">
-            <h3 className="text-xl font-semibold mb-3">Aesthetics</h3>
+          <div className="bg-black/50 border-[#00ff9d]/20 p-4 rounded-lg shadow-lg">
+            <h3 className="text-xl font-semibold mb-3">Эстетика</h3>
             <p>
-              <span className="text-cyan-400">Color:</span> {specs.color}
+              <span className="text-[#ff00ff]">Цвет:</span> {specs.color}
             </p>
             <p>
-              <span className="text-cyan-400">Theme:</span> {specs.theme}
+              <span className="text-[#ff00ff]">Тема:</span> {specs.theme}
             </p>
           </div>
         </div>
