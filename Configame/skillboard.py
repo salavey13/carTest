@@ -263,38 +263,7 @@ def execute_skill():
     # Calculate the user's current level
     user_level = calculate_user_level(config)
 
-    # Find the skill in grouped_actions and check its required level
-    for category, actions in grouped_actions.items():
-        for action_name, action_func, required_level in actions:
-            if action_name == skill:
-                # Check if the user's level meets the required level for the skill
-                if LEVELS[user_level] >= LEVELS[required_level]:
-                    try:
-                        # Pass query parameters to the skill function
-                        action_func()
-                        config[skill_key] = "completed"
-                        save_config(current_project, config)
-                        return jsonify({
-                            "message": f"🎉 Навык '{skill}' освоен!",
-                            "refresh": True
-                        })
-                    except Exception as e:
-                        return jsonify({
-                            "message": f"Ошибка при выполнении навыка '{skill}': {str(e)}",
-                            "refresh": False
-                        }), 500  # Return 500 for server errors
-                else:
-                    return jsonify({
-                        "message": f"❌ Уровень '{required_level}' требуется для освоения навыка '{skill}'. Ваш текущий уровень: '{user_level}'.",
-                        "refresh": False
-                    }), 403  # Return 403 for forbidden access
-
-    # If the skill is not found in grouped_actions
-    return jsonify({
-        "message": f"Навык '{skill}' не найден.",
-        "refresh": False
-    }), 404  # Return 404 if the skill is not found
-    
+ 
     
 
 
@@ -314,7 +283,7 @@ def execute_skill():
                         #### TEST TEST TEST #####
                         #########################
                         
-                        #####action_func()
+                        action_func()
                         
                         #########################
                         #### TEST TEST TEST #####
