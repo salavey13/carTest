@@ -85,10 +85,43 @@ export function useTelegram() {
     }
   }, [tg])
 
-  useEffect(() => {
+   /*useEffect(() => {
     debugLogger.log("useTelegram: useEffect called for initTelegram")
     initTelegram()
-  }, [initTelegram])
+  }, [initTelegram])*/
+  
+  useEffect(() => {
+  const loadScript = async () => {
+    if (typeof window !== "undefined" && !document.getElementById("telegram-web-app-script")) {
+      const script = document.createElement("script")
+      script.id = "telegram-web-app-script"
+      script.src = "https://telegram.org/js/telegram-web-app.js"
+      script.async = true
+      document.head.appendChild(script)
+      return new Promise<void>((resolve) => {
+        script.onload = async () => {
+          const telegram = (window as any).Telegram?.WebApp as TelegramWebApp
+          if (telegram && telegram.initDataUnsafe?.user) {
+            telegram.ready()
+            setTg(telegram)
+            setIsInTelegramContext(true)
+            const telegramUser = telegram.initDataUnsafe.user
+            setUser(telegramUser)
+            await handleAuthentication(telegramUser)
+          } else {
+            setIsInTelegramContext(false)
+          }
+          resolve()
+        }
+      })
+    }
+  }
+  
+  loadScript().catch((err) => {
+    debugLogger.error("Error initializing Telegram:", err)
+    setError(err instanceof Error ? err : new Error("Unknown error occurred"))
+  }).finally(() => setIsLoading(false))
+}, [])
 
   const isAuthenticated = !!dbUser
   const isAdmin = useCallback(() => {

@@ -1,14 +1,16 @@
 // app/layout.tsx
-"use client"; // ✅ Mark as a client component
-import { AnimatePresence, motion } from 'framer-motion';
-import { usePathname } from 'next/navigation';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
+//"use client" // ✅ Mark as a client component
+import { AnimatePresence, motion } from "framer-motion"
+import type React from "react"
+
+//import { usePathname } from "next/navigation"
+import Header from "@/components/Header"
+import Footer from "@/components/Footer"
 import { AppProvider } from "@/contexts/AppContext"
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-
+//  const pathname = usePathname()
+/**/
   return (
     <html lang="en">
       <head>
@@ -18,31 +20,28 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-gray-900 text-white min-h-screen flex flex-col">
         <AppProvider>
-        {/* Header */}
-        <Header />
+          {/* Header */}
+          <Header />
 
-        {/* Main Content */}
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={pathname}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3 }}
-            className="flex-grow"
-          >
-            {children}
-          </motion.div>
-        </AnimatePresence>
+          {/* Main Content 
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+              className="flex-grow"
+            >*/}
+              {children}
+            {/*</motion.div>
+          </AnimatePresence>
 
-        {/* Footer */}
-        <Footer />
+           Footer */}
+          <Footer />
         </AppProvider>
       </body>
     </html>
-  );
+  )
 }
 
-
-
-import './globals.css'
