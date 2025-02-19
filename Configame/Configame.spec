@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_submodules
-hiddenimports = ['skill_config'] + ['cyberui'] + collect_submodules('flask') + collect_submodules('pystray')
+hiddenimports = ['skill_config'] + ['cyberui'] + ['utils'] + collect_submodules('flask') + collect_submodules('pystray') + collect_submodules('flask-sse')
 a = Analysis(
     ['main.py'],
     pathex=[],
@@ -24,7 +24,7 @@ exe = EXE(
     a.binaries,      
     a.datas,
     [],
-    name='skilltree',
+    name='Configame',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

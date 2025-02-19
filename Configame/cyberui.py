@@ -794,20 +794,46 @@ HTML_TEMPLATE = '''
             }
         }
 
+        const eventSource = new EventSource('/stream');
+
+        eventSource.onmessage = function(event) {
+            console.log('Received SSE:', event.data);
+        };
+
+        eventSource.addEventListener('progress', function(event) {
+            const data = JSON.parse(event.data);
+            const message = data.message;
+            const progress = data.progress;
+
+            if (progress === -1) {
+                showToast(message, 'error');
+            } else if (progress === 100) {
+                showToast(message, 'success');
+            } else if (progress >= 0) {
+                showToast(message, 'info');
+            }
+        });
+
+        eventSource.onerror = function() {
+            showToast('Ошибка при получении обновлений прогресса.', 'error');
+            eventSource.close();
+        };
+
+        // Ensure showToast uses cyberpunk colors
         function showToast(message, type = "info") {
             const tcolors = {
-                info: colors.cyberpunk.neon,    // Cyan neon for info
-                success: colors.cyberpunk.pink, // Pink for success
-                error: colors.cyberpunk.purple, // Purple for error
-                warning: colors.cyberpunk.neon  // Neon for warning (same as info for consistency)
+                info: colors.cyberpunk.neon,
+                success: colors.cyberpunk.pink,
+                error: colors.cyberpunk.purple,
+                warning: colors.cyberpunk.neon
             };
             Toastify({
                 text: message,
-                duration: 2000, // Reduced to 2 seconds
+                duration: 2000,
                 close: true,
                 gravity: "top",
                 position: "right",
-                backgroundColor: tcolors[type] || colors.cyberpunk.neon, // Fallback to neon
+                backgroundColor: tcolors[type] || colors.cyberpunk.neon,
             }).showToast();
         }
 
@@ -826,18 +852,17 @@ HTML_TEMPLATE = '''
                 })
                 .then(data => {
                     showToast(data.message || 'Навык выполнен!', 'success');
-                    // Check if refresh is needed and add a delay
                     if (data.refresh) {
                         setTimeout(() => {
                             location.reload();
-                        }, 3000); // 3000ms delay, matching the toast duration
+                        }, 5000); // Increased delay to ensure all progress toasts are seen
                     }
-                    updateSkillVisibility(); // Update skill visibility after skill execution
+                    updateSkillVisibility();
                 })
                 .catch(error => {
                     let toastType = 'error';
                     if (error.message.includes('уже был освоен ранее')) {
-                        toastType = 'info'; // Change to info for already completed skills
+                        toastType = 'info';
                     }
                     showToast(error.message, toastType);
                 });
@@ -852,7 +877,7 @@ HTML_TEMPLATE = '''
                 return;
             }
 
-            executeSkill(skillName)
+            executeSkill(skillName, "{{ current_project }}"); // Pass current_project from template
         }
 
         document.querySelectorAll('.skill-box').forEach(box => {
