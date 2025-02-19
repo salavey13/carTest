@@ -562,6 +562,7 @@ HTML_TEMPLATE = '''
                             ${skill.label} (${skill.unlocked ? '✨ ДОСТУПНО' : '🔒 ЗАБЛОКИРОВАНО'})
                         </div>
                         <div>${skill.description}</div>
+                        <div>(${skill.name})</div>
                         ${skill.dependencies && skill.dependencies.length > 0 ? `
                             <div style="margin-top: 10px; color: ${colors.cyberpunk.neon};">
                                 Требуется:
@@ -606,7 +607,7 @@ HTML_TEMPLATE = '''
                 const label = document.createElement('div');
                 label.className = 'skill-label';
                 label.innerText = skill.label;
-
+                
                 // Assemble elements
                 box.appendChild(icon);
                 box.appendChild(label);
@@ -619,73 +620,73 @@ HTML_TEMPLATE = '''
         }
 
         function redrawConnectionsAndParticles() {
-    const container = document.querySelector('.skill-tree');
-    document.querySelectorAll('.skill-connection, .particle').forEach(el => el.remove());
+            const container = document.querySelector('.skill-tree');
+            document.querySelectorAll('.skill-connection, .particle').forEach(el => el.remove());
 
-    for (const [skillName, skill] of Object.entries(skill_data)) {
-        if (skill.dependencies.length > 0) {
-            skill.dependencies.forEach(depName => {
-                const depSkill = skill_data[depName];
-                if (!depSkill) return;
+            for (const [skillName, skill] of Object.entries(skill_data)) {
+                if (skill.dependencies.length > 0) {
+                    skill.dependencies.forEach(depName => {
+                        const depSkill = skill_data[depName];
+                        if (!depSkill) return;
 
-                const skillNode = document.querySelector(`.skill-box[data-skill="${skillName}"]`);
-                const depSkillNode = document.querySelector(`.skill-box[data-skill="${depName}"]`);
+                        const skillNode = document.querySelector(`.skill-box[data-skill="${skillName}"]`);
+                        const depSkillNode = document.querySelector(`.skill-box[data-skill="${depName}"]`);
 
-                if (skillNode && !skillNode.classList.contains('invisible') && depSkillNode && !depSkillNode.classList.contains('invisible')) {
-                    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                    svg.setAttribute("class", `skill-connection ${!skill.unlocked ? 'dimmed' : 'active'}`);
-                    svg.style.position = "absolute";
-                    svg.style.left = "0";
-                    svg.style.top = "0";
-                    svg.style.width = "100%";
-                    svg.style.height = "100%";
-                    svg.style.overflow = "visible";
+                        if (skillNode && !skillNode.classList.contains('invisible') && depSkillNode && !depSkillNode.classList.contains('invisible')) {
+                            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                            svg.setAttribute("class", `skill-connection ${!skill.unlocked ? 'dimmed' : 'active'}`);
+                            svg.style.position = "absolute";
+                            svg.style.left = "0";
+                            svg.style.top = "0";
+                            svg.style.width = "100%";
+                            svg.style.height = "100%";
+                            svg.style.overflow = "visible";
 
-                    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
 
-                    const x1 = (depSkill.position.col + 0.5) * cellSize.width;
-                    const y1 = (depSkill.position.row + 0.5) * cellSize.height;
-                    const x2 = (skill.position.col + 0.5) * cellSize.width;
-                    const y2 = (skill.position.row + 0.5) * cellSize.height;
+                            const x1 = (depSkill.position.col + 0.5) * cellSize.width;
+                            const y1 = (depSkill.position.row + 0.5) * cellSize.height;
+                            const x2 = (skill.position.col + 0.5) * cellSize.width;
+                            const y2 = (skill.position.row + 0.5) * cellSize.height;
 
-                    const cp1x = x1 + (x2 - x1) * 0.3 + Math.random() * 50 - 25;
-                    const cp1y = y1 + (y2 - y1) * 0.3 + Math.random() * 50 - 25;
-                    const cp2x = x2 - (x2 - x1) * 0.3 + Math.random() * 50 - 25;
-                    const cp2y = y2 - (y2 - y1) * 0.3 + Math.random() * 50 - 25;
+                            const cp1x = x1 + (x2 - x1) * 0.3 + Math.random() * 50 - 25;
+                            const cp1y = y1 + (y2 - y1) * 0.3 + Math.random() * 50 - 25;
+                            const cp2x = x2 - (x2 - x1) * 0.3 + Math.random() * 50 - 25;
+                            const cp2y = y2 - (y2 - y1) * 0.3 + Math.random() * 50 - 25;
 
-                    path.setAttribute("d", `M ${x1},${y1} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${x2},${y2}`);
-                    path.setAttribute("stroke", "url(#gradientStroke)");
-                    path.setAttribute("stroke-width", "2");
-                    path.setAttribute("fill", "none");
-                    path.setAttribute("stroke-linecap", "round");
+                            path.setAttribute("d", `M ${x1},${y1} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${x2},${y2}`);
+                            path.setAttribute("stroke", "url(#gradientStroke)");
+                            path.setAttribute("stroke-width", "2");
+                            path.setAttribute("fill", "none");
+                            path.setAttribute("stroke-linecap", "round");
 
-                    svg.appendChild(path);
-                    container.appendChild(svg);
+                            svg.appendChild(path);
+                            container.appendChild(svg);
 
-                    const particleCount = 10;
-                    for (let i = 0; i < particleCount; i++) {
-                        const particle = document.createElement('div');
-                        particle.className = 'particle';
-                        particle.style.left = `${x1}px`;
-                        particle.style.top = `${y1}px`;
-                        particle.style.background = getParticleColor(skillName, colors);
-                        particle.style.animationDelay = `${Math.random() * 2}s`;
+                            const particleCount = 10;
+                            for (let i = 0; i < particleCount; i++) {
+                                const particle = document.createElement('div');
+                                particle.className = 'particle';
+                                particle.style.left = `${x1}px`;
+                                particle.style.top = `${y1}px`;
+                                particle.style.background = getParticleColor(skillName, colors);
+                                particle.style.animationDelay = `${Math.random() * 2}s`;
 
-                        const dx = x2 - x1;
-                        const dy = y2 - y1;
-                        const jitterX = Math.random() * 30 - 15;
-                        const jitterY = Math.random() * 30 - 15;
+                                const dx = x2 - x1;
+                                const dy = y2 - y1;
+                                const jitterX = Math.random() * 30 - 15;
+                                const jitterY = Math.random() * 30 - 15;
 
-                        particle.style.setProperty('--end-x', `${dx + jitterX}px`);
-                        particle.style.setProperty('--end-y', `${dy + jitterY}px`);
+                                particle.style.setProperty('--end-x', `${dx + jitterX}px`);
+                                particle.style.setProperty('--end-y', `${dy + jitterY}px`);
 
-                        container.appendChild(particle);
-                    }
+                                container.appendChild(particle);
+                            }
+                        }
+                    });
                 }
-            });
+            }
         }
-    }
-}
 
         function updateSkillVisibility() {
             for (const [skillName, skill] of Object.entries(skill_data)) {
@@ -794,24 +795,24 @@ HTML_TEMPLATE = '''
         }
 
         function showToast(message, type = "info") {
-            const colors = {
-                info: "#007bff",
-                success: "#28a745",
-                error: "#dc3545",
-                warning: "#ffc107"
+            const tcolors = {
+                info: colors.cyberpunk.neon,    // Cyan neon for info
+                success: colors.cyberpunk.pink, // Pink for success
+                error: colors.cyberpunk.purple, // Purple for error
+                warning: colors.cyberpunk.neon  // Neon for warning (same as info for consistency)
             };
             Toastify({
                 text: message,
-                duration: 3000,
+                duration: 2000, // Reduced to 2 seconds
                 close: true,
                 gravity: "top",
                 position: "right",
-                backgroundColor: colors[type] || "#007bff",
+                backgroundColor: tcolors[type] || colors.cyberpunk.neon, // Fallback to neon
             }).showToast();
         }
 
         function executeSkill(skillName) {
-            fetch(`/execute/?skill=${encodeURIComponent(skillName)}`, { method: 'GET' })
+            fetch(`/execute/?skill=${encodeURIComponent(skillName)}&project=${encodeURIComponent('{{ current_project }}')}`, { method: 'GET' })
                 .then(response => {
                     if (!response.ok) {
                         if (response.status === 400) {

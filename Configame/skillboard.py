@@ -2,7 +2,6 @@ from flask import Flask, render_template_string, jsonify, request
 import os
 import json
 import sys
-import threading
 import time
 import webbrowser
 import logging
@@ -12,22 +11,9 @@ import requests
 
 from cyberui import HTML_TEMPLATE
 from skill_config import get_skill_data, SKILL_DEPENDENCIES
-
-# Global Colors configuration
-COLORS = {
-    "bg": "#1a1a1a",        # Dark background
-    "fg": "#ffffff",        # White text
-    "btn": "#4d4d4d",      # Button/line color
-    "cyberpunk": {
-        "neon": "#0ff",     # Cyan neon
-        "pink": "#ff1493",  # Deep pink
-        "purple": "#9400d3", # Dark violet
-    }
-}
-# Imports for modularized hooks
 from musthooks import (
     create_project_folder,
-    clone_repository,       # Clone the repository
+    clone_repository,
     apply_zip_updates,
     download_and_install,
     save_config,
@@ -42,62 +28,39 @@ from musthooks import (
     is_npm_package_installed,
     ensure_v0_projects_dir,
     ensure_default_project,
-    install_cli_tool,         
-    is_npm_package_installed,
+    install_cli_tool,
     pull_git_updates,
     check_git_status,
 )
-from vercehooks import (
-    configure_vercel,       # Configure Vercel deployment
-    #complete_deployment,    # Finalize deployment steps
-    sync_env_vars,
-)
-from supahooks import (
-    reset_supabase_db,      # Reset the Supabase database
-    initialize_supabase,    # Initialize Supabase connection
-    apply_demo_data,        # Apply demo data to the database
-    apply_custom_sql,       # Apply custom SQL scripts
-    save_admin_to_database,
-    create_or_update_user,
-    calculate_elapsed_time,
-) 
-from telehooks import (
-    # local configure_telegram_bot, # Configure Telegram bot token and admin chat ID
-    set_webhook,            # Set webhook for Telegram bot
-    # set_admin_chat_id,      # Set admin chat ID for notifications
-)
-from promohooks import (
-    RARITY_COLORS,
-    #local show_landing_page,      # Display the landing page with project details
-    generate_achievements,  # Generate gamified achievements
-    calculate_progress,     # Calculate user progress
-    # local show_leaderboard,       # Display the leaderboard
-    # loacl display_achievements,    # Display the Achievements
-    calculate_user_level,
-)
-from advhooks import (
-    generate_embeddings,    # Regenerate embeddings for semantic search
-    create_pull_request,    # Create a pull request in GitHub
-)
+from vercehooks import configure_vercel, sync_env_vars
+from supahooks import reset_supabase_db, initialize_supabase, apply_demo_data, apply_custom_sql, save_admin_to_database, create_or_update_user, calculate_elapsed_time
+from telehooks import set_webhook
+from promohooks import RARITY_COLORS, generate_achievements, calculate_progress, calculate_user_level
+from advhooks import generate_embeddings, create_pull_request
+
+app = Flask(__name__)
+
 # Global Variables
 current_project = None
 projects = []
-DEFAULT_PROJECT_NAME = "cartest"  # Default project name
+DEFAULT_PROJECT_NAME = "cartest"
 
 # Configuration
 PROJECTS_DIR = os.path.expanduser("~/Documents/V0_Projects")
-VERSION_FILE = os.path.join(PROJECTS_DIR, "version.ini")  # Moved outside the repo
+TEMP_DIR = os.path.join(os.getenv("TEMP", os.path.expanduser("~/AppData/Local/Temp")), "setup_temp")
+if not os.path.exists(TEMP_DIR):
+    os.makedirs(TEMP_DIR, exist_ok=True)
 
-REPO_DIR = os.path.join(PROJECTS_DIR, DEFAULT_PROJECT_NAME)  # Dynamic repo path
-V0_DEV_URL = "https://v0.dev/chat/fork-of-rastaman-shop-KvYJosUCML9"
-VERCEL_URL = "https://vercel.com"
-SUPABASE_URL = "https://supabase.com"
-GITHUB_URL = f"https://github.com/salavey13/{DEFAULT_PROJECT_NAME}"
-TEMP_DIR = os.path.join(os.getenv("TEMP"), "setup_temp")
-# Supabase Configuration
-SUPABASE_URL = "https://inmctohsodgdohamhzag.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzMzk1ODUsImV4cCI6MjA1MzkxNTU4NX0.AdNu5CBn6pp-P5M2lZ6LjpcqTXrhOdTOYMCiQrM_Ud4"
-SUPABASE_SERVICE_ROLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODMzOTU4NSwiZXhwIjoyMDUzOTE1NTg1fQ.xD91Es2o8T1vM-2Ok8iKCn4jGDA5TwBbapD5eqhblLM"
+COLORS = {
+    "bg": "#1a1a1a",
+    "fg": "#ffffff",
+    "btn": "#4d4d4d",
+    "cyberpunk": {
+        "neon": "#0ff",
+        "pink": "#ff1493",
+        "purple": "#9400d3",
+    }
+}
 
 LEVELS = {
     "Beginner": 1,
@@ -106,38 +69,44 @@ LEVELS = {
     "Badass": 4
 }
 
+# Factory function to create action lambdas with current_project
+def create_action_lambda(action_func, required_level):
+    def wrapper(project):
+        return lambda: action_func(project)
+    return wrapper
+
 # Grouped Actions with User Level Checks
 grouped_actions = {
     "Project Management": [
-        ("Создать папку проекта", create_project_folder, "Beginner"),
-        ("Установить Git", lambda: download_and_install("Git", current_project), "Beginner"),
-        ("Установить Node.js", lambda: download_and_install("Node.js", current_project), "Beginner"),
-        ("Установить VS Code", lambda: download_and_install("VS Code", current_project), "Beginner"),
-        ("Установить Notepad++", lambda: download_and_install("Notepad++", current_project), "Beginner"),
-        ("Клонировать репозиторий", lambda: clone_repository(current_project), "Intermediate"),
-        ("Применить ZIP обновления", lambda: apply_zip_updates(current_project), "Badass"),
+        ("Создать папку проекта", create_action_lambda(create_project_folder, "Beginner"), "Beginner"),
+        ("Установить Git", create_action_lambda(lambda p: download_and_install("Git", p), "Beginner"), "Beginner"),
+        ("Установить Node.js", create_action_lambda(lambda p: download_and_install("Node.js", p), "Beginner"), "Beginner"),
+        ("Установить VS Code", create_action_lambda(lambda p: download_and_install("VS Code", p), "Beginner"), "Beginner"),
+        ("Установить Notepad++", create_action_lambda(lambda p: download_and_install("Notepad++", p), "Beginner"), "Beginner"),
+        ("Клонировать репозиторий", create_action_lambda(lambda p: clone_repository(p), "Intermediate"), "Intermediate"),
+        ("Применить ZIP обновления", create_action_lambda(lambda p: apply_zip_updates(p), "Badass"), "Badass"),
     ],
     "Vercel Integration": [
-        ("Установить Supabase CLI", lambda: install_cli_tool("supabase", current_project), "Intermediate"),
-        ("Настроить Vercel", lambda: configure_vercel(current_project), "Intermediate"),
-        ("Синхронизировать переменные окружения", lambda: sync_env_vars(current_project), "Intermediate"),
+        ("Установить Supabase CLI", create_action_lambda(lambda p: install_cli_tool("supabase", p), "Intermediate"), "Intermediate"),
+        ("Настроить Vercel", create_action_lambda(lambda p: configure_vercel(p), "Intermediate"), "Intermediate"),
+        ("Синхронизировать переменные окружения", create_action_lambda(lambda p: sync_env_vars(p), "Intermediate"), "Intermediate"),
     ],
     "Supabase Integration": [
-        ("Установить Vercel CLI", lambda: install_cli_tool("vercel", current_project), "Intermediate"),
-        ("Генерировать вложения", lambda: generate_embeddings(current_project), "Badass"),
-        ("Сбросить базу данных Supabase", lambda: reset_supabase_db(current_project), "Intermediate"),
-        ("Инициализировать Supabase", lambda: initialize_supabase(current_project), "Intermediate"),
-        ("Загрузить демо данные Supabase", lambda: apply_demo_data(current_project), "Intermediate"),
-        ("Применить custom.sql", lambda: apply_custom_sql(current_project), "Intermediate"),
+        ("Установить Vercel CLI", create_action_lambda(lambda p: install_cli_tool("vercel", p), "Intermediate"), "Intermediate"),
+        ("Генерировать вложения", create_action_lambda(lambda p: generate_embeddings(p), "Badass"), "Badass"),
+        ("Сбросить базу данных Supabase", create_action_lambda(lambda p: reset_supabase_db(p), "Intermediate"), "Intermediate"),
+        ("Инициализировать Supabase", create_action_lambda(lambda p: initialize_supabase(p), "Intermediate"), "Intermediate"),
+        ("Загрузить демо данные Supabase", create_action_lambda(lambda p: apply_demo_data(p), "Intermediate"), "Intermediate"),
+        ("Применить custom.sql", create_action_lambda(lambda p: apply_custom_sql(p), "Intermediate"), "Intermediate"),
     ],
     "Telegram Integration": [
-        ("Настроить Telegram бот", lambda: configure_telegram_bot(current_project), "Advanced"),
-        ("Установить Webhook", lambda: set_webhook(current_project), "Advanced"),
+        ("Настроить Telegram бот", create_action_lambda(lambda p: configure_telegram_bot(p), "Advanced"), "Advanced"),
+        ("Установить Webhook", create_action_lambda(lambda p: set_webhook(p), "Advanced"), "Advanced"),
     ],
     "Advanced Features": [
-        ("Показать таблицу лидеров", lambda: unlock_leaderboard(current_project), "Badass"),
-        ("Создать Pull Request", lambda: create_pull_request(current_project, "update", "Обновления", "Автоматические обновления"), "Badass"),
-        ("Применить обновления Git", pull_git_updates, "Intermediate"),
+        ("Показать таблицу лидеров", create_action_lambda(lambda p: unlock_leaderboard(p), "Badass"), "Badass"),
+        ("Создать Pull Request", create_action_lambda(lambda p: create_pull_request(p, "update", "Обновления", "Автоматические обновления"), "Badass"), "Badass"),
+        ("Применить обновления Git", create_action_lambda(pull_git_updates, "Intermediate"), "Intermediate"),
     ],
 }
 
@@ -152,37 +121,26 @@ def unlock_leaderboard(current_project):
     if completed_tasks >= total_tasks:
         config["leaderboard_unlocked"] = "completed"
         save_config(current_project, config)
-        return True
+        return {
+            "status": "success",
+            "message": "Таблица лидеров разблокирована!",
+            "refresh": True
+        }, 200
     else:
         raise Exception("Не все задачи выполнены для разблокировки таблицы лидеров.")
-        
 
-        
-
-       
-
-    
 def create_image():
-    # Create a simple black-and-white image for the tray icon
     width, height = 64, 64
     image = Image.new('RGB', (width, height), COLORS["bg"])
     dc = ImageDraw.Draw(image)
     dc.rectangle((width // 2, 0, width, height // 2), fill=COLORS["cyberpunk"]["purple"])
     dc.rectangle((0, height // 2, width // 2, height), fill=COLORS["cyberpunk"]["pink"])
-    
-
-    # Optionally, add a neon border or other elements
-    dc.rectangle(
-        (0, 0, width, height),                # Full border
-        outline=COLORS["cyberpunk"]["neon"], # Neon outline
-        width=2                               # Border thickness
-    )
+    dc.rectangle((0, 0, width, height), outline=COLORS["cyberpunk"]["neon"], width=2)
     return image
 
 def on_clicked(icon, item):
     if str(item) == "Exit":
         icon.stop()
-         # Directly shut down the Flask server
         shutdown_server()
 
 def setup_tray_icon():
@@ -195,34 +153,20 @@ def setup_tray_icon():
     icon.run()
 
 def open_browser():
-    # Wait for the server to start before opening the browser
     time.sleep(1)
     webbrowser.open("http://127.0.0.1:1313")
 
-
-
-
-app = Flask(__name__)
-
-# Suppress Werkzeug logs
-log = logging.getLogger('werkzeug')
-#log.setLevel(logging.ERROR)
-
-
 @app.route('/')
 def index():
+    global current_project
     current_project = request.args.get('project', DEFAULT_PROJECT_NAME)
     projects = load_projects()
     config = load_config(current_project)
     
-    # Calculate user level
     user_level = calculate_user_level(config)
-    
-    # Check Git status
     git_status = check_git_status(current_project)
     git_status_color = "green" if git_status == '✅' else "red"
     
-    # Pass user_level, git_status, and git_status_color to the template
     return render_template_string(
         HTML_TEMPLATE,
         colors=COLORS,
@@ -235,98 +179,77 @@ def index():
         git_status_color=git_status_color
     )
 
-@app.route('/shutdown', methods=['POST'])
-def shutdown():
-    threading.Thread(target=shutdown_server).start()
-    return jsonify({"message": "Завершение работы сервера..."})
-    
 @app.route('/execute/')
 def execute_skill():
+    global current_project
     current_project = request.args.get('project', DEFAULT_PROJECT_NAME)
-    skill = request.args.get('skill')  # Ensure skill is retrieved from query parameters
+    skill = request.args.get('skill')
     if not skill:
         return jsonify({
             "message": "Название навыка не указано.",
             "refresh": False
-        }), 400  # Return 400 if skill name is missing
+        }), 400
 
     config = load_config(current_project)
     skill_key = skill.lower().replace(" ", "_")
 
-    # Check if the skill is already completed
     if skill_key in config:
         return jsonify({
             "message": f"Навык '{skill}' уже был освоен ранее.",
             "refresh": False
-        }), 400  # Return 400 if the skill was already completed
+        }), 400
 
-    # Calculate the user's current level
     user_level = calculate_user_level(config)
 
- 
-    
-
-
-    # Find the skill in grouped_actions and check its required level
     for category, actions in grouped_actions.items():
         for action_name, action_func, required_level in actions:
             if action_name == skill:
-                # Check if the user's level meets the required level for the skill
                 if LEVELS[user_level] >= LEVELS[required_level]:
                     try:
-                        # Execute the skill's function
+                        # Execute the action with the current project
+                        result, status = action_func(current_project)()
                         
-                        
-                        
-                        
-                        
-                        #### TEST TEST TEST #####
-                        #########################
-                        
-                        action_func()
-                        
-                        #########################
-                        #### TEST TEST TEST #####
-
-
-
-
-
+                        if isinstance(result, dict):
+                            return jsonify(result), status
+                        if isinstance(result, str) and result.startswith('{'):
+                            import json
+                            return jsonify(json.loads(result)), status
 
                         config[skill_key] = "completed"
                         save_config(current_project, config)
                         return jsonify({
                             "message": f"🎉 Навык '{skill}' освоен!",
                             "refresh": True
-                        })
+                        }), 200
                     except Exception as e:
+                        error_msg = f"Ошибка при выполнении навыка '{skill}': {str(e)}"
+                        print(error_msg)
                         return jsonify({
-                            "message": f"Ошибка при выполнении навыка '{skill}': {str(e)}",
+                            "message": error_msg,
                             "refresh": False
-                        }), 500  # Return 500 for server errors
+                        }), 500
                 else:
                     return jsonify({
                         "message": f"❌ Уровень '{required_level}' требуется для освоения навыка '{skill}'. Ваш текущий уровень: '{user_level}'.",
                         "refresh": False
-                    }), 403  # Return 403 for forbidden access
+                    }), 403
 
-    # If the skill is not found in grouped_actions
     return jsonify({
         "message": f"Навык '{skill}' не найден.",
         "refresh": False
-    }), 404  # Return 404 if the skill is not found
+    }), 404
 
 @app.route('/reset_progress')
 def reset_progress():
+    global current_project
     current_project = request.args.get('project', DEFAULT_PROJECT_NAME)
     config = {"создать_папку_проекта": "completed"}
     save_config(current_project, config)
-
     return jsonify({
         "message": "Прогресс сброшен. Начните свое приключение заново!",
         "refresh": True
     })
-    
+
 @app.route('/api/leaderboard')
 def api_leaderboard():
     try:
@@ -337,7 +260,7 @@ def api_leaderboard():
         if response.status_code == 200:
             users = response.json()
             leaderboard_data = []
-            for idx, user in enumerate(users[:10]):  # Top 10 users
+            for idx, user in enumerate(users[:10]):
                 nickname = user['metadata'].get('nickname', 'Неизвестный')
                 total_time = user['metadata'].get('total_time', 'N/A')
                 achievements = user['metadata'].get('achievements', [])
@@ -349,16 +272,14 @@ def api_leaderboard():
                     "achievements": achievements
                 })
             return jsonify(leaderboard_data)
-        else:
-            return jsonify([]), 500  # Return empty list if there's an error
+        return jsonify([]), 500
     except Exception as e:
         print(f"Error fetching leaderboard data: {str(e)}")
         return jsonify([]), 500
-        
+
 @app.route('/api/git_status')
 def api_git_status():
+    global current_project
     current_project = request.args.get('project', DEFAULT_PROJECT_NAME)
     status = check_git_status(current_project)
-    return jsonify({
-        "status": status
-    })
+    return jsonify({"status": status})
