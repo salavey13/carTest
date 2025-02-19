@@ -670,58 +670,76 @@ def apply_zip_updates(project_name):
         initialdir=REPO_DIR,
     )
     if not zip_path or not os.path.exists(zip_path):
-        publish_event('progress', {"message": "ZIP файл не выбран.", "progress": -1})
+        publish_event('progress', {"message": "ZIP файл не выбран.", "progress": -1, "tool": "ZIP Update"})
         return jsonify({"status": "warning", "message": "ZIP файл не выбран."})
 
     try:
-        publish_event('progress', {"message": "Starting ZIP update process...", "progress": 0})
+        publish_event('progress', {"message": "Starting ZIP update process...", "progress": 0, "tool": "ZIP Update"})
 
         # Save and extract ZIP
         temp_dir = os.path.join(TEMP_DIR, "temp_unzip")
         os.makedirs(temp_dir, exist_ok=True)
-        shutil.copy2(zip_path, os.path.join(TEMP_DIR, os.path.basename(zip_path)))
+        zip_filename = os.path.basename(zip_path)
+        shutil.copy2(zip_path, os.path.join(TEMP_DIR, zip_filename))
 
-        publish_event('progress', {"message": "Extracting ZIP file...", "progress": 25})
+        publish_event('progress', {"message": "Extracting ZIP file...", "progress": 25, "tool": "ZIP Update"})
 
+        # Extract ZIP using PowerShell, ensuring we can filter files
         subprocess.run(
-            f"powershell -Command \"Expand-Archive -Force '{os.path.join(TEMP_DIR, os.path.basename(zip_path))}' -DestinationPath '{temp_dir}'\"",
+            f"powershell -Command \"Expand-Archive -Force '{os.path.join(TEMP_DIR, zip_filename)}' -DestinationPath '{temp_dir}'\"",
             shell=True,
             check=True,
         )
 
-        publish_event('progress', {"message": "Copying files to repository...", "progress": 50})
+        publish_event('progress', {"message": "Copying files to repository (excluding .gitignore)...", "progress": 50, "tool": "ZIP Update"})
 
         repo_dir = os.path.join(PROJECTS_DIR, project_name)
-        subprocess.run(f"xcopy /s /y \"{temp_dir}\\*\" \"{repo_dir}\"", shell=True, check=True)
+
+        # Instead of xcopy, use Python to copy files, excluding .gitignore
+        for item in os.listdir(temp_dir):
+            source_path = os.path.join(temp_dir, item)
+            dest_path = os.path.join(repo_dir, item)
+
+            # Skip .gitignore
+            if item == ".gitignore":
+                publish_event('progress', {"message": f"Skipping .gitignore file.", "progress": 50, "tool": "ZIP Update"})
+                continue
+
+            if os.path.isdir(source_path):
+                shutil.copytree(source_path, dest_path, dirs_exist_ok=True)
+            else:
+                shutil.copy2(source_path, dest_path)
+
+        # Clean up temporary directory
         shutil.rmtree(temp_dir)
 
-        publish_event('progress', {"message": "Updating version and committing changes...", "progress": 75})
+        publish_event('progress', {"message": "Updating version and committing changes...", "progress": 75, "tool": "ZIP Update"})
 
         current_version = int(config.get("CURRENT_VERSION", 0))
         next_version = current_version + 1
         config["CURRENT_VERSION"] = str(next_version)
-        config["LAST_APPLIED_ZIP"] = os.path.basename(zip_path)
+        config["LAST_APPLIED_ZIP"] = zip_filename
         save_config(project_name, config)
 
         branch_name = f"update-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         subprocess.run(f"git checkout -b {branch_name}", cwd=repo_dir, shell=True, check=True)
         subprocess.run("git add .", cwd=repo_dir, shell=True, check=True)
-        commit_msg = f"Обновления от {os.path.basename(zip_path)} | Версия {next_version}"
+        commit_msg = f"Обновления от {zip_filename} | Версия {next_version}"
         subprocess.run(f"git commit -m \"{commit_msg}\"", cwd=repo_dir, shell=True, check=True)
         subprocess.run(f"git push origin {branch_name}", cwd=repo_dir, shell=True, check=True)
         subprocess.run("git checkout main", cwd=repo_dir, shell=True, check=True)
         subprocess.run("git pull origin main", cwd=repo_dir, shell=True, check=True)
 
-        publish_event('progress', {"message": "ZIP updates applied successfully.", "progress": 100})
+        publish_event('progress', {"message": "ZIP updates applied successfully.", "progress": 100, "tool": "ZIP Update"})
 
         return jsonify({
             "status": "success",
-            "message": "ZIP обновления применены успешно и создан Pull Request."
+            "message": "ZIP обновления применены успешно и создан Pull Request (excluding .gitignore)."
         })
 
     except subprocess.CalledProcessError as e:
         error_msg = f"Не удалось применить ZIP обновления: {e.stderr}"
-        publish_event('progress', {"message": error_msg, "progress": -1})
+        publish_event('progress', {"message": error_msg, "progress": -1, "tool": "ZIP Update"})
         return jsonify({
             "status": "error",
             "message": error_msg
@@ -729,7 +747,7 @@ def apply_zip_updates(project_name):
 
     except Exception as e:
         error_msg = f"Неизвестная ошибка при обновлении ZIP: {str(e)}"
-        publish_event('progress', {"message": error_msg, "progress": -1})
+        publish_event('progress', {"message": error_msg, "progress": -1, "tool": "ZIP Update"})
         return jsonify({
             "status": "error",
             "message": error_msg
