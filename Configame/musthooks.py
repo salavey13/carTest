@@ -14,7 +14,7 @@ import winreg
 import webbrowser
 import json
 from tkinter import filedialog
-
+import requests
 # load_projects                     +
 # load_config                       +
 # apply_zip_updates                 +
@@ -45,11 +45,11 @@ from tkinter import filedialog
 PROJECTS_DIR = os.path.expanduser("~/Documents/V0_Projects")
 DEFAULT_PROJECT_NAME = "cartest"  # Default project name
 REPO_DIR = os.path.join(PROJECTS_DIR, DEFAULT_PROJECT_NAME)  # Dynamic repo path
-V0_DEV_URL = "https://v0.dev/chat/fork-of-rastaman-shop-KvYJosUCML9"
+V0_DEV_URL = "https://v0.dev/chat/cartest-tupabase-template-hdQdrfzkTFA?b=b_I9SSuPzTot2&p=0"
 VERCEL_URL = "https://vercel.com"
 SUPABASE_URL = "https://supabase.com"
 GITHUB_URL = f"https://github.com/salavey13/{DEFAULT_PROJECT_NAME}"
-TEMP_DIR = os.path.join(os.getenv("TEMP"), "setup_temp")
+#TEMP_DIR = os.path.join(os.getenv("TEMP"), "setup_temp")
 # URLs for downloads
 DOWNLOAD_URLS = {
     "Git": "https://github.com/git-for-windows/git/releases/download/v2.47.1.windows.2/Git-2.47.1.2-64-bit.exe",
@@ -60,20 +60,7 @@ DOWNLOAD_URLS = {
 
 
 
-def get_npm_path():
-    # Find the full path to node
-    node_path = shutil.which("node")
-    if not node_path:
-        raise FileNotFoundError("Node.js is not installed or not found in PATH.")
-    
-    # Derive the npm path by replacing 'node' with 'npm'
-    npm_path = node_path.replace("node.exe", "npm")
-    
-    # Verify that the derived npm path exists
-    if not os.path.exists(npm_path):
-        raise FileNotFoundError(f"npm not found at the expected location: {npm_path}")
-    
-    return npm_path 
+
     
 def update_environment_variable(key, value):
     """
@@ -281,23 +268,56 @@ def is_npm_package_installed(package_name, current_project):
             "message": f"Error checking installation of package {package_name}: {str(e)}"
         })
         
-def is_tool_installed(tool_name, current_project):
-    config = load_config(current_project)
+def get_npm_path():
+    # Find the full path to node
+    node_path = shutil.which("node")
+    if not node_path:
+        raise FileNotFoundError("Node.js is not installed or not found in PATH.")
     
-    # Check if the tool installation status is already saved in version.ini
+    # Derive the npm path by replacing 'node' with 'npm'
+    npm_path = node_path.replace("node.exe", "npm.cmd")  # Use .cmd for Windows
+    if not os.path.exists(npm_path):
+        # Try to find npm in the same directory as node
+        node_dir = os.path.dirname(node_path)
+        potential_npm = os.path.join(node_dir, "npm.cmd")
+        if os.path.exists(potential_npm):
+            npm_path = potential_npm
+        else:
+            raise FileNotFoundError(f"npm not found at the expected location: {npm_path}")
+
+    return npm_path
+
+def is_tool_installed(tool_name, current_project=None):
+    config = load_config(current_project) if current_project else {}
     task_key = f"{tool_name.lower()}_installed"
+
+    # Check if the tool installation status is already saved in config
     if task_key in config and config[task_key] == "True":
         return True
-    
-    # Proceed with the actual check if not found in version.ini
+
     try:
-        subprocess.run([tool_name, "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        
-        # Save the result to version.ini to avoid future checks
-        config[task_key] = "True"
-        save_config(current_project, config)
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
+        # Special handling for Node.js and npm
+        if tool_name.lower() in ["node", "nodejs"]:
+            result = subprocess.run(["node", "--version"], capture_output=True, text=True)
+            if result.returncode == 0:
+                config[task_key] = "True"
+                if current_project:
+                    save_config(current_project, config)
+                return True
+            else:
+                return False
+
+        # For other tools (like Git), check if they can be run
+        result = subprocess.run([tool_name, "--version"], capture_output=True, text=True)
+        if result.returncode == 0:
+            config[task_key] = "True"
+            if current_project:
+                save_config(current_project, config)
+            return True
+        return False
+
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"Error checking installation of {tool_name}: {str(e)}")
         return False
 
 def ensure_v0_projects_dir():
@@ -467,53 +487,80 @@ def initialize_login_checklist(project_name):
     })
 
 
+
+# Ensure TEMP_DIR is defined and valid
+TEMP_DIR = os.path.join(os.getenv("TEMP", os.path.expanduser("~/AppData/Local/Temp")), "setup_temp")
+if not os.path.exists(TEMP_DIR):
+    os.makedirs(TEMP_DIR, exist_ok=True)
+
 def download_and_install(tool_name, current_project):
+    if not current_project or not isinstance(current_project, str):
+        return {
+            "status": "error",
+            "message": f"Invalid project name: {current_project}",
+            "refresh": False
+        }, 400
+
     config = load_config(current_project)
+    skill_key = ("Установить " + tool_name).lower().replace(" ", "_")
     
     # Check if the tool is already installed
     if is_tool_installed(tool_name.lower()):
-        return json.dumps({
-            "status": "info",
-            "message": f"{tool_name} уже установлен.",
-            "refresh": False
-        }), 200
+        # Mark the skill as completed even if the tool is already installed
+        config[skill_key] = "completed"
+        save_config(current_project, config)
+        return {
+            "status": "success",
+            "message": f"{tool_name} уже установлен и отмечен как выполненный.",
+            "refresh": True
+        }, 200
     
     url = DOWNLOAD_URLS.get(tool_name)
     if not url:
-        return json.dumps({
+        return {
             "status": "error",
             "message": f"URL для {tool_name} не найден.",
             "refresh": False
-        }), 404
+        }, 404
     
-    file_path = os.path.join(TEMP_DIR, f"{tool_name.replace(' ', '_')}-Installer.exe")
-    if not os.path.exists(TEMP_DIR):
-        os.makedirs(TEMP_DIR)
-    
-    # Download with progress
+    file_name = f"{tool_name.replace(' ', '_')}-Installer.exe"
+    file_path = os.path.join(TEMP_DIR, file_name)
+    if not isinstance(file_path, str):
+        return {
+            "status": "error",
+            "message": f"Failed to construct file path for {tool_name}",
+            "refresh": False
+        }, 500
+
+    # Download with progress and error handling
     try:
-        import requests
-        response = requests.get(url, stream=True)
+        response = requests.get(url, stream=True, timeout=30)
+        if response.status_code != 200:
+            raise Exception(f"Failed to download {tool_name}: HTTP {response.status_code}")
+        
         total_size = int(response.headers.get('content-length', 0))
         block_size = 1024  # 1 KB
         downloaded = 0
         
         with open(file_path, 'wb') as f:
             for data in response.iter_content(block_size):
-                downloaded += len(data)
-                f.write(data)
-                progress = int(50 * downloaded / total_size)
-                print(f"\r[{'#' * progress}{'.' * (50 - progress)}] {downloaded / 1024:.2f}/{total_size / 1024:.2f} KB", end="")
-        
+                if data:
+                    downloaded += len(data)
+                    f.write(data)
+                    progress = int(50 * downloaded / total_size)
+                    print(f"\r[{'#' * progress}{'.' * (50 - progress)}] {downloaded / 1024:.2f}/{total_size / 1024:.2f} KB", end="")
+
         print("\nDownload completed.")
     except Exception as e:
-        return json.dumps({
+        error_msg = f"Не удалось скачать {tool_name}: {str(e)}"
+        print(error_msg)
+        return {
             "status": "error",
-            "message": f"Не удалось скачать {tool_name}: {str(e)}",
+            "message": error_msg,
             "refresh": False
-        }), 500
-    
-    # Install
+        }, 500
+
+    # Install with detailed error handling
     install_args = {
         "Git": "/VERYSILENT /NORESTART /NOCANCEL",
         "Node.js": "/quiet",
@@ -521,23 +568,61 @@ def download_and_install(tool_name, current_project):
         "VS Code": "/verysilent /suppressmsgboxes"
     }
     args = install_args.get(tool_name, "")
-    if not run_command(f'"{file_path}" {args}', 
-                       f"{tool_name} установлен успешно.", f"Не удалось установить {tool_name}."):
-        return json.dumps({
-            "status": "error",
-            "message": f"Не удалось установить {tool_name}.",
-            "refresh": False
-        }), 500
     
-    # Add to installed tools and save config
-    config.setdefault("TOOLS_INSTALLED", []).append(tool_name)
-    save_config(current_project, config)
-    return json.dumps({
-        "status": "success",
-        "message": f"{tool_name} успешно установлен.",
-        "refresh": True
-    }), 200
+    try:
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Installer not found at {file_path}")
 
+        process = subprocess.run(
+            f'"{file_path}" {args}',
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=600
+        )
+        
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(process.returncode, command=f'"{file_path}" {args}', output=process.stderr)
+
+        if not is_tool_installed(tool_name.lower()):
+            raise Exception(f"Установка {tool_name} завершилась, но инструмент не найден в системе.")
+
+        # Mark as completed after successful installation
+        config[skill_key] = "completed"
+        save_config(current_project, config)
+
+        return {
+            "status": "success",
+            "message": f"{tool_name} успешно установлен.",
+            "refresh": True
+        }, 200
+
+    except subprocess.TimeoutExpired as e:
+        error_msg = f"Таймаут при установке {tool_name}: процесс не завершился в течение 10 минут."
+        print(error_msg)
+        return {
+            "status": "error",
+            "message": error_msg,
+            "refresh": False
+        }, 500
+
+    except subprocess.CalledProcessError as e:
+        error_msg = f"Не удалось установить {tool_name}: {e.output or 'Неизвестная ошибка'}"
+        print(error_msg)
+        return {
+            "status": "error",
+            "message": error_msg,
+            "refresh": False
+        }, 500
+
+    except Exception as e:
+        error_msg = f"Неизвестная ошибка при установке {tool_name}: {str(e)}"
+        print(error_msg)
+        return {
+            "status": "error",
+            "message": error_msg,
+            "refresh": False
+        }, 500
 
 def run_command(command, success_message="Успех", error_message="Ошибка"):
     try:
