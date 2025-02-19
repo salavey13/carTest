@@ -1,21 +1,25 @@
-import type { Database } from "@/types/database.types"
 import { createClient } from "@supabase/supabase-js"
 import { generateJwtToken } from "@/lib/auth"
 import type { WebAppUser } from "@/types/telegram.d"
+import { debugLogger } from "@/lib/debugLogger"
+import type { Database } from "@/types/database.types"
 
-const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "https://inmctohsodgdohamhzag.supabase.co"
-const supabaseAnonKey =
-  process.env.SUPABASE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzMzk1ODUsImV4cCI6MjA1MzkxNTU4NX0.AdNu5CBn6pp-P5M2lZ6LjpcqTXrhOdTOYMCiQrM_Ud4"
-const serviceRoleKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODMzOTU4NSwiZXhwIjoyMDUzOTE1NTg1fQ.xD91Es2o8T1vM-2Ok8iKCn4jGDA5TwBbapD5eqhblLM"
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export const supabaseAnon = createClient<Database>(supabaseUrl, supabaseAnonKey)
 export const supabaseAdmin = createClient<Database>(supabaseUrl, serviceRoleKey)
+
+interface CarResult {
+  id: number
+  make: string
+  model: string
+  similarity: number
+  description: string
+  image_url: string
+  rent_link: string
+}
 
 export const createAuthenticatedClient = async (chatId: string) => {
   const token = await generateJwtToken(chatId)
@@ -50,15 +54,22 @@ export const loadTestProgress = async (chatId: string) => {
 }
 
 export const createOrUpdateUser = async (chatId: string, userInfo: Partial<WebAppUser>) => {
+  debugLogger.log("Creating or updating user:", { chatId, userInfo })
   const { data: existingUser, error: fetchError } = await supabaseAdmin
     .from("users")
     .select("*")
     .eq("user_id", chatId)
     .single()
 
-  if (fetchError && fetchError.message !== "No rows found") throw fetchError
+  if (fetchError && fetchError.message !== "No rows found") {
+    debugLogger.error("Error fetching existing user:", fetchError)
+    throw fetchError
+  }
 
-  if (existingUser) return existingUser
+  if (existingUser) {
+    debugLogger.log("Existing user found:", existingUser)
+    return existingUser
+  }
 
   const { data: newUser, error: insertError } = await supabaseAdmin
     .from("users")
@@ -73,18 +84,38 @@ export const createOrUpdateUser = async (chatId: string, userInfo: Partial<WebAp
     .select()
     .single()
 
-  if (insertError) throw insertError
+  if (insertError) {
+    debugLogger.error("Error inserting new user:", insertError)
+    throw insertError
+  }
 
+  debugLogger.log("New user created:", newUser)
   return newUser
 }
 
-export const searchCars = async (queryEmbedding: number[], matchCount: number) => {
-  const { data, error } = await supabaseAnon.rpc("search_cars", {
-    query_embedding: queryEmbedding,
-    match_count: matchCount,
-  })
-  if (error) throw error
-  return data
+export const searchCars = async (embedding: number[], limit = 5): Promise<CarResult[]> => {
+  try {
+    const { data, error } = await supabaseAnon.rpc("match_cars", {
+      query_embedding: embedding,
+      match_threshold: 0.5,
+      match_count: limit,
+    })
+
+    if (error) throw error
+
+    return data.map((item: any) => ({
+      id: item.id,
+      make: item.make,
+      model: item.model,
+      similarity: item.similarity,
+      description: item.description,
+      image_url: item.image_url,
+      rent_link: `/rent/${item.id}`,
+    }))
+  } catch (error) {
+    console.error("Error searching cars:", error)
+    return []
+  }
 }
 
 export const getSimilarCars = async (carId: string, matchCount = 3) => {
@@ -180,9 +211,15 @@ export const fetchCarById = async (id: string) => {
 }
 
 export const fetchUserData = async (chatId: string) => {
+  debugLogger.log("Fetching user data for chatId:", chatId)
   const { data, error } = await supabaseAnon.from("users").select("*").eq("user_id", chatId).single()
 
-  if (error) throw error
+  if (error) {
+    debugLogger.error("Error fetching user data:", error)
+    throw error
+  }
+
+  debugLogger.log("Fetched user data:", data)
   return data
 }
 

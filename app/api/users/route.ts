@@ -34,11 +34,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Fetch user data using the Supabase Admin client
-    const { data, error } = await supabaseAdmin
-      .from("users")
-      .select("*")
-      .eq("user_id", chatId)
-      .single()
+    const { data, error } = await supabaseAdmin.from("users").select("*").eq("user_id", chatId).single()
 
     if (error) {
       logger.error(`Error fetching user with chat_id ${chatId}:`, error)

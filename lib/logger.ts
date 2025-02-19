@@ -1,50 +1,50 @@
-type LogLevel = 'info' | 'warn' | 'error';
+type LogLevel = "info" | "warn" | "error"
 
 type LogMessage = {
-  level: LogLevel;
-  message: string;
-  args: any[];
-  timestamp: string;
-};
+  level: LogLevel
+  message: string
+  args: any[]
+  timestamp: string
+}
 
-type LogListener = (log: LogMessage) => void;
+type LogListener = (log: LogMessage) => void
 
 class Logger {
-  private listeners: LogListener[] = [];
+  private listeners: LogListener[] = []
 
   private log(level: LogLevel, message: string, ...args: any[]) {
-    const timestamp = new Date().toISOString();
-    const logMessage: LogMessage = { level, message, args, timestamp };
-    
-    console[level](`[${timestamp}] [${level.toUpperCase()}] ${message}`, ...args);
-    
+    const timestamp = new Date().toISOString()
+    const logMessage: LogMessage = { level, message, args, timestamp }
+
+    console[level](`[${timestamp}] [${level.toUpperCase()}] ${message}`, ...args)
+
     // Notify all subscribed listeners
-    this.listeners.forEach((listener) => listener(logMessage));
+    this.listeners.forEach((listener) => listener(logMessage))
   }
 
   info(message: string, ...args: any[]) {
-    this.log('info', message, ...args);
+    this.log("info", message, ...args)
   }
 
   warn(message: string, ...args: any[]) {
-    this.log('warn', message, ...args);
+    this.log("warn", message, ...args)
   }
 
   error(message: string, ...args: any[]) {
-    this.log('error', message, ...args);
+    this.log("error", message, ...args)
   }
 
   subscribe(listener: LogListener) {
-    this.listeners.push(listener);
+    this.listeners.push(listener)
 
     // Return an unsubscribe function
     return {
       unsubscribe: () => {
-        this.listeners = this.listeners.filter((l) => l !== listener);
+        this.listeners = this.listeners.filter((l) => l !== listener)
       },
-    };
+    }
   }
 }
 
-export const logger = new Logger();
+export const logger = new Logger()
 

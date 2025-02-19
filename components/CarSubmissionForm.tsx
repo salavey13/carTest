@@ -1,44 +1,46 @@
 // components/CarSubmissionForm.tsx
-'use client';
-import { useState } from 'react';
-import { supabaseAdmin } from '@/hooks/supabase';
-import { uploadImage } from '@/hooks/supabase';
+"use client"
+import { useState } from "react"
+import type React from "react"
+
+import { supabaseAdmin } from "@/hooks/supabase"
+import { uploadImage } from "@/hooks/supabase"
 
 export function CarSubmissionForm() {
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
-    make: '',
-    model: '',
-    description: '',
+    make: "",
+    model: "",
+    description: "",
     specs: {} as Record<string, string>, // Structured specs object
-    daily_price: '',
-    image_url: '',
-    rent_link: '',
-  });
-  const [imageFile, setImageFile] = useState<File | null>(null); // For image upload
+    daily_price: "",
+    image_url: "",
+    rent_link: "",
+  })
+  const [imageFile, setImageFile] = useState<File | null>(null) // For image upload
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+    e.preventDefault()
+    setIsSubmitting(true)
 
     try {
       // Handle image upload if a file is selected
-      let imageUrl = formData.image_url;
+      let imageUrl = formData.image_url
       if (imageFile) {
-        const bucketName = 'car-images'; // Public bucket for car images
-        imageUrl = await uploadImage(bucketName, imageFile);
+        const bucketName = "car-images" // Public bucket for car images
+        imageUrl = await uploadImage(bucketName, imageFile)
       }
 
       // Combine description and specs into a single text input
-      const specsString = JSON.stringify(formData.specs); // Convert specs to JSON string
-      const combinedText = `${formData.description} ${specsString}`;
+      const specsString = JSON.stringify(formData.specs) // Convert specs to JSON string
+      const combinedText = `${formData.description} ${specsString}`
 
       // Generate embedding (assuming generateEmbedding is available)
-      const embedding = await generateEmbedding(combinedText);
+      const embedding = await generateEmbedding(combinedText)
 
       // Insert the car into the database
       const { data: car, error: insertError } = await supabaseAdmin
-        .from('cars')
+        .from("cars")
         .insert({
           ...formData,
           specs: formData.specs, // Store specs as JSON object
@@ -47,30 +49,30 @@ export function CarSubmissionForm() {
           rent_link: formData.rent_link || `/rent/${formData.id}`, // Default rent link
           embedding: JSON.stringify(embedding),
         })
-        .select(); // Return the inserted car to get its ID
+        .select() // Return the inserted car to get its ID
 
-      if (insertError) throw insertError;
+      if (insertError) throw insertError
 
       // Reset form data
       setFormData({
-        make: '',
-        model: '',
-        description: '',
+        make: "",
+        model: "",
+        description: "",
         specs: {},
-        daily_price: '',
-        image_url: '',
-        rent_link: '',
-      });
-      setImageFile(null); // Clear uploaded image
+        daily_price: "",
+        image_url: "",
+        rent_link: "",
+      })
+      setImageFile(null) // Clear uploaded image
 
-      alert('Car added successfully!');
+      alert("Car added successfully!")
     } catch (error) {
-      console.error('Submission failed:', error);
-      alert('Error adding car');
+      console.error("Submission failed:", error)
+      alert("Error adding car")
     } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(false)
     }
-  };
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -111,7 +113,8 @@ export function CarSubmissionForm() {
 
       {/* Specs */}
       <div>
-        <h3 className="text-lg font-semibold text-cyan-400 mb-2">Specifications</h3><div className="space-y-2">
+        <h3 className="text-lg font-semibold text-cyan-400 mb-2">Specifications</h3>
+        <div className="space-y-2">
           {Object.entries(formData.specs).map(([key, value], index) => (
             <div key={index} className="flex gap-2">
               <input
@@ -150,7 +153,7 @@ export function CarSubmissionForm() {
           ))}
           <button
             type="button"
-            onClick={() => setFormData({ ...formData, specs: { ...formData.specs, '': '' } })}
+            onClick={() => setFormData({ ...formData, specs: { ...formData.specs, "": "" } })}
             className="w-full p-3 rounded bg-gray-700 text-white hover:bg-gray-600 transition-colors"
           >
             Add Spec
@@ -214,9 +217,9 @@ export function CarSubmissionForm() {
         disabled={isSubmitting}
         className="w-full p-3 rounded bg-cyan-500 hover:bg-cyan-600 text-white font-bold transition-colors disabled:opacity-50"
       >
-        {isSubmitting ? 'Adding Car...' : 'Add Rental Car'}
+        {isSubmitting ? "Adding Car..." : "Add Rental Car"}
       </button>
     </form>
-  );
+  )
 }
 

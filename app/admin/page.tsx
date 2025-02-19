@@ -1,23 +1,23 @@
 // app/admin/page.tsx
-"use client";
-import { useEffect } from 'react'
-import { useTelegram } from "@/hooks/useTelegram";
-import { useRouter } from "next/navigation";
-import { CarSubmissionForm } from "@/components/CarSubmissionForm";
-import Link from "next/link";
+"use client"
+import { useEffect } from "react"
+import { useTelegram } from "@/hooks/useTelegram"
+import { useRouter } from "next/navigation"
+import { CarSubmissionForm } from "@/components/CarSubmissionForm"
+import Link from "next/link"
 
 export default function AdminPage() {
-  const { dbUser, isAdmin } = useTelegram();
-  const router = useRouter();
+  const { dbUser, isAdmin } = useTelegram()
+  const router = useRouter()
 
   useEffect(() => {
     if (!dbUser || !isAdmin()) {
-      router.push("/");
+      router.push("/")
     }
-  }, [dbUser, isAdmin, router]);
+  }, [dbUser, isAdmin, router])
 
   if (!dbUser || !isAdmin()) {
-    return <div className="min-h-screen bg-gray-900" />;
+    return <div className="min-h-screen bg-gray-900" />
   }
 
   return (
@@ -37,6 +37,6 @@ export default function AdminPage() {
         </Link>
       </div>
     </div>
-  );
+  )
 }
 
