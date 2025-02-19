@@ -1,4 +1,5 @@
 from flask import Flask, render_template_string, jsonify, request
+from flask_sse import sse
 import os
 import json
 import sys
@@ -37,8 +38,11 @@ from supahooks import reset_supabase_db, initialize_supabase, apply_demo_data, a
 from telehooks import set_webhook
 from promohooks import RARITY_COLORS, generate_achievements, calculate_progress, calculate_user_level
 from advhooks import generate_embeddings, create_pull_request
+from utils import init_sse  # Import from utils
 
 app = Flask(__name__)
+# Initialize SSE
+init_sse(app)
 
 # Global Variables
 current_project = None
@@ -179,6 +183,8 @@ def index():
         git_status_color=git_status_color
     )
 
+
+    
 @app.route('/execute/')
 def execute_skill():
     global current_project

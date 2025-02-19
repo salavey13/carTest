@@ -9,12 +9,13 @@ import subprocess
 import time
 import uuid
 from datetime import datetime
-from tkinter import messagebox
 import winreg
 import webbrowser
 import json
 from tkinter import filedialog
 import requests
+from utils import publish_event  # Import from utils
+import threading
 # load_projects                     +
 # load_config                       +
 # apply_zip_updates                 +
@@ -269,15 +270,12 @@ def is_npm_package_installed(package_name, current_project):
         })
         
 def get_npm_path():
-    # Find the full path to node
     node_path = shutil.which("node")
     if not node_path:
         raise FileNotFoundError("Node.js is not installed or not found in PATH.")
     
-    # Derive the npm path by replacing 'node' with 'npm'
-    npm_path = node_path.replace("node.exe", "npm.cmd")  # Use .cmd for Windows
+    npm_path = node_path.replace("node.exe", "npm.cmd")
     if not os.path.exists(npm_path):
-        # Try to find npm in the same directory as node
         node_dir = os.path.dirname(node_path)
         potential_npm = os.path.join(node_dir, "npm.cmd")
         if os.path.exists(potential_npm):
@@ -291,27 +289,23 @@ def is_tool_installed(tool_name, current_project=None):
     config = load_config(current_project) if current_project else {}
     task_key = f"{tool_name.lower()}_installed"
 
-    # Check if the tool installation status is already saved in config
     if task_key in config and config[task_key] == "True":
         return True
 
     try:
-        # Special handling for Node.js and npm
         if tool_name.lower() in ["node", "nodejs"]:
             result = subprocess.run(["node", "--version"], capture_output=True, text=True)
             if result.returncode == 0:
-                config[task_key] = "True"
                 if current_project:
+                    config[task_key] = "True"
                     save_config(current_project, config)
                 return True
-            else:
-                return False
+            return False
 
-        # For other tools (like Git), check if they can be run
         result = subprocess.run([tool_name, "--version"], capture_output=True, text=True)
         if result.returncode == 0:
-            config[task_key] = "True"
             if current_project:
+                config[task_key] = "True"
                 save_config(current_project, config)
             return True
         return False
@@ -319,6 +313,7 @@ def is_tool_installed(tool_name, current_project=None):
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"Error checking installation of {tool_name}: {str(e)}")
         return False
+
 
 def ensure_v0_projects_dir():
     projects_dir = os.path.expanduser("~/Documents/V0_Projects")
@@ -335,70 +330,81 @@ def ensure_default_project():
         with open(version_file, "w") as f:
             f.write("[DEFAULT]\nсоздать_папку_проекта=complete\n")
     return default_project_dir
-    
-def clone_repository(project_name: str):
-    config = load_config(project_name)
-    targetDir = os.path.join(PROJECTS_DIR, project_name)  # Dynamic repo path
-    if not os.path.exists(REPO_DIR):
-        run_command(f"git clone {GITHUB_URL} \"{targetDir}\"", "Репозиторий успешно клонирован.", "Не удалось клонировать репозиторий.")
-        config["REPO_CLONED_COMPLETED"] = "True"
-        save_config(project_name, config)
 
-# Create New Project
+def clone_repository(project_name):
+    config = load_config(project_name)
+    target_dir = os.path.join(PROJECTS_DIR, project_name)
+    if not os.path.exists(target_dir):
+        publish_event('progress', {"message": f"Starting to clone repository for {project_name}...", "progress": 0})
+        result = run_command(f"git clone {GITHUB_URL} \"{target_dir}\"", "Репозиторий успешно клонирован.", "Не удалось клонировать репозиторий.")
+        if json.loads(result)["status"] == "success":
+            config["REPO_CLONED_COMPLETED"] = "True"
+            save_config(project_name, config)
+            publish_event('progress', {"message": f"Repository cloned successfully for {project_name}", "progress": 100})
+        else:
+            publish_event('progress', {"message": json.loads(result)["message"], "progress": -1})
+        return result
+
 def create_project():
     github_url = simpledialog.askstring("Создать проект", "Введите URL репозитория GitHub:")
     if not github_url:
         messagebox.showerror("Ошибка", "URL репозитория не может быть пустым.")
-        return
+        return json.dumps({"status": "error", "message": "URL репозитория не может быть пустым."})
+    
     project_name = github_url.split("/")[-1].replace(".git", "")
     project_dir = os.path.join(PROJECTS_DIR, project_name)
     if os.path.exists(project_dir):
         messagebox.showerror("Ошибка", f"Проект '{project_name}' уже существует.")
-        return
-    os.makedirs(project_dir)
-    subprocess.run(["git", "clone", github_url, project_dir], check=True)
-    # Initialize version.ini with login checklist
-    initialize_login_checklist(project_name)
-    load_projects()
-    #projects_combobox["values"] = projects
-    #projects_combobox.set(project_name)
-    #refresh_dashboard()
+        return json.dumps({"status": "error", "message": f"Проект '{project_name}' уже существует."})
     
-# Switch Project
+    os.makedirs(project_dir)
+    publish_event('progress', {"message": f"Cloning repository for new project {project_name}...", "progress": 0})
+    result = subprocess.run(["git", "clone", github_url, project_dir], check=True, capture_output=True, text=True)
+    if result.returncode == 0:
+        initialize_login_checklist(project_name)
+        load_projects()
+        publish_event('progress', {"message": f"New project '{project_name}' created and cloned successfully.", "progress": 100})
+        return json.dumps({"status": "success", "message": f"New project '{project_name}' created and cloned successfully."})
+    else:
+        publish_event('progress', {"message": f"Failed to clone repository: {result.stderr}", "progress": -1})
+        return json.dumps({"status": "error", "message": f"Failed to clone repository: {result.stderr}"})
+
 def switch_project(event):
     selected_project = projects_combobox.get()
     if selected_project:
         current_project = selected_project
         refresh_dashboard()
-        
-# Create the V0_Projects folder
+        return json.dumps({"status": "success", "message": f"Switched to project {selected_project}"})
+    return json.dumps({"status": "error", "message": "No project selected"})
+
 def create_project_folder():
-    """Create the V0_Projects folder."""
     projects_dir = os.path.expanduser("~/Documents/V0_Projects")
     config = load_config(DEFAULT_PROJECT_NAME)
 
     if not os.path.exists(projects_dir):
+        publish_event('progress', {"message": "Creating V0_Projects folder...", "progress": 0})
         os.makedirs(projects_dir)
         config["project_folder_created"] = "True"
         save_config(DEFAULT_PROJECT_NAME, config)
-        return jsonify({
+        publish_event('progress', {"message": f"Папка {projects_dir} успешно создана.", "progress": 100})
+        return {
             "status": "success",
             "message": f"Папка {projects_dir} успешно создана."
-        })
+        }, 200
     elif "project_folder_created" not in config:
         config["project_folder_created"] = "True"
         save_config(DEFAULT_PROJECT_NAME, config)
-        return jsonify({
+        publish_event('progress', {"message": f"Папка {projects_dir} уже существует. Ярлык создан на рабочем столе.", "progress": 100})
+        return {
             "status": "info",
             "message": f"Папка {projects_dir} уже существует. Ярлык создан на рабочем столе."
-        })
+        }, 200
     else:
-        return jsonify({
+        return {
             "status": "info",
             "message": f"Папка {projects_dir} уже существует."
-        })
+        }, 200
 
-# Load Configuration for Selected Project
 def load_config(project_name):
     config_file = os.path.join(PROJECTS_DIR, project_name, "version.ini")
     config = {}
@@ -410,29 +416,27 @@ def load_config(project_name):
                     config[key] = value
     return config
 
-# Save Configuration for Selected Project
 def save_config(project_name, config):
     config_file = os.path.join(PROJECTS_DIR, project_name, "version.ini")
     with open(config_file, "w", encoding="utf-8") as f:
         for key, value in config.items():
             f.write(f"{key}={value}\n")
-            
+
 def load_projects():
     projects_dir = os.path.expanduser("~/Documents/V0_Projects")
     if not os.path.exists(projects_dir):
         os.makedirs(projects_dir)
-    projects = [d for d in os.listdir(projects_dir) 
-               if os.path.isdir(os.path.join(projects_dir, d))]
+    projects = [d for d in os.listdir(projects_dir) if os.path.isdir(os.path.join(projects_dir, d))]
     if not projects:
         ensure_default_project()
         projects = ["cartest"]
     return projects
 
-# Mark Step as Completed
 def mark_step_completed(step):
     config = load_config(current_project)
     config[step] = "completed"
     save_config(current_project, config)
+    publish_event('progress', {"message": f"Step {step} marked as completed.", "progress": 100})
 
 # Download and Install Tools
 def is_tool_installed(tool_name):
@@ -486,7 +490,7 @@ def initialize_login_checklist(project_name):
         "message": "Открываю страницы для входа..."
     })
 
-
+installation_lock = threading.Lock()
 
 # Ensure TEMP_DIR is defined and valid
 TEMP_DIR = os.path.join(os.getenv("TEMP", os.path.expanduser("~/AppData/Local/Temp")), "setup_temp")
@@ -494,196 +498,221 @@ if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR, exist_ok=True)
 
 def download_and_install(tool_name, current_project):
-    if not current_project or not isinstance(current_project, str):
-        return {
-            "status": "error",
-            "message": f"Invalid project name: {current_project}",
-            "refresh": False
-        }, 400
+    with installation_lock:
+        if not current_project or not isinstance(current_project, str):
+            publish_event('progress', {"message": f"Invalid project name: {current_project}", "progress": -1, "tool": tool_name})
+            return {
+                "status": "error",
+                "message": f"Invalid project name: {current_project}",
+                "refresh": False
+            }, 400
 
-    config = load_config(current_project)
-    skill_key = ("Установить " + tool_name).lower().replace(" ", "_")
-    
-    # Check if the tool is already installed
-    if is_tool_installed(tool_name.lower()):
-        # Mark the skill as completed even if the tool is already installed
-        config[skill_key] = "completed"
-        save_config(current_project, config)
-        return {
-            "status": "success",
-            "message": f"{tool_name} уже установлен и отмечен как выполненный.",
-            "refresh": True
-        }, 200
-    
-    url = DOWNLOAD_URLS.get(tool_name)
-    if not url:
-        return {
-            "status": "error",
-            "message": f"URL для {tool_name} не найден.",
-            "refresh": False
-        }, 404
-    
-    file_name = f"{tool_name.replace(' ', '_')}-Installer.exe"
-    file_path = os.path.join(TEMP_DIR, file_name)
-    if not isinstance(file_path, str):
-        return {
-            "status": "error",
-            "message": f"Failed to construct file path for {tool_name}",
-            "refresh": False
-        }, 500
-
-    # Download with progress and error handling
-    try:
-        response = requests.get(url, stream=True, timeout=30)
-        if response.status_code != 200:
-            raise Exception(f"Failed to download {tool_name}: HTTP {response.status_code}")
+        config = load_config(current_project)
+        skill_key = ("Установить " + tool_name).lower().replace(" ", "_")
         
-        total_size = int(response.headers.get('content-length', 0))
-        block_size = 1024  # 1 KB
-        downloaded = 0
+        # Notify start
+        publish_event('progress', {"message": f"Starting download of {tool_name}...", "progress": 0, "tool": tool_name})
+
+        # Check if the tool is already installed
+        if is_tool_installed(tool_name.lower()):
+            config[skill_key] = "completed"
+            save_config(current_project, config)
+            publish_event('progress', {"message": f"{tool_name} уже установлен.", "progress": 100, "tool": tool_name})
+            return {
+                "status": "success",
+                "message": f"{tool_name} уже установлен и отмечен как выполненный.",
+                "refresh": True
+            }, 200
         
-        with open(file_path, 'wb') as f:
-            for data in response.iter_content(block_size):
-                if data:
-                    downloaded += len(data)
-                    f.write(data)
-                    progress = int(50 * downloaded / total_size)
-                    print(f"\r[{'#' * progress}{'.' * (50 - progress)}] {downloaded / 1024:.2f}/{total_size / 1024:.2f} KB", end="")
-
-        print("\nDownload completed.")
-    except Exception as e:
-        error_msg = f"Не удалось скачать {tool_name}: {str(e)}"
-        print(error_msg)
-        return {
-            "status": "error",
-            "message": error_msg,
-            "refresh": False
-        }, 500
-
-    # Install with detailed error handling
-    install_args = {
-        "Git": "/VERYSILENT /NORESTART /NOCANCEL",
-        "Node.js": "/quiet",
-        "Notepad++": "/S",
-        "VS Code": "/verysilent /suppressmsgboxes"
-    }
-    args = install_args.get(tool_name, "")
-    
-    try:
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"Installer not found at {file_path}")
-
-        process = subprocess.run(
-            f'"{file_path}" {args}',
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=600
-        )
+        url = DOWNLOAD_URLS.get(tool_name)
+        if not url:
+            publish_event('progress', {"message": f"URL для {tool_name} не найден.", "progress": -1, "tool": tool_name})
+            return {
+                "status": "error",
+                "message": f"URL для {tool_name} не найден.",
+                "refresh": False
+            }, 404
         
-        if process.returncode != 0:
-            raise subprocess.CalledProcessError(process.returncode, command=f'"{file_path}" {args}', output=process.stderr)
+        file_name = f"{tool_name.replace(' ', '_')}-Installer.exe"
+        file_path = os.path.join(TEMP_DIR, file_name)
+        if not isinstance(file_path, str):
+            publish_event('progress', {"message": f"Failed to construct file path for {tool_name}", "progress": -1, "tool": tool_name})
+            return {
+                "status": "error",
+                "message": f"Failed to construct file path for {tool_name}",
+                "refresh": False
+            }, 500
 
-        if not is_tool_installed(tool_name.lower()):
-            raise Exception(f"Установка {tool_name} завершилась, но инструмент не найден в системе.")
+        # Download with progress updates
+        try:
+            with requests.get(url, stream=True, timeout=30) as response:
+                if response.status_code != 200:
+                    raise Exception(f"Failed to download {tool_name}: HTTP {response.status_code}")
+                
+                total_size = int(response.headers.get('content-length', 0))
+                block_size = 1024  # 1 KB
+                downloaded = 0
+                
+                publish_event('progress', {"message": f"Downloading {tool_name}...", "progress": 0, "tool": tool_name})
+                
+                with open(file_path, 'wb') as f:
+                    for data in response.iter_content(block_size):
+                        if data:
+                            downloaded += len(data)
+                            f.write(data)
+                            progress = int((downloaded / total_size) * 100)
+                            if progress in [25, 50, 75, 100]:
+                                publish_event('progress', {"message": f"Download progress: {progress}%", "progress": progress, "tool": tool_name})
 
-        # Mark as completed after successful installation
-        config[skill_key] = "completed"
-        save_config(current_project, config)
+                publish_event('progress', {"message": f"Download of {tool_name} completed.", "progress": 100, "tool": tool_name})
+                print("\nDownload completed.")
+        except Exception as e:
+            error_msg = f"Не удалось скачать {tool_name}: {str(e)}"
+            publish_event('progress', {"message": error_msg, "progress": -1, "tool": tool_name})
+            print(error_msg)
+            return {
+                "status": "error",
+                "message": error_msg,
+                "refresh": False
+            }, 500
 
-        return {
-            "status": "success",
-            "message": f"{tool_name} успешно установлен.",
-            "refresh": True
-        }, 200
+        # Install with progress updates
+        install_args = {
+            "Git": "/VERYSILENT /NORESTART /NOCANCEL",
+            "Node.js": "/quiet",
+            "Notepad++": "/S",
+            "VS Code": "/verysilent /suppressmsgboxes"
+        }
+        args = install_args.get(tool_name, "")
+        
+        try:
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"Installer not found at {file_path}")
 
-    except subprocess.TimeoutExpired as e:
-        error_msg = f"Таймаут при установке {tool_name}: процесс не завершился в течение 10 минут."
-        print(error_msg)
-        return {
-            "status": "error",
-            "message": error_msg,
-            "refresh": False
-        }, 500
+            publish_event('progress', {"message": f"Installing {tool_name}...", "progress": 0, "tool": tool_name})
+            
+            process = subprocess.run(
+                f'"{file_path}" {args}',
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=600
+            )
+            
+            if process.returncode != 0:
+                raise subprocess.CalledProcessError(process.returncode, command=f'"{file_path}" {args}', output=process.stderr)
 
-    except subprocess.CalledProcessError as e:
-        error_msg = f"Не удалось установить {tool_name}: {e.output or 'Неизвестная ошибка'}"
-        print(error_msg)
-        return {
-            "status": "error",
-            "message": error_msg,
-            "refresh": False
-        }, 500
+            if not is_tool_installed(tool_name.lower()):
+                raise Exception(f"Установка {tool_name} завершилась, но инструмент не найден в системе.")
 
-    except Exception as e:
-        error_msg = f"Неизвестная ошибка при установке {tool_name}: {str(e)}"
-        print(error_msg)
-        return {
-            "status": "error",
-            "message": error_msg,
-            "refresh": False
-        }, 500
+            publish_event('progress', {"message": f"Installation of {tool_name} completed.", "progress": 100, "tool": tool_name})
+
+            config[skill_key] = "completed"
+            save_config(current_project, config)
+
+            return {
+                "status": "success",
+                "message": f"{tool_name} успешно установлен.",
+                "refresh": True
+            }, 200
+
+        except subprocess.TimeoutExpired as e:
+            error_msg = f"Таймаут при установке {tool_name}: процесс не завершился в течение 10 минут."
+            publish_event('progress', {"message": error_msg, "progress": -1, "tool": tool_name})
+            print(error_msg)
+            return {
+                "status": "error",
+                "message": error_msg,
+                "refresh": False
+            }, 500
+
+        except subprocess.CalledProcessError as e:
+            error_msg = f"Не удалось установить {tool_name}: {e.output or 'Неизвестная ошибка'}"
+            publish_event('progress', {"message": error_msg, "progress": -1, "tool": tool_name})
+            print(error_msg)
+            return {
+                "status": "error",
+                "message": error_msg,
+                "refresh": False
+            }, 500
+
+        except Exception as e:
+            error_msg = f"Неизвестная ошибка при установке {tool_name}: {str(e)}"
+            publish_event('progress', {"message": error_msg, "progress": -1, "tool": tool_name})
+            print(error_msg)
+            return {
+                "status": "error",
+                "message": error_msg,
+                "refresh": False
+            }, 500
 
 def run_command(command, success_message="Успех", error_message="Ошибка"):
+    publish_event('progress', {"message": f"Executing command: {command}...", "progress": 0})
     try:
         result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True)
+        publish_event('progress', {"message": success_message + "\n" + result.stdout, "progress": 100})
         return json.dumps({
             "status": "success",
             "message": success_message + "\n" + result.stdout
         })
     except subprocess.CalledProcessError as e:
+        publish_event('progress', {"message": error_message + "\n" + e.stderr, "progress": -1})
         return json.dumps({
             "status": "error",
             "message": error_message + "\n" + e.stderr
         })
 
-
-def apply_zip_updates(project_name: str):
+def apply_zip_updates(project_name):
     config = load_config(project_name)
     zip_path = filedialog.askopenfilename(
         title="Выберите ZIP файл",
         filetypes=[("ZIP Files", "*.zip")],
         initialdir=REPO_DIR,
     )
-    if not zip_file or zip_file.filename == '':
+    if not zip_path or not os.path.exists(zip_path):
+        publish_event('progress', {"message": "ZIP файл не выбран.", "progress": -1})
         return jsonify({"status": "warning", "message": "ZIP файл не выбран."})
 
     try:
-        # Save the uploaded ZIP file temporarily
-        temp_dir = os.path.join(os.getenv("TEMP"), "setup_temp")
-        os.makedirs(temp_dir, exist_ok=True)
-        zip_path = os.path.join(temp_dir, zip_file.filename)
-        zip_file.save(zip_path)
+        publish_event('progress', {"message": "Starting ZIP update process...", "progress": 0})
 
-        # Extract the ZIP file
-        extract_dir = os.path.join(temp_dir, "temp_unzip")
+        # Save and extract ZIP
+        temp_dir = os.path.join(TEMP_DIR, "temp_unzip")
+        os.makedirs(temp_dir, exist_ok=True)
+        shutil.copy2(zip_path, os.path.join(TEMP_DIR, os.path.basename(zip_path)))
+
+        publish_event('progress', {"message": "Extracting ZIP file...", "progress": 25})
+
         subprocess.run(
-            f"powershell -Command \"Expand-Archive -Force '{zip_path}' -DestinationPath '{extract_dir}'\"",
+            f"powershell -Command \"Expand-Archive -Force '{os.path.join(TEMP_DIR, os.path.basename(zip_path))}' -DestinationPath '{temp_dir}'\"",
             shell=True,
             check=True,
         )
 
-        # Copy extracted files to the repository directory
-        repo_dir = os.path.join(PROJECTS_DIR, project_name)
-        subprocess.run(f"xcopy /s /y \"{extract_dir}\\*\" \"{repo_dir}\"", shell=True, check=True)
-        subprocess.run(f"rmdir /s /q \"{extract_dir}\"", shell=True, check=True)
+        publish_event('progress', {"message": "Copying files to repository...", "progress": 50})
 
-        # Update version file
+        repo_dir = os.path.join(PROJECTS_DIR, project_name)
+        subprocess.run(f"xcopy /s /y \"{temp_dir}\\*\" \"{repo_dir}\"", shell=True, check=True)
+        shutil.rmtree(temp_dir)
+
+        publish_event('progress', {"message": "Updating version and committing changes...", "progress": 75})
+
         current_version = int(config.get("CURRENT_VERSION", 0))
         next_version = current_version + 1
         config["CURRENT_VERSION"] = str(next_version)
-        config["LAST_APPLIED_ZIP"] = zip_file.filename
+        config["LAST_APPLIED_ZIP"] = os.path.basename(zip_path)
         save_config(project_name, config)
 
-        # Create pull request
         branch_name = f"update-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        subprocess.run(f"git checkout -b {branch_name}", shell=True, check=True)
-        subprocess.run("git add .", shell=True, check=True)
-        commit_msg = f"Обновления от {zip_file.filename} | Версия {next_version}"
-        subprocess.run(f"git commit -m \"{commit_msg}\"", shell=True, check=True)
-        subprocess.run(f"git push origin {branch_name}", shell=True, check=True)
-        subprocess.run("git checkout main", shell=True, check=True)
-        subprocess.run("git pull origin main", shell=True, check=True)
+        subprocess.run(f"git checkout -b {branch_name}", cwd=repo_dir, shell=True, check=True)
+        subprocess.run("git add .", cwd=repo_dir, shell=True, check=True)
+        commit_msg = f"Обновления от {os.path.basename(zip_path)} | Версия {next_version}"
+        subprocess.run(f"git commit -m \"{commit_msg}\"", cwd=repo_dir, shell=True, check=True)
+        subprocess.run(f"git push origin {branch_name}", cwd=repo_dir, shell=True, check=True)
+        subprocess.run("git checkout main", cwd=repo_dir, shell=True, check=True)
+        subprocess.run("git pull origin main", cwd=repo_dir, shell=True, check=True)
+
+        publish_event('progress', {"message": "ZIP updates applied successfully.", "progress": 100})
 
         return jsonify({
             "status": "success",
@@ -691,9 +720,19 @@ def apply_zip_updates(project_name: str):
         })
 
     except subprocess.CalledProcessError as e:
+        error_msg = f"Не удалось применить ZIP обновления: {e.stderr}"
+        publish_event('progress', {"message": error_msg, "progress": -1})
         return jsonify({
             "status": "error",
-            "message": f"Не удалось применить ZIP обновления: {e.stderr}"
+            "message": error_msg
+        }), 500
+
+    except Exception as e:
+        error_msg = f"Неизвестная ошибка при обновлении ZIP: {str(e)}"
+        publish_event('progress', {"message": error_msg, "progress": -1})
+        return jsonify({
+            "status": "error",
+            "message": error_msg
         }), 500
 
 
