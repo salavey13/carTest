@@ -21,6 +21,6 @@ if __name__ == '__main__':
     threading.Thread(target=open_browser, daemon=True).start()
     
     # Start the tray icon in a separate thread
-    threading.Thread(target=setup_tray_icon, daemon=True).start()
+    #threading.Thread(target=setup_tray_icon, daemon=True).start()
     
     app.run(host='0.0.0.0', port=1313, debug=True)
