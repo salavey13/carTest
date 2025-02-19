@@ -16,6 +16,11 @@ from tkinter import filedialog
 import requests
 from utils import publish_event  # Import from utils
 import threading
+
+installation_lock = threading.Lock()
+
+
+    
 # load_projects                     +
 # load_config                       +
 # apply_zip_updates                 +
@@ -490,7 +495,6 @@ def initialize_login_checklist(project_name):
         "message": "Открываю страницы для входа..."
     })
 
-installation_lock = threading.Lock()
 
 # Ensure TEMP_DIR is defined and valid
 TEMP_DIR = os.path.join(os.getenv("TEMP", os.path.expanduser("~/AppData/Local/Temp")), "setup_temp")
@@ -671,7 +675,10 @@ def apply_zip_updates(project_name):
     )
     if not zip_path or not os.path.exists(zip_path):
         publish_event('progress', {"message": "ZIP файл не выбран.", "progress": -1, "tool": "ZIP Update"})
-        return jsonify({"status": "warning", "message": "ZIP файл не выбран."})
+        return {
+            "status": "warning",
+            "message": "ZIP файл не выбран."
+        }, 400  # Return early with error status
 
     try:
         publish_event('progress', {"message": "Starting ZIP update process...", "progress": 0, "tool": "ZIP Update"})
@@ -684,7 +691,7 @@ def apply_zip_updates(project_name):
 
         publish_event('progress', {"message": "Extracting ZIP file...", "progress": 25, "tool": "ZIP Update"})
 
-        # Extract ZIP using PowerShell, ensuring we can filter files
+        # Extract ZIP using PowerShell
         subprocess.run(
             f"powershell -Command \"Expand-Archive -Force '{os.path.join(TEMP_DIR, zip_filename)}' -DestinationPath '{temp_dir}'\"",
             shell=True,
@@ -695,12 +702,11 @@ def apply_zip_updates(project_name):
 
         repo_dir = os.path.join(PROJECTS_DIR, project_name)
 
-        # Instead of xcopy, use Python to copy files, excluding .gitignore
+        # Copy files, excluding .gitignore
         for item in os.listdir(temp_dir):
             source_path = os.path.join(temp_dir, item)
             dest_path = os.path.join(repo_dir, item)
 
-            # Skip .gitignore
             if item == ".gitignore":
                 publish_event('progress', {"message": f"Skipping .gitignore file.", "progress": 50, "tool": "ZIP Update"})
                 continue
@@ -732,26 +738,26 @@ def apply_zip_updates(project_name):
 
         publish_event('progress', {"message": "ZIP updates applied successfully.", "progress": 100, "tool": "ZIP Update"})
 
-        return jsonify({
+        return {
             "status": "success",
             "message": "ZIP обновления применены успешно и создан Pull Request (excluding .gitignore)."
-        })
+        }, 200
 
     except subprocess.CalledProcessError as e:
         error_msg = f"Не удалось применить ZIP обновления: {e.stderr}"
         publish_event('progress', {"message": error_msg, "progress": -1, "tool": "ZIP Update"})
-        return jsonify({
+        return {
             "status": "error",
             "message": error_msg
-        }), 500
+        }, 500
 
     except Exception as e:
         error_msg = f"Неизвестная ошибка при обновлении ZIP: {str(e)}"
         publish_event('progress', {"message": error_msg, "progress": -1, "tool": "ZIP Update"})
-        return jsonify({
+        return {
             "status": "error",
             "message": error_msg
-        }), 500
+        }, 500
 
 
 def generate_installation_achievement(achievement_name, current_project):
