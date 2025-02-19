@@ -1,38 +1,38 @@
-"use client";
+"use client"
 
-import { useState, useEffect } from "react";
-import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { supabaseAnon } from "@/hooks/supabase";  // Ensure you import supabase for fetching data
-import SemanticSearch from "@/components/SemanticSearch";  // Assuming the search component is available
+import { useState, useEffect } from "react"
+import Image from "next/image"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { supabaseAnon } from "@/hooks/supabase" // Ensure you import supabase for fetching data
+import SemanticSearch from "@/components/SemanticSearch" // Assuming the search component is available
 
 export default function RentCar() {
-  const [selectedCar, setSelectedCar] = useState(null);
-  const [rentDays, setRentDays] = useState(1);
-  const [cars, setCars] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");  // New search query state
+  const [selectedCar, setSelectedCar] = useState(null)
+  const [rentDays, setRentDays] = useState(1)
+  const [cars, setCars] = useState([])
+  const [searchQuery, setSearchQuery] = useState("") // New search query state
 
   // Fetch cars from Supabase
   useEffect(() => {
     const fetchCars = async () => {
-      const { data, error } = await supabaseAnon.from("cars").select("*");
+      const { data, error } = await supabaseAnon.from("cars").select("*")
       if (error) {
-        console.error("Error fetching cars:", error);
+        console.error("Error fetching cars:", error)
       } else {
-        setCars(data || []);
+        setCars(data || [])
       }
-    };
-    fetchCars();
-  }, []);
+    }
+    fetchCars()
+  }, [])
 
   const handleRent = () => {
     if (selectedCar) {
-      alert(`Вы арендовали ${selectedCar.name} на ${rentDays} дней за ${selectedCar.daily_price * rentDays}¥`);
+      alert(`Вы арендовали ${selectedCar.name} на ${rentDays} дней за ${selectedCar.daily_price * rentDays}¥`)
     }
-  };
+  }
 
   return (
     <div className="min-h-screen bg-black text-[#00ff9d] pt-20">
@@ -100,7 +100,9 @@ export default function RentCar() {
                     height={200}
                     className="mx-auto mb-4"
                   />
-                  <p className="text-cyan-400  font-mono">{selectedCar.make} {selectedCar.model}</p>
+                  <p className="text-cyan-400  font-mono">
+                    {selectedCar.make} {selectedCar.model}
+                  </p>
                   <p className="text-cyan-400  font-mono">{selectedCar.daily_price}¥/день</p>
                   <p className="text-cyan-400  font-mono mt-4">ИТОГО: {selectedCar.daily_price * rentDays}¥</p>
                 </>
@@ -112,6 +114,6 @@ export default function RentCar() {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
