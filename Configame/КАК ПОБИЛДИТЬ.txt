@@ -2,10 +2,6 @@
 
 1) запустить гит консоль  и станови `pyinstaller`: "npm pyinstaller"
 
-2) перейти в папку `Configame` 
-
-3) скопируй `skilltree.spec` в `Configame.spec`
-
-4) выполни команду:
+2) перейти в папку `Configame` и выполни команду:
 
 `pyinstaller Configame.spec`
