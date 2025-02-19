@@ -214,7 +214,7 @@ def execute_skill():
                     try:
                         # Execute the action with the current project
                         result, status = action_func(current_project)()
-                        
+
                         if isinstance(result, dict):
                             return jsonify(result), status
                         if isinstance(result, str) and result.startswith('{'):
