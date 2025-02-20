@@ -1,7 +1,7 @@
 // app/actions.ts
 "use server"
 
-import { createAuthenticatedClient, supabaseAdmin } from "@/hooks/supabase"
+import { createAuthenticatedClient, supabaseAdmin, supabaseAnon } from "@/hooks/supabase"
 import axios from "axios"
 import { verifyJwtToken, generateJwtToken } from "@/lib/auth"
 //import { acquireBadge, fetchUserBadges } from "@/lib/badgeUtils"
@@ -20,7 +20,7 @@ export async function createOrUpdateUser(user: {
   photo_url?: string
 }) {
   try {
-    const { data: existingUser, error: fetchError } = await supabaseAdmin
+    const { data: existingUser, error: fetchError } = await supabaseAnon
       .from("users")
       .select("*")
       .eq("user_id", user.id)
@@ -30,7 +30,7 @@ export async function createOrUpdateUser(user: {
 
     if (existingUser) return existingUser
 
-    const { data: newUser, error: insertError } = await supabaseAdmin
+    const { data: newUser, error: insertError } = await supabaseAnon
       .from("users")
       .insert({
         user_id: user.id,
