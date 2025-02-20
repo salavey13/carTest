@@ -221,7 +221,7 @@ $$ LANGUAGE plpgsql;
 
 -- Create search function for cars
 CREATE OR REPLACE FUNCTION search_cars(query_embedding VECTOR(384), match_count INT)
-RETURNS TABLE (id TEXT, make TEXT, model TEXT, similarity FLOAT)
+RETURNS TABLE (id TEXT, make TEXT, model TEXT, description TEXT, image_url TEXT, rent_link TEXT, similarity FLOAT)
 LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
@@ -229,12 +229,17 @@ BEGIN
         c.id,
         c.make,
         c.model,
+        c.description,
+        c.image_url,
+        c.rent_link,
         1 - (c.embedding <=> query_embedding) AS similarity
     FROM cars c
     ORDER BY similarity DESC
     LIMIT match_count;
 END;
 $$;
+
+DROP FUNCTION search_cars(vector,integer);
 
 -- Create function for similar cars
 CREATE OR REPLACE FUNCTION similar_cars(

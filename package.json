@@ -64,7 +64,8 @@
     "axios": "latest",
     "@huggingface/transformers": "latest",
     "jsonwebtoken": "latest",
-    "@supabase/supabase-js": "latest"
+    "@supabase/supabase-js": "latest",
+    "worker-loader": "^3.0.8"
   },
   "devDependencies": {
     "@types/node": "^22",

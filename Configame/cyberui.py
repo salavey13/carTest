@@ -463,6 +463,11 @@ HTML_TEMPLATE = '''
         <div>
             Ваш текущий уровень: <strong>{{ user_level }}</strong>
         </div>
+        <div class="legend-item">
+            <a href="https://github.com/salavey13/carTest" target="_blank" style="color: {{ colors.cyberpunk.neon }}; text-decoration: none;">
+                <span>GitHub</span>
+            </a>
+        </div>
     </div>
 
     <script>

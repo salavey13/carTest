@@ -1,7 +1,8 @@
 // utils/seedDemoData.ts
-import { supabaseAdmin } from "@/hooks/supabase"
+import { createAdminClient } from "@/hooks/supabase"
 
 const seedData = async () => {
+  const supabaseAdmin = createAdminClient()
 
   // Import users
   await supabaseAdmin.from("users").upsert([
