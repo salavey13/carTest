@@ -163,15 +163,15 @@ ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
 
 -- Allow users to read their own invoices
 CREATE POLICY "Users can view their own invoices" ON invoices
-    FOR SELECT USING (auth.uid() = user_id);
+    FOR SELECT USING (auth.jwt() ->> 'chat_id' = user_id);
 
 -- Allow users to insert their own invoices
 CREATE POLICY "Users can create their own invoices" ON invoices
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+    FOR INSERT WITH CHECK (auth.jwt() ->> 'chat_id' = user_id);
 
 -- Allow users to update their own invoices
 CREATE POLICY "Users can update their own invoices" ON invoices
-    FOR UPDATE USING (auth.uid() = user_id);
+    FOR UPDATE USING (auth.jwt() ->> 'chat_id' = user_id);
 
 
 
