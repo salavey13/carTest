@@ -20,7 +20,7 @@ export async function createOrUpdateUser(user: {
   photo_url?: string
 }) {
   try {
-    const { data: existingUser, error: fetchError } = await supabaseAdmin // Use supabaseAdmin
+    /*const { data: existingUser, error: fetchError } = await supabaseAdmin // Use supabaseAdmin
       .from("users")
       .select("*")
       .eq("user_id", user.id)
@@ -31,7 +31,7 @@ export async function createOrUpdateUser(user: {
       throw fetchError
     }
 
-    if (existingUser) return existingUser
+    if (existingUser) return existingUser*/
 
     const { data: newUser, error: insertError } = await supabaseAdmin // Use supabaseAdmin
       .from("users")
