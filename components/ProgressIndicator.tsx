@@ -1,4 +1,3 @@
-// components/ProgressIndicator.tsx
 "use client"
 import { motion, useTransform } from "framer-motion"
 
@@ -7,7 +6,7 @@ interface ProgressIndicatorProps {
   total: number
   answered: number[]
   mode: "question" | "preview"
-  modeProgress: number // 0-1 value from Graph's mode transition
+  modeProgress: number
 }
 
 export const ProgressIndicator = ({ current, total, answered, mode, modeProgress }: ProgressIndicatorProps) => {
@@ -20,15 +19,18 @@ export const ProgressIndicator = ({ current, total, answered, mode, modeProgress
       {Array.from({ length: total }).map((_, index) => (
         <motion.div
           key={index}
-          className={`w-3 h-3 rounded-full relative ${answered.includes(index) ? "bg-cyan-500" : "bg-gray-700"}`}
+          className={`relative w-3 h-3 rounded-full ${
+            answered.includes(index) ? "bg-primary" : "bg-muted"
+          }`}
           animate={{
             scale: index === current ? 1.3 : 1,
             y: index === current ? -3 : 0,
             transition: { type: "spring", stiffness: 500 },
           }}
         >
+          {/* Border for Current Question */}
           <motion.div
-            className="absolute inset-0 rounded-full border-2 border-cyan-400"
+            className="absolute inset-0 rounded-full border-2 border-primary"
             initial={{ scale: 0 }}
             animate={{
               scale: index === current ? 1 : 0,
@@ -36,14 +38,22 @@ export const ProgressIndicator = ({ current, total, answered, mode, modeProgress
             }}
             transition={{ type: "spring", bounce: 0.5 }}
           />
+          {/* Preview Mode Background */}
           <motion.div
-            className="absolute inset-0 bg-cyan-400 rounded-full"
+            className="absolute inset-0 bg-primary rounded-full"
             animate={{
               scale: mode === "preview" ? 1.5 : 0,
               opacity: mode === "preview" ? 0.3 : 0,
             }}
             transition={{ duration: 0.3 }}
           />
+          {/* Pulse Effect for Current Question */}
+          {index === current && (
+            <motion.div
+              className="absolute inset-0 rounded-full bg-primary animate-ping"
+              style={{ opacity: 0.5 }}
+            />
+          )}
         </motion.div>
       ))}
     </motion.div>

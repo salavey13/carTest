@@ -85,35 +85,25 @@ export async function sendTelegramInvoice(
   amount: number,
 ) {
   try {
-    // Empty provider token for Stars (XTR)
     const PROVIDER_TOKEN = "" // Empty string for XTR payments
-
-    // Send invoice via Telegram API
     const response = await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendInvoice`, {
       chat_id: chatId,
       title,
       description,
       payload,
       provider_token: PROVIDER_TOKEN,
-      currency: "XTR", // Use Stars as the currency
+      currency: "XTR",
       prices: [{ label: "Subscription", amount }],
       start_parameter: "pay",
       need_shipping_address: false,
       is_flexible: false,
     })
 
-    // Save invoice information in Supabase
     const { error } = await supabaseAdmin.from("invoices").insert([{ id: payload, user_id: chatId, status: "pending" }])
+    if (error) throw new Error(`Database error: ${error.message}`)
 
-    if (error) {
-      logger.error(`Failed to save invoice for user ${chatId}:`, error.message)
-      throw new Error(`Database error: ${error.message}`)
-    }
-
-    logger.info(`Invoice sent and saved successfully for user ${chatId}: ${payload}`)
     return { success: true, data: response.data }
   } catch (error) {
-    logger.error("Error in sendTelegramInvoice:", error)
     return { success: false, error: "Failed to send invoice" }
   }
 }
@@ -121,7 +111,6 @@ export async function sendTelegramInvoice(
 export async function handleWebhookUpdate(update: any) {
   try {
     if (update.pre_checkout_query) {
-      // Confirm pre-checkout
       await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery`, {
         pre_checkout_query_id: update.pre_checkout_query.id,
         ok: true,
@@ -131,77 +120,44 @@ export async function handleWebhookUpdate(update: any) {
     if (update.message?.successful_payment) {
       const { invoice_payload, total_amount } = update.message.successful_payment
 
-      // Update invoice status in Supabase
       const { error: updateError } = await supabaseAdmin
         .from("invoices")
         .update({ status: "paid" })
         .eq("id", invoice_payload)
+      if (updateError) throw new Error(`Database error: ${updateError.message}`)
 
-      if (updateError) {
-        logger.error(`Failed to update invoice status for payload ${invoice_payload}:`, updateError.message)
-        throw new Error(`Database error: ${updateError.message}`)
-      }
-
-      // Get user details
       const userId = update.message.chat.id
       const { data: userData, error: userError } = await supabaseAdmin
         .from("users")
         .select("*")
         .eq("user_id", userId)
         .single()
+      if (userError) throw new Error(`Database error: ${userError.message}`)
 
-      if (userError) {
-        logger.error(`Failed to fetch user data for user ${userId}:`, userError.message)
-        throw new Error(`Database error: ${userError.message}`)
-      }
-
-      // Determine subscription type based on amount
       let newStatus = "pro"
       let newRole = "subscriber"
       if (total_amount === 420) {
-        // VIP subscription
         newStatus = "admin"
         newRole = "admin"
       }
 
-      // Update user status and role
       const { error: updateUserError } = await supabaseAdmin
         .from("users")
         .update({ status: newStatus, role: newRole })
         .eq("user_id", userId)
+      if (updateUserError) throw new Error(`Database error: ${updateUserError.message}`)
 
-      if (updateUserError) {
-        logger.error(`Failed to update user ${userId} status/role:`, updateUserError.message)
-        throw new Error(`Database error: ${updateUserError.message}`)
-      }
-
-      // Notify the user
       const telegramBotUrl = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`
       await axios.post(telegramBotUrl, {
         chat_id: userId,
         text: "🎉 Payment successful! Thank you for your purchase.",
       })
 
-      // Notify all admins
-      const { data: admins, error: adminError } = await supabaseAdmin
-        .from("users")
-        .select("user_id")
-        .eq("role", "admin")
-      if (adminError) {
-        logger.error("Failed to fetch admin users:", adminError.message)
-        throw new Error(`Database error: ${adminError.message}`)
-      }
-
+      const { data: admins } = await supabaseAdmin.from("users").select("user_id").eq("role", "admin")
       const adminMessage = `🔔 User ${userData.username || userData.user_id} has upgraded to ${newStatus.toUpperCase()}!`
-
       for (const admin of admins) {
-        await axios.post(telegramBotUrl, {
-          chat_id: admin.user_id,
-          text: adminMessage,
-        })
+        await axios.post(telegramBotUrl, { chat_id: admin.user_id, text: adminMessage })
       }
-
-      logger.info("Payment confirmed, user updated, and admins notified successfully")
     }
   } catch (error) {
     logger.error("Error handling webhook update:", error)
@@ -284,11 +240,11 @@ export async function sendResult(chatId: string, result: any) {
             [
               {
                 text: "Rent This Car 🚗",
-                url: `https://v0-car-test.vercel.app/rent/${result.slug}`,
+                url: `https://your-domain.com/rent/${result.slug}`,
               },
               {
                 text: "Try Again 🔄",
-                web_app: { url: "https://t.me/oneSitePlsBot/Friends" },
+                web_app: { url: "https://your-domain.com" },
               },
             ],
           ],

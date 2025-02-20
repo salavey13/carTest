@@ -1,12 +1,15 @@
 "use client"
+
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence, useMotionValue } from "framer-motion"
+import { Brain } from "lucide-react"
 import { supabaseAdmin } from "@/hooks/supabase"
 import { useTelegram } from "@/hooks/useTelegram"
 import { useWorker } from "@/hooks/useWorker"
 import { Graph } from "@/components/Graph"
 import { ProgressIndicator } from "@/components/ProgressIndicator"
 import ResultDisplay from "@/components/ResultDisplay"
+import { debugLogger } from "@/lib/debugLogger"
 
 // Type definitions
 interface QuestionData {
@@ -36,7 +39,7 @@ interface CarResult {
 
 export default function SupercarTest() {
   const { user } = useTelegram()
-  const { generateEmbedding } = useWorker()
+  const { generateEmbedding, isInitialized } = useWorker()
 
   const [questions, setQuestions] = useState<QuestionData[]>([])
   const [allAnswers, setAllAnswers] = useState<AnswerData[]>([])
@@ -51,6 +54,10 @@ export default function SupercarTest() {
   const [previewCars, setPreviewCars] = useState<CarResult[]>([])
   // Use a MotionValue for modeProgress instead of a plain number.
   const modeProgress = useMotionValue(0)
+
+  // Add loading state for search
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
 
   // 1. Fetch questions on mount
   useEffect(() => {
@@ -130,7 +137,6 @@ export default function SupercarTest() {
 
   // 6. Handle answer selection
   const handleAnswer = async (answer: AnswerData) => {
-    // Augment answer with the current question text
     const currentQuestion = questions[currentQuestionIndex]
     const augmentedAnswer: AnswerData = {
       ...answer,
@@ -141,25 +147,43 @@ export default function SupercarTest() {
     const nextIndex = currentQuestionIndex + 1
 
     if (nextIndex >= questions.length) {
-      // End of test: aggregate answers, generate embedding, and fetch final result
       try {
+        setIsSearching(true)
         const searchText = updatedAnswers.map((a) => `${a.questionText} ${a.text}`).join(" ")
+
+        // Wait for worker initialization if needed
+        if (!isInitialized) {
+          debugLogger.log("Waiting for worker initialization...")
+          await new Promise((resolve) => setTimeout(resolve, 2000))
+        }
+
         const embedding = await generateEmbedding(searchText)
+
+        if (!embedding || embedding.length === 0) {
+          throw new Error("Generated embedding is empty")
+        }
+
+        debugLogger.log("Generated embedding:", embedding.length, "dimensions")
+
         const { data, error } = await supabaseAdmin.rpc("search_cars", {
           query_embedding: embedding,
           match_count: 1,
         })
+
         if (error) throw error
+
         if (data && data.length > 0) {
           const topResult = data[0]
           setResult(topResult)
+
           const { data: similar, error: similarError } = await supabaseAdmin.rpc("similar_cars", {
             car_id: topResult.id,
             match_count: 3,
           })
+
           if (similarError) throw similarError
+
           if (similar) {
-            // Remove top result from similar cars if it appears there
             const filteredSimilar = similar.filter((car: CarResult) => car.id !== topResult.id)
             setSimilarCars(filteredSimilar)
           }
@@ -167,12 +191,16 @@ export default function SupercarTest() {
           throw new Error("No matching car found")
         }
       } catch (err) {
-        console.error("Error determining final car:", err)
+        debugLogger.error("Error determining final car:", err)
+        setSearchError("Failed to find a matching car. Please try again.")
+        // Show error to user
+        // You might want to add error state and display it in the UI
+      } finally {
+        setIsSearching(false)
+        // Clear stored progress
+        await supabaseAdmin.from("users").update({ test_progress: null }).eq("user_id", user?.id)
       }
-      // Clear stored progress for a fresh start next time
-      await supabaseAdmin.from("users").update({ test_progress: null }).eq("user_id", user?.id)
     } else {
-      // Otherwise, update progress in the database
       const progress = {
         currentQuestionIndex: nextIndex,
         selectedAnswers: updatedAnswers,
@@ -192,6 +220,7 @@ export default function SupercarTest() {
     setSimilarCars([])
     setMode("question")
     modeProgress.set(0)
+    setSearchError(null)
     await supabaseAdmin.from("users").update({ test_progress: null }).eq("user_id", user?.id)
   }
 
@@ -199,6 +228,47 @@ export default function SupercarTest() {
     return (
       <div className="min-h-screen bg-gray-900 text-white p-4 flex items-center justify-center">
         Loading questions...
+      </div>
+    )
+  }
+
+  // Add loading state to result display
+  if (isSearching) {
+    return (
+      <div className="fixed inset-0 bg-background/95 backdrop-blur-sm flex items-center justify-center dark">
+        <div className="bg-card text-card-foreground rounded-lg p-8 shadow-lg max-w-md w-full mx-4 border border-border">
+          <div className="text-center space-y-4">
+            <div className="flex justify-center">
+              <Brain className="h-12 w-12 text-primary animate-pulse" />
+            </div>
+            <h3 className="text-lg font-semibold text-foreground">Анализ предпочтений</h3>
+            <p className="text-sm text-muted-foreground">ИИ подбирает вам машину по вкусу...</p>
+            <div className="flex justify-center gap-2">
+              <div className="animate-bounce delay-0 w-2 h-2 bg-primary rounded-full"></div>
+              <div className="animate-bounce delay-150 w-2 h-2 bg-primary rounded-full"></div>
+              <div className="animate-bounce delay-300 w-2 h-2 bg-primary rounded-full"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (searchError) {
+    return (
+      <div className="min-h-screen bg-background text-foreground p-4 flex items-center justify-center dark">
+        <div className="bg-card text-card-foreground rounded-lg p-8 shadow-lg max-w-md w-full mx-4 border border-destructive">
+          <div className="text-center space-y-4">
+            <h3 className="text-lg font-semibold text-destructive">Вам ничего не подошло</h3>
+            <p className="text-sm text-muted-foreground">Попробуйте закатать губу.</p>
+            <button
+              onClick={resetTest}
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+            >
+              Попробовать снова
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
