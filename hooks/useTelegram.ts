@@ -43,13 +43,13 @@ export function useTelegram() {
     debugLogger.log("Authenticating user...", telegramUser)
     try {
       const cached = loadCachedUser()
-      if (cached && cached.telegramUser.id === telegramUser.id) {
+      /*if (cached && cached.telegramUser.id === telegramUser.id) {
         debugLogger.log("Using cached user data")
         setDbUser(cached.dbUser)
         return
-      }
+      }*/
 
-      const fetchedUser = await fetchUserData(telegramUser.id.toString())
+      const fetchedUser = null//await fetchUserData(telegramUser.id.toString())
       if (!fetchedUser) {
         debugLogger.log("Creating new user...")
         const newUser = await createOrUpdateUser(telegramUser.id.toString(), telegramUser)
