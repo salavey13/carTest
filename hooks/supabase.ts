@@ -39,13 +39,13 @@ export const createOrUpdateUser = async (chatId: string, userInfo: Partial<WebAp
 
   try {
     // First, try to fetch the existing user
-    const existingUser = await fetchUserData(chatId)
+/*    const existingUser = await fetchUserData(chatId)
 
     if (existingUser) {
       debugLogger.log("Existing user found:", existingUser)
       return existingUser
     }
-
+*/
     // If no user exists, create a new one
     debugLogger.log("No existing user found, creating new user...")
     const { data: newUser, error: insertError } = await supabaseAdmin
