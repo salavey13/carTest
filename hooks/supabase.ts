@@ -38,15 +38,7 @@ export const createOrUpdateUser = async (chatId: string, userInfo: Partial<WebAp
   debugLogger.log("Creating or updating user:", { chatId, userInfo })
 
   try {
-    // First, try to fetch the existing user
-/*    const existingUser = await fetchUserData(chatId)
-
-    if (existingUser) {
-      debugLogger.log("Existing user found:", existingUser)
-      return existingUser
-    }
-*/
-    // If no user exists, create a new one
+    // create a new one
     debugLogger.log("No existing user found, creating new user...")
     const { data: newUser, error: insertError } = await supabaseAdmin
       .from("users")
@@ -56,12 +48,7 @@ export const createOrUpdateUser = async (chatId: string, userInfo: Partial<WebAp
         full_name: `${userInfo.first_name || ""} ${userInfo.last_name || ""}`.trim() || null,
         avatar_url: userInfo.photo_url || null,
         language_code: userInfo.language_code || null,
-        status: "free",
-        role: "attendee",
-        updated_at: new Date().toISOString(), // Add this if your schema includes it
       })
-      .select()
-      .single()
 
     if (insertError) {
       debugLogger.error("Error inserting new user:", insertError)
@@ -69,7 +56,12 @@ export const createOrUpdateUser = async (chatId: string, userInfo: Partial<WebAp
     }
 
     debugLogger.log("New user created:", newUser)
-    return newUser
+    const existingUser = await fetchUserData(chatId)
+
+    if (existingUser) {
+      debugLogger.log("New user found:", existingUser) 
+    }
+    return existingUser
   } catch (error) {
     debugLogger.error("Error in createOrUpdateUser:", error)
     throw error
