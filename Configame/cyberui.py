@@ -260,28 +260,113 @@ HTML_TEMPLATE = '''
             animation: moveParticle 3s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite, glow 2s ease-in-out infinite;
         }
 
+        /* Legend Container */
         .legend {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 10px;
-            border-radius: 10px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
+          position: absolute;
+          bottom: 20px;
+          right: 20px;
+          background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(26, 26, 26, 0.7));
+          padding: 15px;
+          border-radius: 12px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 15px;
+          align-items: center;
+          box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+          border: 1px solid {{ colors.cyberpunk.neon }};
+          backdrop-filter: blur(5px);
         }
 
+        /* Legend Items */
         .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 14px;
+          transition: transform 0.3s ease;
         }
 
+        .legend-item:hover {
+          transform: translateY(-2px);
+        }
+
+        /* Legendary Links (v0 and GitHub) */
+        .legend-item.legendary {
+          position: relative;
+        }
+
+        .legend-link {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          text-decoration: none;
+          font-weight: bold;
+          transition: color 0.3s ease, transform 0.3s ease;
+        }
+
+        .legend-link:hover {
+          transform: scale(1.05);
+        }
+
+        .v0-link {
+          color: #ff69b4; /* Hot Pink */
+        }
+
+        .v0-link:hover {
+          color: #ff85c1;
+          text-shadow: 0 0 5px #ff69b4;
+        }
+
+        .github-link {
+          color: {{ colors.cyberpunk.neon }};
+        }
+
+        .github-link:hover {
+          color: #00ffff;
+          text-shadow: 0 0 5px {{ colors.cyberpunk.neon }};
+        }
+
+        /* Legend Dot */
         .legend-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+          transition: transform 0.3s ease;
+        }
+
+        .legend-item:hover .legend-dot {
+          transform: scale(1.2);
+        }
+
+        /* User Level */
+        .legend-user-level {
+          font-size: 16px;
+          padding: 5px 10px;
+          background: rgba(0, 0, 0, 0.5);
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          gap: 5px;
+        }
+
+        .level-text {
+          color: white;
+          font-weight: bold;
+        }
+
+        .level-text[data-level="Beginner"] {
+          color: {{ colors.cyberpunk.purple }};
+        }
+        .level-text[data-level="Intermediate"] {
+          color: {{ colors.cyberpunk.pink }};
+        }
+        .level-text[data-level="Advanced"] {
+          color: {{ colors.cyberpunk.neon }};
+        }
+        .level-text[data-level="Badass"] {
+          color: #ff00ff;
+          text-shadow: 0 0 5px #ff00ff;
         }
 
         /* Tooltips */
@@ -381,6 +466,27 @@ HTML_TEMPLATE = '''
             .tooltip {
                 width: 200px;
             }
+            .legend {
+                bottom: 10px;
+                right: 10px;
+                padding: 10px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+              }
+
+              .legend-item {
+                font-size: 12px;
+              }
+
+              .legend-dot {
+                width: 8px;
+                height: 8px;
+              }
+
+              .legend-user-level {
+                font-size: 14px;
+              }
         }
 
         @media (max-width: 480px) {
@@ -393,7 +499,24 @@ HTML_TEMPLATE = '''
             }
             .tooltip {
                 width: 150px;
-            }
+            }.legend {
+                bottom: 5px;
+                right: 5px;
+                padding: 8px;
+              }
+
+              .legend-item {
+                font-size: 10px;
+              }
+
+              .legend-dot {
+                width: 6px;
+                height: 6px;
+              }
+
+              .legend-user-level {
+                font-size: 12px;
+              }
         }
     </style>
 </head>
@@ -428,10 +551,12 @@ HTML_TEMPLATE = '''
 
     <div class="skill-tree" id="skillTree"></div>
     <div class="legend">
+        <!-- Skill Categories -->
         <div class="legend-item">
             <div class="legend-dot" style="background: white;"></div>
             <span>Настройка проекта</span>
         </div>
+        {% if user_level in ['Intermediate', 'Advanced', 'Badass'] %}
         <div class="legend-item">
             <div class="legend-dot" style="background: yellow;"></div>
             <span>Контроль версий</span>
@@ -440,6 +565,8 @@ HTML_TEMPLATE = '''
             <div class="legend-dot" style="background: blue;"></div>
             <span>Управление базой данных</span>
         </div>
+        {% endif %}
+        {% if user_level in ['Advanced', 'Badass'] %}
         <div class="legend-item">
             <div class="legend-dot" style="background: {{ colors.cyberpunk.pink }};"></div>
             <span>Развертывание</span>
@@ -448,27 +575,46 @@ HTML_TEMPLATE = '''
             <div class="legend-dot" style="background: {{ colors.cyberpunk.purple }};"></div>
             <span>Интеграция</span>
         </div>
+        {% endif %}
+        {% if user_level in ['Badass'] %}
         <div class="legend-item">
             <div class="legend-dot" style="background: {{ colors.cyberpunk.neon }};"></div>
             <span>Продвинутые возможности</span>
         </div>
-        <!-- Git Status for Intermediate and Above -->
+        {% endif %}
+
+        <!-- V0 Project Link (Visible at Beginner+) -->
+        <div class="legend-item legendary">
+        <a href="https://v0.dev/chat/cartest-tupabase-template-hdQdrfzkTFA" target="_blank" class="legend-link v0-link">
+          <div class="legend-dot" style="background: #ff69b4;"></div>
+          <span>V0 Project</span>
+        </a>
+        </div>
+
+        <!-- GitHub Link (Visible at Intermediate+) -->
         {% if user_level in ['Intermediate', 'Advanced', 'Badass'] %}
-        <div class="legend-item">
-            <div class="legend-dot" style="background: {{ git_status_color }};"></div>
-            <span>Статус Git: {{ git_status }}</span>
+        <div class="legend-item legendary">
+        <a href="https://github.com/salavey13/carTest" target="_blank" class="legend-link github-link">
+          <div class="legend-dot" style="background: {{ colors.cyberpunk.neon }};"></div>
+          <span>GitHub</span>
+        </a>
         </div>
         {% endif %}
-        <!-- Current User Level -->
-        <div>
-            Ваш текущий уровень: <strong>{{ user_level }}</strong>
-        </div>
+
+        <!-- Git Status (Visible at Intermediate+) -->
+        {% if user_level in ['Intermediate', 'Advanced', 'Badass'] %}
         <div class="legend-item">
-            <a href="https://github.com/salavey13/carTest" target="_blank" style="color: {{ colors.cyberpunk.neon }}; text-decoration: none;">
-                <span>GitHub</span>
-            </a>
+        <div class="legend-dot" style="background: {{ git_status_color }};"></div>
+        <span>Статус Git: {{ git_status }}</span>
         </div>
-    </div>
+        {% endif %}
+
+        <!-- Current User Level -->
+        <div class="legend-user-level">
+        <span>Ваш уровень: </span>
+        <strong class="level-text" data-level="{{ user_level }}">{{ user_level }}</strong>
+        </div>
+        </div>
 
     <script>
         var skill_data = {{ skill_data | tojson | safe }};
