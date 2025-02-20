@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { debugLogger } from "@/lib/debugLogger"
-import { createOrUpdateUser, fetchUserData } from "@/hooks/supabase"
+import { fetchUserData } from "@/app/actions"//hooks/supabase"
+import { createOrUpdateUser } from "@/app/actions"
 import type { TelegramWebApp, WebAppUser } from "@/types/telegram"
 import type { Database } from "@/types/database.types"
 
