@@ -666,19 +666,15 @@ def run_command(command, success_message="Успех", error_message="Ошибк
             "message": error_message + "\n" + e.stderr
         })
 
-def apply_zip_updates(project_name):
+def apply_zip_updates(project_name, zip_path=None):
     config = load_config(project_name)
-    zip_path = filedialog.askopenfilename(
-        title="Выберите ZIP файл",
-        filetypes=[("ZIP Files", "*.zip")],
-        initialdir=REPO_DIR,
-    )
+    
     if not zip_path or not os.path.exists(zip_path):
         publish_event('progress', {"message": "ZIP файл не выбран.", "progress": -1, "tool": "ZIP Update"})
         return {
             "status": "warning",
             "message": "ZIP файл не выбран."
-        }, 400  # Return early with error status
+        }, 400
 
     try:
         publish_event('progress', {"message": "Starting ZIP update process...", "progress": 0, "tool": "ZIP Update"})
@@ -687,13 +683,14 @@ def apply_zip_updates(project_name):
         temp_dir = os.path.join(TEMP_DIR, "temp_unzip")
         os.makedirs(temp_dir, exist_ok=True)
         zip_filename = os.path.basename(zip_path)
-        shutil.copy2(zip_path, os.path.join(TEMP_DIR, zip_filename))
+        # No need to copy since it's already in TEMP_DIR from upload
+        # shutil.copy2(zip_path, os.path.join(TEMP_DIR, zip_filename))
 
         publish_event('progress', {"message": "Extracting ZIP file...", "progress": 25, "tool": "ZIP Update"})
 
         # Extract ZIP using PowerShell
         subprocess.run(
-            f"powershell -Command \"Expand-Archive -Force '{os.path.join(TEMP_DIR, zip_filename)}' -DestinationPath '{temp_dir}'\"",
+            f"powershell -Command \"Expand-Archive -Force '{zip_path}' -DestinationPath '{temp_dir}'\"",
             shell=True,
             check=True,
         )
@@ -716,8 +713,9 @@ def apply_zip_updates(project_name):
             else:
                 shutil.copy2(source_path, dest_path)
 
-        # Clean up temporary directory
+        # Clean up temporary directory and uploaded file
         shutil.rmtree(temp_dir)
+        os.remove(zip_path)
 
         publish_event('progress', {"message": "Updating version and committing changes...", "progress": 75, "tool": "ZIP Update"})
 

@@ -289,3 +289,44 @@ def api_git_status():
     current_project = request.args.get('project', DEFAULT_PROJECT_NAME)
     status = check_git_status(current_project)
     return jsonify({"status": status})
+
+@app.route('/upload_zip', methods=['POST'])
+def upload_zip():
+    global current_project
+    current_project = request.args.get('project', DEFAULT_PROJECT_NAME)
+    
+    if 'zip_file' not in request.files:
+        return jsonify({
+            "status": "warning",
+            "message": "No ZIP file selected."
+        }), 400
+    
+    file = request.files['zip_file']
+    if file.filename == '':
+        return jsonify({
+            "status": "warning",
+            "message": "No ZIP file selected."
+        }), 400
+    
+    if not file.filename.endswith('.zip'):
+        return jsonify({
+            "status": "error",
+            "message": "Please upload a valid ZIP file."
+        }), 400
+
+    try:
+        # Save the uploaded file to TEMP_DIR
+        zip_filename = f"uploaded_{int(time.time())}_{file.filename}"
+        zip_path = os.path.join(TEMP_DIR, zip_filename)
+        file.save(zip_path)
+        
+        # Call the updated apply_zip_updates with the file path
+        result, status = apply_zip_updates(current_project, zip_path)
+        return jsonify(result), status
+    
+    except Exception as e:
+        error_msg = f"Error processing ZIP file: {str(e)}"
+        return jsonify({
+            "status": "error",
+            "message": error_msg
+        }), 500
