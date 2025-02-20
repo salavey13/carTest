@@ -20,17 +20,20 @@ export async function createOrUpdateUser(user: {
   photo_url?: string
 }) {
   try {
-    const { data: existingUser, error: fetchError } = await supabaseAnon
+    const { data: existingUser, error: fetchError } = await supabaseAdmin // Use supabaseAdmin
       .from("users")
       .select("*")
       .eq("user_id", user.id)
-      .single()
+      .maybeSingle() // Use maybeSingle for consistency
 
-    if (fetchError && fetchError.message !== "No rows found") throw fetchError
+    if (fetchError) {
+      debugLogger.error("Fetch error:", fetchError)
+      throw fetchError
+    }
 
     if (existingUser) return existingUser
 
-    const { data: newUser, error: insertError } = await supabaseAnon
+    const { data: newUser, error: insertError } = await supabaseAdmin // Use supabaseAdmin
       .from("users")
       .insert({
         user_id: user.id,
@@ -42,11 +45,14 @@ export async function createOrUpdateUser(user: {
       .select()
       .single()
 
-    if (insertError) throw insertError
+    if (insertError) {
+      debugLogger.error("Insert error:", insertError)
+      throw insertError
+    }
 
     return newUser
   } catch (error) {
-    console.error("Error creating/updating user:", error)
+    debugLogger.error("Error creating/updating user:", error)
     throw error
   }
 }
