@@ -11,7 +11,7 @@ export default function AdminPage() {
   const router = useRouter()
 
   useEffect(() => {
-    if (!dbUser || !isAdmin()) {
+    if (dbUser && !isAdmin()) {
       router.push("/")
     }
   }, [dbUser, isAdmin, router])
