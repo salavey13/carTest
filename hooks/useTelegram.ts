@@ -207,7 +207,7 @@ export function useTelegram() {
   }, [handleAuthentication, setMockUser, loadCachedAuthState])
 
   const isAuthenticated = Boolean(dbUser)
-  const isAdmin = useCallback(() => dbUser?.role === "admin", [dbUser])
+  const isAdmin = useCallback(() => dbUser?.status === "admin", [dbUser])
 
   return {
     tg,

@@ -85,7 +85,7 @@ export default function Home() {
       </div>
 
       {/* Иконка администратора */}
-      {isAuthenticated && dbUser?.role === "admin" && (
+      {dbUser?.status === "admin" && (
         <div className="fixed bottom-4 right-4 z-50">
           <Link href="/admin">
             <Button variant="ghost" className="text-blue-900 hover:text-blue-700">
