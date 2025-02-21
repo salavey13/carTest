@@ -145,6 +145,7 @@ SELECT create_public_bucket('car-images');
 
 create table public.invoices (
   id text not null,
+  type text,
   user_id text not null,
   subscription_id integer not null,
   status text null default 'pending'::text,
@@ -174,8 +175,36 @@ create index IF not exists invoices_status_idx on public.invoices using btree (s
 --     FOR EACH ROW
 --     EXECUTE FUNCTION public.set_updated_at();
 
+
+
+-- Enable RLS on the invoices table
+ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
+
+-- Allow authenticated users to view their own invoices
+CREATE POLICY "Users can view own invoices" ON public.invoices
+  FOR SELECT
+  TO authenticated
+  USING (auth.jwt() ->> 'chat_id' = user_id); -- Assumes chat_id is passed as uid in JWT
+
+-- Allow authenticated users to insert their own invoices
+CREATE POLICY "Users can create own invoices" ON public.invoices
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.jwt() ->> 'chat_id' = user_id);
+
+-- Allow authenticated users to update their own invoices (if needed)
+CREATE POLICY "Users can update own invoices" ON public.invoices
+  FOR UPDATE
+  TO authenticated
+  USING (auth.jwt() ->> 'chat_id' = user_id);
+
+-- Admins can bypass RLS (handled via supabaseAdmin in code)
+
+
+
 -- Create function to create invoice
 CREATE OR REPLACE FUNCTION create_invoice(
+    p_type TEXT,
     p_id TEXT,
     p_user_id TEXT,
     p_amount NUMERIC,
@@ -185,8 +214,8 @@ CREATE OR REPLACE FUNCTION create_invoice(
 DECLARE
     v_invoice public.invoices;
 BEGIN
-    INSERT INTO public.invoices (id, user_id, amount, metadata, subscription_id)
-    VALUES (p_id, p_user_id, p_amount, p_metadata, p_subscription_id)
+    INSERT INTO public.invoices (type, id, user_id, amount, metadata, subscription_id)
+    VALUES (p_type, p_id, p_user_id, p_amount, p_metadata, p_subscription_id)
     RETURNING * INTO v_invoice;
     
     RETURN v_invoice;

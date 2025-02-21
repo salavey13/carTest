@@ -94,6 +94,7 @@ export default function RentCar() {
 
       // Create metadata for the invoice
       const metadata = {
+        type: "car_rental",
         car_id: selectedCar.id,
         car_make: selectedCar.make,
         car_model: selectedCar.model,
@@ -107,7 +108,7 @@ export default function RentCar() {
 
       // Create invoice in Supabase first
       const invoiceId = `car_rental_${selectedCar.id}_${webAppUser.id}_${Date.now()}`
-      await createInvoice(invoiceId, webAppUser.id.toString(), finalPrice, metadata)
+      await createInvoice("car_rental", invoiceId, webAppUser.id.toString(), finalPrice, metadata)
 
       // Prepare description with subscription status
       const description = hasSubscription
@@ -131,7 +132,7 @@ export default function RentCar() {
       toast.success(getSuccessMessage())
     } catch (err) {
       console.error("Ошибка при создании счета:", err)
-      setError("Произошла ошибка при создании счета.")
+      setError("Произошла ошибка при создании счета. " + err)
       toast.error("Не удалось создать счет. Попробуйте позже.")
     } finally {
       setLoading(false)

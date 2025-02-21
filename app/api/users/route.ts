@@ -1,10 +1,11 @@
 // app/api/users/route.ts
+"use server"
 import { type NextRequest, NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
 import { supabaseAdmin } from "@/hooks/supabase"
 import { logger } from "@/lib/logger"
 
-const JWT_SECRET = process.env.SUPABASE_JWT_SECRET || process.env.NEXT_PUBLIC_SUPABASE_JWT_SECRET
+const JWT_SECRET = process.env.SUPABASE_JWT_SECRE
 
 if (!JWT_SECRET) {
   logger.warn("Missing SUPABASE_JWT_SECRET environment variable. JWT operations will not work correctly.")

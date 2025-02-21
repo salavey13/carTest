@@ -86,6 +86,7 @@ export async function sendTelegramInvoice(
   description: string,
   payload: string,
   amount: number,
+  subscription_id: number,
 ) {
   try {
     const PROVIDER_TOKEN = "" // Empty string for XTR payments
@@ -102,12 +103,17 @@ export async function sendTelegramInvoice(
       is_flexible: false,
     })
 
-    const { error } = await supabaseAdmin.from("invoices").insert([{ id: payload, user_id: chatId, status: "pending" }])
-    if (error) throw new Error(`Database error: ${error.message}`)
+    if (!response.data.ok) {
+      throw new Error(`Telegram API error: ${response.data.description || "Unknown error"}`)
+    }
+
+    //const { error } = await supabaseAdmin.from("invoices").insert([{ id: payload, user_id: chatId, status: "pending"/*, subscription_id: subscription_id*/ }])
+    //if (error) throw new Error(`Database error: ${error.message}`)
 
     return { success: true, data: response.data }
   } catch (error) {
-    return { success: false, error: "Failed to send invoice" }
+    logger.error("Error in sendTelegramInvoice:", error)
+    return { success: false, error: error instanceof Error ? error.message : "Failed to send invoice" }
   }
 }
 
@@ -123,10 +129,23 @@ export async function handleWebhookUpdate(update: any) {
     if (update.message?.successful_payment) {
       const { invoice_payload, total_amount } = update.message.successful_payment
 
+      // Fetch the invoice from Supabase to get its type and metadata
+      const { data: invoice, error: invoiceError } = await supabaseAdmin
+        .from("invoices")
+        .select("*")
+        .eq("id", invoice_payload)
+        .single()
+
+      if (invoiceError || !invoice) {
+        throw new Error(`Invoice not found or database error: ${invoiceError?.message}`)
+      }
+
+      // Update invoice status to "paid"
       const { error: updateError } = await supabaseAdmin
         .from("invoices")
         .update({ status: "paid" })
         .eq("id", invoice_payload)
+
       if (updateError) throw new Error(`Database error: ${updateError.message}`)
 
       const userId = update.message.chat.id
@@ -135,31 +154,53 @@ export async function handleWebhookUpdate(update: any) {
         .select("*")
         .eq("user_id", userId)
         .single()
+
       if (userError) throw new Error(`Database error: ${userError.message}`)
 
-      let newStatus = "pro"
-      let newRole = "subscriber"
-      if (total_amount === 420) {
-        newStatus = "admin"
-        newRole = "admin"
-      }
-
-      const { error: updateUserError } = await supabaseAdmin
-        .from("users")
-        .update({ status: newStatus, role: newRole })
-        .eq("user_id", userId)
-      if (updateUserError) throw new Error(`Database error: ${updateUserError.message}`)
-
       const telegramBotUrl = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`
-      await axios.post(telegramBotUrl, {
-        chat_id: userId,
-        text: "🎉 Payment successful! Thank you for your purchase.",
-      })
+      const { data: admins } = await supabaseAdmin.from("users").select("user_id").eq("status", "admin")
 
-      const { data: admins } = await supabaseAdmin.from("users").select("user_id").eq("role", "admin")
-      const adminMessage = `🔔 User ${userData.username || userData.user_id} has upgraded to ${newStatus.toUpperCase()}!`
-      for (const admin of admins) {
-        await axios.post(telegramBotUrl, { chat_id: admin.user_id, text: adminMessage })
+      if (invoice.type === "subscription") {
+        // Handle subscription logic
+        let newStatus = "pro"
+        let newRole = "subscriber"
+        if (total_amount === 420) {
+          newStatus = "admin"
+          newRole = "admin"
+        }
+
+        const { error: updateUserError } = await supabaseAdmin
+          .from("users")
+          .update({ status: newStatus, role: newRole })
+          .eq("user_id", userId)
+
+        if (updateUserError) throw new Error(`Database error: ${updateUserError.message}`)
+
+        await axios.post(telegramBotUrl, {
+          chat_id: userId,
+          text: "🎉 Оплата подписки прошла успешно! Спасибо за покупку.",
+        })
+
+        
+        const adminMessage = `🔔 Пользователь ${userData.username || userData.user_id} обновил статус до ${newStatus.toUpperCase()}!`
+        for (const admin of admins) {
+          await axios.post(telegramBotUrl, { chat_id: admin.user_id, text: adminMessage })
+        }
+      } else if (invoice.type === "car_rental") {
+        // Handle car rental logic
+        const metadata = invoice.metadata // Assuming metadata is stored in invoice
+
+        await axios.post(telegramBotUrl, {
+          chat_id: userId,
+          text: `🎉 Оплата аренды автомобиля ${metadata.car_make} ${metadata.car_model} прошла успешно! Спасибо за покупку.`,
+        })
+
+        const adminMessage = `🔔 Пользователь ${userData.username || userData.user_id} арендовал автомобиль ${metadata.car_make} ${metadata.car_model} на ${metadata.days} дней за ${metadata.price_stars} XTR.`
+        for (const admin of admins) {
+          await axios.post(telegramBotUrl, { chat_id: admin.user_id, text: adminMessage })
+        }
+      } else {
+        throw new Error("Unknown invoice type")
       }
     }
   } catch (error) {
@@ -215,6 +256,7 @@ export async function saveUser(tgUser: TelegramUser) {
         avatar_url: tgUser.photo_url,
         full_name: `${tgUser.first_name} ${tgUser.last_name || ""}`.trim(),
         telegram_username: tgUser.username,
+        language_code: tgUser.language_code,
       })
       .select()
 
