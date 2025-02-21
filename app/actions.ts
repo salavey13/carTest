@@ -20,7 +20,22 @@ export async function createOrUpdateUser(user: {
   photo_url?: string
 }) {
   try {
-    /*const { data: existingUser, error: fetchError } = await supabaseAdmin // Use supabaseAdmin
+    const { error: insertError } = await supabaseAdmin // Use supabaseAdmin
+      .from("users")
+      .insert({
+        user_id: user.id,
+        username: user.username,
+        full_name: `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim(),
+        avatar_url: user.photo_url,
+        language_code: user.language_code,
+      })
+
+    if (insertError) {
+      debugLogger.error("Insert error:", insertError)
+      throw insertError
+    }
+
+    const { data: existingUser, error: fetchError } = await supabaseAdmin // Use supabaseAdmin
       .from("users")
       .select("*")
       .eq("user_id", user.id)
@@ -31,25 +46,7 @@ export async function createOrUpdateUser(user: {
       throw fetchError
     }
 
-    if (existingUser) return existingUser*/
-
-    const { data: newUser, error: insertError } = await supabaseAdmin // Use supabaseAdmin
-      .from("users")
-      .insert({
-        user_id: user.id,
-        username: user.username,
-        full_name: `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim(),
-        avatar_url: user.photo_url,
-        language_code: user.language_code,
-      })
-      .select()
-      .single()
-
-    if (insertError) {
-      debugLogger.error("Insert error:", insertError)
-      throw insertError
-    }
-
+    if (existingUser) return existingUser
     return newUser
   } catch (error) {
     debugLogger.error("Error creating/updating user:", error)

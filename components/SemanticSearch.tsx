@@ -67,7 +67,7 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
 
   const inputClass = compact
     ? "w-full pl-10 pr-20 py-2 bg-black/30 border-[#00ff9d]/30 text-[#00ff9d] font-mono rounded"
-    : "w-full p-2 bg-black/30 border-2 border-[#00ff9d]/30 text-[#00ff9d] font-mono rounded"
+    : "w-full pl-10  p-2 bg-black/30 border-2 border-[#00ff9d]/30 text-[#00ff9d] font-mono rounded"
 
   const containerClass = compact ? "relative w-full" : "w-full max-w-md mx-auto"
 

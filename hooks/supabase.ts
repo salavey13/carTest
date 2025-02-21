@@ -6,8 +6,12 @@ import { debugLogger } from "@/lib/debugLogger"
 import type { Database } from "@/types/database.types"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://inmctohsodgdohamhzag.supabase.co"
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzMzk1ODUsImV4cCI6MjA1MzkxNTU4NX0.AdNu5CBn6pp-P5M2lZ6LjpcqTXrhOdTOYMCiQrM_Ud4"
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODMzOTU4NSwiZXhwIjoyMDUzOTE1NTg1fQ.xD91Es2o8T1vM-2Ok8iKCn4jGDA5TwBbapD5eqhblLM"
+const supabaseAnonKey =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgzMzk1ODUsImV4cCI6MjA1MzkxNTU4NX0.AdNu5CBn6pp-P5M2lZ6LjpcqTXrhOdTOYMCiQrM_Ud4"
+const serviceRoleKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlubWN0b2hzb2RnZG9oYW1oemFnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODMzOTU4NSwiZXhwIjoyMDUzOTE1NTg1fQ.xD91Es2o8T1vM-2Ok8iKCn4jGDA5TwBbapD5eqhblLM"
 
 export const supabaseAnon = createClient<Database>(supabaseUrl, supabaseAnonKey)
 export const supabaseAdmin = createClient<Database>(supabaseUrl, serviceRoleKey)
@@ -15,11 +19,7 @@ export const supabaseAdmin = createClient<Database>(supabaseUrl, serviceRoleKey)
 export const fetchUserData = async (chatId: string) => {
   debugLogger.log("Fetching user data for chatId:", chatId)
   try {
-    const { data, error } = await supabaseAdmin
-      .from("users")
-      .select("*")
-      .eq("user_id", chatId)
-      .maybeSingle() // Use maybeSingle to handle no rows gracefully
+    const { data, error } = await supabaseAdmin.from("users").select("*").eq("user_id", chatId).maybeSingle() // Use maybeSingle to handle no rows gracefully
 
     if (error) {
       debugLogger.error("Error fetching user data:", error)
@@ -40,32 +40,40 @@ export const createOrUpdateUser = async (chatId: string, userInfo: Partial<WebAp
   try {
     // create a new one
     debugLogger.log("No existing user found, creating new user...")
-    const { data: newUser, error: insertError } = await supabaseAdmin
-      .from("users")
-      .insert({
-        user_id: chatId,
-        username: userInfo.username || null,
-        full_name: `${userInfo.first_name || ""} ${userInfo.last_name || ""}`.trim() || null,
-        avatar_url: userInfo.photo_url || null,
-        language_code: userInfo.language_code || null,
-      })
+    const { error: insertError } = await supabaseAdmin.from("users").insert({
+      user_id: chatId,
+      username: userInfo.username || null,
+      full_name: `${userInfo.first_name || ""} ${userInfo.last_name || ""}`.trim() || null,
+      avatar_url: userInfo.photo_url || null,
+      language_code: userInfo.language_code || null,
+    })
 
     if (insertError) {
       debugLogger.error("Error inserting new user:", insertError)
       throw insertError
     }
 
-    debugLogger.log("New user created:", newUser)
+    debugLogger.log("New user created:", chatId)
     const existingUser = await fetchUserData(chatId)
 
     if (existingUser) {
-      debugLogger.log("New user found:", existingUser) 
+      debugLogger.log("New user found:", existingUser)
     }
     return existingUser
   } catch (error) {
     debugLogger.error("Error in createOrUpdateUser:", error)
     throw error
   }
+}
+
+export interface CarResult {
+  id: string
+  make: string
+  model: string
+  similarity: number
+  description: string
+  image_url: string
+  rent_link: string
 }
 
 export const searchCars = async (embedding: number[], limit = 5): Promise<CarResult[]> => {
@@ -84,14 +92,13 @@ export const searchCars = async (embedding: number[], limit = 5): Promise<CarRes
       similarity: item.similarity,
       description: item.description,
       image_url: item.image_url,
-      rent_link: `/rent/${item.id}`,//item.rent_link,
+      rent_link: `/rent/${item.id}`, //item.rent_link,
     }))
   } catch (error) {
     debugLogger.error("Error searching cars:", error)
     return []
   }
 }
-
 
 export const createAuthenticatedClient = async (chatId: string) => {
   const token = await generateJwtToken(chatId)
@@ -125,77 +132,114 @@ export const loadTestProgress = async (chatId: string) => {
   return data?.test_progress
 }
 
-/*export const createOrUpdateUser = async (chatId: string, userInfo: Partial<WebAppUser>) => {
-  debugLogger.log("Creating or updating user:", { chatId, userInfo })
+// New invoice related functions
+export interface Invoice {
+  id: string
+  user_id: string
+  status: "pending" | "paid" | "cancelled"
+  amount: number
+  created_at?: string
+  updated_at?: string
+  metadata?: Record<string, any>
+  subscription_id: number
+}
 
+export const getUserSubscription = async (userId: string): Promise<number | null> => {
   try {
-    const { data: existingUser, error: fetchError } = await supabaseAdmin
-      .from("users")
-      .select("*")
-      .eq("user_id", chatId)
-      .single()
+    const { data, error } = await supabaseAdmin.from("users").select("subscription_id").eq("user_id", userId).single()
 
-    if (fetchError && fetchError.message !== "No rows found") {
-      debugLogger.error("Error fetching existing user:", fetchError)
-      throw fetchError
-    }
-
-    if (existingUser) {
-      debugLogger.log("Existing user found:", existingUser)
-      return existingUser
-    }
-
-    const { data: newUser, error: insertError } = await supabaseAdmin
-      .from("users")
-      .insert({
-        user_id: chatId,
-        username: userInfo.username,
-        full_name: `${userInfo.first_name || ""} ${userInfo.last_name || ""}`.trim(),
-        avatar_url: userInfo.photo_url,
-        language_code: userInfo.language_code,
-        status: "free",
-        role: "attendee",
-      })
-      .select()
-      .single()
-
-    if (insertError) {
-      debugLogger.error("Error inserting new user:", insertError)
-      throw insertError
-    }
-
-    debugLogger.log("New user created:", newUser)
-    return newUser
+    if (error) throw error
+    return data?.subscription_id || null
   } catch (error) {
-    debugLogger.error("Error in createOrUpdateUser:", error)
-    throw error
+    debugLogger.error("Error fetching user subscription:", error)
+    return null
   }
-}*/
+}
 
-/*export const searchCars = async (embedding: number[], limit = 5): Promise<CarResult[]> => {
+export const createInvoice = async (
+  id: string,
+  userId: string,
+  amount: number,
+  metadata: Record<string, any> = {},
+): Promise<Invoice> => {
   try {
-    const { data, error } = await supabaseAnon.rpc("match_cars", {
-      query_embedding: embedding,
-      match_threshold: 0.5,
-      match_count: limit,
+    // Get user's subscription ID
+    const subscriptionId = await getUserSubscription(userId)
+
+    const { data, error } = await supabaseAdmin.rpc("create_invoice", {
+      p_id: id,
+      p_user_id: userId,
+      p_subscription_id: subscriptionId || 0, // Use 0 for non-subscribers
+      p_amount: amount,
+      p_metadata: metadata,
     })
 
     if (error) throw error
-
-    return data.map((item: any) => ({
-      id: item.id,
-      make: item.make,
-      model: item.model,
-      similarity: item.similarity,
-      description: item.description,
-      image_url: item.image_url,
-      rent_link: `/rent/${item.id}`,
-    }))
+    return data
   } catch (error) {
-    console.error("Error searching cars:", error)
-    return []
+    debugLogger.error("Error creating invoice:", error)
+    throw error
   }
-}*/
+}
+
+export const updateInvoiceStatus = async (invoiceId: string, status: Invoice["status"]): Promise<Invoice> => {
+  try {
+    const { data, error } = await supabaseAdmin.rpc("update_invoice_status", {
+      p_invoice_id: invoiceId,
+      p_status: status,
+    })
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    debugLogger.error("Error updating invoice status:", error)
+    throw error
+  }
+}
+
+export const getUserInvoices = async (userId: string): Promise<Invoice[]> => {
+  try {
+    const { data, error } = await supabaseAdmin.rpc("get_user_invoices", {
+      p_user_id: userId,
+    })
+
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    debugLogger.error("Error fetching user invoices:", error)
+    throw error
+  }
+}
+
+export const getInvoiceById = async (invoiceId: string): Promise<Invoice | null> => {
+  try {
+    const { data, error } = await supabaseAdmin.from("invoices").select("*").eq("id", invoiceId).single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    debugLogger.error("Error fetching invoice:", error)
+    throw error
+  }
+}
+
+// Add new function to update user subscription
+export const updateUserSubscription = async (userId: string, subscriptionId: string) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("users")
+      .update({ subscription_id: subscriptionId })
+      .eq("user_id", userId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    debugLogger.error("Error updating user subscription:", error)
+    throw error
+  }
+}
 
 export const getSimilarCars = async (carId: string, matchCount = 3) => {
   const { data, error } = await supabaseAnon.rpc("similar_cars", {
@@ -250,7 +294,7 @@ export const uploadImage = async (bucketName: string, file: File, fileName?: str
   }
 }
 
-export const createInvoice = async (userId: string, subscriptionId: number, amount: number) => {
+/*export const createInvoice = async (userId: string, subscriptionId: number, amount: number) => {
   const { data, error } = await supabaseAdmin.rpc("create_invoice", {
     user_id: userId,
     subscription_id: subscriptionId,
@@ -275,7 +319,7 @@ export const getUserInvoices = async (userId: string) => {
   })
   if (error) throw error
   return data
-}
+}*/
 
 export const fetchCars = async () => {
   const { data, error } = await supabaseAnon.from("cars").select("*")
