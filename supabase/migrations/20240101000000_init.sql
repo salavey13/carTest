@@ -18,6 +18,8 @@ CREATE TABLE public.users (
     full_name TEXT,
     avatar_url TEXT,
     website TEXT,
+    language_code TEXT,
+    subscription_id INT,
     status TEXT DEFAULT 'free',
     role TEXT DEFAULT 'attendee',
     created_at TIMESTAMPTZ DEFAULT now(),
@@ -141,83 +143,86 @@ SELECT create_public_bucket('car-images');
 
 
 
--- Create invoices table
-CREATE TABLE public.invoices (
-    id SERIAL PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES public.users(user_id) ON DELETE CASCADE,
-    subscription_id INT NOT NULL,
-    status TEXT DEFAULT 'pending',
-    amount INT NOT NULL,
-    currency TEXT DEFAULT 'XTR',
-    created_at TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now(),
-    CONSTRAINT check_status CHECK (status = ANY (ARRAY['pending'::text, 'paid'::text, 'failed'::text]))
-);
+create table public.invoices (
+  id text not null,
+  user_id text not null,
+  subscription_id integer not null,
+  status text null default 'pending'::text,
+  amount integer not null,
+  currency text null default 'XTR'::text,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  metadata jsonb null default '{}'::jsonb,
+  constraint invoices_pkey primary key (id),
+  constraint invoices_user_id_fkey foreign KEY (user_id) references users (user_id) on delete CASCADE,
+  constraint check_status check (
+    (
+      status = any (
+        array['pending'::text, 'paid'::text, 'failed'::text]
+      )
+    )
+  )
+) TABLESPACE pg_default;
 
--- Add indexes for performance
-CREATE INDEX ON invoices (user_id);
-CREATE INDEX ON invoices (status);
+create index IF not exists invoices_user_id_idx on public.invoices using btree (user_id) TABLESPACE pg_default;
 
--- Enable Row-Level Security (RLS)
-ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+create index IF not exists invoices_status_idx on public.invoices using btree (status) TABLESPACE pg_default;
 
--- Allow users to read their own invoices
-CREATE POLICY "Users can view their own invoices" ON invoices
-    FOR SELECT USING (auth.jwt() ->> 'chat_id' = user_id);
+-- Add trigger for updated_at
+-- CREATE TRIGGER set_updated_at
+--     BEFORE UPDATE ON public.invoices
+--     FOR EACH ROW
+--     EXECUTE FUNCTION public.set_updated_at();
 
--- Allow users to insert their own invoices
-CREATE POLICY "Users can create their own invoices" ON invoices
-    FOR INSERT WITH CHECK (auth.jwt() ->> 'chat_id' = user_id);
-
--- Allow users to update their own invoices
-CREATE POLICY "Users can update their own invoices" ON invoices
-    FOR UPDATE USING (auth.jwt() ->> 'chat_id' = user_id);
-
-
-
-
+-- Create function to create invoice
 CREATE OR REPLACE FUNCTION create_invoice(
-    user_id TEXT,
-    subscription_id INT,
-    amount INT
-)
-RETURNS void AS $$
+    p_id TEXT,
+    p_user_id TEXT,
+    p_amount NUMERIC,
+    p_subscription_id  NUMERIC,
+    p_metadata JSONB DEFAULT '{}'::jsonb
+) RETURNS public.invoices AS $$
+DECLARE
+    v_invoice public.invoices;
 BEGIN
-    INSERT INTO invoices (user_id, subscription_id, amount)
-    VALUES (user_id, subscription_id, amount);
+    INSERT INTO public.invoices (id, user_id, amount, metadata, subscription_id)
+    VALUES (p_id, p_user_id, p_amount, p_metadata, p_subscription_id)
+    RETURNING * INTO v_invoice;
+    
+    RETURN v_invoice;
 END;
 $$ LANGUAGE plpgsql;
 
+-- Create function to update invoice status
 CREATE OR REPLACE FUNCTION update_invoice_status(
-    invoice_id INT,
-    new_status TEXT
-)
-RETURNS void AS $$
+    p_invoice_id TEXT,
+    p_status TEXT
+) RETURNS public.invoices AS $$
+DECLARE
+    v_invoice public.invoices;
 BEGIN
-    UPDATE invoices
-    SET status = new_status, updated_at = now()
-    WHERE id = invoice_id;
+    UPDATE public.invoices
+    SET status = p_status,
+        updated_at = now()
+    WHERE id = p_invoice_id
+    RETURNING * INTO v_invoice;
+    
+    RETURN v_invoice;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION get_user_invoices(user_id TEXT)
-RETURNS TABLE (
-    id INT,
-    subscription_id INT,
-    status TEXT,
-    amount INT,
-    currency TEXT,
-    created_at TIMESTAMPTZ,
-    updated_at TIMESTAMPTZ
-) AS $$
+-- Create function to get user invoices
+CREATE OR REPLACE FUNCTION get_user_invoices(
+    p_user_id TEXT
+) RETURNS SETOF public.invoices AS $$
 BEGIN
     RETURN QUERY
-    SELECT id, subscription_id, status, amount, currency, created_at, updated_at
-    FROM invoices
-    WHERE invoices.user_id = get_user_invoices.user_id;
+    SELECT *
+    FROM public.invoices
+    WHERE user_id = p_user_id
+    ORDER BY created_at DESC;
 END;
 $$ LANGUAGE plpgsql;
-
 
 -- Create search function for cars
 CREATE OR REPLACE FUNCTION search_cars(query_embedding VECTOR(384), match_count INT)

@@ -3,6 +3,63 @@
 import { useEffect, useRef, useState } from "react"
 import { debugLogger } from "@/lib/debugLogger"
 
+// Using a simpler embedding approach for preview/testing
+const workerCode = `
+  // Simple cosine similarity based embedding generator
+  function generateSimpleEmbedding(text) {
+    const words = text.toLowerCase().split(/\\s+/);
+    const vector = new Array(384).fill(0);
+    
+    // Generate a deterministic embedding based on word hashing
+    words.forEach((word, i) => {
+      let hash = 0;
+      for (let j = 0; j < word.length; j++) {
+        hash = ((hash << 5) - hash) + word.charCodeAt(j);
+        hash = hash & hash;
+      }
+      
+      // Distribute the hash across the vector
+      const pos = Math.abs(hash) % 384;
+      vector[pos] = Math.sin(hash); // Normalize to [-1, 1]
+    });
+    
+    // Normalize the vector
+    const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
+    return vector.map(val => magnitude ? val / magnitude : 0);
+  }
+
+  self.onmessage = async (event) => {
+    try {
+      if (event.data.type === "init") {
+        self.postMessage({ status: "ready" });
+        return;
+      }
+  
+      if (event.data.type === "embed") {
+        const embedding = generateSimpleEmbedding(event.data.text);
+        
+        if (!embedding || embedding.length === 0) {
+          throw new Error("Generated embedding is empty");
+        }
+  
+        if (embedding.length !== 384) {
+          throw new Error("Invalid embedding dimensions: " + embedding.length);
+        }
+  
+        self.postMessage({
+          status: "complete",
+          embedding,
+        });
+      }
+    } catch (error) {
+      self.postMessage({
+        status: "error",
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+      });
+    }
+  };
+`
+
 export function useWorker() {
   const [isInitialized, setIsInitialized] = useState(false)
   const workerRef = useRef<Worker>()
@@ -11,7 +68,8 @@ export function useWorker() {
     if (typeof window === "undefined") return
 
     try {
-      const worker = new Worker("/workers/embedding.worker.js")
+      const blob = new Blob([workerCode], { type: "text/javascript" })
+      const worker = new Worker(URL.createObjectURL(blob))
 
       worker.onerror = (error) => {
         debugLogger.error("Worker error:", error)
@@ -31,6 +89,7 @@ export function useWorker() {
       return () => {
         if (workerRef.current) {
           workerRef.current.terminate()
+          URL.revokeObjectURL(URL.createObjectURL(blob))
           workerRef.current = undefined
           setIsInitialized(false)
         }
@@ -49,7 +108,7 @@ export function useWorker() {
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         reject(new Error("Embedding generation timed out"))
-      }, 30000) // Reduced timeout to 30s for faster feedback
+      }, 30000)
 
       workerRef.current!.onmessage = (e) => {
         clearTimeout(timeoutId)
