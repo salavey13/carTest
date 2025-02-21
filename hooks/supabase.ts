@@ -132,6 +132,11 @@ export const loadTestProgress = async (chatId: string) => {
   return data?.test_progress
 }
 
+
+
+
+
+
 // New invoice related functions
 export interface Invoice {
   id: string
@@ -144,32 +149,27 @@ export interface Invoice {
   subscription_id: number
 }
 
-export const getUserSubscription = async (userId: string): Promise<number | null> => {
-  try {
-    const { data, error } = await supabaseAdmin.from("users").select("subscription_id").eq("user_id", userId).single()
 
-    if (error) throw error
-    return data?.subscription_id || null
-  } catch (error) {
-    debugLogger.error("Error fetching user subscription:", error)
-    return null
-  }
-}
 
 export const createInvoice = async (
+  type: string,
   id: string,
   userId: string,
   amount: number,
-  metadata: Record<string, any> = {},
+  metadata: Record<string, any> = {}
 ): Promise<Invoice> => {
   try {
-    // Get user's subscription ID
     const subscriptionId = await getUserSubscription(userId)
 
-    const { data, error } = await supabaseAdmin.rpc("create_invoice", {
+    // For testing, use supabaseAdmin; switch to createAuthenticatedClient when RLS is enabled
+    const client = supabaseAdmin
+    //const client = createAuthenticatedClient(userId)// : supabaseAdmin
+
+    const { data, error } = await client.rpc("create_invoice", {
+      p_type: type,
       p_id: id,
       p_user_id: userId,
-      p_subscription_id: subscriptionId || 0, // Use 0 for non-subscribers
+      p_subscription_id: subscriptionId || 0,
       p_amount: amount,
       p_metadata: metadata,
     })
@@ -182,9 +182,17 @@ export const createInvoice = async (
   }
 }
 
-export const updateInvoiceStatus = async (invoiceId: string, status: Invoice["status"]): Promise<Invoice> => {
+export const updateInvoiceStatus = async (
+  invoiceId: string,
+  status: Invoice["status"],
+  jwtToken?: string // Optional JWT for authenticated client
+): Promise<Invoice> => {
   try {
-    const { data, error } = await supabaseAdmin.rpc("update_invoice_status", {
+    // For testing, use supabaseAdmin; switch to createAuthenticatedClient when RLS is enabled
+    const client = supabaseAdmin
+    // const client = jwtToken ? createAuthenticatedClient(jwtToken) : supabaseAdmin
+
+    const { data, error } = await client.rpc("update_invoice_status", {
       p_invoice_id: invoiceId,
       p_status: status,
     })
@@ -197,9 +205,14 @@ export const updateInvoiceStatus = async (invoiceId: string, status: Invoice["st
   }
 }
 
-export const getUserInvoices = async (userId: string): Promise<Invoice[]> => {
+export const getUserInvoices = async (
+  userId: string
+): Promise<Invoice[]> => {
   try {
-    const { data, error } = await supabaseAdmin.rpc("get_user_invoices", {
+    // Use createAuthenticatedClient for RLS when enabled
+    const client = createAuthenticatedClient(userId)// : supabaseAdmin
+
+    const { data, error } = await client.rpc("get_user_invoices", {
       p_user_id: userId,
     })
 
@@ -211,9 +224,16 @@ export const getUserInvoices = async (userId: string): Promise<Invoice[]> => {
   }
 }
 
-export const getInvoiceById = async (invoiceId: string): Promise<Invoice | null> => {
+export const getInvoiceById = async (
+  invoiceId: string,
+  jwtToken?: string // Optional JWT for authenticated client
+): Promise<Invoice | null> => {
   try {
-    const { data, error } = await supabaseAdmin.from("invoices").select("*").eq("id", invoiceId).single()
+    // For admin use, keep supabaseAdmin; for users, use createAuthenticatedClient when RLS is enabled
+    const client = supabaseAdmin
+    // const client = jwtToken ? createAuthenticatedClient(jwtToken) : supabaseAdmin
+
+    const { data, error } = await client.from("invoices").select("*").eq("id", invoiceId).single()
 
     if (error) throw error
     return data
@@ -223,10 +243,16 @@ export const getInvoiceById = async (invoiceId: string): Promise<Invoice | null>
   }
 }
 
-// Add new function to update user subscription
-export const updateUserSubscription = async (userId: string, subscriptionId: string) => {
+export const updateUserSubscription = async (
+  userId: string,
+  subscriptionId: string
+) => {
   try {
-    const { data, error } = await supabaseAdmin
+    // For testing, use supabaseAdmin; switch to createAuthenticatedClient when RLS is enabled
+    const client = supabaseAdmin
+    //const client = createAuthenticatedClient(userId)// : supabaseAdmin
+
+    const { data, error } = await client
       .from("users")
       .update({ subscription_id: subscriptionId })
       .eq("user_id", userId)
@@ -240,6 +266,31 @@ export const updateUserSubscription = async (userId: string, subscriptionId: str
     throw error
   }
 }
+
+export const getUserSubscription = async (
+  userId: string
+): Promise<number | null> => {
+  try {
+    // For testing, use supabaseAdmin; switch to createAuthenticatedClient when RLS is enabled
+    const client = supabaseAdmin
+    //const client = createAuthenticatedClient(userId)// : supabaseAdmin
+
+    const { data, error } = await client.from("users").select("subscription_id").eq("user_id", userId).single()
+
+    if (error) throw error
+    return data?.subscription_id || null
+  } catch (error) {
+    debugLogger.error("Error fetching user subscription:", error)
+    return null
+  }
+}
+
+
+
+
+
+
+
 
 export const getSimilarCars = async (carId: string, matchCount = 3) => {
   const { data, error } = await supabaseAnon.rpc("similar_cars", {
