@@ -402,3 +402,98 @@ export const fetchCarById = async (id: string) => {
   }
 }*/
 
+
+
+
+
+
+
+
+// hooks/supabase.ts
+
+export interface Rental {
+  rental_id: string
+  user_id: string
+  car_id: string
+  start_date: string
+  end_date: string
+  status: "active" | "completed" | "cancelled"
+  payment_status: "pending" | "paid" | "failed"
+  total_cost: number
+  created_at: string
+  updated_at: string
+  car_make?: string
+  car_model?: string
+}
+
+export const createRental = async (
+  userId: string,
+  carId: string,
+  startDate: string,
+  endDate: string,
+  totalCost: number
+): Promise<Rental> => {
+  try {
+    const client = await createAuthenticatedClient(userId)
+    const { data, error } = await client.rpc("create_rental", {
+      p_user_id: userId,
+      p_car_id: carId,
+      p_start_date: startDate,
+      p_end_date: endDate,
+      p_total_cost: totalCost,
+    })
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    debugLogger.error("Error creating rental:", error)
+    throw error
+  }
+}
+
+export const getUserRentals = async (userId: string): Promise<Rental[]> => {
+  try {
+    const client = await createAuthenticatedClient(userId)
+    const { data, error } = await client
+      .from("rentals")
+      .select(`
+        *,
+        cars (
+          make,
+          model
+        )
+      `)
+      .eq("user_id", userId)
+
+    if (error) throw error
+    return data.map((rental: any) => ({
+      ...rental,
+      car_make: rental.cars.make,
+      car_model: rental.cars.model,
+    })) || []
+  } catch (error) {
+    debugLogger.error("Error fetching user rentals:", error)
+    throw error
+  }
+}
+
+export const updateRentalPaymentStatus = async (
+  rentalId: string,
+  paymentStatus: Rental["payment_status"]
+): Promise<Rental> => {
+  try {
+    const client = supabaseAdmin // Switch to authenticated client when RLS is ready
+    const { data, error } = await client
+      .from("rentals")
+      .update({ payment_status: paymentStatus })
+      .eq("rental_id", rentalId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  } catch (error) {
+    debugLogger.error("Error updating rental payment status:", error)
+    throw error
+  }
+}
