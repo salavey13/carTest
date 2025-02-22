@@ -74,90 +74,75 @@ export default function RentCar() {
   }
 
   const handleRent = async () => {
-    if (!selectedCar) return
+  if (!selectedCar) return
 
-    const webAppUser = getTelegramUser()
-    if (!webAppUser) {
-      setError("Вы должны быть авторизованы в Telegram для аренды автомобиля.")
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      const totalPriceYuan = selectedCar.daily_price * rentDays
-      const totalPriceStars = Math.round(totalPriceYuan * YUAN_TO_STARS_RATE)
-
-      // Apply subscriber discount if applicable
-      const finalPrice = hasSubscription ? Math.round(totalPriceStars * 0.9) : totalPriceStars
-
-      // Create metadata for the invoice
-      const metadata = {
-        type: "car_rental",
-        car_id: selectedCar.id,
-        car_make: selectedCar.make,
-        car_model: selectedCar.model,
-        days: rentDays,
-        price_yuan: totalPriceYuan,
-        price_stars: finalPrice,
-        is_subscriber: hasSubscription,
-        original_price: totalPriceStars,
-        discount_applied: hasSubscription ? "10%" : "0%"
-      }
-
-      // Create invoice in Supabase first
-      const invoiceId = `car_rental_${selectedCar.id}_${webAppUser.id}_${Date.now()}`
-      await createInvoice("car_rental", invoiceId, webAppUser.id.toString(), finalPrice, metadata)
-
-      // Prepare description with subscription status
-      const description = hasSubscription
-        ? `Премиум-аренда на ${rentDays} дней\nЦена со скидкой: ${finalPrice} XTR (${totalPriceYuan} ¥)\nПрименена скидка подписчика: 10%`
-        : `Аренда на ${rentDays} дней\nЦена: ${finalPrice} XTR (${totalPriceYuan} ¥)`
-
-      // Send Telegram invoice
-      const response = await sendTelegramInvoice(
-        webAppUser.id.toString(),
-        `Аренда ${selectedCar.make} ${selectedCar.model}`,
-        description,
-        invoiceId,
-        finalPrice,
-      )
-
-      if (!response.success) {
-        throw new Error(response.error || "Не удалось создать счет")
-      }
-
-      setSuccess(true)
-      toast.success(getSuccessMessage())
-    } catch (err) {
-      console.error("Ошибка при создании счета:", err)
-      setError("Произошла ошибка при создании счета. " + err)
-      toast.error("Не удалось создать счет. Попробуйте позже.")
-    } finally {
-      setLoading(false)
-    }
+  const webAppUser = getTelegramUser()
+  if (!webAppUser) {
+    setError("Вы должны быть авторизованы в Telegram для аренды автомобиля.")
+    return
   }
 
-  // Early return if not in Telegram context
-  if (!isInTelegramContext && !getTelegramUser()) {
-    return (
-      <div className="min-h-screen bg-gray-100 text-gray-900 pt-20">
-        <div className="container mx-auto px-4 py-8">
-          <Card className="max-w-md mx-auto">
-            <CardHeader>
-              <CardTitle className="text-center text-red-600">Доступ ограничен</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center">
-                Эта функция доступна только через Telegram. Пожалуйста, откройте приложение через Telegram.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+  setLoading(true)
+  setError(null)
+
+  try {
+    const totalPriceYuan = selectedCar.daily_price * rentDays
+    const totalPriceStars = Math.round(totalPriceYuan * YUAN_TO_STARS_RATE)
+
+    // Apply subscriber discount if applicable
+    const finalPrice = hasSubscription ? Math.round(totalPriceStars * 0.9) : totalPriceStars
+
+    // Create metadata for the invoice
+    const metadata = {
+      type: "car_rental",
+      car_id: selectedCar.id,
+      car_make: selectedCar.make,
+      car_model: selectedCar.model,
+      days: rentDays,
+      price_yuan: totalPriceYuan,
+      price_stars: finalPrice,
+      is_subscriber: hasSubscription,
+      original_price: totalPriceStars,
+      discount_applied: hasSubscription ? "10%" : "0%",
+      image_url: selectedCar.image_url, // Include image URL in metadata for reference
+    }
+
+    // Create invoice in Supabase first
+    const invoiceId = `car_rental_${selectedCar.id}_${webAppUser.id}_${Date.now()}`
+    await createInvoice("car_rental", invoiceId, webAppUser.id.toString(), finalPrice, metadata)
+
+    // Prepare description with subscription status
+    const description = hasSubscription
+      ? `Премиум-аренда на ${rentDays} дней\nЦена со скидкой: ${finalPrice} XTR (${totalPriceYuan} ¥)\nПрименена скидка подписчика: 10%`
+      : `Аренда на ${rentDays} дней\nЦена: ${finalPrice} XTR (${totalPriceYuan} ¥)`
+
+    // Send Telegram invoice with the car's image
+    const response = await sendTelegramInvoice(
+      webAppUser.id.toString(),
+      `Аренда ${selectedCar.make} ${selectedCar.model}`,
+      description,
+      invoiceId,
+      finalPrice,
+      undefined, // subscription_id (not used here, but kept for compatibility)
+      selectedCar.image_url // Pass the car's image URL
     )
+
+    if (!response.success) {
+      throw new Error(response.error || "Не удалось создать счет")
+    }
+
+    setSuccess(true)
+    toast.success(getSuccessMessage())
+  } catch (err) {
+    console.error("Ошибка при создании счета:", err)
+    setError("Произошла ошибка при создании счета. " + err)
+    toast.error("Не удалось создать счет. Попробуйте позже.")
+  } finally {
+    setLoading(false)
   }
+}
+
+    
 
   return (
     <div className="min-h-screen bg-gray-100 text-gray-900 pt-20">
