@@ -1,38 +1,44 @@
 // components/ShadowFleetAdmin.tsx
-"use client"
-import { useState, useEffect } from "react"
-import type React from "react"
-import { supabaseAdmin } from "@/hooks/supabase"
-import { useTelegram } from "@/hooks/useTelegram"
-import Link from "next/link"
+"use client";
+import { useState, useEffect } from "react";
+import type React from "react";
+import { supabaseAdmin } from "@/hooks/supabase";
+import { useTelegram } from "@/hooks/useTelegram";
+import Link from "next/link";
 
 interface PremiumCar {
-  id: string
-  make: string
-  model: string
-  daily_price: number
-  premium: boolean
-  image_url: string
-  rental_count: number
-  total_revenue: number
+  id: string;
+  make: string;
+  model: string;
+  daily_price: number;
+  premium: boolean;
+  image_url: string;
+  rental_count: number;
+  total_revenue: number;
+  active_rentals: number;
+  completed_rentals: number;
+  cancelled_rentals: number;
 }
 
 export function ShadowFleetAdmin() {
-  const { dbUser, isAdmin } = useTelegram()
-  const [premiumCars, setPremiumCars] = useState<PremiumCar[]>([])
-  const [loading, setLoading] = useState(true)
+  const { dbUser, isAdmin } = useTelegram();
+  const [premiumCars, setPremiumCars] = useState<PremiumCar[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const [stats, setStats] = useState({
     totalVipRentals: 0,
     totalRevenue: 0,
+    totalActive: 0,
+    totalCompleted: 0,
+    totalCancelled: 0,
     topCar: null as PremiumCar | null,
-  })
+  });
 
   useEffect(() => {
-    if (!dbUser || !isAdmin()) return
+    if (!dbUser || !isAdmin()) return;
 
     const fetchPremiumCars = async () => {
       try {
-        // Fetch premium cars with rental stats
         const { data, error } = await supabaseAdmin
           .from("cars")
           .select(`
@@ -42,49 +48,51 @@ export function ShadowFleetAdmin() {
             daily_price,
             premium,
             image_url,
-            rentals (id, amount, status)
+            rentals (id, total_cost, payment_status, status)
           `)
-          .eq("premium", true)
+          .eq("premium", true);
 
-        if (error) throw error
+        if (error) throw error;
 
-        // Process rental stats
         const processedCars = data.map((car: any) => ({
           ...car,
           rental_count: car.rentals.length,
           total_revenue: car.rentals
-            .filter((r: any) => r.status === "paid")
-            .reduce((sum: number, r: any) => sum + r.amount, 0),
-        }))
+            .filter((r: any) => r.payment_status === "paid")
+            .reduce((sum: number, r: any) => sum + r.total_cost, 0),
+          active_rentals: car.rentals.filter((r: any) => r.status === "active").length,
+          completed_rentals: car.rentals.filter((r: any) => r.status === "completed").length,
+          cancelled_rentals: car.rentals.filter((r: any) => r.status === "cancelled").length,
+        }));
 
-        setPremiumCars(processedCars)
+        const filteredCars = processedCars.filter(
+          (car) =>
+            car.make.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            car.model.toLowerCase().includes(searchQuery.toLowerCase())
+        );
 
-        // Calculate overall stats
-        const totalVipRentals = processedCars.reduce(
-          (sum, car) => sum + car.rental_count,
-          0
-        )
-        const totalRevenue = processedCars.reduce(
-          (sum, car) => sum + car.total_revenue,
-          0
-        )
-        const topCar = processedCars.sort(
-          (a, b) => b.total_revenue - a.total_revenue
-        )[0] || null
+        setPremiumCars(filteredCars);
 
-        setStats({ totalVipRentals, totalRevenue, topCar })
+        const totalVipRentals = filteredCars.reduce((sum, car) => sum + car.rental_count, 0);
+        const totalRevenue = filteredCars.reduce((sum, car) => sum + car.total_revenue, 0);
+        const totalActive = filteredCars.reduce((sum, car) => sum + car.active_rentals, 0);
+        const totalCompleted = filteredCars.reduce((sum, car) => sum + car.completed_rentals, 0);
+        const totalCancelled = filteredCars.reduce((sum, car) => sum + car.cancelled_rentals, 0);
+        const topCar = filteredCars.sort((a, b) => b.total_revenue - a.total_revenue)[0] || null;
+
+        setStats({ totalVipRentals, totalRevenue, totalActive, totalCompleted, totalCancelled, topCar });
       } catch (error) {
-        console.error("Error fetching premium cars:", error)
+        console.error("Error fetching premium cars:", error);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchPremiumCars()
-  }, [dbUser, isAdmin])
+    fetchPremiumCars();
+  }, [dbUser, isAdmin, searchQuery]);
 
   if (!dbUser || !isAdmin()) {
-    return <div className="min-h-screen bg-black" />
+    return <div className="min-h-screen bg-black" />;
   }
 
   return (
@@ -97,65 +105,63 @@ export function ShadowFleetAdmin() {
 
       <div className="pt-20 relative container mx-auto px-4">
         <h1 className="text-3xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500 font-mono mb-8 animate-neon">
-          Shadow Fleet Admin Portal
+          Портал администратора Shadow Fleet
         </h1>
+
+        {/* Search Bar */}
+        <div className="mb-6">
+          <input
+            type="text"
+            placeholder="Поиск по марке или модели..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full max-w-md p-2 rounded-lg bg-gray-900/80 border border-cyan-500/20 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          />
+        </div>
 
         {/* Fleet Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <StatCard
-            title="Total VIP Rentals"
-            value={stats.totalVipRentals}
-            glow="cyan"
-          />
-          <StatCard
-            title="Total Revenue (XTR)"
-            value={stats.totalRevenue.toLocaleString()}
-            glow="purple"
-          />
+          <StatCard title="Total VIP Rentals" value={stats.totalVipRentals} glow="cyan" />
+          <StatCard title="Total Revenue (XTR)" value={stats.totalRevenue.toLocaleString()} glow="purple" />
           <StatCard
             title="Top Performer"
             value={stats.topCar ? `${stats.topCar.make} ${stats.topCar.model}` : "N/A"}
             glow="pink"
           />
+          <StatCard title="Active Rentals" value={stats.totalActive} glow="green" />
+          <StatCard title="Completed Rentals" value={stats.totalCompleted} glow="blue" />
+          <StatCard title="Cancelled Rentals" value={stats.totalCancelled} glow="red" />
         </div>
 
         {/* Premium Cars List */}
         <div className="space-y-6">
-          <h2 className="text-2xl font-semibold text-cyan-400 mb-4">Fleet Overview</h2>
+          <h2 className="text-2xl font-semibold text-cyan-400 mb-4">Обзор флота</h2>
           {loading ? (
-            <div className="text-center text-gray-400 animate-pulse">
-              Loading Shadow Fleet...
-            </div>
+            <div className="text-center text-gray-400 animate-pulse">Загрузка Shadow Fleet...</div>
           ) : premiumCars.length === 0 ? (
-            <div className="text-center text-gray-400">
-              No premium cars in the fleet yet. Add some VIP rides!
-            </div>
+            <div className="text-center text-gray-400">Нет премиум-автомобилей во флоте. Добавьте несколько VIP-машин!</div>
           ) : (
-            premiumCars.map((car) => (
-              <CarCard key={car.id} car={car} />
-            ))
+            premiumCars.map((car) => <CarCard key={car.id} car={car} />)
           )}
         </div>
 
         <Link href="/admin" className="mt-8 inline-block text-cyan-400 hover:text-cyan-300 transition-colors">
-          ← Back to Main Admin Panel
+          ← Назад к главной панели администратора
         </Link>
       </div>
     </div>
-  )
+  );
 }
 
-// StatCard Component
 function StatCard({ title, value, glow }: { title: string; value: string | number; glow: string }) {
   return (
     <div className={`p-6 rounded-lg bg-gray-900/80 border border-${glow}-500/20 shadow-lg shadow-${glow}-500/10 hover:shadow-${glow}-500/20 transition-shadow`}>
       <h3 className="text-lg font-mono text-gray-400">{title}</h3>
       <p className={`text-3xl font-bold text-${glow}-400 mt-2`}>{value}</p>
     </div>
-  )
+  );
 }
 
-// CarCard Component
 function CarCard({ car }: { car: PremiumCar }) {
   return (
     <div className="p-6 rounded-lg bg-gray-900/80 border border-cyan-500/20 flex flex-col md:flex-row gap-6 hover:shadow-cyan-500/20 transition-shadow">
@@ -170,10 +176,19 @@ function CarCard({ car }: { car: PremiumCar }) {
         <h3 className="text-xl font-semibold text-cyan-400">
           {car.make} {car.model}
         </h3>
-        <p className="text-gray-400 mt-2">Price: {car.daily_price} XTR/day</p>
-        <p className="text-gray-400">Rentals: {car.rental_count}</p>
-        <p className="text-gray-400">Revenue: {car.total_revenue.toLocaleString()} XTR</p>
+        <p className="text-gray-400 mt-2">Цена: {car.daily_price} XTR/день</p>
+        <p className="text-gray-400">Общее количество аренд: {car.rental_count}</p>
+        <p className="text-gray-400">Доход: {car.total_revenue.toLocaleString()} XTR</p>
+        <p className="text-gray-400">Активные: {car.active_rentals}</p>
+        <p className="text-gray-400">Завершенные: {car.completed_rentals}</p>
+        <p className="text-gray-400">Отмененные: {car.cancelled_rentals}</p>
+        <Link
+          href={`/rent/${car.id}`}
+          className="mt-2 inline-block text-cyan-400 hover:text-cyan-300 transition-colors"
+        >
+          Просмотреть историю аренды
+        </Link>
       </div>
     </div>
-  )
+  );
 }
