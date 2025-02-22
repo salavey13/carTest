@@ -29,14 +29,18 @@ export default function AdminPage() {
 
       <div className="pt-20 relative container mx-auto px-4">
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#FF6B6B] to-[#4ECDC4] font-mono mb-8">
-          Admin Panel
+          Панель Администратора
         </h1>
         <CarSubmissionForm />
-        <Link href="/" className="mt-4 inline-block text-cyan-400">
-          ← Back to Main Page
-        </Link>
+        <div className="mt-8 space-y-4">
+          <Link href="/shadow-fleet-admin" className="inline-block text-cyan-400 hover:text-cyan-300 transition-colors">
+            Перейти в Портал Теневого Флота →
+          </Link>
+          <Link href="/" className="block text-cyan-400 hover:text-cyan-300 transition-colors">
+            ← Назад на Главную
+          </Link>
+        </div>
       </div>
     </div>
   )
 }
-
