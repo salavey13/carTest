@@ -70,7 +70,7 @@ export default function BuySubscription() {
     setError(null)
 
     try {
-    
+      
 
       // Create metadata for the invoice
       const metadata = {
@@ -82,14 +82,14 @@ export default function BuySubscription() {
 
       const payload = `subscription_${user.id}_${Date.now()}`
       // Create invoice in Supabase first
-      await createInvoice("subscription", payload, user.id.toString(), finalPrice, metadata)
+      await createInvoice("subscription", payload, user.id.toString(), selectedSubscription.price, metadata)
 
       const response = await sendTelegramInvoice(
         user.id.toString(),
         `${selectedSubscription.name} Абонемент`,
         "Разблокируйте премиум-функции с этим абонементом!",
         payload,
-        selectedSubscription.price
+        selectedSubscription.price,
       )
 
       if (!response.success) {
