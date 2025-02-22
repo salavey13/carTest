@@ -87,6 +87,7 @@ export async function sendTelegramInvoice(
   payload: string,
   amount: number,
   subscription_id: number,
+  photo_url?: string // Optional parameter for the car's image
 ) {
   try {
     const PROVIDER_TOKEN = "" // Empty string for XTR payments
@@ -97,23 +98,24 @@ export async function sendTelegramInvoice(
       payload,
       provider_token: PROVIDER_TOKEN,
       currency: "XTR",
-      prices: [{ label: "Subscription", amount }],
+      prices: [{ label: "Аренда автомобиля", amount }], // Updated label to Russian
       start_parameter: "pay",
       need_shipping_address: false,
       is_flexible: false,
+      photo_url, // Add the image URL here
+      photo_size: 600, // Optional: recommended size in pixels (width or height)
+      photo_width: 600, // Optional: width of the photo
+      photo_height: 400, // Optional: height of the photo (adjust based on your images)
     })
 
     if (!response.data.ok) {
-      throw new Error(`Telegram API error: ${response.data.description || "Unknown error"}`)
+      throw new Error(`Ошибка Telegram API: ${response.data.description || "Неизвестная ошибка"}`)
     }
-
-    //const { error } = await supabaseAdmin.from("invoices").insert([{ id: payload, user_id: chatId, status: "pending"/*, subscription_id: subscription_id*/ }])
-    //if (error) throw new Error(`Database error: ${error.message}`)
 
     return { success: true, data: response.data }
   } catch (error) {
-    logger.error("Error in sendTelegramInvoice: " + error, error)
-    return { success: false, error: error instanceof Error ? error.message : "Failed to send invoice" }
+    logger.error("Ошибка в sendTelegramInvoice: " + error, error)
+    return { success: false, error: error instanceof Error ? error.message : "Не удалось отправить счет" }
   }
 }
 
