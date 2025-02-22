@@ -1,103 +1,160 @@
 // app/invoices/page.tsx
 "use client"
 import { useEffect, useState } from "react"
-import { useAppContext } from "@/contexts/AppContext" // Adjust path as needed
-import { getUserInvoices } from "@/hooks/supabase"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useAppContext } from "@/contexts/AppContext"
+import { getUserInvoices, getUserRentals } from "@/hooks/supabase"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Trophy, Car, CreditCard } from "lucide-react"
 
-export default function Invoices() {
-  const { dbUser } = useAppContext() // Assuming this provides user data and JWT
+interface Invoice {
+  id: string
+  type: string
+  status: string
+  amount: number
+  metadata: { car_make?: string; car_model?: string; days?: number; subscription_id?: string }
+}
+
+interface Rental {
+  rental_id: string
+  car_id: string
+  user_id: string
+  status: string
+  payment_status: string
+  total_cost: number
+  start_date: string
+  end_date: string
+  car_make?: string
+  car_model?: string
+}
+
+export default function GloryHall() {
+  const { dbUser } = useAppContext()
   const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [rentals, setRentals] = useState<Rental[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchInvoices = async () => {
+    const fetchData = async () => {
       if (!dbUser) return
-
-      const { data, error } = await getUserInvoices(dbUser.user_id)
-      if (error) {
-        console.error("Error fetching invoices:", error)
-      } else {
-        setInvoices(data || [])
-      }
+      const [invoicesRes, rentalsRes] = await Promise.all([
+        getUserInvoices(dbUser.user_id),
+        getUserRentals(dbUser.user_id),
+      ])
+      if (invoicesRes.error) console.error("Error fetching invoices:", invoicesRes.error)
+      else setInvoices(invoicesRes.data || [])
+      if (rentalsRes.error) console.error("Error fetching rentals:", rentalsRes.error)
+      else setRentals(rentalsRes.data || [])
       setLoading(false)
     }
-
-    fetchInvoices()
+    fetchData()
   }, [dbUser])
 
-  if (loading) return <div className="pt-20 text-center">Loading...</div>
-  if (!invoices.length) return <div className="pt-20 text-center">No invoices yet.</div>
+  if (loading) return <div className="pt-20 text-center text-2xl text-[#4ECDC4] animate-pulse">Summoning Your Glory...</div>
+  if (!invoices.length && !rentals.length) return (
+    <div className="pt-20 text-center text-xl text-[#FF6B6B]">Your Glory Hall awaits its first triumph!</div>
+  )
 
-  const unpaidInvoices = invoices.filter((inv) => inv.status === "pending")
-  const paidInvoices = invoices.filter((inv) => inv.status === "paid")
+  const pendingItems = [
+    ...invoices.filter((inv) => inv.status === "pending"),
+    ...rentals.filter((r) => r.payment_status === "pending"),
+  ]
+  const completedItems = [
+    ...invoices.filter((inv) => inv.status === "paid"),
+    ...rentals.filter((r) => r.payment_status === "paid"),
+  ]
 
   return (
-    <div className="container mx-auto px-4 py-8 pt-20"> {/* Padding for header */}
-      <h1 className="text-3xl font-bold mb-6">Your Invoices</h1>
+    <div className="container mx-auto px-4 py-8 pt-20 bg-gray-900 min-h-screen">
+      <h1 className="text-4xl font-bold mb-8 text-[#4ECDC4] flex items-center justify-center gap-2">
+        <Trophy className="h-8 w-8" /> Glory Hall
+      </h1>
 
-      {/* Unpaid Invoices (Cart Style) */}
-      {unpaidInvoices.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-2xl font-semibold text-red-600 mb-4">Unpaid Invoices</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Type</TableHead>
-                <TableHead>Amount (XTR)</TableHead>
-                <TableHead>Details</TableHead>
-                <TableHead>Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {unpaidInvoices.map((invoice) => (
-                <TableRow key={invoice.id} className="bg-red-50 hover:bg-red-100">
-                  <TableCell>{invoice.type === "subscription" ? "Subscription" : "Car Rental"}</TableCell>
-                  <TableCell>{invoice.amount}</TableCell>
-                  <TableCell>
-                    {invoice.type === "car_rental" ? (
-                      `${invoice.metadata.car_make} ${invoice.metadata.car_model} for ${invoice.metadata.days} days`
+      {/* Pending Items */}
+      {pendingItems.length > 0 && (
+        <div className="mb-12">
+          <h2 className="text-2xl font-semibold text-red-500 mb-6">Quests Awaiting Payment</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {pendingItems.map((item) => (
+              <Card key={"rental_id" in item ? item.rental_id : item.id} className="bg-red-950/50 border-red-500 hover:shadow-lg hover:shadow-red-500/20 transition-all">
+                <CardHeader>
+                  <CardTitle className="text-red-400 flex items-center gap-2">
+                    {"type" in item ? <CreditCard className="h-5 w-5" /> : <Car className="h-5 w-5" />}
+                    {"type" in item ? (item.type === "subscription" ? "Subscription" : "Car Rental") : "Car Rental"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-white">
+                    <span className="font-semibold">Amount:</span> {"amount" in item ? item.amount : item.total_cost} XTR
+                  </p>
+                  <p className="text-gray-300">
+                    <span className="font-semibold">Details:</span>{" "}
+                    {"type" in item ? (
+                      item.type === "car_rental" ? (
+                        `${item.metadata.car_make} ${item.metadata.car_model} for ${item.metadata.days} days`
+                      ) : (
+                        `Sub #${item.metadata.subscription_id}`
+                      )
                     ) : (
-                      `Subscription ${invoice.metadata.subscription_id}`
+                      `${item.car_make} ${item.car_model} (${new Date(item.start_date).toLocaleDateString()} - ${new Date(item.end_date).toLocaleDateString()})`
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="destructive" onClick={() => {/* Add payment logic */}}>
-                      Pay Now
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </p>
+                  <Badge variant="destructive" className="mt-2">
+                    {"status" in item ? item.status : item.payment_status}
+                  </Badge>
+                </CardContent>
+                <CardFooter>
+                  <Button variant="destructive" className="w-full" onClick={() => {/* Payment logic */}}>
+                    Pay Now
+                  </Button>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Paid Invoices (Glory Corner) */}
-      {paidInvoices.length > 0 && (
-        <div className="bg-green-100 p-6 rounded-lg shadow-lg">
-          <h2 className="text-2xl font-semibold text-green-700 mb-4">Paid Invoices 🎉</h2>
-          <Table>
-            <TableBody>
-              {paidInvoices.map((invoice) => (
-                <TableRow key={invoice.id} className="bg-green-50">
-                  <TableCell>{invoice.type === "subscription" ? "Subscription" : "Car Rental"}</TableCell>
-                  <TableCell>{invoice.amount} XTR</TableCell>
-                  <TableCell>
-                    {invoice.type === "car_rental" ? (
-                      `${invoice.metadata.car_make} ${invoice.metadata.car_model} for ${invoice.metadata.days} days`
+      {/* Completed Items */}
+      {completedItems.length > 0 && (
+        <div className="bg-gradient-to-br from-green-900/30 to-green-700/20 p-8 rounded-xl shadow-xl">
+          <h2 className="text-2xl font-semibold text-green-400 mb-6 flex items-center gap-2">
+            <Trophy className="h-6 w-6" /> Conquered Glories
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {completedItems.map((item) => (
+              <Card key={"rental_id" in item ? item.rental_id : item.id} className="bg-green-950/50 border-green-500 hover:shadow-lg hover:shadow-green-500/20 transition-all">
+                <CardHeader>
+                  <CardTitle className="text-green-400 flex items-center gap-2">
+                    {"type" in item ? <CreditCard className="h-5 w-5" /> : <Car className="h-5 w-5" />}
+                    {"type" in item ? (item.type === "subscription" ? "Subscription" : "Car Rental") : "Car Rental"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-white">
+                    <span className="font-semibold">Amount:</span> {"amount" in item ? item.amount : item.total_cost} XTR
+                  </p>
+                  <p className="text-gray-300">
+                    <span className="font-semibold">Details:</span>{" "}
+                    {"type" in item ? (
+                      item.type === "car_rental" ? (
+                        `${item.metadata.car_make} ${item.metadata.car_model} for ${item.metadata.days} days`
+                      ) : (
+                        `Sub #${item.metadata.subscription_id}`
+                      )
                     ) : (
-                      `Subscription ${invoice.metadata.subscription_id}`
+                      `${item.car_make} ${item.car_model} (${new Date(item.start_date).toLocaleDateString()} - ${new Date(item.end_date).toLocaleDateString()})`
                     )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </p>
+                  <Badge variant="success" className="mt-2">
+                    {"status" in item ? item.status : item.payment_status}
+                  </Badge>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
     </div>
   )
 }
-
