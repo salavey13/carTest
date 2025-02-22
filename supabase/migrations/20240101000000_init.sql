@@ -305,7 +305,39 @@ $$;
 
 
 
+CREATE TABLE public.rentals (
+    rental_id TEXT PRIMARY KEY,
+    user_id TEXT REFERENCES public.users(user_id) ON DELETE CASCADE,
+    car_id TEXT REFERENCES public.cars(id) ON DELETE CASCADE,
+    start_date TIMESTAMPTZ NOT NULL,
+    end_date TIMESTAMPTZ NOT NULL,
+    status TEXT DEFAULT 'active',
+    payment_status TEXT DEFAULT 'pending',
+    total_cost NUMERIC,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    CONSTRAINT check_dates CHECK (end_date > start_date),
+    CONSTRAINT check_status CHECK (status IN ('active', 'completed', 'cancelled')),
+    CONSTRAINT check_payment_status CHECK (payment_status IN ('pending', 'paid', 'failed'))
+);
 
+
+ALTER TABLE public.rentals ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own rentals" ON public.rentals
+FOR SELECT
+USING (auth.jwt() ->> 'chat_id' = user_id);
+
+CREATE POLICY "Users can create own rentals" ON public.rentals
+FOR INSERT
+WITH CHECK (auth.jwt() ->> 'chat_id' = user_id);
+
+CREATE POLICY "Users can update own rentals" ON public.rentals
+FOR UPDATE
+USING (auth.jwt() ->> 'chat_id' = user_id);
+
+CREATE INDEX ON public.rentals (user_id);
+CREATE INDEX ON public.rentals (car_id);
 
 
 
