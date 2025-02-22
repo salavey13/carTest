@@ -80,4 +80,14 @@
   color: #0ff;
   text-shadow: 0 0 5px #0ff, 0 0 10px #0ff;
 }
+// styles/global.css (add these animations)
+@keyframes neon {
+  0%, 100% { text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 20px #00ffff; }
+  50% { text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff; }
+}
+
+@keyframes drift {
+  0% { background-position: 0 0; }
+  100% { background-position: 200px 200px; }
+}
 
