@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import Script from "next/script"
 import Header from "@/components/Header"
 import Footer from "@/components/Footer"
+import { AppProvider } from "@/contexts/AppContext"
 import { Toaster } from "sonner"
 
 export const metadata: Metadata = {
@@ -58,21 +59,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="bg-gray-900 text-white min-h-screen flex flex-col">
-        <Header />
-        {children}
-        <Footer />
-        <Toaster
-          position="bottom-right"
-          toastOptions={{
-            style: {
-              background: "rgba(34, 34, 34, 0.8)",
-              color: "#00ff9d",
-              border: "1px solid rgba(0, 255, 157, 0.4)",
-              boxShadow: "0 0 10px rgba(0, 0, 0, 0.5)",
-              fontFamily: "monospace",
-            },
-          }}
-        />
+        <AppProvider>
+          <Header />
+          {children}
+          <Footer />
+          <Toaster
+            position="bottom-right"
+            toastOptions={{
+              style: {
+                background: "rgba(34, 34, 34, 0.8)",
+                color: "#00ff9d",
+                border: "1px solid rgba(0, 255, 157, 0.4)",
+                boxShadow: "0 0 10px rgba(0, 0, 0, 0.5)",
+                fontFamily: "monospace",
+              },
+            }}
+          />
+        </AppProvider>
       </body>
     </html>
   )
