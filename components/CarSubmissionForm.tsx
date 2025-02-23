@@ -2,7 +2,7 @@
 "use client"
 import { useState } from "react"
 import type React from "react"
-
+import { useWorker } from "@/hooks/useWorker"
 import { supabaseAdmin } from "@/hooks/supabase"
 import { uploadImage } from "@/hooks/supabase"
 
@@ -18,6 +18,7 @@ export function CarSubmissionForm() {
     rent_link: "",
   })
   const [imageFile, setImageFile] = useState<File | null>(null)
+  const { generateEmbedding } = useWorker()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
