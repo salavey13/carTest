@@ -1,24 +1,46 @@
-"use client"
-import type React from "react"
+import type { Metadata } from "next"
 import Script from "next/script"
 import Header from "@/components/Header"
 import Footer from "@/components/Footer"
 import { AppProvider } from "@/contexts/AppContext"
-import { motion, AnimatePresence } from "framer-motion"
-import { useState, useRef } from "react"
+import { Toaster } from "sonner"
+
+export const metadata: Metadata = {
+  title: "ChinaCarRent - Аренда Китайских Кибер-Каров в России",
+  description: "Арендуйте китайские автомобили в России с помощью Telegram. Надежность, скорость и доступность в одном месте. Подпишитесь на премиум-функции!",
+  generator: "v0.dev",
+  applicationName: "ChinaCarRent",
+  keywords: ["аренда автомобилей", "китайские автомобили", "Telegram аренда", "кибер-кары", "Россия", "премиум подписка"],
+  authors: [{ name: "Your Name", url: "https://v0.dev/chat/cartest-tupabase-template-hdQdrfzkTFA" }],
+  creator: "v0.dev",
+  publisher: "v0.dev",
+  robots: "index, follow",
+  openGraph: {
+    type: "website",
+    url: "https://v0.dev/chat/cartest-tupabase-template-hdQdrfzkTFA",
+    title: "ChinaCarRent - Кибер-Аренда Автомобилей",
+    description: "Аренда китайских кибер-каров в России через Telegram. Быстро, надежно, стильно.",
+    siteName: "ChinaCarRent",
+    images: [
+      {
+        url: "/og-image.jpg", // Replace with your actual OG image URL
+        width: 1200,
+        height: 630,
+        alt: "ChinaCarRent - Кибер-Аренда",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    site: "@YourTwitterHandle", // Replace with your Twitter handle
+    creator: "@YourTwitterHandle",
+    title: "ChinaCarRent - Аренда Кибер-Каров",
+    description: "Аренда китайских автомобилей через Telegram в России.",
+    image: "/og-image.jpg", // Replace with your actual Twitter image URL
+  },
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const [toastMessages, setToastMessages] = useState<{ id: number; message: string; type: "success" | "error" }[]>([])
-  const toastIdRef = useRef(0)
-
-  const showToast = (message: string, type: "success" | "error") => {
-    const id = toastIdRef.current++
-    setToastMessages((prev) => [...prev, { id, message, type }])
-    setTimeout(() => {
-      setToastMessages((prev) => prev.filter((toast) => toast.id !== id))
-    }, 3000)
-  }
-
   return (
     <html lang="en">
       <head>
@@ -32,27 +54,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Header />
           {children}
           <Footer />
-          {/* Local Toaster */}
-          <div className="fixed bottom-4 right-4 z-50 space-y-2">
-            <AnimatePresence>
-              {toastMessages.map(({ id, message, type }) => (
-                <motion.div
-                  key={id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-[0_0_10px_rgba(0,0,0,0.5)] font-mono text-sm ${
-                    type === "success"
-                      ? "bg-green-900/80 text-[#00ff9d] border-[#00ff9d]/40"
-                      : "bg-red-900/80 text-red-400 border-red-400/40"
-                  }`}
-                >
-                  {type === "success" ? "✓" : "✗"} {message}
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
+          <Toaster
+            position="bottom-right"
+            toastOptions={{
+              style: {
+                background: "rgba(34, 34, 34, 0.8)",
+                color: "#00ff9d",
+                border: "1px solid rgba(0, 255, 157, 0.4)",
+                boxShadow: "0 0 10px rgba(0, 0, 0, 0.5)",
+                fontFamily: "monospace",
+              },
+            }}
+          />
         </AppProvider>
       </body>
     </html>
