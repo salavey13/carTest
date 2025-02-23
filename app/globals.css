@@ -51,11 +51,13 @@
   background-image: linear-gradient(to right, rgba(255, 107, 107, 0.1) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 107, 107, 0.1) 1px, transparent 1px);
 }
+
 .text-gradient {
   background: linear-gradient(to right, #FF6B6B, #4ECDC4);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+
 @keyframes glow {
   0% {
     text-shadow: 0 0 5px rgba(255, 107, 107, 0.5);
@@ -80,14 +82,25 @@
   color: #0ff;
   text-shadow: 0 0 5px #0ff, 0 0 10px #0ff;
 }
-// styles/global.css (add these animations)
+
 @keyframes neon {
-  0%, 100% { text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 20px #00ffff; }
-  50% { text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff; }
+  0%,
+  100% {
+    text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 20px #00ffff;
+  }
+  50% {
+    text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff;
+  }
 }
 
 @keyframes drift {
-  0% { background-position: 0 0; }
-  100% { background-position: 200px 200px; }
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 200px 200px;
+  }
 }
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
+/* Orbitron Font Import - Correctly placed at the end */
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap");
