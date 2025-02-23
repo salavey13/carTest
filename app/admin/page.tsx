@@ -8,6 +8,8 @@ import { motion } from "framer-motion"
 import { Car, Zap } from "lucide-react"
 import { toast } from "sonner"
 
+
+
 export default function AdminPage() {
   const { dbUser, isAdmin } = useTelegram()
   const router = useRouter()
@@ -44,6 +46,13 @@ export default function AdminPage() {
   if (!isAdminChecked) {
     return null // Router will handle redirect
   }
+
+  // Inside your AdminPage component
+useEffect(() => {
+  if (dbUser && isAdminChecked) { // Replace with your auth logic
+    toast.success("Добро пожаловать в Центр Управления, командир!");
+  }
+}, [dbUser, isAdminChecked]);
 
   return (
     <motion.div
