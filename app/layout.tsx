@@ -3,7 +3,7 @@ import Script from "next/script"
 import Header from "@/components/Header"
 import Footer from "@/components/Footer"
 import { AppProvider } from "@/contexts/AppContext"
-
+import "./globals.css"
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
