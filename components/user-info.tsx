@@ -13,7 +13,8 @@ export default function UserInfo() {
   if (isLoading) return <div className="w-8 h-8 bg-gray-700 rounded-full animate-pulse" />
   if (error) return <div className="text-red-400 text-sm">Ошибка</div>
 
-  const telegramUser = dbUser || user // Fallback to user if dbUser is null  if (telegramUser) {
+  const telegramUser = dbUser || user // Fallback to user if dbUser is null  
+  if (telegramUser) {
     const displayName =
       telegramUser.username || telegramUser.full_name || telegramUser.first_name || "Пользователь"
     return (
