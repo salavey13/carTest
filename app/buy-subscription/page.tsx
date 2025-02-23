@@ -8,6 +8,7 @@ import { useTelegram } from "@/hooks/useTelegram"
 import { sendTelegramInvoice } from "@/app/actions"
 import { createInvoice, getUserSubscription } from "@/hooks/supabase"
 import { motion, AnimatePresence } from "framer-motion"
+import { toast } from "sonner"
 
 const SUBSCRIPTIONS = [
   {
@@ -40,32 +41,20 @@ export default function BuySubscription() {
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasSubscription, setHasSubscription] = useState<boolean>(false)
-  const [toastMessages, setToastMessages] = useState<{ id: number; message: string; type: "success" | "error" }[]>([])
-  const toastIdRef = useRef(0)
 
-  // Local toaster function
-  const showToast = (message: string, type: "success" | "error") => {
-    const id = toastIdRef.current++
-    setToastMessages((prev) => [...prev, { id, message, type }])
-    setTimeout(() => {
-      setToastMessages((prev) => prev.filter((toast) => toast.id !== id))
-    }, 3000)
-  }
-
-  // Check subscription status
   useEffect(() => {
     const checkSubscription = async () => {
       if (user) {
         try {
           const subscriptionId = await getUserSubscription(user.id.toString())
           setHasSubscription(!!subscriptionId)
-          showToast(subscriptionId ? "У вас уже есть подписка" : "Подписка не найдена", "success")
+          toast.success(subscriptionId ? "У вас уже есть подписка" : "Подписка не найдена")
         } catch (err) {
           setError("Ошибка проверки подписки: " + (err instanceof Error ? err.message : "Неизвестная ошибка"))
-          showToast("Ошибка проверки подписки", "error")
+          toast.error("Ошибка проверки подписки")
         }
       } else {
-        showToast("Пользователь не авторизован", "error")
+        toast.error("Пользователь не авторизован")
       }
     }
     checkSubscription()
@@ -74,19 +63,19 @@ export default function BuySubscription() {
   const handlePurchase = async () => {
     if (!user) {
       setError("Вы должны быть авторизованы в Telegram для покупки.")
-      showToast("Авторизуйтесь в Telegram", "error")
+      toast.error("Авторизуйтесь в Telegram")
       return
     }
 
     if (hasSubscription) {
       setError("У вас уже есть активная подписка.")
-      showToast("Подписка уже активна", "error")
+      toast.error("Подписка уже активна")
       return
     }
 
     if (!selectedSubscription) {
       setError("Пожалуйста, выберите абонемент.")
-      showToast("Выберите абонемент", "error")
+      toast.error("Выберите абонемент")
       return
     }
 
@@ -96,7 +85,7 @@ export default function BuySubscription() {
     if (!isInTelegramContext) {
       setSuccess(true)
       setError("Демо-режим: Счет создан успешно!")
-      showToast("Демо: Счет создан успешно!", "success")
+      toast.success("Демо: Счет создан успешно!")
       setLoading(false)
       return
     }
@@ -110,10 +99,10 @@ export default function BuySubscription() {
       }
 
       const payload = `subscription_${user.id}_${Date.now()}`
-      showToast("Создание счета...", "success")
+      toast.success("Создание счета...")
       await createInvoice("subscription", payload, user.id.toString(), selectedSubscription.price, metadata)
 
-      showToast("Отправка счета в Telegram...", "success")
+      toast.success("Отправка счета в Telegram...")
       const response = await sendTelegramInvoice(
         user.id.toString(),
         `${selectedSubscription.name} Абонемент`,
@@ -121,7 +110,7 @@ export default function BuySubscription() {
         payload,
         selectedSubscription.price,
         undefined,
-        undefined // No image for subscription
+        undefined
       )
 
       if (!response.success) {
@@ -129,11 +118,11 @@ export default function BuySubscription() {
       }
 
       setSuccess(true)
-      showToast("Счет успешно отправлен в Telegram!", "success")
+      toast.success("Счет успешно отправлен в Telegram!")
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Неизвестная ошибка"
       setError("Ошибка при покупке: " + errMsg)
-      showToast("Ошибка при покупке: " + errMsg, "error")
+      toast.error("Ошибка при покупке: " + errMsg)
     } finally {
       setLoading(false)
     }
@@ -228,28 +217,6 @@ export default function BuySubscription() {
             )}
           </motion.div>
         )}
-
-        {/* Local Toaster */}
-        <div className="fixed bottom-4 right-4 z-50 space-y-2">
-          <AnimatePresence>
-            {toastMessages.map(({ id, message, type }) => (
-              <motion.div
-                key={id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-[0_0_10px_rgba(0,0,0,0.5)] font-mono text-sm ${
-                  type === "success"
-                    ? "bg-green-900/80 text-[#00ff9d] border-[#00ff9d]/40"
-                    : "bg-red-900/80 text-red-400 border-red-400/40"
-                }`}
-              >
-                {type === "success" ? "✓" : "✗"} {message}
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
       </div>
     </motion.div>
   )
