@@ -1,72 +1,49 @@
 "use client"
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { fetchCarById, fetchCars, createInvoice } from "@/hooks/supabase"
-import { sendTelegramInvoice } from "@/app/actions"
-import { useTelegram } from "@/hooks/useTelegram"
-import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { createInvoice, supabaseAnon, getUserSubscription } from "@/hooks/supabase"
+import { sendTelegramInvoice } from "@/app/actions"
+import { useTelegram } from "@/hooks/useTelegram"
+import { getTelegramUser } from "@/lib/telegram"
+import SemanticSearch from "@/components/SemanticSearch"
 import { toast } from "sonner"
+import { motion, AnimatePresence } from "framer-motion"
 import { ChevronLeft, ChevronRight, Crown } from "lucide-react"
-
-interface Car {
-  id: string
-  make: string
-  model: string
-  daily_price: number
-  image_url: string
-  specs?: {
-    version?: string
-    electric?: boolean
-    color?: string
-    theme?: string
-    horsepower?: number
-    torque?: string
-    acceleration?: string
-    topSpeed?: string
-  }
-}
 
 const YUAN_TO_STARS_RATE = 0.1 // 1 Yuan = 0.1 Stars
 
-export default function RentCarPage({ params }: { params: { id: string } }) {
-  const router = useRouter()
+export default function RentCar() {
   const { user: tgUser, isInTelegramContext, dbUser } = useTelegram()
-  const [car, setCar] = useState<Car | null>(null)
-  const [cars, setCars] = useState<Car[]>([])
-  const [selectedCar, setSelectedCar] = useState<Car | null>(null)
+  const [selectedCar, setSelectedCar] = useState(null)
   const [rentDays, setRentDays] = useState(1)
-  const [loading, setLoading] = useState(true)
+  const [cars, setCars] = useState([])
   const [carouselIndex, setCarouselIndex] = useState(0)
-  const [hasSubscription, setHasSubscription] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [invoiceLoading, setInvoiceLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+  const [hasSubscription, setHasSubscription] = useState<boolean>(false)
 
+  // Fetch cars
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true)
-      try {
-        const [carData, allCars] = await Promise.all([fetchCarById(params.id), fetchCars()])
-        if (!carData) {
-          router.push("/not-found")
-          return
-        }
-        setCar(carData)
-        setSelectedCar(carData)
-        setCars(allCars || [])
-        setCarouselIndex(allCars.findIndex((c) => c.id === carData.id) || 0)
-      } catch (error) {
-        console.error("Error loading car data:", error)
-        router.push("/not-found")
-      } finally {
+    const fetchCars = async () => {
+      const { data, error } = await supabaseAnon.from("cars").select("*")
+      if (error) {
+        console.error("Ошибка при загрузке автомобилей:", error)
+        toast.error("Не удалось загрузить список автомобилей")
+      } else {
+        setCars(data || [])
+        setSelectedCar(data[0] || null) // Default to first car
         setLoading(false)
       }
     }
-    loadData()
-  }, [params.id, router])
+    fetchCars()
+  }, [])
 
+  // Check subscription status
   useEffect(() => {
     const checkSubscription = async () => {
       if (dbUser?.user_id) {
@@ -77,16 +54,13 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
     checkSubscription()
   }, [dbUser])
 
-  const specs = selectedCar?.specs || {
-    version: "v12",
-    electric: false,
-    color: "Cyber Blue",
-    theme: "cyber",
-    horsepower: 900,
-    torque: "750Nm",
-    acceleration: "2.9s 0-100км/ч",
-    topSpeed: "340км/ч",
-  }
+  // Telegram context validation
+  useEffect(() => {
+    const webAppUser = getTelegramUser()
+    if (!webAppUser && typeof window !== "undefined" && !(window as any).Telegram?.WebApp) {
+      setError("Эта функция доступна только через Telegram.")
+    }
+  }, [])
 
   const handleCarouselPrev = () => {
     setCarouselIndex((prev) => (prev === 0 ? cars.length - 1 : prev - 1))
@@ -105,6 +79,9 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
     }
 
     setInvoiceLoading(true)
+    setError(null)
+    setSuccess(false)
+
     try {
       const totalPriceYuan = selectedCar.daily_price * rentDays
       const totalPriceStars = Math.round(totalPriceYuan * YUAN_TO_STARS_RATE)
@@ -142,6 +119,7 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
       )
 
       if (!response.success) throw new Error(response.error || "Не удалось создать счет")
+      setSuccess(true)
       toast.success(
         hasSubscription
           ? "🌟 Счет создан! Проверьте Telegram для оплаты премиум-аренды."
@@ -149,7 +127,8 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
       )
     } catch (err) {
       console.error("Ошибка при создании счета:", err)
-      toast.error("Не удалось создать счет. Попробуйте позже.")
+      setError("Не удалось создать счет. Попробуйте позже.")
+      toast.error("Ошибка при создании счета.")
     } finally {
       setInvoiceLoading(false)
     }
@@ -181,8 +160,16 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
           animate={{ opacity: 1, y: 0 }}
           className="text-3xl md:text-5xl font-bold text-center mb-10 font-mono tracking-wide text-[#00ff9d] drop-shadow-[0_0_10px_rgba(0,255,157,0.3)] flex items-center justify-center gap-2"
         >
-          АРЕНДА КИБЕР-МАШИНЫ {hasSubscription && <Badge className="bg-purple-600"><Crown className="h-4 w-4" /> Премиум</Badge>}
+          АРЕНДА КИБЕР-МАШИН {hasSubscription && <Badge className="bg-purple-600"><Crown className="h-4 w-4" /> Премиум</Badge>}
         </motion.h1>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 max-w-xl mx-auto"
+        >
+          <SemanticSearch compact />
+        </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 z-10 relative">
           {/* Carousel Section */}
@@ -324,34 +311,25 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
           </motion.div>
         </div>
 
-        {/* Specs Section */}
-        {selectedCar && (
-          <motion.section
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mt-12 bg-gray-800/70 border border-[#00ff9d]/20 rounded-xl p-6 shadow-lg z-10 relative"
+        {error && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-red-400 text-center mt-6 bg-red-900/10 px-4 py-2 rounded-lg shadow-md"
           >
-            <h2 className="text-xl md:text-2xl font-mono mb-6 text-[#00ff9d]/90 drop-shadow-[0_0_5px_rgba(0,255,157,0.3)]">
-              ХАРАКТЕРИСТИКИ
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <h3 className="text-lg font-mono text-[#00ff9d]/80">Производительность</h3>
-                <p><span className="text-[#ff00ff]/80">Версия:</span> {specs.version}</p>
-                <p><span className="text-[#ff00ff]/80">Электрический:</span> {specs.electric ? "Да" : "Нет"}</p>
-                <p><span className="text-[#ff00ff]/80">Мощность:</span> {specs.horsepower} л.с.</p>
-                <p><span className="text-[#ff00ff]/80">Крутящий момент:</span> {specs.torque}</p>
-                <p><span className="text-[#ff00ff]/80">Разгон 0-100:</span> {specs.acceleration}</p>
-                <p><span className="text-[#ff00ff]/80">Макс. скорость:</span> {specs.topSpeed}</p>
-              </div>
-              <div className="space-y-3">
-                <h3 className="text-lg font-mono text-[#00ff9d]/80">Эстетика</h3>
-                <p><span className="text-[#ff00ff]/80">Цвет:</span> {specs.color}</p>
-                <p><span className="text-[#ff00ff]/80">Тема:</span> {specs.theme}</p>
-              </div>
-            </div>
-          </motion.section>
+            {error}
+          </motion.p>
+        )}
+        {success && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-[#00ff9d] text-center mt-6 bg-green-900/10 px-4 py-2 rounded-lg shadow-md"
+          >
+            {hasSubscription
+              ? "🌟 Счет создан! Проверьте Telegram для оплаты премиум-аренды."
+              : "🎉 Счет создан! Проверьте Telegram для оплаты."}
+          </motion.p>
         )}
       </div>
     </motion.div>
