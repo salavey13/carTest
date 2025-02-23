@@ -5,28 +5,19 @@ import { useRouter } from "next/navigation"
 import { CarSubmissionForm } from "@/components/CarSubmissionForm"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { Terminal, Zap } from "lucide-react"
+import { Zap, Car } from "lucide-react"
+import { toast } from "sonner"
 
 export default function AdminPage() {
   const { dbUser, isAdmin } = useTelegram()
   const router = useRouter()
-  const [toastMessages, setToastMessages] = useState<{ id: number; message: string; type: "success" | "error" }[]>([])
-  const toastIdRef = useRef(0)
-
-  const showToast = (message: string, type: "success" | "error") => {
-    const id = toastIdRef.current++
-    setToastMessages((prev) => [...prev, { id, message, type }])
-    setTimeout(() => {
-      setToastMessages((prev) => prev.filter((toast) => toast.id !== id))
-    }, 3000)
-  }
 
   useEffect(() => {
     if (dbUser && !isAdmin()) {
-      showToast("Доступ запрещен: требуется статус администратора", "error")
+      toast.error("У вас нет прав доступа. Возвращаемся на главную...")
       router.push("/")
     } else if (dbUser) {
-      showToast("Добро пожаловать в панель администратора", "success")
+      toast.success("Добро пожаловать в Центр Управления!")
     }
   }, [dbUser, isAdmin, router])
 
@@ -49,7 +40,7 @@ export default function AdminPage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-2xl sm:text-3xl md:text-5xl font-bold text-center font-['Orbitron'] text-[#00ff9d] mb-8 drop-shadow-[0_0_15px_rgba(0,255,157,0.5)] flex items-center justify-center gap-2"
         >
-          <Terminal className="h-8 w-8" /> КОНСОЛЬ АДМИНИСТРАТОРА
+          <Car className="h-8 w-8 animate-pulse" /> ЦЕНТР УПРАВЛЕНИЯ
         </motion.h1>
 
         <motion.div
@@ -58,6 +49,9 @@ export default function AdminPage() {
           transition={{ delay: 0.2 }}
           className="bg-gray-800/70 border border-[#00ff9d]/20 rounded-xl p-6 shadow-[0_0_10px_rgba(0,255,157,0.3)]"
         >
+          <p className="text-[#ff00ff] font-mono text-center mb-4">
+            Добавляйте новые машины в наш флот!
+          </p>
           <CarSubmissionForm />
         </motion.div>
 
@@ -67,35 +61,31 @@ export default function AdminPage() {
           transition={{ delay: 0.4 }}
           className="mt-8 space-y-4 text-center"
         >
-          <Link href="/shadow-fleet-admin" className="inline-block text-[#ff00ff] hover:text-[#ff00ff]/70 font-mono text-lg transition-colors">
-            Портал Теневого Флота →
+          <Link
+            href="/shadow-fleet-admin"
+            className="inline-block text-[#ff00ff] hover:text-[#ff00ff]/70 font-mono text-lg transition-colors"
+          >
+            Управление Теневым Флотом →
           </Link>
           <Link href="/" className="block text-[#00ff9d] hover:text-[#00ff9d]/70 font-mono text-lg transition-colors">
-            ← Назад в Матрицу
+            ← Вернуться на главную
           </Link>
         </motion.div>
 
-        {/* Local Toaster */}
-        <div className="fixed bottom-4 right-4 z-50 space-y-2">
-          <AnimatePresence>
-            {toastMessages.map(({ id, message, type }) => (
-              <motion.div
-                key={id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-[0_0_10px_rgba(0,0,0,0.5)] font-mono text-sm ${
-                  type === "success"
-                    ? "bg-green-900/80 text-[#00ff9d] border-[#00ff9d]/40"
-                    : "bg-red-900/80 text-red-400 border-red-400/40"
-                }`}
-              >
-                {type === "success" ? "✓" : "✗"} {message}
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
+        {/* Admin Power Button */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.6 }}
+          className="fixed bottom-4 right-4 z-50"
+        >
+          <Button
+            onClick={() => toast.success("Система активна, вы в деле!")}
+            className="bg-[#ff00ff]/90 text-black hover:bg-[#ff00ff]/70 rounded-full w-12 h-12 flex items-center justify-center shadow-[0_0_10px_rgba(255,0,255,0.5)] transition-all"
+          >
+            <Zap className="h-6 w-6" />
+          </Button>
+        </motion.div>
       </div>
     </motion.div>
   )
