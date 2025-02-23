@@ -1,5 +1,5 @@
 "use client"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useTelegram } from "@/hooks/useTelegram"
 import { useRouter } from "next/navigation"
 import { CarSubmissionForm } from "@/components/CarSubmissionForm"
@@ -11,22 +11,24 @@ import { toast } from "sonner"
 export default function AdminPage() {
   const { dbUser, isAdmin } = useTelegram()
   const router = useRouter()
+  const [isAdminChecked, setIsAdminChecked] = useState<boolean | null>(null)
 
-  // Fix potential runtime error: Ensure isAdmin is called correctly as a function
   useEffect(() => {
     if (!dbUser) return; // Wait for dbUser to load
 
-    const adminCheck = isAdmin(); // Call isAdmin as a function
-    if (!adminCheck) {
+    const checkAdmin = isAdmin(); // Call isAdmin as a function
+    setIsAdminChecked(checkAdmin);
+
+    if (!checkAdmin) {
       toast.error("У вас нет прав доступа. Возвращаемся на главную...");
       router.push("/");
     } else {
       toast.success("Добро пожаловать в Центр Управления!");
     }
-  }, [dbUser, isAdmin, router]); // isAdmin is a function, so it’s fine in deps
+  }, [dbUser, isAdmin, router]);
 
-  // Add loading state to avoid rendering before dbUser is ready
-  if (!dbUser) {
+  // Loading state while dbUser or admin check is pending
+  if (!dbUser || isAdminChecked === null) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950 flex items-center justify-center">
         <motion.div
@@ -38,7 +40,7 @@ export default function AdminPage() {
     );
   }
 
-  if (!isAdmin()) {
+  if (!isAdminChecked) {
     return <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950" />;
   }
 
@@ -48,7 +50,6 @@ export default function AdminPage() {
       animate={{ opacity: 1 }}
       className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950 text-[#00ff9d] relative overflow-hidden"
     >
-      {/* Cyber Grid Background */}
       <div className="absolute inset-0 opacity-10 pointer-events-none select-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEwIDB2MjBNMCAxMGgyME0xMCAyMFYwTTAgMTBoMjAiIHN0cm9rZT0iIzAwZmY5ZCIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9zdmc+')] bg-repeat" />
 
       <div className="pt-20 relative container mx-auto px-4">
@@ -89,7 +90,6 @@ export default function AdminPage() {
           </Link>
         </motion.div>
 
-        {/* Admin Power Button */}
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
