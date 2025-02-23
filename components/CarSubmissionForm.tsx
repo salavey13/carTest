@@ -1,10 +1,10 @@
-// components/CarSubmissionForm.tsx
 "use client"
 import { useState } from "react"
 import type React from "react"
 import { useWorker } from "@/hooks/useWorker"
 import { supabaseAdmin } from "@/hooks/supabase"
 import { uploadImage } from "@/hooks/supabase"
+import { toast } from "sonner"
 
 export function CarSubmissionForm() {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -29,6 +29,7 @@ export function CarSubmissionForm() {
       if (imageFile) {
         const bucketName = "car-images"
         imageUrl = await uploadImage(bucketName, imageFile)
+        toast.success("Изображение загружено!")
       }
 
       const specsString = JSON.stringify(formData.specs)
@@ -60,10 +61,10 @@ export function CarSubmissionForm() {
       })
       setImageFile(null)
 
-      alert("Автомобиль успешно добавлен!")
+      toast.success("Автомобиль успешно добавлен!")
     } catch (error) {
       console.error("Ошибка при добавлении:", error)
-      alert("Ошибка при добавлении автомобиля")
+      toast.error("Ошибка при добавлении автомобиля")
     } finally {
       setIsSubmitting(false)
     }
@@ -73,6 +74,7 @@ export function CarSubmissionForm() {
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Make */}
       <div>
+        <label className="block text-sm font-medium text-gray-300">Марка</label>
         <input
           type="text"
           value={formData.make}
@@ -85,6 +87,7 @@ export function CarSubmissionForm() {
 
       {/* Model */}
       <div>
+        <label className="block text-sm font-medium text-gray-300">Модель</label>
         <input
           type="text"
           value={formData.model}
@@ -97,6 +100,7 @@ export function CarSubmissionForm() {
 
       {/* Description */}
       <div>
+        <label className="block text-sm font-medium text-gray-300">Описание</label>
         <textarea
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -115,15 +119,12 @@ export function CarSubmissionForm() {
               <input
                 type="text"
                 value={key}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    specs: {
-                      ...formData.specs,
-                      [e.target.value]: formData.specs[key],
-                    },
-                  })
-                }
+                onChange={(e) => {
+                  const newSpecs = { ...formData.specs }
+                  delete newSpecs[key]
+                  newSpecs[e.target.value] = formData.specs[key]
+                  setFormData({ ...formData, specs: newSpecs })
+                }}
                 placeholder="Параметр (например, версия)"
                 className="flex-1 p-3 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 required
@@ -134,10 +135,7 @@ export function CarSubmissionForm() {
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    specs: {
-                      ...formData.specs,
-                      [key]: e.target.value,
-                    },
+                    specs: { ...formData.specs, [key]: e.target.value },
                   })
                 }
                 placeholder="Значение (например, v12)"
@@ -158,6 +156,7 @@ export function CarSubmissionForm() {
 
       {/* Daily Price */}
       <div>
+        <label className="block text-sm font-medium text-gray-300">Цена за день (XTR)</label>
         <input
           type="number"
           value={formData.daily_price}
@@ -177,11 +176,11 @@ export function CarSubmissionForm() {
             value={formData.image_url}
             onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
             placeholder="URL изображения (необязательно)"
-            className="flex-1 p-3 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            className="flex-[0.7] p-3 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
           />
           <label
             htmlFor="image-upload"
-            className="p-3 rounded bg-gray-700 text-white hover:bg-gray-600 transition-colors cursor-pointer"
+            className="flex-[0.3] p-3 rounded bg-cyan-500 text-white hover:bg-cyan-600 transition-colors cursor-pointer text-center"
           >
             Загрузить изображение
           </label>
@@ -197,6 +196,7 @@ export function CarSubmissionForm() {
 
       {/* Rent Link */}
       <div>
+        <label className="block text-sm font-medium text-gray-300">Ссылка на аренду</label>
         <input
           type="url"
           value={formData.rent_link}
