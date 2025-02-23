@@ -10,6 +10,7 @@ import { useTelegram } from "@/hooks/useTelegram"
 import SemanticSearch from "@/components/SemanticSearch"
 import { motion, AnimatePresence } from "framer-motion"
 import { ChevronLeft, ChevronRight, Crown, AlertTriangle } from "lucide-react"
+import { toast } from "sonner"
 
 const YUAN_TO_STARS_RATE = 0.1 // 1 Yuan = 0.1 Stars
 const AUTO_INCREMENT_INTERVAL = 3000 // 3 seconds
@@ -27,28 +28,7 @@ export default function RentCar() {
   const [success, setSuccess] = useState(false)
   const [hasSubscription, setHasSubscription] = useState<boolean>(false)
   const [isCarouselEngaged, setIsCarouselEngaged] = useState(false)
-  const [toastMessages, setToastMessages] = useState<{ id: number; message: string; type: "success" | "error" }[]>([])
   const timerRef = useRef<NodeJS.Timeout | null>(null)
-  const toastIdRef = useRef(0)
-
-  // Local toaster function
-  const showToast = (message: string, type: "success" | "error") => {
-    const id = toastIdRef.current++
-    setToastMessages((prev) => [...prev, { id, message, type }])
-    setTimeout(() => {
-      setToastMessages((prev) => prev.filter((toast) => toast.id !== id))
-    }, 3000)
-  }
-
-  // Inside RentCar's useEffect for Telegram context validation
-useEffect(() => {
-  const webAppUser = getTelegramUser()
-  showToast(`Telegram Context: ${isInTelegramContext ? "Detected" : "Not Detected"}`, isInTelegramContext ? "success" : "error")
-  if (!webAppUser && typeof window !== "undefined" && !(window as any).Telegram?.WebApp) {
-    setError("Эта функция доступна только через Telegram, но вы можете протестировать в демо-режиме.")
-    showToast("Running in demo mode", "error")
-  }
-}, [isInTelegramContext])
 
   // Fetch cars
   useEffect(() => {
@@ -57,13 +37,13 @@ useEffect(() => {
       const { data, error } = await supabaseAnon.from("cars").select("*")
       if (error) {
         setError("Ошибка загрузки автомобилей: " + error.message)
-        showToast("Не удалось загрузить автомобили: " + error.message, "error")
+        toast.error("Не удалось загрузить автомобили: " + error.message)
       } else if (!data || data.length === 0) {
         setError("Автомобили не найдены")
-        showToast("Нет доступных автомобилей", "error")
+        toast.error("Нет доступных автомобилей")
       } else {
         setCars(data)
-        showToast("Автомобили загружены успешно", "success")
+        toast.success("Автомобили загружены успешно")
       }
       setLoading(false)
     }
@@ -77,15 +57,30 @@ useEffect(() => {
         try {
           const subscriptionId = await getUserSubscription(dbUser.user_id)
           setHasSubscription(!!subscriptionId)
-          showToast(subscriptionId ? "Премиум статус активен" : "Премиум статус не найден", "success")
+          toast.success(subscriptionId ? "Премиум статус активен" : "Премиум статус не найден")
         } catch (err) {
           setError("Ошибка проверки подписки: " + (err instanceof Error ? err.message : "Неизвестная ошибка"))
-          showToast("Ошибка проверки подписки", "error")
+          toast.error("Ошибка проверки подписки")
         }
       }
     }
     checkSubscription()
   }, [dbUser])
+
+  useEffect(() => {
+  if (!isInTelegramContext && typeof window !== "undefined") {
+    const checkTelegram = () => {
+      const telegram = (window as any).Telegram?.WebApp
+      if (telegram?.initDataUnsafe?.user) {
+        toast.success("Telegram контекст обнаружен с задержкой")
+        // Force re-render or update context (requires hook modification)
+      } else {
+        toast.error("Telegram контекст не обнаружен даже с задержкой")
+      }
+    }
+    setTimeout(checkTelegram, 1000) // Wait 1s for script to load
+  }
+}, [isInTelegramContext])
 
   // Auto-increment carousel
   useEffect(() => {
@@ -112,7 +107,7 @@ useEffect(() => {
       }, REENGAGE_DELAY)
     }
     setSelectedCar(cars[carouselIndex])
-    showToast(`Выбран автомобиль: ${cars[carouselIndex].make} ${cars[carouselIndex].model}`, "success")
+    toast.success(`Выбран автомобиль: ${cars[carouselIndex].make} ${cars[carouselIndex].model}`)
   }
 
   const handleCarouselPrev = () => {
@@ -128,7 +123,7 @@ useEffect(() => {
   const handleRent = async () => {
     if (!selectedCar) {
       setError("Выберите автомобиль для аренды.")
-      showToast("Выберите автомобиль для аренды", "error")
+      toast.error("Выберите автомобиль для аренды")
       return
     }
 
@@ -136,17 +131,14 @@ useEffect(() => {
     setError(null)
     setSuccess(false)
 
-    if (!isInTelegramContext) {
-      setError("Не в Telegram контексте. Используется демо-режим.")
-      showToast("Демо: Счет создан успешно!", "success")
-      setSuccess(true)
-      setInvoiceLoading(false)
-      return
-    }
+    // Diagnostic toast for Telegram context
+    toast.info(`Telegram Context: ${isInTelegramContext ? "Detected" : "Not Detected"}`)
+    toast.info(`User: ${tgUser ? tgUser.id : "Not Found"}`)
 
-    if (!tgUser) {
-      setError("Пользователь Telegram не найден.")
-      showToast("Ошибка: Пользователь не авторизован", "error")
+    if (!isInTelegramContext || !tgUser) {
+      setError("Не удалось подключиться к Telegram. Используется демо-режим.")
+      toast.error("Демо-режим: Подключение к Telegram не удалось")
+      setSuccess(true)
       setInvoiceLoading(false)
       return
     }
@@ -171,14 +163,14 @@ useEffect(() => {
       }
 
       const invoiceId = `car_rental_${selectedCar.id}_${tgUser.id}_${Date.now()}`
-      showToast("Создание счета...", "success")
+      toast.success("Создание счета...")
       await createInvoice("car_rental", invoiceId, tgUser.id.toString(), finalPrice, metadata)
 
       const description = hasSubscription
         ? `Премиум-аренда на ${rentDays} дней\nЦена со скидкой: ${finalPrice} XTR (${totalPriceYuan} ¥)\nСкидка подписчика: 10%`
         : `Аренда на ${rentDays} дней\nЦена: ${finalPrice} XTR (${totalPriceYuan} ¥)`
 
-      showToast("Отправка счета в Telegram...", "success")
+      toast.success("Отправка счета в Telegram...")
       const response = await sendTelegramInvoice(
         tgUser.id.toString(),
         `Аренда ${selectedCar.make} ${selectedCar.model}`,
@@ -193,16 +185,15 @@ useEffect(() => {
         throw new Error(response.error || "Не удалось создать счет")
       }
       setSuccess(true)
-      showToast(
+      toast.success(
         hasSubscription
           ? "🌟 Счет создан! Проверьте Telegram для оплаты премиум-аренды."
-          : "🎉 Счет создан! Проверьте Telegram для оплаты.",
-        "success"
+          : "🎉 Счет создан! Проверьте Telegram для оплаты."
       )
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Неизвестная ошибка"
       setError("Ошибка при создании счета: " + errMsg)
-      showToast("Ошибка при создании счета: " + errMsg, "error")
+      toast.error("Ошибка при создании счета: " + errMsg)
     } finally {
       setInvoiceLoading(false)
     }
@@ -394,28 +385,6 @@ useEffect(() => {
               )}
             </AnimatePresence>
           </motion.div>
-        </div>
-
-        {/* Local Toaster */}
-        <div className="fixed bottom-4 right-4 z-50 space-y-2">
-          <AnimatePresence>
-            {toastMessages.map(({ id, message, type }) => (
-              <motion.div
-                key={id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-[0_0_10px_rgba(0,0,0,0.5)] font-mono text-sm ${
-                  type === "success"
-                    ? "bg-green-900/80 text-[#00ff9d] border-[#00ff9d]/40"
-                    : "bg-red-900/80 text-red-400 border-red-400/40"
-                }`}
-              >
-                {type === "success" ? "✓" : "✗"} {message}
-              </motion.div>
-            ))}
-          </AnimatePresence>
         </div>
 
         {success && (
