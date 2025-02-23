@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,6 +14,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import { ChevronLeft, ChevronRight, Crown } from "lucide-react"
 
 const YUAN_TO_STARS_RATE = 0.1 // 1 Yuan = 0.1 Stars
+const AUTO_INCREMENT_INTERVAL = 3000 // 3 seconds
+const REENGAGE_DELAY = 2000 // 2 seconds after interaction
 
 export default function RentCar() {
   const { user: tgUser, isInTelegramContext, dbUser } = useTelegram()
@@ -26,6 +28,8 @@ export default function RentCar() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [hasSubscription, setHasSubscription] = useState<boolean>(false)
+  const [isCarouselEngaged, setIsCarouselEngaged] = useState(false)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Fetch cars
   useEffect(() => {
@@ -36,7 +40,7 @@ export default function RentCar() {
         toast.error("Не удалось загрузить список автомобилей")
       } else {
         setCars(data || [])
-        setSelectedCar(data[0] || null) // Default to first car
+        setSelectedCar(null) // No default selection initially
         setLoading(false)
       }
     }
@@ -54,26 +58,58 @@ export default function RentCar() {
     checkSubscription()
   }, [dbUser])
 
-  // Telegram context validation
+  // Telegram context validation with fallback
   useEffect(() => {
     const webAppUser = getTelegramUser()
     if (!webAppUser && typeof window !== "undefined" && !(window as any).Telegram?.WebApp) {
-      setError("Эта функция доступна только через Telegram.")
+      setError("Эта функция доступна только через Telegram, но вы можете протестировать в демо-режиме.")
     }
   }, [])
 
+  // Auto-increment carousel
+  useEffect(() => {
+    if (!isCarouselEngaged && cars.length > 0) {
+      timerRef.current = setInterval(() => {
+        setCarouselIndex((prev) => (prev === cars.length - 1 ? 0 : prev + 1))
+      }, AUTO_INCREMENT_INTERVAL)
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [isCarouselEngaged, cars.length])
+
+  const handleCarouselEngage = () => {
+    if (!isCarouselEngaged) {
+      setIsCarouselEngaged(true)
+      if (timerRef.current) clearInterval(timerRef.current)
+      setTimeout(() => {
+        if (isCarouselEngaged && cars.length > 0) {
+          timerRef.current = setInterval(() => {
+            setCarouselIndex((prev) => (prev === cars.length - 1 ? 0 : prev + 1))
+          }, AUTO_INCREMENT_INTERVAL)
+        }
+      }, REENGAGE_DELAY)
+    }
+    setSelectedCar(cars[carouselIndex])
+  }
+
   const handleCarouselPrev = () => {
     setCarouselIndex((prev) => (prev === 0 ? cars.length - 1 : prev - 1))
-    setSelectedCar(cars[carouselIndex === 0 ? cars.length - 1 : carouselIndex - 1])
+    handleCarouselEngage()
   }
 
   const handleCarouselNext = () => {
     setCarouselIndex((prev) => (prev === cars.length - 1 ? 0 : prev + 1))
-    setSelectedCar(cars[carouselIndex === cars.length - 1 ? 0 : carouselIndex + 1])
+    handleCarouselEngage()
   }
 
   const handleRent = async () => {
-    if (!selectedCar || !tgUser || !isInTelegramContext) {
+    if (!selectedCar) {
+      toast.error("Выберите автомобиль для аренды.")
+      return
+    }
+
+    if (!tgUser || !isInTelegramContext) {
       toast.error("Для аренды необходимо авторизоваться в Telegram.")
       return
     }
@@ -168,7 +204,7 @@ export default function RentCar() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8 max-w-xl mx-auto"
         >
-          <SemanticSearch compact />
+          <SemanticSearch /> {/* Full search box */}
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 z-10 relative">
@@ -180,7 +216,7 @@ export default function RentCar() {
             className="bg-gray-800/70 border border-[#00ff9d]/20 rounded-xl p-6 shadow-lg"
           >
             <h2 className="text-xl md:text-2xl font-mono mb-6 text-[#00ff9d]/90">ВЫБОР МАШИНЫ</h2>
-            <div className="relative">
+            <div className="relative cursor-pointer" onClick={handleCarouselEngage}>
               <AnimatePresence mode="wait">
                 <motion.div
                   key={carouselIndex}
@@ -212,7 +248,7 @@ export default function RentCar() {
                 size="icon"
                 variant="ghost"
                 className="absolute left-2 top-1/2 -translate-y-1/2 text-[#00ff9d]/60 hover:text-[#00ff9d] hover:bg-gray-700/50"
-                onClick={handleCarouselPrev}
+                onClick={(e) => { e.stopPropagation(); handleCarouselPrev(); }}
               >
                 <ChevronLeft className="h-6 w-6" />
               </Button>
@@ -220,7 +256,7 @@ export default function RentCar() {
                 size="icon"
                 variant="ghost"
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-[#00ff9d]/60 hover:text-[#00ff9d] hover:bg-gray-700/50"
-                onClick={handleCarouselNext}
+                onClick={(e) => { e.stopPropagation(); handleCarouselNext(); }}
               >
                 <ChevronRight className="h-6 w-6" />
               </Button>
@@ -246,7 +282,7 @@ export default function RentCar() {
           >
             <h2 className="text-xl md:text-2xl font-mono mb-6 text-[#00ff9d]/90">ИНФО О МАШИНЕ</h2>
             <AnimatePresence mode="wait">
-              {selectedCar ? (
+              {isCarouselEngaged && selectedCar ? (
                 <motion.div
                   key={selectedCar.id}
                   initial={{ opacity: 0 }}
@@ -288,7 +324,7 @@ export default function RentCar() {
 
                   <Button
                     onClick={handleRent}
-                    disabled={invoiceLoading || !isInTelegramContext}
+                    disabled={invoiceLoading}
                     className={`w-full ${
                       hasSubscription
                         ? "bg-gradient-to-r from-purple-600 to-[#ff00ff]"
@@ -304,7 +340,7 @@ export default function RentCar() {
                   animate={{ opacity: 0.5 }}
                   className="text-center font-mono text-[#00ff9d]/50"
                 >
-                  ВЫБЕРИТЕ МАШИНУ ДЛЯ ПРОСМОТРА
+                  КЛИКНИТЕ НА КАРУСЕЛЬ ДЛЯ ВЫБОРА
                 </motion.p>
               )}
             </AnimatePresence>
