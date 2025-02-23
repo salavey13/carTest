@@ -61,7 +61,7 @@ CREATE TABLE public.cars (
     is_test_result BOOLEAN DEFAULT FALSE,
     specs JSONB DEFAULT '{}'
 );
-
+ALTER TABLE cars ADD COLUMN owner_id TEXT;
 -- Create user_results table
 CREATE TABLE public.user_results (
     user_id TEXT REFERENCES public.users(user_id) ON DELETE CASCADE,
