@@ -67,20 +67,22 @@ export default function RentCar() {
     checkSubscription()
   }, [dbUser])
 
+  // Telegram context recheck
   useEffect(() => {
-  if (!isInTelegramContext && typeof window !== "undefined") {
-    const checkTelegram = () => {
-      const telegram = (window as any).Telegram?.WebApp
-      if (telegram?.initDataUnsafe?.user) {
-        toast.success("Telegram контекст обнаружен с задержкой")
-        // Force re-render or update context (requires hook modification)
-      } else {
-        toast.error("Telegram контекст не обнаружен даже с задержкой")
+    if (!isInTelegramContext && typeof window !== "undefined") {
+      const checkTelegram = () => {
+        const telegram = (window as any).Telegram?.WebApp
+        if (telegram?.initDataUnsafe?.user) {
+          toast.success("Telegram контекст обнаружен с задержкой")
+          // Note: We can't directly update isInTelegramContext here; it’s managed by useTelegram
+          // This confirms the script loaded late, but useTelegram needs adjustment
+        } else {
+          toast.error("Telegram контекст не обнаружен даже с задержкой")
+        }
       }
+      setTimeout(checkTelegram, 1000) // Wait 1s for script to load
     }
-    setTimeout(checkTelegram, 1000) // Wait 1s for script to load
-  }
-}, [isInTelegramContext])
+  }, [isInTelegramContext])
 
   // Auto-increment carousel
   useEffect(() => {
@@ -131,7 +133,6 @@ export default function RentCar() {
     setError(null)
     setSuccess(false)
 
-    // Diagnostic toast for Telegram context
     toast.info(`Telegram Context: ${isInTelegramContext ? "Detected" : "Not Detected"}`)
     toast.info(`User: ${tgUser ? tgUser.id : "Not Found"}`)
 
@@ -201,7 +202,7 @@ export default function RentCar() {
 
   if (loading || tgLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
@@ -215,7 +216,7 @@ export default function RentCar() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950 text-[#00ff9d] pt-20 pb-12"
+      className="min-h-screen pt-20 pb-12"
     >
       <div className="container mx-auto px-4 md:px-6">
         <div className="absolute top-0 left-0 w-48 h-48 bg-[#00ff9d]/10 rounded-full blur-3xl opacity-20 pointer-events-none" />
