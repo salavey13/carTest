@@ -40,6 +40,16 @@ export default function RentCar() {
     }, 3000)
   }
 
+  // Inside RentCar's useEffect for Telegram context validation
+useEffect(() => {
+  const webAppUser = getTelegramUser()
+  showToast(`Telegram Context: ${isInTelegramContext ? "Detected" : "Not Detected"}`, isInTelegramContext ? "success" : "error")
+  if (!webAppUser && typeof window !== "undefined" && !(window as any).Telegram?.WebApp) {
+    setError("Эта функция доступна только через Telegram, но вы можете протестировать в демо-режиме.")
+    showToast("Running in demo mode", "error")
+  }
+}, [isInTelegramContext])
+
   // Fetch cars
   useEffect(() => {
     const fetchCars = async () => {
