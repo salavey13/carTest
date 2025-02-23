@@ -1,45 +1,9 @@
-import type { Metadata } from "next"
+import type React from "react"
 import Script from "next/script"
 import Header from "@/components/Header"
 import Footer from "@/components/Footer"
 import { AppProvider } from "@/contexts/AppContext"
 import { Toaster } from "sonner"
-import "./globals.css" // Import global styles
-
-export const metadata: Metadata = {
-  title: "ChinaCarRent - Аренда Китайских Кибер-Каров в России",
-  description: "Арендуйте китайские автомобили в России с помощью Telegram. Надежность, скорость и доступность в одном месте. Подпишитесь на премиум-функции!",
-  generator: "v0.dev",
-  applicationName: "ChinaCarRent",
-  keywords: ["аренда автомобилей", "китайские автомобили", "Telegram аренда", "кибер-кары", "Россия", "премиум подписка"],
-  authors: [{ name: "Your Name", url: "https://v0.dev/chat/cartest-tupabase-template-hdQdrfzkTFA" }],
-  creator: "v0.dev",
-  publisher: "v0.dev",
-  robots: "index, follow",
-  openGraph: {
-    type: "website",
-    url: "https://v0.dev/chat/cartest-tupabase-template-hdQdrfzkTFA",
-    title: "ChinaCarRent - Кибер-Аренда Автомобилей",
-    description: "Аренда китайских кибер-каров в России через Telegram. Быстро, надежно, стильно.",
-    siteName: "ChinaCarRent",
-    images: [
-      {
-        url: "/og-image.jpg", // Replace with your actual OG image URL
-        width: 1200,
-        height: 630,
-        alt: "ChinaCarRent - Кибер-Аренда",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    site: "@YourTwitterHandle", // Replace with your Twitter handle
-    creator: "@YourTwitterHandle",
-    title: "ChinaCarRent - Аренда Кибер-Каров",
-    description: "Аренда китайских автомобилей через Telegram в России.",
-    image: "/og-image.jpg", // Replace with your actual Twitter image URL
-  },
-}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -48,18 +12,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <Script
-          id="telegram-webapp"
-          src="https://telegram.org/js/telegram-web-app.js"
-          strategy="afterInteractive" // Changed to ensure script runs after page load
-          onLoad={() => {
-            if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
-              (window as any).Telegram.WebApp.ready()
-            }
-          }}
-        />
+        <Script id="telegram-webapp" src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
       </head>
-      <body className="min-h-screen flex flex-col">
+      <body className="bg-gray-900 text-white min-h-screen flex flex-col">
         <AppProvider>
           <Header />
           {children}
