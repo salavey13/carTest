@@ -1,10 +1,10 @@
-// hooks/useTelegram.ts
 "use client"
 import { useCallback, useEffect, useState } from "react"
 import { debugLogger } from "@/lib/debugLogger"
 import { createOrUpdateUser, fetchUserData } from "@/hooks/supabase"
 import type { TelegramWebApp, WebAppUser } from "@/types/telegram"
 import type { Database } from "@/types/database.types"
+import { toast } from "sonner"
 
 type DatabaseUser = Database["public"]["Tables"]["users"]["Row"]
 
@@ -17,8 +17,6 @@ const MOCK_USER: WebAppUser = {
   photo_url: "https://t.me/i/userpic/320/mockuser.jpg",
 }
 
-const LOCAL_STORAGE_KEY = "telegram_auth_state"
-
 export function useTelegram() {
   const [tg, setTg] = useState<TelegramWebApp | null>(null)
   const [user, setUser] = useState<WebAppUser | null>(null)
@@ -26,36 +24,6 @@ export function useTelegram() {
   const [isInTelegramContext, setIsInTelegramContext] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
-
-  const loadCachedAuthState = useCallback(() => {
-    try {
-      const cached = localStorage.getItem(LOCAL_STORAGE_KEY)
-      if (cached) {
-        const { user, dbUser, timestamp } = JSON.parse(cached)
-        if (Date.now() - timestamp < 3600000) {
-          return { user, dbUser }
-        }
-      }
-    } catch (err) {
-      debugLogger.error("Error loading cached auth state:", err)
-    }
-    return null
-  }, [])
-
-  const saveAuthState = useCallback((user: WebAppUser, dbUser: DatabaseUser) => {
-    try {
-      localStorage.setItem(
-        LOCAL_STORAGE_KEY,
-        JSON.stringify({
-          user,
-          dbUser,
-          timestamp: Date.now(),
-        })
-      )
-    } catch (err) {
-      debugLogger.error("Error saving auth state:", err)
-    }
-  }, [])
 
   const handleAuthentication = useCallback(
     async (telegramUser: WebAppUser) => {
@@ -81,15 +49,16 @@ export function useTelegram() {
 
         setUser(telegramUser)
         setDbUser(userData as DatabaseUser)
-        saveAuthState(telegramUser, userData as DatabaseUser)
+        toast.success("Пользователь авторизован")
         return userData
       } catch (err) {
         debugLogger.error("Failed to authenticate user:", err)
         setError(err instanceof Error ? err : new Error("Authentication failed"))
+        toast.error("Ошибка авторизации")
         throw err
       }
     },
-    [saveAuthState]
+    []
   )
 
   const setMockUser = useCallback(async () => {
@@ -99,9 +68,11 @@ export function useTelegram() {
       if (!userData) {
         throw new Error("Failed to set mock user")
       }
+      toast.info("Используется тестовый пользователь")
     } catch (err) {
       debugLogger.error("Error setting mock user:", err)
       setError(err instanceof Error ? err : new Error("Failed to set mock user"))
+      toast.error("Ошибка установки тестового пользователя")
     }
   }, [handleAuthentication])
 
@@ -114,15 +85,6 @@ export function useTelegram() {
 
       setIsLoading(true)
       setError(null)
-
-      const cached = loadCachedAuthState()
-      if (cached) {
-        debugLogger.log("Using cached auth state")
-        setUser(cached.user)
-        setDbUser(cached.dbUser)
-        setIsLoading(false)
-        return
-      }
 
       const checkTelegram = async () => {
         if (typeof window !== "undefined") {
@@ -137,8 +99,42 @@ export function useTelegram() {
             })
             setIsLoading(false)
             if (intervalId) clearInterval(intervalId)
-          } else {
-            debugLogger.log("Telegram not ready yet")
+            toast.success("Telegram подключен")
+          } else if (!document.getElementById("telegram-web-app-script")) {
+            debugLogger.log("Loading Telegram script dynamically")
+            const script = document.createElement("script")
+            script.id = "telegram-web-app-script"
+            script.src = "https://telegram.org/js/telegram-web-app.js"
+            script.async = true
+
+            script.onload = async () => {
+              if (!mounted) return
+              const telegram = (window as any).Telegram?.WebApp
+              if (telegram?.initDataUnsafe?.user) {
+                telegram.ready()
+                setTg(telegram)
+                setIsInTelegramContext(true)
+                await handleAuthentication(telegram.initDataUnsafe.user).catch((err) => {
+                  debugLogger.error("Error during authentication:", err)
+                  setError(new Error("Authentication failed"))
+                })
+                setIsLoading(false)
+                if (intervalId) clearInterval(intervalId)
+                toast.success("Telegram подключен после загрузки")
+              }
+            }
+
+            script.onerror = () => {
+              if (!mounted) return
+              debugLogger.error("Failed to load Telegram script")
+              setError(new Error("Failed to load Telegram WebApp script"))
+              setIsInTelegramContext(false)
+              setMockUser().finally(() => {
+                if (mounted) setIsLoading(false)
+              })
+            }
+
+            document.head.appendChild(script)
           }
         }
       }
@@ -151,12 +147,12 @@ export function useTelegram() {
         intervalId = setInterval(async () => {
           await checkTelegram()
         }, 500)
-        setTimeout(() => {
+        setTimeout(async () => {  // Made async here
           if (intervalId && !isInTelegramContext) {
             clearInterval(intervalId)
             debugLogger.log("No Telegram context after timeout, using mock user")
             setIsInTelegramContext(false)
-            await setMockUser()
+            await setMockUser()  // Now valid in async function
             setIsLoading(false)
           }
         }, 5000)
@@ -168,8 +164,10 @@ export function useTelegram() {
     return () => {
       mounted = false
       if (intervalId) clearInterval(intervalId)
+      const script = document.getElementById("telegram-web-app-script")
+      if (script) document.head.removeChild(script)
     }
-  }, [handleAuthentication, setMockUser, loadCachedAuthState])
+  }, [handleAuthentication, setMockUser])
 
   const isAuthenticated = Boolean(dbUser)
   const isAdmin = useCallback(() => dbUser?.status === "admin", [dbUser])
