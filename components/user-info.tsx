@@ -2,29 +2,30 @@
 import { User, Bot } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
-import { useAppContext } from "@/contexts/AppContext"
+import { useTelegram } from "@/hooks/useTelegram" // Assuming hook is in this path
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 export default function UserInfo() {
-  const { dbUser, telegramUser, isInTelegramContext, isMockUser, isLoading, error } = useAppContext()
+  const { dbUser, user, isInTelegramContext, isMockUser, isLoading, error } = useTelegram()
 
   if (isLoading) return <div className="w-8 h-8 bg-gray-700 rounded-full animate-pulse" />
   if (error) return <div className="text-red-400 text-sm">Ошибка</div>
 
-  const user = dbUser || telegramUser
-  if (user) {
-    const displayName = user.username || user.full_name || user.first_name || "Пользователь"
+  const telegramUser = user || dbUser // Fallback to dbUser if user is null
+  if (telegramUser) {
+    const displayName =
+      telegramUser.username || telegramUser.full_name || telegramUser.first_name || "Пользователь"
     return (
       <TooltipProvider>
-        <div className="flex items-center gap-2 p-1.5 rounded-lg bg-gray-800/30 hover:bg-gray-700/30 transition-colors">
+        <div className="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-700/20 transition-colors">
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="relative">
-                {dbUser ? (
+                {dbUser && dbUser.avatar_url ? (
                   <Image
-                    src={dbUser.avatar_url || "/placeholder.svg"}
+                    src={dbUser.avatar_url}
                     alt="Avatar"
                     width={32}
                     height={32}
