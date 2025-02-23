@@ -1,4 +1,3 @@
-// hooks/useTelegram.ts
 "use client"
 import { useCallback, useEffect, useState } from "react"
 import { debugLogger } from "@/lib/debugLogger"
@@ -151,12 +150,12 @@ export function useTelegram() {
         intervalId = setInterval(async () => {
           await checkTelegram()
         }, 500)
-        setTimeout(() => {
+        setTimeout(async () => {  // Made async here
           if (intervalId && !isInTelegramContext) {
             clearInterval(intervalId)
             debugLogger.log("No Telegram context after timeout, using mock user")
             setIsInTelegramContext(false)
-            await setMockUser()
+            await setMockUser()  // Now valid in an async function
             setIsLoading(false)
           }
         }, 5000)
