@@ -12,17 +12,34 @@ export default function AdminPage() {
   const { dbUser, isAdmin } = useTelegram()
   const router = useRouter()
 
+  // Fix potential runtime error: Ensure isAdmin is called correctly as a function
   useEffect(() => {
-    if (dbUser && !isAdmin()) {
-      toast.error("У вас нет прав доступа. Возвращаемся на главную...")
-      router.push("/")
-    } else if (dbUser) {
-      toast.success("Добро пожаловать в Центр Управления!")
-    }
-  }, [dbUser, isAdmin, router])
+    if (!dbUser) return; // Wait for dbUser to load
 
-  if (!dbUser || !isAdmin()) {
-    return <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950" />
+    const adminCheck = isAdmin(); // Call isAdmin as a function
+    if (!adminCheck) {
+      toast.error("У вас нет прав доступа. Возвращаемся на главную...");
+      router.push("/");
+    } else {
+      toast.success("Добро пожаловать в Центр Управления!");
+    }
+  }, [dbUser, isAdmin, router]); // isAdmin is a function, so it’s fine in deps
+
+  // Add loading state to avoid rendering before dbUser is ready
+  if (!dbUser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950 flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+          className="w-12 h-12 border-4 border-t-[#00ff9d] border-[#00ff9d]/20 rounded-full shadow-[0_0_10px_rgba(0,255,157,0.5)]"
+        />
+      </div>
+    );
+  }
+
+  if (!isAdmin()) {
+    return <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950" />;
   }
 
   return (
