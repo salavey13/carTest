@@ -9,9 +9,8 @@ import { sendTelegramInvoice } from "@/app/actions"
 import { useTelegram } from "@/hooks/useTelegram"
 import { getTelegramUser } from "@/lib/telegram"
 import SemanticSearch from "@/components/SemanticSearch"
-import { toast } from "sonner"
 import { motion, AnimatePresence } from "framer-motion"
-import { ChevronLeft, ChevronRight, Crown } from "lucide-react"
+import { ChevronLeft, ChevronRight, Crown, AlertTriangle } from "lucide-react"
 
 const YUAN_TO_STARS_RATE = 0.1 // 1 Yuan = 0.1 Stars
 const AUTO_INCREMENT_INTERVAL = 3000 // 3 seconds
@@ -29,7 +28,18 @@ export default function RentCar() {
   const [success, setSuccess] = useState(false)
   const [hasSubscription, setHasSubscription] = useState<boolean>(false)
   const [isCarouselEngaged, setIsCarouselEngaged] = useState(false)
+  const [toastMessages, setToastMessages] = useState<{ id: number; message: string; type: "success" | "error" }[]>([])
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const toastIdRef = useRef(0)
+
+  // Local toaster function
+  const showToast = (message: string, type: "success" | "error") => {
+    const id = toastIdRef.current++
+    setToastMessages((prev) => [...prev, { id, message, type }])
+    setTimeout(() => {
+      setToastMessages((prev) => prev.filter((toast) => toast.id !== id))
+    }, 3000) // Toast disappears after 3 seconds
+  }
 
   // Fetch cars
   useEffect(() => {
@@ -37,7 +47,7 @@ export default function RentCar() {
       const { data, error } = await supabaseAnon.from("cars").select("*")
       if (error) {
         console.error("Ошибка при загрузке автомобилей:", error)
-        toast.error("Не удалось загрузить список автомобилей")
+        showToast("Не удалось загрузить список автомобилей", "error")
       } else {
         setCars(data || [])
         setSelectedCar(null) // No default selection initially
@@ -104,19 +114,23 @@ export default function RentCar() {
   }
 
   const handleRent = async () => {
+    console.log("Rent button clicked", { selectedCar, tgUser, isInTelegramContext }) // Debug log
     if (!selectedCar) {
-      toast.error("Выберите автомобиль для аренды.")
-      return
-    }
-
-    if (!tgUser || !isInTelegramContext) {
-      toast.error("Для аренды необходимо авторизоваться в Telegram.")
+      setError("Выберите автомобиль для аренды.")
+      showToast("Выберите автомобиль для аренды", "error")
       return
     }
 
     setInvoiceLoading(true)
     setError(null)
     setSuccess(false)
+
+    if (!tgUser || !isInTelegramContext) {
+      setError("Для аренды необходимо авторизоваться в Telegram.")
+      showToast("Для аренды необходимо авторизоваться в Telegram", "error")
+      setInvoiceLoading(false)
+      return
+    }
 
     try {
       const totalPriceYuan = selectedCar.daily_price * rentDays
@@ -138,12 +152,14 @@ export default function RentCar() {
       }
 
       const invoiceId = `car_rental_${selectedCar.id}_${tgUser.id}_${Date.now()}`
+      console.log("Creating invoice:", { invoiceId, metadata }) // Debug log
       await createInvoice("car_rental", invoiceId, tgUser.id.toString(), finalPrice, metadata)
 
       const description = hasSubscription
         ? `Премиум-аренда на ${rentDays} дней\nЦена со скидкой: ${finalPrice} XTR (${totalPriceYuan} ¥)\nСкидка подписчика: 10%`
         : `Аренда на ${rentDays} дней\nЦена: ${finalPrice} XTR (${totalPriceYuan} ¥)`
 
+      console.log("Sending Telegram invoice:", { description, finalPrice }) // Debug log
       const response = await sendTelegramInvoice(
         tgUser.id.toString(),
         `Аренда ${selectedCar.make} ${selectedCar.model}`,
@@ -154,17 +170,19 @@ export default function RentCar() {
         selectedCar.image_url
       )
 
+      console.log("Telegram invoice response:", response) // Debug log
       if (!response.success) throw new Error(response.error || "Не удалось создать счет")
       setSuccess(true)
-      toast.success(
+      showToast(
         hasSubscription
           ? "🌟 Счет создан! Проверьте Telegram для оплаты премиум-аренды."
-          : "🎉 Счет создан! Проверьте Telegram для оплаты."
+          : "🎉 Счет создан! Проверьте Telegram для оплаты.",
+        "success"
       )
     } catch (err) {
       console.error("Ошибка при создании счета:", err)
       setError("Не удалось создать счет. Попробуйте позже.")
-      toast.error("Ошибка при создании счета.")
+      showToast("Ошибка при создании счета", "error")
     } finally {
       setInvoiceLoading(false)
     }
@@ -204,7 +222,7 @@ export default function RentCar() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8 max-w-xl mx-auto"
         >
-          <SemanticSearch /> {/* Full search box */}
+          <SemanticSearch />
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 z-10 relative">
@@ -322,17 +340,28 @@ export default function RentCar() {
                     </p>
                   </div>
 
-                  <Button
-                    onClick={handleRent}
-                    disabled={invoiceLoading}
-                    className={`w-full ${
-                      hasSubscription
-                        ? "bg-gradient-to-r from-purple-600 to-[#ff00ff]"
-                        : "bg-[#ff00ff]/90"
-                    } text-black hover:opacity-80 font-mono py-3 rounded-lg transition-all shadow-[0_0_10px_rgba(255,0,255,0.3)] hover:shadow-[0_0_15px_rgba(255,0,255,0.5)]`}
-                  >
-                    {invoiceLoading ? "Обработка..." : hasSubscription ? "АРЕНДОВАТЬ СО СКИДКОЙ" : "АРЕНДОВАТЬ"}
-                  </Button>
+                  <div className="space-y-2">
+                    <Button
+                      onClick={handleRent}
+                      disabled={invoiceLoading}
+                      className={`w-full ${
+                        hasSubscription
+                          ? "bg-gradient-to-r from-purple-600 to-[#ff00ff]"
+                          : "bg-[#ff00ff]/90"
+                      } text-black hover:opacity-80 font-mono py-3 rounded-lg transition-all shadow-[0_0_10px_rgba(255,0,255,0.3)] hover:shadow-[0_0_15px_rgba(255,0,255,0.5)]`}
+                    >
+                      {invoiceLoading ? "Обработка..." : hasSubscription ? "АРЕНДОВАТЬ СО СКИДКОЙ" : "АРЕНДОВАТЬ"}
+                    </Button>
+                    {error && (
+                      <motion.p
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-red-400 text-sm font-mono flex items-center justify-center gap-1 bg-red-900/10 px-2 py-1 rounded-md"
+                      >
+                        <AlertTriangle className="h-4 w-4" /> {error}
+                      </motion.p>
+                    )}
+                  </div>
                 </motion.div>
               ) : (
                 <motion.p
@@ -347,15 +376,28 @@ export default function RentCar() {
           </motion.div>
         </div>
 
-        {error && (
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-red-400 text-center mt-6 bg-red-900/10 px-4 py-2 rounded-lg shadow-md"
-          >
-            {error}
-          </motion.p>
-        )}
+        {/* Local Toaster */}
+        <div className="fixed bottom-4 right-4 z-50 space-y-2">
+          <AnimatePresence>
+            {toastMessages.map(({ id, message, type }) => (
+              <motion.div
+                key={id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-[0_0_10px_rgba(0,0,0,0.5)] font-mono text-sm ${
+                  type === "success"
+                    ? "bg-green-900/80 text-[#00ff9d] border-[#00ff9d]/40"
+                    : "bg-red-900/80 text-red-400 border-red-400/40"
+                }`}
+              >
+                {type === "success" ? "✓" : "✗"} {message}
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+
         {success && (
           <motion.p
             initial={{ opacity: 0 }}
