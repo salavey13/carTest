@@ -47,12 +47,7 @@ export default function AdminPage() {
     return null // Router will handle redirect
   }
 
-  // Inside your AdminPage component
-useEffect(() => {
-  if (dbUser && isAdminChecked) { // Replace with your auth logic
-    toast.success("Добро пожаловать в Центр Управления, командир!");
-  }
-}, [dbUser, isAdminChecked]);
+
 
   return (
     <motion.div
