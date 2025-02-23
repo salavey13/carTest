@@ -12,24 +12,24 @@ export default function AdminPage() {
   const { dbUser, isAdmin } = useTelegram()
   const router = useRouter()
   const [isAdminChecked, setIsAdminChecked] = useState<boolean | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Check admin status with proper loading handling
   useEffect(() => {
-    if (!dbUser) return; // Wait for dbUser to load
+    if (dbUser) {
+      const adminStatus = isAdmin()
+      setIsAdminChecked(adminStatus)
+      setIsLoading(false)
 
-    const adminStatus = isAdmin(); // Call isAdmin function
-    setIsAdminChecked(adminStatus);
-
-    if (adminStatus) {
-      toast.success("Добро пожаловать в Центр Управления, командир!");
-    } else {
-      toast.error("Доступ запрещен. Перенаправляем на главную...");
-      router.push("/");
+      if (adminStatus) {
+        toast.success("Добро пожаловать в Центр Управления, командир!")
+      } else {
+        toast.error("Доступ запрещен. Перенаправляем на главную...")
+        router.push("/")
+      }
     }
-  }, [dbUser, isAdmin, router]);
+  }, [dbUser, isAdmin, router])
 
-  // Loading state while dbUser or admin status is pending
-  if (!dbUser || isAdminChecked === null) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950 flex items-center justify-center">
         <motion.div
@@ -38,12 +38,11 @@ export default function AdminPage() {
           className="w-12 h-12 border-4 border-t-[#00ff9d] border-[#00ff9d]/20 rounded-full shadow-[0_0_10px_rgba(0,255,157,0.5)]"
         />
       </div>
-    );
+    )
   }
 
-  // Redirect if not admin
   if (!isAdminChecked) {
-    return null; // Router will handle redirect
+    return null // Router will handle redirect
   }
 
   return (
@@ -73,7 +72,7 @@ export default function AdminPage() {
           <p className="text-[#ff00ff] font-mono text-center mb-6 text-lg">
             Управляй флотом — добавляй новые кибер-машины!
           </p>
-          <CarSubmissionForm />
+          <CarSubmissionForm ownerId={dbUser.id} />
         </motion.div>
 
         <motion.div
@@ -96,19 +95,18 @@ export default function AdminPage() {
           </Link>
         </motion.div>
 
-        {/* Power Button */}
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.6 }}
           className="fixed bottom-4 right-4 z-50"
         >
-          <Button
+          <button
             onClick={() => toast.success("Система на полной мощности, командир!")}
             className="bg-[#ff00ff]/90 text-black hover:bg-[#ff00ff]/70 rounded-full w-14 h-14 flex items-center justify-center shadow-[0_0_12px_rgba(255,0,255,0.6)] transition-all hover:shadow-[0_0_20px_rgba(255,0,255,0.8)]"
           >
             <Zap className="h-7 w-7" />
-          </Button>
+          </button>
         </motion.div>
       </div>
     </motion.div>
