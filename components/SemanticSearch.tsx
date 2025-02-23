@@ -96,7 +96,7 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
             loading ? "text-gray-600" : "text-[#00ff9d]/60 group-hover:text-[#00ff9d]"
           } transition-colors`}
         />
-        {queryText && (
+        {/*queryText && (
           <Button
             size="icon"
             variant="ghost"
@@ -108,7 +108,7 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
           >
             <X className="h-4 w-4" />
           </Button>
-        )}
+        )*/}
         {!compact && (
           <Button
             size="icon"
