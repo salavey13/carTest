@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge"
 import { createInvoice, supabaseAnon, getUserSubscription } from "@/hooks/supabase"
 import { sendTelegramInvoice } from "@/app/actions"
 import { useTelegram } from "@/hooks/useTelegram"
-import { getTelegramUser } from "@/lib/telegram"
 import SemanticSearch from "@/components/SemanticSearch"
 import { motion, AnimatePresence } from "framer-motion"
 import { ChevronLeft, ChevronRight, Crown, AlertTriangle } from "lucide-react"
@@ -17,7 +16,7 @@ const AUTO_INCREMENT_INTERVAL = 3000 // 3 seconds
 const REENGAGE_DELAY = 2000 // 2 seconds after interaction
 
 export default function RentCar() {
-  const { user: tgUser, isInTelegramContext, dbUser } = useTelegram()
+  const { user: tgUser, isInTelegramContext, dbUser, isLoading: tgLoading } = useTelegram()
   const [selectedCar, setSelectedCar] = useState(null)
   const [rentDays, setRentDays] = useState(1)
   const [cars, setCars] = useState([])
@@ -38,21 +37,25 @@ export default function RentCar() {
     setToastMessages((prev) => [...prev, { id, message, type }])
     setTimeout(() => {
       setToastMessages((prev) => prev.filter((toast) => toast.id !== id))
-    }, 3000) // Toast disappears after 3 seconds
+    }, 3000)
   }
 
   // Fetch cars
   useEffect(() => {
     const fetchCars = async () => {
+      setLoading(true)
       const { data, error } = await supabaseAnon.from("cars").select("*")
       if (error) {
-        console.error("Ошибка при загрузке автомобилей:", error)
-        showToast("Не удалось загрузить список автомобилей", "error")
+        setError("Ошибка загрузки автомобилей: " + error.message)
+        showToast("Не удалось загрузить автомобили: " + error.message, "error")
+      } else if (!data || data.length === 0) {
+        setError("Автомобили не найдены")
+        showToast("Нет доступных автомобилей", "error")
       } else {
-        setCars(data || [])
-        setSelectedCar(null) // No default selection initially
-        setLoading(false)
+        setCars(data)
+        showToast("Автомобили загружены успешно", "success")
       }
+      setLoading(false)
     }
     fetchCars()
   }, [])
@@ -61,20 +64,18 @@ export default function RentCar() {
   useEffect(() => {
     const checkSubscription = async () => {
       if (dbUser?.user_id) {
-        const subscriptionId = await getUserSubscription(dbUser.user_id)
-        setHasSubscription(!!subscriptionId)
+        try {
+          const subscriptionId = await getUserSubscription(dbUser.user_id)
+          setHasSubscription(!!subscriptionId)
+          showToast(subscriptionId ? "Премиум статус активен" : "Премиум статус не найден", "success")
+        } catch (err) {
+          setError("Ошибка проверки подписки: " + (err instanceof Error ? err.message : "Неизвестная ошибка"))
+          showToast("Ошибка проверки подписки", "error")
+        }
       }
     }
     checkSubscription()
   }, [dbUser])
-
-  // Telegram context validation with fallback
-  useEffect(() => {
-    const webAppUser = getTelegramUser()
-    if (!webAppUser && typeof window !== "undefined" && !(window as any).Telegram?.WebApp) {
-      setError("Эта функция доступна только через Telegram, но вы можете протестировать в демо-режиме.")
-    }
-  }, [])
 
   // Auto-increment carousel
   useEffect(() => {
@@ -101,6 +102,7 @@ export default function RentCar() {
       }, REENGAGE_DELAY)
     }
     setSelectedCar(cars[carouselIndex])
+    showToast(`Выбран автомобиль: ${cars[carouselIndex].make} ${cars[carouselIndex].model}`, "success")
   }
 
   const handleCarouselPrev = () => {
@@ -114,7 +116,6 @@ export default function RentCar() {
   }
 
   const handleRent = async () => {
-    console.log("Rent button clicked", { selectedCar, tgUser, isInTelegramContext }) // Debug log
     if (!selectedCar) {
       setError("Выберите автомобиль для аренды.")
       showToast("Выберите автомобиль для аренды", "error")
@@ -125,9 +126,17 @@ export default function RentCar() {
     setError(null)
     setSuccess(false)
 
-    if (!tgUser || !isInTelegramContext) {
-      setError("Для аренды необходимо авторизоваться в Telegram.")
-      showToast("Для аренды необходимо авторизоваться в Telegram", "error")
+    if (!isInTelegramContext) {
+      setError("Не в Telegram контексте. Используется демо-режим.")
+      showToast("Демо: Счет создан успешно!", "success")
+      setSuccess(true)
+      setInvoiceLoading(false)
+      return
+    }
+
+    if (!tgUser) {
+      setError("Пользователь Telegram не найден.")
+      showToast("Ошибка: Пользователь не авторизован", "error")
       setInvoiceLoading(false)
       return
     }
@@ -152,14 +161,14 @@ export default function RentCar() {
       }
 
       const invoiceId = `car_rental_${selectedCar.id}_${tgUser.id}_${Date.now()}`
-      console.log("Creating invoice:", { invoiceId, metadata }) // Debug log
+      showToast("Создание счета...", "success")
       await createInvoice("car_rental", invoiceId, tgUser.id.toString(), finalPrice, metadata)
 
       const description = hasSubscription
         ? `Премиум-аренда на ${rentDays} дней\nЦена со скидкой: ${finalPrice} XTR (${totalPriceYuan} ¥)\nСкидка подписчика: 10%`
         : `Аренда на ${rentDays} дней\nЦена: ${finalPrice} XTR (${totalPriceYuan} ¥)`
 
-      console.log("Sending Telegram invoice:", { description, finalPrice }) // Debug log
+      showToast("Отправка счета в Telegram...", "success")
       const response = await sendTelegramInvoice(
         tgUser.id.toString(),
         `Аренда ${selectedCar.make} ${selectedCar.model}`,
@@ -170,8 +179,9 @@ export default function RentCar() {
         selectedCar.image_url
       )
 
-      console.log("Telegram invoice response:", response) // Debug log
-      if (!response.success) throw new Error(response.error || "Не удалось создать счет")
+      if (!response.success) {
+        throw new Error(response.error || "Не удалось создать счет")
+      }
       setSuccess(true)
       showToast(
         hasSubscription
@@ -180,21 +190,21 @@ export default function RentCar() {
         "success"
       )
     } catch (err) {
-      console.error("Ошибка при создании счета:", err)
-      setError("Не удалось создать счет. Попробуйте позже.")
-      showToast("Ошибка при создании счета", "error")
+      const errMsg = err instanceof Error ? err.message : "Неизвестная ошибка"
+      setError("Ошибка при создании счета: " + errMsg)
+      showToast("Ошибка при создании счета: " + errMsg, "error")
     } finally {
       setInvoiceLoading(false)
     }
   }
 
-  if (loading) {
+  if (loading || tgLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950 flex items-center justify-center">
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-          className="w-12 h-12 border-4 border-t-[#00ff9d] border-[#00ff9d]/20 rounded-full"
+          className="w-12 h-12 border-4 border-t-[#00ff9d] border-[#00ff9d]/20 rounded-full shadow-[0_0_10px_rgba(0,255,157,0.5)]"
         />
       </div>
     )
