@@ -126,7 +126,7 @@ export function CarSubmissionForm() {
                   setFormData({ ...formData, specs: newSpecs })
                 }}
                 placeholder="Параметр (например, версия)"
-                className="flex-1 p-3 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                className="flex-[0.5] p-3 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 required
               />
               <input
@@ -139,7 +139,7 @@ export function CarSubmissionForm() {
                   })
                 }
                 placeholder="Значение (например, v12)"
-                className="flex-1 p-3 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                className="flex-[0.5] p-3 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 required
               />
             </div>
@@ -176,11 +176,11 @@ export function CarSubmissionForm() {
             value={formData.image_url}
             onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
             placeholder="URL изображения (необязательно)"
-            className="flex-[0.7] p-3 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            className="flex-[0.5] p-3 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
           />
           <label
             htmlFor="image-upload"
-            className="flex-[0.3] p-3 rounded bg-cyan-500 text-white hover:bg-cyan-600 transition-colors cursor-pointer text-center"
+            className="flex-[0.2] p-3 rounded bg-cyan-500 text-white hover:bg-cyan-600 transition-colors cursor-pointer text-center"
           >
             Загрузить изображение
           </label>
