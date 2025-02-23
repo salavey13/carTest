@@ -4,6 +4,7 @@ import Header from "@/components/Header"
 import Footer from "@/components/Footer"
 import { AppProvider } from "@/contexts/AppContext"
 import { Toaster } from "sonner"
+import "./globals.css" // Import global styles
 
 export const metadata: Metadata = {
   title: "ChinaCarRent - Аренда Китайских Кибер-Каров в России",
@@ -47,9 +48,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <Script id="telegram-webapp" src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
+        <Script
+          id="telegram-webapp"
+          src="https://telegram.org/js/telegram-web-app.js"
+          strategy="afterInteractive" // Changed to ensure script runs after page load
+          onLoad={() => {
+            if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
+              (window as any).Telegram.WebApp.ready()
+            }
+          }}
+        />
       </head>
-      <body className="bg-gradient-to-br from-gray-900 to-gray-950 text-white min-h-screen flex flex-col">
+      <body className="min-h-screen flex flex-col">
         <AppProvider>
           <Header />
           {children}
