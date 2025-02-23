@@ -110,102 +110,31 @@ export function useTelegram() {
   }, [handleAuthentication])
 
   useEffect(() => {
-    let mounted = true
-
-    const initialize = async () => {
-      if (!mounted) return
-
-      setIsLoading(true)
-      setError(null)
-
-      try {
-        // Try to load cached auth state first
-        const cached = loadCachedAuthState()
-        if (cached) {
-          debugLogger.log("Using cached auth state")
-          setUser(cached.user)
-          setDbUser(cached.dbUser)
-          setIsLoading(false)
-          return
-        }
-
-        if (typeof window !== "undefined") {
-          // Load Telegram script if not already loaded
-          if (!document.getElementById("telegram-web-app-script")) {
-            const script = document.createElement("script")
-            script.id = "telegram-web-app-script"
-            script.src = "https://telegram.org/js/telegram-web-app.js"
-            script.async = true
-
-            script.onload = async () => {
-              if (!mounted) return
-              const telegram = (window as any).Telegram?.WebApp as TelegramWebApp
-
-              if (telegram?.initDataUnsafe?.user) {
-                telegram.ready()
-                setTg(telegram)
-                setIsInTelegramContext(true)
-                await handleAuthentication(telegram.initDataUnsafe.user).catch((err) => {
-                  debugLogger.error("Error during authentication:", err)
-                  setError(new Error("Authentication failed"))
-                })
-              } else {
-                debugLogger.log("No Telegram context, using mock user")
-                setIsInTelegramContext(false)
-                await setMockUser()
-              }
-              if (mounted) setIsLoading(false)
-            }
-
-            script.onerror = () => {
-              if (!mounted) return
-              debugLogger.error("Failed to load Telegram script")
-              setError(new Error("Failed to load Telegram WebApp script"))
-              setIsInTelegramContext(false)
-              setMockUser().finally(() => {
-                if (mounted) setIsLoading(false)
-              })
-            }
-
-            document.head.appendChild(script)
-          } else {
-            // Script already loaded, initialize directly
-            const telegram = (window as any).Telegram?.WebApp as TelegramWebApp
-            if (telegram?.initDataUnsafe?.user) {
-              telegram.ready()
-              setTg(telegram)
-              setIsInTelegramContext(true)
-              await handleAuthentication(telegram.initDataUnsafe.user).catch((err) => {
-                debugLogger.error("Error during authentication:", err)
-                setError(new Error("Authentication failed"))
-              })
-            } else {
-              debugLogger.log("No Telegram context, using mock user")
-              setIsInTelegramContext(false)
-              await setMockUser()
-            }
-            if (mounted) setIsLoading(false)
-          }
-        }
-      } catch (err) {
-        if (!mounted) return
-        debugLogger.error("Error initializing Telegram:", err)
-        setError(err instanceof Error ? err : new Error("Failed to initialize"))
-        setIsInTelegramContext(false)
-        await setMockUser()
-        if (mounted) setIsLoading(false)
-      }
+  const initialize = async () => {
+    setIsLoading(true)
+    const cached = loadCachedAuthState()
+    if (cached) {
+      setUser(cached.user)
+      setDbUser(cached.dbUser)
+      setIsLoading(false)
+      return
     }
 
-    initialize()
-
-    return () => {
-      mounted = false
-      const script = document.getElementById("telegram-web-app-script")
-      if (script) document.head.removeChild(script)
+    const telegram = (window as any).Telegram?.WebApp as TelegramWebApp
+    if (telegram?.initDataUnsafe?.user) {
+      telegram.ready()
+      setTg(telegram)
+      setIsInTelegramContext(true)
+      await handleAuthentication(telegram.initDataUnsafe.user).catch((err) => setError(new Error("Authentication failed")))
+    } else {
+      setIsInTelegramContext(false)
+      await setMockUser()
     }
-  }, [handleAuthentication, setMockUser, loadCachedAuthState])
-
+    setIsLoading(false)
+  }
+  initialize()
+}, [handleAuthentication, setMockUser, loadCachedAuthState])
+  
   const isAuthenticated = Boolean(dbUser)
   const isAdmin = useCallback(() => dbUser?.status === "admin", [dbUser])
 
