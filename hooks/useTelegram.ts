@@ -78,7 +78,6 @@ export function useTelegram() {
 
   useEffect(() => {
     let mounted = true
-    let intervalId: NodeJS.Timeout | null = null
 
     const initialize = async () => {
       if (!mounted) return
@@ -86,84 +85,71 @@ export function useTelegram() {
       setIsLoading(true)
       setError(null)
 
-      const checkTelegram = async () => {
-        if (typeof window !== "undefined") {
-          const telegram = (window as any).Telegram?.WebApp
-          if (telegram?.initDataUnsafe?.user) {
-            telegram.ready()
-            setTg(telegram)
-            setIsInTelegramContext(true)
-            await handleAuthentication(telegram.initDataUnsafe.user).catch((err) => {
-              debugLogger.error("Error during authentication:", err)
-              setError(new Error("Authentication failed"))
-            })
-            setIsLoading(false)
-            if (intervalId) clearInterval(intervalId)
-            toast.success("Telegram подключен")
-          } else if (!document.getElementById("telegram-web-app-script")) {
-            debugLogger.log("Loading Telegram script dynamically")
-            const script = document.createElement("script")
-            script.id = "telegram-web-app-script"
-            script.src = "https://telegram.org/js/telegram-web-app.js"
-            script.async = true
+      if (typeof window !== "undefined") {
+        const telegram = (window as any).Telegram?.WebApp
+        if (telegram?.initDataUnsafe?.user) {
+          telegram.ready()
+          setTg(telegram)
+          setIsInTelegramContext(true)
+          await handleAuthentication(telegram.initDataUnsafe.user).catch((err) => {
+            debugLogger.error("Error during authentication:", err)
+            setError(new Error("Authentication failed"))
+            toast.error("Ошибка авторизации в Telegram")
+          })
+        } else if (!document.getElementById("telegram-web-app-script")) {
+          debugLogger.log("Loading Telegram script dynamically")
+          const script = document.createElement("script")
+          script.id = "telegram-web-app-script"
+          script.src = "https://telegram.org/js/telegram-web-app.js"
+          script.async = true
 
-            script.onload = async () => {
-              if (!mounted) return
-              const telegram = (window as any).Telegram?.WebApp
-              if (telegram?.initDataUnsafe?.user) {
-                telegram.ready()
-                setTg(telegram)
-                setIsInTelegramContext(true)
-                await handleAuthentication(telegram.initDataUnsafe.user).catch((err) => {
-                  debugLogger.error("Error during authentication:", err)
-                  setError(new Error("Authentication failed"))
-                })
-                setIsLoading(false)
-                if (intervalId) clearInterval(intervalId)
-                toast.success("Telegram подключен после загрузки")
-              }
-            }
-
-            script.onerror = () => {
-              if (!mounted) return
-              debugLogger.error("Failed to load Telegram script")
-              setError(new Error("Failed to load Telegram WebApp script"))
-              setIsInTelegramContext(false)
-              setMockUser().finally(() => {
-                if (mounted) setIsLoading(false)
+          script.onload = async () => {
+            if (!mounted) return
+            const telegram = (window as any).Telegram?.WebApp
+            if (telegram?.initDataUnsafe?.user) {
+              telegram.ready()
+              setTg(telegram)
+              setIsInTelegramContext(true)
+              await handleAuthentication(telegram.initDataUnsafe.user).catch((err) => {
+                debugLogger.error("Error during authentication:", err)
+                setError(new Error("Authentication failed"))
+                toast.error("Ошибка авторизации после загрузки")
               })
+              toast.success("Telegram подключен")
+            } else {
+              debugLogger.log("No Telegram context after script load, using mock user")
+              setIsInTelegramContext(false)
+              await setMockUser()
             }
-
-            document.head.appendChild(script)
+            if (mounted) setIsLoading(false)
           }
+
+          script.onerror = () => {
+            if (!mounted) return
+            debugLogger.error("Failed to load Telegram script")
+            setError(new Error("Failed to load Telegram WebApp script"))
+            setIsInTelegramContext(false)
+            setMockUser().finally(() => {
+              if (mounted) setIsLoading(false)
+            })
+            toast.error("Не удалось загрузить Telegram скрипт")
+          }
+
+          document.head.appendChild(script)
+        } else {
+          debugLogger.log("No Telegram context, using mock user")
+          setIsInTelegramContext(false)
+          await setMockUser()
         }
       }
 
-      // Initial check
-      await checkTelegram()
-
-      // Poll every 500ms until Telegram is ready or 5s timeout
-      if (!isInTelegramContext && mounted) {
-        intervalId = setInterval(async () => {
-          await checkTelegram()
-        }, 500)
-        setTimeout(async () => {  // Made async here
-          if (intervalId && !isInTelegramContext) {
-            clearInterval(intervalId)
-            debugLogger.log("No Telegram context after timeout, using mock user")
-            setIsInTelegramContext(false)
-            await setMockUser()  // Now valid in async function
-            setIsLoading(false)
-          }
-        }, 5000)
-      }
+      if (mounted) setIsLoading(false)
     }
 
     initialize()
 
     return () => {
       mounted = false
-      if (intervalId) clearInterval(intervalId)
       const script = document.getElementById("telegram-web-app-script")
       if (script) document.head.removeChild(script)
     }
