@@ -1,5 +1,5 @@
+// hooks/useTelegram.ts
 "use client"
-
 import { useCallback, useEffect, useState } from "react"
 import { debugLogger } from "@/lib/debugLogger"
 import { createOrUpdateUser, fetchUserData } from "@/hooks/supabase"
@@ -27,13 +27,11 @@ export function useTelegram() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  // Load cached auth state
   const loadCachedAuthState = useCallback(() => {
     try {
       const cached = localStorage.getItem(LOCAL_STORAGE_KEY)
       if (cached) {
         const { user, dbUser, timestamp } = JSON.parse(cached)
-        // Check if cache is less than 1 hour old
         if (Date.now() - timestamp < 3600000) {
           return { user, dbUser }
         }
@@ -44,7 +42,6 @@ export function useTelegram() {
     return null
   }, [])
 
-  // Save auth state to cache
   const saveAuthState = useCallback((user: WebAppUser, dbUser: DatabaseUser) => {
     try {
       localStorage.setItem(
@@ -53,7 +50,7 @@ export function useTelegram() {
           user,
           dbUser,
           timestamp: Date.now(),
-        }),
+        })
       )
     } catch (err) {
       debugLogger.error("Error saving auth state:", err)
@@ -74,7 +71,7 @@ export function useTelegram() {
             last_name: telegramUser.last_name,
             language_code: telegramUser.language_code,
             photo_url: telegramUser.photo_url,
-            role: "user", // Default role for new users
+            role: "user",
           })
 
           if (!userData) {
@@ -85,7 +82,6 @@ export function useTelegram() {
         setUser(telegramUser)
         setDbUser(userData as DatabaseUser)
         saveAuthState(telegramUser, userData as DatabaseUser)
-
         return userData
       } catch (err) {
         debugLogger.error("Failed to authenticate user:", err)
@@ -93,7 +89,7 @@ export function useTelegram() {
         throw err
       }
     },
-    [saveAuthState],
+    [saveAuthState]
   )
 
   const setMockUser = useCallback(async () => {
@@ -110,31 +106,71 @@ export function useTelegram() {
   }, [handleAuthentication])
 
   useEffect(() => {
-  const initialize = async () => {
-    setIsLoading(true)
-    const cached = loadCachedAuthState()
-    if (cached) {
-      setUser(cached.user)
-      setDbUser(cached.dbUser)
-      setIsLoading(false)
-      return
+    let mounted = true
+    let intervalId: NodeJS.Timeout | null = null
+
+    const initialize = async () => {
+      if (!mounted) return
+
+      setIsLoading(true)
+      setError(null)
+
+      const cached = loadCachedAuthState()
+      if (cached) {
+        debugLogger.log("Using cached auth state")
+        setUser(cached.user)
+        setDbUser(cached.dbUser)
+        setIsLoading(false)
+        return
+      }
+
+      const checkTelegram = async () => {
+        if (typeof window !== "undefined") {
+          const telegram = (window as any).Telegram?.WebApp
+          if (telegram?.initDataUnsafe?.user) {
+            telegram.ready()
+            setTg(telegram)
+            setIsInTelegramContext(true)
+            await handleAuthentication(telegram.initDataUnsafe.user).catch((err) => {
+              debugLogger.error("Error during authentication:", err)
+              setError(new Error("Authentication failed"))
+            })
+            setIsLoading(false)
+            if (intervalId) clearInterval(intervalId)
+          } else {
+            debugLogger.log("Telegram not ready yet")
+          }
+        }
+      }
+
+      // Initial check
+      await checkTelegram()
+
+      // Poll every 500ms until Telegram is ready or 5s timeout
+      if (!isInTelegramContext && mounted) {
+        intervalId = setInterval(async () => {
+          await checkTelegram()
+        }, 500)
+        setTimeout(() => {
+          if (intervalId && !isInTelegramContext) {
+            clearInterval(intervalId)
+            debugLogger.log("No Telegram context after timeout, using mock user")
+            setIsInTelegramContext(false)
+            await setMockUser()
+            setIsLoading(false)
+          }
+        }, 5000)
+      }
     }
 
-    const telegram = (window as any).Telegram?.WebApp as TelegramWebApp
-    if (telegram?.initDataUnsafe?.user) {
-      telegram.ready()
-      setTg(telegram)
-      setIsInTelegramContext(true)
-      await handleAuthentication(telegram.initDataUnsafe.user).catch((err) => setError(new Error("Authentication failed")))
-    } else {
-      setIsInTelegramContext(false)
-      await setMockUser()
+    initialize()
+
+    return () => {
+      mounted = false
+      if (intervalId) clearInterval(intervalId)
     }
-    setIsLoading(false)
-  }
-  initialize()
-}, [handleAuthentication, setMockUser, loadCachedAuthState])
-  
+  }, [handleAuthentication, setMockUser, loadCachedAuthState])
+
   const isAuthenticated = Boolean(dbUser)
   const isAdmin = useCallback(() => dbUser?.status === "admin", [dbUser])
 
@@ -149,4 +185,3 @@ export function useTelegram() {
     error,
   }
 }
-
