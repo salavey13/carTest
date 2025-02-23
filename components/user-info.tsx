@@ -1,4 +1,3 @@
-// components/UserInfo.tsx
 "use client"
 import { User, Bot } from "lucide-react"
 import Image from "next/image"
@@ -11,15 +10,15 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 export default function UserInfo() {
   const { dbUser, telegramUser, isInTelegramContext, isMockUser, isLoading, error } = useAppContext()
 
-  if (isLoading) return <div className="w-10 h-10 bg-gray-500 rounded-full animate-pulse" />
-  if (error) return <div className="text-red-500 font-semibold">Ошибка</div>
+  if (isLoading) return <div className="w-8 h-8 bg-gray-700 rounded-full animate-pulse" />
+  if (error) return <div className="text-red-400 text-sm">Ошибка</div>
 
   const user = dbUser || telegramUser
   if (user) {
     const displayName = user.username || user.full_name || user.first_name || "Пользователь"
     return (
       <TooltipProvider>
-        <div className="flex items-center gap-3 max-w-[200px] p-2 rounded-lg bg-gray-800/50 hover:bg-gray-700/50 transition-colors">
+        <div className="flex items-center gap-2 p-1.5 rounded-lg bg-gray-800/30 hover:bg-gray-700/30 transition-colors">
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="relative">
@@ -27,44 +26,42 @@ export default function UserInfo() {
                   <Image
                     src={dbUser.avatar_url || "/placeholder.svg"}
                     alt="Avatar"
-                    width={40}
-                    height={40}
-                    className="rounded-full border-2 border-[#4ECDC4] shadow-lg"
+                    width={32}
+                    height={32}
+                    className="rounded-full border border-[#4ECDC4]/50 shadow-sm"
                   />
                 ) : (
-                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                  <div className="w-8 h-8 bg-blue-600/80 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm">
                     {getInitials(displayName)}
                   </div>
                 )}
                 {isInTelegramContext && (
-                  <Badge className="absolute -top-1 -right-1 bg-blue-500">TG</Badge>
+                  <Badge className="absolute -top-0.5 -right-0.5 bg-blue-500/80 text-[8px] px-1 py-0">TG</Badge>
                 )}
                 {isMockUser && (
-                  <Bot className="absolute -bottom-1 -right-1 h-4 w-4 text-yellow-400" />
+                  <Bot className="absolute -bottom-0.5 -right-0.5 h-3 w-3 text-yellow-400" />
                 )}
               </div>
             </TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent className="bg-gray-800 border-[#4ECDC4]/30 text-[#4ECDC4]">
               <p>{displayName}</p>
               {dbUser?.user_id && <p className="text-xs">ID: {dbUser.user_id}</p>}
+              <Link href="/invoices" className="text-[#FF6B6B] hover:text-[#FF8E8E] text-sm mt-1 block">
+                Зал Славы
+              </Link>
             </TooltipContent>
           </Tooltip>
-          <div className="flex flex-col">
-            <span className="text-[#4ECDC4] font-mono text-sm truncate">{displayName}</span>
-            <Link href="/invoices">
-              <Button variant="link" size="sm" className="text-[#FF6B6B] p-0 h-auto">
-                Glory Hall
-              </Button>
-            </Link>
-          </div>
+          <span className="text-[#4ECDC4]/90 font-mono text-sm truncate max-w-[120px]">
+            {displayName}
+          </span>
         </div>
       </TooltipProvider>
     )
   }
 
   return (
-    <Button variant="ghost" className="text-[#FF6B6B] hover:text-[#FF8E8E]">
-      <User className="h-5 w-5" />
+    <Button variant="ghost" className="text-[#FF6B6B]/80 hover:text-[#FF8E8E] p-2">
+      <User className="h-4 w-4" />
     </Button>
   )
 }
