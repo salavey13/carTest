@@ -69,7 +69,7 @@ const RepoXMLFetcher: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-gray-50 rounded-lg shadow-lg">
+    <div className="max-w-4xl mx-auto p-6 bg-gray-50 rounded-lg shadow-lg pt-20">
       <h2 className="text-3xl font-bold text-gray-800 mb-4">Get Your Project’s XML</h2>
       <p className="text-gray-600 mb-6">
         Yo, newbie! Want to use a bot to help build your project? You need something called “XML”—it’s like a map of all your code files that bots can read. Drop a GitHub URL here (like the example), hit the button, and boom—you’ve got your XML to feed to a bot. No clue what you’re doing? Just use the default URL and see what happens!
