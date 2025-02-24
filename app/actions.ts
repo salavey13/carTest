@@ -35,7 +35,7 @@ type SendMessagePayload =
 
 /** Utility to get the base URL dynamically */
 export function getBaseUrl() {
-  return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
+  return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://v0-car-test.vercel.app";
 }
 
 /** Sends a Telegram message with optional image and buttons */
@@ -398,7 +398,7 @@ export async function handleWebhookUpdate(update: any) {
 
         await notifyAdmin(
           metadata.car_id,
-          `Your car ${car.make} ${car.model} has been rented by ${userData.username || userData.user_id}!`
+          `Вашу ${car.make} ${car.model} арендовал ${userData.username || userData.user_id}!`
         );
 
         await sendTelegramMessage(
@@ -492,7 +492,7 @@ export async function sendResult(chatId: string, result: any) {
             [
               {
                 text: "Rent This Car 🚗",
-                url: `${baseUrl}/rent/${result.slug}`,
+                url: `${baseUrl}/rent/${result.car.id}`,
               },
               {
                 text: "Try Again 🔄",
