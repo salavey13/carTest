@@ -1,4 +1,3 @@
-// app/invoices/page.tsx
 "use client";
 import { useEffect, useState } from "react";
 import { useTelegram } from "@/hooks/useTelegram";
@@ -8,38 +7,11 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { getUserInvoices, getUserRentals } from "@/hooks/supabase";
 import { supabaseAdmin } from "@/hooks/supabase";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Trophy, Car, CreditCard, Crown } from "lucide-react";
 
-interface Invoice {
-  id: string;
-  type: string;
-  status: string;
-  amount: number;
-  metadata: { car_make?: string; car_model?: string; days?: number; subscription_id?: string };
-}
-
-interface Rental {
-  rental_id: string;
-  car_id: string;
-  user_id: string;
-  status: string;
-  payment_status: string;
-  total_cost: number;
-  start_date: string;
-  end_date: string;
-  car_make?: string;
-  car_model?: string;
-}
-
-interface TopFleet {
-  owner_id: string;
-  owner_name: string;
-  total_revenue: number;
-  car_count: number;
-}
+interface Invoice { id: string; type: string; status: string; amount: number; metadata: { car_make?: string; car_model?: string; days?: number; subscription_id?: string }; }
+interface Rental { rental_id: string; car_id: string; user_id: string; status: string; payment_status: string; total_cost: number; start_date: string; end_date: string; car_make?: string; car_model?: string; }
+interface TopFleet { owner_id: string; owner_name: string; total_revenue: number; car_count: number; }
 
 export default function GloryHall() {
   const { dbUser, isAdmin } = useTelegram();
@@ -53,250 +25,152 @@ export default function GloryHall() {
   useEffect(() => {
     const fetchUserData = async () => {
       if (!dbUser) return;
-
-      try {
-        const [invoicesRes, rentalsRes] = await Promise.all([
-          getUserInvoices(dbUser.user_id),
-          getUserRentals(dbUser.user_id),
-        ]);
-
-        if (invoicesRes.error) console.error("Error fetching invoices:", invoicesRes.error);
-        else setInvoices(invoicesRes.data || []);
-        if (rentalsRes.error) console.error("Error fetching rentals:", rentalsRes.error);
-        else setRentals(rentalsRes.data || []);
-
-        toast.success("Данные пользователя загружены!");
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-        toast.error("Ошибка загрузки данных пользователя");
-      } finally {
-        setIsUserDataLoading(false);
-      }
+      const [invoicesRes, rentalsRes] = await Promise.all([getUserInvoices(dbUser.user_id), getUserRentals(dbUser.user_id)]);
+      if (invoicesRes.error) console.error("Ошибка счетов:", invoicesRes.error); else setInvoices(invoicesRes.data || []);
+      if (rentalsRes.error) console.error("Ошибка аренд:", rentalsRes.error); else setRentals(rentalsRes.data || []);
+      toast.success("Данные загружены!");
+      setIsUserDataLoading(false);
     };
 
     const fetchTopFleets = async () => {
-      try {
-        const { data: fleetData, error: fleetError } = await supabaseAdmin.rpc("get_top_fleets");
-        if (fleetError) {
-          console.error("Error fetching top fleets:", fleetError);
-          toast.error("Ошибка загрузки топ-флотов");
-        } else {
-          setTopFleets(fleetData || []);
-          toast.success("Топ-флоты загружены!");
-        }
-      } catch (error) {
-        console.error("Unexpected error fetching top fleets:", error);
-        toast.error("Неожиданная ошибка при загрузке топ-флотов");
-      } finally {
-        setIsFleetsLoading(false);
-      }
+      const { data, error } = await supabaseAdmin.rpc("get_top_fleets");
+      if (error) toast.error("Ошибка топ-флотов"); else setTopFleets(data || []), toast.success("Топ-флоты загружены!");
+      setIsFleetsLoading(false);
     };
 
     fetchUserData();
-    if (isAdmin()) fetchTopFleets(); // Only fetch top fleets for admins
+    if (isAdmin()) fetchTopFleets();
   }, [dbUser, isAdmin]);
 
-  if (isUserDataLoading)
+  if (isUserDataLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-background bg-grid-pattern flex items-center justify-center">
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-          className="w-12 h-12 border-4 border-t-[#00ff9d] border-[#00ff9d]/20 rounded-full shadow-[0_0_10px_rgba(0,255,157,0.5)]"
+          className="w-12 h-12 border-4 border-t-primary border-muted rounded-full shadow-[0_0_15px_rgba(255,107,107,0.8)]"
         />
-        <span className="ml-4 text-2xl text-[#4ECDC4] font-['Orbitron'] animate-pulse">Чекаю...</span>
+        <span className="ml-4 text-2xl text-secondary font-mono animate-pulse">Чекаю...</span>
       </div>
     );
+  }
 
-  if (!invoices.length && !rentals.length && (!topFleets.length || !isAdmin()))
+  if (!invoices.length && !rentals.length && (!topFleets.length || !isAdmin())) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950 text-center pt-20">
+      <div className="min-h-screen pt-24 bg-background bg-grid-pattern">
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-xl text-[#FF6B6B] font-mono"
+          className="text-xl text-destructive font-mono text-center pt-20 animate-[neon_2s_infinite]"
         >
           В ожидании первого триумфа!
         </motion.p>
       </div>
     );
+  }
 
-  const pendingItems = [
-    ...invoices.filter((inv) => inv.status === "pending"),
-    ...rentals.filter((r) => r.payment_status === "pending"),
-  ];
-  const completedItems = [
-    ...invoices.filter((inv) => inv.status === "paid"),
-    ...rentals.filter((r) => r.payment_status === "paid"),
-  ];
+  const pendingItems = [...invoices.filter((inv) => inv.status === "pending"), ...rentals.filter((r) => r.payment_status === "pending")];
+  const completedItems = [...invoices.filter((inv) => inv.status === "paid"), ...rentals.filter((r) => r.payment_status === "paid")];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-950 text-[#00ff9d] relative overflow-hidden">
-      {/* Neon Grid Background */}
-      <div className="absolute inset-0 opacity-10 pointer-events-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEwIDB2MjBNMCAxMGgyME0xMCAyMFYwTTAgMTBoMjAiIHN0cm9rZT0iIzAwZmY5ZCIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9zdmc+')] bg-repeat" />
-
-      <div className="container mx-auto px-4 py-8 pt-20">
-        <motion.h1
-          initial={{ opacity: 0, y: -20 }}
+    <div className="min-h-screen pt-24 bg-background bg-grid-pattern animate-[drift_30s_infinite]">
+      <header className="fixed top-0 left-0 right-0 bg-card shadow-md p-6 z-10 border-b border-muted">
+        <h1 className="text-4xl font-bold text-gradient cyber-text glitch" data-text="ЗАЛ СЛАВЫ">
+          ЗАЛ СЛАВЫ
+        </h1>
+      </header>
+      <main className="container mx-auto pt-10 px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-4xl md:text-5xl font-bold text-center font-['Orbitron'] text-[#00ff9d] mb-10 drop-shadow-[0_0_15px_rgba(0,255,157,0.8)] flex items-center justify-center gap-3"
+          className="max-w-5xl mx-auto p-8 bg-card rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-muted"
         >
-          <Trophy className="h-8 w-8 animate-pulse" /> Зал Славы
-        </motion.h1>
+          {isAdmin() && (
+            <div className="mb-12 bg-popover p-6 rounded-xl shadow-inner border border-muted">
+              <h2 className="text-3xl font-semibold text-accent mb-6 cyber-text glitch flex items-center gap-2" data-text="ТОП ФЛОТОВ">
+                <Crown className="h-6 w-6 animate-spin-slow" /> ТОП ФЛОТОВ
+              </h2>
+              {isFleetsLoading ? (
+                <p className="text-accent font-mono text-center animate-pulse">Загрузка...</p>
+              ) : topFleets.length === 0 ? (
+                <p className="text-accent font-mono text-center">Флоты ждут славы!</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {topFleets.map((fleet, i) => (
+                    <motion.div
+                      key={fleet.owner_id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.1 }}
+                      className="bg-card p-4 rounded-lg border border-accent hover:shadow-[0_0_25px_rgba(255,215,0,0.5)] transition-all"
+                    >
+                      <h3 className="text-accent font-mono text-lg flex items-center gap-2">
+                        #{i + 1} {fleet.owner_name}
+                      </h3>
+                      <p className="text-muted-foreground font-mono">Доход: {fleet.total_revenue} XTR</p>
+                      <p className="text-muted-foreground font-mono">Флот: {fleet.car_count} машин</p>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
-        {/* Top Fleets Widget (Admins Only) */}
-        {isAdmin() && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
-            className="mb-12 bg-gradient-to-br from-yellow-900/30 to-yellow-700/20 p-6 rounded-xl shadow-[0_0_15px_rgba(255,215,0,0.4)]"
-          >
-            <h2 className="text-2xl font-semibold text-yellow-400 mb-6 flex items-center gap-2 font-mono">
-              <Crown className="h-6 w-6 animate-spin-slow" /> Топ Командиров Флотов
-            </h2>
-            {isFleetsLoading ? (
-              <div className="text-center text-yellow-400 animate-pulse">Загрузка топ-флотов...</div>
-            ) : topFleets.length === 0 ? (
-              <div className="text-center text-yellow-400">Флоты еще не готовы к славе!</div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {topFleets.map((fleet, index) => (
+          {pendingItems.length > 0 && (
+            <div className="mb-12">
+              <h2 className="text-3xl font-semibold text-destructive mb-6 cyber-text glitch" data-text="ОЖИДАЮТ ОПЛАТЫ">
+                ОЖИДАЮТ ОПЛАТЫ
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {pendingItems.map((item) => (
                   <motion.div
-                    key={fleet.owner_id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
+                    key={"rental_id" in item ? item.rental_id : item.id}
+                    whileHover={{ scale: 1.03 }}
+                    className="bg-card p-4 rounded-lg border border-destructive shadow-[0_0_15px_rgba(255,107,107,0.3)] hover:shadow-[0_0_25px_rgba(255,107,107,0.5)] transition-all"
                   >
-                    <Card className="bg-yellow-950/50 border-yellow-500 hover:shadow-[0_0_20px_rgba(255,215,0,0.5)] transition-all">
-                      <CardHeader>
-                        <CardTitle className="text-yellow-400 flex items-center gap-2">
-                          #{index + 1} {fleet.owner_name}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-white font-mono">
-                          <span className="font-semibold">Доход:</span> {fleet.total_revenue} XTR
-                        </p>
-                        <p className="text-gray-300 font-mono">
-                          <span className="font-semibold">Флот:</span> {fleet.car_count} машин
-                        </p>
-                      </CardContent>
-                    </Card>
+                    <h3 className="text-destructive font-mono flex items-center gap-2">
+                      {"type" in item ? <CreditCard className="h-5 w-5" /> : <Car className="h-5 w-5" />}
+                      {"type" in item ? (item.type === "subscription" ? "Подписка" : "Аренда") : "Аренда"}
+                    </h3>
+                    <p className="text-muted-foreground font-mono">Сумма: {"amount" in item ? item.amount : item.total_cost} XTR</p>
+                    <p className="text-muted-foreground font-mono text-sm">
+                      Детали: {"type" in item ? (item.type === "car_rental" ? `${item.metadata.car_make} ${item.metadata.car_model} на ${item.metadata.days} дней` : `Подписка #${item.metadata.subscription_id}`) : `${item.car_make} ${item.car_model} (${new Date(item.start_date).toLocaleDateString()} - ${new Date(item.end_date).toLocaleDateString()})`}
+                    </p>
+                    <span className="inline-block mt-2 bg-destructive text-destructive-foreground px-2 py-1 rounded font-mono text-sm">Ожидает</span>
                   </motion.div>
                 ))}
               </div>
-            )}
-          </motion.div>
-        )}
+            </div>
+          )}
 
-        {/* Pending Items */}
-        {pendingItems.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="mb-12"
-          >
-            <h2 className="text-2xl font-semibold text-red-500 mb-6 font-mono">Ожидающие Оплаты</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {pendingItems.map((item) => (
-                <motion.div
-                  key={"rental_id" in item ? item.rental_id : item.id}
-                  whileHover={{ scale: 1.03 }}
-                  className="bg-red-950/50 border-red-500 rounded-lg shadow-[0_0_10px_rgba(255,107,107,0.3)] hover:shadow-[0_0_20px_rgba(255,107,107,0.5)] transition-all"
-                >
-                  <CardHeader>
-                    <CardTitle className="text-red-400 flex items-center gap-2 font-mono">
+          {completedItems.length > 0 && (
+            <div className="bg-popover p-6 rounded-xl shadow-inner border border-muted">
+              <h2 className="text-3xl font-semibold text-primary mb-6 cyber-text glitch flex items-center gap-2" data-text="ЗАВОЁВАННЫЕ СЛАВЫ">
+                <Trophy className="h-6 w-6 animate-bounce" /> ЗАВОЁВАННЫЕ СЛАВЫ
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {completedItems.map((item) => (
+                  <motion.div
+                    key={"rental_id" in item ? item.rental_id : item.id}
+                    whileHover={{ scale: 1.03 }}
+                    className="bg-card p-4 rounded-lg border border-primary shadow-[0_0_15px_rgba(0,255,157,0.3)] hover:shadow-[0_0_25px_rgba(0,255,157,0.5)] transition-all"
+                  >
+                    <h3 className="text-primary font-mono flex items-center gap-2">
                       {"type" in item ? <CreditCard className="h-5 w-5" /> : <Car className="h-5 w-5" />}
                       {"type" in item ? (item.type === "subscription" ? "Подписка" : "Аренда") : "Аренда"}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-white font-mono">
-                      <span className="font-semibold">Сумма:</span> {"amount" in item ? item.amount : item.total_cost} XTR
+                    </h3>
+                    <p className="text-muted-foreground font-mono">Сумма: {"amount" in item ? item.amount : item.total_cost} XTR</p>
+                    <p className="text-muted-foreground font-mono text-sm">
+                      Детали: {"type" in item ? (item.type === "car_rental" ? `${item.metadata.car_make} ${item.metadata.car_model} на ${item.metadata.days} дней` : `Подписка #${item.metadata.subscription_id}`) : `${item.car_make} ${item.car_model} (${new Date(item.start_date).toLocaleDateString()} - ${new Date(item.end_date).toLocaleDateString()})`}
                     </p>
-                    <p className="text-gray-300 font-mono text-sm">
-                      <span className="font-semibold">Детали:</span>{" "}
-                      {"type" in item ? (
-                        item.type === "car_rental" ? (
-                          `${item.metadata.car_make} ${item.metadata.car_model} на ${item.metadata.days} дней`
-                        ) : (
-                          `Подписка #${item.metadata.subscription_id}`
-                        )
-                      ) : (
-                        `${item.car_make} ${item.car_model} (${new Date(item.start_date).toLocaleDateString()} - ${new Date(
-                          item.end_date
-                        ).toLocaleDateString()})`
-                      )}
-                    </p>
-                    <Badge variant="destructive" className="mt-2">
-                      {"status" in item ? item.status : item.payment_status}
-                    </Badge>
-                  </CardContent>
-                  <CardFooter>
-                    <Button variant="destructive" className="w-full font-mono" onClick={() => {/* Payment logic */}}>
-                      Оплатить
-                    </Button>
-                  </CardFooter>
-                </motion.div>
-              ))}
+                    <span className="inline-block mt-2 bg-primary text-primary-foreground px-2 py-1 rounded font-mono text-sm">Оплачено</span>
+                  </motion.div>
+                ))}
+              </div>
             </div>
-          </motion.div>
-        )}
-
-        {/* Completed Items */}
-        {completedItems.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="bg-gradient-to-br from-green-900/30 to-green-700/20 p-8 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.4)]"
-          >
-            <h2 className="text-2xl font-semibold text-green-400 mb-6 flex items-center gap-2 font-mono">
-              <Trophy className="h-6 w-6 animate-bounce" /> Завоеванные Славы
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {completedItems.map((item) => (
-                <motion.div
-                  key={"rental_id" in item ? item.rental_id : item.id}
-                  whileHover={{ scale: 1.03 }}
-                  className="bg-green-950/50 border-green-500 rounded-lg shadow-[0_0_10px_rgba(0,255,157,0.3)] hover:shadow-[0_0_20px_rgba(0,255,157,0.5)] transition-all"
-                >
-                  <CardHeader>
-                    <CardTitle className="text-green-400 flex items-center gap-2 font-mono">
-                      {"type" in item ? <CreditCard className="h-5 w-5" /> : <Car className="h-5 w-5" />}
-                      {"type" in item ? (item.type === "subscription" ? "Подписка" : "Аренда") : "Аренда"}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-white font-mono">
-                      <span className="font-semibold">Сумма:</span> {"amount" in item ? item.amount : item.total_cost} XTR
-                    </p>
-                    <p className="text-gray-300 font-mono text-sm">
-                      <span className="font-semibold">Детали:</span>{" "}
-                      {"type" in item ? (
-                        item.type === "car_rental" ? (
-                          `${item.metadata.car_make} ${item.metadata.car_model} на ${item.metadata.days} дней`
-                        ) : (
-                          `Подписка #${item.metadata.subscription_id}`
-                        )
-                      ) : (
-                        `${item.car_make} ${item.car_model} (${new Date(item.start_date).toLocaleDateString()} - ${new Date(
-                          item.end_date
-                        ).toLocaleDateString()})`
-                      )}
-                    </p>
-                    <Badge variant="success" className="mt-2">
-                      {"status" in item ? item.status : item.payment_status}
-                    </Badge>
-                  </CardContent>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </div>
+          )}
+        </motion.div>
+      </main>
     </div>
   );
 }
