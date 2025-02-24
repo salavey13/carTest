@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { getUserInvoices, getUserRentals } from "@/hooks/supabase";
-import { supabaseAdmin } from "@/lib/supabase"; // Add this import
+import { supabaseAdmin } from "@/hooks/supabase"; // Add this import
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
