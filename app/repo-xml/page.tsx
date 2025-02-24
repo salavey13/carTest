@@ -9,8 +9,9 @@ interface FileNode {
   content: string;
 }
 
-const RepoXMLFetcher: React.FC = () => {
+const RepoTxtFetcher: React.FC = () => {
   const [repoUrl, setRepoUrl] = useState<string>("https://github.com/salavey13/cartest");
+  const [token, setToken] = useState<string>("");
   const [txtOutput, setTxtOutput] = useState<string>("");
   const [selectedOutput, setSelectedOutput] = useState<string>("");
   const [files, setFiles] = useState<FileNode[]>([]);
@@ -20,12 +21,10 @@ const RepoXMLFetcher: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<{ id: number; message: string }[]>([]);
 
-  const GITHUB_TOKEN = "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";
-
   const addToast = (message: string) => {
     const id = Date.now();
     setToasts((prev) => [...prev, { id, message }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
   };
 
   const parseRepoUrl = (url: string) => {
@@ -36,7 +35,8 @@ const RepoXMLFetcher: React.FC = () => {
 
   const fetchRepoContents = async (owner: string, repo: string, path: string = "") => {
     const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
-    const headers = { Accept: "application/vnd.github.v3+json", Authorization: `token ${GITHUB_TOKEN}` };
+    const headers: any = { Accept: "application/vnd.github.v3+json" };
+    if (token) headers.Authorization = `token ${token}`;
 
     try {
       const response = await axios.get(url, { headers });
@@ -103,10 +103,10 @@ const RepoXMLFetcher: React.FC = () => {
       setFiles(fetchedFiles);
       const txt = generateTxt(fetchedFiles);
       setTxtOutput(txt);
-      addToast("Извлечение завершено. TXT готов!");
+      addToast("Извлечение завершено. TXT в кармане!");
     } catch (err: any) {
-      setError(`Ошибка загрузки: ${err.message}. Проверь URL.`);
-      addToast("Ошибка: Извлечение прервано!");
+      setError(`Ошибка загрузки: ${err.message}. Проверь URL или токен.`);
+      addToast("Ошибка: Извлечение заглохло!");
     } finally {
       setLoading(false);
       setProgress(100);
@@ -122,25 +122,36 @@ const RepoXMLFetcher: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-6 bg-card rounded-xl shadow-lg border border-muted">
-      <h2 className="text-4xl font-bold cyber-text mb-4">Кибер-Экстрактор TXT</h2>
-      <p className="text-muted-foreground mb-6 text-lg font-mono">
-        Новичок? Не парься. Это выдернет все файлы в один TXT для ботов, чтобы прокачать твой проект. Вставь URL GitHub, жми кнопку и хватай TXT. Берет только .ts, .tsx, .css, .sql, пропускает components/ui/*—чисто и компактно.
+    <div className="max-w-5xl mx-auto p-8 bg-card rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-muted animate-[drift_20s_infinite]">
+      <h2 className="text-5xl font-bold cyber-text mb-6 tracking-wider glitch" data-text="Кибер-Экстрактор TXT">
+        Кибер-Экстрактор TXT
+      </h2>
+      <p className="text-muted-foreground mb-8 text-xl font-mono leading-relaxed">
+        Новичок? Забей. Это выгребает файлы в один TXT для ботов, чтобы твой проект взлетел. Кидай URL GitHub, токен (чтоб GitHub не выпендривался), жми кнопку и забирай TXT. Только .ts, .tsx, .css, .sql, без мусора из components/ui/*—чисто и по делу.
       </p>
-      <div className="flex flex-col gap-4 mb-6">
+      <div className="flex flex-col gap-6 mb-8">
         <input
           type="text"
           value={repoUrl}
           onChange={(e) => setRepoUrl(e.target.value)}
           placeholder="Вставь URL GitHub (например, https://github.com/user/repo)"
-          className="flex-grow p-3 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-glow font-mono"
+          className="flex-grow p-4 bg-input border border-border rounded-xl text-foreground focus:outline-none focus:ring-4 focus:ring-primary/50 text-glow font-mono text-lg shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
+        />
+        <input
+          type="password"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder="Токен GitHub (для приватных реп или лимитов)"
+          className="flex-grow p-4 bg-input border border-border rounded-xl text-foreground focus:outline-none focus:ring-4 focus:ring-primary/50 text-glow font-mono text-lg shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
         />
         <button
           onClick={handleFetch}
           disabled={loading}
-          className={`px-6 py-3 rounded-lg font-semibold text-primary-foreground ${
-            loading ? "bg-muted cursor-not-allowed" : "bg-primary hover:bg-secondary"
-          } transition-colors text-glow font-mono`}
+          className={`px-8 py-4 rounded-xl font-semibold text-primary-foreground ${
+            loading
+              ? "bg-muted cursor-not-allowed animate-pulse"
+              : "bg-primary hover:bg-secondary hover:shadow-[0_0_15px_rgba(255,107,107,0.7)]"
+          } transition-all text-glow font-mono text-lg`}
         >
           {loading ? "Взламываю..." : "Извлечь TXT"}
         </button>
@@ -150,25 +161,29 @@ const RepoXMLFetcher: React.FC = () => {
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
-          className="h-2 bg-primary rounded-full mb-6 shadow-[0_0_10px_rgba(255,107,107,0.8)]"
+          className="h-3 bg-primary rounded-full mb-8 shadow-[0_0_15px_rgba(255,107,107,0.8)]"
         />
       )}
 
-      {error && <p className="text-destructive mb-4 font-mono">{error}</p>}
+      {error && (
+        <p className="text-destructive mb-8 font-mono text-lg animate-[neon_2s_infinite]">{error}</p>
+      )}
 
       {files.length > 0 && (
-        <div className="mb-6 bg-popover p-4 rounded-lg shadow-inner border border-border">
-          <h3 className="text-2xl font-semibold text-secondary mb-2 cyber-text">Дерево файлов</h3>
-          <ul className="space-y-2">
+        <div className="mb-8 bg-popover p-6 rounded-xl shadow-inner border border-border">
+          <h3 className="text-3xl font-semibold text-secondary mb-4 cyber-text glitch" data-text="Дерево файлов">
+            Дерево файлов
+          </h3>
+          <ul className="space-y-3">
             {files.map((file) => (
-              <li key={file.path} className="flex items-center gap-2">
+              <li key={file.path} className="flex items-center gap-3 group">
                 <input
                   type="checkbox"
                   checked={selectedFiles.has(file.path)}
                   onChange={() => toggleFileSelection(file.path)}
-                  className="w-4 h-4 accent-primary"
+                  className="w-5 h-5 accent-primary rounded focus:ring-2 focus:ring-primary/50"
                 />
-                <span className="text-muted-foreground font-mono text-sm hover:text-foreground transition-colors">
+                <span className="text-muted-foreground font-mono text-base group-hover:text-foreground transition-colors duration-300">
                   {file.path}
                 </span>
               </li>
@@ -178,36 +193,43 @@ const RepoXMLFetcher: React.FC = () => {
       )}
 
       {txtOutput && (
-        <div className="mb-6 bg-popover p-4 rounded-lg shadow-inner border border-border">
-          <h3 className="text-2xl font-semibold text-secondary mb-2 cyber-text">Полный TXT</h3>
+        <div className="mb-8 bg-popover p-6 rounded-xl shadow-inner border border-border">
+          <h3 className="text-3xl font-semibold text-secondary mb-4 cyber-text glitch" data-text="Полный TXT">
+            Полный TXT
+          </h3>
           <textarea
             value={txtOutput}
             readOnly
-            className="w-full h-64 bg-card p-4 rounded-lg text-sm text-muted-foreground font-mono border border-muted resize-none"
+            className="w-full h-72 bg-card p-4 rounded-lg text-sm text-muted-foreground font-mono border border-muted resize-none scrollbar-thin scrollbar-thumb-primary scrollbar-track-muted"
           />
         </div>
       )}
 
       {selectedOutput && (
-        <div className="bg-popover p-4 rounded-lg shadow-inner border border-border">
-          <h3 className="text-2xl font-semibold text-secondary mb-2 cyber-text">Выбранные файлы (TXT)</h3>
+        <div className="bg-popover p-6 rounded-xl shadow-inner border border-border">
+          <h3
+            className="text-3xl font-semibold text-secondary mb-4 cyber-text glitch"
+            data-text="Выбранные файлы (TXT)"
+          >
+            Выбранные файлы (TXT)
+          </h3>
           <textarea
             value={selectedOutput}
             readOnly
-            className="w-full h-64 bg-card p-4 rounded-lg text-sm text-muted-foreground font-mono border border-muted resize-none"
+            className="w-full h-72 bg-card p-4 rounded-lg text-sm text-muted-foreground font-mono border border-muted resize-none scrollbar-thin scrollbar-thumb-primary scrollbar-track-muted"
             placeholder="Выбери файлы для их содержимого здесь..."
           />
         </div>
       )}
 
-      <div className="fixed bottom-4 right-4 space-y-2 z-50">
+      <div className="fixed bottom-6 right-6 space-y-3 z-50">
         {toasts.map((toast) => (
           <motion.div
             key={toast.id}
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 50 }}
-            className="bg-primary text-primary-foreground p-3 rounded-lg shadow-[0_0_10px_rgba(255,107,107,0.5)] font-mono text-sm"
+            className="bg-primary text-primary-foreground p-4 rounded-lg shadow-[0_0_15px_rgba(255,107,107,0.7)] font-mono text-base border border-primary/50"
           >
             {toast.message}
           </motion.div>
@@ -219,15 +241,54 @@ const RepoXMLFetcher: React.FC = () => {
   );
 };
 
-export default function RepoXMLPage() {
+export default function RepoTxtPage() {
   return (
-    <div className="min-h-screen pt-24 bg-background bg-grid-pattern">
-      <header className="fixed top-0 left-0 right-0 bg-card shadow-md p-4 z-10 border-b border-muted">
-        <h1 className="text-3xl font-bold text-gradient cyber-text">Генератор Кибер-TXT</h1>
+    <div className="min-h-screen pt-24 bg-background bg-grid-pattern animate-[drift_30s_infinite]">
+      <header className="fixed top-0 left-0 right-0 bg-card shadow-md p-6 z-10 border-b border-muted">
+        <h1
+          className="text-4xl font-bold text-gradient cyber-text glitch"
+          data-text="Генератор Кибер-TXT"
+        >
+          Генератор Кибер-TXT
+        </h1>
       </header>
-      <main className="container mx-auto pt-8">
-        <RepoXMLFetcher />
+      <main className="container mx-auto pt-10">
+        <RepoTxtFetcher />
       </main>
     </div>
   );
 }
+
+// Glitch effect CSS (add to globals.css if not present)
+const glitchStyle = `
+  .glitch {
+    position: relative;
+  }
+  .glitch::before,
+  .glitch::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .glitch::before {
+    color: #ff6b6b;
+    animation: glitch 1s infinite alternate-reverse;
+    clip-path: polygon(0 0, 100% 0, 100% 20%, 0 20%);
+  }
+  .glitch::after {
+    color: #4ecdc4;
+    animation: glitch 1.5s infinite alternate;
+    clip-path: polygon(0 80%, 100% 80%, 100% 100%, 0 100%);
+  }
+  @keyframes glitch {
+    0% { transform: translate(0); }
+    20% { transform: translate(-2px, 2px); }
+    40% { transform: translate(2px, -2px); }
+    60% { transform: translate(-2px, 0); }
+    80% { transform: translate(2px, 2px); }
+    100% { transform: translate(0); }
+  }
+`;
