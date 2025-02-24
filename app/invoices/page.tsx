@@ -75,9 +75,9 @@ export default function GloryHall() {
   }, [dbUser]);
 
   if (loading)
-    return <div className="pt-20 text-center text-2xl text-[#4ECDC4] animate-pulse">Summoning Your Glory...</div>;
+    return <div className="pt-20 text-center text-2xl text-[#4ECDC4] animate-pulse">Чекаю...</div>;
   if (!invoices.length && !rentals.length && !topFleets.length)
-    return <div className="pt-20 text-center text-xl text-[#FF6B6B]">Your Glory Hall awaits its first triumph!</div>;
+    return <div className="pt-20 text-center text-xl text-[#FF6B6B]">В ожидании первого триумфа!</div>;
 
   const pendingItems = [
     ...invoices.filter((inv) => inv.status === "pending"),
