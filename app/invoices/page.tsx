@@ -24,22 +24,66 @@ export default function GloryHall() {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      if (!dbUser) return;
-      const [invoicesRes, rentalsRes] = await Promise.all([getUserInvoices(dbUser.user_id), getUserRentals(dbUser.user_id)]);
-      if (invoicesRes.error) console.error("Ошибка счетов:", invoicesRes.error); else setInvoices(invoicesRes.data || []);
-      if (rentalsRes.error) console.error("Ошибка аренд:", rentalsRes.error); else setRentals(rentalsRes.data || []);
-      toast.success("Данные загружены!");
-      setIsUserDataLoading(false);
+      if (!dbUser) {
+        toast.error("Нет юзера в Telegram, пиздец!");
+        setIsUserDataLoading(false);
+        return;
+      }
+
+      toast.info(`Чекаю данные для юзера ${dbUser.user_id}...`);
+      try {
+        const [invoicesRes, rentalsRes] = await Promise.all([
+          getUserInvoices(dbUser.user_id),
+          getUserRentals(dbUser.user_id),
+        ]);
+
+        if (invoicesRes.error) {
+          toast.error(`Ошибка счетов: ${invoicesRes.error.message || "Хз что сломалось!"}`);
+        } else {
+          const invoiceData = invoicesRes.data || [];
+          setInvoices(invoiceData);
+          toast.success(`Счета загружены: ${invoiceData.length} штук`);
+        }
+
+        if (rentalsRes.error) {
+          toast.error(`Ошибка аренд: ${rentalsRes.error.message || "Аренды не хотят грузиться!"}`);
+        } else {
+          const rentalData = rentalsRes.data || [];
+          setRentals(rentalData);
+          toast.success(`Аренды загружены: ${rentalData.length} штук`);
+        }
+
+        if (!invoicesRes.error && !rentalsRes.error) {
+          toast.success("Всё железо загружено, командир!");
+        }
+      } catch (error) {
+        toast.error(`Критический сбой: ${error instanceof Error ? error.message : "Чёрт знает что!"}`);
+      } finally {
+        setIsUserDataLoading(false);
+      }
     };
 
     const fetchTopFleets = async () => {
-      const { data, error } = await supabaseAdmin.rpc("get_top_fleets");
-      if (error) toast.error("Ошибка топ-флотов"); else setTopFleets(data || []), toast.success("Топ-флоты загружены!");
-      setIsFleetsLoading(false);
+      toast.info("Чекаю топ-флоты для админа...");
+      try {
+        const { data, error } = await supabaseAdmin.rpc("get_top_fleets");
+        if (error) {
+          toast.error(`Ошибка топ-флотов: ${error.message || "Топ-флоты сломались!"}`);
+        } else {
+          const fleetData = data || [];
+          setTopFleets(fleetData);
+          toast.success(`Топ-флоты загружены: ${fleetData.length} экипажей`);
+        }
+      } catch (error) {
+        toast.error(`Крах топ-флотов: ${error instanceof Error ? error.message : "Неизвестная хрень!"}`);
+      } finally {
+        setIsFleetsLoading(false);
+      }
     };
 
+    toast.info("Запускаю загрузку данных...");
     fetchUserData();
-    if (isAdmin()) fetchTopFleets();
+    if (isAdmin()) fetchTopFleets(); else toast.info("Ты не админ, топ-флоты мимо!");
   }, [dbUser, isAdmin]);
 
   if (isUserDataLoading) {
@@ -63,7 +107,7 @@ export default function GloryHall() {
           animate={{ opacity: 1, y: 0 }}
           className="text-xl text-destructive font-mono text-center pt-20 animate-[neon_2s_infinite]"
         >
-          В ожидании первого триумфа!
+          В ожидании первого триумфа, братан!
         </motion.p>
       </div>
     );
@@ -91,9 +135,9 @@ export default function GloryHall() {
                 <Crown className="h-6 w-6 animate-spin-slow" /> ТОП ФЛОТОВ
               </h2>
               {isFleetsLoading ? (
-                <p className="text-accent font-mono text-center animate-pulse">Загрузка...</p>
+                <p className="text-accent font-mono text-center animate-pulse">Гружу топ-флоты...</p>
               ) : topFleets.length === 0 ? (
-                <p className="text-accent font-mono text-center">Флоты ждут славы!</p>
+                <p className="text-accent font-mono text-center">Флоты ещё не прославились!</p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {topFleets.map((fleet, i) => (
@@ -173,4 +217,4 @@ export default function GloryHall() {
       </main>
     </div>
   );
-}
+};
