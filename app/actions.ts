@@ -127,7 +127,7 @@ export async function notifyAdmin(carId: string, message: string) {
   const result = await sendTelegramMessage(
     telegramToken,
     message,
-    [{ text: "View Car", url: `https://your-app.com/cars/${carId}` }], // Adjust URL as needed
+    [{ text: "View Car", url: `https://v0-car-test.vercel.app/rent/${carId}` }], // Adjust URL as needed
     car.image_url, // Add imageUrl if available in car data
     adminId, // Use owner_id as chatId
     carId // Include carId to append car details
