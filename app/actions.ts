@@ -34,7 +34,7 @@ type SendMessagePayload =
     };
 
 /** Utility to get the base URL dynamically */
-export function getBaseUrl() {
+function getBaseUrl() {
   return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://v0-car-test.vercel.app";
 }
 
