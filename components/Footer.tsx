@@ -1,4 +1,4 @@
-i"use client";
+"use client";
 import { motion } from "framer-motion";
 import { Gift, Heart, ExternalLink, Send, Code, Lock } from "lucide-react";
 import { useTelegram } from "@/hooks/useTelegram";
