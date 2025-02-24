@@ -1,7 +1,8 @@
-"use client";
+i"use client";
 import { motion } from "framer-motion";
 import { Gift, Heart, ExternalLink, Send, Code, Lock } from "lucide-react";
 import { useTelegram } from "@/hooks/useTelegram";
+import Link from "next/link";
 
 export default function Footer() {
   const { tg, isInTelegramContext } = useTelegram();
