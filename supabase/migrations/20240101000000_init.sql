@@ -353,7 +353,7 @@ BEGIN
   RETURN QUERY
   SELECT 
     c.owner_id,
-    COALESCE(u.username, 'Unknown') AS owner_name,
+    COALESCE(u.username, 'DEMO') AS owner_name,
     SUM(r.total_cost) AS total_revenue,
     COUNT(DISTINCT c.id) AS car_count
   FROM cars c
