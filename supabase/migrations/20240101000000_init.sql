@@ -342,7 +342,28 @@ CREATE INDEX ON public.rentals (car_id);
 
 
 
-
+CREATE OR REPLACE FUNCTION get_top_fleets()
+RETURNS TABLE (
+  owner_id TEXT,
+  owner_name TEXT,
+  total_revenue NUMERIC,
+  car_count BIGINT
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    c.owner_id,
+    COALESCE(u.username, 'Unknown') AS owner_name,
+    SUM(r.total_cost) AS total_revenue,
+    COUNT(DISTINCT c.id) AS car_count
+  FROM cars c
+  LEFT JOIN rentals r ON c.id = r.car_id AND r.payment_status = 'paid'
+  LEFT JOIN users u ON c.owner_id = u.user_id
+  GROUP BY c.owner_id, u.username
+  ORDER BY total_revenue DESC NULLS LAST
+  LIMIT 5;
+END;
+$$ LANGUAGE plpgsql;
 
 -------------------------------------------------------
 -- SEED QUESTIONS & ANSWERS (BRANCHING LOGIC)
