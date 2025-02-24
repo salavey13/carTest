@@ -44,6 +44,7 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
         .from("cars")
         .insert({
           ...formData,
+          id: formDaya.make + " " + formData.model,
           owner_id: ownerId,
           specs: formData.specs,
           daily_price: Number(formData.daily_price),
