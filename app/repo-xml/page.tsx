@@ -76,7 +76,7 @@ const RepoXMLFetcher: React.FC = () => {
   };
 
   return (
-    <div>
+    <div className="min-h-screen bg-black text-[#00ff9d] pt-20">
       <h2>Get Repository XML</h2>
       <input
         type="text"
