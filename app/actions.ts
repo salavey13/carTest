@@ -9,8 +9,138 @@ import { logger } from "@/lib/logger"
 import type { WebAppUser } from "@/types/telegram"
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
-const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || "413553377"
+const DEFAULT_CHAT_ID = "413553377"; // Your default Telegram chat ID
+const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || DEFAULT_CHAT_ID
 
+interface InlineButton {
+  text: string;
+  url: string;
+}
+
+type SendMessagePayload =
+  | {
+      chat_id: string;
+      text: string;
+      reply_markup?: {
+        inline_keyboard: Array<Array<{ text: string; url: string }>>;
+      };
+    }
+  | {
+      chat_id: string;
+      photo: string;
+      caption: string;
+      reply_markup?: {
+        inline_keyboard: Array<Array<{ text: string; url: string }>>;
+      };
+    };
+
+
+/** Sends a Telegram message with optional image and buttons */
+export async function sendTelegramMessage(
+  token: string,
+  message: string,
+  buttons: InlineButton[] = [],
+  imageUrl?: string,
+  chatId?: string,
+  carId?: string
+) {
+  try {
+    const finalChatId = chatId || ADMIN_CHAT_ID;
+
+    let finalMessage = message;
+    if (carId) {
+      const { data: car, error } = await supabaseAdmin
+        .from("cars")
+        .select("make, model, daily_price")
+        .eq("id", carId)
+        .single();
+      if (error) throw new Error(`Failed to fetch car: ${error.message}`);
+      if (car) {
+        finalMessage += `\n\nCar: ${car.make} ${car.model}\nDaily Price: ${car.daily_price} XTR`;
+      }
+    }
+
+    const payload: SendMessagePayload = imageUrl
+      ? {
+          chat_id: finalChatId,
+          photo: imageUrl,
+          caption: finalMessage,
+          reply_markup: buttons.length
+            ? {
+                inline_keyboard: [buttons.map((button) => ({ text: button.text, url: button.url }))],
+              }
+            : undefined,
+        }
+      : {
+          chat_id: finalChatId,
+          text: finalMessage,
+          reply_markup: buttons.length
+            ? {
+                inline_keyboard: [buttons.map((button) => ({ text: button.text, url: button.url }))],
+              }
+            : undefined,
+        };
+
+    const endpoint = imageUrl ? "sendPhoto" : "sendMessage";
+    const response = await fetch(`https://api.telegram.org/bot${token}/${endpoint}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.description || "Failed to send message");
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "An unexpected error occurred",
+    };
+  }
+}
+
+/** Notifies an admin about a car-related action */
+export async function notifyAdmin(carId: string, message: string) {
+  const { data: car, error } = await supabaseAdmin
+    .from("cars")
+    .select("owner_id")
+    .eq("id", carId)
+    .single();
+
+  if (error) {
+    console.error("Error fetching car:", error);
+    return { success: false, error: error.message };
+  }
+
+  const adminId = car.owner_id;
+  const telegramToken = process.env.TELEGRAM_BOT_TOKEN; // Store in .env
+  if (!telegramToken) {
+    console.error("Telegram bot token not configured");
+    return { success: false, error: "Telegram bot token missing" };
+  }
+
+  const result = await sendTelegramMessage(
+    telegramToken,
+    message,
+    [{ text: "View Car", url: `https://your-app.com/cars/${carId}` }], // Adjust URL as needed
+    car.image_url, // Add imageUrl if available in car data
+    adminId, // Use owner_id as chatId
+    carId // Include carId to append car details
+  );
+
+  if (!result.success) {
+    console.error("Failed to notify admin:", result.error);
+  }
+  return result;
+}
+
+// Usage example: Notify when a car is rented
+//await notifyAdmin("car-uuid-123", "Your car has been rented!");
 export async function createOrUpdateUser(user: {
   id: string
   username?: string | null
