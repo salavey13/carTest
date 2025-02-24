@@ -5,6 +5,7 @@ import { useWorker } from "@/hooks/useWorker";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { uploadImage } from "@/hooks/supabase";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
 
 interface CarSubmissionFormProps {
   ownerId: string;
@@ -24,38 +25,57 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const { generateEmbedding } = useWorker();
 
+  // Generate default rent_link based on make and model
+  const generatedId = `${formData.make.toLowerCase().replace(/\s+/g, "-")}-${formData.model.toLowerCase().replace(/\s+/g, "-")}`;
+  const defaultRentLink = formData.make && formData.model ? `/rent/${generatedId}` : "";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    toast.info("Запускаю добавление тачки...");
 
     try {
-      let imageUrl = formData.image_url;
-      if (imageFile) {
-        const bucketName = "car-images";
-        imageUrl = await uploadImage(bucketName, imageFile);
-        toast.success("Изображение загружено!");
+      // Ensure public bucket exists
+      const bucketName = "car-images";
+      const { data: buckets, error: bucketError } = await supabaseAdmin.storage.listBuckets();
+      if (bucketError) throw bucketError;
+      if (!buckets.some((b) => b.name === bucketName)) {
+        await supabaseAdmin.storage.createBucket(bucketName, { public: true });
+        toast.success(`Бакет ${bucketName} создан на лету!`);
       }
 
+      // Upload image if provided
+      let imageUrl = formData.image_url;
+      if (imageFile) {
+        imageUrl = await uploadImage(bucketName, imageFile);
+        toast.success("Картинка залита в неон!");
+      }
+
+      // Generate embedding
       const specsString = JSON.stringify(formData.specs);
-      const combinedText = `${formData.description} ${specsString}`; // Add make and model if desired
+      const combinedText = `${formData.make} ${formData.model} ${formData.description} ${specsString}`;
       const embedding = await generateEmbedding(combinedText);
 
+      // Insert car with generated ID
       const { data: car, error: insertError } = await supabaseAdmin
         .from("cars")
         .insert({
-          ...formData,
-          id: formDaya.make + " " + formData.model,
+          id: generatedId, // Fixed "id not specified" by generating from make/model
           owner_id: ownerId,
+          make: formData.make,
+          model: formData.model,
+          description: formData.description,
           specs: formData.specs,
           daily_price: Number(formData.daily_price),
           image_url: imageUrl,
-          rent_link: formData.rent_link || `/rent/${formData.id}`,
+          rent_link: formData.rent_link || defaultRentLink,
           embedding: JSON.stringify(embedding),
         })
         .select();
 
       if (insertError) throw insertError;
 
+      // Reset form
       setFormData({
         make: "",
         model: "",
@@ -66,52 +86,66 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
         rent_link: "",
       });
       setImageFile(null);
-      toast.success("Автомобиль успешно добавлен!");
+      toast.success("Тачка в гараже, братан!");
     } catch (error) {
-      console.error("Ошибка при добавлении:", error);
-      toast.error("Ошибка при добавлении автомобиля");
+      toast.error(`Ошибка: ${(error instanceof Error ? error.message : "Хз что сломалось!")}`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <motion.form
+      onSubmit={handleSubmit}
+      className="space-y-6 bg-popover p-6 rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-muted"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 100 }}
+    >
+      <h2 className="text-2xl font-semibold text-gradient cyber-text glitch mb-6" data-text="ДОБАВИТЬ КИБЕР-ЖЕЛЕЗО">
+        ДОБАВИТЬ КИБЕР-ЖЕЛЕЗО
+      </h2>
+
       <div>
-        <label className="block text-sm font-medium text-gray-300">Марка</label>
+        <label className="block text-sm font-mono text-primary text-glow">Марка</label>
         <input
           type="text"
           value={formData.make}
-          onChange={(e) => setFormData({ ...formData, make: e.target.value })}
-          placeholder="Марка (например, Tesla)"
-          className="w-full p-3 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+          onChange={(e) => setFormData({ ...formData, make: e.target.value, rent_link: defaultRentLink })}
+          placeholder="Марка (например, Chery)"
+          className="w-full p-3 mt-1 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
           required
         />
       </div>
+
       <div>
-        <label className="block text-sm font-medium text-gray-300">Модель</label>
+        <label className="block text-sm font-mono text-primary text-glow">Модель</label>
         <input
           type="text"
           value={formData.model}
-          onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-          placeholder="Модель (например, Roadster)"
-          className="w-full p-3 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+          onChange={(e) => setFormData({ ...formData, model: e.target.value, rent_link: defaultRentLink })}
+          placeholder="Модель (например, Tiggo)"
+          className="w-full p-3 mt-1 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
           required
         />
       </div>
+
       <div>
-        <label className="block text-sm font-medium text-gray-300">Описание</label>
+        <label className="block text-sm font-mono text-primary text-glow">Описание</label>
         <textarea
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          placeholder="Описание (например, Футуристический электросуперкар)"
-          className="w-full p-3 rounded bg-gray-800 text-white placeholder-gray-400 h-32 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+          placeholder="Описание (например, Турбированный кибер-зверь)"
+          className="w-full p-3 mt-1 bg-input border border-border rounded-lg text-foreground h-32 focus:outline-none focus:ring-2 focus:ring-primary text-sm font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)] resize-none scrollbar-thin scrollbar-thumb-primary scrollbar-track-muted"
           required
         />
       </div>
+
       <div>
-        <h3 className="text-lg font-semibold text-cyan-400 mb-2">Характеристики</h3>
-        <div className="space-y-2">
+        <h3 className="text-lg font-mono text-secondary mb-2 cyber-text glitch" data-text="ХАРАКТЕРИСТИКИ">
+          ХАРАКТЕРИСТИКИ
+        </h3>
+        <div className="space-y-3">
           {Object.entries(formData.specs).map(([key, value], index) => (
             <div key={index} className="flex flex-wrap gap-2">
               <input
@@ -120,24 +154,19 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
                 onChange={(e) => {
                   const newSpecs = { ...formData.specs };
                   delete newSpecs[key];
-                  newSpecs[e.target.value] = formData.specs[key];
+                  newSpecs[e.target.value] = value;
                   setFormData({ ...formData, specs: newSpecs });
                 }}
-                placeholder="Параметр (например, версия)"
-                className="flex-1 min-w-[150px] p-3 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                placeholder="Параметр (например, мощность)"
+                className="flex-1 min-w-[150px] p-3 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
                 required
               />
               <input
                 type="text"
                 value={value}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    specs: { ...formData.specs, [key]: e.target.value },
-                  })
-                }
-                placeholder="Значение (например, v12)"
-                className="flex-1 min-w-[150px] p-3 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                onChange={(e) => setFormData({ ...formData, specs: { ...formData.specs, [key]: e.target.value } })}
+                placeholder="Значение (например, 300 л.с.)"
+                className="flex-1 min-w-[150px] p-3 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
                 required
               />
             </div>
@@ -145,38 +174,42 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
           <button
             type="button"
             onClick={() => setFormData({ ...formData, specs: { ...formData.specs, "": "" } })}
-            className="w-full p-3 rounded bg-gray-700 text-white hover:bg-gray-600 transition-colors text-sm"
+            className="w-full p-3 bg-muted hover:bg-primary/50 text-foreground hover:text-primary-foreground rounded-lg font-mono text-sm transition-colors shadow-[0_0_10px_rgba(255,107,107,0.3)]"
           >
-            Добавить характеристику
+            + Добавить шнягу
           </button>
         </div>
       </div>
+
       <div>
-        <label className="block text-sm font-medium text-gray-300">Цена за день (XTR)</label>
+        <label className="block text-sm font-mono text-primary text-glow">Цена за день (XTR)</label>
         <input
           type="number"
           value={formData.daily_price}
           onChange={(e) => setFormData({ ...formData, daily_price: e.target.value })}
-          placeholder="Цена за день (XTR)"
-          className="w-full p-3 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+          placeholder="Цена (например, 50)"
+          className="w-full p-3 mt-1 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
           required
         />
       </div>
+
       <div>
-        <h3 className="text-lg font-semibold text-cyan-400 mb-2">Изображение</h3>
+        <h3 className="text-lg font-mono text-secondary mb-2 cyber-text glitch" data-text="КАРТИНКА">
+          КАРТИНКА
+        </h3>
         <div className="flex flex-wrap gap-4 items-center">
           <input
-            type="url"
+            type="text" // Changed from "url" to "text" to allow path-like inputs
             value={formData.image_url}
             onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-            placeholder="URL изображения (необязательно)"
-            className="flex-1 min-w-[200px] p-3 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+            placeholder="URL картинки (опционально)"
+            className="flex-1 min-w-[200px] p-3 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
           />
           <label
             htmlFor="image-upload"
-            className="p-3 rounded bg-cyan-500 text-white hover:bg-cyan-600 transition-colors cursor-pointer text-center min-w-[150px] text-sm"
+            className="p-3 bg-primary hover:bg-secondary text-primary-foreground rounded-lg font-mono text-sm cursor-pointer min-w-[150px] text-center shadow-[0_0_15px_rgba(255,107,107,0.5)] hover:shadow-[0_0_25px_rgba(255,107,107,0.8)] transition-all text-glow"
           >
-            Загрузить изображение
+            Залить фотку
           </label>
           <input
             id="image-upload"
@@ -187,24 +220,27 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
           />
         </div>
       </div>
+
       <div>
-        <label className="block text-sm font-medium text-gray-300">Ссылка на аренду</label>
+        <label className="block text-sm font-mono text-primary text-glow">Ссылка на аренду</label>
         <input
-          type="url"
-          value={formData.rent_link}
+          type="text" // Changed from "url" to "text" to allow path-like inputs
+          value={formData.rent_link || defaultRentLink}
           onChange={(e) => setFormData({ ...formData, rent_link: e.target.value })}
-          placeholder="Ссылка на аренду (по умолчанию: /rent/<id>)"
-          className="w-full p-3 rounded bg-gray-800 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
-          required
+          placeholder={`/rent/${generatedId}`}
+          className="w-full p-3 mt-1 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
         />
       </div>
-      <button
+
+      <motion.button
         type="submit"
         disabled={isSubmitting}
-        className="w-full p-3 rounded bg-cyan-500 hover:bg-cyan-600 text-white font-bold transition-colors disabled:opacity-50 text-sm"
+        className={`w-full p-4 bg-primary hover:bg-secondary text-primary-foreground rounded-xl font-mono text-lg ${isSubmitting ? "animate-pulse cursor-not-allowed opacity-50" : "shadow-[0_0_15px_rgba(255,107,107,0.7)] hover:shadow-[0_0_25px_rgba(255,107,107,0.9)]"} transition-all text-glow`}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
       >
-        {isSubmitting ? "Добавление автомобиля..." : "Добавить автомобиль в аренду"}
-      </button>
-    </form>
+        {isSubmitting ? "Гружу тачку..." : "Засунуть в гараж"}
+      </motion.button>
+    </motion.form>
   );
 }
