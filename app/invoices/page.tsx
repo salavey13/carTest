@@ -1,7 +1,11 @@
 // app/invoices/page.tsx
 "use client";
 import { useEffect, useState } from "react";
-import { useAppContext } from "@/contexts/AppContext";
+import { useTelegram } from "@/hooks/useTelegram"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { motion } from "framer-motion"
+import { toast } from "sonner"
 import { getUserInvoices, getUserRentals } from "@/hooks/supabase";
 import { supabaseAdmin } from "@/hooks/supabase"; // Add this import
 import { Button } from "@/components/ui/button";
@@ -38,7 +42,8 @@ interface TopFleet {
 }
 
 export default function GloryHall() {
-  const { dbUser } = useAppContext();
+  const { dbUser, isAdmin } = useTelegram()
+  const router = useRouter()
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [topFleets, setTopFleets] = useState<TopFleet[]>([]);
