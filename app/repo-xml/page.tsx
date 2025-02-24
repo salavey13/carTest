@@ -11,8 +11,7 @@ interface FileNode {
 
 const RepoXMLFetcher: React.FC = () => {
   const [repoUrl, setRepoUrl] = useState<string>("https://github.com/salavey13/cartest");
-  const [token, setToken] = useState<string>(""); // Optional GitHub token
-  const [xmlOutput, setXmlOutput] = useState<string>("");
+  const [txtOutput, setTxtOutput] = useState<string>("");
   const [selectedOutput, setSelectedOutput] = useState<string>("");
   const [files, setFiles] = useState<FileNode[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
@@ -20,6 +19,8 @@ const RepoXMLFetcher: React.FC = () => {
   const [progress, setProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<{ id: number; message: string }[]>([]);
+
+  const GITHUB_TOKEN = "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";
 
   const addToast = (message: string) => {
     const id = Date.now();
@@ -35,8 +36,7 @@ const RepoXMLFetcher: React.FC = () => {
 
   const fetchRepoContents = async (owner: string, repo: string, path: string = "") => {
     const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
-    const headers: any = { Accept: "application/vnd.github.v3+json" };
-    if (token) headers.Authorization = `token ${token}`;
+    const headers = { Accept: "application/vnd.github.v3+json", Authorization: `token ${GITHUB_TOKEN}` };
 
     try {
       const response = await axios.get(url, { headers });
@@ -51,7 +51,11 @@ const RepoXMLFetcher: React.FC = () => {
         processed++;
         setProgress((processed / total) * 100);
 
-        if (item.type === "file" && allowedExtensions.some((ext) => item.path.endsWith(ext))) {
+        if (
+          item.type === "file" &&
+          allowedExtensions.some((ext) => item.path.endsWith(ext)) &&
+          !item.path.startsWith("components/ui/")
+        ) {
           addToast(`Сканирую ${item.path}...`);
           try {
             const contentResponse = await axios.get(item.download_url);
@@ -72,30 +76,21 @@ const RepoXMLFetcher: React.FC = () => {
     }
   };
 
-  const generateXML = (files: FileNode[]) => {
-    const { XMLBuilder } = (window as any)["fast-xml-parser"];
-    const builder = new XMLBuilder({ ignoreAttributes: false, format: true });
-    const xmlObj = {
-      repository: {
-        files: files.map((file) => ({
-          file: { "@_path": file.path, content: file.content },
-        })),
-      },
-    };
-    return builder.build(xmlObj);
+  const generateTxt = (files: FileNode[]) => {
+    return files.map((file) => `--- ${file.path} ---\n${file.content}`).join("\n\n");
   };
 
-  const generateSelectedMarkdown = (files: FileNode[]) => {
+  const generateSelectedTxt = (files: FileNode[]) => {
     return files
       .filter((file) => selectedFiles.has(file.path))
-      .map((file) => `\`\`\`\n${file.path}\n${file.content}\n\`\`\``)
+      .map((file) => `--- ${file.path} ---\n${file.content}`)
       .join("\n\n");
   };
 
   const handleFetch = async () => {
     setLoading(true);
     setError(null);
-    setXmlOutput("");
+    setTxtOutput("");
     setSelectedOutput("");
     setFiles([]);
     setSelectedFiles(new Set());
@@ -106,11 +101,11 @@ const RepoXMLFetcher: React.FC = () => {
       const { owner, repo } = parseRepoUrl(repoUrl);
       const fetchedFiles = await fetchRepoContents(owner, repo);
       setFiles(fetchedFiles);
-      const xml = generateXML(fetchedFiles);
-      setXmlOutput(xml);
-      addToast("Извлечение завершено. XML готов!");
+      const txt = generateTxt(fetchedFiles);
+      setTxtOutput(txt);
+      addToast("Извлечение завершено. TXT готов!");
     } catch (err: any) {
-      setError(`Ошибка загрузки: ${err.message}. Проверь URL или токен.`);
+      setError(`Ошибка загрузки: ${err.message}. Проверь URL.`);
       addToast("Ошибка: Извлечение прервано!");
     } finally {
       setLoading(false);
@@ -123,14 +118,14 @@ const RepoXMLFetcher: React.FC = () => {
     if (newSelected.has(path)) newSelected.delete(path);
     else newSelected.add(path);
     setSelectedFiles(newSelected);
-    setSelectedOutput(generateSelectedMarkdown(files));
+    setSelectedOutput(generateSelectedTxt(files));
   };
 
   return (
     <div className="max-w-5xl mx-auto p-6 bg-card rounded-xl shadow-lg border border-muted">
-      <h2 className="text-4xl font-bold cyber-text mb-4">Кибер-Экстрактор XML</h2>
+      <h2 className="text-4xl font-bold cyber-text mb-4">Кибер-Экстрактор TXT</h2>
       <p className="text-muted-foreground mb-6 text-lg font-mono">
-        Новичок? Не парься. Это выдернет “XML”—карту кода для ботов, чтобы прокачать твой проект. Вставь URL GitHub, жми кнопку и хватай XML. Берет только .ts, .tsx, .css, .sql—компактно для ботов.
+        Новичок? Не парься. Это выдернет все файлы в один TXT для ботов, чтобы прокачать твой проект. Вставь URL GitHub, жми кнопку и хватай TXT. Берет только .ts, .tsx, .css, .sql, пропускает components/ui/*—чисто и компактно.
       </p>
       <div className="flex flex-col gap-4 mb-6">
         <input
@@ -140,13 +135,6 @@ const RepoXMLFetcher: React.FC = () => {
           placeholder="Вставь URL GitHub (например, https://github.com/user/repo)"
           className="flex-grow p-3 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-glow font-mono"
         />
-        <input
-          type="text"
-          value={token}
-          onChange={(e) => setToken(e.target.value)}
-          placeholder="Токен GitHub (опционально, для приватных реп)"
-          className="flex-grow p-3 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-glow font-mono"
-        />
         <button
           onClick={handleFetch}
           disabled={loading}
@@ -154,7 +142,7 @@ const RepoXMLFetcher: React.FC = () => {
             loading ? "bg-muted cursor-not-allowed" : "bg-primary hover:bg-secondary"
           } transition-colors text-glow font-mono`}
         >
-          {loading ? "Взламываю..." : "Извлечь XML"}
+          {loading ? "Взламываю..." : "Извлечь TXT"}
         </button>
       </div>
 
@@ -189,18 +177,20 @@ const RepoXMLFetcher: React.FC = () => {
         </div>
       )}
 
-      {xmlOutput && (
+      {txtOutput && (
         <div className="mb-6 bg-popover p-4 rounded-lg shadow-inner border border-border">
-          <h3 className="text-2xl font-semibold text-secondary mb-2 cyber-text">Полный XML</h3>
-          <pre className="bg-card p-4 rounded-lg text-sm text-muted-foreground overflow-auto max-h-96 font-mono">
-            {xmlOutput}
-          </pre>
+          <h3 className="text-2xl font-semibold text-secondary mb-2 cyber-text">Полный TXT</h3>
+          <textarea
+            value={txtOutput}
+            readOnly
+            className="w-full h-64 bg-card p-4 rounded-lg text-sm text-muted-foreground font-mono border border-muted resize-none"
+          />
         </div>
       )}
 
       {selectedOutput && (
         <div className="bg-popover p-4 rounded-lg shadow-inner border border-border">
-          <h3 className="text-2xl font-semibold text-secondary mb-2 cyber-text">Выбранные файлы (Markdown)</h3>
+          <h3 className="text-2xl font-semibold text-secondary mb-2 cyber-text">Выбранные файлы (TXT)</h3>
           <textarea
             value={selectedOutput}
             readOnly
@@ -225,7 +215,6 @@ const RepoXMLFetcher: React.FC = () => {
       </div>
 
       <script src="https://unpkg.com/axios/dist/axios.min.js" async></script>
-      <script src="https://unpkg.com/fast-xml-parser@4.2.7/dist/fxp.min.js" async></script>
     </div>
   );
 };
@@ -234,7 +223,7 @@ export default function RepoXMLPage() {
   return (
     <div className="min-h-screen pt-24 bg-background bg-grid-pattern">
       <header className="fixed top-0 left-0 right-0 bg-card shadow-md p-4 z-10 border-b border-muted">
-        <h1 className="text-3xl font-bold text-gradient cyber-text">Генератор Кибер-XML</h1>
+        <h1 className="text-3xl font-bold text-gradient cyber-text">Генератор Кибер-TXT</h1>
       </header>
       <main className="container mx-auto pt-8">
         <RepoXMLFetcher />
