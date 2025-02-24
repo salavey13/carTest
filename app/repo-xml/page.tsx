@@ -20,7 +20,7 @@ const RepoXMLFetcher: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<{ id: number; message: string }[]>([]);
 
-  const GITHUB_TOKEN = "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";
+  const GITHUB_TOKEN = "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";
 
   const addToast = (message: string) => {
     const id = Date.now();
