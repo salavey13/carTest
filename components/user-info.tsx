@@ -1,28 +1,29 @@
-"use client"
-import { useState, useEffect } from "react"
-import { User, Bot } from "lucide-react"
-import Image from "next/image"
-import Link from "next/link"
-import { useTelegram } from "@/hooks/useTelegram"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { motion } from "framer-motion"
+// components/UserInfo.tsx
+"use client";
+import { useState, useEffect } from "react";
+import { User, Bot } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useTelegram } from "@/hooks/useTelegram";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { motion } from "framer-motion";
 
 export default function UserInfo() {
-  const { dbUser, user, isInTelegramContext, isMockUser, isLoading, error } = useTelegram()
-  const [isFirstLoad, setIsFirstLoad] = useState(true)
+  const { dbUser, user, isInTelegramContext, isMockUser, isLoading, error } = useTelegram();
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
 
   useEffect(() => {
     if (!isLoading && (dbUser || user)) {
-      setIsFirstLoad(false)
+      setIsFirstLoad(false);
     }
-  }, [isLoading, dbUser, user])
+  }, [isLoading, dbUser, user]);
 
   if (isLoading) {
     return (
       <div className="w-10 h-10 bg-gradient-to-br from-gray-700 to-gray-800 rounded-full animate-pulse shadow-[0_0_10px_rgba(0,255,157,0.2)]" />
-    )
+    );
   }
 
   if (error) {
@@ -34,13 +35,13 @@ export default function UserInfo() {
       >
         Ошибка
       </motion.div>
-    )
+    );
   }
 
-  const telegramUser = dbUser || user // Fallback to user if dbUser is null
+  const telegramUser = dbUser || user;
   if (telegramUser) {
     const displayName =
-      telegramUser.username || telegramUser.full_name || telegramUser.first_name || "Пользователь"
+      telegramUser.username || telegramUser.full_name || telegramUser.first_name || "Пользователь";
 
     return (
       <TooltipProvider>
@@ -53,7 +54,7 @@ export default function UserInfo() {
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="relative group cursor-pointer">
-                {dbUser && dbUser.avatar_url ? (
+                {dbUser?.avatar_url ? (
                   <Image
                     src={dbUser.avatar_url}
                     alt="Avatar"
@@ -77,14 +78,14 @@ export default function UserInfo() {
                 )}
               </div>
             </TooltipTrigger>
-            <TooltipContent className="bg-gradient-to-br from-gray-800 to-gray-900 border-[#4ECDC4]/40 text-[#4ECDC4] shadow-[0_0_10px_rgba(0,255,157,0.2)]">
+            <TooltipContent side="bottom" className="bg-gradient-to-br from-gray-800 to-gray-900 border-[#4ECDC4]/40 text-[#4ECDC4] shadow-[0_0_10px_rgba(0,255,157,0.2)]">
               <p className="font-mono">{displayName}</p>
               {dbUser?.user_id && (
                 <p className="text-xs font-mono opacity-80">ID: {dbUser.user_id}</p>
               )}
               <Link
                 href="/invoices"
-                className="text-[#FF6B6B] hover:text-[#FF8E8E] text-sm mt-2 block font-mono transition-colors"
+                className="text-[#FF6B6B] hover:text-[#FF8E8E] text-sm mt-2 block font-mono transition-colors underline"
               >
                 Зал Славы
               </Link>
@@ -117,7 +118,7 @@ export default function UserInfo() {
           </motion.span>
         </motion.div>
       </TooltipProvider>
-    )
+    );
   }
 
   return (
@@ -127,7 +128,7 @@ export default function UserInfo() {
     >
       <User className="h-5 w-5" />
     </Button>
-  )
+  );
 }
 
 function getInitials(name: string): string {
@@ -136,5 +137,5 @@ function getInitials(name: string): string {
     .map((word) => word[0])
     .join("")
     .toUpperCase()
-    .slice(0, 2)
+    .slice(0, 2);
 }
