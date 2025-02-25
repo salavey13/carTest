@@ -583,3 +583,4 @@ export async function findSimilarCars(resultEmbedding: number[]) {
     similarity: Math.round(car.similarity * 100),
   }));
 }
+

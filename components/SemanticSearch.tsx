@@ -182,3 +182,4 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
     </div>
   )
 }
+

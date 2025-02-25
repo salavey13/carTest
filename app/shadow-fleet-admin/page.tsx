@@ -1,4 +1,3 @@
-
 // app/shadow-fleet-admin/page.tsx
 "use client"
 import { useRouter } from "next/navigation"
@@ -18,3 +17,4 @@ export default function ShadowFleetAdminPage() {
 
   return <ShadowFleetAdmin />
 }
+

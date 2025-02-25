@@ -50,3 +50,4 @@ export const ProgressIndicator = ({ current, total, answered, mode, modeProgress
     </motion.div>
   );
 };
+

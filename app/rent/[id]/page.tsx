@@ -334,3 +334,4 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
 async function getUserSubscription(userId: string): Promise<string | null> {
   return null; // Placeholder; replace with actual logic
 }
+

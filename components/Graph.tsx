@@ -97,3 +97,4 @@ export const Graph: React.FC<GraphProps> = ({ currentQuestion, answers, onSelect
     </div>
   );
 };
+
