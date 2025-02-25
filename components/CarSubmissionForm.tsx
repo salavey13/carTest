@@ -1,16 +1,13 @@
 "use client";
 import { useState } from "react";
 import type React from "react";
-import { pipeline } from "@huggingface/transformers"; // Ensure this is installed
 import { supabaseAdmin } from "@/hooks/supabase";
 import { uploadImage } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-interface CarSubmissionFormProps {
-  ownerId: string; // Should be the admin's user_id
-}
+import { X } from "lucide-react";
 
-// Simplified embedding generator
+// Simplified embedding generator (verified and slightly tuned)
 function generateSimplifiedEmbedding(text: string): number[] {
   const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 2);
   if (words.length === 0) return new Array(384).fill(0);
@@ -18,23 +15,28 @@ function generateSimplifiedEmbedding(text: string): number[] {
   const embedding = new Array(384).fill(0);
   const wordCount: { [key: string]: number } = {};
 
-  // Count word frequencies
   words.forEach(word => {
     wordCount[word] = (wordCount[word] || 0) + 1;
   });
 
-  // Hash-based distribution with frequency weighting
   Object.entries(wordCount).forEach(([word, count], index) => {
     let hash = 0;
     for (let i = 0; i < word.length; i++) {
-      hash = (hash * 31 + word.charCodeAt(i)) % 10007;
+      hash = ((hash << 5) - hash + word.charCodeAt(i)) % 10007;
     }
-    const baseIdx = (hash + index * 17) % 384;
-    for (let i = 0; i < 5; i++) { // Spread across 5 dimensions
-      const idx = (baseIdx + i) % 384;
-      embedding[idx] += (count / words.length) * (1 - i * 0.1); // Decay effect
+    const baseIdx = Math.abs(hash + index * 23) % 384;
+    for (let i = 0; i < 7; i++) {
+      const idx = (baseIdx + i * 3) % 384;
+      embedding[idx] += (count / words.length) * (1 - i * 0.05);
     }
   });
+
+  const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
+  return magnitude > 0 ? embedding.map(val => val / magnitude) : embedding;
+}
+
+interface CarSubmissionFormProps {
+  ownerId: string; // Admin's user_id
 }
 
 export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
@@ -50,17 +52,27 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
 
-  // Generate default rent_link based on make and model
+  // Default spec keys aligned with RentCarPage
+  const defaultSpecKeys = [
+    "version",      // Версия
+    "electric",     // Электро (boolean as "Да/Нет")
+    "color",        // Цвет
+    "theme",        // Тема
+    "horsepower",   // Лошадки
+    "torque",       // Крутяк
+    "acceleration", // Разгон
+    "topSpeed",     // Макс
+  ];
+
   const generatedId = `${formData.make.toLowerCase().replace(/\s+/g, "-")}-${formData.model.toLowerCase().replace(/\s+/g, "-")}`;
   const defaultRentLink = formData.make && formData.model ? `/rent/${generatedId}` : "";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    toast.info("Запускаю добавление тачки...");
+    toast.info("Запускаю добавление тачки...", { style: { background: "#ff007a", color: "#fff" } });
 
     try {
-      // Ensure public bucket exists
       const bucketName = "car-images";
       const { data: buckets, error: bucketError } = await supabaseAdmin.storage.listBuckets();
       if (bucketError) throw bucketError;
@@ -69,38 +81,34 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
         toast.success(`Бакет ${bucketName} создан на лету!`);
       }
 
-      // Upload image if provided
       let imageUrl = formData.image_url;
       if (imageFile) {
         imageUrl = await uploadImage(bucketName, imageFile);
         toast.success("Картинка залита в неон!");
       }
 
-      // Generate embedding using transformer model
       const specsString = JSON.stringify(formData.specs);
       const combinedText = `${formData.make} ${formData.model} ${formData.description} ${specsString}`;
-      const embedding = await generateSimplifiedEmbedding(combinedText);
+      const embedding = generateSimplifiedEmbedding(combinedText);
 
-      // Insert car with generated ID and owner_id
       const { data: car, error: insertError } = await supabaseAdmin
         .from("cars")
         .insert({
           id: generatedId,
-          owner_id: ownerId, // Ensure this is the admin's user_id
+          owner_id: ownerId,
           make: formData.make,
           model: formData.model,
           description: formData.description,
           specs: formData.specs,
           daily_price: Number(formData.daily_price),
-          image_url: imageUrl,
+          image_url: imageUrl || "",
           rent_link: formData.rent_link || defaultRentLink,
-          embedding: JSON.stringify(embedding),
+          embedding,
         })
         .select();
 
       if (insertError) throw insertError;
 
-      // Reset form
       setFormData({
         make: "",
         model: "",
@@ -111,79 +119,99 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
         rent_link: "",
       });
       setImageFile(null);
-      toast.success("Тачка в гараже, братан!");
+      toast.success("Тачка в гараже, братан!", { style: { background: "#00ff9d", color: "#000" } });
     } catch (error) {
-      toast.error(`Ошибка: ${(error instanceof Error ? error.message : "Хз что сломалось!")}`);
+      toast.error(`Ошибка: ${(error instanceof Error ? error.message : "Хз что сломалось!")}`, { style: { background: "#ff007a", color: "#fff" } });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const addNewSpec = () => {
+    const usedKeys = Object.keys(formData.specs);
+    const nextKey = defaultSpecKeys.find(key => !usedKeys.includes(key)) || "";
+    setFormData({ ...formData, specs: { ...formData.specs, [nextKey]: "" } });
+  };
+
+  const removeSpec = (keyToRemove: string) => {
+    const newSpecs = { ...formData.specs };
+    delete newSpecs[keyToRemove];
+    setFormData({ ...formData, specs: newSpecs });
+  };
+
   return (
     <motion.form
       onSubmit={handleSubmit}
-      className="space-y-6 bg-popover p-6 rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-muted"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ type: "spring", stiffness: 100 }}
+      className="space-y-8 bg-gradient-to-br from-gray-900 to-black p-8 rounded-2xl shadow-[0_0_30px_rgba(255,107,107,0.7)] border border-[#ff007a]/70"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: "spring", stiffness: 150, damping: 15 }}
     >
-      <h2 className="text-2xl font-semibold text-gradient cyber-text glitch mb-6" data-text="ДОБАВИТЬ КИБЕР-ЖЕЛЕЗО">
+      <h2 className="text-3xl font-mono text-[#00ff9d] glitch mb-8 text-center animate-[neon_2s_infinite]" data-text="ДОБАВИТЬ КИБЕР-ЖЕЛЕЗО">
         ДОБАВИТЬ КИБЕР-ЖЕЛЕЗО
       </h2>
 
-      <div>
-        <label className="block text-sm font-mono text-primary text-glow">Марка</label>
-        <input
-          type="text"
-          value={formData.make}
-          onChange={(e) => setFormData({ ...formData, make: e.target.value, rent_link: defaultRentLink })}
-          placeholder="Марка (например, Chery)"
-          className="w-full p-3 mt-1 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
-          required
-        />
-      </div>
+      <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label className="block text-sm font-mono text-[#00ff9d] text-glow mb-2">Марка</label>
+          <input
+            type="text"
+            value={formData.make}
+            onChange={(e) => setFormData({ ...formData, make: e.target.value, rent_link: defaultRentLink })}
+            placeholder="Марка (например, Chery)"
+            className="w-full p-3 bg-black/80 border border-[#00ff9d]/50 text-[#00ff9d] rounded-lg focus:ring-2 focus:ring-[#00ff9d] focus:border-[#00ff9d] placeholder-[#00ff9d]/40 text-sm font-mono shadow-[inset_0_0_10px_rgba(0,255,157,0.5)] transition-all hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-mono text-[#00ff9d] text-glow mb-2">Модель</label>
+          <input
+            type="text"
+            value={formData.model}
+            onChange={(e) => setFormData({ ...formData, model: e.target.value, rent_link: defaultRentLink })}
+            placeholder="Модель (например, Tiggo)"
+            className="w-full p-3 bg-black/80 border border-[#00ff9d]/50 text-[#00ff9d] rounded-lg focus:ring-2 focus:ring-[#00ff9d] focus:border-[#00ff9d] placeholder-[#00ff9d]/40 text-sm font-mono shadow-[inset_0_0_10px_rgba(0,255,157,0.5)] transition-all hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]"
+            required
+          />
+        </div>
+      </motion.div>
 
       <div>
-        <label className="block text-sm font-mono text-primary text-glow">Модель</label>
-        <input
-          type="text"
-          value={formData.model}
-          onChange={(e) => setFormData({ ...formData, model: e.target.value, rent_link: defaultRentLink })}
-          placeholder="Модель (например, Tiggo)"
-          className="w-full p-3 mt-1 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
-          required
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-mono text-primary text-glow">Описание</label>
+        <label className="block text-sm font-mono text-[#00ff9d] text-glow mb-2">Описание</label>
         <textarea
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           placeholder="Описание (например, Турбированный кибер-зверь)"
-          className="w-full p-3 mt-1 bg-input border border-border rounded-lg text-foreground h-32 focus:outline-none focus:ring-2 focus:ring-primary text-sm font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)] resize-none scrollbar-thin scrollbar-thumb-primary scrollbar-track-muted"
+          className="w-full p-3 bg-black/80 border border-[#00ff9d]/50 text-[#00ff9d] rounded-lg h-32 focus:ring-2 focus:ring-[#00ff9d] focus:border-[#00ff9d] placeholder-[#00ff9d]/40 text-sm font-mono shadow-[inset_0_0_10px_rgba(0,255,157,0.5)] transition-all hover:shadow-[0_0_15px_rgba(0,255,157,0.7)] resize-none scrollbar-thin scrollbar-thumb-[#00ff9d] scrollbar-track-gray-900"
           required
         />
       </div>
 
       <div>
-        <h3 className="text-lg font-mono text-secondary mb-2 cyber-text glitch" data-text="ХАРАКТЕРИСТИКИ">
+        <h3 className="text-lg font-mono text-[#00ff9d] mb-4 glitch animate-[neon_2s_infinite]" data-text="ХАРАКТЕРИСТИКИ">
           ХАРАКТЕРИСТИКИ
         </h3>
-        <div className="space-y-3">
+        <div className="space-y-4">
           {Object.entries(formData.specs).map(([key, value], index) => (
-            <div key={index} className="flex flex-wrap gap-2">
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="flex gap-3 items-center"
+            >
               <input
                 type="text"
                 value={key}
                 onChange={(e) => {
                   const newSpecs = { ...formData.specs };
                   delete newSpecs[key];
-                  newSpecs[e.target.value] = value;
+                  newSpecs[e.target.value || defaultSpecKeys[index % defaultSpecKeys.length]] = value;
                   setFormData({ ...formData, specs: newSpecs });
                 }}
-                placeholder="Параметр (например, мощность)"
-                className="flex-1 min-w-[150px] p-3 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
+                placeholder={defaultSpecKeys[index % defaultSpecKeys.length]}
+                className="flex-1 p-3 bg-black/80 border border-[#00ff9d]/50 text-[#00ff9d] rounded-lg focus:ring-2 focus:ring-[#00ff9d] focus:border-[#00ff9d] placeholder-[#00ff9d]/40 text-sm font-mono shadow-[inset_0_0_10px_rgba(0,255,157,0.5)] transition-all hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]"
                 required
               />
               <input
@@ -191,35 +219,57 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
                 value={value}
                 onChange={(e) => setFormData({ ...formData, specs: { ...formData.specs, [key]: e.target.value } })}
                 placeholder="Значение (например, 300 л.с.)"
-                className="flex-1 min-w-[150px] p-3 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
+                className="flex-1 p-3 bg-black/80 border border-[#00ff9d]/50 text-[#00ff9d] rounded-lg focus:ring-2 focus:ring-[#00ff9d] focus:border-[#00ff9d] placeholder-[#00ff9d]/40 text-sm font-mono shadow-[inset_0_0_10px_rgba(0,255,157,0.5)] transition-all hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]"
                 required
               />
-            </div>
+              <button
+                type="button"
+                onClick={() => removeSpec(key)}
+                className="p-2 bg-[#ff007a]/80 hover:bg-[#ff007a] text-white rounded-full shadow-[0_0_10px_rgba(255,0,122,0.5)] transition-all"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </motion.div>
           ))}
-          <button
+          <motion.button
             type="button"
-            onClick={() => setFormData({ ...formData, specs: { ...formData.specs, "": "" } })}
-            className="w-full p-3 bg-muted hover:bg-primary/50 text-foreground hover:text-primary-foreground rounded-lg font-mono text-sm transition-colors shadow-[0_0_10px_rgba(255,107,107,0.3)]"
+            onClick={addNewSpec}
+            className="w-full p-3 bg-gray-800/80 hover:bg-[#00ff9d]/30 text-[#00ff9d] rounded-lg font-mono text-sm transition-colors shadow-[0_0_15px_rgba(0,255,157,0.5)] hover:shadow-[0_0_25px_rgba(0,255,157,0.7)]"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
             + Добавить шнягу
-          </button>
+          </motion.button>
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-mono text-primary text-glow">Цена за день (XTR)</label>
-        <input
-          type="number"
-          value={formData.daily_price}
-          onChange={(e) => setFormData({ ...formData, daily_price: e.target.value })}
-          placeholder="Цена (например, 50)"
-          className="w-full p-3 mt-1 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
-          required
-        />
-      </div>
+      <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label className="block text-sm font-mono text-[#00ff9d] text-glow mb-2">Цена за день (XTR)</label>
+          <input
+            type="number"
+            value={formData.daily_price}
+            onChange={(e) => setFormData({ ...formData, daily_price: e.target.value })}
+            placeholder="Цена (например, 50)"
+            className="w-full p-3 bg-black/80 border border-[#00ff9d]/50 text-[#00ff9d] rounded-lg focus:ring-2 focus:ring-[#00ff9d] focus:border-[#00ff9d] placeholder-[#00ff9d]/40 text-sm font-mono shadow-[inset_0_0_10px_rgba(0,255,157,0.5)] transition-all hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-mono text-[#00ff9d] text-glow mb-2">Ссылка на аренду</label>
+          <input
+            type="text"
+            value={formData.rent_link || defaultRentLink}
+            onChange={(e) => setFormData({ ...formData, rent_link: e.target.value })}
+            placeholder={`/rent/${generatedId}`}
+            className="w-full p-3 bg-black/80 border border-[#00ff9d]/50 text-[#00ff9d] rounded-lg focus:ring-2 focus:ring-[#00ff9d] focus:border-[#00ff9d] placeholder-[#00ff9d]/40 text-sm font-mono shadow-[inset_0_0_10px_rgba(0,255,157,0.5)] transition-all hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]"
+          />
+        </div>
+      </motion.div>
 
       <div>
-        <h3 className="text-lg font-mono text-secondary mb-2 cyber-text glitch" data-text="КАРТИНКА">
+        <h3 className="text-lg font-mono text-[#00ff9d] mb-2 glitch" data-text="КАРТИНКА">
           КАРТИНКА
         </h3>
         <div className="flex flex-wrap gap-4 items-center">
@@ -228,11 +278,11 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
             value={formData.image_url}
             onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
             placeholder="URL картинки (опционально)"
-            className="flex-1 min-w-[200px] p-3 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
+            className="flex-1 min-w-[200px] p-3 bg-black/80 border border-[#00ff9d]/50 text-[#00ff9d] rounded-lg focus:ring-2 focus:ring-[#00ff9d] focus:border-[#00ff9d] placeholder-[#00ff9d]/40 text-sm font-mono shadow-[inset_0_0_10px_rgba(0,255,157,0.5)] transition-all hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]"
           />
           <label
             htmlFor="image-upload"
-            className="p-3 bg-primary hover:bg-secondary text-primary-foreground rounded-lg font-mono text-sm cursor-pointer min-w-[150px] text-center shadow-[0_0_15px_rgba(255,107,107,0.5)] hover:shadow-[0_0_25px_rgba(255,107,107,0.8)] transition-all text-glow"
+            className="p-3 bg-[#ff007a]/80 hover:bg-[#ff007a] text-white rounded-lg font-mono text-sm cursor-pointer min-w-[150px] text-center shadow-[0_0_15px_rgba(255,0,122,0.5)] hover:shadow-[0_0_25px_rgba(255,0,122,0.8)] transition-all animate-[neon_2s_infinite]"
           >
             Залить фотку
           </label>
@@ -246,27 +296,15 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-mono text-primary text-glow">Ссылка на аренду</label>
-        <input
-          type="text"
-          value={formData.rent_link || defaultRentLink}
-          onChange={(e) => setFormData({ ...formData, rent_link: e.target.value })}
-          placeholder={`/rent/${generatedId}`}
-          className="w-full p-3 mt-1 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
-        />
-      </div>
-
       <motion.button
         type="submit"
         disabled={isSubmitting}
-        className={`w-full p-4 bg-primary hover:bg-secondary text-primary-foreground rounded-xl font-mono text-lg ${isSubmitting ? "animate-pulse cursor-not-allowed opacity-50" : "shadow-[0_0_15px_rgba(255,107,107,0.7)] hover:shadow-[0_0_25px_rgba(255,107,107,0.9)]"} transition-all text-glow`}
+        className={`w-full p-4 bg-[#ff007a]/80 hover:bg-[#ff007a] text-white rounded-xl font-mono text-lg ${isSubmitting ? "animate-pulse cursor-not-allowed opacity-50" : "shadow-[0_0_20px_rgba(255,0,122,0.8)] hover:shadow-[0_0_30px_rgba(255,0,122,1)]"} transition-all animate-[neon_2s_infinite]`}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
-        {isSubmitting ? "Гружу тачку..." : "Засунуть в гараж"}
+        {isSubmitting ? "ГРУЖУ ТАЧКУ..." : "ЗАСУНУТЬ В ГАРАЖ"}
       </motion.button>
     </motion.form>
   );
 }
-
