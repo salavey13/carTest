@@ -6,7 +6,7 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { uploadImage } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-
+import { useWorker } from "@/hooks/wuseWorker"
 interface CarSubmissionFormProps {
   ownerId: string; // Should be the admin's user_id
 }
@@ -23,7 +23,8 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
     rent_link: "",
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
-
+  const { generateEmbedding } = useWorker();
+  
   // Generate default rent_link based on make and model
   const generatedId = `${formData.make.toLowerCase().replace(/\s+/g, "-")}-${formData.model.toLowerCase().replace(/\s+/g, "-")}`;
   const defaultRentLink = formData.make && formData.model ? `/rent/${generatedId}` : "";
@@ -94,7 +95,7 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
   };
 
   // Embedding generation function using transformer pipeline
-  const generateEmbedding = async (text: string): Promise<number[]> => {
+  /*const generateEmbedding = async (text: string): Promise<number[]> => {
     try {
       const pipe = await pipeline("feature-extraction", "Supabase/gte-small", { quantized: true });
       const output = await pipe(text, {
@@ -108,7 +109,7 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
       toast.error("Ошибка генерации embeddings");
       throw error;
     }
-  };
+  };*/
 
   return (
     <motion.form
