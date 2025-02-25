@@ -13,7 +13,7 @@ interface CarResult {
   description: string;
   image_url: string;
   rent_link: string;
-  owner_id: string;
+  owner: string; // Updated to owner (username)
   similarity: number;
 }
 
@@ -39,7 +39,10 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
         body: JSON.stringify({ query: text }),
       });
 
-      if (!response.ok) throw new Error(`Ошибка сервера: ${response.status}`);
+      if (!response.ok) {
+        console.error("Server responded with status:", response.status);
+        throw new Error(`Ошибка сервера: ${response.status}`);
+      }
       const data = await response.json();
       setResults(data);
       if (!data.length) setError("Ничего не найдено");
@@ -93,19 +96,6 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
               loading ? "opacity-50" : "hover:text-[#00ff9d]"
             } transition-colors`}
           />
-          {/*queryText && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className={`absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 text-[#00ff9d]/70 hover:text-[#00ff9d] hover:bg-[#00ff9d]/10 rounded-full ${
-                loading ? "opacity-50 cursor-not-allowed" : ""
-              } transition-all`}
-              onClick={clearInput}
-              disabled={loading}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )*/}
         </div>
         {!compact && (
           <Button
@@ -139,7 +129,7 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
                     {!compact && (
                       <p className="text-xs text-[#00ff9d]/80 line-clamp-1">{car.description}</p>
                     )}
-                    <p className="text-xs text-[#00ff9d]/70">Владелец: {car.owner_id}</p>
+                    <p className="text-xs text-[#00ff9d]/70">Владелец: {car.owner}</p>
                   </div>
                   <div className="text-xs text-[#00ff9d]/50">
                     {(car.similarity * 100).toFixed(1)}%
