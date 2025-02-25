@@ -35,7 +35,8 @@ function generateSimplifiedEmbedding(text: string): number[] {
       embedding[idx] += (count / words.length) * (1 - i * 0.1); // Decay effect
     }
   });
-  
+}
+
 export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
