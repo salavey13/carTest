@@ -240,8 +240,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+
+
 DROP FUNCTION search_cars(vector,integer);
--- Create search function for cars (including owner)
+
 CREATE OR REPLACE FUNCTION search_cars(query_embedding VECTOR(384), match_count INT)
 RETURNS TABLE (
     id TEXT, 
@@ -250,7 +252,7 @@ RETURNS TABLE (
     description TEXT, 
     image_url TEXT, 
     rent_link TEXT, 
-    owner_id TEXT, 
+    owner TEXT, -- Changed to return username
     similarity FLOAT
 )
 LANGUAGE plpgsql AS $$
@@ -263,15 +265,14 @@ BEGIN
         c.description,
         c.image_url,
         c.rent_link,
-        c.owner_id, -- Assuming owner_id exists in the cars table
+        COALESCE(u.username, c.owner_id) AS owner, -- Fallback to owner_id if username is null
         1 - (c.embedding <=> query_embedding) AS similarity
     FROM cars c
+    LEFT JOIN users u ON c.owner_id = u.user_id
     ORDER BY similarity DESC
     LIMIT match_count;
 END;
 $$;
-
--- No DROP statement here! Keep the function intact
 
 -- Create function for similar cars (unchanged for now)
 CREATE OR REPLACE FUNCTION similar_cars(
