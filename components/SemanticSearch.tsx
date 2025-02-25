@@ -1,9 +1,10 @@
 "use client";
 import { useState, useCallback } from "react";
 import { Loader2, Search, X } from "lucide-react";
+import { pipeline } from "@huggingface/transformers";
+import { supabaseAdmin } from "@/hooks/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import Link from "next/link";
 
 interface CarResult {
@@ -13,7 +14,7 @@ interface CarResult {
   description: string;
   image_url: string;
   rent_link: string;
-  owner: string; // Updated to owner (username)
+  owner: string; // Username from users table
   similarity: number;
 }
 
@@ -33,18 +34,22 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
     setResults([]);
 
     try {
-      const response = await fetch("/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: text }),
+      // Generate embedding client-side
+      const pipe = await pipeline("feature-extraction", "Supabase/gte-small", { quantized: true });
+      const output = await pipe(text, { pooling: "mean", normalize: true });
+      const queryEmbedding = Array.from(output.data);
+      if (!queryEmbedding || queryEmbedding.length !== 384) throw new Error("Неверный размер эмбеддинга");
+
+      console.log("Эмбеддинг сгенерирован, первые 5 значений:", queryEmbedding.slice(0, 5));
+
+      // Call Supabase RPC directly
+      const { data, error } = await supabaseAdmin.rpc("search_cars", {
+        query_embedding: queryEmbedding,
+        match_count: 5,
       });
 
-      if (!response.ok) {
-        console.error("Server responded with status:", response.status);
-        throw new Error(`Ошибка сервера: ${response.status}`);
-      }
-      const data = await response.json();
-      setResults(data);
+      if (error) throw new Error(`Ошибка Supabase: ${error.message}`);
+      setResults(data || []);
       if (!data.length) setError("Ничего не найдено");
     } catch (err: any) {
       console.error("Поиск не удался:", err);
@@ -96,6 +101,19 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
               loading ? "opacity-50" : "hover:text-[#00ff9d]"
             } transition-colors`}
           />
+          {queryText && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className={`absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 text-[#00ff9d]/70 hover:text-[#00ff9d] hover:bg-[#00ff9d]/10 rounded-full ${
+                loading ? "opacity-50 cursor-not-allowed" : ""
+              } transition-all`}
+              onClick={clearInput}
+              disabled={loading}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
         {!compact && (
           <Button
