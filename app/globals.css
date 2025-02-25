@@ -83,6 +83,11 @@
   text-shadow: 0 0 5px #0ff, 0 0 10px #0ff;
 }
 
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-ms-clear {
+  display: none;
+}
+
 @keyframes neon {
   0%,
   100% {
