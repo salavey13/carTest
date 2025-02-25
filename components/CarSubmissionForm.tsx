@@ -6,7 +6,7 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { uploadImage } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { useWorker } from "@/hooks/wuseWorker"
+import { useWorker } from "@/hooks/useWorker"
 interface CarSubmissionFormProps {
   ownerId: string; // Should be the admin's user_id
 }
