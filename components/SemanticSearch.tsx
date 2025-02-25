@@ -39,7 +39,7 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
         body: JSON.stringify({ query: text }),
       });
 
-      if (!response.ok) throw new Error("Ошибка запроса поиска");
+      if (!response.ok) throw new Error(`Ошибка сервера: ${response.status}`);
       const data = await response.json();
       setResults(data);
       if (!data.length) setError("Ничего не найдено");
@@ -83,11 +83,10 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
             value={queryText}
             onChange={handleInputChange}
             onKeyPress={handleKeyPress}
-            placeholder={compact ? "Поиск..." : "Опиши мечту..."}
+            placeholder={compact ? "Поиск..." : "Опишите машину мечты..."}
             className={`w-full pl-10 pr-10 py-2 bg-black/80 border border-[#00ff9d]/50 text-[#00ff9d] font-mono rounded-lg focus:ring-2 focus:ring-[#00ff9d] focus:border-[#00ff9d] placeholder-[#00ff9d]/40 text-sm shadow-[inset_0_0_5px_rgba(0,255,157,0.5)] ${
               compact ? "py-1.5" : "md:py-3 md:text-base"
             }`}
-            style={{ WebkitAppearance: "none" }}
           />
           <Search
             className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#00ff9d]/70 ${
@@ -128,68 +127,30 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
 
       {results.length > 0 && (
         <div className={compact ? "mt-2" : "mt-6 z-10 relative"}>
-          {compact ? (
-            <div className="space-y-2">
-              {results.slice(0, 3).map((car) => (
-                <Link key={car.id} href={car.rent_link}>
-                  <div className="flex items-center gap-3 text-[#00ff9d] hover:bg-[#00ff9d]/10 p-2 rounded-lg transition-all">
-                    <img src={car.image_url} alt={car.make} className="w-12 h-12 rounded-md border border-[#00ff9d]/30" />
-                    <div>
-                      <p className="text-sm font-mono">{car.make} {car.model}</p>
-                      <p className="text-xs text-[#00ff9d]/70">Владелец: {car.owner_id}</p>
-                    </div>
+          <div className="space-y-2">
+            {results.slice(0, compact ? 3 : results.length).map((car) => (
+              <Link key={car.id} href={car.rent_link}>
+                <div className="flex items-center gap-3 text-[#00ff9d] hover:bg-[#00ff9d]/10 p-2 rounded-lg transition-all">
+                  <img src={car.image_url} alt={car.make} className="w-12 h-12 rounded-md border border-[#00ff9d]/30" />
+                  <div className="flex-1">
+                    <p className="text-sm font-mono">
+                      {car.make} {car.model}
+                    </p>
+                    {!compact && (
+                      <p className="text-xs text-[#00ff9d]/80 line-clamp-1">{car.description}</p>
+                    )}
+                    <p className="text-xs text-[#00ff9d]/70">Владелец: {car.owner_id}</p>
                   </div>
-                </Link>
-              ))}
-              {results.length > 3 && (
-                <p className="text-xs text-[#00ff9d]/50">+{results.length - 3} ещё</p>
-              )}
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {results.map((car) => (
-                <Card
-                  key={car.id}
-                  className="bg-black/90 border border-[#00ff9d]/40 hover:border-[#00ff9d] hover:shadow-[0_0_15px_rgba(0,255,157,0.5)] transition-all rounded-lg overflow-hidden"
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      {car.image_url && (
-                        <div className="relative">
-                          <img
-                            src={car.image_url}
-                            alt={`${car.make} ${car.model}`}
-                            className="w-24 h-16 object-cover rounded-md border border-[#00ff9d]/30"
-                          />
-                          <div className="absolute -top-2 -right-2 bg-[#00ff9d]/30 text-[#00ff9d] text-xs font-mono px-2 py-1 rounded-full shadow-[0_0_5px_rgba(0,255,157,0.5)]">
-                            {(car.similarity * 100).toFixed(1)}%
-                          </div>
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <h3 className="text-[#00ff9d] font-mono text-lg tracking-tight">
-                          {car.make} {car.model}
-                        </h3>
-                        <p className="text-[#00ff9d]/80 text-sm line-clamp-2 mt-1">
-                          {car.description}
-                        </p>
-                        <p className="text-[#00ff9d]/60 text-xs mt-1">Владелец: {car.owner_id}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="p-4 pt-0">
-                    <Button
-                      asChild
-                      variant="outline"
-                      className="w-full bg-[#00ff9d]/10 text-[#00ff9d] border-[#00ff9d]/50 hover:bg-[#00ff9d]/20 hover:border-[#00ff9d] font-mono rounded-lg transition-all shadow-[0_0_5px_rgba(0,255,157,0.3)]"
-                    >
-                      <a href={car.rent_link}>Арендовать</a>
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          )}
+                  <div className="text-xs text-[#00ff9d]/50">
+                    {(car.similarity * 100).toFixed(1)}%
+                  </div>
+                </div>
+              </Link>
+            ))}
+            {compact && results.length > 3 && (
+              <p className="text-xs text-[#00ff9d]/50">+{results.length - 3} ещё</p>
+            )}
+          </div>
         </div>
       )}
     </div>
