@@ -453,8 +453,8 @@ export const createRental = async (
 
 export const getUserRentals = async (userId: string): Promise<Rental[]> => {
   try {
-    const client = await createAuthenticatedClient(userId)
-    const { data, error } = await client
+    //const client = await createAuthenticatedClient(userId)
+    const { data, error } = await supabaseAdmin//client
       .from("rentals")
       .select(`
         *,
