@@ -8,23 +8,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, Crown, AlertTriangle } from "lucide-react";
-
+import {  getUserSubscription } from "@/hooks/supabase"
 interface Car {
   id: string;
   make: string;
   model: string;
   daily_price: number;
   image_url: string;
-  specs?: {
-    version?: string;
-    electric?: boolean;
-    color?: string;
-    theme?: string;
-    horsepower?: number;
-    torque?: string;
-    acceleration?: string;
-    topSpeed?: string;
-  };
+  specs?: Record<string, string | number | boolean>;
 }
 
 const YUAN_TO_STARS_RATE = 0.1;
@@ -78,17 +69,6 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
     };
     checkSubscription();
   }, [dbUser]);
-
-  const specs = selectedCar?.specs || {
-    version: "v12",
-    electric: false,
-    color: "Кибер-синий",
-    theme: "Киберпанк",
-    horsepower: 900,
-    torque: "750 Нм",
-    acceleration: "2.9с 0-100 км/ч",
-    topSpeed: "340 км/ч",
-  };
 
   const handleCarouselPrev = () => {
     setCarouselIndex((prev) => (prev === 0 ? cars.length - 1 : prev - 1));
@@ -149,21 +129,49 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background bg-grid-pattern flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-[#00ff9d] flex items-center justify-center">
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-          className="w-12 h-12 border-4 border-t-primary border-muted rounded-full shadow-[0_0_15px_rgba(255,107,107,0.8)]"
+          className="w-12 h-12 border-4 border-t-[#00ff9d] border-[#00ff9d]/20 rounded-full shadow-[0_0_15px_rgba(0,255,157,0.5)]"
         />
-        <span className="ml-4 text-2xl text-secondary font-mono animate-pulse">Гружу железо...</span>
+        <span className="ml-4 text-2xl font-mono animate-pulse">Гружу железо...</span>
       </div>
     );
   }
 
+  const specs = selectedCar?.specs || {
+    version: "v12",
+    electric: false,
+    color: "Кибер-синий",
+    theme: "Киберпанк",
+    horsepower: 900,
+    torque: "750 Нм",
+    acceleration: "2.9с 0-100 км/ч",
+    topSpeed: "340 км/ч",
+  };
+
+  // Categorize specs into "Power" and "Style"
+  const powerSpecs = ["version", "electric", "horsepower", "torque", "acceleration", "topSpeed"];
+  const styleSpecs = ["color", "theme"];
+  const powerEntries: [string, string | number | boolean][] = [];
+  const styleEntries: [string, string | number | boolean][] = [];
+  const customEntries: [string, string | number | boolean][] = [];
+
+  Object.entries(specs).forEach(([key, value]) => {
+    if (powerSpecs.includes(key)) {
+      powerEntries.push([key, value]);
+    } else if (styleSpecs.includes(key)) {
+      styleEntries.push([key, value]);
+    } else {
+      customEntries.push([key, value]);
+    }
+  });
+
   return (
-    <div className="min-h-screen pt-24 bg-background bg-grid-pattern animate-[drift_30s_infinite]">
-      <header className="fixed top-0 left-0 right-0 bg-card shadow-md p-6 z-10 border-b border-muted">
-        <h1 className="text-4xl font-bold text-gradient cyber-text glitch" data-text="АРЕНДА КИБЕР-ТАЧКИ">
+    <div className="min-h-screen pt-24 bg-gradient-to-b from-gray-900 to-black text-[#00ff9d] animate-[drift_30s_infinite]">
+      <header className="fixed top-0 left-0 right-0 bg-gray-900 shadow-[0_0_15px_rgba(255,107,107,0.5)] p-6 z-10 border-b border-[#ff007a]/50">
+        <h1 className="text-4xl font-mono text-[#00ff9d] glitch text-center animate-[neon_2s_infinite]" data-text="АРЕНДА КИБЕР-ТАЧКИ">
           АРЕНДА КИБЕР-ТАЧКИ
         </h1>
       </header>
@@ -171,10 +179,10 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-5xl mx-auto p-8 bg-card rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-muted"
+          className="max-w-5xl mx-auto p-8 bg-gray-900 rounded-2xl shadow-[0_0_25px_rgba(255,107,107,0.7)] border border-[#ff007a]/70"
         >
-          <h2 className="text-3xl font-semibold text-primary mb-8 cyber-text glitch flex items-center justify-center gap-2" data-text="ВЫБЕРИ ЖЕЛЕЗО">
-            ВЫБЕРИ ЖЕЛЕЗО {hasSubscription && <span className="bg-accent text-accent-foreground px-2 py-1 rounded font-mono text-sm"><Crown className="h-4 w-4 inline" /> Элита</span>}
+          <h2 className="text-3xl font-mono text-[#00ff9d] mb-8 cyber-text glitch flex items-center justify-center gap-2 animate-[neon_2s_infinite]" data-text="ВЫБЕРИ ЖЕЛЕЗО">
+            ВЫБЕРИ ЖЕЛЕЗО {hasSubscription && <span className="bg-[#ff007a]/80 text-white px-2 py-1 rounded font-mono text-sm"><Crown className="h-4 w-4 inline" /> Элита</span>}
           </h2>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -183,9 +191,9 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
               initial={{ x: -50 }}
               animate={{ x: 0 }}
               transition={{ type: "spring", stiffness: 100 }}
-              className="bg-popover p-6 rounded-xl shadow-inner border border-muted"
+              className="bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.5)] border border-[#00ff9d]/50"
             >
-              <h3 className="text-2xl font-semibold text-secondary mb-6 cyber-text glitch" data-text="КАРУСЕЛЬ ЖЕЛЕЗА">
+              <h3 className="text-2xl font-mono text-[#00ff9d] mb-6 glitch animate-[neon_2s_infinite]" data-text="КАРУСЕЛЬ ЖЕЛЕЗА">
                 КАРУСЕЛЬ ЖЕЛЕЗА
               </h3>
               <div className="relative">
@@ -204,35 +212,35 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
                           alt={`${cars[carouselIndex].make} ${cars[carouselIndex].model}`}
                           width={250}
                           height={180}
-                          className="mx-auto rounded-lg border border-muted shadow-[0_0_15px_rgba(255,107,107,0.5)] hover:scale-105 transition-transform"
+                          className="mx-auto rounded-lg border border-[#00ff9d]/50 shadow-[0_0_20px_rgba(0,255,157,0.7)] hover:scale-105 transition-transform"
                         />
-                        <p className="mt-4 font-mono text-xl text-foreground">{cars[carouselIndex].make} {cars[carouselIndex].model}</p>
-                        <p className="font-mono text-base text-primary">{cars[carouselIndex].daily_price}¥/день</p>
+                        <p className="mt-4 font-mono text-xl text-[#00ff9d]">{cars[carouselIndex].make} {cars[carouselIndex].model}</p>
+                        <p className="font-mono text-base text-[#ff007a]">{cars[carouselIndex].daily_price}¥/день</p>
                       </div>
                     )}
                   </motion.div>
                 </AnimatePresence>
                 <button
                   onClick={handleCarouselPrev}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 text-primary/60 hover:text-primary hover:bg-muted/50 p-3 rounded-full transition-all shadow-[0_0_10px_rgba(255,107,107,0.3)]"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 text-[#00ff9d]/70 hover:text-[#00ff9d] hover:bg-gray-700/50 p-3 rounded-full transition-all shadow-[0_0_10px_rgba(0,255,157,0.5)]"
                 >
                   <ChevronLeft className="h-6 w-6" />
                 </button>
                 <button
                   onClick={handleCarouselNext}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-primary/60 hover:text-primary hover:bg-muted/50 p-3 rounded-full transition-all shadow-[0_0_10px_rgba(255,107,107,0.3)]"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[#00ff9d]/70 hover:text-[#00ff9d] hover:bg-gray-700/50 p-3 rounded-full transition-all shadow-[0_0_10px_rgba(0,255,157,0.5)]"
                 >
                   <ChevronRight className="h-6 w-6" />
                 </button>
               </div>
               <div className="mt-6">
-                <label className="text-sm font-mono text-primary">СКОЛЬКО ДНЕЙ ЖЕЧЬ?</label>
+                <label className="text-sm font-mono text-[#00ff9d] text-glow">СКОЛЬКО ДНЕЙ ЖЕЧЬ?</label>
                 <input
                   type="number"
                   min="1"
                   value={rentDays}
                   onChange={(e) => setRentDays(Math.max(1, Number(e.target.value)))}
-                  className="w-full p-3 mt-2 bg-input border border-border rounded-lg text-foreground focus:outline-none focus:ring-4 focus:ring-primary/50 text-glow font-mono shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
+                  className="w-full p-3 mt-2 bg-black/80 border border-[#00ff9d]/50 text-[#00ff9d] rounded-lg focus:ring-2 focus:ring-[#00ff9d] focus:border-[#00ff9d] placeholder-[#00ff9d]/40 text-sm font-mono shadow-[inset_0_0_10px_rgba(0,255,157,0.5)] transition-all hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]"
                 />
               </div>
             </motion.div>
@@ -242,28 +250,28 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
               initial={{ x: 50 }}
               animate={{ x: 0 }}
               transition={{ type: "spring", stiffness: 100, delay: 0.1 }}
-              className="bg-popover p-6 rounded-xl shadow-inner border border-muted"
+              className="bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.5)] border border-[#00ff9d]/50"
             >
-              <h3 className="text-2xl font-semibold text-secondary mb-6 cyber-text glitch" data-text="ДАННЫЕ ТАЧКИ">
+              <h3 className="text-2xl font-mono text-[#00ff9d] mb-6 glitch animate-[neon_2s_infinite]" data-text="ДАННЫЕ ТАЧКИ">
                 ДАННЫЕ ТАЧКИ
               </h3>
               <AnimatePresence mode="wait">
                 {selectedCar ? (
                   <motion.div key={selectedCar.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-6">
                     <motion.div
-                      className="relative h-48 md:h-64 w-full rounded-xl overflow-hidden border border-muted shadow-[0_0_20px_rgba(255,107,107,0.5)]"
+                      className="relative h-48 md:h-64 w-full rounded-xl overflow-hidden border border-[#00ff9d]/50 shadow-[0_0_20px_rgba(0,255,157,0.7)]"
                       whileHover={{ scale: 1.03 }}
                       transition={{ type: "spring", stiffness: 300 }}
                     >
                       <Image src={selectedCar.image_url || "/placeholder.svg"} alt={`${selectedCar.make} ${selectedCar.model}`} fill className="object-cover" />
                     </motion.div>
                     <div className="text-center space-y-4">
-                      <p className="font-mono text-2xl text-foreground">{selectedCar.make} {selectedCar.model}</p>
-                      <p className="font-mono text-lg text-primary">{selectedCar.daily_price}¥/день</p>
-                      <p className="font-mono text-xl text-muted-foreground">
+                      <p className="font-mono text-2xl text-[#00ff9d]">{selectedCar.make} {selectedCar.model}</p>
+                      <p className="font-mono text-lg text-[#ff007a]">{selectedCar.daily_price}¥/день</p>
+                      <p className="font-mono text-xl text-[#00ff9d]/70">
                         ИТОГО: {selectedCar.daily_price * rentDays}¥ (
                         {hasSubscription ? (
-                          <span className="text-accent">{Math.round(selectedCar.daily_price * rentDays * YUAN_TO_STARS_RATE * 0.9)} XTR (10% ништяк)</span>
+                          <span className="text-[#ff007a]">{Math.round(selectedCar.daily_price * rentDays * YUAN_TO_STARS_RATE * 0.9)} XTR (10% ништяк)</span>
                         ) : (
                           `${Math.round(selectedCar.daily_price * rentDays * YUAN_TO_STARS_RATE)} XTR`
                         )})
@@ -272,22 +280,22 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
                     <button
                       onClick={handleRent}
                       disabled={invoiceLoading || !isInTelegramContext}
-                      className={`w-full p-4 rounded-xl font-semibold text-primary-foreground ${hasSubscription ? "bg-gradient-to-r from-accent to-primary" : "bg-primary"} ${invoiceLoading ? "animate-pulse cursor-not-allowed" : "hover:bg-secondary hover:shadow-[0_0_20px_rgba(255,107,107,0.9)]"} transition-all text-glow font-mono text-lg`}
+                      className={`w-full p-4 rounded-xl font-mono text-lg text-white ${hasSubscription ? "bg-gradient-to-r from-[#ff007a] to-[#00ff9d]" : "bg-[#ff007a]/80"} ${invoiceLoading ? "animate-pulse cursor-not-allowed" : "hover:bg-[#ff007a] hover:shadow-[0_0_25px_rgba(255,0,122,1)]"} transition-all`}
                     >
-                      {invoiceLoading ? "Генерю..." : hasSubscription ? "ГОНЯТЬ С НИШТЯКОМ" : "ГОНЯТЬ"}
+                      {invoiceLoading ? "ГЕНЕРЮ..." : hasSubscription ? "ГОНЯТЬ С НИШТЯКОМ" : "ГОНЯТЬ"}
                     </button>
                     {error && (
                       <motion.p
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="text-destructive text-sm font-mono flex items-center justify-center gap-1 animate-[neon_2s_infinite]"
+                        className="text-[#ff007a] text-sm font-mono flex items-center justify-center gap-1 animate-[neon_2s_infinite]"
                       >
                         <AlertTriangle className="h-4 w-4" /> {error}
                       </motion.p>
                     )}
                   </motion.div>
                 ) : (
-                  <motion.p initial={{ opacity: 0 }} animate={{ opacity: 0.5 }} className="text-center font-mono text-muted-foreground">
+                  <motion.p initial={{ opacity: 0 }} animate={{ opacity: 0.5 }} className="text-center font-mono text-[#00ff9d]/70">
                     КЛИКНИ НА ЖЕЛЕЗО, ЧТОБЫ УВИДЕТЬ!
                   </motion.p>
                 )}
@@ -295,31 +303,58 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
             </motion.div>
           </div>
 
-          {/* Specs Section */}
+          {/* Dynamic Specs Section */}
           {selectedCar && (
             <motion.section
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="mt-12 bg-popover p-6 rounded-xl shadow-inner border border-muted"
+              className="mt-12 bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.5)] border border-[#00ff9d]/50"
             >
-              <h3 className="text-2xl font-semibold text-secondary mb-6 cyber-text glitch" data-text="ТЕРМИНАЛ ХАРАКТЕРИСТИК">
+              <h3 className="text-2xl font-mono text-[#00ff9d] mb-6 glitch animate-[neon_2s_infinite]" data-text="ТЕРМИНАЛ ХАРАКТЕРИСТИК">
                 ТЕРМИНАЛ ХАРАКТЕРИСТИК
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Power Specs */}
                 <div className="space-y-4">
-                  <h4 className="text-lg font-mono text-primary">МОЩА</h4>
-                  <p className="text-muted-foreground font-mono"><span className="text-secondary">Версия:</span> {specs.version}</p>
-                  <p className="text-muted-foreground font-mono"><span className="text-secondary">Электро:</span> {specs.electric ? "Да, братан!" : "Бенз, классика!"}</p>
-                  <p className="text-muted-foreground font-mono"><span className="text-secondary">Лошадки:</span> {specs.horsepower} л.с.</p>
-                  <p className="text-muted-foreground font-mono"><span className="text-secondary">Крутяк:</span> {specs.torque}</p>
-                  <p className="text-muted-foreground font-mono"><span className="text-secondary">Разгон:</span> {specs.acceleration}</p>
-                  <p className="text-muted-foreground font-mono"><span className="text-secondary">Макс:</span> {specs.topSpeed}</p>
+                  <h4 className="text-lg font-mono text-[#ff007a] animate-[neon_2s_infinite]">МОЩА</h4>
+                  {powerEntries.map(([key, value]) => (
+                    <p key={key} className="text-[#00ff9d]/70 font-mono">
+                      <span className="text-[#00ff9d]">
+                        {key === "version" ? "Версия" :
+                         key === "electric" ? "Электро" :
+                         key === "horsepower" ? "Лошадки" :
+                         key === "torque" ? "Крутяк" :
+                         key === "acceleration" ? "Разгон" :
+                         key === "topSpeed" ? "Макс" : key}:
+                      </span>{" "}
+                      {key === "electric" ? (value ? "Да, братан!" : "Бенз, классика!") : value}
+                    </p>
+                  ))}
                 </div>
+
+                {/* Style Specs */}
                 <div className="space-y-4">
-                  <h4 className="text-lg font-mono text-primary">СТИЛЬ</h4>
-                  <p className="text-muted-foreground font-mono"><span className="text-secondary">Цвет:</span> {specs.color}</p>
-                  <p className="text-muted-foreground font-mono"><span className="text-secondary">Тема:</span> {specs.theme}</p>
+                  <h4 className="text-lg font-mono text-[#ff007a] animate-[neon_2s_infinite]">СТИЛЬ</h4>
+                  {styleEntries.map(([key, value]) => (
+                    <p key={key} className="text-[#00ff9d]/70 font-mono">
+                      <span className="text-[#00ff9d]">
+                        {key === "color" ? "Цвет" :
+                         key === "theme" ? "Тема" : key}:
+                      </span>{" "}
+                      {value}
+                    </p>
+                  ))}
+                  {customEntries.length > 0 && (
+                    <>
+                      <h4 className="text-lg font-mono text-[#ff007a] animate-[neon_2s_infinite] mt-4">КАСТОМ</h4>
+                      {customEntries.map(([key, value]) => (
+                        <p key={key} className="text-[#00ff9d]/70 font-mono">
+                          <span className="text-[#00ff9d]">{key}:</span> {value}
+                        </p>
+                      ))}
+                    </>
+                  )}
                 </div>
               </div>
             </motion.section>
@@ -329,9 +364,3 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
     </div>
   );
 }
-
-// Assuming getUserSubscription is imported elsewhere or defined
-async function getUserSubscription(userId: string): Promise<string | null> {
-  return null; // Placeholder; replace with actual logic
-}
-
