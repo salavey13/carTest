@@ -13,7 +13,7 @@ interface CarResult {
   description: string;
   image_url: string;
   rent_link: string;
-  owner_id: string;
+  owner: string;
   similarity: number;
 }
 
@@ -139,7 +139,7 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
                     {!compact && (
                       <p className="text-xs text-[#00ff9d]/80 line-clamp-1">{car.description}</p>
                     )}
-                    <p className="text-xs text-[#00ff9d]/70">Владелец: {car.owner_id}</p>
+                    <p className="text-xs text-[#00ff9d]/70">Владелец: {car.owner}</p>
                   </div>
                   <div className="text-xs text-[#00ff9d]/50">
                     {(car.similarity * 100).toFixed(1)}%
