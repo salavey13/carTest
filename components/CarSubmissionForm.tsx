@@ -6,11 +6,36 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { uploadImage } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { useWorker } from "@/hooks/useWorker"
 interface CarSubmissionFormProps {
   ownerId: string; // Should be the admin's user_id
 }
 
+// Simplified embedding generator
+function generateSimplifiedEmbedding(text: string): number[] {
+  const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  if (words.length === 0) return new Array(384).fill(0);
+
+  const embedding = new Array(384).fill(0);
+  const wordCount: { [key: string]: number } = {};
+
+  // Count word frequencies
+  words.forEach(word => {
+    wordCount[word] = (wordCount[word] || 0) + 1;
+  });
+
+  // Hash-based distribution with frequency weighting
+  Object.entries(wordCount).forEach(([word, count], index) => {
+    let hash = 0;
+    for (let i = 0; i < word.length; i++) {
+      hash = (hash * 31 + word.charCodeAt(i)) % 10007;
+    }
+    const baseIdx = (hash + index * 17) % 384;
+    for (let i = 0; i < 5; i++) { // Spread across 5 dimensions
+      const idx = (baseIdx + i) % 384;
+      embedding[idx] += (count / words.length) * (1 - i * 0.1); // Decay effect
+    }
+  });
+  
 export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -23,8 +48,7 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
     rent_link: "",
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const { generateEmbedding } = useWorker();
-  
+
   // Generate default rent_link based on make and model
   const generatedId = `${formData.make.toLowerCase().replace(/\s+/g, "-")}-${formData.model.toLowerCase().replace(/\s+/g, "-")}`;
   const defaultRentLink = formData.make && formData.model ? `/rent/${generatedId}` : "";
@@ -54,7 +78,7 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
       // Generate embedding using transformer model
       const specsString = JSON.stringify(formData.specs);
       const combinedText = `${formData.make} ${formData.model} ${formData.description} ${specsString}`;
-      const embedding = await generateEmbedding(combinedText);
+      const embedding = await generateSimplifiedEmbedding(combinedText);
 
       // Insert car with generated ID and owner_id
       const { data: car, error: insertError } = await supabaseAdmin
@@ -93,23 +117,6 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
       setIsSubmitting(false);
     }
   };
-
-  // Embedding generation function using transformer pipeline
-  /*const generateEmbedding = async (text: string): Promise<number[]> => {
-    try {
-      const pipe = await pipeline("feature-extraction", "Supabase/gte-small", { quantized: true });
-      const output = await pipe(text, {
-        pooling: "mean",
-        normalize: true,
-      });
-      const embedding = Array.from(output.data);
-      if (embedding.length !== 384) throw new Error("Invalid embedding dimensions");
-      return embedding;
-    } catch (error) {
-      toast.error("Ошибка генерации embeddings");
-      throw error;
-    }
-  };*/
 
   return (
     <motion.form
