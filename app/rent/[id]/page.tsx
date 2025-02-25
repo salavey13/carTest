@@ -364,3 +364,4 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
     </div>
   );
 }
+
