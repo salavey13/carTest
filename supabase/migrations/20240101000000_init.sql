@@ -125,19 +125,6 @@ ON user_results
 FOR INSERT
 WITH CHECK (auth.jwt() ->> 'chat_id' = user_id);
 
--- policy_init.sql
--- Create a public bucket for car images
-CREATE OR REPLACE FUNCTION create_public_bucket(bucket_name TEXT)
-RETURNS void AS $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM storage.buckets WHERE name = bucket_name) THEN
-    INSERT INTO storage.buckets (name, public) VALUES (bucket_name, true);
-  END IF;
-END;
-$$ LANGUAGE plpgsql;
-
--- Call the function to create the bucket
-SELECT create_public_bucket('car-images');
 
 
 
