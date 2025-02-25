@@ -98,7 +98,7 @@ export default function UserInfo() {
       {/* Modal */}
       {isModalOpen && (
         <motion.div
-          className="fixed inset-0 top-[42%] z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 top-[69%] z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -158,3 +158,4 @@ export default function UserInfo() {
 function getInitials(name: string): string {
   return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 }
+

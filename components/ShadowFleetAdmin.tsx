@@ -209,3 +209,4 @@ function CarCard({ car }: { car: PremiumCar }) {
     </motion.div>
   )
 }
+

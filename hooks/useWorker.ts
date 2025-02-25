@@ -99,3 +99,4 @@ export function useWorker() {
 
   return { generateEmbedding, isInitialized };
 }
+

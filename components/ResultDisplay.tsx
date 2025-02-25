@@ -100,3 +100,4 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({ result, similarCars }) =>
 };
 
 export default ResultDisplay;
+

@@ -292,3 +292,4 @@ const glitchStyle = `
     100% { transform: translate(0); }
   }
 `;
+
