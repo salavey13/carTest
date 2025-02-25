@@ -143,7 +143,7 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
                     <img src={car.image_url} alt={car.make} className="w-12 h-12 rounded-md border border-[#00ff9d]/30" />
                     <div>
                       <p className="text-sm font-mono">{car.make} {car.model}</p>
-                      <p className="text-xs text-[#00ff9d]/70">Owner: {car.owner}</p>
+                      <p className="text-xs text-[#00ff9d]/70">Owner: {car.owner_id}</p>
                     </div>
                   </div>
                 </Link>
