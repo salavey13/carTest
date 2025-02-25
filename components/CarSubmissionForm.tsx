@@ -1,14 +1,14 @@
 "use client";
 import { useState } from "react";
 import type React from "react";
-import { useWorker } from "@/hooks/useWorker";
+import { pipeline } from "@huggingface/transformers"; // Ensure this is installed
 import { supabaseAdmin } from "@/hooks/supabase";
 import { uploadImage } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 
 interface CarSubmissionFormProps {
-  ownerId: string;
+  ownerId: string; // Should be the admin's user_id
 }
 
 export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
@@ -23,7 +23,6 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
     rent_link: "",
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const { generateEmbedding } = useWorker();
 
   // Generate default rent_link based on make and model
   const generatedId = `${formData.make.toLowerCase().replace(/\s+/g, "-")}-${formData.model.toLowerCase().replace(/\s+/g, "-")}`;
@@ -51,17 +50,17 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
         toast.success("Картинка залита в неон!");
       }
 
-      // Generate embedding
+      // Generate embedding using transformer model
       const specsString = JSON.stringify(formData.specs);
       const combinedText = `${formData.make} ${formData.model} ${formData.description} ${specsString}`;
       const embedding = await generateEmbedding(combinedText);
 
-      // Insert car with generated ID
+      // Insert car with generated ID and owner_id
       const { data: car, error: insertError } = await supabaseAdmin
         .from("cars")
         .insert({
-          id: generatedId, // Fixed "id not specified" by generating from make/model
-          owner_id: ownerId,
+          id: generatedId,
+          owner_id: ownerId, // Ensure this is the admin's user_id
           make: formData.make,
           model: formData.model,
           description: formData.description,
@@ -91,6 +90,23 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
       toast.error(`Ошибка: ${(error instanceof Error ? error.message : "Хз что сломалось!")}`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Embedding generation function using transformer pipeline
+  const generateEmbedding = async (text: string): Promise<number[]> => {
+    try {
+      const pipe = await pipeline("feature-extraction", "Supabase/gte-small", { quantized: true });
+      const output = await pipe(text, {
+        pooling: "mean",
+        normalize: true,
+      });
+      const embedding = Array.from(output.data);
+      if (embedding.length !== 384) throw new Error("Invalid embedding dimensions");
+      return embedding;
+    } catch (error) {
+      toast.error("Ошибка генерации embeddings");
+      throw error;
     }
   };
 
@@ -199,7 +215,7 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
         </h3>
         <div className="flex flex-wrap gap-4 items-center">
           <input
-            type="text" // Changed from "url" to "text" to allow path-like inputs
+            type="text"
             value={formData.image_url}
             onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
             placeholder="URL картинки (опционально)"
@@ -224,7 +240,7 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
       <div>
         <label className="block text-sm font-mono text-primary text-glow">Ссылка на аренду</label>
         <input
-          type="text" // Changed from "url" to "text" to allow path-like inputs
+          type="text"
           value={formData.rent_link || defaultRentLink}
           onChange={(e) => setFormData({ ...formData, rent_link: e.target.value })}
           placeholder={`/rent/${generatedId}`}
