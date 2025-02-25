@@ -13,7 +13,7 @@ interface CarResult {
   description: string;
   image_url: string;
   rent_link: string;
-  owner_id: string; // Added owner field
+  owner_id: string;
   similarity: number;
 }
 
@@ -25,7 +25,7 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
 
   const handleSearch = useCallback(async (text: string) => {
     if (text.length < 3) {
-      setError("Query must be at least 3 characters");
+      setError("Запрос должен быть не менее 3 символов");
       return;
     }
     setLoading(true);
@@ -39,13 +39,13 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
         body: JSON.stringify({ query: text }),
       });
 
-      if (!response.ok) throw new Error("Search request failed");
+      if (!response.ok) throw new Error("Ошибка запроса поиска");
       const data = await response.json();
       setResults(data);
-      if (!data.length) setError("No results found");
+      if (!data.length) setError("Ничего не найдено");
     } catch (err: any) {
-      console.error("Search failed:", err);
-      setError(err.message || "Search error");
+      console.error("Поиск не удался:", err);
+      setError(err.message || "Ошибка поиска");
     } finally {
       setLoading(false);
     }
@@ -72,41 +72,42 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
 
   return (
     <div className={containerClass}>
-      {/* Cyberpunk Neon Glow */}
       {!compact && (
         <div className="absolute -top-10 -left-10 w-40 h-40 bg-[#00ff9d]/20 rounded-full blur-3xl opacity-30 pointer-events-none animate-pulse" />
       )}
 
       <div className="relative z-10 flex items-center gap-2">
-        <Input
-          type="search"
-          value={queryText}
-          onChange={handleInputChange}
-          onKeyPress={handleKeyPress}
-          placeholder={compact ? "Search..." : "Describe your dream ride..."}
-          className={`w-full pl-10 pr-10 py-2 bg-black/80 border border-[#00ff9d]/50 text-[#00ff9d] font-mono rounded-lg focus:ring-2 focus:ring-[#00ff9d] focus:border-[#00ff9d] placeholder-[#00ff9d]/40 text-sm shadow-[inset_0_0_5px_rgba(0,255,157,0.5)] ${
-            compact ? "py-1.5" : "md:py-3 md:text-base"
-          }`}
-          style={{ WebkitAppearance: "none" }} // Disable default "x"
-        />
-        <Search
-          className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#00ff9d]/70 ${
-            loading ? "opacity-50" : "hover:text-[#00ff9d]"
-          } transition-colors`}
-        />
-        {queryText && (
-          <Button
-            size="icon"
-            variant="ghost"
-            className={`absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 text-[#00ff9d]/70 hover:text-[#00ff9d] hover:bg-[#00ff9d]/10 rounded-full ${
-              loading ? "opacity-50 cursor-not-allowed" : ""
-            } transition-all`}
-            onClick={clearInput}
-            disabled={loading}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        )}
+        <div className="relative flex-1">
+          <Input
+            type="search"
+            value={queryText}
+            onChange={handleInputChange}
+            onKeyPress={handleKeyPress}
+            placeholder={compact ? "Поиск..." : "Опиши мечту..."}
+            className={`w-full pl-10 pr-10 py-2 bg-black/80 border border-[#00ff9d]/50 text-[#00ff9d] font-mono rounded-lg focus:ring-2 focus:ring-[#00ff9d] focus:border-[#00ff9d] placeholder-[#00ff9d]/40 text-sm shadow-[inset_0_0_5px_rgba(0,255,157,0.5)] ${
+              compact ? "py-1.5" : "md:py-3 md:text-base"
+            }`}
+            style={{ WebkitAppearance: "none" }}
+          />
+          <Search
+            className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-[#00ff9d]/70 ${
+              loading ? "opacity-50" : "hover:text-[#00ff9d]"
+            } transition-colors`}
+          />
+          {/*queryText && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className={`absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 text-[#00ff9d]/70 hover:text-[#00ff9d] hover:bg-[#00ff9d]/10 rounded-full ${
+                loading ? "opacity-50 cursor-not-allowed" : ""
+              } transition-all`}
+              onClick={clearInput}
+              disabled={loading}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )*/}
+        </div>
         {!compact && (
           <Button
             size="icon"
@@ -118,14 +119,6 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
           </Button>
         )}
       </div>
-
-      {/* Hide default browser clear button */}
-      <style jsx>{`
-        input[type="search"]::-webkit-search-cancel-button,
-        input[type="search"]::-ms-clear {
-          display: none;
-        }
-      `}</style>
 
       {error && (
         <p className="mt-2 text-sm text-[#ff007a] bg-[#ff007a]/10 px-3 py-1 rounded-lg shadow-[0_0_5px_rgba(255,0,122,0.5)] z-10 relative">
@@ -143,13 +136,13 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
                     <img src={car.image_url} alt={car.make} className="w-12 h-12 rounded-md border border-[#00ff9d]/30" />
                     <div>
                       <p className="text-sm font-mono">{car.make} {car.model}</p>
-                      <p className="text-xs text-[#00ff9d]/70">Owner: {car.owner_id}</p>
+                      <p className="text-xs text-[#00ff9d]/70">Владелец: {car.owner_id}</p>
                     </div>
                   </div>
                 </Link>
               ))}
               {results.length > 3 && (
-                <p className="text-xs text-[#00ff9d]/50">+{results.length - 3} more</p>
+                <p className="text-xs text-[#00ff9d]/50">+{results.length - 3} ещё</p>
               )}
             </div>
           ) : (
@@ -180,7 +173,7 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
                         <p className="text-[#00ff9d]/80 text-sm line-clamp-2 mt-1">
                           {car.description}
                         </p>
-                        <p className="text-[#00ff9d]/60 text-xs mt-1">Owner: {car.owner_id}</p>
+                        <p className="text-[#00ff9d]/60 text-xs mt-1">Владелец: {car.owner_id}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -190,7 +183,7 @@ export default function SemanticSearch({ compact = false }: { compact?: boolean 
                       variant="outline"
                       className="w-full bg-[#00ff9d]/10 text-[#00ff9d] border-[#00ff9d]/50 hover:bg-[#00ff9d]/20 hover:border-[#00ff9d] font-mono rounded-lg transition-all shadow-[0_0_5px_rgba(0,255,157,0.3)]"
                     >
-                      <a href={car.rent_link}>Rent Now</a>
+                      <a href={car.rent_link}>Арендовать</a>
                     </Button>
                   </CardFooter>
                 </Card>
