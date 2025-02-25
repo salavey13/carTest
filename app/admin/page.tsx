@@ -61,7 +61,7 @@ export default function AdminPage() {
           <p className="text-muted-foreground mb-8 text-lg font-mono text-center">
             Управляй кибер-флотом — добавляй новые машины в строй!
           </p>
-          <CarSubmissionForm ownerId={dbUser.id} />
+          <CarSubmissionForm ownerId={dbUser?.user_id} />
           <div className="mt-10 space-y-6 text-center">
             <Link
               href="/shadow-fleet-admin"
