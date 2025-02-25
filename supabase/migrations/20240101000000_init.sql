@@ -240,9 +240,19 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Create search function for cars
+DROP FUNCTION search_cars(vector,integer);
+-- Create search function for cars (including owner)
 CREATE OR REPLACE FUNCTION search_cars(query_embedding VECTOR(384), match_count INT)
-RETURNS TABLE (id TEXT, make TEXT, model TEXT, description TEXT, image_url TEXT, rent_link TEXT, similarity FLOAT)
+RETURNS TABLE (
+    id TEXT, 
+    make TEXT, 
+    model TEXT, 
+    description TEXT, 
+    image_url TEXT, 
+    rent_link TEXT, 
+    owner_id TEXT, 
+    similarity FLOAT
+)
 LANGUAGE plpgsql AS $$
 BEGIN
     RETURN QUERY
@@ -253,6 +263,7 @@ BEGIN
         c.description,
         c.image_url,
         c.rent_link,
+        c.owner_id, -- Assuming owner_id exists in the cars table
         1 - (c.embedding <=> query_embedding) AS similarity
     FROM cars c
     ORDER BY similarity DESC
@@ -260,9 +271,9 @@ BEGIN
 END;
 $$;
 
-DROP FUNCTION search_cars(vector,integer);
+-- No DROP statement here! Keep the function intact
 
--- Create function for similar cars
+-- Create function for similar cars (unchanged for now)
 CREATE OR REPLACE FUNCTION similar_cars(
     car_id TEXT,
     match_count INT DEFAULT 3
