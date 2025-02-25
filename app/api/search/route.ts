@@ -60,3 +60,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Внутренняя ошибка сервера" }, { status: 500 });
   }
 }
+
