@@ -1,28 +1,34 @@
 // app/style-guide/page.tsx
-import {
-  Button,
-  Input,
-  Textarea,
+import { Button } from "@/components/ui/button"; // Explicit import
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { 
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenuItem 
+} from "@/components/ui/dropdown-menu";
+import { 
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
-  CardFooter,
-  Switch,
-  Label,
+  CardFooter 
+} from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { 
   Select,
   SelectTrigger,
   SelectValue,
   SelectContent,
-  SelectItem,
-  Checkbox,
-  Slider,
-} from "@/components/ui";
+  SelectItem 
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Slider } from "@/components/ui/slider";
+
+
 
 export default function StyleGuide() {
   return (
