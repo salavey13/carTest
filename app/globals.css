@@ -3,47 +3,47 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 0%;
-  --foreground: 0 0% 100%;
-  --card: 0 0% 0%;
-  --card-foreground: 0 0% 100%;
-  --popover: 0 0% 0%;
-  --popover-foreground: 0 0% 100%;
-  --primary: 0 85% 70%;
-  --primary-foreground: 0 0% 0%;
-  --secondary: 173 71% 55%;
-  --secondary-foreground: 0 0% 0%;
-  --muted: 0 0% 20%;
-  --muted-foreground: 0 0% 60%;
-  --accent: 45 100% 62%;
-  --accent-foreground: 0 0% 0%;
-  --destructive: 0 100% 50%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 0 85% 70%;
-  --input: 0 85% 70%;
-  --ring: 0 85% 70%;
+  --background: #000000; /* Black background */
+  --foreground: #ffffff; /* White text */
+  --card: #1a1a1a; /* Dark card background */
+  --card-foreground: #ffffff; /* White text on card */
+  --popover: #1a1a1a; /* Dark popover background */
+  --popover-foreground: #ffffff; /* White text on popover */
+  --primary: #ff6b6b; /* Bright pink/magenta */
+  --primary-foreground: #000000; /* Black text on primary */
+  --secondary: #003366; /* Deep blue */
+  --secondary-foreground: #ffffff; /* White text on secondary */
+  --muted: #262626; /* Slightly lighter black for muted elements */
+  --muted-foreground: #888888; /* Gray text for muted elements */
+  --accent: #4ecdc4; /* Light teal accent */
+  --accent-foreground: #000000; /* Black text on accent */
+  --destructive: #ff3333; /* Red for destructive actions */
+  --destructive-foreground: #ffffff; /* White text on destructive */
+  --border: #333333; /* Dark gray border */
+  --input: #333333; /* Dark gray input background */
+  --ring: #ff6b6b; /* Pink ring */
 }
 
 .dark {
-  --background: 0 0% 0%;
-  --foreground: 0 0% 100%;
-  --card: 0 0% 3%;
-  --card-foreground: 0 0% 100%;
-  --popover: 0 0% 3%;
-  --popover-foreground: 0 0% 100%;
-  --primary: 0 85% 70%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 173 71% 55%;
-  --secondary-foreground: 0 0% 100%;
-  --muted: 0 0% 20%;
-  --muted-foreground: 0 0% 60%;
-  --accent: 45 100% 62%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 100% 50%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 0 0% 20%;
-  --input: 0 0% 20%;
-  --ring: 0 85% 70%;
+  --background: #000000; /* Black background */
+  --foreground: #ffffff; /* White text */
+  --card: #1a1a1a; /* Dark card background */
+  --card-foreground: #ffffff; /* White text on card */
+  --popover: #1a1a1a; /* Dark popover background */
+  --popover-foreground: #ffffff; /* White text on popover */
+  --primary: #ff6b6b; /* Bright pink/magenta */
+  --primary-foreground: #000000; /* Black text on primary */
+  --secondary: #003366; /* Deep blue */
+  --secondary-foreground: #ffffff; /* White text on secondary */
+  --muted: #262626; /* Slightly lighter black for muted elements */
+  --muted-foreground: #888888; /* Gray text for muted elements */
+  --accent: #4ecdc4; /* Light teal accent */
+  --accent-foreground: #000000; /* Black text on accent */
+  --destructive: #ff3333; /* Red for destructive actions */
+  --destructive-foreground: #ffffff; /* White text on destructive */
+  --border: #333333; /* Dark gray border */
+  --input: #333333; /* Dark gray input background */
+  --ring: #ff6b6b; /* Pink ring */
 }
 
 .bg-grid-pattern {
@@ -89,8 +89,7 @@ input[type="search"]::-ms-clear {
 }
 
 @keyframes neon {
-  0%,
-  100% {
+  0%, 100% {
     text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 20px #00ffff;
   }
   50% {
@@ -109,4 +108,3 @@ input[type="search"]::-ms-clear {
 
 /* Orbitron Font Import - Correctly placed at the end */
 @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap");
-
