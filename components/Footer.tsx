@@ -38,7 +38,7 @@ export default function Footer() {
             <ul className="space-y-3">
               <li>
                 <a
-                  href="https://v0.dev/chat/cartest-tupabase-template-hdQdrfzkTFA?b=b_HVsNns2SOBL&p=0"
+                  href="https://v0.dev/chat/community/car-rent-telegram-web-app-demo-7jgtr94e1QR"
                   className="text-sm text-muted-foreground hover:text-primary font-mono flex items-center gap-2 transition-colors text-glow"
                   target="_blank"
                   rel="noopener noreferrer"
