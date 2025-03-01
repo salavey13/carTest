@@ -88,7 +88,11 @@ export default function Home() {
         </div>
       </motion.main>
 
-      {/* Features Section */}
+      {/* Features Section {
+              title: "Отслеживание",
+              icon: <MapPin className="h-10 w-10 text-[#FFD93D]" />,
+              description: "Мониторинг в реальном времени",
+            },*/}
       <motion.div
         initial={{ opacity: 0, y: 50 }}
         animate={{ opacity: 1, y: 0 }}
@@ -107,11 +111,7 @@ export default function Home() {
               icon: <Car className="h-10 w-10 text-[#ff00ff]" />,
               description: "Кибер-кар прямо к вашему порогу",
             },
-            {
-              title: "Отслеживание",
-              icon: <MapPin className="h-10 w-10 text-[#FFD93D]" />,
-              description: "Мониторинг в реальном времени",
-            },
+            
           ].map((feature, index) => (
             <motion.div
               key={index}
