@@ -92,6 +92,14 @@ export default function Footer() {
                   <Lock className="w-4 h-4" /> Кибер-Гараж
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/donate"
+                  className="text-sm text-muted-foreground hover:text-primary font-mono flex items-center gap-2 transition-colors text-glow"
+                >
+                  <Code className="w-4 h-4" /> Донат
+                </Link>
+              </li>
             </ul>
           </div>
 
