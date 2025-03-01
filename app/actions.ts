@@ -408,7 +408,25 @@ export async function handleWebhookUpdate(update: any) {
           undefined,
           ADMIN_CHAT_ID
         );
-      }
+      } else if (invoice.type === "donation") {
+  // Новая логика для пожертвований
+  const message = invoice.metadata?.message || "Сообщение отсутствует";
+  await sendTelegramMessage(
+    process.env.TELEGRAM_BOT_TOKEN!,
+    `🎉 Поступило новое пожертвование!\nСумма: ${total_amount} XTR\nОт кого: ${userData.username || userData.user_id}\nСообщение: ${message}\nМы искренне благодарны за вашу щедрость!`,
+    [],
+    undefined,
+    ADMIN_CHAT_ID
+  );
+
+  await sendTelegramMessage(
+    process.env.TELEGRAM_BOT_TOKEN!,
+    "Большое спасибо за ваше пожертвование! 🌟 Ваша поддержка вдохновляет нас и помогает двигаться вперёд. Вы — часть нашего успеха!",
+    [],
+    undefined,
+    userId
+  );
+}
     }
   } catch (error) {
     logger.error("Error handling webhook update:", error);
