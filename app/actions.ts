@@ -189,6 +189,65 @@ export async function broadcastMessage(message: string, role?: string) {
   }
 }
 
+/** Sends a donation invoice to the user and notifies the admin */
+export async function sendDonationInvoice(chatId: string, amount: number, message: string) {
+  try {
+    const invoicePayload = `donation_${Date.now()}`; // Unique payload for the invoice
+    const title = "Donation to Leha";
+    const description = `Thank you for your support! ${message || "No message provided"}`;
+
+    // Send the invoice using existing function
+    const invoiceResult = await sendTelegramInvoice(
+      chatId,
+      title,
+      description,
+      invoicePayload,
+      amount,
+      0, // No subscription ID for donations
+      undefined // No photo for donations
+    );
+
+    if (!invoiceResult.success) {
+      throw new Error(invoiceResult.error);
+    }
+
+    // Store the invoice in the database with type "donation"
+    const { error: insertError } = await supabaseAdmin
+      .from("invoices")
+      .insert({
+        id: invoicePayload,
+        user_id: chatId,
+        amount,
+        type: "donation",
+        status: "pending",
+        metadata: { message },
+      });
+
+    if (insertError) {
+      throw new Error(`Failed to save invoice: ${insertError.message}`);
+    }
+
+    // Notify admin of the new donation attempt
+    const adminMessage = `New donation attempt!\nAmount: ${amount} XTR\nFrom: ${chatId}\nMessage: ${message || "No message"}`;
+    const adminResult = await sendTelegramMessage(
+      process.env.TELEGRAM_BOT_TOKEN!,
+      adminMessage,
+      [],
+      undefined,
+      ADMIN_CHAT_ID
+    );
+
+    if (!adminResult.success) {
+      logger.warn("Failed to notify admin:", adminResult.error);
+    }
+
+    return { success: true };
+  } catch (error) {
+    logger.error("Error in sendDonationInvoice:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Failed to process donation" };
+  }
+}
+
 /** Updates a car’s status and notifies the owner */
 export async function updateCarStatus(carId: string, newStatus: string) {
   const { error } = await supabaseAdmin
