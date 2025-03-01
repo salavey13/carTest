@@ -48,6 +48,16 @@ export default function Footer() {
               </li>
               <li>
                 <a
+                  href="https://v0.dev/chat/fork-of-rastaman-shop-ovZ2DvhjGCA"
+                  className="text-sm text-muted-foreground hover:text-primary font-mono flex items-center gap-2 transition-colors text-glow"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="w-4 h-4" /> Проект V0 + донат
+                </a>
+              </li>
+              <li>
+                <a
                   href="https://t.me/oneSitePlsBot/Friends"
                   className="text-sm text-muted-foreground hover:text-primary font-mono flex items-center gap-2 transition-colors text-glow"
                   target="_blank"
