@@ -221,6 +221,7 @@ export async function sendDonationInvoice(chatId: string, amount: number, messag
         type: "donation",
         status: "pending",
         metadata: { message },
+        subscription_id: 0,
       });
 
     if (insertError) {
