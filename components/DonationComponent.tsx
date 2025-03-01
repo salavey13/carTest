@@ -7,30 +7,34 @@ import { useTelegram } from "@/hooks/useTelegram";
 
 export default function DonationComponent() {
   const { dbUser } = useTelegram();
-  const [tipAmount, setTipAmount] = useState("10");
+  const [starAmount, setStarAmount] = useState("10");
   const [feedbackText, setFeedbackText] = useState("");
+  const [showDoubleButton, setShowDoubleButton] = useState(false);
 
   const handleDoubleIt = () => {
-    setTipAmount((prev) => String(parseInt(prev) * 2));
+    setStarAmount((prev) => {
+      const num = parseInt(prev);
+      return isNaN(num) ? "10" : String(num * 2);
+    });
   };
 
   const handleDonate = async () => {
     if (!dbUser) {
-      alert("Please log in with Telegram first!");
+      alert("Пожалуйста, сначала войдите через Telegram!");
       return;
     }
 
-    const amount = parseInt(tipAmount);
+    const amount = parseInt(starAmount);
     if (isNaN(amount) || amount <= 0) {
-      alert("Please enter a valid donation amount!");
+      alert("Пожалуйста, введите действительную сумму пожертвования!");
       return;
     }
 
     const result = await sendDonationInvoice(dbUser.user_id, amount, feedbackText);
     if (result.success) {
-      alert("Donation invoice sent! Please check your Telegram to complete the payment.");
+      alert("Счет на пожертвование отправлен! Пожалуйста, проверьте ваш Telegram, чтобы завершить платеж.");
     } else {
-      alert(`Oops, something went wrong: ${result.error}`);
+      alert(`Упс, что-то пошло не так: ${result.error}`);
     }
   };
 
@@ -42,41 +46,49 @@ export default function DonationComponent() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: "easeOut" }}
       >
-        <h2 className="text-5xl font-extrabold text-white mb-8 text-center tracking-tight">
-          Support Leha!
+        <h2 className="text-5xl font-extrabold text-white mb-4 text-center tracking-tight">
+          Поддержите команду Tupabase!
         </h2>
+        <p className="text-lg text-gray-300 mb-8 text-center">
+          Ваша поддержка помогает нам делать проект еще лучше!
+        </p>
 
         {/* Feedback Input */}
         <motion.input
           type="text"
           value={feedbackText}
           onChange={(e) => setFeedbackText(e.target.value)}
-          placeholder="Say something nice to Leha!"
+          placeholder="Скажите что-нибудь приятное команде Tupabase!"
           className="w-full p-4 mb-6 rounded-lg border border-gray-600 bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
-          whileFocus={{ borderColor: "#10B981", scale: 1.02 }}
+          whileFocus={{ boxShadow: "0 0 10px rgba(16, 185, 129, 0.7)", scale: 1.02 }}
           transition={{ duration: 0.3 }}
         />
 
-        {/* Tip Amount and Double It */}
+        {/* Star Amount and Double It */}
         <div className="flex items-center mb-8">
           <motion.input
             type="number"
-            value={tipAmount}
-            onChange={(e) => setTipAmount(e.target.value)}
+            value={starAmount}
+            onChange={(e) => setStarAmount(e.target.value)}
+            onBlur={() => setShowDoubleButton(true)}
             min="1"
             className="w-28 p-4 rounded-lg border border-gray-600 bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-500 mr-4"
-            whileFocus={{ borderColor: "#10B981", scale: 1.02 }}
+            whileFocus={{ boxShadow: "0 0 10px rgba(16, 185, 129, 0.7)", scale: 1.02 }}
             transition={{ duration: 0.3 }}
           />
-          <motion.button
-            onClick={handleDoubleIt}
-            className="px-5 py-3 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600"
-            whileHover={{ scale: 1.1, rotate: 5 }}
-            whileTap={{ scale: 0.9, rotate: -5 }}
-            transition={{ duration: 0.2 }}
-          >
-            Double It!
-          </motion.button>
+          {showDoubleButton && (
+            <motion.button
+              onClick={handleDoubleIt}
+              className="px-5 py-3 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3 }}
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              whileTap={{ scale: 0.9, rotate: -5 }}
+            >
+              Удвоить!
+            </motion.button>
+          )}
         </div>
 
         {/* Send Stars Button */}
@@ -89,7 +101,7 @@ export default function DonationComponent() {
           animate={{ boxShadow: "0 0 25px rgba(16, 185, 129, 0.9)" }}
           transition={{ repeat: Infinity, duration: 1.2, repeatType: "reverse" }}
         >
-          Send Stars! ✨
+          Отправить звезды! ✨
         </motion.button>
       </motion.div>
     </div>
