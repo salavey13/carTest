@@ -76,8 +76,8 @@ export default function BuySubscription() {
   };
 
   return (
-    <div className="min-h-screen pt-24 bg-background bg-grid-pattern animate-[drift_30s_infinite]">
-      <header className="fixed top-0 left-0 right-0 bg-card shadow-md p-6 z-10 border-b border-muted">
+    <div className="min-h-screen pt-32 bg-background bg-grid-pattern animate-[drift_30s_infinite]">
+      <header className="fixed top-24 left-0 right-0 bg-card shadow-md p-6 z-10 border-b border-muted">
         <h1 className="text-4xl font-bold text-gradient cyber-text glitch" data-text="КУПИТЬ АБОНЕМЕНТ">
           КУПИТЬ АБОНЕМЕНТ
         </h1>
