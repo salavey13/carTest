@@ -39,18 +39,18 @@ export default function DonationComponent() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 to-black">
+    <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--background))] bg-grid-pattern">
       <motion.div
-        className="p-10 bg-gray-800 rounded-xl shadow-2xl max-w-md w-full"
+        className="p-10 bg-[hsl(var(--card))] rounded-xl shadow-2xl max-w-md w-full border border-[hsl(var(--border))]"
         initial={{ opacity: 0, y: -50 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: "easeOut" }}
       >
-        <h2 className="text-5xl font-extrabold text-white mb-4 text-center tracking-tight">
+        <h2 className="text-4xl font-extrabold text-[hsl(var(--foreground))] mb-4 text-center tracking-tight cyber-text">
           Поддержите команду Tupabase!
         </h2>
-        <p className="text-lg text-gray-300 mb-8 text-center">
-          Ваша поддержка помогает нам делать проект еще лучше!
+        <p className="text-lg text-[hsl(var(--muted-foreground))] mb-8 text-center text-gradient">
+          Ваша поддержка творит чудеса для нашего проекта!
         </p>
 
         {/* Feedback Input */}
@@ -59,8 +59,8 @@ export default function DonationComponent() {
           value={feedbackText}
           onChange={(e) => setFeedbackText(e.target.value)}
           placeholder="Скажите что-нибудь приятное команде Tupabase!"
-          className="w-full p-4 mb-6 rounded-lg border border-gray-600 bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
-          whileFocus={{ boxShadow: "0 0 10px rgba(16, 185, 129, 0.7)", scale: 1.02 }}
+          className="w-full p-4 mb-6 rounded-lg bg-[hsl(var(--card))] border border-[hsl(var(--input))] text-[hsl(var(--foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] placeholder-[hsl(var(--muted-foreground))]"
+          whileFocus={{ boxShadow: "0 0 10px hsl(var(--ring))", scale: 1.02 }}
           transition={{ duration: 0.3 }}
         />
 
@@ -72,14 +72,14 @@ export default function DonationComponent() {
             onChange={(e) => setStarAmount(e.target.value)}
             onBlur={() => setShowDoubleButton(true)}
             min="1"
-            className="w-28 p-4 rounded-lg border border-gray-600 bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-green-500 mr-4"
-            whileFocus={{ boxShadow: "0 0 10px rgba(16, 185, 129, 0.7)", scale: 1.02 }}
+            className="w-28 p-4 rounded-lg bg-[hsl(var(--card))] border border-[hsl(var(--input))] text-[hsl(var(--foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] mr-4"
+            whileFocus={{ boxShadow: "0 0 10px hsl(var(--ring))", scale: 1.02 }}
             transition={{ duration: 0.3 }}
           />
           {showDoubleButton && (
             <motion.button
               onClick={handleDoubleIt}
-              className="px-5 py-3 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600"
+              className="px-5 py-3 bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] font-semibold rounded-lg hover:bg-[hsl(var(--accent),0.8)]"
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3 }}
@@ -94,11 +94,11 @@ export default function DonationComponent() {
         {/* Send Stars Button */}
         <motion.button
           onClick={handleDonate}
-          className="w-full px-8 py-5 bg-green-500 text-white text-2xl font-bold rounded-xl hover:bg-green-600"
-          whileHover={{ scale: 1.05, backgroundColor: "#34D399" }}
+          className="w-full px-8 py-5 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] text-2xl font-bold rounded-xl hover:bg-[hsl(var(--primary),0.8)] cyber-text"
+          whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          initial={{ boxShadow: "0 0 15px rgba(16, 185, 129, 0.5)" }}
-          animate={{ boxShadow: "0 0 25px rgba(16, 185, 129, 0.9)" }}
+          initial={{ boxShadow: "0 0 15px hsl(var(--ring))" }}
+          animate={{ boxShadow: "0 0 25px hsl(var(--ring))" }}
           transition={{ repeat: Infinity, duration: 1.2, repeatType: "reverse" }}
         >
           Отправить звезды! ✨
