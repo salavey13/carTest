@@ -45,14 +45,14 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen pt-24 bg-background bg-grid-pattern animate-[drift_30s_infinite]">
-      <header className="fixed top-0 left-0 right-0 bg-card shadow-md p-6 z-10 border-b border-muted">
+      {/*<header className="fixed top-0 left-0 right-0 bg-card shadow-md p-6 z-10 border-b border-muted">
         <h1
           className="text-4xl font-bold text-gradient cyber-text glitch"
           data-text="ЦЕНТР УПРАВЛЕНИЯ"
         >
           ЦЕНТР УПРАВЛЕНИЯ
         </h1>
-      </header>
+      </header>*/}
       <main className="container mx-auto pt-10 px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
