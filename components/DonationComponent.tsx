@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { sendDonationInvoice } from "@/app/actions";
 import { useTelegram } from "@/hooks/useTelegram";
-import { Footer } from "@/components/Footer"
+import  Footer  from "@/components/Footer"
 export default function DonationComponent() {
   const { dbUser } = useTelegram();
   const [starAmount, setStarAmount] = useState("10");
