@@ -39,7 +39,7 @@ export default function DonationComponent() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--background))] bg-grid-pattern">
+    <div className="min-h-screen pt-24 flex items-center justify-center bg-[hsl(var(--background))] bg-grid-pattern">
       <motion.div
         className="p-10 bg-[hsl(var(--card))] rounded-xl shadow-2xl max-w-md w-full border border-[hsl(var(--border))]"
         initial={{ opacity: 0, y: -50 }}
