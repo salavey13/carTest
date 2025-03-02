@@ -86,7 +86,7 @@ export default function DonationComponent() {
               whileHover={{ scale: 1.1, rotate: 5 }}
               whileTap={{ scale: 0.9, rotate: -5 }}
             >
-              Удвоить!
+              x2!
             </motion.button>
           )}
         </div>
