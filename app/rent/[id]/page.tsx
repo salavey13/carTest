@@ -169,10 +169,10 @@ export default function RentCarPage({ params }: { params: { id: string } }) {
   });
 
   return (
-    <div className="min-h-screen pt-24 bg-gradient-to-b from-gray-900 to-black text-[#00ff9d] animate-[drift_30s_infinite]">
-      <header className="fixed top-0 left-0 right-0 bg-gray-900 shadow-[0_0_15px_rgba(255,107,107,0.5)] p-6 z-10 border-b border-[#ff007a]/50">
+    <div className="min-h-screen pt-32 bg-gradient-to-b from-gray-900 to-black text-[#00ff9d] animate-[drift_30s_infinite]">
+      <header className="fixed top-20 left-0 right-0 bg-gray-900 shadow-[0_0_15px_rgba(255,107,107,0.5)] p-6 z-10 border-b border-[#ff007a]/50">
         <h1 className="text-4xl font-mono text-[#00ff9d] glitch text-center animate-[neon_2s_infinite]" data-text="АРЕНДА КИБЕР-ТАЧКИ">
-          АРЕНДА КИБЕР-ТАЧКИ
+          АРЕНДА ТАЧКИ
         </h1>
       </header>
       <main className="container mx-auto pt-10 px-4">
