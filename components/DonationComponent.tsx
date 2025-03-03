@@ -81,6 +81,7 @@ export default function DonationComponent() {
       <p><strong>Step 7: Activate webhook.</strong> In the admin UI, set the webhook. (Note: Needs subscription or Supabase setup.)</p>
       
       <p><strong>Step 8: Set up web app.</strong> In @BotFather, link your Vercel URL as a Telegram web app.</p>
+      
       <p><strong>Step 9: Pin the message.</strong> Pin a message in Telegram with your web app link (e.g., <code>t.me/oneSitePlsBot/tips</code>) and a cool image.</p>
 
       <h3 className="text-2xl font-semibold mb-2">Recap</h3>
