@@ -60,19 +60,27 @@ export default function DonationComponent() {
         <li>Add secrets in Vercel.</li>
         <li>Redeploy.</li>
         <li>Activate webhook (subscription or Supabase).</li>
-        <li>Set up web app in BotFather.</li>
+        <li>Set up web app in @BotFather.</li>
         <li>Pin the message in Telegram.</li>
       </ol>
 
       <h3 className="text-2xl font-semibold mb-2">Full Guide</h3>
+      
       <p><strong>Step 1: Create a blank GitHub repo.</strong> This is your project’s home.</p>
+      
       <p><strong>Step 2: Fork the template.</strong> Head to <a href="t.me/oneSitePlsBot/tips" className="text-blue-500 underline">t.me/oneSitePlsBot/tips</a>, find "Проект v0 + donate" in the footer, and fork it.</p>
+      
       <p><strong>Step 3: Log into v0.</strong> Use your GitHub account to access the dashboard.</p>
+      
       <p><strong>Step 4: Deploy to Vercel.</strong> Connect your repo and deploy to get a URL (e.g., <code>v0-donate.vercel.app</code>).</p>
+      
       <p><strong>Step 5: Add secrets.</strong> In Vercel settings, add <code>TELEGRAM_BOT_TOKEN</code>, <code>ADMIN_CHAT_ID</code>, and <code>VERCEL_URL</code>.</p>
+      
       <p><strong>Step 6: Redeploy.</strong> This applies your secrets.</p>
-      <p><strong>Step 7: Activate webhook.</strong> In the admin UI, set the webhook to <code>v0-donate.vercel.app/api/telegramWebhook</code>. (Note: Needs subscription or Supabase setup.)</p>
-      <p><strong>Step 8: Set up web app.</strong> In BotFather, link your Vercel URL as a Telegram web app.</p>
+      
+      <p><strong>Step 7: Activate webhook.</strong> In the admin UI, set the webhook. (Note: Needs subscription or Supabase setup.)</p>
+      
+      <p><strong>Step 8: Set up web app.</strong> In @BotFather, link your Vercel URL as a Telegram web app.</p>
       <p><strong>Step 9: Pin the message.</strong> Pin a message in Telegram with your web app link (e.g., <code>t.me/oneSitePlsBot/tips</code>) and a cool image.</p>
 
       <h3 className="text-2xl font-semibold mb-2">Recap</h3>
@@ -100,19 +108,28 @@ export default function DonationComponent() {
         <li>Добавьте секреты в Vercel.</li>
         <li>Переразверните.</li>
         <li>Активируйте вебхук (требуется подписка или Supabase).</li>
-        <li>Настройте веб-приложение в BotFather.</li>
+        <li>Настройте веб-приложение в @BotFather.</li>
         <li>Закрепите сообщение в Telegram.</li>
       </ol>
 
       <h3 className="text-2xl font-semibold mb-2">Полное руководство</h3>
+      
       <p><strong>Шаг 1: Создайте пустой репозиторий на GitHub.</strong> Это основа вашего проекта.</p>
+      
       <p><strong>Шаг 2: Сделайте форк шаблона.</strong> Перейдите на <a href="t.me/oneSitePlsBot/tips" className="text-blue-500 underline">t.me/oneSitePlsBot/tips</a>, найдите "Проект v0 + donate" в футере и сделайте форк.</p>
+      
       <p><strong>Шаг 3: Войдите в v0.</strong> Используйте ваш аккаунт GitHub для доступа к панели управления.</p>
+      
       <p><strong>Шаг 4: Разверните на Vercel.</strong> Подключите ваш репозиторий и разверните, чтобы получить URL (например, <code>v0-donate.vercel.app</code>).</p>
+      
       <p><strong>Шаг 5: Добавьте секреты.</strong> В настройках Vercel добавьте <code>TELEGRAM_BOT_TOKEN</code>, <code>ADMIN_CHAT_ID</code> и <code>VERCEL_URL</code>.</p>
+      
       <p><strong>Шаг 6: Переразверните.</strong> Это применит ваши секреты.</p>
-      <p><strong>Шаг 7: Активируйте вебхук.</strong> В админской панели установите вебхук на <code>v0-donate.vercel.app/api/telegramWebhook</code>. (Примечание: требуется подписка или настройка Supabase.)</p>
-      <p><strong>Шаг 8: Настройте веб-приложение.</strong> В BotFather свяжите ваш URL Vercel как веб-приложение Telegram.</p>
+      
+      <p><strong>Шаг 7: Активируйте вебхук.</strong> В админской панели установите вебхук. (Примечание: требуется подписка или настройка Supabase.)</p>
+      
+      <p><strong>Шаг 8: Настройте веб-приложение.</strong> В @BotFather свяжите ваш URL Vercel как веб-приложение Telegram.</p>
+      
       <p><strong>Шаг 9: Закрепите сообщение.</strong> Закрепите сообщение в Telegram с ссылкой на веб-приложение (например, <code>t.me/oneSitePlsBot/tips</code>) и крутой картинкой.</p>
 
       <h3 className="text-2xl font-semibold mb-2">Итог</h3>
