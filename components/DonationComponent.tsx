@@ -90,8 +90,7 @@ export default function DonationComponent() {
     </motion.div>
   );
 
-  import { motion } from 'framer-motion';
-
+  
 // Define individual slides for the English guide
 const englishSlides = [
   // Slide 1: Introduction
@@ -208,8 +207,7 @@ const EnglishGuideSlideshow = (
     </motion.div>
   );
 
-  import { motion } from 'framer-motion';
-
+  
 // Define individual slides for the Russian guide
 const russianSlides = [
   // Slide 1: Introduction
