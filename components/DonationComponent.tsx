@@ -90,6 +90,75 @@ export default function DonationComponent() {
     </motion.div>
   );
 
+  import { motion } from 'framer-motion';
+
+// Define individual slides for the English guide
+const englishSlides = [
+  // Slide 1: Introduction
+  (
+    <div>
+      <p className="text-xl font-bold mb-2">
+        Want to set up your own donation page in minutes? Here’s how!
+      </p>
+      <p className="mb-4">
+        This is the easiest way to get your donation page live and start collecting stars—legally and tax-free!
+      </p>
+    </div>
+  ),
+  // Slide 2: Quick Version
+  (
+    <div>
+      <h3 className="text-2xl font-semibold mb-2">Quick Version</h3>
+      <ol className="list-decimal ml-6 mb-4">
+        <li>Create a blank GitHub repo.</li>
+        <li>Fork the template from <a href="t.me/oneSitePlsBot/tips" className="text-blue-500 underline">t.me/oneSitePlsBot/tips</a>.</li>
+        <li>Log into v0 with GitHub.</li>
+        <li>Deploy to Vercel.</li>
+        <li>Add secrets in Vercel.</li>
+        <li>Redeploy.</li>
+        <li>Activate webhook (subscription or Supabase).</li>
+        <li>Set up web app in @BotFather.</li>
+        <li>Pin the message in Telegram.</li>
+      </ol>
+    </div>
+  ),
+  // Slides 3-11: Full Guide Steps
+  <p><strong>Step 1: Create a blank GitHub repo.</strong> This is your project’s home.</p>,
+  <p><strong>Step 2: Fork the template.</strong> Head to <a href="t.me/oneSitePlsBot/tips" className="text-blue-500 underline">t.me/oneSitePlsBot/tips</a>, find "Проект v0 + donate" in the footer, and fork it.</p>,
+  <p><strong>Step 3: Log into v0.</strong> Use your GitHub account to access the dashboard.</p>,
+  <p><strong>Step 4: Deploy to Vercel.</strong> Connect your repo and deploy to get a URL (e.g., <code>v0-donate.vercel.app</code>).</p>,
+  <p><strong>Step 5: Add secrets.</strong> In Vercel settings, add <code>TELEGRAM_BOT_TOKEN</code>, <code>ADMIN_CHAT_ID</code>, and <code>VERCEL_URL</code>.</p>,
+  <p><strong>Step 6: Redeploy.</strong> This applies your secrets.</p>,
+  <p><strong>Step 7: Activate webhook.</strong> In the admin UI, set the webhook. (Note: Needs subscription or Supabase setup.)</p>,
+  <p><strong>Step 8: Set up web app.</strong> In @BotFather, link your Vercel URL as a Telegram web app.</p>,
+  <p><strong>Step 9: Pin the message.</strong> Pin a message in Telegram with your web app link (e.g., <code>t.me/oneSitePlsBot/tips</code>) and a cool image.</p>,
+  // Slide 12: Recap
+  (
+    <div>
+      <h3 className="text-2xl font-semibold mb-2">Recap</h3>
+      <p>Create repo → Fork template → Log in → Deploy → Add secrets → Redeploy → Activate webhook → Set up web app → Pin message. Boom—you’re live!</p>
+      <p className="mt-4 font-bold">Ready? Follow these steps and start collecting stars today!</p>
+    </div>
+  ),
+];
+
+// Render the slideshow
+const EnglishGuideSlideshow = (
+  <div className="space-y-4">
+    {englishSlides.map((slide, index) => (
+      <motion.div
+        key={index}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: index * 0.3 }}
+        className="bg-[hsl(var(--card))] p-4 rounded-lg shadow"
+      >
+        {slide}
+      </motion.div>
+    ))}
+  </div>
+);
+
   // Russian Guide (Correctly Implemented JSX Constant)
   const russianGuide = (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
@@ -139,6 +208,75 @@ export default function DonationComponent() {
     </motion.div>
   );
 
+  import { motion } from 'framer-motion';
+
+// Define individual slides for the Russian guide
+const russianSlides = [
+  // Slide 1: Introduction
+  (
+    <div>
+      <p className="text-xl font-bold mb-2">
+        Хотите настроить свою страницу пожертвований за считанные минуты? Вот как это сделать!
+      </p>
+      <p className="mb-4">
+        Это самый простой способ запустить страницу пожертвований и начать собирать звезды — законно и без налогов!
+      </p>
+    </div>
+  ),
+  // Slide 2: Quick Version
+  (
+    <div>
+      <h3 className="text-2xl font-semibold mb-2">Краткая версия</h3>
+      <ol className="list-decimal ml-6 mb-4">
+        <li>Создайте пустой репозиторий на GitHub.</li>
+        <li>Сделайте форк шаблона с <a href="t.me/oneSitePlsBot/tips" className="text-blue-500 underline">t.me/oneSitePlsBot/tips</a>.</li>
+        <li>Войдите в v0 с помощью GitHub.</li>
+        <li>Разверните на Vercel.</li>
+        <li>Добавьте секреты в Vercel.</li>
+        <li>Переразверните.</li>
+        <li>Активируйте вебхук (требуется подписка или Supabase).</li>
+        <li>Настройте веб-приложение в @BotFather.</li>
+        <li>Закрепите сообщение в Telegram.</li>
+      </ol>
+    </div>
+  ),
+  // Slides 3-11: Full Guide Steps
+  <p><strong>Шаг 1: Создайте пустой репозиторий на GitHub.</strong> Это основа вашего проекта.</p>,
+  <p><strong>Шаг 2: Сделайте форк шаблона.</strong> Перейдите на <a href="t.me/oneSitePlsBot/tips" className="text-blue-500 underline">t.me/oneSitePlsBot/tips</a>, найдите "Проект v0 + donate" в футере и сделайте форк.</p>,
+  <p><strong>Шаг 3: Войдите в v0.</strong> Используйте ваш аккаунт GitHub для доступа к панели управления.</p>,
+  <p><strong>Шаг 4: Разверните на Vercel.</strong> Подключите ваш репозиторий и разверните, чтобы получить URL (например, <code>v0-donate.vercel.app</code>).</p>,
+  <p><strong>Шаг 5: Добавьте секреты.</strong> В настройках Vercel добавьте <code>TELEGRAM_BOT_TOKEN</code>, <code>ADMIN_CHAT_ID</code> и <code>VERCEL_URL</code>.</p>,
+  <p><strong>Шаг 6: Переразверните.</strong> Это применит ваши секреты.</p>,
+  <p><strong>Шаг 7: Активируйте вебхук.</strong> В админской панели установите вебхук. (Примечание: требуется подписка или настройка Supabase.)</p>,
+  <p><strong>Шаг 8: Настройте веб-приложение.</strong> В @BotFather свяжите ваш URL Vercel как веб-приложение Telegram.</p>,
+  <p><strong>Шаг 9: Закрепите сообщение.</strong> Закрепите сообщение в Telegram с ссылкой на веб-приложение (например, <code>t.me/oneSitePlsBot/tips</code>) и крутой картинкой.</p>,
+  // Slide 12: Recap
+  (
+    <div>
+      <h3 className="text-2xl font-semibold mb-2">Итог</h3>
+      <p>Создайте репозиторий → Сделайте форк шаблона → Войдите → Разверните → Добавьте секреты → Переразверните → Активируйте вебхук → Настройте веб-приложение → Закрепите сообщение. Готово — вы в деле!</p>
+      <p className="mt-4 font-bold">Готовы? Следуйте этим шагам и начните собирать звезды уже сегодня!</p>
+    </div>
+  ),
+];
+
+// Render the slideshow
+const RussianGuideSlideshow = (
+  <div className="space-y-4">
+    {russianSlides.map((slide, index) => (
+      <motion.div
+        key={index}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: index * 0.3 }}
+        className="bg-[hsl(var(--card))] p-4 rounded-lg shadow"
+      >
+        {slide}
+      </motion.div>
+    ))}
+  </div>
+);
+  
   return (
     <>
       <div className="min-h-screen pt-24 flex items-center justify-center bg-[hsl(var(--background))] bg-grid-pattern">
@@ -248,9 +386,9 @@ export default function DonationComponent() {
               {language === "en" ? "How to Set Up Your Own Donation Page" : "Как настроить свою страницу пожертвований"}
             </h2>
 
-            {/* Conditional Rendering of Guide */}
-            {language === "en" ? englishGuide : russianGuide}
-
+            {/* Conditional Rendering of Guide }
+            {language === "en" ? englishGuide : russianGuide*/}
+            { language === 'en' ? EnglishGuideSlideshow : RussianGuideSlideshow}
             <button
               onClick={() => setIsModalOpen(false)}
               className="mt-6 px-4 py-2 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded-lg hover:bg-[hsl(var(--primary),0.8)]"
