@@ -4,7 +4,7 @@ import { useTelegram } from '@/hooks/useTelegram';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
+import { Footer } from "@/components/Footer"
 // BotBustersHeader: Navigation bar for the app
 function BotBustersHeader() {
   return (
@@ -148,24 +148,6 @@ function BotBustersDailyStatsSection() {
   );
 }
 
-// BotBustersFooter: Links to Telegram, newsletter, and support
-function BotBustersFooter() {
-  return (
-    <footer className="bg-gray-800 p-4 text-center">
-      <div className="space-x-4">
-        <Button variant="link" className="text-gray-300 hover:text-white">
-          Telegram Group
-        </Button>
-        <Button variant="link" className="text-gray-300 hover:text-white">
-          Newsletter
-        </Button>
-        <Button variant="link" className="text-gray-300 hover:text-white">
-          Support Us
-        </Button>
-      </div>
-    </footer>
-  );
-}
 
 // Main Home component: The default export of page.tsx
 export default function BotBustersHome() {
@@ -180,7 +162,7 @@ export default function BotBustersHome() {
         <BotBustersTipsSection />
         <BotBustersAutomaScriptsSection />
         <BotBustersDailyStatsSection />
-      <BotBustersFooter />
+      <Footer />
     </div>
   );
 }
