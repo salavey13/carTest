@@ -1,4 +1,5 @@
 // page.tsx
+"use client"
 import { useTelegram } from '@/hooks/useTelegram';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -167,20 +168,18 @@ function BotBustersFooter() {
 }
 
 // Main Home component: The default export of page.tsx
-export default function Home() {
+export default function BotBustersHome() {
   const { dbUser } = useTelegram();
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       <BotBustersHeader />
-      <main>
         <BotBustersHeroSection />
         <BotBustersFeaturesSection />
         {dbUser && <BotBustersBlocklistFormSection />} {/* Only show if authenticated */}
         <BotBustersTipsSection />
         <BotBustersAutomaScriptsSection />
         <BotBustersDailyStatsSection />
-      </main>
       <BotBustersFooter />
     </div>
   );
