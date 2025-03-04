@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 // BotBustersHeader: Navigation bar for the app
 function BotBustersHeader() {
   return (
-    <header className="bg-gray-800 p-4 sticky top-0 z-10">
+    <header className="bg-gray-800 p-4 pt-24 sticky top-0 z-10">
       <nav className="flex justify-between items-center container mx-auto">
         <div className="text-xl font-bold">BotBusters</div>
         <div className="space-x-4">
