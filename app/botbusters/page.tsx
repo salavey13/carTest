@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Footer from "@/components/Footer";
 import BotHuntingToolsSection from "@/components/PurchaseScriptsSection";
 import Link from "next/link";
+import { toast } from "sonner";
 
 // BotBustersHeader: Navigation bar with horizontal scrolling
 function BotBustersHeader() {
@@ -25,7 +26,11 @@ function BotBustersHeader() {
           <Link href="#stats" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
             Stats
           </Link>
-          <Link href="https://grok.com/share/bGVnYWN5_2d4f7c04-f5b5-43d9-a4ee-141b2c6130c2" target="_blank" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
+          <Link
+            href="https://grok.com/share/bGVnYWN5_2d4f7c04-f5b5-43d9-a4ee-141b2c6130c2"
+            target="_blank"
+            className="text-white hover:text-gray-300 whitespace-nowrap transition-colors"
+          >
             Dev Chat
           </Link>
         </div>
@@ -82,7 +87,7 @@ function BotBustersFeaturesSection() {
   );
 }
 
-// BotBustersBlocklistFormSection: Form for blocklist submission
+// BotBustersBlocklistFormSection: Improved submission with upsert
 function BotBustersBlocklistFormSection({ dbUser }) {
   const [usernames, setUsernames] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,16 +100,20 @@ function BotBustersBlocklistFormSection({ dbUser }) {
     try {
       const usernameList = usernames.split(",").map((name) => name.trim());
       const client = await createAuthenticatedClient(dbUser.user_id);
-      for (const username of usernameList) {
-        const { error: insertError } = await client.from("bots").insert({
-          username,
+      const { error: upsertError } = await client.from("bots").upsert(
+        usernameList.map((username) => ({
+          user_name: username,
           submitted_by: dbUser.user_id,
-        });
-        if (insertError) throw insertError;
-      }
+          last_updated: new Date().toISOString(),
+        })),
+        { onConflict: "user_name", ignoreDuplicates: false } // Overwrite existing entries
+      );
+      if (upsertError) throw upsertError;
       setUsernames("");
+      toast.success("Blocklist submitted successfully!");
     } catch (err) {
       setError("Failed to submit blocklist. Please try again.");
+      toast.error("Failed to submit blocklist.");
     } finally {
       setIsSubmitting(false);
     }
@@ -112,9 +121,7 @@ function BotBustersBlocklistFormSection({ dbUser }) {
 
   return (
     <section id="submit-blocklist" className="py-16 bg-gray-900">
-      <h2 className="text-3xl font-bold text-center mb-8 text-white">
-        Submit Your Blocklist
-      </h2>
+      <h2 className="text-3xl font-bold text-center mb-8 text-white">Submit Your Blocklist</h2>
       <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-4">
         <Input
           placeholder="Enter bot usernames (comma-separated)"
@@ -135,7 +142,7 @@ function BotBustersBlocklistFormSection({ dbUser }) {
   );
 }
 
-// BotBustersDailyStatsSection: Enhanced stats with total and confirmed bots
+// BotBustersDailyStatsSection: Enhanced stats with precise counts and bot list export
 function BotBustersDailyStatsSection() {
   const [stats, setStats] = useState({
     botsBlocked: 0,
@@ -143,11 +150,13 @@ function BotBustersDailyStatsSection() {
     totalBots: 0,
     confirmedBots: 0,
   });
+  const [botList, setBotList] = useState([]);
+  const [selectedList, setSelectedList] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    async function fetchStats() {
+    async function fetchStatsAndBots() {
       try {
         const today = new Date().toISOString().split("T")[0];
 
@@ -168,32 +177,49 @@ function BotBustersDailyStatsSection() {
         if (reportsError) throw reportsError;
 
         // Total bots
-        const { data: totalBots, error: totalError } = await supabaseAnon
+        const { count: totalBotsCount, error: totalError } = await supabaseAnon
           .from("bots")
           .select("id", { count: "exact" });
         if (totalError) throw totalError;
 
         // Confirmed bots
-        const { data: confirmedBots, error: confirmedError } = await supabaseAnon
+        const { count: confirmedBotsCount, error: confirmedError } = await supabaseAnon
           .from("bots")
           .select("id", { count: "exact" })
           .eq("confirmed", true);
         if (confirmedError) throw confirmedError;
 
+        // Fetch all bot usernames
+        const { data: bots, error: botsError } = await supabaseAnon
+          .from("bots")
+          .select("user_name")
+          .order("last_updated", { ascending: false });
+        if (botsError) throw botsError;
+
         setStats({
           botsBlocked: blocks.length,
           reportsFiled: reports.length,
-          totalBots: totalBots.length,
-          confirmedBots: confirmedBots.length,
+          totalBots: totalBotsCount,
+          confirmedBots: confirmedBotsCount,
         });
+        setBotList(bots.map((bot) => bot.user_name));
       } catch (err) {
         setError("Failed to load stats.");
       } finally {
         setIsLoading(false);
       }
     }
-    fetchStats();
+    fetchStatsAndBots();
   }, []);
+
+  const getBotList = (limit) => {
+    return botList.slice(0, limit).join(",");
+  };
+
+  const handleCopy = (text) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard!");
+  };
 
   if (isLoading) return <p className="text-center py-16 text-white">Loading stats...</p>;
   if (error) return <p className="text-center py-16 text-red-500">{error}</p>;
@@ -213,6 +239,77 @@ function BotBustersDailyStatsSection() {
         >
           View Bot List
         </Link>
+      </div>
+
+      {/* Bot List Export */}
+      <div className="mt-8 max-w-md mx-auto">
+        <h3 className="text-xl font-semibold mb-4 text-white">Export Bot List</h3>
+        <div className="flex flex-wrap justify-center gap-2 mb-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSelectedList(getBotList(13))}
+            className="text-white border-gray-700 hover:bg-gray-700"
+          >
+            Top 13
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSelectedList(getBotList(69))}
+            className="text-white border-gray-700 hover:bg-gray-700"
+          >
+            Top 69
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSelectedList(getBotList(146))}
+            className="text-white border-gray-700 hover:bg-gray-700"
+          >
+            Top 146
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSelectedList(getBotList(420))}
+            className="text-white border-gray-700 hover:bg-gray-700"
+          >
+            Top 420
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSelectedList(getBotList(1000))}
+            className="text-white border-gray-700 hover:bg-gray-700"
+          >
+            Top 1k
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSelectedList(botList.join(","))}
+            className="text-white border-gray-700 hover:bg-gray-700"
+          >
+            All
+          </Button>
+        </div>
+        {selectedList && (
+          <div className="relative">
+            <Input
+              value={selectedList}
+              readOnly
+              className="bg-gray-800 border-gray-700 text-white pr-20"
+            />
+            <Button
+              size="sm"
+              className="absolute right-1 top-1/2 transform -translate-y-1/2 bg-blue-600 hover:bg-blue-700"
+              onClick={() => handleCopy(selectedList)}
+            >
+              Copy
+            </Button>
+          </div>
+        )}
       </div>
     </section>
   );
