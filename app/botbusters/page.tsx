@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Footer from "@/components/Footer";
-
+import BotHuntingToolsSection from "@/components/PurchaseScriptsSection"
 // BotBustersHeader: Navigation bar for the app
 function BotBustersHeader() {
   return (
@@ -255,8 +255,7 @@ export default function BotBustersHome() {
       <BotBustersHeroSection />
       <BotBustersFeaturesSection />
       {dbUser && <BotBustersBlocklistFormSection dbUser={dbUser} />}
-      <BotBustersTipsSection />
-      <BotBustersAutomaScriptsSection />
+      <BotHuntingToolsSection />
       <BotBustersDailyStatsSection />
       <Footer />
     </div>
