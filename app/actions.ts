@@ -486,7 +486,39 @@ export async function handleWebhookUpdate(update: any) {
     undefined,
     userId
   );
-}
+} else if (invoice.type === "script_access") {
+        // Grant access and send script links
+        await supabaseAdmin
+          .from("users")
+          .update({ has_script_access: true })
+          .eq("user_id", userId);
+
+        const scripts = [
+          { name: "Block'em All", url: "https://automa.app/marketplace/blockemall" },
+          { name: "Purge'em All", url: "https://automa.app/marketplace/purgeemall" },
+          { name: "Hunter", url: "https://automa.app/marketplace/hunter" },
+        ];
+
+        const message =
+          "Спасибо за покупку Automa Bot-Hunting Scripts! Вот ваши ссылки:\n" +
+          scripts.map((script) => `- [${script.name}](${script.url})`).join("\n");
+
+        await sendTelegramMessage(
+          process.env.TELEGRAM_BOT_TOKEN!,
+          message,
+          [],
+          undefined,
+          userId
+        );
+
+        await sendTelegramMessage(
+          process.env.TELEGRAM_BOT_TOKEN!,
+          `🔔 Пользователь ${userData.username || userData.user_id} приобрел доступ к Automa скриптам!`,
+          [],
+          undefined,
+          ADMIN_CHAT_ID
+        );
+      }
     }
   } catch (error) {
     logger.error("Error handling webhook update:", error);
