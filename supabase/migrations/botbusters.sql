@@ -1,12 +1,17 @@
+-- Add has_script_access to users table
 ALTER TABLE public.users
 ADD COLUMN has_script_access BOOLEAN DEFAULT FALSE;
 
--- Table to store bot usernames submitted by users
-CREATE TABLE blocklist (
+-- Table to store bot usernames and metadata
+CREATE TABLE bots (
   id SERIAL PRIMARY KEY,
-  username TEXT NOT NULL,
+  username TEXT UNIQUE NOT NULL, -- Maps to "user_name" from .xlsx
+  account_id BIGINT UNIQUE, -- Maps to "account_id" from .xlsx
+  full_name TEXT, -- Maps to "full name" from .xlsx
+  created_at TIMESTAMP WITH TIME ZONE, -- Maps to "Create Date" from .xlsx
+  confirmed BOOLEAN DEFAULT FALSE,
   submitted_by TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   FOREIGN KEY (submitted_by) REFERENCES users(user_id)
 );
 
@@ -17,5 +22,6 @@ CREATE TABLE actions (
   target_username TEXT NOT NULL,
   performed_by TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  FOREIGN KEY (performed_by) REFERENCES users(user_id)
+  FOREIGN KEY (performed_by) REFERENCES users(user_id),
+  FOREIGN KEY (target_username) REFERENCES bots(username)
 );
