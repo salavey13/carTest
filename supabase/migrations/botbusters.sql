@@ -1,3 +1,6 @@
+ALTER TABLE public.users
+ADD COLUMN has_script_access BOOLEAN DEFAULT FALSE;
+
 -- Table to store bot usernames submitted by users
 CREATE TABLE blocklist (
   id SERIAL PRIMARY KEY,
