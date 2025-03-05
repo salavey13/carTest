@@ -6,6 +6,7 @@ import { createInvoice } from "@/hooks/supabase"; // Adjust path to your Supabas
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { differenceInDays, parseISO } from "date-fns";
+import Link from "next/link";
 
 // Define the script pack details
 const SCRIPT_PACK = {
@@ -126,7 +127,16 @@ export default function BotHuntingToolsSection() {
           <p className="text-muted-foreground mb-4">{SCRIPT_PACK.description}</p>
           <p className="text-3xl font-bold mb-6 font-mono">{SCRIPT_PACK.price} XTR</p>
           {hasAccess ? (
-            <p className="text-green-400 font-mono">Access already activated!</p>
+            <>
+              <p className="text-green-400 font-mono">Access already activated!</p>
+              <Link
+                  href="https://automa.site/workflow/16rZppoNhrm7HCJSncPJV"
+                  target="_blank"
+                  className="text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  View Automa Block Script
+               </Link>
+            </>
           ) : (
             <button
               onClick={handlePurchase}
