@@ -22,12 +22,12 @@ function BotBustersHeader() {
           <Link href="#submit-blocklist" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
             Submit Blocklist
           </Link>
-          <Link href="#tips" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
+          {/*<Link href="#tips" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
             Tips
           </Link>
           <Link href="#automa-scripts" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
             Automa Scripts
-          </Link>
+          </Link>*/}
           <Link href="#stats" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
             Stats
           </Link>
@@ -47,9 +47,9 @@ function BotBustersHeroSection() {
       <p className="text-lg md:text-xl mb-8 text-gray-300">
         Help us keep 9GAG bot-free with powerful tools and community action.
       </p>
-      <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+      {/*<Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white transition-colors">
         Get Started
-      </Button>
+      </Button>*/}
     </section>
   );
 }
@@ -182,6 +182,9 @@ function BotBustersDailyStatsSection() {
       <div className="text-gray-300">
         <p>Bots Blocked: {stats.botsBlocked}</p>
         <p>Reports Filed: {stats.reportsFiled}</p>
+        <Link href="https://docs.google.com/spreadsheets/d/1rpSqA9Dh_QSNgocqtpCm9a371pTRldJ-hshUSCyjTmo/edit?pli=1&gid=0#gid=0" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
+            Bot list
+        </Link>
       </div>
     </section>
   );
