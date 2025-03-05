@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useTelegram } from "@/hooks/useTelegram"; // Adjust path to your Telegram hook
 import { sendTelegramInvoice } from "@/app/actions"; // Adjust path to your invoice action
-import { createInvoice } from "@/hooks/supabase"; // Adjust path to your Supabase hook
+import { createInvoice, supabaseAdmin } from "@/hooks/supabase"; // Adjust path to your Supabase hook
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { differenceInDays, parseISO } from "date-fns";
@@ -36,7 +36,7 @@ export default function BotHuntingToolsSection() {
   useEffect(() => {
     const checkAccess = async () => {
       if (user) {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
           .from("users")
           .select("has_script_access")
           .eq("user_id", user.id.toString())
