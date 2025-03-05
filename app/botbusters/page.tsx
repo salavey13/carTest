@@ -22,14 +22,11 @@ function BotBustersHeader() {
           <Link href="#submit-blocklist" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
             Submit Blocklist
           </Link>
-          {/*<Link href="#tips" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
-            Tips
-          </Link>
-          <Link href="#automa-scripts" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
-            Automa Scripts
-          </Link>*/}
           <Link href="#stats" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
             Stats
+          </Link>
+          <Link href="https://grok.com/share/bGVnYWN5_2d4f7c04-f5b5-43d9-a4ee-141b2c6130c2" target="_blank" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
+            Dev Chat
           </Link>
         </div>
       </nav>
@@ -37,7 +34,7 @@ function BotBustersHeader() {
   );
 }
 
-// BotBustersHeroSection: Bold, playful introduction
+// BotBustersHeroSection: Bold introduction with updated CTA
 function BotBustersHeroSection() {
   return (
     <section id="home" className="text-center py-16 bg-gray-900">
@@ -47,9 +44,11 @@ function BotBustersHeroSection() {
       <p className="text-lg md:text-xl mb-8 text-gray-300">
         Help us keep 9GAG bot-free with powerful tools and community action.
       </p>
-      {/*<Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white transition-colors">
-        Get Started
-      </Button>*/}
+      <Button asChild size="lg" className="bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+        <Link href="https://t.me/OneSitePlsBot/block9gag" target="_blank">
+          Get Started
+        </Link>
+      </Button>
     </section>
   );
 }
@@ -97,7 +96,7 @@ function BotBustersBlocklistFormSection({ dbUser }) {
       const usernameList = usernames.split(",").map((name) => name.trim());
       const client = await createAuthenticatedClient(dbUser.user_id);
       for (const username of usernameList) {
-        const { error: insertError } = await client.from("blocklist").insert({
+        const { error: insertError } = await client.from("bots").insert({
           username,
           submitted_by: dbUser.user_id,
         });
@@ -136,9 +135,14 @@ function BotBustersBlocklistFormSection({ dbUser }) {
   );
 }
 
-// BotBustersDailyStatsSection: Display daily stats
+// BotBustersDailyStatsSection: Enhanced stats with total and confirmed bots
 function BotBustersDailyStatsSection() {
-  const [stats, setStats] = useState({ botsBlocked: 0, reportsFiled: 0 });
+  const [stats, setStats] = useState({
+    botsBlocked: 0,
+    reportsFiled: 0,
+    totalBots: 0,
+    confirmedBots: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -146,6 +150,8 @@ function BotBustersDailyStatsSection() {
     async function fetchStats() {
       try {
         const today = new Date().toISOString().split("T")[0];
+
+        // Daily blocks
         const { data: blocks, error: blocksError } = await supabaseAnon
           .from("actions")
           .select("id", { count: "exact" })
@@ -153,6 +159,7 @@ function BotBustersDailyStatsSection() {
           .gte("created_at", today);
         if (blocksError) throw blocksError;
 
+        // Daily reports
         const { data: reports, error: reportsError } = await supabaseAnon
           .from("actions")
           .select("id", { count: "exact" })
@@ -160,9 +167,24 @@ function BotBustersDailyStatsSection() {
           .gte("created_at", today);
         if (reportsError) throw reportsError;
 
+        // Total bots
+        const { data: totalBots, error: totalError } = await supabaseAnon
+          .from("bots")
+          .select("id", { count: "exact" });
+        if (totalError) throw totalError;
+
+        // Confirmed bots
+        const { data: confirmedBots, error: confirmedError } = await supabaseAnon
+          .from("bots")
+          .select("id", { count: "exact" })
+          .eq("confirmed", true);
+        if (confirmedError) throw confirmedError;
+
         setStats({
           botsBlocked: blocks.length,
           reportsFiled: reports.length,
+          totalBots: totalBots.length,
+          confirmedBots: confirmedBots.length,
         });
       } catch (err) {
         setError("Failed to load stats.");
@@ -178,12 +200,18 @@ function BotBustersDailyStatsSection() {
 
   return (
     <section id="stats" className="py-16 bg-gray-900 text-center">
-      <h2 className="text-3xl font-bold mb-4 text-white">Daily Bot-Hunting Stats</h2>
-      <div className="text-gray-300">
-        <p>Bots Blocked: {stats.botsBlocked}</p>
-        <p>Reports Filed: {stats.reportsFiled}</p>
-        <Link href="https://docs.google.com/spreadsheets/d/1rpSqA9Dh_QSNgocqtpCm9a371pTRldJ-hshUSCyjTmo/edit?pli=1&gid=0#gid=0" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
-            Bot list
+      <h2 className="text-3xl font-bold mb-4 text-white">Bot-Hunting Stats</h2>
+      <div className="text-gray-300 space-y-2">
+        <p>Daily Bots Blocked: {stats.botsBlocked}</p>
+        <p>Daily Reports Filed: {stats.reportsFiled}</p>
+        <p>Total Bots Identified: {stats.totalBots}</p>
+        <p>Confirmed Bots: {stats.confirmedBots}</p>
+        <Link
+          href="https://docs.google.com/spreadsheets/d/1rpSqA9Dh_QSNgocqtpCm9a371pTRldJ-hshUSCyjTmo/edit?pli=1&gid=0#gid=0"
+          target="_blank"
+          className="text-blue-400 hover:text-blue-300 transition-colors"
+        >
+          View Bot List
         </Link>
       </div>
     </section>
