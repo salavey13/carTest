@@ -48,29 +48,43 @@ function generateSimplifiedEmbedding(text: string): number[] {
   return magnitude > 0 ? embedding.map(val => val / magnitude) : embedding;
 }
 
-// New function to generate embeddings via Edge Function with fallback
-export async function generateCarEmbedding(carId?: string, carData?: { make: string; model: string; description: string; specs: Record<string, any> }) {
+// Updated function to handle Edge Function calls, including /create
+export async function generateCarEmbedding(
+  carId?: string,
+  carData?: {
+    make: string;
+    model: string;
+    description: string;
+    specs: Record<string, any>;
+    owner_id?: string;
+    daily_price?: number;
+    image_url?: string;
+    rent_link?: string;
+  }
+) {
   try {
-    // If carId is provided, fetch car data if not provided
-    let combinedText: string;
+    let endpoint: string;
+    let body: string | undefined;
+
     if (carId && !carData) {
-      const { data, error } = await supabaseAdmin
-        .from("cars")
-        .select("make, model, description, specs")
-        .eq("id", carId)
-        .single();
-      if (error) throw new Error(`Failed to fetch car: ${error.message}`);
-      combinedText = `${data.make} ${data.model} ${data.description} ${JSON.stringify(data.specs || {})}`;
+      // Single car update
+      endpoint = `${supabaseUrl}/functions/v1/generate-embeddings/single`;
+      body = JSON.stringify({ carId });
     } else if (carData) {
-      combinedText = `${carData.make} ${carData.model} ${carData.description} ${JSON.stringify(carData.specs || {})}`;
+      // New car creation
+      endpoint = `${supabaseUrl}/functions/v1/generate-embeddings/create`;
+      body = JSON.stringify({
+        make: carData.make,
+        model: carData.model,
+        description: carData.description,
+        specs: carData.specs,
+      });
     } else {
-      throw new Error("Either carId or carData must be provided");
+      // Batch processing
+      endpoint = `${supabaseUrl}/functions/v1/generate-embeddings/batch`;
+      body = undefined;
     }
 
-    // Try Edge Function first
-    const endpoint = carId ? `${supabaseUrl}/functions/v1/generate-embeddings/single` : `${supabaseUrl}/functions/v1/generate-embeddings/batch`;
-    const body = carId ? JSON.stringify({ carId }) : undefined;
-    
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -86,35 +100,68 @@ export async function generateCarEmbedding(carId?: string, carData?: { make: str
 
     const result = await response.json();
     debugLogger.log(`Edge Function success: ${result.message}`);
-    
-    // For single car, return immediately; for batch, return undefined (processing in background)
-    return carId ? result : undefined;
+
+    // For /create, update additional fields after creation
+    if (carData && carData.owner_id) {
+      const { error: updateError } = await supabaseAdmin
+        .from("cars")
+        .update({
+          owner_id: carData.owner_id,
+          daily_price: carData.daily_price,
+          image_url: carData.image_url,
+          rent_link: carData.rent_link,
+        })
+        .eq("id", result.carId);
+
+      if (updateError) throw new Error(`Failed to update additional fields: ${updateError.message}`);
+    }
+
+    return carId || carData ? result : undefined; // Return result for single/create, undefined for batch
   } catch (error) {
     debugLogger.error("Edge Function failed, falling back to simplified embedding:", error);
 
     // Fallback to simplified embedding
-    if (carId || carData) {
-      const combinedText = carData 
-        ? `${carData.make} ${carData.model} ${carData.description} ${JSON.stringify(carData.specs || {})}`
-        : (await supabaseAdmin.from("cars").select("make, model, description, specs").eq("id", carId!).single()).data
-          ? `${data.make} ${data.model} ${data.description} ${JSON.stringify(data.specs || {})}`
-          : "";
-      
-      const embedding = generateSimplifiedEmbedding(combinedText);
-      
-      if (carId) {
-        const { error } = await supabaseAdmin
-          .from("cars")
-          .update({ embedding })
-          .eq("id", carId);
-        if (error) throw new Error(`Failed to update embedding: ${error.message}`);
-      }
-      
-      return carId ? { message: "Embedding generated with fallback" } : undefined;
+    let combinedText: string;
+    if (carId && !carData) {
+      const { data, error } = await supabaseAdmin
+        .from("cars")
+        .select("make, model, description, specs")
+        .eq("id", carId)
+        .single();
+      if (error) throw new Error(`Failed to fetch car: ${error.message}`);
+      combinedText = `${data.make} ${data.model} ${data.description} ${JSON.stringify(data.specs || {})}`;
+    } else if (carData) {
+      combinedText = `${carData.make} ${carData.model} ${carData.description} ${JSON.stringify(carData.specs || {})}`;
+    } else {
+      throw new Error("Cannot generate embedding for batch in fallback mode");
     }
-    throw error;
+
+    const embedding = generateSimplifiedEmbedding(combinedText);
+
+    if (carId) {
+      const { error } = await supabaseAdmin
+        .from("cars")
+        .update({ embedding })
+        .eq("id", carId);
+      if (error) throw new Error(`Failed to update embedding: ${error.message}`);
+    } else if (carData) {
+      const { data: newCar, error } = await supabaseAdmin
+        .from("cars")
+        .insert({
+          ...carData,
+          embedding,
+        })
+        .select("id")
+        .single();
+      if (error) throw new Error(`Failed to create car in fallback: ${error.message}`);
+      return { message: "Car created with fallback embedding", carId: newCar.id };
+    }
+
+    return carId || carData ? { message: "Embedding generated with fallback" } : undefined;
   }
 }
+
+
 
 // [Rest of your existing functions remain unchanged...]
 
