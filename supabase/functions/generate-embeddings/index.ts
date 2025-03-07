@@ -1,6 +1,6 @@
 // supabase/functions/generate-embeddings/index.ts
- 
-import { SupabaseClient, createClient } from 'npm:@supabase/supabase-js@2.45.0';
+
+import { createClient } from 'npm:@supabase/supabase-js@2.45.0';
 import { Session } from 'npm:@supabase/ai@0.1.0';
 
 // Initialize the embedding model
@@ -8,7 +8,7 @@ const model = new Session('gte-small');
 
 // Type definitions
 interface Car {
-  id: string;
+  id?: string; // Optional for new cars
   make: string;
   model: string;
   description: string;
@@ -30,12 +30,50 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // Handle different routes
     const url = new URL(req.url);
     const path = url.pathname;
 
+    // New route for UI-based car creation
+    if (req.method === 'POST' && path === '/generate-embeddings/create') {
+      const carData: Omit<Car, 'id' | 'embedding'> = await req.json();
+      
+      // Validate required fields
+      if (!carData.make || !carData.model || !carData.description) {
+        throw new Error('Missing required fields: make, model, or description');
+      }
+
+      // Generate embedding
+      const text = getCombinedText(carData);
+      const embedding = await model.run(text, { 
+        mean_pool: true, 
+        normalize: true 
+      });
+
+      // Insert new car with embedding
+      const { data: newCar, error: insertError } = await supabase
+        .from('cars')
+        .insert({
+          ...carData,
+          embedding: Array.from(embedding),
+        })
+        .select('id')
+        .single();
+
+      if (insertError) {
+        throw new Error(`Failed to create car: ${insertError.message}`);
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          message: 'Car created with embedding successfully',
+          carId: newCar.id 
+        }),
+        { status: 201, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Existing batch processing route
     if (req.method === 'POST' && path === '/generate-embeddings/batch') {
-      // Batch processing of all cars without embeddings
       const { data: cars, error: fetchError } = await supabase
         .from('cars')
         .select('id, make, model, description, specs')
@@ -52,7 +90,6 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      // Process embeddings in background
       const updatePromises = cars.map(async (car: Car) => {
         const text = getCombinedText(car);
         const embedding = await model.run(text, { 
@@ -66,7 +103,6 @@ Deno.serve(async (req: Request) => {
           .eq('id', car.id);
       });
 
-      // Run updates in background without blocking response
       EdgeRuntime.waitUntil(Promise.all(updatePromises));
 
       return new Response(
@@ -78,8 +114,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Existing single car processing route
     if (req.method === 'POST' && path === '/generate-embeddings/single') {
-      // Process single car embedding
       const { carId } = await req.json();
       
       const { data: car, error: fetchError } = await supabase
@@ -123,4 +159,4 @@ Deno.serve(async (req: Request) => {
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
-}); 
+});
