@@ -6,7 +6,8 @@ import { uploadImage } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
-
+// components/CarSubmissionForm.tsx
+import { generateCarEmbedding } from "@/hooks/supabase";
 // Simplified embedding generator (verified and slightly tuned)
 function generateSimplifiedEmbedding(text: string): number[] {
   const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 2);
@@ -89,7 +90,8 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
 
       const specsString = JSON.stringify(formData.specs);
       const combinedText = `${formData.make} ${formData.model} ${formData.description} ${specsString}`;
-      const embedding = generateSimplifiedEmbedding(combinedText);
+      //const embedding = generateSimplifiedEmbedding(combinedText);
+
 
       const { data: car, error: insertError } = await supabaseAdmin
         .from("cars")
@@ -103,12 +105,14 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
           daily_price: Number(formData.daily_price),
           image_url: imageUrl || "",
           rent_link: formData.rent_link || defaultRentLink,
-          embedding,
+          //embedding,
         })
         .select();
 
       if (insertError) throw insertError;
-
+      
+      await generateCarEmbedding(generatedId);
+    
       setFormData({
         make: "",
         model: "",
