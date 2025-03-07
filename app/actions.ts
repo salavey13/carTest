@@ -634,26 +634,6 @@ export async function sendResult(chatId: string, result: any) {
   }
 }
 
-export const generateEmbeddings = async () => {
-  const { data: cars } = await supabaseAdmin.from("cars").select("id,description").is("embedding", null);
-
-  if (!cars?.length) return;
-
-  const pipe = await pipeline("feature-extraction", "Supabase/gte-small", { quantized: true });
-
-  for (const car of cars) {
-    const output = await pipe(car.description, {
-      pooling: "mean",
-      normalize: true,
-    });
-
-    await supabaseAdmin
-      .from("cars")
-      .update({ embedding: JSON.stringify(Array.from(output.data)) })
-      .eq("id", car.id);
-  }
-};
-
 export async function setTelegramWebhook() {
   const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
   const WEBHOOK_URL = `${getBaseUrl()}/api/telegramWebhook`;
