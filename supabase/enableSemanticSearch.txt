@@ -1,0 +1,10 @@
+Deploy to Supabase Cloud:
+Ensure your CLI is set up: 
+
+supabase login 
+
+(with your access token) and 
+
+supabase link --project-ref inmctohsodgdohamhzag 
+
+supabase functions deploy generate-embeddings
