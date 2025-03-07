@@ -16,6 +16,108 @@ const serviceRoleKey =
 export const supabaseAnon = createClient<Database>(supabaseUrl, supabaseAnonKey)
 export const supabaseAdmin = createClient<Database>(supabaseUrl, serviceRoleKey)
 
+
+// Match the vector dimensions with the database
+const VECTOR_DIMENSIONS = 384;
+
+// Simplified embedding generator (as fallback)
+function generateSimplifiedEmbedding(text: string): number[] {
+  const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  if (words.length === 0) return new Array(VECTOR_DIMENSIONS).fill(0);
+
+  const embedding = new Array(VECTOR_DIMENSIONS).fill(0);
+  const wordCount: { [key: string]: number } = {};
+
+  words.forEach(word => {
+    wordCount[word] = (wordCount[word] || 0) + 1;
+  });
+
+  Object.entries(wordCount).forEach(([word, count], index) => {
+    let hash = 0;
+    for (let i = 0; i < word.length; i++) {
+      hash = ((hash << 5) - hash + word.charCodeAt(i)) % 10007;
+    }
+    const baseIdx = Math.abs(hash + index * 23) % VECTOR_DIMENSIONS;
+    for (let i = 0; i < 7; i++) {
+      const idx = (baseIdx + i * 3) % VECTOR_DIMENSIONS;
+      embedding[idx] += (count / words.length) * (1 - i * 0.05);
+    }
+  });
+
+  const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
+  return magnitude > 0 ? embedding.map(val => val / magnitude) : embedding;
+}
+
+// New function to generate embeddings via Edge Function with fallback
+export async function generateCarEmbedding(carId?: string, carData?: { make: string; model: string; description: string; specs: Record<string, any> }) {
+  try {
+    // If carId is provided, fetch car data if not provided
+    let combinedText: string;
+    if (carId && !carData) {
+      const { data, error } = await supabaseAdmin
+        .from("cars")
+        .select("make, model, description, specs")
+        .eq("id", carId)
+        .single();
+      if (error) throw new Error(`Failed to fetch car: ${error.message}`);
+      combinedText = `${data.make} ${data.model} ${data.description} ${JSON.stringify(data.specs || {})}`;
+    } else if (carData) {
+      combinedText = `${carData.make} ${carData.model} ${carData.description} ${JSON.stringify(carData.specs || {})}`;
+    } else {
+      throw new Error("Either carId or carData must be provided");
+    }
+
+    // Try Edge Function first
+    const endpoint = carId ? `${supabaseUrl}/functions/v1/generate-embeddings/single` : `${supabaseUrl}/functions/v1/generate-embeddings/batch`;
+    const body = carId ? JSON.stringify({ carId }) : undefined;
+    
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      body,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Edge Function failed: ${await response.text()}`);
+    }
+
+    const result = await response.json();
+    debugLogger.log(`Edge Function success: ${result.message}`);
+    
+    // For single car, return immediately; for batch, return undefined (processing in background)
+    return carId ? result : undefined;
+  } catch (error) {
+    debugLogger.error("Edge Function failed, falling back to simplified embedding:", error);
+
+    // Fallback to simplified embedding
+    if (carId || carData) {
+      const combinedText = carData 
+        ? `${carData.make} ${carData.model} ${carData.description} ${JSON.stringify(carData.specs || {})}`
+        : (await supabaseAdmin.from("cars").select("make, model, description, specs").eq("id", carId!).single()).data
+          ? `${data.make} ${data.model} ${data.description} ${JSON.stringify(data.specs || {})}`
+          : "";
+      
+      const embedding = generateSimplifiedEmbedding(combinedText);
+      
+      if (carId) {
+        const { error } = await supabaseAdmin
+          .from("cars")
+          .update({ embedding })
+          .eq("id", carId);
+        if (error) throw new Error(`Failed to update embedding: ${error.message}`);
+      }
+      
+      return carId ? { message: "Embedding generated with fallback" } : undefined;
+    }
+    throw error;
+  }
+}
+
+// [Rest of your existing functions remain unchanged...]
+
 export const fetchUserData = async (chatId: string) => {
   debugLogger.log("Fetching user data for chatId:", chatId)
   try {
