@@ -1,7 +1,7 @@
 // app/actions.ts
 "use server";
 
-import { createAuthenticatedClient, supabaseAdmin, supabaseAnon } from "@/hooks/supabase";
+import { generateCarEmbedding, createAuthenticatedClient, supabaseAdmin, supabaseAnon } from "@/hooks/supabase";
 import axios from "axios";
 import { verifyJwtToken, generateJwtToken } from "@/lib/auth";
 import { logger } from "@/lib/logger";
@@ -37,6 +37,19 @@ type SendMessagePayload =
 function getBaseUrl() {
   return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://v0-car-test.vercel.app";
 }
+
+export const generateEmbeddings = async () => {
+  const { data: cars } = await supabaseAdmin
+    .from("cars")
+    .select("id")
+    .is("embedding", null);
+
+  if (!cars?.length) return;
+
+  // Call the centralized embedding function for batch processing
+  await generateCarEmbedding(); // No carId means batch processing
+  console.log(`Triggered embedding generation for ${cars.length} cars`);
+};
 
 /** Sends a Telegram message with optional image and buttons */
 export async function sendTelegramMessage(
