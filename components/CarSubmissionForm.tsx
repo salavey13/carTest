@@ -1,40 +1,10 @@
 "use client";
 import { useState } from "react";
 import type React from "react";
-import { supabaseAdmin } from "@/hooks/supabase";
-import { uploadImage } from "@/hooks/supabase";
+import { supabaseAdmin, uploadImage, generateCarEmbedding } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
-// components/CarSubmissionForm.tsx
-import { generateCarEmbedding } from "@/hooks/supabase";
-// Simplified embedding generator (verified and slightly tuned)
-function generateSimplifiedEmbedding(text: string): number[] {
-  const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-  if (words.length === 0) return new Array(384).fill(0);
-
-  const embedding = new Array(384).fill(0);
-  const wordCount: { [key: string]: number } = {};
-
-  words.forEach(word => {
-    wordCount[word] = (wordCount[word] || 0) + 1;
-  });
-
-  Object.entries(wordCount).forEach(([word, count], index) => {
-    let hash = 0;
-    for (let i = 0; i < word.length; i++) {
-      hash = ((hash << 5) - hash + word.charCodeAt(i)) % 10007;
-    }
-    const baseIdx = Math.abs(hash + index * 23) % 384;
-    for (let i = 0; i < 7; i++) {
-      const idx = (baseIdx + i * 3) % 384;
-      embedding[idx] += (count / words.length) * (1 - i * 0.05);
-    }
-  });
-
-  const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
-  return magnitude > 0 ? embedding.map(val => val / magnitude) : embedding;
-}
 
 interface CarSubmissionFormProps {
   ownerId: string; // Admin's user_id
@@ -88,31 +58,20 @@ export function CarSubmissionForm({ ownerId }: CarSubmissionFormProps) {
         toast.success("Картинка залита в неон!");
       }
 
-      const specsString = JSON.stringify(formData.specs);
-      const combinedText = `${formData.make} ${formData.model} ${formData.description} ${specsString}`;
-      //const embedding = generateSimplifiedEmbedding(combinedText);
+      // Pass all data to generateCarEmbedding
+      const carData = {
+        make: formData.make,
+        model: formData.model,
+        description: formData.description,
+        specs: formData.specs,
+        owner_id: ownerId,
+        daily_price: Number(formData.daily_price),
+        image_url: imageUrl || "",
+        rent_link: formData.rent_link || defaultRentLink,
+      };
 
+      const result = await generateCarEmbedding(undefined, carData);
 
-      const { data: car, error: insertError } = await supabaseAdmin
-        .from("cars")
-        .insert({
-          id: generatedId,
-          owner_id: ownerId,
-          make: formData.make,
-          model: formData.model,
-          description: formData.description,
-          specs: formData.specs,
-          daily_price: Number(formData.daily_price),
-          image_url: imageUrl || "",
-          rent_link: formData.rent_link || defaultRentLink,
-          //embedding,
-        })
-        .select();
-
-      if (insertError) throw insertError;
-      
-      await generateCarEmbedding(generatedId);
-    
       setFormData({
         make: "",
         model: "",
