@@ -10,6 +10,10 @@ import type { WebAppUser } from "@/types/telegram";
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DEFAULT_CHAT_ID = "413553377"; // Your default Telegram chat ID
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || DEFAULT_CHAT_ID;
+// Environment variables for Coze API with hardcoded defaults
+const COZE_API_KEY = process.env.COZE_API_KEY;
+const COZE_BOT_ID = process.env.COZE_BOT_ID || '7480584293518376966';
+const COZE_USER_ID = process.env.COZE_USER_ID || 'user341503612082';
 
 interface InlineButton {
   text: string;
@@ -36,6 +40,38 @@ type SendMessagePayload =
 /** Utility to get the base URL dynamically */
 function getBaseUrl() {
   return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://v0-car-test.vercel.app";
+}
+
+// New server action for Coze API
+export async function analyzeMessage(content: string) {
+  try {
+    const response = await axios.post(
+      'https://api.coze.com/v3/chat',
+      {
+        bot_id: COZE_BOT_ID,
+        user_id: COZE_USER_ID,
+        stream: false,
+        auto_save_history: true,
+        additional_messages: [
+          {
+            role: 'user',
+            content: content,
+            content_type: 'text',
+          },
+        ],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${COZE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error analyzing message:', error);
+    throw new Error('Failed to analyze message');
+  }
 }
 
 export const generateEmbeddings = async () => {
