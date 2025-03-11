@@ -60,10 +60,11 @@ export default function BullshitDetector() {
     try {
       const result = await analyzeMessage(input);
       setResponse({
-        analyzed_content: input, // Placeholder; adjust based on actual Coze API response
-        emotional_comment: result.data?.emotional_comment || "Hmm, interesting...",
-        emotion: result.data?.emotion || "neutral", // Assume 'emotion' field exists
-        bullshit_percentage: result.data?.bullshit_percentage || 50,
+        analyzed_content: result.analyzed_content || input,
+        emotional_comment: result.emotional_comment || "Hmm, interesting...",
+        animation: result.animation || "neutral",
+        bullshit_percentage: result.bullshit_percentage || 50,
+        content_summary: result.content_summary || "No summary available.",
       });
       toast.success("Analysis complete!");
     } catch (error) {
@@ -84,8 +85,8 @@ export default function BullshitDetector() {
     }
   }, [response]);
 
-  // Determine Evil Axis member based on emotion
-  const member = response ? evilAxisMembers[response.emotion] || evilAxisMembers.neutral : null;
+  // Determine Evil Axis member based on animation
+  const member = response ? evilAxisMembers[response.animation] || evilAxisMembers.neutral : null;
 
   return (
     <div className="py-16 bg-gray-900 min-h-screen">
@@ -128,27 +129,28 @@ export default function BullshitDetector() {
               </p>
             </div>
 
-            {/* Comic Balloon with Evil Axis Member */}
-            <motion.div
-              className="relative p-6 bg-white rounded-lg shadow-lg max-w-md mx-auto comic-bubble"
-              variants={balloonVariants}
-              initial="hidden"
-              animate="visible"
-            >
-              <div className="flex items-start">
-                <img
-                  src={member!.image}
-                  alt={member!.name}
-                  className="w-16 h-16 rounded-full mr-4"
-                />
+            {/* Evil Axis Member Image and Comic Balloon */}
+            <div className="flex flex-col items-center space-y-4">
+              {/* Evil Axis Member Image */}
+              <div className="w-32 h-auto aspect-[9/16] rounded-lg overflow-hidden">
+                <img src={member!.image} alt={member!.name} className="w-full h-full object-cover" />
+              </div>
+
+              {/* Comic Balloon */}
+              <motion.div
+                className="relative p-6 bg-white rounded-lg shadow-lg max-w-md comic-bubble"
+                variants={balloonVariants}
+                initial="hidden"
+                animate="visible"
+              >
                 <div>
                   <p className="text-lg font-bold text-black">{member!.name} says:</p>
                   <p className="text-black font-comic">{response.emotional_comment}</p>
                 </div>
-              </div>
-              {/* Balloon tail */}
-              <div className="absolute -bottom-3 left-10 w-0 h-0 border-t-[12px] border-t-white border-x-[8px] border-x-transparent"></div>
-            </motion.div>
+                {/* Balloon tail */}
+                <div className="absolute -bottom-3 left-10 w-0 h-0 border-t-[12px] border-t-white border-x-[8px] border-x-transparent"></div>
+              </motion.div>
+            </div>
 
             {/* Debug Info for Testing */}
             <details className="mt-4">
