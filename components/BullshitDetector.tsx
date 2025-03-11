@@ -6,13 +6,12 @@ import { supabaseAdmin } from "@/hooks/supabase"; // Adjust path as needed
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
-// Images for Evil Axis members based on emotion
 const evilAxisMembers = {
-  happy: { name: "Darth Smiley", image: "/images/darth-smiley.png" },
-  angry: { name: "Lord Fume", image: "/images/lord-fume.png" },
-  sad: { name: "Gloomy Vader", image: "/images/gloomy-vader.png" },
-  sarcastic: { name: "Snark Vader", image: "/images/snark-vader.png" },
-  neutral: { name: "General Bland", image: "/images/general-bland.png" },
+  happy: { name: "Donald Trump", image: "/images/trump-happy.png" },
+  angry: { name: "Kim Jong-un", image: "/images/kim-angry.png" },
+  sad: { name: "Bashar al-Assad", image: "/images/assad-sad.png" },
+  sarcastic: { name: "Vladimir Putin", image: "/images/putin-sarcastic.png" },
+  neutral: { name: "Xi Jinping", image: "/images/xi-neutral.png" },
 };
 
 // Comic balloon animation variants
