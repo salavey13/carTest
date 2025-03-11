@@ -7,11 +7,11 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 
 const evilAxisMembers = {
-  happy: { name: "Donald Trump", image: "/images/trump-happy.png" },
-  angry: { name: "Kim Jong-un", image: "/images/kim-angry.png" },
-  sad: { name: "Bashar al-Assad", image: "/images/assad-sad.png" },
-  sarcastic: { name: "Vladimir Putin", image: "/images/putin-sarcastic.png" },
-  neutral: { name: "Xi Jinping", image: "/images/xi-neutral.png" },
+  happy: { name: "Donald Trump", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//trump.png" },
+  angry: { name: "Kim Jong-un", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//kim.png" },
+  sad: { name: "Bashar al-Assad", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//assad.png" },
+  sarcastic: { name: "Vladimir Putin", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//putin-sarcastic.png" },
+  neutral: { name: "Xi Jinping", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png" },
 };
 
 // Comic balloon animation variants
