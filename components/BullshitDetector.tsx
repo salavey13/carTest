@@ -52,10 +52,6 @@ export default function BullshitDetector() {
       toast.error("Please log in via Telegram");
       return;
     }
-    if (!hasSubscription) {
-      toast.error("You need a Pro or Admin subscription to use this feature.");
-      return;
-    }
     if (!input.trim()) {
       toast.error("Please enter a message to analyze.");
       return;
@@ -79,8 +75,6 @@ export default function BullshitDetector() {
 
   // Placeholder for future Eleven Labs voiceover
   const handleVoiceover = async (text: string) => {
-    // Future implementation: const audio = await elevenLabsAPI.generateVoiceover(text);
-    // Play audio here
     console.log("Voiceover placeholder:", text);
   };
 
@@ -107,7 +101,7 @@ export default function BullshitDetector() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Enter a message or Telegram channel URL"
-          disabled={loading || !hasSubscription}
+          disabled={loading}
         />
         <button
           className={`w-full mt-4 p-3 rounded-lg font-mono text-lg ${
@@ -116,15 +110,10 @@ export default function BullshitDetector() {
               : "bg-purple-600 hover:bg-purple-700 text-white"
           } transition-all`}
           onClick={handleAnalyze}
-          disabled={loading || !hasSubscription}
+          disabled={loading}
         >
           {loading ? "Analyzing..." : "Detect Bullshit"}
         </button>
-        {!hasSubscription && (
-          <p className="text-red-400 text-sm mt-2 text-center">
-            Upgrade to Pro or Admin to unlock this feature!
-          </p>
-        )}
 
         {/* Response Section */}
         {response && (
@@ -160,6 +149,27 @@ export default function BullshitDetector() {
               {/* Balloon tail */}
               <div className="absolute -bottom-3 left-10 w-0 h-0 border-t-[12px] border-t-white border-x-[8px] border-x-transparent"></div>
             </motion.div>
+
+            {/* Debug Info for Testing */}
+            <details className="mt-4">
+              <summary className="text-sm text-gray-400 cursor-pointer">Debug Info</summary>
+              <pre className="bg-gray-800 p-4 rounded-lg text-sm text-gray-300">
+                {JSON.stringify(response, null, 2)}
+              </pre>
+            </details>
+
+            {/* Subscription Reminder */}
+            {!hasSubscription && (
+              <div className="mt-4 p-3 bg-yellow-100 text-yellow-800 rounded-lg text-center">
+                <p>
+                  Enjoying the Bullshit Detector?{" "}
+                  <a href="/subscribe" className="underline">
+                    Subscribe
+                  </a>{" "}
+                  to remove this message!
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
