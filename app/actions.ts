@@ -11,7 +11,7 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DEFAULT_CHAT_ID = "413553377"; // Your default Telegram chat ID
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || DEFAULT_CHAT_ID;
 // Environment variables for Coze API with hardcoded defaults
-const COZE_API_KEY = process.env.COZE_API_KEY;
+const COZE_API_KEY = process.env.COZE_API_KEY || 'pat_2iWalfwl7xVrPbgwuOSQdldnvhGmG2wZTYtEo9RcT2plRDj3YUR4CTSqI5snzR8u';
 const COZE_BOT_ID = process.env.COZE_BOT_ID || '7480584293518376966';
 const COZE_USER_ID = process.env.COZE_USER_ID || 'user341503612082';
 
