@@ -87,7 +87,7 @@ export default function BullshitDetector() {
   const member = response ? evilAxisMembers[response.animation] || evilAxisMembers.neutral : null;
 
   return (
-    <div className="pt-32 pb-16 flex flex-col min-h-screen bg-gray-900 px-4 py-6 sm:p-6">
+    <div className="pt-32 pb-24 flex flex-col min-h-screen bg-gray-900 px-4 py-6 sm:p-6">
       <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full">
         <h1 className="text-2xl sm:text-3xl font-bold text-center mb-6 text-gradient bg-gradient-to-r from-red-500 to-purple-500 text-transparent bg-clip-text">
           Bullshit Detector
@@ -154,7 +154,7 @@ export default function BullshitDetector() {
               disabled={loading}
             />
             <button
-              className={`absolute right-2 p-2 rounded-full ${
+              className={`absolute right-1 p-2 rounded-full ${
                 loading ? "bg-gray-600 cursor-not-allowed" : "bg-purple-600 hover:bg-purple-700"
               } transition-all`}
               onClick={handleAnalyze}
