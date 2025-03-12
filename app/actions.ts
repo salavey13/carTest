@@ -67,7 +67,24 @@ export async function analyzeMessage(content: string) {
         },
       }
     );
-    return response.data;
+
+    console.log('Coze API response.data:', response.data); // Log for debugging
+
+    // Hypothesized structure: assistant response is in messages[1].content as a JSON string
+    const assistantMessage = response.data.messages?.[1]?.content;
+    if (!assistantMessage) {
+      throw new Error('No assistant message found in response');
+    }
+
+    // Parse the JSON string from content
+    const parsedData = JSON.parse(assistantMessage);
+    return {
+      bullshit_percentage: parsedData.bullshit_percentage || 50,
+      emotional_comment: parsedData.emotional_comment || "Hmmm, interesting...",
+      analyzed_content: parsedData.analyzed_content || content,
+      content_summary: parsedData.content_summary || "No summary available.",
+      animation: parsedData.animation || "neutral",
+    };
   } catch (error) {
     console.error('Error analyzing message:', error);
     throw new Error('Failed to analyze message');
