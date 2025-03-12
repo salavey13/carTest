@@ -174,24 +174,11 @@ export default function BullshitDetector() {
           {!hasSubscription && (
             <div className="mt-2 text-center text-xs text-yellow-800 bg-yellow-100 p-2 rounded-lg">
               Enjoying the Bullshit Detector?{" "}
-              <a href="/subscribe" className="underline">Subscribe</a> to remove this message!
+              <a href="/buy-subscription" className="underline">Subscribe</a> to remove this message!
             </div>
           )}
         </div>
       </div>
-
-      {/* Comic Balloon CSS */}
-      <style jsx>{`
-        .comic-bubble {
-          position: relative;
-          background: white;
-          border: 2px solid black;
-          border-radius: 15px;
-        }
-        .font-comic {
-          font-family: "Comic Sans MS", "Chalkboard", sans-serif;
-        }
-      `}</style>
     </div>
   );
 }
