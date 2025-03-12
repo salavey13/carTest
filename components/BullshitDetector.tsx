@@ -131,11 +131,6 @@ export default function BullshitDetector() {
 
             {/* Evil Axis Member Image and Comic Balloon */}
             <div className="flex flex-col items-center space-y-4">
-              {/* Evil Axis Member Image */}
-              <div className="w-32 h-auto aspect-[9/16] rounded-lg overflow-hidden">
-                <img src={member!.image} alt={member!.name} className="w-full h-full object-cover" />
-              </div>
-
               {/* Comic Balloon */}
               <motion.div
                 className="relative p-6 bg-white rounded-lg shadow-lg max-w-md comic-bubble"
@@ -150,6 +145,11 @@ export default function BullshitDetector() {
                 {/* Balloon tail */}
                 <div className="absolute -bottom-3 left-10 w-0 h-0 border-t-[12px] border-t-white border-x-[8px] border-x-transparent"></div>
               </motion.div>
+              {/* Evil Axis Member Image */}
+              <div className="w-32 h-auto aspect-[9/16] rounded-lg overflow-hidden">
+                <img src={member!.image} alt={member!.name} className="w-full h-full object-cover" />
+              </div>
+
             </div>
 
             {/* Debug Info for Testing */}
