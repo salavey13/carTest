@@ -7,12 +7,12 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 
 const evilAxisMembers = {
-  happy: { name: "Donald Trump", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//trump.png" },
-  angry: { name: "Kim Jong-un", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//kim.png" },
-  sad: { name: "Bashar al-Assad", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//assad.png" },
-  sarcastic: { name: "Vladimir Putin", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//putin-sarcastic.png" },
-  neutral: { name: "Xi Jinping", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png" },
-  smirk: { name: "Vladimir Putin", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//putin-sarcastic.png" }, // Added for "smirk"
+  laugh: { name: "Donald Trump", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//trump.png" },
+  eyeroll: { name: "Kim Jong-un", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//kim.png" },
+  mocking: { name: "Bashar al-Assad", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//assad.png" },
+  disbelief: { name: "Vladimir Putin", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//putin-sarcastic.png" },
+  smirk: { name: "Xi Jinping", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png" },
+  neutral: { name: "Vladimir Putin", image: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//putin-sarcastic.png" }, // Added for "smirk"
 };
 
 // Animation variants
