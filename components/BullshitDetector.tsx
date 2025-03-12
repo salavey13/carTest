@@ -87,7 +87,7 @@ export default function BullshitDetector() {
   const member = response ? evilAxisMembers[response.animation] || evilAxisMembers.neutral : null;
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-900 px-4 py-6 sm:p-6">
+    <div className="py-16 flex flex-col min-h-screen bg-gray-900 px-4 py-6 sm:p-6">
       <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full">
         <h1 className="text-2xl sm:text-3xl font-bold text-center mb-6 text-gradient bg-gradient-to-r from-red-500 to-purple-500 text-transparent bg-clip-text">
           Bullshit Detector
@@ -116,11 +116,6 @@ export default function BullshitDetector() {
 
             {/* Image and Balloon */}
             <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-              {/* Evil Axis Member Image */}
-              <div className="w-20 sm:w-24 h-auto aspect-[9/16] rounded-lg overflow-hidden sm:ml-4">
-                <img src={member!.image} alt={member!.name} className="w-full h-full object-cover" />
-              </div>
-
               {/* Comic Balloon */}
               <motion.div
                 className="relative p-4 bg-white rounded-lg shadow-lg w-full sm:w-80 comic-bubble sm:mr-4"
@@ -130,13 +125,18 @@ export default function BullshitDetector() {
                 <p className="text-black font-comic text-sm sm:text-base">{response.emotional_comment}</p>
                 <div className="absolute -bottom-3 left-6 w-0 h-0 border-t-[10px] border-t-white border-x-[6px] border-x-transparent" />
               </motion.div>
+              {/* Evil Axis Member Image */}
+              <div className="w-24 sm:w-32 h-auto aspect-[9/16] rounded-lg overflow-hidden sm:ml-4">
+                <img src={member!.image} alt={member!.name} className="w-full h-full object-cover" />
+              </div>
+
             </div>
           </motion.div>
         )}
 
         {/* Loading Animation */}
         {loading && (
-          <div className="mb-6 flex justify-center">
+          <div className="mb-6 flex justify-center pt-16">
             <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
           </div>
         )}
