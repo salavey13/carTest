@@ -24,7 +24,7 @@ export default function WheelOfFortune() {
   const [manualWinningNumber, setManualWinningNumber] = useState("")
   const wheelRef = useRef<HTMLDivElement>(null)
 
-  // Генерация уникальных чисел для сегментов
+  // Generate unique numbers for segments
   const generateUniqueNumbers = (count: number, max: number) => {
     const numbers = new Set<number>()
     while (numbers.size < count) {
@@ -33,14 +33,14 @@ export default function WheelOfFortune() {
     return Array.from(numbers)
   }
 
-  // Создание сегментов колеса с уникальными числами
+  // Create wheel segments with unique numbers
   const uniqueNumbers = generateUniqueNumbers(20, 999)
   const segments: WheelSegment[] = uniqueNumbers.map((value, i) => ({
     value,
     color: getWheelColor(i, 20),
   }))
 
-  // Загрузка ранее выбранного числа пользователя
+  // Load user's previously selected number
   useEffect(() => {
     if (dbUser && !isLoading) {
       const metadata = dbUser.metadata as any
@@ -50,22 +50,13 @@ export default function WheelOfFortune() {
     }
   }, [dbUser, isLoading])
 
-  // Функция для получения цвета сегмента с плавным градиентом
+  // Generate gradient colors for segments
   function getWheelColor(index: number, total: number) {
-    const colorSteps = [
-      "bg-blue-300",
-      "bg-blue-400",
-      "bg-blue-500",
-      "bg-blue-600",
-      "bg-blue-700",
-      "bg-blue-800",
-      "bg-blue-900",
-    ]
-    const step = Math.floor((index / total) * colorSteps.length)
-    return colorSteps[step]
+    const hue = (index / total) * 360
+    return `linear-gradient(135deg, hsl(${hue}, 70%, 60%), hsl(${hue}, 70%, 40%))`
   }
 
-  // Логика вращения колеса
+  // Spin the wheel logic
   const spinWheel = async () => {
     if (isSpinning || !dbUser) return
 
@@ -77,7 +68,7 @@ export default function WheelOfFortune() {
       const segmentAngle = 360 / segments.length
       const normalizedRotation = (rotation + spinDegrees) % 360
       const segmentIndex = Math.floor(normalizedRotation / segmentAngle)
-      const selectedSegment = segments[segmentIndex % segments.length]
+      const selectedSegment = segments[segments.length - 1 - (segmentIndex % segments.length)] // Adjusted for correct segment selection
 
       setSelectedNumber(selectedSegment.value)
       setUserNumber(selectedSegment.value)
@@ -95,17 +86,17 @@ export default function WheelOfFortune() {
           .eq("user_id", dbUser.user_id)
 
         if (error) throw error
-        toast.success(`Ваше счастливое число: ${selectedSegment.value}!`)
+        toast.success(`Your lucky number: ${selectedSegment.value}!`)
       } catch (error) {
-        console.error("Ошибка сохранения числа:", error)
-        toast.error("Не удалось сохранить число. Попробуйте снова.")
+        console.error("Error saving number:", error)
+        toast.error("Failed to save number. Try again.")
       }
 
       setIsSpinning(false)
     }, 5000)
   }
 
-  // Поиск победителей (для администратора)
+  // Find winners (admin only)
   const findWinners = async () => {
     if (!isAdmin()) return
 
@@ -115,7 +106,7 @@ export default function WheelOfFortune() {
       const winningNumber = manualWinningNumber ? Number.parseInt(manualWinningNumber) : selectedNumber
 
       if (!winningNumber) {
-        toast.error("Сначала крутите колесо или введите выигрышное число")
+        toast.error("Spin the wheel first or enter a winning number")
         setIsLoadingWinners(false)
         return
       }
@@ -131,19 +122,19 @@ export default function WheelOfFortune() {
 
       if (data?.length > 0) {
         await notifyWinners(winningNumber, data)
-        toast.success(`Найдено и уведомлено ${data.length} победителей!`)
+        toast.success(`Found and notified ${data.length} winners!`)
       } else {
-        toast.info("Победителей с этим числом не найдено")
+        toast.info("No winners found with this number")
       }
     } catch (error) {
-      console.error("Ошибка поиска победителей:", error)
-      toast.error("Не удалось найти победителей. Попробуйте снова.")
+      console.error("Error finding winners:", error)
+      toast.error("Failed to find winners. Try again.")
     }
 
     setIsLoadingWinners(false)
   }
 
-  // Состояние загрузки
+  // Loading state
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px] bg-blue-900 mt-6">
@@ -152,38 +143,42 @@ export default function WheelOfFortune() {
     )
   }
 
-  // Проверка авторизации
+  // Authorization check
   if (!dbUser) {
     return (
       <div className="text-center p-8 bg-blue-800 text-white rounded-lg mt-6">
-        <h2 className="text-2xl font-bold mb-4">Пожалуйста, войдите</h2>
-        <p>Для использования Колеса Фортуны нужно войти в систему.</p>
+        <h2 className="text-2xl font-bold mb-4">Please Log In</h2>
+        <p>You need to log in to use the Wheel of Fortune.</p>
       </div>
     )
   }
 
-  // Основной рендер компонента
+  // Main component render
   return (
     <div className="container mx-auto p-4 bg-blue-900 min-h-screen text-white mt-6">
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-2">Колесо Фортуны</h1>
-        <p className="text-lg text-blue-200">Крути колесо и узнай свое счастливое число!</p>
+        <h1 className="text-4xl font-bold mb-2">Wheel of Fortune</h1>
+        <p className="text-lg text-blue-200">Spin the wheel to find your lucky number!</p>
 
         {userNumber && (
           <div className="mt-4 p-3 bg-blue-800 rounded-lg inline-block">
             <p className="text-lg">
-              Твое текущее число: <span className="font-bold text-2xl text-yellow-400">{userNumber}</span>
+              Your current number: <span className="font-bold text-2xl text-yellow-400">{userNumber}</span>
             </p>
           </div>
         )}
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 items-center justify-center">
-        {/* Секция колеса */}
-        <div className="relative w-80 h-80">
-          <div className="absolute inset-0 flex items-center justify-center">
+      <div className="flex flex-col lg:flex-row gap-16 items-center justify-center">
+        {/* Wheel Section */}
+        <div className="relative max-w-md w-full aspect-square">
+          <motion.div
+            className="absolute inset-0 flex items-center justify-center"
+            animate={isSpinning ? { y: [0, -10, 0] } : {}}
+            transition={{ duration: 0.5, repeat: isSpinning ? Infinity : 0 }}
+          >
             <div className="w-4 h-16 bg-yellow-400 z-10 -mt-16 rounded-b-lg" />
-          </div>
+          </motion.div>
 
           <motion.div
             ref={wheelRef}
@@ -198,16 +193,19 @@ export default function WheelOfFortune() {
               return (
                 <div
                   key={index}
-                  className={`absolute w-full h-full ${segment.color}`}
+                  className="absolute w-full h-full"
                   style={{
-                    transform: `rotate(${rotation}deg) skewY(${90 - angle}deg)`,
+                    background: segment.color,
+                    clipPath: `polygon(50% 50%, 100% 0%, 100% ${100 * Math.tan((angle * Math.PI) / 360)}%)`,
+                    transform: `rotate(${rotation}deg)`,
                     transformOrigin: "50% 50%",
                   }}
                 >
                   <div
-                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white font-bold text-lg"
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white font-bold text-xl"
                     style={{
-                      transform: `rotate(${angle / 2}deg) translateY(-120px) rotate(${-rotation}deg)`,
+                      transform: `translateY(-60%) rotate(${-rotation}deg)`,
+                      textShadow: "0 0 4px rgba(0, 0, 0, 0.5)",
                     }}
                   >
                     {segment.value}
@@ -227,27 +225,27 @@ export default function WheelOfFortune() {
             {isSpinning ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Крутим...
+                Spinning...
               </>
             ) : (
               <>
                 <RotateCw className="w-5 h-5" />
-                Крутить колесо
+                Spin the Wheel
               </>
             )}
           </button>
         </div>
 
-        {/* Секция администратора */}
+        {/* Admin Section */}
         {isAdmin() && (
           <div className="bg-blue-800 p-6 rounded-lg w-full max-w-md">
             <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
               <Trophy className="w-6 h-6 text-yellow-400" />
-              Панель администратора
+              Admin Panel
             </h2>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-1 text-blue-100">Выигрышное число (опционально)</label>
+              <label className="block text-sm font-medium mb-1 text-blue-100">Winning Number (Optional)</label>
               <input
                 type="number"
                 min="1"
@@ -255,7 +253,7 @@ export default function WheelOfFortune() {
                 value={manualWinningNumber}
                 onChange={(e) => setManualWinningNumber(e.target.value)}
                 className="w-full p-2 border border-blue-600 bg-blue-900 text-white rounded-md placeholder-blue-300"
-                placeholder="Введите число (1-999)"
+                placeholder="Enter number (1-999)"
               />
             </div>
 
@@ -269,16 +267,16 @@ export default function WheelOfFortune() {
               {isLoadingWinners ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Поиск победителей...
+                  Finding Winners...
                 </>
               ) : (
-                "Найти и уведомить победителей"
+                "Find and Notify Winners"
               )}
             </button>
 
             {winners.length > 0 && (
               <div className="mt-6">
-                <h3 className="text-lg font-semibold mb-2">Победители ({winners.length})</h3>
+                <h3 className="text-lg font-semibold mb-2">Winners ({winners.length})</h3>
                 <div className="max-h-60 overflow-y-auto bg-blue-900 rounded-md p-2">
                   {winners.map((winner) => (
                     <div key={winner.user_id} className="p-2 border-b border-blue-700 last:border-b-0">
