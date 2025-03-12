@@ -42,8 +42,6 @@ function getBaseUrl() {
   return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://v0-car-test.vercel.app";
 }
 
-
-
 // Utility to delay execution (for polling)
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -76,18 +74,19 @@ export async function analyzeMessage(content: string) {
     console.log('Initial Coze API response.data:', initResponse.data);
 
     const chatId = initResponse.data.data?.id;
-    if (!chatId) {
-      throw new Error('No chat ID returned in initial response');
+    const conversationId = initResponse.data.data?.conversation_id;
+    if (!chatId || !conversationId) {
+      throw new Error('Missing chat ID or conversation ID in initial response');
     }
 
-    // Step 2: Poll for chat completion
+    // Step 2: Poll for chat messages until assistant's answer is available
     let attempts = 0;
     const maxAttempts = 10; // Limit polling
     const pollInterval = 2000; // Poll every 2 seconds
 
     while (attempts < maxAttempts) {
-      const chatResponse = await axios.get(
-        `https://api.coze.com/v3/chat/${chatId}`,
+      const messagesResponse = await axios.get(
+        `https://api.coze.com/v3/chat/message/list?conversation_id=${conversationId}&chat_id=${chatId}`,
         {
           headers: {
             Authorization: `Bearer ${COZE_API_KEY}`,
@@ -96,34 +95,24 @@ export async function analyzeMessage(content: string) {
         }
       );
 
-      console.log('Poll Coze API chat response.data:', chatResponse.data);
+      console.log('Coze API messages response.data:', messagesResponse.data);
 
-      const status = chatResponse.data.data?.status;
-      if (status === 'completed') {
-        // Step 3: Fetch the chat messages
-        const messagesResponse = await axios.get(
-          `https://api.coze.com/v3/chat/messages?chat_id=${chatId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${COZE_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+      // Find the assistant's answer message
+      const assistantAnswer = messagesResponse.data.data?.find(
+        (msg: any) => msg.role === 'assistant' && msg.type === 'answer'
+      )?.content;
 
-        console.log('Coze API messages response.data:', messagesResponse.data);
-
-        // Find the assistant's response (assuming role: 'assistant')
-        const assistantMessage = messagesResponse.data.data?.find(
-          (msg: any) => msg.role === 'assistant'
-        )?.content;
-
-        if (!assistantMessage) {
-          throw new Error('No assistant message found in completed chat');
+      if (assistantAnswer) {
+        // Parse the content, assuming it's a JSON string
+        let parsedData;
+        try {
+          parsedData = JSON.parse(assistantAnswer);
+        } catch (e) {
+          // If parsing fails, assume plain text and use defaults
+          console.warn('Assistant content is not JSON, treating as plain text:', assistantAnswer);
+          parsedData = { emotional_comment: assistantAnswer };
         }
 
-        // Parse the JSON string from content
-        const parsedData = JSON.parse(assistantMessage);
         return {
           bullshit_percentage: parsedData.bullshit_percentage || 50,
           emotional_comment: parsedData.emotional_comment || "Hmm, interesting...",
@@ -131,20 +120,20 @@ export async function analyzeMessage(content: string) {
           content_summary: parsedData.content_summary || "No summary available.",
           animation: parsedData.animation || "neutral",
         };
-      } else if (status === 'failed' || status === 'error') {
-        throw new Error('Chat processing failed');
       }
 
       attempts++;
       await delay(pollInterval); // Wait before next poll
     }
 
-    throw new Error('Chat processing timed out after maximum attempts');
+    throw new Error('No assistant answer received after maximum attempts');
   } catch (error) {
     console.error('Error analyzing message:', error);
     throw new Error('Failed to analyze message');
   }
 }
+
+
 
 
 
