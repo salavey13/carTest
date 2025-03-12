@@ -42,6 +42,40 @@ function getBaseUrl() {
   return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://v0-car-test.vercel.app";
 }
 
+// Add this new function to notify winners
+export async function notifyWinners(winningNumber: number, winners: any[]) {
+  try {
+    // Notify each winner
+    for (const winner of winners) {
+      await sendTelegramMessage(
+        process.env.TELEGRAM_BOT_TOKEN!,
+        `🎉 Congratulations! Your lucky number ${winningNumber} has been drawn in the Wheel of Fortune! You are a winner! 🏆`,
+        [],
+        undefined,
+        winner.user_id,
+      )
+    }
+
+    // Notify admin about the winners
+    const winnerNames = winners.map((w) => w.username || w.full_name || w.user_id).join(", ")
+    await sendTelegramMessage(
+      process.env.TELEGRAM_BOT_TOKEN!,
+      `🎮 Wheel of Fortune Results:\nWinning Number: ${winningNumber}\nWinners (${winners.length}): ${winnerNames}`,
+      [],
+      undefined,
+      ADMIN_CHAT_ID,
+    )
+
+    return { success: true }
+  } catch (error) {
+    logger.error("Error notifying winners:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to notify winners",
+    }
+  }
+}
+
 // Utility to delay execution (for polling)
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
