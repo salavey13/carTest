@@ -6,6 +6,7 @@ import axios from "axios";
 import { verifyJwtToken, generateJwtToken } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 import type { WebAppUser } from "@/types/telegram";
+import { createHash, randomBytes } from "crypto";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DEFAULT_CHAT_ID = "413553377"; // Your default Telegram chat ID
@@ -40,6 +41,26 @@ type SendMessagePayload =
 /** Utility to get the base URL dynamically */
 function getBaseUrl() {
   return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://v0-car-test.vercel.app";
+}
+
+
+// Generate CAPTCHA text and its hash
+export async function generateCaptchaSecret(length: number, characterSet: "letters" | "numbers" | "both") {
+  const chars =
+    characterSet === "letters"
+      ? "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+      : characterSet === "numbers"
+      ? "0123456789"
+      : "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const text = Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  const hash = createHash("sha256").update(text).digest("hex");
+  return { hash, text };
+}
+
+// Verify user input against the stored CAPTCHA text
+export async function verifyCaptcha(hash: string, userInput: string) {
+  const computedHash = createHash("sha256").update(userInput).digest("hex");
+  return computedHash === hash;
 }
 
 
