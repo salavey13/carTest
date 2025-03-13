@@ -48,6 +48,83 @@ function getBaseUrl() {
 
 
 
+interface CaptchaSettings {
+  string_length: number;
+  character_set: "letters" | "numbers" | "both";
+  case_sensitive: boolean;
+  noise_level: number; // 0-100 (lines count)
+  font_size: number; // 20-50
+  background_color: string; // Hex code
+  text_color: string; // Hex code
+  distortion: number; // 0-1 (rotation intensity)
+}
+
+export async function generateCaptcha(settings: CaptchaSettings) {
+  const chars =
+    settings.character_set === "letters"
+      ? "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+      : settings.character_set === "numbers"
+      ? "0123456789"
+      : "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const text = Array.from(
+    { length: settings.string_length },
+    () => chars[Math.floor(Math.random() * chars.length)]
+  ).join("");
+
+  const width = Math.max(200, settings.string_length * 40 + 60);
+  const height = 80;
+
+  // SVG with gradient background
+  let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`;
+  svg += `<defs><linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:${settings.background_color};stop-opacity:1" /><stop offset="100%" style="stop-color:${adjustColor(settings.background_color, -20)};stop-opacity:1" /></linearGradient></defs>`;
+  svg += `<rect width="${width}" height="${height}" fill="url(#grad)" />`;
+
+  // Distorted text with shadow
+  for (let i = 0; i < text.length; i++) {
+    const x = 30 + i * 40;
+    const y = height / 2 + settings.font_size / 2;
+    const rotation = (Math.random() - 0.5) * settings.distortion * 30; // Degrees
+    svg += `<text x="${x}" y="${y}" font-family="Courier New, monospace" font-size="${settings.font_size}" fill="${settings.text_color}" transform="rotate(${rotation}, ${x}, ${y})" filter="url(#shadow)">${text[i]}</text>`;
+  }
+
+  // Shadow filter
+  svg += `<defs><filter id="shadow"><feDropShadow dx="2" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.3)" /></filter></defs>`;
+
+  // Noise (wavy lines)
+  for (let i = 0; i < settings.noise_level / 10; i++) {
+    const x1 = Math.random() * width;
+    const y1 = Math.random() * height;
+    const cx = Math.random() * width;
+    const cy = Math.random() * height;
+    const x2 = Math.random() * width;
+    const y2 = Math.random() * height;
+    svg += `<path d="M${x1},${y1} Q${cx},${cy} ${x2},${y2}" stroke="rgba(150,150,150,0.5)" stroke-width="1" fill="none" />`;
+  }
+
+  svg += `</svg>`;
+
+  const image = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+  const hash = createHash("sha256").update(text).digest("hex");
+
+  return { image, hash };
+}
+
+export async function verifyCaptcha(hash: string, userInput: string) {
+  const computedHash = createHash("sha256").update(userInput).digest("hex");
+  return computedHash === hash;
+}
+
+
+
+// Helper to adjust color brightness
+function adjustColor(hex: string, amount: number): string {
+  const color = hex.replace("#", "");
+  const r = Math.max(0, Math.min(255, parseInt(color.slice(0, 2), 16) + amount));
+  const g = Math.max(0, Math.min(255, parseInt(color.slice(2, 4), 16) + amount));
+  const b = Math.max(0, Math.min(255, parseInt(color.slice(4, 6), 16) + amount));
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+}
+
 
 
 
