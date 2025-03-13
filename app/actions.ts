@@ -6,7 +6,8 @@ import axios from "axios";
 import { verifyJwtToken, generateJwtToken } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 import type { WebAppUser } from "@/types/telegram";
-import { createHash, randomBytes } from "crypto";
+import { createHash } from "crypto";
+import svgCaptcha from "svg-captcha";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DEFAULT_CHAT_ID = "413553377"; // Your default Telegram chat ID
@@ -44,7 +45,8 @@ function getBaseUrl() {
 }
 
 
-// Generate CAPTCHA text and its hash
+
+
 export async function generateCaptchaSecret(length: number, characterSet: "letters" | "numbers" | "both") {
   const chars =
     characterSet === "letters"
@@ -52,9 +54,21 @@ export async function generateCaptchaSecret(length: number, characterSet: "lette
       : characterSet === "numbers"
       ? "0123456789"
       : "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  const text = Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-  const hash = createHash("sha256").update(text).digest("hex");
-  return { hash, text };
+
+  const captcha = svgCaptcha.create({
+    size: length,
+    charPreset: chars,
+    noise: 2,
+    width: Math.max(200, length * 30 + 60),
+    height: 60,
+    background: "#f0f0f0",
+    color: true,
+  });
+
+  const image = `data:image/svg+xml;base64,${Buffer.from(captcha.data).toString("base64")}`;
+  const hash = createHash("sha256").update(captcha.text).digest("hex");
+
+  return { image, hash };
 }
 
 // Verify user input against the stored CAPTCHA text
