@@ -6,8 +6,11 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { Loader2, Trophy } from "lucide-react";
 import { notifyCaptchaSuccess, notifySuccessfulUsers, generateCaptchaImage } from "@/app/actions";
-
-export default function CaptchaVerification() {
+// Add the prop type
+interface CaptchaVerificationProps {
+  onCaptchaSuccess: () => void;
+}
+export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerificationProps) {
   const { dbUser, isLoading, isAdmin } = useTelegram();
   const [settings, setSettings] = useState<{
     string_length: number;
@@ -80,7 +83,7 @@ export default function CaptchaVerification() {
     }
   }, [isAdmin]);
 
-  // Handle CAPTCHA submission
+  // Update handleSubmit to call onCaptchaSuccess
   const handleSubmit = async () => {
     if (!settings || !dbUser) return;
 
@@ -101,6 +104,7 @@ export default function CaptchaVerification() {
         if (error) throw error;
 
         setIsSuccess(true);
+        onCaptchaSuccess(); // Call the callback to notify the parent
         toast.success("CAPTCHA успешно пройдена!");
 
         const notifyResult = await notifyCaptchaSuccess(dbUser.user_id, dbUser.username);
