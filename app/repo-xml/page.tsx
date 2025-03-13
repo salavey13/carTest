@@ -3,6 +3,8 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
+import { runCoseAgent } from "@/app/actions";
+import { toast } from "sonner";
 
 interface FileNode {
   path: string;
@@ -20,6 +22,8 @@ const RepoTxtFetcher: React.FC = () => {
   const [progress, setProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<{ id: number; message: string }[]>([]);
+  const [kworkInput, setKworkInput] = useState<string>("");
+  const [botRequest, setBotRequest] = useState<string>("");
 
   const addToast = (message: string) => {
     const id = Date.now();
@@ -121,14 +125,42 @@ const RepoTxtFetcher: React.FC = () => {
     setSelectedOutput(generateSelectedTxt(files));
   };
 
+  const handleGenerateBotRequest = async () => {
+    if (!kworkInput.trim()) {
+      toast.error("Введи запрос с Kwork!");
+      return;
+    }
+
+    setLoading(true);
+    setBotRequest("");
+    addToast("Генерирую запрос для бота...");
+
+    try {
+      const context = selectedOutput || txtOutput || "No repo context provided.";
+      const fullInput = `Kwork request: "${kworkInput}"\nRepo context:\n${context}`;
+      const botId = "123456789"; // Replace with your KworkBotConverter bot ID
+      const userId = "987654321"; // Replace with your Coze user ID
+      const response = await runCoseAgent(botId, userId, fullInput);
+      setBotRequest(response);
+      toast.success("Запрос для бота готов!");
+    } catch (err) {
+      setError("Ошибка генерации запроса для бота.");
+      addToast("Ошибка: Генерация заглохла!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto p-8 bg-card rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-muted animate-[drift_20s_infinite]">
       <h2 className="text-5xl font-bold cyber-text mb-6 tracking-wider glitch" data-text="Кибер-Экстрактор TXT">
         Кибер-Экстрактор TXT
       </h2>
       <p className="text-muted-foreground mb-8 text-xl font-mono leading-relaxed">
-        Новичок? Забей. Это выгребает файлы в один TXT для ботов, чтобы твой проект взлетел. Кидай URL GitHub, токен (чтоб GitHub не выпендривался), жми кнопку и забирай TXT. Только .ts, .tsx, .css, .sql, без мусора из components/ui/*—чисто и по делу.
+        Кидай URL GitHub, токен (для приватных реп), жми кнопку—получай TXT из .ts, .tsx, .css, .sql. Плюс: превращай запросы с Kwork в техзадания для ботов с учётом моего арсенала (CAPTCHA, Bullshit Detector, Wheel of Fortune). Выбирай файлы для контекста!
       </p>
+
+      {/* Repo Input Section */}
       <div className="flex flex-col gap-6 mb-8">
         <input
           type="text"
@@ -154,6 +186,30 @@ const RepoTxtFetcher: React.FC = () => {
           } transition-all text-glow font-mono text-lg`}
         >
           {loading ? "Взламываю..." : "Извлечь TXT"}
+        </button>
+      </div>
+
+      {/* Kwork Input Section */}
+      <div className="mb-8 bg-popover p-6 rounded-xl shadow-inner border border-border">
+        <h3 className="text-3xl font-semibold text-secondary mb-4 cyber-text glitch" data-text="Kwork в Бота">
+          Kwork в Бота
+        </h3>
+        <textarea
+          value={kworkInput}
+          onChange={(e) => setKworkInput(e.target.value)}
+          placeholder="Вставь запрос с Kwork (например, 'Нужен бот для квизов с статистикой')"
+          className="w-full h-32 p-4 bg-input border border-border rounded-xl text-foreground focus:outline-none focus:ring-4 focus:ring-primary/50 text-glow font-mono text-lg shadow-[inset_0_0_10px_rgba(255,107,107,0.2)] resize-none scrollbar-thin scrollbar-thumb-primary scrollbar-track-muted"
+        />
+        <button
+          onClick={handleGenerateBotRequest}
+          disabled={loading}
+          className={`mt-4 px-8 py-4 rounded-xl font-semibold text-primary-foreground ${
+            loading
+              ? "bg-muted cursor-not-allowed animate-pulse"
+              : "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 hover:shadow-[0_0_15px_rgba(255,107,107,0.7)]"
+          } transition-all text-glow font-mono text-lg`}
+        >
+          {loading ? "Генерирую..." : "Сгенерировать запрос"}
         </button>
       </div>
 
@@ -206,18 +262,27 @@ const RepoTxtFetcher: React.FC = () => {
       )}
 
       {selectedOutput && (
-        <div className="bg-popover p-6 rounded-xl shadow-inner border border-border">
-          <h3
-            className="text-3xl font-semibold text-secondary mb-4 cyber-text glitch"
-            data-text="Выбранные файлы (TXT)"
-          >
+        <div className="mb-8 bg-popover p-6 rounded-xl shadow-inner border border-border">
+          <h3 className="text-3xl font-semibold text-secondary mb-4 cyber-text glitch" data-text="Выбранные файлы (TXT)">
             Выбранные файлы (TXT)
           </h3>
           <textarea
             value={selectedOutput}
             readOnly
             className="w-full h-72 bg-card p-4 rounded-lg text-sm text-muted-foreground font-mono border border-muted resize-none scrollbar-thin scrollbar-thumb-primary scrollbar-track-muted"
-            placeholder="Выбери файлы для их содержимого здесь..."
+          />
+        </div>
+      )}
+
+      {botRequest && (
+        <div className="mb-8 bg-popover p-6 rounded-xl shadow-inner border border-border">
+          <h3 className="text-3xl font-semibold text-secondary mb-4 cyber-text glitch" data-text="Запрос для Бота">
+            Запрос для Бота
+          </h3>
+          <textarea
+            value={botRequest}
+            readOnly
+            className="w-full h-72 bg-card p-4 rounded-lg text-sm text-muted-foreground font-mono border border-muted resize-none scrollbar-thin scrollbar-thumb-primary scrollbar-track-muted"
           />
         </div>
       )}
@@ -235,8 +300,6 @@ const RepoTxtFetcher: React.FC = () => {
           </motion.div>
         ))}
       </div>
-
-      <script src="https://unpkg.com/axios/dist/axios.min.js" async></script>
     </div>
   );
 };
@@ -258,38 +321,3 @@ export default function RepoTxtPage() {
     </div>
   );
 }
-
-// Glitch effect CSS (add to globals.css if not present)
-const glitchStyle = `
-  .glitch {
-    position: relative;
-  }
-  .glitch::before,
-  .glitch::after {
-    content: attr(data-text);
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-  }
-  .glitch::before {
-    color: #ff6b6b;
-    animation: glitch 1s infinite alternate-reverse;
-    clip-path: polygon(0 0, 100% 0, 100% 20%, 0 20%);
-  }
-  .glitch::after {
-    color: #4ecdc4;
-    animation: glitch 1.5s infinite alternate;
-    clip-path: polygon(0 80%, 100% 80%, 100% 100%, 0 100%);
-  }
-  @keyframes glitch {
-    0% { transform: translate(0); }
-    20% { transform: translate(-2px, 2px); }
-    40% { transform: translate(2px, -2px); }
-    60% { transform: translate(-2px, 0); }
-    80% { transform: translate(2px, 2px); }
-    100% { transform: translate(0); }
-  }
-`;
-
