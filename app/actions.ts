@@ -42,6 +42,68 @@ function getBaseUrl() {
   return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://v0-car-test.vercel.app";
 }
 
+// Notify admins when a user successfully completes CAPTCHA
+export async function notifyCaptchaSuccess(userId: string, username?: string | null) {
+  try {
+    const { data: admins, error: adminError } = await supabaseAdmin
+      .from("users")
+      .select("user_id")
+      .eq("status", "admin")
+    if (adminError) throw adminError
+
+    const adminChatIds = admins.map((admin) => admin.user_id)
+    const message = `🔔 Пользователь ${username || userId} успешно прошел CAPTCHA.`
+
+    for (const adminId of adminChatIds) {
+      const result = await sendTelegramMessage(
+        process.env.TELEGRAM_BOT_TOKEN!,
+        message,
+        [],
+        undefined,
+        adminId
+      )
+      if (!result.success) {
+        console.error(`Failed to notify admin ${adminId}:`, result.error)
+      }
+    }
+
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to notify admins",
+    }
+  }
+}
+
+// Notify all successful users
+export async function notifySuccessfulUsers(userIds: string[]) {
+  try {
+    const message = `🎉 Поздравляем! Вы успешно прошли CAPTCHA и можете продолжить. 🚀`
+
+    for (const userId of userIds) {
+      const result = await sendTelegramMessage(
+        process.env.TELEGRAM_BOT_TOKEN!,
+        message,
+        [],
+        undefined,
+        userId
+      )
+      if (!result.success) {
+        console.error(`Failed to notify user ${userId}:`, result.error)
+      }
+    }
+
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to notify users",
+    }
+  }
+}
+
+
 // Add this new function to notify winners
 export async function notifyWinners(winningNumber: number, winners: any[]) {
   try {
