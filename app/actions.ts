@@ -1,7 +1,6 @@
 // app/actions.ts
 "use server";
 
-import { createCanvas } from 'canvas';
 import { generateCarEmbedding, createAuthenticatedClient, supabaseAdmin, supabaseAnon } from "@/hooks/supabase";
 import axios from "axios";
 import { verifyJwtToken, generateJwtToken } from "@/lib/auth";
@@ -43,41 +42,6 @@ function getBaseUrl() {
   return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://v0-car-test.vercel.app";
 }
 
-export async function generateCaptchaImage(length: number, characterSet: "letters" | "numbers" | "both") {
-  const canvas = createCanvas(200, 60);
-  const ctx = canvas.getContext('2d');
-  
-  // Background
-  ctx.fillStyle = '#f0f0f0';
-  ctx.fillRect(0, 0, 200, 60);
-  
-  // Generate text
-  const chars = characterSet === 'letters' ? 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' :
-                characterSet === 'numbers' ? '0123456789' :
-                'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  const text = Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  
-  // Draw distorted text
-  ctx.font = '30px Arial';
-  ctx.fillStyle = '#333';
-  for (let i = 0; i < text.length; i++) {
-    ctx.save();
-    ctx.translate(30 + i * 30, 40);
-    ctx.rotate((Math.random() - 0.5) * 0.4);
-    ctx.fillText(text[i], 0, 0);
-    ctx.restore();
-  }
-  
-  // Add noise
-  for (let i = 0; i < 50; i++) {
-    ctx.beginPath();
-    ctx.arc(Math.random() * 200, Math.random() * 60, 1, 0, 2 * Math.PI);
-    ctx.fillStyle = '#999';
-    ctx.fill();
-  }
-  
-  return { image: canvas.toDataURL(), text };
-}
 
 // Notify admins when a user successfully completes CAPTCHA
 export async function notifyCaptchaSuccess(userId: string, username?: string | null) {
