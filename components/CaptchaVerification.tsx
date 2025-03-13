@@ -196,7 +196,7 @@ export default function CaptchaVerification() {
   }
 
   return (
-    <div className="container mx-auto p-4 bg-green-900 min-h-screen text-white mt-6">
+    <div className="container mx-auto p-4 pt-24 bg-green-900 min-h-screen text-white mt-6">
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold mb-2">Проверка CAPTCHA</h1>
         <p className="text-lg text-green-200">Пройдите CAPTCHA, чтобы продолжить.</p>
