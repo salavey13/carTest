@@ -1,6 +1,7 @@
 // app/actions.ts
 "use server";
 
+import { createCanvas } from 'canvas';
 import { generateCarEmbedding, createAuthenticatedClient, supabaseAdmin, supabaseAnon } from "@/hooks/supabase";
 import axios from "axios";
 import { verifyJwtToken, generateJwtToken } from "@/lib/auth";
@@ -41,6 +42,100 @@ type SendMessagePayload =
 function getBaseUrl() {
   return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://v0-car-test.vercel.app";
 }
+
+export async function generateCaptchaImage(length: number, characterSet: "letters" | "numbers" | "both") {
+  const canvas = createCanvas(200, 60);
+  const ctx = canvas.getContext('2d');
+  
+  // Background
+  ctx.fillStyle = '#f0f0f0';
+  ctx.fillRect(0, 0, 200, 60);
+  
+  // Generate text
+  const chars = characterSet === 'letters' ? 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' :
+                characterSet === 'numbers' ? '0123456789' :
+                'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const text = Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  
+  // Draw distorted text
+  ctx.font = '30px Arial';
+  ctx.fillStyle = '#333';
+  for (let i = 0; i < text.length; i++) {
+    ctx.save();
+    ctx.translate(30 + i * 30, 40);
+    ctx.rotate((Math.random() - 0.5) * 0.4);
+    ctx.fillText(text[i], 0, 0);
+    ctx.restore();
+  }
+  
+  // Add noise
+  for (let i = 0; i < 50; i++) {
+    ctx.beginPath();
+    ctx.arc(Math.random() * 200, Math.random() * 60, 1, 0, 2 * Math.PI);
+    ctx.fillStyle = '#999';
+    ctx.fill();
+  }
+  
+  return { image: canvas.toDataURL(), text };
+}
+
+// Update the component
+const [captchaImage, setCaptchaImage] = useState<string | null>(null);
+
+useEffect(() => {
+  const fetchSettingsAndImage = async () => {
+    try {
+      const data = await getCaptchaSettings();
+      setSettings(data);
+      setEditingSettings(data);
+      const { image, text } = await generateCaptchaImage(data.string_length, data.character_set);
+      setCaptchaImage(image);
+      setCaptchaString(text); // Store the text for verification
+      setIsSettingsLoaded(true);
+    } catch (err) {
+      console.error("Ошибка:", err);
+      toast.error("Не удалось загрузить CAPTCHA.");
+      setIsSettingsLoaded(true);
+    }
+  };
+  fetchSettingsAndImage();
+}, []);
+
+// In the JSX, replace the text display with an image
+{isSuccess ? (
+  <div className="mt-4 p-3 bg-green-800 rounded-lg inline-block">
+    <p className="text-lg">CAPTCHA успешно пройдена!</p>
+  </div>
+) : (
+  <div className="captcha-challenge">
+    <p>Пожалуйста, введите текст с изображения:</p>
+    {captchaImage && <img src={captchaImage} alt="CAPTCHA" className="mt-2" />}
+    <button
+      onClick={async () => {
+        const { image, text } = await generateCaptchaImage(settings!.string_length, settings!.character_set);
+        setCaptchaImage(image);
+        setCaptchaString(text);
+      }}
+      className="mt-2 text-yellow-400 underline"
+    >
+      Обновить CAPTCHA
+    </button>
+    <input
+      type="text"
+      value={userInput}
+      onChange={(e) => setUserInput(e.target.value)}
+      placeholder="Введите CAPTCHA здесь"
+      className="w-full p-2 mt-2 border border-green-600 bg-green-900 text-white rounded-md placeholder-green-300"
+    />
+    <button
+      onClick={handleSubmit}
+      className="mt-4 px-6 py-3 bg-yellow-400 text-green-900 rounded-full font-bold text-lg flex items-center justify-center gap-2 mx-auto hover:bg-yellow-300"
+    >
+      Отправить
+    </button>
+    {error && <p className="text-red-400 mt-2">{error}</p>}
+  </div>
+)}
 
 // Notify admins when a user successfully completes CAPTCHA
 export async function notifyCaptchaSuccess(userId: string, username?: string | null) {
