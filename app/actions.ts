@@ -79,64 +79,6 @@ export async function generateCaptchaImage(length: number, characterSet: "letter
   return { image: canvas.toDataURL(), text };
 }
 
-// Update the component
-const [captchaImage, setCaptchaImage] = useState<string | null>(null);
-
-useEffect(() => {
-  const fetchSettingsAndImage = async () => {
-    try {
-      const data = await getCaptchaSettings();
-      setSettings(data);
-      setEditingSettings(data);
-      const { image, text } = await generateCaptchaImage(data.string_length, data.character_set);
-      setCaptchaImage(image);
-      setCaptchaString(text); // Store the text for verification
-      setIsSettingsLoaded(true);
-    } catch (err) {
-      console.error("Ошибка:", err);
-      toast.error("Не удалось загрузить CAPTCHA.");
-      setIsSettingsLoaded(true);
-    }
-  };
-  fetchSettingsAndImage();
-}, []);
-
-// In the JSX, replace the text display with an image
-{isSuccess ? (
-  <div className="mt-4 p-3 bg-green-800 rounded-lg inline-block">
-    <p className="text-lg">CAPTCHA успешно пройдена!</p>
-  </div>
-) : (
-  <div className="captcha-challenge">
-    <p>Пожалуйста, введите текст с изображения:</p>
-    {captchaImage && <img src={captchaImage} alt="CAPTCHA" className="mt-2" />}
-    <button
-      onClick={async () => {
-        const { image, text } = await generateCaptchaImage(settings!.string_length, settings!.character_set);
-        setCaptchaImage(image);
-        setCaptchaString(text);
-      }}
-      className="mt-2 text-yellow-400 underline"
-    >
-      Обновить CAPTCHA
-    </button>
-    <input
-      type="text"
-      value={userInput}
-      onChange={(e) => setUserInput(e.target.value)}
-      placeholder="Введите CAPTCHA здесь"
-      className="w-full p-2 mt-2 border border-green-600 bg-green-900 text-white rounded-md placeholder-green-300"
-    />
-    <button
-      onClick={handleSubmit}
-      className="mt-4 px-6 py-3 bg-yellow-400 text-green-900 rounded-full font-bold text-lg flex items-center justify-center gap-2 mx-auto hover:bg-yellow-300"
-    >
-      Отправить
-    </button>
-    {error && <p className="text-red-400 mt-2">{error}</p>}
-  </div>
-)}
-
 // Notify admins when a user successfully completes CAPTCHA
 export async function notifyCaptchaSuccess(userId: string, username?: string | null) {
   try {
