@@ -54,14 +54,16 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
   }, []);
 
   // Check if user has already completed CAPTCHA
+    // Update this useEffect in CaptchaVerification
   useEffect(() => {
     if (dbUser && !isLoading) {
       const metadata = dbUser.metadata as any;
       if (metadata?.captchaSuccess) {
         setIsSuccess(true);
+        onCaptchaSuccess(); // Ensure WheelOfFortune shows if already passed
       }
     }
-  }, [dbUser, isLoading]);
+  }, [dbUser, isLoading, onCaptchaSuccess]);
 
   // Fetch successful users for admin panel
   useEffect(() => {
