@@ -228,6 +228,76 @@ export async function notifyWinners(winningNumber: number, winners: any[]) {
 // Utility to delay execution (for polling)
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+
+// Generalized function to run a Coze agent
+export async function runCoseAgent(botId: string, userId: string, content: string) {
+  try {
+    // Step 1: Initiate the chat
+    const initResponse = await axios.post(
+      "https://api.coze.com/v3/chat",
+      {
+        bot_id: botId,
+        user_id: userId,
+        stream: false,
+        auto_save_history: true,
+        additional_messages: [
+          {
+            role: "user",
+            content: content,
+            content_type: "text",
+          },
+        ],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${COZE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const chatId = initResponse.data.data?.id;
+    const conversationId = initResponse.data.data?.conversation_id;
+    if (!chatId || !conversationId) {
+      throw new Error("Missing chat ID or conversation ID in initial response");
+    }
+
+    // Step 2: Poll for chat messages until assistant's answer is available
+    let attempts = 0;
+    const maxAttempts = 10; // Limit polling
+    const pollInterval = 2000; // Poll every 2 seconds
+
+    while (attempts < maxAttempts) {
+      const messagesResponse = await axios.get(
+        `https://api.coze.com/v3/chat/message/list?conversation_id=${conversationId}&chat_id=${chatId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${COZE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const assistantAnswer = messagesResponse.data.data?.find(
+        (msg: any) => msg.role === "assistant" && msg.type === "answer"
+      )?.content;
+
+      if (assistantAnswer) {
+        return assistantAnswer; // Return plain text as requested
+      }
+
+      attempts++;
+      await delay(pollInterval);
+    }
+
+    throw new Error("No assistant answer received after maximum attempts");
+  } catch (error) {
+    console.error("Error running Coze agent:", error);
+    throw new Error("Failed to run Coze agent");
+  }
+}
+
+
 export async function analyzeMessage(content: string) {
   try {
     // Step 1: Initiate the chat
