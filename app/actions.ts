@@ -6,7 +6,7 @@ import axios from "axios";
 import { verifyJwtToken, generateJwtToken } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 import type { WebAppUser } from "@/types/telegram";
-import { createHash } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import svgCaptcha from "svg-captcha";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
