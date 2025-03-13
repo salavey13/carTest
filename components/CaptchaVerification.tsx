@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTelegram } from "@/hooks/useTelegram";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { Loader2, Trophy } from "lucide-react";
-import { notifyCaptchaSuccess, notifySuccessfulUsers, generateCaptchaImage } from "@/app/actions";
-// Add the prop type
+import { notifyCaptchaSuccess, notifySuccessfulUsers } from "@/app/actions";
+
 interface CaptchaVerificationProps {
   onCaptchaSuccess: () => void;
 }
+
 export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerificationProps) {
   const { dbUser, isLoading, isAdmin } = useTelegram();
   const [settings, setSettings] = useState<{
@@ -18,17 +19,60 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
     case_sensitive: boolean;
   } | null>(null);
   const [editingSettings, setEditingSettings] = useState(settings);
-  const [captchaImage, setCaptchaImage] = useState<string | null>(null);
-  const [captchaString, setCaptchaString] = useState(""); // Hidden text for verification
+  const [captchaString, setCaptchaString] = useState("");
   const [userInput, setUserInput] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState("");
   const [successfulUsers, setSuccessfulUsers] = useState<any[]>([]);
   const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Fetch settings and generate initial CAPTCHA image on mount
+  // Generate CAPTCHA text and draw it on the canvas
+  const generateCaptcha = () => {
+    if (!settings || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d")!;
+    const chars =
+      settings.character_set === "letters"
+        ? "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        : settings.character_set === "numbers"
+        ? "0123456789"
+        : "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const text = Array.from(
+      { length: settings.string_length },
+      () => chars[Math.floor(Math.random() * chars.length)]
+    ).join("");
+
+    // Clear canvas
+    ctx.fillStyle = "#f0f0f0";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw distorted text
+    ctx.font = "30px Arial";
+    ctx.fillStyle = "#333";
+    for (let i = 0; i < text.length; i++) {
+      ctx.save();
+      ctx.translate(30 + i * 30, 40);
+      ctx.rotate((Math.random() - 0.5) * 0.4);
+      ctx.fillText(text[i], 0, 0);
+      ctx.restore();
+    }
+
+    // Add noise
+    for (let i = 0; i < 50; i++) {
+      ctx.beginPath();
+      ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, 1, 0, 2 * Math.PI);
+      ctx.fillStyle = "#999";
+      ctx.fill();
+    }
+
+    setCaptchaString(text);
+  };
+
+  // Fetch settings and generate initial CAPTCHA on mount
   useEffect(() => {
-    const fetchSettingsAndImage = async () => {
+    const fetchSettings = async () => {
       try {
         const { data, error } = await supabaseAdmin
           .from("settings")
@@ -39,28 +83,30 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
 
         setSettings(data);
         setEditingSettings(data);
-
-        const { image, text } = await generateCaptchaImage(data.string_length, data.character_set);
-        setCaptchaImage(image);
-        setCaptchaString(text);
         setIsSettingsLoaded(true);
       } catch (err) {
-        console.error("Ошибка загрузки настроек или CAPTCHA:", err);
-        toast.error("Не удалось загрузить CAPTCHA.");
-        setIsSettingsLoaded(true); // Proceed even if it fails
+        console.error("Ошибка загрузки настроек:", err);
+        toast.error("Не удалось загрузить настройки CAPTCHA.");
+        setIsSettingsLoaded(true);
       }
     };
-    fetchSettingsAndImage();
+    fetchSettings();
   }, []);
 
+  // Generate CAPTCHA when settings are loaded
+  useEffect(() => {
+    if (isSettingsLoaded && settings) {
+      generateCaptcha();
+    }
+  }, [isSettingsLoaded, settings]);
+
   // Check if user has already completed CAPTCHA
-    // Update this useEffect in CaptchaVerification
   useEffect(() => {
     if (dbUser && !isLoading) {
       const metadata = dbUser.metadata as any;
       if (metadata?.captchaSuccess) {
         setIsSuccess(true);
-        onCaptchaSuccess(); // Ensure WheelOfFortune shows if already passed
+        onCaptchaSuccess();
       }
     }
   }, [dbUser, isLoading, onCaptchaSuccess]);
@@ -85,7 +131,7 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
     }
   }, [isAdmin]);
 
-  // Update handleSubmit to call onCaptchaSuccess
+  // Handle CAPTCHA submission
   const handleSubmit = async () => {
     if (!settings || !dbUser) return;
 
@@ -95,10 +141,7 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
     if (userInputToCheck === captchaToCheck) {
       try {
         const currentMetadata = dbUser.metadata || {};
-        const updatedMetadata = {
-          ...currentMetadata,
-          captchaSuccess: true,
-        };
+        const updatedMetadata = { ...currentMetadata, captchaSuccess: true };
         const { error } = await supabaseAdmin
           .from("users")
           .update({ metadata: updatedMetadata })
@@ -106,7 +149,7 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
         if (error) throw error;
 
         setIsSuccess(true);
-        onCaptchaSuccess(); // Call the callback to notify the parent
+        onCaptchaSuccess();
         toast.success("CAPTCHA успешно пройдена!");
 
         const notifyResult = await notifyCaptchaSuccess(dbUser.user_id, dbUser.username);
@@ -124,19 +167,11 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
     }
   };
 
-  // Handle refreshing CAPTCHA image
-  const handleRefreshCaptcha = async () => {
-    if (!settings) return;
-    try {
-      const { image, text } = await generateCaptchaImage(settings.string_length, settings.character_set);
-      setCaptchaImage(image);
-      setCaptchaString(text);
-      setUserInput("");
-      setError("");
-    } catch (err) {
-      console.error("Ошибка обновления CAPTCHA:", err);
-      toast.error("Не удалось обновить CAPTCHA.");
-    }
+  // Handle refreshing CAPTCHA
+  const handleRefreshCaptcha = () => {
+    generateCaptcha();
+    setUserInput("");
+    setError("");
   };
 
   // Handle saving settings in admin panel
@@ -145,9 +180,7 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
     try {
       await supabaseAdmin.from("settings").update(editingSettings).eq("id", 1);
       setSettings(editingSettings);
-      const { image, text } = await generateCaptchaImage(editingSettings.string_length, editingSettings.character_set);
-      setCaptchaImage(image);
-      setCaptchaString(text);
+      generateCaptcha();
       toast.success("Настройки успешно обновлены!");
     } catch (err) {
       console.error("Ошибка обновления настроек:", err);
@@ -173,7 +206,6 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
     }
   };
 
-  // Loading state
   if (isLoading || !isSettingsLoaded) {
     return (
       <div className="flex items-center justify-center min-h-[400px] bg-green-900 mt-6">
@@ -182,7 +214,6 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
     );
   }
 
-  // Login check
   if (!dbUser) {
     return (
       <div className="text-center p-8 bg-green-800 text-white rounded-lg mt-6">
@@ -208,7 +239,7 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
           ) : (
             <div className="captcha-challenge">
               <p>Пожалуйста, введите текст с изображения:</p>
-              {captchaImage && <img src={captchaImage} alt="CAPTCHA" className="mt-2 rounded-md" />}
+              <canvas ref={canvasRef} width={200} height={60} className="mt-2 rounded-md" />
               <button
                 onClick={handleRefreshCaptcha}
                 className="mt-2 text-yellow-400 underline hover:text-yellow-300"
@@ -240,7 +271,6 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
               Панель Администратора
             </h2>
 
-            {/* CAPTCHA Settings */}
             <div className="settings-section mb-6">
               <h3 className="text-lg font-semibold mb-2">Настройки CAPTCHA</h3>
               <label className="block mb-2">
@@ -300,7 +330,6 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
               </button>
             </div>
 
-            {/* Success Checker */}
             <div className="success-checker">
               <h3 className="text-lg font-semibold mb-2">Пользователи, прошедшие CAPTCHA</h3>
               {successfulUsers.length > 0 ? (
