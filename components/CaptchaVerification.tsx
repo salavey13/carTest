@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useTelegram } from '@/hooks/useTelegram' // Custom hook for user and admin status
 import { supabaseAdmin } from '@/hooks/supabase' // Supabase client for database operations
-import toast from 'react-hot-toast' // For user feedback
+import toast from 'sonner' // For user feedback
 
 // Utility function to generate CAPTCHA string
 const generateCaptchaString = (length: number, characterSet: 'letters' | 'numbers' | 'both') => {
