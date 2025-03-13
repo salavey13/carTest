@@ -47,31 +47,46 @@ function getBaseUrl() {
 
 
 
-export async function generateCaptchaSecret(length: number, characterSet: "letters" | "numbers" | "both") {
+
+interface CaptchaSettings {
+  string_length: number;
+  character_set: "letters" | "numbers" | "both";
+  case_sensitive: boolean;
+  captcha_type: "text" | "svg";
+  noise_level: number;
+  font_size: number;
+  background_color: string;
+  text_color: string;
+}
+
+export async function generateCaptchaSecret(settings: CaptchaSettings) {
   const chars =
-    characterSet === "letters"
+    settings.character_set === "letters"
       ? "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-      : characterSet === "numbers"
+      : settings.character_set === "numbers"
       ? "0123456789"
       : "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
   const captcha = svgCaptcha.create({
-    size: length,
+    size: settings.string_length,
     charPreset: chars,
-    noise: 2,
-    width: Math.max(200, length * 30 + 60),
+    noise: settings.noise_level,
+    fontSize: settings.font_size,
+    width: Math.max(200, settings.string_length * 30 + 60),
     height: 60,
-    background: "#f0f0f0",
-    color: true,
+    background: settings.background_color,
+    color: true, // Enable color, override with text_color
   });
 
-  const image = `data:image/svg+xml;base64,${Buffer.from(captcha.data).toString("base64")}`;
+  // Override text color (svg-captcha doesn't have a direct prop, so we modify the SVG)
+  let svgText = captcha.data.replace(/fill="[^"]*"/g, `fill="${settings.text_color}"`);
+
+  const image = `data:image/svg+xml;base64,${Buffer.from(svgText).toString("base64")}`;
   const hash = createHash("sha256").update(captcha.text).digest("hex");
 
   return { image, hash };
 }
 
-// Verify user input against the stored CAPTCHA text
 export async function verifyCaptcha(hash: string, userInput: string) {
   const computedHash = createHash("sha256").update(userInput).digest("hex");
   return computedHash === hash;
