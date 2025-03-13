@@ -1,11 +1,22 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useTelegram } from "@/hooks/useTelegram";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { Loader2, Trophy } from "lucide-react";
 import { notifyCaptchaSuccess, notifySuccessfulUsers, generateCaptchaSecret, verifyCaptcha } from "@/app/actions";
+
+interface CaptchaSettings {
+  string_length: number;
+  character_set: "letters" | "numbers" | "both";
+  case_sensitive: boolean;
+  captcha_type: "text" | "svg"; // New: "text" for plain text, "svg" for server-side image
+  noise_level: number; // 0-5
+  font_size: number; // 20-50
+  background_color: string; // Hex code
+  text_color: string; // Hex code
+}
 
 interface CaptchaVerificationProps {
   onCaptchaSuccess: () => void;
@@ -13,70 +24,62 @@ interface CaptchaVerificationProps {
 
 export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerificationProps) {
   const { dbUser, isLoading, isAdmin } = useTelegram();
-  const [settings, setSettings] = useState<{
-    string_length: number;
-    character_set: "letters" | "numbers" | "both";
-    case_sensitive: boolean;
-  } | null>(null);
-  const [editingSettings, setEditingSettings] = useState(settings);
-  const [captchaHash, setCaptchaHash] = useState<string | null>(null);
+  const [settings, setSettings] = useState<CaptchaSettings | null>(null);
+  const [editingSettings, setEditingSettings] = useState<CaptchaSettings | null>(null);
+  const [captchaImage, setCaptchaImage] = useState<string | null>(null); // For SVG mode
+  const [captchaText, setCaptchaText] = useState<string>(""); // For text mode
+  const [captchaHash, setCaptchaHash] = useState<string | null>(null); // For SVG mode verification
   const [userInput, setUserInput] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState("");
   const [successfulUsers, setSuccessfulUsers] = useState<any[]>([]);
   const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Draw CAPTCHA on canvas using user input as a placeholder
-  const drawCaptcha = (text: string) => {
-    if (!settings || !canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d")!;
-
-    // Dynamically adjust width (optional improvement)
-    canvas.width = Math.max(200, settings.string_length * 30 + 60);
-
-    // Clear canvas
-    ctx.fillStyle = "#f0f0f0";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw distorted text
-    ctx.font = "30px Arial";
-    ctx.fillStyle = "#333";
-    for (let i = 0; i < text.length; i++) {
-      ctx.save();
-      ctx.translate(30 + i * 30, 40);
-      ctx.rotate((Math.random() - 0.5) * 0.4);
-      ctx.fillText(text[i], 0, 0);
-      ctx.restore();
-    }
-
-    // Add noise
-    for (let i = 0; i < 50; i++) {
-      ctx.beginPath();
-      ctx.arc(Math.random() * canvas.width, Math.random() * canvas.height, 1, 0, 2 * Math.PI);
-      ctx.fillStyle = "#999";
-      ctx.fill();
-    }
+  // Generate plain text CAPTCHA (client-side for "text" mode)
+  const generatePlainTextCaptcha = (length: number, characterSet: "letters" | "numbers" | "both") => {
+    const chars =
+      characterSet === "letters"
+        ? "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        : characterSet === "numbers"
+        ? "0123456789"
+        : "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const text = Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    setCaptchaText(text);
   };
 
-  // Fetch settings and generate initial CAPTCHA hash
+  // Fetch settings and initialize CAPTCHA
   useEffect(() => {
     const fetchSettingsAndCaptcha = async () => {
       try {
         const { data, error } = await supabaseAdmin
           .from("settings")
-          .select("string_length, character_set, case_sensitive")
+          .select("string_length, character_set, case_sensitive, captcha_type, noise_level, font_size, background_color, text_color")
           .eq("id", 1)
           .single();
         if (error) throw error;
 
-        setSettings(data);
-        setEditingSettings(data);
+        const defaultSettings: CaptchaSettings = {
+          string_length: 4,
+          character_set: "both",
+          case_sensitive: false,
+          captcha_type: "text",
+          noise_level: 2,
+          font_size: 30,
+          background_color: "#f0f0f0",
+          text_color: "#333333",
+          ...data,
+        };
 
-        const { hash } = await generateCaptchaSecret(data.string_length, data.character_set);
-        setCaptchaHash(hash);
+        setSettings(defaultSettings);
+        setEditingSettings(defaultSettings);
+
+        if (defaultSettings.captcha_type === "text") {
+          generatePlainTextCaptcha(defaultSettings.string_length, defaultSettings.character_set);
+        } else {
+          const { image, hash } = await generateCaptchaSecret(defaultSettings);
+          setCaptchaImage(image);
+          setCaptchaHash(hash);
+        }
         setIsSettingsLoaded(true);
       } catch (err) {
         console.error("Ошибка загрузки настроек или CAPTCHA:", err);
@@ -86,15 +89,6 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
     };
     fetchSettingsAndCaptcha();
   }, []);
-
-  // Draw initial CAPTCHA when hash and settings are ready
-  useEffect(() => {
-    if (isSettingsLoaded && settings && captchaHash) {
-      // Use a dummy string of correct length for initial display
-      const dummyText = "X".repeat(settings.string_length);
-      drawCaptcha(dummyText);
-    }
-  }, [isSettingsLoaded, settings, captchaHash]);
 
   // Check if user has already completed CAPTCHA
   useEffect(() => {
@@ -129,12 +123,20 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
 
   // Handle CAPTCHA submission
   const handleSubmit = async () => {
-    if (!settings || !dbUser || !captchaHash) return;
+    if (!settings || !dbUser) return;
 
     const userInputToCheck = settings.case_sensitive ? userInput : userInput.toLowerCase();
 
     try {
-      const isValid = await verifyCaptcha(captchaHash, userInputToCheck);
+      let isValid = false;
+      if (settings.captcha_type === "text") {
+        const captchaToCheck = settings.case_sensitive ? captchaText : captchaText.toLowerCase();
+        isValid = userInputToCheck === captchaToCheck;
+      } else {
+        if (!captchaHash) return;
+        isValid = await verifyCaptcha(captchaHash, userInputToCheck);
+      }
+
       if (isValid) {
         const currentMetadata = dbUser.metadata || {};
         const updatedMetadata = { ...currentMetadata, captchaSuccess: true };
@@ -166,16 +168,19 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
   // Handle refreshing CAPTCHA
   const handleRefreshCaptcha = async () => {
     if (!settings) return;
-    try {
-      const { hash } = await generateCaptchaSecret(settings.string_length, settings.character_set);
-      setCaptchaHash(hash);
-      setUserInput("");
-      setError("");
-      const dummyText = "X".repeat(settings.string_length);
-      drawCaptcha(dummyText);
-    } catch (err) {
-      console.error("Ошибка обновления CAPTCHA:", err);
-      toast.error("Не удалось обновить CAPTCHA.");
+    setUserInput("");
+    setError("");
+    if (settings.captcha_type === "text") {
+      generatePlainTextCaptcha(settings.string_length, settings.character_set);
+    } else {
+      try {
+        const { image, hash } = await generateCaptchaSecret(settings);
+        setCaptchaImage(image);
+        setCaptchaHash(hash);
+      } catch (err) {
+        console.error("Ошибка обновления CAPTCHA:", err);
+        toast.error("Не удалось обновить CAPTCHA.");
+      }
     }
   };
 
@@ -185,10 +190,18 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
     try {
       await supabaseAdmin.from("settings").update(editingSettings).eq("id", 1);
       setSettings(editingSettings);
-      const { hash } = await generateCaptchaSecret(editingSettings.string_length, editingSettings.character_set);
-      setCaptchaHash(hash);
-      const dummyText = "X".repeat(editingSettings.string_length);
-      drawCaptcha(dummyText);
+      setUserInput("");
+      setError("");
+      if (editingSettings.captcha_type === "text") {
+        generatePlainTextCaptcha(editingSettings.string_length, editingSettings.character_set);
+        setCaptchaImage(null);
+        setCaptchaHash(null);
+      } else {
+        const { image, hash } = await generateCaptchaSecret(editingSettings);
+        setCaptchaImage(image);
+        setCaptchaHash(hash);
+        setCaptchaText("");
+      }
       toast.success("Настройки успешно обновлены!");
     } catch (err) {
       console.error("Ошибка обновления настроек:", err);
@@ -199,7 +212,6 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
   // Handle sending notifications to successful users
   const handleNotify = async () => {
     if (successfulUsers.length === 0) return;
-
     try {
       const userIds = successfulUsers.map((user) => user.user_id);
       const notifyResult = await notifySuccessfulUsers(userIds);
@@ -246,8 +258,14 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
             </div>
           ) : (
             <div className="captcha-challenge">
-              <p>Пожалуйста, введите текст с изображения:</p>
-              <canvas ref={canvasRef} height={60} className="mt-2 rounded-md" />
+              <p>Пожалуйста, введите текст{settings?.captcha_type === "svg" ? " с изображения" : ""}:</p>
+              {settings?.captcha_type === "text" ? (
+                <div className="mt-2 p-4 bg-gray-200 text-black rounded-md font-mono text-xl">
+                  {captchaText}
+                </div>
+              ) : (
+                captchaImage && <img src={captchaImage} alt="CAPTCHA" className="mt-2 rounded-md" />
+              )}
               <button
                 onClick={handleRefreshCaptcha}
                 className="mt-2 text-yellow-400 underline hover:text-yellow-300"
@@ -281,6 +299,22 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
 
             <div className="settings-section mb-6">
               <h3 className="text-lg font-semibold mb-2">Настройки CAPTCHA</h3>
+              <label className="block mb-2">
+                Тип CAPTCHA:
+                <select
+                  value={editingSettings?.captcha_type || "text"}
+                  onChange={(e) =>
+                    setEditingSettings({
+                      ...editingSettings!,
+                      captcha_type: e.target.value as "text" | "svg",
+                    })
+                  }
+                  className="w-full p-2 mt-1 border border-green-600 bg-green-900 text-white rounded-md"
+                >
+                  <option value="text">Простой текст</option>
+                  <option value="svg">SVG изображение</option>
+                </select>
+              </label>
               <label className="block mb-2">
                 Длина строки:
                 <input
@@ -330,6 +364,70 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
                   <option value="false">Нет</option>
                 </select>
               </label>
+              {editingSettings?.captcha_type === "svg" && (
+                <>
+                  <label className="block mb-2">
+                    Уровень шума (0-5):
+                    <input
+                      type="number"
+                      min="0"
+                      max="5"
+                      value={editingSettings?.noise_level || 2}
+                      onChange={(e) =>
+                        setEditingSettings({
+                          ...editingSettings!,
+                          noise_level: parseInt(e.target.value),
+                        })
+                      }
+                      className="w-full p-2 mt-1 border border-green-600 bg-green-900 text-white rounded-md"
+                    />
+                  </label>
+                  <label className="block mb-2">
+                    Размер шрифта (20-50):
+                    <input
+                      type="number"
+                      min="20"
+                      max="50"
+                      value={editingSettings?.font_size || 30}
+                      onChange={(e) =>
+                        setEditingSettings({
+                          ...editingSettings!,
+                          font_size: parseInt(e.target.value),
+                        })
+                      }
+                      className="w-full p-2 mt-1 border border-green-600 bg-green-900 text-white rounded-md"
+                    />
+                  </label>
+                  <label className="block mb-2">
+                    Цвет фона:
+                    <input
+                      type="color"
+                      value={editingSettings?.background_color || "#f0f0f0"}
+                      onChange={(e) =>
+                        setEditingSettings({
+                          ...editingSettings!,
+                          background_color: e.target.value,
+                        })
+                      }
+                      className="w-full h-10 mt-1 border border-green-600 bg-green-900 rounded-md"
+                    />
+                  </label>
+                  <label className="block mb-2">
+                    Цвет текста:
+                    <input
+                      type="color"
+                      value={editingSettings?.text_color || "#333333"}
+                      onChange={(e) =>
+                        setEditingSettings({
+                          ...editingSettings!,
+                          text_color: e.target.value,
+                        })
+                      }
+                      className="w-full h-10 mt-1 border border-green-600 bg-green-900 rounded-md"
+                    />
+                  </label>
+                </>
+              )}
               <button
                 onClick={handleSaveSettings}
                 className="mt-4 px-6 py-3 bg-yellow-400 text-green-900 rounded-full font-bold text-lg flex items-center justify-center gap-2 mx-auto hover:bg-yellow-300"
