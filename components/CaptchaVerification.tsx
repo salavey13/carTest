@@ -1,87 +1,64 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useTelegram } from "@/hooks/useTelegram"
-import { supabaseAdmin } from "@/hooks/supabase"
-import { toast } from "sonner"
-import { Loader2, Trophy } from "lucide-react"
-import { notifyCaptchaSuccess, notifySuccessfulUsers } from "@/app/actions" // New server actions
-
-// Utility function to generate CAPTCHA string based on settings
-const generateCaptchaString = (length: number, characterSet: "letters" | "numbers" | "both") => {
-  let chars = ""
-  if (characterSet === "letters" || characterSet === "both") {
-    chars += "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-  }
-  if (characterSet === "numbers" || characterSet === "both") {
-    chars += "0123456789"
-  }
-  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("")
-}
-
-// Database functions
-const getCaptchaSettings = async () => {
-  const { data, error } = await supabaseAdmin
-    .from("settings")
-    .select("string_length, character_set, case_sensitive")
-    .eq("id", 1)
-    .single()
-  if (error) throw error
-  return data
-}
-
-const updateCaptchaSettings = async (settings: {
-  string_length: number
-  character_set: "letters" | "numbers" | "both"
-  case_sensitive: boolean
-}) => {
-  const { error } = await supabaseAdmin.from("settings").update(settings).eq("id", 1)
-  if (error) throw error
-}
+import { useState, useEffect } from "react";
+import { useTelegram } from "@/hooks/useTelegram";
+import { supabaseAdmin } from "@/hooks/supabase";
+import { toast } from "sonner";
+import { Loader2, Trophy } from "lucide-react";
+import { notifyCaptchaSuccess, notifySuccessfulUsers, generateCaptchaImage } from "@/app/actions";
 
 export default function CaptchaVerification() {
-  const { dbUser, isLoading, isAdmin } = useTelegram()
+  const { dbUser, isLoading, isAdmin } = useTelegram();
   const [settings, setSettings] = useState<{
-    string_length: number
-    character_set: "letters" | "numbers" | "both"
-    case_sensitive: boolean
-  } | null>(null)
-  const [editingSettings, setEditingSettings] = useState(settings)
-  const [captchaString, setCaptchaString] = useState("")
-  const [userInput, setUserInput] = useState("")
-  const [isSuccess, setIsSuccess] = useState(false)
-  const [error, setError] = useState("")
-  const [successfulUsers, setSuccessfulUsers] = useState<any[]>([])
-  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false)
+    string_length: number;
+    character_set: "letters" | "numbers" | "both";
+    case_sensitive: boolean;
+  } | null>(null);
+  const [editingSettings, setEditingSettings] = useState(settings);
+  const [captchaImage, setCaptchaImage] = useState<string | null>(null);
+  const [captchaString, setCaptchaString] = useState(""); // Hidden text for verification
+  const [userInput, setUserInput] = useState("");
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [error, setError] = useState("");
+  const [successfulUsers, setSuccessfulUsers] = useState<any[]>([]);
+  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
 
-  // Fetch settings and generate CAPTCHA on mount
+  // Fetch settings and generate initial CAPTCHA image on mount
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchSettingsAndImage = async () => {
       try {
-        const data = await getCaptchaSettings()
-        setSettings(data)
-        setEditingSettings(data)
-        const newCaptcha = generateCaptchaString(data.string_length, data.character_set)
-        setCaptchaString(newCaptcha)
-        setIsSettingsLoaded(true) // Mark settings as loaded
+        const { data, error } = await supabaseAdmin
+          .from("settings")
+          .select("string_length, character_set, case_sensitive")
+          .eq("id", 1)
+          .single();
+        if (error) throw error;
+
+        setSettings(data);
+        setEditingSettings(data);
+
+        const { image, text } = await generateCaptchaImage(data.string_length, data.character_set);
+        setCaptchaImage(image);
+        setCaptchaString(text);
+        setIsSettingsLoaded(true);
       } catch (err) {
-        console.error("Ошибка загрузки настроек:", err)
-        toast.error("Не удалось загрузить настройки CAPTCHA.")
-        setIsSettingsLoaded(true) // Still proceed even if settings fail
+        console.error("Ошибка загрузки настроек или CAPTCHA:", err);
+        toast.error("Не удалось загрузить CAPTCHA.");
+        setIsSettingsLoaded(true); // Proceed even if it fails
       }
-    }
-    fetchSettings()
-  }, [])
+    };
+    fetchSettingsAndImage();
+  }, []);
 
   // Check if user has already completed CAPTCHA
   useEffect(() => {
     if (dbUser && !isLoading) {
-      const metadata = dbUser.metadata as any
+      const metadata = dbUser.metadata as any;
       if (metadata?.captchaSuccess) {
-        setIsSuccess(true)
+        setIsSuccess(true);
       }
     }
-  }, [dbUser, isLoading])
+  }, [dbUser, isLoading]);
 
   // Fetch successful users for admin panel
   useEffect(() => {
@@ -91,89 +68,104 @@ export default function CaptchaVerification() {
           const { data, error } = await supabaseAdmin
             .from("users")
             .select("*")
-            .filter("metadata->captchaSuccess", "eq", true)
-          if (error) throw error
-          setSuccessfulUsers(data || [])
+            .filter("metadata->captchaSuccess", "eq", true);
+          if (error) throw error;
+          setSuccessfulUsers(data || []);
         } catch (err) {
-          console.error("Ошибка загрузки пользователей:", err)
-          toast.error("Не удалось загрузить пользователей, прошедших CAPTCHA.")
+          console.error("Ошибка загрузки пользователей:", err);
+          toast.error("Не удалось загрузить пользователей, прошедших CAPTCHA.");
         }
-      }
-      fetchSuccessfulUsers()
+      };
+      fetchSuccessfulUsers();
     }
-  }, [isAdmin])
+  }, [isAdmin]);
 
   // Handle CAPTCHA submission
   const handleSubmit = async () => {
-    if (!settings || !dbUser) return
+    if (!settings || !dbUser) return;
 
-    const userInputToCheck = settings.case_sensitive ? userInput : userInput.toLowerCase()
-    const captchaToCheck = settings.case_sensitive ? captchaString : captchaString.toLowerCase()
+    const userInputToCheck = settings.case_sensitive ? userInput : userInput.toLowerCase();
+    const captchaToCheck = settings.case_sensitive ? captchaString : captchaString.toLowerCase();
 
     if (userInputToCheck === captchaToCheck) {
       try {
-        const currentMetadata = dbUser.metadata || {}
+        const currentMetadata = dbUser.metadata || {};
         const updatedMetadata = {
-          ...currentMetadata, // Preserve existing metadata
-          captchaSuccess: true, // Only update captchaSuccess
-        }
+          ...currentMetadata,
+          captchaSuccess: true,
+        };
         const { error } = await supabaseAdmin
           .from("users")
           .update({ metadata: updatedMetadata })
-          .eq("user_id", dbUser.user_id)
-        if (error) throw error
+          .eq("user_id", dbUser.user_id);
+        if (error) throw error;
 
-        setIsSuccess(true)
-        toast.success("CAPTCHA успешно пройдена!")
+        setIsSuccess(true);
+        toast.success("CAPTCHA успешно пройдена!");
 
-        // Notify admins using server action
-        const notifyResult = await notifyCaptchaSuccess(dbUser.user_id, dbUser.username)
+        const notifyResult = await notifyCaptchaSuccess(dbUser.user_id, dbUser.username);
         if (!notifyResult.success) {
-          console.error("Ошибка уведомления админов:", notifyResult.error)
-          toast.error("Не удалось уведомить админов.")
+          console.error("Ошибка уведомления админов:", notifyResult.error);
+          toast.error("Не удалось уведомить админов.");
         }
       } catch (err) {
-        console.error("Ошибка обновления метаданных:", err)
-        toast.error("Не удалось обновить статус. Попробуйте снова.")
+        console.error("Ошибка обновления метаданных:", err);
+        toast.error("Не удалось обновить статус. Попробуйте снова.");
       }
     } else {
-      setError("Неверная CAPTCHA. Попробуйте снова.")
-      setUserInput("") // Clear input for retry
+      setError("Неверная CAPTCHA. Попробуйте снова.");
+      setUserInput("");
     }
-  }
+  };
+
+  // Handle refreshing CAPTCHA image
+  const handleRefreshCaptcha = async () => {
+    if (!settings) return;
+    try {
+      const { image, text } = await generateCaptchaImage(settings.string_length, settings.character_set);
+      setCaptchaImage(image);
+      setCaptchaString(text);
+      setUserInput("");
+      setError("");
+    } catch (err) {
+      console.error("Ошибка обновления CAPTCHA:", err);
+      toast.error("Не удалось обновить CAPTCHA.");
+    }
+  };
 
   // Handle saving settings in admin panel
   const handleSaveSettings = async () => {
-    if (!editingSettings) return
+    if (!editingSettings) return;
     try {
-      await updateCaptchaSettings(editingSettings)
-      setSettings(editingSettings)
-      const newCaptcha = generateCaptchaString(editingSettings.string_length, editingSettings.character_set)
-      setCaptchaString(newCaptcha)
-      toast.success("Настройки успешно обновлены!")
+      await supabaseAdmin.from("settings").update(editingSettings).eq("id", 1);
+      setSettings(editingSettings);
+      const { image, text } = await generateCaptchaImage(editingSettings.string_length, editingSettings.character_set);
+      setCaptchaImage(image);
+      setCaptchaString(text);
+      toast.success("Настройки успешно обновлены!");
     } catch (err) {
-      console.error("Ошибка обновления настроек:", err)
-      toast.error("Не удалось обновить настройки. Попробуйте снова.")
+      console.error("Ошибка обновления настроек:", err);
+      toast.error("Не удалось обновить настройки. Попробуйте снова.");
     }
-  }
+  };
 
   // Handle sending notifications to successful users
   const handleNotify = async () => {
-    if (successfulUsers.length === 0) return
+    if (successfulUsers.length === 0) return;
 
     try {
-      const userIds = successfulUsers.map((user) => user.user_id)
-      const notifyResult = await notifySuccessfulUsers(userIds)
+      const userIds = successfulUsers.map((user) => user.user_id);
+      const notifyResult = await notifySuccessfulUsers(userIds);
       if (notifyResult.success) {
-        toast.success("Уведомления успешно отправлены!")
+        toast.success("Уведомления успешно отправлены!");
       } else {
-        throw new Error(notifyResult.error)
+        throw new Error(notifyResult.error);
       }
     } catch (err) {
-      console.error("Ошибка отправки уведомлений:", err)
-      toast.error("Не удалось отправить уведомления. Попробуйте снова.")
+      console.error("Ошибка отправки уведомлений:", err);
+      toast.error("Не удалось отправить уведомления. Попробуйте снова.");
     }
-  }
+  };
 
   // Loading state
   if (isLoading || !isSettingsLoaded) {
@@ -181,7 +173,7 @@ export default function CaptchaVerification() {
       <div className="flex items-center justify-center min-h-[400px] bg-green-900 mt-6">
         <Loader2 className="w-12 h-12 animate-spin text-yellow-400" />
       </div>
-    )
+    );
   }
 
   // Login check
@@ -191,7 +183,7 @@ export default function CaptchaVerification() {
         <h2 className="text-2xl font-bold mb-4">Пожалуйста, Войдите</h2>
         <p>Вам нужно войти, чтобы использовать CAPTCHA.</p>
       </div>
-    )
+    );
   }
 
   return (
@@ -209,10 +201,14 @@ export default function CaptchaVerification() {
             </div>
           ) : (
             <div className="captcha-challenge">
-              <p>
-                Пожалуйста, введите следующий текст:{" "}
-                <strong className="text-yellow-400">{captchaString}</strong>
-              </p>
+              <p>Пожалуйста, введите текст с изображения:</p>
+              {captchaImage && <img src={captchaImage} alt="CAPTCHA" className="mt-2 rounded-md" />}
+              <button
+                onClick={handleRefreshCaptcha}
+                className="mt-2 text-yellow-400 underline hover:text-yellow-300"
+              >
+                Обновить CAPTCHA
+              </button>
               <input
                 type="text"
                 value={userInput}
@@ -326,5 +322,5 @@ export default function CaptchaVerification() {
         )}
       </div>
     </div>
-  )
+  );
 }
