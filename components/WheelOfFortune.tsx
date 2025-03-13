@@ -24,7 +24,6 @@ export default function WheelOfFortune() {
   const [manualWinningNumber, setManualWinningNumber] = useState("")
   const wheelRef = useRef<HTMLDivElement>(null)
 
-  // Generate unique numbers for segments
   const generateUniqueNumbers = (count: number, max: number) => {
     const numbers = new Set<number>()
     while (numbers.size < count) {
@@ -33,14 +32,12 @@ export default function WheelOfFortune() {
     return Array.from(numbers)
   }
 
-  // Create wheel segments with unique numbers
   const uniqueNumbers = generateUniqueNumbers(20, 999)
   const segments: WheelSegment[] = uniqueNumbers.map((value, i) => ({
     value,
     color: getWheelColor(i, 20),
   }))
 
-  // Load user's previously selected number
   useEffect(() => {
     if (dbUser && !isLoading) {
       const metadata = dbUser.metadata as any
@@ -50,13 +47,11 @@ export default function WheelOfFortune() {
     }
   }, [dbUser, isLoading])
 
-  // Generate gradient colors for segments
   function getWheelColor(index: number, total: number) {
     const hue = 120 - (index / (total - 1)) * 120
     return `linear-gradient(135deg, hsl(${hue}, 70%, 60%), hsl(${hue}, 70%, 40%))`
   }
 
-  // Spin the wheel logic
   const spinWheel = async () => {
     if (isSpinning || !dbUser) return
 
@@ -96,7 +91,6 @@ export default function WheelOfFortune() {
     }, 5000)
   }
 
-  // Find winners (admin only)
   const findWinners = async () => {
     if (!isAdmin()) return
 
@@ -134,7 +128,6 @@ export default function WheelOfFortune() {
     setIsLoadingWinners(false)
   }
 
-  // Loading state
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px] bg-green-900 mt-6">
@@ -143,7 +136,6 @@ export default function WheelOfFortune() {
     )
   }
 
-  // Authorization check
   if (!dbUser) {
     return (
       <div className="text-center p-8 bg-green-800 text-white rounded-lg mt-6">
@@ -153,7 +145,6 @@ export default function WheelOfFortune() {
     )
   }
 
-  // Main component render
   return (
     <div className="container mx-auto p-4 bg-green-900 min-h-screen text-white mt-6">
       <div className="text-center mb-8">
@@ -170,56 +161,57 @@ export default function WheelOfFortune() {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-16 items-center justify-center">
-        {/* Wheel Section */}
-        <div className="relative max-w-md w-full aspect-square overflow-hidden">
-          <motion.div
-            className="absolute inset-0 flex items-center justify-center"
-            animate={isSpinning ? { y: [0, -10, 0] } : {}}
-            transition={{ duration: 0.5, repeat: isSpinning ? Infinity : 0 }}
-          >
-            <div className="w-4 h-16 bg-yellow-400 z-10 -mt-16 rounded-b-lg" />
-          </motion.div>
+        <div className="flex flex-col items-center">
+          <div className="relative max-w-md w-full aspect-square">
+            <motion.div
+              className="absolute inset-0 flex items-center justify-center"
+              animate={isSpinning ? { y: [0, -10, 0] } : {}}
+              transition={{ duration: 0.5, repeat: isSpinning ? Infinity : 0 }}
+            >
+              <div className="w-4 h-16 bg-yellow-400 z-10 -mt-16 rounded-b-lg" />
+            </motion.div>
 
-          <motion.div
-            ref={wheelRef}
-            className="w-full h-full rounded-full overflow-hidden border-8 border-green-700 relative"
-            style={{ willChange: 'transform' }}
-            animate={{ rotate: rotation }}
-            transition={{ duration: 5, ease: "easeOut" }}
-          >
-            {segments.map((segment, index) => {
-              const angle = 360 / segments.length
-              const rotation = index * angle
+            <motion.div
+              ref={wheelRef}
+              className="w-full h-full rounded-full overflow-hidden border-8 border-green-700 relative"
+              style={{ willChange: 'transform' }}
+              animate={{ rotate: rotation }}
+              transition={{ duration: 5, ease: "easeOut" }}
+            >
+              {segments.map((segment, index) => {
+                const angle = 360 / segments.length
+                const rotation = index * angle
 
-              return (
-                <div
-                  key={index}
-                  className="absolute w-full h-full overflow-hidden"
-                  style={{
-                    background: segment.color,
-                    clipPath: `polygon(50% 50%, 100% 0%, 100% ${100 * Math.tan((angle * Math.PI) / 360)}%)`,
-                    transform: `rotate(${rotation}deg)`,
-                    transformOrigin: "50% 50%",
-                  }}
-                >
+                return (
                   <div
-                    className="absolute top-1/2 left-1/2 -translate-x-1/2 text-white font-bold text-sm"
+                    key={index}
+                    className="absolute w-full h-full overflow-hidden"
                     style={{
-                      transform: `translateY(-50%) rotate(${-rotation}deg)`,
-                      textShadow: "0 0 4px rgba(0, 0, 0, 0.5)",
+                      background: segment.color,
+                      clipPath: `polygon(50% 50%, 100% 0%, 100% ${100 * Math.tan((angle * Math.PI) / 360)}%)`,
+                      transform: `rotate(${rotation}deg)`,
+                      transformOrigin: "50% 50%",
                     }}
                   >
-                    {segment.value}
+                    <div
+                      className="absolute top-0 left-1/2 -translate-x-1/2 text-white font-bold text-sm"
+                      style={{
+                        transform: `translateY(-150px) rotate(${-rotation}deg)`,
+                        textShadow: "0 0 4px rgba(0, 0, 0, 0.5)",
+                      }}
+                    >
+                      {segment.value}
+                    </div>
                   </div>
-                </div>
-              )
-            })}
-          </motion.div>
+                )
+              })}
+            </motion.div>
+          </div>
 
           <button
             onClick={spinWheel}
             disabled={isSpinning}
-            className={`mt-8 px-6 py-3 bg-yellow-400 text-green-900 rounded-full font-bold text-lg flex items-center justify-center gap-2 mx-auto ${
+            className={`mt-8 px-6 py-3 bg-yellow-400 text-green-900 rounded-full font-bold text-lg flex items-center justify-center gap-2 ${
               isSpinning ? "opacity-50 cursor-not-allowed" : "hover:bg-yellow-300"
             }`}
           >
@@ -237,7 +229,6 @@ export default function WheelOfFortune() {
           </button>
         </div>
 
-        {/* Admin Section */}
         {isAdmin() && (
           <div className="bg-green-800 p-6 rounded-lg w-full max-w-md">
             <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
