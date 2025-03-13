@@ -65,9 +65,12 @@
     "@huggingface/transformers": "latest",
     "jsonwebtoken": "latest",
     "@supabase/supabase-js": "latest",
-    "worker-loader": "^3.0.8"
+    "worker-loader": "^3.0.8",
+    "svg-captcha": "^1.4.0",
+    "canvas": "^2.11.2"
   },
   "devDependencies": {
+    "@types/svg-captcha": "^1.4.4",
     "@types/node": "^22",
     "@types/react": "^18",
     "@types/react-dom": "^18",
