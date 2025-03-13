@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react"
 import { useTelegram } from "@/hooks/useTelegram"
 import { supabaseAdmin } from "@/hooks/supabase"
-import { sendTelegramMessage } from "@/app/actions"
 import { toast } from "sonner"
 import { Loader2, Trophy } from "lucide-react"
+import { notifyCaptchaSuccess, notifySuccessfulUsers } from "@/app/actions" // New server actions
 
 // Utility function to generate CAPTCHA string based on settings
 const generateCaptchaString = (length: number, characterSet: "letters" | "numbers" | "both") => {
@@ -39,12 +39,6 @@ const updateCaptchaSettings = async (settings: {
   if (error) throw error
 }
 
-const getAdminChatIds = async () => {
-  const { data, error } = await supabaseAdmin.from("users").select("user_id").eq("status", "admin")
-  if (error) throw error
-  return data?.map((admin) => admin.user_id) || []
-}
-
 export default function CaptchaVerification() {
   const { dbUser, isLoading, isAdmin } = useTelegram()
   const [settings, setSettings] = useState<{
@@ -58,6 +52,7 @@ export default function CaptchaVerification() {
   const [isSuccess, setIsSuccess] = useState(false)
   const [error, setError] = useState("")
   const [successfulUsers, setSuccessfulUsers] = useState<any[]>([])
+  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false)
 
   // Fetch settings and generate CAPTCHA on mount
   useEffect(() => {
@@ -68,9 +63,11 @@ export default function CaptchaVerification() {
         setEditingSettings(data)
         const newCaptcha = generateCaptchaString(data.string_length, data.character_set)
         setCaptchaString(newCaptcha)
+        setIsSettingsLoaded(true) // Mark settings as loaded
       } catch (err) {
         console.error("Ошибка загрузки настроек:", err)
         toast.error("Не удалось загрузить настройки CAPTCHA.")
+        setIsSettingsLoaded(true) // Still proceed even if settings fail
       }
     }
     fetchSettings()
@@ -108,7 +105,7 @@ export default function CaptchaVerification() {
 
   // Handle CAPTCHA submission
   const handleSubmit = async () => {
-    if (!settings) return
+    if (!settings || !dbUser) return
 
     const userInputToCheck = settings.case_sensitive ? userInput : userInput.toLowerCase()
     const captchaToCheck = settings.case_sensitive ? captchaString : captchaString.toLowerCase()
@@ -116,21 +113,24 @@ export default function CaptchaVerification() {
     if (userInputToCheck === captchaToCheck) {
       try {
         const currentMetadata = dbUser.metadata || {}
-        const updatedMetadata = { ...currentMetadata, captchaSuccess: true }
-        await supabaseAdmin.from("users").update({ metadata: updatedMetadata }).eq("user_id", dbUser.user_id)
+        const updatedMetadata = {
+          ...currentMetadata, // Preserve existing metadata
+          captchaSuccess: true, // Only update captchaSuccess
+        }
+        const { error } = await supabaseAdmin
+          .from("users")
+          .update({ metadata: updatedMetadata })
+          .eq("user_id", dbUser.user_id)
+        if (error) throw error
+
         setIsSuccess(true)
         toast.success("CAPTCHA успешно пройдена!")
 
-        // Notify admins
-        const adminChatIds = await getAdminChatIds()
-        for (const adminId of adminChatIds) {
-          await sendTelegramMessage(
-            process.env.TELEGRAM_BOT_TOKEN!,
-            `🔔 Пользователь ${dbUser.username || dbUser.user_id} успешно прошел CAPTCHA.`,
-            [],
-            undefined,
-            adminId
-          )
+        // Notify admins using server action
+        const notifyResult = await notifyCaptchaSuccess(dbUser.user_id, dbUser.username)
+        if (!notifyResult.success) {
+          console.error("Ошибка уведомления админов:", notifyResult.error)
+          toast.error("Не удалось уведомить админов.")
         }
       } catch (err) {
         console.error("Ошибка обновления метаданных:", err)
@@ -159,17 +159,16 @@ export default function CaptchaVerification() {
 
   // Handle sending notifications to successful users
   const handleNotify = async () => {
+    if (successfulUsers.length === 0) return
+
     try {
-      for (const user of successfulUsers) {
-        await sendTelegramMessage(
-          process.env.TELEGRAM_BOT_TOKEN!,
-          `🎉 Поздравляем! Вы успешно прошли CAPTCHA и можете продолжить. 🚀`,
-          [],
-          undefined,
-          user.user_id
-        )
+      const userIds = successfulUsers.map((user) => user.user_id)
+      const notifyResult = await notifySuccessfulUsers(userIds)
+      if (notifyResult.success) {
+        toast.success("Уведомления успешно отправлены!")
+      } else {
+        throw new Error(notifyResult.error)
       }
-      toast.success("Уведомления успешно отправлены!")
     } catch (err) {
       console.error("Ошибка отправки уведомлений:", err)
       toast.error("Не удалось отправить уведомления. Попробуйте снова.")
@@ -177,7 +176,7 @@ export default function CaptchaVerification() {
   }
 
   // Loading state
-  if (isLoading || !settings) {
+  if (isLoading || !isSettingsLoaded) {
     return (
       <div className="flex items-center justify-center min-h-[400px] bg-green-900 mt-6">
         <Loader2 className="w-12 h-12 animate-spin text-yellow-400" />
@@ -196,7 +195,7 @@ export default function CaptchaVerification() {
   }
 
   return (
-    <div className="container mx-auto p-4 pt-24 bg-green-900 min-h-screen text-white mt-6">
+    <div className="container mx-auto p-4 pt-24 bg-green-900 min-h-screen text-white">
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold mb-2">Проверка CAPTCHA</h1>
         <p className="text-lg text-green-200">Пройдите CAPTCHA, чтобы продолжить.</p>
