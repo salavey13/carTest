@@ -5,7 +5,7 @@ import { useTelegram } from "@/hooks/useTelegram";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { Loader2, Trophy } from "lucide-react";
-import { notifyCaptchaSuccess, notifySuccessfulUsers } from "@/app/actions";
+import { notifyCaptchaSuccess, notifySuccessfulUsers, generateCaptchaSecret, verifyCaptcha } from "@/app/actions";
 
 interface CaptchaVerificationProps {
   onCaptchaSuccess: () => void;
@@ -19,7 +19,7 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
     case_sensitive: boolean;
   } | null>(null);
   const [editingSettings, setEditingSettings] = useState(settings);
-  const [captchaString, setCaptchaString] = useState("");
+  const [captchaHash, setCaptchaHash] = useState<string | null>(null);
   const [userInput, setUserInput] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -27,22 +27,15 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
   const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Generate CAPTCHA text and draw it on the canvas
-  const generateCaptcha = () => {
+  // Draw CAPTCHA on canvas using user input as a placeholder
+  const drawCaptcha = (text: string) => {
     if (!settings || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d")!;
-    const chars =
-      settings.character_set === "letters"
-        ? "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        : settings.character_set === "numbers"
-        ? "0123456789"
-        : "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    const text = Array.from(
-      { length: settings.string_length },
-      () => chars[Math.floor(Math.random() * chars.length)]
-    ).join("");
+
+    // Dynamically adjust width (optional improvement)
+    canvas.width = Math.max(200, settings.string_length * 30 + 60);
 
     // Clear canvas
     ctx.fillStyle = "#f0f0f0";
@@ -66,13 +59,11 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
       ctx.fillStyle = "#999";
       ctx.fill();
     }
-
-    setCaptchaString(text);
   };
 
-  // Fetch settings and generate initial CAPTCHA on mount
+  // Fetch settings and generate initial CAPTCHA hash
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchSettingsAndCaptcha = async () => {
       try {
         const { data, error } = await supabaseAdmin
           .from("settings")
@@ -83,22 +74,27 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
 
         setSettings(data);
         setEditingSettings(data);
+
+        const { hash } = await generateCaptchaSecret(data.string_length, data.character_set);
+        setCaptchaHash(hash);
         setIsSettingsLoaded(true);
       } catch (err) {
-        console.error("Ошибка загрузки настроек:", err);
-        toast.error("Не удалось загрузить настройки CAPTCHA.");
+        console.error("Ошибка загрузки настроек или CAPTCHA:", err);
+        toast.error("Не удалось загрузить CAPTCHA.");
         setIsSettingsLoaded(true);
       }
     };
-    fetchSettings();
+    fetchSettingsAndCaptcha();
   }, []);
 
-  // Generate CAPTCHA when settings are loaded
+  // Draw initial CAPTCHA when hash and settings are ready
   useEffect(() => {
-    if (isSettingsLoaded && settings) {
-      generateCaptcha();
+    if (isSettingsLoaded && settings && captchaHash) {
+      // Use a dummy string of correct length for initial display
+      const dummyText = "X".repeat(settings.string_length);
+      drawCaptcha(dummyText);
     }
-  }, [isSettingsLoaded, settings]);
+  }, [isSettingsLoaded, settings, captchaHash]);
 
   // Check if user has already completed CAPTCHA
   useEffect(() => {
@@ -133,13 +129,13 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
 
   // Handle CAPTCHA submission
   const handleSubmit = async () => {
-    if (!settings || !dbUser) return;
+    if (!settings || !dbUser || !captchaHash) return;
 
     const userInputToCheck = settings.case_sensitive ? userInput : userInput.toLowerCase();
-    const captchaToCheck = settings.case_sensitive ? captchaString : captchaString.toLowerCase();
 
-    if (userInputToCheck === captchaToCheck) {
-      try {
+    try {
+      const isValid = await verifyCaptcha(captchaHash, userInputToCheck);
+      if (isValid) {
         const currentMetadata = dbUser.metadata || {};
         const updatedMetadata = { ...currentMetadata, captchaSuccess: true };
         const { error } = await supabaseAdmin
@@ -157,21 +153,30 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
           console.error("Ошибка уведомления админов:", notifyResult.error);
           toast.error("Не удалось уведомить админов.");
         }
-      } catch (err) {
-        console.error("Ошибка обновления метаданных:", err);
-        toast.error("Не удалось обновить статус. Попробуйте снова.");
+      } else {
+        setError("Неверная CAPTCHA. Попробуйте снова.");
+        setUserInput("");
       }
-    } else {
-      setError("Неверная CAPTCHA. Попробуйте снова.");
-      setUserInput("");
+    } catch (err) {
+      console.error("Ошибка проверки CAPTCHA:", err);
+      toast.error("Не удалось проверить CAPTCHA. Попробуйте снова.");
     }
   };
 
   // Handle refreshing CAPTCHA
-  const handleRefreshCaptcha = () => {
-    generateCaptcha();
-    setUserInput("");
-    setError("");
+  const handleRefreshCaptcha = async () => {
+    if (!settings) return;
+    try {
+      const { hash } = await generateCaptchaSecret(settings.string_length, settings.character_set);
+      setCaptchaHash(hash);
+      setUserInput("");
+      setError("");
+      const dummyText = "X".repeat(settings.string_length);
+      drawCaptcha(dummyText);
+    } catch (err) {
+      console.error("Ошибка обновления CAPTCHA:", err);
+      toast.error("Не удалось обновить CAPTCHA.");
+    }
   };
 
   // Handle saving settings in admin panel
@@ -180,7 +185,10 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
     try {
       await supabaseAdmin.from("settings").update(editingSettings).eq("id", 1);
       setSettings(editingSettings);
-      generateCaptcha();
+      const { hash } = await generateCaptchaSecret(editingSettings.string_length, editingSettings.character_set);
+      setCaptchaHash(hash);
+      const dummyText = "X".repeat(editingSettings.string_length);
+      drawCaptcha(dummyText);
       toast.success("Настройки успешно обновлены!");
     } catch (err) {
       console.error("Ошибка обновления настроек:", err);
@@ -239,7 +247,7 @@ export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerific
           ) : (
             <div className="captcha-challenge">
               <p>Пожалуйста, введите текст с изображения:</p>
-              <canvas ref={canvasRef} width={200} height={60} className="mt-2 rounded-md" />
+              <canvas ref={canvasRef} height={60} className="mt-2 rounded-md" />
               <button
                 onClick={handleRefreshCaptcha}
                 className="mt-2 text-yellow-400 underline hover:text-yellow-300"
