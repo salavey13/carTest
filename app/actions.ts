@@ -7,7 +7,6 @@ import { verifyJwtToken, generateJwtToken } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 import type { WebAppUser } from "@/types/telegram";
 import { createHash, randomBytes } from "crypto";
-import svgCaptcha from "svg-captcha";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DEFAULT_CHAT_ID = "413553377"; // Your default Telegram chat ID
@@ -48,49 +47,9 @@ function getBaseUrl() {
 
 
 
-interface CaptchaSettings {
-  string_length: number;
-  character_set: "letters" | "numbers" | "both";
-  case_sensitive: boolean;
-  captcha_type: "text" | "svg";
-  noise_level: number;
-  font_size: number;
-  background_color: string;
-  text_color: string;
-}
 
-export async function generateCaptchaSecret(settings: CaptchaSettings) {
-  const chars =
-    settings.character_set === "letters"
-      ? "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-      : settings.character_set === "numbers"
-      ? "0123456789"
-      : "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
-  const captcha = svgCaptcha.create({
-    size: settings.string_length,
-    charPreset: chars,
-    noise: settings.noise_level,
-    fontSize: settings.font_size,
-    width: Math.max(200, settings.string_length * 30 + 60),
-    height: 60,
-    background: settings.background_color,
-    color: true, // Enable color, override with text_color
-  });
 
-  // Override text color (svg-captcha doesn't have a direct prop, so we modify the SVG)
-  let svgText = captcha.data.replace(/fill="[^"]*"/g, `fill="${settings.text_color}"`);
-
-  const image = `data:image/svg+xml;base64,${Buffer.from(svgText).toString("base64")}`;
-  const hash = createHash("sha256").update(captcha.text).digest("hex");
-
-  return { image, hash };
-}
-
-export async function verifyCaptcha(hash: string, userInput: string) {
-  const computedHash = createHash("sha256").update(userInput).digest("hex");
-  return computedHash === hash;
-}
 
 
 // Notify admins when a user successfully completes CAPTCHA
