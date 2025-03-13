@@ -65,8 +65,7 @@
     "@huggingface/transformers": "latest",
     "jsonwebtoken": "latest",
     "@supabase/supabase-js": "latest",
-    "worker-loader": "^3.0.8",
-    "canvas": "^2.11.2"
+    "worker-loader": "^3.0.8"
   },
   "devDependencies": {
     "@types/node": "^22",
