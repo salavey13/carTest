@@ -97,6 +97,10 @@ const RepoTxtFetcher: React.FC = () => {
     return files.map((file) => `--- ${file.path} ---\n${file.content}`).join("\n\n");
   };
 
+  const generateTreeOnly = (files: FileNode[]) => {
+    return files.map((file) => `- ${file.path}`).join("\n");
+  };
+
   const generateSelectedTxt = (files: FileNode[]) => {
     return files
       .filter((file) => selectedFiles.has(file.path))
@@ -176,9 +180,9 @@ const RepoTxtFetcher: React.FC = () => {
   };
 
   const handleAddFullTree = () => {
-    const fullTree = generateTxt(files);
-    setKworkInput((prev) => `${prev}\n\nПолное дерево файлов:\n${fullTree}`);
-    addToast("Полное дерево добавлено в запрос!");
+    const treeOnly = generateTreeOnly(files);
+    setKworkInput((prev) => `${prev}\n\nДерево файлов:\n${treeOnly}`);
+    addToast("Дерево файлов добавлено в запрос!");
   };
 
   const handleAddBriefTree = () => {
@@ -221,29 +225,32 @@ const RepoTxtFetcher: React.FC = () => {
   };
 
   return (
-    <div className="w-full p-6 bg-gray-800 pt-24 rounded-2xl shadow-[0_0_30px_rgba(255,107,107,0.5)] border border-gray-700 repo-xml-content-wrapper">
-      <h2 className="text-4xl font-bold text-white mb-6 tracking-wider animate-pulse text-shadow-neon">
+    <div className="w-full p-6 bg-gray-800 pt-24 rounded-2xl shadow-[0_0_30px_rgba(255,107,107,0.5)] border border-gray-700 repo-xml-content-wrapper relative overflow-hidden">
+      {/* Cyberpunk Overlay */}
+      <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-transparent via-purple-900/10 to-cyan-900/10 animate-gradient-shift"></div>
+
+      <h2 className="text-4xl font-bold text-white mb-6 tracking-wider animate-pulse text-shadow-neon relative z-10">
         Кибер-Экстрактор TXT
       </h2>
-      <p className="text-gray-300 mb-8 text-lg font-mono">
-        Извлекайте текст из репозиториев GitHub (.ts, .tsx, .css, .sql) и генерируйте запросы для ботов с контекстом!
+      <p className="text-gray-300 mb-8 text-lg font-mono relative z-10">
+        Извлекайте текст из репозиториев GitHub и анализируйте задачи с Kwork в стиле CyberDev!
       </p>
 
       {/* Repo Input Section */}
-      <div className="flex flex-col gap-4 mb-8">
+      <div className="flex flex-col gap-4 mb-8 relative z-10">
         <input
           type="text"
           value={repoUrl}
           onChange={(e) => setRepoUrl(e.target.value)}
           placeholder="URL GitHub (например, https://github.com/user/repo)"
-          className="p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+          className="p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono shadow-[0_0_10px_rgba(147,51,234,0.3)]"
         />
         <input
           type="password"
           value={token}
           onChange={(e) => setToken(e.target.value)}
           placeholder="Токен GitHub (опционально)"
-          className="p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+          className="p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono shadow-[0_0_10px_rgba(147,51,234,0.3)]"
         />
         <motion.button
           onClick={handleFetch}
@@ -259,13 +266,13 @@ const RepoTxtFetcher: React.FC = () => {
       </div>
 
       {/* Kwork Input Section */}
-      <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)]">
+      <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
         <h3 className="text-2xl font-semibold text-white mb-4">Kwork в Бота</h3>
         <textarea
           value={kworkInput}
           onChange={(e) => setKworkInput(e.target.value)}
-          placeholder="Введите запрос с Kwork (например, 'Нужен бот для квизов со статистикой')"
-          className="w-full h-64 p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono resize-none"
+          placeholder="Введите запрос с Kwork или задачу Telegram Web App..."
+          className="w-full h-64 p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono resize-none shadow-[0_0_10px_rgba(0,255,157,0.3)]"
         />
         <div className="flex gap-4 mt-4 flex-wrap">
           <motion.button
@@ -277,7 +284,7 @@ const RepoTxtFetcher: React.FC = () => {
             whileHover={{ scale: botLoading ? 1 : 1.05 }}
             whileTap={{ scale: botLoading ? 1 : 0.95 }}
           >
-            {botLoading ? "Генерация..." : "Сгенерировать запрос для бота"}
+            {botLoading ? "Генерация..." : "Анализировать с Ботом"}
           </motion.button>
           <motion.button
             onClick={handleAddFullTree}
@@ -285,7 +292,7 @@ const RepoTxtFetcher: React.FC = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            Добавить дерево файлов
+            Добавить дерево
           </motion.button>
           <motion.button
             onClick={handleAddBriefTree}
@@ -293,7 +300,7 @@ const RepoTxtFetcher: React.FC = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            Добавить ключевые файлы
+            Добавить ключевые
           </motion.button>
           <motion.button
             onClick={handleAddSelected}
@@ -310,20 +317,20 @@ const RepoTxtFetcher: React.FC = () => {
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
-          className="h-2 bg-purple-500 rounded-full mb-8 shadow-[0_0_10px_rgba(147,51,234,0.7)]"
+          className="h-2 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full mb-8 shadow-[0_0_15px_rgba(147,51,234,0.7)] animate-pulse relative z-10"
         />
       )}
 
       {error && (
-        <p className="text-red-400 mb-8 font-mono">{error}</p>
+        <p className="text-red-400 mb-8 font-mono relative z-10">{error}</p>
       )}
 
       {files.length > 0 && (
-        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)]">
+        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
           <h3 className="text-2xl font-semibold text-white mb-4">Консоль файлов</h3>
           <div className="grid grid-cols-3 gap-4">
             {groupedFiles.map(({ folder, files: folderFiles }, index) => (
-              <div key={`${folder}-${index}`} className="bg-gray-800 p-4 rounded-lg border border-gray-600">
+              <div key={`${folder}-${index}`} className="bg-gray-800 p-4 rounded-lg border border-gray-600 shadow-[0_0_10px_rgba(0,255,157,0.2)]">
                 <h4 className="text-lg font-bold text-purple-400 mb-2">{folder}</h4>
                 <ul className="space-y-2">
                   {folderFiles.map((file) => (
@@ -353,23 +360,23 @@ const RepoTxtFetcher: React.FC = () => {
       )}
 
       {txtOutput && (
-        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)]">
+        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
           <h3 className="text-2xl font-semibold text-white mb-4">Полный TXT</h3>
           <textarea
             value={txtOutput}
             readOnly
-            className="w-full h-96 bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none"
+            className="w-full h-96 bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none overflow-y-auto shadow-[0_0_10px_rgba(0,255,157,0.2)]"
           />
         </div>
       )}
 
       {selectedOutput && (
-        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)]">
+        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
           <h3 className="text-2xl font-semibold text-white mb-4">Выбранный TXT</h3>
           <textarea
             value={selectedOutput}
             readOnly
-            className="w-full h-[768px] bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-y min-h-[768px] max-h-[1536px]"
+            className="w-full h-[768px] bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-y min-h-[768px] max-h-[1536px] overflow-y-auto shadow-[0_0_10px_rgba(0,255,157,0.2)]"
           />
         </div>
       )}
@@ -381,7 +388,7 @@ const RepoTxtFetcher: React.FC = () => {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
-            className="bg-purple-500 text-white p-3 rounded-lg shadow-lg font-mono border border-purple-700"
+            className="bg-purple-500 text-white p-3 rounded-lg shadow-lg font-mono border border-purple-700 shadow-[0_0_10px_rgba(147,51,234,0.5)]"
           >
             {toast.message}
           </motion.div>
