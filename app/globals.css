@@ -59,8 +59,11 @@ body {
 }
 
 @media (max-width: 767px) {
-  .repo-xml-content-wrapper > main {
-    min-width: 1024px; /* Matches viewport width for "PC mode" */
+  .repo-xml-content-wrapper {
+    min-width: 1024px; /* Matches viewport width */
+    transform: scale(0.7); /* Scales down to fit mobile */
+    transform-origin: top left;
+    width: 1463px; /* 1024 / 0.7 to maintain proportions */
   }
 }
 .bg-grid-pattern {
