@@ -138,8 +138,8 @@ const RepoTxtFetcher: React.FC = () => {
     try {
       const context = selectedOutput || txtOutput || "No repo context provided.";
       const fullInput = `Kwork request: "${kworkInput}"\nRepo context:\n${context}`;
-      const botId = "123456789"; // Replace with your KworkBotConverter bot ID
-      const userId = "987654321"; // Replace with your Coze user ID
+      const botId = "7481446329554747397"; // Replace with your KworkBotConverter bot ID
+      const userId = "341503612082"; // Replace with your Coze user ID
       const response = await runCoseAgent(botId, userId, fullInput);
       setBotRequest(response);
       toast.success("Запрос для бота готов!");
