@@ -1,10 +1,10 @@
-import type React from "react"
-import Script from "next/script"
-import Header from "@/components/Header"
-import Footer from "@/components/Footer"
-import { AppProvider } from "@/contexts/AppContext"
-import { Toaster } from "sonner"
-import "./globals.css"
+import type React from "react";
+import Script from "next/script";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
+import { AppProvider } from "@/contexts/AppContext";
+import { Toaster } from "sonner";
+import "./globals.css";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -12,31 +12,28 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <Script id="telegram-webapp" src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
-        <Script id="dynamic-viewport" strategy="afterInteractive">
-          {`
-            (function() {
-              const path = window.location.pathname;
-              if (path === '/repo-xml') { // Adjust this to match your RepoTxtPage path
-                const meta = document.createElement('meta');
-                meta.name = 'viewport';
-                meta.content = 'width=1024, initial-scale=0.7, maximum-scale=5.0, user-scalable=yes';
-                document.head.appendChild(meta);
-              } else {
-                const meta = document.createElement('meta');
-                meta.name = 'viewport';
-                meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
-                document.head.appendChild(meta);
-              }
-            })();
-          `}
-        </Script>
+        <Script
+          id="telegram-webapp"
+          src="https://telegram.org/js/telegram-web-app.js"
+          strategy="beforeInteractive"
+        />
+        {/* Default viewport for mobile */}
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
       </head>
       <body className="bg-gray-900 text-white min-h-screen flex flex-col">
         <AppProvider>
-          <Header />
-          {children}
-          <Footer />
+          {/* Fixed Header */}
+          <div className="fixed top-0 left-0 w-full z-50">
+            <Header />
+          </div>
+          {/* Main content with padding to avoid overlap */}
+          <div className="flex-grow pt-16 pb-16 overflow-auto">
+            {children}
+          </div>
+          {/* Fixed Footer */}
+          <div className="fixed bottom-0 left-0 w-full z-50">
+            <Footer />
+          </div>
           <Toaster
             position="bottom-right"
             toastOptions={{
@@ -52,9 +49,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </AppProvider>
       </body>
     </html>
-  )
+  );
 }
 
 export const metadata = {
-  generator: 'v0.dev'
+  generator: "v0.dev",
 };
