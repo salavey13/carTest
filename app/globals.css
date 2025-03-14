@@ -60,6 +60,14 @@
   }
 }
 
+@media (max-width: 767px) {
+  .repo-txt-page-wrapper {
+    transform: scale(0.7);
+    transform-origin: top left;
+    width: 1463px; /* 1024 / 0.7 to maintain proportions */
+  }
+}
+
 .bg-grid-pattern {
   background-size: 50px 50px;
   background-image: linear-gradient(to right, rgba(255, 107, 107, 0.1) 1px, transparent 1px),
