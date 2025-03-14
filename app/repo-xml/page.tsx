@@ -153,10 +153,10 @@ const RepoTxtFetcher: React.FC = () => {
 
   return (
     <div className="w-full p-8 bg-card rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-muted animate-[drift_20s_infinite]">
-      <h2 className="text-5xl font-bold cyber-text mb-6 tracking-wider glitch" data-text="Кибер-Экстрактор TXT">
+      <h2 className="text-5xl font-bold text-white mb-6 tracking-wider glitch" data-text="Кибер-Экстрактор TXT">
         Кибер-Экстрактор TXT
       </h2>
-      <p className="text-muted-foreground mb-8 text-xl font-mono leading-relaxed">
+      <p className="text-gray-300 mb-8 text-xl font-mono leading-relaxed">
         Кидай URL GitHub, токен (для приватных реп), жми кнопку—получай TXT из .ts, .tsx, .css, .sql. Плюс: превращай запросы с Kwork в техзадания для ботов с учётом моего арсенала (CAPTCHA, Bullshit Detector, Wheel of Fortune). Выбирай файлы для контекста!
       </p>
 
@@ -167,47 +167,47 @@ const RepoTxtFetcher: React.FC = () => {
           value={repoUrl}
           onChange={(e) => setRepoUrl(e.target.value)}
           placeholder="Вставь URL GitHub (например, https://github.com/user/repo)"
-          className="flex-grow p-4 bg-input border border-border rounded-xl text-foreground focus:outline-none focus:ring-4 focus:ring-primary/50 text-glow font-mono text-lg shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
+          className="flex-grow p-4 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-4 focus:ring-purple-500/50 font-mono text-lg shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
         />
         <input
           type="password"
           value={token}
           onChange={(e) => setToken(e.target.value)}
           placeholder="Токен GitHub (для приватных реп или лимитов)"
-          className="flex-grow p-4 bg-input border border-border rounded-xl text-foreground focus:outline-none focus:ring-4 focus:ring-primary/50 text-glow font-mono text-lg shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
+          className="flex-grow p-4 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-4 focus:ring-purple-500/50 font-mono text-lg shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
         />
         <button
           onClick={handleFetch}
           disabled={loading}
-          className={`px-8 py-4 rounded-xl font-semibold text-primary-foreground ${
+          className={`px-8 py-4 rounded-xl font-semibold text-white ${
             loading
-              ? "bg-muted cursor-not-allowed animate-pulse"
-              : "bg-primary hover:bg-secondary hover:shadow-[0_0_15px_rgba(255,107,107,0.7)]"
-          } transition-all text-glow font-mono text-lg`}
+              ? "bg-gray-600 cursor-not-allowed animate-pulse"
+              : "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 hover:shadow-[0_0_15px_rgba(255,107,107,0.7)]"
+          } transition-all font-mono text-lg`}
         >
           {loading ? "Взламываю..." : "Извлечь TXT"}
         </button>
       </div>
 
       {/* Kwork Input Section */}
-      <div className="mb-8 bg-popover p-6 rounded-xl shadow-inner border border-border">
-        <h3 className="text-3xl font-semibold text-secondary mb-4 cyber-text glitch" data-text="Kwork в Бота">
+      <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-inner border border-gray-700">
+        <h3 className="text-3xl font-semibold text-white mb-4 glitch" data-text="Kwork в Бота">
           Kwork в Бота
         </h3>
         <textarea
           value={kworkInput}
           onChange={(e) => setKworkInput(e.target.value)}
           placeholder="Вставь запрос с Kwork (например, 'Нужен бот для квизов с статистикой')"
-          className="w-full h-32 p-4 bg-input border border-border rounded-xl text-foreground focus:outline-none focus:ring-4 focus:ring-primary/50 text-glow font-mono text-lg shadow-[inset_0_0_10px_rgba(255,107,107,0.2)] resize-none scrollbar-thin scrollbar-thumb-primary scrollbar-track-muted"
+          className="w-full h-32 p-4 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-4 focus:ring-purple-500/50 font-mono text-lg shadow-[inset_0_0_10px_rgba(255,107,107,0.2)] resize-none scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-gray-700"
         />
         <button
           onClick={handleGenerateBotRequest}
           disabled={loading}
-          className={`mt-4 px-8 py-4 rounded-xl font-semibold text-primary-foreground ${
+          className={`mt-4 px-8 py-4 rounded-xl font-semibold text-white ${
             loading
-              ? "bg-muted cursor-not-allowed animate-pulse"
+              ? "bg-gray-600 cursor-not-allowed animate-pulse"
               : "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 hover:shadow-[0_0_15px_rgba(255,107,107,0.7)]"
-          } transition-all text-glow font-mono text-lg`}
+          } transition-all font-mono text-lg`}
         >
           {loading ? "Генерирую..." : "Сгенерировать запрос"}
         </button>
@@ -217,17 +217,17 @@ const RepoTxtFetcher: React.FC = () => {
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
-          className="h-3 bg-primary rounded-full mb-8 shadow-[0_0_15px_rgba(255,107,107,0.8)]"
+          className="h-3 bg-purple-500 rounded-full mb-8 shadow-[0_0_15px_rgba(255,107,107,0.8)]"
         />
       )}
 
       {error && (
-        <p className="text-destructive mb-8 font-mono text-lg animate-[neon_2s_infinite]">{error}</p>
+        <p className="text-red-400 mb-8 font-mono text-lg animate-[neon_2s_infinite]">{error}</p>
       )}
 
       {files.length > 0 && (
-        <div className="mb-8 bg-popover p-6 rounded-xl shadow-inner border border-border">
-          <h3 className="text-3xl font-semibold text-secondary mb-4 cyber-text glitch" data-text="Дерево файлов">
+        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-inner border border-gray-700">
+          <h3 className="text-3xl font-semibold text-white mb-4 glitch" data-text="Дерево файлов">
             Дерево файлов
           </h3>
           <ul className="space-y-3">
@@ -237,9 +237,9 @@ const RepoTxtFetcher: React.FC = () => {
                   type="checkbox"
                   checked={selectedFiles.has(file.path)}
                   onChange={() => toggleFileSelection(file.path)}
-                  className="w-5 h-5 accent-primary rounded focus:ring-2 focus:ring-primary/50"
+                  className="w-5 h-5 accent-purple-500 rounded focus:ring-2 focus:ring-purple-500/50"
                 />
-                <span className="text-muted-foreground font-mono text-base group-hover:text-foreground transition-colors duration-300">
+                <span className="text-gray-400 font-mono text-base group-hover:text-white transition-colors duration-300">
                   {file.path}
                 </span>
               </li>
@@ -249,40 +249,40 @@ const RepoTxtFetcher: React.FC = () => {
       )}
 
       {txtOutput && (
-        <div className="mb-8 bg-popover p-6 rounded-xl shadow-inner border border-border">
-          <h3 className="text-3xl font-semibold text-secondary mb-4 cyber-text glitch" data-text="Полный TXT">
+        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-inner border border-gray-700">
+          <h3 className="text-3xl font-semibold text-white mb-4 glitch" data-text="Полный TXT">
             Полный TXT
           </h3>
           <textarea
             value={txtOutput}
             readOnly
-            className="w-full h-72 bg-card p-4 rounded-lg text-sm text-muted-foreground font-mono border border-muted resize-none scrollbar-thin scrollbar-thumb-primary scrollbar-track-muted"
+            className="w-full h-72 bg-gray-900 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-gray-700"
           />
         </div>
       )}
 
       {selectedOutput && (
-        <div className="mb-8 bg-popover p-6 rounded-xl shadow-inner border border-border">
-          <h3 className="text-3xl font-semibold text-secondary mb-4 cyber-text glitch" data-text="Выбранные файлы (TXT)">
+        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-inner border border-gray-700">
+          <h3 className="text-3xl font-semibold text-white mb-4 glitch" data-text="Выбранные файлы (TXT)">
             Выбранные файлы (TXT)
           </h3>
           <textarea
             value={selectedOutput}
             readOnly
-            className="w-full h-72 bg-card p-4 rounded-lg text-sm text-muted-foreground font-mono border border-muted resize-none scrollbar-thin scrollbar-thumb-primary scrollbar-track-muted"
+            className="w-full h-72 bg-gray-900 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-gray-700"
           />
         </div>
       )}
 
       {botRequest && (
-        <div className="mb-8 bg-popover p-6 rounded-xl shadow-inner border border-border">
-          <h3 className="text-3xl font-semibold text-secondary mb-4 cyber-text glitch" data-text="Запрос для Бота">
+        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-inner border border-gray-700">
+          <h3 className="text-3xl font-semibold text-white mb-4 glitch" data-text="Запрос для Бота">
             Запрос для Бота
           </h3>
           <textarea
             value={botRequest}
             readOnly
-            className="w-full h-72 bg-card p-4 rounded-lg text-sm text-muted-foreground font-mono border border-muted resize-none scrollbar-thin scrollbar-thumb-primary scrollbar-track-muted"
+            className="w-full h-72 bg-gray-900 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-gray-700"
           />
         </div>
       )}
@@ -294,7 +294,7 @@ const RepoTxtFetcher: React.FC = () => {
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 50 }}
-            className="bg-primary text-primary-foreground p-4 rounded-lg shadow-[0_0_15px_rgba(255,107,107,0.7)] font-mono text-base border border-primary/50"
+            className="bg-purple-500 text-white p-4 rounded-lg shadow-[0_0_15px_rgba(255,107,107,0.7)] font-mono text-base border border-purple-500/50"
           >
             {toast.message}
           </motion.div>
@@ -304,15 +304,18 @@ const RepoTxtFetcher: React.FC = () => {
   );
 };
 
-export default function RepoTxtPage() {
+export default function RepoXmlPage() {
   return (
-    <div className="min-h-screen bg-background bg-grid-pattern animate-[drift_30s_infinite]">
-      <div className="repo-txt-page-wrapper">
-        
-        <main className="pt-32 w-full">
-          <RepoTxtFetcher />
-        </main>
+    <>
+      {/* Apply repo-xml-specific viewport */}
+      <meta name="viewport" content="width=1024, initial-scale=0.7, maximum-scale=5.0, user-scalable=yes" />
+      <div className="min-h-screen bg-gray-900 bg-grid-pattern animate-[drift_30s_infinite]">
+        <div className="repo-xml-content-wrapper">
+          <main className="w-full">
+            <RepoTxtFetcher />
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
