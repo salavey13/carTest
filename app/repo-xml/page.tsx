@@ -34,7 +34,7 @@ const RepoTxtFetcher: React.FC = () => {
 
   const parseRepoUrl = (url: string) => {
     const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
-    if (!match) throw new Error("Invalid GitHub URL");
+    if (!match) throw new Error("Неверный URL GitHub");
     return { owner: match[1], repo: match[2] };
   };
 
@@ -61,13 +61,13 @@ const RepoTxtFetcher: React.FC = () => {
           allowedExtensions.some((ext) => item.path.endsWith(ext)) &&
           !item.path.startsWith("components/ui/")
         ) {
-          addToast(`Scanning ${item.path}...`);
+          addToast(`Сканирую ${item.path}...`);
           try {
             const contentResponse = await axios.get(item.download_url);
             files.push({ path: item.path, content: contentResponse.data });
           } catch (contentErr) {
-            console.error(`Error fetching ${item.path}:`, contentErr);
-            addToast(`Error: ${item.path} failed to load`);
+            console.error(`Ошибка загрузки ${item.path}:`, contentErr);
+            addToast(`Ошибка: ${item.path} не загружен`);
           }
         } else if (item.type === "dir") {
           const subFiles = await fetchRepoContents(owner, repo, item.path);
@@ -76,7 +76,7 @@ const RepoTxtFetcher: React.FC = () => {
       }
       return files;
     } catch (err) {
-      console.error("API Error:", err);
+      console.error("Ошибка API:", err);
       throw err;
     }
   };
@@ -101,7 +101,7 @@ const RepoTxtFetcher: React.FC = () => {
     setSelectedFiles(new Set());
     setAllSelected(false);
     setProgress(0);
-    addToast("Starting extraction...");
+    addToast("Запускаю извлечение...");
 
     try {
       const { owner, repo } = parseRepoUrl(repoUrl);
@@ -109,10 +109,10 @@ const RepoTxtFetcher: React.FC = () => {
       setFiles(fetchedFiles);
       const txt = generateTxt(fetchedFiles);
       setTxtOutput(txt);
-      addToast("Extraction complete!");
+      addToast("Извлечение завершено!");
     } catch (err: any) {
-      setError(`Fetch error: ${err.message}. Check URL or token.`);
-      addToast("Error: Extraction failed!");
+      setError(`Ошибка загрузки: ${err.message}. Проверьте URL или токен.`);
+      addToast("Ошибка: Извлечение не удалось!");
     } finally {
       setExtractLoading(false);
       setProgress(100);
@@ -132,46 +132,48 @@ const RepoTxtFetcher: React.FC = () => {
     if (allSelected) {
       setSelectedFiles(new Set());
       setSelectedOutput("");
+      addToast("Все файлы сняты с выбора");
     } else {
       const allPaths = files.map((file) => file.path);
       setSelectedFiles(new Set(allPaths));
       setSelectedOutput(generateTxt(files));
+      addToast("Все файлы выбраны");
     }
     setAllSelected(!allSelected);
   };
 
   const handleGenerateBotRequest = async () => {
     if (!kworkInput.trim()) {
-      toast.error("Enter a Kwork request!");
+      toast.error("Введите запрос с Kwork!");
       return;
     }
 
     setBotLoading(true);
-    addToast("Generating bot request...");
+    addToast("Генерирую запрос для бота...");
 
     try {
-      const context = selectedOutput || txtOutput || "No repo context provided.";
-      const fullInput = `Kwork request: "${kworkInput}"\nRepo context:\n${context}`;
-      const botId = "7481446329554747397"; // Replace with your bot ID
-      const userId = "341503612082"; // Replace with your user ID
+      const context = selectedOutput || txtOutput || "Контекст репозитория не предоставлен.";
+      const fullInput = `Запрос с Kwork: "${kworkInput}"\nКонтекст репозитория:\n${context}`;
+      const botId = "7481446329554747397"; // Замените на ваш ID бота
+      const userId = "341503612082"; // Замените на ваш ID пользователя
       const response = await runCoseAgent(botId, userId, fullInput);
-      setTxtOutput(response); // Display bot response in Full TXT section
-      addToast("Bot request generated!");
+      setTxtOutput(response);
+      addToast("Запрос для бота сгенерирован!");
     } catch (err) {
-      setError("Error generating bot request.");
-      addToast("Error: Generation failed!");
+      setError("Ошибка генерации запроса для бота.");
+      addToast("Ошибка: Генерация не удалась!");
     } finally {
       setBotLoading(false);
     }
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6 bg-gray-800 rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-gray-700">
+    <div className="w-full p-6 bg-gray-800 rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-gray-700 repo-xml-content-wrapper">
       <h2 className="text-4xl font-bold text-white mb-6 tracking-wider">
-        Cyber TXT Extractor
+        Кибер-Экстрактор TXT
       </h2>
       <p className="text-gray-300 mb-8 text-lg font-mono">
-        Extract text from GitHub repos (.ts, .tsx, .css, .sql) and generate bot requests with context!
+        Извлекайте текст из репозиториев GitHub (.ts, .tsx, .css, .sql) и генерируйте запросы для ботов с контекстом!
       </p>
 
       {/* Repo Input Section */}
@@ -180,14 +182,14 @@ const RepoTxtFetcher: React.FC = () => {
           type="text"
           value={repoUrl}
           onChange={(e) => setRepoUrl(e.target.value)}
-          placeholder="GitHub URL (e.g., https://github.com/user/repo)"
+          placeholder="URL GitHub (например, https://github.com/user/repo)"
           className="p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
         />
         <input
           type="password"
           value={token}
           onChange={(e) => setToken(e.target.value)}
-          placeholder="GitHub Token (optional)"
+          placeholder="Токен GitHub (опционально)"
           className="p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
         />
         <button
@@ -199,17 +201,17 @@ const RepoTxtFetcher: React.FC = () => {
               : "bg-purple-500 hover:bg-purple-600"
           } transition-all font-mono`}
         >
-          {extractLoading ? "Extracting..." : "Extract TXT"}
+          {extractLoading ? "Извлечение..." : "Извлечь TXT"}
         </button>
       </div>
 
       {/* Kwork Input Section */}
       <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700">
-        <h3 className="text-2xl font-semibold text-white mb-4">Kwork to Bot</h3>
+        <h3 className="text-2xl font-semibold text-white mb-4">Kwork в Бота</h3>
         <textarea
           value={kworkInput}
           onChange={(e) => setKworkInput(e.target.value)}
-          placeholder="Enter Kwork request (e.g., 'Need a quiz bot with stats')"
+          placeholder="Введите запрос с Kwork (например, 'Нужен бот для квизов со статистикой')"
           className="w-full h-32 p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono resize-none"
         />
         <button
@@ -221,7 +223,7 @@ const RepoTxtFetcher: React.FC = () => {
               : "bg-purple-500 hover:bg-purple-600"
           } transition-all font-mono`}
         >
-          {botLoading ? "Generating..." : "Generate Bot Request"}
+          {botLoading ? "Генерация..." : "Сгенерировать запрос для бота"}
         </button>
       </div>
 
@@ -239,12 +241,12 @@ const RepoTxtFetcher: React.FC = () => {
 
       {files.length > 0 && (
         <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700">
-          <h3 className="text-2xl font-semibold text-white mb-4">File Tree</h3>
+          <h3 className="text-2xl font-semibold text-white mb-4">Дерево файлов</h3>
           <button
             onClick={handleSelectAll}
             className="mb-4 p-2 bg-purple-500 text-white rounded hover:bg-purple-600 font-mono"
           >
-            {allSelected ? "Deselect All" : "Select All"}
+            {allSelected ? "Снять все" : "Выбрать все"}
           </button>
           <ul className="space-y-2">
             {files.map((file) => (
@@ -266,7 +268,7 @@ const RepoTxtFetcher: React.FC = () => {
 
       {txtOutput && (
         <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700">
-          <h3 className="text-2xl font-semibold text-white mb-4">Full TXT</h3>
+          <h3 className="text-2xl font-semibold text-white mb-4">Полный TXT</h3>
           <textarea
             value={txtOutput}
             readOnly
@@ -277,7 +279,7 @@ const RepoTxtFetcher: React.FC = () => {
 
       {selectedOutput && (
         <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700">
-          <h3 className="text-2xl font-semibold text-white mb-4">Selected TXT</h3>
+          <h3 className="text-2xl font-semibold text-white mb-4">Выбранный TXT</h3>
           <textarea
             value={selectedOutput}
             readOnly
@@ -286,7 +288,7 @@ const RepoTxtFetcher: React.FC = () => {
         </div>
       )}
 
-      <div className="fixed bottom-20 right-4 space-y-2 z-50">
+      <div className="fixed bottom-4 right-4 space-y-2 z-50">
         {toasts.map((toast) => (
           <motion.div
             key={toast.id}
@@ -305,10 +307,14 @@ const RepoTxtFetcher: React.FC = () => {
 
 export default function RepoXmlPage() {
   return (
-    <div className="min-h-screen bg-gray-900">
-      <main className="pt-16 pb-16">
-        <RepoTxtFetcher />
-      </main>
-    </div>
+    <>
+      {/* Desktop viewport for this page only */}
+      <meta name="viewport" content="width=1024, initial-scale=0.7, maximum-scale=5.0, user-scalable=yes" />
+      <div className="min-h-screen bg-gray-900">
+        <main className="py-6">
+          <RepoTxtFetcher />
+        </main>
+      </div>
+    </>
   );
 }
