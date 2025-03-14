@@ -60,21 +60,32 @@ body {
 
 @media (max-width: 767px) {
   .repo-xml-content-wrapper {
-    min-width: 1024px; /* Matches viewport width */
-    transform: scale(0.7); /* Scales down to fit mobile */
+    min-width: 1024px;
+    transform: scale(0.7);
     transform-origin: top left;
-    width: 1463px; /* 1024 / 0.7 to maintain proportions */
+    width: 1463px; /* 1024 / 0.7 */
   }
+}
+
+.text-shadow-neon {
+  text-shadow: 0 0 5px rgba(255, 107, 107, 0.8), 0 0 10px rgba(255, 107, 107, 0.6), 0 0 15px rgba(255, 107, 107, 0.4);
+}
+
+.animate-gradient-shift {
+  animation: gradientShift 10s infinite linear;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 0%; }
+  50% { background-position: 100% 100%; }
+  100% { background-position: 0% 0%; }
 }
 .bg-grid-pattern {
   background-size: 50px 50px;
   background-image: linear-gradient(to right, rgba(255, 107, 107, 0.1) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 107, 107, 0.1) 1px, transparent 1px);
 }
-/* Cyberpunk Neon Text Shadow */
-.text-shadow-neon {
-  text-shadow: 0 0 5px rgba(255, 107, 107, 0.8), 0 0 10px rgba(255, 107, 107, 0.6), 0 0 15px rgba(255, 107, 107, 0.4);
-}
+
 .text-gradient {
   background: linear-gradient(to right, #FF6B6B, #4ECDC4);
   -webkit-background-clip: text;
