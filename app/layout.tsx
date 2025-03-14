@@ -17,23 +17,22 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           src="https://telegram.org/js/telegram-web-app.js"
           strategy="beforeInteractive"
         />
-        {/* Default viewport for mobile */}
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
       </head>
       <body className="bg-gray-900 text-white min-h-screen flex flex-col">
         <AppProvider>
           {/* Fixed Header */}
-          <div className="fixed top-0 left-0 w-full z-50">
+          <header className="fixed top-0 left-0 w-full z-50 bg-gray-900">
             <Header />
-          </div>
-          {/* Main content with padding to avoid overlap */}
-          <div className="flex-grow pt-16 pb-16 overflow-auto">
+          </header>
+          {/* Main content area with padding */}
+          <main className="flex-grow pt-16 pb-16 overflow-y-auto">
             {children}
-          </div>
+          </main>
           {/* Fixed Footer */}
-          <div className="fixed bottom-0 left-0 w-full z-50">
+          <footer className="fixed bottom-0 left-0 w-full z-50 bg-gray-900">
             <Footer />
-          </div>
+          </footer>
           <Toaster
             position="bottom-right"
             toastOptions={{
