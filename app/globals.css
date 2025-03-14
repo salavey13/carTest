@@ -46,6 +46,20 @@
   --ring: 0 85% 70%;
 }
 
+.page-wrapper {
+  width: 1024px;
+  margin: 0 auto;
+  overflow-x: auto;
+}
+
+@media (max-width: 767px) {
+  .page-wrapper {
+    transform: scale(0.7);
+    transform-origin: top left;
+    width: 1463px; /* 1024 / 0.7 */
+  }
+}
+
 .bg-grid-pattern {
   background-size: 50px 50px;
   background-image: linear-gradient(to right, rgba(255, 107, 107, 0.1) 1px, transparent 1px),
