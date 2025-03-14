@@ -307,8 +307,8 @@ const RepoTxtFetcher: React.FC = () => {
 export default function RepoTxtPage() {
   return (
     <div className="min-h-screen bg-background bg-grid-pattern animate-[drift_30s_infinite]">
-      <div className="page-wrapper">
-        <header className="fixed top-0 left-0 right-0 bg-card shadow-md p-6 z-10 border-b border-muted">
+      <div className="repo-txt-page-wrapper">
+        <header className="fixed top-24 left-0 right-0 bg-card shadow-md p-6 z-10 border-b border-muted">
           <h1
             className="text-4xl font-bold text-gradient cyber-text glitch"
             data-text="Генератор Кибер-TXT"
@@ -316,7 +316,7 @@ export default function RepoTxtPage() {
             Генератор Кибер-TXT
           </h1>
         </header>
-        <main className="pt-24 w-full">
+        <main className="pt-32 w-full">
           <RepoTxtFetcher />
         </main>
       </div>
