@@ -24,10 +24,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <header className="w-full bg-gray-900 z-50 fixed top-0">
             <Header />
           </header>
-          <main className="flex-1 pt-16 pb-16 overflow-y-auto">
+          <main className="flex-1 pt-24 pb-16 overflow-y-auto">
             {children}
           </main>
-          <footer className="w-full bg-gray-900 z-50 fixed bottom-0">
+          <footer className="w-full bg-gray-900 z-50">
             <Footer />
           </footer>
           <Toaster
