@@ -46,25 +46,15 @@
   --ring: 0 85% 70%;
 }
 
-.page-wrapper {
-  width: 1024px;
-  margin: 0 auto;
-  overflow-x: auto;
+.repo-xml-content-wrapper {
+  width: 100%;
+  overflow-x: auto; /* Horizontal scrolling for wide content */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on mobile */
 }
 
 @media (max-width: 767px) {
-  .page-wrapper {
-    transform: scale(0.7);
-    transform-origin: top left;
-    width: 1463px; /* 1024 / 0.7 */
-  }
-}
-
-@media (max-width: 767px) {
-  .repo-txt-page-wrapper {
-    transform: scale(0.7);
-    transform-origin: top left;
-    width: 1463px; /* 1024 / 0.7 to maintain proportions */
+  .repo-xml-content-wrapper > main {
+    min-width: 1024px; /* Matches viewport width */
   }
 }
 
