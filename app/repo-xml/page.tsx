@@ -19,12 +19,12 @@ const RepoTxtFetcher: React.FC = () => {
   const [files, setFiles] = useState<FileNode[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [allSelected, setAllSelected] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [extractLoading, setExtractLoading] = useState<boolean>(false);
+  const [botLoading, setBotLoading] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<{ id: number; message: string }[]>([]);
   const [kworkInput, setKworkInput] = useState<string>("");
-  const [botRequest, setBotRequest] = useState<string>("");
 
   const addToast = (message: string) => {
     const id = Date.now();
@@ -93,7 +93,7 @@ const RepoTxtFetcher: React.FC = () => {
   };
 
   const handleFetch = async () => {
-    setLoading(true);
+    setExtractLoading(true);
     setError(null);
     setTxtOutput("");
     setSelectedOutput("");
@@ -101,7 +101,7 @@ const RepoTxtFetcher: React.FC = () => {
     setSelectedFiles(new Set());
     setAllSelected(false);
     setProgress(0);
-    addToast("Starting cyber-extraction...");
+    addToast("Starting extraction...");
 
     try {
       const { owner, repo } = parseRepoUrl(repoUrl);
@@ -109,12 +109,12 @@ const RepoTxtFetcher: React.FC = () => {
       setFiles(fetchedFiles);
       const txt = generateTxt(fetchedFiles);
       setTxtOutput(txt);
-      addToast("Extraction complete. TXT ready!");
+      addToast("Extraction complete!");
     } catch (err: any) {
       setError(`Fetch error: ${err.message}. Check URL or token.`);
       addToast("Error: Extraction failed!");
     } finally {
-      setLoading(false);
+      setExtractLoading(false);
       setProgress(100);
     }
   };
@@ -146,8 +146,7 @@ const RepoTxtFetcher: React.FC = () => {
       return;
     }
 
-    setLoading(true);
-    setBotRequest("");
+    setBotLoading(true);
     addToast("Generating bot request...");
 
     try {
@@ -156,13 +155,13 @@ const RepoTxtFetcher: React.FC = () => {
       const botId = "7481446329554747397"; // Replace with your bot ID
       const userId = "341503612082"; // Replace with your user ID
       const response = await runCoseAgent(botId, userId, fullInput);
-      setBotRequest(response);
-      toast.success("Bot request generated!");
+      setTxtOutput(response); // Display bot response in Full TXT section
+      addToast("Bot request generated!");
     } catch (err) {
       setError("Error generating bot request.");
       addToast("Error: Generation failed!");
     } finally {
-      setLoading(false);
+      setBotLoading(false);
     }
   };
 
@@ -172,7 +171,7 @@ const RepoTxtFetcher: React.FC = () => {
         Cyber TXT Extractor
       </h2>
       <p className="text-gray-300 mb-8 text-lg font-mono">
-        Enter a GitHub URL and optional token to extract TXT from .ts, .tsx, .css, and .sql files. Convert Kwork requests into bot tasks with repo context!
+        Extract text from GitHub repos (.ts, .tsx, .css, .sql) and generate bot requests with context!
       </p>
 
       {/* Repo Input Section */}
@@ -193,14 +192,14 @@ const RepoTxtFetcher: React.FC = () => {
         />
         <button
           onClick={handleFetch}
-          disabled={loading}
+          disabled={extractLoading}
           className={`w-full p-4 rounded-xl font-semibold text-white ${
-            loading
+            extractLoading
               ? "bg-gray-600 cursor-not-allowed"
               : "bg-purple-500 hover:bg-purple-600"
           } transition-all font-mono`}
         >
-          {loading ? "Extracting..." : "Extract TXT"}
+          {extractLoading ? "Extracting..." : "Extract TXT"}
         </button>
       </div>
 
@@ -215,18 +214,18 @@ const RepoTxtFetcher: React.FC = () => {
         />
         <button
           onClick={handleGenerateBotRequest}
-          disabled={loading}
+          disabled={botLoading}
           className={`w-full p-4 rounded-xl font-semibold text-white ${
-            loading
+            botLoading
               ? "bg-gray-600 cursor-not-allowed"
               : "bg-purple-500 hover:bg-purple-600"
           } transition-all font-mono`}
         >
-          {loading ? "Generating..." : "Generate Bot Request"}
+          {botLoading ? "Generating..." : "Generate Bot Request"}
         </button>
       </div>
 
-      {loading && (
+      {(extractLoading || botLoading) && (
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
@@ -243,7 +242,7 @@ const RepoTxtFetcher: React.FC = () => {
           <h3 className="text-2xl font-semibold text-white mb-4">File Tree</h3>
           <button
             onClick={handleSelectAll}
-            className="mb-4 p-2 bg-purple-500 text-white rounded hover:bg-purple-600"
+            className="mb-4 p-2 bg-purple-500 text-white rounded hover:bg-purple-600 font-mono"
           >
             {allSelected ? "Deselect All" : "Select All"}
           </button>
@@ -287,18 +286,7 @@ const RepoTxtFetcher: React.FC = () => {
         </div>
       )}
 
-      {botRequest && (
-        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700">
-          <h3 className="text-2xl font-semibold text-white mb-4">Bot Request</h3>
-          <textarea
-            value={botRequest}
-            readOnly
-            className="w-full h-64 bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none"
-          />
-        </div>
-      )}
-
-      <div className="fixed bottom-4 right-4 space-y-2 z-50">
+      <div className="fixed bottom-20 right-4 space-y-2 z-50">
         {toasts.map((toast) => (
           <motion.div
             key={toast.id}
