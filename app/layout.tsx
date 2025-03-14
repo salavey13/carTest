@@ -19,18 +19,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
       </head>
-      <body className="bg-gray-900 text-white min-h-screen flex flex-col">
+      <body className="bg-gray-900 text-white flex flex-col min-h-screen">
         <AppProvider>
-          {/* Fixed Header */}
-          <header className="fixed top-0 left-0 w-full z-50 bg-gray-900">
+          <header className="w-full bg-gray-900 z-50 fixed top-0">
             <Header />
           </header>
-          {/* Main content area with padding */}
-          <main className="flex-grow pt-16 pb-16 overflow-y-auto">
+          <main className="flex-1 pt-16 pb-16 overflow-y-auto">
             {children}
           </main>
-          {/* Fixed Footer */}
-          <footer className="fixed bottom-0 left-0 w-full z-50 bg-gray-900">
+          <footer className="w-full bg-gray-900 z-50 fixed bottom-0">
             <Footer />
           </footer>
           <Toaster
