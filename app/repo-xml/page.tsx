@@ -35,7 +35,6 @@ const RepoTxtFetcher: React.FC = () => {
     "components/Footer.tsx",
     "lib/utils.ts",
     "hooks/useTelegram.ts",
-    "types/database.types.ts",
     "types/supabase.ts",
   ];
 
@@ -136,7 +135,7 @@ const RepoTxtFetcher: React.FC = () => {
       const newSelected = new Set(prev);
       if (newSelected.has(path)) newSelected.delete(path);
       else newSelected.add(path);
-      setSelectedOutput(generateSelectedTxt(files)); // Immediate update
+      setSelectedOutput(generateSelectedTxt(files));
       return newSelected;
     });
   };
@@ -185,18 +184,11 @@ const RepoTxtFetcher: React.FC = () => {
   const handleAddBriefTree = () => {
     const briefTree = `
       Краткое дерево ключевых файлов:
-      - app/actions.ts: Серверные действия, включая runCoseAgent для вызовов бота.
-      - app/layout.tsx: Основной макет приложения с хедером, футером и главным контентом.
-      - app/repo-xml/page.tsx: Этот инструмент для извлечения текста из GitHub.
-      - app/api/auth/jwt/route.ts: Логика аутентификации через JWT.
-      - app/api/telegramWebhook/route.ts: Интеграция с Telegram через вебхуки.
-      - components/Header.tsx: Компонент хедера приложения.
-      - components/Footer.tsx: Компонент футера приложения.
-      - lib/utils.ts: Утилиты общего назначения.
-      - hooks/useTelegram.ts: Хук для работы с Telegram API.
-      - types/database.types.ts: Типы для базы данных.
-      - types/supabase.ts: Типы для Supabase интеграции.
-      - supabase/: База данных с таблицами, хранилищем, edge-функциями (generate-embeddings) и скриптом инициализации (init.sql).
+      - hooks/useTelegram.ts: Хук для получения пользователя из Telegram API.
+      - types/supabase.ts: Типы для Supabase, используйте хук Supabase для работы с таблицами и JSONB метаданными в таблице \`users\`.
+      - app/layout.tsx: Основной макет с хедером (учитывайте pt-24 для отступа) и футером, полезно для новых компонентов.
+      - app/actions.ts: Серверные действия для серверной логики (например, runCoseAgent).
+      - app/repo-xml/page.tsx: Этот инструмент для извлечения текста.
       Остальное может быть сгенерировано на лету.
     `;
     setKworkInput((prev) => `${prev}\n\n${briefTree}`);
@@ -210,10 +202,23 @@ const RepoTxtFetcher: React.FC = () => {
       if (!grouped[folder]) grouped[folder] = [];
       grouped[folder].push(file);
     });
-    return grouped;
+    return Object.entries(grouped).reduce((acc, [folder, folderFiles]) => {
+      acc.push({ folder, files: folderFiles.slice(0, Math.ceil(folderFiles.length / 3)) });
+      acc.push({ folder, files: folderFiles.slice(Math.ceil(folderFiles.length / 3), Math.ceil((2 * folderFiles.length) / 3)) });
+      acc.push({ folder, files: folderFiles.slice(Math.ceil((2 * folderFiles.length) / 3)) });
+      return acc;
+    }, [] as { folder: string; files: FileNode[] }[]);
   };
 
   const groupedFiles = groupFilesByFolder(files);
+
+  const getDisplayName = (path: string) => {
+    const parts = path.split("/");
+    if (parts[0] === "app" && (path.endsWith("page.tsx") || path.endsWith("route.ts"))) {
+      return parts.slice(1).join("/");
+    }
+    return parts.pop()!;
+  };
 
   return (
     <div className="w-full p-6 bg-gray-800 pt-24 rounded-2xl shadow-[0_0_30px_rgba(255,107,107,0.5)] border border-gray-700 repo-xml-content-wrapper">
@@ -260,7 +265,7 @@ const RepoTxtFetcher: React.FC = () => {
           value={kworkInput}
           onChange={(e) => setKworkInput(e.target.value)}
           placeholder="Введите запрос с Kwork (например, 'Нужен бот для квизов со статистикой')"
-          className="w-full h-32 p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono resize-none"
+          className="w-full h-64 p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono resize-none"
         />
         <div className="flex gap-4 mt-4 flex-wrap">
           <motion.button
@@ -316,9 +321,9 @@ const RepoTxtFetcher: React.FC = () => {
       {files.length > 0 && (
         <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)]">
           <h3 className="text-2xl font-semibold text-white mb-4">Консоль файлов</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {Object.entries(groupedFiles).map(([folder, folderFiles]) => (
-              <div key={folder} className="bg-gray-800 p-4 rounded-lg border border-gray-600">
+          <div className="grid grid-cols-3 gap-4">
+            {groupedFiles.map(({ folder, files: folderFiles }, index) => (
+              <div key={`${folder}-${index}`} className="bg-gray-800 p-4 rounded-lg border border-gray-600">
                 <h4 className="text-lg font-bold text-purple-400 mb-2">{folder}</h4>
                 <ul className="space-y-2">
                   {folderFiles.map((file) => (
@@ -336,7 +341,7 @@ const RepoTxtFetcher: React.FC = () => {
                             : "text-gray-400 hover:text-white"
                         }`}
                       >
-                        {file.path.split("/").pop()}
+                        {getDisplayName(file.path)}
                       </span>
                     </li>
                   ))}
@@ -353,7 +358,7 @@ const RepoTxtFetcher: React.FC = () => {
           <textarea
             value={txtOutput}
             readOnly
-            className="w-full h-[768px] bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none"
+            className="w-full h-96 bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none"
           />
         </div>
       )}
