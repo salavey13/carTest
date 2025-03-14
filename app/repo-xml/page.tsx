@@ -168,7 +168,7 @@ const RepoTxtFetcher: React.FC = () => {
   };
 
   return (
-    <div className="w-full p-6 bg-gray-800 rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-gray-700 repo-xml-content-wrapper">
+    <div className="w-full p-6 bg-gray-800 pt-24 rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-gray-700 repo-xml-content-wrapper">
       <h2 className="text-4xl font-bold text-white mb-6 tracking-wider">
         Кибер-Экстрактор TXT
       </h2>
