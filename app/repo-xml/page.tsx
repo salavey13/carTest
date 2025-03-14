@@ -152,7 +152,7 @@ const RepoTxtFetcher: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-8 bg-card rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-muted animate-[drift_20s_infinite]">
+    <div className="w-full p-8 bg-card rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-muted animate-[drift_20s_infinite]">
       <h2 className="text-5xl font-bold cyber-text mb-6 tracking-wider glitch" data-text="Кибер-Экстрактор TXT">
         Кибер-Экстрактор TXT
       </h2>
@@ -306,18 +306,20 @@ const RepoTxtFetcher: React.FC = () => {
 
 export default function RepoTxtPage() {
   return (
-    <div className="min-h-screen pt-24 bg-background bg-grid-pattern animate-[drift_30s_infinite]">
-      <header className="fixed top-0 left-0 right-0 bg-card shadow-md p-6 z-10 border-b border-muted">
-        <h1
-          className="text-4xl font-bold text-gradient cyber-text glitch"
-          data-text="Генератор Кибер-TXT"
-        >
-          Генератор Кибер-TXT
-        </h1>
-      </header>
-      <main className="container mx-auto pt-10">
-        <RepoTxtFetcher />
-      </main>
+    <div className="min-h-screen bg-background bg-grid-pattern animate-[drift_30s_infinite]">
+      <div className="page-wrapper">
+        <header className="fixed top-0 left-0 right-0 bg-card shadow-md p-6 z-10 border-b border-muted">
+          <h1
+            className="text-4xl font-bold text-gradient cyber-text glitch"
+            data-text="Генератор Кибер-TXT"
+          >
+            Генератор Кибер-TXT
+          </h1>
+        </header>
+        <main className="pt-24 w-full">
+          <RepoTxtFetcher />
+        </main>
+      </div>
     </div>
   );
 }
