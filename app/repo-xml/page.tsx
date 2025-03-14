@@ -120,12 +120,14 @@ const RepoTxtFetcher: React.FC = () => {
   };
 
   const toggleFileSelection = (path: string) => {
-    const newSelected = new Set(selectedFiles);
-    if (newSelected.has(path)) newSelected.delete(path);
-    else newSelected.add(path);
-    setSelectedFiles(newSelected);
-    setSelectedOutput(generateSelectedTxt(files));
-    setAllSelected(newSelected.size === files.length);
+    setSelectedFiles((prev) => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(path)) newSelected.delete(path);
+      else newSelected.add(path);
+      setSelectedOutput(generateSelectedTxt(files)); // Update immediately
+      setAllSelected(newSelected.size === files.length);
+      return newSelected;
+    });
   };
 
   const handleSelectAll = () => {
@@ -154,8 +156,8 @@ const RepoTxtFetcher: React.FC = () => {
     try {
       const context = selectedOutput || txtOutput || "Контекст репозитория не предоставлен.";
       const fullInput = `Запрос с Kwork: "${kworkInput}"\nКонтекст репозитория:\n${context}`;
-      const botId = "7481446329554747397"; // Замените на ваш ID бота
-      const userId = "341503612082"; // Замените на ваш ID пользователя
+      const botId = "7481446329554747397";
+      const userId = "341503612082";
       const response = await runCoseAgent(botId, userId, fullInput);
       setTxtOutput(response);
       addToast("Запрос для бота сгенерирован!");
@@ -167,9 +169,27 @@ const RepoTxtFetcher: React.FC = () => {
     }
   };
 
+  const handleAddFullTree = () => {
+    const fullTree = generateTxt(files);
+    setKworkInput((prev) => `${prev}\n\nПолное дерево файлов:\n${fullTree}`);
+    addToast("Полное дерево добавлено в запрос!");
+  };
+
+  const handleAddBriefTree = () => {
+    const briefTree = `
+      Краткое дерево файлов:
+      - hooks/*: Пользовательские хуки для логики приложения
+      - app/actions.ts: Серверные действия (например, runCoseAgent)
+      - supabase/: База данных с таблицами, хранилищем, edge-функциями и скриптом инициализации
+      Остальное может быть сгенерировано на лету.
+    `;
+    setKworkInput((prev) => `${prev}\n\n${briefTree}`);
+    addToast("Краткое дерево добавлено в запрос!");
+  };
+
   return (
-    <div className="w-full p-6 bg-gray-800 pt-24 rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-gray-700 repo-xml-content-wrapper">
-      <h2 className="text-4xl font-bold text-white mb-6 tracking-wider">
+    <div className="w-full p-6 bg-gray-800 pt-24 rounded-2xl shadow-[0_0_30px_rgba(255,107,107,0.5)] border border-gray-700 repo-xml-content-wrapper">
+      <h2 className="text-4xl font-bold text-white mb-6 tracking-wider animate-pulse text-shadow-neon">
         Кибер-Экстрактор TXT
       </h2>
       <p className="text-gray-300 mb-8 text-lg font-mono">
@@ -192,21 +212,21 @@ const RepoTxtFetcher: React.FC = () => {
           placeholder="Токен GitHub (опционально)"
           className="p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
         />
-        <button
+        <motion.button
           onClick={handleFetch}
           disabled={extractLoading}
-          className={`w-full p-4 rounded-xl font-semibold text-white ${
-            extractLoading
-              ? "bg-gray-600 cursor-not-allowed"
-              : "bg-purple-500 hover:bg-purple-600"
-          } transition-all font-mono`}
+          className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 transition-all font-mono shadow-lg ${
+            extractLoading ? "opacity-50 cursor-not-allowed" : "hover:scale-105"
+          }`}
+          whileHover={{ scale: extractLoading ? 1 : 1.05 }}
+          whileTap={{ scale: extractLoading ? 1 : 0.95 }}
         >
           {extractLoading ? "Извлечение..." : "Извлечь TXT"}
-        </button>
+        </motion.button>
       </div>
 
       {/* Kwork Input Section */}
-      <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700">
+      <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)]">
         <h3 className="text-2xl font-semibold text-white mb-4">Kwork в Бота</h3>
         <textarea
           value={kworkInput}
@@ -214,24 +234,42 @@ const RepoTxtFetcher: React.FC = () => {
           placeholder="Введите запрос с Kwork (например, 'Нужен бот для квизов со статистикой')"
           className="w-full h-32 p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono resize-none"
         />
-        <button
-          onClick={handleGenerateBotRequest}
-          disabled={botLoading}
-          className={`w-full p-4 rounded-xl font-semibold text-white ${
-            botLoading
-              ? "bg-gray-600 cursor-not-allowed"
-              : "bg-purple-500 hover:bg-purple-600"
-          } transition-all font-mono`}
-        >
-          {botLoading ? "Генерация..." : "Сгенерировать запрос для бота"}
-        </button>
+        <div className="flex gap-4 mt-4">
+          <motion.button
+            onClick={handleGenerateBotRequest}
+            disabled={botLoading}
+            className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 transition-all font-mono shadow-lg ${
+              botLoading ? "opacity-50 cursor-not-allowed" : "hover:scale-105"
+            }`}
+            whileHover={{ scale: botLoading ? 1 : 1.05 }}
+            whileTap={{ scale: botLoading ? 1 : 0.95 }}
+          >
+            {botLoading ? "Генерация..." : "Сгенерировать запрос для бота"}
+          </motion.button>
+          <motion.button
+            onClick={handleAddFullTree}
+            className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 transition-all font-mono shadow-lg hover:scale-105"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Добавить дерево файлов с описанием
+          </motion.button>
+          <motion.button
+            onClick={handleAddBriefTree}
+            className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-green-500 to-lime-500 hover:from-green-600 hover:to-lime-600 transition-all font-mono shadow-lg hover:scale-105"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Добавить краткое дерево
+          </motion.button>
+        </div>
       </div>
 
       {(extractLoading || botLoading) && (
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
-          className="h-2 bg-purple-500 rounded-full mb-8"
+          className="h-2 bg-purple-500 rounded-full mb-8 shadow-[0_0_10px_rgba(147,51,234,0.7)]"
         />
       )}
 
@@ -240,11 +278,11 @@ const RepoTxtFetcher: React.FC = () => {
       )}
 
       {files.length > 0 && (
-        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700">
+        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)]">
           <h3 className="text-2xl font-semibold text-white mb-4">Дерево файлов</h3>
           <button
             onClick={handleSelectAll}
-            className="mb-4 p-2 bg-purple-500 text-white rounded hover:bg-purple-600 font-mono"
+            className="mb-4 p-2 bg-purple-500 text-white rounded hover:bg-purple-600 font-mono transition-all"
           >
             {allSelected ? "Снять все" : "Выбрать все"}
           </button>
@@ -267,7 +305,7 @@ const RepoTxtFetcher: React.FC = () => {
       )}
 
       {txtOutput && (
-        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700">
+        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)]">
           <h3 className="text-2xl font-semibold text-white mb-4">Полный TXT</h3>
           <textarea
             value={txtOutput}
@@ -278,12 +316,12 @@ const RepoTxtFetcher: React.FC = () => {
       )}
 
       {selectedOutput && (
-        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700">
+        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)]">
           <h3 className="text-2xl font-semibold text-white mb-4">Выбранный TXT</h3>
           <textarea
             value={selectedOutput}
             readOnly
-            className="w-full h-64 bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none"
+            className="w-full h-96 bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-y min-h-[384px] max-h-[768px]"
           />
         </div>
       )}
@@ -295,7 +333,7 @@ const RepoTxtFetcher: React.FC = () => {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
-            className="bg-purple-500 text-white p-3 rounded-lg shadow-lg font-mono"
+            className="bg-purple-500 text-white p-3 rounded-lg shadow-lg font-mono border border-purple-700"
           >
             {toast.message}
           </motion.div>
@@ -308,7 +346,6 @@ const RepoTxtFetcher: React.FC = () => {
 export default function RepoXmlPage() {
   return (
     <>
-      {/* Desktop viewport for this page only */}
       <meta name="viewport" content="width=1024, initial-scale=0.7, maximum-scale=5.0, user-scalable=yes" />
       <div className="min-h-screen bg-gray-900">
         <main className="py-6">
