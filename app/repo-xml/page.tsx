@@ -18,6 +18,7 @@ const RepoTxtFetcher: React.FC = () => {
   const [selectedOutput, setSelectedOutput] = useState<string>("");
   const [files, setFiles] = useState<FileNode[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [allSelected, setAllSelected] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +34,7 @@ const RepoTxtFetcher: React.FC = () => {
 
   const parseRepoUrl = (url: string) => {
     const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
-    if (!match) throw new Error("Неверный URL GitHub");
+    if (!match) throw new Error("Invalid GitHub URL");
     return { owner: match[1], repo: match[2] };
   };
 
@@ -60,13 +61,13 @@ const RepoTxtFetcher: React.FC = () => {
           allowedExtensions.some((ext) => item.path.endsWith(ext)) &&
           !item.path.startsWith("components/ui/")
         ) {
-          addToast(`Сканирую ${item.path}...`);
+          addToast(`Scanning ${item.path}...`);
           try {
             const contentResponse = await axios.get(item.download_url);
             files.push({ path: item.path, content: contentResponse.data });
           } catch (contentErr) {
-            console.error(`Ошибка загрузки ${item.path}:`, contentErr);
-            addToast(`Ошибка: ${item.path} не загружен`);
+            console.error(`Error fetching ${item.path}:`, contentErr);
+            addToast(`Error: ${item.path} failed to load`);
           }
         } else if (item.type === "dir") {
           const subFiles = await fetchRepoContents(owner, repo, item.path);
@@ -75,7 +76,7 @@ const RepoTxtFetcher: React.FC = () => {
       }
       return files;
     } catch (err) {
-      console.error("Ошибка API:", err);
+      console.error("API Error:", err);
       throw err;
     }
   };
@@ -98,8 +99,9 @@ const RepoTxtFetcher: React.FC = () => {
     setSelectedOutput("");
     setFiles([]);
     setSelectedFiles(new Set());
+    setAllSelected(false);
     setProgress(0);
-    addToast("Запускаю кибер-извлечение...");
+    addToast("Starting cyber-extraction...");
 
     try {
       const { owner, repo } = parseRepoUrl(repoUrl);
@@ -107,10 +109,10 @@ const RepoTxtFetcher: React.FC = () => {
       setFiles(fetchedFiles);
       const txt = generateTxt(fetchedFiles);
       setTxtOutput(txt);
-      addToast("Извлечение завершено. TXT в кармане!");
+      addToast("Extraction complete. TXT ready!");
     } catch (err: any) {
-      setError(`Ошибка загрузки: ${err.message}. Проверь URL или токен.`);
-      addToast("Ошибка: Извлечение заглохло!");
+      setError(`Fetch error: ${err.message}. Check URL or token.`);
+      addToast("Error: Extraction failed!");
     } finally {
       setLoading(false);
       setProgress(100);
@@ -123,93 +125,104 @@ const RepoTxtFetcher: React.FC = () => {
     else newSelected.add(path);
     setSelectedFiles(newSelected);
     setSelectedOutput(generateSelectedTxt(files));
+    setAllSelected(newSelected.size === files.length);
+  };
+
+  const handleSelectAll = () => {
+    if (allSelected) {
+      setSelectedFiles(new Set());
+      setSelectedOutput("");
+    } else {
+      const allPaths = files.map((file) => file.path);
+      setSelectedFiles(new Set(allPaths));
+      setSelectedOutput(generateTxt(files));
+    }
+    setAllSelected(!allSelected);
   };
 
   const handleGenerateBotRequest = async () => {
     if (!kworkInput.trim()) {
-      toast.error("Введи запрос с Kwork!");
+      toast.error("Enter a Kwork request!");
       return;
     }
 
     setLoading(true);
     setBotRequest("");
-    addToast("Генерирую запрос для бота...");
+    addToast("Generating bot request...");
 
     try {
       const context = selectedOutput || txtOutput || "No repo context provided.";
       const fullInput = `Kwork request: "${kworkInput}"\nRepo context:\n${context}`;
-      const botId = "7481446329554747397"; // Replace with your KworkBotConverter bot ID
-      const userId = "341503612082"; // Replace with your Coze user ID
+      const botId = "7481446329554747397"; // Replace with your bot ID
+      const userId = "341503612082"; // Replace with your user ID
       const response = await runCoseAgent(botId, userId, fullInput);
       setBotRequest(response);
-      toast.success("Запрос для бота готов!");
+      toast.success("Bot request generated!");
     } catch (err) {
-      setError("Ошибка генерации запроса для бота.");
-      addToast("Ошибка: Генерация заглохла!");
+      setError("Error generating bot request.");
+      addToast("Error: Generation failed!");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="w-full p-8 bg-card rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-muted animate-[drift_20s_infinite]">
-      <h2 className="text-5xl font-bold text-white mb-6 tracking-wider glitch" data-text="Кибер-Экстрактор TXT">
-        Кибер-Экстрактор TXT
+    <div className="w-full max-w-4xl mx-auto p-6 bg-gray-800 rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-gray-700">
+      <h2 className="text-4xl font-bold text-white mb-6 tracking-wider">
+        Cyber TXT Extractor
       </h2>
-      <p className="text-gray-300 mb-8 text-xl font-mono leading-relaxed">
-        Кидай URL GitHub, токен (для приватных реп), жми кнопку—получай TXT из .ts, .tsx, .css, .sql. Плюс: превращай запросы с Kwork в техзадания для ботов с учётом моего арсенала (CAPTCHA, Bullshit Detector, Wheel of Fortune). Выбирай файлы для контекста!
+      <p className="text-gray-300 mb-8 text-lg font-mono">
+        Enter a GitHub URL and optional token to extract TXT from .ts, .tsx, .css, and .sql files. Convert Kwork requests into bot tasks with repo context!
       </p>
 
       {/* Repo Input Section */}
-      <div className="flex flex-col gap-6 mb-8">
+      <div className="flex flex-col gap-4 mb-8">
         <input
           type="text"
           value={repoUrl}
           onChange={(e) => setRepoUrl(e.target.value)}
-          placeholder="Вставь URL GitHub (например, https://github.com/user/repo)"
-          className="flex-grow p-4 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-4 focus:ring-purple-500/50 font-mono text-lg shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
+          placeholder="GitHub URL (e.g., https://github.com/user/repo)"
+          className="p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
         />
         <input
           type="password"
           value={token}
           onChange={(e) => setToken(e.target.value)}
-          placeholder="Токен GitHub (для приватных реп или лимитов)"
-          className="flex-grow p-4 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-4 focus:ring-purple-500/50 font-mono text-lg shadow-[inset_0_0_10px_rgba(255,107,107,0.2)]"
+          placeholder="GitHub Token (optional)"
+          className="p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono"
         />
         <button
           onClick={handleFetch}
           disabled={loading}
-          className={`px-8 py-4 rounded-xl font-semibold text-white ${
+          className={`w-full p-4 rounded-xl font-semibold text-white ${
             loading
-              ? "bg-gray-600 cursor-not-allowed animate-pulse"
-              : "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 hover:shadow-[0_0_15px_rgba(255,107,107,0.7)]"
-          } transition-all font-mono text-lg`}
+              ? "bg-gray-600 cursor-not-allowed"
+              : "bg-purple-500 hover:bg-purple-600"
+          } transition-all font-mono`}
         >
-          {loading ? "Взламываю..." : "Извлечь TXT"}
+          {loading ? "Extracting..." : "Extract TXT"}
         </button>
       </div>
 
       {/* Kwork Input Section */}
-      <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-inner border border-gray-700">
-        <h3 className="text-3xl font-semibold text-white mb-4 glitch" data-text="Kwork в Бота">
-          Kwork в Бота
-        </h3>
+      <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700">
+        <h3 className="text-2xl font-semibold text-white mb-4">Kwork to Bot</h3>
         <textarea
           value={kworkInput}
           onChange={(e) => setKworkInput(e.target.value)}
-          placeholder="Вставь запрос с Kwork (например, 'Нужен бот для квизов с статистикой')"
-          className="w-full h-32 p-4 bg-gray-800 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-4 focus:ring-purple-500/50 font-mono text-lg shadow-[inset_0_0_10px_rgba(255,107,107,0.2)] resize-none scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-gray-700"
+          placeholder="Enter Kwork request (e.g., 'Need a quiz bot with stats')"
+          className="w-full h-32 p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono resize-none"
         />
         <button
           onClick={handleGenerateBotRequest}
           disabled={loading}
-          className={`mt-4 px-8 py-4 rounded-xl font-semibold text-white ${
+          className={`w-full p-4 rounded-xl font-semibold text-white ${
             loading
-              ? "bg-gray-600 cursor-not-allowed animate-pulse"
-              : "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 hover:shadow-[0_0_15px_rgba(255,107,107,0.7)]"
-          } transition-all font-mono text-lg`}
+              ? "bg-gray-600 cursor-not-allowed"
+              : "bg-purple-500 hover:bg-purple-600"
+          } transition-all font-mono`}
         >
-          {loading ? "Генерирую..." : "Сгенерировать запрос"}
+          {loading ? "Generating..." : "Generate Bot Request"}
         </button>
       </div>
 
@@ -217,29 +230,33 @@ const RepoTxtFetcher: React.FC = () => {
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
-          className="h-3 bg-purple-500 rounded-full mb-8 shadow-[0_0_15px_rgba(255,107,107,0.8)]"
+          className="h-2 bg-purple-500 rounded-full mb-8"
         />
       )}
 
       {error && (
-        <p className="text-red-400 mb-8 font-mono text-lg animate-[neon_2s_infinite]">{error}</p>
+        <p className="text-red-400 mb-8 font-mono">{error}</p>
       )}
 
       {files.length > 0 && (
-        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-inner border border-gray-700">
-          <h3 className="text-3xl font-semibold text-white mb-4 glitch" data-text="Дерево файлов">
-            Дерево файлов
-          </h3>
-          <ul className="space-y-3">
+        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700">
+          <h3 className="text-2xl font-semibold text-white mb-4">File Tree</h3>
+          <button
+            onClick={handleSelectAll}
+            className="mb-4 p-2 bg-purple-500 text-white rounded hover:bg-purple-600"
+          >
+            {allSelected ? "Deselect All" : "Select All"}
+          </button>
+          <ul className="space-y-2">
             {files.map((file) => (
-              <li key={file.path} className="flex items-center gap-3 group">
+              <li key={file.path} className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   checked={selectedFiles.has(file.path)}
                   onChange={() => toggleFileSelection(file.path)}
-                  className="w-5 h-5 accent-purple-500 rounded focus:ring-2 focus:ring-purple-500/50"
+                  className="w-4 h-4 accent-purple-500"
                 />
-                <span className="text-gray-400 font-mono text-base group-hover:text-white transition-colors duration-300">
+                <span className="text-gray-400 font-mono hover:text-white">
                   {file.path}
                 </span>
               </li>
@@ -249,52 +266,46 @@ const RepoTxtFetcher: React.FC = () => {
       )}
 
       {txtOutput && (
-        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-inner border border-gray-700">
-          <h3 className="text-3xl font-semibold text-white mb-4 glitch" data-text="Полный TXT">
-            Полный TXT
-          </h3>
+        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700">
+          <h3 className="text-2xl font-semibold text-white mb-4">Full TXT</h3>
           <textarea
             value={txtOutput}
             readOnly
-            className="w-full h-72 bg-gray-900 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-gray-700"
+            className="w-full h-64 bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none"
           />
         </div>
       )}
 
       {selectedOutput && (
-        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-inner border border-gray-700">
-          <h3 className="text-3xl font-semibold text-white mb-4 glitch" data-text="Выбранные файлы (TXT)">
-            Выбранные файлы (TXT)
-          </h3>
+        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700">
+          <h3 className="text-2xl font-semibold text-white mb-4">Selected TXT</h3>
           <textarea
             value={selectedOutput}
             readOnly
-            className="w-full h-72 bg-gray-900 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-gray-700"
+            className="w-full h-64 bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none"
           />
         </div>
       )}
 
       {botRequest && (
-        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-inner border border-gray-700">
-          <h3 className="text-3xl font-semibold text-white mb-4 glitch" data-text="Запрос для Бота">
-            Запрос для Бота
-          </h3>
+        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700">
+          <h3 className="text-2xl font-semibold text-white mb-4">Bot Request</h3>
           <textarea
             value={botRequest}
             readOnly
-            className="w-full h-72 bg-gray-900 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-gray-700"
+            className="w-full h-64 bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none"
           />
         </div>
       )}
 
-      <div className="fixed bottom-6 right-6 space-y-3 z-50">
+      <div className="fixed bottom-4 right-4 space-y-2 z-50">
         {toasts.map((toast) => (
           <motion.div
             key={toast.id}
-            initial={{ opacity: 0, x: 50 }}
+            initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 50 }}
-            className="bg-purple-500 text-white p-4 rounded-lg shadow-[0_0_15px_rgba(255,107,107,0.7)] font-mono text-base border border-purple-500/50"
+            exit={{ opacity: 0, x: 20 }}
+            className="bg-purple-500 text-white p-3 rounded-lg shadow-lg font-mono"
           >
             {toast.message}
           </motion.div>
@@ -306,16 +317,10 @@ const RepoTxtFetcher: React.FC = () => {
 
 export default function RepoXmlPage() {
   return (
-    <>
-      {/* Apply repo-xml-specific viewport */}
-      <meta name="viewport" content="width=1024, initial-scale=0.7, maximum-scale=5.0, user-scalable=yes" />
-      <div className="min-h-screen bg-gray-900 bg-grid-pattern animate-[drift_30s_infinite]">
-        <div className="repo-xml-content-wrapper">
-          <main className="w-full">
-            <RepoTxtFetcher />
-          </main>
-        </div>
-      </div>
-    </>
+    <div className="min-h-screen bg-gray-900">
+      <main className="pt-16 pb-16">
+        <RepoTxtFetcher />
+      </main>
+    </div>
   );
 }
