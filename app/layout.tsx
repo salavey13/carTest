@@ -21,13 +21,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-gray-900 text-white flex flex-col min-h-screen">
         <AppProvider>
-          <header className="w-full bg-gray-900 z-50 fixed top-0">
+          <header className="w-full bg-gray-900 z-50">
             <Header />
           </header>
-          <main className="flex-1 pt-24 pb-16 overflow-y-auto">
+          <main className="flex-1">
             {children}
           </main>
-          <footer className="w-full bg-gray-900 z-50">
+          <footer className="w-full bg-gray-900">
             <Footer />
           </footer>
           <Toaster
