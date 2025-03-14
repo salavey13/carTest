@@ -18,13 +18,26 @@ const RepoTxtFetcher: React.FC = () => {
   const [selectedOutput, setSelectedOutput] = useState<string>("");
   const [files, setFiles] = useState<FileNode[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
-  const [allSelected, setAllSelected] = useState<boolean>(false);
   const [extractLoading, setExtractLoading] = useState<boolean>(false);
   const [botLoading, setBotLoading] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<{ id: number; message: string }[]>([]);
   const [kworkInput, setKworkInput] = useState<string>("");
+
+  const importantFiles = [
+    "app/actions.ts",
+    "app/layout.tsx",
+    "app/repo-xml/page.tsx",
+    "app/api/auth/jwt/route.ts",
+    "app/api/telegramWebhook/route.ts",
+    "components/Header.tsx",
+    "components/Footer.tsx",
+    "lib/utils.ts",
+    "hooks/useTelegram.ts",
+    "types/database.types.ts",
+    "types/supabase.ts",
+  ];
 
   const addToast = (message: string) => {
     const id = Date.now();
@@ -99,7 +112,6 @@ const RepoTxtFetcher: React.FC = () => {
     setSelectedOutput("");
     setFiles([]);
     setSelectedFiles(new Set());
-    setAllSelected(false);
     setProgress(0);
     addToast("Запускаю извлечение...");
 
@@ -124,24 +136,19 @@ const RepoTxtFetcher: React.FC = () => {
       const newSelected = new Set(prev);
       if (newSelected.has(path)) newSelected.delete(path);
       else newSelected.add(path);
-      setSelectedOutput(generateSelectedTxt(files)); // Update immediately
-      setAllSelected(newSelected.size === files.length);
+      setSelectedOutput(generateSelectedTxt(files)); // Immediate update
       return newSelected;
     });
   };
 
-  const handleSelectAll = () => {
-    if (allSelected) {
-      setSelectedFiles(new Set());
-      setSelectedOutput("");
-      addToast("Все файлы сняты с выбора");
-    } else {
-      const allPaths = files.map((file) => file.path);
-      setSelectedFiles(new Set(allPaths));
-      setSelectedOutput(generateTxt(files));
-      addToast("Все файлы выбраны");
+  const handleAddSelected = () => {
+    if (selectedFiles.size === 0) {
+      addToast("Выберите хотя бы один файл!");
+      return;
     }
-    setAllSelected(!allSelected);
+    const selectedTxt = generateSelectedTxt(files);
+    setKworkInput((prev) => `${prev}\n\nВыбранные файлы:\n${selectedTxt}`);
+    addToast("Выбранные файлы добавлены в запрос!");
   };
 
   const handleGenerateBotRequest = async () => {
@@ -177,15 +184,36 @@ const RepoTxtFetcher: React.FC = () => {
 
   const handleAddBriefTree = () => {
     const briefTree = `
-      Краткое дерево файлов:
-      - hooks/*: Пользовательские хуки для логики приложения
-      - app/actions.ts: Серверные действия (например, runCoseAgent)
-      - supabase/: База данных с таблицами, хранилищем, edge-функциями и скриптом инициализации
+      Краткое дерево ключевых файлов:
+      - app/actions.ts: Серверные действия, включая runCoseAgent для вызовов бота.
+      - app/layout.tsx: Основной макет приложения с хедером, футером и главным контентом.
+      - app/repo-xml/page.tsx: Этот инструмент для извлечения текста из GitHub.
+      - app/api/auth/jwt/route.ts: Логика аутентификации через JWT.
+      - app/api/telegramWebhook/route.ts: Интеграция с Telegram через вебхуки.
+      - components/Header.tsx: Компонент хедера приложения.
+      - components/Footer.tsx: Компонент футера приложения.
+      - lib/utils.ts: Утилиты общего назначения.
+      - hooks/useTelegram.ts: Хук для работы с Telegram API.
+      - types/database.types.ts: Типы для базы данных.
+      - types/supabase.ts: Типы для Supabase интеграции.
+      - supabase/: База данных с таблицами, хранилищем, edge-функциями (generate-embeddings) и скриптом инициализации (init.sql).
       Остальное может быть сгенерировано на лету.
     `;
     setKworkInput((prev) => `${prev}\n\n${briefTree}`);
     addToast("Краткое дерево добавлено в запрос!");
   };
+
+  const groupFilesByFolder = (files: FileNode[]) => {
+    const grouped: { [key: string]: FileNode[] } = {};
+    files.forEach((file) => {
+      const folder = file.path.split("/")[0] || "root";
+      if (!grouped[folder]) grouped[folder] = [];
+      grouped[folder].push(file);
+    });
+    return grouped;
+  };
+
+  const groupedFiles = groupFilesByFolder(files);
 
   return (
     <div className="w-full p-6 bg-gray-800 pt-24 rounded-2xl shadow-[0_0_30px_rgba(255,107,107,0.5)] border border-gray-700 repo-xml-content-wrapper">
@@ -234,7 +262,7 @@ const RepoTxtFetcher: React.FC = () => {
           placeholder="Введите запрос с Kwork (например, 'Нужен бот для квизов со статистикой')"
           className="w-full h-32 p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono resize-none"
         />
-        <div className="flex gap-4 mt-4">
+        <div className="flex gap-4 mt-4 flex-wrap">
           <motion.button
             onClick={handleGenerateBotRequest}
             disabled={botLoading}
@@ -252,7 +280,7 @@ const RepoTxtFetcher: React.FC = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            Добавить дерево файлов с описанием
+            Добавить дерево файлов
           </motion.button>
           <motion.button
             onClick={handleAddBriefTree}
@@ -260,7 +288,15 @@ const RepoTxtFetcher: React.FC = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            Добавить краткое дерево
+            Добавить ключевые файлы
+          </motion.button>
+          <motion.button
+            onClick={handleAddSelected}
+            className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 transition-all font-mono shadow-lg hover:scale-105"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Добавить выбранные
           </motion.button>
         </div>
       </div>
@@ -279,28 +315,35 @@ const RepoTxtFetcher: React.FC = () => {
 
       {files.length > 0 && (
         <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)]">
-          <h3 className="text-2xl font-semibold text-white mb-4">Дерево файлов</h3>
-          <button
-            onClick={handleSelectAll}
-            className="mb-4 p-2 bg-purple-500 text-white rounded hover:bg-purple-600 font-mono transition-all"
-          >
-            {allSelected ? "Снять все" : "Выбрать все"}
-          </button>
-          <ul className="space-y-2">
-            {files.map((file) => (
-              <li key={file.path} className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={selectedFiles.has(file.path)}
-                  onChange={() => toggleFileSelection(file.path)}
-                  className="w-4 h-4 accent-purple-500"
-                />
-                <span className="text-gray-400 font-mono hover:text-white">
-                  {file.path}
-                </span>
-              </li>
+          <h3 className="text-2xl font-semibold text-white mb-4">Консоль файлов</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {Object.entries(groupedFiles).map(([folder, folderFiles]) => (
+              <div key={folder} className="bg-gray-800 p-4 rounded-lg border border-gray-600">
+                <h4 className="text-lg font-bold text-purple-400 mb-2">{folder}</h4>
+                <ul className="space-y-2">
+                  {folderFiles.map((file) => (
+                    <li key={file.path} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedFiles.has(file.path)}
+                        onChange={() => toggleFileSelection(file.path)}
+                        className="w-4 h-4 accent-purple-500"
+                      />
+                      <span
+                        className={`font-mono text-sm ${
+                          importantFiles.includes(file.path)
+                            ? "text-cyan-400 font-bold animate-pulse"
+                            : "text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        {file.path.split("/").pop()}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       )}
 
@@ -310,7 +353,7 @@ const RepoTxtFetcher: React.FC = () => {
           <textarea
             value={txtOutput}
             readOnly
-            className="w-full h-64 bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none"
+            className="w-full h-[768px] bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none"
           />
         </div>
       )}
@@ -321,7 +364,7 @@ const RepoTxtFetcher: React.FC = () => {
           <textarea
             value={selectedOutput}
             readOnly
-            className="w-full h-96 bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-y min-h-[384px] max-h-[768px]"
+            className="w-full h-[768px] bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-y min-h-[768px] max-h-[1536px]"
           />
         </div>
       )}
