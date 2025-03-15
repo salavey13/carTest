@@ -65,7 +65,9 @@
     "@huggingface/transformers": "latest",
     "jsonwebtoken": "latest",
     "@supabase/supabase-js": "latest",
-    "worker-loader": "^3.0.8"
+    "worker-loader": "^3.0.8",
+    "react-syntax-highlighter": "latest",
+    "react-folder-tree": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
