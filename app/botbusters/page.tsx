@@ -381,6 +381,11 @@ function BotBustersDailyStatsSection({ language }) {
   );
 }
 
+function BotHuntingToolsSection({ language }) {
+  return <section className="py-16 bg-gray-900">Hello, {translations[language].toolsTitle}</section>;
+}
+
+/*
 // BotHuntingToolsSection: Purchase and preorder section
 function BotHuntingToolsSection({ language }) {
   const { user, isInTelegramContext } = useTelegram();
@@ -561,7 +566,7 @@ function BotHuntingToolsSection({ language }) {
       </div>
     </section>
   );
-}
+}*/
 
 // Main BotBustersHome component
 export default function BotBustersHome() {
