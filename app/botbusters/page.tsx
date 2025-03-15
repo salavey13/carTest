@@ -504,7 +504,12 @@ function BotHuntingToolsSection({ language }) {
       setLoading(false);
     }
   };*/
-  
+  return (
+    <section className="py-16 bg-gray-900">
+      <div>Hello, {translations[language].toolsTitle}</div>
+    </section>
+  );
+  /*
   return (
     <section className="py-16 bg-gray-900">
       <div className="max-w-4xl mx-auto p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
@@ -597,7 +602,7 @@ function BotHuntingToolsSection({ language }) {
         </div>
       </div>
     </section>
-  );
+  );*/
 }
 
 // Main BotBustersHome component
