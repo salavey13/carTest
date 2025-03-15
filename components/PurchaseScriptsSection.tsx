@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { differenceInDays, parseISO } from "date-fns";
-import Link from "next/link";
 import { translations } from "./translations"; // Adjust path if needed
 
 const SCRIPT_PACK = {
@@ -20,10 +19,10 @@ const SCRIPT_PACK = {
 const BOT_CREATION_DATE = "2024-06-22";
 
 export default function PurchaseScriptsSection({ language }: { language: "en" | "ru" }) {
-  const { user, isInTelegramContext } = useTelegram();
+  const { user, isInTelegramContext, tg } = useTelegram(); // Added tg
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [hasAccess, setHasAccess] = useState(false);
 
   const creationDate = parseISO(BOT_CREATION_DATE);
@@ -94,6 +93,14 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
     }
   };
 
+  const handleScriptLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (isInTelegramContext && tg) {
+      e.preventDefault();
+      tg.openLink("https://automa.site/workflow/16rZppoNhrm7HCJSncPJV");
+    }
+    // Outside Telegram, the href will open in a new tab as usual
+  };
+
   return (
     <section className="py-16 bg-gradient-to-b from-gray-900 to-black">
       <div className="max-w-4xl mx-auto p-6 bg-gray-800/80 backdrop-blur-md rounded-xl shadow-2xl border border-cyan-500/30">
@@ -134,28 +141,6 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
                 <p className="text-green-400 font-mono text-sm tracking-wide">
                   {translations[language].accessActivated}
                 </p>
-                <a
-                  href="https://automa.site/workflow/16rZppoNhrm7HCJSncPJV"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-cyan-400 hover:text-cyan-300 font-mono text-sm underline transition-colors duration-200"
-                >
-                  {translations[language].viewScript}
-                </a>
-              </div>
-            )}
-            {!hasAccess && (
-              <div className="space-y-4">
-                <Button
-                  onClick={handlePurchase}
-                  disabled={loading}
-                  className="w-full py-3 font-mono text-lg bg-gradient-to-r from-green-600 to-teal-400 hover:from-green-700 hover:to-teal-500 text-white rounded-lg shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/50 transition-all duration-300"
-                >
-                  {loading ? translations[language].processing : translations[language].buyNow}
-                </Button>
-                <p className="text-yellow-300 font-mono text-sm animate-pulse tracking-wide">
-                  {translations[language].firstHunter}
-                </p>
               </div>
             )}
             {error && (
@@ -172,15 +157,29 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
           {/* Preorder Block'em All */}
           <div className="p-4 bg-gray-900/60 rounded-lg border border-cyan-500/40 hover:border-cyan-500 transition-all duration-300">
             <h3 className="text-2xl font-bold mb-3 text-teal-400 font-orbitron">Block'em All</h3>
-            <p className="text-gray-300 mb-4 font-mono text-sm">{translations[language].blockEmAllDesc}</p>
+            )}
+            {hasAccess && (
+              <p className="text-gray-300 mb-4 font-mono text-sm">{translations[language].blockEmAllDesc}</p>
+            {/* Note: This link might be a placeholder; consider restricting or removing until available */}
             <a
               href="https://automa.site/workflow/16rZppoNhrm7HCJSncPJV"
+              onClick={handleScriptLinkClick}
               target="_blank"
               rel="noopener noreferrer"
               className="text-cyan-400 hover:text-cyan-300 font-mono text-sm underline transition-colors duration-200"
             >
               {translations[language].viewScript}
             </a>
+            )}
+            {!hasAccess && (
+      <Button
+              onClick={handlePurchase}
+              disabled={loading}
+              className="w-full py-3 font-mono text-lg bg-gradient-to-r from-green-600 to-teal-400 hover:from-green-700 hover:to-teal-500 text-white rounded-lg shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/50 transition-all duration-300"
+            >
+              {translations[language].buyNow}
+            </Button>
+      )}
           </div>
 
           {/* Preorder Purge'em All */}
