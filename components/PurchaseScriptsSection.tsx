@@ -184,11 +184,15 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
             <h3 className="text-2xl font-bold mb-3 text-teal-400 font-orbitron">Purge'em All</h3>
             <p className="text-gray-300 mb-4 font-mono text-sm">{translations[language].purgeEmAllDesc}</p>
             <Button
-              disabled
-              className="w-full py-3 font-mono text-lg bg-gray-700 text-gray-400 rounded-lg cursor-not-allowed"
-            >
-              {translations[language].preorder}
-            </Button>
+              onClick={handlePurchase}
+                  disabled={loading}
+                  className="w-full py-3 font-mono text-lg bg-gradient-to-r from-green-600 to-teal-400 hover:from-green-700 hover:to-teal-500 text-white rounded-lg shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all"
+                >
+                  {translations[language].preorder}
+                </Button>
+                <p className="text-yellow-300 font-mono text-sm animate-pulse">
+                  Be the FIRST Hunter!
+                </p>
           </div>
 
           {/* Preorder Hunter */}
@@ -196,11 +200,12 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
             <h3 className="text-2xl font-bold mb-3 text-teal-400 font-orbitron">Hunter</h3>
             <p className="text-gray-300 mb-4 font-mono text-sm">{translations[language].hunterDesc}</p>
             <Button
-              disabled
-              className="w-full py-3 font-mono text-lg bg-gray-700 text-gray-400 rounded-lg cursor-not-allowed"
-            >
-              {translations[language].preorder}
-            </Button>
+              onClick={handlePurchase}
+                  disabled={loading}
+                  className="w-full py-3 font-mono text-lg bg-gradient-to-r from-green-600 to-teal-400 hover:from-green-700 hover:to-teal-500 text-white rounded-lg shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all"
+                >
+                  {translations[language].preorder}
+                </Button>
           </div>
         </div>
       </div>
