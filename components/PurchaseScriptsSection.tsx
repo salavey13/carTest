@@ -107,11 +107,11 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
             <li>{translations[language].repetitiveComments}</li>
             <li>{translations[language].randomUsernames}</li>
             <li>{translations[language].noFollowers}</li>
-            {/*<li>
+            <li>
               {translations[language].accountAge
                 .replace("{age}", ageInDays.toString())
                 .replace("{date}", creationDate.toLocaleDateString())}
-            </li>*/}
+            </li>
           </ul>
         </div>
 
