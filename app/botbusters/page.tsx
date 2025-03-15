@@ -8,46 +8,8 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { differenceInDays, parseISO } from "date-fns";
 import BotHuntingToolsSection from "@/components/PurchaseScriptsSection"; 
+import { translations } from "@/components/translations";
 
-// Define translations for English and Russian
-const translations = {
-  en: {
-    title: "Join the Fight Against Bots on 9GAG!",
-    description: "Help us keep 9GAG bot-free with powerful tools and community action.",
-    welcome: "Welcome, 9GAG users! Tired of bots ruining your experience? Our tools help you block and report bots efficiently. Join the community effort to keep 9GAG clean and fun!",
-    share: "Share with 9GAG Community",
-    statsTitle: "Bot-Hunting Stats",
-    submitTitle: "Submit Your Blocklist",
-    dailyBotsBlocked: "Daily Bots Blocked",
-    dailyReportsFiled: "Daily Reports Filed",
-    totalBots: "Total Bots Identified",
-    confirmedBots: "Confirmed Bots",
-    viewBotList: "View Bot List",
-    exportBotList: "Export Bot List",
-    placeholder: "Enter bot usernames (comma-separated)",
-    submitting: "Submitting...",
-    submit: "Submit",
-    getStarted: "Get Started",
-  },
-  ru: {
-    title: "Присоединяйтесь к борьбе с ботами на 9GAG!",
-    description: "Помогите нам очистить 9GAG от ботов с помощью мощных инструментов и действий сообщества.",
-    welcome: "Добро пожаловать, пользователи 9GAG! Устали от ботов, портящих ваш опыт? Наши инструменты помогут вам эффективно блокировать и сообщать о ботах. Присоединяйтесь к усилиям сообщества, чтобы сохранить 9GAG чистым и веселым! Кремлеботы, сдавайтесь и добавляйте свои никнеймы!",
-    share: "Поделиться с сообществом 9GAG",
-    statsTitle: "Статистика борьбы с ботами",
-    submitTitle: "Отправьте свой список блокировки",
-    dailyBotsBlocked: "Ботов заблокировано за день",
-    dailyReportsFiled: "Жалоб подано за день",
-    totalBots: "Всего обнаружено ботов",
-    confirmedBots: "Подтвержденные боты",
-    viewBotList: "Посмотреть список ботов",
-    exportBotList: "Экспортировать список ботов",
-    placeholder: "Введите имена ботов (через запятую)",
-    submitting: "Отправка...",
-    submit: "Отправить",
-    getStarted: "Начать",
-  },
-};
 
 // BotBustersHeader: Updated with cyberpunk styling
 function BotBustersHeader({ language, toggleLanguage }) {
