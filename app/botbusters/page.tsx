@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTelegram } from "@/hooks/useTelegram";
 import { supabaseAdmin, createAuthenticatedClient } from "@/hooks/supabase";
 import { Button } from "@/components/ui/button";
