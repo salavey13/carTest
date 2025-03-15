@@ -18,6 +18,7 @@ export const translations = {
     submit: "Submit",
     accountAge: "Accounts are currently {age} days old (created on {date}).",
     getStarted: "Get Started",
+    preorder: "Preorder Now",
   },
   ru: {
     toolsTitle: "Наши инструменты для борьбы с ботами",
@@ -38,5 +39,6 @@ export const translations = {
     accountAge: "Аккаунты существуют уже {age} дней (созданы {date}).",
     submit: "Отправить",
     getStarted: "Начать",
+    preorder: "Предзаказ",
   },
 };
