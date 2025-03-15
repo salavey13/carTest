@@ -126,7 +126,7 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
           <div className="p-4 bg-gray-900/50 rounded-lg border border-cyan-500/30 hover:border-cyan-500 transition-all">
             <h3 className="text-2xl font-bold mb-3 text-teal-400 font-orbitron">Get Automa Scripts</h3>
             <p className="text-gray-300 mb-4 font-mono text-sm">{translations[language].automaDesc}</p>
-            <p className="text-3xl font-bold mb-6 text-white font-mono tracking-tight">
+            {/*<p className="text-3xl font-bold mb-6 text-white font-mono tracking-tight">
               {SCRIPT_PACK.price} XTR
             </p>
             {hasAccess ? (
@@ -150,10 +150,10 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
                   {loading ? translations[language].processing : translations[language].buyNow]}
                 </Button>
                 <p className="text-yellow-300 font-mono text-sm animate-pulse">
-                  Be the FIRST Hunter! {/* Discount code: FIRSTHUNTER for 20% off */}
+                  Be the FIRST Hunter!
                 </p>
               </div>
-            )}
+            )*/}
             {error && (
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
@@ -169,12 +169,14 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
           <div className="p-4 bg-gray-900/50 rounded-lg border border-cyan-500/30 hover:border-cyan-500 transition-all">
             <h3 className="text-2xl font-bold mb-3 text-teal-400 font-orbitron">Block'em All</h3>
             <p className="text-gray-300 mb-4 font-mono text-sm">{translations[language].blockEmAllDesc}</p>
-            <Button
-              disabled
-              className="w-full py-3 font-mono text-lg bg-gray-700 text-gray-400 rounded-lg cursor-not-allowed"
-            >
-              {translations[language].preorder}
-            </Button>
+            <p className="text-green-400 font-mono text-sm">Access Activated</p>
+                <Link
+                  href="https://automa.site/workflow/16rZppoNhrm7HCJSncPJV"
+                  target="_blank"
+                  className="text-cyan-400 hover:text-cyan-300 font-mono text-sm underline transition-colors"
+                >
+                  Automa Block Script
+               </Link>
           </div>
 
           {/* Preorder Purge'em All */}
