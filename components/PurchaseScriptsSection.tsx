@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { differenceInDays, parseISO } from "date-fns";
 import Link from "next/link";
-import { translations } from "@/components/translations";
+import { translations } from "./translations"; // Adjust path if needed
 
 const SCRIPT_PACK = {
   id: "automa_scripts",
@@ -23,7 +23,7 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
   const { user, isInTelegramContext } = useTelegram();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
   const [hasAccess, setHasAccess] = useState(false);
 
   const creationDate = parseISO(BOT_CREATION_DATE);
@@ -95,96 +95,107 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
   };
 
   return (
-    <section className="py-16 bg-gray-900">
-      <div className="max-w-4xl mx-auto p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
-        <h2 className="text-3xl font-bold text-center mb-8 text-white font-orbitron">
+    <section className="py-16 bg-gradient-to-b from-gray-900 to-black">
+      <div className="max-w-4xl mx-auto p-6 bg-gray-800/80 backdrop-blur-md rounded-xl shadow-xl border border-cyan-500/20">
+        <h2 className="text-4xl font-extrabold text-center mb-8 text-cyan-300 tracking-wider font-orbitron">
           {translations[language].toolsTitle}
         </h2>
 
+        {/* Bot Tips Section */}
         <div className="mb-12">
-          <h3 className="text-2xl font-bold mb-4 text-cyan-400">{translations[language].howToSpot}</h3>
-          <ul className="list-disc list-inside text-gray-300 font-mono">
+          <h3 className="text-2xl font-bold mb-4 text-teal-400 font-orbitron">
+            {translations[language].howToSpot}
+          </h3>
+          <ul className="list-disc list-inside text-gray-200 font-mono text-sm">
             <li>{translations[language].repetitiveComments}</li>
             <li>{translations[language].randomUsernames}</li>
             <li>{translations[language].noFollowers}</li>
             <li>
               {translations[language].accountAge
-                .replace("{age}", ageInDays.toString())
-                .replace("{date}", creationDate.toLocaleDateString())}
+                ? translations[language].accountAge
+                    .replace("{age}", ageInDays.toString())
+                    .replace("{date}", creationDate.toLocaleDateString())
+                : "Account age data unavailable"}
             </li>
           </ul>
         </div>
 
+        {/* Purchase and Preorder Sections */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div>
-            <h3 className="text-2xl font-bold mb-4 text-cyan-400">Get Automa Scripts</h3>
-            <p className="text-gray-300 mb-4">{translations[language].automaDesc}</p>
-            <p className="text-3xl font-bold mb-6 font-mono text-white">{SCRIPT_PACK.price} XTR</p>
-            {/*hasAccess ? (
-              <>
-                <p className="text-green-400 font-mono">Access already activated!</p>
+          {/* Automa Scripts */}
+          <div className="p-4 bg-gray-900/50 rounded-lg border border-cyan-500/30 hover:border-cyan-500 transition-all">
+            <h3 className="text-2xl font-bold mb-3 text-teal-400 font-orbitron">Get Automa Scripts</h3>
+            <p className="text-gray-300 mb-4 font-mono text-sm">{translations[language].automaDesc}</p>
+            <p className="text-3xl font-bold mb-6 text-white font-mono tracking-tight">
+              {SCRIPT_PACK.price} XTR
+            </p>
+            {hasAccess ? (
+              <div className="space-y-2">
+                <p className="text-green-400 font-mono text-sm">Access Activated</p>
                 <Link
                   href="https://automa.site/workflow/16rZppoNhrm7HCJSncPJV"
                   target="_blank"
-                  className="text-blue-400 hover:text-blue-300 transition-colors"
+                  className="text-cyan-400 hover:text-cyan-300 font-mono text-sm underline transition-colors"
                 >
                   View Automa Block Script
                 </Link>
-              </>
+              </div>
             ) : (
-              <>
+              <div className="space-y-4">
                 <Button
                   onClick={handlePurchase}
                   disabled={loading}
-                  className={`w-full p-3 rounded-lg font-mono text-lg bg-gradient-to-r ${SCRIPT_PACK.color} hover:from-green-700 hover:to-teal-500 text-white transition-all shadow-glow`}
+                  className="w-full py-3 font-mono text-lg bg-gradient-to-r from-green-600 to-teal-400 hover:from-green-700 hover:to-teal-500 text-white rounded-lg shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/40 transition-all"
                 >
                   {loading ? translations[language].processing : translations[language].buyNow]}
                 </Button>
-                <p className="text-yellow-400 font-bold mt-4 font-mono animate-pulse">
-                  Be the FIRST Bot Hunter! Use code <span className="text-white">FIRSTHUNTER</span> for 20%
-                  off – limited time only!
+                <p className="text-yellow-300 font-mono text-sm animate-pulse">
+                  Be the FIRST Hunter! Code: <span className="text-white">FIRSTHUNTER</span> for 20% off
                 </p>
-              </>
-            )*/}
+              </div>
+            )}
             {error && (
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="text-red-500 text-sm font-mono mt-4 text-center"
+                className="text-red-400 text-sm font-mono mt-4 text-center"
               >
                 {error}
               </motion.p>
             )}
           </div>
 
-          <div>
-            <h3 className="text-2xl font-bold mb-4 text-cyan-400">Preorder Block'em All</h3>
-            <p className="text-gray-300 mb-4">{translations[language].blockEmAllDesc}</p>
+          {/* Preorder Block'em All */}
+          <div className="p-4 bg-gray-900/50 rounded-lg border border-cyan-500/30 hover:border-cyan-500 transition-all">
+            <h3 className="text-2xl font-bold mb-3 text-teal-400 font-orbitron">Block'em All</h3>
+            <p className="text-gray-300 mb-4 font-mono text-sm">{translations[language].blockEmAllDesc}</p>
             <Button
               disabled
-              className="w-full p-3 rounded-lg font-mono text-lg bg-gray-600 text-white shadow-glow"
+              className="w-full py-3 font-mono text-lg bg-gray-700 text-gray-400 rounded-lg cursor-not-allowed"
             >
               {translations[language].preorder}
             </Button>
           </div>
 
-          <div>
-            <h3 className="text-2xl font-bold mb-4 text-cyan-400">Preorder Purge'em All</h3>
-            <p className="text-gray-300 mb-4">{translations[language].purgeEmAllDesc}</p>
+          {/* Preorder Purge'em All */}
+          <div className="p-4 bg-gray-900/50 rounded-lg border border-cyan-500/30 hover:border-cyan-500 transition-all">
+            <h3 className="text-2xl font-bold mb-3 text-teal-400 font-orbitron">Purge'em All</h3>
+            <p className="text-gray-300 mb-4 font-mono text-sm">{translations[language].purgeEmAllDesc}</p>
             <Button
               disabled
-              className="w-full p-3 rounded-lg font-mono text-lg bg-gray-600 text-white shadow-glow"
+              className="w-full py-3 font-mono text-lg bg-gray-700 text-gray-400 rounded-lg cursor-not-allowed"
             >
               {translations[language].preorder}
             </Button>
           </div>
 
-          <div>
-            <h3 className="text-2xl font-bold mb-4 text-cyan-400">Preorder Hunter</h3>
-            <p className="text-gray-300 mb-4">{translations[language].hunterDesc}</p>
+          {/* Preorder Hunter */}
+          <div className="p-4 bg-gray-900/50 rounded-lg border border-cyan-500/30 hover:border-cyan-500 transition-all">
+            <h3 className="text-2xl font-bold mb-3 text-teal-400 font-orbitron">Hunter</h3>
+            <p className="text-gray-300 mb-4 font-mono text-sm">{translations[language].hunterDesc}</p>
             <Button
               disabled
-              className="w-full p-3 rounded-lg font-mono text-lg bg-gray-600 text-white shadow-glow"
+              className="w-full py-3 font-mono text-lg bg-gray-700 text-gray-400 rounded-lg cursor-not-allowed"
             >
               {translations[language].preorder}
             </Button>
