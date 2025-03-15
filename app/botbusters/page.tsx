@@ -419,7 +419,7 @@ function BotHuntingToolsSection({ language }) {
 
 
 // BotHuntingToolsSection: Purchase and preorder section
-function BotHuntingToolsSection({ language }) {
+function BotHuntingToolsSection({ language }) {*/
   const { user, isInTelegramContext } = useTelegram();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -503,7 +503,7 @@ function BotHuntingToolsSection({ language }) {
     } finally {
       setLoading(false);
     }
-  };*/
+  };
   return (
     <section className="py-16 bg-gray-900">
       {/*<div>Hello, {translations[language].toolsTitle}</div>
