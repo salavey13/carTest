@@ -31,7 +31,7 @@ const SCRIPT_PACK = {
 // Bot creation date: 256 days before March 4, 2025
 const BOT_CREATION_DATE = "2024-06-22";
 
-export default function BotHuntingToolsSection() {
+function BotHuntingToolsSection() {
   const { user, isInTelegramContext } = useTelegram();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
