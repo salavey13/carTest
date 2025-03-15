@@ -151,7 +151,7 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
                   disabled={loading}
                   className="w-full py-3 font-mono text-lg bg-gradient-to-r from-green-600 to-teal-400 hover:from-green-700 hover:to-teal-500 text-white rounded-lg shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/50 transition-all duration-300"
                 >
-                  {loading ? translations[language].processing : translations[language].buyNow]}
+                  {loading ? translations[language].processing : translations[language].buyNow}
                 </Button>
                 <p className="text-yellow-300 font-mono text-sm animate-pulse tracking-wide">
                   {translations[language].firstHunter}
