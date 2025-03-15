@@ -1,26 +1,60 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useTelegram } from "@/hooks/useTelegram"; // Adjust path to your Telegram hook
-import { sendTelegramInvoice } from "@/app/actions"; // Adjust path to your invoice action
-import { createInvoice, supabaseAdmin } from "@/hooks/supabase"; // Adjust path to your Supabase hook
+import { useTelegram } from "@/hooks/useTelegram";
+import { supabaseAdmin, createInvoice } from "@/hooks/supabase";
+import { sendTelegramInvoice, notifyAdmin } from "@/app/actions";
+import { Button } from "@/components/ui/button"; // Import Button for consistency
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { differenceInDays, parseISO } from "date-fns";
 import Link from "next/link";
 
+// Define translations for English and Russian
+const translations = {
+  en: {
+    toolsTitle: "Our Bot-Hunting Tools",
+    howToSpot: "How to Spot a Bot",
+    repetitiveComments: "Repetitive comments like 'lol nice' on every post.",
+    randomUsernames: "Usernames with random numbers (e.g., User12345).",
+    noFollowers: "Accounts with hundreds of posts but no followers.",
+    accountAge: "Accounts are currently {age} days old (created on {date}).",
+    buyNow: "Buy Now",
+    processing: "Processing...",
+    preorder: "Preorder (Coming Soon)",
+    blockEmAllDesc: "Batch-block known bots with one click.",
+    purgeEmAllDesc: "Report and cleanse bot activity in bulk.",
+    hunterDesc: "Find new bots by tracing their network.",
+    automaDesc: "Unlock powerful Automa scripts to automate bot-blocking on 9GAG.",
+  },
+  ru: {
+    toolsTitle: "Наши инструменты для борьбы с ботами",
+    howToSpot: "Как распознать бота",
+    repetitiveComments: "Повторяющиеся комментарии, такие как 'лол круто' под каждым постом.",
+    randomUsernames: "Имена пользователей с случайными числами (например, User12345).",
+    noFollowers: "Аккаунты с сотнями постов, но без подписчиков.",
+    accountAge: "Аккаунты существуют уже {age} дней (созданы {date}).",
+    buyNow: "Купить сейчас",
+    processing: "Обработка...",
+    preorder: "Предзаказ (Скоро будет)",
+    blockEmAllDesc: "Блокируйте известных ботов одним кликом.",
+    purgeEmAllDesc: "Сообщайте и очищайте активность ботов массово.",
+    hunterDesc: "Находите новых ботов, отслеживая их сеть.",
+    automaDesc: "Разблокируйте мощные скрипты Automa для автоматической блокировки ботов на 9GAG.",
+  },
+};
+
 // Define the script pack details
 const SCRIPT_PACK = {
   id: "automa_scripts",
   name: "Automa Bot-Hunting Scripts",
-  price: 100, // Price in XTR (adjust as needed)
-  description: "Unlock powerful Automa scripts to automate bot-blocking on 9GAG.",
+  price: 100, // Price in XTR
   color: "from-green-600 to-teal-400",
 };
 
-// Bot creation date: 256 days before March 4, 2025
+// Bot creation date
 const BOT_CREATION_DATE = "2024-06-22";
 
-export default function BotHuntingToolsSection() {
+export default function BotHuntingToolsSection({ language }: { language: "en" | "ru" }) {
   const { user, isInTelegramContext } = useTelegram();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -35,18 +69,17 @@ export default function BotHuntingToolsSection() {
   // Check if the user already has script access
   useEffect(() => {
     const checkAccess = async () => {
-      if (user) {
-        const { data, error } = await supabaseAdmin
-          .from("users")
-          .select("has_script_access")
-          .eq("user_id", user.id.toString())
-          .single();
-        if (error) {
-          toast.error("Error checking access");
-        } else {
-          setHasAccess(data?.has_script_access || false);
-          if (data?.has_script_access) toast.success("You already have script access!");
-        }
+      if (!user?.id) return; // Guard against undefined user
+      const { data, error } = await supabaseAdmin
+        .from("users")
+        .select("has_script_access")
+        .eq("user_id", user.id.toString())
+        .single();
+      if (error) {
+        toast.error("Error checking access");
+      } else {
+        setHasAccess(data?.has_script_access || false);
+        if (data?.has_script_access) toast.success("You already have script access!");
       }
     };
     checkAccess();
@@ -54,7 +87,7 @@ export default function BotHuntingToolsSection() {
 
   // Handle purchase logic
   const handlePurchase = async () => {
-    if (!user) {
+    if (!user?.id) {
       setError("Please log in via Telegram");
       toast.error("Please log in via Telegram");
       return;
@@ -82,13 +115,14 @@ export default function BotHuntingToolsSection() {
       const response = await sendTelegramInvoice(
         user.id.toString(),
         SCRIPT_PACK.name,
-        SCRIPT_PACK.description,
+        translations[language].automaDesc,
         payload,
         SCRIPT_PACK.price
       );
       if (!response.success) throw new Error(response.error || "Failed to send invoice");
       setSuccess(true);
       toast.success("Invoice sent to Telegram!");
+      await notifyAdmin(`User ${user.id} purchased ${SCRIPT_PACK.name} for ${SCRIPT_PACK.price} XTR`);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Unknown error";
       setError("Purchase error: " + errMsg);
@@ -99,68 +133,107 @@ export default function BotHuntingToolsSection() {
   };
 
   return (
-    <div className="py-16 bg-gray-900">
-      <div className="max-w-4xl mx-auto p-6 bg-card rounded-xl shadow-lg border border-muted">
-        <h2 className="text-3xl font-bold text-center mb-8 text-gradient cyber-text">
-          Bot-Hunting Tools
+    <section className="py-16 bg-gray-900">
+      <div className="max-w-4xl mx-auto p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+        <h2 className="text-3xl font-bold text-center mb-8 text-white font-orbitron">
+          {translations[language].toolsTitle}
         </h2>
 
         {/* Bot Tips Section */}
         <div className="mb-12">
-          <h3 className="text-2xl font-bold mb-4 text-primary">How to Spot a Bot</h3>
+          <h3 className="text-2xl font-bold mb-4 text-cyan-400">{translations[language].howToSpot}</h3>
           <ul className="list-disc list-inside text-gray-300 font-mono">
-            <li>Repetitive comments like "lol nice" on every post.</li>
-            <li>Usernames with random numbers (e.g., User12345).</li>
-            <li>Accounts with hundreds of posts but no followers.</li>
+            <li>{translations[language].repetitiveComments}</li>
+            <li>{translations[language].randomUsernames}</li>
+            <li>{translations[language].noFollowers}</li>
             <li>
-              Accounts are currently{" "}
-              <span className="text-primary font-bold">{ageInDays} days old</span>{" "}
-              (created on{" "}
-              <span className="text-teal-400">{creationDate.toLocaleDateString()}</span>).
+              {translations[language].accountAge
+                .replace("{age}", ageInDays.toString())
+                .replace("{date}", creationDate.toLocaleDateString())}
             </li>
           </ul>
         </div>
 
-        {/* Purchase Section */}
-        <div>
-          <h3 className="text-2xl font-bold mb-4 text-primary">Get Automa Scripts</h3>
-          <p className="text-muted-foreground mb-4">{SCRIPT_PACK.description}</p>
-          <p className="text-3xl font-bold mb-6 font-mono">{SCRIPT_PACK.price} XTR</p>
-          {hasAccess ? (
-            <>
-              <p className="text-green-400 font-mono">Access already activated!</p>
-              <Link
+        {/* Purchase and Preorder Sections */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Automa Scripts */}
+          <div>
+            <h3 className="text-2xl font-bold mb-4 text-cyan-400">Get Automa Scripts</h3>
+            <p className="text-gray-300 mb-4">{translations[language].automaDesc}</p>
+            <p className="text-3xl font-bold mb-6 font-mono text-white">{SCRIPT_PACK.price} XTR</p>
+            {hasAccess ? (
+              <>
+                <p className="text-green-400 font-mono">Access already activated!</p>
+                <Link
                   href="https://automa.site/workflow/16rZppoNhrm7HCJSncPJV"
                   target="_blank"
                   className="text-blue-400 hover:text-blue-300 transition-colors"
                 >
                   View Automa Block Script
-               </Link>
-            </>
-          ) : (
-            <button
-              onClick={handlePurchase}
-              disabled={loading}
-              className={`w-full p-3 rounded-lg font-mono text-lg ${
-                loading
-                  ? "bg-muted cursor-not-allowed animate-pulse"
-                  : "bg-primary hover:bg-secondary text-primary-foreground"
-              } transition-all`}
+                </Link>
+              </>
+            ) : (
+              <>
+                <Button
+                  onClick={handlePurchase}
+                  disabled={loading}
+                  className={`w-full p-3 rounded-lg font-mono text-lg bg-gradient-to-r ${SCRIPT_PACK.color} hover:from-green-700 hover:to-teal-500 text-white transition-all shadow-glow`}
+                >
+                  {loading ? translations[language].processing : translations[language].buyNow]}
+                </Button>
+                <p className="text-yellow-400 font-bold mt-4 font-mono animate-pulse">
+                  Be the FIRST Bot Hunter! Use code <span className="text-white">FIRSTHUNTER</span> for 20% off – limited time only!
+                </p>
+              </>
+            )}
+            {error && (
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-red-500 text-sm font-mono mt-4 text-center"
+              >
+                {error}
+              </motion.p>
+            )}
+          </div>
+
+          {/* Preorder Block'em All */}
+          <div>
+            <h3 className="text-2xl font-bold mb-4 text-cyan-400">Preorder Block'em All</h3>
+            <p className="text-gray-300 mb-4">{translations[language].blockEmAllDesc}</p>
+            <Button
+              disabled
+              className="w-full p-3 rounded-lg font-mono text-lg bg-gray-600 text-white shadow-glow"
             >
-              {loading ? "Processing..." : "Buy Now"}
-            </button>
-          )}
-          {error && (
-            <motion.p
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-destructive text-sm font-mono mt-4 text-center"
+              {translations[language].preorder}
+            </Button>
+          </div>
+
+          {/* Preorder Purge'em All */}
+          <div>
+            <h3 className="text-2xl font-bold mb-4 text-cyan-400">Preorder Purge'em All</h3>
+            <p className="text-gray-300 mb-4">{translations[language].purgeEmAllDesc}</p>
+            <Button
+              disabled
+              className="w-full p-3 rounded-lg font-mono text-lg bg-gray-600 text-white shadow-glow"
             >
-              {error}
-            </motion.p>
-          )}
+              {translations[language].preorder}
+            </Button>
+          </div>
+
+          {/* Preorder Hunter */}
+          <div>
+            <h3 className="text-2xl font-bold mb-4 text-cyan-400">Preorder Hunter</h3>
+            <p className="text-gray-300 mb-4">{translations[language].hunterDesc}</p>
+            <Button
+              disabled
+              className="w-full p-3 rounded-lg font-mono text-lg bg-gray-600 text-white shadow-glow"
+            >
+              {translations[language].preorder}
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
