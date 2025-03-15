@@ -129,7 +129,7 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
             <p className="text-3xl font-bold mb-6 text-white font-mono tracking-tight">
               {SCRIPT_PACK.price} XTR
             </p>
-            {hasAccess ? (
+            {/*hasAccess ? (
               <div className="space-y-2">
                 <p className="text-green-400 font-mono text-sm">Access Activated</p>
                 <Link
@@ -151,9 +151,9 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
                 </Button>
                 <p className="text-yellow-300 font-mono text-sm animate-pulse">
                   Be the FIRST Hunter!
-                </p>{/*Code: <span className="text-white">FIRSTHUNTER</span> for 20% off*/}
-              </div>
-            )}
+                </p>*/}{/*Code: <span className="text-white">FIRSTHUNTER</span> for 20% off*/}
+              {/*</div>
+            )*/}
             {error && (
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
