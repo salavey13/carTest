@@ -154,7 +154,7 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
                 </p>
               </div>
             )*/}
-            {haveAccess && (
+            {hasAccess && (
               <p className="text-green-400 font-mono text-sm">Access Activated</p>
             )}
             {error && (
