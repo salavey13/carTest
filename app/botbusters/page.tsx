@@ -382,6 +382,34 @@ function BotBustersDailyStatsSection({ language }) {
 }
 
 function BotHuntingToolsSection({ language }) {
+  const { user, isInTelegramContext } = useTelegram();
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState(null); // Simplified type to avoid TS issues
+  const [hasAccess, setHasAccess] = useState(false); // Simplified type
+
+  const creationDate = parseISO(BOT_CREATION_DATE);
+  const today = new Date();
+  const ageInDays = differenceInDays(today, creationDate);
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (!user?.id) return; // Guard against undefined user
+      const { data, error } = await supabaseAdmin
+        .from("users")
+        .select("has_script_access")
+        .eq("user_id", user.id.toString())
+        .single();
+      if (error) {
+        toast.error("Error checking access");
+      } else {
+        setHasAccess(data?.has_script_access || false);
+        if (data?.has_script_access) toast.success("You already have script access!");
+      }
+    };
+    checkAccess();
+  }, [user]);
+  /*
   return (
     <section className="py-16 bg-gray-900">
       <div>Hello, {translations[language].toolsTitle}</div>
@@ -389,7 +417,7 @@ function BotHuntingToolsSection({ language }) {
   );
 }
 
-/*
+
 // BotHuntingToolsSection: Purchase and preorder section
 function BotHuntingToolsSection({ language }) {
   const { user, isInTelegramContext } = useTelegram();
@@ -476,7 +504,7 @@ function BotHuntingToolsSection({ language }) {
       setLoading(false);
     }
   };
-
+*/
   return (
     <section className="py-16 bg-gray-900">
       <div className="max-w-4xl mx-auto p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
@@ -570,7 +598,7 @@ function BotHuntingToolsSection({ language }) {
       </div>
     </section>
   );
-}*/
+}
 
 // Main BotBustersHome component
 export default function BotBustersHome() {
