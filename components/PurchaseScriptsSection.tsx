@@ -48,7 +48,7 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
     checkAccess();
   }, [user]);
 
-  /*const handlePurchase = async () => {
+  const handlePurchase = async () => {
     if (!user?.id) {
       setError("Please log in via Telegram");
       toast.error("Please log in via Telegram");
@@ -92,7 +92,7 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
     } finally {
       setLoading(false);
     }
-  };*/
+  };
 
   return (
     <section className="py-16 bg-gray-900">
@@ -107,11 +107,11 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
             <li>{translations[language].repetitiveComments}</li>
             <li>{translations[language].randomUsernames}</li>
             <li>{translations[language].noFollowers}</li>
-            <li>
+            {/*<li>
               {translations[language].accountAge
                 .replace("{age}", ageInDays.toString())
                 .replace("{date}", creationDate.toLocaleDateString())}
-            </li>
+            </li>*/}
           </ul>
         </div>
 
@@ -120,7 +120,7 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
             <h3 className="text-2xl font-bold mb-4 text-cyan-400">Get Automa Scripts</h3>
             <p className="text-gray-300 mb-4">{translations[language].automaDesc}</p>
             <p className="text-3xl font-bold mb-6 font-mono text-white">{SCRIPT_PACK.price} XTR</p>
-            {/*hasAccess ? (
+            {hasAccess ? (
               <>
                 <p className="text-green-400 font-mono">Access already activated!</p>
                 <Link
@@ -145,7 +145,7 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
                   off – limited time only!
                 </p>
               </>
-            )*/}
+            )}
             {error && (
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
