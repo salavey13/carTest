@@ -382,12 +382,12 @@ function BotBustersDailyStatsSection({ language }) {
 }
 
 function BotHuntingToolsSection({ language }) {
-  const { user, isInTelegramContext } = useTelegram();
+  /*const { user, isInTelegramContext } = useTelegram();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null); // Simplified type to avoid TS issues
   const [hasAccess, setHasAccess] = useState(false); // Simplified type
-/*
+
   const creationDate = parseISO(BOT_CREATION_DATE);
   const today = new Date();
   const ageInDays = differenceInDays(today, creationDate);
