@@ -6,6 +6,8 @@ import { motion } from "framer-motion";
 import { runCoseAgent, notifyAdmin, sendTelegramMessage } from "@/app/actions";
 import { toast } from "sonner";
 import { useTelegram } from "@/hooks/useTelegram";
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface FileNode {
   path: string;
@@ -26,6 +28,7 @@ const RepoTxtFetcher: React.FC = () => {
   const [toasts, setToasts] = useState<{ id: number; message: string }[]>([]);
   const [kworkInput, setKworkInput] = useState<string>("");
   const [analysisComplete, setAnalysisComplete] = useState<boolean>(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
   const { user } = useTelegram();
 
@@ -215,7 +218,7 @@ const RepoTxtFetcher: React.FC = () => {
     const message = `Результат анализа Kwork:\n\nЗапрос: ${kworkInput}\n\nАнализ:\n${txtOutput}`;
     try {
       const result = await notifyAdmin(message);
-       if (result.success) {
+      if (result.success) {
         addToast("Результат отправлен админам!");
       } else {
         addToast("Ошибка при отправке админам!");
@@ -265,6 +268,36 @@ ${txtOutput}
     }
   };
 
+  const handleSaveAnalysis = () => {
+    if (!txtOutput) {
+      addToast("Нет результатов для сохранения!");
+      return;
+    }
+    const blob = new Blob([txtOutput], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'analysis.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+    addToast("Анализ сохранен локально!");
+  };
+
+  const handleShareLink = () => {
+    if (!txtOutput) {
+      addToast("Нет результатов для分享!");
+      return;
+    }
+    const encodedData = encodeURIComponent(txtOutput);
+    const shareUrl = `${window.location.origin}/share?analysis=${encodedData}`;
+    navigator.clipboard.writeText(shareUrl);
+    addToast("Ссылка скопирована в буфер обмена!");
+  };
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
   const groupFilesByFolder = (files: FileNode[]) => {
     const grouped: { [key: string]: FileNode[] } = {};
     files.forEach((file) => {
@@ -291,15 +324,26 @@ ${txtOutput}
   };
 
   return (
-    <div className="w-full p-6 bg-gray-800 pt-24 rounded-2xl shadow-[0_0_30px_rgba(255,107,107,0.5)] border border-gray-700 repo-xml-content-wrapper relative overflow-hidden">
+    <div className={`w-full p-6 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'} pt-24 rounded-2xl shadow-[0_0_30px_rgba(255,107,107,0.5)] border ${theme === 'dark' ? 'border-gray-700' : 'border-gray-300'} relative overflow-hidden`}>
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-transparent via-purple-900/10 to-cyan-900/10 animate-gradient-shift"></div>
 
-      <h2 className="text-4xl font-bold text-white mb-6 tracking-wider animate-pulse text-shadow-neon relative z-10">
+      <h2 className={`text-4xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-6 tracking-wider animate-pulse text-shadow-neon relative z-10`}>
         Кибер-Экстрактор TXT
       </h2>
-      <p className="text-gray-300 mb-8 text-lg font-mono relative z-10">
+      <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-8 text-lg font-mono relative z-10`}>
         Извлекайте текст из GitHub и анализируйте задачи с Kwork в стиле CyberDev!
       </p>
+
+      <div className="fixed top-4 right-4 z-50">
+        <motion.button
+          onClick={toggleTheme}
+          className={`p-2 rounded-full ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-gray-300 text-gray-900'} shadow-[0_0_10px_rgba(147,51,234,0.5)]`}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </motion.button>
+      </div>
 
       <div className="flex flex-col gap-4 mb-8 relative z-10">
         <input
@@ -307,68 +351,68 @@ ${txtOutput}
           value={repoUrl}
           onChange={(e) => setRepoUrl(e.target.value)}
           placeholder="URL GitHub (например, https://github.com/user/repo)"
-          className="p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono shadow-[0_0_10px_rgba(147,51,234,0.3)]"
+          className={`p-4 ${theme === 'dark' ? 'bg-gray-900 border-gray-700 text-white' : 'bg-gray-100 border-gray-300 text-gray-900'} border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono shadow-[0_0_10px_rgba(147,51,234,0.3)] transition-all duration-300 hover:border-cyan-500`}
         />
         <input
           type="password"
           value={token}
           onChange={(e) => setToken(e.target.value)}
           placeholder="Токен GitHub (опционально)"
-          className="p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono shadow-[0_0_10px_rgba(147,51,234,0.3)]"
+          className={`p-4 ${theme === 'dark' ? 'bg-gray-900 border-gray-700 text-white' : 'bg-gray-100 border-gray-300 text-gray-900'} border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono shadow-[0_0_10px_rgba(147,51,234,0.3)] transition-all duration-300 hover:border-cyan-500`}
         />
         <motion.button
           onClick={handleFetch}
           disabled={extractLoading}
-          className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 transition-all font-mono shadow-lg ${
-            extractLoading ? "opacity-50 cursor-not-allowed" : "hover:scale-105"
+          className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-purple-500 to-pink-500 transition-all font-mono shadow-lg ${
+            extractLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_15px_rgba(147,51,234,0.7)]"
           }`}
-          whileHover={{ scale: extractLoading ? 1 : 1.05 }}
+          whileHover={{ scale: extractLoading ? 1 : 1.05, boxShadow: "0 0 15px rgba(147, 51, 234, 0.7)" }}
           whileTap={{ scale: extractLoading ? 1 : 0.95 }}
         >
           {extractLoading ? "Извлечение..." : "Извлечь TXT"}
         </motion.button>
       </div>
 
-      <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
-        <h3 className="text-2xl font-semibold text-white mb-4">Kwork в Бота</h3>
+      <div className={`mb-8 ${theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-300'} p-6 rounded-xl border shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10`}>
+        <h3 className={`text-2xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Kwork в Бота</h3>
         <textarea
           value={kworkInput}
           onChange={(e) => setKworkInput(e.target.value)}
           placeholder="Введите запрос с Kwork или задачу Telegram Web App..."
-          className="w-full h-64 p-4 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono resize-none shadow-[0_0_10px_rgba(0,255,157,0.3)]"
+          className={`w-full h-64 p-4 ${theme === 'dark' ? 'bg-gray-900 border-gray-700 text-white' : 'bg-gray-100 border-gray-300 text-gray-900'} border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono resize-none shadow-[0_0_10px_rgba(0,255,157,0.3)]`}
         />
         <div className="flex gap-4 mt-4 flex-wrap">
           <motion.button
             onClick={handleGenerateBotRequest}
             disabled={botLoading}
-            className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 transition-all font-mono shadow-lg ${
-              botLoading ? "opacity-50 cursor-not-allowed" : "hover:scale-105"
+            className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-500 to-cyan-500 transition-all font-mono shadow-lg ${
+              botLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]"
             }`}
-            whileHover={{ scale: botLoading ? 1 : 1.05 }}
+            whileHover={{ scale: botLoading ? 1 : 1.05, boxShadow: "0 0 15px rgba(0, 255, 157, 0.7)" }}
             whileTap={{ scale: botLoading ? 1 : 0.95 }}
           >
             {botLoading ? "Генерация..." : "Анализировать с Ботом"}
           </motion.button>
           <motion.button
             onClick={handleAddFullTree}
-            className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 transition-all font-mono shadow-lg hover:scale-105"
-            whileHover={{ scale: 1.05 }}
+            className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-red-500 to-orange-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(255,107,107,0.7)]"
+            whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(255, 107, 107, 0.7)" }}
             whileTap={{ scale: 0.95 }}
           >
             Добавить дерево
           </motion.button>
           <motion.button
             onClick={handleAddBriefTree}
-            className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-green-500 to-lime-500 hover:from-green-600 hover:to-lime-600 transition-all font-mono shadow-lg hover:scale-105"
-            whileHover={{ scale: 1.05 }}
+            className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-green-500 to-lime-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]"
+            whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(0, 255, 157, 0.7)" }}
             whileTap={{ scale: 0.95 }}
           >
             Добавить ключевые
           </motion.button>
           <motion.button
             onClick={handleAddSelected}
-            className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 transition-all font-mono shadow-lg hover:scale-105"
-            whileHover={{ scale: 1.05 }}
+            className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(99,102,241,0.7)]"
+            whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(99, 102, 241, 0.7)" }}
             whileTap={{ scale: 0.95 }}
           >
             Добавить выбранные
@@ -376,10 +420,10 @@ ${txtOutput}
           <motion.button
             onClick={handleShareWithAdmins}
             disabled={!analysisComplete}
-            className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 transition-all font-mono shadow-lg ${
-              !analysisComplete ? "opacity-50 cursor-not-allowed" : "hover:scale-105"
+            className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-yellow-500 to-orange-500 transition-all font-mono shadow-lg ${
+              !analysisComplete ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_15px_rgba(251,191,36,0.7)]"
             }`}
-            whileHover={{ scale: analysisComplete ? 1.05 : 1 }}
+            whileHover={{ scale: analysisComplete ? 1.05 : 1, boxShadow: analysisComplete ? "0 0 15px rgba(251, 191, 36, 0.7)" : "none" }}
             whileTap={{ scale: analysisComplete ? 0.95 : 1 }}
           >
             Поделиться с админами
@@ -387,33 +431,54 @@ ${txtOutput}
           <motion.button
             onClick={handleSendToMe}
             disabled={!analysisComplete || !user?.id}
-            className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 transition-all font-mono shadow-lg ${
-              !analysisComplete || !user?.id ? "opacity-50 cursor-not-allowed" : "hover:scale-105"
+            className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-teal-500 to-cyan-500 transition-all font-mono shadow-lg ${
+              !analysisComplete || !user?.id ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_15px_rgba(20,184,166,0.7)]"
             }`}
-            whileHover={{ scale: analysisComplete && user?.id ? 1.05 : 1 }}
+            whileHover={{ scale: analysisComplete && user?.id ? 1.05 : 1, boxShadow: analysisComplete && user?.id ? "0 0 15px rgba(20, 184, 166, 0.7)" : "none" }}
             whileTap={{ scale: analysisComplete && user?.id ? 0.95 : 1 }}
           >
             Отправить себе
+          </motion.button>
+          <motion.button
+            onClick={handleSaveAnalysis}
+            className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-pink-500 to-purple-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(219,39,119,0.7)]"
+            whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(219, 39, 119, 0.7)" }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Сохранить анализ
+          </motion.button>
+          <motion.button
+            onClick={handleShareLink}
+            className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-cyan-500 to-teal-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(6,182,212,0.7)]"
+            whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(6, 182, 212, 0.7)" }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Поделиться ссылкой
           </motion.button>
         </div>
       </div>
 
       {(extractLoading || botLoading) && (
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${progress}%` }}
-          className="h-2 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full mb-8 shadow-[0_0_15px_rgba(147,51,234,0.7)] animate-pulse relative z-10"
-        />
+        <div className="mb-8 relative z-10">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${progress}%` }}
+            className="h-2 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full shadow-[0_0_15px_rgba(147,51,234,0.7)]"
+          />
+          <p className={`${theme === 'dark' ? 'text-white' : 'text-gray-900'} font-mono mt-2`}>
+            {extractLoading ? "Извлечение" : "Анализ"}: {Math.round(progress)}%
+          </p>
+        </div>
       )}
 
       {error && <p className="text-red-400 mb-8 font-mono relative z-10">{error}</p>}
 
       {files.length > 0 && (
-        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
-          <h3 className="text-2xl font-semibold text-white mb-4">Консоль файлов</h3>
-          <div className="grid grid-cols-3 gap-4">
+        <div className={`mb-8 ${theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-300'} p-6 rounded-xl border shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10`}>
+          <h3 className={`text-2xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Консоль файлов</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {groupedFiles.map(({ folder, files: folderFiles }, index) => (
-              <div key={`${folder}-${index}`} className="bg-gray-800 p-4 rounded-lg border border-gray-600 shadow-[0_0_10px_rgba(0,255,157,0.2)]">
+              <div key={`${folder}-${index}`} className={`${theme === 'dark' ? 'bg-gray-800 border-gray-600' : 'bg-gray-200 border-gray-400'} p-4 rounded-lg border shadow-[0_0_10px_rgba(0,255,157,0.2)]`}>
                 <h4 className="text-lg font-bold text-purple-400 mb-2">{folder}</h4>
                 <ul className="space-y-2">
                   {folderFiles.map((file) => (
@@ -428,7 +493,7 @@ ${txtOutput}
                         className={`font-mono text-sm ${
                           importantFiles.includes(file.path)
                             ? "text-cyan-400 font-bold animate-pulse"
-                            : "text-gray-400 hover:text-white"
+                            : theme === 'dark' ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-gray-900"
                         }`}
                       >
                         {getDisplayName(file.path)}
@@ -443,24 +508,20 @@ ${txtOutput}
       )}
 
       {txtOutput && (
-        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
-          <h3 className="text-2xl font-semibold text-white mb-4">Полный TXT</h3>
-          <textarea
-            value={txtOutput}
-            readOnly
-            className="w-full h-96 bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-none overflow-y-auto shadow-[0_0_10px_rgba(0,255,157,0.2)]"
-          />
+        <div className={`mb-8 ${theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-300'} p-6 rounded-xl border shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10`}>
+          <h3 className={`text-2xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Полный TXT</h3>
+          <SyntaxHighlighter language="typescript" style={oneDark} customStyle={{ background: theme === 'dark' ? '#1f2937' : '#f3f4f6', padding: '1rem', borderRadius: '0.5rem', maxHeight: '24rem', overflowY: 'auto' }}>
+            {txtOutput}
+          </SyntaxHighlighter>
         </div>
       )}
 
       {selectedOutput && (
-        <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
-          <h3 className="text-2xl font-semibold text-white mb-4">Выбранный TXT</h3>
-          <textarea
-            value={selectedOutput}
-            readOnly
-            className="w-full h-[768px] bg-gray-800 p-4 rounded-lg text-sm text-gray-300 font-mono border border-gray-700 resize-y min-h-[768px] max-h-[1536px] overflow-y-auto shadow-[0_0_10px_rgba(0,255,157,0.2)]"
-          />
+        <div className={`mb-8 ${theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-300'} p-6 rounded-xl border shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10`}>
+          <h3 className={`text-2xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Выбранный TXT</h3>
+          <SyntaxHighlighter language="typescript" style={oneDark} customStyle={{ background: theme === 'dark' ? '#1f2937' : '#f3f4f6', padding: '1rem', borderRadius: '0.5rem', maxHeight: '48rem', overflowY: 'auto' }}>
+            {selectedOutput}
+          </SyntaxHighlighter>
         </div>
       )}
 
@@ -485,10 +546,15 @@ export default function RepoXmlPage() {
   return (
     <>
       <meta name="viewport" content="width=1024, initial-scale=0.7, maximum-scale=5.0, user-scalable=yes" />
-      <div className="min-h-screen bg-gray-900">
-        <main className="py-6">
+      <div className="min-h-screen bg-gray-900 grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+        <div className="md:col-span-2">
           <RepoTxtFetcher />
-        </main>
+        </div>
+        <div className="hidden md:block">
+          <div className="bg-gray-800 p-6 rounded-xl h-full shadow-[0_0_15px_rgba(0,255,157,0.3)]">
+            <h3 className="text-xl font-bold text-white">Скоро будет...</h3>
+          </div>
+        </div>
       </div>
     </>
   );
