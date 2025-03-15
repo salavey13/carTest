@@ -382,7 +382,7 @@ function BotBustersDailyStatsSection({ language }) {
 }
 
 function BotHuntingToolsSection({ language }) {
-  const { user, isInTelegramContext } = useTelegram();
+  //const { user, isInTelegramContext } = useTelegram();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null); // Simplified type to avoid TS issues
@@ -447,7 +447,7 @@ function BotHuntingToolsSection({ language }) {
     };
     checkAccess();
   }, [user]);
-*/
+
   const handlePurchase = async () => {
     if (!user?.id) {
       setError("Please log in via Telegram");
@@ -503,7 +503,7 @@ function BotHuntingToolsSection({ language }) {
     } finally {
       setLoading(false);
     }
-  };
+  };*/
 
   return (
     <section className="py-16 bg-gray-900">
