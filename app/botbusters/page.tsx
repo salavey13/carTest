@@ -91,6 +91,41 @@ const BOT_CREATION_DATE = "2024-06-22";
 
 
 
+// BotBustersHeader: Updated with cyberpunk styling
+function BotBustersHeader({ language, toggleLanguage }) {
+  return (
+    <header className="bg-gray-900 p-4 pt-24 sticky top-0 z-10 border-b border-gray-700">
+      <nav className="flex items-center container mx-auto">
+        <div className="text-xl font-bold text-cyan-400 font-orbitron">BotBusters</div>
+        <div className="flex overflow-x-auto space-x-4 ml-4 scrollbar-hide">
+          <Link href="#home" className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors">
+            Home
+          </Link>
+          <Link
+            href="#submit-blocklist"
+            className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors"
+          >
+            {translations[language].submitTitle}
+          </Link>
+          <Link href="#stats" className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors">
+            {translations[language].statsTitle}
+          </Link>
+          <Link
+            href="https://grok.com/share/bGVnYWN5_2d4f7c04-f5b5-43d9-a4ee-141b2c6130c2"
+            target="_blank"
+            className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors"
+          >
+            Dev Chat
+          </Link>
+        </div>
+        <Button onClick={toggleLanguage} className="ml-4 bg-gray-800 hover:bg-gray-700 text-white">
+          {language === "en" ? "RU" : "EN"}
+        </Button>
+      </nav>
+    </header>
+  );
+}
+
 function BotHuntingToolsSection({ language }) {
   const { user, isInTelegramContext } = useTelegram();
   const [loading, setLoading] = useState(false);
@@ -281,40 +316,6 @@ function BotHuntingToolsSection({ language }) {
 
 
 
-// BotBustersHeader: Updated with cyberpunk styling
-function BotBustersHeader({ language, toggleLanguage }) {
-  return (
-    <header className="bg-gray-900 p-4 pt-24 sticky top-0 z-10 border-b border-gray-700">
-      <nav className="flex items-center container mx-auto">
-        <div className="text-xl font-bold text-cyan-400 font-orbitron">BotBusters</div>
-        <div className="flex overflow-x-auto space-x-4 ml-4 scrollbar-hide">
-          <Link href="#home" className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors">
-            Home
-          </Link>
-          <Link
-            href="#submit-blocklist"
-            className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors"
-          >
-            {translations[language].submitTitle}
-          </Link>
-          <Link href="#stats" className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors">
-            {translations[language].statsTitle}
-          </Link>
-          <Link
-            href="https://grok.com/share/bGVnYWN5_2d4f7c04-f5b5-43d9-a4ee-141b2c6130c2"
-            target="_blank"
-            className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors"
-          >
-            Dev Chat
-          </Link>
-        </div>
-        <Button onClick={toggleLanguage} className="ml-4 bg-gray-800 hover:bg-gray-700 text-white">
-          {language === "en" ? "RU" : "EN"}
-        </Button>
-      </nav>
-    </header>
-  );
-}
 
 // BotBustersHeroSection: Welcoming 9GAG users
 function BotBustersHeroSection({ language }) {
