@@ -597,18 +597,4 @@ export default function BotBustersHome() {
   );
 }
 
-// Add this to your CSS (e.g., globals.css) for cyberpunk styling
-/*
-@font-face {
-  font-family: 'Orbitron';
-  src: url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
-}
 
-.shadow-glow {
-  box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
-}
-
-.shadow-glow:hover {
-  box-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
-}
-*/
