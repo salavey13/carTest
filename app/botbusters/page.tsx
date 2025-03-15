@@ -391,7 +391,7 @@ function BotHuntingToolsSection({ language }) {
   const creationDate = parseISO(BOT_CREATION_DATE);
   const today = new Date();
   const ageInDays = differenceInDays(today, creationDate);
-
+/*
   useEffect(() => {
     const checkAccess = async () => {
       if (!user?.id) return; // Guard against undefined user
@@ -409,7 +409,7 @@ function BotHuntingToolsSection({ language }) {
     };
     checkAccess();
   }, [user]);
-  /*
+  
   return (
     <section className="py-16 bg-gray-900">
       <div>Hello, {translations[language].toolsTitle}</div>
@@ -447,7 +447,7 @@ function BotHuntingToolsSection({ language }) {
     };
     checkAccess();
   }, [user]);
-
+*/
   const handlePurchase = async () => {
     if (!user?.id) {
       setError("Please log in via Telegram");
@@ -504,7 +504,7 @@ function BotHuntingToolsSection({ language }) {
       setLoading(false);
     }
   };
-*/
+
   return (
     <section className="py-16 bg-gray-900">
       <div className="max-w-4xl mx-auto p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
