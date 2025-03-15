@@ -16,6 +16,7 @@ export const translations = {
     placeholder: "Enter bot usernames (comma-separated)",
     submitting: "Submitting...",
     submit: "Submit",
+    accountAge: "Accounts are currently {age} days old (created on {date}).",
     getStarted: "Get Started",
   },
   ru: {
@@ -34,6 +35,7 @@ export const translations = {
     exportBotList: "Экспортировать список ботов",
     placeholder: "Введите имена ботов (через запятую)",
     submitting: "Отправка...",
+    accountAge: "Аккаунты существуют уже {age} дней (созданы {date}).",
     submit: "Отправить",
     getStarted: "Начать",
   },
