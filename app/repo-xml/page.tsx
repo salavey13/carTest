@@ -3,8 +3,9 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { runCoseAgent } from "@/app/actions";
+import { runCoseAgent, notifyAdmin, sendTelegramMessage } from "@/app/actions";
 import { toast } from "sonner";
+import { useTelegram } from "@/hooks/useTelegram";
 
 interface FileNode {
   path: string;
@@ -24,6 +25,9 @@ const RepoTxtFetcher: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [toasts, setToasts] = useState<{ id: number; message: string }[]>([]);
   const [kworkInput, setKworkInput] = useState<string>("");
+  const [analysisComplete, setAnalysisComplete] = useState<boolean>(false);
+
+  const { user } = useTelegram();
 
   const importantFiles = [
     "app/actions.ts",
@@ -116,6 +120,7 @@ const RepoTxtFetcher: React.FC = () => {
     setFiles([]);
     setSelectedFiles(new Set());
     setProgress(0);
+    setAnalysisComplete(false);
     addToast("Запускаю извлечение...");
 
     try {
@@ -161,6 +166,7 @@ const RepoTxtFetcher: React.FC = () => {
     }
 
     setBotLoading(true);
+    setAnalysisComplete(false);
     addToast("Генерирую запрос для бота...");
 
     try {
@@ -170,7 +176,8 @@ const RepoTxtFetcher: React.FC = () => {
       const userId = "341503612082";
       const response = await runCoseAgent(botId, userId, fullInput);
       setTxtOutput(response);
-      addToast("Запрос для бота сгенерирован!");
+      setAnalysisComplete(true);
+      addToast("Анализ завершен!");
     } catch (err) {
       setError("Ошибка генерации запроса для бота.");
       addToast("Ошибка: Генерация не удалась!");
@@ -188,15 +195,74 @@ const RepoTxtFetcher: React.FC = () => {
   const handleAddBriefTree = () => {
     const briefTree = `
       Краткое дерево ключевых файлов:
-      - hooks/useTelegram.ts: Хук для получения пользователя из Telegram API.
-      - types/supabase.ts: Типы для Supabase, используйте хук Supabase для работы с таблицами и JSONB метаданными в таблице \`users\`.
-      - app/layout.tsx: Основной макет с хедером (учитывайте pt-24 для отступа) и футером, полезно для новых компонентов.
-      - app/actions.ts: Серверные действия для серверной логики (например, runCoseAgent).
+      - hooks/useTelegram.ts: Хук для получения текущего пользователя Telegram (chat ID и данные).
+      - types/supabase.ts: Типы для Supabase, используйте хук Supabase для доступа к \`supabaseAdmin\` клиенту и функциям вроде \`generateCarEmbedding\`.
+      - app/layout.tsx: Макет с хедером (pt-24 для отступа) и футером, полезно для новых компонентов.
+      - app/actions.ts: Серверные действия: \`sendTelegramMessage\` (отправка сообщений), \`runCoseAgent\` (запуск бота), \`notifyAdmin\` (уведомления админов), \`broadcastMessage\` (рассылка), \`handleWebhookUpdate\` (обработка платежей — обновите для новых подписок).
       - app/repo-xml/page.tsx: Этот инструмент для извлечения текста.
-      Остальное может быть сгенерировано на лету.
+      Остальное генерируется на лету.
     `;
     setKworkInput((prev) => `${prev}\n\n${briefTree}`);
     addToast("Краткое дерево добавлено в запрос!");
+  };
+
+  const handleShareWithAdmins = async () => {
+    if (!txtOutput) {
+      addToast("Нет результатов для отправки!");
+      return;
+    }
+
+    const message = `Результат анализа Kwork:\n\nЗапрос: ${kworkInput}\n\nАнализ:\n${txtOutput}`;
+    try {
+      const result = await notifyAdmin(message);
+       if (result.success) {
+        addToast("Результат отправлен админам!");
+      } else {
+        addToast("Ошибка при отправке админам!");
+      }
+    } catch (err) {
+      addToast("Ошибка: Не удалось отправить!");
+    }
+  };
+
+  const handleSendToMe = async () => {
+    if (!txtOutput) {
+      addToast("Нет результатов для отправки!");
+      return;
+    }
+    if (!user?.id) {
+      addToast("Пользователь Telegram не найден!");
+      return;
+    }
+
+    const markdownMessage = `
+*✨ Анализ Kwork от CyberDev ✨*
+
+**Запрос:**
+${kworkInput}
+
+**Результат анализа:**
+${txtOutput}
+
+*Поделитесь этим с командой, если хотите! 🚀*
+    `.trim();
+
+    try {
+      const result = await sendTelegramMessage(
+        process.env.TELEGRAM_BOT_TOKEN || "",
+        markdownMessage,
+        [],
+        undefined,
+        user.id.toString()
+      );
+      if (result.success) {
+        addToast("Анализ отправлен вам в Telegram!");
+      } else {
+        addToast("Ошибка при отправке вам!");
+      }
+    } catch (err) {
+      addToast("Ошибка: Не удалось отправить!");
+    }
   };
 
   const groupFilesByFolder = (files: FileNode[]) => {
@@ -226,17 +292,15 @@ const RepoTxtFetcher: React.FC = () => {
 
   return (
     <div className="w-full p-6 bg-gray-800 pt-24 rounded-2xl shadow-[0_0_30px_rgba(255,107,107,0.5)] border border-gray-700 repo-xml-content-wrapper relative overflow-hidden">
-      {/* Cyberpunk Overlay */}
       <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-transparent via-purple-900/10 to-cyan-900/10 animate-gradient-shift"></div>
 
       <h2 className="text-4xl font-bold text-white mb-6 tracking-wider animate-pulse text-shadow-neon relative z-10">
         Кибер-Экстрактор TXT
       </h2>
       <p className="text-gray-300 mb-8 text-lg font-mono relative z-10">
-        Извлекайте текст из репозиториев GitHub и анализируйте задачи с Kwork в стиле CyberDev!
+        Извлекайте текст из GitHub и анализируйте задачи с Kwork в стиле CyberDev!
       </p>
 
-      {/* Repo Input Section */}
       <div className="flex flex-col gap-4 mb-8 relative z-10">
         <input
           type="text"
@@ -265,7 +329,6 @@ const RepoTxtFetcher: React.FC = () => {
         </motion.button>
       </div>
 
-      {/* Kwork Input Section */}
       <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
         <h3 className="text-2xl font-semibold text-white mb-4">Kwork в Бота</h3>
         <textarea
@@ -310,6 +373,28 @@ const RepoTxtFetcher: React.FC = () => {
           >
             Добавить выбранные
           </motion.button>
+          <motion.button
+            onClick={handleShareWithAdmins}
+            disabled={!analysisComplete}
+            className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 transition-all font-mono shadow-lg ${
+              !analysisComplete ? "opacity-50 cursor-not-allowed" : "hover:scale-105"
+            }`}
+            whileHover={{ scale: analysisComplete ? 1.05 : 1 }}
+            whileTap={{ scale: analysisComplete ? 0.95 : 1 }}
+          >
+            Поделиться с админами
+          </motion.button>
+          <motion.button
+            onClick={handleSendToMe}
+            disabled={!analysisComplete || !user?.id}
+            className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 transition-all font-mono shadow-lg ${
+              !analysisComplete || !user?.id ? "opacity-50 cursor-not-allowed" : "hover:scale-105"
+            }`}
+            whileHover={{ scale: analysisComplete && user?.id ? 1.05 : 1 }}
+            whileTap={{ scale: analysisComplete && user?.id ? 0.95 : 1 }}
+          >
+            Отправить себе
+          </motion.button>
         </div>
       </div>
 
@@ -321,9 +406,7 @@ const RepoTxtFetcher: React.FC = () => {
         />
       )}
 
-      {error && (
-        <p className="text-red-400 mb-8 font-mono relative z-10">{error}</p>
-      )}
+      {error && <p className="text-red-400 mb-8 font-mono relative z-10">{error}</p>}
 
       {files.length > 0 && (
         <div className="mb-8 bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
