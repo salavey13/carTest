@@ -5,49 +5,104 @@ import { supabaseAnon, createAuthenticatedClient } from "@/hooks/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import Footer from "@/components/Footer";
-//import BotHuntingToolsSection from "@/components/PurchaseScriptsSection";
 import Link from "next/link";
 import { toast } from "sonner";
-//"use client";
-//import { useState, useEffect } from "react";
-//import { useTelegram } from "@/hooks/useTelegram"; // Adjust path to your Telegram hook
-import { sendTelegramInvoice } from "@/app/actions"; // Adjust path to your invoice actio
-//import { createInvoice, supabaseAdmin } from "@/hooks/supabase"; // Adjust path to your Supabase hook
 import { motion } from "framer-motion";
-//import { toast } from "sonner";
 import { differenceInDays, parseISO } from "date-fns";
-//import Link from "next/link";
 
-// Define the script pack details
+// Define translations for English and Russian
+const translations = {
+  en: {
+    title: "Join the Fight Against Bots on 9GAG!",
+    description: "Help us keep 9GAG bot-free with powerful tools and community action.",
+    welcome: "Welcome, 9GAG users! Tired of bots ruining your experience? Our tools help you block and report bots efficiently. Join the community effort to keep 9GAG clean and fun!",
+    share: "Share with 9GAG Community",
+    toolsTitle: "Our Bot-Hunting Tools",
+    statsTitle: "Bot-Hunting Stats",
+    submitTitle: "Submit Your Blocklist",
+    dailyBotsBlocked: "Daily Bots Blocked",
+    dailyReportsFiled: "Daily Reports Filed",
+    totalBots: "Total Bots Identified",
+    confirmedBots: "Confirmed Bots",
+    viewBotList: "View Bot List",
+    exportBotList: "Export Bot List",
+    placeholder: "Enter bot usernames (comma-separated)",
+    submitting: "Submitting...",
+    submit: "Submit",
+    howToSpot: "How to Spot a Bot",
+    repetitiveComments: "Repetitive comments like 'lol nice' on every post.",
+    randomUsernames: "Usernames with random numbers (e.g., User12345).",
+    noFollowers: "Accounts with hundreds of posts but no followers.",
+    accountAge: "Accounts are currently {age} days old (created on {date}).",
+    getStarted: "Get Started",
+    buyNow: "Buy Now",
+    processing: "Processing...",
+    preorder: "Preorder (Coming Soon)",
+    blockEmAllDesc: "Batch-block known bots with one click.",
+    purgeEmAllDesc: "Report and cleanse bot activity in bulk.",
+    hunterDesc: "Find new bots by tracing their network.",
+    automaDesc: "Unlock powerful Automa scripts to automate bot-blocking on 9GAG.",
+  },
+  ru: {
+    title: "Присоединяйтесь к борьбе с ботами на 9GAG!",
+    description: "Помогите нам очистить 9GAG от ботов с помощью мощных инструментов и действий сообщества.",
+    welcome: "Добро пожаловать, пользователи 9GAG! Устали от ботов, портящих ваш опыт? Наши инструменты помогут вам эффективно блокировать и сообщать о ботах. Присоединяйтесь к усилиям сообщества, чтобы сохранить 9GAG чистым и веселым! Кремлеботы, сдавайтесь и добавляйте свои никнеймы!",
+    share: "Поделиться с сообществом 9GAG",
+    toolsTitle: "Наши инструменты для борьбы с ботами",
+    statsTitle: "Статистика борьбы с ботами",
+    submitTitle: "Отправьте свой список блокировки",
+    dailyBotsBlocked: "Ботов заблокировано за день",
+    dailyReportsFiled: "Жалоб подано за день",
+    totalBots: "Всего обнаружено ботов",
+    confirmedBots: "Подтвержденные боты",
+    viewBotList: "Посмотреть список ботов",
+    exportBotList: "Экспортировать список ботов",
+    placeholder: "Введите имена ботов (через запятую)",
+    submitting: "Отправка...",
+    submit: "Отправить",
+    howToSpot: "Как распознать бота",
+    repetitiveComments: "Повторяющиеся комментарии, такие как 'лол круто' под каждым постом.",
+    randomUsernames: "Имена пользователей с случайными числами (например, User12345).",
+    noFollowers: "Аккаунты с сотнями постов, но без подписчиков.",
+    accountAge: "Аккаунты существуют уже {age} дней (созданы {date}).",
+    getStarted: "Начать",
+    buyNow: "Купить сейчас",
+    processing: "Обработка...",
+    preorder: "Предзаказ (Скоро будет)",
+    blockEmAllDesc: "Блокируйте известных ботов одним кликом.",
+    purgeEmAllDesc: "Сообщайте и очищайте активность ботов массово.",
+    hunterDesc: "Находите новых ботов, отслеживая их сеть.",
+    automaDesc: "Разблокируйте мощные скрипты Automa для автоматической блокировки ботов на 9GAG.",
+  },
+};
+
+// Script pack details
 const SCRIPT_PACK = {
   id: "automa_scripts",
   name: "Automa Bot-Hunting Scripts",
-  price: 100, // Price in XTR (adjust as needed)
-  description: "Unlock powerful Automa scripts to automate bot-blocking on 9GAG.",
+  price: 100, // Price in XTR
   color: "from-green-600 to-teal-400",
 };
 
-// Bot creation date: 256 days before March 4, 2025
+// Bot creation date
 const BOT_CREATION_DATE = "2024-06-22";
 
-function BotHuntingToolsSection() {
+// BotHuntingToolsSection: Purchase and preorder section
+function BotHuntingToolsSection({ language }) {
   const { user, isInTelegramContext } = useTelegram();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasAccess, setHasAccess] = useState<boolean>(false);
 
-  // Calculate bot age dynamically
   const creationDate = parseISO(BOT_CREATION_DATE);
   const today = new Date();
   const ageInDays = differenceInDays(today, creationDate);
 
-  // Check if the user already has script access
   useEffect(() => {
     const checkAccess = async () => {
       if (user) {
-        const { data, error } = await supabaseAdmin
+        const { data, error } = await supabaseAnon
           .from("users")
           .select("has_script_access")
           .eq("user_id", user.id.toString())
@@ -63,7 +118,6 @@ function BotHuntingToolsSection() {
     checkAccess();
   }, [user]);
 
-  // Handle purchase logic
   const handlePurchase = async () => {
     if (!user) {
       setError("Please log in via Telegram");
@@ -89,15 +143,24 @@ function BotHuntingToolsSection() {
     try {
       const metadata = { type: "script_access" };
       const payload = `script_access_${user.id}_${Date.now()}`;
-      await createInvoice("script_access", payload, user.id.toString(), SCRIPT_PACK.price, metadata);
-      const response = await sendTelegramInvoice(
-        user.id.toString(),
-        SCRIPT_PACK.name,
-        SCRIPT_PACK.description,
+      await createAuthenticatedClient(user.id.toString()).from("invoices").insert({
+        type: "script_access",
         payload,
-        SCRIPT_PACK.price
-      );
-      if (!response.success) throw new Error(response.error || "Failed to send invoice");
+        user_id: user.id.toString(),
+        price: SCRIPT_PACK.price,
+        metadata,
+      });
+      const response = await fetch("/api/sendTelegramInvoice", {
+        method: "POST",
+        body: JSON.stringify({
+          userId: user.id.toString(),
+          title: SCRIPT_PACK.name,
+          description: translations[language].automaDesc,
+          payload,
+          price: SCRIPT_PACK.price,
+        }),
+      });
+      if (!response.ok) throw new Error("Failed to send invoice");
       setSuccess(true);
       toast.success("Invoice sent to Telegram!");
     } catch (err) {
@@ -111,150 +174,168 @@ function BotHuntingToolsSection() {
 
   return (
     <div className="py-16 bg-gray-900">
-      <div className="max-w-4xl mx-auto p-6 bg-card rounded-xl shadow-lg border border-muted">
-        <h2 className="text-3xl font-bold text-center mb-8 text-gradient cyber-text">
-          Bot-Hunting Tools
+      <div className="max-w-4xl mx-auto p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
+        <h2 className="text-3xl font-bold text-center mb-8 text-white font-orbitron">
+          {translations[language].toolsTitle}
         </h2>
 
-        {/* Bot Tips Section */}
+        {/* How to Spot a Bot */}
         <div className="mb-12">
-          <h3 className="text-2xl font-bold mb-4 text-primary">How to Spot a Bot</h3>
+          <h3 className="text-2xl font-bold mb-4 text-cyan-400">{translations[language].howToSpot}</h3>
           <ul className="list-disc list-inside text-gray-300 font-mono">
-            <li>Repetitive comments like "lol nice" on every post.</li>
-            <li>Usernames with random numbers (e.g., User12345).</li>
-            <li>Accounts with hundreds of posts but no followers.</li>
+            <li>{translations[language].repetitiveComments}</li>
+            <li>{translations[language].randomUsernames}</li>
+            <li>{translations[language].noFollowers}</li>
             <li>
-              Accounts are currently{" "}
-              <span className="text-primary font-bold">{ageInDays} days old</span>{" "}
-              (created on{" "}
-              <span className="text-teal-400">{creationDate.toLocaleDateString()}</span>).
+              {translations[language].accountAge
+                .replace("{age}", ageInDays.toString())
+                .replace("{date}", creationDate.toLocaleDateString())}
             </li>
           </ul>
         </div>
 
-        {/* Purchase Section */}
-        <div>
-          <h3 className="text-2xl font-bold mb-4 text-primary">Get Automa Scripts</h3>
-          <p className="text-muted-foreground mb-4">{SCRIPT_PACK.description}</p>
-          <p className="text-3xl font-bold mb-6 font-mono">{SCRIPT_PACK.price} XTR</p>
-          {hasAccess ? (
-            <>
-              <p className="text-green-400 font-mono">Access already activated!</p>
-              <Link
+        {/* Purchase and Preorder Sections */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Automa Scripts */}
+          <div>
+            <h3 className="text-2xl font-bold mb-4 text-cyan-400">Get Automa Scripts</h3>
+            <p className="text-gray-300 mb-4">{translations[language].automaDesc}</p>
+            <p className="text-3xl font-bold mb-6 font-mono text-white">{SCRIPT_PACK.price} XTR</p>
+            {hasAccess ? (
+              <>
+                <p className="text-green-400 font-mono">Access already activated!</p>
+                <Link
                   href="https://automa.site/workflow/16rZppoNhrm7HCJSncPJV"
                   target="_blank"
                   className="text-blue-400 hover:text-blue-300 transition-colors"
                 >
                   View Automa Block Script
-               </Link>
-            </>
-          ) : (
-            <button
-              onClick={handlePurchase}
-              disabled={loading}
-              className={`w-full p-3 rounded-lg font-mono text-lg ${
-                loading
-                  ? "bg-muted cursor-not-allowed animate-pulse"
-                  : "bg-primary hover:bg-secondary text-primary-foreground"
-              } transition-all`}
+                </Link>
+              </>
+            ) : (
+              <Button
+                onClick={handlePurchase}
+                disabled={loading}
+                className={`w-full p-3 rounded-lg font-mono text-lg bg-gradient-to-r from-green-600 to-teal-400 hover:from-green-700 hover:to-teal-500 text-white transition-all shadow-glow`}
+              >
+                {loading ? translations[language].processing : translations[language].buyNow]}
+              </Button>
+            )}
+            {error && (
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-red-500 text-sm font-mono mt-4 text-center"
+              >
+                {error}
+              </motion.p>
+            )}
+          </div>
+
+          {/* Preorder Block'em All */}
+          <div>
+            <h3 className="text-2xl font-bold mb-4 text-cyan-400">Preorder Block'em All</h3>
+            <p className="text-gray-300 mb-4">{translations[language].blockEmAllDesc}</p>
+            <Button
+              disabled
+              className="w-full p-3 rounded-lg font-mono text-lg bg-gray-600 text-white shadow-glow"
             >
-              {loading ? "Processing..." : "Buy Now"}
-            </button>
-          )}
-          {error && (
-            <motion.p
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-destructive text-sm font-mono mt-4 text-center"
+              {translations[language].preorder}
+            </Button>
+          </div>
+
+          {/* Preorder Purge'em All */}
+          <div>
+            <h3 className="text-2xl font-bold mb-4 text-cyan-400">Preorder Purge'em All</h3>
+            <p className="text-gray-300 mb-4">{translations[language].purgeEmAllDesc}</p>
+            <Button
+              disabled
+              className="w-full p-3 rounded-lg font-mono text-lg bg-gray-600 text-white shadow-glow"
             >
-              {error}
-            </motion.p>
-          )}
+              {translations[language].preorder}
+            </Button>
+          </div>
+
+          {/* Preorder Hunter */}
+          <div>
+            <h3 className="text-2xl font-bold mb-4 text-cyan-400">Preorder Hunter</h3>
+            <p className="text-gray-300 mb-4">{translations[language].hunterDesc}</p>
+            <Button
+              disabled
+              className="w-full p-3 rounded-lg font-mono text-lg bg-gray-600 text-white shadow-glow"
+            >
+              {translations[language].preorder}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// BotBustersHeader: Navigation bar with horizontal scrolling
-function BotBustersHeader() {
+// BotBustersHeader: Updated with cyberpunk styling
+function BotBustersHeader({ language, toggleLanguage }) {
   return (
-    <header className="bg-gray-800 p-4 pt-24 sticky top-0 z-10">
+    <header className="bg-gray-900 p-4 pt-24 sticky top-0 z-10 border-b border-gray-700">
       <nav className="flex items-center container mx-auto">
-        <div className="text-xl font-bold text-white">BotBusters</div>
+        <div className="text-xl font-bold text-cyan-400 font-orbitron">BotBusters</div>
         <div className="flex overflow-x-auto space-x-4 ml-4 scrollbar-hide">
-          <Link href="#home" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
+          <Link href="#home" className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors">
             Home
           </Link>
-          <Link href="#submit-blocklist" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
-            Submit Blocklist
+          <Link
+            href="#submit-blocklist"
+            className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors"
+          >
+            {translations[language].submitTitle}
           </Link>
-          <Link href="#stats" className="text-white hover:text-gray-300 whitespace-nowrap transition-colors">
-            Stats
+          <Link href="#stats" className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors">
+            {translations[language].statsTitle}
           </Link>
           <Link
             href="https://grok.com/share/bGVnYWN5_2d4f7c04-f5b5-43d9-a4ee-141b2c6130c2"
             target="_blank"
-            className="text-white hover:text-gray-300 whitespace-nowrap transition-colors"
+            className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors"
           >
             Dev Chat
           </Link>
         </div>
+        <Button onClick={toggleLanguage} className="ml-4 bg-gray-800 hover:bg-gray-700 text-white">
+          {language === "en" ? "RU" : "EN"}
+        </Button>
       </nav>
     </header>
   );
 }
 
-// BotBustersHeroSection: Bold introduction with updated CTA
-function BotBustersHeroSection() {
+// BotBustersHeroSection: Welcoming 9GAG users
+function BotBustersHeroSection({ language }) {
   return (
     <section id="home" className="text-center py-16 bg-gray-900">
-      <h1 className="text-4xl md:text-5xl font-bold mb-4 text-white">
-        Join the Fight Against Bots on 9GAG!
+      <h1 className="text-4xl md:text-5xl font-bold mb-4 text-white font-orbitron">
+        {translations[language].title}
       </h1>
-      <p className="text-lg md:text-xl mb-8 text-gray-300">
-        Help us keep 9GAG bot-free with powerful tools and community action.
-      </p>
-      <Button asChild size="lg" className="bg-blue-600 hover:bg-blue-700 text-white transition-colors">
+      <p className="text-lg md:text-xl mb-8 text-gray-300">{translations[language].welcome}</p>
+      <Button asChild size="lg" className="bg-cyan-500 hover:bg-cyan-600 text-white transition-colors shadow-glow">
         <Link href="https://t.me/OneSitePlsBot/block9gag" target="_blank">
-          Get Started
+          {translations[language].getStarted}
+        </Link>
+      </Button>
+      <Button
+        asChild
+        size="lg"
+        className="ml-4 bg-green-600 hover:bg-green-700 text-white transition-colors shadow-glow"
+      >
+        <Link href="https://9gag.com" target="_blank">
+          {translations[language].share}
         </Link>
       </Button>
     </section>
   );
 }
 
-// BotBustersFeaturesSection: Highlight core tools
-function BotBustersFeaturesSection() {
-  return (
-    <section id="features" className="py-16 bg-gray-900">
-      <h2 className="text-3xl font-bold text-center mb-8 text-white">Our Tools</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 container mx-auto px-4">
-        <Card className="bg-gray-800 border-gray-700">
-          <CardHeader>
-            <CardTitle className="text-white">Block'em All</CardTitle>
-          </CardHeader>
-          <CardContent className="text-gray-300">Batch-block known bots with one click.</CardContent>
-        </Card>
-        <Card className="bg-gray-800 border-gray-700">
-          <CardHeader>
-            <CardTitle className="text-white">Purge'em All</CardTitle>
-          </CardHeader>
-          <CardContent className="text-gray-300">Report and cleanse bot activity in bulk.</CardContent>
-        </Card>
-        <Card className="bg-gray-800 border-gray-700">
-          <CardHeader>
-            <CardTitle className="text-white">Hunter</CardTitle>
-          </CardHeader>
-          <CardContent className="text-gray-300">Find new bots by tracing their network.</CardContent>
-        </Card>
-      </div>
-    </section>
-  );
-}
-
-// BotBustersBlocklistFormSection: Improved submission with upsert
-function BotBustersBlocklistFormSection({ dbUser }) {
+// BotBustersBlocklistFormSection: Multilingual submission form
+function BotBustersBlocklistFormSection({ dbUser, language }) {
   const [usernames, setUsernames] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -272,7 +353,7 @@ function BotBustersBlocklistFormSection({ dbUser }) {
           submitted_by: dbUser.user_id,
           last_updated: new Date().toISOString(),
         })),
-        { onConflict: "user_name", ignoreDuplicates: false } // Overwrite existing entries
+        { onConflict: "user_name", ignoreDuplicates: false }
       );
       if (upsertError) throw upsertError;
       setUsernames("");
@@ -287,20 +368,22 @@ function BotBustersBlocklistFormSection({ dbUser }) {
 
   return (
     <section id="submit-blocklist" className="py-16 bg-gray-900">
-      <h2 className="text-3xl font-bold text-center mb-8 text-white">Submit Your Blocklist</h2>
+      <h2 className="text-3xl font-bold text-center mb-8 text-white font-orbitron">
+        {translations[language].submitTitle}
+      </h2>
       <form onSubmit={handleSubmit} className="max-w-md mx-auto space-y-4">
         <Input
-          placeholder="Enter bot usernames (comma-separated)"
+          placeholder={translations[language].placeholder}
           className="bg-gray-800 border-gray-700 text-white"
           value={usernames}
           onChange={(e) => setUsernames(e.target.value)}
         />
         <Button
           type="submit"
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+          className="w-full bg-cyan-500 hover:bg-cyan-600 text-white transition-colors shadow-glow"
           disabled={isSubmitting}
         >
-          {isSubmitting ? "Submitting..." : "Submit"}
+          {isSubmitting ? translations[language].submitting : translations[language].submit}
         </Button>
         {error && <p className="text-red-500">{error}</p>}
       </form>
@@ -308,8 +391,8 @@ function BotBustersBlocklistFormSection({ dbUser }) {
   );
 }
 
-// BotBustersDailyStatsSection: Enhanced stats with precise counts and bot list export
-function BotBustersDailyStatsSection() {
+// BotBustersDailyStatsSection: Fixed Supabase limit with pagination
+function BotBustersDailyStatsSection({ language }) {
   const [stats, setStats] = useState({
     botsBlocked: 0,
     reportsFiled: 0,
@@ -342,25 +425,34 @@ function BotBustersDailyStatsSection() {
           .gte("created_at", today);
         if (reportsError) throw reportsError;
 
-        // Total bots
+        // Total bots count
         const { count: totalBotsCount, error: totalError } = await supabaseAnon
           .from("bots")
           .select("id", { count: "exact" });
         if (totalError) throw totalError;
 
-        // Confirmed bots
+        // Confirmed bots count
         const { count: confirmedBotsCount, error: confirmedError } = await supabaseAnon
           .from("bots")
           .select("id", { count: "exact" })
           .eq("confirmed", true);
         if (confirmedError) throw confirmedError;
 
-        // Fetch all bot usernames
-        const { data: bots, error: botsError } = await supabaseAnon
-          .from("bots")
-          .select("user_name")
-          .order("last_updated", { ascending: false });
-        if (botsError) throw botsError;
+        // Fetch all bot usernames with pagination
+        let allBots = [];
+        let offset = 0;
+        const limit = 1000;
+        while (true) {
+          const { data, error } = await supabaseAnon
+            .from("bots")
+            .select("user_name")
+            .order("last_updated", { ascending: false })
+            .range(offset, offset + limit - 1);
+          if (error) throw error;
+          allBots = allBots.concat(data);
+          if (data.length < limit) break;
+          offset += limit;
+        }
 
         setStats({
           botsBlocked: blocks.length,
@@ -368,7 +460,7 @@ function BotBustersDailyStatsSection() {
           totalBots: totalBotsCount,
           confirmedBots: confirmedBotsCount,
         });
-        setBotList(bots.map((bot) => bot.user_name));
+        setBotList(allBots.map((bot) => bot.user_name));
       } catch (err) {
         setError("Failed to load stats.");
       } finally {
@@ -392,30 +484,34 @@ function BotBustersDailyStatsSection() {
 
   return (
     <section id="stats" className="py-16 bg-gray-900 text-center">
-      <h2 className="text-3xl font-bold mb-4 text-white">Bot-Hunting Stats</h2>
+      <h2 className="text-3xl font-bold mb-4 text-white font-orbitron">
+        {translations[language].statsTitle}
+      </h2>
       <div className="text-gray-300 space-y-2">
-        <p>Daily Bots Blocked: {stats.botsBlocked}</p>
-        <p>Daily Reports Filed: {stats.reportsFiled}</p>
-        <p>Total Bots Identified: {stats.totalBots}</p>
-        <p>Confirmed Bots: {stats.confirmedBots}</p>
+        <p>{translations[language].dailyBotsBlocked}: {stats.botsBlocked}</p>
+        <p>{translations[language].dailyReportsFiled}: {stats.reportsFiled}</p>
+        <p>{translations[language].totalBots}: {stats.totalBots}</p>
+        <p>{translations[language].confirmedBots}: {stats.confirmedBots}</p>
         <Link
           href="https://docs.google.com/spreadsheets/d/1rpSqA9Dh_QSNgocqtpCm9a371pTRldJ-hshUSCyjTmo/edit?pli=1&gid=0#gid=0"
           target="_blank"
-          className="text-blue-400 hover:text-blue-300 transition-colors"
+          className="text-cyan-400 hover:text-cyan-300 transition-colors"
         >
-          View Bot List
+          {translations[language].viewBotList}
         </Link>
       </div>
 
       {/* Bot List Export */}
       <div className="mt-8 max-w-md mx-auto">
-        <h3 className="text-xl font-semibold mb-4 text-white">Export Bot List</h3>
+        <h3 className="text-xl font-semibold mb-4 text-white">
+          {translations[language].exportBotList}
+        </h3>
         <div className="flex flex-wrap justify-center gap-2 mb-4">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setSelectedList(getBotList(13))}
-            className="text-white border-gray-700 hover:bg-gray-700"
+            className="text-white border-gray-700 hover:bg-gray-700 shadow-glow"
           >
             Top 13
           </Button>
@@ -423,7 +519,7 @@ function BotBustersDailyStatsSection() {
             variant="outline"
             size="sm"
             onClick={() => setSelectedList(getBotList(69))}
-            className="text-white border-gray-700 hover:bg-gray-700"
+            className="text-white border-gray-700 hover:bg-gray-700 shadow-glow"
           >
             Top 69
           </Button>
@@ -431,7 +527,7 @@ function BotBustersDailyStatsSection() {
             variant="outline"
             size="sm"
             onClick={() => setSelectedList(getBotList(146))}
-            className="text-white border-gray-700 hover:bg-gray-700"
+            className="text-white border-gray-700 hover:bg-gray-700 shadow-glow"
           >
             Top 146
           </Button>
@@ -439,7 +535,7 @@ function BotBustersDailyStatsSection() {
             variant="outline"
             size="sm"
             onClick={() => setSelectedList(getBotList(420))}
-            className="text-white border-gray-700 hover:bg-gray-700"
+            className="text-white border-gray-700 hover:bg-gray-700 shadow-glow"
           >
             Top 420
           </Button>
@@ -447,7 +543,7 @@ function BotBustersDailyStatsSection() {
             variant="outline"
             size="sm"
             onClick={() => setSelectedList(getBotList(1000))}
-            className="text-white border-gray-700 hover:bg-gray-700"
+            className="text-white border-gray-700 hover:bg-gray-700 shadow-glow"
           >
             Top 1k
           </Button>
@@ -455,7 +551,7 @@ function BotBustersDailyStatsSection() {
             variant="outline"
             size="sm"
             onClick={() => setSelectedList(botList.join(","))}
-            className="text-white border-gray-700 hover:bg-gray-700"
+            className="text-white border-gray-700 hover:bg-gray-700 shadow-glow"
           >
             All
           </Button>
@@ -469,7 +565,7 @@ function BotBustersDailyStatsSection() {
             />
             <Button
               size="sm"
-              className="absolute right-1 top-1/2 transform -translate-y-1/2 bg-blue-600 hover:bg-blue-700"
+              className="absolute right-1 top-1/2 transform -translate-y-1/2 bg-cyan-500 hover:bg-cyan-600 shadow-glow"
               onClick={() => handleCopy(selectedList)}
             >
               Copy
@@ -481,18 +577,38 @@ function BotBustersDailyStatsSection() {
   );
 }
 
-// Main Home component
+// Main BotBustersHome component
 export default function BotBustersHome() {
   const { dbUser } = useTelegram();
+  const [language, setLanguage] = useState("en");
+
+  const toggleLanguage = () => {
+    setLanguage((prev) => (prev === "en" ? "ru" : "en"));
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      <BotBustersHeader />
-      <BotBustersHeroSection />
-      <BotBustersFeaturesSection />
-      {dbUser && <BotBustersBlocklistFormSection dbUser={dbUser} />}
-      <BotHuntingToolsSection />
-      <BotBustersDailyStatsSection />
+      <BotBustersHeader language={language} toggleLanguage={toggleLanguage} />
+      <BotBustersHeroSection language={language} />
+      {dbUser && <BotBustersBlocklistFormSection dbUser={dbUser} language={language} />}
+      <BotHuntingToolsSection language={language} />
+      <BotBustersDailyStatsSection language={language} />
     </div>
   );
 }
+
+// Add this to your CSS (e.g., globals.css) for cyberpunk styling
+/*
+@font-face {
+  font-family: 'Orbitron';
+  src: url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+}
+
+.shadow-glow {
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
+
+.shadow-glow:hover {
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
+}
+*/
