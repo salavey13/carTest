@@ -157,6 +157,7 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
           {/* Preorder Block'em All */}
           <div className="p-4 bg-gray-900/60 rounded-lg border border-cyan-500/40 hover:border-cyan-500 transition-all duration-300">
             <h3 className="text-2xl font-bold mb-3 text-teal-400 font-orbitron">Block'em All</h3>
+      
             {hasAccess && (
               <p className="text-gray-300 mb-4 font-mono text-sm">{translations[language].blockEmAllDesc}</p>
             {/* Note: This link might be a placeholder; consider restricting or removing until available */}
