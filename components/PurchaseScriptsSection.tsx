@@ -107,9 +107,9 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
             {translations[language].howToSpot}
           </h3>
           <ul className="list-disc list-inside text-gray-200 font-mono text-sm">
-            <li>{translations[language].repetitiveComments}</li>
+            {/*<li>{translations[language].repetitiveComments}</li>
             <li>{translations[language].randomUsernames}</li>
-            <li>{translations[language].noFollowers}</li>
+            <li>{translations[language].noFollowers}</li>*/}
             <li>
               {translations[language].accountAge
                 ? translations[language].accountAge
@@ -154,6 +154,9 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
                 </p>
               </div>
             )*/}
+            {haveAccess && (
+              <p className="text-green-400 font-mono text-sm">Access Activated</p>
+            )}
             {error && (
               <motion.p
                 initial={{ opacity: 0, y: 10 }}
@@ -169,8 +172,7 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
           <div className="p-4 bg-gray-900/50 rounded-lg border border-cyan-500/30 hover:border-cyan-500 transition-all">
             <h3 className="text-2xl font-bold mb-3 text-teal-400 font-orbitron">Block'em All</h3>
             <p className="text-gray-300 mb-4 font-mono text-sm">{translations[language].blockEmAllDesc}</p>
-            <p className="text-green-400 font-mono text-sm">Access Activated</p>
-                <Link
+            <Link
                   href="https://automa.site/workflow/16rZppoNhrm7HCJSncPJV"
                   target="_blank"
                   className="text-cyan-400 hover:text-cyan-300 font-mono text-sm underline transition-colors"
@@ -190,9 +192,7 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
                 >
                   {translations[language].preorder}
                 </Button>
-                <p className="text-yellow-300 font-mono text-sm animate-pulse">
-                  Be the FIRST Hunter!
-                </p>
+                
           </div>
 
           {/* Preorder Hunter */}
@@ -206,6 +206,9 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
                 >
                   {translations[language].preorder}
                 </Button>
+            <p className="text-yellow-300 font-mono text-sm animate-pulse">
+                  Be the FIRST Hunter!
+                </p>
           </div>
         </div>
       </div>
