@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useTelegram } from "@/hooks/useTelegram";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { FaTree, FaKey, FaFileAlt, FaShareAlt, FaTelegramPlane, FaSave, FaLink } from 'react-icons/fa';
 
 interface FileNode {
   path: string;
@@ -47,8 +48,11 @@ const RepoTxtFetcher: React.FC = () => {
 
   const addToast = (message: string) => {
     const id = Date.now();
-    setToasts((prev) => [...prev, { id, message }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
+    setToasts((prev) => {
+      if (prev.length >= 3) prev.shift(); // Limit to 3 toasts
+      return [...prev, { id, message }];
+    });
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2000); // Reduced TTL
   };
 
   const parseRepoUrl = (url: string) => {
@@ -334,7 +338,7 @@ ${txtOutput}
         Извлекайте текст из GitHub и анализируйте задачи с Kwork в стиле CyberDev!
       </p>
 
-      <div className="fixed top-4 right-4 z-50">
+      <div className="fixed top-16 right-4 z-50">
         <motion.button
           onClick={toggleTheme}
           className={`p-2 rounded-full ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-gray-300 text-gray-900'} shadow-[0_0_10px_rgba(147,51,234,0.5)]`}
@@ -393,68 +397,33 @@ ${txtOutput}
           >
             {botLoading ? "Генерация..." : "Анализировать с Ботом"}
           </motion.button>
-          <motion.button
-            onClick={handleAddFullTree}
-            className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-red-500 to-orange-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(255,107,107,0.7)]"
-            whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(255, 107, 107, 0.7)" }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Добавить дерево
-          </motion.button>
-          <motion.button
-            onClick={handleAddBriefTree}
-            className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-green-500 to-lime-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]"
-            whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(0, 255, 157, 0.7)" }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Добавить ключевые
-          </motion.button>
-          <motion.button
-            onClick={handleAddSelected}
-            className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(99,102,241,0.7)]"
-            whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(99, 102, 241, 0.7)" }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Добавить выбранные
-          </motion.button>
-          <motion.button
-            onClick={handleShareWithAdmins}
-            disabled={!analysisComplete}
-            className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-yellow-500 to-orange-500 transition-all font-mono shadow-lg ${
-              !analysisComplete ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_15px_rgba(251,191,36,0.7)]"
-            }`}
-            whileHover={{ scale: analysisComplete ? 1.05 : 1, boxShadow: analysisComplete ? "0 0 15px rgba(251, 191, 36, 0.7)" : "none" }}
-            whileTap={{ scale: analysisComplete ? 0.95 : 1 }}
-          >
-            Поделиться с админами
-          </motion.button>
-          <motion.button
-            onClick={handleSendToMe}
-            disabled={!analysisComplete || !user?.id}
-            className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-teal-500 to-cyan-500 transition-all font-mono shadow-lg ${
-              !analysisComplete || !user?.id ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_15px_rgba(20,184,166,0.7)]"
-            }`}
-            whileHover={{ scale: analysisComplete && user?.id ? 1.05 : 1, boxShadow: analysisComplete && user?.id ? "0 0 15px rgba(20, 184, 166, 0.7)" : "none" }}
-            whileTap={{ scale: analysisComplete && user?.id ? 0.95 : 1 }}
-          >
-            Отправить себе
-          </motion.button>
-          <motion.button
-            onClick={handleSaveAnalysis}
-            className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-pink-500 to-purple-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(219,39,119,0.7)]"
-            whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(219, 39, 119, 0.7)" }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Сохранить анализ
-          </motion.button>
-          <motion.button
-            onClick={handleShareLink}
-            className="px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-cyan-500 to-teal-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(6,182,212,0.7)]"
-            whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(6, 182, 212, 0.7)" }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Поделиться ссылкой
-          </motion.button>
+          <div className="flex flex-col gap-2">
+            <h4 className="text-lg font-bold text-white">Добавить в запрос</h4>
+            <motion.button onClick={handleAddFullTree} className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-red-500 to-orange-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(255,107,107,0.7)]">
+              <FaTree /> Добавить дерево
+            </motion.button>
+            <motion.button onClick={handleAddBriefTree} className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-green-500 to-lime-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]">
+              <FaKey /> Добавить ключевые
+            </motion.button>
+            <motion.button onClick={handleAddSelected} className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(99,102,241,0.7)]">
+              <FaFileAlt /> Добавить выбранные
+            </motion.button>
+          </div>
+          <div className="flex flex-col gap-2">
+            <h4 className="text-lg font-bold text-white">Действия с анализом</h4>
+            <motion.button onClick={handleShareWithAdmins} disabled={!analysisComplete} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-yellow-500 to-orange-500 transition-all font-mono shadow-lg ${!analysisComplete ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_15px_rgba(251,191,36,0.7)]"}`}>
+              <FaShareAlt /> Поделиться с админами
+            </motion.button>
+            <motion.button onClick={handleSendToMe} disabled={!analysisComplete || !user?.id} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-teal-500 to-cyan-500 transition-all font-mono shadow-lg ${!analysisComplete || !user?.id ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_15px_rgba(20,184,166,0.7)]"}`}>
+              <FaTelegramPlane /> Отправить себе
+            </motion.button>
+            <motion.button onClick={handleSaveAnalysis} className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-pink-500 to-purple-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(219,39,119,0.7)]">
+              <FaSave /> Сохранить анализ
+            </motion.button>
+            <motion.button onClick={handleShareLink} className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-cyan-500 to-teal-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(6,182,212,0.7)]">
+              <FaLink /> Поделиться ссылкой
+            </motion.button>
+          </div>
         </div>
       </div>
 
@@ -510,9 +479,11 @@ ${txtOutput}
       {txtOutput && (
         <div className={`mb-8 ${theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-300'} p-6 rounded-xl border shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10`}>
           <h3 className={`text-2xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Полный TXT</h3>
-          <SyntaxHighlighter language="typescript" style={oneDark} customStyle={{ background: theme === 'dark' ? '#1f2937' : '#f3f4f6', padding: '1rem', borderRadius: '0.5rem', maxHeight: '24rem', overflowY: 'auto' }}>
-            {txtOutput}
-          </SyntaxHighlighter>
+          <textarea
+            value={txtOutput}
+            readOnly
+            className={`w-full h-96 p-4 ${theme === 'dark' ? 'bg-gray-800 text-gray-300' : 'bg-gray-200 text-gray-700'} rounded-lg text-sm font-mono border ${theme === 'dark' ? 'border-gray-700' : 'border-gray-300'} resize-none overflow-y-auto shadow-[0_0_10px_rgba(0,255,157,0.2)]`}
+          />
         </div>
       )}
 
@@ -532,7 +503,7 @@ ${txtOutput}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
-            className="bg-purple-500 text-white p-3 rounded-lg shadow-lg font-mono border border-purple-700 shadow-[0_0_10px_rgba(147,51,234,0.5)]"
+            className="bg-purple-500 text-white p-2 rounded-lg shadow-lg font-mono text-sm border border-purple-700 shadow-[0_0_10px_rgba(147,51,234,0.5)]"
           >
             {toast.message}
           </motion.div>
@@ -547,10 +518,10 @@ export default function RepoXmlPage() {
     <>
       <meta name="viewport" content="width=1024, initial-scale=0.7, maximum-scale=5.0, user-scalable=yes" />
       <div className="min-h-screen bg-gray-900 grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
-        <div className="md:col-span-2">
+        <div className="col-span-1 md:col-span-2">
           <RepoTxtFetcher />
         </div>
-        <div className="hidden md:block">
+        <div className="hidden md:block md:col-span-1">
           <div className="bg-gray-800 p-6 rounded-xl h-full shadow-[0_0_15px_rgba(0,255,157,0.3)]">
             <h3 className="text-xl font-bold text-white">Скоро будет...</h3>
           </div>
