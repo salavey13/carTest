@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useTelegram } from "@/hooks/useTelegram";
-import { supabaseAnon, createAuthenticatedClient } from "@/hooks/supabase";
+import { supabaseAdmin, createAuthenticatedClient } from "@/hooks/supabase"; // Updated import
+import { sendTelegramInvoice, notifyAdmin } from "@/app/actions"; // Added actions import
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,7 +88,9 @@ const SCRIPT_PACK = {
 // Bot creation date
 const BOT_CREATION_DATE = "2024-06-22";
 
-// BotHuntingToolsSection: Purchase and preorder section
+
+
+
 function BotHuntingToolsSection({ language }) {
   const { user, isInTelegramContext } = useTelegram();
   const [loading, setLoading] = useState(false);
@@ -102,7 +105,7 @@ function BotHuntingToolsSection({ language }) {
   useEffect(() => {
     const checkAccess = async () => {
       if (user) {
-        const { data, error } = await supabaseAnon
+        const { data, error } = await supabaseAdmin // Replaced supabaseAnon
           .from("users")
           .select("has_script_access")
           .eq("user_id", user.id.toString())
@@ -150,19 +153,17 @@ function BotHuntingToolsSection({ language }) {
         price: SCRIPT_PACK.price,
         metadata,
       });
-      const response = await fetch("/api/sendTelegramInvoice", {
-        method: "POST",
-        body: JSON.stringify({
-          userId: user.id.toString(),
-          title: SCRIPT_PACK.name,
-          description: translations[language].automaDesc,
-          payload,
-          price: SCRIPT_PACK.price,
-        }),
-      });
-      if (!response.ok) throw new Error("Failed to send invoice");
+      const response = await sendTelegramInvoice( // Replaced fetch with action
+        user.id.toString(),
+        SCRIPT_PACK.name,
+        translations[language].automaDesc,
+        payload,
+        SCRIPT_PACK.price
+      );
+      if (!response.success) throw new Error(response.error || "Failed to send invoice");
       setSuccess(true);
       toast.success("Invoice sent to Telegram!");
+      await notifyAdmin(`User ${user.id} purchased ${SCRIPT_PACK.name} for ${SCRIPT_PACK.price} XTR`); // Added admin notification
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Unknown error";
       setError("Purchase error: " + errMsg);
@@ -173,7 +174,7 @@ function BotHuntingToolsSection({ language }) {
   };
 
   return (
-    <div className="py-16 bg-gray-900">
+    <section className="py-16 bg-gray-900"> {/* Changed div to section */}
       <div className="max-w-4xl mx-auto p-6 bg-gray-800 rounded-xl shadow-lg border border-gray-700">
         <h2 className="text-3xl font-bold text-center mb-8 text-white font-orbitron">
           {translations[language].toolsTitle}
@@ -213,13 +214,18 @@ function BotHuntingToolsSection({ language }) {
                 </Link>
               </>
             ) : (
-              <Button
-                onClick={handlePurchase}
-                disabled={loading}
-                className={`w-full p-3 rounded-lg font-mono text-lg bg-gradient-to-r from-green-600 to-teal-400 hover:from-green-700 hover:to-teal-500 text-white transition-all shadow-glow`}
-              >
-                {loading ? translations[language].processing : translations[language].buyNow]}
-              </Button>
+              <>
+                <Button
+                  onClick={handlePurchase}
+                  disabled={loading}
+                  className={`w-full p-3 rounded-lg font-mono text-lg bg-gradient-to-r from-green-600 to-teal-400 hover:from-green-700 hover:to-teal-500 text-white transition-all shadow-glow`}
+                >
+                  {loading ? translations[language].processing : translations[language].buyNow]}
+                </Button>
+                <p className="text-yellow-400 font-bold mt-4 font-mono">
+                  Be the FIRST to get these scripts! Use code <span className="text-white">FIRSTHUNTER</span> for 20% off – only for the first buyer!
+                </p>
+              </>
             )}
             {error && (
               <motion.p
@@ -269,9 +275,11 @@ function BotHuntingToolsSection({ language }) {
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
+
+
 
 // BotBustersHeader: Updated with cyberpunk styling
 function BotBustersHeader({ language, toggleLanguage }) {
