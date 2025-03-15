@@ -382,7 +382,11 @@ function BotBustersDailyStatsSection({ language }) {
 }
 
 function BotHuntingToolsSection({ language }) {
-  return <section className="py-16 bg-gray-900">Hello, {translations[language].toolsTitle}</section>;
+  return (
+    <section className="py-16 bg-gray-900">
+      <div>Hello, {translations[language].toolsTitle}</div>
+    </section>
+  );
 }
 
 /*
