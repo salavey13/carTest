@@ -150,8 +150,8 @@ export default function PurchaseScriptsSection({ language }: { language: "en" | 
                   {loading ? translations[language].processing : translations[language].buyNow]}
                 </Button>
                 <p className="text-yellow-300 font-mono text-sm animate-pulse">
-                  Be the FIRST Hunter! Code: <span className="text-white">FIRSTHUNTER</span> for 20% off
-                </p>
+                  Be the FIRST Hunter!
+                </p>{/*Code: <span className="text-white">FIRSTHUNTER</span> for 20% off*/}
               </div>
             )}
             {error && (
