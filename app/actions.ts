@@ -45,7 +45,25 @@ function getBaseUrl() {
 
 
 
+export async function notifyAdmins(message: string) {
+  const { data: admins, error } = await supabaseAdmin
+    .from("users")
+    .select("user_id")
+    .eq("status", "admin");
 
+  if (error) throw error;
+
+  for (const admin of admins) {
+    await sendTelegramMessage(
+      process.env.TELEGRAM_BOT_TOKEN!,
+      message,
+      [],
+      undefined,
+      admin.user_id
+    );
+  }
+  return { success: true };
+}
 
 
 interface CaptchaSettings {
