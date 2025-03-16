@@ -22,7 +22,7 @@ export default function Pavele0903() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center relative">
+    <div className="min-h-screen pt-24 bg-gray-900 text-white flex flex-col items-center relative">
       <main className="w-full max-w-md p-4 space-y-8">
         {/* Intro Section */}
         <section id="intro" className="space-y-4">
