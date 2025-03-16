@@ -43,6 +43,7 @@ export const translations = {
     snatcherProcessing: "Processing...",
     snatcherLoginError: "Please log in via Telegram",
     snatcherAlreadyOwned: "You already have access",
+    testButton: "Test Order Snatcher",
   },
   ru: {
     // Page-level text
@@ -88,5 +89,6 @@ export const translations = {
     snatcherProcessing: "Обрабатываем, жди...",
     snatcherLoginError: "Войди через Telegram, чувак!",
     snatcherAlreadyOwned: "У тебя уже есть это, хитрец!",
+    testButton: "Тест Хваталки Заказов",
   },
 };
