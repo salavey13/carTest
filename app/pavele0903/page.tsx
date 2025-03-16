@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTelegram } from "@/hooks/useTelegram";
+import { supabaseAdmin } from "@/hooks/supabase";
 import { translations } from "@/components/translations_inventory";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { FaWarehouse, FaTools, FaChartBar, FaCog } from "react-icons/fa";
+import { FaWarehouse, FaBox, FaTools, FaChartBar, FaCog } from "react-icons/fa";
 import SettingsForm from "@/components/SettingsForm";
 import OrderList from "@/components/OrderList";
 import InventoryTable from "@/components/InventoryTable";
@@ -15,10 +16,35 @@ import OrderSnatcherSection from "@/components/OrderSnatcherSection";
 
 export default function Pavele0903() {
   const { user } = useTelegram();
-  const lang = user?.language_code === "ru" ? "ru" : "en"; // Default to English if not Russian
+  const lang = user?.language_code === "ru" ? "ru" : "en";
+  const [refreshKey, setRefreshKey] = useState(0); // For forcing re-render
 
   const scrollToSection = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const addTestOrder = async () => {
+    const crmNames = ["crm1", "crm2", "crm3"];
+    const serviceIds = ["test1", "test2", "test3", "test4"];
+    const serviceTypes = ["Basic Wash", "Waxing", "Deep Clean"];
+    const carSizes = ["Small", "Sedan", "SUV", "Truck"];
+
+    const randomOrder = {
+      crm_name: crmNames[Math.floor(Math.random() * crmNames.length)],
+      service_id: `test-${Date.now()}-${Math.floor(Math.random() * 1000)}`, // Unique ID
+      service_type: serviceTypes[Math.floor(Math.random() * serviceTypes.length)],
+      car_size: carSizes[Math.floor(Math.random() * carSizes.length)],
+      completed_at: new Date().toISOString(),
+      processed: false,
+    };
+
+    const { error } = await supabaseAdmin.from("orders").insert(randomOrder);
+
+    if (error) {
+      console.error("Failed to add test order:", error.message);
+    } else {
+      setRefreshKey((prev) => prev + 1); // Trigger re-render
+    }
   };
 
   return (
@@ -39,7 +65,7 @@ export default function Pavele0903() {
         <section id="warehouse" className="space-y-4">
           <h2 className="text-xl font-semibold">{translations[lang].warehouse}</h2>
           <Card className="p-4 bg-gray-800">
-            <InventoryTable />
+            <InventoryTable key={refreshKey} />
           </Card>
         </section>
 
@@ -47,13 +73,16 @@ export default function Pavele0903() {
         <section id="tools" className="space-y-4">
           <h2 className="text-xl font-semibold">{translations[lang].tools}</h2>
           <OrderSnatcherSection language={lang} />
+          <Button onClick={addTestOrder} className="bg-[#ff007a] hover:bg-[#ff007a]/80">
+            {translations[lang].testButton || "Test Order Snatcher"}
+          </Button>
         </section>
 
         {/* Stats Section */}
         <section id="stats" className="space-y-4">
           <h2 className="text-xl font-semibold">{translations[lang].stats}</h2>
           <Card className="p-4 bg-gray-800">
-            <OrderList />
+            <OrderList key={refreshKey} />
           </Card>
         </section>
 
@@ -70,16 +99,16 @@ export default function Pavele0903() {
           <FaWarehouse className="text-lg" />
         </button>
         <button onClick={() => scrollToSection("warehouse")} className="p-2 bg-gray-700 rounded-full">
-          <FaWarehouse />
+          <FaBox className="text-lg" />
         </button>
         <button onClick={() => scrollToSection("tools")} className="p-2 bg-gray-700 rounded-full">
-          <FaTools />
+          <FaTools className="text-lg" />
         </button>
         <button onClick={() => scrollToSection("stats")} className="p-2 bg-gray-700 rounded-full">
-          <FaChartBar />
+          <FaChartBar className="text-lg" />
         </button>
         <button onClick={() => scrollToSection("settings")} className="p-2 bg-gray-700 rounded-full">
-          <FaCog />
+          <FaCog className="text-lg" />
         </button>
       </nav>
     </div>
