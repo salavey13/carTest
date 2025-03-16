@@ -3,7 +3,10 @@
 import { useEffect } from "react";
 import { useTelegram } from "@/hooks/useTelegram";
 import { translations } from "@/components/translations_inventory";
-import { Button, Card, Input, Modal } from "@/components/ui"; // Assuming Vercel UI
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
 import { FaWarehouse, FaTools, FaChartBar, FaCog } from "react-icons/fa";
 import SettingsForm from "@/components/SettingsForm";
 import OrderList from "@/components/OrderList";
