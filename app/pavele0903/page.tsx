@@ -2,8 +2,8 @@
 
 import { useEffect } from "react";
 import { useTelegram } from "@/hooks/useTelegram";
-import { translations } from "@/translations_inventory";
-import { Button, Card, Input, Modal } from "@vercel/ui"; // Assuming Vercel UI
+import { translations } from "@/components/translations_inventory";
+import { Button, Card, Input, Modal } from "@/components/ui"; // Assuming Vercel UI
 import { FaWarehouse, FaTools, FaChartBar, FaCog } from "react-icons/fa";
 import SettingsForm from "@/components/SettingsForm";
 import OrderList from "@/components/OrderList";
