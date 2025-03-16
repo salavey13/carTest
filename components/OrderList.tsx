@@ -17,20 +17,55 @@ export default function OrderList() {
 
   useEffect(() => {
     if (!dbUser || !isAdmin()) return;
+
+    // Initial fetch
     const fetchOrders = async () => {
-      let query = supabaseAdmin.from("orders").select("*").order("completed_at", { ascending: false });
+      let query = supabaseAdmin
+        .from("orders")
+        .select("*")
+        .order("completed_at", { ascending: false });
       if (filter === "processed") query = query.eq("processed", true);
       if (filter === "unprocessed") query = query.eq("processed", false);
 
       const { data, error } = await query;
       if (error) {
-        toast.error(`Error fetching orders: ${error.message}`);
+        toast.error(`Ошибка загрузки заказов: ${error.message}`);
       } else {
         setOrders(data || []);
       }
       setLoading(false);
     };
     fetchOrders();
+
+    // Realtime subscription
+    const channel = supabaseAdmin
+      .channel("orders_changes")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "orders" },
+        (payload) => {
+          setOrders((prev) => {
+            const newOrder = payload.new;
+            // Apply filter logic to decide if new order should be added
+            if (
+              filter === "all" ||
+              (filter === "processed" && newOrder.processed) ||
+              (filter === "unprocessed" && !newOrder.processed)
+            ) {
+              return [newOrder, ...prev].sort((a, b) =>
+                new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
+              );
+            }
+            return prev; // If it doesn’t match filter, keep list unchanged
+          });
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabaseAdmin.removeChannel(channel);
+    };
   }, [dbUser, isAdmin, filter]);
 
   const paginatedOrders = orders.slice((page - 1) * itemsPerPage, page * itemsPerPage);
@@ -40,8 +75,15 @@ export default function OrderList() {
   if (!dbUser || !isAdmin()) return null;
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gray-800/80 backdrop-blur-md rounded-xl shadow-2xl border border-cyan-500/30 p-6">
-      <h2 className="text-2xl font-bold mb-4 text-teal-400 font-orbitron glitch" data-text={translations[lang].ordersTitle}>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-gray-800/80 backdrop-blur-md rounded-xl shadow-2xl border border-cyan-500/30 p-6"
+    >
+      <h2
+        className="text-2xl font-bold mb-4 text-teal-400 font-orbitron glitch"
+        data-text={translations[lang].ordersTitle}
+      >
         {translations[lang].ordersTitle}
       </h2>
       <div className="flex gap-4 mb-4">
@@ -49,7 +91,9 @@ export default function OrderList() {
           <button
             key={f}
             onClick={() => setFilter(f as any)}
-            className={`p-2 font-mono text-sm rounded-lg ${filter === f ? "bg-[#00ff9d]/30 text-[#00ff9d]" : "bg-gray-900/60 text-white hover:bg-gray-700"} transition-all`}
+            className={`p-2 font-mono text-sm rounded-lg ${
+              filter === f ? "bg-[#00ff9d]/30 text-[#00ff9d]" : "bg-gray-900/60 text-white hover:bg-gray-700"
+            } transition-all`}
           >
             {translations[lang][`filter${f.charAt(0).toUpperCase() + f.slice(1)}` as keyof typeof translations["en"]]}
           </button>
@@ -57,7 +101,12 @@ export default function OrderList() {
       </div>
       <ul className="space-y-2">
         {paginatedOrders.map((order) => (
-          <motion.li key={order.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-3 bg-gray-900/60 rounded-lg border border-cyan-500/40">
+          <motion.li
+            key={order.id}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="p-3 bg-gray-900/60 rounded-lg border border-cyan-500/40"
+          >
             <span className="text-white font-mono">
               {order.crm_name} - {order.service_id} ({order.service_type}, {order.car_size})
             </span>
