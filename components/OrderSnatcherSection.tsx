@@ -81,7 +81,7 @@ export default function OrderSnatcherSection() {
   const handleScriptLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (isInTelegramContext && tg) {
       e.preventDefault();
-      tg.openLink("https://automa.site/workflow/order-snatcher");
+      tg.openLink("https://automa.site/workflow/16rZppoNhrm7HCJSncPJV");
     }
   };
 
