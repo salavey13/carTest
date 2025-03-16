@@ -902,7 +902,42 @@ export async function handleWebhookUpdate(update: any) {
           ADMIN_CHAT_ID
         );
       }
-    }
+    } else if (invoice.type === "inventory_script_access") {
+    // New case: Inventory script access for warehouse
+    await supabaseAdmin
+      .from("users")
+      .update({
+        metadata: {
+          ...userData.metadata, // Preserve existing metadata
+          has_inventory_script_access: true, // Add or update this flag
+        },
+      })
+      .eq("user_id", userId);
+
+    const inventoryScripts = [
+      { name: "Order Snatcher", url: "https://automa.site/workflow/16rZppoNhrm7HCJSncPJV" },
+    ];
+
+    const message =
+      "Спасибо, что купил Automa скрипты для склада! Хватай заказы и синкай химию:\n" +
+      inventoryScripts.map((script) => `- [${script.name}](${script.url})`).join("\n");
+
+    await sendTelegramMessage(
+      process.env.TELEGRAM_BOT_TOKEN!,
+      message,
+      [],
+      undefined,
+      userId
+    );
+
+    await sendTelegramMessage(
+      process.env.TELEGRAM_BOT_TOKEN!,
+      `🔔 ${userData.username || userData.user_id} схватил Automa скрипты для склада!`,
+      [],
+      undefined,
+      process.env.ADMIN_CHAT_ID!
+    );
+  }
   } catch (error) {
     logger.error("Error handling webhook update:", error);
   }
