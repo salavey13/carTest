@@ -40,6 +40,10 @@ CREATE TABLE public.orders (
   UNIQUE (crm_name, service_id)
 );
 
+-- Enable Realtime for orders table
+ALTER TABLE orders REPLICA IDENTITY FULL;
+ALTER PUBLICATION supabase_realtime ADD TABLE orders;
+
 -- Processed Services (track processed orders)
 CREATE TABLE public.processed_services (
   id SERIAL PRIMARY KEY,
