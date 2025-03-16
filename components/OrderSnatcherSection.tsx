@@ -2,88 +2,133 @@
 import { useState, useEffect } from "react";
 import { useTelegram } from "@/hooks/useTelegram";
 import { supabaseAdmin } from "@/hooks/supabase";
+import { sendTelegramInvoice, notifyAdmin } from "@/app/actions";
+import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { translations } from "@/components/translations_inventory";
+import { translations } from "@/componrnts/translations_inventory";
 
-export default function InventoryTable() {
-  const { dbUser, isAdmin, user } = useTelegram();
+const SCRIPT_PACK = {
+  id: "order_snatcher",
+  name: "Order Snatcher Scripts",
+  price: 150, // Price in XTR
+};
+
+export default function OrderSnatcherSection() {
+  const { user, isInTelegramContext, tg } = useTelegram();
   const lang = user?.language_code === "ru" ? "ru" : "en";
-  const [chemicals, setChemicals] = useState<any[]>([]);
-  const [sortField, setSortField] = useState<"name" | "quantity">("name");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasAccess, setHasAccess] = useState(false);
 
   useEffect(() => {
-    if (!dbUser || !isAdmin()) return;
-    const fetchInventory = async () => {
-      const { data, error } = await supabaseAdmin.from("chemicals").select("*");
+    const checkAccess = async () => {
+      if (!user?.id) return;
+      const { data, error } = await supabaseAdmin
+        .from("users")
+        .select("has_script_access")
+        .eq("user_id", user.id.toString())
+        .single();
       if (error) {
-        toast.error(`Error fetching inventory: ${error.message}`);
+        toast.error("Error checking access");
       } else {
-        setChemicals(data || []);
+        setHasAccess(data?.has_script_access || false);
+        if (data?.has_script_access) toast.success(lang === "en" ? "Access granted!" : "Доступ получен!");
       }
-      setLoading(false);
     };
-    fetchInventory();
-  }, [dbUser, isAdmin]);
+    checkAccess();
+  }, [user, lang]);
 
-  const handleSort = (field: "name" | "quantity") => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortOrder("asc");
+  const handlePurchase = async () => {
+    if (!user?.id) {
+      toast.error(translations[lang].snatcherLoginError);
+      return;
+    }
+    if (hasAccess) {
+      toast.error(translations[lang].snatcherAlreadyOwned);
+      return;
+    }
+    setLoading(true);
+
+    try {
+      const payload = `order_snatcher_${user.id}_${Date.now()}`;
+      const response = await sendTelegramInvoice(
+        user.id.toString(),
+        SCRIPT_PACK.name,
+        translations[lang].snatcherDescription,
+        payload,
+        SCRIPT_PACK.price
+      );
+
+      if (!response.success) throw new Error(response.error || "Failed to send invoice");
+
+      toast.success(lang === "en" ? "Invoice sent to Telegram!" : "Счет отправлен в Telegram!");
+      const { error: updateError } = await supabaseAdmin
+        .from("users")
+        .update({ has_script_access: true })
+        .eq("user_id", user.id.toString());
+
+      if (updateError) throw updateError;
+
+      await notifyAdmin(`User ${user.id} purchased ${SCRIPT_PACK.name} for ${SCRIPT_PACK.price} XTR`);
+      setHasAccess(true);
+    } catch (err) {
+      toast.error(`${lang === "en" ? "Purchase error" : "Ошибка покупки"}: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const sortedChemicals = [...chemicals].sort((a, b) => {
-    const multiplier = sortOrder === "asc" ? 1 : -1;
-    if (sortField === "name") return multiplier * a.name.localeCompare(b.name);
-    return multiplier * (a.quantity - b.quantity);
-  });
-
-  if (loading) return <p className="text-center text-[#00ff9d] font-mono">{translations[lang].inventoryLoading}</p>;
-  if (!dbUser || !isAdmin()) return null;
+  const handleScriptLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (isInTelegramContext && tg) {
+      e.preventDefault();
+      tg.openLink("https://automa.site/workflow/order-snatcher");
+    }
+  };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gray-800/80 backdrop-blur-md rounded-xl shadow-2xl border border-cyan-500/30 p-6">
-      <h2 className="text-2xl font-bold mb-4 text-teal-400 font-orbitron glitch" data-text={translations[lang].inventoryTitle}>
-        {translations[lang].inventoryTitle}
-      </h2>
-      <table className="w-full text-left font-mono text-sm">
-        <thead>
-          <tr className="bg-gray-900/60 border-b border-cyan-500/40">
-            <th
-              onClick={() => handleSort("name")}
-              className="p-3 text-[#00ff9d] cursor-pointer hover:text-[#00ff9d]/80 transition-colors"
-            >
-              {translations[lang].name} {sortField === "name" && (sortOrder === "asc" ? "↑" : "↓")}
-            </th>
-            <th
-              onClick={() => handleSort("quantity")}
-              className="p-3 text-[#00ff9d] cursor-pointer hover:text-[#00ff9d]/80 transition-colors"
-            >
-              {translations[lang].quantity} {sortField === "quantity" && (sortOrder === "asc" ? "↑" : "↓")}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedChemicals.map((chem) => (
-            <motion.tr
-              key={chem.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className={`border-b border-gray-700 ${chem.quantity < 100 ? "bg-red-900/20" : ""}`}
-            >
-              <td className="p-3 text-white">{chem.name}</td>
-              <td className={`p-3 ${chem.quantity < 100 ? "text-red-400" : "text-white"}`}>
-                {chem.quantity} {chem.unit}
-              </td>
-            </motion.tr>
-          ))}
-        </tbody>
-      </table>
-    </motion.div>
+    <section className="py-16 bg-gradient-to-b from-gray-900 to-black">
+      <div className="max-w-4xl mx-auto p-6 bg-gray-800/80 backdrop-blur-md rounded-xl shadow-2xl border border-cyan-500/30">
+        <h2 className="text-4xl font-extrabold text-center mb-8 text-cyan-300 tracking-widest font-orbitron uppercase glitch animate-[neon_2s_infinite]" data-text={translations[lang].snatcherTitle}>
+          {translations[lang].snatcherTitle}
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="p-4 bg-gray-900/60 rounded-lg border border-cyan-500/40 hover:border-cyan-500 transition-all duration-300">
+            <h3 className="text-2xl font-bold mb-3 text-teal-400 font-orbitron">
+              {translations[lang].snatcherSubtitle}
+            </h3>
+            <p className="text-gray-300 mb-4 font-mono text-sm">
+              {translations[lang].snatcherDescription}
+            </p>
+            <p className="text-3xl font-bold mb-6 text-white font-mono tracking-tight">
+              {translations[lang].snatcherPrice}
+            </p>
+            {hasAccess ? (
+              <div className="space-y-3">
+                <p className="text-green-400 font-mono text-sm tracking-wide">
+                  {translations[lang].snatcherAccess}
+                </p>
+                <a
+                  href="https://automa.site/workflow/order-snatcher"
+                  onClick={handleScriptLinkClick}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-cyan-400 hover:text-cyan-300 font-mono text-sm underline transition-colors duration-200"
+                >
+                  {translations[lang].snatcherView}
+                </a>
+              </div>
+            ) : (
+              <Button
+                onClick={handlePurchase}
+                disabled={loading}
+                className="w-full py-3 font-mono text-lg bg-gradient-to-r from-green-600 to-teal-400 hover:from-green-700 hover:to-teal-500 text-white rounded-lg shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/50 transition-all duration-300 animate-[neon_2s_infinite]"
+              >
+                {loading ? translations[lang].snatcherProcessing : translations[lang].snatcherButton}
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
