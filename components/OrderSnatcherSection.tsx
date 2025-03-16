@@ -6,7 +6,7 @@ import { sendTelegramInvoice, notifyAdmin } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { translations } from "@/componrnts/translations_inventory";
+import { translations } from "@/components/translations_inventory";
 
 const SCRIPT_PACK = {
   id: "order_snatcher",
