@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { notifyAdmin } from "@/app/actions";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { translations } from "@/translations_inventory";
+import { translations } from "@/components/translations_inventory";
 
 export default function SettingsForm() {
   const { dbUser, isAdmin, user } = useTelegram();
