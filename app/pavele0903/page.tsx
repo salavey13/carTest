@@ -71,10 +71,10 @@ export default function Pavele0903() {
         {/* Tools Section */}
         <section id="tools" className="space-y-4">
           <h2 className="text-xl font-semibold">{translations[lang].tools}</h2>
-          <OrderSnatcherSection />
           <Button onClick={addTestOrder} className="bg-[#ff007a] hover:bg-[#ff007a]/80">
             {translations[lang].testButton}
           </Button>
+          <OrderSnatcherSection />
         </section>
 
         {/* Stats Section */}
