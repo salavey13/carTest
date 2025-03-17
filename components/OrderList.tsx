@@ -69,19 +69,6 @@ export default function OrderList() {
   const paginatedOrders = orders.slice((page - 1) * itemsPerPage, page * itemsPerPage);
   const totalPages = Math.ceil(orders.length / itemsPerPage);
 
-  const processAllOrders = async () => {
-    try {
-      const { error } = await supabaseAdmin.rpc("process_orders");
-      if (error) throw error;
-      toast.success(translations[lang].processAllSuccess || "All orders processed successfully!");
-      setOrders((prev) =>
-        prev.map((order) => (order.processed ? order : { ...order, processed: true }))
-      );
-    } catch (err) {
-      toast.error(`Failed to process orders: ${err.message}`);
-    }
-  };
-
   if (loading) return <p className="text-center text-[#00ff9d] font-mono text-sm">{translations[lang].ordersLoading}</p>;
   if (!dbUser || !isAdmin()) return null;
 
@@ -153,12 +140,6 @@ export default function OrderList() {
           {translations[lang].next}
         </button>
       </div>
-      <Button
-        onClick={processAllOrders}
-        className="mt-4 w-full bg-gradient-to-r from-green-600 to-teal-400 hover:from-green-700 hover:to-teal-500 text-white rounded-lg font-mono text-sm"
-      >
-        {lang === "en" ? "Process All Orders" : "Обработать все заказы"}
-      </Button>
     </motion.div>
   );
 }
