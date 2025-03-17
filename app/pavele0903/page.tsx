@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { useTelegram } from "@/hooks/useTelegram";
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -17,7 +16,7 @@ import OrderSnatcherSection from "@/components/OrderSnatcherSection";
 export default function Pavele0903() {
   const { user } = useTelegram();
   const lang = user?.language_code === "ru" ? "ru" : "en";
-  const [refreshKey, setRefreshKey] = useState(0); // For forcing re-render
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const scrollToSection = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
@@ -31,7 +30,7 @@ export default function Pavele0903() {
 
     const randomOrder = {
       crm_name: crmNames[Math.floor(Math.random() * crmNames.length)],
-      service_id: `test-${Date.now()}-${Math.floor(Math.random() * 1000)}`, // Unique ID
+      service_id: `test-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       service_type: serviceTypes[Math.floor(Math.random() * serviceTypes.length)],
       car_size: carSizes[Math.floor(Math.random() * carSizes.length)],
       completed_at: new Date().toISOString(),
@@ -43,15 +42,15 @@ export default function Pavele0903() {
     if (error) {
       console.error("Failed to add test order:", error.message);
     } else {
-      setRefreshKey((prev) => prev + 1); // Trigger re-render
+      setRefreshKey((prev) => prev + 1); // Fallback for non-Realtime components
     }
   };
 
   return (
-    <div className="min-h-screen pt-24 bg-gray-900 text-white flex flex-col items-center relative">
-      <main className="w-full max-w-md p-4 space-y-8">
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center relative">
+      <main className="w-full max-w-md p-4 space-y-8 flex-1">
         {/* Intro Section */}
-        <section id="intro" className="space-y-4">
+        <section id="intro" className="space-y-4 pt-24">
           <h1 className="text-2xl font-bold">{translations[lang].title}</h1>
           <p className="text-sm">
             {translations[lang].intro}{" "}
@@ -72,9 +71,9 @@ export default function Pavele0903() {
         {/* Tools Section */}
         <section id="tools" className="space-y-4">
           <h2 className="text-xl font-semibold">{translations[lang].tools}</h2>
-          <OrderSnatcherSection language={lang} />
+          <OrderSnatcherSection />
           <Button onClick={addTestOrder} className="bg-[#ff007a] hover:bg-[#ff007a]/80">
-            {translations[lang].testButton || "Test Order Snatcher"}
+            {translations[lang].testButton}
           </Button>
         </section>
 
