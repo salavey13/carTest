@@ -44,8 +44,13 @@ export const translations = {
     snatcherLoginError: "Please log in via Telegram",
     snatcherAlreadyOwned: "You already have access",
     testButton: "Test Order Snatcher",
+    serviceType: "Service Type",
+    carSize: "Car Size",
+    // other translations
   },
   ru: {
+    serviceType: "Тип услуги",
+    carSize: "Размер автомобиля",
     // Page-level text
     title: "Складские Вайбы для Паши",
     intro: "Эй, pavele0903! Это мой демо-бот — для моего портфолио и твоего складского бардака. Автоматизируем хаос, кидай копейку, если зашло! Пиши @salavey13 или жми «донат», чтобы жизнь стала легче, братан!",
