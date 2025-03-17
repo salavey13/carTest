@@ -5,7 +5,7 @@ ADD COLUMN has_script_access BOOLEAN DEFAULT FALSE;
 -- Updated bots table to match CSV headers and script requirements
 CREATE TABLE bots (
   id SERIAL PRIMARY KEY,
-  user_id TEXT NOT NULL, -- Maps to "user_id" (submitter ID), references users(user_id)
+  user_id TEXT, -- Maps to "user_id" (submitter ID), references users(user_id)
   account_id BIGINT UNIQUE, -- Maps to "account_id" (bot account ID)
   user_name TEXT UNIQUE NOT NULL, -- Maps to "user_name" (bot username)
   full_name TEXT, -- Maps to "full name"
