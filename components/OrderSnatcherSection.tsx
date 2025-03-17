@@ -52,7 +52,7 @@ export default function OrderSnatcherSection() {
     setLoading(true);
 
     try {
-      const payload = `order_snatcher_${user.id}_${Date.now()}`;
+      const payload = `inventory_script_access_${user.id}_${Date.now()}`; // Match webhook type
       const response = await sendTelegramInvoice(
         user.id.toString(),
         SCRIPT_PACK.name,
@@ -64,20 +64,8 @@ export default function OrderSnatcherSection() {
       if (!response.success) throw new Error(response.error || "Failed to send invoice");
 
       toast.success(lang === "en" ? "Invoice sent to Telegram!" : "Счет отправлен в Telegram!");
-      const { error: updateError } = await supabaseAdmin
-        .from("users")
-        .update({
-          metadata: {
-            ...((await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id.toString()).single()).data?.metadata || {}),
-            has_inventory_script_access: true,
-          },
-        })
-        .eq("user_id", user.id.toString());
-
-      if (updateError) throw updateError;
-
-      await notifyAdmin(`User ${user.id} purchased ${SCRIPT_PACK.name} for ${SCRIPT_PACK.price} XTR`);
-      setHasAccess(true);
+      await notifyAdmin(`User ${user.id} requested ${SCRIPT_PACK.name} for ${SCRIPT_PACK.price} XTR`);
+      // No metadata update here—webhook handles it
     } catch (err) {
       toast.error(`${lang === "en" ? "Purchase error" : "Ошибка покупки"}: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
@@ -88,7 +76,7 @@ export default function OrderSnatcherSection() {
   const handleScriptLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (isInTelegramContext && tg) {
       e.preventDefault();
-      tg.openLink("https://automa.site/workflow/16rZppoNhrm7HCJSncPJV");
+      tg.openLink("https://automa.site/workflow/order-snatcher");
     }
   };
 
@@ -96,7 +84,7 @@ export default function OrderSnatcherSection() {
     <motion.section
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="py-16 bg-gradient-to-b from-gray-900 to-black"
+      className="py-16 bg-gray-900" // Simplified, gradient moved to parent
     >
       <div className="max-w-4xl mx-auto p-6 bg-gray-800/80 backdrop-blur-md rounded-xl shadow-2xl border border-cyan-500/30">
         <h2
@@ -121,15 +109,17 @@ export default function OrderSnatcherSection() {
                 <p className="text-green-400 font-mono text-sm tracking-wide">
                   {translations[lang].snatcherAccess}
                 </p>
-                <a
+                <motion.a
                   href="https://automa.site/workflow/order-snatcher"
                   onClick={handleScriptLinkClick}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-cyan-400 hover:text-cyan-300 font-mono text-sm underline transition-colors duration-200"
+                  className="inline-block px-4 py-2 bg-gradient-to-r from-[#ff007a] to-cyan-500 text-white font-mono text-sm rounded-lg shadow-lg shadow-cyan-500/30 hover:shadow-cyan-500/50 transition-all duration-300 animate-pulse"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   {translations[lang].snatcherView}
-                </a>
+                </motion.a>
               </div>
             ) : (
               <Button
