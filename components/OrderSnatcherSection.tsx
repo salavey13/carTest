@@ -84,7 +84,7 @@ export default function OrderSnatcherSection() {
     <motion.section
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="py-16 bg-gray-900" // Simplified, gradient moved to parent
+      className="bg-gray-900" // Simplified, gradient moved to parent
     >
       <div className="max-w-4xl mx-auto p-6 bg-gray-800/80 backdrop-blur-md rounded-xl shadow-2xl border border-cyan-500/30">
         <h2
