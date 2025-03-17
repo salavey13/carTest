@@ -51,35 +51,47 @@ export default function SettingsForm() {
     }
   };
 
-  if (loading) return <p className="text-center text-[#00ff9d] font-mono">{translations[lang].settingsLoading}</p>;
+  if (loading) return <p className="text-center text-[#00ff9d] font-mono text-[10px]">{translations[lang].settingsLoading}</p>;
   if (!dbUser || !isAdmin()) return null;
 
   return (
-    <motion.form onSubmit={handleSubmit} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-8 bg-gray-800/80 backdrop-blur-md rounded-xl shadow-2xl border border-cyan-500/30 p-6">
-      <h2 className="text-2xl font-bold mb-4 text-teal-400 font-orbitron glitch" data-text={translations[lang].settingsTitle}>
+    <motion.form
+      onSubmit={handleSubmit}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="bg-gray-800/80 backdrop-blur-md rounded-xl shadow-2xl border border-cyan-500/30 px-2 py-4 space-y-4" // Reduced padding
+    >
+      <h2
+        className="text-xl font-bold text-teal-400 font-orbitron glitch"
+        data-text={translations[lang].settingsTitle}
+      >
         {translations[lang].settingsTitle}
       </h2>
-      <div className="space-y-4">
+      <div className="space-y-2">
         {rates.map((rate) => (
-          <motion.div key={rate.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 items-center">
-            <label className="flex-1 text-sm font-mono text-[#00ff9d] text-glow">
-              {rate.chemicals.name} - {rate.service_types.name} - {rate.car_sizes.name}
+          <motion.div
+            key={rate.id}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex items-center gap-2"
+          >
+            <label className="flex-1 text-[10px] font-mono text-[#00ff9d] truncate">
+              {rate.chemicals.name.slice(0, 5)}... - {rate.service_types.name} - {rate.car_sizes.name}
             </label>
             <input
               type="number"
               value={formData[rate.id] || ""}
               onChange={(e) => setFormData({ ...formData, [rate.id]: Number(e.target.value) })}
-              className="w-24 p-3 bg-black/80 border border-[#00ff9d]/50 text-[#00ff9d] rounded-lg focus:ring-2 focus:ring-[#00ff9d] placeholder-[#00ff9d]/40 text-sm font-mono shadow-[inset_0_0_10px_rgba(0,255,157,0.5)] transition-all hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]"
-              required
+              className="w-16 p-1 bg-black/80 border border-[#00ff9d]/50 text-[#00ff9d] rounded-lg focus:ring-1 focus:ring-[#00ff9d] text-[10px] font-mono transition-all"
             />
-            <span className="text-[#00ff9d] font-mono">{translations[lang].settingsUnit}</span>
+            <span className="text-[#00ff9d] font-mono text-[10px]">{translations[lang].settingsUnit}</span>
           </motion.div>
         ))}
       </div>
       <motion.button
         type="submit"
         disabled={loading}
-        className={`w-full p-4 bg-[#ff007a]/80 hover:bg-[#ff007a] text-white rounded-xl font-mono text-lg ${loading ? "animate-pulse cursor-not-allowed opacity-50" : "shadow-[0_0_20px_rgba(255,0,122,0.8)] hover:shadow-[0_0_30px_rgba(255,0,122,1)]"} transition-all animate-[neon_2s_infinite]`}
+        className={`w-full py-2 bg-[#ff007a]/80 hover:bg-[#ff007a] text-white rounded-full font-mono text-[10px] ${loading ? "animate-pulse opacity-50" : "shadow-[0_0_10px_rgba(255,0,122,0.8)]"} transition-all`}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
