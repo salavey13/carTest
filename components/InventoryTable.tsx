@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { translations } from "@/components/translations_inventory";
+import { FaSortAlphaDown, FaSortAlphaUp, FaSortNumericDown, FaSortNumericUp, FaExclamationTriangle } from "react-icons/fa";
 
 export default function InventoryTable() {
   const { dbUser, isAdmin, user } = useTelegram();
@@ -43,47 +44,61 @@ export default function InventoryTable() {
     return multiplier * (a.quantity - b.quantity);
   });
 
-  if (loading) return <p className="text-center text-[#00ff9d] font-mono">{translations[lang].inventoryLoading}</p>;
+  if (loading) return <p className="text-center text-[#00ff9d] font-mono text-sm">{translations[lang].inventoryLoading}</p>;
   if (!dbUser || !isAdmin()) return null;
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-gray-800/80 backdrop-blur-md rounded-xl shadow-2xl border border-cyan-500/30 p-6">
-      <h2 className="text-2xl font-bold mb-4 text-teal-400 font-orbitron glitch" data-text={translations[lang].inventoryTitle}>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-gray-800/80 backdrop-blur-md rounded-xl shadow-2xl border border-cyan-500/30 p-4"
+    >
+      <h2
+        className="text-xl font-bold mb-3 text-teal-400 font-orbitron glitch"
+        data-text={translations[lang].inventoryTitle}
+      >
         {translations[lang].inventoryTitle}
       </h2>
-      <table className="w-full text-left font-mono text-sm">
-        <thead>
-          <tr className="bg-gray-900/60 border-b border-cyan-500/40">
-            <th
-              onClick={() => handleSort("name")}
-              className="p-3 text-[#00ff9d] cursor-pointer hover:text-[#00ff9d]/80 transition-colors"
-            >
-              {translations[lang].name} {sortField === "name" && (sortOrder === "asc" ? "↑" : "↓")}
-            </th>
-            <th
-              onClick={() => handleSort("quantity")}
-              className="p-3 text-[#00ff9d] cursor-pointer hover:text-[#00ff9d]/80 transition-colors"
-            >
-              {translations[lang].quantity} {sortField === "quantity" && (sortOrder === "asc" ? "↑" : "↓")}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedChemicals.map((chem) => (
-            <motion.tr
-              key={chem.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className={`border-b border-gray-700 ${chem.quantity < 100 ? "bg-red-900/20" : ""}`}
-            >
-              <td className="p-3 text-white">{chem.name}</td>
-              <td className={`p-3 ${chem.quantity < 100 ? "text-red-400" : "text-white"}`}>
-                {chem.quantity} {chem.unit}
-              </td>
-            </motion.tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left font-mono text-xs">
+          <thead>
+            <tr className="bg-gray-900/60 border-b border-cyan-500/40">
+              <th
+                onClick={() => handleSort("name")}
+                className="p-2 text-[#00ff9d] cursor-pointer hover:text-[#00ff9d]/80 transition-colors flex items-center space-x-1"
+              >
+                <span>{translations[lang].name}</span>
+                {sortField === "name" && (sortOrder === "asc" ? <FaSortAlphaDown /> : <FaSortAlphaUp />)}
+              </th>
+              <th
+                onClick={() => handleSort("quantity")}
+                className="p-2 text-[#00ff9d] cursor-pointer hover:text-[#00ff9d]/80 transition-colors flex items-center space-x-1"
+              >
+                <span>{translations[lang].quantity}</span>
+                {sortField === "quantity" && (sortOrder === "asc" ? <FaSortNumericDown /> : <FaSortNumericUp />)}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedChemicals.map((chem) => (
+              <motion.tr
+                key={chem.id}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className={`border-b border-gray-700 ${chem.quantity < 100 ? "bg-red-900/20" : ""}`}
+              >
+                <td className="p-2 text-white flex items-center space-x-2">
+                  {chem.quantity < 100 && <FaExclamationTriangle className="text-red-400" />}
+                  <span>{chem.name}</span>
+                </td>
+                <td className={`p-2 ${chem.quantity < 100 ? "text-red-400" : "text-white"}`}>
+                  {chem.quantity} {chem.unit}
+                </td>
+              </motion.tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </motion.div>
   );
 }
