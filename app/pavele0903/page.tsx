@@ -42,12 +42,12 @@ export default function Pavele0903() {
     if (error) {
       console.error("Failed to add test order:", error.message);
     } else {
-      //setRefreshKey((prev) => prev + 1); // Fallback for non-Realtime components
+      setRefreshKey((prev) => prev + 1);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center relative">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white flex flex-col items-center relative">
       <main className="w-full max-w-md p-4 space-y-8 flex-1">
         {/* Intro Section */}
         <section id="intro" className="space-y-4 pt-24">
@@ -71,10 +71,10 @@ export default function Pavele0903() {
         {/* Tools Section */}
         <section id="tools" className="space-y-4">
           <h2 className="text-xl font-semibold">{translations[lang].tools}</h2>
-          <Button onClick={addTestOrder} className="bg-[#ff007a] hover:bg-[#ff007a]/80 rounded-full">
+          <OrderSnatcherSection />
+          <Button onClick={addTestOrder} className="bg-[#ff007a] hover:bg-[#ff007a]/80">
             {translations[lang].testButton}
           </Button>
-          <OrderSnatcherSection />
         </section>
 
         {/* Stats Section */}
@@ -86,7 +86,7 @@ export default function Pavele0903() {
         </section>
 
         {/* Settings Section */}
-        <section id="settings" className="space-y-4">
+        <section id="settings" className="space-y-4 pb-16"> {/* Added padding */}
           <h2 className="text-xl font-semibold">{translations[lang].settings}</h2>
           <SettingsForm />
         </section>
