@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useTelegram } from "@/hooks/useTelegram";
-import { supabaseAdmin } from "@/hooks/supabase";
 import { translations } from "@/components/translations_inventory";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,7 +23,6 @@ export default function Pavele0903() {
 
   const addTestOrder = async () => {
     const crmNames = ["crm1", "crm2", "crm3"];
-    const serviceIds = ["test1", "test2", "test3", "test4"];
     const serviceTypes = ["Basic Wash", "Waxing", "Deep Clean"];
     const carSizes = ["Small", "Sedan", "SUV", "Truck"];
 
@@ -34,15 +32,21 @@ export default function Pavele0903() {
       service_type: serviceTypes[Math.floor(Math.random() * serviceTypes.length)],
       car_size: carSizes[Math.floor(Math.random() * carSizes.length)],
       completed_at: new Date().toISOString(),
-      processed: false,
     };
 
-    const { error } = await supabaseAdmin.from("orders").insert(randomOrder);
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(randomOrder),
+      });
 
-    if (error) {
-      console.error("Failed to add test order:", error.message);
-    } else {
-      setRefreshKey((prev) => prev + 1);
+      if (!response.ok) {
+        throw new Error(`Failed to add test order: ${response.statusText}`);
+      }
+      setRefreshKey((prev) => prev + 1); // Trigger refresh for non-Realtime components
+    } catch (error) {
+      console.error("Error adding test order:", error);
     }
   };
 
@@ -86,7 +90,7 @@ export default function Pavele0903() {
         </section>
 
         {/* Settings Section */}
-        <section id="settings" className="space-y-4 pb-16"> {/* Added padding */}
+        <section id="settings" className="space-y-4 pb-16">
           <h2 className="text-xl font-semibold">{translations[lang].settings}</h2>
           <SettingsForm />
         </section>
