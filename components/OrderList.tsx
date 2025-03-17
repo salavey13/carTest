@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { translations } from "@/components/translations_inventory";
 import { FaCheckCircle, FaTimesCircle, FaInfoCircle } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/modal"; // Assuming you have a Modal component
+import Modal from "@/components/ui/Modal"; // Correct import path
 
 export default function OrderList() {
   const { dbUser, isAdmin, user } = useTelegram();
@@ -81,7 +81,7 @@ export default function OrderList() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-gray-800/80 backdrop-blur-md rounded-xl shadow-2xl border border-cyan-500/30 px-2 py-4" // Reduced x padding
+      className="bg-gray-800/80 backdrop-blur-md rounded-xl shadow-2xl border border-cyan-500/30 px-2 py-4"
     >
       <h2
         className="text-xl font-bold mb-3 text-teal-400 font-orbitron glitch"
@@ -152,7 +152,7 @@ export default function OrderList() {
 
       {/* Modal for order details */}
       {selectedOrder && (
-        <Modal onClose={closeModal}>
+        <Modal isOpen={!!selectedOrder} onClose={closeModal}>
           <div className="p-2 bg-gray-900/80 rounded-lg border border-cyan-500/40">
             <h3 className="text-lg font-bold text-teal-400 mb-2">{translations[lang].orderDetails}</h3>
             <p className="text-white font-mono text-[10px]">
