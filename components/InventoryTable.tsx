@@ -44,17 +44,17 @@ export default function InventoryTable() {
     return multiplier * (a.quantity - b.quantity);
   });
 
-  if (loading) return <p className="text-center text-[#00ff9d] font-mono text-sm">{translations[lang].inventoryLoading}</p>;
+  if (loading) return <p className="text-center text-[#00ff9d] font-mono text-xs">{translations[lang].inventoryLoading}</p>;
   if (!dbUser || !isAdmin()) return null;
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-gray-800/80 backdrop-blur-md rounded-xl shadow-2xl border border-cyan-500/30 p-4"
+      className="bg-gray-800/80 backdrop-blur-md rounded-lg shadow-lg border border-cyan-500/20"
     >
       <h2
-        className="text-xl font-bold mb-3 text-teal-400 font-orbitron glitch"
+        className="text-lg font-bold mb-2 text-teal-400 font-orbitron glitch px-1 pt-1"
         data-text={translations[lang].inventoryTitle}
       >
         {translations[lang].inventoryTitle}
@@ -65,17 +65,17 @@ export default function InventoryTable() {
             <tr className="bg-gray-900/60 border-b border-cyan-500/40">
               <th
                 onClick={() => handleSort("name")}
-                className="p-2 text-[#00ff9d] cursor-pointer hover:text-[#00ff9d]/80 transition-colors flex items-center space-x-1"
+                className="p-1 text-[#00ff9d] cursor-pointer hover:text-[#00ff9d]/80 transition-colors flex items-center space-x-1"
               >
                 <span>{translations[lang].name}</span>
-                {sortField === "name" && (sortOrder === "asc" ? <FaSortAlphaDown /> : <FaSortAlphaUp />)}
+                {sortField === "name" && (sortOrder === "asc" ? <FaSortAlphaDown className="text-sm" /> : <FaSortAlphaUp className="text-sm" />)}
               </th>
               <th
                 onClick={() => handleSort("quantity")}
-                className="p-2 text-[#00ff9d] cursor-pointer hover:text-[#00ff9d]/80 transition-colors flex items-center space-x-1"
+                className="p-1 text-[#00ff9d] cursor-pointer hover:text-[#00ff9d]/80 transition-colors flex items-center space-x-1"
               >
                 <span>{translations[lang].quantity}</span>
-                {sortField === "quantity" && (sortOrder === "asc" ? <FaSortNumericDown /> : <FaSortNumericUp />)}
+                {sortField === "quantity" && (sortOrder === "asc" ? <FaSortNumericDown className="text-sm" /> : <FaSortNumericUp className="text-sm" />)}
               </th>
             </tr>
           </thead>
@@ -87,11 +87,11 @@ export default function InventoryTable() {
                 animate={{ opacity: 1 }}
                 className={`border-b border-gray-700 ${chem.quantity < 100 ? "bg-red-900/20" : ""}`}
               >
-                <td className="p-2 text-white flex items-center space-x-2">
-                  {chem.quantity < 100 && <FaExclamationTriangle className="text-red-400" />}
+                <td className="p-1 text-white flex items-center space-x-1">
+                  {chem.quantity < 100 && <FaExclamationTriangle className="text-red-400 text-xs" />}
                   <span>{chem.name}</span>
                 </td>
-                <td className={`p-2 ${chem.quantity < 100 ? "text-red-400" : "text-white"}`}>
+                <td className={`p-1 ${chem.quantity < 100 ? "text-red-400" : "text-white"}`}>
                   {chem.quantity} {chem.unit}
                 </td>
               </motion.tr>
