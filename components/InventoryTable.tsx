@@ -65,17 +65,17 @@ export default function InventoryTable() {
             <tr className="bg-gray-900/60 border-b border-cyan-500/40">
               <th
                 onClick={() => handleSort("name")}
-                className="p-1 text-[#00ff9d] cursor-pointer hover:text-[#00ff9d]/80 transition-colors flex items-center space-x-1"
+                className="p-0.5 text-[#00ff9d] cursor-pointer hover:text-[#00ff9d]/80 transition-colors flex items-center space-x-0.5 flex-nowrap"
               >
-                <span>{translations[lang].name}</span>
-                {sortField === "name" && (sortOrder === "asc" ? <FaSortAlphaDown className="text-sm" /> : <FaSortAlphaUp className="text-sm" />)}
+                <span className="text-[10px]">{translations[lang].name}</span>
+                {sortField === "name" && (sortOrder === "asc" ? <FaSortAlphaDown className="text-[10px]" /> : <FaSortAlphaUp className="text-[10px]" />)}
               </th>
               <th
                 onClick={() => handleSort("quantity")}
-                className="p-1 text-[#00ff9d] cursor-pointer hover:text-[#00ff9d]/80 transition-colors flex items-center space-x-1"
+                className="p-0.5 text-[#00ff9d] cursor-pointer hover:text-[#00ff9d]/80 transition-colors flex items-center space-x-0.5 flex-nowrap"
               >
-                <span>{translations[lang].quantity}</span>
-                {sortField === "quantity" && (sortOrder === "asc" ? <FaSortNumericDown className="text-sm" /> : <FaSortNumericUp className="text-sm" />)}
+                <span className="text-[10px]">{translations[lang].quantity}</span>
+                {sortField === "quantity" && (sortOrder === "asc" ? <FaSortNumericDown className="text-[10px]" /> : <FaSortNumericUp className="text-[10px]" />)}
               </th>
             </tr>
           </thead>
