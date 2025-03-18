@@ -248,7 +248,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 
 // Generalized function to run a Coze agent
-export async function runCoseAgent(botId: string, userId: string, content: string) {
+export async function runCozeAgent(botId: string, userId: string, content: string) {
   try {
     // Step 1: Initiate the chat
     const initResponse = await axios.post(
