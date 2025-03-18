@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { runCoseAgent, notifyAdmin, sendTelegramMessage } from "@/app/actions";
+import { runCozeAgent, notifyAdmin, sendTelegramMessage } from "@/app/actions";
 import { toast } from "sonner";
 import { useTelegram } from "@/hooks/useTelegram";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
