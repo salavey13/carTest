@@ -181,7 +181,7 @@ const RepoTxtFetcher: React.FC = () => {
       const fullInput = `Запрос с Kwork: "${kworkInput}"\nКонтекст репозитория:\n${context}`;
       const botId = "7481446329554747397";
       const userId = "341503612082";
-      const response = await runCoseAgent(botId, userId, fullInput);
+      const response = await runCozeAgent(botId, userId, fullInput);
       setTxtOutput(response);
       setAnalysisComplete(true);
       addToast("Анализ завершен!");
