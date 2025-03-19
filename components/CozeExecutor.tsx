@@ -58,6 +58,8 @@ export default function CozeExecutor({
   const [cozeResponses, setCozeResponses] = useState<CozeResponse[]>([]);
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [packageJsonInput, setPackageJsonInput] = useState<string>("");
+  const [newModules, setNewModules] = useState<string[]>([]);
   const { user, openLink } = useTelegram();
 
   // PR-related state
@@ -154,10 +156,13 @@ export default function CozeExecutor({
     return entries;
   };
 
-  // Parse files from text
+  // Parse files and detect new modules from text
   const parseFilesFromText = (text: string): FileEntry[] => {
     const entries: FileEntry[] = [];
     const supportedLanguages = ["typescript", "tsx", "ts", "sql"];
+    const importRegex = /import\s+.*\s+from\s+['"]([^'"]+)['"]/g;
+    const detectedModules: Set<string> = new Set();
+
     try {
       const codeBlocks = text.match(/```[\s\S]*?```/g) || [];
       codeBlocks.forEach((block) => {
@@ -182,8 +187,22 @@ export default function CozeExecutor({
         const path = fileMatch ? fileMatch[1].trim() : defaultPath;
         const extension = path.split(".").pop() || (language === "sql" ? "sql" : "txt");
 
+        // Detect imports
+        let match;
+        while ((match = importRegex.exec(codeContent)) !== null) {
+          const moduleName = match[1];
+          if (!moduleName.startsWith("@/") && !moduleName.startsWith("./") && !moduleName.startsWith("../")) {
+            detectedModules.add(moduleName);
+          }
+        }
+
         entries.push({ path, content: codeContent, extension });
       });
+
+      // Update new modules, excluding already installed ones
+      const currentDeps = packageJsonInput ? Object.keys(JSON.parse(packageJsonInput).dependencies || {}) : [];
+      const newMods = Array.from(detectedModules).filter((mod) => !currentDeps.includes(mod));
+      setNewModules(newMods);
     } catch (err) {
       setError("Ошибка парсинга текста: " + (err as Error).message);
     }
@@ -195,6 +214,7 @@ export default function CozeExecutor({
     setLoading(true);
     setError("");
     setFiles([]);
+    setNewModules([]);
     try {
       const result = await executeCozeAgent(botId, userId, content, { operation: "code_generation" });
       if (result.success) {
@@ -222,6 +242,7 @@ export default function CozeExecutor({
   const handleParse = () => {
     setError("");
     setFiles([]);
+    setNewModules([]);
     const parsedFiles = parseFilesFromText(response);
     setFiles(parsedFiles);
     if (parsedFiles.length === 0) {
@@ -379,6 +400,29 @@ export default function CozeExecutor({
     setSelectedFiles(allFilePaths);
   };
 
+  // Update package.json with new modules
+  const handleUpdatePackageJson = () => {
+    if (!packageJsonInput || newModules.length === 0) return;
+    try {
+      const pkg = JSON.parse(packageJsonInput);
+      const deps = pkg.dependencies || {};
+      newModules.forEach((mod) => {
+        if (!deps[mod]) deps[mod] = "latest";
+      });
+      pkg.dependencies = deps;
+
+      const updatedPkgJson = JSON.stringify(pkg, null, 2);
+      setFiles((prev) => [
+        ...prev.filter((f) => f.path !== "package.json"),
+        { path: "package.json", content: updatedPkgJson, extension: "json" },
+      ]);
+      setSelectedFiles((prev) => new Set(prev).add("package.json"));
+      setError("package.json обновлен и добавлен в список файлов!");
+    } catch (err) {
+      setError("Ошибка обработки package.json: " + (err as Error).message);
+    }
+  };
+
   // Render response with syntax highlighting
   const renderResponse = (text: string) => {
     if (!text) return null;
@@ -433,6 +477,28 @@ export default function CozeExecutor({
         />
       </div>
 
+      {/* New Modules Detection */}
+      {newModules.length > 0 && (
+        <div className="mb-4">
+          <h2 className="text-xl font-semibold mb-2 text-yellow-500">Новые модули обнаружены!</h2>
+          <p className="mb-2">Эти модули нужны: {newModules.join(", ")}. Вставьте package.json сюда:</p>
+          <textarea
+            className="w-4 h-4 p-1 bg-gray-800 text-white rounded resize-none overflow-hidden"
+            value={packageJsonInput}
+            onChange={(e) => setPackageJsonInput(e.target.value)}
+            placeholder="package.json"
+            title="Вставьте package.json из экстрактора выше"
+          />
+          <button
+            className="bg-orange-500 p-1 ml-2 rounded hover:bg-orange-600 disabled:bg-gray-400"
+            onClick={handleUpdatePackageJson}
+            disabled={!packageJsonInput || loading}
+          >
+            Обновить package.json
+          </button>
+        </div>
+      )}
+
       {/* Buttons */}
       <div className="mb-4 flex gap-2 flex-wrap">
         <button
@@ -476,6 +542,8 @@ export default function CozeExecutor({
             setContent("");
             setFiles([]);
             setSelectedFiles(new Set());
+            setNewModules([]);
+            setPackageJsonInput("");
           }}
         >
           Очистить
