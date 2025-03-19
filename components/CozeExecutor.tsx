@@ -1,10 +1,9 @@
 // components/CozeExecutor.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { executeCozeAgent } from "@/app/actions";
+import { executeCozeAgent, sendTelegramDocument } from "@/app/actions"; // Import the new action
 import { supabaseAdmin } from "@/hooks/supabase";
 import { useTelegram } from "@/hooks/useTelegram";
-import { saveAs } from "file-saver";
 import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
 import { docco } from "react-syntax-highlighter/dist/esm/styles/hljs";
 
@@ -50,7 +49,6 @@ export default function CozeExecutor({
       try {
         console.log("Loading data for user_id:", user.id);
 
-        // Fetch saved files from user metadata
         const { data: userData, error: userError } = await supabaseAdmin
           .from("users")
           .select("metadata")
@@ -65,7 +63,6 @@ export default function CozeExecutor({
           console.log("No saved files found in metadata");
         }
 
-        // Fetch Coze responses
         const { data: responses, error: responsesError } = await supabaseAdmin
           .from("coze_responses")
           .select("*")
@@ -230,29 +227,30 @@ export default function CozeExecutor({
     }
   };
 
-  // Download a file with fallback
+  // Send file to Telegram chat using the server-side action
   const downloadFile = async (file: FileEntry) => {
+    if (!user) {
+      setError("No Telegram user detected");
+      return;
+    }
+    setLoading(true);
     try {
-      console.log("Attempting to download:", file.path);
-      const blob = new Blob([file.content], { type: "text/plain;charset=utf-8" });
-      saveAs(blob, file.path.split("/").pop() || "file");
-      setError(`File "${file.path}" downloaded successfully! Files are saved to your browser's default download folder (e.g., "Downloads").`);
-    } catch (err) {
-      setError(`Failed to download file "${file.path}": ` + (err as Error).message);
-      // Fallback method
-      try {
-        const url = window.URL.createObjectURL(new Blob([file.content], { type: "text/plain;charset=utf-8" }));
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = file.path.split("/").pop() || "file";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-        setError(`File "${file.path}" downloaded via fallback method! Check your Downloads folder.`);
-      } catch (fallbackErr) {
-        setError(`Fallback download failed for "${file.path}": ` + (fallbackErr as Error).message);
+      const result = await sendTelegramDocument(
+        user.id,
+        file.content,
+        file.path.split("/").pop() || "file"
+      );
+
+      if (!result.success) {
+        throw new Error(result.error);
       }
+
+      setError(`File "${file.path}" sent to your Telegram chat successfully!`);
+    } catch (err) {
+      setError(`Failed to send file "${file.path}" to Telegram: ` + (err as Error).message);
+      console.error("Send document error:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -379,7 +377,7 @@ export default function CozeExecutor({
                       disabled={loading}
                       className="bg-purple-500 p-1 rounded hover:bg-purple-600 disabled:bg-gray-400"
                     >
-                      Download
+                      Send to Chat
                     </button>
                   </div>
                 </div>
@@ -440,7 +438,7 @@ export default function CozeExecutor({
                     disabled={loading}
                     className="bg-purple-500 p-1 rounded ml-2 hover:bg-purple-600 disabled:bg-gray-400"
                   >
-                    Download
+                    Send to Chat
                   </button>
                 </div>
               </div>
