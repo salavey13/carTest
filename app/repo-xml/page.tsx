@@ -9,7 +9,7 @@ import { useTelegram } from "@/hooks/useTelegram";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { FaTree, FaKey, FaFileAlt, FaShareAlt, FaTelegramPlane, FaSave, FaLink } from 'react-icons/fa';
-
+import CozeExecutor from '@/components/CozeExecutor';
 interface FileNode {
   path: string;
   content: string;
@@ -520,6 +520,7 @@ export default function RepoXmlPage() {
       <div className="min-h-screen bg-gray-900 grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
         <div className="col-span-1 md:col-span-2">
           <RepoTxtFetcher />
+          <CozeExecutor />
         </div>
         <div className="hidden md:block md:col-span-1">
           <div className="bg-gray-800 p-6 rounded-xl h-full shadow-[0_0_15px_rgba(0,255,157,0.3)]">
