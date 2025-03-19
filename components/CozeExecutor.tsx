@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import { executeCozeAgent, sendTelegramDocument, createGitHubPullRequest, getOpenPullRequests, approvePullRequest } from "@/app/actions_github/actions";
+import { createGitHubPullRequest, getOpenPullRequests, approvePullRequest } from "@/app/actions_github/actions";
+import { executeCozeAgent, sendTelegramDocument} from "@/app/actions";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { useTelegram } from "@/hooks/useTelegram";
 import { saveAs } from "file-saver";
