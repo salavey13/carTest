@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { executeCozeAgent } from "@/app/actions";
-import { supabaseAdmin } from "@/lib/supabase";
+import { supabaseAdmin } from "@/hooks/supabase";
 import { useTelegram } from "@/hooks/useTelegram";
 import { saveAs } from 'file-saver';
 
