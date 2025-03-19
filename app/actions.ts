@@ -319,9 +319,90 @@ export async function notifyWinners(winningNumber: number, winners: any[]) {
 // Utility to delay execution (for polling)
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// app/actions.ts
+export async function executeCozeAgent(
+  botId: string,
+  userId: string,
+  content: string,
+  metadata?: Record<string, any>
+) {
+  try {
+    // Step 1: Initiate the chat with the Coze API
+    const initResponse = await axios.post(
+      "https://api.coze.com/v3/chat",
+      {
+        bot_id: botId,
+        user_id: userId,
+        stream: false,
+        auto_save_history: true,
+        additional_messages: [{
+          role: "user",
+          content: content,
+          content_type: "text",
+        }],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.COZE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const chatId = initResponse.data.data?.id;
+    const conversationId = initResponse.data.data?.conversation_id;
+
+    if (!chatId || !conversationId) {
+      throw new Error("Missing chat ID or conversation ID in initial response");
+    }
+
+    // Step 2: Poll for the assistant's response
+    let attempts = 0;
+    const maxAttempts = 10;
+    const pollInterval = 2000; // 2 seconds
+
+    while (attempts < maxAttempts) {
+      const messagesResponse = await axios.get(
+        `https://api.coze.com/v3/chat/message/list?conversation_id=${conversationId}&chat_id=${chatId}`,
+        {
+          headers: { Authorization: `Bearer ${process.env.COZE_API_KEY}` },
+        }
+      );
+
+      const assistantAnswer = messagesResponse.data.data?.find(
+        (msg: any) => msg.role === "assistant" && msg.type === "answer"
+      )?.content;
+
+      if (assistantAnswer) {
+        // Step 3: Save the text response to Supabase
+        const { error } = await supabaseAdmin
+          .from("coze_responses")
+          .insert({
+            bot_id: botId,
+            user_id: userId,
+            content: content,
+            response: assistantAnswer, // Store as plain text
+            metadata: metadata || {},
+          });
+
+        if (error) throw error;
+
+        return { success: true, data: assistantAnswer }; // Return the text response
+      }
+
+      attempts++;
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+
+    throw new Error("No response from Coze agent after maximum attempts");
+  } catch (error) {
+    console.error("Coze execution failed:", error);
+    return { success: false, error: error.message };
+  }
+}
 
 // Generalized function to run a Coze agent
-export async function runCozeAgent(botId: string, userId: string, content: string) {
+export async function runCozeAgentJSON(botId: string, userId: string, content: string) {
   try {
     // Step 1: Initiate the chat
     const initResponse = await axios.post(
