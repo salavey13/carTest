@@ -20,6 +20,44 @@ const COZE_USER_ID = process.env.COZE_USER_ID || '341503612082';
 
 
 
+/** Sends a Telegram document to a specified chat */
+export async function sendTelegramDocument(
+  chatId: string,
+  fileContent: string,
+  fileName: string
+) {
+  try {
+    const token = TELEGRAM_BOT_TOKEN;
+    if (!token) {
+      throw new Error("Telegram bot token not configured");
+    }
+
+    const blob = new Blob([fileContent], { type: "text/plain;charset=utf-8" });
+    const formData = new FormData();
+    formData.append("chat_id", chatId);
+    formData.append("document", blob, fileName);
+
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.description || "Failed to send document");
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "An unexpected error occurred",
+    };
+  }
+}
+
+
+
 interface InlineButton {
   text: string;
   url: string;
