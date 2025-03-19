@@ -5,6 +5,8 @@ import { executeCozeAgent } from "@/app/actions";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { useTelegram } from "@/hooks/useTelegram";
 import { saveAs } from "file-saver";
+import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
+import { docco } from "react-syntax-highlighter/dist/esm/styles/hljs";
 
 interface FileEntry {
   path: string;
@@ -17,7 +19,7 @@ interface CozeResponse {
   bot_id: string;
   user_id: string;
   content: string;
-  response: any;
+  response: string;
   metadata: any;
   created_at: string;
 }
@@ -29,10 +31,8 @@ export default function CozeExecutor({
   botId?: string;
   userId?: string;
 }) {
-  // State Definitions
-  const [response, setResponse] = useState<any>(null);
+  const [response, setResponse] = useState<string>("");
   const [content, setContent] = useState<string>("Generate code components");
-  const [jsonInput, setJsonInput] = useState<string>("");
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [savedFiles, setSavedFiles] = useState<FileEntry[]>([]);
   const [cozeResponses, setCozeResponses] = useState<CozeResponse[]>([]);
@@ -52,10 +52,7 @@ export default function CozeExecutor({
           .eq("id", user.id)
           .single();
         if (userData?.metadata?.generated_files) {
-          setSavedFiles(parseFilesFromJson(userData.metadata.generated_files));
-          setJsonInput(
-            JSON.stringify(userData.metadata.generated_files, null, 2)
-          );
+          setSavedFiles(parseFilesFromText(JSON.stringify(userData.metadata.generated_files)));
         }
 
         // Fetch Coze responses
@@ -72,70 +69,60 @@ export default function CozeExecutor({
     loadData();
   }, [user]);
 
-  // Parse JSON to extract file entries
-  const parseFilesFromJson = (json: any): FileEntry[] => {
+  // Parse files from text response
+  const parseFilesFromText = (text: string): FileEntry[] => {
     const entries: FileEntry[] = [];
     try {
-      json.new_components?.forEach((c: any) => {
-        const match = c.code.match(/\/\/ File: (.+)\n/);
-        if (match) {
+      const codeBlocks = text.match(/```[\s\S]*?```/g) || [];
+      codeBlocks.forEach((block) => {
+        const content = block.slice(3, -3).trim();
+        const lines = content.split("\n");
+        const firstLine = lines[0];
+        const languageMatch = firstLine.match(/^([a-z]+)$/i); // e.g., "typescript"
+        const codeStartIndex = languageMatch ? 1 : 0;
+        const codeContent = lines.slice(codeStartIndex).join("\n");
+
+        // Extract file path from comments like "// File: path/to/file.tsx"
+        const fileMatch = codeContent.match(/\/\/\s*File:\s*(.+)/i);
+        if (fileMatch) {
+          const path = fileMatch[1].trim();
           entries.push({
-            path: match[1],
-            content: c.code,
-            extension: match[1].split(".").pop() || "tsx",
+            path,
+            content: codeContent,
+            extension: path.split(".").pop() || "txt",
           });
         }
       });
-
-      json.new_pages?.forEach((p: any) => {
-        entries.push({
-          path: p.route,
-          content: p.code,
-          extension: p.route.split(".").pop() || "tsx",
-        });
-      });
-
-      json.new_actions?.forEach((a: any) => {
-        entries.push({
-          path: `app/actions/${a.name}.ts`,
-          content: a.code,
-          extension: "ts",
-        });
-      });
-
-      json.supabase_migrations?.forEach((m: any) => {
-        entries.push({
-          path: `supabase/migrations/${m.name}.sql`,
-          content: m.sql,
-          extension: "sql",
-        });
-      });
     } catch (err) {
-      setError("Error parsing files");
+      setError("Error parsing files from text");
     }
     return entries;
   };
 
-  // Handle execution of Coze agent
+  // Handle execution of the Coze agent
   const handleExecute = async () => {
     setLoading(true);
     setError("");
+    setResponse("");
+    setFiles([]);
     try {
       const result = await executeCozeAgent(botId, userId, content, {
         operation: "code_generation",
       });
-      setResponse(result);
-      setJsonInput(JSON.stringify(result, null, 2));
-      setFiles(parseFilesFromJson(result));
+      if (result.success) {
+        setResponse(result.data);
+        const parsedFiles = parseFilesFromText(result.data);
+        setFiles(parsedFiles);
 
-      // Refetch Coze responses to include the latest one
-      if (user) {
+        // Refresh the responses table
         const { data: responses } = await supabaseAdmin
           .from("coze_responses")
           .select("*")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
         setCozeResponses(responses || []);
+      } else {
+        setError(result.error);
       }
     } catch (err) {
       setError("Execution failed: " + (err as Error).message);
@@ -144,14 +131,34 @@ export default function CozeExecutor({
     }
   };
 
-  // Handle re-parsing of JSON input
-  const handleParse = () => {
+  // Save parsed files to user's metadata
+  const handleSaveFiles = async () => {
+    if (!user || files.length === 0) return;
+    setLoading(true);
     try {
-      const parsed = JSON.parse(jsonInput);
-      setFiles(parseFilesFromJson(parsed));
-      setError("");
+      const fileData = files.map((file) => ({
+        path: file.path,
+        code: file.content,
+        extension: file.extension,
+      }));
+
+      const { error } = await supabaseAdmin
+        .from("users")
+        .update({
+          metadata: {
+            generated_files: fileData,
+          },
+        })
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      setSavedFiles(files);
+      setError("Files saved successfully!");
     } catch (err) {
-      setError("Invalid JSON format");
+      setError("Failed to save files: " + (err as Error).message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -161,7 +168,27 @@ export default function CozeExecutor({
     saveAs(blob, file.path.split("/").pop() || "file");
   };
 
-  // JSX Rendering
+  // Render response with syntax highlighting
+  const renderResponse = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/(```[\s\S]*?```)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith("```") && part.endsWith("```")) {
+        const code = part.slice(3, -3).trim();
+        const firstLine = code.split("\n")[0];
+        const languageMatch = firstLine.match(/^([a-z]+)$/i);
+        const language = languageMatch ? languageMatch[1] : "text";
+        const codeContent = languageMatch ? code.split("\n").slice(1).join("\n") : code;
+        return (
+          <SyntaxHighlighter key={index} language={language} style={docco}>
+            {codeContent}
+          </SyntaxHighlighter>
+        );
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
+
   return (
     <div className="p-2 sm:p-4 bg-gray-900 text-white text-xs sm:text-sm">
       {/* Content Input */}
@@ -170,7 +197,7 @@ export default function CozeExecutor({
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          className="w-full h-24 p-2 bg-gray-800 text-white"
+          className="w-full h-24 p-2 bg-gray-800 text-white rounded"
           placeholder="Enter your query here..."
         />
       </div>
@@ -180,60 +207,75 @@ export default function CozeExecutor({
         <button
           onClick={handleExecute}
           disabled={loading}
-          className="bg-blue-500 p-2 rounded flex-1 sm:flex-none"
+          className="bg-blue-500 p-2 rounded flex-1 sm:flex-none hover:bg-blue-600"
         >
           {loading ? "Running..." : "Run Agent"}
         </button>
         <button
-          onClick={handleParse}
-          className="bg-green-500 p-2 rounded flex-1 sm:flex-none"
+          onClick={handleSaveFiles}
+          disabled={loading || files.length === 0}
+          className="bg-green-500 p-2 rounded flex-1 sm:flex-none hover:bg-green-600"
         >
-          Re-parse JSON
+          Save Files
+        </button>
+        <button
+          onClick={() => {
+            setResponse("");
+            setContent("");
+            setFiles([]);
+          }}
+          className="bg-gray-500 p-2 rounded flex-1 sm:flex-none hover:bg-gray-600"
+        >
+          Clear
         </button>
       </div>
 
-      {/* Error Display */}
-      {error && <div className="text-red-500 mb-4">{error}</div>}
-
-      {/* JSON Response and Parsed Files Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* JSON Response */}
-        <div>
-          <h3 className="text-base font-bold mb-2">JSON Response</h3>
-          <textarea
-            value={jsonInput}
-            onChange={(e) => setJsonInput(e.target.value)}
-            className="w-full h-64 bg-gray-800 p-2 text-white"
-          />
+      {/* Error/Success Display */}
+      {error && (
+        <div
+          className={`mb-4 ${
+            error.includes("successfully") ? "text-green-500" : "text-red-500"
+          }`}
+        >
+          {error}
         </div>
+      )}
 
-        {/* Parsed Files */}
-        <div>
+      {/* Text Response */}
+      {response && (
+        <div className="mb-4">
+          <h3 className="text-base font-bold mb-2">Response</h3>
+          <div className="w-full h-64 p-2 bg-gray-800 text-white overflow-auto rounded">
+            {renderResponse(response)}
+          </div>
+        </div>
+      )}
+
+      {/* Parsed Files */}
+      {files.length > 0 && (
+        <div className="mb-4">
           <h3 className="text-base font-bold mb-2">Parsed Files</h3>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div className="space-y-2 max-h-64 overflow-y-auto">
             {files.map((file, index) => (
               <div key={index} className="bg-gray-800 p-2 rounded">
                 <div className="flex justify-between items-center">
                   <span className="truncate">{file.path}</span>
                   <button
                     onClick={() => downloadFile(file)}
-                    className="bg-purple-500 p-1 rounded ml-2"
+                    className="bg-purple-500 p-1 rounded ml-2 hover:bg-purple-600"
                   >
                     Download
                   </button>
                 </div>
               </div>
             ))}
-            {files.length === 0 && (
-              <p className="text-gray-400">No files generated yet.</p>
-            )}
           </div>
         </div>
-      </div>
+      )}
 
       {/* Coze Responses Table */}
       <div className="mt-6">
-        <h3 className="text-base font-bold mb-2">Coze Responses</h3>
+        <h3 className="text-base font-bold mb-2">Previous Responses</h3>
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead>
@@ -252,12 +294,8 @@ export default function CozeExecutor({
                     <td className="p-2">{resp.id.slice(0, 8)}...</td>
                     <td className="p-2">{resp.bot_id}</td>
                     <td className="p-2">{resp.content.slice(0, 30)}...</td>
-                    <td className="p-2">
-                      {JSON.stringify(resp.response).slice(0, 30)}...
-                    </td>
-                    <td className="p-2">
-                      {new Date(resp.created_at).toLocaleString()}
-                    </td>
+                    <td className="p-2">{resp.response.slice(0, 30)}...</td>
+                    <td className="p-2">{new Date(resp.created_at).toLocaleString()}</td>
                   </tr>
                 ))
               ) : (
@@ -273,27 +311,26 @@ export default function CozeExecutor({
       </div>
 
       {/* Saved Files */}
-      <div className="mt-6">
-        <h3 className="text-base font-bold mb-2">Saved Files</h3>
-        <div className="space-y-2">
-          {savedFiles.map((file, index) => (
-            <div key={index} className="bg-gray-700 p-2 rounded">
-              <div className="flex justify-between items-center">
-                <span className="truncate">{file.path}</span>
-                <button
-                  onClick={() => downloadFile(file)}
-                  className="bg-purple-500 p-1 rounded ml-2"
-                >
-                  Download
-                </button>
+      {savedFiles.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-base font-bold mb-2">Saved Files</h3>
+          <div className="space-y-2">
+            {savedFiles.map((file, index) => (
+              <div key={index} className="bg-gray-700 p-2 rounded">
+                <div className="flex justify-between items-center">
+                  <span className="truncate">{file.path}</span>
+                  <button
+                    onClick={() => downloadFile(file)}
+                    className="bg-purple-500 p-1 rounded ml-2 hover:bg-purple-600"
+                  >
+                    Download
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
-          {savedFiles.length === 0 && (
-            <p className="text-gray-400">No saved files yet.</p>
-          )}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
