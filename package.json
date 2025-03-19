@@ -68,7 +68,8 @@
     "worker-loader": "^3.0.8",
     "react-syntax-highlighter": "latest",
     "react-folder-tree": "latest",
-    "file-saver": "latest",
+    "file-saver": "latest",,
+    "jszip": "latest",
     "@octokit/rest": "latest"
   },
   "devDependencies": {
