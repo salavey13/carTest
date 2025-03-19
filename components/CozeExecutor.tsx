@@ -1,7 +1,7 @@
 // components/CozeExecutor.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { executeCozeAgent, sendTelegramDocument } from "@/app/actions"; // Import the new action
+import { executeCozeAgent, sendTelegramDocument } from "@/app/actions";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { useTelegram } from "@/hooks/useTelegram";
 import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -39,15 +39,16 @@ export default function CozeExecutor({
   const [loading, setLoading] = useState(false);
   const { user } = useTelegram();
 
-  // Load initial data from Supabase
+  // Load initial data from Supabase when user is available
   useEffect(() => {
     const loadData = async () => {
       if (!user) {
-        setError("No user detected from Telegram");
+        console.log("Waiting for Telegram user to load...");
         return;
       }
       try {
         console.log("Loading data for user_id:", user.id);
+        setError(""); // Clear initial "No user" error once user loads
 
         const { data: userData, error: userError } = await supabaseAdmin
           .from("users")
@@ -76,10 +77,14 @@ export default function CozeExecutor({
         console.error("Load data error:", err);
       }
     };
-    loadData();
+
+    // Only run loadData if user is defined
+    if (user) {
+      loadData();
+    }
   }, [user]);
 
-  // Improved file parsing for multiple languages
+  // Improved file parsing to handle both language and filename on first line
   const parseFilesFromText = (text: string): FileEntry[] => {
     const entries: FileEntry[] = [];
     const supportedLanguages = ["typescript", "tsx", "ts", "sql"];
@@ -89,20 +94,32 @@ export default function CozeExecutor({
         const content = block.slice(3, -3).trim();
         const lines = content.split("\n");
         const firstLine = lines[0].trim();
-        const language = supportedLanguages.find((lang) => firstLine === lang) || "text";
-        const codeStartIndex = supportedLanguages.includes(firstLine) ? 1 : 0;
-        const codeContent = lines.slice(codeStartIndex).join("\n");
 
-        const fileMatch = codeContent.match(/(?:\/\/|--)\s*File:\s*(.+)/i);
-        if (fileMatch) {
-          const path = fileMatch[1].trim();
-          const extension = path.split(".").pop() || (language === "sql" ? "sql" : "txt");
-          entries.push({
-            path,
-            content: codeContent,
-            extension,
-          });
+        // Check if first line is a language or filename
+        let language = supportedLanguages.find((lang) => firstLine === lang);
+        let codeStartIndex = language ? 1 : 0;
+        let defaultPath = "unnamed";
+
+        // If first line looks like a filename (e.g., "SleepReminderAdmin.tsx")
+        if (!language && firstLine.match(/^[a-zA-Z0-9_-]+\.(tsx|ts|sql|typescript)$/)) {
+          defaultPath = firstLine;
+          codeStartIndex = 1; // Skip the filename line
+          language = firstLine.split(".").pop() || "text";
+        } else if (!language) {
+          language = "text"; // Default if no match
         }
+
+        const codeContent = lines.slice(codeStartIndex).join("\n");
+        const fileMatch = codeContent.match(/(?:\/\/|--)\s*File:\s*(.+)/i);
+
+        const path = fileMatch ? fileMatch[1].trim() : defaultPath;
+        const extension = path.split(".").pop() || (language === "sql" ? "sql" : "txt");
+
+        entries.push({
+          path,
+          content: codeContent,
+          extension,
+        });
       });
     } catch (err) {
       setError("Error parsing files from text: " + (err as Error).message);
@@ -124,12 +141,14 @@ export default function CozeExecutor({
         const parsedFiles = parseFilesFromText(result.data);
         setFiles(parsedFiles);
 
-        const { data: responses } = await supabaseAdmin
-          .from("coze_responses")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
-        setCozeResponses(responses || []);
+        if (user) {
+          const { data: responses } = await supabaseAdmin
+            .from("coze_responses")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false });
+          setCozeResponses(responses || []);
+        }
       } else {
         setError(result.error);
       }
@@ -388,22 +407,22 @@ export default function CozeExecutor({
       )}
 
       {/* Coze Responses Table */}
-      <div className="mt-6">
-        <h3 className="text-base font-bold mb-2">Previous Responses</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full">
-            <thead>
-              <tr className="bg-gray-800">
-                <th className="p-2">ID</th>
-                <th className="p-2">Bot ID</th>
-                <th className="p-2">Content</th>
-                <th className="p-2">Response</th>
-                <th className="p-2">Created At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cozeResponses.length > 0 ? (
-                cozeResponses.map((resp) => (
+      {cozeResponses.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-base font-bold mb-2">Previous Responses</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead>
+                <tr className="bg-gray-800">
+                  <th className="p-2">ID</th>
+                  <th className="p-2">Bot ID</th>
+                  <th className="p-2">Content</th>
+                  <th className="p-2">Response</th>
+                  <th className="p-2">Created At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cozeResponses.map((resp) => (
                   <tr key={resp.id} className="border-b border-gray-700">
                     <td className="p-2">{resp.id.slice(0, 8)}...</td>
                     <td className="p-2">{resp.bot_id}</td>
@@ -411,18 +430,12 @@ export default function CozeExecutor({
                     <td className="p-2">{resp.response.slice(0, 30)}...</td>
                     <td className="p-2">{new Date(resp.created_at).toLocaleString()}</td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={5} className="p-2 text-center text-gray-400">
-                    No responses yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Saved Files */}
       {savedFiles.length > 0 && (
