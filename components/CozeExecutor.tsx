@@ -69,27 +69,29 @@ export default function CozeExecutor({
     loadData();
   }, [user]);
 
-  // Parse files from text response
+  // Improved file parsing for multiple languages
   const parseFilesFromText = (text: string): FileEntry[] => {
     const entries: FileEntry[] = [];
+    const supportedLanguages = ["typescript", "tsx", "ts", "sql"];
     try {
       const codeBlocks = text.match(/```[\s\S]*?```/g) || [];
       codeBlocks.forEach((block) => {
         const content = block.slice(3, -3).trim();
         const lines = content.split("\n");
-        const firstLine = lines[0];
-        const languageMatch = firstLine.match(/^([a-z]+)$/i); // e.g., "typescript"
-        const codeStartIndex = languageMatch ? 1 : 0;
+        const firstLine = lines[0].trim();
+        const language = supportedLanguages.find((lang) => firstLine === lang) || "text";
+        const codeStartIndex = supportedLanguages.includes(firstLine) ? 1 : 0;
         const codeContent = lines.slice(codeStartIndex).join("\n");
 
-        // Extract file path from comments like "// File: path/to/file.tsx"
-        const fileMatch = codeContent.match(/\/\/\s*File:\s*(.+)/i);
+        // Extract file path from comments like "// File: path/to/file.tsx" or "-- File: path/to/file.sql"
+        const fileMatch = codeContent.match(/(?:\/\/|--)\s*File:\s*(.+)/i);
         if (fileMatch) {
           const path = fileMatch[1].trim();
+          const extension = path.split(".").pop() || (language === "sql" ? "sql" : "txt");
           entries.push({
             path,
             content: codeContent,
-            extension: path.split(".").pop() || "txt",
+            extension,
           });
         }
       });
@@ -103,7 +105,6 @@ export default function CozeExecutor({
   const handleExecute = async () => {
     setLoading(true);
     setError("");
-    setResponse("");
     setFiles([]);
     try {
       const result = await executeCozeAgent(botId, userId, content, {
@@ -128,6 +129,17 @@ export default function CozeExecutor({
       setError("Execution failed: " + (err as Error).message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle manual parsing of response textarea
+  const handleParse = () => {
+    setError("");
+    setFiles([]);
+    const parsedFiles = parseFilesFromText(response);
+    setFiles(parsedFiles);
+    if (parsedFiles.length === 0) {
+      setError("No files found in the response");
     }
   };
 
@@ -175,9 +187,9 @@ export default function CozeExecutor({
     return parts.map((part, index) => {
       if (part.startsWith("```") && part.endsWith("```")) {
         const code = part.slice(3, -3).trim();
-        const firstLine = code.split("\n")[0];
-        const languageMatch = firstLine.match(/^([a-z]+)$/i);
-        const language = languageMatch ? languageMatch[1] : "text";
+        const firstLine = code.split("\n")[0].trim();
+        const languageMatch = ["typescript", "tsx", "ts", "sql"].includes(firstLine);
+        const language = languageMatch ? firstLine : "text";
         const codeContent = languageMatch ? code.split("\n").slice(1).join("\n") : code;
         return (
           <SyntaxHighlighter key={index} language={language} style={docco}>
@@ -202,6 +214,17 @@ export default function CozeExecutor({
         />
       </div>
 
+      {/* Response Textarea */}
+      <div className="mb-4">
+        <h3 className="text-base font-bold mb-2">Response</h3>
+        <textarea
+          value={response}
+          onChange={(e) => setResponse(e.target.value)}
+          className="w-full h-64 p-2 bg-gray-800 text-white rounded overflow-auto"
+          placeholder="Paste a response here to parse files or wait for Coze execution..."
+        />
+      </div>
+
       {/* Buttons */}
       <div className="mb-4 flex gap-2">
         <button
@@ -210,6 +233,13 @@ export default function CozeExecutor({
           className="bg-blue-500 p-2 rounded flex-1 sm:flex-none hover:bg-blue-600"
         >
           {loading ? "Running..." : "Run Agent"}
+        </button>
+        <button
+          onClick={handleParse}
+          disabled={loading || !response}
+          className="bg-yellow-500 p-2 rounded flex-1 sm:flex-none hover:bg-yellow-600"
+        >
+          Parse Files
         </button>
         <button
           onClick={handleSaveFiles}
@@ -241,10 +271,10 @@ export default function CozeExecutor({
         </div>
       )}
 
-      {/* Text Response */}
+      {/* Rendered Response */}
       {response && (
         <div className="mb-4">
-          <h3 className="text-base font-bold mb-2">Response</h3>
+          <h3 className="text-base font-bold mb-2">Rendered Response</h3>
           <div className="w-full h-64 p-2 bg-gray-800 text-white overflow-auto rounded">
             {renderResponse(response)}
           </div>
