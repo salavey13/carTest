@@ -45,11 +45,11 @@ export default function CozeExecutor({
     const loadData = async () => {
       if (!user) return;
       try {
-        // Fetch saved files from user metadata
+        // Fetch saved files from user metadata using user_id
         const { data: userData } = await supabaseAdmin
           .from("users")
           .select("metadata")
-          .eq("id", user.id)
+          .eq("user_id", user.id) // Changed to "user_id"
           .single();
         if (userData?.metadata?.generated_files) {
           setSavedFiles(parseFilesFromText(JSON.stringify(userData.metadata.generated_files)));
@@ -63,7 +63,7 @@ export default function CozeExecutor({
           .order("created_at", { ascending: false });
         setCozeResponses(responses || []);
       } catch (err) {
-        setError("Failed to load data");
+        setError("Failed to load data: " + (err as Error).message);
       }
     };
     loadData();
@@ -96,7 +96,7 @@ export default function CozeExecutor({
         }
       });
     } catch (err) {
-      setError("Error parsing files from text");
+      setError("Error parsing files from text: " + (err as Error).message);
     }
     return entries;
   };
@@ -143,7 +143,7 @@ export default function CozeExecutor({
     }
   };
 
-  // Save parsed files to user's metadata
+  // Save all parsed files to user's metadata
   const handleSaveFiles = async () => {
     if (!user || files.length === 0) return;
     setLoading(true);
@@ -161,7 +161,7 @@ export default function CozeExecutor({
             generated_files: fileData,
           },
         })
-        .eq("id", user.id);
+        .eq("user_id", user.id); // Changed to "user_id"
 
       if (error) throw error;
 
@@ -174,10 +174,57 @@ export default function CozeExecutor({
     }
   };
 
-  // Download a file
-  const downloadFile = (file: FileEntry) => {
-    const blob = new Blob([file.content], { type: "text/plain" });
-    saveAs(blob, file.path.split("/").pop() || "file");
+  // Save an individual file to user's metadata
+  const handleSaveFile = async (file: FileEntry) => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      // Fetch existing saved files
+      const { data: userData } = await supabaseAdmin
+        .from("users")
+        .select("metadata")
+        .eq("user_id", user.id)
+        .single();
+
+      const existingFiles = userData?.metadata?.generated_files || [];
+      const updatedFiles = [
+        ...existingFiles.filter((f: any) => f.path !== file.path),
+        { path: file.path, code: file.content, extension: file.extension },
+      ];
+
+      const { error } = await supabaseAdmin
+        .from("users")
+        .update({
+          metadata: {
+            generated_files: updatedFiles,
+          },
+        })
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      setSavedFiles(updatedFiles.map((f: any) => ({
+        path: f.path,
+        content: f.code,
+        extension: f.extension,
+      })));
+      setError(`File "${file.path}" saved successfully!`);
+    } catch (err) {
+      setError(`Failed to save file "${file.path}": ` + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Download a file with error handling
+  const downloadFile = async (file: FileEntry) => {
+    try {
+      const blob = new Blob([file.content], { type: "text/plain;charset=utf-8" });
+      saveAs(blob, file.path.split("/").pop() || "file");
+      setError(`File "${file.path}" downloaded successfully!`);
+    } catch (err) {
+      setError(`Failed to download file "${file.path}": ` + (err as Error).message);
+    }
   };
 
   // Render response with syntax highlighting
@@ -246,7 +293,7 @@ export default function CozeExecutor({
           disabled={loading || files.length === 0}
           className="bg-green-500 p-2 rounded flex-1 sm:flex-none hover:bg-green-600"
         >
-          Save Files
+          Save All Files
         </button>
         <button
           onClick={() => {
@@ -290,12 +337,22 @@ export default function CozeExecutor({
               <div key={index} className="bg-gray-800 p-2 rounded">
                 <div className="flex justify-between items-center">
                   <span className="truncate">{file.path}</span>
-                  <button
-                    onClick={() => downloadFile(file)}
-                    className="bg-purple-500 p-1 rounded ml-2 hover:bg-purple-600"
-                  >
-                    Download
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleSaveFile(file)}
+                      disabled={loading}
+                      className="bg-green-500 p-1 rounded hover:bg-green-600 disabled:bg-gray-400"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => downloadFile(file)}
+                      disabled={loading}
+                      className="bg-purple-500 p-1 rounded hover:bg-purple-600 disabled:bg-gray-400"
+                    >
+                      Download
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -351,7 +408,8 @@ export default function CozeExecutor({
                   <span className="truncate">{file.path}</span>
                   <button
                     onClick={() => downloadFile(file)}
-                    className="bg-purple-500 p-1 rounded ml-2 hover:bg-purple-600"
+                    disabled={loading}
+                    className="bg-purple-500 p-1 rounded ml-2 hover:bg-purple-600 disabled:bg-gray-400"
                   >
                     Download
                   </button>
