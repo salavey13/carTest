@@ -69,7 +69,7 @@
     "react-syntax-highlighter": "latest",
     "react-folder-tree": "latest",
     "file-saver": "latest",
-    "octokit/rest": "latest"
+    "@octokit/rest": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
