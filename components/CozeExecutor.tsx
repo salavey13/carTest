@@ -43,27 +43,40 @@ export default function CozeExecutor({
   // Load initial data from Supabase
   useEffect(() => {
     const loadData = async () => {
-      if (!user) return;
+      if (!user) {
+        setError("No user detected from Telegram");
+        return;
+      }
       try {
-        // Fetch saved files from user metadata using user_id
-        const { data: userData } = await supabaseAdmin
+        console.log("Loading data for user_id:", user.id);
+
+        // Fetch saved files from user metadata
+        const { data: userData, error: userError } = await supabaseAdmin
           .from("users")
           .select("metadata")
-          .eq("user_id", user.id) // Changed to "user_id"
+          .eq("user_id", user.id)
           .single();
+        if (userError) throw userError;
         if (userData?.metadata?.generated_files) {
-          setSavedFiles(parseFilesFromText(JSON.stringify(userData.metadata.generated_files)));
+          const parsedSavedFiles = parseFilesFromText(JSON.stringify(userData.metadata.generated_files));
+          setSavedFiles(parsedSavedFiles);
+          console.log("Loaded saved files:", parsedSavedFiles);
+        } else {
+          console.log("No saved files found in metadata");
         }
 
         // Fetch Coze responses
-        const { data: responses } = await supabaseAdmin
+        const { data: responses, error: responsesError } = await supabaseAdmin
           .from("coze_responses")
           .select("*")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
+        if (responsesError) throw responsesError;
         setCozeResponses(responses || []);
+        console.log("Loaded Coze responses:", responses);
       } catch (err) {
         setError("Failed to load data: " + (err as Error).message);
+        console.error("Load data error:", err);
       }
     };
     loadData();
@@ -83,7 +96,6 @@ export default function CozeExecutor({
         const codeStartIndex = supportedLanguages.includes(firstLine) ? 1 : 0;
         const codeContent = lines.slice(codeStartIndex).join("\n");
 
-        // Extract file path from comments like "// File: path/to/file.tsx" or "-- File: path/to/file.sql"
         const fileMatch = codeContent.match(/(?:\/\/|--)\s*File:\s*(.+)/i);
         if (fileMatch) {
           const path = fileMatch[1].trim();
@@ -115,7 +127,6 @@ export default function CozeExecutor({
         const parsedFiles = parseFilesFromText(result.data);
         setFiles(parsedFiles);
 
-        // Refresh the responses table
         const { data: responses } = await supabaseAdmin
           .from("coze_responses")
           .select("*")
@@ -156,19 +167,22 @@ export default function CozeExecutor({
 
       const { error } = await supabaseAdmin
         .from("users")
-        .update({
-          metadata: {
-            generated_files: fileData,
+        .upsert(
+          {
+            user_id: user.id,
+            metadata: { generated_files: fileData },
           },
-        })
-        .eq("user_id", user.id); // Changed to "user_id"
+          { onConflict: "user_id" }
+        );
 
       if (error) throw error;
 
       setSavedFiles(files);
       setError("Files saved successfully!");
+      console.log("Saved files to Supabase:", fileData);
     } catch (err) {
       setError("Failed to save files: " + (err as Error).message);
+      console.error("Save files error:", err);
     } finally {
       setLoading(false);
     }
@@ -179,7 +193,6 @@ export default function CozeExecutor({
     if (!user) return;
     setLoading(true);
     try {
-      // Fetch existing saved files
       const { data: userData } = await supabaseAdmin
         .from("users")
         .select("metadata")
@@ -194,12 +207,13 @@ export default function CozeExecutor({
 
       const { error } = await supabaseAdmin
         .from("users")
-        .update({
-          metadata: {
-            generated_files: updatedFiles,
+        .upsert(
+          {
+            user_id: user.id,
+            metadata: { generated_files: updatedFiles },
           },
-        })
-        .eq("user_id", user.id);
+          { onConflict: "user_id" }
+        );
 
       if (error) throw error;
 
@@ -216,14 +230,29 @@ export default function CozeExecutor({
     }
   };
 
-  // Download a file with error handling
+  // Download a file with fallback
   const downloadFile = async (file: FileEntry) => {
     try {
+      console.log("Attempting to download:", file.path);
       const blob = new Blob([file.content], { type: "text/plain;charset=utf-8" });
       saveAs(blob, file.path.split("/").pop() || "file");
-      setError(`File "${file.path}" downloaded successfully!`);
+      setError(`File "${file.path}" downloaded successfully! Files are saved to your browser's default download folder (e.g., "Downloads").`);
     } catch (err) {
       setError(`Failed to download file "${file.path}": ` + (err as Error).message);
+      // Fallback method
+      try {
+        const url = window.URL.createObjectURL(new Blob([file.content], { type: "text/plain;charset=utf-8" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = file.path.split("/").pop() || "file";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        setError(`File "${file.path}" downloaded via fallback method! Check your Downloads folder.`);
+      } catch (fallbackErr) {
+        setError(`Fallback download failed for "${file.path}": ` + (fallbackErr as Error).message);
+      }
     }
   };
 
