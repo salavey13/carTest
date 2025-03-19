@@ -250,7 +250,6 @@ export async function notifyWinners(winningNumber: number, winners: any[]) {
 // Utility to delay execution (for polling)
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// app/actions.ts
 export async function executeCozeAgent(
   botId: string,
   userId: string,
