@@ -67,7 +67,8 @@
     "@supabase/supabase-js": "latest",
     "worker-loader": "^3.0.8",
     "react-syntax-highlighter": "latest",
-    "react-folder-tree": "latest"
+    "react-folder-tree": "latest",
+    "file-saver": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
