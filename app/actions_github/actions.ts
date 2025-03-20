@@ -1,4 +1,5 @@
 //app/actions_github/actions.ts
+"use server";
 import { Octokit } from "@octokit/rest";
 
 // Interface for files to be committed
