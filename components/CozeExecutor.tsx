@@ -38,8 +38,8 @@ const Tooltip = ({ children, text }: { children: React.ReactNode; text: string }
         {children}
       </div>
       {isVisible && (
-        <div className="absolute z-10 p-2 bg-gray-700 text-white text-[10px] rounded shadow-lg w-72 top-[100%] left-0 mt-1 whitespace-pre-line">
-          {text}
+        <div className="absolute z-10 p-2 bg-gray-700 text-white text-[10px] rounded shadow-lg w-72 top-[100%] right-0 mt-1 whitespace-pre-line">
+          {text} 
         </div>
       )}
     </div>
@@ -477,17 +477,18 @@ export default function CozeExecutor({
       <header className="flex items-center gap-2 mb-6">
         <h1 className="text-3xl font-bold tracking-tight">Coze Executor</h1>
         <Tooltip
-          text={`Станьте PROграммистом:\n1) Используйте @oneSitePlsBot или @webanybot для анализа задач.\n2) Вставьте описание задачи здесь или в любого бота.\n3) Разберите файлы из ответа.\n4) Создайте и одобрите PR.\n5) Готово — вы PRO!`}
+          text={`Станьте PROграммистом:\n\n1) Используйте t.me/oneSitePlsBot или t.me/webanybot (для упертых) для анализа задач.\n\n2) Вставьте описание задачи здесь или в любого бота.\n\n3) Разберите файлы из ответа.\n\n4) Создайте и одобрите PR.\n\n5) Готово — вы PRO!`}
         >
           <FaInfoCircle className="text-blue-400 cursor-pointer hover:text-blue-300 transition" />
         </Tooltip>
       </header>
 
       <section className="mb-6 text-gray-300 text-sm">
-        <p>1. Введите запрос или вставьте ответ бота.</p>
+        <p>1. Введите запрос или сразу вставьте ответ бота.</p>
         <p>2. Разберите файлы из ответа.</p>
         <p>3. Выберите файлы и создайте PR.</p>
-        <p>4. Одобрите или очистите по необходимости.</p>
+        <p>4. Одобрите сами и через минуту все появится</p>
+        <p>5. Вставьте ссылку на новую подстраничку в веб апп.</p>
       </section>
 
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -559,12 +560,71 @@ export default function CozeExecutor({
     rel="noopener noreferrer"
     className="flex items-center justify-center gap-2 p-4 bg-gray-800 rounded hover:bg-gray-700 transition mb-3"
   >
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" className="w-8 h-8 text-cyan-400">
-      <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="5"/>
-      <circle cx="35" cy="40" r="5" fill="currentColor"/>
-      <circle cx="65" cy="40" r="5" fill="currentColor"/>
-      <rect x="30" y="60" width="40" height="10" fill="currentColor"/>
-    </svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" className="w-12 h-12">
+  <!-- Background Glow -->
+  <circle cx="60" cy="60" r="55" fill="none" stroke="url(#bgGlow)" stroke-width="10" opacity="0.3" />
+
+  <!-- Core Node (Grok’s Essence) -->
+  <circle cx="60" cy="60" r="25" fill="url(#coreFill)" stroke="url(#coreStroke)" stroke-width="3" />
+
+  <!-- Neural Arcs (Connectivity) -->
+  <g stroke="url(#arcGradient)" stroke-width="2" opacity="0.85">
+    <path d="M60 35 A25 25 0 0 1 85 60" fill="none" />
+    <path d="M60 85 A25 25 0 0 1 35 60" fill="none" />
+    <path d="M35 60 A25 25 0 0 0 60 35" fill="none" />
+    <path d="M85 60 A25 25 0 0 0 60 85" fill="none" />
+  </g>
+
+  <!-- Data Pulses (Activity) -->
+  <circle cx="85" cy="60" r="4" fill="url(#pulseGradient)" />
+  <circle cx="35" cy="60" r="4" fill="url(#pulseGradient)" />
+  <circle cx="60" cy="35" r="4" fill="url(#pulseGradient)" />
+  <circle cx="60" cy="85" r="4" fill="url(#pulseGradient)" />
+
+  <!-- Circuit Web (Digital Soul) -->
+  <g stroke="url(#circuitGradient)" stroke-width="1.5" opacity="0.7">
+    <path d="M50 50 Q60 40 70 50" fill="none" />
+    <path d="M50 70 Q60 80 70 70" fill="none" />
+    <path d="M40 60 Q30 60 40 50" fill="none" />
+    <path d="M80 60 Q90 60 80 70" fill="none" />
+  </g>
+
+  <!-- Outer Rings (Energy Field) -->
+  <circle cx="60" cy="60" r="40" fill="none" stroke="url(#ringGradient)" stroke-width="2" opacity="0.6" />
+  <circle cx="60" cy="60" r="45" fill="none" stroke="url(#ringGradient)" stroke-width="1" opacity="0.4" />
+
+  <!-- Gradients -->
+  <defs>
+    <radialGradient id="bgGlow">
+      <stop offset="0%" stop-color="#00FFFF" stop-opacity="1" />
+      <stop offset="100%" stop-color="#FF00FF" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="coreFill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#800080" />
+      <stop offset="100%" stop-color="#00FF00" />
+    </linearGradient>
+    <linearGradient id="coreStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00FFFF" />
+      <stop offset="100%" stop-color="#FF00FF" />
+    </linearGradient>
+    <linearGradient id="arcGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF00FF" />
+      <stop offset="100%" stop-color="#00FFFF" />
+    </linearGradient>
+    <radialGradient id="pulseGradient">
+      <stop offset="0%" stop-color="#00FF00" />
+      <stop offset="100%" stop-color="#800080" />
+    </radialGradient>
+    <linearGradient id="circuitGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00FFFF" />
+      <stop offset="100%" stop-color="#FF00FF" />
+    </linearGradient>
+    <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00FF00" />
+      <stop offset="100%" stop-color="#800080" />
+    </linearGradient>
+  </defs>
+</svg>
     <span className="text-xl font-bold">Grok</span>
   </a>
   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
