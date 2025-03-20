@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { createGitHubPullRequest, getOpenPullRequests, approvePullRequest } from "@/app/actions_github/actions";
 import { executeCozeAgent, sendTelegramDocument} from "@/app/actions";
 import { supabaseAdmin } from "@/hooks/supabase";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useAppContext } from "@/contexts/AppContext";
 import { saveAs } from "file-saver";
 import { Light as SyntaxHighlighter } from "react-syntax-highlighter";
 import { docco } from "react-syntax-highlighter/dist/esm/styles/hljs";
@@ -68,7 +68,7 @@ export default function CozeExecutor({
   const [loading, setLoading] = useState(false);
   const [packageJsonInput, setPackageJsonInput] = useState<string>("");
   const [newModules, setNewModules] = useState<string[]>([]);
-  const { user, openLink } = useTelegram();
+  const { user, openLink } = useAppContext();
 
   // PR-related state
   const [repoUrl, setRepoUrl] = useState<string>("https://github.com/salavey13/cartest");
