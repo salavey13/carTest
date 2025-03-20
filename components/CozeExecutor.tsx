@@ -38,7 +38,7 @@ const Tooltip = ({ children, text }: { children: React.ReactNode; text: string }
         {children}
       </div>
       {isVisible && (
-        <div className="absolute z-10 p-2 bg-gray-700 text-white text-[10px] rounded shadow-lg w-72 top-[100%] right-0 mt-1 whitespace-pre-line">
+        <div className="absolute z-10 p-2 bg-gray-700 text-purple text-[13px] rounded shadow-lg w-42 top-[100%] right-[-13px] mt-1 whitespace-pre-line">
           {text} 
         </div>
       )}
