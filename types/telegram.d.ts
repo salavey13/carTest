@@ -4,6 +4,10 @@ export interface TelegramWebApp {
   initDataUnsafe: {
     user?: WebAppUser
   }
+  openLink: (url: string) => void;
+  close: () => void;
+  showPopup: (params: { message: string }) => void;
+  sendData: (data: string) => void;
 }
 
 // types/telegram.ts
