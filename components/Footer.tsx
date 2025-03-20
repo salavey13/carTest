@@ -1,11 +1,11 @@
 "use client";
 import { motion } from "framer-motion";
 import { Gift, Heart, ExternalLink, Send, Code, Lock } from "lucide-react";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useAppContext } from "@/contexts/AppContext";
 import Link from "next/link";
 
 export default function Footer() {
-  const { tg, isInTelegramContext } = useTelegram();
+  const { tg, isInTelegramContext } = useAppContext();
 
   const handleShare = () => {
     const shareUrl = "https://t.me/share/url?url=" + encodeURIComponent("https://t.me/oneSitePlsBot/Friends") + "&text=" + encodeURIComponent("Зацени Affordable Chinese Rent Cars!");
