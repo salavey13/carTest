@@ -38,7 +38,7 @@ const Tooltip = ({ children, text }: { children: React.ReactNode; text: string }
         {children}
       </div>
       {isVisible && (
-        <div className="absolute z-10 p-2 bg-gray-700 text-white text-[10px] rounded shadow-lg w-72 -mt-2 ml-4 whitespace-pre-line">
+        <div className="absolute z-10 p-2 bg-gray-700 text-white text-[10px] rounded shadow-lg w-72 top-[100%] left-0 mt-1 whitespace-pre-line">
           {text}
         </div>
       )}
@@ -552,54 +552,70 @@ export default function CozeExecutor({
         </button>
       </section>
 
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <a
-          href="https://chatgpt.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 p-2 bg-gray-800 rounded hover:bg-gray-700 transition"
-        >
-          <FaRobot className="text-green-500 text-lg" />
-          <span>ChatGPT</span>
-        </a>
-        <a
-          href="https://qwenlm.ai"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 p-2 bg-gray-800 rounded hover:bg-gray-700 transition"
-        >
-          <FaImage className="text-blue-500 text-lg" />
-          <span>QwenLM</span>
-        </a>
-        <a
-          href="https://notebooklm.google.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 p-2 bg-gray-800 rounded hover:bg-gray-700 transition"
-        >
-          <FaBook className="text-yellow-500 text-lg" />
-          <span>NotebookLM</span>
-        </a>
-        {customLink ? (
-          <a
-            href={customLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 p-2 bg-gray-800 rounded hover:bg-gray-700 transition"
-          >
-            <FaExternalLinkAlt className="text-purple-500 text-lg" />
-            <span>Пользовательская ссылка</span>
-          </a>
-        ) : (
-          <button
-            onClick={setCustomLinkHandler}
-            className="flex items-center gap-2 p-2 bg-gray-800 rounded hover:bg-gray-700 transition"
-          >
-            <FaPlus className="text-gray-400 text-lg" />
-            <span>Добавить ссылку</span>
-          </button>
-        )}
-      </section>
+      <section className="mb-6">
+  <a
+    href="https://grok.com"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="flex items-center justify-center gap-2 p-4 bg-gray-800 rounded hover:bg-gray-700 transition mb-3"
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" className="w-8 h-8 text-cyan-400">
+      <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="5"/>
+      <circle cx="35" cy="40" r="5" fill="currentColor"/>
+      <circle cx="65" cy="40" r="5" fill="currentColor"/>
+      <rect x="30" y="60" width="40" height="10" fill="currentColor"/>
+    </svg>
+    <span className="text-xl font-bold">Grok</span>
+  </a>
+  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+    <a
+      href="https://chatgpt.com"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 p-2 bg-gray-800 rounded hover:bg-gray-700 transition"
+    >
+      <FaRobot className="text-green-500 text-lg" />
+      <span>ChatGPT</span>
+    </a>
+    <a
+      href="https://qwenlm.ai"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 p-2 bg-gray-800 rounded hover:bg-gray-700 transition"
+    >
+      <FaImage className="text-blue-500 text-lg" />
+      <span>QwenLM</span>
+    </a>
+    <a
+      href="https://notebooklm.google.com"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 p-2 bg-gray-800 rounded hover:bg-gray-700 transition"
+    >
+      <FaBook className="text-yellow-500 text-lg" />
+      <span>NotebookLM</span>
+    </a>
+    {customLink ? (
+      <a
+        href={customLink}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-2 p-2 bg-gray-800 rounded hover:bg-gray-700 transition"
+      >
+        <FaExternalLinkAlt className="text-purple-500 text-lg" />
+        <span>Пользовательская ссылка</span>
+      </a>
+    ) : (
+      <button
+        onClick={setCustomLinkHandler}
+        className="flex items-center gap-2 p-2 bg-gray-800 rounded hover:bg-gray-700 transition"
+      >
+        <FaPlus className="text-gray-400 text-lg" />
+        <span>Добавить ссылку</span>
+      </button>
+    )}
+  </div>
+</section>
 
       {newModules.length > 0 && (
         <section className="mb-6 bg-gray-800 p-4 rounded-lg">
@@ -691,21 +707,21 @@ export default function CozeExecutor({
           rows={3}
         />
         <div className="flex gap-2">
-          <button
-            className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-500 transition"
-            onClick={handleCreatePR}
-            disabled={loading}
-          >
-            Создать PR
-          </button>
-          <button
-            className="bg-gray-600 px-4 py-2 rounded hover:bg-gray-700 disabled:bg-gray-500 transition"
-            onClick={handleGetOpenPRs}
-            disabled={loading}
-          >
-            Список PR
-          </button>
-        </div>
+  <button
+    className="bg-gradient-to-r from-purple-600 to-cyan-500 text-white px-4 py-2 rounded shadow-glow hover:shadow-glow transition disabled:bg-gray-500 disabled:shadow-none"
+    onClick={handleCreatePR}
+    disabled={loading || !repoUrl || selectedFiles.size === 0 || !commitMessage}
+  >
+    Создать PR
+  </button>
+  <button
+    className="bg-cyan-600 text-white px-4 py-2 rounded hover:bg-cyan-700 transition disabled:bg-gray-500"
+    onClick={handleGetOpenPRs}
+    disabled={loading || !repoUrl}
+  >
+    Список PR
+  </button>
+</div>
       </section>
 
       {openPRs.length > 0 && (
