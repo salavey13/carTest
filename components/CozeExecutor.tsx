@@ -11,7 +11,7 @@ import { executeCozeAgent, sendTelegramDocument, notifyAdmin } from "@/app/actio
 import { supabaseAdmin } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
 import { saveAs } from "file-saver";
-import { FaInfoCircle, FaTelegramPlane, FaTrash, FaExternalLinkAlt, FaDatabase, FaRocket, FaGithub, FaRobot, FaImage, FaBook } from "react-icons/fa";
+import { FaInfoCircle, FaTelegramPlane, FaTrash, FaExternalLinkAlt, FaRobot, FaImage, FaBook, FaPlus } from "react-icons/fa";
 import { toast } from 'sonner';
 
 interface FileEntry {
@@ -63,7 +63,8 @@ export default function CozeExecutor({
   const [loading, setLoading] = useState(false);
   const [packageJsonInput, setPackageJsonInput] = useState<string>("");
   const [newModules, setNewModules] = useState<string[]>([]);
-  const { user, openLink } = useAppContext();
+  const [customLink, setCustomLink] = useState<string | null>(null);
+  const { user } = useAppContext();
 
   const [repoUrl, setRepoUrl] = useState<string>("https://github.com/salavey13/cartest");
   const [prTitle, setPrTitle] = useState<string>("");
@@ -90,7 +91,9 @@ export default function CozeExecutor({
             }))
           );
         }
-
+        if (userData?.metadata?.customLink) {
+          setCustomLink(userData.metadata.customLink);
+        }
         const { data: responses } = await supabaseAdmin
           .from("coze_responses")
           .select("*")
@@ -158,16 +161,46 @@ export default function CozeExecutor({
     return entries;
   };
 
-  const extractCommitMessage = (data: any, rawText: string): string => {
+  const extractPRDetails = (data: any, rawText: string) => {
+    let title = "Обновление от CozeExecutor";
+    let description = "Автоматически сгенерировано CozeExecutor";
+    let commitMsg = "Изменения из ответа бота";
+
     if (data && typeof data === "object") {
-      if (data.commitMessage) return data.commitMessage;
-      if (data.description) return data.description;
-      if (data.summary) return data.summary;
+      title = data.title || data.subject || title;
+      description = data.description || data.body || description;
+      commitMsg = data.commitMessage || data.summary || commitMsg;
     }
+
     const lines = rawText.split("\n").filter((line) => line.trim());
-    const summary = lines[0]?.substring(0, 72) || "Изменения из ответа бота";
-    const body = lines.slice(1).join("\n");
-    return body ? `${summary}\n\n${body}` : summary;
+    if (lines.length > 0) {
+      for (const line of lines) {
+        if (line.toLowerCase().startsWith("title:") || line.toLowerCase().startsWith("заголовок:")) {
+          title = line.substring(line.indexOf(":") + 1).trim().substring(0, 100);
+        } else if (line.toLowerCase().startsWith("description:") || line.toLowerCase().startsWith("описание:")) {
+          description = line.substring(line.indexOf(":") + 1).trim();
+        } else if (line.toLowerCase().startsWith("commit:") || line.toLowerCase().startsWith("коммит:")) {
+          commitMsg = line.substring(line.indexOf(":") + 1).trim();
+        }
+      }
+      if (!data?.title && title === "Обновление от CozeExecutor") {
+        title = lines[0].substring(0, 100);
+      }
+      if (!data?.description && description === "Автоматически сгенерировано CozeExecutor" && lines.length > 1) {
+        description = lines.slice(1).join("\n");
+      }
+      if (!data?.commitMessage && commitMsg === "Изменения из ответа бота") {
+        commitMsg = lines[0].substring(0, 72) + (lines.length > 1 ? "\n\n" + lines.slice(1).join("\n") : "");
+      }
+    }
+
+    if (files.length > 0 && commitMsg === "Изменения из ответа бота") {
+      commitMsg = `Обновлены файлы: ${files.map(f => f.path).join(", ")}`;
+    } else if (content && title === "Обновление от CozeExecutor") {
+      title = `Изменения для: ${content.substring(0, 50)}`;
+    }
+
+    return { title, description, commitMessage: commitMsg };
   };
 
   const handleExecute = async () => {
@@ -181,9 +214,10 @@ export default function CozeExecutor({
         const rawResponse = JSON.stringify(result.data, null, 2);
         setResponse(rawResponse);
         setFiles(parseFilesFromText(rawResponse));
-        setPrTitle(result.data?.title || "Обновление от CozeExecutor");
-        setPrDescription(result.data?.description || "Автоматически сгенерировано CozeExecutor");
-        setCommitMessage(extractCommitMessage(result.data, rawResponse));
+        const { title, description, commitMessage } = extractPRDetails(result.data, rawResponse);
+        setPrTitle(title);
+        setPrDescription(description);
+        setCommitMessage(commitMessage);
       } else {
         toast.error(result.error);
       }
@@ -199,7 +233,10 @@ export default function CozeExecutor({
     setNewModules([]);
     const parsedFiles = parseFilesFromText(response);
     setFiles(parsedFiles);
-    setCommitMessage(extractCommitMessage(null, response));
+    const { title, description, commitMessage } = extractPRDetails(null, response);
+    setPrTitle(title);
+    setPrDescription(description);
+    setCommitMessage(commitMessage);
     if (parsedFiles.length === 0) toast.info("В ответе не найдено файлов");
   };
 
@@ -286,16 +323,18 @@ export default function CozeExecutor({
     setLoading(true);
     try {
       const filesToCommit = files.filter((file) => selectedFiles.has(file.path));
+      const username = user?.username || user?.id || "unknown";
       const result = await createGitHubPullRequest(
         repoUrl,
         filesToCommit,
         prTitle,
         prDescription,
-        commitMessage
+        username,
+        Array.from(selectedFiles)
       );
       if (result.success) {
         toast.success(`PR успешно создан: ${result.prUrl}`);
-        await notifyAdmin("system", `Новый PR создан пользователем ${user?.username || user?.id}: ${result.prUrl}`);
+        await notifyAdmin("system", `Новый PR создан пользователем ${username}: ${result.prUrl}`);
         handleGetOpenPRs();
       } else {
         toast.error("Ошибка при создании PR: " + result.error);
@@ -407,6 +446,32 @@ export default function CozeExecutor({
     }
   };
 
+  const setCustomLinkHandler = () => {
+    const link = prompt("Введите вашу пользовательскую ссылку:");
+    if (link) {
+      saveCustomLink(link);
+    }
+  };
+
+  const saveCustomLink = async (link: string) => {
+    if (!user) return;
+    try {
+      const { data: existingData } = await supabaseAdmin
+        .from("users")
+        .select("metadata")
+        .eq("user_id", user.id)
+        .single();
+      const updatedMetadata = { ...existingData?.metadata, customLink: link };
+      await supabaseAdmin
+        .from("users")
+        .upsert({ user_id: user.id, metadata: updatedMetadata });
+      setCustomLink(link);
+      toast.success("Пользовательская ссылка сохранена!");
+    } catch (err) {
+      toast.error("Ошибка при сохранении пользовательской ссылки: " + (err as Error).message);
+    }
+  };
+
   return (
     <div className="p-4 bg-gray-900 text-white min-h-screen font-sans">
       <header className="flex items-center gap-2 mb-6">
@@ -487,7 +552,7 @@ export default function CozeExecutor({
         </button>
       </section>
 
-      <section className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <a
           href="https://chatgpt.com"
           target="_blank"
@@ -515,6 +580,25 @@ export default function CozeExecutor({
           <FaBook className="text-yellow-500 text-lg" />
           <span>NotebookLM</span>
         </a>
+        {customLink ? (
+          <a
+            href={customLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 p-2 bg-gray-800 rounded hover:bg-gray-700 transition"
+          >
+            <FaExternalLinkAlt className="text-purple-500 text-lg" />
+            <span>Пользовательская ссылка</span>
+          </a>
+        ) : (
+          <button
+            onClick={setCustomLinkHandler}
+            className="flex items-center gap-2 p-2 bg-gray-800 rounded hover:bg-gray-700 transition"
+          >
+            <FaPlus className="text-gray-400 text-lg" />
+            <span>Добавить ссылку</span>
+          </button>
+        )}
       </section>
 
       {newModules.length > 0 && (
