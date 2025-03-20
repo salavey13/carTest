@@ -1,44 +1,37 @@
-//app/actions_github/actions.ts
+// /app/actions_github/actions.ts
 "use server";
 import { Octokit } from "@octokit/rest";
 
-// Interface for files to be committed
 interface FileNode {
   path: string;
   content: string;
 }
 
-/**
- * Creates a pull request on GitHub with the provided files using a secure token from the server environment.
- * @param repoUrl - The GitHub repository URL (e.g., https://github.com/user/repo)
- * @param files - Array of files to commit (path and content)
- * @param prTitle - Title of the pull request
- * @param prDescription - Description of the pull request
- * @returns Object indicating success or failure with the PR URL or error message
- */
 export async function createGitHubPullRequest(
   repoUrl: string,
   files: FileNode[],
   prTitle: string,
-  prDescription: string
+  prDescription: string,
+  username: string,
+  selectedFiles: string[]
 ) {
   try {
     const token = process.env.GITHUB_TOKEN;
-    if (!token) {
-      throw new Error("GitHub token is not configured in the server environment");
-    }
-
-    const { owner, repo } = parseRepoUrl(repoUrl);
+    if (!token) throw new Error("GitHub token missing");
+    const [owner, repo] = parseRepoUrl(repoUrl);
     const octokit = new Octokit({ auth: token });
+
+    const { data: repoData } = await octokit.repos.get({ owner, repo });
+    const defaultBranch = repoData.default_branch;
 
     const { data: refData } = await octokit.git.getRef({
       owner,
       repo,
-      ref: "heads/main",
+      ref: `heads/${defaultBranch}`,
     });
     const baseSha = refData.object.sha;
 
-    const branchName = `feature/coze-${Date.now()}`;
+    const branchName = `feature/coze-${Date.now()}-${username}`;
     await octokit.git.createRef({
       owner,
       repo,
@@ -48,27 +41,21 @@ export async function createGitHubPullRequest(
 
     for (const file of files) {
       const content = Buffer.from(file.content).toString("base64");
-      let sha: string | undefined;
-
-      try {
-        const { data: existingFile } = await octokit.repos.getContent({
+      const { data: fileData } = await octokit.repos
+        .getContent({
           owner,
           repo,
           path: file.path,
-          ref: branchName,
-        });
-        if (!Array.isArray(existingFile)) {
-          sha = existingFile.sha;
-        }
-      } catch (err) {
-        // File doesn't exist, proceed with creation
-      }
+          ref: defaultBranch,
+        })
+        .catch(() => ({ data: null }));
+      const sha = fileData?.sha;
 
       await octokit.repos.createOrUpdateFileContents({
         owner,
         repo,
         path: file.path,
-        message: `Add or update ${file.path} via CozeExecutor`,
+        message: `Update files: ${selectedFiles.join(", ")}`,
         content,
         sha,
         branch: branchName,
@@ -81,16 +68,12 @@ export async function createGitHubPullRequest(
       title: prTitle,
       body: prDescription,
       head: branchName,
-      base: "main",
+      base: defaultBranch,
     });
 
     return { success: true, prUrl: pr.html_url };
   } catch (error) {
-    console.error("Error creating pull request:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error occurred",
-    };
+    return { success: false, error: (error as Error).message };
   }
 }
 
