@@ -3,11 +3,11 @@ import { useState, useEffect } from "react";
 import { User, Bot, Trophy, Car, Lock } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useAppContext } from "@/contexts/AppContext";
 import { motion } from "framer-motion";
 
 export default function UserInfo() {
-  const { dbUser, user, isInTelegramContext, isMockUser, isLoading, error } = useTelegram();
+  const { dbUser, user, isInTelegramContext, isMockUser, isLoading, error } = useAppContext();
   const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
