@@ -14,7 +14,7 @@ const MOCK_USER: WebAppUser = {
   last_name: "User",
   username: "mockuser",
   language_code: "ru",
-  photo_url: "https://t.me/i/userpic/320/mockuser.jpg",
+  photo_url: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png",
 }
 
 export function useTelegram() {
@@ -30,7 +30,6 @@ export function useTelegram() {
       debugLogger.log("Authenticating user...", telegramUser)
       try {
         let userData = await fetchUserData(telegramUser.id.toString())
-
         if (!userData) {
           debugLogger.log("Creating new user...")
           userData = await createOrUpdateUser(telegramUser.id.toString(), {
@@ -41,15 +40,13 @@ export function useTelegram() {
             photo_url: telegramUser.photo_url,
             role: "user",
           })
-
           if (!userData) {
             throw new Error("Failed to create new user")
           }
         }
-
         setUser(telegramUser)
         setDbUser(userData as DatabaseUser)
-        toast.success("Пользователь авторизован")
+        // Removed toast.success("Пользователь авторизован") - handled in AppProvider
         return userData
       } catch (err) {
         debugLogger.error("Failed to authenticate user:", err)
@@ -158,6 +155,45 @@ export function useTelegram() {
   const isAuthenticated = Boolean(dbUser)
   const isAdmin = useCallback(() => dbUser?.status === "admin", [dbUser])
 
+  const openLink = useCallback((url: string) => {
+    if (tg) {
+      tg.openLink(url)
+    } else {
+      toast.error("Telegram context not available")
+    }
+  }, [tg])
+
+  const close = useCallback(() => {
+    if (tg) {
+      tg.close()
+    } else {
+      toast.error("Telegram context not available")
+    }
+  }, [tg])
+
+  const showPopup = useCallback((message: string) => {
+    if (tg) {
+      tg.showPopup({ message })
+    } else {
+      toast.error("Telegram context not available")
+    }
+  }, [tg])
+
+  const sendData = useCallback((data: string) => {
+    if (tg) {
+      tg.sendData(data)
+    } else {
+      toast.error("Telegram context not available")
+    }
+  }, [tg])
+
+  const getInitData = useCallback(() => {
+    if (tg) {
+      return tg.initDataUnsafe
+    }
+    return null
+  }, [tg])
+
   return {
     tg,
     user,
@@ -167,6 +203,10 @@ export function useTelegram() {
     isAdmin,
     isLoading,
     error,
+    openLink,
+    close,
+    showPopup,
+    sendData,
+    getInitData,
   }
 }
-
