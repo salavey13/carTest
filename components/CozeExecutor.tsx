@@ -164,58 +164,78 @@ export default function CozeExecutor({
     return entries;
   };
 
-  // Parse files and detect new modules from text
   const parseFilesFromText = (text: string): FileEntry[] => {
-    const entries: FileEntry[] = [];
-    const supportedLanguages = ["typescript", "tsx", "ts", "sql"];
-    const importRegex = /import\s+.*\s+from\s+['"]([^'"]+)['"]/g;
-    const detectedModules: Set<string> = new Set();
+  const entries: FileEntry[] = [];
+  const supportedLanguages = ["typescript", "tsx", "ts", "sql"];
+  const importRegex = /import\s+.*\s+from\s+['"]([^'"]+)['"]/g;
+  const detectedModules: Set<string> = new Set();
 
-    try {
-      const codeBlocks = text.match(/```[\s\S]*?```/g) || [];
-      codeBlocks.forEach((block) => {
-        const content = block.slice(3, -3).trim();
-        const lines = content.split("\n");
-        const firstLine = lines[0].trim();
+  try {
+    const codeBlocks = text.match(/```[\s\S]*?```/g) || [];
+    codeBlocks.forEach((block) => {
+      const content = block.slice(3, -3).trim();
+      const lines = content.split("\n");
+      let codeStartIndex = 0;
+      let language: string | undefined;
+      let defaultPath = "unnamed";
 
-        let language = supportedLanguages.find((lang) => firstLine === lang);
-        let codeStartIndex = language ? 1 : 0;
-        let defaultPath = "unnamed";
-
-        if (!language && firstLine.match(/^[a-zA-Z0-9_-]+\.(tsx|ts|sql|typescript)$/)) {
-          defaultPath = firstLine;
-          codeStartIndex = 1;
-          language = firstLine.split(".").pop() || "text";
-        } else if (!language) {
-          language = "text";
+      const firstLine = lines[0].trim();
+      if (supportedLanguages.includes(firstLine)) {
+        language = firstLine;
+        codeStartIndex = 1;
+        const secondLine = lines[1]?.trim();
+        if (secondLine && secondLine.match(/^[a-zA-Z0-9_-]+\.(tsx|ts|sql|typescript)$/)) {
+          defaultPath = secondLine;
+          codeStartIndex = 2;
         }
+      } else if (firstLine.match(/^[a-zA-Z0-9_-]+\.(tsx|ts|sql|typescript)$/)) {
+        defaultPath = firstLine;
+        language = firstLine.split(".").pop() || "text";
+        codeStartIndex = 1;
+      } else {
+        language = "text";
+      }
 
-        const codeContent = lines.slice(codeStartIndex).join("\n");
-        const fileMatch = codeContent.match(/(?:\/\/|--)\s*File:\s*(.+)/i);
-        const path = fileMatch ? fileMatch[1].trim() : defaultPath;
-        const extension = path.split(".").pop() || (language === "sql" ? "sql" : "txt");
+      const codeContent = lines.slice(codeStartIndex).join("\n");
+      const fileMatch = codeContent.match(/(?:\/\/|--)\s*File:\s*(.+)/i);
+      let path = fileMatch ? fileMatch[1].trim() : defaultPath;
 
-        // Detect imports
-        let match;
-        while ((match = importRegex.exec(codeContent)) !== null) {
-          const moduleName = match[1];
-          if (!moduleName.startsWith("@/") && !moduleName.startsWith("./") && !moduleName.startsWith("../")) {
-            detectedModules.add(moduleName);
-          }
+      // Default path adjustments
+      if (path === "unnamed") {
+        if (language === "tsx" || language === "typescript") {
+          path = `components/unnamed.${language}`; // Default TSX to components/
+        } else if (language === "sql") {
+          path = `supabase/migrations/unnamed.sql`; // Default SQL to migrations/
         }
+      } else if (language === "ts" && path.endsWith(".ts") && path.includes("Update")) {
+        // Handle actions with subfolder
+        const actionName = path.split(".")[0];
+        const subfolderPrefix = actionName.match(/^[a-z]+/)?.[0] || "misc";
+        path = `app/actions_${subfolderPrefix}/${path}`;
+      }
 
-        entries.push({ path, content: codeContent, extension });
-      });
+      const extension = path.split(".").pop() || (language === "sql" ? "sql" : "txt");
 
-      // Update new modules, excluding already installed ones
-      const currentDeps = packageJsonInput ? Object.keys(JSON.parse(packageJsonInput).dependencies || {}) : [];
-      const newMods = Array.from(detectedModules).filter((mod) => !currentDeps.includes(mod));
-      setNewModules(newMods);
-    } catch (err) {
-      setError("Ошибка парсинга текста: " + (err as Error).message);
-    }
-    return entries;
-  };
+      // Detect external modules
+      let match;
+      while ((match = importRegex.exec(codeContent)) !== null) {
+        const moduleName = match[1];
+        if (!moduleName.startsWith("@/") && !moduleName.startsWith("./") && !moduleName.startsWith("../")) {
+          detectedModules.add(moduleName);
+        }
+      }
+
+      entries.push({ path, content: codeContent, extension });
+    });
+
+    const currentDeps = packageJsonInput ? Object.keys(JSON.parse(packageJsonInput).dependencies || {}) : [];
+    const newMods = Array.from(detectedModules).filter((mod) => !currentDeps.includes(mod));
+    setNewModules(newMods);
+  } catch (err) {
+    setError("Ошибка парсинга текста: " + (err as Error).message);
+  }
+  return entries;
+};
 
   // Execute Coze agent
   const handleExecute = async () => {
