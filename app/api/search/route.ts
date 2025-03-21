@@ -1,3 +1,4 @@
+// app/api/search/route.ts
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/hooks/supabase";
 
