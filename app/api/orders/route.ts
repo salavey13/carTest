@@ -1,3 +1,4 @@
+// app/api/orders/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { notifyAdmin } from "@/app/actions";
