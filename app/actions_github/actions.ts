@@ -1,10 +1,17 @@
 // /app/actions_github/actions.ts
 "use server";
 import { Octokit } from "@octokit/rest";
+import { notifyAdmins } from "@/app/actions";
 
 interface FileNode {
   path: string;
   content: string;
+}
+
+function parseRepoUrl(repoUrl: string) {
+  const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+  if (!match) throw new Error("Invalid GitHub repo URL");
+  return { owner: match[1], repo: match[2] };
 }
 
 export async function createGitHubPullRequest(
@@ -20,7 +27,6 @@ export async function createGitHubPullRequest(
     const { owner, repo } = parseRepoUrl(repoUrl);
     const octokit = new Octokit({ auth: token });
 
-    // Get the default branch dynamically
     const { data: repoData } = await octokit.repos.get({ owner, repo });
     const defaultBranch = repoData.default_branch;
 
@@ -31,7 +37,7 @@ export async function createGitHubPullRequest(
     });
     const baseSha = refData.object.sha;
 
-    const branchName = `feature/coze-${Date.now()}`; // Back to no username
+    const branchName = `feature/coze-${Date.now()}`;
     await octokit.git.createRef({
       owner,
       repo,
@@ -42,7 +48,6 @@ export async function createGitHubPullRequest(
     for (const file of files) {
       const content = Buffer.from(file.content).toString("base64");
       let sha: string | undefined;
-
       try {
         const { data: existingFile } = await octokit.repos.getContent({
           owner,
@@ -51,10 +56,7 @@ export async function createGitHubPullRequest(
           ref: branchName,
         });
         if (!Array.isArray(existingFile)) sha = existingFile.sha;
-      } catch (err) {
-        // File doesn’t exist, proceed with creation
-      }
-
+      } catch (err) {}
       await octokit.repos.createOrUpdateFileContents({
         owner,
         repo,
@@ -66,14 +68,22 @@ export async function createGitHubPullRequest(
       });
     }
 
+    // Append changed files to PR description
+    const changedFiles = files.map(file => file.path).join(", ");
+    const fullPrDescription = `${prDescription}\n\n**Измененные файлы:** ${changedFiles}`;
+
     const { data: pr } = await octokit.pulls.create({
       owner,
       repo,
       title: prTitle,
-      body: prDescription,
+      body: fullPrDescription,
       head: branchName,
       base: defaultBranch,
     });
+
+    // Polished Russian notification with GitHub link
+    const adminMessage = `🔔 Созданы новые изменения в проекте!\nЧто меняем: ${prTitle}\nПодробности: ${prDescription}\nФайлы: ${changedFiles}\n\n[Посмотреть и одобрить на GitHub](https://github.com/salavey13/cartest/pull/${pr.number})`;
+    await notifyAdmins(adminMessage);
 
     return { success: true, prUrl: pr.html_url };
   } catch (error) {
@@ -85,12 +95,35 @@ export async function createGitHubPullRequest(
   }
 }
 
-// Rest of the file (getOpenPullRequests, approvePullRequest, closePullRequest, parseRepoUrl) remains unchanged
-function parseRepoUrl(url: string) {
-  const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
-  if (!match) throw new Error("Invalid GitHub URL");
-  return { owner: match[1], repo: match[2] };
+export async function mergePullRequest(repoUrl: string, pullNumber: number) {
+  try {
+    const token = process.env.GITHUB_TOKEN;
+    if (!token) throw new Error("GitHub token missing");
+    const { owner, repo } = parseRepoUrl(repoUrl);
+    const octokit = new Octokit({ auth: token });
+
+    await octokit.pulls.merge({
+      owner,
+      repo,
+      pull_number: pullNumber,
+      merge_method: "squash", // Keeps history clean; change to "merge" or "rebase" if preferred
+    });
+
+    // Polished Russian notification with GitHub link
+    const adminMessage = `🚀 Изменения #${pullNumber} добавлены в проект!\n\n[Посмотреть на GitHub](https://github.com/salavey13/cartest/pull/${pullNumber})`;
+    await notifyAdmins(adminMessage);
+
+    return { success: true };
+  } catch (error) {
+    console.error("Merge failed:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to merge changes",
+    };
+  }
 }
+
+
 
 export async function getOpenPullRequests(repoUrl: string) {
   try {
