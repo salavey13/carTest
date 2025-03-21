@@ -1,4 +1,4 @@
-// hooks/supabase.ts
+// /hooks/supabase.ts
 import { createClient } from "@supabase/supabase-js"
 import { generateJwtToken } from "@/lib/auth"
 import type { WebAppUser } from "@/types/telegram"
