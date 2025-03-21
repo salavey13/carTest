@@ -1,0 +1,590 @@
+"use client";
+import React, { useState } from "react";
+import axios from "axios";
+import { motion } from "framer-motion";
+import { runCozeAgent, notifyAdmin, sendTelegramMessage, createGitHubPullRequest } from "@/app/actions";
+import { toast } from "sonner";
+import { useAppContext } from "@/contexts/AppContext";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { FaTree, FaKey, FaFileAlt, FaShareAlt, FaTelegramPlane, FaSave, FaLink } from "react-icons/fa";
+
+interface FileNode {
+  path: string;
+  content: string;
+}
+
+const RepoTxtFetcher: React.FC = () => {
+  const [repoUrl, setRepoUrl] = useState<string>("https://github.com/salavey13/cartest");
+  const [token, setToken] = useState<string>("");
+  const [txtOutput, setTxtOutput] = useState<string>("");
+  const [selectedOutput, setSelectedOutput] = useState<string>("");
+  const [files, setFiles] = useState<FileNode[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [extractLoading, setExtractLoading] = useState<boolean>(false);
+  const [botLoading, setBotLoading] = useState<boolean>(false);
+  const [progress, setProgress] = useState<number>(0);
+  const [error, setError] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<{ id: number; message: string }[]>([]);
+  const [kworkInput, setKworkInput] = useState<string>("");
+  const [analysisComplete, setAnalysisComplete] = useState<boolean>(false);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  const { user } = useAppContext();
+
+  const importantFiles = [
+    "app/actions.ts",
+    "app/layout.tsx",
+    "app/repo-xml/page.tsx",
+    "app/actions_github/actions.ts",
+    "components/CozeExecutor.tsx",
+    "components/RepoTxtFetcher.tsx",
+    "hooks/useTelegram.ts",
+    "contexts/AppContext.tsx",
+    "types/telegrsm.d.ts",
+    "types/supabase.ts",
+  ];
+
+  const addToast = (message: string) => {
+    const id = Date.now();
+    setToasts((prev) => {
+      if (prev.length >= 3) prev.shift();
+      return [...prev, { id, message }];
+    });
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2000);
+  };
+
+  const parseRepoUrl = (url: string) => {
+    const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
+    if (!match) throw new Error("Неверный URL GitHub");
+    return { owner: match[1], repo: match[2] };
+  };
+
+  const fetchRepoContents = async (owner: string, repo: string, path: string = "") => {
+    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+    const headers: any = { Accept: "application/vnd.github.v3+json" };
+    if (token) headers.Authorization = `token ${token}`;
+
+    try {
+      const response = await axios.get(url, { headers });
+      const contents = response.data;
+
+      const files: FileNode[] = [];
+      const allowedExtensions = [".ts", ".tsx", ".css"]; // Exclude .sql
+      let total = contents.length;
+      let processed = 0;
+
+      for (const item of contents) {
+        processed++;
+        setProgress((processed / total) * 100);
+
+        if (
+          item.type === "file" &&
+          allowedExtensions.some((ext) => item.path.endsWith(ext)) &&
+          !item.path.startsWith("components/ui/") &&
+          !item.path.endsWith(".sql")
+        ) {
+          addToast(`Сканирую ${item.path}...`);
+          try {
+            const contentResponse = await axios.get(item.download_url);
+            // Prepend or overwrite path comment
+            const contentLines = contentResponse.data.split("\n");
+            const pathComment = `// ${item.path}`;
+            if (contentLines[0].startsWith("// ")) {
+              contentLines[0] = pathComment;
+            } else {
+              contentLines.unshift(pathComment);
+            }
+            files.push({ path: item.path, content: contentLines.join("\n") });
+          } catch (contentErr) {
+            console.error(`Ошибка загрузки ${item.path}:`, contentErr);
+            addToast(`Ошибка: ${item.path} не загружен`);
+          }
+        } else if (item.type === "dir") {
+          const subFiles = await fetchRepoContents(owner, repo, item.path);
+          files.push(...subFiles);
+        }
+      }
+      return files;
+    } catch (err) {
+      console.error("Ошибка API:", err);
+      throw err;
+    }
+  };
+
+  const generateTxt = (files: FileNode[]) => {
+    return files.map((file) => `--- ${file.path} ---\n${file.content}`).join("\n\n");
+  };
+
+  const generateTreeOnly = (files: FileNode[]) => {
+    return files.map((file) => `- ${file.path}`).join("\n");
+  };
+
+  const generateSelectedTxt = (files: FileNode[]) => {
+    return files
+      .filter((file) => selectedFiles.has(file.path))
+      .map((file) => `--- ${file.path} ---\n${file.content}`)
+      .join("\n\n");
+  };
+
+  const handleFetch = async () => {
+    setExtractLoading(true);
+    setError(null);
+    setTxtOutput("");
+    setSelectedOutput("");
+    setFiles([]);
+    setSelectedFiles(new Set());
+    setProgress(0);
+    setAnalysisComplete(false);
+    addToast("Запускаю извлечение...");
+
+    try {
+      const { owner, repo } = parseRepoUrl(repoUrl);
+      const fetchedFiles = await fetchRepoContents(owner, repo);
+      setFiles(fetchedFiles);
+      const txt = generateTxt(fetchedFiles);
+      setTxtOutput(txt);
+      addToast("Извлечение завершено!");
+    } catch (err: any) {
+      setError(`Ошибка загрузки: ${err.message}. Проверьте URL или токен.`);
+      addToast("Ошибка: Извлечение не удалось!");
+    } finally {
+      setExtractLoading(false);
+      setProgress(100);
+    }
+  };
+
+  const toggleFileSelection = (path: string) => {
+    setSelectedFiles((prev) => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(path)) newSelected.delete(path);
+      else newSelected.add(path);
+      setSelectedOutput(generateSelectedTxt(files));
+      return newSelected;
+    });
+  };
+
+  const handleAddSelected = () => {
+    if (selectedFiles.size === 0) {
+      addToast("Выберите хотя бы один файл!");
+      return;
+    }
+    const selectedTxt = generateSelectedTxt(files);
+    setKworkInput((prev) => `${prev}\n\nВыбранные файлы:\n${selectedTxt}`);
+    addToast("Выбранные файлы добавлены в запрос!");
+  };
+
+  const handleGenerateBotRequest = async () => {
+    if (!kworkInput.trim()) {
+      toast.error("Введите запрос с Kwork!");
+      return;
+    }
+
+    setBotLoading(true);
+    setAnalysisComplete(false);
+    addToast("Генерирую запрос для бота...");
+
+    try {
+      const context = selectedOutput || txtOutput || "Контекст репозитория не предоставлен.";
+      const fullInput = `Запрос с Kwork: "${kworkInput}"\nКонтекст репозитория:\n${context}`;
+      const botId = "7481446329554747397";
+      const userId = "341503612082";
+      const response = await runCozeAgent(botId, userId, fullInput);
+      setTxtOutput(response);
+      setAnalysisComplete(true);
+      addToast("Анализ завершен!");
+    } catch (err) {
+      setError("Ошибка генерации запроса для бота.");
+      addToast("Ошибка: Генерация не удалась!");
+    } finally {
+      setBotLoading(false);
+    }
+  };
+
+  const handleAddFullTree = () => {
+    const treeOnly = generateTreeOnly(files);
+    setKworkInput((prev) => `${prev}\n\nДерево файлов:\n${treeOnly}`);
+    addToast("Дерево файлов добавлено в запрос!");
+  };
+
+  const handleAddBriefTree = () => {
+    const briefTree = `
+      Краткое дерево ключевых файлов:
+      - hooks/useAppContext.ts: Хук для доступа к данным Telegram через контекст.
+      - contexts/AppContext.tsx: Контекст приложения с данными пользователя.
+      - app/actions.ts: Серверные действия: отправка сообщений, запуск бота, уведомления.
+      - components/CozeExecutor.tsx: Генерация кода и создание PR.
+      - components/RepoTxtFetcher.tsx: Этот инструмент для извлечения контекста.
+      - app/repo-xml/page.tsx: Главная страница с компонентами.
+    `;
+    setKworkInput((prev) => `${prev}\n\n${briefTree}`);
+    addToast("Краткое дерево добавлено в запрос!");
+  };
+
+  const handleShareWithAdmins = async () => {
+    if (!txtOutput) {
+      addToast("Нет результатов для отправки!");
+      return;
+    }
+
+    const message = `Результат анализа Kwork:\n\nЗапрос: ${kworkInput}\n\nАнализ:\n${txtOutput}`;
+    try {
+      const result = await notifyAdmin(message);
+      if (result.success) {
+        addToast("Результат отправлен админам!");
+      } else {
+        addToast("Ошибка при отправке админам!");
+      }
+    } catch (err) {
+      addToast("Ошибка: Не удалось отправить!");
+    }
+  };
+
+  const handleSendToMe = async () => {
+    if (!txtOutput) {
+      addToast("Нет результатов для отправки!");
+      return;
+    }
+    if (!user?.id) {
+      addToast("Пользователь Telegram не найден!");
+      return;
+    }
+
+    const markdownMessage = `
+*✨ Анализ Kwork от CyberDev ✨*
+
+**Запрос:**
+${kworkInput}
+
+**Результат анализа:**
+${txtOutput}
+
+*Поделитесь этим с командой, если хотите! 🚀*
+    `.trim();
+
+    try {
+      const result = await sendTelegramMessage(
+        process.env.TELEGRAM_BOT_TOKEN || "",
+        markdownMessage,
+        [],
+        undefined,
+        user.id.toString()
+      );
+      if (result.success) {
+        addToast("Анализ отправлен вам в Telegram!");
+      } else {
+        addToast("Ошибка при отправке вам!");
+      }
+    } catch (err) {
+      addToast("Ошибка: Не удалось отправить!");
+    }
+  };
+
+  const handleSaveAnalysis = () => {
+    if (!txtOutput) {
+      addToast("Нет результатов для сохранения!");
+      return;
+    }
+    const blob = new Blob([txtOutput], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "analysis.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+    addToast("Анализ сохранен локально!");
+  };
+
+  const handleShareLink = () => {
+    if (!txtOutput) {
+      addToast("Нет результатов для分享!");
+      return;
+    }
+    const encodedData = encodeURIComponent(txtOutput);
+    const shareUrl = `${window.location.origin}/share?analysis=${encodedData}`;
+    navigator.clipboard.writeText(shareUrl);
+    addToast("Ссылка скопирована в буфер обмена!");
+  };
+
+  const handleUpdateImports = async () => {
+    if (files.length === 0) {
+      addToast("Нет файлов для обновления!");
+      return;
+    }
+
+    const updatedFiles = files.map((file) => {
+      let content = file.content;
+      // Replace import statement
+      content = content.replace(
+        /import\s+{([^}]+)}\s+from\s+['"]@\/hooks\/useTelegram['"]/g,
+        `import {$1} from "@/contexts/AppContext"`
+      );
+      // Replace useTelegram with useAppContext in destructuring
+      content = content.replace(
+        /{\s*([^}]*)\buseTelegram\b([^}]*)}/g,
+        (_, before, after) => `{${before.trim()}useAppContext${after.trim()}}`
+      );
+      return { path: file.path, content };
+    });
+
+    try {
+      const result = await createGitHubPullRequest(
+        repoUrl,
+        updatedFiles,
+        "Переход с useTelegram на useAppContext",
+        "Автоматически обновлены импорты и использование хука в файлах для использования AppContext вместо Telegram.\n\n**Измененные файлы:** " + updatedFiles.map(f => f.path).join(", "),
+        "Обновление импортов: useTelegram -> useAppContext"
+      );
+      if (result.success) {
+        addToast(`PR создан: ${result.prUrl}`);
+        setFiles(updatedFiles);
+        setTxtOutput(generateTxt(updatedFiles));
+        setSelectedOutput(generateSelectedTxt(updatedFiles));
+      } else {
+        addToast(`Ошибка создания PR: ${result.error}`);
+      }
+    } catch (err) {
+      addToast("Ошибка: " + (err as Error).message);
+    }
+  };
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  };
+
+  const groupFilesByFolder = (files: FileNode[]) => {
+    const grouped: { [key: string]: FileNode[] } = {};
+    files.forEach((file) => {
+      const folder = file.path.split("/")[0] || "root";
+      if (!grouped[folder]) grouped[folder] = [];
+      grouped[folder].push(file);
+    });
+    return Object.entries(grouped).map(([folder, folderFiles]) => ({ folder, files: folderFiles }));
+  };
+
+  const getDisplayName = (path: string) => {
+    const parts = path.split("/");
+    if (parts[0] === "app" && (path.endsWith("page.tsx") || path.endsWith("route.ts"))) {
+      return parts.slice(1).join("/");
+    }
+    return parts.pop()!;
+  };
+
+  return (
+    <div className="w-full p-6 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden">
+      <h2 className="text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-6">
+        Кибер-Экстрактор TXT
+      </h2>
+      <p className="text-gray-300 mb-8 text-lg">
+        Это ваш "экстрактор контекста" — инструмент для извлечения кода из GitHub репозитория. Выберите ключевые файлы, добавьте их в запрос для бота или обновите код автоматически и создайте PR!
+      </p>
+
+      <div className="fixed top-16 right-4 z-50">
+        <motion.button
+          onClick={toggleTheme}
+          className="p-2 rounded-full bg-gray-800 text-[#E1FF01] shadow-[0_0_10px_rgba(225,255,1,0.5)]"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          {theme === "dark" ? "☀️" : "🌙"}
+        </motion.button>
+      </div>
+
+      <div className="flex flex-col gap-4 mb-8 relative z-10">
+        <input
+          type="text"
+          value={repoUrl}
+          onChange={(e) => setRepoUrl(e.target.value)}
+          placeholder="URL GitHub (например, https://github.com/salavey13/cartest)"
+          className="p-4 bg-gray-800 border border-gray-700 rounded-lg focus:border-cyan-500 focus:outline-none transition shadow-[0_0_10px_rgba(0,255,157,0.3)] hover:border-cyan-400"
+        />
+        <input
+          type="password"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder="Токен GitHub (опционально)"
+          className="p-4 bg-gray-800 border border-gray-700 rounded-lg focus:border-cyan-500 focus:outline-none transition shadow-[0_0_10px_rgba(0,255,157,0.3)] hover:border-cyan-400"
+        />
+        <motion.button
+          onClick={handleFetch}
+          disabled={extractLoading}
+          className={`px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-purple-600 to-cyan-500 transition-all shadow-[0_0_15px_rgba(0,255,157,0.3)] ${extractLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_20px_rgba(0,255,157,0.5)]"}`}
+          whileHover={{ scale: extractLoading ? 1 : 1.05 }}
+          whileTap={{ scale: extractLoading ? 1 : 0.95 }}
+        >
+          {extractLoading ? "Извлечение..." : "Извлечь TXT"}
+        </motion.button>
+      </div>
+
+      <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
+        <h3 className="text-2xl font-bold text-cyan-400 mb-4">Kwork в Бота</h3>
+        <textarea
+          value={kworkInput}
+          onChange={(e) => setKworkInput(e.target.value)}
+          placeholder="Введите запрос с Kwork или задачу Telegram Web App..."
+          className="w-full h-64 p-4 bg-gray-900 border border-gray-700 rounded-lg focus:border-cyan-500 focus:outline-none transition shadow-[0_0_10px_rgba(0,255,157,0.3)] resize-none"
+        />
+        <div className="flex flex-col gap-4 mt-4">
+          <motion.button
+            onClick={handleGenerateBotRequest}
+            disabled={botLoading}
+            className={`px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-cyan-500 transition-all shadow-[0_0_15px_rgba(0,255,157,0.3)] ${botLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_20px_rgba(0,255,157,0.5)]"}`}
+            whileHover={{ scale: botLoading ? 1 : 1.05 }}
+            whileTap={{ scale: botLoading ? 1 : 0.95 }}
+          >
+            {botLoading ? "Генерация..." : "Анализировать с Ботом"}
+          </motion.button>
+          <div className="flex flex-col gap-2">
+            <h4 className="text-lg font-bold text-purple-400">Добавить в запрос</h4>
+            <motion.button
+              onClick={handleAddFullTree}
+              className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-red-600 to-orange-500 transition-all shadow-[0_0_15px_rgba(255,107,107,0.3)] hover:shadow-[0_0_20px_rgba(255,107,107,0.5)]"
+            >
+              <FaTree /> Добавить дерево
+            </motion.button>
+            <motion.button
+              onClick={handleAddBriefTree}
+              className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-green-600 to-lime-500 transition-all shadow-[0_0_15px_rgba(0,255,157,0.3)] hover:shadow-[0_0_20px_rgba(0,255,157,0.5)]"
+            >
+              <FaKey /> Добавить ключевые
+            </motion.button>
+            {files.length > 0 && (
+              <motion.button
+                onClick={handleAddSelected}
+                className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-500 transition-all shadow-[0_0_15px_rgba(99,102,241,0.3)] hover:shadow-[0_0_20px_rgba(99,102,241,0.5)]"
+              >
+                <FaFileAlt /> Добавить выбранные
+              </motion.button>
+            )}
+          </div>
+          {analysisComplete && (
+            <div className="flex flex-col gap-2">
+              <h4 className="text-lg font-bold text-purple-400">Действия с анализом</h4>
+              <motion.button
+                onClick={handleShareWithAdmins}
+                className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-yellow-600 to-orange-500 transition-all shadow-[0_0_15px_rgba(251,191,36,0.3)] hover:shadow-[0_0_20px_rgba(251,191,36,0.5)]"
+              >
+                <FaShareAlt /> Поделиться с админами
+              </motion.button>
+              {user?.id && (
+                <motion.button
+                  onClick={handleSendToMe}
+                  className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-teal-600 to-cyan-500 transition-all shadow-[0_0_15px_rgba(20,184,166,0.3)] hover:shadow-[0_0_20px_rgba(20,184,166,0.5)]"
+                >
+                  <FaTelegramPlane /> Отправить себе
+                </motion.button>
+              )}
+              <motion.button
+                onClick={handleSaveAnalysis}
+                className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-pink-600 to-purple-500 transition-all shadow-[0_0_15px_rgba(219,39,119,0.3)] hover:shadow-[0_0_20px_rgba(219,39,119,0.5)]"
+              >
+                <FaSave /> Сохранить анализ
+              </motion.button>
+              <motion.button
+                onClick={handleShareLink}
+                className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-cyan-600 to-teal-500 transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)] hover:shadow-[0_0_20px_rgba(6,182,212,0.5)]"
+              >
+                <FaLink /> Поделиться ссылкой
+              </motion.button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {(extractLoading || botLoading) && (
+        <div className="mb-8 relative z-10">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${progress}%` }}
+            className="h-2 bg-gradient-to-r from-purple-600 to-cyan-500 rounded-full shadow-[0_0_15px_rgba(0,255,157,0.5)]"
+          />
+          <p className="text-white font-mono mt-2">
+            {extractLoading ? "Извлечение" : "Анализ"}: {Math.round(progress)}%
+          </p>
+        </div>
+      )}
+
+      {error && <p className="text-red-400 mb-8 font-mono relative z-10">{error}</p>}
+
+      {files.length > 0 && (
+        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
+          <h3 className="text-2xl font-bold text-cyan-400 mb-4">Консоль файлов</h3>
+          <motion.button
+            onClick={handleUpdateImports}
+            className="mb-4 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-purple-600 to-cyan-500 transition-all shadow-[0_0_15px_rgba(0,255,157,0.3)] hover:shadow-[0_0_20px_rgba(0,255,157,0.5)]"
+          >
+            Обновить useTelegram на useAppContext
+          </motion.button>
+          <div className="flex flex-col gap-4">
+            {groupFilesByFolder(files).map(({ folder, files: folderFiles }, index) => (
+              <div key={`${folder}-${index}`} className="bg-gray-900 p-4 rounded-lg border border-gray-700 shadow-[0_0_10px_rgba(0,255,157,0.2)]">
+                <h4 className="text-lg font-bold text-purple-400 mb-2">{folder}</h4>
+                <ul className="space-y-2">
+                  {folderFiles.map((file) => (
+                    <li key={file.path} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedFiles.has(file.path)}
+                        onChange={() => toggleFileSelection(file.path)}
+                        className="w-4 h-4 accent-cyan-500"
+                      />
+                      <span
+                        className={`text-sm ${
+                          importantFiles.includes(file.path)
+                            ? "text-[#E1FF01] font-bold animate-pulse"
+                            : "text-gray-400 hover:text-white"
+                        }`}
+                      >
+                        {getDisplayName(file.path)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {txtOutput && (
+        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
+          <h3 className="text-2xl font-bold text-cyan-400 mb-4">Полный TXT</h3>
+          <textarea
+            value={txtOutput}
+            readOnly
+            className="w-full h-96 p-4 bg-gray-900 text-gray-300 rounded-lg text-sm border border-gray-700 resize-none overflow-y-auto shadow-[0_0_10px_rgba(0,255,157,0.2)]"
+          />
+        </div>
+      )}
+
+      {selectedOutput && (
+        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
+          <h3 className="text-2xl font-bold text-cyan-400 mb-4">Выбранный TXT</h3>
+          <SyntaxHighlighter
+            language="typescript"
+            style={oneDark}
+            customStyle={{ background: "#1f2937", padding: "1rem", borderRadius: "0.5rem", maxHeight: "48rem", overflowY: "auto" }}
+          >
+            {selectedOutput}
+          </SyntaxHighlighter>
+        </div>
+      )}
+
+      <div className="fixed bottom-4 right-4 space-y-2 z-50">
+        {toasts.map((toast) => (
+          <motion.div
+            key={toast.id}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+            className="bg-purple-600 text-white p-2 rounded-lg shadow-[0_0_10px_rgba(147,51,234,0.5)] text-sm"
+          >
+            {toast.message}
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default RepoTxtFetcher;
