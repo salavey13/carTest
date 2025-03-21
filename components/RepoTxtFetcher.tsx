@@ -317,6 +317,10 @@ ${txtOutput}
     addToast("Обновляю импорты...");
 
     const updatedFiles = files.map((file) => {
+      // Skip swapping in AppContext.tsx itself
+      if (file.path === "contexts/AppContext.tsx") {
+        return file; // Leave it untouched
+      }
       let content = file.content;
       // Replace import statement: { useTelegram } -> { useAppContext }
       content = content.replace(
@@ -336,14 +340,15 @@ ${txtOutput}
     });
 
     const { owner, repo } = parseRepoUrl(repoUrl);
-    const branchName = `feature/import-swap-${Date.now()}`;
+    const branchName = `cyber-swap-matrix-${Date.now()}`; // Creative branch name!
 
     try {
       const result = await createGitHubPullRequest(
         repoUrl,
         updatedFiles,
         "Переход с useTelegram на useAppContext",
-        "Автоматически обновлены импорты и использование хука в файлах для использования AppContext вместо Telegram."
+        "Автоматически обновлены импорты и использование хука в файлах для использования AppContext вместо Telegram.",
+        branchName // Pass the custom branch name
       );
 
       if (result.success) {
@@ -495,9 +500,9 @@ ${txtOutput}
                 <motion.button
                   onClick={handleSendToMe}
                   className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-teal-600 to-cyan-500 transition-all shadow-[0_0_15px_rgba(20,184,166,0.3)] hover:shadow-[0_0_20px_rgba(20,184,166,0.5)]"
-                >
-                  <FaTelegramPlane /> Отправить себе
-                </motion.button>
+              >
+                <FaTelegramPlane /> Отправить себе
+              </motion.button>
               )}
               <motion.button
                 onClick={handleSaveAnalysis}
@@ -521,7 +526,7 @@ ${txtOutput}
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${progress}%` }}
-            className="h--2 bg-gradient-to-r from-purple-600 to-cyan-500 rounded-full shadow-[0_0_15px_rgba(0,255,157,0.5)]"
+            className="h-2 bg-gradient-to-r from-purple-600 to-cyan-500 rounded-full shadow-[0_0_15px_rgba(0,255,157,0.5)]"
           />
           <p className="text-white font-mono mt-2">
             {extractLoading ? "Извлечение" : "Обновление"}: {Math.round(progress)}%
