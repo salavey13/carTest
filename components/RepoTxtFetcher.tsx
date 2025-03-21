@@ -89,8 +89,15 @@ const RepoTxtFetcher: React.FC = () => {
           try {
             const contentResponse = await axios.get(item.download_url);
             const contentLines = contentResponse.data.split("\n");
-            const pathComment = `// /${item.path}`;
-            if (contentLines[0].startsWith("// ")) {
+            let pathComment: string;
+            if (item.path.endsWith(".ts") || item.path.endsWith(".tsx")) {
+              pathComment = `// /${item.path}`;
+            } else if (item.path.endsWith(".css")) {
+              pathComment = `/* /${item.path} */`;
+            } else {
+              pathComment = `# /${item.path}`; // Fallback for other types
+            }
+            if (contentLines[0].match(/^(\/\/|\/\*|#)/)) {
               contentLines[0] = pathComment;
             } else {
               contentLines.unshift(pathComment);
@@ -316,31 +323,30 @@ ${txtOutput}
     setBotLoading(true);
     addToast("Обновляю импорты...");
 
-    const updatedFiles = files.map((file) => {
-      // Skip swapping in AppContext.tsx itself
-      if (file.path === "contexts/AppContext.tsx") {
-        return file; // Leave it untouched
-      }
-      let content = file.content;
-      // Replace import statement: { useTelegram } -> { useAppContext }
-      content = content.replace(
-        /import\s+{\s*useTelegram\s*(?:,\s*[^}]+)?}\s+from\s+['"]@\/hooks\/useTelegram['"]/g,
-        (match) => {
-          const imports = match.match(/{\s*useTelegram\s*(?:,\s*[^}]+)?}/)![0];
-          const otherImports = imports.replace("useTelegram", "useAppContext").replace(/\s+/g, " ");
-          return `import ${otherImports} from "@/contexts/AppContext"`;
-        }
-      );
-      // Replace destructuring: useTelegram() -> useAppContext()
-      content = content.replace(
-        /const\s+{([^}]+)}\s*=\s*useTelegram\(\)/g,
-        `const {$1} = useAppContext()`
-      );
-      return { path: file.path, content };
-    });
+    const updatedFiles = files
+      .filter((file) => file.path !== "contexts/AppContext.tsx") // Exclude AppContext.tsx from swapping
+      .map((file) => {
+        let content = file.content;
+        // Replace import statement: { useTelegram } -> { useAppContext }
+        content = content.replace(
+          /import\s+{\s*useTelegram\s*(?:,\s*[^}]+)?}\s+from\s+['"]@\/hooks\/useTelegram['"]/g,
+          (match) => {
+            const imports = match.match(/{\s*useTelegram\s*(?:,\s*[^}]+)?}/)![0];
+            const otherImports = imports.replace("useTelegram", "useAppContext").replace(/\s+/g, " ");
+            return `import ${otherImports} from "@/contexts/AppContext"`;
+          }
+        );
+        // Replace destructuring: useTelegram() -> useAppContext()
+        content = content.replace(
+          /const\s+{([^}]+)}\s*=\s*useTelegram\(\)/g,
+          `const {$1} = useAppContext()`
+        );
+        return { path: file.path, content };
+      })
+      .concat(files.filter((file) => file.path === "contexts/AppContext.tsx")); // Add back unchanged AppContext.tsx
 
     const { owner, repo } = parseRepoUrl(repoUrl);
-    const branchName = `cyber-swap-matrix-${Date.now()}`; // Creative branch name!
+    const branchName = `cyber-swap-matrix-${Date.now()}`;
 
     try {
       const result = await createGitHubPullRequest(
@@ -348,7 +354,7 @@ ${txtOutput}
         updatedFiles,
         "Переход с useTelegram на useAppContext",
         "Автоматически обновлены импорты и использование хука в файлах для использования AppContext вместо Telegram.",
-        branchName // Pass the custom branch name
+        branchName
       );
 
       if (result.success) {
@@ -394,10 +400,11 @@ ${txtOutput}
 
   const getDisplayName = (path: string) => {
     const parts = path.split("/");
+    // Only trim 'app/' for page.tsx or route.ts, otherwise keep full path
     if (parts[0] === "app" && (path.endsWith("page.tsx") || path.endsWith("route.ts"))) {
       return parts.slice(1).join("/");
     }
-    return parts.pop()!;
+    return path; // Show full path for other files like actions_github/actions.ts
   };
 
   return (
@@ -500,9 +507,9 @@ ${txtOutput}
                 <motion.button
                   onClick={handleSendToMe}
                   className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-teal-600 to-cyan-500 transition-all shadow-[0_0_15px_rgba(20,184,166,0.3)] hover:shadow-[0_0_20px_rgba(20,184,166,0.5)]"
-              >
-                <FaTelegramPlane /> Отправить себе
-              </motion.button>
+                >
+                  <FaTelegramPlane /> Отправить себе
+                </motion.button>
               )}
               <motion.button
                 onClick={handleSaveAnalysis}
