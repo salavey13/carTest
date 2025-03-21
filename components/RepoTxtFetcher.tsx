@@ -95,7 +95,7 @@ const RepoTxtFetcher: React.FC = () => {
             } else if (item.path.endsWith(".css")) {
               pathComment = `/* /${item.path} */`;
             } else {
-              pathComment = `# /${item.path}`; // Fallback for other types
+              pathComment = `# /${item.path}`;
             }
             if (contentLines[0].match(/^(\/\/|\/\*|#)/)) {
               contentLines[0] = pathComment;
@@ -237,7 +237,7 @@ const RepoTxtFetcher: React.FC = () => {
 
     const message = `Результат анализа Kwork:\n\nЗапрос: ${kworkInput}\n\nАнализ:\n${txtOutput}`;
     try {
-      const result = await notifyAdmin(message);
+      const result = await notifyAdmin(message); // Always use notifyAdmin for now
       if (result.success) {
         addToast("Результат отправлен админам!");
       } else {
@@ -324,10 +324,9 @@ ${txtOutput}
     addToast("Обновляю импорты...");
 
     const updatedFiles = files
-      .filter((file) => file.path !== "contexts/AppContext.tsx") // Exclude AppContext.tsx from swapping
+      .filter((file) => file.path !== "contexts/AppContext.tsx")
       .map((file) => {
         let content = file.content;
-        // Replace import statement: { useTelegram } -> { useAppContext }
         content = content.replace(
           /import\s+{\s*useTelegram\s*(?:,\s*[^}]+)?}\s+from\s+['"]@\/hooks\/useTelegram['"]/g,
           (match) => {
@@ -336,14 +335,13 @@ ${txtOutput}
             return `import ${otherImports} from "@/contexts/AppContext"`;
           }
         );
-        // Replace destructuring: useTelegram() -> useAppContext()
         content = content.replace(
           /const\s+{([^}]+)}\s*=\s*useTelegram\(\)/g,
           `const {$1} = useAppContext()`
         );
         return { path: file.path, content };
       })
-      .concat(files.filter((file) => file.path === "contexts/AppContext.tsx")); // Add back unchanged AppContext.tsx
+      .concat(files.filter((file) => file.path === "contexts/AppContext.tsx"));
 
     const { owner, repo } = parseRepoUrl(repoUrl);
     const branchName = `cyber-swap-matrix-${Date.now()}`;
@@ -362,23 +360,12 @@ ${txtOutput}
         setFiles(updatedFiles);
         setTxtOutput(generateTxt(updatedFiles));
         setSelectedOutput(generateSelectedTxt(updatedFiles));
-        const deleteResult = await deleteGitHubBranch(repoUrl, result.branch);
-        if (deleteResult.success) {
-          addToast(`Ветка ${result.branch} удалена после успеха`);
-        } else {
-          addToast(`Ошибка очистки ветки ${result.branch}: ${deleteResult.error}`);
-        }
+        // No branch deletion here—let it live until merged
       } else {
         throw new Error(result.error || "Неизвестная ошибка при создании PR");
       }
     } catch (err) {
       addToast(`Ошибка: ${(err as Error).message}`);
-      const deleteResult = await deleteGitHubBranch(repoUrl, branchName);
-      if (deleteResult.success) {
-        addToast(`Ветка ${branchName} удалена после ошибки`);
-      } else {
-        addToast(`Ошибка очистки ветки ${branchName}: ${deleteResult.error}`);
-      }
     } finally {
       setBotLoading(false);
     }
@@ -400,26 +387,25 @@ ${txtOutput}
 
   const getDisplayName = (path: string) => {
     const parts = path.split("/");
-    // Only trim 'app/' for page.tsx or route.ts, otherwise keep full path
-    if (parts[0] === "app" && (path.endsWith("page.tsx") || path.endsWith("route.ts"))) {
-      return parts.slice(1).join("/");
+    if (parts[0] === "app") {
+      return parts.slice(1).join("/"); // Strip 'app/' for all app files
     }
-    return path; // Show full path for other files like actions_github/actions.ts
+    return path; // Keep full path for non-app files
   };
 
   return (
-    <div className="w-full p-6 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden">
-      <h2 className="text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-6">
+    <div className="w-full p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden">
+      <h2 className="text-2xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-4">
         Кибер-Экстрактор TXT
       </h2>
-      <p className="text-gray-300 mb-8 text-lg">
-        Это ваш "экстрактор контекста" — инструмент для извлечения кода из GitHub репозитория. Выберите ключевые файлы, добавьте их в запрос для бота или обновите код автоматически и создайте PR!
+      <p className="text-gray-300 mb-6 text-sm">
+        Ваш инструмент для извлечения кода из GitHub. Выбирайте файлы, отправляйте боту или обновляйте код с PR!
       </p>
 
-      <div className="fixed top-16 right-4 z-50">
+      <div className="fixed top-12 right-4 z-50">
         <motion.button
           onClick={toggleTheme}
-          className="p-2 rounded-full bg-gray-800 text-[#E1FF01] shadow-[0_0_10px_rgba(225,255,1,0.5)]"
+          className="p-1 rounded-full bg-gray-800 text-[#E1FF01] shadow-[0_0_8px_rgba(225,255,1,0.5)]"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
         >
@@ -427,25 +413,25 @@ ${txtOutput}
         </motion.button>
       </div>
 
-      <div className="flex flex-col gap-4 mb-8 relative z-10">
+      <div className="flex flex-col gap-3 mb-6 relative z-10">
         <input
           type="text"
           value={repoUrl}
           onChange={(e) => setRepoUrl(e.target.value)}
-          placeholder="URL GitHub (например, https://github.com/salavey13/cartest)"
-          className="p-4 bg-gray-800 border border-gray-700 rounded-lg focus:border-cyan-500 focus:outline-none transition shadow-[0_0_10px_rgba(0,255,157,0.3)] hover:border-cyan-400"
+          placeholder="URL GitHub (https://github.com/salavey13/cartest)"
+          className="p-3 bg-gray-800 border border-gray-700 rounded-lg focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] hover:border-cyan-400 text-sm"
         />
         <input
           type="password"
           value={token}
           onChange={(e) => setToken(e.target.value)}
           placeholder="Токен GitHub (опционально)"
-          className="p-4 bg-gray-800 border border-gray-700 rounded-lg focus:border-cyan-500 focus:outline-none transition shadow-[0_0_10px_rgba(0,255,157,0.3)] hover:border-cyan-400"
+          className="p-3 bg-gray-800 border border-gray-700 rounded-lg focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] hover:border-cyan-400 text-sm"
         />
         <motion.button
           onClick={handleFetch}
           disabled={extractLoading}
-          className={`px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-purple-600 to-cyan-500 transition-all shadow-[0_0_15px_rgba(0,255,157,0.3)] ${extractLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_20px_rgba(0,255,157,0.5)]"}`}
+          className={`px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-purple-600 to-cyan-500 transition-all shadow-[0_0_12px_rgba(0,255,157,0.3)] ${extractLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_18px_rgba(0,255,157,0.5)]"}`}
           whileHover={{ scale: extractLoading ? 1 : 1.05 }}
           whileTap={{ scale: extractLoading ? 1 : 0.95 }}
         >
@@ -453,42 +439,42 @@ ${txtOutput}
         </motion.button>
       </div>
 
-      <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
-        <h3 className="text-2xl font-bold text-cyan-400 mb-4">Kwork в Бота</h3>
+      <div className="mb-6 bg-gray-800 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.3)] relative z-10">
+        <h3 className="text-xl font-bold text-cyan-400 mb-3">Kwork в Бота</h3>
         <textarea
           value={kworkInput}
           onChange={(e) => setKworkInput(e.target.value)}
           placeholder="Введите запрос с Kwork или задачу Telegram Web App..."
-          className="w-full h-64 p-4 bg-gray-900 border border-gray-700 rounded-lg focus:border-cyan-500 focus:outline-none transition shadow-[0_0_10px_rgba(0,255,157,0.3)] resize-none"
+          className="w-full h-48 p-3 bg-gray-900 border border-gray-700 rounded-lg focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] resize-none text-sm"
         />
-        <div className="flex flex-col gap-4 mt-4">
+        <div className="flex flex-col gap-3 mt-3">
           <motion.button
             onClick={handleGenerateBotRequest}
             disabled={botLoading}
-            className={`px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-cyan-500 transition-all shadow-[0_0_15px_rgba(0,255,157,0.3)] ${botLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_20px_rgba(0,255,157,0.5)]"}`}
+            className={`px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-blue-600 to-cyan-500 transition-all shadow-[0_0_12px_rgba(0,255,157,0.3)] ${botLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_18px_rgba(0,255,157,0.5)]"}`}
             whileHover={{ scale: botLoading ? 1 : 1.05 }}
             whileTap={{ scale: botLoading ? 1 : 0.95 }}
           >
             {botLoading ? "Генерация..." : "Анализировать с Ботом"}
           </motion.button>
           <div className="flex flex-col gap-2">
-            <h4 className="text-lg font-bold text-purple-400">Добавить в запрос</h4>
+            <h4 className="text-sm font-bold text-purple-400">Добавить в запрос</h4>
             <motion.button
               onClick={handleAddFullTree}
-              className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-red-600 to-orange-500 transition-all shadow-[0_0_15px_rgba(255,107,107,0.3)] hover:shadow-[0_0_20px_rgba(255,107,107,0.5)]"
+              className="flex items-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-red-600 to-orange-500 transition-all shadow-[0_0_12px_rgba(255,107,107,0.3)] hover:shadow-[0_0_18px_rgba(255,107,107,0.5)]"
             >
               <FaTree /> Добавить дерево
             </motion.button>
             <motion.button
               onClick={handleAddBriefTree}
-              className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-green-600 to-lime-500 transition-all shadow-[0_0_15px_rgba(0,255,157,0.3)] hover:shadow-[0_0_20px_rgba(0,255,157,0.5)]"
+              className="flex items-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-green-600 to-lime-500 transition-all shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:shadow-[0_0_18px_rgba(0,255,157,0.5)]"
             >
               <FaKey /> Добавить ключевые
             </motion.button>
             {files.length > 0 && (
               <motion.button
                 onClick={handleAddSelected}
-                className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-500 transition-all shadow-[0_0_15px_rgba(99,102,241,0.3)] hover:shadow-[0_0_20px_rgba(99,102,241,0.5)]"
+                className="flex items-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-indigo-600 to-purple-500 transition-all shadow-[0_0_12px_rgba(99,102,241,0.3)] hover:shadow-[0_0_18px_rgba(99,102,241,0.5)]"
               >
                 <FaFileAlt /> Добавить выбранные
               </motion.button>
@@ -496,30 +482,30 @@ ${txtOutput}
           </div>
           {analysisComplete && (
             <div className="flex flex-col gap-2">
-              <h4 className="text-lg font-bold text-purple-400">Действия с анализом</h4>
+              <h4 className="text-sm font-bold text-purple-400">Действия с анализом</h4>
               <motion.button
                 onClick={handleShareWithAdmins}
-                className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-yellow-600 to-orange-500 transition-all shadow-[0_0_15px_rgba(251,191,36,0.3)] hover:shadow-[0_0_20px_rgba(251,191,36,0.5)]"
+                className="flex items-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-yellow-600 to-orange-500 transition-all shadow-[0_0_12px_rgba(251,191,36,0.3)] hover:shadow-[0_0_18px_rgba(251,191,36,0.5)]"
               >
                 <FaShareAlt /> Поделиться с админами
               </motion.button>
               {user?.id && (
                 <motion.button
                   onClick={handleSendToMe}
-                  className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-teal-600 to-cyan-500 transition-all shadow-[0_0_15px_rgba(20,184,166,0.3)] hover:shadow-[0_0_20px_rgba(20,184,166,0.5)]"
+                  className="flex items-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-teal-600 to-cyan-500 transition-all shadow-[0_0_12px_rgba(20,184,166,0.3)] hover:shadow-[0_0_18px_rgba(20,184,166,0.5)]"
                 >
                   <FaTelegramPlane /> Отправить себе
                 </motion.button>
               )}
               <motion.button
                 onClick={handleSaveAnalysis}
-                className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-pink-600 to-purple-500 transition-all shadow-[0_0_15px_rgba(219,39,119,0.3)] hover:shadow-[0_0_20px_rgba(219,39,119,0.5)]"
+                className="flex items-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-pink-600 to-purple-500 transition-all shadow-[0_0_12px_rgba(219,39,119,0.3)] hover:shadow-[0_0_18px_rgba(219,39,119,0.5)]"
               >
                 <FaSave /> Сохранить анализ
               </motion.button>
               <motion.button
                 onClick={handleShareLink}
-                className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-cyan-600 to-teal-500 transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)] hover:shadow-[0_0_20px_rgba(6,182,212,0.5)]"
+                className="flex items-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-cyan-600 to-teal-500 transition-all shadow-[0_0_12px_rgba(6,182,212,0.3)] hover:shadow-[0_0_18px_rgba(6,182,212,0.5)]"
               >
                 <FaLink /> Поделиться ссылкой
               </motion.button>
@@ -529,51 +515,51 @@ ${txtOutput}
       </div>
 
       {(extractLoading || botLoading) && (
-        <div className="mb-8 relative z-10">
+        <div className="mb-6 relative z-10">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${progress}%` }}
-            className="h-2 bg-gradient-to-r from-purple-600 to-cyan-500 rounded-full shadow-[0_0_15px_rgba(0,255,157,0.5)]"
+            className="h-1 bg-gradient-to-r from-purple-600 to-cyan-500 rounded-full shadow-[0_0_10px_rgba(0,255,157,0.5)]"
           />
-          <p className="text-white font-mono mt-2">
+          <p className="text-white text-xs font-mono mt-1">
             {extractLoading ? "Извлечение" : "Обновление"}: {Math.round(progress)}%
           </p>
         </div>
       )}
 
-      {error && <p className="text-red-400 mb-8 font-mono relative z-10">{error}</p>}
+      {error && <p className="text-red-400 mb-6 text-xs font-mono relative z-10">{error}</p>}
 
       {files.length > 0 && (
-        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
-          <h3 className="text-2xl font-bold text-cyan-400 mb-4">Консоль файлов</h3>
+        <div className="mb-6 bg-gray-800 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.3)] relative z-10">
+          <h3 className="text-xl font-bold text-cyan-400 mb-3">Консоль файлов</h3>
           <motion.button
             onClick={handleUpdateImports}
             disabled={botLoading}
-            className={`mb-4 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-purple-600 to-cyan-500 transition-all shadow-[0_0_15px_rgba(0,255,157,0.3)] ${botLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_20px_rgba(0,255,157,0.5)]"}`}
+            className={`mb-3 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-purple-600 to-cyan-500 transition-all shadow-[0_0_12px_rgba(0,255,157,0.3)] ${botLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_18px_rgba(0,255,157,0.5)]"}`}
             whileHover={{ scale: botLoading ? 1 : 1.05 }}
             whileTap={{ scale: botLoading ? 1 : 0.95 }}
           >
             {botLoading ? "Обновление..." : "Обновить useTelegram на useAppContext"}
           </motion.button>
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             {groupFilesByFolder(files).map(({ folder, files: folderFiles }, index) => (
-              <div key={`${folder}-${index}`} className="bg-gray-900 p-4 rounded-lg border border-gray-700 shadow-[0_0_10px_rgba(0,255,157,0.2)]">
-                <h4 className="text-lg font-bold text-purple-400 mb-2">{folder}</h4>
-                <ul className="space-y-2">
+              <div key={`${folder}-${index}`} className="bg-gray-900 p-3 rounded-lg border border-gray-700 shadow-[0_0_8px_rgba(0,255,157,0.2)]">
+                <h4 className="text-sm font-bold text-purple-400 mb-2">{folder}</h4>
+                <ul className="space-y-1">
                   {folderFiles.map((file) => (
                     <li key={file.path} className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         checked={selectedFiles.has(file.path)}
                         onChange={() => toggleFileSelection(file.path)}
-                        className="w-4 h-4 accent-cyan-500"
+                        className="w-3 h-3 accent-cyan-500"
                       />
                       <span
-                        className={`text-sm ${
+                        className={`text-xs ${
                           importantFiles.includes(file.path)
                             ? "text-[#E1FF01] font-bold animate-pulse"
                             : "text-gray-400 hover:text-white"
-                        }`}
+                        } truncate`}
                       >
                         {getDisplayName(file.path)}
                       </span>
@@ -587,37 +573,37 @@ ${txtOutput}
       )}
 
       {txtOutput && (
-        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
-          <h3 className="text-2xl font-bold text-cyan-400 mb-4">Полный TXT</h3>
+        <div className="mb-6 bg-gray-800 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.3)] relative z-10">
+          <h3 className="text-xl font-bold text-cyan-400 mb-3">Полный TXT</h3>
           <textarea
             value={txtOutput}
             readOnly
-            className="w-full h-96 p-4 bg-gray-900 text-gray-300 rounded-lg text-sm border border-gray-700 resize-none overflow-y-auto shadow-[0_0_10px_rgba(0,255,157,0.2)]"
+            className="w-full h-80 p-3 bg-gray-900 text-gray-300 rounded-lg text-xs border border-gray-700 resize-none overflow-y-auto shadow-[0_0_8px_rgba(0,255,157,0.2)]"
           />
         </div>
       )}
 
       {selectedOutput && (
-        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
-          <h3 className="text-2xl font-bold text-cyan-400 mb-4">Выбранный TXT</h3>
+        <div className="mb-6 bg-gray-800 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.3)] relative z-10">
+          <h3 className="text-xl font-bold text-cyan-400 mb-3">Выбранный TXT</h3>
           <SyntaxHighlighter
             language="typescript"
             style={oneDark}
-            customStyle={{ background: "#1f2937", padding: "1rem", borderRadius: "0.5rem", maxHeight: "48rem", overflowY: "auto" }}
+            customStyle={{ background: "#1f2937", padding: "0.75rem", borderRadius: "0.5rem", maxHeight: "40rem", overflowY: "auto", fontSize: "0.75rem" }}
           >
             {selectedOutput}
           </SyntaxHighlighter>
         </div>
       )}
 
-      <div className="fixed bottom-4 right-4 space-y-2 z-50">
+      <div className="fixed bottom-2 right-2 space-y-1 z-50">
         {toasts.map((toast) => (
           <motion.div
             key={toast.id}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
-            className="bg-purple-600 text-white p-2 rounded-lg shadow-[0_0_10px_rgba(147,51,234,0.5)] text-sm"
+            className="bg-purple-600 text-white p-1 rounded-lg shadow-[0_0_8px_rgba(147,51,234,0.5)] text-xs"
           >
             {toast.message}
           </motion.div>
