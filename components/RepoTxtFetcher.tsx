@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { runCozeAgent, notifyAdmin, sendTelegramMessage } from "@/app/actions";
-import { createGitHubPullRequest, deleteGitHubBranch } from "@/app/actions_github/actions"; // Added deleteGitHubBranch
+import { createGitHubPullRequest, deleteGitHubBranch } from "@/app/actions_github/actions";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -89,7 +89,7 @@ const RepoTxtFetcher: React.FC = () => {
           try {
             const contentResponse = await axios.get(item.download_url);
             const contentLines = contentResponse.data.split("\n");
-            const pathComment = `// /${item.path}`; // Keep leading "/"
+            const pathComment = `// /${item.path}`;
             if (contentLines[0].startsWith("// ")) {
               contentLines[0] = pathComment;
             } else {
@@ -100,6 +100,7 @@ const RepoTxtFetcher: React.FC = () => {
             console.error(`Ошибка загрузки ${item.path}:`, contentErr);
             addToast(`Ошибка: ${item.path} не загружен`);
           }
+          await new Promise((resolve) => setTimeout(resolve, 100));
         } else if (item.type === "dir") {
           const subFiles = await fetchRepoContents(owner, repo, item.path);
           files.push(...subFiles);
@@ -312,17 +313,21 @@ ${txtOutput}
       return;
     }
 
-    setBotLoading(true); // Reuse botLoading for this async operation
+    setBotLoading(true);
     addToast("Обновляю импорты...");
 
     const updatedFiles = files.map((file) => {
       let content = file.content;
-      // Replace import statement
+      // Replace import statement: { useTelegram } -> { useAppContext }
       content = content.replace(
-        /import\s+{([^}]+)}\s+from\s+['"]@\/hooks\/useTelegram['"]/g,
-        `import {$1} from "@/contexts/AppContext"`
+        /import\s+{\s*useTelegram\s*(?:,\s*[^}]+)?}\s+from\s+['"]@\/hooks\/useTelegram['"]/g,
+        (match) => {
+          const imports = match.match(/{\s*useTelegram\s*(?:,\s*[^}]+)?}/)![0];
+          const otherImports = imports.replace("useTelegram", "useAppContext").replace(/\s+/g, " ");
+          return `import ${otherImports} from "@/contexts/AppContext"`;
+        }
       );
-      // Replace useTelegram() with useAppContext() in destructuring
+      // Replace destructuring: useTelegram() -> useAppContext()
       content = content.replace(
         /const\s+{([^}]+)}\s*=\s*useTelegram\(\)/g,
         `const {$1} = useAppContext()`
@@ -331,46 +336,39 @@ ${txtOutput}
     });
 
     const { owner, repo } = parseRepoUrl(repoUrl);
-    const branchName = `feature/import-swap-${Date.now()}`; // Unique branch per attempt
+    const branchName = `feature/import-swap-${Date.now()}`;
 
     try {
       const result = await createGitHubPullRequest(
         repoUrl,
         updatedFiles,
         "Переход с useTelegram на useAppContext",
-        "Автоматически обновлены импорты и использование хука в файлах для использования AppContext вместо Telegram.\n\n**Измененные файлы:** " +
-          updatedFiles.map((f) => f.path).join(", "),
-        "Обновление импортов: useTelegram -> useAppContext",
-        branchName // Pass branch name explicitly if your action supports it
+        "Автоматически обновлены импорты и использование хука в файлах для использования AppContext вместо Telegram."
       );
 
-      if (result && typeof result === "object" && "success" in result && result.success) {
+      if (result.success) {
         addToast(`PR создан: ${result.prUrl}`);
         setFiles(updatedFiles);
         setTxtOutput(generateTxt(updatedFiles));
         setSelectedOutput(generateSelectedTxt(updatedFiles));
+        const deleteResult = await deleteGitHubBranch(repoUrl, result.branch);
+        if (deleteResult.success) {
+          addToast(`Ветка ${result.branch} удалена после успеха`);
+        } else {
+          addToast(`Ошибка очистки ветки ${result.branch}: ${deleteResult.error}`);
+        }
       } else {
-        throw new Error(result?.error || "Неизвестная ошибка при создании PR");
+        throw new Error(result.error || "Неизвестная ошибка при создании PR");
       }
     } catch (err) {
       addToast(`Ошибка: ${(err as Error).message}`);
-      // Cleanup branch on failure
-      try {
-        await deleteGitHubBranch(repoUrl, branchName);
+      const deleteResult = await deleteGitHubBranch(repoUrl, branchName);
+      if (deleteResult.success) {
         addToast(`Ветка ${branchName} удалена после ошибки`);
-      } catch (cleanupErr) {
-        addToast(`Ошибка очистки ветки ${branchName}: ${(cleanupErr as Error).message}`);
+      } else {
+        addToast(`Ошибка очистки ветки ${branchName}: ${deleteResult.error}`);
       }
     } finally {
-      // Cleanup branch on success too, if PR is created (optional, depends on your workflow)
-      if (result?.success) {
-        try {
-          await deleteGitHubBranch(repoUrl, branchName);
-          addToast(`Ветка ${branchName} удалена после успеха`);
-        } catch (cleanupErr) {
-          addToast(`Ошибка очистки ветки ${branchName}: ${(cleanupErr as Error).message}`);
-        }
-      }
       setBotLoading(false);
     }
   };
@@ -523,7 +521,7 @@ ${txtOutput}
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${progress}%` }}
-            className="h-2 bg-gradient-to-r from-purple-600 to-cyan-500 rounded-full shadow-[0_0_15px_rgba(0,255,157,0.5)]"
+            className="h--2 bg-gradient-to-r from-purple-600 to-cyan-500 rounded-full shadow-[0_0_15px_rgba(0,255,157,0.5)]"
           />
           <p className="text-white font-mono mt-2">
             {extractLoading ? "Извлечение" : "Обновление"}: {Math.round(progress)}%
