@@ -1,8 +1,9 @@
+// /contexts/AppContext.tsx
 "use client"
 
 import type React from "react"
 import { createContext, useContext, useEffect } from "react"
-import { useTelegram } from "@/hooks/useTelegram"
+import { useAppContext } from "@/contexts/AppContext"
 import { debugLogger } from "@/lib/debugLogger"
 import { toast } from "sonner"
 

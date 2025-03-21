@@ -1,3 +1,4 @@
+// /app/bullshitdetector/page.tsx
 import BullshitDetector from "@/components/BullshitDetector"; // Adjust path as needed
 
 export default function noBullshit() {

@@ -1,3 +1,4 @@
+// /components/Footer.tsx
 "use client";
 import { motion } from "framer-motion";
 import { Gift, Heart, ExternalLink, Send, Code, Lock } from "lucide-react";

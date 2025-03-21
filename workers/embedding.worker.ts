@@ -1,3 +1,4 @@
+// /workers/embedding.worker.ts
 import { pipeline } from "@huggingface/transformers"
 
 // Ensure we match the database vector dimensions (384)

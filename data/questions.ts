@@ -1,3 +1,4 @@
+// /data/questions.ts
 /*interface Answer {
   text: string
   result: string

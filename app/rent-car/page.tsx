@@ -1,9 +1,10 @@
+// /app/rent-car/page.tsx
 "use client";
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { createInvoice, supabaseAnon, getUserSubscription } from "@/hooks/supabase";
 import { sendTelegramInvoice } from "@/app/actions";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useAppContext } from "@/contexts/AppContext";
 import SemanticSearch from "@/components/SemanticSearch";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Crown, AlertTriangle } from "lucide-react";
@@ -14,7 +15,7 @@ const AUTO_INCREMENT_INTERVAL = 3000;
 const REENGAGE_DELAY = 2000;
 
 export default function RentCar() {
-  const { user: tgUser, isInTelegramContext, dbUser, isLoading: tgLoading } = useTelegram();
+  const { user: tgUser, isInTelegramContext, dbUser, isLoading: tgLoading } = useAppContext();
   const [selectedCar, setSelectedCar] = useState<any>(null);
   const [rentDays, setRentDays] = useState(1);
   const [cars, setCars] = useState<any[]>([]);

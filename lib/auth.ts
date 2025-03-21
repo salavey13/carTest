@@ -1,3 +1,4 @@
+// /lib/auth.ts
 import { logger } from "@/lib/logger"
 
 /**

@@ -1,6 +1,7 @@
+// /components/InventoryTable.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useAppContext } from "@/contexts/AppContext";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -8,7 +9,7 @@ import { translations } from "@/components/translations_inventory";
 import { FaSortAlphaDown, FaSortAlphaUp, FaSortNumericDown, FaSortNumericUp, FaExclamationTriangle } from "react-icons/fa";
 
 export default function InventoryTable() {
-  const { dbUser, isAdmin, user } = useTelegram();
+  const { dbUser, isAdmin, user } = useAppContext();
   const lang = user?.language_code === "ru" ? "ru" : "en";
   const [chemicals, setChemicals] = useState<any[]>([]);
   const [sortField, setSortField] = useState<"name" | "quantity">("name");
