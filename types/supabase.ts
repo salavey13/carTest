@@ -1,4 +1,4 @@
-// types/supabase.ts
+// /types/supabase.ts
 import type { Database } from "./database.types" //GEN IT "npx supabase gen types typescript --local > types/database.types.ts" OR ASK CHATGPT
 
 declare global {

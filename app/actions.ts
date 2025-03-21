@@ -1,4 +1,4 @@
-// app/actions.ts
+// /app/actions.ts
 "use server";
 
 import { generateCarEmbedding, createAuthenticatedClient, supabaseAdmin, supabaseAnon } from "@/hooks/supabase";

@@ -1,3 +1,4 @@
+// /types/telegram.d.ts
 export interface TelegramWebApp {
   ready: () => void
   disableVerticalSwipes: () => void

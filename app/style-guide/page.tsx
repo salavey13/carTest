@@ -1,4 +1,4 @@
-// app/style-guide/page.tsx
+// /app/style-guide/page.tsx
 import { Button } from "@/components/ui/button"; // Explicit import
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";

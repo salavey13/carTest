@@ -1,3 +1,4 @@
+// /components/ProgressIndicator.tsx
 "use client";
 import { motion, useTransform } from "framer-motion";
 
