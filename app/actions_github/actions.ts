@@ -1,4 +1,3 @@
-// /app/actions_github/actions.ts
 "use server";
 import { Octokit } from "@octokit/rest";
 import { notifyAdmins } from "@/app/actions";
@@ -187,6 +186,30 @@ export async function closePullRequest(repoUrl: string, pullNumber: number) {
     return {
       success: false,
       error: error instanceof Error ? error.message : "Shit went sideways",
+    };
+  }
+}
+
+export async function deleteGitHubBranch(repoUrl: string, branchName: string) {
+  try {
+    const token = process.env.GITHUB_TOKEN;
+    if (!token) throw new Error("GitHub token missing");
+
+    const { owner, repo } = parseRepoUrl(repoUrl);
+    const octokit = new Octokit({ auth: token });
+
+    await octokit.git.deleteRef({
+      owner,
+      repo,
+      ref: `heads/${branchName}`,
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting branch:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to delete branch",
     };
   }
 }
