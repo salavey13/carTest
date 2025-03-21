@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
@@ -10,6 +8,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { FaTree, FaKey, FaFileAlt, FaShareAlt, FaTelegramPlane, FaSave, FaLink } from 'react-icons/fa';
 import CozeExecutor from '@/components/CozeExecutor';
+
 interface FileNode {
   path: string;
   content: string;
@@ -49,10 +48,10 @@ const RepoTxtFetcher: React.FC = () => {
   const addToast = (message: string) => {
     const id = Date.now();
     setToasts((prev) => {
-      if (prev.length >= 3) prev.shift(); // Limit to 3 toasts
+      if (prev.length >= 3) prev.shift();
       return [...prev, { id, message }];
     });
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2000); // Reduced TTL
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2000);
   };
 
   const parseRepoUrl = (url: string) => {
@@ -328,20 +327,18 @@ ${txtOutput}
   };
 
   return (
-    <div className={`w-full p-6 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-200'} pt-24 rounded-2xl shadow-[0_0_30px_rgba(255,107,107,0.5)] border ${theme === 'dark' ? 'border-gray-700' : 'border-gray-300'} relative overflow-hidden`}>
-      <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-transparent via-purple-900/10 to-cyan-900/10 animate-gradient-shift"></div>
-
-      <h2 className={`text-4xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-6 tracking-wider animate-pulse text-shadow-neon relative z-10`}>
+    <div className={`w-full p-6 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden`}>
+      <h2 className="text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-6">
         Кибер-Экстрактор TXT
       </h2>
-      <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mb-8 text-lg font-mono relative z-10`}>
+      <p className="text-gray-300 mb-8 text-lg">
         Извлекайте текст из GitHub и анализируйте задачи с Kwork в стиле CyberDev!
       </p>
 
       <div className="fixed top-16 right-4 z-50">
         <motion.button
           onClick={toggleTheme}
-          className={`p-2 rounded-full ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-gray-300 text-gray-900'} shadow-[0_0_10px_rgba(147,51,234,0.5)]`}
+          className={`p-2 rounded-full bg-gray-800 text-[#E1FF01] shadow-[0_0_10px_rgba(225,255,1,0.5)]`}
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
         >
@@ -355,72 +352,68 @@ ${txtOutput}
           value={repoUrl}
           onChange={(e) => setRepoUrl(e.target.value)}
           placeholder="URL GitHub (например, https://github.com/user/repo)"
-          className={`p-4 ${theme === 'dark' ? 'bg-gray-900 border-gray-700 text-white' : 'bg-gray-100 border-gray-300 text-gray-900'} border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono shadow-[0_0_10px_rgba(147,51,234,0.3)] transition-all duration-300 hover:border-cyan-500`}
+          className="p-4 bg-gray-800 border border-gray-700 rounded-lg focus:border-cyan-500 focus:outline-none transition shadow-[0_0_10px_rgba(0,255,157,0.3)] hover:border-cyan-400"
         />
         <input
           type="password"
           value={token}
           onChange={(e) => setToken(e.target.value)}
           placeholder="Токен GitHub (опционально)"
-          className={`p-4 ${theme === 'dark' ? 'bg-gray-900 border-gray-700 text-white' : 'bg-gray-100 border-gray-300 text-gray-900'} border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono shadow-[0_0_10px_rgba(147,51,234,0.3)] transition-all duration-300 hover:border-cyan-500`}
+          className="p-4 bg-gray-800 border border-gray-700 rounded-lg focus:border-cyan-500 focus:outline-none transition shadow-[0_0_10px_rgba(0,255,157,0.3)] hover:border-cyan-400"
         />
         <motion.button
           onClick={handleFetch}
           disabled={extractLoading}
-          className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-purple-500 to-pink-500 transition-all font-mono shadow-lg ${
-            extractLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_15px_rgba(147,51,234,0.7)]"
-          }`}
-          whileHover={{ scale: extractLoading ? 1 : 1.05, boxShadow: "0 0 15px rgba(147, 51, 234, 0.7)" }}
+          className={`px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-purple-600 to-cyan-500 transition-all shadow-[0_0_15px_rgba(0,255,157,0.3)] ${extractLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_20px_rgba(0,255,157,0.5)]"}`}
+          whileHover={{ scale: extractLoading ? 1 : 1.05 }}
           whileTap={{ scale: extractLoading ? 1 : 0.95 }}
         >
           {extractLoading ? "Извлечение..." : "Извлечь TXT"}
         </motion.button>
       </div>
 
-      <div className={`mb-8 ${theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-300'} p-6 rounded-xl border shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10`}>
-        <h3 className={`text-2xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Kwork в Бота</h3>
+      <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
+        <h3 className="text-2xl font-bold text-cyan-400 mb-4">Kwork в Бота</h3>
         <textarea
           value={kworkInput}
           onChange={(e) => setKworkInput(e.target.value)}
           placeholder="Введите запрос с Kwork или задачу Telegram Web App..."
-          className={`w-full h-64 p-4 ${theme === 'dark' ? 'bg-gray-900 border-gray-700 text-white' : 'bg-gray-100 border-gray-300 text-gray-900'} border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono resize-none shadow-[0_0_10px_rgba(0,255,157,0.3)]`}
+          className="w-full h-64 p-4 bg-gray-900 border border-gray-700 rounded-lg focus:border-cyan-500 focus:outline-none transition shadow-[0_0_10px_rgba(0,255,157,0.3)] resize-none"
         />
         <div className="flex gap-4 mt-4 flex-wrap">
           <motion.button
             onClick={handleGenerateBotRequest}
             disabled={botLoading}
-            className={`px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-500 to-cyan-500 transition-all font-mono shadow-lg ${
-              botLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]"
-            }`}
-            whileHover={{ scale: botLoading ? 1 : 1.05, boxShadow: "0 0 15px rgba(0, 255, 157, 0.7)" }}
+            className={`px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-blue-600 to-cyan-500 transition-all shadow-[0_0_15px_rgba(0,255,157,0.3)] ${botLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_20px_rgba(0,255,157,0.5)]"}`}
+            whileHover={{ scale: botLoading ? 1 : 1.05 }}
             whileTap={{ scale: botLoading ? 1 : 0.95 }}
           >
             {botLoading ? "Генерация..." : "Анализировать с Ботом"}
           </motion.button>
           <div className="flex flex-col gap-2">
-            <h4 className="text-lg font-bold text-white">Добавить в запрос</h4>
-            <motion.button onClick={handleAddFullTree} className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-red-500 to-orange-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(255,107,107,0.7)]">
+            <h4 className="text-lg font-bold text-purple-400">Добавить в запрос</h4>
+            <motion.button onClick={handleAddFullTree} className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-red-600 to-orange-500 transition-all shadow-[0_0_15px_rgba(255,107,107,0.3)] hover:shadow-[0_0_20px_rgba(255,107,107,0.5)]">
               <FaTree /> Добавить дерево
             </motion.button>
-            <motion.button onClick={handleAddBriefTree} className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-green-500 to-lime-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]">
+            <motion.button onClick={handleAddBriefTree} className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-green-600 to-lime-500 transition-all shadow-[0_0_15px_rgba(0,255,157,0.3)] hover:shadow-[0_0_20px_rgba(0,255,157,0.5)]">
               <FaKey /> Добавить ключевые
             </motion.button>
-            <motion.button onClick={handleAddSelected} className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-indigo-500 to-purple-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(99,102,241,0.7)]">
+            <motion.button onClick={handleAddSelected} className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-500 transition-all shadow-[0_0_15px_rgba(99,102,241,0.3)] hover:shadow-[0_0_20px_rgba(99,102,241,0.5)]">
               <FaFileAlt /> Добавить выбранные
             </motion.button>
           </div>
           <div className="flex flex-col gap-2">
-            <h4 className="text-lg font-bold text-white">Действия с анализом</h4>
-            <motion.button onClick={handleShareWithAdmins} disabled={!analysisComplete} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-yellow-500 to-orange-500 transition-all font-mono shadow-lg ${!analysisComplete ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_15px_rgba(251,191,36,0.7)]"}`}>
+            <h4 className="text-lg font-bold text-purple-400">Действия с анализом</h4>
+            <motion.button onClick={handleShareWithAdmins} disabled={!analysisComplete} className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-yellow-600 to-orange-500 transition-all shadow-[0_0_15px_rgba(251,191,36,0.3)] ${!analysisComplete ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_20px_rgba(251,191,36,0.5)]"}`}>
               <FaShareAlt /> Поделиться с админами
             </motion.button>
-            <motion.button onClick={handleSendToMe} disabled={!analysisComplete || !user?.id} className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-teal-500 to-cyan-500 transition-all font-mono shadow-lg ${!analysisComplete || !user?.id ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_15px_rgba(20,184,166,0.7)]"}`}>
+            <motion.button onClick={handleSendToMe} disabled={!analysisComplete || !user?.id} className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-teal-600 to-cyan-500 transition-all shadow-[0_0_15px_rgba(20,184,166,0.3)] ${!analysisComplete || !user?.id ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_20px_rgba(20,184,166,0.5)]"}`}>
               <FaTelegramPlane /> Отправить себе
             </motion.button>
-            <motion.button onClick={handleSaveAnalysis} className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-pink-500 to-purple-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(219,39,119,0.7)]">
+            <motion.button onClick={handleSaveAnalysis} className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-pink-600 to-purple-500 transition-all shadow-[0_0_15px_rgba(219,39,119,0.3)] hover:shadow-[0_0_20px_rgba(219,39,119,0.5)]">
               <FaSave /> Сохранить анализ
             </motion.button>
-            <motion.button onClick={handleShareLink} className="flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-cyan-500 to-teal-500 transition-all font-mono shadow-lg hover:shadow-[0_0_15px_rgba(6,182,212,0.7)]">
+            <motion.button onClick={handleShareLink} className="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-cyan-600 to-teal-500 transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)] hover:shadow-[0_0_20px_rgba(6,182,212,0.5)]">
               <FaLink /> Поделиться ссылкой
             </motion.button>
           </div>
@@ -432,9 +425,9 @@ ${txtOutput}
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${progress}%` }}
-            className="h-2 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full shadow-[0_0_15px_rgba(147,51,234,0.7)]"
+            className="h-2 bg-gradient-to-r from-purple-600 to-cyan-500 rounded-full shadow-[0_0_15px_rgba(0,255,157,0.5)]"
           />
-          <p className={`${theme === 'dark' ? 'text-white' : 'text-gray-900'} font-mono mt-2`}>
+          <p className="text-white font-mono mt-2">
             {extractLoading ? "Извлечение" : "Анализ"}: {Math.round(progress)}%
           </p>
         </div>
@@ -443,11 +436,11 @@ ${txtOutput}
       {error && <p className="text-red-400 mb-8 font-mono relative z-10">{error}</p>}
 
       {files.length > 0 && (
-        <div className={`mb-8 ${theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-300'} p-6 rounded-xl border shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10`}>
-          <h3 className={`text-2xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Консоль файлов</h3>
+        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
+          <h3 className="text-2xl font-bold text-cyan-400 mb-4">Консоль файлов</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {groupedFiles.map(({ folder, files: folderFiles }, index) => (
-              <div key={`${folder}-${index}`} className={`${theme === 'dark' ? 'bg-gray-800 border-gray-600' : 'bg-gray-200 border-gray-400'} p-4 rounded-lg border shadow-[0_0_10px_rgba(0,255,157,0.2)]`}>
+            {groupFilesByFolder(files).map(({ folder, files: folderFiles }, index) => (
+              <div key={`${folder}-${index}`} className="bg-gray-900 p-4 rounded-lg border border-gray-700 shadow-[0_0_10px_rgba(0,255,157,0.2)]">
                 <h4 className="text-lg font-bold text-purple-400 mb-2">{folder}</h4>
                 <ul className="space-y-2">
                   {folderFiles.map((file) => (
@@ -456,13 +449,13 @@ ${txtOutput}
                         type="checkbox"
                         checked={selectedFiles.has(file.path)}
                         onChange={() => toggleFileSelection(file.path)}
-                        className="w-4 h-4 accent-purple-500"
+                        className="w-4 h-4 accent-cyan-500"
                       />
                       <span
-                        className={`font-mono text-sm ${
+                        className={`text-sm ${
                           importantFiles.includes(file.path)
-                            ? "text-cyan-400 font-bold animate-pulse"
-                            : theme === 'dark' ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-gray-900"
+                            ? "text-[#E1FF01] font-bold animate-pulse"
+                            : "text-gray-400 hover:text-white"
                         }`}
                       >
                         {getDisplayName(file.path)}
@@ -477,20 +470,20 @@ ${txtOutput}
       )}
 
       {txtOutput && (
-        <div className={`mb-8 ${theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-300'} p-6 rounded-xl border shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10`}>
-          <h3 className={`text-2xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Полный TXT</h3>
+        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
+          <h3 className="text-2xl font-bold text-cyan-400 mb-4">Полный TXT</h3>
           <textarea
             value={txtOutput}
             readOnly
-            className={`w-full h-96 p-4 ${theme === 'dark' ? 'bg-gray-800 text-gray-300' : 'bg-gray-200 text-gray-700'} rounded-lg text-sm font-mono border ${theme === 'dark' ? 'border-gray-700' : 'border-gray-300'} resize-none overflow-y-auto shadow-[0_0_10px_rgba(0,255,157,0.2)]`}
+            className="w-full h-96 p-4 bg-gray-900 text-gray-300 rounded-lg text-sm border border-gray-700 resize-none overflow-y-auto shadow-[0_0_10px_rgba(0,255,157,0.2)]"
           />
         </div>
       )}
 
       {selectedOutput && (
-        <div className={`mb-8 ${theme === 'dark' ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-300'} p-6 rounded-xl border shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10`}>
-          <h3 className={`text-2xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'} mb-4`}>Выбранный TXT</h3>
-          <SyntaxHighlighter language="typescript" style={oneDark} customStyle={{ background: theme === 'dark' ? '#1f2937' : '#f3f4f6', padding: '1rem', borderRadius: '0.5rem', maxHeight: '48rem', overflowY: 'auto' }}>
+        <div className="mb-8 bg-gray-800 p-6 rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative z-10">
+          <h3 className="text-2xl font-bold text-cyan-400 mb-4">Выбранный TXT</h3>
+          <SyntaxHighlighter language="typescript" style={oneDark} customStyle={{ background: '#1f2937', padding: '1rem', borderRadius: '0.5rem', maxHeight: '48rem', overflowY: 'auto' }}>
             {selectedOutput}
           </SyntaxHighlighter>
         </div>
@@ -503,7 +496,7 @@ ${txtOutput}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
-            className="bg-purple-500 text-white p-2 rounded-lg shadow-lg font-mono text-sm border border-purple-700 shadow-[0_0_10px_rgba(147,51,234,0.5)]"
+            className="bg-purple-600 text-white p-2 rounded-lg shadow-[0_0_10px_rgba(147,51,234,0.5)] text-sm"
           >
             {toast.message}
           </motion.div>
@@ -517,10 +510,46 @@ export default function RepoXmlPage() {
   return (
     <>
       <meta name="viewport" content="width=1024, initial-scale=0.7, maximum-scale=5.0, user-scalable=yes" />
-      <div className="min-h-screen bg-gray-900 grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+      <div className="min-h-screen bg-gray-900 grid grid-cols-1 md:grid-cols-3 gap-6 p-6 pt-24">
         <div className="col-span-1 md:col-span-2">
-          <RepoTxtFetcher />
+          <section className="mb-12 text-center">
+            <div className="flex justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" className="w-24 h-12">
+                <circle cx="50" cy="50" r="45" fill="none" stroke="url(#bgGlow)" stroke-width="10" opacity="0.3" />
+                <circle cx="50" cy="50" r="20" fill="url(#robotFill)" stroke="url(#robotStroke)" stroke-width="2" />
+                <circle cx="40" cy="45" r="3" fill="#E1FF01" />
+                <circle cx="60" cy="45" r="3" fill="#E1FF01" />
+                <rect x="35" y="60" width="30" height="5" fill="#E1FF01" />
+                <text x="100" y="60" font-size="40" fill="url(#moneyFill)">💸</text>
+                <defs>
+                  <radialGradient id="bgGlow">
+                    <stop offset="0%" stop-color="#E1FF01" stop-opacity="1" />
+                    <stop offset="100%" stop-color="#000" stop-opacity="0" />
+                  </radialGradient>
+                  <linearGradient id="robotFill" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#000" />
+                    <stop offset="100%" stop-color="#E1FF01" />
+                  </linearGradient>
+                  <linearGradient id="robotStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#E1FF01" />
+                    <stop offset="100%" stop-color="#000" />
+                  </linearGradient>
+                  <linearGradient id="moneyFill" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#E1FF01" />
+                    <stop offset="100%" stop-color="#000" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <h1 className="text-4xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse">
+              Грок пришел, наслаждайтесь своими бесконечными желаниями
+            </h1>
+            <p className="text-lg text-gray-300 mt-2">
+              Создайте подстраницу для этого демо веб-приложения и назначьте ее на свое собственное веб-приложение для быстрого старта, принося МНЕ деньги - или украдите всю настройку и назначьте своего собственного бота;)
+            </p>
+          </section>
           <CozeExecutor />
+          <RepoTxtFetcher />
         </div>
         <div className="hidden md:block md:col-span-1">
           <div className="bg-gray-800 p-6 rounded-xl h-full shadow-[0_0_15px_rgba(0,255,157,0.3)]">
