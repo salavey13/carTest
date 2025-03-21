@@ -1,3 +1,4 @@
+// app/api/auth/jwt/route.ts
 import { type NextRequest, NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
 import { logger } from "@/lib/logger"
