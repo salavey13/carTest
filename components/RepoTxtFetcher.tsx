@@ -2,7 +2,8 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { runCozeAgent, notifyAdmin, sendTelegramMessage, createGitHubPullRequest } from "@/app/actions";
+import { runCozeAgent, notifyAdmin, sendTelegramMessage } from "@/app/actions";
+import { createGitHubPullRequest } from "@/app/actions_github/actions";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
