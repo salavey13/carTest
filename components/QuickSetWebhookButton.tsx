@@ -1,4 +1,4 @@
-// components/QuickSetWebhookButton.tsx
+// /components/QuickSetWebhookButton.tsx
 "use client";
 import { useState } from "react";
 import { setTelegramWebhook } from "@/app/actions";

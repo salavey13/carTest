@@ -1,6 +1,7 @@
+// /components/SettingsForm.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useAppContext } from "@/contexts/AppContext";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { notifyAdmin } from "@/app/actions";
 import { motion } from "framer-motion";
@@ -8,7 +9,7 @@ import { toast } from "sonner";
 import { translations } from "@/components/translations_inventory";
 
 export default function SettingsForm() {
-  const { dbUser, isAdmin, user } = useTelegram();
+  const { dbUser, isAdmin, user } = useAppContext();
   const lang = user?.language_code === "ru" ? "ru" : "en";
   const [rates, setRates] = useState<any[]>([]);
   const [formData, setFormData] = useState<Record<number, number>>({});

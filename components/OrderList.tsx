@@ -1,6 +1,7 @@
+// /components/OrderList.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useAppContext } from "@/contexts/AppContext";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -10,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import Modal from "@/components/ui/Modal"; // Correct import path
 
 export default function OrderList() {
-  const { dbUser, isAdmin, user } = useTelegram();
+  const { dbUser, isAdmin, user } = useAppContext();
   const lang = user?.language_code === "ru" ? "ru" : "en";
   const [orders, setOrders] = useState<any[]>([]);
   const [filter, setFilter] = useState<"all" | "processed" | "unprocessed">("all");

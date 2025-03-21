@@ -1,4 +1,4 @@
-// hooks/useWorker.ts
+// /hooks/useWorker.ts
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { debugLogger } from "@/lib/debugLogger";

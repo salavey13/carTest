@@ -1,4 +1,4 @@
-/*interface Answer {
+// /data/questions.ts
   text: string
   result: string
 }

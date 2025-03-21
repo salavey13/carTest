@@ -1,4 +1,4 @@
-// src/components/ThemeSelector.tsx
+// /components/ThemeSelector.tsx
 interface ThemeSelectorProps {
   theme: string
   onThemeChange: (theme: string) => void

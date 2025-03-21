@@ -1,4 +1,4 @@
-// data/types.ts
+// /data/types.ts
 export interface Question {
   id: number
   text: string

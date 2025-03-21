@@ -1,3 +1,4 @@
+// /components/translations_inventory.ts
 export const translations = {
   en: {
     // Page-level text

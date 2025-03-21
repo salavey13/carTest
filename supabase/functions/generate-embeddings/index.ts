@@ -1,4 +1,4 @@
-// supabase/functions/generate-embeddings/index.ts
+// /supabase/functions/generate-embeddings/index.ts
 
 import { createClient } from 'npm:@supabase/supabase-js@2.45.0';
 import { Session } from 'npm:@supabase/ai@0.1.0';
