@@ -1,3 +1,4 @@
+// /app/actions_github/actions.ts
 "use server";
 import { Octokit } from "@octokit/rest";
 import { notifyAdmins } from "@/app/actions";
@@ -17,7 +18,8 @@ export async function createGitHubPullRequest(
   repoUrl: string,
   files: FileNode[],
   prTitle: string,
-  prDescription: string
+  prDescription: string,
+  branchName?: string // Optional custom branch name
 ) {
   try {
     const token = process.env.GITHUB_TOKEN;
@@ -36,39 +38,64 @@ export async function createGitHubPullRequest(
     });
     const baseSha = refData.object.sha;
 
-    const branchName = `feature/coze-${Date.now()}`;
+    const branch = branchName || `feature/coze-${Date.now()}`;
     await octokit.git.createRef({
       owner,
       repo,
-      ref: `refs/heads/${branchName}`,
+      ref: `refs/heads/${branch}`,
       sha: baseSha,
     });
 
-    for (const file of files) {
-      const content = Buffer.from(file.content).toString("base64");
-      let sha: string | undefined;
-      try {
-        const { data: existingFile } = await octokit.repos.getContent({
+    // Get the latest commit on the branch
+    const { data: commitData } = await octokit.git.getCommit({
+      owner,
+      repo,
+      commit_sha: baseSha,
+    });
+    const baseTree = commitData.tree.sha;
+
+    // Create a new tree with all file changes
+    const tree = await Promise.all(
+      files.map(async (file) => {
+        const content = Buffer.from(file.content).toString("base64");
+        const { data } = await octokit.git.createBlob({
           owner,
           repo,
-          path: file.path,
-          ref: branchName,
+          content,
+          encoding: "base64",
         });
-        if (!Array.isArray(existingFile)) sha = existingFile.sha;
-      } catch (err) {}
-      await octokit.repos.createOrUpdateFileContents({
-        owner,
-        repo,
-        path: file.path,
-        message: `Add or update ${file.path} via CozeExecutor`,
-        content,
-        sha,
-        branch: branchName,
-      });
-    }
+        return {
+          path: file.path,
+          mode: "100644" as const, // Standard file mode
+          type: "blob" as const,
+          sha: data.sha,
+        };
+      })
+    );
 
-    // Append changed files to PR description
-    const changedFiles = files.map(file => file.path).join(", ");
+    const { data: newTree } = await octokit.git.createTree({
+      owner,
+      repo,
+      base_tree: baseTree,
+      tree,
+    });
+
+    const { data: newCommit } = await octokit.git.createCommit({
+      owner,
+      repo,
+      message: `Update files via CozeExecutor: ${prTitle}`,
+      tree: newTree.sha,
+      parents: [baseSha],
+    });
+
+    await octokit.git.updateRef({
+      owner,
+      repo,
+      ref: `heads/${branch}`,
+      sha: newCommit.sha,
+    });
+
+    const changedFiles = files.map((file) => file.path).join(", ");
     const fullPrDescription = `${prDescription}\n\n**Измененные файлы:** ${changedFiles}`;
 
     const { data: pr } = await octokit.pulls.create({
@@ -76,20 +103,55 @@ export async function createGitHubPullRequest(
       repo,
       title: prTitle,
       body: fullPrDescription,
-      head: branchName,
+      head: branch,
       base: defaultBranch,
     });
 
-    // Polished Russian notification with GitHub link
-    const adminMessage = `🔔 Созданы новые изменения в проекте!\nЧто меняем: ${prTitle}\nПодробности: ${prDescription}\nФайлы: ${changedFiles}\n\n[Посмотреть и одобрить на GitHub](https://github.com/salavey13/cartest/pull/${pr.number})`;
+    const adminMessage = `🔔 Созданы новые изменения в проекте!\nЧто меняем: ${prTitle}\nПодробности: ${prDescription}\nФайлы: ${changedFiles}\n\n[Посмотреть и одобрить на GitHub](https://github.com/${owner}/${repo}/pull/${pr.number})`;
     await notifyAdmins(adminMessage);
 
-    return { success: true, prUrl: pr.html_url };
+    return { success: true, prUrl: pr.html_url, branch };
   } catch (error) {
     console.error("Error creating pull request:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
+export async function deleteGitHubBranch(repoUrl: string, branchName: string) {
+  try {
+    const token = process.env.GITHUB_TOKEN;
+    if (!token) throw new Error("GitHub token missing");
+
+    const { owner, repo } = parseRepoUrl(repoUrl);
+    const octokit = new Octokit({ auth: token });
+
+    await octokit.git.deleteRef({
+      owner,
+      repo,
+      ref: `heads/${branchName}`,
+    });
+
+    // Verify deletion with a delay to avoid race conditions
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      await octokit.git.getRef({
+        owner,
+        repo,
+        ref: `heads/${branchName}`,
+      });
+      throw new Error("Branch still exists after deletion attempt");
+    } catch (err) {
+      if (err.status === 404) return { success: true }; // Expected: branch is gone
+      throw err;
+    }
+  } catch (error) {
+    console.error("Error deleting branch:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to delete branch",
     };
   }
 }
@@ -190,26 +252,3 @@ export async function closePullRequest(repoUrl: string, pullNumber: number) {
   }
 }
 
-export async function deleteGitHubBranch(repoUrl: string, branchName: string) {
-  try {
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) throw new Error("GitHub token missing");
-
-    const { owner, repo } = parseRepoUrl(repoUrl);
-    const octokit = new Octokit({ auth: token });
-
-    await octokit.git.deleteRef({
-      owner,
-      repo,
-      ref: `heads/${branchName}`,
-    });
-
-    return { success: true };
-  } catch (error) {
-    console.error("Error deleting branch:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to delete branch",
-    };
-  }
-}
