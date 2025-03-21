@@ -1,6 +1,7 @@
+// /app/admin/page.tsx
 "use client";
 import { useEffect, useState } from "react";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useTelegram } from "@/contexts/AppContext";
 import { useRouter } from "next/navigation";
 import { CarSubmissionForm } from "@/components/CarSubmissionForm";
 import { QuickSetWebhookButton } from "@/components/QuickSetWebhookButton"; // New import
@@ -10,7 +11,7 @@ import { Car, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminPage() {
-  const { dbUser, isAdmin } = useTelegram();
+  const { dbUser, isAdmin } = useAppContext();
   const router = useRouter();
   const [isAdminChecked, setIsAdminChecked] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
