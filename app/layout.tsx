@@ -1,3 +1,4 @@
+// /app/layout.tsx
 import type React from "react";
 import Script from "next/script";
 import Header from "@/components/Header";

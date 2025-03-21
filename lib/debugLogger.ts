@@ -1,3 +1,4 @@
+// /lib/debugLogger.ts
 class DebugLogger {
   private logs: string[] = []
   private maxLogs = 100
