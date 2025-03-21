@@ -1,6 +1,7 @@
+// /app/botbusters/page.tsx
 "use client";
 import { useEffect, useState } from "react";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useTelegram } from "@/contexts/AppContext";
 import { supabaseAdmin, createAuthenticatedClient } from "@/hooks/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -307,7 +308,7 @@ function BotBustersDailyStatsSection({ language }) {
 
 // Main BotBustersHome component
 export default function BotBustersHome() {
-  const { dbUser } = useTelegram();
+  const { dbUser } = useAppContext();
   const [language, setLanguage] = useState("en");
 
   const toggleLanguage = () => {
