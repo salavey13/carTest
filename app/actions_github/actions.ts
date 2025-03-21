@@ -11,16 +11,16 @@ export async function createGitHubPullRequest(
   repoUrl: string,
   files: FileNode[],
   prTitle: string,
-  prDescription: string,
-  username: string,
-  selectedFiles: string[]
+  prDescription: string
 ) {
   try {
     const token = process.env.GITHUB_TOKEN;
     if (!token) throw new Error("GitHub token missing");
-    const [owner, repo] = parseRepoUrl(repoUrl);
+
+    const { owner, repo } = parseRepoUrl(repoUrl);
     const octokit = new Octokit({ auth: token });
 
+    // Get the default branch dynamically
     const { data: repoData } = await octokit.repos.get({ owner, repo });
     const defaultBranch = repoData.default_branch;
 
@@ -31,7 +31,7 @@ export async function createGitHubPullRequest(
     });
     const baseSha = refData.object.sha;
 
-    const branchName = `feature/coze-${Date.now()}-${username}`;
+    const branchName = `feature/coze-${Date.now()}`; // Back to no username
     await octokit.git.createRef({
       owner,
       repo,
@@ -41,21 +41,25 @@ export async function createGitHubPullRequest(
 
     for (const file of files) {
       const content = Buffer.from(file.content).toString("base64");
-      const { data: fileData } = await octokit.repos
-        .getContent({
+      let sha: string | undefined;
+
+      try {
+        const { data: existingFile } = await octokit.repos.getContent({
           owner,
           repo,
           path: file.path,
-          ref: defaultBranch,
-        })
-        .catch(() => ({ data: null }));
-      const sha = fileData?.sha;
+          ref: branchName,
+        });
+        if (!Array.isArray(existingFile)) sha = existingFile.sha;
+      } catch (err) {
+        // File doesn’t exist, proceed with creation
+      }
 
       await octokit.repos.createOrUpdateFileContents({
         owner,
         repo,
         path: file.path,
-        message: `Update files: ${selectedFiles.join(", ")}`,
+        message: `Add or update ${file.path} via CozeExecutor`,
         content,
         sha,
         branch: branchName,
@@ -73,21 +77,25 @@ export async function createGitHubPullRequest(
 
     return { success: true, prUrl: pr.html_url };
   } catch (error) {
-    return { success: false, error: (error as Error).message };
+    console.error("Error creating pull request:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error occurred",
+    };
   }
 }
 
-/**
- * Fetches open pull requests for a given repository.
- * @param repoUrl - The GitHub repository URL
- * @returns Object with success status and list of open PRs or error message
- */
+// Rest of the file (getOpenPullRequests, approvePullRequest, closePullRequest, parseRepoUrl) remains unchanged
+function parseRepoUrl(url: string) {
+  const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
+  if (!match) throw new Error("Invalid GitHub URL");
+  return { owner: match[1], repo: match[2] };
+}
+
 export async function getOpenPullRequests(repoUrl: string) {
   try {
     const token = process.env.GITHUB_TOKEN;
-    if (!token) {
-      throw new Error("GitHub token is missing, dumbass");
-    }
+    if (!token) throw new Error("GitHub token is missing, dumbass");
     const { owner, repo } = parseRepoUrl(repoUrl);
     const octokit = new Octokit({ auth: token });
     const { data } = await octokit.pulls.list({
@@ -105,18 +113,10 @@ export async function getOpenPullRequests(repoUrl: string) {
   }
 }
 
-/**
- * Approves a pull request on GitHub.
- * @param repoUrl - The GitHub repository URL
- * @param pullNumber - The pull request number to approve
- * @returns Object indicating success or failure
- */
 export async function approvePullRequest(repoUrl: string, pullNumber: number) {
   try {
     const token = process.env.GITHUB_TOKEN;
-    if (!token) {
-      throw new Error("GitHub token is AWOL");
-    }
+    if (!token) throw new Error("GitHub token is AWOL");
     const { owner, repo } = parseRepoUrl(repoUrl);
     const octokit = new Octokit({ auth: token });
     await octokit.pulls.createReview({
@@ -136,18 +136,10 @@ export async function approvePullRequest(repoUrl: string, pullNumber: number) {
   }
 }
 
-/**
- * Closes a pull request on GitHub.
- * @param repoUrl - The GitHub repository URL
- * @param pullNumber - The pull request number to close
- * @returns Object indicating success or failure
- */
 export async function closePullRequest(repoUrl: string, pullNumber: number) {
   try {
     const token = process.env.GITHUB_TOKEN;
-    if (!token) {
-      throw new Error("GitHub token is missing, you fuck");
-    }
+    if (!token) throw new Error("GitHub token is missing, you fuck");
     const { owner, repo } = parseRepoUrl(repoUrl);
     const octokit = new Octokit({ auth: token });
     await octokit.pulls.update({
@@ -164,15 +156,4 @@ export async function closePullRequest(repoUrl: string, pullNumber: number) {
       error: error instanceof Error ? error.message : "Shit went sideways",
     };
   }
-}
-
-/**
- * Parses a GitHub repository URL to extract owner and repo names.
- * @param url - The GitHub URL
- * @returns Object with owner and repo properties
- */
-function parseRepoUrl(url: string) {
-  const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
-  if (!match) throw new Error("Invalid GitHub URL");
-  return { owner: match[1], repo: match[2] };
 }
