@@ -1,6 +1,7 @@
+// app/buy-subscription/page.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { useTelegram } from "@/hooks/useTelegram";
+import {useAppContext} from "@/contexts/AppContext";
 import { sendTelegramInvoice } from "@/app/actions";
 import { createInvoice, getUserSubscription } from "@/hooks/supabase";
 import { motion } from "framer-motion";
