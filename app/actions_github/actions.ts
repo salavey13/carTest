@@ -1,4 +1,4 @@
-// /app/actions_github/actions.ts
+// app/actions_github/actions.ts
 "use server";
 import { Octokit } from "@octokit/rest";
 import { notifyAdmins } from "@/app/actions";
