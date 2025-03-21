@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { runCozeAgent, notifyAdmin, sendTelegramMessage } from "@/app/actions";
-import { createGitHubPullRequest } from "@/app/actions_github/actions";
+import { createGitHubPullRequest, deleteGitHubBranch } from "@/app/actions_github/actions"; // Added deleteGitHubBranch
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -41,8 +41,9 @@ const RepoTxtFetcher: React.FC = () => {
     "components/CozeExecutor.tsx",
     "components/RepoTxtFetcher.tsx",
     "hooks/useTelegram.ts",
+    "hooks/useAppContext.ts",
     "contexts/AppContext.tsx",
-    "types/telegrsm.d.ts",
+    "lib/utils.ts",
     "types/supabase.ts",
   ];
 
@@ -71,7 +72,7 @@ const RepoTxtFetcher: React.FC = () => {
       const contents = response.data;
 
       const files: FileNode[] = [];
-      const allowedExtensions = [".ts", ".tsx", ".css"]; // Exclude .sql
+      const allowedExtensions = [".ts", ".tsx", ".css"];
       let total = contents.length;
       let processed = 0;
 
@@ -88,9 +89,8 @@ const RepoTxtFetcher: React.FC = () => {
           addToast(`Сканирую ${item.path}...`);
           try {
             const contentResponse = await axios.get(item.download_url);
-            // Prepend or overwrite path comment
             const contentLines = contentResponse.data.split("\n");
-            const pathComment = `// ${item.path}`;
+            const pathComment = `// /${item.path}`; // Keep leading "/"
             if (contentLines[0].startsWith("// ")) {
               contentLines[0] = pathComment;
             } else {
@@ -313,6 +313,9 @@ ${txtOutput}
       return;
     }
 
+    setBotLoading(true); // Reuse botLoading for this async operation
+    addToast("Обновляю импорты...");
+
     const updatedFiles = files.map((file) => {
       let content = file.content;
       // Replace import statement
@@ -320,32 +323,56 @@ ${txtOutput}
         /import\s+{([^}]+)}\s+from\s+['"]@\/hooks\/useTelegram['"]/g,
         `import {$1} from "@/contexts/AppContext"`
       );
-      // Replace useTelegram with useAppContext in destructuring
+      // Replace useTelegram() with useAppContext() in destructuring
       content = content.replace(
-        /{\s*([^}]*)\buseTelegram\b([^}]*)}/g,
-        (_, before, after) => `{${before.trim()}useAppContext${after.trim()}}`
+        /const\s+{([^}]+)}\s*=\s*useTelegram\(\)/g,
+        `const {$1} = useAppContext()`
       );
       return { path: file.path, content };
     });
+
+    const { owner, repo } = parseRepoUrl(repoUrl);
+    const branchName = `feature/import-swap-${Date.now()}`; // Unique branch per attempt
 
     try {
       const result = await createGitHubPullRequest(
         repoUrl,
         updatedFiles,
         "Переход с useTelegram на useAppContext",
-        "Автоматически обновлены импорты и использование хука в файлах для использования AppContext вместо Telegram.\n\n**Измененные файлы:** " + updatedFiles.map(f => f.path).join(", "),
-        "Обновление импортов: useTelegram -> useAppContext"
+        "Автоматически обновлены импорты и использование хука в файлах для использования AppContext вместо Telegram.\n\n**Измененные файлы:** " +
+          updatedFiles.map((f) => f.path).join(", "),
+        "Обновление импортов: useTelegram -> useAppContext",
+        branchName // Pass branch name explicitly if your action supports it
       );
-      if (result.success) {
+
+      if (result && typeof result === "object" && "success" in result && result.success) {
         addToast(`PR создан: ${result.prUrl}`);
         setFiles(updatedFiles);
         setTxtOutput(generateTxt(updatedFiles));
         setSelectedOutput(generateSelectedTxt(updatedFiles));
       } else {
-        addToast(`Ошибка создания PR: ${result.error}`);
+        throw new Error(result?.error || "Неизвестная ошибка при создании PR");
       }
     } catch (err) {
-      addToast("Ошибка: " + (err as Error).message);
+      addToast(`Ошибка: ${(err as Error).message}`);
+      // Cleanup branch on failure
+      try {
+        await deleteGitHubBranch(repoUrl, branchName);
+        addToast(`Ветка ${branchName} удалена после ошибки`);
+      } catch (cleanupErr) {
+        addToast(`Ошибка очистки ветки ${branchName}: ${(cleanupErr as Error).message}`);
+      }
+    } finally {
+      // Cleanup branch on success too, if PR is created (optional, depends on your workflow)
+      if (result?.success) {
+        try {
+          await deleteGitHubBranch(repoUrl, branchName);
+          addToast(`Ветка ${branchName} удалена после успеха`);
+        } catch (cleanupErr) {
+          addToast(`Ошибка очистки ветки ${branchName}: ${(cleanupErr as Error).message}`);
+        }
+      }
+      setBotLoading(false);
     }
   };
 
@@ -500,7 +527,7 @@ ${txtOutput}
             className="h-2 bg-gradient-to-r from-purple-600 to-cyan-500 rounded-full shadow-[0_0_15px_rgba(0,255,157,0.5)]"
           />
           <p className="text-white font-mono mt-2">
-            {extractLoading ? "Извлечение" : "Анализ"}: {Math.round(progress)}%
+            {extractLoading ? "Извлечение" : "Обновление"}: {Math.round(progress)}%
           </p>
         </div>
       )}
@@ -512,9 +539,12 @@ ${txtOutput}
           <h3 className="text-2xl font-bold text-cyan-400 mb-4">Консоль файлов</h3>
           <motion.button
             onClick={handleUpdateImports}
-            className="mb-4 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-purple-600 to-cyan-500 transition-all shadow-[0_0_15px_rgba(0,255,157,0.3)] hover:shadow-[0_0_20px_rgba(0,255,157,0.5)]"
+            disabled={botLoading}
+            className={`mb-4 px-6 py-3 rounded-lg font-semibold text-white bg-gradient-to-r from-purple-600 to-cyan-500 transition-all shadow-[0_0_15px_rgba(0,255,157,0.3)] ${botLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_20px_rgba(0,255,157,0.5)]"}`}
+            whileHover={{ scale: botLoading ? 1 : 1.05 }}
+            whileTap={{ scale: botLoading ? 1 : 0.95 }}
           >
-            Обновить useTelegram на useAppContext
+            {botLoading ? "Обновление..." : "Обновить useTelegram на useAppContext"}
           </motion.button>
           <div className="flex flex-col gap-4">
             {groupFilesByFolder(files).map(({ folder, files: folderFiles }, index) => (
