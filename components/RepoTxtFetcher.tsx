@@ -41,7 +41,6 @@ const RepoTxtFetcher: React.FC = () => {
     "components/CozeExecutor.tsx",
     "components/RepoTxtFetcher.tsx",
     "hooks/useTelegram.ts",
-    "hooks/useAppContext.ts",
     "contexts/AppContext.tsx",
     "lib/utils.ts",
     "types/supabase.ts",
