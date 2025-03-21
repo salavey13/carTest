@@ -1,6 +1,7 @@
+// /app/buy-subscription/page.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useTelegram } from "@/contexts/AppContext";
 import { sendTelegramInvoice } from "@/app/actions";
 import { createInvoice, getUserSubscription } from "@/hooks/supabase";
 import { motion } from "framer-motion";
@@ -13,7 +14,7 @@ const SUBSCRIPTIONS = [
 ];
 
 export default function BuySubscription() {
-  const { user, isInTelegramContext } = useTelegram();
+  const { user, isInTelegramContext } = useAppContext();
   const [selectedSubscription, setSelectedSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
