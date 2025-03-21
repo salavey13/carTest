@@ -1,9 +1,10 @@
+// /app/supercar-test/page.tsx
 "use client";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence, useMotionValue } from "framer-motion";
 import { Brain } from "lucide-react";
 import { supabaseAdmin } from "@/hooks/supabase";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useAppContext } from "@/contexts/AppContext";
 import { Graph } from "@/components/Graph";
 import { ProgressIndicator } from "@/components/ProgressIndicator";
 import ResultDisplay from "@/components/ResultDisplay";
@@ -36,7 +37,7 @@ interface CarResult {
 }
 
 export default function SupercarTest() {
-  const { user } = useTelegram();
+  const { user } = useAppContext();
 
   const [questions, setQuestions] = useState<QuestionData[]>([]);
   const [allAnswers, setAllAnswers] = useState<AnswerData[]>([]);

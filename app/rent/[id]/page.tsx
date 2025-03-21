@@ -1,9 +1,10 @@
+// /app/rent/[id]/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { fetchCarById, fetchCars, createInvoice } from "@/hooks/supabase";
 import { sendTelegramInvoice } from "@/app/actions";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useAppContext } from "@/contexts/AppContext";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -22,7 +23,7 @@ const YUAN_TO_STARS_RATE = 0.1;
 
 export default function RentCarPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const { user: tgUser, isInTelegramContext, dbUser } = useTelegram();
+  const { user: tgUser, isInTelegramContext, dbUser } = useAppContext();
   const [car, setCar] = useState<Car | null>(null);
   const [cars, setCars] = useState<Car[]>([]);
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);

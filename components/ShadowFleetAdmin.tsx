@@ -1,8 +1,9 @@
+// /components/ShadowFleetAdmin.tsx
 "use client"
 import { useState, useEffect } from "react"
 import type React from "react"
 import { supabaseAdmin } from "@/hooks/supabase"
-import { useTelegram } from "@/hooks/useTelegram"
+import { useAppContext } from "@/contexts/AppContext"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { toast } from "sonner"
@@ -23,7 +24,7 @@ interface PremiumCar {
 }
 
 export function ShadowFleetAdmin() {
-  const { dbUser, isAdmin } = useTelegram()
+  const { dbUser, isAdmin } = useAppContext()
   const [premiumCars, setPremiumCars] = useState<PremiumCar[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")

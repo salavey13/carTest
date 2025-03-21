@@ -1,6 +1,7 @@
+// /app/pavele0903/page.tsx
 "use client";
 import { useEffect, useState } from "react";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useAppContext } from "@/contexts/AppContext";
 import { translations } from "@/components/translations_inventory";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,7 +14,7 @@ import InventoryTable from "@/components/InventoryTable";
 import OrderSnatcherSection from "@/components/OrderSnatcherSection";
 
 export default function Pavele0903() {
-  const { user } = useTelegram();
+  const { user } = useAppContext();
   const lang = user?.language_code === "ru" ? "ru" : "en";
   const [refreshKey, setRefreshKey] = useState(0);
 

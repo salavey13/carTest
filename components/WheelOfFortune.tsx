@@ -1,8 +1,9 @@
+// /components/WheelOfFortune.tsx
 "use client"
 
 import { useState, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
-import { useTelegram } from "@/hooks/useTelegram"
+import { useAppContext } from "@/contexts/AppContext"
 import { supabaseAdmin } from "@/hooks/supabase"
 import { notifyWinners } from "@/app/actions"
 import { toast } from "sonner"
@@ -14,7 +15,7 @@ interface WheelSegment {
 }
 
 export default function WheelOfFortune() {
-  const { dbUser, isLoading, isAdmin } = useTelegram()
+  const { dbUser, isLoading, isAdmin } = useAppContext()
   const [isSpinning, setIsSpinning] = useState(false)
   const [rotation, setRotation] = useState(0)
   const [selectedNumber, setSelectedNumber] = useState<number | null>(null)

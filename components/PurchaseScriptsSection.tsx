@@ -1,6 +1,7 @@
+// /components/PurchaseScriptsSection.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useAppContext } from "@/contexts/AppContext";
 import { supabaseAdmin, createInvoice } from "@/hooks/supabase";
 import { sendTelegramInvoice, notifyAdmin } from "@/app/actions";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ const SCRIPT_PACK = {
 const BOT_CREATION_DATE = "2024-06-22";
 
 export default function PurchaseScriptsSection({ language }: { language: "en" | "ru" }) {
-  const { user, isInTelegramContext, tg } = useTelegram(); // Added tg
+  const { user, isInTelegramContext, tg } = useAppContext(); // Added tg
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
