@@ -315,36 +315,50 @@ export default function CozeExecutor({
     }
   };
 
-  const handleCreatePR = async () => {
-    if (!repoUrl || !selectedFiles.size || !commitMessage) {
-      toast.error("Пожалуйста, укажите URL репозитория, выберите файлы и укажите сообщение коммита");
+
+const handleCreatePR = async () => {
+  if (!repoUrl || !selectedFiles.size || !prTitle || !prDescription || !commitMessage) {
+    toast.error("Please provide repo URL, select files, PR title, description, and commit message");
+    return;
+  }
+  setLoading(true);
+  try {
+    const filesToCommit = files
+      .filter((file) => selectedFiles.has(file.path))
+      .map((file) => ({
+        path: file.path,
+        content: file.content,
+      })); // Map to FileNode shape
+    if (filesToCommit.length === 0) {
+      toast.error("No valid files selected to commit");
       return;
     }
-    setLoading(true);
-    try {
-      const filesToCommit = files.filter((file) => selectedFiles.has(file.path));
-      const username = user?.username || user?.id || "unknown";
-      const result = await createGitHubPullRequest(
-        repoUrl,
-        filesToCommit,
-        prTitle,
-        prDescription,
-        username,
-        Array.from(selectedFiles)
-      );
-      if (result.success) {
-        toast.success(`PR успешно создан: ${result.prUrl}`);
-        await notifyAdmin("system", `Новый PR создан пользователем ${username}: ${result.prUrl}`);
-        handleGetOpenPRs();
-      } else {
-        toast.error("Ошибка при создании PR: " + result.error);
-      }
-    } catch (err) {
-      toast.error("Ошибка при создании PR: " + (err as Error).message);
-    } finally {
-      setLoading(false);
+
+    const username = user?.username || user?.id || "unknown";
+    const enrichedPrDescription = `${prDescription}\n\nCreated by: ${username}\nFiles: ${Array.from(selectedFiles).join(", ")}`;
+
+    const result = await createGitHubPullRequest(
+      repoUrl,
+      filesToCommit,
+      prTitle,
+      enrichedPrDescription
+    );
+
+    if (result.success) {
+      toast.success(`PR successfully created: ${result.prUrl}`);
+      await notifyAdmin(`New PR created by ${username}: ${result.prUrl}`);
+      handleGetOpenPRs();
+    } else {
+      toast.error("Failed to create PR: " + result.error);
     }
-  };
+  } catch (err) {
+    console.error("PR creation error:", err);
+    toast.error("Error creating PR: " + (err instanceof Error ? err.message : "Unknown error"));
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleGetOpenPRs = async () => {
     if (!repoUrl) {
