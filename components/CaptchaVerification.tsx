@@ -1,7 +1,8 @@
+// /components/CaptchaVerification.tsx
 "use client";
 
 import { useState, useEffect } from "react";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useAppContext } from "@/contexts/AppContext";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { toast } from "sonner";
 import { Loader2, Trophy, RefreshCw } from "lucide-react";
@@ -23,7 +24,7 @@ interface CaptchaVerificationProps {
 }
 
 export default function CaptchaVerification({ onCaptchaSuccess }: CaptchaVerificationProps) {
-  const { dbUser, isLoading, isAdmin } = useTelegram();
+  const { dbUser, isLoading, isAdmin } = useAppContext();
   const [settings, setSettings] = useState<CaptchaSettings | null>(null);
   const [editingSettings, setEditingSettings] = useState<CaptchaSettings | null>(null);
   const [captchaImage, setCaptchaImage] = useState<string>("");

@@ -1,3 +1,4 @@
+// /components/user-info.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { User, Bot, Trophy, Car, Lock } from "lucide-react";

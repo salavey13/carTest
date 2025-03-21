@@ -1,7 +1,8 @@
+// /components/BullshitDetector.tsx
 "use client";
 import { useState, useEffect } from "react";
 import { analyzeMessage } from "@/app/actions";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useAppContext } from "@/contexts/AppContext";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -22,7 +23,7 @@ const balloonVariants = {
 };
 
 export default function BullshitDetector() {
-  const { user } = useTelegram();
+  const { user } = useAppContext();
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<any>(null);

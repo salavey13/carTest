@@ -1,3 +1,4 @@
+// /components/warehouse-map.tsx
 "use client"
 
 import { useEffect, useRef } from "react"
