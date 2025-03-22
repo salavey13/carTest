@@ -62,19 +62,19 @@ export default function SupportForm() {
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         required
-        className="w-full text-sm md:text-base"
+        className="w-full bg-black text-white border border-[#39FF14] rounded-lg text-sm md:text-base"
       />
       <Select value={level} onValueChange={setLevel}>
-        <SelectTrigger className="w-full text-sm md:text-base">
+        <SelectTrigger className="w-full bg-black text-white border border-[#39FF14] rounded-lg text-sm md:text-base">
           <SelectValue placeholder="Выберите уровень поддержки" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-black text-white border border-[#39FF14]">
           <SelectItem value="1">1 звезда (1000 XTR ≈ 20$)</SelectItem>
           <SelectItem value="2">2 звезды (2000 XTR ≈ 40$)</SelectItem>
           <SelectItem value="3">3 звезды (3000 XTR ≈ 60$)</SelectItem>
         </SelectContent>
       </Select>
-      <Button type="submit" className="w-full">Отправить заявку</Button>
+      <Button type="submit" className="w-full bg-[#39FF14] text-black rounded-lg shadow-[0_0_5px_#39FF14] hover:bg-[#2CFF00]">Отправить заявку</Button>
     </form>
   );
 }
