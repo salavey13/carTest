@@ -5,12 +5,22 @@ import SupportForm from "@/components/SupportForm";
 
 export default function AboutPage() {
   return (
-    <div className="relative min-h-screen pt-24">
-      {/* Cyberpunk background layer */}
-      <div className="absolute inset-0 z-0 bg-black">
-  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#39FF14_0%,transparent_70%)] opacity-20 animate-pulse"></div>
-  <div className="absolute inset-0 bg-[linear-gradient(45deg,#39FF14_0%,#111_50%,#39FF14_100%)] opacity-10"></div>
-</div>
+    <div className="relative min-h-screen">
+      {/* Cyberpunk SVG Background */}
+      <div className="absolute inset-0 z-0">
+        <svg className="w-full h-full opacity-70 animate-pulse-slow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
+          <defs>
+            <linearGradient id="cyberBg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style={{ stopColor: "#000000", stopOpacity: 1 }} />
+              <stop offset="100%" style={{ stopColor: "#111111", stopOpacity: 1 }} />
+            </linearGradient>
+          </defs>
+          <rect width="1000" height="1000" fill="url(#cyberBg)" />
+          <path d="M0,200 H1000 M0,400 H1000 M0,600 H1000 M0,800 H1000" stroke="#39FF14" strokeWidth="2" opacity="0.5" />
+          <path d="M200,0 V1000 M400,0 V1000 M600,0 V1000 M800,0 V1000" stroke="#39FF14" strokeWidth="2" opacity="0.5" />
+          <circle cx="500" cy="500" r="300" stroke="#39FF14" strokeWidth="1" fill="none" opacity="0.3" />
+        </svg>
+      </div>
       <div className="relative z-10 container mx-auto p-4">
         <Card className="max-w-3xl mx-auto bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
           <CardHeader>
