@@ -8,6 +8,8 @@ import { logger } from "@/lib/logger";
 import type { WebAppUser } from "@/types/telegram";
 import { createHash, randomBytes } from "crypto";
 import { handleWebhookProxy } from "./webhook-handlers/proxy"; // Import the proxy
+import { getBaseUrl } from "@/lib/utils";
+
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DEFAULT_CHAT_ID = "413553377"; // Your default Telegram chat ID
@@ -127,10 +129,6 @@ type SendMessagePayload =
       };
     };
 
-/** Utility to get the base URL dynamically */
-function getBaseUrl() {
-  return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://v0-car-test.vercel.app";
-}
 
 
 
