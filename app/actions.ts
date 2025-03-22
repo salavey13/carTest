@@ -20,14 +20,54 @@ const COZE_USER_ID = process.env.COZE_USER_ID || '341503612082';
 import { subscriptionHandler } from "./webhook-handlers/subscription";
 import { carRentalHandler } from "./webhook-handlers/car-rental";
 import { supportHandler } from "./webhook-handlers/support";
-// Import other handlers here
+import { donationHandler } from "./webhook-handlers/donation";
+import { scriptAccessHandler } from "./webhook-handlers/script-access";
+import { inventoryScriptAccessHandler } from "./webhook-handlers/inventory-script-access";
 
+// List of all webhook handlers
 const handlers = [
   subscriptionHandler,
   carRentalHandler,
   supportHandler,
-  // Add other handlers here
+  donationHandler,
+  scriptAccessHandler,
+  inventoryScriptAccessHandler,
 ];
+/*How to Add New Handlers
+Create a New Handler File:
+Add a new file in /app/webhook-handlers/ (e.g., new-type.ts).
+Implement the WebhookHandler interface:
+
+
+
+// /app/webhook-handlers/new-type.ts
+import { WebhookHandler } from "./types";
+import { sendTelegramMessage } from "../actions";
+
+export const newTypeHandler: WebhookHandler = {
+  canHandle: (invoice) => invoice.type === "new_type",
+  handle: async (invoice, userId, userData, totalAmount, supabase, telegramToken, adminChatId) => {
+    // Your logic here
+    await sendTelegramMessage(telegramToken, "New type handled!", [], undefined, userId);
+  },
+};
+
+
+Register the Handler:
+Import and add it to the handlers array in actions.ts:
+
+
+import { newTypeHandler } from "./webhook-handlers/new-type";
+const handlers = [
+  subscriptionHandler,
+  carRentalHandler,
+  supportHandler,
+  donationHandler,
+  scriptAccessHandler,
+  inventoryScriptAccessHandler,
+  newTypeHandler,
+];
+*/
 
 
 
