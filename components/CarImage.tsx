@@ -1,3 +1,4 @@
+// /components/CarImage.tsx
 "use client"
 import { motion, useTransform } from "framer-motion"
 import Image from "next/image"

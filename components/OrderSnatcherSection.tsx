@@ -1,6 +1,7 @@
+// /components/OrderSnatcherSection.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useAppContext } from "@/contexts/AppContext";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { sendTelegramInvoice, notifyAdmin } from "@/app/actions";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,7 @@ const SCRIPT_PACK = {
 };
 
 export default function OrderSnatcherSection() {
-  const { user, isInTelegramContext, tg } = useTelegram();
+  const { user, isInTelegramContext, tg } = useAppContext();
   const lang = user?.language_code === "ru" ? "ru" : "en";
   const [loading, setLoading] = useState(false);
   const [hasAccess, setHasAccess] = useState(false);

@@ -1,14 +1,15 @@
+// /app/page.tsx
 "use client"
 import { useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { debugLogger } from "@/lib/debugLogger"
-import { useTelegram } from "@/hooks/useTelegram"
+import { useAppContext } from "@/contexts/AppContext"
 import { motion } from "framer-motion"
 import { Car, CreditCard, MapPin, Zap } from "lucide-react"
 
 export default function Home() {
-  const { dbUser, isAuthenticated, isLoading, error, isInTelegramContext } = useTelegram()
+  const { dbUser, isAuthenticated, isLoading, error, isInTelegramContext } = useAppContext()
 
   useEffect(() => {
     debugLogger.log("Home component mounted", { isLoading, isInTelegramContext, dbUser, error })

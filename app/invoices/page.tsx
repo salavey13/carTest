@@ -1,6 +1,7 @@
+// /app/invoices/page.tsx
 "use client";
 import { useEffect, useState } from "react";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useAppContext } from "@/contexts/AppContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -14,7 +15,7 @@ interface Rental { rental_id: string; car_id: string; user_id: string; status: s
 interface TopFleet { owner_id: string; owner_name: string; total_revenue: number; car_count: number; }
 
 export default function GloryHall() {
-  const { dbUser, isAdmin } = useTelegram();
+  const { dbUser, isAdmin } = useAppContext();
   const router = useRouter();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [rentals, setRentals] = useState<Rental[]>([]);

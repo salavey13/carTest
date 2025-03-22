@@ -1,3 +1,4 @@
+// /components/ErrorBoundary.tsx
 import React, { type ErrorInfo, type ReactNode } from "react"
 import { debugLogger } from "@/lib/debugLogger"
 

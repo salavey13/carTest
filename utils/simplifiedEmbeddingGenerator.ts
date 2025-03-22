@@ -1,3 +1,4 @@
+// /utils/simplifiedEmbeddingGenerator.ts
 import { supabaseAdmin } from "@/hooks/supabase";
 import { debugLogger } from "@/lib/debugLogger";
 

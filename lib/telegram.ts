@@ -1,3 +1,4 @@
+// /lib/telegram.ts
 import { logger } from "@/lib/logger"
 import type { WebAppUser } from "@/types/telegram"
 

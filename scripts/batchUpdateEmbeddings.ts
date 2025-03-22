@@ -1,4 +1,4 @@
-// scripts/batchUpdateEmbeddings.ts
+// /scripts/batchUpdateEmbeddings.ts
 import { generateCarEmbedding } from "@/hooks/supabase";
 import { debugLogger } from "@/lib/debugLogger";
 

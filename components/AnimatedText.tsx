@@ -1,3 +1,4 @@
+// /components/AnimatedText.tsx
 "use client"
 import { motion, useMotionValue } from "framer-motion"
 import type React from "react"

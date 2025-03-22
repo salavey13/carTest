@@ -1,3 +1,4 @@
+// /lib/inventory.ts
 import { supabaseAdmin } from "@/hooks/supabase";
 import { notifyAdmin } from "@/app/actions";
 

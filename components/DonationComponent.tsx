@@ -1,12 +1,13 @@
+// /components/DonationComponent.tsx
 "use client";
 
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { sendDonationInvoice } from "@/app/actions";
-import { useTelegram } from "@/hooks/useTelegram";
+import { useAppContext } from "@/contexts/AppContext";
 
 export default function DonationComponent() {
-  const { dbUser } = useTelegram();
+  const { dbUser } = useAppContext();
   const [starAmount, setStarAmount] = useState("10");
   const [feedbackText, setFeedbackText] = useState("");
   const [showDoubleButton, setShowDoubleButton] = useState(false);

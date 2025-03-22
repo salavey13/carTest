@@ -1,4 +1,4 @@
-// scripts/setWebhook.ts
+// /scripts/setWebhook.ts
 import axios from "axios"
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN

@@ -1,12 +1,12 @@
-// app/shadow-fleet-admin/page.tsx
+// /app/shadow-fleet-admin/page.tsx
 "use client"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
-import { useTelegram } from "@/hooks/useTelegram"
+import { useAppContext } from "@/contexts/AppContext"
 import { ShadowFleetAdmin } from "@/components/ShadowFleetAdmin"
 
 export default function ShadowFleetAdminPage() {
-  const { dbUser, isAdmin } = useTelegram()
+  const { dbUser, isAdmin } = useAppContext()
   const router = useRouter()
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-// utils/seedDemoData.ts
+// /utils/seedDemoData.ts
 import { createAdminClient } from "@/hooks/supabase"
 
 const seedData = async () => {
