@@ -7,7 +7,10 @@ export default function AboutPage() {
   return (
     <div className="relative min-h-screen pt-24">
       {/* Cyberpunk background layer */}
-      <div className="absolute inset-0 z-0 bg-gradient-to-br from-black via-[#111] to-black opacity-90"></div>
+      <div className="absolute inset-0 z-0 bg-black">
+  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#39FF14_0%,transparent_70%)] opacity-20 animate-pulse"></div>
+  <div className="absolute inset-0 bg-[linear-gradient(45deg,#39FF14_0%,#111_50%,#39FF14_100%)] opacity-10"></div>
+</div>
       <div className="relative z-10 container mx-auto p-4">
         <Card className="max-w-3xl mx-auto bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
           <CardHeader>
