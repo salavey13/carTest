@@ -17,6 +17,75 @@ const COZE_BOT_ID = process.env.COZE_BOT_ID || '7480584293518376966';
 const COZE_USER_ID = process.env.COZE_USER_ID || '341503612082';
 
 
+import { subscriptionHandler } from "./webhook-handlers/subscription";
+import { carRentalHandler } from "./webhook-handlers/car-rental";
+import { supportHandler } from "./webhook-handlers/support";
+// Import other handlers here
+
+const handlers = [
+  subscriptionHandler,
+  carRentalHandler,
+  supportHandler,
+  // Add other handlers here
+];
+
+
+
+export async function handleWebhookUpdate(update: any) {
+  try {
+    if (update.pre_checkout_query) {
+      await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery`, {
+        pre_checkout_query_id: update.pre_checkout_query.id,
+        ok: true,
+      });
+    }
+
+    if (update.message?.successful_payment) {
+      const { invoice_payload, total_amount } = update.message.successful_payment;
+
+      const { data: invoice, error: invoiceError } = await supabaseAdmin
+        .from("invoices")
+        .select("*")
+        .eq("id", invoice_payload)
+        .single();
+
+      if (invoiceError || !invoice) throw new Error(`Invoice error: ${invoiceError?.message}`);
+
+      await supabaseAdmin.from("invoices").update({ status: "paid" }).eq("id", invoice_payload);
+
+      const userId = update.message.chat.id;
+      const { data: userData, error: userError } = await supabaseAdmin
+        .from("users")
+        .select("*")
+        .eq("user_id", userId)
+        .single();
+
+      if (userError) throw new Error(`User fetch error: ${userError.message}`);
+
+      const baseUrl = getBaseUrl();
+      const telegramToken = process.env.TELEGRAM_BOT_TOKEN!;
+      const adminChatId = process.env.ADMIN_CHAT_ID!;
+
+      const handler = handlers.find((h) => h.canHandle(invoice, invoice_payload));
+      if (handler) {
+        await handler.handle(
+          invoice,
+          userId,
+          userData,
+          total_amount,
+          supabaseAdmin,
+          telegramToken,
+          adminChatId,
+          baseUrl
+        );
+      } else {
+        logger.warn(`No handler found for invoice type: ${invoice.type} or payload: ${invoice_payload}`);
+      }
+    }
+  } catch (error) {
+    logger.error("Error handling webhook update:", error);
+  }
+}
 
 
 
@@ -885,7 +954,7 @@ export async function sendTelegramInvoice(
   }
 }
 
-export async function handleWebhookUpdate(update: any) {
+/*export async function handleWebhookUpdate(update: any) {
   try {
     if (update.pre_checkout_query) {
       await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery`, {
@@ -1079,7 +1148,7 @@ export async function handleWebhookUpdate(update: any) {
   } catch (error) {
     logger.error("Error handling webhook update:", error);
   }
-}
+}*/
 
 export async function confirmPayment(preCheckoutQueryId: string) {
   const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
