@@ -1,3 +1,4 @@
+// /components/translations.ts
 export const translations = {
   en: {
     toolsTitle: "Our Bot-Hunting Tools",

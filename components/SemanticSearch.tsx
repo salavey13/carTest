@@ -1,3 +1,4 @@
+// /components/SemanticSearch.tsx
 "use client";
 import { useState, useCallback } from "react";
 import { Loader2, Search, X } from "lucide-react";

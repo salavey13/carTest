@@ -1,3 +1,4 @@
+// /lib/logger.ts
 type LogLevel = "info" | "warn" | "error"
 
 type LogMessage = {
