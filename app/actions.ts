@@ -1059,7 +1059,23 @@ export async function handleWebhookUpdate(update: any) {
       undefined,
       process.env.ADMIN_CHAT_ID!
     );
-  }
+  } else if (invoice_payload.startsWith("support_")) {
+        await sendTelegramMessage(
+          process.env.TELEGRAM_BOT_TOKEN!,
+          `🔔 Новая оплаченная заявка на поддержку!\nСумма: ${total_amount} XTR\nОт: ${userData.username || userData.user_id}\nОписание: ${invoice.description}`,
+          [],
+          undefined,
+          process.env.ADMIN_CHAT_ID!
+        );
+
+        await sendTelegramMessage(
+          process.env.TELEGRAM_BOT_TOKEN!,
+          "Спасибо за оплату! Ваша заявка на поддержку принята, я свяжусь с вами в ближайшее время.",
+          [],
+          undefined,
+          userId
+        );
+      }
   } catch (error) {
     logger.error("Error handling webhook update:", error);
   }
