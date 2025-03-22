@@ -7,36 +7,27 @@ import { verifyJwtToken, generateJwtToken } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 import type { WebAppUser } from "@/types/telegram";
 import { createHash, randomBytes } from "crypto";
+import { handleWebhookProxy } from "./webhook-handlers/proxy"; // Import the proxy
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DEFAULT_CHAT_ID = "413553377"; // Your default Telegram chat ID
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || DEFAULT_CHAT_ID;
 // Environment variables for Coze API with hardcoded defaults
 const COZE_API_KEY = process.env.COZE_API_KEY;
-const COZE_BOT_ID = process.env.COZE_BOT_ID || '7480584293518376966';
-const COZE_USER_ID = process.env.COZE_USER_ID || '341503612082';
+const COZE_BOT_ID = process.env.COZE_BOT_ID || "7480584293518376966";
+const COZE_USER_ID = process.env.COZE_USER_ID || "341503612082";
 
+// Delegate webhook handling to the proxy
+export async function handleWebhookUpdate(update: any) {
+  await handleWebhookProxy(update);
+}
 
-import { subscriptionHandler } from "./webhook-handlers/subscription";
-import { carRentalHandler } from "./webhook-handlers/car-rental";
-import { supportHandler } from "./webhook-handlers/support";
-import { donationHandler } from "./webhook-handlers/donation";
-import { scriptAccessHandler } from "./webhook-handlers/script-access";
-import { inventoryScriptAccessHandler } from "./webhook-handlers/inventory-script-access";
+/*
+Adding New Handlers
+To add a new handler (e.g., new-type.ts), you now only modify /app/webhook-handlers/proxy.ts:
 
-// List of all webhook handlers
-const handlers = [
-  subscriptionHandler,
-  carRentalHandler,
-  supportHandler,
-  donationHandler,
-  scriptAccessHandler,
-  inventoryScriptAccessHandler,
-];
-/*How to Add New Handlers
-Create a New Handler File:
-Add a new file in /app/webhook-handlers/ (e.g., new-type.ts).
-Implement the WebhookHandler interface:
+Create the New Handler:
+tsx
 
 
 
@@ -47,17 +38,18 @@ import { sendTelegramMessage } from "../actions";
 export const newTypeHandler: WebhookHandler = {
   canHandle: (invoice) => invoice.type === "new_type",
   handle: async (invoice, userId, userData, totalAmount, supabase, telegramToken, adminChatId) => {
-    // Your logic here
     await sendTelegramMessage(telegramToken, "New type handled!", [], undefined, userId);
   },
 };
+Update proxy.ts:
+tsx
 
 
-Register the Handler:
-Import and add it to the handlers array in actions.ts:
 
+// /app/webhook-handlers/proxy.ts
+// ... (other imports)
+import { newTypeHandler } from "./new-type";
 
-import { newTypeHandler } from "./webhook-handlers/new-type";
 const handlers = [
   subscriptionHandler,
   carRentalHandler,
@@ -65,67 +57,13 @@ const handlers = [
   donationHandler,
   scriptAccessHandler,
   inventoryScriptAccessHandler,
-  newTypeHandler,
+  newTypeHandler, // Add here
 ];
 */
 
 
 
-export async function handleWebhookUpdate(update: any) {
-  try {
-    if (update.pre_checkout_query) {
-      await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery`, {
-        pre_checkout_query_id: update.pre_checkout_query.id,
-        ok: true,
-      });
-    }
 
-    if (update.message?.successful_payment) {
-      const { invoice_payload, total_amount } = update.message.successful_payment;
-
-      const { data: invoice, error: invoiceError } = await supabaseAdmin
-        .from("invoices")
-        .select("*")
-        .eq("id", invoice_payload)
-        .single();
-
-      if (invoiceError || !invoice) throw new Error(`Invoice error: ${invoiceError?.message}`);
-
-      await supabaseAdmin.from("invoices").update({ status: "paid" }).eq("id", invoice_payload);
-
-      const userId = update.message.chat.id;
-      const { data: userData, error: userError } = await supabaseAdmin
-        .from("users")
-        .select("*")
-        .eq("user_id", userId)
-        .single();
-
-      if (userError) throw new Error(`User fetch error: ${userError.message}`);
-
-      const baseUrl = getBaseUrl();
-      const telegramToken = process.env.TELEGRAM_BOT_TOKEN!;
-      const adminChatId = process.env.ADMIN_CHAT_ID!;
-
-      const handler = handlers.find((h) => h.canHandle(invoice, invoice_payload));
-      if (handler) {
-        await handler.handle(
-          invoice,
-          userId,
-          userData,
-          total_amount,
-          supabaseAdmin,
-          telegramToken,
-          adminChatId,
-          baseUrl
-        );
-      } else {
-        logger.warn(`No handler found for invoice type: ${invoice.type} or payload: ${invoice_payload}`);
-      }
-    }
-  } catch (error) {
-    logger.error("Error handling webhook update:", error);
-  }
-}
 
 
 
