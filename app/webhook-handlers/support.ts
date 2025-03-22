@@ -7,7 +7,7 @@ export const supportHandler: WebhookHandler = {
   handle: async (invoice, userId, userData, totalAmount, supabase, telegramToken, adminChatId) => {
     await sendTelegramMessage(
       telegramToken,
-      `🔔 Новая оплаченная заявка на поддержку!\nСумма: ${totalAmount} XTR\nОт: ${userData.username || userData.user_id}\nОписание: ${invoice desсription}`,
+      `🔔 Новая оплаченная заявка на поддержку!\nСумма: ${totalAmount} XTR\nОт: ${userData.username || userData.user_id}\nОписание: ${invoice.desсription}`,
       [],
       undefined,
       adminChatId
