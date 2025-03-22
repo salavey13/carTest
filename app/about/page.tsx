@@ -21,13 +21,15 @@ export default function AboutPage() {
           <circle cx="500" cy="500" r="300" stroke="#39FF14" strokeWidth="1" fill="none" opacity="0.3" />
         </svg>
       </div>
-      <div className="relative z-10 container mx-auto p-4">
+      <div className="relative z-10 container mx-auto p-4 pt-24">
         <Card className="max-w-3xl mx-auto bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
           <CardHeader>
-            <CardTitle className="text-2xl md:text-3xl font-bold text-center text-[#39FF14]">Обо мне</CardTitle>
+            <CardTitle className="text-2xl md:text-3xl font-bold text-center text-[#39FF14]">
+              Павел Соловьёв: Ваш Навигатор в Киберпространстве
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Личная информация */}
+            {/* Personal Info */}
             <div className="flex flex-col items-center space-y-4">
               <Avatar className="w-24 h-24 md:w-32 md:h-32 border-2 border-[#39FF14]">
                 <AvatarImage src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix//135398606.png" alt="Павел Соловьёв" />
@@ -44,48 +46,83 @@ export default function AboutPage() {
               </div>
             </div>
 
-            {/* Профессиональный обзор */}
+            {/* Professional Overview */}
             <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
               <CardHeader>
-                <CardTitle className="text-lg md:text-xl font-semibold text-[#39FF14]">Профессиональный обзор</CardTitle>
+                <CardTitle className="text-lg md:text-xl font-semibold text-[#39FF14]">Кто Я Такой?</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm md:text-base">
-                  Павел Соловьёв — разработчик с более чем 13-летним опытом, перешедший от Java к низкокодовым платформам (Framer, Supabase). Его флагманский проект "carTest" — это полноценное веб-приложение, демонстрирующее базовые функции и уникальную подстраницу selfdev, где новички могут создавать страницы с помощью ИИ прямо через pull request. Основатель платформы <a href="https://onesitepls.framer.ai" target="_blank" className="text-[#39FF14] hover:underline">oneSitePls.framer.ai</a> и ментор для начинающих разработчиков.
+                  Я — Павел Соловьёв, кибер-алхимик с 13+ годами опыта, прошедший путь от суровых Java-джунглей до вершин низкокодовых платформ вроде Framer и Supabase. Мой флагманский проект <strong>carTest</strong> — это не просто приложение, это твой серфборд, чтобы оседлать волны AI-цунами! Здесь ты найдёшь всё: от базовых функций до уникальной подстраницы <a href="/selfdev" className="text-[#39FF14] hover:underline">/selfdev</a>, где новички могут творить страницы с помощью ИИ через pull requests. Я основал <a href="https://onesitepls.framer.ai" target="_blank" className="text-[#39FF14] hover:underline">oneSitePls.framer.ai</a> и наставляю начинающих кодеров, помогая им взломать матрицу разработки.
                 </p>
               </CardContent>
             </Card>
 
-            {/* Методология VIBE */}
+            {/* VIBE Methodology */}
             <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
               <CardHeader>
-                <CardTitle className="text-lg md:text-xl font-semibold text-[#39FF14]">Методология VIBE</CardTitle>
+                <CardTitle className="text-lg md:text-xl font-semibold text-[#39FF14]">Методология VIBE: Код Будущего</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm md:text-base">
-                  Моя методология VIBE — это не ноукод и не лоукод, это фулкод, но его можно даже не читать. Это как тестить в продакшне на стероидах. Всё чисто боты, что позволяет быстро и эффективно разрабатывать приложения.
+                  Забудь про ноукод и лоукод — моя методология VIBE это фулкод на стероидах, где читать код необязательно. Это как серфинг на продакшен-волнах: всё держится на ботах, которые разгоняют разработку до скорости света. Быстро, эффективно, без тормозов — это VIBE, братан!
                 </p>
               </CardContent>
             </Card>
 
-            {/* Заявка на платную поддержку */}
+            {/* Paid Support */}
             <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
               <CardHeader>
-                <CardTitle className="text-lg md:text-xl font-semibold text-[#39FF14]">Заявка на платную поддержку</CardTitle>
+                <CardTitle className="text-lg md:text-xl font-semibold text-[#39FF14]">Нужна Помощь? Платная Поддержка</CardTitle>
               </CardHeader>
               <CardContent>
+                <p className="text-sm md:text-base mb-4">
+                  Застрял в коде или хочешь ускорить свой проект? Я тут, чтобы вытащить тебя из цифрового болота. Заполни форму ниже, и мы вместе покорим AI-волны!
+                </p>
                 <SupportForm />
               </CardContent>
             </Card>
 
-            {/* Интересная информация о проекте */}
+            {/* Project Overview */}
             <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
               <CardHeader>
-                <CardTitle className="text-lg md:text-xl font-semibold text-[#39FF14]">О проекте</CardTitle>
+                <CardTitle className="text-lg md:text-xl font-semibold text-[#39FF14]">Проект: Твой Кибер-Гараж</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm md:text-base">
-                  Этот проект — не просто страница, а настоящая кибер-экосистема для аренды китайских автомобилей! Здесь есть всё: от ИИ-ассистента, который помогает писать код, до кибер-гаража для управления автопарком. Мы прикрутили Telegram-ботов для оплаты и общения, а также подстраницу <a href="/repo-xml" className="text-[#39FF14] hover:underline">/repo-xml</a>, где ты можешь подключиться к разработке. Давай вместе добавим новые фичи — например, AR-туры по машинам или нейросеть для подбора тачек по вайбу! Присоединяйся, братан, и го развивать это дальше!
+                  Это не просто страница — это киберпанк-экосистема для аренды китайских тачек, где ты рулишь будущим! ИИ-ассистенты пишут код, Telegram-боты принимают бабки и чатятся, а кибер-гараж управляет автопарком. Хочешь внести свою лепту? Заходи на <a href="/repo-xml" className="text-[#39FF14] hover:underline">/repo-xml</a> или <a href="/selfdev" className="text-[#39FF14] hover:underline">/selfdev</a>, где мы вместе можем прикрутить AR-туры по машинам или нейросеть для подбора тачек по вайбу. Это твой серфборд — прыгай на волну и го расширять этот мир, братан!
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* How to Use /selfdev */}
+            <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
+              <CardHeader>
+                <CardTitle className="text-lg md:text-xl font-semibold text-[#39FF14]">Как Оседлать /selfdev: Гайд для Кибер-Сёрферов</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm md:text-base">
+                  Хочешь внести свой код в этот кибер-океан? Вот как работает подстраница <a href="/selfdev" className="text-[#39FF14] hover:underline">/selfdev</a> — твой пульт управления AI-волнами:
+                </p>
+                <ol className="list-decimal list-inside mt-2 space-y-2 text-sm md:text-base">
+                  <li>
+                    <strong>Кидай задачу боту:</strong> Открывай Telegram, находи <strong>oneSitePlsBot</strong>, скидывай ему запрос прямо с Кворка или пиши, что хочешь добавить. Например: “Добавь AR-туры на /selfdev”. Он отвечает: “Спасибо, ща разберусь!”.
+                  </li>
+                  <li>
+                    <strong>Спрашивай у Грока:</strong> Если лимит запросов в боте кончился, заходи на мою страничку разработчика (кнопка внизу слева на <a href="/selfdev" className="text-[#39FF14] hover:underline">/selfdev</a>). Там открывается Грок — копируй задачу, жми кнопку, и он выдаёт код с кнопкой “Скопировать”.
+                  </li>
+                  <li>
+                    <strong>Разбери файлы:</strong> Бери этот код, вставляй в поле на <a href="/selfdev" className="text-[#39FF14] hover:underline">/selfdev</a>, жми “Разобрать файлы”. Они появляются в списке — ставь галочки на нужных (например, обновил два файла).
+                  </li>
+                  <li>
+                    <strong>Создай Pull Request:</strong> Жми “Создать request” — бот сам заполнит поля (что было, что стало, как называется). Отправляй, и вуаля — ссылка на pull request готова. Я захожу, вижу твой код, жму “Замёрджить”, и изменения влетают в прод!
+                  </li>
+                  <li>
+                    <strong>Кибер-Экстрактор:</strong> Внизу страницы есть фича — жми “Извлечь”, и он сканирует все файлы проекта для контекста. Потом можешь пихнуть это в Грока или oneSitePlsBot, чтобы доработать. Дерево файлов тоже можно прикрутить — кидай идею!
+                  </li>
+                </ol>
+                <p className="text-sm md:text-base mt-4">
+                  Итог: тебе даже GitHub не нужен! Бери ответ бота, разбирай, создавай PR, и я получаю оповещение (ну, если оно прилетит, хех). Обновляй страничку — и твоя версия уже в деле. Го кататься на этих AI-волнах вместе!
                 </p>
               </CardContent>
             </Card>
