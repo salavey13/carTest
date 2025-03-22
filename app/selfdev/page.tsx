@@ -2,36 +2,45 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { sendTelegramInvoice } from "../actions";
+import { toast } from "sonner"; // Import Sonner toast
+import { useAppContext } from "@/contexts/AppContext"; // Import AppContext
 
 export default function SelfDevPage() {
+  const { user } = useAppContext(); // Deconstruct user from context
+  const chatId = user?.user_id; // Dynamic user ID
+
   const buyBoost = async (type: string, amount: number, title: string, description: string) => {
-    const chatId = "413553377"; // Replace with dynamic user chat ID in production
+    if (!chatId) {
+      toast.error("Ошибка: Не удалось найти твой ID. Залогинься, братан!");
+      return;
+    }
+
     const payload = `selfdev_boost_${type}_${Date.now()}`;
 
     const result = await sendTelegramInvoice(chatId, title, description, payload, amount, 0);
     if (result.success) {
-      alert(`Invoice for ${title} sent! Pay with XTR in Telegram, bro!`);
+      toast.success(`Счёт за "${title}" отправлен! Плати XTR в Telegram, бро!`);
     } else {
-      alert("Oops, invoice failed. Retry, my man!");
+      toast.error("Не удалось отправить счёт. Попробуй ещё раз, мой человек!");
     }
   };
 
   const boosts = [
-    { type: "priority_review", title: "Priority Review Pass", desc: "Your pull request merged in 24 hours!", amount: 50 },
-    { type: "cyber_extractor_pro", title: "Cyber-Extractor Pro", desc: "Full project tree + AI context suggestions.", amount: 100 },
-    { type: "custom_command", title: "Custom Bot Command", desc: "Tailored command for oneSitePlsBot.", amount: 200 },
-    { type: "ai_code_review", title: "AI Code Review", desc: "Grok audits your code with pro tips.", amount: 75 },
-    { type: "neon_avatar", title: "Neon Avatar", desc: "Custom cyberpunk avatar for your profile.", amount: 150 },
-    { type: "vibe_session", title: "VIBE Mentorship Session", desc: "1-on-1 with me to master VIBE!", amount: 300 },
-    { type: "ar_tour_generator", title: "AR Tour Generator", desc: "AI builds AR tours for your cars.", amount: 250 },
-    { type: "code_warp_drive", title: "Code Warp Drive", desc: "Bot writes a feature in 12 hours.", amount: 400 },
-    { type: "cyber_garage_key", title: "Cyber-Garage VIP Key", desc: "Exclusive access to premium car listings.", amount: 500 },
-    { type: "tsunami_rider", title: "Tsunami Rider Badge", desc: "Bragging rights + priority in all queues.", amount: 1000 },
-    { type: "bot_overclock", title: "Bot Overclock", desc: "Double oneSitePlsBot speed for 30 days.", amount: 600 },
-    { type: "neural_tuner", title: "Neural Tuner", desc: "AI picks cars by your vibe, custom algo.", amount: 350 },
-    { type: "repo_stealth_mode", title: "Repo Stealth Mode", desc: "Hide your PRs from others for secrecy.", amount: 200 },
-    { type: "glitch_fx_pack", title: "Glitch FX Pack", desc: "Cyberpunk UI effects for your pages.", amount: 120 },
-    { type: "infinite_extract", title: "Infinite Extractor", desc: "Unlimited file extractions, no cooldown.", amount: 800 },
+    { type: "priority_review", title: "Пропуск на Приоритетный Обзор", desc: "Твой pull request вливается за 24 часа!", amount: 50 },
+    { type: "cyber_extractor_pro", title: "Кибер-Экстрактор Про", desc: "Полное дерево проекта + AI-подсказки.", amount: 100 },
+    { type: "custom_command", title: "Кастомная Команда Бота", desc: "Персональная команда для oneSitePlsBot.", amount: 200 },
+    { type: "ai_code_review", title: "AI Обзор Кода", desc: "Grok проверяет твой код с проф. советами.", amount: 75 },
+    { type: "neon_avatar", title: "Неоновый Аватар", desc: "Кастомный киберпанк-аватар для профиля.", amount: 150 },
+    { type: "vibe_session", title: "Сессия Менторства VIBE", desc: "1-на-1 со мной, чтобы освоить VIBE!", amount: 300 },
+    { type: "ar_tour_generator", title: "Генератор AR-Туров", desc: "AI создаёт AR-туры для твоих тачек.", amount: 250 },
+    { type: "code_warp_drive", title: "Кодовый Варп-Двигатель", desc: "Бот пишет фичу за 12 часов.", amount: 400 },
+    { type: "cyber_garage_key", title: "Ключ VIP Кибер-Гаража", desc: "Эксклюзивный доступ к премиум-тачкам.", amount: 500 },
+    { type: "tsunami_rider", title: "Значок Всадника Цунами", desc: "Понты + приоритет во всех очередях.", amount: 1000 },
+    { type: "bot_overclock", title: "Оверклок Бота", desc: "Удвой скорость oneSitePlsBot на 30 дней.", amount: 600 },
+    { type: "neural_tuner", title: "Нейронный Тюнер", desc: "AI подбирает тачки по твоему вайбу.", amount: 350 },
+    { type: "repo_stealth_mode", title: "Режим Стелс Репозитория", desc: "Скрой свои PR от чужих глаз.", amount: 200 },
+    { type: "glitch_fx_pack", title: "Пакет Глитч-Эффектов", desc: "Киберпанк-эффекты для твоих страниц.", amount: 120 },
+    { type: "infinite_extract", title: "Бесконечный Экстрактор", desc: "Извлечение файлов без лимитов.", amount: 800 },
   ];
 
   return (
@@ -55,12 +64,12 @@ export default function SelfDevPage() {
         <Card className="max-w-4xl mx-auto bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
           <CardHeader>
             <CardTitle className="text-2xl md:text-4xl font-bold text-center text-[#39FF14]">
-              Boosts Market: Твой Кибер-Базар
+              Рынок Бустов: Твой Кибер-Базар
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <p className="text-sm md:text-base text-center">
-              Добро пожаловать в Boosts Market, братан! Это твой портал в мир AI-ускорителей — от прокачки кода до эксклюзивных фич. Всё за XTR, всё для тебя, чтобы оседлать цунами технологий. Выбирай, плати, взлетаем!
+              Добро пожаловать на Рынок Бустов, братан! Это твой шлюз в мир AI-ускорителей — от прокачки кода до эксклюзивных фишек. Всё за XTR, всё для тебя, чтобы оседлать цунами технологий. Выбирай, плати, взлетаем!
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -81,7 +90,7 @@ export default function SelfDevPage() {
             </div>
 
             <p className="text-sm md:text-base text-center mt-6">
-              Не видишь нужного буста? Пиши в <a href="https://t.me/salavey13" className="text-[#39FF14] hover:underline">Telegram</a>, и я замутим что-то космическое под тебя! Го зарабатывать звёзды и править кибер-миром, мой * boy!
+              Не нашёл нужный буст? Пиши в <a href="https://t.me/salavey13" className="text-[#39FF14] hover:underline">Telegram</a>, и я замутим что-то космическое под тебя! Го зарабатывать звёзды и править кибер-миром, мой звёздный бой!
             </p>
           </CardContent>
         </Card>
