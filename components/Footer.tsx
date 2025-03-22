@@ -1,4 +1,3 @@
-// /components/Footer.tsx
 "use client";
 import { motion } from "framer-motion";
 import { Gift, Heart, ExternalLink, Send, Code, Lock } from "lucide-react";
@@ -26,6 +25,16 @@ export default function Footer() {
             <h3 className="text-xl font-semibold text-gradient cyber-text glitch" data-text="О НАС">
               О НАС
             </h3>
+            <ul className="space-y-3">
+              <li>
+                <Link
+                  href="/about"
+                  className="text-sm text-muted-foreground hover:text-primary font-mono flex items-center gap-2 transition-colors text-glow"
+                >
+                  <ExternalLink className="w-4 h-4" /> Обо мне
+                </Link>
+              </li>
+            </ul>
             <p className="text-sm text-muted-foreground font-mono">
               Affordable Chinese Rent Cars — твой кибер-гараж для аренды китайских тачек. ИИ, неон и любовь к железу в одном флаконе!
             </p>
@@ -156,4 +165,3 @@ export default function Footer() {
     </footer>
   );
 }
-
