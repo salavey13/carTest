@@ -5,7 +5,7 @@ import SupportForm from "@/components/SupportForm";
 
 export default function AboutPage() {
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen pt-24">
       {/* Cyberpunk background layer */}
       <div className="absolute inset-0 z-0 bg-gradient-to-br from-black via-[#111] to-black opacity-90"></div>
       <div className="relative z-10 container mx-auto p-4">
