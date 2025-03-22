@@ -2,6 +2,7 @@
 import axios from "axios";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { logger } from "@/lib/logger";
+import { getBaseUrl } from "@/lib/utils";
 
 // Import all specific handlers
 import { subscriptionHandler } from "./subscription";
@@ -21,10 +22,46 @@ const handlers = [
   inventoryScriptAccessHandler,
 ];
 
-// Utility to get the base URL dynamically (copied from actions.ts)
-function getBaseUrl() {
-  return process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://v0-car-test.vercel.app";
-}
+/*
+Adding New Handlers
+To add a new handler (e.g., new-type.ts), you now only modify /app/webhook-handlers/proxy.ts:
+
+Create the New Handler:
+tsx
+
+
+
+// /app/webhook-handlers/new-type.ts
+import { WebhookHandler } from "./types";
+import { sendTelegramMessage } from "../actions";
+
+export const newTypeHandler: WebhookHandler = {
+  canHandle: (invoice) => invoice.type === "new_type",
+  handle: async (invoice, userId, userData, totalAmount, supabase, telegramToken, adminChatId) => {
+    await sendTelegramMessage(telegramToken, "New type handled!", [], undefined, userId);
+  },
+};
+Update proxy.ts:
+tsx
+
+
+
+// /app/webhook-handlers/proxy.ts
+// ... (other imports)
+import { newTypeHandler } from "./new-type";
+
+const handlers = [
+  subscriptionHandler,
+  carRentalHandler,
+  supportHandler,
+  donationHandler,
+  scriptAccessHandler,
+  inventoryScriptAccessHandler,
+  newTypeHandler, // Add here
+];
+*/
+
+
 
 export async function handleWebhookProxy(update: any) {
   try {
