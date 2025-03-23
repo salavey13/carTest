@@ -5,10 +5,10 @@ import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
-import { supabaseAdmin } from "@/hooks/supabase"; // For ticker data
+import { supabaseAdmin } from "@/hooks/supabase";
 import {
   Zap,
-  Tool,
+  Wrench, // Replaced Tool with Wrench (Tool might not exist or is misnamed)
   Bot,
   Search,
   Star,
@@ -22,12 +22,12 @@ import {
   EyeOff,
   Sparkles,
   Infinity,
-} from "lucide-react"; // Lucide icons
+} from "lucide-react"; // Explicit imports
 
 // Map boost types to Lucide icons
 const boostIcons = {
   priority_review: Zap,
-  cyber_extractor_pro: Tool,
+  cyber_extractor_pro: Wrench, // Using Wrench instead of Tool
   custom_command: Bot,
   ai_code_review: Search,
   neon_avatar: Star,
@@ -48,10 +48,19 @@ const topBoosts = ["tsunami_rider", "cyber_garage_key", "infinite_extract"];
 
 export default function SelfDevPage() {
   const { user } = useAppContext();
-  const chatId = user?.id; // Aligned with user.id
+  const chatId = user?.id;
   const [xtrEarned, setXtrEarned] = useState(0);
   const [recentPurchases, setRecentPurchases] = useState<string[]>([]);
-  const boostOfTheDay = "code_warp_drive";
+
+  // Randomize Boost of the Day based on date
+  const getBoostOfTheDay = () => {
+    const boostsList = boosts.map(b => b.type);
+    const daySeed = new Date().toDateString(); // Unique per day
+    const seed = daySeed.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const randomIndex = seed % boostsList.length;
+    return boostsList[randomIndex];
+  };
+  const boostOfTheDay = getBoostOfTheDay();
 
   // Mock XTR earnings simulation
   useEffect(() => {
