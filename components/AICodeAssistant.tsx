@@ -261,7 +261,7 @@ export default function AICodeAssistant() {
     <div className="p-4 bg-gray-900 text-white min-h-screen font-sans">
       <header className="flex items-center gap-2 mb-6">
         <h1 className="text-3xl font-bold tracking-tight">AI Code Assistant</h1>
-        <Tooltip text="Шаги для создания PR:\n1. Вставьте ответ бота.\n2. Разберите файлы.\n3. Выберите файлы.\n4. Создайте PR.">
+        <Tooltip text={`Шаги для создания PR:\n1. Вставьте ответ бота.\n2. Разберите файлы.\n3. Выберите файлы.\n4. Создайте PR.`}>
           <FaInfoCircle className="text-blue-400 cursor-pointer hover:text-blue-300 transition" />
         </Tooltip>
       </header>
