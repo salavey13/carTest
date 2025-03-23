@@ -114,7 +114,7 @@ export default function CozeExecutor({
     const detectedModules: Set<string> = new Set();
 
     try {
-      const codeBlocks = text.match(/```[\s\S]*?```/g) || [];
+      const codeBlocks = text.match(/^```[\s\S]*?^```/gm) || [];
       codeBlocks.forEach((block) => {
         const content = block.slice(3, -3).trim();
         const lines = content.split("\n");
