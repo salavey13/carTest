@@ -47,8 +47,9 @@ export default function AICodeAssistant() {
   const [customLinks, setCustomLinks] = useState<{ name: string; url: string }[]>([]);
 
   const predefinedLinks = [
-    { name: "ChatGPT", url: "https://chatgpt.com", icon: <FaRobot className="text-green-500" /> },
-    { name: "QwenLM", url: "https://qwenlm.ai", icon: <FaImage className="text-blue-500" /> },
+    { name: "Grok", url: "https://grok.com", icon: <FaRobot className="text-yellow-300 font-bold drop-shadow-md" />
+},
+{ name: "QwenLM", url: "https://qwenlm.ai", icon: <FaImage className="text-blue-500" /> },
     { name: "NotebookLM", url: "https://notebooklm.google.com", icon: <FaBook className="text-yellow-500" /> },
     { name: "Supabase", url: "https://supabase.com", icon: <FaDatabase className="text-teal-500" /> },
     { name: "Vercel", url: "https://vercel.com", icon: <FaRocket className="text-black" /> },
