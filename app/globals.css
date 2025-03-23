@@ -68,6 +68,30 @@ body {
   }
 }
 
+/* Existing glitch animation */
+@keyframes glitch {
+  0% { transform: translate(0); }
+  20% { transform: translate(-2px, 2px); }
+  40% { transform: translate(2px, -2px); }
+  60% { transform: translate(-2px, -2px); }
+  80% { transform: translate(2px, 2px); }
+  100% { transform: translate(0); }
+}
+.animate-glitch {
+  animation: glitch 0.3s infinite alternate;
+}
+.animate-glitch:hover {
+  animation: glitch 0.1s infinite alternate;
+}
+
+/* Ticker animation */
+@keyframes ticker {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+.animate-ticker {
+  animation: ticker 20s linear infinite;
+}
 .text-shadow-neon {
   text-shadow: 0 0 5px rgba(255, 107, 107, 0.8), 0 0 10px rgba(255, 107, 107, 0.6), 0 0 15px rgba(255, 107, 107, 0.4);
 }
