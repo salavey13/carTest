@@ -130,7 +130,16 @@ type SendMessagePayload =
     };
 
 
-
+export async function notifyAdmin(message: string) {
+  await sendTelegramMessage(
+    process.env.TELEGRAM_BOT_TOKEN!,
+    message,
+    [],
+    undefined,
+    ADMIN_CHAT_ID
+  );
+  return { success: true };
+}
 
 export async function notifyAdmins(message: string) {
   const { data: admins, error } = await supabaseAdmin
