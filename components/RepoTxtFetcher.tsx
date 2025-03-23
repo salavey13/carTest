@@ -1,19 +1,23 @@
-// /components/RepoTxtFetcher.tsx
 "use client";
 import React, { useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { runCozeAgent, notifyAdmin, sendTelegramMessage } from "@/app/actions";
-import { createGitHubPullRequest, deleteGitHubBranch } from "@/app/actions_github/actions";
+import { runCozeAgent, notifyAdmin, sendTelegramMessage, sendTelegramDocument } from "@/app/actions";
+import { createGitHubPullRequest } from "@/app/actions_github/actions";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { FaTree, FaKey, FaFileAlt, FaShareAlt, FaTelegramPlane, FaSave, FaLink } from "react-icons/fa";
+import { FaTree, FaKey, FaFileAlt, FaShareAlt, FaTelegramPlane, FaSave, FaLink, FaClipboard } from "react-icons/fa";
 
 interface FileNode {
   path: string;
   content: string;
+}
+
+interface FileInfo {
+  path: string;
+  download_url: string;
 }
 
 const RepoTxtFetcher: React.FC = () => {
@@ -30,9 +34,10 @@ const RepoTxtFetcher: React.FC = () => {
   const [toasts, setToasts] = useState<{ id: number; message: string }[]>([]);
   const [kworkInput, setKworkInput] = useState<string>("");
   const [analysisComplete, setAnalysisComplete] = useState<boolean>(false);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
-
+  const [contextUsed, setContextUsed] = useState<string>("Контекст репозитория не предоставлен.");
   const { user } = useAppContext();
+
+  const DEFAULT_CONTEXT = "Контекст репозитория не предоставлен.";
 
   const importantFiles = [
     "app/actions.ts",
@@ -46,6 +51,8 @@ const RepoTxtFetcher: React.FC = () => {
     "lib/utils.ts",
     "types/supabase.ts",
   ];
+
+  const allowedExtensions = [".ts", ".tsx", ".css"];
 
   const addToast = (message: string) => {
     const id = Date.now();
@@ -62,78 +69,36 @@ const RepoTxtFetcher: React.FC = () => {
     return { owner: match[1], repo: match[2] };
   };
 
-  const fetchRepoContents = async (owner: string, repo: string, path: string = "") => {
+  const getLanguage = (path: string) => {
+    if (path.endsWith(".ts") || path.endsWith(".tsx")) return "typescript";
+    if (path.endsWith(".css")) return "css";
+    return "text";
+  };
+
+  const collectFilePaths = async (owner: string, repo: string, path: string = ""): Promise<FileInfo[]> => {
     const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
     const headers: any = { Accept: "application/vnd.github.v3+json" };
     if (token) headers.Authorization = `token ${token}`;
 
-    try {
-      const response = await axios.get(url, { headers });
-      const contents = response.data;
+    const response = await axios.get(url, { headers });
+    const contents = response.data;
 
-      const files: FileNode[] = [];
-      const allowedExtensions = [".ts", ".tsx", ".css"];
-      let total = contents.length;
-      let processed = 0;
+    let fileInfos: FileInfo[] = [];
 
-      for (const item of contents) {
-        processed++;
-        setProgress((processed / total) * 100);
-
-        if (
-          item.type === "file" &&
-          allowedExtensions.some((ext) => item.path.endsWith(ext)) &&
-          !item.path.startsWith("components/ui/") &&
-          !item.path.endsWith(".sql")
-        ) {
-          addToast(`Сканирую ${item.path}...`);
-          try {
-            const contentResponse = await axios.get(item.download_url);
-            const contentLines = contentResponse.data.split("\n");
-            let pathComment: string;
-            if (item.path.endsWith(".ts") || item.path.endsWith(".tsx")) {
-              pathComment = `// /${item.path}`;
-            } else if (item.path.endsWith(".css")) {
-              pathComment = `/* /${item.path} */`;
-            } else {
-              pathComment = `# /${item.path}`;
-            }
-            if (contentLines[0].match(/^(\/\/|\/\*|#)/)) {
-              contentLines[0] = pathComment;
-            } else {
-              contentLines.unshift(pathComment);
-            }
-            files.push({ path: item.path, content: contentLines.join("\n") });
-          } catch (contentErr) {
-            console.error(`Ошибка загрузки ${item.path}:`, contentErr);
-            addToast(`Ошибка: ${item.path} не загружен`);
-          }
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        } else if (item.type === "dir") {
-          const subFiles = await fetchRepoContents(owner, repo, item.path);
-          files.push(...subFiles);
-        }
+    for (const item of contents) {
+      if (
+        item.type === "file" &&
+        allowedExtensions.some((ext) => item.path.endsWith(ext)) &&
+        !item.path.startsWith("components/ui/") &&
+        !item.path.endsWith(".sql")
+      ) {
+        fileInfos.push({ path: item.path, download_url: item.download_url });
+      } else if (item.type === "dir") {
+        const subFileInfos = await collectFilePaths(owner, repo, item.path);
+        fileInfos = fileInfos.concat(subFileInfos);
       }
-      return files;
-    } catch (err) {
-      console.error("Ошибка API:", err);
-      throw err;
     }
-  };
-
-  const generateTxt = (files: FileNode[]) => {
-    return files.map((file) => `--- ${file.path} ---\n${file.content}`).join("\n\n");
-  };
-
-  const generateTreeOnly = (files: FileNode[]) => {
-    return files.map((file) => `- ${file.path}`).join("\n");
-  };
-
-  const generateSelectedTxt = (files: FileNode[]) => {
-    return files
-      .filter((file) => selectedFiles.has(file.path))
-      .map((file) => `--- ${file.path} ---\n${file.content}`)
-      .join("\n\n");
+    return fileInfos;
   };
 
   const handleFetch = async () => {
@@ -149,9 +114,40 @@ const RepoTxtFetcher: React.FC = () => {
 
     try {
       const { owner, repo } = parseRepoUrl(repoUrl);
-      const fetchedFiles = await fetchRepoContents(owner, repo);
-      setFiles(fetchedFiles);
-      const txt = generateTxt(fetchedFiles);
+      const fileInfos = await collectFilePaths(owner, repo);
+      const files: FileNode[] = [];
+
+      const fetchPromises = fileInfos.map(async (fileInfo, index) => {
+        try {
+          const contentResponse = await axios.get(fileInfo.download_url);
+          const contentLines = contentResponse.data.split("\n");
+          let pathComment: string;
+          if (fileInfo.path.endsWith(".ts") || fileInfo.path.endsWith(".tsx")) {
+            pathComment = `// /${fileInfo.path}`;
+          } else if (fileInfo.path.endsWith(".css")) {
+            pathComment = `/* /${fileInfo.path} */`;
+          } else {
+            pathComment = `# /${fileInfo.path}`;
+          }
+          if (contentLines[0] && contentLines[0].match(/^(\/\/|\/\*|#)/)) {
+            contentLines[0] = pathComment;
+          } else {
+            contentLines.unshift(pathComment);
+          }
+          setProgress(((index + 1) / fileInfos.length) * 100);
+          return { path: fileInfo.path, content: contentLines.join("\n") };
+        } catch (contentErr) {
+          console.error(`Ошибка загрузки ${fileInfo.path}:`, contentErr);
+          addToast(`Ошибка: ${fileInfo.path} не загружен`);
+          return null;
+        }
+      });
+
+      const fetchResults = await Promise.all(fetchPromises);
+      files.push(...fetchResults.filter((file): file is FileNode => file !== null));
+
+      setFiles(files);
+      const txt = generateTxt(files);
       setTxtOutput(txt);
       addToast("Извлечение завершено!");
     } catch (err: any) {
@@ -159,8 +155,25 @@ const RepoTxtFetcher: React.FC = () => {
       addToast("Ошибка: Извлечение не удалось!");
     } finally {
       setExtractLoading(false);
-      setProgress(100);
     }
+  };
+
+  const generateTxt = (files: FileNode[]) => {
+    return files.map((file) => `--- ${file.path} ---\n${file.content}`).join("\n\n");
+  };
+
+  const generateTreeOnly = (files: FileNode[]) => {
+    return files.map((file) => `- ${file.path}`).join("\n");
+  };
+
+  const generateMarkdownSelectedTxt = (files: FileNode[]) => {
+    return files
+      .filter((file) => selectedFiles.has(file.path))
+      .map((file) => {
+        const lang = getLanguage(file.path);
+        return `\`\`\`${lang}\n${file.content}\n\`\`\``;
+      })
+      .join("\n\n");
   };
 
   const toggleFileSelection = (path: string) => {
@@ -168,7 +181,7 @@ const RepoTxtFetcher: React.FC = () => {
       const newSelected = new Set(prev);
       if (newSelected.has(path)) newSelected.delete(path);
       else newSelected.add(path);
-      setSelectedOutput(generateSelectedTxt(files));
+      setSelectedOutput(generateTxt(files.filter((file) => newSelected.has(file.path))));
       return newSelected;
     });
   };
@@ -178,9 +191,22 @@ const RepoTxtFetcher: React.FC = () => {
       addToast("Выберите хотя бы один файл!");
       return;
     }
-    const selectedTxt = generateSelectedTxt(files);
-    setKworkInput((prev) => `${prev}\n\nВыбранные файлы:\n${selectedTxt}`);
+    const markdownTxt = generateMarkdownSelectedTxt(files);
+    setKworkInput((prev) => `${prev}\n\nВыбранные файлы:\n${markdownTxt}`);
     addToast("Выбранные файлы добавлены в запрос!");
+  };
+
+  const handleAddImportantFiles = () => {
+    const importantFilesSet = new Set(importantFiles);
+    const importantFilesContent = files
+      .filter((file) => importantFilesSet.has(file.path))
+      .map((file) => {
+        const lang = getLanguage(file.path);
+        return `\`\`\`${lang}\n${file.content}\n\`\`\``;
+      })
+      .join("\n\n");
+    setKworkInput((prev) => `${prev}\n\nОсновные файлы:\n${importantFilesContent}`);
+    addToast("Основные файлы добавлены в запрос!");
   };
 
   const handleGenerateBotRequest = async () => {
@@ -188,20 +214,19 @@ const RepoTxtFetcher: React.FC = () => {
       toast.error("Введите запрос с Kwork!");
       return;
     }
-
     setBotLoading(true);
     setAnalysisComplete(false);
     addToast("Генерирую запрос для бота...");
-
     try {
-      const context = selectedOutput || txtOutput || "Контекст репозитория не предоставлен.";
+      const context = selectedOutput || txtOutput || DEFAULT_CONTEXT;
+      setContextUsed(context);
       const fullInput = `Запрос с Kwork: "${kworkInput}"\nКонтекст репозитория:\n${context}`;
       const botId = "7481446329554747397";
       const userId = "341503612082";
       const response = await runCozeAgent(botId, userId, fullInput);
       setTxtOutput(response);
       setAnalysisComplete(true);
-      addToast("Анализ завершен!");
+      addToast("А Bucharestализ завершен!");
     } catch (err) {
       setError("Ошибка генерации запроса для бота.");
       addToast("Ошибка: Генерация не удалась!");
@@ -235,15 +260,11 @@ const RepoTxtFetcher: React.FC = () => {
       addToast("Нет результатов для отправки!");
       return;
     }
-
     const message = `Результат анализа Kwork:\n\nЗапрос: ${kworkInput}\n\nАнализ:\n${txtOutput}`;
     try {
-      const result = await notifyAdmin(message); // Always use notifyAdmin for now
-      if (result.success) {
-        addToast("Результат отправлен админам!");
-      } else {
-        addToast("Ошибка при отправке админам!");
-      }
+      const result = await notifyAdmin(message);
+      if (result.success) addToast("Результат отправлен админам!");
+      else addToast("Ошибка при отправке админам!");
     } catch (err) {
       addToast("Ошибка: Не удалось отправить!");
     }
@@ -258,7 +279,6 @@ const RepoTxtFetcher: React.FC = () => {
       addToast("Пользователь Telegram не найден!");
       return;
     }
-
     const markdownMessage = `
 *✨ Анализ Kwork от CyberDev ✨*
 
@@ -270,7 +290,6 @@ ${txtOutput}
 
 *Поделитесь этим с командой, если хотите! 🚀*
     `.trim();
-
     try {
       const result = await sendTelegramMessage(
         process.env.TELEGRAM_BOT_TOKEN || "",
@@ -279,11 +298,8 @@ ${txtOutput}
         undefined,
         user.id.toString()
       );
-      if (result.success) {
-        addToast("Анализ отправлен вам в Telegram!");
-      } else {
-        addToast("Ошибка при отправке вам!");
-      }
+      if (result.success) addToast("Анализ отправлен вам в Telegram!");
+      else addToast("Ошибка при отправке вам!");
     } catch (err) {
       addToast("Ошибка: Не удалось отправить!");
     }
@@ -304,6 +320,33 @@ ${txtOutput}
     addToast("Анализ сохранен локально!");
   };
 
+  const handleCopyContextToClipboard = () => {
+    if (!contextUsed || contextUsed === DEFAULT_CONTEXT) {
+      addToast("Контекст пуст или не изменен!");
+      return;
+    }
+    navigator.clipboard.writeText(contextUsed);
+    addToast("Контекст скопирован в буфер обмена!");
+  };
+
+  const handleSendContextAsFile = async () => {
+    if (!contextUsed || contextUsed === DEFAULT_CONTEXT) {
+      addToast("Контекст пуст или не изменен!");
+      return;
+    }
+    if (!user?.id) {
+      addToast("Пользователь Telegram не найден!");
+      return;
+    }
+    try {
+      const result = await sendTelegramDocument(user.id.toString(), contextUsed, "Context.txt");
+      if (result.success) addToast("Контекст отправлен как Context.txt в Telegram!");
+      else addToast(`Ошибка при отправке: ${result.error}`);
+    } catch (err) {
+      addToast("Ошибка: Не удалось отправить файл!");
+    }
+  };
+
   const handleShareLink = () => {
     if (!txtOutput) {
       addToast("Нет результатов для分享!");
@@ -320,10 +363,8 @@ ${txtOutput}
       addToast("Нет файлов для обновления!");
       return;
     }
-
     setBotLoading(true);
     addToast("Обновляю импорты...");
-
     const updatedFiles = files
       .filter((file) => file.path !== "contexts/AppContext.tsx")
       .map((file) => {
@@ -355,13 +396,11 @@ ${txtOutput}
         "Автоматически обновлены импорты и использование хука в файлах для использования AppContext вместо Telegram.",
         branchName
       );
-
       if (result.success) {
         addToast(`PR создан: ${result.prUrl}`);
         setFiles(updatedFiles);
         setTxtOutput(generateTxt(updatedFiles));
-        setSelectedOutput(generateSelectedTxt(updatedFiles));
-        // No branch deletion here—let it live until merged
+        setSelectedOutput(generateTxt(updatedFiles.filter((file) => selectedFiles.has(file.path))));
       } else {
         throw new Error(result.error || "Неизвестная ошибка при создании PR");
       }
@@ -370,10 +409,6 @@ ${txtOutput}
     } finally {
       setBotLoading(false);
     }
-  };
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   };
 
   const groupFilesByFolder = (files: FileNode[]) => {
@@ -388,10 +423,8 @@ ${txtOutput}
 
   const getDisplayName = (path: string) => {
     const parts = path.split("/");
-    if (parts[0] === "app") {
-      return parts.slice(1).join("/"); // Strip 'app/' for all app files
-    }
-    return path; // Keep full path for non-app files
+    if (parts[0] === "app") return parts.slice(1).join("/");
+    return path;
   };
 
   return (
@@ -402,17 +435,6 @@ ${txtOutput}
       <p className="text-gray-300 mb-6 text-sm">
         Ваш инструмент для извлечения кода из GitHub. Выбирайте файлы, отправляйте боту или обновляйте код с PR!
       </p>
-
-      <div className="fixed top-12 right-4 z-50">
-        <motion.button
-          onClick={toggleTheme}
-          className="p-1 rounded-full bg-gray-800 text-[#E1FF01] shadow-[0_0_8px_rgba(225,255,1,0.5)]"
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-        >
-          {theme === "dark" ? "☀️" : "🌙"}
-        </motion.button>
-      </div>
 
       <div className="flex flex-col gap-3 mb-6 relative z-10">
         <input
@@ -473,14 +495,41 @@ ${txtOutput}
               <FaKey /> Добавить ключевые
             </motion.button>
             {files.length > 0 && (
-              <motion.button
-                onClick={handleAddSelected}
-                className="flex items-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-indigo-600 to-purple-500 transition-all shadow-[0_0_12px_rgba(99,102,241,0.3)] hover:shadow-[0_0_18px_rgba(99,102,241,0.5)]"
-              >
-                <FaFileAlt /> Добавить выбранные
-              </motion.button>
+              <>
+                <motion.button
+                  onClick={handleAddSelected}
+                  className="flex items-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-indigo-600 to-purple-500 transition-all shadow-[0_0_12px_rgba(99,102,241,0.3)] hover:shadow-[0_0_18px_rgba(99,102,241,0.5)]"
+                >
+                  <FaFileAlt /> Добавить выбранные
+                </motion.button>
+                <motion.button
+                  onClick={handleAddImportantFiles}
+                  className="flex items-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-blue-600 to-cyan-500 transition-all shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:shadow-[0_0_18px_rgba(0,255,157,0.5)]"
+                >
+                  <FaFileAlt /> Добавить основные файлы
+                </motion.button>
+              </>
             )}
           </div>
+          {contextUsed !== DEFAULT_CONTEXT && (
+            <div className="flex flex-col gap-2">
+              <h4 className="text-sm font-bold text-purple-400">Действия с контекстом</h4>
+              <motion.button
+                onClick={handleCopyContextToClipboard}
+                className="flex items-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-cyan-600 to-teal-500 transition-all shadow-[0_0_12px_rgba(6,182,212,0.3)] hover:shadow-[0_0_18px_rgba(6,182,212,0.5)]"
+              >
+                <FaClipboard /> Скопировать контекст
+              </motion.button>
+              {user?.id && (
+                <motion.button
+                  onClick={handleSendContextAsFile}
+                  className="flex items-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-teal-600 to-cyan-500 transition-all shadow-[0_0_12px_rgba(20,184,166,0.3)] hover:shadow-[0_0_18px_rgba(20,184,166,0.5)]"
+                >
+                  <FaTelegramPlane /> Отправить Context.txt
+                </motion.button>
+              )}
+            </div>
+          )}
           {analysisComplete && (
             <div className="flex flex-col gap-2">
               <h4 className="text-sm font-bold text-purple-400">Действия с анализом</h4>
@@ -573,6 +622,29 @@ ${txtOutput}
         </div>
       )}
 
+      {selectedFiles.size > 0 && (
+        <div className="mb-6 bg-gray-800 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.3)] relative z-10">
+          <h3 className="text-xl font-bold text-cyan-400 mb-3">Выбранные файлы</h3>
+          {Array.from(selectedFiles).map((path) => {
+            const file = files.find((f) => f.path === path);
+            if (!file) return null;
+            const lang = getLanguage(file.path);
+            return (
+              <div key={file.path} className="mb-4">
+                <h4 className="text-sm font-bold text-purple-400 mb-1">{file.path}</h4>
+                <SyntaxHighlighter
+                  language={lang}
+                  style={oneDark}
+                  customStyle={{ background: "#1f2937", padding: "0.75rem", borderRadius: "0.5rem", fontSize: "0.75rem" }}
+                >
+                  {file.content}
+                </SyntaxHighlighter>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {txtOutput && (
         <div className="mb-6 bg-gray-800 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.3)] relative z-10">
           <h3 className="text-xl font-bold text-cyan-400 mb-3">Полный TXT</h3>
@@ -581,19 +653,6 @@ ${txtOutput}
             readOnly
             className="w-full h-80 p-3 bg-gray-900 text-gray-300 rounded-lg text-xs border border-gray-700 resize-none overflow-y-auto shadow-[0_0_8px_rgba(0,255,157,0.2)]"
           />
-        </div>
-      )}
-
-      {selectedOutput && (
-        <div className="mb-6 bg-gray-800 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.3)] relative z-10">
-          <h3 className="text-xl font-bold text-cyan-400 mb-3">Выбранный TXT</h3>
-          <SyntaxHighlighter
-            language="typescript"
-            style={oneDark}
-            customStyle={{ background: "#1f2937", padding: "0.75rem", borderRadius: "0.5rem", maxHeight: "40rem", overflowY: "auto", fontSize: "0.75rem" }}
-          >
-            {selectedOutput}
-          </SyntaxHighlighter>
         </div>
       )}
 
