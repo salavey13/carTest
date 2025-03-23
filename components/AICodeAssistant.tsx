@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import { createGitHubPullRequest, getOpenPullRequests, notifyAdmin } from "@/app/actions_github/actions";
+import { createGitHubPullRequest, getOpenPullRequests } from "@/app/actions_github/actions";
+import { notifyAdmin } from "@/app/actions";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
 import { saveAs } from "file-saver";
