@@ -68,22 +68,51 @@ body {
   }
 }
 
-/* Existing glitch animation */
+/* Improved glitch animation */
 @keyframes glitch {
-  0% { transform: translate(0); }
-  20% { transform: translate(-2px, 2px); }
-  40% { transform: translate(2px, -2px); }
-  60% { transform: translate(-2px, -2px); }
-  80% { transform: translate(2px, 2px); }
-  100% { transform: translate(0); }
-}
-.animate-glitch {
-  animation: glitch 0.3s infinite alternate;
-}
-.animate-glitch:hover {
-  animation: glitch 0.1s infinite alternate;
+  0% {
+    transform: translate(0);
+    opacity: 1;
+    filter: blur(0);
+  }
+  10% {
+    transform: translate(-1px, 1px) skew(2deg);
+    opacity: 0.95;
+    filter: blur(0.5px);
+  }
+  20% {
+    transform: translate(1px, -1px) skew(-2deg);
+    opacity: 0.9;
+  }
+  30% {
+    transform: translate(0);
+    opacity: 1;
+    filter: blur(0);
+  }
+  50% {
+    transform: translate(-1px, 0) scale(1.01);
+    opacity: 0.85;
+    filter: blur(1px);
+  }
+  60% {
+    transform: translate(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0);
+    opacity: 1;
+    filter: blur(0);
+  }
 }
 
+.animate-glitch {
+  animation: glitch 1.5s infinite ease-in-out; /* Slower and smoother */
+}
+
+.animate-glitch:hover {
+  animation: glitch 0.5s infinite ease-in-out; /* Faster on hover, but still controlled */
+  box-shadow: 0 0 15px rgba(57, 255, 20, 0.8); /* Extra neon pop */
+}
 /* Ticker animation */
 @keyframes ticker {
   0% { transform: translateX(100%); }
