@@ -1,4 +1,3 @@
-// /app/actions_github/actions.ts
 "use server";
 import { Octokit } from "@octokit/rest";
 import { notifyAdmins } from "@/app/actions";
@@ -8,11 +7,93 @@ interface FileNode {
   content: string;
 }
 
+interface FileInfo {
+  path: string;
+  download_url: string;
+}
+
 function parseRepoUrl(repoUrl: string) {
   const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/);
   if (!match) throw new Error("Invalid GitHub repo URL");
   return { owner: match[1], repo: match[2] };
 }
+
+// New function to fetch repository contents server-side
+export async function fetchRepoContents(repoUrl: string, customToken?: string) {
+  try {
+    const token = customToken || process.env.GITHUB_TOKEN;
+    if (!token) throw new Error("GitHub token is missing");
+
+    const { owner, repo } = parseRepoUrl(repoUrl);
+    const octokit = new Octokit({ auth: token });
+
+    const allowedExtensions = [".ts", ".tsx", ".css"];
+
+    async function collectFiles(path: string = ""): Promise<FileInfo[]> {
+      const { data: contents } = await octokit.repos.getContent({
+        owner,
+        repo,
+        path,
+      });
+
+      let fileInfos: FileInfo[] = [];
+
+      for (const item of contents) {
+        if (
+          item.type === "file" &&
+          allowedExtensions.some((ext) => item.path.endsWith(ext)) &&
+          !item.path.startsWith("components/ui/") &&
+          !item.path.endsWith(".sql")
+        ) {
+          fileInfos.push({ path: item.path, download_url: item.download_url });
+        } else if (item.type === "dir") {
+          const subFiles = await collectFiles(item.path);
+          fileInfos = fileInfos.concat(subFiles);
+        }
+      }
+      return fileInfos;
+    }
+
+    const fileInfos = await collectFiles();
+
+    const files: FileNode[] = await Promise.all(
+      fileInfos.map(async (fileInfo) => {
+        const response = await fetch(fileInfo.download_url, {
+          headers: { Authorization: `token ${token}` },
+        });
+        if (!response.ok) throw new Error(`Failed to fetch ${fileInfo.path}: ${response.statusText}`);
+        const content = await response.text();
+        const contentLines = content.split("\n");
+        let pathComment: string;
+        if (fileInfo.path.endsWith(".ts") || fileInfo.path.endsWith(".tsx")) {
+          pathComment = `// /${fileInfo.path}`;
+        } else if (fileInfo.path.endsWith(".css")) {
+          pathComment = `/* /${fileInfo.path} */`;
+        } else {
+          pathComment = `# /${fileInfo.path}`;
+        }
+        if (contentLines[0] && contentLines[0].match(/^(\/\/|\/\*|#)/)) {
+          contentLines[0] = pathComment;
+        } else {
+          contentLines.unshift(pathComment);
+        }
+        return { path: fileInfo.path, content: contentLines.join("\n") };
+      })
+    );
+
+    return { success: true, files };
+  } catch (error) {
+    console.error("Error fetching repo contents:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
+
+
+
 
 export async function createGitHubPullRequest(
   repoUrl: string,
@@ -251,4 +332,3 @@ export async function closePullRequest(repoUrl: string, pullNumber: number) {
     };
   }
 }
-
