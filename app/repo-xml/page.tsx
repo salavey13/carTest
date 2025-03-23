@@ -1,8 +1,7 @@
-// /app/repo-xml/page.tsx
 "use client";
 import React from "react";
-import CozeExecutor from "@/components/CozeExecutor";
 import RepoTxtFetcher from "@/components/RepoTxtFetcher";
+import CozeExecutor from "@/components/CozeExecutor";
 
 export default function RepoXmlPage() {
   return (
@@ -39,14 +38,34 @@ export default function RepoXmlPage() {
             </svg>
           </div>
           <h1 className="text-4xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse">
-            Грок пришел, наслаждайтесь своими бесконечными желаниями
+            Грок здесь, чтобы исполнить ваши кодовые мечты!
           </h1>
           <p className="text-lg text-gray-300 mt-2">
-            Создайте подстраницу для этого демо веб-приложения и назначьте ее на свое собственное веб-приложение для быстрого старта, принося МНЕ деньги - или украдите всю настройку и назначьте своего собственного бота;)
+            Добро пожаловать в мир автоматизации! Это демо покажет, как легко извлечь код из GitHub и создать что-то крутое с помощью бота. Не бойтесь странных названий вроде "RepoTxtFetcher" или "CozeExecutor" — это просто имена, которые мы придумали для удобства. Страницы лежат в папке `app`, а компоненты — в `components`. Всё просто, правда?
           </p>
         </section>
-        <CozeExecutor />
+
+        <section className="mb-12 text-center">
+          <h2 className="text-2xl font-bold text-cyan-400 mb-4">
+            Шаг 1: Сформулируйте запрос для бота с контекстом
+          </h2>
+          <p className="text-gray-300 text-sm max-w-2xl mx-auto">
+            Сначала подумайте, что вы хотите сделать. Например: "Добавить кнопку на сайт" или "Исправить баг в коде". Запишите это в поле ниже в "Kwork в Бота". Чтобы бот понял, о чём речь, ему нужен контекст — код вашего проекта. Давайте его извлечём!
+          </p>
+        </section>
+
         <RepoTxtFetcher />
+
+        <section className="mb-12 text-center">
+          <h2 className="text-2xl font-bold text-cyan-400 mb-4">
+            Шаг 2: Вставьте результат в исполнителя
+          </h2>
+          <p className="text-gray-300 text-sm max-w-2xl mx-auto">
+            После того как вы извлекли код и получили анализ от бота (смотрите "Полный TXT" или отправьте себе "Context.txt"), скопируйте результат. Затем вставьте его в "CozeExecutor" ниже, чтобы бот написал новый код или создал Pull Request на GitHub. Всё готово для магии!
+          </p>
+        </section>
+
+        <CozeExecutor />
       </div>
     </>
   );
