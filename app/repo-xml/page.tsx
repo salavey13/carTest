@@ -21,7 +21,7 @@ export default function RepoXmlPage() {
               <circle cx="50" cy="50" r="20" fill="url(#robotFill)" stroke="url(#robotStroke)" stroke-width="2" />
               <circle cx="40" cy="45" r="3" fill="#E1FF01" />
               <circle cx="60" cy="45" r="3" fill="#E1FF01" />
-              <rect x="35" y="60" width="30" height="5" fill="#E1FF01" />
+              <rect x="35" y="42" width="30" height="5" fill="#E1FF01" />
               <text x="100" y="60" font-size="40" fill="url(#moneyFill)">💸</text>
               <defs>
                 <radialGradient id="bgGlow">
@@ -47,11 +47,38 @@ export default function RepoXmlPage() {
             Грок здесь, чтобы исполнить ваши кодовые мечты!
           </h1>
           <p className="text-lg text-gray-300 mt-2">
-            Добро пожаловать в мир автоматизации! Это демо покажет, как легко извлечь код из GitHub и создать что-то крутое с помощью бота.Страницы лежат в папке `app`, а компоненты — в `components`. Всё просто, правда?
+            Добро пожаловать в мир автоматизации! Это демо покажет, как легко извлечь код из GitHub и создать что-то крутое с помощью бота. Страницы лежат в папке `app`, а компоненты — в `components`. Всё просто, правда?
           </p>
           <p className="text-sm text-red-400 mt-4 bg-gray-800 p-2 rounded-lg">
-            ⚠️ Внимание: встроенный бот сейчас без денег, поэтому для анализа используйте t.me/oneSitePlsBot в Telegram (t.me/webanybot), а для разработки — Grok. Спасибо за понимание! ;)
-          </p>
+  ⚠️ Внимание: встроенный бот сейчас без денег, поэтому для анализа используйте{" "}
+  <a
+    href="https://t.me/oneSitePlsBot"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="text-blue-400 underline hover:text-blue-300 transition"
+  >
+    t.me/oneSitePlsBot
+  </a>{" "}
+  в Telegram (
+  <a
+    href="https://t.me/webanybot"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="text-blue-400 underline hover:text-blue-300 transition"
+  >
+    t.me/webanybot
+  </a>
+  ), а для разработки —{" "}
+  <a
+    href="https://grok.com"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="text-blue-400 underline hover:text-blue-300 transition"
+  >
+    Grok
+  </a>
+  . Спасибо за понимание! ;)
+</p>
         </section>
 
         {/* Step 1: Formulate Request */}
