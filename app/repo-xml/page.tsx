@@ -21,7 +21,7 @@ export default function RepoXmlPage() {
               <circle cx="50" cy="50" r="20" fill="url(#robotFill)" stroke="url(#robotStroke)" stroke-width="2" />
               <circle cx="40" cy="45" r="3" fill="#E1FF01" />
               <circle cx="60" cy="45" r="3" fill="#E1FF01" />
-              <rect x="35" y="42" width="30" height="5" fill="#E1FF01" />
+              <rect x="35" y="50" width="30" height="5" fill="#E1FF01" />
               <text x="100" y="60" font-size="40" fill="url(#moneyFill)">💸</text>
               <defs>
                 <radialGradient id="bgGlow">
