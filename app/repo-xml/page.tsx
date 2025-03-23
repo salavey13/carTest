@@ -2,13 +2,19 @@
 import React from "react";
 import RepoTxtFetcher from "@/components/RepoTxtFetcher";
 import CozeExecutor from "@/components/CozeExecutor";
+import { FaRobot, FaFileCode, FaCode } from "react-icons/fa";
 
 export default function RepoXmlPage() {
+  const scrollToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
     <>
       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
-      <div className="min-h-screen bg-gray-900 p-6 pt-24">
-        <section className="mb-12 text-center">
+      <div className="min-h-screen bg-gray-900 p-6 pt-24 text-white flex flex-col items-center relative">
+        {/* Intro Section */}
+        <section id="intro" className="mb-12 text-center max-w-2xl">
           <div className="flex justify-center mb-4">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" className="w-24 h-12">
               <circle cx="50" cy="50" r="45" fill="none" stroke="url(#bgGlow)" stroke-width="10" opacity="0.3" />
@@ -43,29 +49,79 @@ export default function RepoXmlPage() {
           <p className="text-lg text-gray-300 mt-2">
             Добро пожаловать в мир автоматизации! Это демо покажет, как легко извлечь код из GitHub и создать что-то крутое с помощью бота. Не бойтесь странных названий вроде "RepoTxtFetcher" или "CozeExecutor" — это просто имена, которые мы придумали для удобства. Страницы лежат в папке `app`, а компоненты — в `components`. Всё просто, правда?
           </p>
+          <p className="text-sm text-red-400 mt-4 bg-gray-800 p-2 rounded-lg">
+            ⚠️ Внимание: встроенный бот сейчас без денег, поэтому для анализа используйте @oneSitePlsBot в Telegram, а для разработки — Grok. Спасибо за понимание! ;)
+          </p>
         </section>
 
-        <section className="mb-12 text-center">
+        {/* Step 1: Formulate Request */}
+        <section id="step1" className="mb-12 text-center max-w-2xl">
           <h2 className="text-2xl font-bold text-cyan-400 mb-4">
             Шаг 1: Сформулируйте запрос для бота с контекстом
           </h2>
-          <p className="text-gray-300 text-sm max-w-2xl mx-auto">
+          <p className="text-gray-300 text-sm">
             Сначала подумайте, что вы хотите сделать. Например: "Добавить кнопку на сайт" или "Исправить баг в коде". Запишите это в поле ниже в "Kwork в Бота". Чтобы бот понял, о чём речь, ему нужен контекст — код вашего проекта. Давайте его извлечём!
           </p>
         </section>
 
-        <RepoTxtFetcher />
+        {/* RepoTxtFetcher Section */}
+        <section id="extractor" className="mb-12 w-full max-w-2xl">
+          <RepoTxtFetcher />
+        </section>
 
-        <section className="mb-12 text-center">
+        {/* Step 2: Paste into Executor */}
+        <section id="step2" className="mb-12 text-center max-w-2xl">
           <h2 className="text-2xl font-bold text-cyan-400 mb-4">
             Шаг 2: Вставьте результат в исполнителя
           </h2>
-          <p className="text-gray-300 text-sm max-w-2xl mx-auto">
+          <p className="text-gray-300 text-sm">
             После того как вы извлекли код и получили анализ от бота (смотрите "Полный TXT" или отправьте себе "Context.txt"), скопируйте результат. Затем вставьте его в "CozeExecutor" ниже, чтобы бот написал новый код или создал Pull Request на GitHub. Всё готово для магии!
           </p>
         </section>
 
-        <CozeExecutor />
+        {/* CozeExecutor Section */}
+        <section id="executor" className="mb-12 w-full max-w-2xl pb-16">
+          <CozeExecutor />
+        </section>
+
+        {/* Fixed Navigation Icons */}
+        <nav className="fixed right-2 top-1/2 transform -translate-y-1/2 flex flex-col space-y-4">
+          <button
+            onClick={() => scrollToSection("intro")}
+            className="p-2 bg-gray-700 rounded-full hover:bg-gray-600 transition"
+            title="Введение"
+          >
+            <FaRobot className="text-lg" />
+          </button>
+          <button
+            onClick={() => scrollToSection("step1")}
+            className="p-2 bg-gray-700 rounded-full hover:bg-gray-600 transition"
+            title="Шаг 1: Запрос"
+          >
+            <FaFileCode className="text-lg" />
+          </button>
+          <button
+            onClick={() => scrollToSection("extractor")}
+            className="p-2 bg-gray-700 rounded-full hover:bg-gray-600 transition"
+            title="Экстрактор кода"
+          >
+            <FaCode className="text-lg" />
+          </button>
+          <button
+            onClick={() => scrollToSection("step2")}
+            className="p-2 bg-gray-700 rounded-full hover:bg-gray-600 transition"
+            title="Шаг 2: Исполнение"
+          >
+            <FaFileCode className="text-lg" />
+          </button>
+          <button
+            onClick={() => scrollToSection("executor")}
+            className="p-2 bg-gray-700 rounded-full hover:bg-gray-600 transition"
+            title="Исполнитель кода"
+          >
+            <FaRobot className="text-lg" />
+          </button>
+        </nav>
       </div>
     </>
   );
