@@ -667,7 +667,7 @@ export async function sendTelegramMessage(
 }
 
 /** Notifies an admin about a car-related action */
-export async function notifyAdmin(carId: string, message: string) {
+export async function notifyCarAdmin(carId: string, message: string) {
   const { data: car, error } = await supabaseAdmin
     .from("cars")
     .select("owner_id, image_url")
@@ -820,7 +820,7 @@ export async function updateCarStatus(carId: string, newStatus: string) {
     return;
   }
 
-  await notifyAdmin(carId, `Your car status has been updated to: ${newStatus}`);
+  await notifyCarAdmin(carId, `Your car status has been updated to: ${newStatus}`);
 }
 
 export async function createOrUpdateUser(user: {
