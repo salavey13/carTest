@@ -1,9 +1,8 @@
 "use client";
 import React, { useState } from "react";
-import axios from "axios";
 import { motion } from "framer-motion";
 import { runCozeAgent, notifyAdmin, sendTelegramMessage, sendTelegramDocument } from "@/app/actions";
-import { createGitHubPullRequest } from "@/app/actions_github/actions";
+import { createGitHubPullRequest, fetchRepoContents } from "@/app/actions_github/actions"; // Import new function
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -13,11 +12,6 @@ import { FaTree, FaKey, FaFileAlt, FaShareAlt, FaTelegramPlane, FaSave, FaLink, 
 interface FileNode {
   path: string;
   content: string;
-}
-
-interface FileInfo {
-  path: string;
-  download_url: string;
 }
 
 const RepoTxtFetcher: React.FC = () => {
@@ -52,8 +46,6 @@ const RepoTxtFetcher: React.FC = () => {
     "types/supabase.ts",
   ];
 
-  const allowedExtensions = [".ts", ".tsx", ".css"];
-
   const addToast = (message: string) => {
     const id = Date.now();
     setToasts((prev) => {
@@ -75,32 +67,6 @@ const RepoTxtFetcher: React.FC = () => {
     return "text";
   };
 
-  const collectFilePaths = async (owner: string, repo: string, path: string = ""): Promise<FileInfo[]> => {
-    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
-    const headers: any = { Accept: "application/vnd.github.v3+json" };
-    if (token) headers.Authorization = `token ${token}`;
-
-    const response = await axios.get(url, { headers });
-    const contents = response.data;
-
-    let fileInfos: FileInfo[] = [];
-
-    for (const item of contents) {
-      if (
-        item.type === "file" &&
-        allowedExtensions.some((ext) => item.path.endsWith(ext)) &&
-        !item.path.startsWith("components/ui/") &&
-        !item.path.endsWith(".sql")
-      ) {
-        fileInfos.push({ path: item.path, download_url: item.download_url });
-      } else if (item.type === "dir") {
-        const subFileInfos = await collectFilePaths(owner, repo, item.path);
-        fileInfos = fileInfos.concat(subFileInfos);
-      }
-    }
-    return fileInfos;
-  };
-
   const handleFetch = async () => {
     setExtractLoading(true);
     setError(null);
@@ -113,40 +79,20 @@ const RepoTxtFetcher: React.FC = () => {
     addToast("Запускаю извлечение...");
 
     try {
-      const { owner, repo } = parseRepoUrl(repoUrl);
-      const fileInfos = await collectFilePaths(owner, repo);
-      const files: FileNode[] = [];
+      const result = await fetchRepoContents(repoUrl, token || undefined);
+      if (!result.success) {
+        throw new Error(result.error || "Не удалось загрузить содержимое репозитория");
+      }
 
-      const fetchPromises = fileInfos.map(async (fileInfo, index) => {
-        try {
-          const contentResponse = await axios.get(fileInfo.download_url);
-          const contentLines = contentResponse.data.split("\n");
-          let pathComment: string;
-          if (fileInfo.path.endsWith(".ts") || fileInfo.path.endsWith(".tsx")) {
-            pathComment = `// /${fileInfo.path}`;
-          } else if (fileInfo.path.endsWith(".css")) {
-            pathComment = `/* /${fileInfo.path} */`;
-          } else {
-            pathComment = `# /${fileInfo.path}`;
-          }
-          if (contentLines[0] && contentLines[0].match(/^(\/\/|\/\*|#)/)) {
-            contentLines[0] = pathComment;
-          } else {
-            contentLines.unshift(pathComment);
-          }
-          setProgress(((index + 1) / fileInfos.length) * 100);
-          return { path: fileInfo.path, content: contentLines.join("\n") };
-        } catch (contentErr) {
-          console.error(`Ошибка загрузки ${fileInfo.path}:`, contentErr);
-          addToast(`Ошибка: ${fileInfo.path} не загружен`);
-          return null;
-        }
+      const files = result.files;
+      setFiles(files);
+
+      // Simulate progress for UI feedback
+      const totalFiles = files.length;
+      files.forEach((_, index) => {
+        setTimeout(() => setProgress(((index + 1) / totalFiles) * 100), index * 50);
       });
 
-      const fetchResults = await Promise.all(fetchPromises);
-      files.push(...fetchResults.filter((file): file is FileNode => file !== null));
-
-      setFiles(files);
       const txt = generateTxt(files);
       setTxtOutput(txt);
       addToast("Извлечение завершено!");
@@ -226,7 +172,7 @@ const RepoTxtFetcher: React.FC = () => {
       const response = await runCozeAgent(botId, userId, fullInput);
       setTxtOutput(response);
       setAnalysisComplete(true);
-      addToast("А Bucharestализ завершен!");
+      addToast("Анализ завершен!");
     } catch (err) {
       setError("Ошибка генерации запроса для бота.");
       addToast("Ошибка: Генерация не удалась!");
@@ -385,7 +331,6 @@ ${txtOutput}
       })
       .concat(files.filter((file) => file.path === "contexts/AppContext.tsx"));
 
-    const { owner, repo } = parseRepoUrl(repoUrl);
     const branchName = `cyber-swap-matrix-${Date.now()}`;
 
     try {
