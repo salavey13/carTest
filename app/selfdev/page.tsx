@@ -8,7 +8,7 @@ import { useState, useEffect } from "react";
 import { supabaseAdmin } from "@/hooks/supabase";
 import {
   Zap,
-  Wrench, // Replaced Tool with Wrench (Tool might not exist or is misnamed)
+  Wrench,
   Bot,
   Search,
   Star,
@@ -22,12 +22,12 @@ import {
   EyeOff,
   Sparkles,
   Infinity,
-} from "lucide-react"; // Explicit imports
+} from "lucide-react";
 
 // Map boost types to Lucide icons
 const boostIcons = {
   priority_review: Zap,
-  cyber_extractor_pro: Wrench, // Using Wrench instead of Tool
+  cyber_extractor_pro: Wrench,
   custom_command: Bot,
   ai_code_review: Search,
   neon_avatar: Star,
@@ -46,32 +46,57 @@ const boostIcons = {
 // Top boosts for extra glow
 const topBoosts = ["tsunami_rider", "cyber_garage_key", "infinite_extract"];
 
+// Boosts data (moved outside to avoid redefinition)
+const boosts = [
+  { type: "priority_review", title: "Пропуск на Приоритетный Обзор", desc: "Твой PR вливается за 24 часа!", amount: 50 },
+  { type: "cyber_extractor_pro", title: "Кибер-Экстрактор Про", desc: "Полное дерево проекта + AI-подсказки.", amount: 100 },
+  { type: "custom_command", title: "Кастомная Команда Бота", desc: "Персональная команда для бота.", amount: 200 },
+  { type: "ai_code_review", title: "AI Обзор Кода", desc: "Grok проверяет твой код.", amount: 75 },
+  { type: "neon_avatar", title: "Неоновый Аватар", desc: "Кастомный киберпанк-аватар.", amount: 150 },
+  { type: "vibe_session", title: "Сессия Менторства VIBE", desc: "1-на-1 со мной по VIBE!", amount: 300 },
+  { type: "ar_tour_generator", title: "Генератор AR-Туров", desc: "AI создаёт AR-туры для тачек.", amount: 250 },
+  { type: "code_warp_drive", title: "Кодовый Варп-Двигатель", desc: "Бот пишет фичу за 12 часов.", amount: 400 },
+  { type: "cyber_garage_key", title: "Ключ VIP Кибер-Гаража", desc: "Доступ к премиум-тачкам.", amount: 500 },
+  { type: "tsunami_rider", title: "Значок Всадника Цунами", desc: "Элита + приоритет в очередях.", amount: 1000 },
+  { type: "bot_overclock", title: "Оверклок Бота", desc: "Удвой скорость бота на 30 дней.", amount: 600 },
+  { type: "neural_tuner", title: "Нейронный Тюнер", desc: "AI подбирает тачки по вайбу.", amount: 350 },
+  { type: "repo_stealth_mode", title: "Режим Стелс Репозитория", desc: "Скрой свои PR от других.", amount: 200 },
+  { type: "glitch_fx_pack", title: "Пакет Глитч-Эффектов", desc: "Эффекты для твоих страниц.", amount: 120 },
+  { type: "infinite_extract", title: "Бесконечный Экстрактор", desc: "Извлечение без лимитов.", amount: 800 },
+];
+
 export default function SelfDevPage() {
   const { user } = useAppContext();
-  const chatId = user?.id;
+  const [isMounted, setIsMounted] = useState(false); // Prevent SSR issues
   const [xtrEarned, setXtrEarned] = useState(0);
   const [recentPurchases, setRecentPurchases] = useState<string[]>([]);
 
   // Randomize Boost of the Day based on date
   const getBoostOfTheDay = () => {
-    const boostsList = boosts.map(b => b.type);
-    const daySeed = new Date().toDateString(); // Unique per day
+    const daySeed = new Date().toDateString();
     const seed = daySeed.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const randomIndex = seed % boostsList.length;
-    return boostsList[randomIndex];
+    const randomIndex = seed % boosts.length;
+    return boosts[randomIndex].type;
   };
   const boostOfTheDay = getBoostOfTheDay();
 
+  // Ensure client-side mounting
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Mock XTR earnings simulation
   useEffect(() => {
+    if (!isMounted) return;
     const interval = setInterval(() => {
       setXtrEarned((prev) => Math.min(prev + Math.floor(Math.random() * 50), 1000));
     }, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isMounted]);
 
   // Fetch recent purchases from Supabase
   useEffect(() => {
+    if (!isMounted) return;
     const fetchRecentPurchases = async () => {
       const { data, error } = await supabaseAdmin
         .from("invoices")
@@ -103,10 +128,10 @@ export default function SelfDevPage() {
     return () => {
       supabaseAdmin.removeChannel(channel);
     };
-  }, []);
+  }, [isMounted]);
 
   const buyBoost = async (type: string, amount: number, title: string, description: string) => {
-    if (!chatId) {
+    if (!user?.id) {
       toast.error("Ошибка: Не удалось найти твой ID. Залогинься, братан!");
       return;
     }
@@ -114,7 +139,7 @@ export default function SelfDevPage() {
     const payload = `selfdev_boost_${type}_${Date.now()}`;
     const finalAmount = type === boostOfTheDay ? Math.floor(amount * 0.8) : amount;
 
-    const result = await sendTelegramInvoice(chatId, title, description, payload, finalAmount, 0);
+    const result = await sendTelegramInvoice(user.id, title, description, payload, finalAmount, 0);
     if (result.success) {
       toast.success(`Счёт за "${title}" отправлен! Плати ${finalAmount} XTR в Telegram, бро!`);
     } else {
@@ -122,23 +147,9 @@ export default function SelfDevPage() {
     }
   };
 
-  const boosts = [
-    { type: "priority_review", title: "Пропуск на Приоритетный Обзор", desc: "Твой PR вливается за 24 часа!", amount: 50 },
-    { type: "cyber_extractor_pro", title: "Кибер-Экстрактор Про", desc: "Полное дерево проекта + AI-подсказки.", amount: 100 },
-    { type: "custom_command", title: "Кастомная Команда Бота", desc: "Персональная команда для бота.", amount: 200 },
-    { type: "ai_code_review", title: "AI Обзор Кода", desc: "Grok проверяет твой код.", amount: 75 },
-    { type: "neon_avatar", title: "Неоновый Аватар", desc: "Кастомный киберпанк-аватар.", amount: 150 },
-    { type: "vibe_session", title: "Сессия Менторства VIBE", desc: "1-на-1 со мной по VIBE!", amount: 300 },
-    { type: "ar_tour_generator", title: "Генератор AR-Туров", desc: "AI создаёт AR-туры для тачек.", amount: 250 },
-    { type: "code_warp_drive", title: "Кодовый Варп-Двигатель", desc: "Бот пишет фичу за 12 часов.", amount: 400 },
-    { type: "cyber_garage_key", title: "Ключ VIP Кибер-Гаража", desc: "Доступ к премиум-тачкам.", amount: 500 },
-    { type: "tsunami_rider", title: "Значок Всадника Цунами", desc: "Элита + приоритет в очередях.", amount: 1000 },
-    { type: "bot_overclock", title: "Оверклок Бота", desc: "Удвой скорость бота на 30 дней.", amount: 600 },
-    { type: "neural_tuner", title: "Нейронный Тюнер", desc: "AI подбирает тачки по вайбу.", amount: 350 },
-    { type: "repo_stealth_mode", title: "Режим Стелс Репозитория", desc: "Скрой свои PR от других.", amount: 200 },
-    { type: "glitch_fx_pack", title: "Пакет Глитч-Эффектов", desc: "Эффекты для твоих страниц.", amount: 120 },
-    { type: "infinite_extract", title: "Бесконечный Экстрактор", desc: "Извлечение без лимитов.", amount: 800 },
-  ];
+  if (!isMounted) {
+    return null; // Prevent SSR rendering until mounted
+  }
 
   return (
     <div className="relative min-h-screen">
@@ -157,7 +168,7 @@ export default function SelfDevPage() {
           <circle cx="500" cy="500" r="300" stroke="#39FF14" strokeWidth="1" fill="none" opacity="0.3" />
         </svg>
       </div>
-      <div className="relative z-10 container mx-auto p-4 pt-24">
+      <div className="relative z-10 container mx-auto p-4 pt-24"> {/* Added pt-24 */}
         <Card className="max-w-4xl mx-auto bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
           <CardHeader>
             <CardTitle className="text-2xl md:text-4xl font-bold text-center text-[#39FF14] cyber-text">
