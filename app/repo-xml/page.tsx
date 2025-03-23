@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import RepoTxtFetcher from "@/components/RepoTxtFetcher";
-import CozeExecutor from "@/components/CozeExecutor";
+import AICodeAssistant from "@/components/AICodeAssistant";
 import { FaRobot, FaFileCode, FaCode } from "react-icons/fa";
 
 export default function RepoXmlPage() {
@@ -47,10 +47,10 @@ export default function RepoXmlPage() {
             Грок здесь, чтобы исполнить ваши кодовые мечты!
           </h1>
           <p className="text-lg text-gray-300 mt-2">
-            Добро пожаловать в мир автоматизации! Это демо покажет, как легко извлечь код из GitHub и создать что-то крутое с помощью бота. Не бойтесь странных названий вроде "RepoTxtFetcher" или "CozeExecutor" — это просто имена, которые мы придумали для удобства. Страницы лежат в папке `app`, а компоненты — в `components`. Всё просто, правда?
+            Добро пожаловать в мир автоматизации! Это демо покажет, как легко извлечь код из GitHub и создать что-то крутое с помощью бота.Страницы лежат в папке `app`, а компоненты — в `components`. Всё просто, правда?
           </p>
           <p className="text-sm text-red-400 mt-4 bg-gray-800 p-2 rounded-lg">
-            ⚠️ Внимание: встроенный бот сейчас без денег, поэтому для анализа используйте @oneSitePlsBot в Telegram, а для разработки — Grok. Спасибо за понимание! ;)
+            ⚠️ Внимание: встроенный бот сейчас без денег, поэтому для анализа используйте t.me/oneSitePlsBot в Telegram (t.me/webanybot), а для разработки — Grok. Спасибо за понимание! ;)
           </p>
         </section>
 
@@ -72,26 +72,26 @@ export default function RepoXmlPage() {
         {/* Step 2: Paste into Executor */}
         <section id="step2" className="mb-12 text-center max-w-2xl">
           <h2 className="text-2xl font-bold text-cyan-400 mb-4">
-            Шаг 2: Вставьте результат в исполнителя
+            Шаг 2: Вставьте результат в Бота исполнителя
           </h2>
           <p className="text-gray-300 text-sm">
-            После того как вы извлекли код и получили анализ от бота (смотрите "Полный TXT" или отправьте себе "Context.txt"), скопируйте результат. Затем вставьте его в "CozeExecutor" ниже, чтобы бот написал новый код или создал Pull Request на GitHub. Всё готово для магии!
+            После того как вы извлекли код и получили анализ от бота, скопируйте результат. Затем вставьте его ниже (или в Grok!), чтобы бот написал новый код - дальше создаш Pull Request на GitHub в клик. Всё готово для магии!
           </p>
         </section>
 
-        {/* CozeExecutor Section */}
+        {/* AICodeAssistant Section */}
         <section id="executor" className="mb-12 w-full max-w-2xl pb-16">
-          <CozeExecutor />
+          <AICodeAssistant />
         </section>
 
         {/* Fixed Navigation Icons */}
-        <nav className="fixed right-2 top-1/2 transform -translate-y-1/2 flex flex-col space-y-4">
+        <nav className="fixed right-2 top-1/2 transform -translate-y-1/2 flex flex-col space-y-4 z-13">
           <button
             onClick={() => scrollToSection("intro")}
             className="p-2 bg-gray-700 rounded-full hover:bg-gray-600 transition"
             title="Введение"
           >
-            <FaRobot className="text-lg" />
+            <FaCode className="text-lg" />
           </button>
           <button
             onClick={() => scrollToSection("step1")}
@@ -105,7 +105,7 @@ export default function RepoXmlPage() {
             className="p-2 bg-gray-700 rounded-full hover:bg-gray-600 transition"
             title="Экстрактор кода"
           >
-            <FaCode className="text-lg" />
+            <FaRobot className="text-lg" />
           </button>
           <button
             onClick={() => scrollToSection("step2")}
