@@ -53,6 +53,10 @@ body {
   box-sizing: border-box;
 }
 
+section {
+  scroll-margin-top: 96px; /* Matches pt-24 */
+}
+
 .repo-xml-content-wrapper {
   width: 100%;
   overflow-x: auto;
