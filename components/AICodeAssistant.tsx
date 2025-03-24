@@ -77,27 +77,61 @@ export default function AICodeAssistant() {
     loadData();
   }, [user]);
 
-  const parseFilesFromText = (text: string): FileEntry[] => {
-    const entries: FileEntry[] = [];
-    const codeBlocks = text.match(/^```[\s\S]*?^```/gm) || [];
-    codeBlocks.forEach((block) => {
-      const content = block.slice(3, -3).trim();
-      const lines = content.split("\n");
-      let codeStartIndex = 0;
-      let path: string | undefined;
-      for (let i = codeStartIndex; i < lines.length; i++) {
-        const match = lines[i].match(/^\s*\/\/\s*\/?(.+?\.(tsx|ts|sql|json))/);
+  interface FileEntry {
+  path: string;
+  content: string;
+  extension: string;
+}
+
+const parseFilesFromText = (text: string): FileEntry[] => {
+  const entries: FileEntry[] = [];
+
+  // Match all code blocks enclosed in triple backticks
+  const codeBlocks = text.match(/^```[\s\S]*?^```/gm) || [];
+
+  // Define comment patterns for different languages
+  const commentPatterns = [
+    /^\s*\/\/\s*\/?(.+?\.\w+)/,          // e.g., // /path/to/file.ts or // path/to/file.json
+    /^\s*--\s*\/?(.+?\.\w+)/,           // e.g., -- /path/to/file.sql
+    /^\s*\/\*\s*\/?(.+?\.\w+)\s*\*\//,  // e.g., /* /path/to/file.css */
+  ];
+
+  codeBlocks.forEach((block) => {
+    // Remove backticks and trim the content
+    const content = block.slice(3, -3).trim();
+    const lines = content.split("\n");
+
+    let path: string | undefined;
+    let codeStartIndex = 0;
+
+    // Search for the first line matching any comment pattern
+    for (let i = 0; i < lines.length; i++) {
+      for (const pattern of commentPatterns) {
+        const match = lines[i].match(pattern);
         if (match) {
-          path = match[1].trim();
-          codeStartIndex = i + 1;
+          path = match[1].trim(); // Extract the path from the capture group
+          codeStartIndex = i + 1; // Content starts on the next line
           break;
         }
       }
-      if (!path) path = `unnamed.txt`;
-      entries.push({ path, content: lines.slice(codeStartIndex).join("\n"), extension: path.split(".").pop() || "txt" });
+      if (path) break; // Exit outer loop once a path is found
+    }
+
+    // If no path is found, use default
+    if (!path) {
+      path = "unnamed.txt";
+    }
+
+    // Create the FileEntry
+    entries.push({
+      path,
+      content: lines.slice(codeStartIndex).join("\n"),
+      extension: path.split(".").pop() || "txt",
     });
-    return entries;
-  };
+  });
+
+  return entries;
+};
 
   const extractPRDetails = (rawText: string) => {
     let title = "Обновление от AI Code Assistant";
