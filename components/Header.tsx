@@ -7,7 +7,42 @@ import SemanticSearch from "@/components/SemanticSearch";
 import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 
-// Define the list of pages with their special logo texts
+// Define groups (feature packs) with display names, icons, and colors
+const groups = {
+  "SLY13": { displayName: "SLY13", icon: "🚀", color: "bg-blue-500" },
+  "RuliBeri": { displayName: "RuliBeri", icon: "🏎️", color: "bg-red-500" },
+  "9GAG": { displayName: "9GAG", icon: "😂", color: "bg-green-500" },
+  "YT": { displayName: "YT", icon: "🎥", color: "bg-yellow-500" },
+  "Tips": { displayName: "Tips", icon: "💡", color: "bg-purple-500" },
+  "CRM": { displayName: "CRM", icon: "📊", color: "bg-orange-500" },
+  "Dev": { displayName: "Dev", icon: "💻", color: "bg-pink-500" },
+  "Gifts": { displayName: "Gifts", icon: "🎁", color: "bg-teal-500" },
+};
+
+// Map pages to their groups and define display names
+const pageGroups: Record<string, string> = {
+  "/about": "SLY13",
+  "/admin": "RuliBeri",
+  "/botbusters": "9GAG",
+  "/bullshitdetector": "YT",
+  "/buy-subscription": "RuliBeri",
+  "/cyber-garage": "RuliBeri",
+  "/donate": "Tips",
+  "/invoices": "RuliBeri",
+  "/": "RuliBeri",
+  "/pavele0903": "CRM",
+  "/rent-car": "RuliBeri",
+  "/rent/[id]": "RuliBeri",
+  "/repo-xml": "Dev",
+  "/selfdev": "Dev",
+  "/shadow-fleet-admin": "RuliBeri",
+  "/style-guide": "Dev",
+  "/supercar-test": "RuliBeri",
+  "/tasks": "YT",
+  "/wheel-of-fortune": "Gifts",
+  "/youtubeAdmin": "YT",
+};
+
 const pageLogos: Record<string, string> = {
   "/about": "SLY13",
   "/admin": "RuliBeri",
@@ -20,7 +55,7 @@ const pageLogos: Record<string, string> = {
   "/": "RuliBeri",
   "/pavele0903": "CRM",
   "/rent-car": "RuliBeri",
-  "/rent/[id]": "RuliBeri", // Note: Dynamic routes might need special handling
+  "/rent/[id]": "RuliBeri",
   "/repo-xml": "Dev",
   "/selfdev": "Dev",
   "/shadow-fleet-admin": "RuliBeri",
@@ -30,6 +65,39 @@ const pageLogos: Record<string, string> = {
   "/wheel-of-fortune": "Gifts",
   "/youtubeAdmin": "YT",
 };
+
+const pageDisplayNames: Record<string, string> = {
+  "/about": "About",
+  "/admin": "Admin Panel",
+  "/botbusters": "Bot Busters",
+  "/bullshitdetector": "BS Detector",
+  "/buy-subscription": "Subscribe",
+  "/cyber-garage": "Cyber Garage",
+  "/donate": "Donate",
+  "/invoices": "Invoices",
+  "/": "Home",
+  "/pavele0903": "CRM Dashboard",
+  "/rent-car": "Rent a Car",
+  "/rent/[id]": "Car Details",
+  "/repo-xml": "XML Repo",
+  "/selfdev": "Self Dev",
+  "/shadow-fleet-admin": "Fleet Admin",
+  "/style-guide": "Style Guide",
+  "/supercar-test": "Supercar Test",
+  "/tasks": "Tasks",
+  "/wheel-of-fortune": "Wheel of Fortune",
+  "/youtubeAdmin": "YT Admin",
+};
+
+// Organize pages into grouped and ungrouped
+const uniqueGroups = Array.from(new Set(Object.values(pageGroups)));
+const groupedPages: Record<string, string[]> = {};
+uniqueGroups.forEach((group) => {
+  groupedPages[group] = Object.entries(pageGroups)
+    .filter(([_, g]) => g === group)
+    .map(([path]) => path);
+});
+const ungroupedPages = Object.keys(pageLogos).filter((path) => !pageGroups[path]);
 
 export default function Header() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -48,10 +116,10 @@ export default function Header() {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
 
-      if (currentScrollY > lastScrollY) {
-        // Scrolling down
+      if (currentScrollY > lastScrollY && currentScrollY > 50) {
+        // Scrolling down, hide only if past a small threshold
         setIsHeaderVisible(false);
-      } else {
+      } else if (currentScrollY < lastScrollY) {
         // Scrolling up
         setIsHeaderVisible(true);
       }
@@ -72,7 +140,6 @@ export default function Header() {
       setIsHeaderVisible(false);
     }, 2000);
 
-    // Cleanup on unmount
     return () => {
       window.removeEventListener("scroll", handleScroll);
       clearTimeout(timeoutId);
@@ -87,7 +154,7 @@ export default function Header() {
     >
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          {/* Logo with dropdown */}
+          {/* Logo with enhanced dropdown */}
           <div className="relative">
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -97,19 +164,50 @@ export default function Header() {
               {currentLogoText}
             </button>
             {isDropdownOpen && (
-              <div className="absolute top-full left-0 mt-2 w-48 bg-card border border-muted rounded shadow-lg">
+              <div className="absolute top-full left-0 mt-2 w-64 bg-card border border-muted rounded shadow-lg max-h-[80vh] overflow-y-auto">
                 <ul className="py-2">
-                  {Object.entries(pageLogos).map(([path, logoText]) => (
-                    <li key={path}>
-                      <Link
-                        href={path}
-                        className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
-                        onClick={() => setIsDropdownOpen(false)}
-                      >
-                        {logoText}
-                      </Link>
+                  {/* Grouped pages */}
+                  {uniqueGroups.map((group) => (
+                    <li key={group} className="mb-2">
+                      <div className={`px-4 py-2 text-sm font-bold text-white ${groups[group].color}`}>
+                        {groups[group].icon} {groups[group].displayName}
+                      </div>
+                      <ul>
+                        {groupedPages[group].map((path) => (
+                          <li key={path}>
+                            <Link
+                              href={path}
+                              className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
+                              onClick={() => setIsDropdownOpen(false)}
+                            >
+                              {pageDisplayNames[path]}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
                     </li>
                   ))}
+                  {/* Ungrouped pages */}
+                  {ungroupedPages.length > 0 && (
+                    <li className="mt-4">
+                      <div className="px-4 py-2 text-sm font-bold text-white bg-gray-500">
+                        Other
+                      </div>
+                      <ul>
+                        {ungroupedPages.map((path) => (
+                          <li key={path}>
+                            <Link
+                              href={path}
+                              className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
+                              onClick={() => setIsDropdownOpen(false)}
+                            >
+                              {pageDisplayNames[path]}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  )}
                 </ul>
               </div>
             )}
