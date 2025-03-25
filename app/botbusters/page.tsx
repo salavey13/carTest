@@ -12,40 +12,6 @@ import BotHuntingToolsSection from "@/components/PurchaseScriptsSection";
 import { translations } from "@/components/translations";
 
 
-// BotBustersHeader: Updated with cyberpunk styling
-function BotBustersHeader({ language, toggleLanguage }) {
-  return (
-    <header className="bg-gray-900 p-4 pt-24 sticky top-0 z-10 border-b border-gray-700">
-      <nav className="flex items-center container mx-auto">
-        <div className="text-xl font-bold text-cyan-400 font-orbitron">BotBusters</div>
-        <div className="flex overflow-x-auto space-x-4 ml-4 scrollbar-hide">
-          <Link href="#home" className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors">
-            Home
-          </Link>
-          <Link
-            href="#submit-blocklist"
-            className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors"
-          >
-            {translations[language].submitTitle}
-          </Link>
-          <Link href="#stats" className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors">
-            {translations[language].statsTitle}
-          </Link>
-          <Link
-            href="https://grok.com/share/bGVnYWN5_2d4f7c04-f5b5-43d9-a4ee-141b2c6130c2"
-            target="_blank"
-            className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors"
-          >
-            Dev Chat
-          </Link>
-        </div>
-        <Button onClick={toggleLanguage} className="ml-4 bg-gray-800 hover:bg-gray-700 text-white">
-          {language === "en" ? "RU" : "EN"}
-        </Button>
-      </nav>
-    </header>
-  );
-}
 
 // BotBustersHeroSection: Welcoming 9GAG users
 function BotBustersHeroSection({ language }) {
@@ -305,8 +271,33 @@ function BotBustersDailyStatsSection({ language }) {
     </section>
   );
 }
+// Add this new component after BotBustersDailyStatsSection
+function BotBustersVideoSection({ language }) {
+  return (
+    <section id="video" className="py-16 bg-gray-900">
+      <h2 className="text-3xl font-bold text-center mb-8 text-white font-orbitron">
+        {translations[language].videoTitle || "BotBusters in Action"}
+      </h2>
+      <div className="max-w-4xl mx-auto px-4">
+        <div className="relative" style={{ paddingBottom: '56.25%' /* 16:9 Aspect Ratio */ }}>
+          <iframe
+            className="absolute top-0 left-0 w-full h-full rounded-lg border-2 border-cyan-400 shadow-glow"
+            src="https://www.youtube.com/embed/CpVasSm-D9c"
+            title="BotBusters Video"
+            frameBorder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          ></iframe>
+        </div>
+        <p className="text-gray-300 text-center mt-4">
+          {translations[language].videoDescription || "Watch how BotBusters fights against spam and bots!"}
+        </p>
+      </div>
+    </section>
+  );
+}
 
-// Main BotBustersHome component
+// Modified main BotBustersHome component with video section added
 export default function BotBustersHome() {
   const { dbUser } = useAppContext();
   const [language, setLanguage] = useState("en");
@@ -322,6 +313,45 @@ export default function BotBustersHome() {
       {dbUser && <BotBustersBlocklistFormSection dbUser={dbUser} language={language} />}
       <BotHuntingToolsSection language={language} />
       <BotBustersDailyStatsSection language={language} />
+      <BotBustersVideoSection language={language} /> {/* Added video section */}
     </div>
+  );
+}
+
+// If you want to add navigation to the video section, update the BotBustersHeader:
+function BotBustersHeader({ language, toggleLanguage }) {
+  return (
+    <header className="bg-gray-900 p-4 pt-24 sticky top-0 z-10 border-b border-gray-700">
+      <nav className="flex items-center container mx-auto">
+        <div className="text-xl font-bold text-cyan-400 font-orbitron">BotBusters</div>
+        <div className="flex overflow-x-auto space-x-4 ml-4 scrollbar-hide">
+          <Link href="#home" className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors">
+            Home
+          </Link>
+          <Link
+            href="#submit-blocklist"
+            className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors"
+          >
+            {translations[language].submitTitle}
+          </Link>
+          <Link href="#stats" className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors">
+            {translations[language].statsTitle}
+          </Link>
+          <Link href="#video" className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors">
+            Video
+          </Link>
+          <Link
+            href="https://grok.com/share/bGVnYWN5_2d4f7c04-f5b5-43d9-a4ee-141b2c6130c2"
+            target="_blank"
+            className="text-white hover:text-cyan-300 whitespace-nowrap transition-colors"
+          >
+            Dev Chat
+          </Link>
+        </div>
+        <Button onClick={toggleLanguage} className="ml-4 bg-gray-800 hover:bg-gray-700 text-white">
+          {language === "en" ? "RU" : "EN"}
+        </Button>
+      </nav>
+    </header>
   );
 }
