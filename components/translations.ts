@@ -35,8 +35,12 @@ export const translations = {
     accessActivated: "Access Activated",
     viewScript: "View Automa Script",
     firstHunter: "Be the FIRST Hunter!",
+    videoTitle: "BotBusters in Action",
+    videoDescription: "Watch how BotBusters fights against spam and bots!"
   },
   ru: {
+    videoTitle: "BotBusters в действии",
+    videoDescription: "Посмотрите, как BotBusters борется со спамом и ботами!",
     toolsTitle: "Наши инструменты для борьбы с ботами",
     title: "Присоединяйтесь к борьбе с ботами на 9GAG!",
     description: "Помогите нам очистить 9GAG от ботов с помощью мощных инструментов и действий сообщества.",
