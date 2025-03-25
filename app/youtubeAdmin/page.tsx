@@ -56,6 +56,10 @@ export default function YoutubeAdminPage() {
 
   return (
     <div className="pt-24 p-4 bg-background min-h-screen">
+      <nav className="mt-8 flex justify-center space-x-4">
+        <Link href="/yt" className="text-blue-400 hover:underline">Characters</Link>
+        <Link href="/tasks" className="text-blue-400 hover:underline">Tasks</Link>
+      </nav>
       <h1 className="text-3xl font-bold text-primary mb-6">YouTube Admin Dashboard</h1>
 
       {/* Section 1: YouTube Video Upload */}
