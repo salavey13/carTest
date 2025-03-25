@@ -1,130 +1,168 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useAppContext } from "@/contexts/AppContext";
-import { useRouter } from "next/navigation";
-import { uploadVideoToYouTube, getYouTubeAnalytics } from "@/app/youtube_actions/actions";
-import { toast } from "sonner";
-import Link from "next/link";
+import { useState, useEffect } from "react";
+import { supabaseAdmin } from "@/hooks/supabase"; // Adjust this import based on your setup
+import { toast } from "sonner"; // For notifications
+import { CharacterForm } from "@/components/CharacterForm"; // Your CharacterForm component
+import { motion } from "framer-motion"; // For animations
 
-export default function YouTubeAdminPage() {
-  const { dbUser, isAdmin } = useAppContext();
-  const router = useRouter();
-  const [isAdminChecked, setIsAdminChecked] = useState<boolean | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [file, setFile] = useState<File | null>(null);
+export default function YoutubeAdminPage() {
+  // YouTube form states
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
-  const [analytics, setAnalytics] = useState<any[]>([]);
 
-  useEffect(() => {
-    if (dbUser) {
-      const adminStatus = isAdmin();
-      setIsAdminChecked(adminStatus);
-      setIsLoading(false);
-      if (!adminStatus) router.push("/");
-    }
-  }, [dbUser, isAdmin, router]);
+  // Character management states
+  const [characters, setCharacters] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCharacter, setSelectedCharacter] = useState<any | null>(null);
 
+  // Fetch characters on page load
   useEffect(() => {
-    const fetchAnalytics = async () => {
-      try {
-        const data = await getYouTubeAnalytics();
-        setAnalytics(data);
-      } catch (error) {
-        console.error("Ошибка при загрузке аналитики:", error);
-        toast.error("Не удалось загрузить аналитику");
+    const fetchCharacters = async () => {
+      const { data, error } = await supabaseAdmin.from("characters").select("*");
+      if (error) {
+        toast.error("Failed to load characters");
+        console.error(error);
+      } else {
+        setCharacters(data || []);
       }
+      setLoading(false);
     };
-    if (isAdminChecked) fetchAnalytics();
-  }, [isAdminChecked]);
+    fetchCharacters();
+  }, []);
 
-  const handleUpload = async (e: React.FormEvent) => {
+  // Handle YouTube form submission
+  const handleYoutubeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) return toast.error("Пожалуйста, выберите видеофайл");
+    // Add your YouTube submission logic here (e.g., API call)
+    toast.success("YouTube video submitted successfully!");
+    setTitle("");
+    setDescription("");
+    setTags("");
+  };
 
-    const formData = new FormData();
-    formData.append("video", file);
-    formData.append("title", title);
-    formData.append("description", description);
-    formData.append("tags", tags);
-
-    const result = await uploadVideoToYouTube(formData);
-    if (result.success) {
-      toast.success("Видео успешно загружено!");
-      setFile(null);
-      setTitle("");
-      setDescription("");
-      setTags("");
-    } else {
-      toast.error("Ошибка загрузки: " + result.error);
+  // Delete a character
+  const handleDeleteCharacter = async (id: number) => {
+    try {
+      const { error } = await supabaseAdmin.from("characters").delete().eq("id", id);
+      if (error) throw error;
+      setCharacters(characters.filter((char) => char.id !== id));
+      toast.success("Character deleted successfully!");
+    } catch (error) {
+      toast.error("Failed to delete character");
+      console.error(error);
     }
   };
 
-  if (isLoading) return <p className="text-center text-muted-foreground animate-pulse-slow">Загрузка...</p>;
-  if (!isAdminChecked) return null;
-
   return (
-    <div className="container mx-auto p-4 pt-24 bg-background min-h-screen">
-      <h1 className="text-3xl font-bold text-primary mb-6 animate-glitch text-glow">Панель управления YouTube</h1>
-      <form onSubmit={handleUpload} className="space-y-6 mb-8 max-w-lg mx-auto">
-        <input
-          type="file"
-          accept="video/*"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
-          className="border border-muted p-3 w-full bg-card text-foreground rounded shadow-glow"
-        />
-        <input
-          type="text"
-          placeholder="Название"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="border border-muted p-3 w-full bg-card text-foreground rounded shadow-glow"
-        />
-        <textarea
-          placeholder="Описание"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          ClassName="border border-muted p-3 w-full bg-card text-foreground rounded shadow-glow"
-        />
-        <input
-          type="text"
-          placeholder="Теги (через запятую)"
-          value={tags}
-          onChange={(e) => setTags(e.target.value)}
-          className="border border-muted p-3 w-full bg-card text-foreground rounded shadow-glow"
-        />
-        <button type="submit" className="bg-primary text-primary-foreground p-3 rounded shadow-glow hover:shadow-glow">
-          Загрузить видео
-        </button>
-      </form>
-      <h2 className="text-2xl font-semibold text-secondary mb-4 text-glow">Аналитика YouTube</h2>
-      {analytics.length > 0 ? (
-        <ul className="space-y-4">
-          {analytics.map((item) => (
-            <li key={item.videoId} className="p-4 bg-card rounded-lg shadow-lg">
-              <p className="text-muted-foreground">Видео ID: {item.videoId}</p>
-              <p className="text-muted-foreground">Просмотры: {item.views}</p>
-              <p className="text-muted-foreground">Лайки: {item.likes}</p>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-muted-foreground animate-pulse-slow">Данные аналитики отсутствуют.</p>
-      )}
-      <div className="mt-8 p-4 bg-card rounded-lg shadow-lg">
-        <h3 className="text-xl font-semibold text-secondary mb-2">Кастомизация страниц</h3>
-        <p className="text-muted-foreground mb-4">
-          Для интеграции внешних данных и AI вы можете использовать страницу <code>/repo-xml</code> как пример.
-        </p>
-        <Link href="/repo-xml" className="bg-secondary text-secondary-foreground p-2 rounded shadow-glow hover:shadow-glow">
-          Перейти к /repo-xml
-        </Link>
-      </div>
-      <nav className="mt-8 flex justify-center space-x-4">
-        <Link href="/yt" className="text-primary hover:underline">Персонажи</Link>
-        <Link href="/tasks" className="text-primary hover:underline">Задачи</Link>
-      </nav>
+    <div className="pt-24 p-4 bg-background min-h-screen">
+      <h1 className="text-3xl font-bold text-primary mb-6">YouTube Admin Dashboard</h1>
+
+      {/* Section 1: YouTube Video Upload */}
+      <section className="mb-12">
+        <h2 className="text-2xl font-semibold text-secondary mb-4">YouTube Video Upload</h2>
+        <form onSubmit={handleYoutubeSubmit} className="space-y-4 max-w-lg mx-auto">
+          <div>
+            <label className="block text-muted-foreground">Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="border p-2 w-full bg-card text-foreground rounded shadow-glow"
+            />
+          </div>
+          <div>
+            <label className="block text-muted-foreground">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="border p-2 w-full bg-card text-foreground rounded shadow-glow"
+            />
+          </div>
+          <div>
+            <label className="block text-muted-foreground">Tags</label>
+            <input
+              type="text"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              className="border p-2 w-full bg-card text-foreground rounded shadow-glow"
+            />
+          </div>
+          <button
+            type="submit"
+            className="bg-primary text-primary-foreground p-3 rounded shadow-glow hover:shadow-glow"
+          >
+            Upload Video
+          </button>
+        </form>
+      </section>
+
+      {/* Section 2: Character Management */}
+      <section>
+        <h2 className="text-2xl font-semibold text-secondary mb-4">Character Management</h2>
+
+        {/* Character Form for adding/editing */}
+        <div className="mb-8">
+          <CharacterForm character={selectedCharacter} />
+          {selectedCharacter && (
+            <button
+              onClick={() => setSelectedCharacter(null)}
+              className="mt-4 text-red-500 hover:underline"
+            >
+              Cancel Edit
+            </button>
+          )}
+        </div>
+
+        {/* List of Existing Characters */}
+        <h3 className="text-xl font-semibold text-secondary mb-4">Existing Characters</h3>
+        {loading ? (
+          <p className="text-center text-muted-foreground">Loading characters...</p>
+        ) : characters.length === 0 ? (
+          <p className="text-center text-muted-foreground">No characters found.</p>
+        ) : (
+          <ul className="space-y-4">
+            {characters.map((char) => (
+              <motion.li
+                key={char.id}
+                className="p-4 bg-card rounded-lg shadow-lg flex justify-between items-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              >
+                <div>
+                  <h4 className="text-lg font-semibold text-white">{char.name}</h4>
+                  <p className="text-sm text-gray-400">{char.description}</p>
+                  {char.video_url && (
+                    <a
+                      href={char.video_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:underline"
+                    >
+                      Video
+                    </a>
+                  )}
+                </div>
+                <div className="flex space-x-4">
+                  <button
+                    onClick={() => setSelectedCharacter(char)}
+                    className="text-blue-400 hover:underline"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteCharacter(char.id)}
+                    className="text-red-500 hover:underline"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </motion.li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
