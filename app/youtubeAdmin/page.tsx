@@ -4,6 +4,8 @@ import { supabaseAdmin } from "@/hooks/supabase"; // Adjust this import based on
 import { toast } from "sonner"; // For notifications
 import { CharacterForm } from "@/components/CharacterForm"; // Your CharacterForm component
 import { motion } from "framer-motion"; // For animations
+import Link from "next/link";
+
 
 export default function YoutubeAdminPage() {
   // YouTube form states
