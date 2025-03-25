@@ -155,7 +155,7 @@ export default function Header() {
 
   return (
     <motion.header
-      className={`fixed top-0 left-0 right-0 z-50 bg-card bg-opacity-80 border-b border-muted shadow-[0_0_15px_rgba(255,107,107,0.3)] backdrop-blur-md transition-transform duration-300 rounded-b-lg m-2 ${
+      className={`fixed top-0 left-0 right-0 z-50 bg-card bg-opacity-80 border-b border-muted shadow-[0_0_15px_rgba(255,107,107,0.3)] backdrop-blur-lg transition-transform duration-300 rounded-lg m-2 ${
         isHeaderVisible ? "translate-y-0" : "-translate-y-full"
       }`}
     >
