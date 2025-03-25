@@ -70,7 +70,8 @@
     "react-folder-tree": "latest",
     "file-saver": "latest",
     "jszip": "latest",
-    "@octokit/rest": "latest"
+    "@octokit/rest": "latest",
+    "googleapis": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
