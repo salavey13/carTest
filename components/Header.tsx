@@ -89,6 +89,9 @@ const pageDisplayNames: Record<string, string> = {
   "/youtubeAdmin": "YT Admin",
 };
 
+// Tooltip description for Dev pages
+const devTooltip = "These pages are the hidden pearls of the Vibe Coding Template—showcasing innovative dev tools and style guides that power our creative chaos!";
+
 // Organize pages into grouped and ungrouped
 const uniqueGroups = Array.from(new Set(Object.values(pageGroups)));
 const groupedPages: Record<string, string[]> = {};
@@ -109,15 +112,15 @@ export default function Header() {
   // Determine the current logo text based on the pathname
   const currentLogoText = pageLogos[pathname] || "RuliBeri";
 
-  // Handle scroll events and auto-hide header after 2 seconds
+  // Handle scroll events and auto-hide header after 2 seconds, unless dropdown or search is open
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
 
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
 
-      if (currentScrollY > lastScrollY && currentScrollY > 50) {
-        // Scrolling down, hide only if past a small threshold
+      if (currentScrollY > lastScrollY && currentScrollY > 50 && !isDropdownOpen && !isSearchOpen) {
+        // Scrolling down, hide only if past threshold and no dropdown/search
         setIsHeaderVisible(false);
       } else if (currentScrollY < lastScrollY) {
         // Scrolling up
@@ -126,29 +129,33 @@ export default function Header() {
 
       setLastScrollY(currentScrollY);
 
-      // Reset the timer on scroll
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        setIsHeaderVisible(false);
-      }, 2000);
+      // Reset the timer on scroll, but only if dropdown/search isn’t active
+      if (!isDropdownOpen && !isSearchOpen) {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          setIsHeaderVisible(false);
+        }, 2000);
+      }
     };
 
     window.addEventListener("scroll", handleScroll);
 
-    // Initial timer to hide header after 2 seconds
-    timeoutId = setTimeout(() => {
-      setIsHeaderVisible(false);
-    }, 2000);
+    // Initial timer to hide header after 2 seconds, unless dropdown/search is active
+    if (!isDropdownOpen && !isSearchOpen) {
+      timeoutId = setTimeout(() => {
+        setIsHeaderVisible(false);
+      }, 2000);
+    }
 
     return () => {
       window.removeEventListener("scroll", handleScroll);
       clearTimeout(timeoutId);
     };
-  }, [lastScrollY]);
+  }, [lastScrollY, isDropdownOpen, isSearchOpen]);
 
   return (
     <motion.header
-      className={`fixed top-0 left-0 right-0 z-50 bg-card border-b border-muted shadow-[0_0_15px_rgba(255,107,107,0.3)] backdrop-blur-md transition-transform duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-50 bg-card bg-opacity-80 border-b border-muted shadow-[0_0_15px_rgba(255,107,107,0.3)] backdrop-blur-md transition-transform duration-300 rounded-b-lg m-2 ${
         isHeaderVisible ? "translate-y-0" : "-translate-y-full"
       }`}
     >
@@ -174,14 +181,22 @@ export default function Header() {
                       </div>
                       <ul>
                         {groupedPages[group].map((path) => (
-                          <li key={path}>
+                          <li key={path} className="relative group">
                             <Link
                               href={path}
-                              className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
+                              className="block px-4 py-2 text-sm text-foreground hover:bg-muted flex items-center"
                               onClick={() => setIsDropdownOpen(false)}
                             >
                               {pageDisplayNames[path]}
+                              {group === "Dev" && (
+                                <span className="ml-2 text-pink-400">ℹ️</span>
+                              )}
                             </Link>
+                            {group === "Dev" && (
+                              <div className="absolute left-full top-0 mt-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                {devTooltip}
+                              </div>
+                            )}
                           </li>
                         ))}
                       </ul>
