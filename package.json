@@ -71,7 +71,8 @@
     "file-saver": "latest",
     "jszip": "latest",
     "@octokit/rest": "latest",
-    "googleapis": "latest"
+    "googleapis": "latest",
+    "react-dom-confetti": "latest",
   },
   "devDependencies": {
     "@types/node": "^22",
