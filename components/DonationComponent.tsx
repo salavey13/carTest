@@ -24,21 +24,30 @@ const confettiConfig = {
 
 const presetAmounts = [10, 25, 50, 100, 250];
 
+
 export default function DonationComponent() {
   const { dbUser, isAuthenticated } = useAppContext();
   const [starAmount, setStarAmount] = useState("10");
   const [feedbackText, setFeedbackText] = useState("");
-  const [language, setLanguage] = useState<"en" | "ru">("en");
+  const [language, setLanguage] = useState<"en" | "ru">(
+    dbUser?.language_code === 'ru' ? 'ru' : 'en'
+  );
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
+  useEffect(() => {
+    if (dbUser?.language_code) {
+      setLanguage(dbUser.language_code === 'ru' ? 'ru' : 'en');
+    }
+  }, [dbUser?.language_code]);
+
   const t = donationTranslations[language];
-  const benefits = donationBenefits?.map(benefit => ({
-  icon: benefit.icon,
-  title: benefit.title[language],
-  description: benefit.description[language]
-}));
+  const benefits = donationBenefits.map(benefit => ({
+    icon: benefit.icon,
+    title: benefit.title[language],
+    description: benefit.description[language]
+  }));
 
   useEffect(() => {
     const interval = setInterval(() => {
