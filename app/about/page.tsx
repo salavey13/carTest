@@ -70,6 +70,65 @@ export default function AboutPage() {
               </CardContent>
             </Card>
 
+            <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
+  <CardHeader>
+    <CardTitle className="text-lg md:text-xl font-semibold text-[#39FF14]">
+      VIBE CODING + SECURE DEVELOPMENT: Киберпанк-Алхимия
+    </CardTitle>
+  </CardHeader>
+  <CardContent>
+    <div className="mb-4">
+      <iframe 
+        width="100%" 
+        height="315" 
+        src="https://www.youtube.com/embed/Tw18-4U7mts" 
+        title="YouTube video player"
+        frameBorder="0" 
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+        allowFullScreen
+        className="rounded-lg shadow-[0_0_10px_#39FF14]"
+      ></iframe>
+    </div>
+
+    <p className="text-sm md:text-base mb-4">
+      <strong>VIBE CODING:</strong> В 2025 мир захватила эпидемия "виб-кодинга" - когда ты полностью отдаёшься потоку, 
+      используешь экспоненциальные технологии и забываешь, что код вообще существует. Но без должной безопасности 
+      это приводит к катастрофам:
+    </p>
+
+    <ul className="list-disc list-inside space-y-2 text-sm md:text-base mb-4">
+      <li>API-ключи сурэйпятся ботами</li>
+      <li>Базы данных заполняются мусором</li>
+      <li>Подписки обходятся через уязвимости</li>
+    </ul>
+
+    <p className="text-sm md:text-base mb-4">
+      <strong>Мой подход:</strong> 13 лет в security позволяют мне применять VIBE-методологию без этих рисков. 
+      Вот как я сочетаю скорость AI-разработки с надёжностью:
+    </p>
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-gray-900 p-4 rounded-lg border border-[#39FF14]/30">
+        <h4 className="font-bold text-[#39FF14] mb-2">1. AI + Security First</h4>
+        <p className="text-xs md:text-sm">Все AI-генерации автоматически проверяются через статический анализ и шаблоны OWASP</p>
+      </div>
+      <div className="bg-gray-900 p-4 rounded-lg border border-[#39FF14]/30">
+        <h4 className="font-bold text-[#39FF14] mb-2">2. Zero Trust Vibes</h4>
+        <p className="text-xs md:text-sm">Каждый PR проходит через автоматические тесты на уязвимости перед мержем</p>
+      </div>
+      <div className="bg-gray-900 p-4 rounded-lg border border-[#39FF14]/30">
+        <h4 className="font-bold text-[#39FF14] mb-2">3. Cyberpunk Git Flow</h4>
+        <p className="text-xs md:text-sm">История изменений защищена криптографически, а доступ контролируется через Telegram-бота</p>
+      </div>
+    </div>
+
+    <p className="text-sm md:text-base mt-4">
+      Хочешь научиться vibe-кодингу без компромиссов в безопасности? Заходи на <a href="/repo-xml" className="text-[#39FF14] hover:underline">/repo-xml</a> 
+      и смотри, как я интегрировал эти принципы в свой кибер-гараж!
+    </p>
+  </CardContent>
+</Card>
+
             {/* Paid Support */}
             <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
               <CardHeader>
