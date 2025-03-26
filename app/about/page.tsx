@@ -123,7 +123,7 @@ export default function AboutPage() {
     </div>
 
     <p className="text-sm md:text-base mt-4">
-      Хочешь научиться vibe-кодингу без компромиссов в безопасности? Заходи на <a href="/repo-xml" className="text-[#39FF14] hover:underline">/repo-xml</a> 
+      Хочешь научиться vibe-кодингу без компромиссов в безопасности? Заходи на <a href="/repo-xml" className="text-[#39FF14] hover:underline">/repo-xml </a> 
       и смотри, как я интегрировал эти принципы в свой кибер-гараж!
     </p>
   </CardContent>
