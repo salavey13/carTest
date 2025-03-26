@@ -31,13 +31,13 @@ export default function AboutPage() {
           <CardContent className="space-y-6">
             {/* Personal Info */}
             <div className="flex flex-col items-center space-y-4">
-              <Avatar className="w-24 h-24 md:w-32 md:h-32 border-2 border-[#39FF14]">
+              <Avatar className="w-32 h-32 md:w-36 md:h-36 border-2 border-[#39FF14]">
                 <AvatarImage src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix//135398606.png" alt="Павел Соловьёв" />
                 <AvatarFallback>ПС</AvatarFallback>
               </Avatar>
               <div className="text-center">
                 <h2 className="text-xl md:text-2xl font-bold text-[#39FF14]">Павел Соловьёв</h2>
-                <p className="text-sm md:text-base">Нижний Новгород, Россия</p>
+                <p className="text-sm md:text-base">Россия</p>
                 <div className="mt-4 space-y-2 text-sm md:text-base">
                   <p><strong>Email:</strong> <a href="mailto:salavey13@gmail.com" className="text-[#39FF14] hover:underline">salavey13@gmail.com</a></p>
                   <p><strong>Telegram:</strong> <a href="https://t.me/salavey13" target="_blank" className="text-[#39FF14] hover:underline">t.me/salavey13</a></p>
@@ -53,7 +53,7 @@ export default function AboutPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm md:text-base">
-                  Я — Павел Соловьёв, кибер-алхимик с 13+ годами опыта, прошедший путь от суровых Java-джунглей до вершин низкокодовых платформ вроде Framer и Supabase. Мой флагманский проект <strong>carTest</strong> — это не просто приложение, это твой серфборд, чтобы оседлать волны AI-цунами! Здесь ты найдёшь всё: от базовых функций до уникальной подстраницы <a href="/selfdev" className="text-[#39FF14] hover:underline">/selfdev</a>, где новички могут творить страницы с помощью ИИ через pull requests. Я основал <a href="https://onesitepls.framer.ai" target="_blank" className="text-[#39FF14] hover:underline">oneSitePls.framer.ai</a> и наставляю начинающих кодеров, помогая им взломать матрицу разработки.
+                  Я — Павел Соловьёв, кибер-алхимик с 13+ годами опыта, прошедший путь от суровых Java-джунглей до вершин низкокодовых платформ вроде Framer и Supabase. Мой флагманский проект <strong>carTest</strong> — это не просто приложение, это твой серфборд, чтобы оседлать волны AI-цунами! Здесь ты найдёшь всё: от базовых функций до уникальной подстраницы <a href="/repo-xml" className="text-[#39FF14] hover:underline">/repo-xml</a>, где новички могут творить страницы с помощью ИИ через pull requests. Я основал <a href="https://onesitepls.framer.ai" target="_blank" className="text-[#39FF14] hover:underline">oneSitePls.framer.ai</a> и наставляю начинающих кодеров, помогая им взломать матрицу разработки.
                 </p>
               </CardContent>
             </Card>
@@ -90,35 +90,35 @@ export default function AboutPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm md:text-base">
-                  Это не просто страница — это киберпанк-экосистема для аренды китайских тачек, где ты рулишь будущим! ИИ-ассистенты пишут код, Telegram-боты принимают бабки и чатятся, а кибер-гараж управляет автопарком. Хочешь внести свою лепту? Заходи на <a href="/repo-xml" className="text-[#39FF14] hover:underline">/repo-xml</a> или <a href="/selfdev" className="text-[#39FF14] hover:underline">/selfdev</a>, где мы вместе можем прикрутить AR-туры по машинам или нейросеть для подбора тачек по вайбу. Это твой серфборд — прыгай на волну и го расширять этот мир, братан!
+                  Это не просто страница — это киберпанк-экосистема для аренды китайских тачек, где ты рулишь будущим! ИИ-ассистенты пишут код, Telegram-боты принимают бабки и чатятся, а кибер-гараж управляет автопарком. Хочешь внести свою лепту? Заходи на <a href="/repo-xml" className="text-[#39FF14] hover:underline">/repo-xml</a>, где мы вместе можем прикрутить AR-туры по машинам или нейросеть для подбора тачек по вайбу. Это твой серфборд — прыгай на волну и го расширять этот мир, братан!
                 </p>
               </CardContent>
             </Card>
 
-            {/* How to Use /selfdev */}
+            {/* How to Use /repo-xml */}
             <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
               <CardHeader>
-                <CardTitle className="text-lg md:text-xl font-semibold text-[#39FF14]">Как Оседлать /selfdev: Гайд для Кибер-Сёрферов</CardTitle>
+                <CardTitle className="text-lg md:text-xl font-semibold text-[#39FF14]">Как Оседлать /repo-xml: Гайд для Кибер-Сёрферов</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm md:text-base">
-                  Хочешь внести свой код в этот кибер-океан? Вот как работает подстраница <a href="/selfdev" className="text-[#39FF14] hover:underline">/selfdev</a> — твой пульт управления AI-волнами:
+                  Хочешь внести свой код в этот кибер-океан? Вот как работает подстраница <a href="/repo-xml" className="text-[#39FF14] hover:underline">/repo-xml</a> — твой пульт управления AI-волнами:
                 </p>
                 <ol className="list-decimal list-inside mt-2 space-y-2 text-sm md:text-base">
                   <li>
-                    <strong>Кидай задачу боту:</strong> Открывай Telegram, находи <strong>oneSitePlsBot</strong>, скидывай ему запрос прямо с Кворка или пиши, что хочешь добавить. Например: “Добавь AR-туры на /selfdev”. Он отвечает: “Спасибо, ща разберусь!”.
+                    <strong>Кидай задачу боту:</strong> Открывай Telegram, находи <strong>oneSitePlsBot</strong>, скидывай ему запрос прямо с Кворка или пиши, что хочешь добавить. Например: "Добавь AR-туры на /repo-xml". Он отвечает: "Спасибо, ща разберусь!".
                   </li>
                   <li>
-                    <strong>Спрашивай у Грока:</strong> Если лимит запросов в боте кончился, заходи на мою страничку разработчика (кнопка внизу слева на <a href="/selfdev" className="text-[#39FF14] hover:underline">/selfdev</a>). Там открывается Грок — копируй задачу, жми кнопку, и он выдаёт код с кнопкой “Скопировать”.
+                    <strong>Спрашивай у Грока:</strong> Если лимит запросов в боте кончился, заходи на мою страничку разработчика (кнопка внизу слева на <a href="/repo-xml" className="text-[#39FF14] hover:underline">/repo-xml</a>). Там открывается Грок — копируй задачу, жми кнопку, и он выдаёт код с кнопкой "Скопировать".
                   </li>
                   <li>
-                    <strong>Разбери файлы:</strong> Бери этот код, вставляй в поле на <a href="/selfdev" className="text-[#39FF14] hover:underline">/selfdev</a>, жми “Разобрать файлы”. Они появляются в списке — ставь галочки на нужных (например, обновил два файла).
+                    <strong>Разбери файлы:</strong> Бери этот код, вставляй в поле на <a href="/repo-xml" className="text-[#39FF14] hover:underline">/repo-xml</a>, жми "Разобрать файлы". Они появляются в списке — ставь галочки на нужных (например, обновил два файла).
                   </li>
                   <li>
-                    <strong>Создай Pull Request:</strong> Жми “Создать request” — бот сам заполнит поля (что было, что стало, как называется). Отправляй, и вуаля — ссылка на pull request готова. Я захожу, вижу твой код, жму “Замёрджить”, и изменения влетают в прод!
+                    <strong>Создай Pull Request:</strong> Жми "Создать request" — бот сам заполнит поля (что было, что стало, как называется). Отправляй, и вуаля — ссылка на pull request готова. Я захожу, вижу твой код, жму "Замёрджить", и изменения влетают в прод!
                   </li>
                   <li>
-                    <strong>Кибер-Экстрактор:</strong> Внизу страницы есть фича — жми “Извлечь”, и он сканирует все файлы проекта для контекста. Потом можешь пихнуть это в Грока или oneSitePlsBot, чтобы доработать. Дерево файлов тоже можно прикрутить — кидай идею!
+                    <strong>Кибер-Экстрактор:</strong> Внизу страницы есть фича — жми "Извлечь", и он сканирует все файлы проекта для контекста. Потом можешь пихнуть это в Грока или oneSitePlsBot, чтобы доработать. Дерево файлов тоже можно прикрутить — кидай идею!
                   </li>
                 </ol>
                 <p className="text-sm md:text-base mt-4">
