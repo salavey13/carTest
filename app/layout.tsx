@@ -1,4 +1,6 @@
-// /app/layout.tsx
+"use client";
+import StickyChatButton from "@/components/StickyChatButton";
+import { usePathname } from "next/navigation";
 import type React from "react";
 import Script from "next/script";
 import Header from "@/components/Header";
@@ -8,7 +10,9 @@ import { Toaster } from "sonner";
 import "./globals.css";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
+  const pathname = usePathname(); // Get the current page path
+
+return (
     <html lang="en">
       <head>
         <meta name="format-detection" content="telephone=no" />
@@ -27,10 +31,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </header>
           <main className="flex-1">
             {children}
+            <StickyChatButton currentPath={pathname} /> {/* Xuinity button with current path */}
+          </footer>
           </main>
           <footer className="w-full bg-gray-900">
             <Footer />
-          </footer>
           <Toaster
             position="bottom-right"
             toastOptions={{
