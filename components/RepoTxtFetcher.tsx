@@ -1,8 +1,8 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { runCozeAgent, notifyAdmin, sendTelegramMessage, sendTelegramDocument } from "@/app/actions";
-import { createGitHubPullRequest, fetchRepoContents } from "@/app/actions_github/actions"; // Import new function
+import { createGitHubPullRequest, fetchRepoContents } from "@/app/actions_github/actions";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -14,7 +14,12 @@ interface FileNode {
   content: string;
 }
 
-const RepoTxtFetcher: React.FC = () => {
+interface RepoTxtFetcherProps {
+  highlightedFiles?: string[];
+  autoFetch?: boolean;
+}
+
+const RepoTxtFetcher: React.FC<RepoTxtFetcherProps> = ({ highlightedFiles = [], autoFetch = false }) => {
   const [repoUrl, setRepoUrl] = useState<string>("https://github.com/salavey13/cartest");
   const [token, setToken] = useState<string>("");
   const [txtOutput, setTxtOutput] = useState<string>("");
@@ -32,19 +37,6 @@ const RepoTxtFetcher: React.FC = () => {
   const { user } = useAppContext();
 
   const DEFAULT_CONTEXT = "Контекст репозитория не предоставлен.";
-
-  const importantFiles = [
-    "app/actions.ts",
-    "app/layout.tsx",
-    "app/repo-xml/page.tsx",
-    "app/actions_github/actions.ts",
-    "components/CozeExecutor.tsx",
-    "components/RepoTxtFetcher.tsx",
-    "hooks/useTelegram.ts",
-    "contexts/AppContext.tsx",
-    "lib/utils.ts",
-    "types/supabase.ts",
-  ];
 
   const addToast = (message: string) => {
     const id = Date.now();
@@ -67,6 +59,22 @@ const RepoTxtFetcher: React.FC = () => {
     return "text";
   };
 
+  const parseImports = (content: string): string[] => {
+    const importRegex = /import\s+.*\s+from\s+['"]([^'"]+)['"]/g;
+    const imports: string[] = [];
+    let match;
+    while ((match = importRegex.exec(content)) !== null) {
+      const importPath = match[1];
+      if (importPath.startsWith("@/")) {
+        imports.push(importPath.replace("@/", ""));
+      } else if (importPath.startsWith("./") || importPath.startsWith("../")) {
+        // Resolve relative paths if needed (simplified here)
+        imports.push(importPath);
+      }
+    }
+    return imports;
+  };
+
   const handleFetch = async () => {
     setExtractLoading(true);
     setError(null);
@@ -87,7 +95,6 @@ const RepoTxtFetcher: React.FC = () => {
       const files = result.files;
       setFiles(files);
 
-      // Simulate progress for UI feedback
       const totalFiles = files.length;
       files.forEach((_, index) => {
         setTimeout(() => setProgress(((index + 1) / totalFiles) * 100), index * 50);
@@ -95,6 +102,17 @@ const RepoTxtFetcher: React.FC = () => {
 
       const txt = generateTxt(files);
       setTxtOutput(txt);
+
+      if (highlightedFiles.length > 0) {
+        const targetFile = files.find((file) => file.path === highlightedFiles[0]);
+        const dynamicHighlights = targetFile
+          ? [targetFile.path, ...parseImports(targetFile.content).map((imp) => imp)]
+          : highlightedFiles;
+        const newSelected = new Set(dynamicHighlights.filter((file) => files.some((f) => f.path === file)));
+        setSelectedFiles(newSelected);
+        setSelectedOutput(generateTxt(files.filter((file) => newSelected.has(file.path))));
+      }
+
       addToast("Извлечение завершено!");
     } catch (err: any) {
       setError(`Ошибка загрузки: ${err.message}. Проверьте URL или токен.`);
@@ -103,6 +121,10 @@ const RepoTxtFetcher: React.FC = () => {
       setExtractLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (autoFetch) handleFetch();
+  }, [autoFetch]);
 
   const generateTxt = (files: FileNode[]) => {
     return files.map((file) => `--- ${file.path} ---\n${file.content}`).join("\n\n");
@@ -143,7 +165,7 @@ const RepoTxtFetcher: React.FC = () => {
   };
 
   const handleAddImportantFiles = () => {
-    const importantFilesSet = new Set(importantFiles);
+    const importantFilesSet = new Set(highlightedFiles);
     const importantFilesContent = files
       .filter((file) => importantFilesSet.has(file.path))
       .map((file) => {
@@ -551,7 +573,7 @@ ${txtOutput}
                       />
                       <span
                         className={`text-xs ${
-                          importantFiles.includes(file.path)
+                          highlightedFiles.includes(file.path)
                             ? "text-[#E1FF01] font-bold animate-pulse"
                             : "text-gray-400 hover:text-white"
                         } truncate`}
