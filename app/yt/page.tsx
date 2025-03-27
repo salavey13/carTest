@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { FiYoutube, FiUsers, FiSettings, FiCalendar } from "react-icons/fi";
 import { useTelegram } from "@/hooks/useTelegram";
+import GlitchyHero from '@/components/GlitchyHero'
 
 export default function YTPage() {
   const [characters, setCharacters] = useState<any[]>([]);
@@ -34,6 +35,13 @@ export default function YTPage() {
   return (
     <div className="pt-24 p-4 bg-gray-900 min-h-screen">
       <div className="max-w-6xl mx-auto">
+        {!loading && characters.length > 0 && (
+          <GlitchyHero
+            imageUrls={characters.slice(0, 5).map(c => c.image_url || "/default-character.jpg")}
+            buttonText="Watch Videos"
+            buttonLink="https://youtube.com/salavey13"
+          />
+        )}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-white flex items-center gap-2">
             <FiYoutube className="text-red-500" /> YouTube Characters
