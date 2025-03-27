@@ -1,4 +1,4 @@
-// /app/layout.tsx
+import StickyChatButton from "@/components/StickyChatButton";
 import type React from "react";
 import Script from "next/script";
 import Header from "@/components/Header";
@@ -27,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </header>
           <main className="flex-1">
             {children}
+            <StickyChatButton /> {/* No currentPath prop needed */}
           </main>
           <footer className="w-full bg-gray-900">
             <Footer />
@@ -48,7 +49,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
-
-export const metadata = {
-  generator: "v0.dev",
-};
