@@ -22,6 +22,8 @@ const groups = {
 // Map pages to their groups and define display names
 const pageGroups: Record<string, string> = {
   "/about": "SLY13",
+  "/onesiteplsinstructions": "SLY13",
+  "/onesitepls": "SLY13",
   "/admin": "RuliBeri",
   "/botbusters": "9GAG",
   "/bullshitdetector": "YT",
@@ -64,10 +66,14 @@ const pageLogos: Record<string, string> = {
   "/tasks": "YT",
   "/wheel-of-fortune": "Gifts",
   "/youtubeAdmin": "YT",
+  "/onesiteplsinstructions": "SLY13",
+  "/onesitepls": "SLY13",
 };
 
 const pageDisplayNames: Record<string, string> = {
   "/about": "About",
+  "/onesiteplsinstructions": "oneSitePls Instructions",
+  "/onesitepls": "oneSitePls",
   "/admin": "Admin Panel",
   "/botbusters": "Bot Busters",
   "/bullshitdetector": "BS Detector",
@@ -129,7 +135,7 @@ export default function Header() {
 
       setLastScrollY(currentScrollY);
 
-      // Reset the timer on scroll, but only if dropdown/search isn’t active
+      // Reset the timer on scroll, but only if dropdown/search isn't active
       if (!isDropdownOpen && !isSearchOpen) {
         clearTimeout(timeoutId);
         timeoutId = setTimeout(() => {
@@ -165,18 +171,18 @@ export default function Header() {
           <div className="relative">
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="text-xl md:text-3xl font-bold text-gradient cyber-text glitch hover:text-glow"
+              className="text-xl md:text-3xl font-bold text-gradient cyber-text glitch hover:text-glow px-4 py-2"
               data-text={currentLogoText}
             >
               {currentLogoText}
             </button>
             {isDropdownOpen && (
-              <div className="absolute top-full left-0 mt-2 w-64 bg-card border border-muted rounded shadow-lg max-h-[80vh] overflow-y-auto">
+              <div className="absolute top-full left-0 mt-2 w-72 bg-card border border-muted rounded-xl shadow-lg max-h-[80vh] overflow-y-auto px-2 py-3">
                 <ul className="py-2">
                   {/* Grouped pages */}
                   {uniqueGroups.map((group) => (
                     <li key={group} className="mb-2">
-                      <div className={`px-4 py-2 text-sm font-bold text-white ${groups[group].color}`}>
+                      <div className={`px-4 py-2 text-sm font-bold text-white ${groups[group].color} rounded-lg`}>
                         {groups[group].icon} {groups[group].displayName}
                       </div>
                       <ul>
@@ -184,7 +190,7 @@ export default function Header() {
                           <li key={path} className="relative group">
                             <Link
                               href={path}
-                              className="block px-4 py-2 text-sm text-foreground hover:bg-muted flex items-center"
+                              className="block px-4 py-2 text-sm text-foreground hover:bg-muted rounded-lg flex items-center"
                               onClick={() => setIsDropdownOpen(false)}
                             >
                               {pageDisplayNames[path]}
@@ -205,7 +211,7 @@ export default function Header() {
                   {/* Ungrouped pages */}
                   {ungroupedPages.length > 0 && (
                     <li className="mt-4">
-                      <div className="px-4 py-2 text-sm font-bold text-white bg-gray-500">
+                      <div className="px-4 py-2 text-sm font-bold text-white bg-gray-500 rounded-lg">
                         Other
                       </div>
                       <ul>
@@ -213,7 +219,7 @@ export default function Header() {
                           <li key={path}>
                             <Link
                               href={path}
-                              className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
+                              className="block px-4 py-2 text-sm text-foreground hover:bg-muted rounded-lg"
                               onClick={() => setIsDropdownOpen(false)}
                             >
                               {pageDisplayNames[path]}
