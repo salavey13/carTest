@@ -3,27 +3,26 @@ import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { FaRobot } from "react-icons/fa";
+import Image from "next/image";
 
 const StickyChatButton: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [fixClicked, setFixClicked] = useState(false);
-  const [hasAutoOpened, setHasAutoOpened] = useState(false); // Track if auto-open has occurred
+  const [hasAutoOpened, setHasAutoOpened] = useState(false);
   const currentPath = usePathname();
 
   const suggestions = [
     ...(fixClicked ? [] : [{ text: "Исправить текущую страницу", link: `/repo-xml?path=${currentPath}` }]),
     { text: "Добавить что-то новое", link: "/repo-xml" },
-    { text: "Оптимизировать код", link: "/repo-xml" },
-    { text: "Создать новый компонент", link: "/repo-xml" },
+    { text: "Нанять меня за звезды", link: "/selfdef" },
   ];
 
-  // Auto-open once after 13 seconds on initial load
   useEffect(() => {
     if (!hasAutoOpened) {
       const timer = setTimeout(() => {
         setIsOpen(true);
-        setHasAutoOpened(true); // Mark as opened so it doesn’t repeat
-      }, 13000); // 13 seconds
+        setHasAutoOpened(true);
+      }, 13000);
       return () => clearTimeout(timer);
     }
   }, [hasAutoOpened]);
@@ -36,7 +35,9 @@ const StickyChatButton: React.FC = () => {
   const handleFixClick = (link: string) => {
     if (link.includes("path")) {
       setFixClicked(true);
-      window.location.href = link; // Navigate to repo-xml with path
+      window.location.href = link;
+    } else {
+      window.location.href = link;
     }
   };
 
@@ -73,12 +74,18 @@ const StickyChatButton: React.FC = () => {
             initial="hidden"
             animate="visible"
             exit="exit"
-            className="p-4 w-72 flex flex-col items-end bg-gray-800 bg-opacity-80 rounded-lg shadow-[0_0_15px_rgba(0,255,157,0.3)] border border-cyan-500"
+            className="p-4 w-72 flex flex-col items-end bg-transparent"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Xuinity Robot Icon */}
+            {/* Xuinity PNG Icon */}
             <motion.div variants={childVariants} className="mb-4 flex justify-end">
-              <FaRobot className="text-cyan-500 text-4xl drop-shadow-[0_0_10px_rgba(0,255,157,0.5)]" />
+              <Image
+                src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/character-images/public/x2.png" // Replace with your PNG path (e.g., in /public/)
+                alt="Xuinity"
+                width={169}
+                height={169}
+                className="drop-shadow-[0_0_10px_rgba(0,255,157,0.5)]"
+              />
             </motion.div>
 
             {/* Random Suggestion Text */}
@@ -107,7 +114,7 @@ const StickyChatButton: React.FC = () => {
       ) : (
         <motion.button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-4 right-12 bg-transparent p-2 rounded-full shadow-[0_0_10px_rgba(0,255,157,0.5)] hover:shadow-[0_0_15px_rgba(0,255,157,0.7)] transition-all"
+          className="fixed bottom-8 right-16 bg-transparent p-2 rounded-full shadow-[0_0_10px_rgba(0,255,157,0.5)] hover:shadow-[0_0_15px_rgba(0,255,157,0.7)] transition-all"
           initial={{ scale: 0 }}
           animate={{ scale: 1, rotate: [0, 10, -10, 0] }}
           transition={{ duration: 0.5, rotate: { repeat: Infinity, duration: 2 } }}
