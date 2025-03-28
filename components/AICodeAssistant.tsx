@@ -1,16 +1,17 @@
 "use client";
 import { useState, useEffect } from "react";
 import { createGitHubPullRequest, getOpenPullRequests } from "@/app/actions_github/actions";
-import { notifyAdmin } from "@/app/actions";
+import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
 import { saveAs } from "file-saver";
-import { FaArrowRight, FaEllipsisV, FaTelegramPlane, FaTrash, FaList, FaTools, FaPlus, FaInfoCircle, FaRobot, FaImage, FaBook, FaDatabase, FaRocket, FaCode, FaLink } from "react-icons/fa";
+import { FaArrowRight, FaEllipsisV, FaTelegramPlane, FaList, FaTools, FaPlus, FaInfoCircle, FaRobot, FaImage, FaBook, FaDatabase, FaRocket, FaCode, FaLink } from "react-icons/fa";
 import { toast } from "sonner";
-import { sendTelegramDocument } from "@/app/actions";
-
-interface FileEntry { path: string; content: string; extension: string; }
-
+interface FileEntry {
+  path: string;
+  content: string;
+  extension: string;
+}
 const Tooltip = ({ children, text }: { children: React.ReactNode; text: string }) => {
   const [isVisible, setIsVisible] = useState(false);
   return (
@@ -26,8 +27,6 @@ const Tooltip = ({ children, text }: { children: React.ReactNode; text: string }
     </div>
   );
 };
-
-// pat
 export default function AICodeAssistant() {
   const { user } = useAppContext();
   const [response, setResponse] = useState<string>("");
@@ -45,17 +44,14 @@ export default function AICodeAssistant() {
   const [showPRDetails, setShowPRDetails] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
   const [customLinks, setCustomLinks] = useState<{ name: string; url: string }[]>([]);
-
   const predefinedLinks = [
-    { name: "Grok", url: "https://grok.com", icon: <FaRobot className="text-yellow-300 font-bold drop-shadow-md" />
-},
-{ name: "QwenLM", url: "https://qwenlm.ai", icon: <FaImage className="text-blue-500" /> },
+    { name: "Grok", url: "https://grok.com", icon: <FaRobot className="text-yellow-300 font-bold drop-shadow-md" /> },
+    { name: "QwenLM", url: "https://qwenlm.ai", icon: <FaImage className="text-blue-500" /> },
     { name: "NotebookLM", url: "https://notebooklm.google.com", icon: <FaBook className="text-yellow-500" /> },
     { name: "Supabase", url: "https://supabase.com", icon: <FaDatabase className="text-teal-500" /> },
     { name: "Vercel", url: "https://vercel.com", icon: <FaRocket className="text-black" /> },
     { name: "Coze.com", url: "https://coze.com", icon: <FaCode className="text-purple-500" /> },
   ];
-
   useEffect(() => {
     const loadData = async () => {
       if (user) {
@@ -65,74 +61,50 @@ export default function AICodeAssistant() {
           .eq("user_id", user.id)
           .single();
         if (userData?.metadata?.generated_files) {
-          setSavedFiles(userData.metadata.generated_files.map((f: any) => ({
-            path: f.path,
-            content: f.code,
-            extension: f.extension,
-          })));
+          setSavedFiles(
+            userData.metadata.generated_files.map((f: any) => ({
+              path: f.path,
+              content: f.code,
+              extension: f.extension,
+            }))
+          );
         }
         if (userData?.metadata?.customLinks) setCustomLinks(userData.metadata.customLinks);
       }
     };
     loadData();
   }, [user]);
-
-  interface FileEntry {
-  path: string;
-  content: string;
-  extension: string;
-}
-
-const parseFilesFromText = (text: string): FileEntry[] => {
-  const entries: FileEntry[] = [];
-
-  // Match all code blocks enclosed in triple backticks
-  const codeBlocks = text.match(/^```[\s\S]*?^```/gm) || [];
-
-  // Define comment patterns for different languages
-  const commentPatterns = [
-    /^\s*\/\/\s*\/?(.+?\.\w+)/,          // e.g., // /path/to/file.ts or // path/to/file.json
-    /^\s*--\s*\/?(.+?\.\w+)/,           // e.g., -- /path/to/file.sql
-    /^\s*\/\*\s*\/?(.+?\.\w+)\s*\*\//,  // e.g., /* /path/to/file.css */
-  ];
-
-  codeBlocks.forEach((block) => {
-    // Remove backticks and trim the content
-    const content = block.slice(3, -3).trim();
-    const lines = content.split("\n");
-
-    let path: string | undefined;
-    let codeStartIndex = 0;
-
-    // Search for the first line matching any comment pattern
-    for (let i = 0; i < lines.length; i++) {
-      for (const pattern of commentPatterns) {
-        const match = lines[i].match(pattern);
-        if (match) {
-          path = match[1].trim(); // Extract the path from the capture group
-          codeStartIndex = i + 1; // Content starts on the next line
-          break;
+  const parseFilesFromText = (text: string): FileEntry[] => {
+    const entries: FileEntry[] = [];
+    const codeBlocks = text.match(/^```[\s\S]*?^```/gm) || [];
+    const commentPatterns = [
+      /^\s*\/\/\s*\/?(.+?\.\w+)/,
+      /^\s*--\s*\/?(.+?\.\w+)/,
+      /^\s*\/\*\s*\/?(.+?\.\w+)\s*\*\//,
+    ];
+    codeBlocks.forEach((block) => {
+      const content = block.slice(3, -3).trim();
+      const lines = content.split("\n");
+      let path: string | undefined;
+      let codeStartIndex = 0;
+      for (let i = 0; i < lines.length; i++) {
+        for (const pattern of commentPatterns) {
+          const match = lines[i].match(pattern);
+          if (match) {
+            path = match[1].trim();
+            codeStartIndex = i + 1;
+            break;
+          }
         }
+        if (path) break;
       }
-      if (path) break; // Exit outer loop once a path is found
-    }
-
-    // If no path is found, use default
-    if (!path) {
-      path = "unnamed.txt";
-    }
-
-    // Create the FileEntry
-    entries.push({
-      path,
-      content: lines.slice(codeStartIndex).join("\n"),
-      extension: path.split(".").pop() || "txt",
+      if (!path) path = "unnamed.txt";
+      const codeContent = lines.slice(codeStartIndex).join("\n");
+      const extension = path.split(".").pop() || "txt";
+      entries.push({ path, content: codeContent, extension });
     });
-  });
-
-  return entries;
-};
-
+    return entries;
+  };
   const extractPRDetails = (rawText: string) => {
     let title = "Обновление от AI Code Assistant";
     let description = "Автоматически сгенерировано AI Code Assistant";
@@ -150,7 +122,6 @@ const parseFilesFromText = (text: string): FileEntry[] => {
     }
     return { title, description, commitMessage: commitMsg };
   };
-
   const handleParse = () => {
     setFiles([]);
     const parsedFiles = parseFilesFromText(response);
@@ -161,7 +132,6 @@ const parseFilesFromText = (text: string): FileEntry[] => {
     setCommitMessage(commitMessage);
     if (parsedFiles.length === 0) toast.info("В ответе не найдено файлов");
   };
-
   const handleSaveFiles = async () => {
     if (!user || files.length === 0) return;
     setLoading(true);
@@ -181,7 +151,6 @@ const parseFilesFromText = (text: string): FileEntry[] => {
       setLoading(false);
     }
   };
-
   const handleDownload = async () => {
     const JSZip = (await import("jszip")).default;
     const zip = new JSZip();
@@ -189,7 +158,6 @@ const parseFilesFromText = (text: string): FileEntry[] => {
     const blob = await zip.generateAsync({ type: "blob" });
     saveAs(blob, "coze_files.zip");
   };
-
   const downloadFile = async (file: FileEntry) => {
     if (!user) return toast.error("Пользователь Telegram не найден");
     setLoading(true);
@@ -203,7 +171,6 @@ const parseFilesFromText = (text: string): FileEntry[] => {
       setLoading(false);
     }
   };
-
   const handleClearAllSavedFiles = async () => {
     if (!user) return;
     setLoading(true);
@@ -218,7 +185,6 @@ const parseFilesFromText = (text: string): FileEntry[] => {
       setLoading(false);
     }
   };
-
   const handleCreatePR = async () => {
     if (!repoUrl || !selectedFiles.size || !prTitle || !prDescription || !commitMessage) {
       toast.error("Пожалуйста, укажите URL репозитория, выберите файлы, заголовок PR, описание и сообщение коммита");
@@ -226,12 +192,14 @@ const parseFilesFromText = (text: string): FileEntry[] => {
     }
     setLoading(true);
     try {
-      const filesToCommit = Array.from(selectedFiles).map((path) => {
-        const parsedFile = files.find((f) => f.path === path);
-        const savedFile = savedFiles.find((f) => f.path === path);
-        const file = parsedFile || savedFile;
-        return file ? { path: file.path, content: file.content } : null;
-      }).filter(Boolean) as { path: string; content: string }[];
+      const filesToCommit = Array.from(selectedFiles)
+        .map((path) => {
+          const parsedFile = files.find((f) => f.path === path);
+          const savedFile = savedFiles.find((f) => f.path === path);
+          const file = parsedFile || savedFile;
+          return file ? { path: file.path, content: file.content } : null;
+        })
+        .filter(Boolean) as { path: string; content: string }[];
       if (filesToCommit.length === 0) {
         toast.error("Нет выбранных файлов для коммита");
         return;
@@ -243,6 +211,7 @@ const parseFilesFromText = (text: string): FileEntry[] => {
         toast.success(`PR успешно создан: ${result.prUrl}`);
         await notifyAdmin(`Новый PR создан ${username}: ${result.prUrl}`);
         handleGetOpenPRs();
+        document.getElementById("pr-section")?.scrollIntoView({ behavior: "smooth" });
       } else {
         toast.error("Ошибка при создании PR: " + result.error);
       }
@@ -252,7 +221,6 @@ const parseFilesFromText = (text: string): FileEntry[] => {
       setLoading(false);
     }
   };
-
   const handleGetOpenPRs = async () => {
     if (!repoUrl) return toast.error("Пожалуйста, укажите URL репозитория");
     setLoading(true);
@@ -266,7 +234,6 @@ const parseFilesFromText = (text: string): FileEntry[] => {
       setLoading(false);
     }
   };
-
   const toggleFileSelection = (path: string) => {
     setSelectedFiles((prev) => {
       const newSelected = new Set(prev);
@@ -274,9 +241,7 @@ const parseFilesFromText = (text: string): FileEntry[] => {
       return newSelected;
     });
   };
-
   const handleSelectAllFiles = () => setSelectedFiles(new Set(files.map((file) => file.path)));
-
   const handleAddCustomLink = async () => {
     const name = prompt("Введите название ссылки:");
     const url = prompt("Введите URL ссылки:");
@@ -290,31 +255,32 @@ const parseFilesFromText = (text: string): FileEntry[] => {
       }
     }
   };
-
   return (
-    <div className="p-4 bg-gray-900 text-white min-h-screen font-sans">
+    <div className="p-4 bg-gray-900 text-white min-h-screen font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden">
       <header className="flex items-center gap-2 mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">AI Code Assistant</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse">
+          AI Code Assistant
+        </h1>
         <Tooltip text={`Шаги для создания PR:\n1. Вставьте ответ бота.\n2. Разберите файлы.\n3. Выберите файлы.\n4. Создайте PR.`}>
           <FaInfoCircle className="text-blue-400 cursor-pointer hover:text-blue-300 transition" />
         </Tooltip>
       </header>
-
       <div className="mb-6">
         <p className="text-yellow-400 mb-2 text-sm">
-          Примечание: Встроенный бот Coze в настоящее время неактивен из-за проблем с финансированием. Пожалуйста, используйте других ботов для генерации ответа и вставьте его здесь.
+          Примечание: Встроенный бот Coze в настоящее время неактивен из-за проблем с финансированием. Пожалуйста, используйте Grok или других ботов для генерации ответа и вставьте его здесь.
         </p>
         <div className="relative">
           <textarea
-            className="w-full p-3 pr-12 bg-gray-800 rounded-lg border border-gray-700 focus:border-blue-500 focus:outline-none transition text-sm"
-            rows={3}
+            id="response-input"
+            className="w-full p-3 pr-12 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm"
+            rows={5}
             value={response}
             onChange={(e) => setResponse(e.target.value)}
             placeholder="Вставьте ответ бота здесь..."
             disabled={loading}
           />
           <button
-            className="absolute right-2 bottom-2 p-2 rounded-full bg-purple-600 hover:bg-purple-700 transition disabled:bg-gray-500"
+            className="absolute right-2 bottom-2 p-2 rounded-full bg-gradient-to-r from-purple-600 to-cyan-500 hover:shadow-[0_0_18px_rgba(0,255,157,0.5)] transition disabled:bg-gray-500 shadow-[0_0_12px_rgba(0,255,157,0.3)]"
             onClick={handleParse}
             disabled={loading || !response}
           >
@@ -322,20 +288,25 @@ const parseFilesFromText = (text: string): FileEntry[] => {
           </button>
         </div>
       </div>
-
       {files.length > 0 && (
-        <div className="mb-6">
+        <div className="mb-6 bg-gray-800 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.3)]">
           <div className="flex justify-between items-center mb-2">
-            <h2 className="text-lg font-semibold">Разобранные файлы</h2>
+            <h2 className="text-lg font-semibold text-cyan-400">Разобранные файлы</h2>
             <div className="relative">
               <button className="p-1" onClick={() => setShowFileMenu(!showFileMenu)}>
                 <FaEllipsisV className="text-gray-400" />
               </button>
               {showFileMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded shadow-lg z-10">
-                  <button className="block w-full text-left px-4 py-2 hover:bg-gray-700 text-sm" onClick={handleSaveFiles}>Сохранить файлы</button>
-                  <button className="block w-full text-left px-4 py-2 hover:bg-gray-700 text-sm" onClick={handleDownload}>Скачать ZIP</button>
-                  <button className="block w-full text-left px-4 py-2 hover:bg-gray-700 text-sm" onClick={handleSelectAllFiles}>Выбрать все</button>
+                  <button className="block w-full text-left px-4 py-2 hover:bg-gray-700 text-sm" onClick={handleSaveFiles}>
+                    Сохранить файлы
+                  </button>
+                  <button className="block w-full text-left px-4 py-2 hover:bg-gray-700 text-sm" onClick={handleDownload}>
+                    Скачать ZIP
+                  </button>
+                  <button className="block w-full text-left px-4 py-2 hover:bg-gray-700 text-sm" onClick={handleSelectAllFiles}>
+                    Выбрать все
+                  </button>
                 </div>
               )}
             </div>
@@ -343,26 +314,29 @@ const parseFilesFromText = (text: string): FileEntry[] => {
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {files.map((file) => (
               <div key={file.path} className="flex items-center gap-2">
-                <input type="checkbox" checked={selectedFiles.has(file.path)} onChange={() => toggleFileSelection(file.path)} />
-                <span className="truncate text-sm">{file.path}</span>
-                <button onClick={() => downloadFile(file)} disabled={loading}><FaTelegramPlane className="text-purple-500" /></button>
+                <input type="checkbox" checked={selectedFiles.has(file.path)} onChange={() => toggleFileSelection(file.path)} className="w-3 h-3 accent-cyan-500" />
+                <span className="truncate text-sm text-gray-400 hover:text-white">{file.path}</span>
+                <button onClick={() => downloadFile(file)} disabled={loading}>
+                  <FaTelegramPlane className="text-purple-500" />
+                </button>
               </div>
             ))}
           </div>
         </div>
       )}
-
       {savedFiles.length > 0 && (
-        <div className="mb-6">
+        <div className="mb-6 bg-gray-800 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.3)]">
           <div className="flex justify-between items-center mb-2">
-            <h2 className="text-lg font-semibold">Сохраненные файлы</h2>
+            <h2 className="text-lg font-semibold text-cyan-400">Сохраненные файлы</h2>
             <div className="relative">
               <button className="p-1" onClick={() => setShowSavedFileMenu(!showSavedFileMenu)}>
                 <FaEllipsisV className="text-gray-400" />
               </button>
               {showSavedFileMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded shadow-lg z-10">
-                  <button className="block w-full text-left px-4 py-2 hover:bg-gray-700 text-sm" onClick={handleClearAllSavedFiles}>Очистить все сохраненные файлы</button>
+                  <button className="block w-full text-left px-4 py-2 hover:bg-gray-700 text-sm" onClick={handleClearAllSavedFiles}>
+                    Очистить все сохраненные файлы
+                  </button>
                 </div>
               )}
             </div>
@@ -370,65 +344,59 @@ const parseFilesFromText = (text: string): FileEntry[] => {
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {savedFiles.map((file) => (
               <div key={file.path} className="flex items-center gap-2">
-                <input type="checkbox" checked={selectedFiles.has(file.path)} onChange={() => toggleFileSelection(file.path)} />
-                <span className="truncate text-sm">{file.path}</span>
-                <button onClick={() => downloadFile(file)} disabled={loading}><FaTelegramPlane className="text-purple-500" /></button>
+                <input type="checkbox" checked={selectedFiles.has(file.path)} onChange={() => toggleFileSelection(file.path)} className="w-3 h-3 accent-cyan-500" />
+                <span className="truncate text-sm text-gray-400 hover:text-white">{file.path}</span>
+                <button onClick={() => downloadFile(file)} disabled={loading}>
+                  <FaTelegramPlane className="text-purple-500" />
+                </button>
               </div>
             ))}
           </div>
         </div>
       )}
-
-      <section className="mb-6">
+      <section id="pr-section" className="mb-6">
         <div className="flex justify-between items-center mb-2">
-          <h2 className="text-lg font-semibold">Pull Request</h2>
+          <h2 className="text-lg font-semibold text-cyan-400">Pull Request</h2>
           <div className="flex gap-2">
             <button
-              className="bg-gradient-to-r from-purple-600 to-cyan-500 text-white px-4 py-2 rounded shadow-glow hover:shadow-glow transition disabled:bg-gray-500 disabled:shadow-none text-sm"
+              className="px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-purple-600 to-cyan-500 transition-all shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:shadow-[0_0_18px_rgba(0,255,157,0.5)] disabled:bg-gray-500 disabled:shadow-none"
               onClick={handleCreatePR}
               disabled={loading || !repoUrl || selectedFiles.size === 0 || !commitMessage}
             >
               Создать PR
             </button>
-            <button
-              className="p-2"
-              onClick={handleGetOpenPRs}
-              disabled={loading || !repoUrl}
-            >
+            <button className="p-2" onClick={handleGetOpenPRs} disabled={loading || !repoUrl}>
               <FaList className="text-gray-400" />
             </button>
           </div>
         </div>
-        <button
-          className="text-blue-400 hover:underline text-sm"
-          onClick={() => setShowPRDetails(!showPRDetails)}
-        >
+        <button className="text-blue-400 hover:underline text-sm" onClick={() => setShowPRDetails(!showPRDetails)}>
           {showPRDetails ? "Скрыть детали PR" : "Показать детали PR"}
         </button>
         {showPRDetails && (
           <div className="mt-2 space-y-2">
             <p className="text-gray-400 text-xs">Эти поля автоматически заполнены из ответа бота.</p>
             <input
-              className="w-full p-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 transition text-sm"
+              className="w-full p-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm"
               value={repoUrl}
               onChange={(e) => setRepoUrl(e.target.value)}
               placeholder="URL репозитория GitHub"
             />
             <input
-              className="w-full p-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 transition text-sm"
+              className="w-full p-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm"
               value={prTitle}
               onChange={(e) => setPrTitle(e.target.value)}
               placeholder="Заголовок PR"
             />
             <textarea
-              className="w-full p-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 transition text-sm"
+              className="w-full p-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm"
               value={prDescription}
               onChange={(e) => setPrDescription(e.target.value)}
               placeholder="Описание PR"
               rows={2}
             />
             <textarea
-              className="w-full p-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 transition text-sm"
+              className="w-full p-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm"
               value={commitMessage}
               onChange={(e) => setCommitMessage(e.target.value)}
               placeholder="Сообщение коммита (автоматически заполнено из ответа)"
@@ -437,13 +405,12 @@ const parseFilesFromText = (text: string): FileEntry[] => {
           </div>
         )}
       </section>
-
       {openPRs.length > 0 && (
-        <section className="mb-6">
-          <h2 className="text-lg font-semibold mb-2">Открытые Pull Requests</h2>
+        <section className="mb-6 bg-gray-800 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.3)]">
+          <h2 className="text-lg font-semibold text-cyan-400 mb-2">Открытые Pull Requests</h2>
           <ul className="space-y-2">
             {openPRs.map((pr) => (
-              <li key={pr.number} className="flex items-center gap-2 bg-gray-800 p-2 rounded text-sm">
+              <li key={pr.number} className="flex items-center gap-2 bg-gray-900 p-2 rounded text-sm">
                 <a href={pr.html_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
                   #{pr.number}: {pr.title}
                 </a>
@@ -452,23 +419,37 @@ const parseFilesFromText = (text: string): FileEntry[] => {
           </ul>
         </section>
       )}
-
       <div className="mb-6">
         <div className="relative">
-          <button className="flex items-center gap-2 p-2 bg-gray-800 rounded hover:bg-gray-700 transition" onClick={() => setShowToolsMenu(!showToolsMenu)}>
+          <button
+            className="flex items-center gap-2 p-2 bg-gray-800 rounded hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)]"
+            onClick={() => setShowToolsMenu(!showToolsMenu)}
+          >
             <FaTools className="text-gray-400" />
             <span className="text-sm">Дополнительные инструменты</span>
           </button>
           {showToolsMenu && (
             <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded shadow-lg z-10">
               {predefinedLinks.map((link) => (
-                <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 hover:bg-gray-700 text-sm">
+                <a
+                  key={link.name}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2 hover:bg-gray-700 text-sm"
+                >
                   {link.icon}
                   <span>{link.name}</span>
                 </a>
               ))}
               {customLinks.map((link) => (
-                <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 hover:bg-gray-700 text-sm">
+                <a
+                  key={link.name}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2 hover:bg-gray-700 text-sm"
+                >
                   <FaLink className="text-gray-400" />
                   <span>{link.name}</span>
                 </a>
