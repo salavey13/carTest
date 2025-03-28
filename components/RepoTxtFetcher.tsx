@@ -94,13 +94,14 @@ const RepoTxtFetcher: React.FC = () => {
   };
 
   useEffect(() => {
+    console.log("Search params:", searchParams.toString(), "Highlighted path:", highlightedPath, "Auto-fetch:", autoFetch);
     if (autoFetch) {
       handleFetch();
       setTimeout(() => document.getElementById("kwork-input")?.scrollIntoView({ behavior: "smooth" }), 100);
       setKworkInput("Введите, что вы хотите изменить...");
       setLastAction("auto_fetch");
     }
-  }, [autoFetch, repoUrl, token]); // Added dependencies to ensure useEffect triggers correctly
+  }, [autoFetch, repoUrl, token]);
 
   const toggleFileSelection = (path: string) => {
     setSelectedFiles((prev) => {
