@@ -26,6 +26,10 @@ const RepoTxtFetcher: React.FC = () => {
   const [lastAction, setLastAction] = useState<string | null>(null);
   const { user } = useAppContext();
 
+  const searchParams = useSearchParams();
+  const highlightedPath = searchParams.get("path") || "";
+  const autoFetch = !!highlightedPath;
+
   const importantFiles = [
     "app/actions.ts",
     "app/layout.tsx",
@@ -43,95 +47,60 @@ const RepoTxtFetcher: React.FC = () => {
     toast(message, { style: { background: "rgba(34, 34, 34, 0.8)", color: "#E1FF01" } });
   };
 
-  const SearchParamsHandler: React.FC = () => {
-    const searchParams = useSearchParams();
-    const highlightedPath = searchParams.get("path") || "";
-    const autoFetch = !!highlightedPath;
+  const handleFetch = async () => {
+    setExtractLoading(true);
+    setError(null);
+    setFiles([]);
+    setSelectedFiles(new Set());
+    setProgress(0);
+    addToast("Извлечение файлов...");
 
-    useEffect(() => {
-      if (autoFetch) {
-        handleFetch();
-        setTimeout(() => document.getElementById("kwork-input")?.scrollIntoView({ behavior: "smooth" }), 100);
-        setKworkInput("Введите, что вы хотите изменить...");
-        setLastAction("auto_fetch");
+    try {
+      const result = await fetchRepoContents(repoUrl, token || undefined);
+      if (!result || !result.success) {
+        throw new Error(result?.error || "Не удалось загрузить содержимое репозитория");
       }
-    }, [autoFetch]);
 
-    const handleFetch = async () => {
-      setExtractLoading(true);
-      setError(null);
-      setFiles([]);
-      setSelectedFiles(new Set());
-      setProgress(0);
-      addToast("Извлечение файлов...");
-
-      try {
-        const result = await fetchRepoContents(repoUrl, token || undefined);
-        if (!result.success) throw new Error(result.error || "Не удалось загрузить содержимое репозитория");
-
-        const fetchedFiles = result.files;
-        setFiles(fetchedFiles);
-        addToast("Файлы извлечены! Выберите файл для добавления в контекст.");
-        const totalFiles = fetchedFiles.length;
-        fetchedFiles.forEach((_, index) => {
-          setTimeout(() => setProgress(((index + 1) / totalFiles) * 100), index * 50);
-        });
-        if (highlightedPath) {
-          setTimeout(() => {
-            const fileElement = document.getElementById(`file-${highlightedPath}`);
-            if (fileElement) fileElement.scrollIntoView({ behavior: "smooth" });
-          }, 100);
-        }
-      } catch (err: any) {
-        setError(`Ошибка: ${err.message}`);
-        addToast(`Ошибка: ${err.message}`);
-      } finally {
-        setExtractLoading(false);
-        setLastAction("fetch");
+      const fetchedFiles = result.files || [];
+      if (!Array.isArray(fetchedFiles)) {
+        throw new Error("Неверный формат данных от fetchRepoContents");
       }
-    };
 
-    return (
-      <>
-        {highlightedPath && (
-          <p className="text-yellow-400 mb-6 text-center">
-            Исправление файлов, связанных с <strong>{highlightedPath}</strong>
-          </p>
-        )}
-        <div className="flex flex-col gap-3 mb-6">
-          <div>
-            <label className="block text-sm font-medium mb-1">URL репозитория</label>
-            <input
-              type="text"
-              value={repoUrl}
-              onChange={(e) => setRepoUrl(e.target.value)}
-              className="w-full p-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] hover:border-cyan-400 text-sm"
-              placeholder="https://github.com/username/repository"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Токен GitHub (опционально)</label>
-            <input
-              type="password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              className="w-full p-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] hover:border-cyan-400 text-sm"
-              placeholder="Введите ваш токен GitHub"
-            />
-          </div>
-          <motion.button
-            onClick={handleFetch}
-            disabled={extractLoading}
-            className={`px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-purple-600 to-cyan-500 transition-all shadow-[0_0_12px_rgba(0,255,157,0.3)] ${extractLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_18px_rgba(0,255,157,0.5)]"}`}
-            whileHover={{ scale: extractLoading ? 1 : 1.05 }}
-            whileTap={{ scale: extractLoading ? 1 : 0.95 }}
-          >
-            {extractLoading ? "Извлечение..." : "Извлечь файлы"}
-          </motion.button>
-        </div>
-      </>
-    );
+      setFiles(fetchedFiles);
+      addToast("Файлы извлечены! Выберите файл для добавления в контекст.");
+      const totalFiles = fetchedFiles.length;
+      fetchedFiles.forEach((_, index) => {
+        setTimeout(() => setProgress(((index + 1) / totalFiles) * 100), index * 50);
+      });
+      if (highlightedPath) {
+        setTimeout(() => {
+          const fileElement = document.getElementById(`file-${highlightedPath}`);
+          if (fileElement) {
+            fileElement.scrollIntoView({ behavior: "smooth" });
+          } else {
+            console.warn(`Файл с путем "${highlightedPath}" не найден в списке`);
+          }
+        }, 100);
+      }
+    } catch (err: any) {
+      const errorMessage = `Ошибка: ${err.message || "Неизвестная ошибка при загрузке репозитория"}`;
+      setError(errorMessage);
+      addToast(errorMessage);
+      console.error("Fetch error:", err);
+    } finally {
+      setExtractLoading(false);
+      setLastAction("fetch");
+    }
   };
+
+  useEffect(() => {
+    if (autoFetch) {
+      handleFetch();
+      setTimeout(() => document.getElementById("kwork-input")?.scrollIntoView({ behavior: "smooth" }), 100);
+      setKworkInput("Введите, что вы хотите изменить...");
+      setLastAction("auto_fetch");
+    }
+  }, [autoFetch, repoUrl, token]); // Added dependencies to ensure useEffect triggers correctly
 
   const toggleFileSelection = (path: string) => {
     setSelectedFiles((prev) => {
@@ -223,6 +192,11 @@ const RepoTxtFetcher: React.FC = () => {
 
   return (
     <div className="w-full p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden">
+      {highlightedPath && (
+        <p className="text-yellow-400 mb-6 text-center">
+          Исправление файлов, связанных с <strong>{highlightedPath}</strong>
+        </p>
+      )}
       <h2 className="text-2xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-4">
         Кибер-Экстрактор Кода
       </h2>
@@ -230,7 +204,37 @@ const RepoTxtFetcher: React.FC = () => {
         Ваш инструмент для извлечения кода из GitHub. Выбирайте файлы и отправляйте запросы боту!
       </p>
 
-      <SearchParamsHandler />
+      <div className="flex flex-col gap-3 mb-6">
+        <div>
+          <label className="block text-sm font-medium mb-1">URL репозитория</label>
+          <input
+            type="text"
+            value={repoUrl}
+            onChange={(e) => setRepoUrl(e.target.value)}
+            className="w-full p-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] hover:border-cyan-400 text-sm"
+            placeholder="https://github.com/username/repository"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Токен GitHub (опционально)</label>
+          <input
+            type="password"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            className="w-full p-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] hover:border-cyan-400 text-sm"
+            placeholder="Введите ваш токен GitHub"
+          />
+        </div>
+        <motion.button
+          onClick={handleFetch}
+          disabled={extractLoading}
+          className={`px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-purple-600 to-cyan-500 transition-all shadow-[0_0_12px_rgba(0,255,157,0.3)] ${extractLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_18px_rgba(0,255,157,0.5)]"}`}
+          whileHover={{ scale: extractLoading ? 1 : 1.05 }}
+          whileTap={{ scale: extractLoading ? 1 : 0.95 }}
+        >
+          {extractLoading ? "Извлечение..." : "Извлечь файлы"}
+        </motion.button>
+      </div>
 
       {extractLoading && (
         <div className="mb-6">
@@ -263,7 +267,7 @@ const RepoTxtFetcher: React.FC = () => {
                       />
                       <span
                         className={`text-xs ${
-                          file.path === (useSearchParams().get("path") || "")
+                          file.path === highlightedPath
                             ? "text-yellow-400 font-bold animate-pulse"
                             : importantFiles.includes(file.path)
                             ? "text-[#E1FF01] font-bold animate-pulse"
