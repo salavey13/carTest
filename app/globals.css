@@ -222,7 +222,10 @@ input[type="search"]::-ms-clear {
     background-position: 200px 200px;
   }
 }
-
+@import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&display=swap');
+.font-comic {
+  font-family: 'Comic Neue', cursive;
+}
 /* Orbitron Font Import - Correctly placed at the end */
 @import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap");
 @font-face {
