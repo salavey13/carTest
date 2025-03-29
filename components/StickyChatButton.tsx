@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { FaRobot } from "react-icons/fa";
+import { FaRobot, FaStar } from "react-icons/fa";
 import Image from "next/image";
 
 const StickyChatButton: React.FC = () => {
@@ -10,9 +10,13 @@ const StickyChatButton: React.FC = () => {
   const [fixClicked, setFixClicked] = useState(false);
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
   const currentPath = usePathname();
+  const router = useRouter();
+
+  // Determine the folder path (not the full file path)
+  const folderPath = currentPath === "/" ? "app" : `app${currentPath}`;
 
   const suggestions = [
-    ...(fixClicked ? [] : [{ text: "Исправить текущую страницу", link: `/repo-xml?path=${currentPath}` }]),
+    ...(fixClicked ? [] : [{ text: "Исправить текущую страницу", link: `/repo-xml?path=${folderPath}` }]),
     { text: "Добавить что-то новое", link: "/repo-xml" },
     { text: "Нанять меня за звезды", link: "/selfdev" },
   ];
@@ -32,17 +36,13 @@ const StickyChatButton: React.FC = () => {
     return suggestions[randomIndex];
   };
 
-  const handleFixClick = (link: string) => {
-    if (link.includes("path")) {
-      setFixClicked(true);
-      window.location.href = link;
-    } else {
-      window.location.href = link;
-    }
+  const handleClick = (link: string) => {
+    if (link.includes("path")) setFixClicked(true);
+    router.push(link);
   };
 
   const containerVariants = {
-    hidden: { opacity: 0, x: 300 },
+    hidden: { opacity: 0, x: -300 },
     visible: {
       opacity: 1,
       x: 0,
@@ -51,10 +51,10 @@ const StickyChatButton: React.FC = () => {
         stiffness: 120,
         damping: 15,
         when: "beforeChildren",
-        staggerChildren: 0.1,
+        staggerChildren: 0.3,
       },
     },
-    exit: { opacity: 0, x: 300, transition: { duration: 0.3 } },
+    exit: { opacity: 0, x: -300, transition: { duration: 0.3 } },
   };
 
   const childVariants = {
@@ -66,7 +66,7 @@ const StickyChatButton: React.FC = () => {
     <>
       {isOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-end"
+          className="fixed inset-0 z-50 flex items-center justify-start"
           onClick={() => setIsOpen(false)}
         >
           <motion.div
@@ -74,26 +74,23 @@ const StickyChatButton: React.FC = () => {
             initial="hidden"
             animate="visible"
             exit="exit"
-            className="p-4 w-72 flex flex-col items-end bg-transparent"
+            className="p-4 w-72 flex flex-col items-start bg-transparent"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Buttons */}
-            <motion.div variants={childVariants} className="space-y-2 w-full">
-              {suggestions.map((suggestion, index) => (
-                <a
-                  key={index}
-                  href={suggestion.link}
-                  onClick={() => handleFixClick(suggestion.link)}
-                  className="block w-full text-right px-4 py-2 bg-gray-700 bg-opacity-80 rounded-full text-cyan-400 hover:text-cyan-300 transition-all shadow-[0_0_8px_rgba(0,255,157,0.3)] hover:shadow-[0_0_12px_rgba(0,255,157,0.5)] text-sm"
-                >
-                  {suggestion.text}
-                </a>
-              ))}
+            {/* Comic-Style Balloon for Suggestion */}
+            <motion.div
+              variants={childVariants}
+              className="relative mb-4 bg-white bg-opacity-90 p-3 rounded-full shadow-[0_0_10px_rgba(0,255,157,0.5)]"
+            >
+              <p className="text-sm text-gray-800 font-comic font-bold">
+                Попробуй {getRandomSuggestion().text}!
+              </p>
+              <div className="absolute -bottom-2 left-16 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-white" />
             </motion.div>
 {/* Xuinity PNG Icon */}
-            <motion.div variants={childVariants} className="mb-4 flex justify-end">
+            <motion.div variants={childVariants} className="mb-4 pl-0">
               <Image
-                src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/character-images/public/x2.png" // Replace with your PNG path (e.g., in /public/)
+                src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/character-images/public/x13.png"
                 alt="Xuinity"
                 width={169}
                 height={169}
@@ -101,13 +98,23 @@ const StickyChatButton: React.FC = () => {
               />
             </motion.div>
 
-            {/* Random Suggestion Text */}
-            <motion.p
-              variants={childVariants}
-              className="text-sm text-white mb-4 drop-shadow-[0_0_5px_rgba(0,255,157,0.3)] text-right"
-            >
-              Попробуй {getRandomSuggestion().text}!
-            </motion.p>
+            {/* Buttons */}
+            <motion.div variants={childVariants} className="space-y-2 w-full">
+              {suggestions.map((suggestion, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleClick(suggestion.link)}
+                  className={`block w-full text-left px-4 py-2 rounded-full text-sm font-semibold transition-all shadow-[0_0_8px_rgba(0,255,157,0.3)] hover:shadow-[0_0_12px_rgba(0,255,157,0.5)] ${
+                    suggestion.text === "Нанять меня за звезды"
+                      ? "bg-gradient-to-r from-yellow-500 to-orange-500 text-white"
+                      : "bg-gray-700 bg-opacity-80 text-cyan-400 hover:text-cyan-300"
+                  }`}
+                >
+                  {suggestion.text === "Нанять меня за звезды" && <FaStar className="inline mr-1" />}
+                  {suggestion.text}
+                </button>
+              ))}
+            </motion.div>
           </motion.div>
         </div>
       ) : (
