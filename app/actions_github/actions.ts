@@ -100,6 +100,7 @@ export async function createGitHubPullRequest(
   files: FileNode[],
   prTitle: string,
   prDescription: string,
+  commitMessage: string, // <<< Added parameter
   branchName?: string // Optional custom branch name
 ) {
   try {
@@ -119,7 +120,32 @@ export async function createGitHubPullRequest(
     });
     const baseSha = refData.object.sha;
 
-    const branch = branchName || `feature/coze-${Date.now()}`;
+
+    // --- Define Limits and Check/Truncate Inputs ---
+    const MAX_SIZE_BYTES = 65000; // Approx 65kb limit for GitHub API fields
+    let finalCommitMessage = commitMessage;
+    let finalPrDescription = prDescription;
+
+    const commitMsgBlob = new Blob([finalCommitMessage]);
+    if (commitMsgBlob.size > MAX_SIZE_BYTES) {
+      console.warn(
+        `Commit message is too long (${commitMsgBlob.size} bytes). Truncating to ~${MAX_SIZE_BYTES} bytes.`
+      );
+      // Simple truncation strategy (adjust character count if needed)
+      finalCommitMessage = finalCommitMessage.substring(0, 60000) + "... (message truncated due to size limit)";
+    }
+
+    const prDescBlob = new Blob([finalPrDescription]);
+    if (prDescBlob.size > MAX_SIZE_BYTES) {
+       console.warn(
+         `PR description is too long (${prDescBlob.size} bytes). Truncating to ~${MAX_SIZE_BYTES} bytes.`
+       );
+       // Simple truncation strategy
+       finalPrDescription = finalPrDescription.substring(0, 60000) + "\n\n... (description truncated due to size limit)";
+    }
+// --- End Size Checks ---
+
+    const branch = branchName || `feature-aiassisted-onesitepls-${Date.now()}`;
     await octokit.git.createRef({
       owner,
       repo,
@@ -164,7 +190,7 @@ export async function createGitHubPullRequest(
     const { data: newCommit } = await octokit.git.createCommit({
       owner,
       repo,
-      message: `Update files via CozeExecutor: ${prTitle}`,
+      message: finalCommitMessage,
       tree: newTree.sha,
       parents: [baseSha],
     });
@@ -174,16 +200,21 @@ export async function createGitHubPullRequest(
       repo,
       ref: `heads/${branch}`,
       sha: newCommit.sha,
+      force: false, // Avoid force unless absolutely necessary
     });
 
     const changedFiles = files.map((file) => file.path).join(", ");
-    const fullPrDescription = `${prDescription}\n\n**Измененные файлы:** ${changedFiles}`;
+    
 
+    // The finalPrDescription already includes truncation notice if needed
+    // const fullPrDescription = `${finalPrDescription}\n\n**Измененные файлы:** ${changedFiles}`; // Avoid doubling up info if already in finalPrDescription
+
+    // Create the Pull Request using the potentially truncated description
     const { data: pr } = await octokit.pulls.create({
       owner,
       repo,
       title: prTitle,
-      body: fullPrDescription,
+      body: finalPrDescription,
       head: branch,
       base: defaultBranch,
     });
