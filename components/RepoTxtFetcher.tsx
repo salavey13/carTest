@@ -401,7 +401,7 @@ const RepoTxtFetcher = forwardRef<any, RepoTxtFetcherProps>(({ kworkInputRef }, 
                                 />
                                 <span
                                     className={`text-xs flex-grow truncate ${
-                                    file.path === `${primaryHighlightedPath}/page.tsx`
+                                    file.path === primaryHighlightedPath
                                         ? "text-yellow-300 font-bold ring-1 ring-yellow-400 rounded px-1" // More visible highlight
                                         : secondaryHighlightedPaths.includes(file.path)
                                         ? "text-green-400 font-semibold ring-1 ring-green-500 rounded px-1"
