@@ -24,6 +24,8 @@ const RepoTxtFetcher: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [kworkInput, setKworkInput] = useState<string>("");
   const [lastAction, setLastAction] = useState<string | null>(null);
+  const [primaryHighlightedPath, setPrimaryHighlightedPath] = useState<string | null>(null);
+  const [secondaryHighlightedPaths, setSecondaryHighlightedPaths] = useState<string[]>([]);
   const { user } = useAppContext();
 
   const searchParams = useSearchParams();
@@ -32,14 +34,8 @@ const RepoTxtFetcher: React.FC = () => {
 
   const importantFiles = [
     "app/actions.ts",
-    "app/layout.tsx",
-    "app/repo-xml/page.tsx",
-    "app/actions_github/actions.ts",
-    "components/CozeExecutor.tsx",
-    "components/RepoTxtFetcher.tsx",
     "hooks/useTelegram.ts",
     "contexts/AppContext.tsx",
-    "lib/utils.ts",
     "types/supabase.ts",
   ];
 
@@ -47,6 +43,40 @@ const RepoTxtFetcher: React.FC = () => {
     toast(message, { style: { background: "rgba(34, 34, 34, 0.8)", color: "#E1FF01" } });
   };
 
+  // **Helper Functions**
+
+  /** Maps a route path (e.g., "/repo-xml") to its corresponding page.tsx file path */
+  const getPageFilePath = (routePath: string): string => {
+     return `${routePath}/page.tsx`;
+  };
+
+  /** Extracts import paths from file content */
+  const extractImports = (content: string): string[] => {
+    const importRegex = /import\s+.*?\s+from\s+['"](.+?)['"]/g;
+    const matches = content.matchAll(importRegex);
+    return Array.from(matches, (m) => m[1]);
+  };
+
+  /** Resolves an import path to an actual file path in the repository */
+  const resolveImportPath = (importPath: string, files: FileNode[]): string | null => {
+    if (importPath.startsWith("@/")) {
+      const relativePath = importPath.replace("@/", "");
+      const possiblePaths = [
+        `${relativePath}.tsx`,
+        `${relativePath}.ts`,
+        `${relativePath}/index.tsx`,
+        `${relativePath}/index.ts`,
+      ];
+      for (const path of possiblePaths) {
+        if (files.some((file) => file.path === path)) {
+          return path;
+        }
+      }
+    }
+    return null;
+  };
+
+  // **Fetch Handler with Highlighting Logic**
   const handleFetch = async () => {
     setExtractLoading(true);
     setError(null);
@@ -72,15 +102,21 @@ const RepoTxtFetcher: React.FC = () => {
       fetchedFiles.forEach((_, index) => {
         setTimeout(() => setProgress(((index + 1) / totalFiles) * 100), index * 50);
       });
+
+      // **Highlighting Logic**
       if (highlightedPath) {
-        setTimeout(() => {
-          const fileElement = document.getElementById(`file-${highlightedPath}`);
-          if (fileElement) {
-            fileElement.scrollIntoView({ behavior: "smooth" });
-          } else {
-            console.warn(`Файл с путем "${highlightedPath}" не найден в списке`);
-          }
-        }, 100);
+        const pageFilePath = getPageFilePath(highlightedPath);
+        setPrimaryHighlightedPath(pageFilePath);
+        const pageFile = fetchedFiles.find((file) => file.path === pageFilePath);
+        if (pageFile) {
+          const imports = extractImports(pageFile.content);
+          const secondaryPaths = imports
+            .map((imp) => resolveImportPath(imp, fetchedFiles))
+            .filter((path): path is string => path !== null);
+          setSecondaryHighlightedPaths(secondaryPaths);
+        } else {
+          console.warn(`Page file "${pageFilePath}" not found in repository`);
+        }
       }
     } catch (err: any) {
       const errorMessage = `Ошибка: ${err.message || "Неизвестная ошибка при загрузке репозитория"}`;
@@ -93,6 +129,7 @@ const RepoTxtFetcher: React.FC = () => {
     }
   };
 
+  // **Auto-Fetch Effect**
   useEffect(() => {
     console.log("Search params:", searchParams.toString(), "Highlighted path:", highlightedPath, "Auto-fetch:", autoFetch);
     if (autoFetch) {
@@ -101,7 +138,19 @@ const RepoTxtFetcher: React.FC = () => {
       setKworkInput("Введите, что вы хотите изменить...");
       setLastAction("auto_fetch");
     }
-  }, [autoFetch, repoUrl, token]);
+  }, [autoFetch, repoUrl, token, highlightedPath]);
+
+  // **Scroll to Primary Highlighted File Effect**
+  useEffect(() => {
+    if (primaryHighlightedPath && files.length > 0) {
+      const fileElement = document.getElementById(`file-${primaryHighlightedPath}`);
+      if (fileElement) {
+        fileElement.scrollIntoView({ behavior: "smooth" });
+      } else {
+        console.warn(`Файл с путем "${primaryHighlightedPath}" не найден в списке`);
+      }
+    }
+  }, [files, primaryHighlightedPath]);
 
   const toggleFileSelection = (path: string) => {
     setSelectedFiles((prev) => {
@@ -268,8 +317,10 @@ const RepoTxtFetcher: React.FC = () => {
                       />
                       <span
                         className={`text-xs ${
-                          file.path === highlightedPath
+                          file.path === primaryHighlightedPath
                             ? "text-yellow-400 font-bold animate-pulse"
+                            : secondaryHighlightedPaths.includes(file.path)
+                            ? "text-green-400 font-bold animate-pulse"
                             : importantFiles.includes(file.path)
                             ? "text-[#E1FF01] font-bold animate-pulse"
                             : "text-gray-400 hover:text-white"
@@ -341,7 +392,7 @@ const RepoTxtFetcher: React.FC = () => {
         />
         <motion.button
           onClick={handleCopyToClipboard}
-          className="absolute top-6 right-2 p-1 bg-gradient-to-r from-cyan-600 to-teal-500 rounded-full shadow-[0_0_8px_rgba(6,182,212,0.3)] hover:shadow-[0_0_12px_rgba(6,182,212,0.5)] transition-all"
+          className="absolute top-2 right-2 p-1 bg-gradient-to-r from-cyan-600 to-teal-500 rounded-full shadow-[0_0_8px_rgba(6,182,212,0.3)] hover:shadow-[0_0_12px_rgba(6,182,212,0.5)] transition-all"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           title="Скопировать в буфер"
