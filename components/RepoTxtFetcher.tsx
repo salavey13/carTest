@@ -74,8 +74,8 @@ const RepoTxtFetcher = forwardRef<any, RepoTxtFetcherProps>(({ kworkInputRef }, 
   // **Helper Functions** (getPageFilePath, extractImports, resolveImportPath remain the same)
     const getPageFilePath = (routePath: string): string => {
         // Adjust if using route groups like (app) etc.
-        const cleanPath = routePath.replace(/^\(.*\)/, ''); // Remove potential group like (app)
-        return `app${cleanPath}/page.tsx`; // Assuming structure is app/route/page.tsx
+        const cleanPath = routePath//.replace(/^\(.*\)/, ''); // Remove potential group like (app)
+        return `${cleanPath}/page.tsx`; // Assuming structure is app/route/page.tsx
     };
     const extractImports = (content: string): string[] => {
         const importRegex = /import\s+.*?\s+from\s+['"](.+?)['"]/g;
