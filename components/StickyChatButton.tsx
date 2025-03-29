@@ -83,7 +83,7 @@ const StickyChatButton: React.FC = () => {
               className="relative mb-4 bg-white bg-opacity-90 p-3 rounded-full shadow-[0_0_10px_rgba(0,255,157,0.5)]"
             >
               <p className="text-sm text-gray-800 font-comic font-bold">
-                Попробуй {getRandomSuggestion().text}!
+                Попробуй {getRandomSuggestion().text}, я подскажу, не ссы, йоба!)
               </p>
               <div className="absolute -bottom-2 left-16 w-0 h-0 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-white" />
             </motion.div>
