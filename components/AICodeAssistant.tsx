@@ -716,7 +716,7 @@ const AICodeAssistant = forwardRef<any, AICodeAssistantProps>(({ aiResponseInput
                             className="w-full p-2 bg-gray-800 rounded border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.2)] text-sm min-h-[80px] resize-y"
                             value={commitMessage}
                             onChange={(e) => setCommitMessage(e.target.value)}
-                            placeholder="Сообщение для коммита (первая строка - заголовок < 50 симв., далее - тело)"
+                            placeholder="Сообщение для коммита"
                              disabled={loading}
                         />
                      </div>
