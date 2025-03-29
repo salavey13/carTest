@@ -305,7 +305,7 @@ const StickyChatButton: React.FC = () => {
                             width={120} // Slightly smaller for action list
                             height={120}
                             priority
-                            className="drop-shadow-[0_0_12px_rgba(0,255,157,0.6)]"
+                            className="rounded-full drop-shadow-[0_0_12px_rgba(0,255,157,0.6)]"
                         />
                     </motion.div>
                 </motion.div>
