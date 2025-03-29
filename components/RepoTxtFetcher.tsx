@@ -171,7 +171,7 @@ const RepoTxtFetcher: React.FC = () => {
       .map((file) => `**${file.path}**\n\`\`\`\n${file.content}\n\`\`\``)
       .join("\n\n");
     setKworkInput((prev) => `${prev}\n\nВыбранные файлы:\n${markdownTxt}`);
-    addToast("Нажмите это, когда закончите писать!");
+    addToast("Нажмите Скопировать, когда закончите писать!;)");
     setLastAction("add_selected");
     setTimeout(() => document.getElementById("kwork-input")?.scrollIntoView({ behavior: "smooth" }), 100);
   };
@@ -198,7 +198,7 @@ const RepoTxtFetcher: React.FC = () => {
       return;
     }
     navigator.clipboard.writeText(kworkInput);
-    addToast("Скопировано! Спросите Grok, вставьте ответ ниже и не забудьте ссылку на чат!");
+    addToast("Скопировано! Спросите Grok, вставьте ответ ниже и не забудьте ссылку на чат!)");
     setLastAction("copy");
     setTimeout(() => document.getElementById("response-input")?.scrollIntoView({ behavior: "smooth" }), 100);
   };
@@ -210,7 +210,7 @@ const RepoTxtFetcher: React.FC = () => {
       case "fetch":
         return "Выберите файл для добавления в контекст!";
       case "add_selected":
-        return "Нажмите 'Добавить выбранные', когда закончите!";
+        return "Нажмите 'Скопировать', когда закончите!";
       case "copy":
         return "Спросите Grok, вставьте ответ ниже!";
       default:
