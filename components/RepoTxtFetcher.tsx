@@ -150,7 +150,30 @@ const RepoTxtFetcher = forwardRef<any, RepoTxtFetcherProps>(({ kworkInputRef }, 
 
       setFilesFetched(true, primaryPath, secondaryPaths); // Update context: fetch succeeded with highlight info
       addToast("Файлы извлечены! Готов к следующему шагу.");
+      // ... (inside handleFetch, after setFiles)
+      if (primaryPath) {
+        // Give rendering a bit more time, especially with progress updates
+        setTimeout(() => {
+          // Find the *first* file that matches the highlight criteria
+          const fileToScrollTo = fetchedFiles.find(f =>
+            f.path === primaryPath || f.path.startsWith(highlightedPathFromUrl + '/')
+          );
 
+          if (fileToScrollTo) {
+            const elementId = `file-${fileToScrollTo.path}`;
+            const fileElement = document.getElementById(elementId);
+            if (fileElement) {
+              fileElement.scrollIntoView({ behavior: "smooth", block: "center" }); // Added block: 'center' for better visibility
+               console.log(`Scrolling to element: ${elementId}`);
+            } else {
+               // This might happen if the element isn't rendered yet or ID mismatch
+               console.warn(`Found matching file "${fileToScrollTo.path}" but its element ID "${elementId}" was not found in the DOM.`);
+            }
+          } else {
+            console.warn(`No file found matching the path prefix or exact match for "${highlightedPath}"`);
+          }
+        }, 500); // Increased delay to allow rendering completion
+      }
     } catch (err: any) {
       const errorMessage = `Ошибка: ${err.message || "Неизвестная ошибка при загрузке репозитория"}`;
       setError(errorMessage);
