@@ -64,9 +64,9 @@ const RepoXmlPageContext = createContext<RepoXmlPageContextType | undefined>(und
 
 export const useRepoXmlPageContext = () => {
   const context = useContext(RepoXmlPageContext);
-  if (!context) {
+  /*if (!context) {
     throw new Error('useRepoXmlPageContext must be used within a RepoXmlPageProvider');
-  }
+  }*/
   return context;
 };
 
