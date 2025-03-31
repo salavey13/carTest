@@ -241,23 +241,53 @@ const AICodeAssistant = forwardRef<any, AICodeAssistantProps>(({ aiResponseInput
     }
   }, [response, setParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues]);
 
-  const handleSearch = useCallback((searchText: string) => {
+  const handleSearch = useCallback((searchText: string, direction: 'next' | 'prev' = 'next') => {
     if (!searchText) {
-      toast.warn("Введите текст для поиска.");
-      return;
+        toast.warn("Please enter text to search.");
+        return;
     }
     const textarea = aiResponseInputRef.current;
     if (!textarea) return;
-    const text = textarea.value;
-    const index = text.indexOf(searchText);
-    if (index !== -1) {
-      textarea.setSelectionRange(index, index + searchText.length);
-      textarea.focus();
-      toast.success(`Найден "${searchText}".`);
-    } else {
-      toast.info("Текст не найден.");
+
+    const text = textarea.value.toLowerCase(); // Case-insensitive
+    const searchLower = searchText.toLowerCase();
+    let cursorPos = textarea.selectionStart;
+
+    // Find all matches
+    let matches = [];
+    let index = text.indexOf(searchLower);
+    while (index !== -1) {
+        matches.push(index);
+        index = text.indexOf(searchLower, index + 1);
     }
-  }, [aiResponseInputRef]);
+
+    if (matches.length === 0) {
+        toast.info("Text not found.");
+        return;
+    }
+
+    // Determine the next or previous match
+    let currentIndex;
+    if (direction === 'next') {
+        currentIndex = matches.findIndex(pos => pos > cursorPos);
+        if (currentIndex === -1) currentIndex = 0; // Wrap to start
+    } else {
+        currentIndex = matches.slice().reverse().findIndex(pos => pos < cursorPos);
+        if (currentIndex === -1) currentIndex = matches.length - 1; // Wrap to end
+        else currentIndex = matches.length - 1 - currentIndex;
+    }
+
+    const matchPos = matches[currentIndex];
+    textarea.setSelectionRange(matchPos, matchPos + searchText.length);
+    textarea.focus();
+
+    // Scroll to the match
+    const lineHeight = parseInt(window.getComputedStyle(textarea).lineHeight) || 20;
+    const lines = textarea.value.substring(0, matchPos).split('\n').length - 1;
+    textarea.scrollTop = lines * lineHeight - textarea.clientHeight / 2 + lineHeight / 2;
+
+    toast.success(`Found "${searchText}".`);
+}, [aiResponseInputRef]);
 
   // File List Handlers
   const handleToggleFileSelection = useCallback((fileId: string) => {
