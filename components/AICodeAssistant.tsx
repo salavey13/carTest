@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useImperativeHandle, forwardRef, MutableRefObject, useCallback } from "react";
 // Action Imports
-import { createGitHubPullRequest, getOpenPullRequests, fetchRepoContents } from "@/app/actions_github/actions"; // Add fetchRepoContents
+import { createGitHubPullRequest, getOpenPullRequests, fetchRepoContents } from "@/app/actions_github/actions";
 import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 // Hook Imports
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -16,7 +16,7 @@ import { PullRequestForm } from './assistant_components/PullRequestForm';
 import { OpenPrList } from './assistant_components/OpenPrList';
 import { ToolsMenu } from './assistant_components/ToolsMenu';
 import { SwapModal } from './assistant_components/SwapModal';
-import { CodeRestorer } from './assistant_components/CodeRestorer'; // Import CodeRestorer
+import { CodeRestorer } from './assistant_components/CodeRestorer';
 // Library Imports
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
@@ -35,7 +35,6 @@ Tooltip.displayName = 'Tooltip';
 // --- Interfaces ---
 interface FileEntry extends ValidationFileEntry {}
 interface AICodeAssistantProps { aiResponseInputRef: MutableRefObject<HTMLTextAreaElement | null>; }
-// Interface for original files fetched by RepoTxtFetcher
 interface OriginalFile { path: string; content: string; }
 
 // --- Main Component ---
@@ -65,73 +64,57 @@ const AICodeAssistant = forwardRef<any, AICodeAssistantProps>(({ aiResponseInput
   const [customLinks, setCustomLinks] = useState<{ name: string; url: string }[]>([]);
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [isCreatingPr, setIsCreatingPr] = useState(false);
-  const [originalRepoFiles, setOriginalRepoFiles] = useState<OriginalFile[]>([]); // State to hold original files for restoration
+  const [originalRepoFiles, setOriginalRepoFiles] = useState<OriginalFile[]>([]);
   const [isFetchingOriginals, setIsFetchingOriginals] = useState(false);
 
   // --- Helper ---
    const extractPRTitleHint = (text: string): string => { const lines = text.split('\n'); const firstLine = lines.find(l => l.trim() !== '') || "AI Assistant Update"; return firstLine.trim().substring(0, 70); };
 
   // --- Effects ---
-   useEffect(() => { const hasContent = response.trim().length > 0; setAiResponseHasContent(hasContent); if (!hasContent) { setFilesParsed(false); setSelectedAssistantFiles(new Set()); setValidationStatus('idle'); setValidationIssues([]); } else { if (parsedFiles.length === 0 && validationStatus !== 'idle' && !isParsing) { setValidationStatus('idle'); setValidationIssues([]); } } }, [response, parsedFiles.length, isParsing, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues]);
+   useEffect(() => { const hasContent = response.trim().length > 0; setAiResponseHasContent(hasContent); if (!hasContent) { setFilesParsed(false); setSelectedAssistantFiles(new Set()); setValidationStatus('idle'); setValidationIssues([]); setOriginalRepoFiles([]); } else { if (parsedFiles.length === 0 && validationStatus !== 'idle' && !isParsing) { setValidationStatus('idle'); setValidationIssues([]); } } }, [response, parsedFiles.length, isParsing, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues]);
    useEffect(() => { const loadLinks = async () => { if (!user) { setCustomLinks([]); return; } try { const { data: userData, error } = await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id).single(); if (!error && userData?.metadata?.customLinks) setCustomLinks(userData.metadata.customLinks); else setCustomLinks([]); } catch (e) { console.error("Error loading links:", e); setCustomLinks([]); } }; loadLinks(); }, [user]);
 
-   // --- NEW: Effect to fetch original files when needed for restoration ---
+   // Fetch original files when skipped issues are detected
    const skippedIssues = validationIssues.filter(i => i.type === 'skippedCodeBlock');
    useEffect(() => {
-        // Fetch only if there are skipped issues and we haven't fetched yet (or repoUrl changed?)
         if (skippedIssues.length > 0 && originalRepoFiles.length === 0 && !isFetchingOriginals && repoUrl) {
             const fetchOriginals = async () => {
-                setIsFetchingOriginals(true);
-                toast.info("Загрузка оригинальных файлов для восстановления...");
+                setIsFetchingOriginals(true); toast.info("Загрузка оригиналов...");
                 try {
-                    // Reuse the fetch action from RepoTxtFetcher (ensure it's imported)
-                    const result = await fetchRepoContents(repoUrl); // Use default token logic
-                    if (result.success && Array.isArray(result.files)) {
-                        setOriginalRepoFiles(result.files);
-                        toast.success("Оригинальные файлы загружены.");
-                    } else {
-                        toast.error("Не удалось загрузить оригинальные файлы: " + result.error);
-                        setOriginalRepoFiles([]); // Clear on error
-                    }
-                } catch (error) {
-                    toast.error("Ошибка при загрузке оригинальных файлов.");
-                    console.error("Fetch original files error:", error);
-                    setOriginalRepoFiles([]);
-                } finally {
-                    setIsFetchingOriginals(false);
-                }
+                    const result = await fetchRepoContents(repoUrl);
+                    if (result.success && Array.isArray(result.files)) { setOriginalRepoFiles(result.files); toast.success("Оригиналы загружены."); }
+                    else { toast.error("Ошибка загрузки оригиналов: " + result.error); setOriginalRepoFiles([]); }
+                } catch (error) { toast.error("Крит. ошибка загрузки оригиналов."); setOriginalRepoFiles([]); } finally { setIsFetchingOriginals(false); }
             };
             fetchOriginals();
         }
-   }, [skippedIssues.length, originalRepoFiles.length, isFetchingOriginals, repoUrl]); // Rerun if skipped issues appear or repoUrl changes
+   }, [skippedIssues.length, originalRepoFiles.length, isFetchingOriginals, repoUrl]);
 
 
   // --- Handlers ---
 
   // Parse & Validate Handler
   const handleParse = useCallback(async () => {
-        setAssistantLoading(true); setOriginalRepoFiles([]); // Clear original files on new parse
-        const { files: newlyParsedFiles } = await parseAndValidateResponse(response);
-        setAssistantLoading(false); setFilesParsed(newlyParsedFiles.length > 0);
-        const initialSelection = new Set(newlyParsedFiles.map(f => f.id));
-        setSelectedFileIds(initialSelection); setSelectedAssistantFiles(new Set(newlyParsedFiles.map(f => f.path)));
-        if (newlyParsedFiles.length > 0) setPrTitle(extractPRTitleHint(rawDescription || response)); else setPrTitle('');
-   }, [response, rawDescription, parseAndValidateResponse, setAssistantLoading, setFilesParsed, setSelectedAssistantFiles]);
+    setAssistantLoading(true); setOriginalRepoFiles([]); // Clear originals on re-parse
+    const { files: newlyParsedFiles } = await parseAndValidateResponse(response);
+    setAssistantLoading(false); setFilesParsed(newlyParsedFiles.length > 0);
+    const initialSelection = new Set(newlyParsedFiles.map(f => f.id)); setSelectedFileIds(initialSelection); setSelectedAssistantFiles(new Set(newlyParsedFiles.map(f => f.path)));
+    if (newlyParsedFiles.length > 0) setPrTitle(extractPRTitleHint(rawDescription || response)); else setPrTitle('');
+  }, [response, rawDescription, parseAndValidateResponse, setAssistantLoading, setFilesParsed, setSelectedAssistantFiles]);
 
    // Auto-Fix Handler
    const handleAutoFix = useCallback(() => { autoFixIssues(parsedFiles, validationIssues); }, [autoFixIssues, parsedFiles, validationIssues]);
 
    // Copy Fix Prompt Handler (for skippedComment issues)
-   const handleCopyFixPrompt = useCallback(() => { const skipped = validationIssues.filter(i => i.type === 'skippedComment'); if (skipped.length===0) return; const fl = skipped.map(i=>`- ${i.filePath} (~${i.details?.lineNumber})`).join('\n'); const p=`Полный код для '// ...' в:\n${fl}\n\nВерни полные блоки кода/комментариев.`; navigator.clipboard.writeText(p).then(()=>toast.success("Prompt скопирован!")).catch(()=>toast.error("Ошибка копирования.")); }, [validationIssues]);
+   const handleCopyFixPrompt = useCallback(() => { const skipped = validationIssues.filter(i => i.type === 'skippedComment'); if (skipped.length===0) return toast.info("Нет маркеров '// ...'."); const fl = skipped.map(i=>`- ${i.filePath} (~${i.details?.lineNumber})`).join('\n'); const p=`Полный код для '// ...' в:\n${fl}\n\nВерни полные блоки.`; navigator.clipboard.writeText(p).then(()=>toast.success("Prompt скопирован!")).catch(()=>toast.error("Ошибка копирования.")); }, [validationIssues]);
 
    // Restore Skipped Code Handler (Called by CodeRestorer component)
    const handleRestorationComplete = useCallback((updatedFiles: FileEntry[], successCount: number, errorCount: number) => {
         setParsedFiles(updatedFiles);
         const remainingIssues = validationIssues.filter(i => i.type !== 'skippedCodeBlock');
         setValidationIssues(remainingIssues);
-        setValidationStatus(remainingIssues.length > 0 ? (remainingIssues.some(i=>!i.fixable)? 'error':'warning') : 'success');
-        if (successCount > 0) toast.success(`${successCount} блоков кода восстановлено из оригиналов!`);
-        if (errorCount > 0) toast.warning(`${errorCount} блоков не найдено/не удалось проверить для авто-восстановления.`);
+        setValidationStatus(remainingIssues.length > 0 ? (remainingIssues.some(i=>!i.fixable && !i.restorable)? 'error':'warning') : 'success');
+        // Toasts are handled within CodeRestorer now
     }, [validationIssues, setParsedFiles, setValidationIssues, setValidationStatus]);
 
   // Text Area Utility Handlers
@@ -160,7 +143,7 @@ const AICodeAssistant = forwardRef<any, AICodeAssistantProps>(({ aiResponseInput
         let finalDescription = rawDescription.substring(0, 13000) + (rawDescription.length > 13000 ? "\n\n...(описание усечено)" : ""); // Increased limit
         finalDescription += `\n\n**Файлы в этом PR (${selectedFiles.length}):**\n` + selectedFiles.map(f => `- \`${f.path}\``).join('\n');
         const unselectedUnnamed = parsedFiles.filter(f => f.path.startsWith('unnamed-') && !selectedFileIds.has(f.id));
-        if (unselectedUnnamed.length > 0) finalDescription += `\n\n**Примечание:** ${unselectedUnnamed.length} блоков кода без имени файла не включены.`;
+        if (unselectedUnnamed.length > 0) finalDescription += `\n\n**Примечание:** ${unselectedUnnamed.length} блоков кода без имени файла не были включены.`;
         const remainingIssues = validationIssues; // Use current issues state
          if (remainingIssues.length > 0) {
             finalDescription += "\n\n**Обнаруженные Проблемы (не исправлено / не восстановлено):**\n";
@@ -175,7 +158,7 @@ const AICodeAssistant = forwardRef<any, AICodeAssistantProps>(({ aiResponseInput
         try {
             const filesToCommit = selectedFiles.map(f => ({ path: f.path, content: f.content }));
             const result = await createGitHubPullRequest( repoUrl, filesToCommit, prTitle, finalDescription, finalCommitMessage );
-            if (result.success && result.prUrl) { toast.success(`PR создан: ${result.prUrl}`); await notifyAdmin(`Новый PR "${prTitle}" создан: ${result.prUrl}`); handleGetOpenPRs(); }
+            if (result.success && result.prUrl) { toast.success(`PR создан: ${result.prUrl}`); await notifyAdmin(`Новый PR "${prTitle}" создан ${user?.username || user?.id}: ${result.prUrl}`); handleGetOpenPRs(); }
             else { toast.error("Ошибка создания PR: " + result.error); console.error("PR Creation Failed:", result.error); }
         } catch (err) { toast.error("Критическая ошибка создания PR."); console.error("Create PR error:", err); }
         finally { setAssistantLoading(false); setIsCreatingPr(false); }
@@ -208,12 +191,12 @@ const AICodeAssistant = forwardRef<any, AICodeAssistantProps>(({ aiResponseInput
             </div>
              {/* Validation Status and Actions */}
              <div className="flex justify-end items-start mt-1 gap-2 min-h-[30px]">
-                 {/* Render CodeRestorer which handles its own button and modal */}
+                 {/* Render CodeRestorer only if there are relevant issues and not parsing/fetching */}
                  <CodeRestorer
-                    parsedFiles={parsedFiles} // Pass current parsed files
-                    originalFiles={originalRepoFiles} // Pass fetched original files
+                    parsedFiles={parsedFiles}
+                    originalFiles={originalRepoFiles}
                     skippedIssues={validationIssues.filter(i => i.type === 'skippedCodeBlock')}
-                    onRestorationComplete={handleRestorationComplete} // Callback to update state here
+                    onRestorationComplete={handleRestorationComplete}
                     disabled={isParsing || isCreatingPr || assistantLoading || validationStatus === 'validating' || isFetchingOriginals} // Disable while busy or fetching originals
                  />
                  <ValidationStatusIndicator
@@ -238,7 +221,7 @@ const AICodeAssistant = forwardRef<any, AICodeAssistantProps>(({ aiResponseInput
          {/* Tools Menu */}
          <ToolsMenu customLinks={customLinks} onAddCustomLink={handleAddCustomLink} />
 
-         {/* Swap Modal (Only Swap Modal is directly managed here) */}
+         {/* Modals */}
          <AnimatePresence>
              {showSwapModal && ( <SwapModal isOpen={showSwapModal} onClose={() => setShowSwapModal(false)} onSwap={handleSwap} /> )}
              {/* Restore modal rendering is now inside CodeRestorer */}
