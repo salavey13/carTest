@@ -43,7 +43,7 @@ export const Tooltip = ({ children, text, position = 'bottom' }: { children: Rea
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: 0.15 }}
-            className={clsx("absolute z-[70] p-2 bg-gray-700 text-white text-[13px] rounded shadow-lg w-max max-w-xs whitespace-pre-line", positionClasses[position])}
+            className={clsx("absolute z-[70] p-2 bg-gray-700 text-white text-[13px] rounded-lg shadow-lg w-max max-w-xs whitespace-pre-line", positionClasses[position])}
           >
             {text}
           </motion.div>
@@ -437,14 +437,13 @@ const AICodeAssistant = forwardRef<any, AICodeAssistantProps>(({ aiResponseInput
       {/* Header */}
       <header className="flex items-center gap-2">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse">AI Code Assistant</h1>
-        <Tooltip text={`Вставьте ответ AI → '➡️' → Проверьте/Исправьте → Выберите файлы → Создать PR`} position="bottom">
+        <Tooltip text={`Вставьте ответ AI → '➡️' → Проверьте/Исправьте → Выберите файлы → Создать PR`} position="left">
           <FaCircleInfo className="text-blue-400 cursor-help hover:text-blue-300 transition" />
         </Tooltip>
       </header>
 
       {/* AI Response Input Area */}
       <div>
-        <label htmlFor="response-input" className="block text-sm font-medium mb-1">2. Ввод ответа AI</label>
         <p className="text-yellow-400 mb-2 text-xs md:text-sm">2️⃣ Вставьте сюда ПОЛНЫЙ ОТВЕТ от вашего AI. Затем нажмите '➡️'.</p>
         <div className="relative group">
           <textarea
