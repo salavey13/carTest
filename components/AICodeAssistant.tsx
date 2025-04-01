@@ -241,23 +241,148 @@ const AICodeAssistant = forwardRef<any, AICodeAssistantProps>(({ aiResponseInput
     }
   }, [response, setParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues]);
 
-  const handleSearch = useCallback((searchText: string) => {
+  const handleSearch = useCallback((searchText: string, isMultiline: boolean) => {
     if (!searchText) {
-      toast.warn("Введите текст для поиска.");
-      return;
+        toast.warn("Пожалуйста, введите текст для поиска.");
+        return;
     }
     const textarea = aiResponseInputRef.current;
     if (!textarea) return;
+
+    const cursorPos = textarea.selectionStart;
     const text = textarea.value;
-    const index = text.indexOf(searchText);
-    if (index !== -1) {
-      textarea.setSelectionRange(index, index + searchText.length);
-      textarea.focus();
-      toast.success(`Найден "${searchText}".`);
+
+    if (isMultiline) {
+        // Trim spaces and remove empty lines from search text
+        const cleanedSearchText = searchText
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0)
+            .join('\n');
+        const firstLine = cleanedSearchText.split('\n')[0];
+        const functionName = extractFunctionName(firstLine);
+        if (!functionName) {
+            toast.error("Не удалось извлечь имя функции.");
+            return;
+        }
+
+        // Search from cursor position, wrapping around
+        const searchTextFromCursor = text.slice(cursorPos) + text.slice(0, cursorPos);
+        const functionRegex = new RegExp(`\\bfunction\\s+${functionName}\\b|\\bconst\\s+${functionName}\\s+=`, 'g');
+        const match = functionRegex.exec(searchTextFromCursor);
+        if (!match) {
+            toast.info(`Функция "${functionName}" не найдена.`);
+            return;
+        }
+
+        // Adjust match index to original text
+        const matchIndex = (match.index + cursorPos) % text.length;
+        textarea.setSelectionRange(matchIndex, matchIndex);
+        textarea.focus();
+
+        // Select the entire function
+        handleMagicSelect();
+
+        // Swap the selected function
+        const selectedStart = textarea.selectionStart;
+        const selectedEnd = textarea.selectionEnd;
+        if (selectedStart !== selectedEnd) {
+            const newValue = text.substring(0, selectedStart) + cleanedSearchText + text.substring(selectedEnd);
+            textarea.value = newValue;
+            textarea.setSelectionRange(selectedStart, selectedStart + cleanedSearchText.length);
+            toast.success(`Функция "${functionName}" успешно заменена! 🎉 Поздравляем, вы нашли пасхальное яйцо! 🥚`);
+        } else {
+            toast.error("Не удалось выделить функцию для замены.");
+        }
     } else {
-      toast.info("Текст не найден.");
+        // Single-line search from cursor position
+        const searchLower = searchText.toLowerCase();
+        const textFromCursor = text.slice(cursorPos).toLowerCase() + text.slice(0, cursorPos).toLowerCase();
+        const index = textFromCursor.indexOf(searchLower);
+        if (index !== -1) {
+            const actualIndex = (index + cursorPos) % text.length;
+            textarea.setSelectionRange(actualIndex, actualIndex + searchText.length);
+            textarea.focus();
+            toast.success(`Найдено "${searchText}".`);
+        } else {
+            toast.info("Текст не найден.");
+        }
     }
-  }, [aiResponseInputRef]);
+}, [aiResponseInputRef]);
+
+const handleMagicSelect = useCallback(() => {
+    const textarea = aiResponseInputRef.current;
+    if (!textarea) return;
+
+    const cursorPos = textarea.selectionStart;
+    const text = textarea.value;
+    const lines = text.split('\n');
+    let charCount = 0;
+    let currentLineIndex = -1;
+
+    // Find the current line based on cursor position
+    for (let i = 0; i < lines.length; i++) {
+        charCount += lines[i].length + 1;
+        if (charCount > cursorPos) {
+            currentLineIndex = i;
+            break;
+        }
+    }
+
+    if (currentLineIndex === -1) {
+        toast.info("Не удалось определить текущую строку.");
+        return;
+    }
+
+    // Find the nearest previous line ending with '{'
+    let functionStartLine = -1;
+    for (let i = currentLineIndex; i >= 0; i--) {
+        if (lines[i].trim().endsWith('{')) {
+            functionStartLine = i;
+            break;
+        }
+    }
+
+    if (functionStartLine === -1) {
+        toast.info("Не найдена строка, заканчивающаяся на '{'.");
+        return;
+    }
+
+    // Calculate the start position (beginning of the function's first line)
+    const functionStartPos = lines.slice(0, functionStartLine).reduce((acc, line) => acc + line.length + 1, 0);
+
+    // Find the matching closing '}' by tracking depth
+    let depth = 1;
+    let closingLineIndex = functionStartLine;
+    while (closingLineIndex < lines.length && depth > 0) {
+        closingLineIndex++;
+        const line = lines[closingLineIndex] || '';
+        for (const char of line) {
+            if (char === '{') depth++;
+            if (char === '}') depth--;
+            if (depth === 0) break;
+        }
+    }
+
+    if (depth === 0) {
+        const functionEndPos = lines.slice(0, closingLineIndex + 1).reduce((acc, line) => acc + line.length + 1, 0) - 1;
+        textarea.setSelectionRange(functionStartPos, functionEndPos);
+        textarea.focus();
+    } else {
+        toast.info("Соответствующая закрывающая скобка не найдена.");
+    }
+}, [aiResponseInputRef]);
+
+const extractFunctionName = (line: string): string | null => {
+    const tokens = line.split(/[\s:]+/);
+    const skipWords = ['export', 'const', 'function'];
+    for (let i = 0; i < tokens.length; i++) {
+        if (!skipWords.includes(tokens[i]) && tokens[i] && /[a-zA-Z]/.test(tokens[i])) {
+            return tokens[i].replace(/\W/g, '');
+        }
+    }
+    return null;
+};
 
   // File List Handlers
   const handleToggleFileSelection = useCallback((fileId: string) => {
