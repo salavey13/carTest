@@ -1,0 +1,1 @@
+import { FaRightLeft, FaMagnifyingGlass, FaTimes } from 'react-icons/fa6'; // Use Fa6 consistently
