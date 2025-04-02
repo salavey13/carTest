@@ -1,0 +1,57 @@
+// Внутри /app/vpr-test/[subjectId]/page.tsx
+
+// ... другие импорты
+import type { User } from '@/types/supabase'; // Импортируем тип User если нужно
+
+// ... существующий код ...
+
+    useEffect(() => {
+        // ... (проверка user?.id и subjectId) ...
+
+        const initializeTest = async () => {
+            setIsLoading(true);
+            setError(null);
+            // ... (сброс состояния) ...
+
+            try {
+                // --- Начало блока обновления роли ---
+                // Проверяем текущую роль пользователя ИЗ КОНТЕКСТА
+                // Важно: dbUser из useAppContext должен быть актуальным
+                const currentUserRole = user?.dbUser?.role; // Получаем роль из контекста
+
+                if (user?.id && currentUserRole && currentUserRole !== 'vpr_tester' && currentUserRole !== 'admin') {
+                    try {
+                        const { error: roleUpdateError } = await supabaseAdmin
+                            .from('users')
+                            .update({ role: 'vpr_tester' }) // Устанавливаем роль
+                            .eq('user_id', user.id);
+
+                        if (roleUpdateError) {
+                             debugLogger.error("Ошибка обновления роли пользователя:", roleUpdateError);
+                             // Не критично для теста, но стоит залогировать
+                        } else {
+                            debugLogger.log(`Роль пользователя ${user.id} обновлена на vpr_tester`);
+                            // Опционально: обновить dbUser в контексте, если AppContext это поддерживает
+                            // user.updateDbUser({ ...user.dbUser, role: 'vpr_tester' }); // Пример
+                        }
+                    } catch (roleErr) {
+                         debugLogger.error("Исключение при обновлении роли:", roleErr);
+                    }
+                }
+                // --- Конец блока обновления роли ---
+
+
+                // ... (Загрузка предмета, вопросов) ...
+                // ... (Логика поиска/создания попытки - остается прежней) ...
+
+            } catch (err: any) {
+                // ... (Обработка ошибок) ...
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        initializeTest();
+     }, [user, subjectId, router]); // Добавляем user.dbUser?.role в зависимости, если нужно реагировать на смену роли извне
+
+// ... остальной код компонента ...
