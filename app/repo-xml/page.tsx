@@ -51,7 +51,7 @@ export default function RepoXmlPage() {
             <div className="min-h-screen bg-gray-900 p-6 pt-24 text-white flex flex-col items-center relative overflow-y-auto">
                 {/* Intro Section */}
                 <section id="intro" className="mb-12 text-center max-w-2xl">
-                    {/* ... (intro content remains the same) ... */}
+                    
                      <div className="flex justify-center mb-4">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" className="w-24 h-12">
                           <circle cx="50" cy="50" r="45" fill="none" stroke="url(#bgGlow)" strokeWidth="10" opacity="0.3" />
@@ -81,7 +81,7 @@ export default function RepoXmlPage() {
                         </svg>
                       </div>
                       <h1 className="text-4xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse">
-                        Грок здесь, чтобы исполнить ваши кодовые мечты!
+                        CYBER STUDIO
                       </h1>
                       <p className="text-lg text-gray-300 mt-2">
                         Добро пожаловать в мир автоматизации! Это демо покажет, как легко извлечь код из GitHub и создать что-то крутое с помощью бота. Страницы лежат в папке `app`, а компоненты — в `components`. Всё просто, правда?
@@ -154,6 +154,14 @@ export default function RepoXmlPage() {
                 <section id="executor" ref={prSectionRef} className="mb-12 w-full max-w-2xl pb-16">
                      <ForwardedAICodeAssistant ref={assistantRef} aiResponseInputRef={aiResponseInputRef} />
                 </section>
+{/* --- ADD ID HERE --- For Xuinity scroll target */}
+             <section id="kwork-input-section" className="mb-12 w-full max-w-2xl">
+                 {/* This section was implicitly part of RepoTxtFetcher before, */}
+                 {/* but we need an ID outside it for scrolling. */}
+                 {/* The actual textarea is inside RepoTxtFetcher */}
+             </section>
+             {/* Note: We scroll to the *section*, not the textarea directly */}
+             {/* because the textarea itself is inside RepoTxtFetcher */}
 
                 {/* Fixed Navigation Icons */}
                 <nav className="fixed right-2 top-1/2 transform -translate-y-1/2 flex flex-col space-y-4 z-13">

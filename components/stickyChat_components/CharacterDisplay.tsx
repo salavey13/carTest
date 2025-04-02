@@ -1,11 +1,10 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react'; // Import useState, useEffect
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { FaGithub } from 'react-icons/fa6';
 
-// Re-define profile type here or import from a shared types file
 interface GitHubProfile {
     login: string;
     avatar_url: string;
@@ -17,7 +16,7 @@ interface CharacterDisplayProps {
     githubProfile: GitHubProfile | null;
     characterImageUrl: string;
     characterAltText: string;
-    variants: any; // Or define specific variant type
+    variants: any;
 }
 
 export const CharacterDisplay: React.FC<CharacterDisplayProps> = ({
@@ -26,31 +25,58 @@ export const CharacterDisplay: React.FC<CharacterDisplayProps> = ({
     characterAltText,
     variants
 }) => {
+    const [profileJustLoaded, setProfileJustLoaded] = useState(false);
+
+    // Effect to detect when profile loads *after* initial render
+    useEffect(() => {
+        if (githubProfile) {
+            // Trigger animation only once when it loads
+            const timer = setTimeout(() => setProfileJustLoaded(true), 100); // Short delay ensures it's post-load
+            const clearTimer = setTimeout(() => setProfileJustLoaded(false), 1100); // Animation duration + buffer
+            return () => {
+                clearTimeout(timer);
+                clearTimeout(clearTimer);
+            }
+        }
+    }, [githubProfile]); // Run only when githubProfile changes
+
+    const imageSrc = githubProfile?.avatar_url || characterImageUrl;
+    const imageAlt = githubProfile?.login || characterAltText;
+
     return (
         <motion.div
             variants={variants}
             className="flex-shrink-0 self-center sm:self-end"
-            style={{ perspective: '500px' }} // Enable 3D perspective for hover effect
+            style={{ perspective: '500px' }}
         >
+            {/* Image container with conditional pulse */}
             <motion.div
-                whileHover={{ scale: 1.05, rotateY: 10 }} // Subtle 3D rotation on hover
+                whileHover={{ scale: 1.05, rotateY: 10 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+                // Add pulse animation when profileJustLoaded is true
+                animate={profileJustLoaded ? {
+                    scale: [1, 1.1, 1], // Pulse effect
+                    boxShadow: ["0 0 12px rgba(0,255,157,0.6)", "0 0 25px rgba(0,255,157,0.9)", "0 0 12px rgba(0,255,157,0.6)"]
+                } : {}}
+                initial={{ scale: 1, boxShadow: "0 0 12px rgba(0,255,157,0.6)" }} // Ensure initial state is set
             >
                 <Image
-                    // Use GitHub avatar if found, otherwise default
-                    src={githubProfile?.avatar_url || characterImageUrl}
-                    alt={githubProfile?.login || characterAltText}
+                    key={imageSrc} // Add key to force re-render on src change if needed
+                    src={imageSrc}
+                    alt={imageAlt}
                     width={120}
                     height={120}
-                    priority // Preload/prioritize this image
-                    className="rounded-full drop-shadow-[0_0_12px_rgba(0,255,157,0.6)] border-2 border-cyan-400/50" // Added border
-                    // Prevent Next.js optimizing external URL if it's from GitHub
+                    priority
+                    className="rounded-full drop-shadow-[0_0_12px_rgba(0,255,157,0.6)] border-2 border-cyan-400/50"
                     unoptimized={!!githubProfile?.avatar_url}
                 />
             </motion.div>
-            {/* Optional link to GitHub profile */}
+            {/* GitHub Link */}
             {githubProfile && (
-                <a
+                <motion.a // Animate the link appearance too
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
                     href={githubProfile.html_url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -58,7 +84,7 @@ export const CharacterDisplay: React.FC<CharacterDisplayProps> = ({
                     title={`GitHub: ${githubProfile.login}`}
                 >
                     <FaGithub className="mr-1"/> {githubProfile.login}
-                </a>
+                </motion.a>
             )}
         </motion.div>
     );

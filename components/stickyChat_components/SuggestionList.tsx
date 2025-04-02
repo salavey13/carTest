@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { FaPaperPlane } from 'react-icons/fa6';
 
-// Re-define Suggestion type here or import from a shared types file
 interface Suggestion {
     id: string;
     text: string;
@@ -32,20 +31,22 @@ export const SuggestionList: React.FC<SuggestionListProps> = ({
 }) => {
     return (
         <motion.div
-            variants={listVariants} // Apply list container animation variants
-            className="space-y-2 w-full flex-grow" // Allow list to grow and add space between buttons
+            variants={listVariants}
+            className="space-y-2 w-full flex-grow"
         >
-            <AnimatePresence initial={false}> {/* Animate changes within the list */}
+            <AnimatePresence initial={false}>
                 {suggestions.map((suggestion) => (
                     <motion.button
-                        key={suggestion.id} // Unique key for list items
-                        variants={itemVariants} // Apply item animation to each button
+                        key={suggestion.id}
+                        variants={itemVariants}
                         initial="hidden"
                         animate="visible"
                         exit="exit"
-                        layout // Animate layout changes
+                        layout
                         onClick={() => onSuggestionClick(suggestion)}
                         disabled={suggestion.disabled}
+                        whileHover={!suggestion.disabled ? { scale: 1.03, x: 3 } : {}} // Add subtle hover effect
+                        whileTap={!suggestion.disabled ? { scale: 0.98 } : {}}     // Add subtle tap effect
                         className={clsx( // Dynamically apply classes
                             "flex items-center w-full text-left px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ease-in-out",
                             "shadow-[0_0_8px_rgba(0,255,157,0.3)] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-opacity-75",
