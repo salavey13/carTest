@@ -3,78 +3,90 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { supabaseAdmin } from "@/hooks/supabase"; // Используем клиентский supabase!
-import { useAppContext } from "@/contexts/AppContext"; // Для информации о пользователе, если нужно
+import { supabaseAdmin } from "@/hooks/supabase";
+import { useAppContext } from "@/contexts/AppContext"; // Keep if needed for user context
 import { debugLogger } from "@/lib/debugLogger";
 import { Loader2, Trophy, BookOpen } from "lucide-react";
-import type { Database } from '@/types/database.types'; // Импорт типов БД
+import type { Database } from '@/types/database.types';
 
-// Типы данных для страницы
+// --- Types (Kept from current context) ---
 type Subject = Database['public']['Tables']['subjects']['Row'];
 type LeaderboardEntry = {
     user_id: string;
     username: string | null;
     avatar_url: string | null;
-    total_score: number | null; // Сумма очков по всем завершенным тестам
-    // Дополнительно можно добавить:
-    // subjects_attempted: number | null;
-    // total_attempts: number | null;
+    total_score: number | null;
 };
+// --- End Types ---
 
-// Компонент для отображения одного предмета
+// --- SubjectCard Component (Updated with new styles) ---
 const SubjectCard = ({ subject }: { subject: Subject }) => (
     <Link href={`/vpr-test/${subject.id}`} passHref legacyBehavior>
         <motion.a
-            className="block bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden border border-gray-200 group p-5 text-center"
-            whileHover={{ y: -5, scale: 1.03 }}
+            // New classes for dark theme gradient, border, shadow, hover effects
+            className="block bg-gradient-to-br from-dark-card to-gray-800 rounded-2xl shadow-lg hover:shadow-xl shadow-brand-blue/20 hover:shadow-brand-blue/30 transition-all duration-300 overflow-hidden border-2 border-brand-blue/30 group p-6 text-center"
+            // New hover animation
+            whileHover={{ y: -6, scale: 1.04 }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 15 }}
         >
-            <BookOpen className="w-12 h-12 mx-auto text-indigo-500 mb-3 group-hover:text-indigo-600 transition-colors" />
-            <h3 className="text-lg font-semibold text-gray-800 group-hover:text-indigo-700 transition-colors">
+            {/* Updated icon wrapper style */}
+            <div className="mb-4 w-16 h-16 mx-auto rounded-full bg-brand-blue/20 flex items-center justify-center border-2 border-brand-blue/50 group-hover:scale-110 transition-transform">
+                 {/* Updated icon color, hover color */}
+                 <BookOpen className="w-8 h-8 text-brand-blue group-hover:text-neon-lime transition-colors" />
+            </div>
+            {/* Updated text color, hover color */}
+            <h3 className="text-lg font-semibold text-light-text group-hover:text-brand-green transition-colors">
                 {subject.name}
             </h3>
-            {/* Можно добавить краткое описание, если нужно */}
-            {/* <p className="text-sm text-gray-500 mt-1 line-clamp-2">{subject.description?.substring(0, 50)}...</p> */}
         </motion.a>
     </Link>
 );
+// --- End SubjectCard ---
 
-// Компонент Лидерборда
+// --- Leaderboard Component (Updated with new styles) ---
 const Leaderboard = ({ entries }: { entries: LeaderboardEntry[] }) => (
-    <div className="bg-white rounded-xl shadow-md border border-gray-200 p-5 md:p-6">
-        <h2 className="text-xl font-bold text-center text-indigo-700 mb-5 flex items-center justify-center gap-2">
-            <Trophy className="w-6 h-6 text-yellow-500" />
+    // New classes for dark card, gradient, border
+    <div className="bg-gradient-to-b from-dark-card to-dark-bg rounded-xl shadow-xl border border-brand-purple/30 p-5 md:p-6">
+        {/* Updated title style */}
+        <h2 className="text-xl font-bold text-center text-brand-orange mb-5 flex items-center justify-center gap-2">
+            <Trophy className="w-6 h-6 text-yellow-400" />
             Доска Почета ВПР
         </h2>
         {entries.length === 0 ? (
-            <p className="text-center text-gray-500 py-4">Пока никто не завершил тесты.</p>
+            // Updated empty state text color
+            <p className="text-center text-gray-400 py-4">Пока никто не завершил тесты.</p>
         ) : (
             <ol className="space-y-3">
                 {entries.map((entry, index) => (
                     <motion.li
                         key={entry.user_id}
-                        className="flex items-center gap-3 p-2.5 bg-gray-50 rounded-lg border border-gray-100"
+                        // New list item styling: gradient, border based on rank
+                        className={`flex items-center gap-3 p-3 rounded-lg border ${index < 3 ? 'border-yellow-400/50 bg-gradient-to-r from-yellow-500/10 to-dark-card' : 'border-gray-700 bg-dark-card/60'}`}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
                     >
-                        <span className={`font-bold text-lg w-6 text-center ${index < 3 ? 'text-yellow-600' : 'text-gray-500'}`}>
+                        {/* Updated rank number styling */}
+                        <span className={`font-bold text-lg w-6 text-center ${index < 3 ? 'text-yellow-400' : 'text-gray-400'}`}>
                             {index + 1}
                         </span>
-                        <Image
-                            src={entry.avatar_url || '/default-avatar.png'} // Замените на путь к аватару по умолчанию
+                        {/* Image remains the same, ensure default avatar path is correct */}
+                         <Image
+                            src={entry.avatar_url || '/default-avatar.png'}
                             alt={entry.username || 'Аноним'}
                             width={36}
                             height={36}
-                            className="rounded-full border border-gray-300"
+                            className="rounded-full border border-gray-600" // Darker border for avatar
                         />
-                        <span className="flex-grow font-medium text-gray-700 truncate">
+                        {/* Updated username text style */}
+                        <span className="flex-grow font-medium text-light-text/90 truncate">
                             {entry.username || `Ученик #${entry.user_id.substring(0, 4)}`}
                         </span>
-                        <span className="font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-md text-sm">
-                            {entry.total_score ?? 0} <span className="text-xs">очков</span>
+                        {/* Updated score badge style */}
+                        <span className="font-bold text-brand-green bg-brand-green/10 px-2.5 py-1 rounded-md text-sm border border-brand-green/30">
+                            {entry.total_score ?? 0} <span className="text-xs opacity-80">очк.</span>
                         </span>
                     </motion.li>
                 ))}
@@ -82,20 +94,23 @@ const Leaderboard = ({ entries }: { entries: LeaderboardEntry[] }) => (
         )}
     </div>
 );
+// --- End Leaderboard ---
 
 
 export default function VprTestsListPage() {
+    // --- State and Fetching Logic (Kept from current context) ---
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    // const { user } = useAppContext(); // Keep if needed
 
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
             setError(null);
             try {
-                // 1. Fetch Subjects
+                // 1. Fetch Subjects (from current context)
                 const { data: subjectsData, error: subjectsError } = await supabaseAdmin
                     .from('subjects')
                     .select('*')
@@ -104,45 +119,12 @@ export default function VprTestsListPage() {
                 if (subjectsError) throw subjectsError;
                 setSubjects(subjectsData || []);
 
-                // 2. Fetch Leaderboard Data
-                // Используем RPC функцию для агрегации (нужно будет ее создать)
+                // 2. Fetch Leaderboard Data using RPC (from current context)
                 const { data: leaderboardData, error: leaderboardError } = await supabaseAdmin
-                     .rpc('get_vpr_leaderboard', { limit_count: 10 }); // Пример RPC вызова
-
-                // // --- ИЛИ --- Прямой запрос с агрегацией (если нет RPC)
-                // const { data: leaderboardAggData, error: leaderboardAggError } = await supabaseAdmin
-                //     .from('vpr_test_attempts')
-                //     .select(`
-                //         score,
-                //         users ( user_id, username, avatar_url )
-                //     `)
-                //     .neq('score', null) // Учитываем только завершенные с оценкой
-                //     .is('completed_at', true) // Уточнение условия завершенности
-
-                // // Агрегация на клиенте (менее эффективно для больших данных)
-                // if (leaderboardAggError) throw leaderboardAggError;
-                // const userScores: { [key: string]: LeaderboardEntry } = {};
-                // leaderboardAggData?.forEach(attempt => {
-                //     const user = attempt.users;
-                //     if (!user) return;
-                //     const userId = user.user_id;
-                //     if (!userScores[userId]) {
-                //         userScores[userId] = {
-                //             user_id: userId,
-                //             username: user.username,
-                //             avatar_url: user.avatar_url,
-                //             total_score: 0
-                //         };
-                //     }
-                //     userScores[userId].total_score = (userScores[userId].total_score || 0) + (attempt.score || 0);
-                // });
-                // const leaderboardEntries = Object.values(userScores)
-                //                              .sort((a, b) => (b.total_score || 0) - (a.total_score || 0))
-                //                              .slice(0, 10); // Лимит на клиенте
+                     .rpc('get_vpr_leaderboard', { limit_count: 10 });
 
                 if (leaderboardError) throw leaderboardError;
-                setLeaderboard((leaderboardData as LeaderboardEntry[]) || []);
-
+                setLeaderboard((leaderboardData as LeaderboardEntry[]) || []); // Type assertion might be needed
 
             } catch (err: any) {
                 debugLogger.error("Ошибка загрузки данных:", err);
@@ -154,39 +136,56 @@ export default function VprTestsListPage() {
 
         fetchData();
     }, []);
+    // --- End State and Fetching ---
 
+    // --- Loading State (styled for dark theme) ---
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-                <Loader2 className="h-12 w-12 animate-spin text-indigo-600" />
-                <span className="ml-4 text-lg text-gray-700">Загружаем тесты...</span>
+            <div className="min-h-screen bg-dark-bg flex items-center justify-center"> {/* Dark bg */}
+                <Loader2 className="h-12 w-12 animate-spin text-brand-blue" /> {/* Brand color */}
+                <span className="ml-4 text-lg text-light-text">Загружаем тесты...</span> {/* Light text */}
             </div>
         );
     }
 
+    // --- Error State (styled for dark theme) ---
      if (error) {
-         // Отображение ошибки
-         return <div className="min-h-screen bg-gray-100 flex items-center justify-center text-red-600 p-5 text-center">{error}</div>;
+         return (
+            <div className="min-h-screen bg-dark-bg flex items-center justify-center text-brand-pink p-5 text-center"> {/* Dark bg, Brand color */}
+                {error}
+            </div>
+         );
      }
 
+    // --- Main Page Render (Updated with new styles/components) ---
     return (
-        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-indigo-100 py-10 px-4 md:px-8">
+        // Updated page background and text color
+        <div className="min-h-screen bg-page-gradient py-10 px-4 md:px-8 text-light-text">
             <div className="max-w-6xl mx-auto">
-                <h1 className="text-3xl md:text-4xl font-bold text-center text-indigo-800 mb-8">
-                    Тренажеры ВПР (6 класс)
-                </h1>
+                 {/* Updated heading style */}
+                 <motion.h1
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    // New bright text color, added emoji
+                    className="text-3xl md:text-4xl font-bold text-center text-brand-green mb-8 md:mb-12"
+                 >
+                    Тренажеры ВПР (6 класс) 🚀
+                 </motion.h1>
 
-                {/* Сетка предметов */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6 mb-10">
+
+                {/* Subject Grid (using updated SubjectCard) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-8 mb-10 md:mb-12">
                     {subjects.map(subject => (
                         <SubjectCard key={subject.id} subject={subject} />
                     ))}
                 </div>
 
-                {/* Лидерборд */}
+                {/* Leaderboard (using updated Leaderboard component) */}
                  <Leaderboard entries={leaderboard} />
 
             </div>
+             {/* Optional particles mentioned in new version */}
+             {/* <ParticlesComponent /> */}
         </div>
     );
 }
