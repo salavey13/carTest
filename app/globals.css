@@ -23,6 +23,8 @@
   --border: 0 85% 70%;
   --input: 0 85% 70%;
   --ring: 0 85% 70%;
+  --dark-bg-rgb: 26, 26, 46;  /* RGB for #1a1a2e */
+  --dark-card-rgb: 22, 33, 62; /* RGB for #16213e */
 }
 
 .dark {
@@ -45,6 +47,8 @@
   --border: 0 0% 20%;
   --input: 0 0% 20%;
   --ring: 0 85% 70%;
+  --dark-bg-rgb: 26, 26, 46;  /* RGB for #1a1a2e */
+  --dark-card-rgb: 22, 33, 62; /* RGB for #16213e */
 }
 
 body {
