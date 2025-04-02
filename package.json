@@ -72,7 +72,8 @@
     "jszip": "latest",
     "@octokit/rest": "latest",
     "googleapis": "latest",
-    "react-dom-confetti": "latest"
+    "react-dom-confetti": "latest",
+    "react-markdown": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
