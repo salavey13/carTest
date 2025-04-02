@@ -107,59 +107,60 @@ export default function CozeExecutor({
     if (user) loadData();
   }, [user]);
 
-  const parseFilesFromText = (text: string): FileEntry[] => {
-    const entries: FileEntry[] = [];
-    const supportedLanguages = ["typescript", "tsx", "ts", "sql"];
-    const importRegex = /import\s+.*\s+from\s+['"]([^'"]+)['"]/g;
-    const detectedModules: Set<string> = new Set();
+const parseFilesFromText = (text: string): FileEntry[] => {
+  const entries: FileEntry[] = [];
+  const supportedLanguages = ["typescript", "tsx", "ts", "sql"];
+  const importRegex = /import\s+.*\s+from\s+['"]([^'"]+)['"]/g;
+  const detectedModules: Set<string> = new Set();
 
-    try {
-      const codeBlocks = text.match(/^```[\s\S]*?^```/gm) || [];
-      codeBlocks.forEach((block) => {
-        const content = block.slice(3, -3).trim();
-        const lines = content.split("\n");
-        let codeStartIndex = 0;
-        let language: string | undefined;
-        let path: string | undefined;
+  try {
+    const codeBlocks = text.match(/^```[\s\S]*?^```/gm) || [];
+    codeBlocks.forEach((block) => {
+      const content = block.slice(3, -3).trim();
+      const lines = content.split("\n");
+      let codeStartIndex = 0;
+      let language: string | undefined;
+      let path: string | undefined;
 
-        const firstLine = lines[0].trim();
-        if (supportedLanguages.includes(firstLine)) {
-          language = firstLine;
-          codeStartIndex = 1;
+      const firstLine = lines[0].trim();
+      if (supportedLanguages.includes(firstLine)) {
+        language = firstLine;
+        codeStartIndex = 1;
+      }
+
+      for (let i = codeStartIndex; i < lines.length; i++) {
+        // Updated regex to handle square brackets and other special characters
+        const match = lines[i].match(/^\s*\/\/\s*\/?([\w\/\[\]-]+?\.(tsx|ts|sql|json))/);
+        if (match) {
+          path = match[1].trim();
+          codeStartIndex = i + 1;
+          break;
         }
+      }
 
-        for (let i = codeStartIndex; i < lines.length; i++) {
-          const match = lines[i].match(/^\s*\/\/\s*\/?(.+?\.(tsx|ts|sql|json))/);
-          if (match) {
-            path = match[1].trim();
-            codeStartIndex = i + 1;
-            break;
-          }
+      if (!path) path = `unnamed.${language || "txt"}`;
+      const codeContent = lines.slice(codeStartIndex).join("\n");
+      const extension = path.split(".").pop() || "txt";
+
+      let match;
+      while ((match = importRegex.exec(codeContent)) !== null) {
+        const moduleName = match[1];
+        if (!moduleName.startsWith("@/") && !moduleName.startsWith("./") && !moduleName.startsWith("../")) {
+          detectedModules.add(moduleName);
         }
+      }
 
-        if (!path) path = `unnamed.${language || "txt"}`;
-        const codeContent = lines.slice(codeStartIndex).join("\n");
-        const extension = path.split(".").pop() || "txt";
+      entries.push({ path, content: codeContent, extension });
+    });
 
-        let match;
-        while ((match = importRegex.exec(codeContent)) !== null) {
-          const moduleName = match[1];
-          if (!moduleName.startsWith("@/") && !moduleName.startsWith("./") && !moduleName.startsWith("../")) {
-            detectedModules.add(moduleName);
-          }
-        }
-
-        entries.push({ path, content: codeContent, extension });
-      });
-
-      const currentDeps = packageJsonInput ? Object.keys(JSON.parse(packageJsonInput).dependencies || {}) : [];
-      const newMods = Array.from(detectedModules).filter((mod) => !currentDeps.includes(mod));
-      setNewModules(newMods);
-    } catch (err) {
-      toast.error("Ошибка при парсинге текста: " + (err as Error).message);
-    }
-    return entries;
-  };
+    const currentDeps = packageJsonInput ? Object.keys(JSON.parse(packageJsonInput).dependencies || {}) : [];
+    const newMods = Array.from(detectedModules).filter((mod) => !currentDeps.includes(mod));
+    setNewModules(newMods);
+  } catch (err) {
+    toast.error("Ошибка при парсинге текста: " + (err as Error).message);
+  }
+  return entries;
+};
 
   const extractPRDetails = (data: any, rawText: string) => {
     let title = "Обновление от CozeExecutor";
