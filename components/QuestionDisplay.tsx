@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion';
 
+// Interface remains the same as current context
 interface QuestionDisplayProps {
-    questionText: string | undefined; // Текст вопроса
-    questionNumber: number; // Номер текущего вопроса (1-based)
-    totalQuestions: number; // Общее число вопросов
+    questionText: string | undefined;
+    questionNumber: number;
+    totalQuestions: number;
 }
 
 export const QuestionDisplay = ({ questionText, questionNumber, totalQuestions }: QuestionDisplayProps) => {
@@ -11,17 +12,19 @@ export const QuestionDisplay = ({ questionText, questionNumber, totalQuestions }
 
     return (
         <motion.div
-            key={questionNumber} // Анимация при смене вопроса
+            key={questionNumber} // Keep key for animation
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
-            className="mb-6 md:mb-8 p-4 md:p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200 shadow-sm"
+            // New classes for dark theme, gradient, border, shadow
+            className="mb-6 md:mb-8 p-5 md:p-6 bg-gradient-to-br from-dark-card to-gray-800 rounded-xl border border-brand-purple/40 shadow-lg shadow-brand-purple/10"
         >
-            <p className="text-sm text-indigo-600 font-medium mb-2">
+            {/* New text color */}
+            <p className="text-sm text-brand-blue font-medium mb-3">
                 Вопрос {questionNumber} из {totalQuestions}
             </p>
-            {/* Используем <pre> для сохранения форматирования, если в тексте вопроса есть переносы строк */}
-            <pre className="text-lg md:text-xl leading-relaxed text-gray-800 whitespace-pre-wrap font-sans">
+            {/* New text color, keep pre formatting */}
+            <pre className="text-lg md:text-xl leading-relaxed text-light-text whitespace-pre-wrap font-sans">
                 {questionText}
             </pre>
         </motion.div>
