@@ -5,8 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
-    // Icons for Repo XML page suggestions
-    FaDownload, FaCode, FaBrain, FaRocket, FaEye // Added more specific icons
+    // Specific Icons for Repo XML page suggestions
+    FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaInfoCircle, FaKeyboard, // Added Info & Keyboard
+    FaRegGrinBeamSweat // Added for fun
 } from "react-icons/fa6";
 
 // Import Subcomponents
@@ -23,10 +24,9 @@ import { getGitHubUserProfile } from "@/app/actions_github/actions";
 const AUTO_OPEN_DELAY_MS = 13000;
 const CHARACTER_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/character-images/public/x13.png";
 const CHARACTER_ALT_TEXT = "Xuinity Assistant";
-const HIRE_ME_TEXT = "Найми меня! ✨"; // More vibrant
+const HIRE_ME_TEXT = "Найми меня! ✨";
 const FIX_PAGE_ID = "fix-current-page";
 
-// Re-define Suggestion type here or import from a shared types file
 interface Suggestion {
     id: string;
     text: string;
@@ -37,7 +37,6 @@ interface Suggestion {
     isFixAction?: boolean;
     disabled?: boolean;
 }
-// Re-define profile type here or import from a shared types file
 interface GitHubProfile {
     login: string;
     avatar_url: string;
@@ -45,11 +44,10 @@ interface GitHubProfile {
     name?: string | null;
 }
 
-// --- Animation Variants --// --- Animation Variants --- (Keep variants definitions)
+// --- Animation Variants ---
 const containerVariants = { hidden: { opacity: 0, x: -300 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 120, damping: 15, when: "beforeChildren", staggerChildren: 0.08, }, }, exit: { opacity: 0, x: -300, transition: { duration: 0.3 } }, };
 const childVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", bounce: 0.4 } }, exit: { opacity: 0, transition: { duration: 0.2 } }, };
 const fabVariants = { hidden: { scale: 0, opacity: 0 }, visible: { scale: 1, opacity: 1, rotate: [0, 10, -10, 5, -5, 0], transition: { scale: { duration: 0.4, ease: "easeOut" }, opacity: { duration: 0.4, ease: "easeOut" }, rotate: { repeat: Infinity, duration: 3, ease: "easeInOut", delay: 1 } } }, exit: { scale: 0, opacity: 0, transition: { duration: 0.3 } } };
-
 
 // --- Main Component (Orchestrator) ---
 const StickyChatButton: React.FC = () => {
@@ -57,7 +55,7 @@ const StickyChatButton: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [fixActionClicked, setFixActionClicked] = useState(false);
     const [hasAutoOpened, setHasAutoOpened] = useState(false);
-    const [activeMessage, setActiveMessage] = useState<string>("Загрузка..."); // Initial loading message
+    const [activeMessage, setActiveMessage] = useState<string>("Загрузка...");
     const [githubProfile, setGithubProfile] = useState<GitHubProfile | null>(null);
     const [githubLoading, setGithubLoading] = useState<boolean>(false);
     const [prevGithubLoading, setPrevGithubLoading] = useState<boolean>(false); // Track previous loading state
@@ -69,7 +67,9 @@ const StickyChatButton: React.FC = () => {
 
     // --- Fetch GitHub Profile ---
     useEffect(() => {
-        setPrevGithubLoading(githubLoading); // Update previous state *before* potential new fetch
+        // Track previous loading state BEFORE fetching
+        setPrevGithubLoading(githubLoading);
+
         if (isOpen && !isAppLoading && appContextUser?.username && !githubProfile && !githubLoading) {
             const fetchProfile = async () => {
                 setGithubLoading(true);
@@ -80,12 +80,19 @@ const StickyChatButton: React.FC = () => {
                     setGithubProfile(result.profile);
                 } else {
                     console.warn("GitHub profile fetch failed:", result.error);
+                    setGithubProfile(null); // Explicitly set to null on failure/not found
                 }
                 setGithubLoading(false);
             };
             fetchProfile();
         }
-    }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading]); // Rerun if loading state changes too
+        // Reset profile state if user context changes (e.g., logout/login simulation)
+        if (!appContextUser) {
+            setGithubProfile(null);
+            setGithubLoading(false);
+        }
+    }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading]); // Re-run if any of these change
+
 
     // --- Define Suggestions (Page-Specific Logic) ---
     const suggestions = useMemo((): Suggestion[] => {
@@ -93,20 +100,20 @@ const StickyChatButton: React.FC = () => {
 
         // --- Suggestions for Repo XML Page ---
         if (isOnRepoXmlPage) {
-            // Function to navigate to page sections
             const scrollTo = (id: string) => {
                 const element = document.getElementById(id);
-                // Use smooth scroll, center element if possible
+                console.log(`Scrolling to: ${id}`, element); // Debug Log
                 element?.scrollIntoView({ behavior: "smooth", block: "center" });
-                setIsOpen(false); // Close chat after clicking suggestion
+                setIsOpen(false);
             };
 
             return [
-                { id: "scroll-fetcher", text: "К Экстрактору Кода 🤖", action: () => scrollTo('extractor'), icon: <FaDownload className="mr-1.5" /> },
-                { id: "scroll-kwork", text: "Написать Запрос Боту ✍️", action: () => scrollTo('kwork-input-section'), icon: <FaCode className="mr-1.5" /> }, // Assuming you add id="kwork-input-section" to the div containing the label/textarea
-                { id: "scroll-assistant", text: "К Ответу AI / PR 🚀", action: () => scrollTo('executor'), icon: <FaBrain className="mr-1.5" /> },
-                { id: "back-to-intro", text: "Что тут вообще? 🤔", action: () => scrollTo('intro'), icon: <FaEye className="mr-1.5" /> },
-                 { id: "hire-me", text: HIRE_ME_TEXT, link: "/selfdev", isHireMe: true, icon: <FaStar className="mr-1.5" /> }, // Keep hire me
+                // Guide the user through the page sections
+                { id: "scroll-intro", text: "Че за CYBER STUDIO? 🤔", action: () => scrollTo('intro'), icon: <FaInfoCircle className="mr-1.5" /> },
+                { id: "scroll-fetcher", text: "Дай Ссылку на GitHub! 🤖", action: () => scrollTo('extractor'), icon: <FaDownload className="mr-1.5" /> },
+                { id: "scroll-kwork", text: "Напиши Запрос Боту! ✍️", action: () => scrollTo('kwork-input-section'), icon: <FaKeyboard className="mr-1.5" /> },
+                { id: "scroll-assistant", text: "Вставь Ответ / Создай PR! 🚀", action: () => scrollTo('executor'), icon: <FaRocket className="mr-1.5" /> },
+                { id: "hire-me", text: HIRE_ME_TEXT, link: "/selfdev", isHireMe: true, icon: <FaStar className="mr-1.5" /> },
             ];
         }
 
@@ -116,60 +123,62 @@ const StickyChatButton: React.FC = () => {
             const baseSuggestions: Suggestion[] = [];
 
             if (!fixActionClicked) {
-                baseSuggestions.push({ id: FIX_PAGE_ID, text: "Исправить эту страницу 🤩", link: `/repo-xml?path=${folderPath}`, isFixAction: true, icon: <FaHighlighter className="mr-1.5" /> });
+                baseSuggestions.push({ id: FIX_PAGE_ID, text: "Починить эту Страницу? 🤩", link: `/repo-xml?path=${folderPath}`, isFixAction: true, icon: <FaHighlighter className="mr-1.5" /> });
             }
             baseSuggestions.push({ id: "add-new", text: "Создать Новое с Нуля ✨", link: "/repo-xml", icon: <FaWandMagicSparkles className="mr-1.5" /> });
             baseSuggestions.push({ id: "hire-me", text: HIRE_ME_TEXT, link: "/selfdev", isHireMe: true, icon: <FaStar className="mr-1.5" /> });
 
             return baseSuggestions;
         }
-    }, [currentPath, fixActionClicked]); // Only depends on path and click state now
+    }, [currentPath, fixActionClicked]);
 
 
-    // --- Update Active Message Logic (Fixes delayed update) ---
+    // --- Update Active Message Logic (Reacts to GitHub state changes) ---
     useEffect(() => {
-        // Initial loading state
-        if (isAppLoading && !appContextUser) {
-            setActiveMessage("Подключаюсь...");
-            return;
+        // Show loading if app context or GitHub profile is loading
+        if (isAppLoading || githubLoading) {
+             let loadingMsg = "Подключаюсь...";
+             if (githubLoading) loadingMsg = `Ищу твой профиль на GitHub... 🧐`;
+             setActiveMessage(loadingMsg);
+             return; // Exit early if loading
         }
 
         // Determine user identifier
-        let userIdentifier = "";
-        if (githubProfile?.name) userIdentifier = githubProfile.name;
-        else if (appContextUser?.first_name) userIdentifier = appContextUser.first_name;
-        else if (appContextUser?.username) userIdentifier = appContextUser.username;
+        let userIdentifier = appContextUser?.first_name || appContextUser?.username || null;
+        if (githubProfile?.name) { // Prefer GitHub name if available
+            userIdentifier = githubProfile.name;
+        }
 
-        const baseGreeting = userIdentifier ? `Привет, ${userIdentifier}!` : "Привет!";
+        const baseGreeting = userIdentifier ? `Здарова, ${userIdentifier}!` : "Эй, Кодер!"; // More casual
 
         let message = "";
         const isOnRepoXmlPage = currentPath === '/repo-xml';
+        const justLoadedProfile = prevGithubLoading && !githubLoading && githubProfile; // Profile was loading, now finished AND found
 
         // --- Message Logic ---
-        if (githubLoading) {
-            // Loading profile specifically
-             message = `Привет${userIdentifier ? ', ' + userIdentifier : ''}! Ищу твой профиль на GitHub... 🧐`;
-        } else if (githubProfile) {
-             // Profile loaded *successfully* (even if just now)
-             const loadedGreeting = userIdentifier ? `Ага, ${userIdentifier}!` : "О!"; // More surprised if name known
-             message = `${loadedGreeting} Нашел твой GitHub! ✨ Выглядишь круто! Чем займемся?`;
-             if (isOnRepoXmlPage) message = `${loadedGreeting} Нашел твой GitHub! ✨ Готов зажечь на странице Экстрактора/PR?`;
+        if (justLoadedProfile) {
+            // Special "WOW" message when profile loads after initial check
+            const wowGreeting = userIdentifier ? `ВОУ, ${userIdentifier}!` : "ОПА!";
+            message = `${wowGreeting} Нашел твой GitHub! ✨ Крутой аватар! Готов зажечь?`;
+            if (isOnRepoXmlPage) message = `${wowGreeting} Нашел твой GitHub! ✨ Теперь ты точно готов к магии на этой странице! 😎👇`;
 
-        } else if (prevGithubLoading && !githubProfile) {
-             // Finished loading, but profile *not* found
-              message = `${baseGreeting} Не нашел твой GitHub (или юзернейм не совпал)... Не беда! 😉 Что будем кодить?`;
-             if (isOnRepoXmlPage) message = `${baseGreeting} GitHub не найден, но мы все равно можем работать с кодом здесь! 👇`;
+        } else if (githubProfile) {
+            // Profile was already loaded or loaded instantly
+            message = `${baseGreeting} Рад видеть твой GitHub! Чем сегодня займемся?`;
+            if (isOnRepoXmlPage) message = `${baseGreeting} Вижу твой GitHub! Эта страница - твоя песочница. С чего начнем? 👇`;
 
         } else {
-             // Default state (App loaded, GitHub not loading and not found yet/ever)
-             message = `${baseGreeting} Что будем кодить сегодня?`;
-             if (isOnRepoXmlPage) message = `${baseGreeting} Готов поработать с кодом на этой супер-странице? 😎`;
-             else message = `${baseGreeting} Может, улучшим страницу "${currentPath}"? 😉`;
+            // No profile loading, none found, or username missing
+             message = `${baseGreeting} GitHub-профиль не найден (или ты инкогнито 😉)... Это не важно! Главное - код! Что будем делать?`;
+            if (isOnRepoXmlPage) message = `${baseGreeting} GitHub не нужен для магии здесь! Просто укажи репо и погнали! 🔥👇`;
+             else if (currentPath !== '/') message = `${baseGreeting} Зацени эту страницу (${currentPath})... Хочешь её прокачать? 😉`;
+             else message = `${baseGreeting} Готов создать что-то крутое или починить баг? 😎`;
         }
 
         setActiveMessage(message);
 
-    }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading, prevGithubLoading, currentPath]); // Add prevGithubLoading
+    }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading, prevGithubLoading, currentPath]);
+
 
     // --- Auto-open Timer ---
     useEffect(() => { if (!hasAutoOpened && !isOpen) { const timer = setTimeout(() => { setIsOpen(true); setHasAutoOpened(true); }, AUTO_OPEN_DELAY_MS); return () => clearTimeout(timer); } }, [hasAutoOpened, isOpen]);
@@ -186,7 +195,7 @@ const StickyChatButton: React.FC = () => {
             if (suggestion.isFixAction) { setFixActionClicked(true); }
             router.push(suggestion.link);
         } else if (suggestion.action) {
-            suggestion.action(); // This will now trigger the scrollTo actions on /repo-xml
+            suggestion.action(); // Triggers scrollTo for repo-xml page
         }
         setIsOpen(false);
     };
@@ -199,7 +208,6 @@ const StickyChatButton: React.FC = () => {
     return (
         <AnimatePresence>
             {isOpen ? (
-                // --- Overlay and Dialog ---
                 <motion.div
                     key="dialog-overlay"
                     className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:justify-start p-4 bg-black bg-opacity-40 backdrop-blur-sm"
@@ -225,7 +233,7 @@ const StickyChatButton: React.FC = () => {
                                 variants={childVariants}
                             />
                             <SuggestionList
-                                suggestions={suggestions} // Use the correct suggestions list
+                                suggestions={suggestions} // Correct list based on page
                                 onSuggestionClick={handleSuggestionClick}
                                 listVariants={childVariants}
                                 itemVariants={childVariants}
@@ -234,7 +242,6 @@ const StickyChatButton: React.FC = () => {
                     </motion.div>
                 </motion.div>
             ) : (
-                // --- Floating Action Button ---
                 <FloatingActionButton onClick={handleFabClick} variants={fabVariants} />
             )}
         </AnimatePresence>
