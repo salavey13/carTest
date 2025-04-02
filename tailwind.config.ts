@@ -99,8 +99,7 @@ const config: Config = {
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "gradient-conic": "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
-        "page-gradient": ({ theme }) =>
-          `linear-gradient(145deg, ${hexToRgba(theme("colors.dark-bg"), 0.98)}, ${hexToRgba(theme("colors.dark-card"), 0.95)})`,
+        "page-gradient":"linear-gradient(145deg, rgba(var(--dark-bg-rgb), 0.98), rgba(var(--dark-card-rgb), 0.95))",
       },
       animation: {
         "subtle-pulse": "subtle-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
