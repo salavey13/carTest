@@ -67,6 +67,36 @@ BEFORE UPDATE ON public.vpr_test_attempts
 FOR EACH ROW
 EXECUTE FUNCTION update_modified_column();
 
--- REMOVE the old test_progress field from users if no longer needed for supercars
--- ALTER TABLE public.users DROP COLUMN test_progress;
--- OR just ignore it for the VPR app.
+-- Add variant_number to vpr_questions
+ALTER TABLE public.vpr_questions
+ADD COLUMN variant_number INT NOT NULL DEFAULT 1;
+
+-- Add variant_number to vpr_test_attempts
+ALTER TABLE public.vpr_test_attempts
+ADD COLUMN variant_number INT NOT NULL DEFAULT 1;
+
+-- Drop old unique constraint on questions if it exists without variant
+-- Find the constraint name first (it might vary) if needed:
+-- SELECT constraint_name
+-- FROM information_schema.table_constraints
+-- WHERE table_name = 'vpr_questions' AND constraint_type = 'UNIQUE';
+
+ALTER TABLE public.vpr_questions DROP CONSTRAINT vpr_questions_subject_id_position_key;
+
+-- Add new unique constraint including variant_number for questions
+ALTER TABLE public.vpr_questions
+ADD CONSTRAINT vpr_questions_subject_variant_position_key UNIQUE (subject_id, variant_number, position);
+
+-- Drop old unique constraint on attempts if it exists without variant (similar process)
+-- Example: ALTER TABLE public.vpr_test_attempts DROP CONSTRAINT vpr_test_attempts_user_id_subject_id_completed_at_idx; -- Might need adjusting
+
+-- Add new unique constraint for attempts (one active attempt per user/subject/variant)
+-- Using a partial index for the uniqueness check on active attempts
+DROP INDEX IF EXISTS unique_active_attempt_per_user_subject_variant; -- Drop if exists
+CREATE UNIQUE INDEX unique_active_attempt_per_user_subject_variant
+ON public.vpr_test_attempts (user_id, subject_id, variant_number)
+WHERE (completed_at IS NULL);
+
+-- Optional: Index for faster lookup of attempts
+CREATE INDEX IF NOT EXISTS idx_vpr_test_attempts_user_subject_variant
+ON public.vpr_test_attempts (user_id, subject_id, variant_number);
