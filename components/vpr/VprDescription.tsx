@@ -17,7 +17,6 @@ export function VprDescription({ description, show }: VprDescriptionProps) {
           transition={{ duration: 0.3 }}
           className="overflow-hidden"
         >
-          {/* Added prose-headings:text-brand-cyan etc for better styling within markdown */}
           <div className="p-4 bg-dark-bg rounded-lg border border-brand-purple/30 prose prose-sm md:prose-base max-w-none prose-invert prose-headings:text-brand-cyan prose-a:text-brand-blue prose-strong:text-light-text/90">
             <ReactMarkdown>{description}</ReactMarkdown>
           </div>

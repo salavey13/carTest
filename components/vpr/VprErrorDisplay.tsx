@@ -2,7 +2,7 @@ import { XCircle } from "lucide-react";
 
 interface VprErrorDisplayProps {
   error: string | null;
-  onRetry?: () => void; // Optional retry function
+  onRetry?: () => void;
 }
 
 export function VprErrorDisplay({ error, onRetry }: VprErrorDisplayProps) {
@@ -15,7 +15,6 @@ export function VprErrorDisplay({ error, onRetry }: VprErrorDisplayProps) {
         <h2 className="text-xl font-semibold text-brand-pink mb-2">Ошибка</h2>
         <p className="text-light-text/80 mb-4">{error}</p>
         <button
-          // Use onRetry if provided, otherwise default to reload
           onClick={onRetry ? onRetry : () => window.location.reload()}
           className="bg-brand-pink text-white px-4 py-2 rounded hover:bg-brand-pink/80 transition-colors"
         >
