@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
-import { CheckCircle, RotateCcw, BookOpen } from "lucide-react";
+import { CheckCircle, RotateCcw, BookOpen } from "lucide-react"; // Changed List to BookOpen to match original
 
 interface VprCompletionScreenProps {
   subjectName: string | undefined;
+  variantNumber?: number | null; // <<< Added prop
   finalScore: number;
   totalQuestions: number;
   onReset: () => void;
@@ -11,12 +12,13 @@ interface VprCompletionScreenProps {
 
 export function VprCompletionScreen({
   subjectName,
+  variantNumber, // <<< Destructure prop
   finalScore,
   totalQuestions,
   onReset,
   onGoToList,
 }: VprCompletionScreenProps) {
-  const percentage = totalQuestions > 0 ? ((finalScore / totalQuestions) * 100).toFixed(0) : 0;
+  const percentage = totalQuestions > 0 ? ((finalScore / totalQuestions) * 100).toFixed(0) : '0';
   const scoreInt = parseInt(percentage);
   const resultColor = scoreInt >= 80 ? 'text-brand-green' : scoreInt >= 50 ? 'text-yellow-500' : 'text-brand-pink';
   const resultBg = scoreInt >= 80 ? 'bg-green-900/30' : scoreInt >= 50 ? 'bg-yellow-900/30' : 'bg-red-900/30';
@@ -38,9 +40,15 @@ export function VprCompletionScreen({
           <CheckCircle className={`h-16 w-16 ${resultColor} mx-auto mb-5`} />
         </motion.div>
 
-        <h2 className="text-2xl md:text-3xl font-bold text-light-text mb-3">
+        <h2 className="text-2xl md:text-3xl font-bold text-light-text mb-1"> {/* Adjusted margin */}
           Тест "{subjectName || 'Тест'}" завершен!
         </h2>
+        {/* Display variant number if available */}
+        {variantNumber && (
+            <p className="text-sm text-gray-400 mb-3">
+                (Вариант {variantNumber})
+            </p>
+        )}
         <p className={`text-xl md:text-2xl font-semibold mb-6 p-3 rounded-lg ${resultBg} ${resultColor}`}>
           {finalScore} из {totalQuestions} ({percentage}%)
         </p>
@@ -50,7 +58,8 @@ export function VprCompletionScreen({
             className="w-full bg-brand-blue text-white px-6 py-3 rounded-lg font-semibold text-lg hover:bg-brand-blue/80 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
           >
             <RotateCcw className="h-5 w-5" />
-            Пройти еще раз
+            {/* Updated button text */}
+            Пройти другой вариант
           </button>
           <button
             onClick={onGoToList}
