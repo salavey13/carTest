@@ -284,7 +284,7 @@ export default function VprTestPage() {
              debugLogger.log(`Helper: Creating new attempt for user ${userId}, subject ${subjId}, variant ${variantNum}, totalQ ${totalQ}`);
              return await supabaseAdmin
                  .from('vpr_test_attempts')
-                 .insert({ userId, subject_id: subjId, variant_number: variantNum, total_questions: totalQ, last_question_index: 0, score: 0 })
+                 .insert({ user_id: userId, subject_id: subjId, variant_number: variantNum, total_questions: totalQ, last_question_index: 0, score: 0 })
                  .select()
                  .single();
          };
