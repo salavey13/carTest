@@ -10,8 +10,8 @@ interface SpeechBubbleProps {
 
 export const SpeechBubble: React.FC<SpeechBubbleProps> = ({ message, variants }) => {
     return (
+        // REMOVED key={message} from this motion.div
         <motion.div
-            key={message} // Animate message change
             variants={variants}
             className="relative mb-3 w-full bg-white bg-opacity-95 p-3 rounded-full shadow-[0_0_15px_rgba(0,255,157,0.6)]"
         >
