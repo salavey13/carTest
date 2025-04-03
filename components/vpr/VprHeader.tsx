@@ -1,5 +1,6 @@
 import { Info } from "lucide-react";
-import { TimerDisplay } from "@/components/TimerDisplay"; // Assuming TimerDisplay is separate, e.g., /components/TimerDisplay.tsx
+// Ensure TimerDisplay path is correct relative to your project structure
+import { TimerDisplay } from "@/components/TimerDisplay";
 
 interface VprHeaderProps {
   subjectName: string | undefined;
