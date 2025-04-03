@@ -20,6 +20,7 @@ import { VprAnswerList } from "@/components/vpr/VprAnswerList";
 import { VprTimeUpModal } from "@/components/vpr/VprTimeUpModal";
 
 import { toast } from "sonner";
+import { notifyAdmin } from "@/app/actions"; // <--- ИМПОРТ ДОБАВЛЕН
 
 // --- Interfaces ---
 interface SubjectData {
@@ -58,16 +59,12 @@ interface VprTestAttempt {
 }
 // --- End Interfaces ---
 
-// Removed hardcoded variant
-// const CURRENT_VARIANT_TO_LOAD = 1;
-
 export default function VprTestPage() {
     // --- States ---
     const { user } = useAppContext();
     const params = useParams();
     const router = useRouter();
     const subjectId = parseInt(params.subjectId as string, 10);
-    // variantNumber will be determined dynamically inside useEffect
 
     const [subject, setSubject] = useState<SubjectData | null>(null);
     const [questions, setQuestions] = useState<VprQuestionData[]>([]);
@@ -89,9 +86,9 @@ export default function VprTestPage() {
     const [timeUpModal, setTimeUpModal] = useState(false);
     const [isCurrentQuestionNonAnswerable, setIsCurrentQuestionNonAnswerable] = useState(false);
     const [resetCounter, setResetCounter] = useState(0);
-    const [selectedVariant, setSelectedVariant] = useState<number | null>(null); // State to hold the chosen variant
+    const [selectedVariant, setSelectedVariant] = useState<number | null>(null);
 
-    // --- Timer Functions (Unchanged) ---
+    // --- Timer Functions ---
     const handleTimeUp = useCallback(() => {
         debugLogger.log("Timer: Time is up!");
         if (!isTestComplete && !timeUpModal) {
@@ -119,8 +116,28 @@ export default function VprTestPage() {
                  .eq('id', currentAttempt.id)
                  .select()
                  .single();
+
               if (updateError) throw updateError;
               if (!updatedAttempt) throw new Error("Attempt not found after forced completion update.");
+
+              // --- НАЧАЛО: Отправка уведомления админу (Время вышло) ---
+              if (user && subject && updatedAttempt) {
+                const message = `🔔 Тест ВПР завершен (Время вышло)!
+Пользователь: ${user.username || user.id} (${user.id})
+Предмет: ${subject.name}
+Вариант: ${updatedAttempt.variant_number}
+Результат: ${updatedAttempt.score ?? 0} из ${updatedAttempt.total_questions}`;
+                  try {
+                      await notifyAdmin(message);
+                      debugLogger.log("Admin notified of time-up completion.");
+                  } catch (notifyError) {
+                      debugLogger.error("Failed to notify admin about time-up completion:", notifyError);
+                  }
+              } else {
+                  debugLogger.warn("Could not notify admin (time-up): missing user, subject, or attempt data.");
+              }
+              // --- КОНЕЦ: Отправка уведомления админу (Время вышло) ---
+
               setCurrentAttempt(updatedAttempt);
               setIsTestComplete(true);
               setFinalScore(updatedAttempt.score ?? 0);
@@ -131,15 +148,15 @@ export default function VprTestPage() {
          } finally {
             setIsSaving(false);
          }
-    }, [currentAttempt, isSaving, isTestComplete, questions.length]);
+    // Добавлены user и subject в зависимости для использования в уведомлении
+    }, [currentAttempt, isSaving, isTestComplete, questions.length, user, subject]);
     // --- End Timer Functions ---
 
 
     // --- Data Fetching & Attempt Handling (Includes Variant Selection) ---
     useEffect(() => {
-        debugLogger.log(`useEffect running. Reset Counter: ${resetCounter}`); // Log effect trigger
+        debugLogger.log(`useEffect running. Reset Counter: ${resetCounter}`);
 
-        // Basic validation
         if (!user?.id || !subjectId || isNaN(subjectId)) {
             if (!user?.id) router.push('/login');
             else setError("Неверный ID предмета");
@@ -158,7 +175,6 @@ export default function VprTestPage() {
             debugLogger.log("InitializeTest starting...");
             setIsLoading(true);
             setError(null);
-            // Reset states...
             setShowDescription(false);
             setIsTestComplete(false);
             setShowFeedback(false);
@@ -173,15 +189,12 @@ export default function VprTestPage() {
             setCurrentAttempt(null);
             setQuestions([]);
             setIsCurrentQuestionNonAnswerable(false);
-            setSelectedVariant(null); // Reset selected variant
+            setSelectedVariant(null);
 
-            let variantToLoad: number | null = null; // Variable to hold the chosen variant
+            let variantToLoad: number | null = null;
 
             try {
-                // --- START: Variant Selection Logic ---
                 debugLogger.log("Selecting variant...");
-
-                // 1. Get all available variants for the subject
                 const { data: variantData, error: variantError } = await supabaseAdmin
                     .from('vpr_questions')
                     .select('variant_number')
@@ -191,16 +204,15 @@ export default function VprTestPage() {
                 if (variantError) throw new Error(`Ошибка получения вариантов: ${variantError.message}`);
                 if (!variantData || variantData.length === 0) throw new Error('Для этого предмета не найдено ни одного варианта.');
 
-                const allAvailableVariants = [...new Set(variantData.map(q => q.variant_number))].sort((a,b) => a - b); // Unique, sorted list
+                const allAvailableVariants = [...new Set(variantData.map(q => q.variant_number))].sort((a,b) => a - b);
                 debugLogger.log("Available variants:", allAvailableVariants);
 
-                // 2. Get variants completed by the user for this subject
                 const { data: completedAttemptsData, error: completedError } = await supabaseAdmin
                     .from('vpr_test_attempts')
                     .select('variant_number')
                     .eq('user_id', user.id)
                     .eq('subject_id', subjectId)
-                    .not('completed_at', 'is', null); // Only count COMPLETED attempts
+                    .not('completed_at', 'is', null);
 
                 if (!isMounted) return;
                 if (completedError) throw new Error(`Ошибка получения пройденных попыток: ${completedError.message}`);
@@ -208,33 +220,23 @@ export default function VprTestPage() {
                 const completedVariants = [...new Set(completedAttemptsData.map(a => a.variant_number))];
                 debugLogger.log("User has completed variants:", completedVariants);
 
-                // 3. Determine untried variants
                 const untriedVariants = allAvailableVariants.filter(v => !completedVariants.includes(v));
                 debugLogger.log("Untried variants:", untriedVariants);
 
-                // 4. Select variant
                 if (untriedVariants.length > 0) {
-                    // Choose randomly from untried
                     variantToLoad = untriedVariants[Math.floor(Math.random() * untriedVariants.length)];
                     debugLogger.log(`Selected random untried variant: ${variantToLoad}`);
                 } else if (allAvailableVariants.length > 0) {
-                    // All variants tried, choose randomly from all available
                     variantToLoad = allAvailableVariants[Math.floor(Math.random() * allAvailableVariants.length)];
                     debugLogger.log(`All variants tried. Selected random variant from all: ${variantToLoad}`);
                 } else {
-                    // Should have been caught earlier, but defensive check
                     throw new Error('Не удалось определить вариант для загрузки.');
                 }
 
-                setSelectedVariant(variantToLoad); // Store the chosen variant in state
+                setSelectedVariant(variantToLoad);
 
-                // --- END: Variant Selection Logic ---
+                if (!variantToLoad) throw new Error("Variant selection failed.");
 
-
-                // --- START: Fetching Subject, Questions, and Attempt (using variantToLoad) ---
-                if (!variantToLoad) throw new Error("Variant selection failed."); // Should not happen
-
-                // Fetch Subject
                 debugLogger.log("Fetching subject data...");
                 const { data: subjectData, error: subjectError } = await supabaseAdmin
                     .from('subjects')
@@ -244,16 +246,15 @@ export default function VprTestPage() {
                 if (!isMounted) return;
                 if (subjectError) throw new Error(`Ошибка загрузки предмета: ${subjectError.message}`);
                 if (!subjectData) throw new Error('Предмет не найден');
-                setSubject(subjectData);
+                setSubject(subjectData); // <--- setSubject ЗДЕСЬ
                 debugLogger.log("Subject data loaded:", subjectData.name);
 
-                // Fetch Questions for the selected variant
                 debugLogger.log(`Fetching questions for selected variant ${variantToLoad}...`);
                 const { data: questionData, error: questionError } = await supabaseAdmin
                     .from('vpr_questions')
                     .select(`*, vpr_answers ( * )`)
                     .eq('subject_id', subjectId)
-                    .eq('variant_number', variantToLoad) // Use dynamic variant
+                    .eq('variant_number', variantToLoad)
                     .order('position', { ascending: true });
                 if (!isMounted) return;
                 if (questionError) throw new Error(`Ошибка загрузки вопросов: ${questionError.message}`);
@@ -261,14 +262,13 @@ export default function VprTestPage() {
                 setQuestions(questionData);
                 debugLogger.log(`Loaded ${questionData.length} questions.`);
 
-                // Find Active Attempt for the selected variant
                 debugLogger.log(`Finding active test attempt for variant ${variantToLoad}...`);
                 const { data: existingAttempts, error: attemptError } = await supabaseAdmin
                     .from('vpr_test_attempts')
                     .select('*')
                     .eq('user_id', user.id)
                     .eq('subject_id', subjectId)
-                    .eq('variant_number', variantToLoad) // Use dynamic variant
+                    .eq('variant_number', variantToLoad)
                     .is('completed_at', null)
                     .order('started_at', { ascending: false })
                     .limit(1);
@@ -279,7 +279,6 @@ export default function VprTestPage() {
 
                 if (existingAttempts && existingAttempts.length > 0) {
                     const potentialAttempt = existingAttempts[0];
-                    // Check if question count matches (in case questions were updated)
                     if (potentialAttempt.total_questions !== questionData.length) {
                         debugLogger.warn(`Question count mismatch for variant ${variantToLoad}. Active attempt outdated. Will create new one.`);
                          try {
@@ -297,10 +296,8 @@ export default function VprTestPage() {
                     debugLogger.log(`No active attempt found in DB for variant ${variantToLoad}.`);
                 }
 
-                // Create new attempt if needed
                 if (!attemptToUse) {
                      debugLogger.log(`Creating new attempt for variant ${variantToLoad}.`);
-                     // Pass variantToLoad to the creation helper
                      const { data: newAttemptData, error: newAttemptError } = await createNewAttempt(user.id, subjectId, variantToLoad, questionData.length);
                      if (!isMounted) return;
                      if (newAttemptError || !newAttemptData) throw newAttemptError || new Error('Не удалось создать новую попытку');
@@ -309,23 +306,19 @@ export default function VprTestPage() {
                      setFinalScore(0);
                 }
 
-                // Set state for the loaded/created attempt
                 setCurrentAttempt(attemptToUse);
                 const resumeIndex = Math.max(0, Math.min(attemptToUse.last_question_index, questionData.length - 1));
                 setCurrentQuestionIndex(resumeIndex);
                 debugLogger.log(`Setting current question index to: ${resumeIndex}`);
 
-                // Check non-answerable status
                 const currentQ = questionData[resumeIndex];
                 const currentAnswers = currentQ?.vpr_answers || [];
                 const isNonAnswerable = currentAnswers.length > 0 && currentAnswers.every(a => /^\[(Рисунок|Ввод текста|Диаграмма|Изображение|Площадь)\].*/.test(a.text));
                 setIsCurrentQuestionNonAnswerable(isNonAnswerable);
                 debugLogger.log(`Is current question (${resumeIndex}) non-answerable? ${isNonAnswerable}`);
 
-                // Start Timer
                 debugLogger.log("Attempt is active. Starting timer.");
                 setIsTimerRunning(true);
-                // --- END: Fetching Subject, Questions, and Attempt ---
 
             } catch (err: any) {
                 if (!isMounted) return;
@@ -340,7 +333,6 @@ export default function VprTestPage() {
             }
         };
 
-        // Helper to create attempt - now accepts variantNum
         const createNewAttempt = async (userId: string, subjId: number, variantNum: number, totalQ: number) => {
              debugLogger.log(`Helper: Creating new attempt for user ${userId}, subject ${subjId}, variant ${variantNum}, totalQ ${totalQ}`);
              return await supabaseAdmin
@@ -352,17 +344,15 @@ export default function VprTestPage() {
 
         initializeTest();
 
-        // Cleanup function
         return () => {
             isMounted = false;
             debugLogger.log("useEffect cleanup: component unmounting or dependencies changed.");
         };
-     // Dependencies: user, subjectId, and resetCounter. Variant is determined inside.
-     }, [user, subjectId, resetCounter]); // router removed, not used directly in effect now
+     }, [user, subjectId, resetCounter, router]); // router добавлен обратно, так как используется в if (!user?.id)
     // --- End Data Fetching ---
 
 
-    // --- Answer Handling (Unchanged) ---
+    // --- Answer Handling ---
     const handleAnswer = useCallback(async (selectedAnswer: VprAnswerData) => {
         if (!currentAttempt || showFeedback || isTestComplete || isSaving || !isTimerRunning || timeUpModal || !questions[currentQuestionIndex]) return;
         debugLogger.log(`Handling answer selection: Answer ID ${selectedAnswer.id} for Question ID ${questions[currentQuestionIndex].id} (Variant: ${currentAttempt.variant_number})`);
@@ -379,6 +369,7 @@ export default function VprTestPage() {
         try {
             debugLogger.log("Recording answer to DB...");
             const { error: recordError } = await supabaseAdmin.from('vpr_attempt_answers').insert({ attempt_id: currentAttempt.id, question_id: questions[currentQuestionIndex].id, selected_answer_id: selectedAnswer.id, was_correct: correct });
+            // Игнорируем ошибку дубликата (23505), но выводим остальные
             if (recordError && recordError.code !== '23505') throw new Error(`Ошибка записи ответа: ${recordError.message}`);
             if (recordError?.code === '23505') debugLogger.warn("Attempt answer already recorded."); else debugLogger.log("Answer recorded successfully.");
             debugLogger.log("Updating attempt score in DB...");
@@ -390,14 +381,16 @@ export default function VprTestPage() {
         } catch (err: any) {
             debugLogger.error("Error saving answer/score:", err);
             toast.error(`Не удалось сохранить результат: ${err.message}`);
+            // Важно: Не устанавливаем setShowFeedback(false) здесь, чтобы пользователь видел фидбек, даже если сохранение не удалось
         } finally {
              setIsSaving(false);
+             // Таймер не перезапускаем здесь, он запустится при handleNextQuestion
         }
     }, [currentAttempt, showFeedback, isTestComplete, isSaving, isTimerRunning, timeUpModal, questions, currentQuestionIndex]);
     // --- End Answer Handling ---
 
 
-    // --- Navigation Logic (Unchanged) ---
+    // --- Navigation Logic ---
     const handleNextQuestion = useCallback(async (isSkip: boolean = false) => {
         if (!currentAttempt || isSaving || isTestComplete || timeUpModal || !questions.length) return;
         const currentQIndex = currentQuestionIndex;
@@ -418,19 +411,41 @@ export default function VprTestPage() {
             const { data: updatedAttempt, error: updateError } = await supabaseAdmin.from('vpr_test_attempts').update(updates).eq('id', currentAttempt.id).select().single();
             if (updateError) throw new Error(`Ошибка обновления прогресса: ${updateError.message}`);
             if (!updatedAttempt) throw new Error("Attempt not found after update.");
+
             setCurrentAttempt(updatedAttempt); // Update with DB data *first*
+
             if (!isFinishing) {
                 setCurrentQuestionIndex(nextIndex);
                 setIsCurrentQuestionNonAnswerable(nextIsNonAnswerable);
                 setIsTimerRunning(true);
                 debugLogger.log(`Moved to question index: ${nextIndex}. Timer restarted.`);
             } else {
+                // ТЕСТ ЗАВЕРШЕН НОРМАЛЬНО
                 setIsCurrentQuestionNonAnswerable(false);
                 setIsTimerRunning(false);
                 setIsTestComplete(true);
                 setFinalScore(updatedAttempt.score ?? 0);
                 debugLogger.log("Test marked as complete. Final Score from DB:", updatedAttempt.score);
                 toast.success("Тест завершен!", { duration: 4000 });
+
+                // --- НАЧАЛО: Отправка уведомления админу ---
+                if (user && subject && updatedAttempt) {
+                    const message = `✅ Тест ВПР завершен!
+Пользователь: ${user.username || user.id} (${user.id})
+Предмет: ${subject.name}
+Вариант: ${updatedAttempt.variant_number}
+Результат: ${updatedAttempt.score ?? 0} из ${updatedAttempt.total_questions}`;
+                    try {
+                        await notifyAdmin(message);
+                        debugLogger.log("Admin notified of normal test completion.");
+                    } catch (notifyError) {
+                        debugLogger.error("Failed to notify admin about normal completion:", notifyError);
+                        // Можно добавить toast.warning("Не удалось уведомить администратора.") если нужно
+                    }
+                } else {
+                    debugLogger.warn("Could not notify admin: missing user, subject, or attempt data.");
+                }
+                // --- КОНЕЦ: Отправка уведомления админу ---
             }
         } catch(err: any) {
             debugLogger.error("Error updating attempt on navigation:", err);
@@ -440,93 +455,87 @@ export default function VprTestPage() {
         } finally {
             setIsSaving(false);
         }
-    }, [currentAttempt, isSaving, isTestComplete, timeUpModal, questions, currentQuestionIndex]);
+    // Добавлены user и subject в зависимости для использования в уведомлении
+    }, [currentAttempt, isSaving, isTestComplete, timeUpModal, questions, currentQuestionIndex, user, subject]);
     // --- End Navigation Logic ---
 
 
-    // --- Reset Logic (Modified to clear selectedVariant) ---
+    // --- Reset Logic ---
      const resetTest = useCallback(async () => {
          if (isSaving) {
              toast.warning("Подождите, идет сохранение...");
              return;
          }
          debugLogger.log("Reset button clicked.");
-         setIsLoading(true); // Show full loading indicator
+         setIsLoading(true);
 
          try {
-             // Stop the timer immediately
              setIsTimerRunning(false);
 
-             // Attempt to delete the currently loaded ACTIVE attempt
-             // Note: We don't know the variant loaded by the *previous* run without storing it,
-             // so we delete any active attempt for the CURRENT subject/user. This might delete
-             // an attempt for a *different* variant if the user reset immediately after load
-             // before answering. This is usually acceptable behavior for a full reset.
-             // A more precise delete would require storing the `selectedVariant` from the *previous* run.
              debugLogger.log(`Attempting to delete ANY active attempt for subject ${subjectId} and user before reset.`);
              const { error: deleteError } = await supabaseAdmin
                  .from('vpr_test_attempts')
                  .delete()
-                 .eq('user_id', user?.id) // Ensure user is defined
+                 .eq('user_id', user?.id)
                  .eq('subject_id', subjectId)
-                 .is('completed_at', null); // Only delete active ones
+                 .is('completed_at', null);
 
              if (deleteError) {
                   debugLogger.error("Error deleting active attempt(s) during reset:", deleteError);
-                  // Don't necessarily block the reset, but log it.
-                  // toast.error("Не удалось корректно сбросить предыдущую попытку.");
              } else {
                   debugLogger.log("Any active attempts for this subject/user deleted successfully.");
              }
 
-
-             // Clear sensitive local state *before* triggering re-fetch
              setCurrentAttempt(null);
-             setQuestions([]); // Clear questions
+             setQuestions([]);
              setCurrentQuestionIndex(0);
              setError(null);
-             setSelectedVariant(null); // <<< Clear the selected variant
+             setSelectedVariant(null);
+             setSubject(null); // Сбрасываем предмет тоже
 
              toast.info("Сброс теста...", { duration: 1500});
-             // Increment the counter to explicitly trigger the useEffect hook
              setResetCounter(prev => prev + 1);
              debugLogger.log("Reset counter incremented, useEffect will re-run.");
 
          } catch (err: any) {
               debugLogger.error("Error during reset process:", err);
               setError(`Ошибка сброса теста: ${err.message}`);
-              setIsLoading(false); // Ensure loading stops on error
+              setIsLoading(false);
          }
-         // setIsLoading(true) remains active, useEffect will set it to false when done re-initializing.
-     }, [isSaving, user?.id, subjectId]); // Added user.id and subjectId for the delete query
+     }, [isSaving, user?.id, subjectId]);
     // --- End Reset Logic ---
 
 
-    // --- Rendering Logic (Added Variant display in Header) ---
+    // --- Rendering Logic ---
     if (isLoading) return <VprLoadingIndicator />;
     if (error) return <VprErrorDisplay error={error} onRetry={resetTest} />;
     if (isTestComplete) {
-        return ( <VprCompletionScreen subjectName={subject?.name} variantNumber={currentAttempt?.variant_number} finalScore={finalScore} totalQuestions={questions.length} onReset={resetTest} onGoToList={() => router.push('/vpr-tests')} /> );
+        // Передаем данные в компонент завершения
+        return ( <VprCompletionScreen
+                    subjectName={subject?.name}
+                    variantNumber={currentAttempt?.variant_number}
+                    finalScore={finalScore}
+                    totalQuestions={questions.length}
+                    onReset={resetTest}
+                    onGoToList={() => router.push('/vpr-tests')} /> );
     }
-    // Check for selectedVariant *after* loading and error checks
-    if (!currentAttempt || questions.length === 0 || !selectedVariant) {
-         // If variant selection failed or questions didn't load for it
-         return <VprErrorDisplay error={error || "Данные теста (или вариант) не загружены. Попробуйте сбросить."} onRetry={resetTest} />;
+    // Проверка после загрузки и ошибок, перед рендером основного теста
+    if (!currentAttempt || questions.length === 0 || !selectedVariant || !subject) {
+         return <VprErrorDisplay error={error || "Данные теста (предмет, вариант или вопросы) не загружены. Попробуйте сбросить."} onRetry={resetTest} />;
     }
 
     const currentQuestionData = questions[currentQuestionIndex];
     const answersForCurrent = currentQuestionData?.vpr_answers || [];
-    const showSavingOverlay = isSaving; // Use the dedicated saving state
+    const showSavingOverlay = isSaving;
 
     return (
         <motion.div key={currentAttempt.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-h-screen bg-page-gradient text-light-text flex flex-col items-center pt-6 pb-10 px-4">
             <VprTimeUpModal show={timeUpModal} onConfirm={completeTestDueToTime} />
             <div className="max-w-3xl w-full bg-dark-card shadow-xl rounded-2xl p-5 md:p-8 flex-grow flex flex-col border border-brand-blue/20 relative">
                  {showSavingOverlay && ( <div className="absolute inset-0 bg-dark-card/80 backdrop-blur-sm flex items-center justify-center z-40 rounded-2xl"> <Loader2 className="h-8 w-8 animate-spin text-brand-blue" /> <span className="ml-3 text-light-text">Сохранение...</span> </div> )}
-                {/* Pass selectedVariant to Header */}
                  <VprHeader
                     subjectName={subject?.name}
-                    variantNumber={selectedVariant} // Pass the selected variant number
+                    variantNumber={selectedVariant} // Передаем выбранный вариант
                     showDescriptionButton={!!subject?.description}
                     isDescriptionShown={showDescription}
                     onToggleDescription={() => setShowDescription(!showDescription)}
