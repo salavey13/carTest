@@ -83,7 +83,15 @@ ADD COLUMN variant_number INT NOT NULL DEFAULT 1;
 -- WHERE table_name = 'vpr_questions' AND constraint_type = 'UNIQUE';
 
 ALTER TABLE public.vpr_questions DROP CONSTRAINT vpr_questions_subject_id_position_key;
+BEGIN;
 
+ALTER TABLE public.subjects
+DROP CONSTRAINT subjects_name_key;
+
+ALTER TABLE public.subjects
+ADD CONSTRAINT subjects_name_grade_level_key UNIQUE (name, grade_level);
+
+COMMIT;
 -- Add new unique constraint including variant_number for questions
 ALTER TABLE public.vpr_questions
 ADD CONSTRAINT vpr_questions_subject_variant_position_key UNIQUE (subject_id, variant_number, position);
