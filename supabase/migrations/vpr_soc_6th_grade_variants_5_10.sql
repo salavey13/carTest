@@ -8,7 +8,7 @@ DO $$
 DECLARE
     subj_soc_id INT;
 BEGIN
-    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание';
+    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание' AND grade_level = 6;
 
     IF subj_soc_id IS NOT NULL THEN
         RAISE NOTICE 'Deleting existing data for Обществознание Variants 5, 6, 7, 8, 9, 10...';
@@ -36,7 +36,7 @@ DECLARE
     subj_soc_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание';
+    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание' AND grade_level = 6;
 
     IF subj_soc_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Social Studies Variant 5...';
@@ -166,7 +166,7 @@ DECLARE
     subj_soc_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание';
+    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание' AND grade_level = 6;
 
     IF subj_soc_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Social Studies Variant 6...';
@@ -297,7 +297,7 @@ DECLARE
     subj_soc_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание';
+    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание' AND grade_level = 6;
 
     IF subj_soc_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Social Studies Variant 7...';
@@ -428,7 +428,7 @@ DECLARE
     subj_soc_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание';
+    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание' AND grade_level = 6;
 
     IF subj_soc_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Social Studies Variant 8...';
@@ -558,7 +558,7 @@ DECLARE
     subj_soc_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание';
+    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание' AND grade_level = 6;
 
     IF subj_soc_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Social Studies Variant 9...';
@@ -687,7 +687,7 @@ DECLARE
     subj_soc_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание';
+    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание' AND grade_level = 6;
 
     IF subj_soc_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Social Studies Variant 10...';
