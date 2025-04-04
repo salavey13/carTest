@@ -1,13 +1,36 @@
 -- Ensure the "Русский язык" subject exists
 INSERT INTO public.subjects (name, description) VALUES
 ('Русский язык', E'## ВПР по Русскому языку (6 класс)\n\nПроверка знаний по орфографии, пунктуации, морфологии, синтаксису, лексике и работе с текстом.')
-ON CONFLICT (name) DO NOTHING;
+ON CONFLICT (name, grade_level) DO NOTHING;
 
 -- Clear existing Russian language questions before seeding (optional, for idempotency)
-DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Русский язык'));
-DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Русский язык');
+-- DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Русский язык' AND grade_level = 6));
+-- DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Русский язык' AND grade_level = 6);
 
 
+-- Clear existing Social Studies questions for idempotency (Variants 1, 2, 3, 4)
+DO $$
+DECLARE
+    subj_soc_id INT;
+BEGIN
+    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Русский язык' AND grade_level = 6;
+
+    IF subj_soc_id IS NOT NULL THEN
+        RAISE NOTICE 'Deleting existing data for Обществознание Variants 1, 2...';
+        DELETE FROM public.vpr_answers a
+        USING public.vpr_questions q
+        WHERE a.question_id = q.id
+          AND q.subject_id = subj_soc_id
+          AND q.variant_number IN (1, 2);
+
+        DELETE FROM public.vpr_questions
+        WHERE subject_id = subj_soc_id
+          AND variant_number IN (1, 2);
+        RAISE NOTICE 'Deletion complete for Обществознание Variants 1, 2.';
+    ELSE
+        RAISE NOTICE 'Subject "Обществознание" not found. Skipping deletion.';
+    END IF;
+END $$;
 -- ======================================================
 -- === INSERT RUSSIAN LANGUAGE 6th Grade, VARIANT 1 ===
 -- === (Комплект 1, Вариант 1)                      ===
