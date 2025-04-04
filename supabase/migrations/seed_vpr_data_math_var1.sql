@@ -5,8 +5,8 @@ INSERT INTO public.subjects (name, description) VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- Clear existing math questions for idempotency before seeding (optional, but good practice)
-DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Математика'));
-DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Математика');
+DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Математика' AND grade_level = 6));
+DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Математика' AND grade_level = 6);
 
 
 -- =============================================
@@ -17,7 +17,7 @@ DECLARE
     subj_math_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_math_id FROM public.subjects WHERE name = 'Математика';
+    SELECT id INTO subj_math_id FROM public.subjects WHERE name = 'Математика' AND grade_level = 6;
 
     IF subj_math_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Math Variant 1...';
@@ -125,7 +125,7 @@ DECLARE
     subj_math_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_math_id FROM public.subjects WHERE name = 'Математика';
+    SELECT id INTO subj_math_id FROM public.subjects WHERE name = 'Математика' AND grade_level = 6;
 
     IF subj_math_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Math Variant 2...';
@@ -237,7 +237,7 @@ DECLARE
     subj_math_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_math_id FROM public.subjects WHERE name = 'Математика';
+    SELECT id INTO subj_math_id FROM public.subjects WHERE name = 'Математика' AND grade_level = 6;
 
     IF subj_math_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Math Variant 3 (from testreal1.txt)...';
