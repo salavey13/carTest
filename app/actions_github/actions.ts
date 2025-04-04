@@ -20,6 +20,8 @@ function parseRepoUrl(repoUrl: string) {
 }
 
 // fetchRepoContents function structure restored from context
+
+
 export async function fetchRepoContents(repoUrl: string, customToken?: string) {
   try {
     const token = customToken || process.env.GITHUB_TOKEN;
@@ -28,9 +30,9 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string) {
     const { owner, repo } = parseRepoUrl(repoUrl);
     const octokit = new Octokit({ auth: token });
 
-    const allowedExtensions = [".ts", ".tsx", ".css"];
+    // --- Includes .sql ---
+    const allowedExtensions = [".ts", ".tsx", ".css", ".sql"];
 
-    // Restore inner collectFiles function structure from context (~47)
     async function collectFiles(path: string = ""): Promise<FileInfo[]> {
       const { data: contents } = await octokit.repos.getContent({
         owner,
@@ -44,8 +46,8 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string) {
         if (
           item.type === "file" &&
           allowedExtensions.some((ext) => item.path.endsWith(ext)) &&
-          !item.path.startsWith("components/ui/") &&
-          !item.path.endsWith(".sql") // Keep this condition
+          !item.path.startsWith("components/ui/")
+          // --- .sql exclusion removed ---
         ) {
           fileInfos.push({ path: item.path, download_url: item.download_url });
         } else if (item.type === "dir") {
@@ -71,14 +73,18 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string) {
           pathComment = `// /${fileInfo.path}`;
         } else if (fileInfo.path.endsWith(".css")) {
           pathComment = `/* /${fileInfo.path} */`;
+        // --- Added case for .sql comments ---
+        } else if (fileInfo.path.endsWith(".sql")) {
+          pathComment = `-- /${fileInfo.path}`;
         } else {
-          pathComment = `# /${fileInfo.path}`;
+           pathComment = `# /${fileInfo.path}`; // Default or handle other types
+           console.warn(`Unhandled extension for path comment: ${fileInfo.path}`);
         }
-        // Keep path comment logic
-        if (contentLines[0] && contentLines[0].match(/^(\/\/|\/\*|#)/)) {
-          contentLines[0] = pathComment;
+        // --- Updated regex to check for SQL comments too ---
+        if (contentLines[0]?.match(/^(--|\/\/|\/\*|#)/)) { // Added -- and optional chaining
+          contentLines[0] = pathComment; // Replace existing comment
         } else {
-          contentLines.unshift(pathComment);
+          contentLines.unshift(pathComment); // Add new comment line
         }
         return { path: fileInfo.path, content: contentLines.join("\n") };
       })
