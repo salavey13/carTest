@@ -20,7 +20,7 @@ import { VprAnswerList } from "@/components/vpr/VprAnswerList";
 import { VprTimeUpModal } from "@/components/vpr/VprTimeUpModal";
 
 import { toast } from "sonner";
-import { notifyAdmin } from "@/app/actions"; // <--- ИМПОРТ ДОБАВЛЕН
+import { notifyVprAdmins } from "@/app/actions"; // <--- ИМПОРТ ДОБАВЛЕН
 
 // --- Interfaces ---
 interface SubjectData {
@@ -128,7 +128,7 @@ export default function VprTestPage() {
 Вариант: ${updatedAttempt.variant_number}
 Результат: ${updatedAttempt.score ?? 0} из ${updatedAttempt.total_questions}`;
                   try {
-                      await notifyAdmin(message);
+                      await notifyVprAdmins(message);
                       debugLogger.log("Admin notified of time-up completion.");
                   } catch (notifyError) {
                       debugLogger.error("Failed to notify admin about time-up completion:", notifyError);
@@ -436,7 +436,7 @@ export default function VprTestPage() {
 Вариант: ${updatedAttempt.variant_number}
 Результат: ${updatedAttempt.score ?? 0} из ${updatedAttempt.total_questions}`;
                     try {
-                        await notifyAdmin(message);
+                        await notifyVprAdmins(message);
                         debugLogger.log("Admin notified of normal test completion.");
                     } catch (notifyError) {
                         debugLogger.error("Failed to notify admin about normal completion:", notifyError);

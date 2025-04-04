@@ -1,4 +1,3 @@
-// /app/actions.ts
 "use server";
 
 import { generateCarEmbedding, createAuthenticatedClient, supabaseAdmin, supabaseAnon } from "@/hooks/supabase";
@@ -49,7 +48,7 @@ tsx
 
 
 // /app/webhook-handlers/proxy.ts
-// ... (other imports)
+// .. (other imports)
 import { newTypeHandler } from "./new-type";
 
 const handlers = [
@@ -161,6 +160,25 @@ export async function notifyAdmins(message: string) {
   return { success: true };
 }
 
+export async function notifyVprAdmins(message: string) {
+  const { data: admins, error } = await supabaseAdmin
+    .from("users")
+    .select("user_id")
+    .eq("role", "vprAdmin");
+
+  if (error) throw error;
+
+  for (const admin of admins) {
+    await sendTelegramMessage(
+      process.env.TELEGRAM_BOT_TOKEN!,
+      message,
+      [],
+      undefined,
+      admin.user_id
+    );
+  }
+  return { success: true };
+}
 
 interface CaptchaSettings {
   string_length: number;
@@ -562,7 +580,7 @@ export async function analyzeMessage(content: string) {
 
         return {
           bullshit_percentage: parsedData.bullshit_percentage || 50,
-          emotional_comment: parsedData.emotional_comment || "Hmm, interesting...",
+          emotional_comment: parsedData.emotional_comment || "Hmm, interesting..",
           analyzed_content: parsedData.analyzed_content || content,
           content_summary: parsedData.content_summary || "No summary available.",
           animation: parsedData.animation || "neutral",
@@ -1283,4 +1301,3 @@ export async function findSimilarCars(resultEmbedding: number[]) {
     similarity: Math.round(car.similarity * 100),
   }));
 }
-
