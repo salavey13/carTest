@@ -8,8 +8,8 @@ INSERT INTO public.subjects (name, description) VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- Clear existing Biology questions for idempotency
-DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Биология'));
-DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Биология');
+DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Биология' AND grade_level = 6));
+DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Биология' AND grade_level = 6);
 
 
 -- =============================================
@@ -20,7 +20,7 @@ DECLARE
     subj_bio_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_bio_id FROM public.subjects WHERE name = 'Биология';
+    SELECT id INTO subj_bio_id FROM public.subjects WHERE name = 'Биология' AND grade_level = 6;
 
     IF subj_bio_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Biology Variant 1...';
@@ -90,8 +90,8 @@ INSERT INTO public.subjects (name, description) VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- Clear existing English questions for idempotency
-DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык'));
-DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык');
+DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык' AND grade_level = 6));
+DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык' AND grade_level = 6);
 
 
 -- =============================================
@@ -176,8 +176,8 @@ END $$;
 -- (Assuming the subject 'Английский язык' is already inserted from the previous block)
 
 -- Clear existing English questions for VARIANT 2 for idempotency
-DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык') AND variant_number = 2);
-DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык') AND variant_number = 2;
+DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык' AND grade_level = 6) AND variant_number = 2);
+DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык' AND grade_level = 6) AND variant_number = 2;
 
 -- =============================================
 -- === INSERT ENGLISH 6th Grade, VARIANT 2 ===
@@ -187,7 +187,7 @@ DECLARE
     subj_eng_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_eng_id FROM public.subjects WHERE name = 'Английский язык';
+    SELECT id INTO subj_eng_id FROM public.subjects WHERE name = 'Английский язык' AND grade_level = 6;
 
     IF subj_eng_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding English Variant 2...';
@@ -257,8 +257,8 @@ END $$;
 
 
 -- Clear existing English questions for VARIANT 3 for idempotency
-DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык') AND variant_number = 3);
-DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык') AND variant_number = 3;
+DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык' AND grade_level = 6) AND variant_number = 3);
+DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык' AND grade_level = 6) AND variant_number = 3;
 
 -- =============================================
 -- === INSERT ENGLISH 6th Grade, VARIANT 3 ===
@@ -268,7 +268,7 @@ DECLARE
     subj_eng_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_eng_id FROM public.subjects WHERE name = 'Английский язык';
+    SELECT id INTO subj_eng_id FROM public.subjects WHERE name = 'Английский язык' AND grade_level = 6;
 
     IF subj_eng_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding English Variant 3...';
@@ -343,8 +343,8 @@ END $$;
 -- (Assuming the subject 'Английский язык' is already inserted)
 
 -- Clear existing English questions for VARIANT 4 for idempotency
-DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык') AND variant_number = 4);
-DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык') AND variant_number = 4;
+DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык' AND grade_level = 6) AND variant_number = 4);
+DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык' AND grade_level = 6) AND variant_number = 4;
 
 -- =============================================
 -- === INSERT ENGLISH 6th Grade, VARIANT 4 ===
@@ -354,7 +354,7 @@ DECLARE
     subj_eng_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_eng_id FROM public.subjects WHERE name = 'Английский язык';
+    SELECT id INTO subj_eng_id FROM public.subjects WHERE name = 'Английский язык' AND grade_level = 6;
 
     IF subj_eng_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding English Variant 4...';
@@ -424,8 +424,8 @@ END $$;
 
 
 -- Clear existing English questions for VARIANT 5 for idempotency
-DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык') AND variant_number = 5);
-DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык') AND variant_number = 5;
+DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык' AND grade_level = 6) AND variant_number = 5);
+DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Английский язык' AND grade_level = 6) AND variant_number = 5;
 
 -- =============================================
 -- === INSERT ENGLISH 6th Grade, VARIANT 5 ===
@@ -435,7 +435,7 @@ DECLARE
     subj_eng_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_eng_id FROM public.subjects WHERE name = 'Английский язык';
+    SELECT id INTO subj_eng_id FROM public.subjects WHERE name = 'Английский язык' AND grade_level = 6;
 
     IF subj_eng_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding English Variant 5...';
@@ -513,8 +513,8 @@ INSERT INTO public.subjects (name, description) VALUES
 ON CONFLICT (name) DO NOTHING;
 
 -- Clear existing Social Studies questions for idempotency
-DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Обществознание'));
-DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Обществознание');
+DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Обществознание' AND grade_level = 6));
+DELETE FROM public.vpr_questions WHERE subject_id = (SELECT id FROM public.subjects WHERE name = 'Обществознание' AND grade_level = 6);
 
 
 -- ====================================================
@@ -525,7 +525,7 @@ DECLARE
     subj_soc_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание';
+    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание' AND grade_level = 6;
 
     IF subj_soc_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Social Studies Variant 1...';
