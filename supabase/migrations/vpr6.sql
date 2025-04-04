@@ -4,6 +4,7 @@ CREATE TABLE public.subjects (
     name TEXT NOT NULL UNIQUE, -- e.g., 'Русский язык', 'Математика'
     description TEXT,          -- Optional: General info about VPR for this subject
     created_at TIMESTAMPTZ DEFAULT now()
+    grade_level INTEGER NOT NULL DEFAULT 6;
 );
 
 -- 2. Create VPR Questions Table
