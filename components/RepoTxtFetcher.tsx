@@ -150,7 +150,7 @@ const RepoTxtFetcher = forwardRef<any, RepoTxtFetcherProps>(({ kworkInputRef }, 
 
       setFilesFetched(true, primaryPath, secondaryPaths); // Update context: fetch succeeded with highlight info
       addToast("Файлы извлечены! Готов к следующему шагу.");
-      // ... (inside handleFetch, after setFiles)
+      // (inside handleFetch, after setFiles)
       if (primaryPath) {
         // Give rendering a bit more time, especially with progress updates
         setTimeout(() => {
@@ -312,6 +312,7 @@ const RepoTxtFetcher = forwardRef<any, RepoTxtFetcherProps>(({ kworkInputRef }, 
           case 'html': return 'html';
           case 'json': return 'json';
           case 'py': return 'python';
+          case 'sql': return 'sql'; 
           case 'md': return 'markdown';
           default: return 'text';
       }
