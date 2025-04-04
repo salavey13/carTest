@@ -6,7 +6,7 @@ DECLARE
     subj_math_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_math_id FROM public.subjects WHERE name = 'Математика';
+    SELECT id INTO subj_math_id FROM public.subjects WHERE name = 'Математика' AND grade_level = 6;
 
     IF subj_math_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Math Variant 4 (Komplekt 7, Variant 1)...';
@@ -108,7 +108,7 @@ DECLARE
     subj_math_id INT;
     q_id INT;
 BEGIN
-    SELECT id INTO subj_math_id FROM public.subjects WHERE name = 'Математика';
+    SELECT id INTO subj_math_id FROM public.subjects WHERE name = 'Математика' AND grade_level = 6;
 
     IF subj_math_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Math Variant 5 (Komplekt 7, Variant 2)...';
