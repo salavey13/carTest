@@ -41,7 +41,7 @@ DECLARE
     q_id INT;
     v_num INT := 1; -- Variant Number
 BEGIN
-    SELECT id INTO subj_rus_id FROM public.subjects WHERE name = 'Русский язык';
+    SELECT id INTO subj_rus_id FROM public.subjects WHERE name = 'Русский язык' AND grade_level = 6;
 
     IF subj_rus_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Russian Language Variant %...', v_num;
@@ -149,7 +149,7 @@ DECLARE
     q_id INT;
     v_num INT := 2; -- Variant Number
 BEGIN
-    SELECT id INTO subj_rus_id FROM public.subjects WHERE name = 'Русский язык';
+    SELECT id INTO subj_rus_id FROM public.subjects WHERE name = 'Русский язык' AND grade_level = 6;
 
     IF subj_rus_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Russian Language Variant %...', v_num;
