@@ -9,11 +9,11 @@ DECLARE
     q_id INT; -- Переменная для ID вопроса
 BEGIN
     -- Получаем ID предметов (предполагаем, что они уже вставлены)
-    SELECT id INTO subj_rus_id FROM public.subjects WHERE name = 'Русский язык';
-    SELECT id INTO subj_math_id FROM public.subjects WHERE name = 'Математика';
-    SELECT id INTO subj_bio_id FROM public.subjects WHERE name = 'Биология';
-    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание';
-    SELECT id INTO subj_eng_id FROM public.subjects WHERE name = 'Английский язык';
+    SELECT id INTO subj_rus_id FROM public.subjects WHERE name = 'Русский язык' AND grade_level = 6;
+    SELECT id INTO subj_math_id FROM public.subjects WHERE name = 'Математика' AND grade_level = 6;
+    SELECT id INTO subj_bio_id FROM public.subjects WHERE name = 'Биология' AND grade_level = 6;
+    SELECT id INTO subj_soc_id FROM public.subjects WHERE name = 'Обществознание' AND grade_level = 6;
+    SELECT id INTO subj_eng_id FROM public.subjects WHERE name = 'Английский язык' AND grade_level = 6;
 
     -- === РУССКИЙ ЯЗЫК ===
     IF subj_rus_id IS NOT NULL THEN
