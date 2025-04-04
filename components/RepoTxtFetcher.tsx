@@ -8,7 +8,8 @@ import { useAppContext } from "@/contexts/AppContext";
 import { useRepoXmlPageContext } from "@/contexts/RepoXmlPageContext"; // Import the context hook
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { FaTree, FaKey, FaFileAlt, FaClipboard, FaDownload, FaSync } from "react-icons/fa";
+import { FaTree, FaKey, FaFileAlt, FaClipboard, FaDownload, FaSync } from "react-icons/fa"
+// TODO: Verify import for FaRotate, consider 'react-icons/fa6';
 
 export interface FileNode { // Make sure this is exported or defined commonly
   path: string;
@@ -150,7 +151,7 @@ const RepoTxtFetcher = forwardRef<any, RepoTxtFetcherProps>(({ kworkInputRef }, 
 
       setFilesFetched(true, primaryPath, secondaryPaths); // Update context: fetch succeeded with highlight info
       addToast("Файлы извлечены! Готов к следующему шагу.");
-      // ... (inside handleFetch, after setFiles)
+      // (inside handleFetch, after setFiles)
       if (primaryPath) {
         // Give rendering a bit more time, especially with progress updates
         setTimeout(() => {
@@ -312,6 +313,7 @@ const RepoTxtFetcher = forwardRef<any, RepoTxtFetcherProps>(({ kworkInputRef }, 
           case 'html': return 'html';
           case 'json': return 'json';
           case 'py': return 'python';
+          case 'sql': return 'sql'; 
           case 'md': return 'markdown';
           default: return 'text';
       }
@@ -385,7 +387,7 @@ const RepoTxtFetcher = forwardRef<any, RepoTxtFetcherProps>(({ kworkInputRef }, 
             whileHover={{ scale: (extractLoading) ? 1 : 1.05 }}
             whileTap={{ scale: (extractLoading) ? 1 : 0.95 }}
             >
-             {extractLoading ? <FaSync className="animate-spin" /> : <FaDownload />}
+             {extractLoading ? <FaRotate className="animate-spin" /> : <FaDownload />}
             {extractLoading ? "Извлечение..." : "Извлечь файлы"}
             </motion.button>
         </div>
