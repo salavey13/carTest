@@ -28,9 +28,8 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string) {
     const { owner, repo } = parseRepoUrl(repoUrl);
     const octokit = new Octokit({ auth: token });
 
-    const allowedExtensions = [".ts", ".tsx", ".css"];
+    const allowedExtensions = [".ts", ".tsx", ".css", ".sql"];
 
-    // Restore inner collectFiles function structure from context (~47)
     async function collectFiles(path: string = ""): Promise<FileInfo[]> {
       const { data: contents } = await octokit.repos.getContent({
         owner,
@@ -71,6 +70,8 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string) {
           pathComment = `// /${fileInfo.path}`;
         } else if (fileInfo.path.endsWith(".css")) {
           pathComment = `/* /${fileInfo.path} */`;
+        } else if( fileInfo.path.endsWith(".sql")) {
+          pathComment = `-- /${fileInfo.path} `;
         } else {
           pathComment = `# /${fileInfo.path}`;
         }
