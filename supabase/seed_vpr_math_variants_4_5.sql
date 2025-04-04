@@ -1,15 +1,20 @@
--- =============================================
 -- === INSERT MATH 6th Grade, VARIANT 4 (K7 V1) ===
 -- =============================================
 DO $$
 DECLARE
     subj_math_id INT;
     q_id INT;
+    variant_num INT := 4;
 BEGIN
     SELECT id INTO subj_math_id FROM public.subjects WHERE name = 'Математика' AND grade_level = 6;
 
     IF subj_math_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Math Variant 4 (Komplekt 7, Variant 1)...';
+
+        -- Clean up existing data for this specific variant first (optional but recommended)
+        DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = subj_math_id AND variant_number = variant_num);
+        DELETE FROM public.vpr_questions WHERE subject_id = subj_math_id AND variant_number = variant_num;
+
 
         -- Question 1 (Var 4) - Free Response (Number)
         INSERT INTO public.vpr_questions (subject_id, variant_number, text, explanation, position)
@@ -107,11 +112,16 @@ DO $$
 DECLARE
     subj_math_id INT;
     q_id INT;
+    variant_num INT := 5; -- Set variant number
 BEGIN
     SELECT id INTO subj_math_id FROM public.subjects WHERE name = 'Математика' AND grade_level = 6;
 
     IF subj_math_id IS NOT NULL THEN
         RAISE NOTICE 'Seeding Math Variant 5 (Komplekt 7, Variant 2)...';
+
+        -- Clean up existing data for this specific variant first (optional but recommended)
+        DELETE FROM public.vpr_answers WHERE question_id IN (SELECT id FROM public.vpr_questions WHERE subject_id = subj_math_id AND variant_number = variant_num);
+        DELETE FROM public.vpr_questions WHERE subject_id = subj_math_id AND variant_number = variant_num;
 
         -- Question 1 (Var 5) - Free Response (Number)
         INSERT INTO public.vpr_questions (subject_id, variant_number, text, explanation, position)
