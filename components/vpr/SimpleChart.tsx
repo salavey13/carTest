@@ -21,7 +21,7 @@ import React from 'react';
               <div key={index} className="flex flex-col items-center flex-grow min-w-0" title={`${labels[index]}: ${value}`}>
                 {/* Bar */}
                 <div
-                  className="w-full bg-brand-blue hover:bg-brand-cyan transition-colors duration-200 rounded-t"
+                  className="w-full bg-brand-blue hover:bg-accent transition-colors duration-200 rounded-t"
                   style={{ height: `${Math.max((value / maxValue) * 100, 1)}%` }} // Ensure minimum visible height
                 >
                   {/* Optional: Value inside bar if enough space */}
