@@ -74,7 +74,8 @@
     "@octokit/rest": "latest",
     "googleapis": "latest",
     "react-dom-confetti": "latest",
-    "react-markdown": "latest"
+    "react-markdown": "latest",
+    "recharts": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",
