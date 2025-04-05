@@ -37,6 +37,7 @@ interface VprQuestionData {
     explanation?: string;
     position: number;
     vpr_answers: VprAnswerData[];
+    visual_data?: any | null; // Add the new field (type 'any' for now, or create specific types)
 }
 
 export interface VprAnswerData {
@@ -346,6 +347,7 @@ export default function VprTestPage() {
 
         return () => {
             isMounted = false;
+            const currentQuestionData = questions[currentQuestionIndex];
             debugLogger.log("useEffect cleanup: component unmounting or dependencies changed.");
         };
      }, [user, subjectId, resetCounter, router]); // router добавлен обратно, так как используется в if (!user?.id)
@@ -546,7 +548,11 @@ export default function VprTestPage() {
                 />
                 <VprDescription description={subject?.description} show={showDescription} />
                 <VprProgressIndicator current={currentQuestionIndex} total={questions.length} />
-                <VprQuestionContent questionText={currentQuestionData?.text} questionNumber={currentQuestionIndex + 1} totalQuestions={questions.length} />
+                <VprQuestionContent
+                        questionData={currentQuestionData}
+                        questionNumber={currentQuestionIndex + 1}
+                        totalQuestions={questions.length}
+                    />
                 <VprAnswerList answers={answersForCurrent} selectedAnswerId={selectedAnswerId} showFeedback={showFeedback} timeUpModal={timeUpModal} handleAnswer={handleAnswer} />
                  {isCurrentQuestionNonAnswerable && !showFeedback && !isTestComplete && !timeUpModal && (
                      <div className="mt-4 text-center"> <button onClick={() => handleNextQuestion(true)} disabled={isSaving} className="bg-brand-purple text-white px-6 py-2 rounded-lg font-semibold hover:bg-brand-purple/80 transition-colors disabled:opacity-50 disabled:cursor-wait"> Пропустить / Далее </button> <p className="text-xs text-gray-400 mt-2">Этот вопрос требует рисунка, ввода текста или анализа изображения.</p> </div>
