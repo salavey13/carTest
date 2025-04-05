@@ -1,65 +1,81 @@
-import { motion } from 'framer-motion';
-import { CheckCircle, XCircle } from 'lucide-react';
-// Import type from the correct location
-import type { VprAnswerData } from '@/app/vpr-test/[subjectId]/page';
+import { motion } from "framer-motion";
+import { CheckCircle2, XCircle, Circle } from "lucide-react";
+import type { VprAnswerData } from "@/app/vpr-test/[subjectId]/page"; // Adjust import path if needed
 
-// Interface remains the same as current context
 interface AnswerOptionProps {
-    answer: VprAnswerData;
-    isSelected: boolean;
-    showCorrectness: boolean;
-    showIncorrectness: boolean;
-    isDisabled: boolean;
-    onClick: (answer: VprAnswerData) => void;
+  answer: VprAnswerData;
+  isSelected: boolean;
+  showCorrectness: boolean;
+  showIncorrectness: boolean;
+  isDisabled: boolean;
+  onClick: (answer: VprAnswerData) => void;
+  isDummyHighlighted?: boolean; // <-- NEW PROP for dummy mode highlight
 }
 
-export const AnswerOption = ({
-    answer,
-    isSelected,
-    showCorrectness,
-    showIncorrectness,
-    isDisabled,
-    onClick
-}: AnswerOptionProps) => {
+export function AnswerOption({
+  answer,
+  isSelected,
+  showCorrectness,
+  showIncorrectness,
+  isDisabled,
+  onClick,
+  isDummyHighlighted = false, // <-- Default value
+}: AnswerOptionProps) {
 
-    // --- New class definitions for dark theme ---
-    const baseClasses = "w-full text-left p-3.5 md:p-4 rounded-xl border-2 transition-all duration-200 flex items-center justify-between group text-base md:text-lg shadow-md";
-    const interactionClasses = isDisabled
-        ? 'cursor-not-allowed opacity-60' // Adjusted opacity for dark
-        : 'hover:bg-brand-blue/10 hover:border-brand-blue cursor-pointer'; // New hover effect
-    const selectedClasses = isSelected ? 'ring-2 ring-offset-2 ring-offset-dark-card ring-brand-green border-brand-green' : 'border-gray-600 hover:border-brand-blue'; // New selected styles
-    const correctClasses = showCorrectness ? 'bg-green-600/30 border-brand-green text-white' : ''; // New correct style
-    const incorrectClasses = showIncorrectness ? 'bg-red-600/30 border-brand-pink text-white' : ''; // New incorrect style
-    const textClasses = (showCorrectness || showIncorrectness) ? 'font-semibold' : 'text-light-text/90'; // New text color logic
-    // --- End new class definitions ---
+  const getBaseClasses = () => {
+    let classes = "flex items-center w-full p-4 rounded-lg border transition-all duration-200 cursor-pointer text-left ";
+    if (isDisabled) {
+        classes += "cursor-not-allowed ";
+    } else {
+        classes += "hover:bg-brand-blue/10 ";
+    }
+    return classes;
+  };
 
-    return (
-        <motion.button
-            onClick={() => onClick(answer)}
-            disabled={isDisabled}
-            // Combine classes using new logic. Order matters.
-            className={`${baseClasses} ${isDisabled ? '' : interactionClasses} ${isSelected ? selectedClasses : 'border-gray-600'} ${correctClasses} ${incorrectClasses}`}
-            // New hover/tap animations
-            whileHover={!isDisabled ? { scale: 1.03, y: -2, boxShadow: '0 6px 20px rgba(0, 194, 255, 0.2)' } : {}}
-            whileTap={!isDisabled ? { scale: 0.97 } : {}}
-            layout // Keep layout animation
-        >
-            <span className={`${textClasses} mr-2`}>
-                {answer.text}
-            </span>
-            {/* Icons with updated colors */}
-            <div className="flex-shrink-0">
-                 {showCorrectness && (
-                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
-                        <CheckCircle className="h-6 w-6 text-brand-green" /> {/* New Color */}
-                    </motion.div>
-                 )}
-                 {showIncorrectness && (
-                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
-                        <XCircle className="h-6 w-6 text-brand-pink" /> {/* New Color */}
-                    </motion.div>
-                 )}
-            </div>
-        </motion.button>
-    );
-};
+  const getVariantClasses = () => {
+    if (showCorrectness) {
+        return "border-green-500 bg-green-900/30 text-green-200 scale-[1.01]"; // Correct answer shown
+    }
+    if (showIncorrectness) {
+        return "border-red-500 bg-red-900/30 text-red-200"; // Incorrect answer selected
+    }
+    if (isDummyHighlighted) { // Apply dummy highlight style if correct answer wasn't selected but dummy mode is on
+        return "border-yellow-500 bg-yellow-900/20 ring-2 ring-yellow-500/70 ring-offset-2 ring-offset-dark-card text-yellow-200 scale-[1.01]"; // Highlight for dummy mode
+    }
+    if (isSelected) {
+        return "border-brand-blue bg-brand-blue/20 text-light-text"; // Selected but feedback not shown yet
+    }
+    // Default / Not Selected
+    return "border-gray-700 bg-dark-bg/50 hover:border-brand-blue/50 text-gray-300";
+  };
+
+  const IconComponent = showCorrectness || isDummyHighlighted
+    ? CheckCircle2
+    : showIncorrectness
+    ? XCircle
+    : Circle; // Default or selected but no feedback yet
+
+  const iconColor = showCorrectness || isDummyHighlighted
+    ? "text-green-400"
+    : showIncorrectness
+    ? "text-red-400"
+    : isSelected
+    ? "text-brand-blue"
+    : "text-gray-500";
+
+  return (
+    <motion.button
+      onClick={() => onClick(answer)}
+      disabled={isDisabled}
+      className={`${getBaseClasses()} ${getVariantClasses()}`}
+      whileHover={!isDisabled ? { scale: 1.02 } : {}}
+      whileTap={!isDisabled ? { scale: 0.98 } : {}}
+      initial={{ opacity: 0, y: 5 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.15 }}
+    >
+      <IconComponent className={`h-5 w-5 mr-3 flex-shrink-0 ${iconColor}`} />
+      <span className="flex-grow">{answer.text}</span>
+    </motion.button>
+  );
+}
