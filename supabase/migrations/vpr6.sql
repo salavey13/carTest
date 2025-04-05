@@ -14,10 +14,14 @@ CREATE TABLE public.vpr_questions (
     subject_id INT REFERENCES public.subjects(id) ON DELETE CASCADE NOT NULL,
     text TEXT NOT NULL,         -- The question itself
     explanation TEXT,           -- Explanation of the correct answer
+    visual_data JSONB NULL,     -- JSONB data specifying the type and parameters for visual components like chart, axis, compare, plot.
     position INT NOT NULL,      -- Order of question within the subject test
     created_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE (subject_id, position) -- Ensure unique positioning within a subject
 );
+
+-- Optional: Add an index if you anticipate querying based on visual_data content often (unlikely needed now)
+-- CREATE INDEX idx_vpr_questions_visual_data ON public.vpr_questions USING GIN (visual_data);
 
 -- 3. Create VPR Answers Table
 -- Renaming from 'answers'
