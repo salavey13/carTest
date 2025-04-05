@@ -1,0 +1,431 @@
+**Database Schema**
+
+New column to store the visual configuration. Execute this SQL migration:
+
+"""sql
+-- /supabase/migrations/add_visual_data_column.sql
+
+-- 1. Create Subjects Table
+CREATE TABLE public.subjects (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE, -- e.g., 'Русский язык', 'Математика'
+    description TEXT,          -- Optional: General info about VPR for this subject
+    created_at TIMESTAMPTZ DEFAULT now()
+    grade_level INTEGER NOT NULL DEFAULT 6;
+);
+
+-- 2. Create VPR Questions Table
+-- Renaming from 'questions' to avoid conflict if you keep the old one
+CREATE TABLE public.vpr_questions (
+    id SERIAL PRIMARY KEY,
+    subject_id INT REFERENCES public.subjects(id) ON DELETE CASCADE NOT NULL,
+    text TEXT NOT NULL,         -- The question itself
+    explanation TEXT,           -- Explanation of the correct answer
+    visual_data JSONB NULL,     -- JSONB data specifying the type and parameters for visual components like chart, axis, compare, plot.
+    position INT NOT NULL,      -- Order of question within the subject test
+    created_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (subject_id, position) -- Ensure unique positioning within a subject
+);
+
+-- Optional: Add an index if you anticipate querying based on visual_data content often (unlikely needed now)
+-- CREATE INDEX idx_vpr_questions_visual_data ON public.vpr_questions USING GIN (visual_data);
+
+-- 3. Create VPR Answers Table
+-- Renaming from 'answers'
+CREATE TABLE public.vpr_answers (
+    id SERIAL PRIMARY KEY,
+    question_id INT REFERENCES public.vpr_questions(id) ON DELETE CASCADE NOT NULL,
+    text TEXT NOT NULL,         -- The answer option text
+    is_correct BOOLEAN NOT NULL DEFAULT false, -- Indicates if this is the right answer
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 4. Create Test Attempts Table (Track user progress per subject test)
+CREATE TABLE public.vpr_test_attempts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- Use UUID for attempts
+    user_id TEXT REFERENCES public.users(user_id) ON DELETE CASCADE NOT NULL,
+    subject_id INT REFERENCES public.subjects(id) ON DELETE CASCADE NOT NULL,
+    started_at TIMESTAMPTZ DEFAULT now(),
+    completed_at TIMESTAMPTZ, -- NULL until finished
+    score INT,               -- Number of correct answers
+    total_questions INT,     -- Total questions in the test when started
+    last_question_index INT DEFAULT 0, -- To track resume position
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 5. Create Attempt Answers Table (Track specific answers given by user in an attempt)
+CREATE TABLE public.vpr_attempt_answers (
+    id SERIAL PRIMARY KEY,
+    attempt_id UUID REFERENCES public.vpr_test_attempts(id) ON DELETE CASCADE NOT NULL,
+    question_id INT REFERENCES public.vpr_questions(id) ON DELETE CASCADE NOT NULL,
+    selected_answer_id INT REFERENCES public.vpr_answers(id) ON DELETE SET NULL, -- Store which answer user picked
+    was_correct BOOLEAN NOT NULL, -- Was the selected answer correct?
+    answered_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (attempt_id, question_id) -- User answers each question once per attempt
+);
+
+-- Optional: Add a trigger to update 'updated_at' on vpr_test_attempts
+CREATE OR REPLACE FUNCTION update_modified_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_vpr_test_attempts_modtime
+BEFORE UPDATE ON public.vpr_test_attempts
+FOR EACH ROW
+EXECUTE FUNCTION update_modified_column();
+
+-- Add variant_number to vpr_questions
+ALTER TABLE public.vpr_questions
+ADD COLUMN variant_number INT NOT NULL DEFAULT 1;
+
+-- Add variant_number to vpr_test_attempts
+ALTER TABLE public.vpr_test_attempts
+ADD COLUMN variant_number INT NOT NULL DEFAULT 1;
+
+-- Drop old unique constraint on questions if it exists without variant
+-- Find the constraint name first (it might vary) if needed:
+-- SELECT constraint_name
+-- FROM information_schema.table_constraints
+-- WHERE table_name = 'vpr_questions' AND constraint_type = 'UNIQUE';
+
+ALTER TABLE public.vpr_questions DROP CONSTRAINT vpr_questions_subject_id_position_key;
+BEGIN;
+
+ALTER TABLE public.subjects
+DROP CONSTRAINT subjects_name_key;
+
+ALTER TABLE public.subjects
+ADD CONSTRAINT subjects_name_grade_level_key UNIQUE (name, grade_level);
+
+COMMIT;
+-- Add new unique constraint including variant_number for questions
+ALTER TABLE public.vpr_questions
+ADD CONSTRAINT vpr_questions_subject_variant_position_key UNIQUE (subject_id, variant_number, position);
+
+-- Drop old unique constraint on attempts if it exists without variant (similar process)
+-- Example: ALTER TABLE public.vpr_test_attempts DROP CONSTRAINT vpr_test_attempts_user_id_subject_id_completed_at_idx; -- Might need adjusting
+
+-- Add new unique constraint for attempts (one active attempt per user/subject/variant)
+-- Using a partial index for the uniqueness check on active attempts
+DROP INDEX IF EXISTS unique_active_attempt_per_user_subject_variant; -- Drop if exists
+CREATE UNIQUE INDEX unique_active_attempt_per_user_subject_variant
+ON public.vpr_test_attempts (user_id, subject_id, variant_number)
+WHERE (completed_at IS NULL);
+
+-- Optional: Index for faster lookup of attempts
+CREATE INDEX IF NOT EXISTS idx_vpr_test_attempts_user_subject_variant
+ON public.vpr_test_attempts (user_id, subject_id, variant_number);
+
+-- Optional: Add an index if you anticipate querying based on visual_data content often (unlikely needed now)
+-- CREATE INDEX idx_vpr_questions_visual_data ON public.vpr_questions USING GIN (visual_data);
+"""
+
+
+
+**Instructions for the Content Generation "Bot"**
+
+When generating SQL `INSERT` statements for `vpr_questions`, if a question requires a visual component, populate the `visual_data` column with a valid JSON string matching one of the formats defined above.
+**Definitions of  JSON Structures for `visual_data`**
+
+This defines the expected format within the `visual_data` column.
+
+*   **Chart:**
+```json
+    {
+      "type": "chart",
+      "data": [/* array of numbers */],
+      "labels": [/* array of strings, same length as data */],
+      "title": "Optional Chart Title"
+    }
+```
+*   **Comparison:** (Sizes are relative hints for the visual component, not necessarily exact values)
+```json
+    {
+      "type": "compare",
+      "size1": /* number (relative size hint) */,
+      "size2": /* number (relative size hint) */,
+      "label1": "Label for Item 1",
+      "label2": "Label for Item 2",
+      "referenceLabel": "Optional text like 'Длина X = Y м'"
+    }
+```
+*   **Axis:**
+```json
+    {
+      "type": "axis",
+      "points": [
+        { "value": /* number */, "label": "Point Label A" },
+        { "value": /* number */, "label": "Point Label B" }
+        /* ... more points ... */
+      ],
+      "minVal": /* Optional: explicit minimum value for axis */,
+      "maxVal": /* Optional: explicit maximum value for axis */
+    }
+```
+*   **Plot:**
+```json
+    {
+        "type": "plot",
+        "points": [
+            { "x": /* number or string */, "y": /* number */, "label": "Optional Point Label 1" },
+            { "x": /* number or string */, "y": /* number */, "label": "Optional Point Label 2" }
+            /* ... more points ... */
+        ],
+        "xLabel": "Optional X-Axis Label",
+        "yLabel": "Optional Y-Axis Label",
+        "title": "Optional Plot Title"
+    }
+```
+
+**Example SQL INSERT including `visual_data`:**
+
+```sql
+-- Example for a chart question (like subj2-var4-pos6)
+INSERT INTO public.vpr_questions
+  (subject_id, variant_number, text, explanation, position, visual_data)
+VALUES
+  (
+    2, -- Assuming Subject ID for Math Grade 6 is 2
+    4,
+    E'Результаты контрольной 6 «В». Сколько человек писали работу?\n\n[Диаграмма: Оценки К7В1]', -- Keep the original placeholder for context if desired, or remove if visual_data is sufficient
+    E'Складываем число учеников по каждой оценке:\n"2": 3 ученика\n"3": 6 учеников\n"4": 8 учеников\n"5": 5 учеников\nВсего: 3 + 6 + 8 + 5 = 22 человека.',
+    6,
+    '{
+      "type": "chart",
+      "data": [3, 6, 8, 5],
+      "labels": ["Оц. \\"2\\"", "Оц. \\"3\\"", "Оц. \\"4\\"", "Оц. \\"5\\""],
+      "title": "Результаты контрольной 6 «В»"
+    }'::jsonb -- Note the ::jsonb cast
+  );
+
+-- Example for a comparison question (like subj2-var4-pos5)
+INSERT INTO public.vpr_questions
+  (subject_id, variant_number, text, explanation, position, visual_data)
+VALUES
+  (
+    2, 4,
+    E'Автобус и автомобиль. Длина автомобиля 4,2 м. Примерная длина автобуса? (см)\n\n[Изображение: Автобус и автомобиль К7В1]',
+    E'Автомобиль 4.2м = 420 см. Автобус визуально примерно в 2-2.5 раза длиннее. 420 * 2.2 ≈ 924 см. Ответ в см. Диапазон 800-1200 см.',
+    5,
+    '{
+        "type": "compare",
+        "size1": 2.2, -- Relative size: bus is ~2.2x car
+        "size2": 1,
+        "label1": "Автобус (прим.)",
+        "label2": "Автомобиль",
+        "referenceLabel": "Длина автомобиля 4,2 м (420 см)"
+    }'::jsonb
+  );
+
+-- Example for an axis question (like subj2-var6-pos8)
+INSERT INTO public.vpr_questions
+  (subject_id, variant_number, text, explanation, position, visual_data)
+VALUES
+  (
+    2, 6,
+    E'На координатной прямой отмечены точки A, B и C. Установите соответствие между точками и их координатами.\n\n[Изображение: Коорд. прямая К8В1: ... A ... -1 ... B ... 1 ... C ...]\n\nТОЧКИ:\nA\nB\nC\n\nКООРДИНАТЫ:\n1) 1/3\n2) 2,8\n3) -1,6\n4) 0,55\n5) -0,9\n\nВ таблице для каждой точки укажите номер соответствующей координаты. Ответ: цифры для А,Б,В.',
+    E'Положение точек на прямой:\nA < -1 -> -1,6 (3)\nB (между -1 и 1) -> 0,55 (4)\nC (> 1) -> 2,8 (2)\nОтвет: 342.',
+    8,
+    '{
+        "type": "axis",
+        "points": [
+            { "value": -1.6, "label": "A" },
+            { "value": 0.55, "label": "B" },
+            { "value": 2.8, "label": "C" }
+        ],
+        "minVal": -2,
+        "maxVal": 3
+    }'::jsonb
+  );
+
+-- Example for a plot question (like subj1-var1-pos15 - Assuming Subject ID 1 for Grade 7)
+INSERT INTO public.vpr_questions
+  (subject_id, variant_number, text, explanation, position, visual_data)
+VALUES
+  (
+    1, 1, -- Assuming Subject ID 1 for Math Grade 7
+    E'К трём часам дня 25 августа воздух прогрелся до +27°С... [Полный текст] ... По описанию постройте схематично график изменения температуры ... \n\n[График]', -- Example placeholder
+    E'См. график в решении.',
+    15,
+    '{
+        "type": "plot",
+        "points": [
+            { "x": 0, "y": 27, "label": "15:00(25)" },
+            { "x": 3, "y": 18 }, { "x": 6, "y": 15 },
+            { "x": 9, "y": 18 }, { "x": 12, "y": 12 },
+            { "x": 15, "y": 9 }, { "x": 21, "y": 15 },
+            { "x": 24, "y": 21, "label": "15:00(26)" }
+        ],
+        "xLabel": "Время (часы от 15:00 25 авг)",
+        "yLabel": "Температура, °C",
+        "title": "Изменение температуры (схематично)"
+    }'::jsonb
+  );
+```
+
+**Important Notes for the Bot:**
+
+*   Use the correct `type` identifier (`chart`, `compare`, `axis`, `plot`).
+*   Ensure the data within the JSON matches the structure exactly (e.g., `data` and `labels` arrays in `chart` must have the same length).
+*   Escape any special characters within JSON strings if necessary (e.g., double quotes inside labels: `"Оц. \\"2\\""`). Using `E''` strings in PostgreSQL helps.
+*   Include the `::jsonb` cast at the end of the JSON string in the SQL.
+*   The original placeholder text like `[Диаграмма...]` can optionally be kept in the main `text` field for human readability in the database, or removed if the `visual_data` is considered sufficient. The React component should be designed to *ignore* this tag if `visual_data` is present.
+
+
+
+
+
+**4. Retrofit Existing Questions (Math Grade 6, Subject ID = 35)**
+
+**A. Extraction Query:**
+
+This query finds potential candidates in Math Grade 6 (subject_id = 2) based on keywords.
+
+```sql
+SELECT
+    q.id,
+    q.variant_number,
+    q.position,
+    q.text AS question_text,
+    q.explanation,
+    string_agg(a.text, ' || ') AS correct_answers -- Aggregate correct answers for context
+FROM
+    public.vpr_questions q
+LEFT JOIN
+    public.vpr_answers a ON q.id = a.question_id AND a.is_correct = true
+WHERE
+    q.subject_id = 35 -- Assuming 36 is the ID for 'Математика' Grade 6
+    AND
+        q.position > 4
+    AND
+        q.position < 13
+    AND
+        q.variant_number < 13
+    AND (
+        q.text ILIKE '%[Диаграмма%'
+        OR q.text ILIKE '%[Изображение%'
+        OR q.text ILIKE '%[Рисунок%'
+        OR q.text ILIKE '%[График%'
+        OR q.text ILIKE '%На коорд. прямой%'
+        OR q.text ILIKE '%На координатной прямой%'
+        -- Add other relevant keywords if needed
+    )
+GROUP BY
+    q.id, q.variant_number, q.position, q.text, q.explanation
+ORDER BY
+    q.variant_number,
+    q.position;
+```
+
+**Analysis and JSON Construction:**
+
+*Running the query above. You got a list of questions in csv.* Go through each one and manually construct the JSON for the `visual_data` column based on the question text, explanation, and the defined JSON structures.
+
+**Generate UPDATE Statements:**
+
+Here are JUST examples based on the analysis done previously for the `vprVisualData.ts` file, but now formatted as SQL UPDATEs. **You need to verify/adjust the JSON based on the actual CSV**
+
+```sql
+-- /supabase/graphs/example.sql
+-- UPDATE statements for Math Grade 6 (subject_id = 7)
+-- Replace question_id with the actual ID from the SELECT query output.
+
+-- Variant 4, Position 5 (Image -> Compare)
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "compare", "size1": 2.2, "size2": 1, "label1": "Автобус (прим.)", "label2": "Автомобиль", "referenceLabel": "Длина автомобиля 4,2 м (420 см)"
+}'::jsonb WHERE id = /*_ID_FOR_VAR4_POS5_*/ AND subject_id = 2;
+
+-- Variant 4, Position 6 (Diagram -> Chart)
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "chart", "data": [3, 6, 8, 5], "labels": ["Оц. \\"2\\"", "Оц. \\"3\\"", "Оц. \\"4\\"", "Оц. \\"5\\""], "title": "Результаты контрольной 6 «В»"
+}'::jsonb WHERE id = /*_ID_FOR_VAR4_POS6_*/ AND subject_id = 2;
+
+-- Variant 4, Position 8 (Coord. Line -> Axis) - Using VPR answers despite visual contradiction
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "axis", "points": [{"value": 1.5, "label": "A"}, {"value": 2.105, "label": "B"}, {"value": 3.5, "label": "C"}], "minVal": 0, "maxVal": 4
+}'::jsonb WHERE id = /*_ID_FOR_VAR4_POS8_*/ AND subject_id = 2;
+
+-- Variant 5, Position 5 (Image -> Compare)
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "compare", "size1": 4.1, "size2": 2.7, "label1": "Дерево", "label2": "Куст (прим.)", "referenceLabel": "Высота дерева 4,1 м"
+}'::jsonb WHERE id = /*_ID_FOR_VAR5_POS5_*/ AND subject_id = 2;
+
+-- Variant 5, Position 6 (Diagram -> Chart) - Using placeholder data
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "chart", "data": [40, 35, 50, 65, 78, 60, 68, 72, 55, 71, 45, 40], "labels": ["Янв","Фев","Мар","Апр","Май","Июн","Июл","Авг","Сен","Окт","Ноя","Дек"], "title": "Осадки в Томске (мм, пример)"
+}'::jsonb WHERE id = /*_ID_FOR_VAR5_POS6_*/ AND subject_id = 2;
+
+-- Variant 5, Position 8 (Coord. Line -> Axis) - Using VPR answers
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "axis", "points": [{"value": -24/7, "label": "P"}, {"value": -20/9, "label": "Q"}, {"value": 16/7, "label": "R"}], "minVal": -4, "maxVal": 4
+}'::jsonb WHERE id = /*_ID_FOR_VAR5_POS8_*/ AND subject_id = 2; -- Note: Used fractional values for precision
+
+-- Variant 6, Position 5 (Image -> Compare)
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "compare", "size1": 10, "size2": 7, "label1": "Дом", "label2": "Столб (прим.)", "referenceLabel": "Высота дома 10 м"
+}'::jsonb WHERE id = /*_ID_FOR_VAR6_POS5_*/ AND subject_id = 2;
+
+-- Variant 6, Position 6 (Diagram -> Chart) - Using placeholder data
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "chart", "data": [5, 8, 10, 6, 7], "labels": ["Пн", "Вт", "Ср", "Чт", "Пт"], "title": "Посещаемость кружка"
+}'::jsonb WHERE id = /*_ID_FOR_VAR6_POS6_*/ AND subject_id = 2;
+
+-- Variant 6, Position 8 (Coord. Line -> Axis)
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "axis", "points": [{"value": -1.6, "label": "A"}, {"value": 0.55, "label": "B"}, {"value": 2.8, "label": "C"}], "minVal": -2, "maxVal": 3
+}'::jsonb WHERE id = /*_ID_FOR_VAR6_POS8_*/ AND subject_id = 2;
+
+-- Variant 7, Position 5 (Image -> Compare)
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "compare", "size1": 8, "size2": 4.5, "label1": "Грузовик", "label2": "Легковой (прим.)", "referenceLabel": "Длина грузовика 8 м"
+}'::jsonb WHERE id = /*_ID_FOR_VAR7_POS5_*/ AND subject_id = 2;
+
+-- Variant 7, Position 6 (Diagram -> Plot) - Using placeholder data
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "plot", "points": [{"x":0, "y":8}, {"x":3, "y":9}, {"x":6, "y":10}, {"x":9, "y":13}, {"x":12, "y":15}, {"x":15, "y":14}, {"x":18, "y":12}, {"x":21, "y":10}, {"x":24, "y":8}], "xLabel": "Время (часы)", "yLabel": "Температура (°C)", "title": "Температура воздуха (пример)"
+}'::jsonb WHERE id = /*_ID_FOR_VAR7_POS6_*/ AND subject_id = 2;
+
+-- Variant 7, Position 8 (Coord. Line -> Axis)
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "axis", "points": [{"value": -1/3, "label": "P"}, {"value": 1.15, "label": "Q"}, {"value": 3.05, "label": "R"}], "minVal": -1, "maxVal": 4
+}'::jsonb WHERE id = /*_ID_FOR_VAR7_POS8_*/ AND subject_id = 2;
+
+-- ... continue for Variants 8 and 9 ...
+
+-- Variant 8, Position 5 (Image -> Compare)
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "compare", "size1": 7, "size2": 1, "label1": "Стол (прим.)", "label2": "Карандаш", "referenceLabel": "Длина карандаша 15 см"
+}'::jsonb WHERE id = /*_ID_FOR_VAR8_POS5_*/ AND subject_id = 2;
+
+-- Variant 8, Position 6 (Diagram -> Chart) - Using placeholder data
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "chart", "data": [40, 60, 50, 70, 55, 80], "labels": ["Янв", "Фев", "Мар", "Апр", "Май", "Июн"], "title": "Продажи книг (шт.)"
+}'::jsonb WHERE id = /*_ID_FOR_VAR8_POS6_*/ AND subject_id = 2;
+
+-- Variant 8, Position 8 (Coord. Line -> Axis)
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "axis", "points": [{"value": -2.1, "label": "X"}, {"value": 0.05, "label": "Y"}, {"value": 1.9, "label": "Z"}], "minVal": -3, "maxVal": 3
+}'::jsonb WHERE id = /*_ID_FOR_VAR8_POS8_*/ AND subject_id = 2;
+
+-- Variant 9, Position 5 (Image -> Compare)
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "compare", "size1": 1.2, "size2": 1, "label1": "Дверь (прим.)", "label2": "Человек", "referenceLabel": "Рост человека 1,8 м"
+}'::jsonb WHERE id = /*_ID_FOR_VAR9_POS5_*/ AND subject_id = 2;
+
+-- Variant 9, Position 6 (Diagram -> Chart) - Using placeholder data
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "chart", "data": [25, 30, 15, 20, 10], "labels": ["Детектив", "Фантастика", "Классика", "Приключения", "Поэзия"], "title": "Жанры книг в библиотеке (шт.)"
+}'::jsonb WHERE id = /*_ID_FOR_VAR9_POS6_*/ AND subject_id = 2;
+
+-- Variant 9, Position 8 (Coord. Line -> Axis)
+UPDATE public.vpr_questions SET visual_data = '{
+    "type": "axis", "points": [{"value": -1.1, "label": "M"}, {"value": 0.8, "label": "N"}, {"value": 2.05, "label": "K"}], "minVal": -2, "maxVal": 3
+}'::jsonb WHERE id = /*_ID_FOR_VAR9_POS8_*/ AND subject_id = 2;
+
+-- IMPORTANT: Replace /*_ID_FOR_..._*/ with the actual IDs from your database after running the SELECT query!
+```
