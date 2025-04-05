@@ -75,7 +75,7 @@
     "googleapis": "latest",
     "react-dom-confetti": "latest",
     "react-markdown": "latest",
-    "recharts": "latest"
+    "recharts": "2.15.0"
   },
   "devDependencies": {
     "@types/node": "^22",
