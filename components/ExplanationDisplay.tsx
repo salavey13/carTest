@@ -1,50 +1,56 @@
-import { motion } from 'framer-motion';
+import { motion } from "framer-motion";
 import ReactMarkdown from 'react-markdown';
-import { CheckCircle, XCircle, Lightbulb } from 'lucide-react';
+import { Lightbulb, XOctagon, CheckCircle, ArrowRight } from "lucide-react"; // Added icons
 
-// Interface remains the same as current context
 interface ExplanationDisplayProps {
-    explanation: string | null;
-    isCorrect: boolean;
-    onNext: () => void;
-    isLastQuestion: boolean;
+  explanation: string | null;
+  isCorrect: boolean;
+  onNext: () => void;
+  isLastQuestion: boolean;
+  isDummyModeExplanation?: boolean; // <-- NEW PROP
 }
 
-export const ExplanationDisplay = ({ explanation, isCorrect, onNext, isLastQuestion }: ExplanationDisplayProps) => {
-    if (!explanation) return null;
+export function ExplanationDisplay({
+  explanation,
+  isCorrect,
+  onNext,
+  isLastQuestion,
+  isDummyModeExplanation = false, // <-- Default value
+}: ExplanationDisplayProps) {
 
-    return (
-        <motion.div
-            initial={{ opacity: 0, y: 10, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: 'auto' }}
-            exit={{ opacity: 0, y: -10, height: 0 }}
-            transition={{ duration: 0.3 }}
-            // New classes for dark theme, border, background, shadow
-            className="mt-6 p-4 md:p-6 rounded-xl border-2 border-brand-orange/50 bg-dark-bg shadow-inner shadow-black/20"
-        >
-            {/* Feedback Title with new colors */}
-            <div className={`flex items-center mb-3 ${isCorrect ? 'text-brand-green' : 'text-brand-pink'}`}>
-                 {isCorrect ? <CheckCircle className="h-6 w-6 mr-2 flex-shrink-0" /> : <XCircle className="h-6 w-6 mr-2 flex-shrink-0" />}
-                <span className="font-semibold text-lg">{isCorrect ? "Правильно!" : "Неверно."}</span>
-            </div>
+  const borderColor = isDummyModeExplanation ? 'border-yellow-500/50' : isCorrect ? 'border-green-500/50' : 'border-red-500/50';
+  const bgColor = isDummyModeExplanation ? 'bg-yellow-900/20' : isCorrect ? 'bg-green-900/20' : 'bg-red-900/20';
+  const iconColor = isDummyModeExplanation ? 'text-yellow-400' : isCorrect ? 'text-green-400' : 'text-red-400';
+  const Icon = isDummyModeExplanation ? Lightbulb : isCorrect ? CheckCircle : XOctagon;
 
-            {/* Explanation Text section */}
-             <div className="flex items-start mb-4">
-                 <Lightbulb className="h-5 w-5 text-yellow-400 mr-2.5 mt-1 flex-shrink-0" /> {/* Updated color */}
-                 {/* Add prose-invert for dark theme markdown */}
-                 <div className="prose prose-sm md:prose-base max-w-none text-light-text/90 prose-invert prose-p:my-1 prose-li:my-0.5">
-                     <ReactMarkdown>{explanation}</ReactMarkdown>
-                 </div>
-             </div>
-
-            {/* Next Button with new bright style */}
-            <button
-                onClick={onNext}
-                // New classes for bright button
-                className="w-full mt-4 bg-brand-green text-dark-bg px-4 py-2.5 rounded-lg font-bold text-base md:text-lg hover:bg-neon-lime transition-all duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-neon-lime focus:ring-offset-2 focus:ring-offset-dark-bg shadow-md hover:shadow-lg shadow-brand-green/30"
-            >
-                {isLastQuestion ? "Завершить тест" : "Следующий вопрос"}
-            </button>
-        </motion.div>
-    );
-};
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      transition={{ duration: 0.3 }}
+      className={`mt-6 p-4 rounded-lg border ${borderColor} ${bgColor} overflow-hidden`}
+    >
+      <div className="flex items-start mb-3">
+          <Icon className={`h-6 w-6 mr-3 flex-shrink-0 ${iconColor}`} />
+          <h3 className={`text-lg font-semibold ${iconColor}`}>
+              {isDummyModeExplanation ? "Подсказка" : (isCorrect ? "Верно!" : "Неверно")}
+          </h3>
+      </div>
+      <div className="prose prose-invert prose-sm max-w-none text-light-text/90 mb-4 prose-p:my-1">
+           {explanation ? (
+             <ReactMarkdown>{explanation}</ReactMarkdown>
+           ) : (
+             <p>Объяснение отсутствует.</p>
+           )}
+      </div>
+      <button
+        onClick={onNext}
+        className="w-full sm:w-auto float-right bg-brand-blue hover:bg-brand-blue/80 text-white px-5 py-2 rounded-md font-semibold text-sm flex items-center justify-center gap-2 transition-colors"
+      >
+        {isLastQuestion ? "Завершить тест" : "Следующий вопрос"}
+        <ArrowRight className="h-4 w-4" />
+      </button>
+    </motion.div>
+  );
+}

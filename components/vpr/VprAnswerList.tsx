@@ -1,12 +1,14 @@
-import { AnswerOption } from "@/components/AnswerOption"; // Assuming path is correct
-import { VprAnswerData } from "@/app/vpr-test/[subjectId]/page"; // Import type
+import { motion } from "framer-motion";
+import { AnswerOption } from "@/components/AnswerOption";
+import { VprAnswerData } from "@/app/vpr-test/[subjectId]/page";
 
 interface VprAnswerListProps {
   answers: VprAnswerData[];
   selectedAnswerId: number | null;
-  showFeedback: boolean;
+  showFeedback: boolean; // For normal feedback display
   timeUpModal: boolean;
   handleAnswer: (answer: VprAnswerData) => void;
+  isDummyModeActive: boolean; // <-- NEW PROP
 }
 
 export function VprAnswerList({
@@ -15,11 +17,11 @@ export function VprAnswerList({
   showFeedback,
   timeUpModal,
   handleAnswer,
+  isDummyModeActive, // <-- Destructure new prop
 }: VprAnswerListProps) {
-  // Check if there are any answers that are NOT placeholders
+
   const hasRealOptions = answers && answers.some(a => !/^\[(Рисунок|Ввод текста|Диаграмма|Изображение|Площадь)\].*/.test(a.text));
 
-  // If no answers array or only placeholder answers, show a message
   if (!hasRealOptions) {
      return (
        <div className="text-light-text/70 text-center my-4 p-4 bg-dark-bg/30 rounded-md border border-dashed border-gray-600">
@@ -30,32 +32,48 @@ export function VprAnswerList({
       );
   }
 
-  // Render clickable AnswerOption components only for non-placeholder answers
   return (
-    <div className="space-y-3 mb-6">
+    <motion.div
+        className="space-y-3 mb-6"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.2 }}
+    >
       {answers.map((answer) => {
-        // Skip rendering if it's a placeholder type
         if (/^\[(Рисунок|Ввод текста|Диаграмма|Изображение|Площадь)\].*/.test(answer.text)) {
-             return null;
+             return null; // Skip non-standard answers
         }
 
-        // Render standard answer options
+        // Determine state for standard answers
         const isSelected = answer.id === selectedAnswerId;
-        const showCorrectness = showFeedback && answer.is_correct;
-        const showIncorrectness = showFeedback && isSelected && !answer.is_correct;
+        const isCorrect = answer.is_correct;
+
+        // --- Dummy Mode Logic ---
+        const highlightCorrectInDummy = isDummyModeActive && isCorrect;
+        const disableInDummy = isDummyModeActive;
+
+        // --- Normal Feedback Logic ---
+        const showCorrectnessInFeedback = showFeedback && isCorrect;
+        const showIncorrectnessInFeedback = showFeedback && isSelected && !isCorrect;
+        const disableInFeedback = showFeedback;
+
+        // Combine disabling conditions
+        const isDisabled = disableInDummy || disableInFeedback || timeUpModal;
 
         return (
           <AnswerOption
             key={answer.id}
             answer={answer}
-            isSelected={isSelected}
-            showCorrectness={showCorrectness}
-            showIncorrectness={showIncorrectness}
-            isDisabled={showFeedback || timeUpModal} // Disable when feedback shown or time's up
+            isSelected={isSelected && !isDummyModeActive} // Don't show selection state in dummy mode
+            showCorrectness={showCorrectnessInFeedback || highlightCorrectInDummy} // Highlight if correct in feedback OR if dummy mode highlights it
+            showIncorrectness={showIncorrectnessInFeedback} // Only show incorrectness in normal feedback
+            isDisabled={isDisabled}
             onClick={handleAnswer}
+            // Add specific styling for dummy mode highlight if needed
+            isDummyHighlighted={highlightCorrectInDummy}
           />
         );
       })}
-    </div>
+    </motion.div>
   );
 }
