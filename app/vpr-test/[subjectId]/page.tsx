@@ -539,7 +539,7 @@ export default function VprTestPage() {
              setIsDummyModeActive(false); // Ensure dummy mode is off on reset
 
              // Using user.id and supabaseAdmin for delete as per context
-             if (user?.user_id && subjectId) {
+             if (user?.id && subjectId) {
                  debugLogger.log(`Attempting to delete ANY active attempt for subject ${subjectId} and user ${user.id} before reset using supabaseAdmin.`);
                  const { error: deleteError } = await supabaseAdmin
                      .from('vpr_test_attempts')
@@ -575,12 +575,12 @@ export default function VprTestPage() {
               setIsLoading(false); // Stop loading on error
          }
          // Let useEffect handle setting isLoading to false after re-fetch
-     }, [isSaving, user?.user_id, subjectId]); // Dependency on user.id
+     }, [isSaving, user?.id, subjectId]); // Dependency on user.id
 
 
     // --- NEW: Purchase Disabling of Dummy Mode ---
     const handlePurchaseDisableDummy = async () => {
-        if (!user?.user_id) { // Use user.id
+        if (!user?.id) { // Use user.id
             toast.error("Не удалось определить пользователя для покупки.");
             return;
         }
@@ -758,7 +758,7 @@ export default function VprTestPage() {
                                             variant="outline"
                                             size="sm"
                                             onClick={handlePurchaseDisableDummy}
-                                            disabled={isPurchasingDisable || !user?.user_id}
+                                            disabled={isPurchasingDisable || !user?.id}
                                             className="border-red-500/50 text-red-400 hover:bg-red-900/30 hover:text-red-300 px-2 py-1 h-auto"
                                         >
                                             {isPurchasingDisable ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4"/>}
