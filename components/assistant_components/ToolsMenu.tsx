@@ -18,14 +18,14 @@ interface ToolsMenuProps {
 
 // Moved predefined links here as they are static presentation data
 const predefinedLinks: LinkItem[] = [
-    { name: "aiStudio", url: "https://aistudio.google.com", icon: <FaRobot className="text-blue-600 font-bold drop-shadow-lg" />  },
-    { name: "ChatGPT", url: "https://chatgpt.com", icon: <FaImage className="text-blue-500 font-bold drop-shadow-md" /> },
+    { name: "aiStudio", url: "https://aistudio.google.com", icon: <FaRobot className="text-purple-300 font-bold drop-shadow-lg" />  },
+    { name: "ChatGPT", url: "https://chatgpt.com", icon: <FaImage className="text-blue-300 font-bold drop-shadow-md" /> },
     { name: "Grok", url: "https://grok.com", icon: <FaRobot className="text-yellow-400 font-bold drop-shadow-md" /> },
     { name: "QwenLM", url: "https://qwenlm.ai", icon: <FaImage className="text-blue-500" /> },
     { name: "NotebookLM", url: "https://notebooklm.google.com", icon: <FaBook className="text-yellow-500" /> },
     { name: "Supabase", url: "https://supabase.com/dashboard", icon: <FaDatabase className="text-teal-500" /> },
     { name: "Vercel", url: "https://vercel.com", icon: <FaRocket className="text-black" /> },
-    { name: "Coze.com", url: "https://coze.com", icon: <FaCode className="text-purple-500" /> },
+    { name: "Coze", url: "https://coze.com", icon: <FaCode className="text-purple-500" /> },
 ];
 
 
@@ -48,11 +48,11 @@ export const ToolsMenu: React.FC<ToolsMenuProps> = ({ customLinks, onAddCustomLi
                 {showToolsMenu && (
                     <motion.div
                         initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-                        className="absolute left-0 bottom-full mb-2 w-56 bg-gray-700 rounded-lg shadow-lg z-20 border border-gray-600 overflow-hidden"
+                        className="absolute left-0 bottom-full mb-2 w-56 bg-gray-700 rounded-sm shadow-lg z-20 border border-gray-600 overflow-hidden"
                     >
                         {predefinedLinks.map((link) => (
                             <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-4 py-2 hover:bg-gray-600 text-sm transition text-white">
-                                {link.icon ?? <FaLink className="text-gray-400" />} {/* Default icon */}
+                                {link.icon ?? <FaLink className="text-white" />} {/* Default icon */}
                                 <span className="flex-grow">{link.name}</span>
                             </a>
                         ))}
