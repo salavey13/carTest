@@ -1,35 +1,61 @@
 "use client";
-import React, { useState, useEffect, useImperativeHandle, forwardRef, MutableRefObject } from "react"; // Import necessary hooks
+import React, { useState, useEffect, useImperativeHandle, forwardRef, MutableRefObject, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
-import { fetchRepoContents } from "@/app/actions_github/actions";
 import { toast } from "sonner";
-import { useAppContext } from "@/contexts/AppContext";
-import { useRepoXmlPageContext } from "@/contexts/RepoXmlPageContext"; // Import the context hook
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { FaTree, FaKey, FaFileLines, FaClipboard, FaDownload, FaArrowsRotate } from "react-icons/fa6";
+import { FaCog, FaCircleCheck, FaCircleTimes } from "react-icons/fa6"; // Added icons
+import { motion } from "framer-motion";
 
-export interface FileNode { // Make sure this is exported or defined commonly
+import { fetchRepoContents } from "@/app/actions_github/actions";
+import { useAppContext } from "@/contexts/AppContext";
+import { useRepoXmlPageContext } from "@/contexts/RepoXmlPageContext";
+
+import SettingsModal from "./repo/SettingsModal";
+import FileList from "./repo/FileList";
+import SelectedFilesPreview from "./repo/SelectedFilesPreview";
+import RequestInput from "./repo/RequestInput";
+import ProgressBar from "./repo/ProgressBar"; // Import ProgressBar
+
+export interface FileNode {
   path: string;
   content: string;
 }
 
 interface RepoTxtFetcherProps {
-    kworkInputRef: MutableRefObject<HTMLTextAreaElement | null>; // Receive ref
+    kworkInputRef: MutableRefObject<HTMLTextAreaElement | null>;
 }
+
+// Helper outside component: Determine language for syntax highlighting
+const getLanguage = (path: string): string => {
+    const extension = path.split('.').pop();
+    switch(extension) {
+        case 'ts': return 'typescript';
+        case 'tsx': return 'typescript';
+        case 'js': return 'javascript';
+        case 'jsx': return 'javascript';
+        case 'css': return 'css';
+        case 'html': return 'html';
+        case 'json': return 'json';
+        case 'py': return 'python';
+        case 'sql': return 'sql';
+        case 'md': return 'markdown';
+        default: return 'text';
+    }
+};
 
 const RepoTxtFetcher = forwardRef<any, RepoTxtFetcherProps>(({ kworkInputRef }, ref) => {
   const [repoUrl, setRepoUrl] = useState<string>("https://github.com/salavey13/cartest");
   const [token, setToken] = useState<string>("");
   const [files, setFiles] = useState<FileNode[]>([]);
-  const [selectedFiles, setSelectedFilesState] = useState<Set<string>>(new Set()); // Local state for UI checkbox
+  const [selectedFiles, setSelectedFilesState] = useState<Set<string>>(new Set());
   const [extractLoading, setExtractLoading] = useState<boolean>(false);
-  const [progress, setProgress] = useState<number>(0);
+  const [progress, setProgress] = useState<number>(0); // Progress state remains here
   const [error, setError] = useState<string | null>(null);
   const [kworkInput, setKworkInput] = useState<string>("");
   const [primaryHighlightedPath, setPrimaryHighlightedPath] = useState<string | null>(null);
   const [secondaryHighlightedPaths, setSecondaryHighlightedPaths] = useState<string[]>([]);
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false); // State for modal
+  const [fetchStatus, setFetchStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle'); // For progress bar
+
   const { user } = useAppContext();
   const {
     setRepoUrlEntered,
@@ -38,497 +64,424 @@ const RepoTxtFetcher = forwardRef<any, RepoTxtFetcherProps>(({ kworkInputRef }, 
     setKworkInputHasContent,
     setRequestCopied,
     scrollToSection,
-  } = useRepoXmlPageContext(); // Use the context
+  } = useRepoXmlPageContext();
 
   const searchParams = useSearchParams();
   const highlightedPathFromUrl = searchParams.get("path") || "";
   const autoFetch = !!highlightedPathFromUrl;
 
+  // Define important files (could be moved to config/constants)
   const importantFiles = [
     "app/actions.ts",
     "hooks/useTelegram.ts",
     "contexts/AppContext.tsx",
     "types/supabase.ts",
-    
   ];
 
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // --- Utility Functions ---
   const addToast = (message: string) => {
     toast(message, { style: { background: "rgba(34, 34, 34, 0.8)", color: "#E1FF01" } });
   };
 
-  // Update context when repoUrl changes
-  useEffect(() => {
-      setRepoUrlEntered(repoUrl.trim().length > 0);
-  }, [repoUrl, setRepoUrlEntered]);
+  const getPageFilePath = (routePath: string): string => {
+    const cleanPath = routePath;
+    return `${cleanPath}/page.tsx`;
+  };
 
-  // Update context when kworkInput changes
-  useEffect(() => {
-      setKworkInputHasContent(kworkInput.trim().length > 0);
-      // Reset copied status if user edits the input after copying
-      if (kworkInput.trim().length > 0) {
-          setRequestCopied(false);
+  const extractImports = (content: string): string[] => {
+    const importRegex = /import\s+.*?\s+from\s+['"](.+?)['"]/g;
+    const matches = content.matchAll(importRegex);
+    return Array.from(matches, (m) => m[1]);
+  };
+
+  const resolveImportPath = (importPath: string, currentFilePath: string, allFiles: FileNode[]): string | null => {
+    if (importPath.startsWith('@/')) {
+      const relativePath = importPath.replace('@/', '');
+      const possibleExtensions = ['.tsx', '.ts', '/index.tsx', '/index.ts'];
+      for (const ext of possibleExtensions) {
+        const potentialPath = `${relativePath}${ext}`;
+        if (allFiles.some(file => file.path === potentialPath)) return potentialPath;
       }
-  }, [kworkInput, setKworkInputHasContent, setRequestCopied]);
+    } else if (importPath.startsWith('.')) {
+      const currentDir = currentFilePath.substring(0, currentFilePath.lastIndexOf('/'));
+      // Basic relative path resolution (needs URL polyfill/better logic for edge cases)
+      try {
+         // Simulate browser URL resolution behavior
+         const baseUrl = `file://${currentDir}/`;
+         // Ensure importPath has a filename part for URL constructor
+         const resolvedUrl = new URL(importPath.endsWith('/') ? importPath + 'index' : importPath, baseUrl);
+         let resolved = resolvedUrl.pathname.substring(1); // Remove leading '/'
 
-
-  // **Helper Functions** (getPageFilePath, extractImports, resolveImportPath remain the same)
-    const getPageFilePath = (routePath: string): string => {
-        // Adjust if using route groups like (app) etc.
-        const cleanPath = routePath//.replace(/^\(.*\)/, ''); // Remove potential group like (app)
-        return `${cleanPath}/page.tsx`; // Assuming structure is app/route/page.tsx
-    };
-    const extractImports = (content: string): string[] => {
-        const importRegex = /import\s+.*?\s+from\s+['"](.+?)['"]/g;
-        const matches = content.matchAll(importRegex);
-        return Array.from(matches, (m) => m[1]);
-    };
-    const resolveImportPath = (importPath: string, currentFilePath: string, allFiles: FileNode[]): string | null => {
-        if (importPath.startsWith('@/')) {
-            const relativePath = importPath.replace('@/', '');
-            const possibleExtensions = ['.tsx', '.ts', '/index.tsx', '/index.ts'];
-            for (const ext of possibleExtensions) {
-                const potentialPath = `${relativePath}${ext}`;
-                if (allFiles.some(file => file.path === potentialPath)) {
-                    return potentialPath;
-                }
-            }
-        } else if (importPath.startsWith('.')) {
-            // Basic relative path resolution (needs improvement for ../)
-            const currentDir = currentFilePath.substring(0, currentFilePath.lastIndexOf('/'));
-            const resolved = new URL(importPath, `file://${currentDir}/`).pathname.substring(1); // Crude simulation
-             const possibleExtensions = ['', '.tsx', '.ts', '/index.tsx', '/index.ts'];
-             for (const ext of possibleExtensions) {
-                const potentialPath = `${resolved}${ext}`;
-                 if (allFiles.some(file => file.path === potentialPath)) {
-                    return potentialPath;
-                }
+         const possibleExtensions = ['', '.tsx', '.ts', '/index.tsx', '/index.ts'];
+         for (const ext of possibleExtensions) {
+            // Adjust path if it resolved to a directory looking for index
+            let potentialPath = resolved;
+             if (importPath.endsWith('/') && (ext === '/index.tsx' || ext === '/index.ts')) {
+                 potentialPath += ext; // Already has implicit directory
+             } else if (!importPath.endsWith('/') && !importPath.split('/').pop()?.includes('.')){
+                 // If import looks like './components' add extension
+                  potentialPath += ext;
+             } else if (ext && !potentialPath.endsWith(ext)) {
+                 potentialPath += ext; // Add extension if needed
              }
+             // Remove double slashes that might occur
+             potentialPath = potentialPath.replace(/\/\//g, '/');
+
+            if (allFiles.some(file => file.path === potentialPath)) {
+               return potentialPath;
+            }
+         }
+      } catch(e) {
+         console.error("Error resolving relative path:", importPath, currentFilePath, e);
+      }
+    }
+    return null;
+  };
+
+  // --- Mocked Progress Logic ---
+  const stopProgressSimulation = useCallback(() => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+     if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+        fetchTimeoutRef.current = null;
+    }
+  }, []);
+
+  const startProgressSimulation = useCallback((estimatedDurationSeconds = 13) => {
+    stopProgressSimulation(); // Clear any existing timers
+    setProgress(0);
+    setFetchStatus('loading');
+    const increment = 100 / (estimatedDurationSeconds * 10); // Update 10 times per second
+
+    progressIntervalRef.current = setInterval(() => {
+      setProgress((prev) => {
+        const nextProgress = prev + increment;
+        if (nextProgress >= 69) { // Cap at 69%
+            if (fetchTimeoutRef.current) { // If the actual fetch is still running past estimate
+                 return 69;
+            } else {
+                 // This case shouldn't normally be hit if cleanup is correct,
+                 // but ensures interval stops if progress exceeds cap *after* fetch finished/errored
+                 stopProgressSimulation();
+                 return 69; // Stay at 69 if fetch finished early but interval fired late
+            }
         }
-        // Add more resolution logic if needed (node_modules, etc.)
-        return null;
-    };
+        return nextProgress;
+      });
+    }, 100); // Update every 100ms
+
+    // Set a timeout to mark the fetch as potentially "hanging" if not completed
+     fetchTimeoutRef.current = setTimeout(() => {
+         // If the interval is still running (meaning fetch hasn't completed/errored)
+         if (progressIntervalRef.current) {
+             setProgress(69); // Force to 69%
+             // Keep the interval running at 69 until success/error actually occurs
+         }
+         fetchTimeoutRef.current = null; // Timeout fulfilled its purpose
+     }, estimatedDurationSeconds * 1000);
+
+  }, [stopProgressSimulation]);
 
 
-  // **Fetch Handler**
-  const handleFetch = async () => {
+  // --- Fetch Logic ---
+  const handleFetch = useCallback(async () => {
     setExtractLoading(true);
     setError(null);
     setFiles([]);
-    setSelectedFilesState(new Set()); // Reset local UI state
-    setProgress(0);
-    setFilesFetched(false); // Update context: fetching started
-    setSelectedFetcherFiles(new Set()); // Reset context selection
+    setSelectedFilesState(new Set());
+    setFilesFetched(false);
+    setSelectedFetcherFiles(new Set());
     addToast("Извлечение файлов...");
+    startProgressSimulation(); // Start mocked progress
 
     try {
       const result = await fetchRepoContents(repoUrl, token || undefined);
+      stopProgressSimulation(); // Stop simulation on actual result
+
       if (!result || !result.success || !Array.isArray(result.files)) {
         throw new Error(result?.error || "Не удалось загрузить содержимое репозитория или неверный формат данных");
       }
+
       const fetchedFiles = result.files;
-      setFiles(fetchedFiles); // Update local state for rendering list
-      setProgress(100);
+      setFiles(fetchedFiles);
+      setProgress(100); // Set progress to 100% on success
+      setFetchStatus('success');
 
       let primaryPath: string | null = null;
       let secondaryPaths: string[] = [];
 
       if (highlightedPathFromUrl) {
           primaryPath = getPageFilePath(highlightedPathFromUrl);
-          setPrimaryHighlightedPath(primaryPath); // Update local state for styling
+          setPrimaryHighlightedPath(primaryPath);
           const pageFile = fetchedFiles.find((file) => file.path === primaryPath);
           if (pageFile) {
               const imports = extractImports(pageFile.content);
               secondaryPaths = imports
                   .map((imp) => resolveImportPath(imp, pageFile.path, fetchedFiles))
                   .filter((path): path is string => path !== null);
-              setSecondaryHighlightedPaths(secondaryPaths); // Update local state for styling
+              setSecondaryHighlightedPaths(secondaryPaths);
           } else {
               console.warn(`Page file "${primaryPath}" not found in repository`);
-              primaryPath = null; // Don't highlight if not found
+              primaryPath = null;
           }
       }
 
-      setFilesFetched(true, primaryPath, secondaryPaths); // Update context: fetch succeeded with highlight info
+      setFilesFetched(true, primaryPath, secondaryPaths);
       addToast("Файлы извлечены! Готов к следующему шагу.");
-      // (inside handleFetch, after setFiles)
-      if (primaryPath) {
-        // Give rendering a bit more time, especially with progress updates
-        setTimeout(() => {
-          // Find the *first* file that matches the highlight criteria
-          const fileToScrollTo = fetchedFiles.find(f =>
-            f.path === primaryPath || f.path.startsWith(highlightedPathFromUrl + '/')
-          );
+      setIsSettingsOpen(false); // Close settings on successful fetch
 
-          if (fileToScrollTo) {
-            const elementId = `file-${fileToScrollTo.path}`;
-            const fileElement = document.getElementById(elementId);
-            if (fileElement) {
-              fileElement.scrollIntoView({ behavior: "smooth", block: "center" }); // Added block: 'center' for better visibility
-               console.log(`Scrolling to element: ${elementId}`);
-            } else {
-               // This might happen if the element isn't rendered yet or ID mismatch
-               console.warn(`Found matching file "${fileToScrollTo.path}" but its element ID "${elementId}" was not found in the DOM.`);
-            }
-          } else {
-            console.warn(`No file found matching the path prefix or exact match for "${highlightedPath}"`);
-          }
-        }, 500); // Increased delay to allow rendering completion
+      // Auto-scroll logic (moved slightly later)
+      if (primaryPath) {
+          setTimeout(() => {
+              const fileToScrollTo = fetchedFiles.find(f => f.path === primaryPath);
+              if (fileToScrollTo) {
+                  const elementId = `file-${fileToScrollTo.path}`;
+                  const fileElement = document.getElementById(elementId);
+                  if (fileElement) {
+                      fileElement.scrollIntoView({ behavior: "smooth", block: "center" });
+                  } else {
+                      console.warn(`Element ID "${elementId}" not found for scrolling.`);
+                  }
+              }
+          }, 300); // Short delay
       }
+
     } catch (err: any) {
-      const errorMessage = `Ошибка: ${err.message || "Неизвестная ошибка при загрузке репозитория"}`;
+      stopProgressSimulation(); // Stop simulation on error
+      const errorMessage = `Ошибка: ${err.message || "Неизвестная ошибка"}`;
       setError(errorMessage);
       addToast(errorMessage);
       console.error("Fetch error:", err);
-      setFilesFetched(false); // Update context: fetch failed
+      setFilesFetched(false);
+      setProgress(0); // Reset progress on error
+      setFetchStatus('error');
     } finally {
       setExtractLoading(false);
+       // Ensure cleanup happens even if component unmounts during fetch
+       setTimeout(stopProgressSimulation, 500); // Add slight delay for final state update render
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repoUrl, token, highlightedPathFromUrl, setFilesFetched, setSelectedFetcherFiles, addToast, startProgressSimulation, stopProgressSimulation]); // Dependencies for handleFetch
 
-  // **Auto-Fetch Effect**
+
+  // --- Effects ---
+  useEffect(() => {
+    setRepoUrlEntered(repoUrl.trim().length > 0);
+  }, [repoUrl, setRepoUrlEntered]);
+
+  useEffect(() => {
+    setKworkInputHasContent(kworkInput.trim().length > 0);
+    if (kworkInput.trim().length > 0) {
+      setRequestCopied(false);
+    }
+  }, [kworkInput, setKworkInputHasContent, setRequestCopied]);
+
   useEffect(() => {
     if (autoFetch) {
-        console.log("Auto-fetching for path:", highlightedPathFromUrl);
-        handleFetch(); // Trigger fetch automatically
-        // Auto-scroll and set Kwork input is handled by StickyChatButton now based on context
+      console.log("Auto-fetching for path:", highlightedPathFromUrl);
+      handleFetch();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [highlightedPathFromUrl]); // Only run when the highlighted path changes
+  }, [highlightedPathFromUrl]); // Only run when URL param changes
 
-
-   // **Select Highlighted Files** (Callable via ref/context)
-    const selectHighlightedFiles = () => {
-        const filesToSelect = new Set<string>();
-        if (primaryHighlightedPath && files.some(f => f.path === primaryHighlightedPath)) {
-            filesToSelect.add(primaryHighlightedPath);
-        }
-        secondaryHighlightedPaths.forEach(path => {
-            if (files.some(f => f.path === path)) {
-                filesToSelect.add(path);
-            }
-        });
-        importantFiles.forEach(path => {
-            if (files.some(f => f.path === path)) {
-                filesToSelect.add(path); // Also select important files automatically
-            }
-        });
-
-        setSelectedFilesState(filesToSelect); // Update local UI
-        setSelectedFetcherFiles(filesToSelect); // Update context
-        addToast("Подсвеченные и важные файлы выбраны!");
-        // Optionally auto-add to kwork? Or let user click next action.
-        handleAddSelected(filesToSelect); // Automatically add them to Kwork
+   // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+        stopProgressSimulation();
     };
+  }, [stopProgressSimulation]);
 
-  // Update context when selection changes
+  // --- File Selection & Kwork Input Logic ---
+  const selectHighlightedFiles = useCallback(() => {
+    const filesToSelect = new Set<string>();
+    if (primaryHighlightedPath && files.some(f => f.path === primaryHighlightedPath)) {
+        filesToSelect.add(primaryHighlightedPath);
+    }
+    secondaryHighlightedPaths.forEach(path => {
+        if (files.some(f => f.path === path)) {
+            filesToSelect.add(path);
+        }
+    });
+    importantFiles.forEach(path => {
+        if (files.some(f => f.path === path)) {
+            filesToSelect.add(path);
+        }
+    });
+
+    setSelectedFilesState(filesToSelect);
+    setSelectedFetcherFiles(filesToSelect);
+    addToast("Подсвеченные и важные файлы выбраны!");
+    handleAddSelected(filesToSelect); // Auto-add to Kwork
+  }, [primaryHighlightedPath, secondaryHighlightedPaths, importantFiles, files, setSelectedFetcherFiles, addToast]); // Removed handleAddSelected from deps
+
   const toggleFileSelection = (path: string) => {
     const newSet = new Set(selectedFiles);
     if (newSet.has(path)) newSet.delete(path);
     else newSet.add(path);
-    setSelectedFilesState(newSet); // Update local UI state
-    setSelectedFetcherFiles(newSet); // Update context state
+    setSelectedFilesState(newSet);
+    setSelectedFetcherFiles(newSet);
   };
 
-  // Modified to accept optional set of files (for auto-select)
-  const handleAddSelected = (filesToAdd?: Set<string>) => {
-      const setToAdd = filesToAdd || selectedFiles;
-      if (setToAdd.size === 0) {
-          addToast("Выберите хотя бы один файл!");
-          return;
-      }
-      const markdownTxt = files
-          .filter((file) => setToAdd.has(file.path))
-          .map((file) => `\`${file.path}\`:\n\`\`\`${getLanguage(file.path)}\n${file.content}\n\`\`\``) // Add language hint
-          .join("\n\n");
+  const handleAddSelected = useCallback((filesToAdd?: Set<string>) => {
+    const setToAdd = filesToAdd || selectedFiles;
+    if (setToAdd.size === 0) {
+      addToast("Выберите хотя бы один файл!");
+      return;
+    }
+    const markdownTxt = files
+      .filter((file) => setToAdd.has(file.path))
+      .map((file) => `\`${file.path}\`:\n\`\`\`${getLanguage(file.path)}\n${file.content}\n\`\`\``)
+      .join("\n\n");
 
-      setKworkInput((prev) => `${prev ? prev + '\n\n' : ''}Контекст:\n${markdownTxt}`);
-      addToast("Файлы добавлены. Опишите задачу и нажмите 'Скопировать'.");
-      scrollToSection('kworkInput');
-  };
+    setKworkInput((prev) => `${prev ? prev + '\n\n' : ''}Контекст:\n${markdownTxt}`);
+    addToast(`${setToAdd.size} файлов добавлено. Опишите задачу и нажмите 'Скопировать'.`);
+    scrollToSection('kworkInput');
+  }, [files, selectedFiles, scrollToSection, addToast]); // Dependencies for handleAddSelected
 
-
-  const handleAddImportantFiles = () => {
-    const importantFilesSet = new Set(importantFiles);
-    const filesToAdd = new Set(selectedFiles); // Start with current selection
+  const handleAddImportantFiles = useCallback(() => {
+    const filesToAdd = new Set(selectedFiles);
     let addedCount = 0;
     importantFiles.forEach(path => {
-        if (files.some(f => f.path === path) && !filesToAdd.has(path)) {
-            filesToAdd.add(path);
-            addedCount++;
-        }
+      if (files.some(f => f.path === path) && !filesToAdd.has(path)) {
+        filesToAdd.add(path);
+        addedCount++;
+      }
     });
 
-    if (addedCount === 0 && selectedFiles.size > 0) {
+    if (addedCount === 0 && filesToAdd.size > 0) {
          addToast("Важные файлы уже выбраны или добавлены.");
          return;
     }
-     if (addedCount === 0 && selectedFiles.size === 0) {
+     if (addedCount === 0 && filesToAdd.size === 0) {
          addToast("Важные файлы не найдены в репозитории.");
          return;
     }
 
-    setSelectedFilesState(filesToAdd); // Update local UI
-    setSelectedFetcherFiles(filesToAdd); // Update context
+    setSelectedFilesState(filesToAdd);
+    setSelectedFetcherFiles(filesToAdd);
     handleAddSelected(filesToAdd); // Add them to kwork
     addToast(`${addedCount} важных файлов добавлено в выборку и запрос!`);
-  };
+  }, [selectedFiles, importantFiles, files, setSelectedFetcherFiles, handleAddSelected, addToast]);
 
-  const handleAddFullTree = () => {
+  const handleAddFullTree = useCallback(() => {
     const treeOnly = files.map((file) => `- ${file.path}`).join("\n");
     setKworkInput((prev) => `${prev}\n\nСтруктура проекта:\n\`\`\`\n${treeOnly}\n\`\`\``);
     addToast("Дерево файлов добавлено в запрос!");
     scrollToSection('kworkInput');
-  };
+  }, [files, scrollToSection, addToast]);
 
-  const handleCopyToClipboard = () => {
+  const handleCopyToClipboard = useCallback(() => {
     if (!kworkInput.trim()) {
       addToast("Нечего копировать!");
       return;
     }
     navigator.clipboard.writeText(kworkInput);
     addToast("Скопировано! Вставьте в AI, затем результат вставьте ниже.");
-    setRequestCopied(true); // Update context
-    scrollToSection('aiResponseInput'); // Scroll to next logical step
-  };
+    setRequestCopied(true);
+    scrollToSection('aiResponseInput');
+  }, [kworkInput, setRequestCopied, scrollToSection, addToast]);
 
-  // Expose methods via ref for the parent/context
+
+  // --- Imperative Handle (Expose methods to parent) ---
   useImperativeHandle(ref, () => ({
     handleFetch,
     selectHighlightedFiles,
     handleAddSelected: () => handleAddSelected(), // Ensure it uses current selectedFiles state
     handleCopyToClipboard,
-    // Add other methods if needed
   }));
 
-  const getDisplayName = (path: string) => path.split("/").pop() || path;
-  const getLanguage = (path: string) => {
-      const extension = path.split('.').pop();
-      switch(extension) {
-          case 'ts': return 'typescript';
-          case 'tsx': return 'typescript'; // or 'jsx' depending on highlighter
-          case 'js': return 'javascript';
-          case 'jsx': return 'javascript'; // or 'jsx'
-          case 'css': return 'css';
-          case 'html': return 'html';
-          case 'json': return 'json';
-          case 'py': return 'python';
-          case 'sql': return 'sql'; 
-          case 'md': return 'markdown';
-          default: return 'text';
-      }
-  };
-  const groupFilesByFolder = (files: FileNode[]) => {
-    const grouped: { folder: string; files: FileNode[] }[] = [];
-    const folderMap: { [key: string]: FileNode[] } = {};
-    files.forEach((file) => {
-      const folder = file.path.includes('/') ? file.path.substring(0, file.path.lastIndexOf("/")) : "root";
-      if (!folderMap[folder]) folderMap[folder] = [];
-      folderMap[folder].push(file);
-    });
-    // Sort folders, root first
-    const sortedFolders = Object.keys(folderMap).sort((a, b) => {
-        if (a === 'root') return -1;
-        if (b === 'root') return 1;
-        return a.localeCompare(b);
-    });
-    sortedFolders.forEach(folder => {
-        // Sort files within folder
-        folderMap[folder].sort((a, b) => a.path.localeCompare(b.path));
-        grouped.push({ folder, files: folderMap[folder] });
-    })
-    return grouped;
-  };
-
-
-  // --- RENDER ---
+  // --- Render ---
   return (
     <div className="w-full p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden">
-        {/* ... Header, Repo URL, Token Input ... */}
-        <h2 className="text-2xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-4">
-          Кибер-Экстрактор Кода
-        </h2>
-        {highlightedPathFromUrl && (
-            <p className="text-yellow-400 mb-4 text-center text-sm">
-            Запрос на изменение страницы: <strong>{highlightedPathFromUrl}</strong>
-            </p>
-        )}
-        <p className="text-gray-300 mb-6 text-sm">
-            Извлеките код, выберите файлы для контекста, опишите задачу и скопируйте запрос для AI.
-        </p>
 
-        <div className="flex flex-col gap-3 mb-6">
+      {/* Header & Intro Text */}
+       <div className="flex justify-between items-start mb-4">
             <div>
-            <label className="block text-sm font-medium mb-1">URL репозитория</label>
-            <input
-                type="text"
-                value={repoUrl}
-                onChange={(e) => setRepoUrl(e.target.value)}
-                className="w-full p-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] hover:border-cyan-400 text-sm"
-                placeholder="https://github.com/username/repository"
-                disabled={extractLoading}
-            />
-            </div>
-            <div>
-            <label className="block text-sm font-medium mb-1">Токен GitHub (опционально, для приватных репо)</label>
-            <input
-                type="password"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                className="w-full p-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] hover:border-cyan-400 text-sm"
-                placeholder="Введите ваш токен GitHub"
-                 disabled={extractLoading}
-            />
+                <h2 className="text-2xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-2">
+                Кибер-Экстрактор Кода
+                </h2>
+                 <p className="text-yellow-400 mb-1 text-xs md:text-sm"> 1️⃣ Введите URL репозитория (и токен для приватных). </p>
+                 <p className="text-yellow-400 mb-1 text-xs md:text-sm"> 2️⃣ Нажмите <span className="font-bold text-purple-400 mx-1">"Извлечь файлы"</span>. </p>
+                 <p className="text-yellow-400 mb-1 text-xs md:text-sm"> 3️⃣ Выберите нужные файлы для контекста. </p>
+                 <p className="text-yellow-400 mb-4 text-xs md:text-sm"> 4️⃣ Опишите задачу в поле ниже и добавьте код кнопками <span className="font-bold text-indigo-400 mx-1">"Добавить..."</span>. </p>
             </div>
             <motion.button
-            onClick={handleFetch}
-            disabled={extractLoading}
-            className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-purple-600 to-cyan-500 transition-all shadow-[0_0_12px_rgba(0,255,157,0.3)] ${extractLoading ? "opacity-50 cursor-not-allowed" : "hover:shadow-[0_0_18px_rgba(0,255,157,0.5)]"}`}
-            whileHover={{ scale: (extractLoading) ? 1 : 1.05 }}
-            whileTap={{ scale: (extractLoading) ? 1 : 0.95 }}
-            >
-             {extractLoading ? <FaArrowsRotate className="animate-spin" /> : <FaDownload />}
-            {extractLoading ? "Извлечение..." : "Извлечь файлы"}
-            </motion.button>
-        </div>
-
-        {/* ... Progress Bar, Error Message ... */}
-        {extractLoading && (
-            <div className="mb-6">
-                <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progress}%` }}
-                    transition={{ duration: 0.5 }}
-                    className="h-1 bg-gradient-to-r from-purple-600 to-cyan-500 rounded-full shadow-[0_0_10px_rgba(0,255,157,0.5)]"
-                />
-                <p className="text-white text-xs font-mono mt-1">Извлечение: {Math.round(progress)}%</p>
-            </div>
-        )}
-        {error && <p className="text-red-400 mb-6 text-xs font-mono">{error}</p>}
-
-
-        {/* File List */}
-        {files.length > 0 && !extractLoading && (
-            <div className="mb-6 bg-gray-800 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.3)]">
-            <h3 className="text-xl font-bold text-cyan-400 mb-3">Консоль файлов ({files.length})</h3>
-            <div className="max-h-60 overflow-y-auto pr-2 space-y-3"> {/* Added max-height and scroll */}
-                 {groupFilesByFolder(files).map(({ folder, files: folderFiles }) => (
-                    <div key={folder} className="bg-gray-900 p-3 rounded-lg border border-gray-700 shadow-[0_0_8px_rgba(0,255,157,0.2)]">
-                        <h4 className="text-sm font-semibold text-purple-400 mb-2 sticky top-0 bg-gray-900 py-1">{folder}</h4> {/* Sticky folder header */}
-                        <ul className="space-y-1.5"> {/* Increased spacing */}
-                            {folderFiles.map((file) => (
-                                <li id={`file-${file.path}`} key={file.path} className="flex items-center gap-2 cursor-pointer hover:bg-gray-700 px-1 rounded" onClick={() => toggleFileSelection(file.path)}>
-                                <input
-                                    type="checkbox"
-                                    checked={selectedFiles.has(file.path)}
-                                    onChange={(e) => { e.stopPropagation(); toggleFileSelection(file.path); }} // Prevent li click, handle directly
-                                    className="w-3.5 h-3.5 accent-cyan-500 cursor-pointer flex-shrink-0" // Slightly larger checkbox
-                                />
-                                <span
-                                    className={`text-xs flex-grow truncate ${
-                                    file.path === primaryHighlightedPath
-                                        ? "text-yellow-300 font-bold ring-1 ring-yellow-400 rounded px-1" // More visible highlight
-                                        : secondaryHighlightedPaths.includes(file.path)
-                                        ? "text-green-400 font-semibold ring-1 ring-green-500 rounded px-1"
-                                        : importantFiles.includes(file.path)
-                                        ? "text-cyan-300 font-medium"
-                                        : "text-gray-400" // Default
-                                    } ${selectedFiles.has(file.path) ? 'text-white' : ''} `} // White text if selected
-                                    title={file.path} // Tooltip with full path
-                                >
-                                    {getDisplayName(file.path)}
-                                </span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                ))}
-            </div>
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-2 mt-4">
-                 <motion.button
-                    onClick={() => handleAddSelected()}
-                    disabled={selectedFiles.size === 0}
-                    className={`flex-1 flex items-center justify-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-indigo-600 to-purple-500 transition-all shadow-[0_0_12px_rgba(99,102,241,0.3)] ${selectedFiles.size === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-[0_0_18px_rgba(99,102,241,0.5)]'}`}
-                    whileHover={{ scale: selectedFiles.size === 0 ? 1 : 1.05 }}
-                    whileTap={{ scale: selectedFiles.size === 0 ? 1 : 0.95 }}
-                    >
-                    <FaFileLines /> Добавить выбранные ({selectedFiles.size})
-                </motion.button>
-                <motion.button
-                    onClick={handleAddImportantFiles}
-                    className="flex-1 flex items-center justify-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-blue-600 to-cyan-500 transition-all shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:shadow-[0_0_18px_rgba(0,255,157,0.5)]"
-                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                    >
-                    <FaKey /> Добавить важные
-                </motion.button>
-                <motion.button
-                    onClick={handleAddFullTree}
-                    className="flex-1 flex items-center justify-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-red-600 to-orange-500 transition-all shadow-[0_0_12px_rgba(255,107,107,0.3)] hover:shadow-[0_0_18px_rgba(255,107,107,0.5)]"
-                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                    >
-                    <FaTree /> Добавить дерево
-                </motion.button>
-            </div>
-            </div>
-        )}
-
-        {/* Kwork Input Area */}
-        <div className="mb-4 relative">
-            <label htmlFor="kwork-input" className="block text-sm font-medium mb-1">Ввод запроса</label>
-            <textarea
-                id="kwork-input"
-                ref={kworkInputRef} // Assign the ref
-                value={kworkInput}
-                onChange={(e) => setKworkInput(e.target.value)}
-                className="w-full p-3 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] resize-y min-h-[100px] text-sm" // Allow vertical resize
-                placeholder="Опишите здесь вашу задачу... Затем добавьте контекст с помощью кнопок выше."
-            />
-            <motion.button
-                onClick={handleCopyToClipboard}
-                
-                className={`absolute top-2 right-2 p-1.5 bg-gradient-to-r from-cyan-600 to-teal-500 rounded-full shadow-[0_0_8px_rgba(6,182,212,0.3)] transition-all 'hover:shadow-[0_0_12px_rgba(6,182,212,0.5)]`}
+                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                className="p-2 bg-gray-700 rounded-full hover:bg-gray-600 transition-colors"
                 whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                title="Скопировать запрос в буфер"
+                whileTap={{ scale: 0.95 }}
+                title="Настройки репозитория"
             >
-                <FaClipboard className="text-white text-base" /> {/* Slightly smaller icon */}
+                <FaCog className="text-cyan-400 text-xl" />
             </motion.button>
-        </div>
+       </div>
 
 
-        {/* Selected Files Preview (Optional but helpful) */}
-        {selectedFiles.size > 0 && (
-            <details className="mb-6 bg-gray-800 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.3)]">
-            <summary className="text-lg font-bold text-cyan-400 cursor-pointer">Предпросмотр выбранных файлов ({selectedFiles.size})</summary>
-            <div className="mt-3 max-h-96 overflow-y-auto space-y-4">
-                {Array.from(selectedFiles).map((path) => {
-                    const file = files.find((f) => f.path === path);
-                    if (!file) return null;
-                    const lang = getLanguage(file.path);
-                    return (
-                    <div key={file.path} className="bg-gray-900 rounded-lg overflow-hidden border border-gray-700">
-                        <h4 className="text-xs font-bold text-purple-400 px-3 py-1 bg-gray-700">{file.path}</h4>
-                        <SyntaxHighlighter
-                            language={lang}
-                            style={oneDark}
-                            customStyle={{ background: "#111827", padding: "0.75rem", margin: 0, fontSize: "0.75rem" }}
-                            showLineNumbers={true} // Add line numbers
-                        >
-                        {file.content.length > 1000 ? file.content.substring(0, 1000) + '\n... (усечено)' : file.content}
-                        </SyntaxHighlighter>
-                    </div>
-                    );
-                })}
+      {/* Settings Modal/Section */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        repoUrl={repoUrl}
+        setRepoUrl={setRepoUrl}
+        token={token}
+        setToken={setToken}
+        onFetch={handleFetch}
+        loading={extractLoading}
+      />
+
+      {/* Progress Bar & Status */}
+       {(fetchStatus === 'loading' || fetchStatus === 'success' || fetchStatus === 'error') && files.length === 0 && ( // Show only during initial load or if error before files appear
+            <div className="mb-6">
+                 <ProgressBar status={fetchStatus} progress={progress} />
+                 {fetchStatus === 'loading' && <p className="text-white text-xs font-mono mt-1 text-center">Извлечение: {Math.round(progress)}%</p>}
+                 {fetchStatus === 'success' && files.length === 0 && <p className="text-green-400 text-xs font-mono mt-1 text-center flex items-center justify-center gap-1"><FaCircleCheck /> Успешно, но файлы не найдены?</p>}
+                 {fetchStatus === 'error' && <p className="text-red-400 text-xs font-mono mt-1 text-center flex items-center justify-center gap-1"><FaCircleTimes /> {error || "Произошла ошибка"}</p>}
             </div>
-            </details>
+        )}
+         {/* Show general error if it occurs *after* files might have been partially listed (less likely but possible) */}
+        {error && fetchStatus !== 'error' && <p className="text-red-400 mb-6 text-xs font-mono">{error}</p>}
+
+
+      {/* Selected Files Preview (Moved Up) */}
+       {selectedFiles.size > 0 && (
+            <SelectedFilesPreview
+                selectedFiles={selectedFiles}
+                allFiles={files}
+                getLanguage={getLanguage} // Pass helper
+            />
         )}
 
-        {/* Removed the fixed bottom message - Xuinity handles this now */}
+      {/* File List */}
+      {files.length > 0 && !extractLoading && (
+        <FileList
+          files={files}
+          selectedFiles={selectedFiles}
+          primaryHighlightedPath={primaryHighlightedPath}
+          secondaryHighlightedPaths={secondaryHighlightedPaths}
+          importantFiles={importantFiles}
+          toggleFileSelection={toggleFileSelection}
+          onAddSelected={handleAddSelected}
+          onAddImportant={handleAddImportantFiles}
+          onAddTree={handleAddFullTree}
+        />
+      )}
+
+      {/* Kwork Input Area */}
+      <RequestInput
+        kworkInput={kworkInput}
+        setKworkInput={setKworkInput}
+        kworkInputRef={kworkInputRef}
+        onCopyToClipboard={handleCopyToClipboard}
+      />
 
     </div>
   );
 });
 
-RepoTxtFetcher.displayName = 'RepoTxtFetcher'; // Add display name
-
+RepoTxtFetcher.displayName = 'RepoTxtFetcher';
 export default RepoTxtFetcher;
