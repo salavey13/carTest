@@ -1,3 +1,4 @@
+// /components/RepoTxtFetcher.tsx
 "use client";
 import React, { useState, useEffect, useImperativeHandle, forwardRef, MutableRefObject, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
@@ -463,7 +464,7 @@ const RepoTxtFetcher = forwardRef<any, RepoTxtFetcherProps>(({ kworkInputRef }, 
           secondaryHighlightedPaths={secondaryHighlightedPaths}
           importantFiles={importantFiles}
           toggleFileSelection={toggleFileSelection}
-          onAddSelected={handleAddSelected}
+          onAddSelected={handleAddSelected()}
           onAddImportant={handleAddImportantFiles}
           onAddTree={handleAddFullTree}
         />
