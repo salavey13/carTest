@@ -5,9 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
-    // Specific Icons for Repo XML page suggestions
-    FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard //, // Added Info & Keyboard
-   // FaRegGrinBeamSweat // Added for fun
+    FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard
 } from "react-icons/fa6";
 
 // Import Subcomponents
@@ -26,6 +24,8 @@ const CHARACTER_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1
 const CHARACTER_ALT_TEXT = "Xuinity Assistant";
 const HIRE_ME_TEXT = "Найми меня! ✨";
 const FIX_PAGE_ID = "fix-current-page";
+const DEFAULT_TASK_IDEA = "Проанализируй предоставленный контекст кода. Опиши его основные функции и предложи возможные улучшения или рефакторинг.";
+
 
 interface Suggestion {
     id: string;
@@ -44,6 +44,27 @@ interface GitHubProfile {
     name?: string | null;
 }
 
+// --- Helper Function for Predefined Tasks ---
+const getPredefinedTaskForPath = (routePath: string): string => {
+    console.log("Generating task for suggestion based on path:", routePath);
+    // Handle potential base path ('app') vs route path ('/')
+    const cleanPath = routePath.startsWith('app') ? routePath.substring(3) : routePath; // Remove 'app' prefix if present
+
+    // Match specific dynamic route, ignoring the actual ID value
+    // Example: /vpr-test/35 -> matches /vpr-test/*
+    if (cleanPath.startsWith('/vpr-test/')) {
+        return "скрой кнопку включения подсказок, пожалуйста";
+    }
+
+    // --- Add more specific paths here ---
+    // else if (cleanPath === '/admin/dashboard') {
+    //    return "Refactor the main dashboard component for clarity.";
+    // }
+    // --- Default Task ---
+    return DEFAULT_TASK_IDEA;
+};
+
+
 // --- Animation Variants ---
 const containerVariants = { hidden: { opacity: 0, x: -300 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 120, damping: 15, when: "beforeChildren", staggerChildren: 0.08, }, }, exit: { opacity: 0, x: -300, transition: { duration: 0.3 } }, };
 const childVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", bounce: 0.4 } }, exit: { opacity: 0, transition: { duration: 0.2 } }, };
@@ -53,7 +74,7 @@ const fabVariants = { hidden: { scale: 0, opacity: 0 }, visible: { scale: 1, opa
 const StickyChatButton: React.FC = () => {
     // --- State ---
     const [isOpen, setIsOpen] = useState(false);
-    const [fixActionClicked, setFixActionClicked] = useState(false);
+    const [fixActionClicked, setFixActionClicked] = useState(false); // Keep this? Maybe reset on path change?
     const [hasAutoOpened, setHasAutoOpened] = useState(false);
     const [activeMessage, setActiveMessage] = useState<string>("Загрузка...");
     const [githubProfile, setGithubProfile] = useState<GitHubProfile | null>(null);
@@ -120,17 +141,31 @@ const StickyChatButton: React.FC = () => {
         // --- Base Suggestions (Other Pages) ---
         else {
             const folderPath = currentPath === "/" ? "app" : `app${currentPath.split('?')[0]}`;
+            // Get the predefined task for this path
+            const taskIdea = getPredefinedTaskForPath(currentPath); // Use currentPath directly
+            const encodedTaskIdea = encodeURIComponent(taskIdea);
+            // Construct the link with path and idea
+            const fixPageLink = `/repo-xml?path=${encodeURIComponent(folderPath)}&idea=${encodedTaskIdea}`;
+
             const baseSuggestions: Suggestion[] = [];
 
-            if (!fixActionClicked) {
-                baseSuggestions.push({ id: FIX_PAGE_ID, text: "Починить эту Страницу? 🤩", link: `/repo-xml?path=${folderPath}`, isFixAction: true, icon: <FaHighlighter className="mr-1.5" /> });
+            // Only show "Fix this Page" if not clicked *and* we're not on the root page (doesn't make sense to "fix" root layout this way)
+            if (!fixActionClicked && currentPath !== '/') {
+                baseSuggestions.push({
+                    id: FIX_PAGE_ID,
+                    text: "Починить эту Страницу? 🤩",
+                    link: fixPageLink, // Use the constructed link
+                    isFixAction: true,
+                    icon: <FaHighlighter className="mr-1.5" />
+                 });
             }
+             // Offer "Create New" which goes to repo-xml without parameters
             baseSuggestions.push({ id: "add-new", text: "Создать Новое с Нуля ✨", link: "/repo-xml", icon: <FaWandMagicSparkles className="mr-1.5" /> });
             baseSuggestions.push({ id: "hire-me", text: HIRE_ME_TEXT, link: "/selfdev", isHireMe: true, icon: <FaStar className="mr-1.5" /> });
 
             return baseSuggestions;
         }
-    }, [currentPath, fixActionClicked]);
+    }, [currentPath, fixActionClicked, router]); // Added router dependency if needed for actions
 
 
     // --- Update Active Message Logic (Reacts to GitHub state changes) ---
@@ -186,6 +221,11 @@ const StickyChatButton: React.FC = () => {
     // --- Handle Escape Key to Close Dialog ---
     const handleEscKey = useCallback((event: KeyboardEvent) => { if (event.key === 'Escape') { setIsOpen(false); } }, []);
     useEffect(() => { if (isOpen) { document.addEventListener('keydown', handleEscKey); } else { document.removeEventListener('keydown', handleEscKey); } return () => { document.removeEventListener('keydown', handleEscKey); }; }, [isOpen, handleEscKey]);
+
+    // Reset fixActionClicked when path changes, so the button reappears
+    useEffect(() => {
+        setFixActionClicked(false);
+    }, [currentPath]);
 
 
     // --- Event Handlers ---
