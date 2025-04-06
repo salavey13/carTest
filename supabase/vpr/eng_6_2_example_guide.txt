@@ -1,0 +1,87 @@
+## 1. Template Guide: Creating an English VPR Variant (Grade 6 Example)
+
+This guide outlines the structure for each task type based on Variant 2 (Question IDs 1015-1020, Subject ID 38).
+
+**General Principles:**
+
+*   **Subject ID:** Use the correct `subject_id` (e.g., 38 for English Grade 6) in all `vpr_questions` updates.
+*   **Markdown:** Use Markdown in `vpr_questions.text` for clear formatting (bolding, lists, tables).
+*   **Explanation Field:** Use `vpr_questions.explanation` to store keys, transcripts, model answers, and evaluation criteria.
+*   **Visual Data:** Use `vpr_questions.visual_data` (JSONB) to store paths or identifiers for audio/images. Use simple flags like `[AUDIO_FLAG: path]` or `[IMAGE_FLAG: path]` in the `text` field for easy UI recognition if `visual_data` isn't directly used by the UI.
+*   **Answer Table (`vpr_answers`):**
+    *   For tasks *without* user-selectable answers (Listening, Reading Aloud, Grammar, Email, Monologue), `UPDATE` the original `correct_answer_id` row's `text` to explain its purpose (e.g., "Ключ к заданию...") and set `is_correct` appropriately (often `true` or `false` depending on how you handle non-selectable rows).
+    *   For MCQ tasks (Reading Comprehension), `DELETE` the old consolidated answer row and `INSERT` *all* options (A, B, C...) as separate rows linked to the main `question_id`, marking only the correct one(s) with `is_correct = true`.
+
+---
+
+**Task 1: Listening Matching (Example: ID 1015)**
+
+*   **`vpr_questions.text`:**
+    *   Clear instructions.
+    *   List of statements (1-6).
+    *   Table structure for student answers.
+    *   `[AUDIO_FLAG: path/to/audio.mp3]` marker.
+*   **`vpr_questions.explanation`:**
+    *   Full audio transcript, including narrator cues.
+    *   Correct key (e.g., A-1, B-2...).
+*   **`vpr_questions.visual_data`:** `{"audio_path": "path/to/audio.mp3"}`
+*   **`vpr_answers`:** `UPDATE` original row `text` to "Ключ к заданию...". No incorrect options needed.
+
+**Task 2: Reading Aloud (Example: ID 1016)**
+
+*   **`vpr_questions.text`:**
+    *   Clear instructions.
+    *   The full text to be read aloud.
+*   **`vpr_questions.explanation`:**
+    *   Detailed evaluation criteria (phonetics, intonation, pace, fluency).
+*   **`vpr_questions.visual_data`:** `NULL` (unless displaying text requires it).
+*   **`vpr_answers`:** `UPDATE` original row `text` to "Оценивается произношение...". No incorrect options needed.
+
+**Task 3: Reading Comprehension (MCQ - True/False/Not Stated) (Example: ID 1017)**
+
+*   **`vpr_questions.text`:**
+    *   Clear instructions (explain A/B/C).
+    *   The full reading passage.
+    *   Numbered list of statements (1-5), each followed by A/B/C options.
+*   **`vpr_questions.explanation`:**
+    *   Correct key with brief justification (e.g., 1. B (False - lives on savannah)).
+    *   Note explaining how answers are stored in `vpr_answers`.
+*   **`vpr_questions.visual_data`:** `NULL`.
+*   **`vpr_answers`:**
+    *   `DELETE` the old consolidated answer row.
+    *   `INSERT` 3 rows for *each* statement (e.g., "1. A) True", "1. B) False", "1. C) Not stated"), linking all to the main `question_id` (1017). Mark only the correct option for each statement as `is_correct = true`. (Total 15 inserts for 5 statements).
+
+**Task 4: Grammar Transformation (Example: ID 1018)**
+
+*   **`vpr_questions.text`:**
+    *   Clear instructions.
+    *   Text with numbered gaps `(1)`.
+    *   List of base words in capitals corresponding to the gaps (e.g., `(1) BE`).
+*   **`vpr_questions.explanation`:**
+    *   List of correctly transformed words (e.g., 1. were, 2. more active...).
+*   **`vpr_questions.visual_data`:** `NULL`.
+*   **`vpr_answers`:** `UPDATE` original row `text` to "Ключ к заданию...". No incorrect options needed.
+
+**Task 5: Email Writing (Example: ID 1019)**
+
+*   **`vpr_questions.text`:**
+    *   Clear instructions (reply to email, answer questions, word count).
+    *   The full stimulus email received from the friend.
+*   **`vpr_questions.explanation`:**
+    *   A full model answer meeting all requirements.
+    *   Detailed evaluation criteria (content, organization, vocab/grammar, spelling/punctuation).
+*   **`vpr_questions.visual_data`:** `NULL`.
+*   **`vpr_answers`:** `UPDATE` original row `text` to "Образец / Оценивается по критериям...". No incorrect options needed.
+
+**Task 6: Picture Description Monologue (Example: ID 1020)**
+
+*   **`vpr_questions.text`:**
+    *   Clear instructions (choose one photo, time limits, sentence count).
+    *   `[IMAGE_FLAG: path/to/pic1.jpg]`, `[IMAGE_FLAG: path/to/pic2.jpg]`, `[IMAGE_FLAG: path/to/pic3.jpg]` markers.
+    *   The structured plan (e.g., the place, the action...).
+    *   Required starting phrase ("I'd like to describe...").
+*   **`vpr_questions.explanation`:**
+    *   A full model monologue for *one* of the pictures.
+    *   Detailed evaluation criteria (content/plan, organization, vocab, grammar, phonetics).
+*   **`vpr_questions.visual_data`:** `{"image_paths": ["path/to/pic1.jpg", "path/to/pic2.jpg", "path/to/pic3.jpg"]}`
+*   **`vpr_answers`:** `UPDATE` original row `text` to "Образец / Оценивается по критериям...". No incorrect options needed.
