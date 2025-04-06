@@ -49,7 +49,23 @@ export default function RepoXmlPage() {
         <>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
             <div className="min-h-screen bg-gray-900 p-6 pt-24 text-white flex flex-col items-center relative overflow-y-auto">
-                {/* Intro Section */}
+                
+                {/* RepoTxtFetcher Section with Suspense */}
+                <Suspense fallback={<div className="text-white">Загрузка...</div>}>
+                    {/* Pass the ref here */}
+                    <section id="extractor" className="mb-12 w-full max-w-2xl">
+                        <ForwardedRepoTxtFetcher ref={fetcherRef} kworkInputRef={kworkInputRef} />
+                    </section>
+                </Suspense>
+              
+                {/* AICodeAssistant Section */}
+                {/* Pass the ref here */}
+                {/* Assign the ref to the wrapping section for scrolling */}
+                <section id="executor" ref={prSectionRef} className="mb-12 w-full max-w-2xl pb-16">
+                     <ForwardedAICodeAssistant ref={assistantRef} aiResponseInputRef={aiResponseInputRef} />
+                </section>
+              
+              {/* Intro Section */}
                 <section id="intro" className="mb-12 text-center max-w-2xl">
                     
                      <div className="flex justify-center mb-4">
@@ -107,7 +123,7 @@ export default function RepoXmlPage() {
                         </a>
                         ), а для разработки —{" "}
                         <a
-                          href="https://grok.com"
+                          href="https://aistudio.google.com"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-blue-400 underline hover:text-blue-300 transition"
@@ -120,56 +136,33 @@ export default function RepoXmlPage() {
 
                 {/* Step 1: Formulate Request */}
                 <section id="step1" className="mb-12 text-center max-w-2xl">
-                    {/* ... (step 1 content remains the same) ... */}
                     <h2 className="text-2xl font-bold text-cyan-400 mb-4">
                         Шаг 1: Сформулируйте запрос для бота с контекстом
                     </h2>
                     <p className="text-gray-300 text-sm">
-                        Сначала подумайте, что вы хотите сделать. Например: "Добавить кнопку на сайт" или "Исправить баг в коде". Запишите это в поле ниже в "Ввод запроса". Чтобы бот понял, о чём речь, ему нужен контекст — код вашего проекта. Давайте его извлечём!
+                        Сначала подумайте, что вы хотите сделать. Например: "Добавить кнопку на страницу" или "Исправить багу". Запишите это в поле ниже в "Ввод запроса". Чтобы бот понял, о чём речь, ему нужен контекст — код вашего проекта. Давайте его извлечём!
                     </p>
                 </section>
 
-                {/* RepoTxtFetcher Section with Suspense */}
-                <Suspense fallback={<div className="text-white">Загрузка...</div>}>
-                    {/* Pass the ref here */}
-                    <section id="extractor" className="mb-12 w-full max-w-2xl">
-                        <ForwardedRepoTxtFetcher ref={fetcherRef} kworkInputRef={kworkInputRef} />
-                    </section>
-                </Suspense>
 
                 {/* Step 2: Paste into Executor */}
                 <section id="step2" className="mb-12 text-center max-w-2xl">
-                   {/* ... (step 2 content remains the same) ... */}
                    <h2 className="text-2xl font-bold text-cyan-400 mb-4">
-                        Шаг 2: Вставьте результат в Бота исполнителя
+                        Шаг 2: Вставьте ответ бота 
                     </h2>
                     <p className="text-gray-300 text-sm">
-                        После того как вы извлекли код и получили анализ от бота, скопируйте результат. Затем вставьте его ниже (или в Grok!), чтобы бот написал новый код — дальше создайте Pull Request на GitHub в один клик. Всё готово для магии!
+                        После того как вы извлекли код и получили анализ от бота, скопируйте результат. Затем вставьте его в aiStudio, чтобы бот написал новый код — дальше создайте Pull Request на GitHub в один клик. Всё готово для магии!
                     </p>
                 </section>
 
-                {/* AICodeAssistant Section */}
-                {/* Pass the ref here */}
-                 {/* Assign the ref to the wrapping section for scrolling */}
-                <section id="executor" ref={prSectionRef} className="mb-12 w-full max-w-2xl pb-16">
-                     <ForwardedAICodeAssistant ref={assistantRef} aiResponseInputRef={aiResponseInputRef} />
-                </section>
-{/* --- ADD ID HERE --- For Xuinity scroll target */}
-             <section id="kwork-input-section" className="mb-12 w-full max-w-2xl">
-                 {/* This section was implicitly part of RepoTxtFetcher before, */}
-                 {/* but we need an ID outside it for scrolling. */}
-                 {/* The actual textarea is inside RepoTxtFetcher */}
-             </section>
-             {/* Note: We scroll to the *section*, not the textarea directly */}
-             {/* because the textarea itself is inside RepoTxtFetcher */}
-
+             
                 {/* Fixed Navigation Icons */}
                 <nav className="fixed right-2 top-1/2 transform -translate-y-1/2 flex flex-col space-y-4 z-13">
+                    <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-blue-700 rounded-full hover:bg-gray-600 transition" title="Экстрактор кода"> <FaRobot className="text-lg" /> </button>
+                    <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-purple-700 rounded-full hover:bg-gray-600 transition" title="Исполнитель кода"> <FaRobot className="text-lg" /> </button>
                     <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700 rounded-full hover:bg-gray-600 transition" title="Введение"> <FaCode className="text-lg" /> </button>
                     <button onClick={() => scrollToSectionNav("step1")} className="p-2 bg-gray-700 rounded-full hover:bg-gray-600 transition" title="Шаг 1: Запрос"> <FaFileCode className="text-lg" /> </button>
-                    <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-gray-700 rounded-full hover:bg-gray-600 transition" title="Экстрактор кода"> <FaRobot className="text-lg" /> </button>
                     <button onClick={() => scrollToSectionNav("step2")} className="p-2 bg-gray-700 rounded-full hover:bg-gray-600 transition" title="Шаг 2: Исполнение"> <FaFileCode className="text-lg" /> </button>
-                    <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-gray-700 rounded-full hover:bg-gray-600 transition" title="Исполнитель кода"> <FaRobot className="text-lg" /> </button>
                 </nav>
             </div>
         </>
