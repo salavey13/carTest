@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
@@ -16,10 +18,12 @@ interface ToolsMenuProps {
 
 // Moved predefined links here as they are static presentation data
 const predefinedLinks: LinkItem[] = [
+    { name: "aiStudio", url: "https://aistudio.google.com", icon: <FaRobot className="text-blue-600 font-bold drop-shadow-lg" />  },
+    { name: "ChatGPT", url: "https://chatgpt.com", icon: <FaImage className="text-blue-500 font-bold drop-shadow-md" /> },
     { name: "Grok", url: "https://grok.com", icon: <FaRobot className="text-yellow-400 font-bold drop-shadow-md" /> },
     { name: "QwenLM", url: "https://qwenlm.ai", icon: <FaImage className="text-blue-500" /> },
     { name: "NotebookLM", url: "https://notebooklm.google.com", icon: <FaBook className="text-yellow-500" /> },
-    { name: "Supabase", url: "https://supabase.com", icon: <FaDatabase className="text-teal-500" /> },
+    { name: "Supabase", url: "https://supabase.com/dashboard", icon: <FaDatabase className="text-teal-500" /> },
     { name: "Vercel", url: "https://vercel.com", icon: <FaRocket className="text-black" /> },
     { name: "Coze.com", url: "https://coze.com", icon: <FaCode className="text-purple-500" /> },
 ];
