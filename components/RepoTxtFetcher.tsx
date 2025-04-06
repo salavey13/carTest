@@ -464,7 +464,7 @@ const RepoTxtFetcher = forwardRef<any, RepoTxtFetcherProps>(({ kworkInputRef }, 
           secondaryHighlightedPaths={secondaryHighlightedPaths}
           importantFiles={importantFiles}
           toggleFileSelection={toggleFileSelection}
-          onAddSelected={handleAddSelected()}
+          onAddSelected={() => handleAddSelected()}
           onAddImportant={handleAddImportantFiles}
           onAddTree={handleAddFullTree}
         />
