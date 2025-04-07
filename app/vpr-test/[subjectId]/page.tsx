@@ -71,14 +71,16 @@ interface VprTestAttempt {
     score?: number;
     total_questions: number;
     last_question_index: number;
+    // Add metadata field based on previous thought process
+    metadata?: Record<string, any> | null;
 }
 // --- End Interfaces ---
 
 export default function VprTestPage() {
     // --- States ---
     // Using `user` from useAppContext as per context, rename dbUser usage to user
-    const { user, token } = useAppContext(); // Use `user` which corresponds to `dbUser`
-    
+    const { user, token, isLoading: isUserLoading } = useAppContext(); // Use `user`, get loading state
+
     const params = useParams();
     const router = useRouter();
     const subjectId = parseInt(params.subjectId as string, 10);
@@ -88,7 +90,7 @@ export default function VprTestPage() {
     const [questions, setQuestions] = useState<VprQuestionData[]>([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [currentAttempt, setCurrentAttempt] = useState<VprTestAttempt | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(true); // General test loading
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedAnswerId, setSelectedAnswerId] = useState<number | null>(null);
@@ -111,6 +113,7 @@ export default function VprTestPage() {
     const [isPurchasingDisable, setIsPurchasingDisable] = useState(false);
 
     // Check if dummy mode is permanently disabled using `user.metadata`
+    // Use optional chaining for safety during initial load
     const isDummyModeGloballyDisabled = user?.metadata?.is_dummy_mode_disabled_by_parent === true;
     // --- End Dummy Mode States ---
 
@@ -139,7 +142,7 @@ export default function VprTestPage() {
                  completed_at: new Date().toISOString(),
                  score: currentScore // Keep the score as it was
              };
-             
+
              // Let's use supabaseAdmin for consistency with original context's completion logic
              const { data: updatedAttempt, error: updateError } = await supabaseAdmin
                  .from('vpr_test_attempts')
@@ -155,7 +158,7 @@ export default function VprTestPage() {
               if (user && subject && updatedAttempt) {
                 const message = `🔔 Тест ВПР завершен (Время вышло)!
 Пользователь: ${user.username || user.id} (${user.id})
-Предмет: ${subject.name}
+Предмет: ${subject?.name || 'Неизвестный'}
 Вариант: ${updatedAttempt.variant_number}
 Результат: ${updatedAttempt.score ?? 0} из ${updatedAttempt.total_questions}`;
                   try {
@@ -187,16 +190,21 @@ export default function VprTestPage() {
     useEffect(() => {
         debugLogger.log(`useEffect running. Reset Counter: ${resetCounter}`);
 
+        // Wait for user data from context if it's loading
+        if (isUserLoading) {
+            debugLogger.log("Waiting for user data from AppContext...");
+            setIsLoading(true); // Keep general loading true while waiting for user
+            return;
+        }
+
         // Use `user.id` as per context
         if (!user?.id || !subjectId || isNaN(subjectId)) {
             if (!user?.id) {
-                 // Let AppContext handle redirection or show loading/error
-                 debugLogger.warn("No user ID found in AppContext yet.");
-                 // Don't redirect immediately, show loading or wait
-                 // setError("Ожидание данных пользователя..."); // Or keep loading
-                 // return; // Wait for user context
-                 
-
+                 // If still no user after context loaded, show error/redirect
+                 debugLogger.error("No user ID found in AppContext after loading.");
+                 setError("Не удалось получить данные пользователя. Попробуйте перезайти.");
+                 setIsLoading(false);
+                 // Consider redirecting: router.push('/auth-error');
             }
             else if (isNaN(subjectId)) {
                  setError("Неверный ID предмета");
@@ -207,7 +215,7 @@ export default function VprTestPage() {
 
         debugLogger.log(`Initializing test for Subject ID: ${subjectId}, User ID: ${user.id}`);
         let isMounted = true;
-        
+
 
         const initializeTest = async () => {
             if (!isMounted) {
@@ -282,9 +290,10 @@ export default function VprTestPage() {
                  setQuestions(questionData);
                  debugLogger.log(`Loaded ${questionData.length} questions.`);
 
-                // --- Find or Create Attempt (using supabaseAdmin for read, supabaseAdmin for delete, client for insert) ---
+                // --- Find or Create Attempt (using supabaseAdmin for read, supabaseAdmin for delete, supabaseAdmin for insert for simplicity/permissions) ---
                 debugLogger.log(`Finding active test attempt for variant ${variantToLoad}...`);
-                const { data: existingAttempts, error: attemptError } = await supabaseAdmin // Use client
+                 // Using supabaseAdmin for consistency, ensure RLS would allow user reads if switching later
+                const { data: existingAttempts, error: attemptError } = await supabaseAdmin
                     .from('vpr_test_attempts')
                     .select('*')
                     .eq('user_id', user.id) // Use user.id
@@ -321,10 +330,10 @@ export default function VprTestPage() {
                      debugLogger.log(`No active attempt found in DB for variant ${variantToLoad}.`);
                 }
 
-                // Create new attempt if needed (using client, assuming RLS allows)
+                // Create new attempt if needed (using supabaseAdmin)
                 if (!attemptToUse) {
                      debugLogger.log(`Creating new attempt for variant ${variantToLoad}.`);
-                     // Use client for insert (check RLS policies)
+                     // Use supabaseAdmin for insert (simplifies permissions for now)
                      const { data: newAttemptData, error: newAttemptError } = await supabaseAdmin
                          .from('vpr_test_attempts')
                          .insert({ user_id: user.id, subject_id: subjectId, variant_number: variantToLoad, total_questions: questionData.length, last_question_index: 0, score: 0 })
@@ -359,8 +368,9 @@ export default function VprTestPage() {
                     setIsCurrentQuestionNonAnswerable(isNonAnswerable);
                     debugLogger.log(`Is current question (${validResumeIndex}) non-answerable? ${isNonAnswerable}`);
 
-                    debugLogger.log("Attempt is active. Starting timer.");
-                    setIsTimerRunning(true); // Start timer only for active attempts
+                    debugLogger.log("Attempt is active. Starting timer (if dummy mode isn't globally disabled or active).");
+                    // Start timer only if not globally disabled and not initially active
+                     setIsTimerRunning(!isDummyModeActive && !isDummyModeGloballyDisabled);
                  }
 
             } catch (err: any) {
@@ -383,8 +393,7 @@ export default function VprTestPage() {
             isMounted = false;
             debugLogger.log("useEffect cleanup: component unmounting or dependencies changed.");
         };
-     }, [user, subjectId, resetCounter, router, token]); // Keep dependencies
-    // --- End Data Fetching ---
+     }, [user, subjectId, resetCounter, router, token, isUserLoading]); // Added isUserLoading dependency
 
 
     // --- Answer Handling (Restoring context's version + dummy check) ---
@@ -437,7 +446,7 @@ export default function VprTestPage() {
              setIsSaving(false);
              // Timer remains paused until 'Next' is clicked
         }
-    }, [currentAttempt, showFeedback, isTestComplete, isSaving, isTimerRunning, timeUpModal, questions, currentQuestionIndex, isDummyModeActive, token]); // Added isDummyModeActive, token
+    }, [currentAttempt, showFeedback, isTestComplete, isSaving, isTimerRunning, timeUpModal, questions, currentQuestionIndex, isDummyModeActive]); // Removed token dependency as supabaseAdmin is used
 
 
     // --- Navigation Logic (Restoring context's version + dummy logic) ---
@@ -479,12 +488,13 @@ export default function VprTestPage() {
                 setCurrentQuestionIndex(nextIndex);
                 setIsCurrentQuestionNonAnswerable(nextIsNonAnswerable);
                 // Timer logic: Run only if not finishing AND dummy mode is OFF
-                if (!isDummyModeActive) {
+                if (!isDummyModeActive && !isDummyModeGloballyDisabled) { // Check global disable too
                     setIsTimerRunning(true);
                     debugLogger.log(`Moved to question index: ${nextIndex}. Timer restarted.`);
                 } else {
-                    setIsTimerRunning(false); // Ensure timer is paused if dummy mode is ON
-                    debugLogger.log(`Moved to question index: ${nextIndex}. Timer remains paused (Dummy Mode Active).`);
+                    setIsTimerRunning(false); // Ensure timer is paused if dummy mode is ON or globally disabled
+                    const reason = isDummyModeActive ? "Dummy Mode Active" : "Globally Disabled";
+                    debugLogger.log(`Moved to question index: ${nextIndex}. Timer remains paused (${reason}).`);
                 }
             } else {
                 // Test completion logic (restored from context)
@@ -522,7 +532,7 @@ export default function VprTestPage() {
         } finally {
             setIsSaving(false);
         }
-    }, [currentAttempt, isSaving, isTestComplete, timeUpModal, questions, currentQuestionIndex, user, subject, isDummyModeActive]); // Added isDummyModeActive
+    }, [currentAttempt, isSaving, isTestComplete, timeUpModal, questions, currentQuestionIndex, user, subject, isDummyModeActive, isDummyModeGloballyDisabled]); // Added isDummyModeGloballyDisabled
 
 
     // --- Reset Logic (Restoring context's version + dummy reset) ---
@@ -597,6 +607,7 @@ export default function VprTestPage() {
                 if (result.alreadyDisabled) {
                     toast.success("Режим подсказок уже отключен для этого пользователя.", { id: "purchase-disable-dummy" });
                     // AppContext should update user eventually, maybe force refresh context?
+                    // Consider a manual refresh/refetch of user data here if needed immediately
                 } else {
                     toast.success("Счет на отключение отправлен в Telegram! Пожалуйста, оплатите его там.", { id: "purchase-disable-dummy", duration: 5000 });
                 }
@@ -643,8 +654,10 @@ export default function VprTestPage() {
     // --- End Toggle Dummy Mode ---
 
     // --- Rendering Logic (Restoring structure from context + merging new UI) ---
-    // Loading state from context
-    if (isLoading && !currentAttempt) return <VprLoadingIndicator />; // Adjusted condition slightly
+    // Loading state handling user loading and test loading
+    if (isUserLoading || (isLoading && !currentAttempt)) {
+        return <VprLoadingIndicator text={isUserLoading ? "Загрузка пользователя..." : undefined} />;
+    }
     // Error state from context
     if (error && !currentAttempt) return <VprErrorDisplay error={error} onRetry={resetTest} />; // Adjusted condition
     // Completion screen from context
@@ -668,9 +681,12 @@ export default function VprTestPage() {
     if (!currentQuestionData) {
         debugLogger.warn("currentQuestionData is undefined for index:", currentQuestionIndex);
         // Avoid rendering components that rely on it if it's missing
-        return <VprLoadingIndicator text="Загрузка вопроса..." />;
-        // Or show error if this state persists
-        // return <VprErrorDisplay error="Не удалось загрузить данные текущего вопроса." onRetry={resetTest} />;
+        // Return Loading or Error based on whether we expect it eventually
+        if (isLoading) {
+            return <VprLoadingIndicator text="Загрузка вопроса..." />;
+        } else {
+            return <VprErrorDisplay error={`Не удалось загрузить данные вопроса #${currentQuestionIndex + 1}. Попробуйте сбросить тест.`} onRetry={resetTest} />;
+        }
     }
 
     const answersForCurrent = currentQuestionData.vpr_answers || [];
@@ -689,7 +705,7 @@ export default function VprTestPage() {
         <TooltipProvider>
             {/* Using motion.div key from context */}
             <motion.div
-                key={currentAttempt.id}
+                key={currentAttempt?.id || 'loading'} // Use attempt ID or fallback key
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="min-h-screen bg-page-gradient text-light-text flex flex-col items-center pt-6 pb-10 px-4"
@@ -718,39 +734,52 @@ export default function VprTestPage() {
                             timeLimit={timeLimit}
                             onTimeUp={handleTimeUp}
                             // Adjust timer running condition based on merged logic
-                            isTimerRunning={isTimerRunning && !isSaving && !isTestComplete && !timeUpModal && !isDummyModeActive}
+                            isTimerRunning={isTimerRunning && !isSaving && !isTestComplete && !timeUpModal && !isDummyModeActive && !isDummyModeGloballyDisabled}
                         />
                         {/* --- Dummy Mode Toggle & Purchase Button --- */}
                         <div className="flex items-center space-x-3 self-center sm:self-auto">
-                             <Tooltip>
-                                <TooltipTrigger asChild>
-                                     <div className="flex items-center space-x-2">
-                                         {isDummyModeGloballyDisabled ? (
-                                            <Lock className="h-5 w-5 text-yellow-500" />
-                                         ) : (
-                                            <Sparkles className={`h-5 w-5 transition-colors ${isDummyModeActive ? 'text-yellow-400' : 'text-gray-500'}`} />
-                                         )}
-                                        <Switch
-                                            id="dummy-mode-toggle"
-                                            checked={isDummyModeActive}
-                                            onCheckedChange={toggleDummyMode}
-                                            disabled={isDummyModeGloballyDisabled || isTestComplete || timeUpModal || isSaving}
-                                            aria-label="Режим Подсказок"
-                                            className="data-[state=checked]:bg-yellow-500 data-[state=unchecked]:bg-gray-600"
-                                        />
-                                        <label htmlFor="dummy-mode-toggle" className={`text-sm font-medium transition-colors ${isDummyModeActive ? 'text-yellow-400' : 'text-gray-400'} ${isDummyModeGloballyDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
-                                             Подсказки
-                                         </label>
-                                    </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    {isDummyModeGloballyDisabled
-                                        ? <p>Режим подсказок отключен родителем.</p>
-                                        : <p>{isDummyModeActive ? 'Выключить' : 'Включить'} режим подсказок (показать правильный ответ)</p>
-                                    }
-                                </TooltipContent>
-                            </Tooltip>
-                            {/* Show button to disable if not already disabled */}
+                             {/* === Show Toggle ONLY if NOT globally disabled === */}
+                             {!isDummyModeGloballyDisabled && (
+                                 <Tooltip>
+                                     <TooltipTrigger asChild>
+                                         <div className="flex items-center space-x-2">
+                                             <Sparkles className={`h-5 w-5 transition-colors ${isDummyModeActive ? 'text-yellow-400' : 'text-gray-500'}`} />
+                                             <Switch
+                                                 id="dummy-mode-toggle"
+                                                 checked={isDummyModeActive}
+                                                 onCheckedChange={toggleDummyMode}
+                                                 // Removed isDummyModeGloballyDisabled check here
+                                                 disabled={isTestComplete || timeUpModal || isSaving}
+                                                 aria-label="Режим Подсказок"
+                                                 className="data-[state=checked]:bg-yellow-500 data-[state=unchecked]:bg-gray-600"
+                                             />
+                                             <label htmlFor="dummy-mode-toggle" className={`text-sm font-medium transition-colors ${isDummyModeActive ? 'text-yellow-400' : 'text-gray-400'} cursor-pointer`}>
+                                                 Подсказки
+                                             </label>
+                                         </div>
+                                     </TooltipTrigger>
+                                     <TooltipContent>
+                                         <p>{isDummyModeActive ? 'Выключить' : 'Включить'} режим подсказок (показать правильный ответ)</p>
+                                     </TooltipContent>
+                                 </Tooltip>
+                             )}
+
+                            {/* === Show Lock Icon/Text if globally disabled === */}
+                            {isDummyModeGloballyDisabled && (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className="flex items-center space-x-2 text-yellow-500 opacity-70 cursor-not-allowed">
+                                            <Lock className="h-5 w-5" />
+                                            <span className="text-sm font-medium">Подсказки</span>
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Режим подсказок отключен родителем.</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            )}
+
+                            {/* Show button to disable IF NOT already globally disabled */}
                             {!isDummyModeGloballyDisabled && (
                                 <Tooltip>
                                     <TooltipTrigger asChild>
