@@ -313,8 +313,10 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
 
         try {
           result = await fetchRepoContents(repoUrl, token || undefined);
+          console.log(`[handleFetch] Attempt ${currentTry} result:`, result); // <<< DEBUG LOG ADDED
 
-          if (result.success && Array.isArray(result.files)) {
+          // --- FIX: Check if result exists before accessing properties ---
+          if (result && result.success && Array.isArray(result.files)) {
             // --- SUCCESS ---
             stopProgressSimulation(); setProgress(100); setFetchStatus('success');
             addToast(`Извлечено ${result.files.length} файлов!`, 'success');
@@ -355,11 +357,11 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
                 setSelectedFilesState(filesToSelect); setSelectedFetcherFiles(filesToSelect);
                 const task = ideaFromUrl || DEFAULT_TASK_IDEA; // Use idea from URL!
                 const prefix = "Контекст кода для анализа (отвечай полным кодом, не пропуская части):\n";
-                // Format: ```lang\n// /path\ncontent```
+                // Format: ```lang\n// File: path\ncontent```
                 const markdownTxt = fetchedFiles
                     .filter(f => filesToSelect.has(f.path))
                     .sort((a,b) => a.path.localeCompare(b.path))
-                    .map(f => `\`\`\`${getLanguage(f.path)}\n// /${f.path}\n${f.content}\n\`\`\``)
+                    .map(f => `\`\`\`${getLanguage(f.path)}\n// File: ${f.path}\n${f.content}\n\`\`\``)
                     .join("\n\n");
                 const combinedContent = `${task}\n\n${prefix}${markdownTxt}`;
                 console.log("Generated combined content for automation (first 200 chars):", combinedContent.substring(0, 200)); // Debug Log
@@ -389,30 +391,45 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
             }
             return; // Exit loop on success
 
-          } else { throw new Error(result?.error || "Не удалось получить файлы (ответ API)"); }
+          } else {
+              // Handle cases where result is null/undefined or !result.success
+              // Use optional chaining for error access, provide a default message.
+              const errorMessage = result?.error || "Не удалось получить файлы (ответ API не содержит ожидаемую структуру)";
+              throw new Error(errorMessage);
+          }
         } catch (err: any) {
           console.error(`Fetch attempt ${currentTry} failed:`, err);
-          setError(`Попытка ${currentTry}: ${err?.message || "Неизвестная ошибка"}`);
+          // Use err.message which might come from the explicit throw above or a network error
+          const displayError = err?.message || "Неизвестная ошибка при извлечении";
+          setError(`Попытка ${currentTry}: ${displayError}`);
           if (currentTry > maxRetries) {
             stopProgressSimulation(); setFetchStatus('failed_retries');
             addToast(`Не удалось извлечь файлы после ${maxRetries + 1} попыток.`, 'error');
             setFilesFetched(false, null, []); setExtractLoading(false);
             return; // Exit loop after final failure
           }
+          // No need to throw again, loop will continue or exit based on maxRetries
         }
     } // End while loop
-    // Fallback cleanup (should not be reached normally)
-    stopProgressSimulation(); setFetchStatus('error'); setFilesFetched(false, null, []); setExtractLoading(false);
-   }, [ // Dependencies
+
+    // Fallback cleanup (should only be reached if loop somehow exits unexpectedly)
+    console.warn("[handleFetch] Reached fallback cleanup - this should not normally happen.");
+    stopProgressSimulation();
+    // Set status based on whether an error was recorded or not
+    setFetchStatus(error ? 'failed_retries' : 'error');
+    setFilesFetched(false, null, []);
+    setExtractLoading(false);
+
+   }, [ // Dependencies (Ensure all are listed, including the callbacks used)
         repoUrl, token, highlightedPathFromUrl, ideaFromUrl, importantFiles, fetchStatus,
         addToast, startProgressSimulation, stopProgressSimulation, getLanguage,
         getPageFilePath, extractImports, resolveImportPath, openLink,
         setFetchStatus, setRepoUrlEntered, setFilesFetched, setSelectedFetcherFiles,
         setKworkInput, setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles,
-        handleCopyToClipboard, // Added handleCopyToClipboard as it's used internally now
-        scrollToSection, DEFAULT_TASK_IDEA, files // Added files dependency for automation sequence
-        // Note: Removed handleAddSelected/handleCopyToClipboard from *here* if they don't call handleFetch,
-        // but kept them if handleFetch *calls* them (like in the automation sequence). Added handleCopyToClipboard back.
+        handleCopyToClipboard, // Needed for automation sequence
+        scrollToSection, DEFAULT_TASK_IDEA, files // files is needed for automation sequence
+        // Note: handleAddSelected is NOT directly called by handleFetch, so not needed here.
+        //       handleCopyToClipboard *is* called, so it's included.
    ]);
 
 
@@ -473,17 +490,15 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
 
 
   // === Imperative Handle ===
-  // Expose the correctly memoized functions directly.
-  // The context triggers will call these exact same function instances.
-  // If the direct prop calls fail, it confirms the issue is likely stale props
-  // in the child components (FileList/RequestInput), not in RepoTxtFetcher itself.
+  // Reverted to using wrapper functions as per your finding that it was needed
+  // for direct button clicks (passed as props) to work correctly.
   useImperativeHandle(ref, () => ({
-    handleFetch: handleFetch, // Expose the memoized function directly
-    selectHighlightedFiles: selectHighlightedFiles, // Expose the memoized function directly
-    handleAddSelected: handleAddSelected, // Expose the memoized function directly
-    handleCopyToClipboard: handleCopyToClipboard, // Expose the memoized function directly
-    clearAll: handleClearAll, // Expose the memoized function directly
-  }), [handleFetch, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll]); // Dependencies are the memoized functions themselves
+    handleFetch: (isManualRetry = false) => handleFetch(isManualRetry), // Wrapper for consistency / future args
+    selectHighlightedFiles, // Direct is fine if no args needed and it's stable
+    handleAddSelected: () => handleAddSelected(), // Wrapper needed for direct prop calls?
+    handleCopyToClipboard: (textToCopy?: string, shouldScroll = true) => handleCopyToClipboard(textToCopy, shouldScroll), // Wrapper needed for direct prop calls?
+    clearAll: handleClearAll, // Direct is likely fine
+  }), [handleFetch, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll]); // Dependencies are the memoized functions
 
 
   // --- Render ---
@@ -578,7 +593,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
                   importantFiles={importantFiles}
                   isLoading={isLoading}
                   toggleFileSelection={toggleFileSelection}
-                  onAddSelected={handleAddSelected} // Pass the memoized handler
+                  onAddSelected={handleAddSelected} // Pass the memoized handler (intended to be called by wrapper in useImperativeHandle if needed)
                   onAddImportant={handleAddImportantFiles}
                   onAddTree={handleAddFullTree}
                   onSelectHighlighted={selectHighlightedFiles}
@@ -593,7 +608,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
                     kworkInput={kworkInput}
                     setKworkInput={setKworkInput}
                     kworkInputRef={kworkInputRef} // Pass DOM ref from context
-                    onCopyToClipboard={handleCopyToClipboard} // Pass the memoized handler
+                    onCopyToClipboard={handleCopyToClipboard} // Pass the memoized handler (intended to be called by wrapper in useImperativeHandle if needed)
                     onClearAll={handleClearAll} // Pass the memoized handler
                     isCopyDisabled={!kworkInput.trim()}
                     isClearDisabled={!kworkInput.trim() && selectedFiles.size === 0}
