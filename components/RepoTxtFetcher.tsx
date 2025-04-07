@@ -547,7 +547,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
           <motion.button
               onClick={() => handleFetch()} // Default manual fetch (isManualRetry=false)
               disabled={isFetchDisabled}
-              className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-base text-white bg-gradient-to-r from-purple-600 to-cyan-500 transition-all shadow-md shadow-purple-500/30 ${isFetchDisabled ? "opacity-60 cursor-not-allowed brightness-75" : "hover:shadow-lg hover:shadow-cyan-500/40 hover:brightness-110 active:scale-[0.98]"}`}
+              className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-white bg-gradient-to-r from-purple-600 to-cyan-500 transition-all shadow-md shadow-purple-500/30 ${isFetchDisabled ? "opacity-60 cursor-not-allowed brightness-75" : "hover:shadow-lg hover:shadow-cyan-500/40 hover:brightness-110 active:scale-[0.98]"}`}
               whileHover={{ scale: isFetchDisabled ? 1 : 1.03 }}
               whileTap={{ scale: isFetchDisabled ? 1 : 0.97 }}
           >
