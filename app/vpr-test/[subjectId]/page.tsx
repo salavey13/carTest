@@ -114,7 +114,7 @@ export default function VprTestPage() {
 
     // Check if dummy mode is permanently disabled using `user.metadata`
     // Use optional chaining for safety during initial load
-    const isDummyModeGloballyDisabled = user?.metadata?.is_dummy_mode_disabled_by_parent === true;
+    const isDummyModeGloballyDisabled = true // user?.metadata?.is_dummy_mode_disabled_by_parent === true;
     // --- End Dummy Mode States ---
 
     // --- Timer Functions --- (Restoring originals and adding dummy check)
