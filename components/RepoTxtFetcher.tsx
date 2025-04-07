@@ -36,14 +36,7 @@ const getLanguage = (path: string): string => {
         case 'json': return 'json';
         case 'py': return 'python';
         case 'sql': return 'sql';
-        case 'md': return 'markdown';
-        case 'yaml': return 'yaml';
-        case 'yml': return 'yaml';
-        case 'sh': return 'bash';
-        case 'java': return 'java';
-        case 'go': return 'go';
-        case 'php': return 'php';
-        case 'rb': return 'ruby';
+        
         default: return ''; // Return empty string if no specific language known
     }
 };
@@ -188,8 +181,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
         progressIntervalRef.current = setInterval(() => { setProgress((prev) => {
             const randomFactor = Math.random() * 0.6 + 0.7;
             let nextProgress = prev + (incrementBase * randomFactor);
-            if (nextProgress >= 95 && (fetchStatus === 'loading' || fetchStatus === 'retrying') && fetchTimeoutRef.current) {
-                 nextProgress = Math.min(prev + incrementBase * 0.1, 98);
+            if (nextProgress >= 69 && (fetchStatus === 'loading' || fetchStatus === 'retrying') && fetchTimeoutRef.current) {
+                 nextProgress = Math.min(prev + incrementBase * 0.1, 100);
             }
             if (nextProgress >= 100) { stopProgressSimulation(); return 100; }
             return nextProgress;
@@ -219,8 +212,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
         const markdownTxt = files
           .filter((file) => filesToAdd.has(file.path))
           .sort((a, b) => a.path.localeCompare(b.path))
-          // Format: ```lang\n// File: path\ncontent```
-          .map((file) => `\`\`\`${getLanguage(file.path)}\n// File: ${file.path}\n${file.content}\n\`\`\``)
+          // Format: ```lang\n// /path\ncontent```
+          .map((file) => `\`\`\`${getLanguage(file.path)}\n// /${file.path}\n${file.content}\n\`\`\``)
           .join("\n\n");
 
         setKworkInput((prev) => {
