@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
     FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard,
-    FaCopy, FaListCheck, FaBug, FaSync, FaPlus, FaPaperPlane, FaBroom, FaCheck, FaRobot, FaRedo, FaArrowsRotate, FaAngrycreative
+    FaCopy, FaListCheck, FaBug, FaSync, FaPlus, FaPaperPlane, FaBroom, FaCheck, FaRobot, FaArrowRotateRight, FaArrowsRotate, FaAngrycreative
 } from "react-icons/fa6";
 
 // Import Subcomponents
@@ -85,7 +85,7 @@ const AutomationBuddy: React.FC = () => {
                 addSuggestion("loading-indicator", fetchStatus === 'retrying' ? "Повтор Запроса..." : "Загрузка Файлов...", () => {}, <FaArrowsRotate className="animate-spin"/>, true, true ); // Disabled indicator shows status
                 break;
             case 'fetch_failed':
-                addSuggestion("retry-fetch", "Попробовать Снова?", () => triggerFetch(true), <FaRedo />, true, isLoading); // Allow retry click even if assistant loading? Check this interaction. Disable if isLoading.
+                addSuggestion("retry-fetch", "Попробовать Снова?", () => triggerFetch(true), <FaArrowRotateRight />, true, isLoading); // Allow retry click even if assistant loading? Check this interaction. Disable if isLoading.
                 addSuggestion("goto-fetcher-settings", "Проверить URL/Токен", () => scrollToSection('fetcher'), <FaKeyboard />, !isLoading); // Disable if any loading
                 break;
             // --- States after successful fetch ---
