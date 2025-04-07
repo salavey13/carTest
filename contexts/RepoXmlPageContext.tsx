@@ -1,42 +1,66 @@
 "use client";
 
 import React, { createContext, useState, useContext, ReactNode, useCallback, MutableRefObject } from 'react';
-import { FileNode } from '@/components/RepoTxtFetcher'; // Assuming FileNode is exported
+
+// Define Ref Interfaces
+export interface RepoTxtFetcherRef {
+    handleFetch: (isManualRetry?: boolean) => Promise<void>; // Added optional flag
+    selectHighlightedFiles: () => void;
+    handleAddSelected: () => void;
+    handleCopyToClipboard: (textToCopy?: string, shouldScroll?: boolean) => boolean;
+    clearAll: () => void;
+}
+
+export interface AICodeAssistantRef {
+    handleParse: () => Promise<void>; // Mark as async
+    selectAllParsedFiles: () => void;
+    handleCreatePR: () => Promise<void>; // Mark as async
+}
+
+// Added fetch status type
+export type FetchStatus = 'idle' | 'loading' | 'success' | 'error' | 'retrying' | 'failed_retries';
 
 export type WorkflowStep =
-  | 'idle'
-  | 'need_fetch'
-  | 'files_fetched'
-  | 'files_selected' // Implies files are fetched
-  | 'request_written' // Implies files might be selected
-  | 'request_copied'
-  | 'response_pasted'
-  | 'response_parsed'
-  | 'parsed_files_selected'
-  | 'pr_ready'; // Implies parsed files selected
+  | 'idle' // Should ideally not happen if context is used correctly
+  | 'need_repo_url' // Explicit state if URL is missing
+  | 'ready_to_fetch' // URL entered, ready for initial fetch or retry
+  | 'fetching' // Covers loading, retrying
+  | 'fetch_failed' // Explicit state after retries exhausted
+  | 'files_fetched' // Success, no highlights or files selected yet
+  | 'files_fetched_highlights' // Success, highlights available to select
+  | 'files_selected' // Files selected in fetcher, ready to add to kwork
+  | 'request_written' // Kwork has content, ready to copy
+  | 'request_copied' // Kwork copied, waiting for AI response paste
+  | 'response_pasted' // AI Response pasted, ready to parse
+  | 'parsing_response' // Assistant is parsing
+  | 'response_parsed' // Parsing done, validation shown, ready to select files or fix
+  | 'pr_ready'; // Parsed files selected, ready to create PR
 
 interface RepoXmlPageContextType {
   // State Flags
   currentStep: WorkflowStep;
+  fetchStatus: FetchStatus; // Added fetch status
   repoUrlEntered: boolean;
   filesFetched: boolean;
   primaryHighlightedPath: string | null;
   secondaryHighlightedPaths: string[];
-  selectedFetcherFiles: Set<string>; // Files selected in RepoTxtFetcher
+  selectedFetcherFiles: Set<string>;
   kworkInputHasContent: boolean;
   requestCopied: boolean;
   aiResponseHasContent: boolean;
   filesParsed: boolean;
-  selectedAssistantFiles: Set<string>; // Files selected in AICodeAssistant
+  selectedAssistantFiles: Set<string>;
+  assistantLoading: boolean; // Loading for Assistant actions (Parse, PR Create)
 
-  // Refs for scrolling/actions (populated by components)
-  fetcherRef: MutableRefObject<any | null>; // Ref to RepoTxtFetcher instance/methods
-  assistantRef: MutableRefObject<any | null>; // Ref to AICodeAssistant instance/methods
+  // Refs
+  fetcherRef: MutableRefObject<RepoTxtFetcherRef | null>;
+  assistantRef: MutableRefObject<AICodeAssistantRef | null>;
   kworkInputRef: MutableRefObject<HTMLTextAreaElement | null>;
   aiResponseInputRef: MutableRefObject<HTMLTextAreaElement | null>;
   prSectionRef: MutableRefObject<HTMLElement | null>;
 
-  // Updater Functions (called by components)
+  // Updaters
+  setFetchStatus: (status: FetchStatus) => void; // Added setter
   setRepoUrlEntered: (entered: boolean) => void;
   setFilesFetched: (fetched: boolean, primaryPath?: string | null, secondaryPaths?: string[]) => void;
   setSelectedFetcherFiles: (files: Set<string>) => void;
@@ -45,35 +69,57 @@ interface RepoXmlPageContextType {
   setAiResponseHasContent: (hasContent: boolean) => void;
   setFilesParsed: (parsed: boolean) => void;
   setSelectedAssistantFiles: (files: Set<string>) => void;
+  setAssistantLoading: (loading: boolean) => void;
 
-  // Action Triggers (called by StickyChatButton)
-  triggerFetch: () => Promise<void>;
+  // Action Triggers
+  triggerFetch: (isManualRetry?: boolean) => Promise<void>; // Pass retry flag
   triggerSelectHighlighted: () => void;
   triggerAddSelectedToKwork: () => void;
   triggerCopyKwork: () => void;
-  triggerParseResponse: () => void;
+  triggerParseResponse: () => Promise<void>;
   triggerSelectAllParsed: () => void;
   triggerCreatePR: () => Promise<void>;
   scrollToSection: (id: 'kworkInput' | 'aiResponseInput' | 'prSection' | 'fetcher' | 'assistant') => void;
 
-  // Xuinity Messages (optional, can derive in StickyChatButton)
-  getXuinityMessage: () => string;
+  // Messages
+  getXuinityMessage: () => string; // Renamed for clarity, used by Buddy
 }
 
 const RepoXmlPageContext = createContext<RepoXmlPageContextType | undefined>(undefined);
 
 export const useRepoXmlPageContext = () => {
   const context = useContext(RepoXmlPageContext);
-  /*if (!context) {
-    throw new Error('useRepoXmlPageContext must be used within a RepoXmlPageProvider');
-  }*/
+  if (context === undefined) {
+    console.error('useRepoXmlPageContext must be used within a RepoXmlPageProvider. Returning stub.');
+     // Provide default functions that warn if called unexpectedly
+     const warn = (name: string) => () => { console.warn(`Context not available: ${name} called.`); return Promise.resolve(); };
+     const warnSync = (name: string) => () => { console.warn(`Context not available: ${name} called.`); };
+     return {
+        currentStep: 'idle', fetchStatus: 'idle', repoUrlEntered: false, filesFetched: false,
+        primaryHighlightedPath: null, secondaryHighlightedPaths: [], selectedFetcherFiles: new Set(),
+        kworkInputHasContent: false, requestCopied: false, aiResponseHasContent: false,
+        filesParsed: false, selectedAssistantFiles: new Set(), assistantLoading: false,
+        fetcherRef: { current: null }, assistantRef: { current: null }, kworkInputRef: { current: null },
+        aiResponseInputRef: { current: null }, prSectionRef: { current: null },
+        setFetchStatus: warnSync('setFetchStatus'), setRepoUrlEntered: warnSync('setRepoUrlEntered'),
+        setFilesFetched: warnSync('setFilesFetched'), setSelectedFetcherFiles: warnSync('setSelectedFetcherFiles'),
+        setKworkInputHasContent: warnSync('setKworkInputHasContent'), setRequestCopied: warnSync('setRequestCopied'),
+        setAiResponseHasContent: warnSync('setAiResponseHasContent'), setFilesParsed: warnSync('setFilesParsed'),
+        setSelectedAssistantFiles: warnSync('setSelectedAssistantFiles'), setAssistantLoading: warnSync('setAssistantLoading'),
+        triggerFetch: warn('triggerFetch'), triggerSelectHighlighted: warnSync('triggerSelectHighlighted'),
+        triggerAddSelectedToKwork: warnSync('triggerAddSelectedToKwork'), triggerCopyKwork: warnSync('triggerCopyKwork'),
+        triggerParseResponse: warn('triggerParseResponse'), triggerSelectAllParsed: warnSync('triggerSelectAllParsed'),
+        triggerCreatePR: warn('triggerCreatePR'), scrollToSection: warnSync('scrollToSection'),
+        getXuinityMessage: () => "Context unavailable",
+     } as RepoXmlPageContextType;
+  }
   return context;
 };
 
 interface RepoXmlPageProviderProps {
   children: ReactNode;
-  fetcherRef: MutableRefObject<any | null>;
-  assistantRef: MutableRefObject<any | null>;
+  fetcherRef: MutableRefObject<RepoTxtFetcherRef | null>;
+  assistantRef: MutableRefObject<AICodeAssistantRef | null>;
   kworkInputRef: MutableRefObject<HTMLTextAreaElement | null>;
   aiResponseInputRef: MutableRefObject<HTMLTextAreaElement | null>;
   prSectionRef: MutableRefObject<HTMLElement | null>;
@@ -87,7 +133,8 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
   aiResponseInputRef,
   prSectionRef,
 }) => {
-  const [repoUrlEntered, setRepoUrlEnteredState] = useState(true);
+  const [fetchStatus, setFetchStatusState] = useState<FetchStatus>('idle');
+  const [repoUrlEntered, setRepoUrlEnteredState] = useState(false);
   const [filesFetched, setFilesFetchedState] = useState(false);
   const [primaryHighlightedPath, setPrimaryHighlightedPathState] = useState<string | null>(null);
   const [secondaryHighlightedPaths, setSecondaryHighlightedPathsState] = useState<string[]>([]);
@@ -97,138 +144,147 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
   const [aiResponseHasContent, setAiResponseHasContentState] = useState(false);
   const [filesParsed, setFilesParsedState] = useState(false);
   const [selectedAssistantFiles, setSelectedAssistantFilesState] = useState<Set<string>>(new Set());
+  const [assistantLoading, setAssistantLoadingState] = useState(false);
 
-  // Derive current workflow step
+  // Derive current workflow step based on context state
   const getCurrentStep = useCallback((): WorkflowStep => {
-    if (!repoUrlEntered) return 'need_fetch'; // Or 'idle' if preferred
-    if (!filesFetched) return 'need_fetch';
+    if (fetchStatus === 'loading' || fetchStatus === 'retrying') return 'fetching';
+    if (fetchStatus === 'failed_retries') return 'fetch_failed';
+    if (assistantLoading) {
+        if (!aiResponseHasContent) return 'fetching'; // Or a specific 'initial_assistant_load' if needed
+        if (!filesParsed) return 'parsing_response';
+        return 'pr_ready'; // Assume PR creation or post-parse selection if assistant loading after parse
+    }
+
+    if (!repoUrlEntered) return 'need_repo_url';
+    if (!filesFetched) return 'ready_to_fetch';
+
+    // Files are fetched (fetchStatus === 'success')
     if (requestCopied) {
-        if (!aiResponseHasContent) return 'request_copied'; // Waiting for AI response paste
+        if (!aiResponseHasContent) return 'request_copied';
         if (!filesParsed) return 'response_pasted';
         if (selectedAssistantFiles.size === 0) return 'response_parsed';
         return 'pr_ready';
     }
-    if (kworkInputHasContent) {
-        if (selectedFetcherFiles.size > 0) return 'request_written'; // Has files and text
-        return 'request_written'; // Has text only
-    }
+    if (kworkInputHasContent) return 'request_written';
     if (selectedFetcherFiles.size > 0) return 'files_selected';
-    return 'files_fetched'; // Files fetched, but nothing else done
+    if (primaryHighlightedPath || secondaryHighlightedPaths.length > 0) return 'files_fetched_highlights';
+    return 'files_fetched';
+
   }, [
-    repoUrlEntered, filesFetched, selectedFetcherFiles, kworkInputHasContent,
-    requestCopied, aiResponseHasContent, filesParsed, selectedAssistantFiles
+    fetchStatus, repoUrlEntered, filesFetched, assistantLoading,
+    primaryHighlightedPath, secondaryHighlightedPaths.length, selectedFetcherFiles.size,
+    kworkInputHasContent, requestCopied, aiResponseHasContent, filesParsed,
+    selectedAssistantFiles.size
   ]);
 
   const currentStep = getCurrentStep();
 
-  // --- Updaters ---
-  const setFilesFetched = (fetched: boolean, primaryPath: string | null = null, secondaryPaths: string[] = []) => {
+  // --- Updaters (Memoized) ---
+  const setFetchStatusCallback = useCallback((status: FetchStatus) => setFetchStatusState(status), []);
+  const setFilesFetchedCallback = useCallback((fetched: boolean, primaryPath: string | null = null, secondaryPaths: string[] = []) => {
     setFilesFetchedState(fetched);
     setPrimaryHighlightedPathState(primaryPath);
     setSecondaryHighlightedPathsState(secondaryPaths);
-    if (!fetched) { // Reset subsequent states if fetch fails or is redone
+    if (!fetched) {
         setSelectedFetcherFilesState(new Set());
         setKworkInputHasContentState(false);
         setRequestCopiedState(false);
-        // Keep AI response? Maybe not.
         setAiResponseHasContentState(false);
         setFilesParsedState(false);
         setSelectedAssistantFilesState(new Set());
+        setAssistantLoadingState(false);
+    } else {
+        // If fetch succeeded, ensure fetchStatus reflects success explicitly
+        // This might override a quick 'retrying' -> 'success' visual glitch
+        setFetchStatusState('success');
     }
-  };
+  }, []);
+  const setSelectedFetcherFilesCallback = useCallback((files: Set<string>) => setSelectedFetcherFilesState(files), []);
+  const setKworkInputHasContentCallback = useCallback((hasContent: boolean) => setKworkInputHasContentState(hasContent), []);
+  const setRequestCopiedCallback = useCallback((copied: boolean) => setRequestCopiedState(copied), []);
+  const setAiResponseHasContentCallback = useCallback((hasContent: boolean) => {
+      setAiResponseHasContentState(hasContent);
+      if (!hasContent) { setFilesParsedState(false); setSelectedAssistantFilesState(new Set()); }
+  }, []);
+  const setFilesParsedCallback = useCallback((parsed: boolean) => {
+      setFilesParsedState(parsed);
+      if (!parsed) { setSelectedAssistantFilesState(new Set()); }
+  }, []);
+  const setSelectedAssistantFilesCallback = useCallback((files: Set<string>) => setSelectedAssistantFilesState(files), []);
+  const setAssistantLoadingCallback = useCallback((loading: boolean) => setAssistantLoadingState(loading), []);
 
-  // --- Action Triggers ---
-  const triggerFetch = async () => {
-    await fetcherRef.current?.handleFetch?.();
-  };
 
-  const triggerSelectHighlighted = () => {
-    fetcherRef.current?.selectHighlightedFiles?.();
-  };
-
-  const triggerAddSelectedToKwork = () => {
-    fetcherRef.current?.handleAddSelected?.();
-  }
-
-  const triggerCopyKwork = () => {
-    fetcherRef.current?.handleCopyToClipboard?.();
-  };
-
-  const triggerParseResponse = () => {
-    assistantRef.current?.handleParse?.();
-  };
-
-   const triggerSelectAllParsed = () => {
-    assistantRef.current?.selectAllParsedFiles?.();
-   }
-
-  const triggerCreatePR = async () => {
-    await assistantRef.current?.handleCreatePR?.();
-  };
-
-  const scrollToSection = (id: 'kworkInput' | 'aiResponseInput' | 'prSection' | 'fetcher' | 'assistant') => {
+  // --- Action Triggers (Memoized) ---
+  const triggerFetch = useCallback(async (isManualRetry = false) => {
+    if (fetcherRef.current) {
+        await fetcherRef.current.handleFetch(isManualRetry);
+    } else { console.warn("triggerFetch called but fetcherRef is not yet available."); }
+  }, [fetcherRef]);
+  const triggerSelectHighlighted = useCallback(() => { if (fetcherRef.current) fetcherRef.current.selectHighlightedFiles(); else console.warn("triggerSelectHighlighted called but fetcherRef is not yet available."); }, [fetcherRef]);
+  const triggerAddSelectedToKwork = useCallback(() => { if (fetcherRef.current) fetcherRef.current.handleAddSelected(); else console.warn("triggerAddSelectedToKwork called but fetcherRef is not yet available."); }, [fetcherRef]);
+  const triggerCopyKwork = useCallback(() => { if (fetcherRef.current) fetcherRef.current.handleCopyToClipboard(); else console.warn("triggerCopyKwork called but fetcherRef is not yet available."); }, [fetcherRef]);
+  const triggerParseResponse = useCallback(async () => { if (assistantRef.current) await assistantRef.current.handleParse(); else console.warn("triggerParseResponse called but assistantRef is not yet available."); }, [assistantRef]);
+  const triggerSelectAllParsed = useCallback(() => { if (assistantRef.current) assistantRef.current.selectAllParsedFiles(); else console.warn("triggerSelectAllParsed called but assistantRef is not yet available."); }, [assistantRef]);
+  const triggerCreatePR = useCallback(async () => { if (assistantRef.current) await assistantRef.current.handleCreatePR(); else console.warn("triggerCreatePR called but assistantRef is not yet available."); }, [assistantRef]);
+  const scrollToSection = useCallback((id: 'kworkInput' | 'aiResponseInput' | 'prSection' | 'fetcher' | 'assistant') => {
      let element: HTMLElement | null = null;
      switch(id) {
         case 'kworkInput': element = kworkInputRef.current; break;
         case 'aiResponseInput': element = aiResponseInputRef.current; break;
         case 'prSection': element = prSectionRef.current; break;
-        case 'fetcher': element = document.getElementById('extractor'); break; // Use IDs from page
-        case 'assistant': element = document.getElementById('executor'); break; // Use IDs from page
+        case 'fetcher': element = document.getElementById('extractor'); break;
+        case 'assistant': element = document.getElementById('executor'); break;
      }
-     element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
+     if (element) { element.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+     else { console.warn(`scrollToSection: Element for id "${id}" not found.`); }
+  }, [kworkInputRef, aiResponseInputRef, prSectionRef]);
 
-  // --- Xuinity Message Logic ---
+  // --- Xuinity Message Logic (Memoized) ---
    const getXuinityMessage = useCallback((): string => {
     switch (currentStep) {
-      case 'idle': return "Готов помочь с кодом!";
-      case 'need_fetch': return repoUrlEntered ? "Нажмите 'Извлечь файлы'!" : "Введите URL репозитория.";
-      case 'files_fetched': return primaryHighlightedPath ? "Файлы загружены. Выбрать подсвеченные?" : "Файлы загружены. Выберите нужные.";
-      case 'files_selected': return "Файлы выбраны. Добавить их в запрос?";
-      case 'request_written': return "Запрос готов? Нажмите 'Скопировать'.";
-      case 'request_copied': return "Скопировано! Вставьте ответ от AI ниже.";
-      case 'response_pasted': return "Ответ вставлен. Нажмите '->' для разбора файлов.";
-      case 'response_parsed': return "Файлы разобраны. Выберите нужные для PR.";
-      case 'parsed_files_selected': return "Файлы для PR выбраны. Нажмите 'Создать PR'.";
-      case 'pr_ready': return "Все готово! Нажмите 'Создать PR'.";
-      default: return "Что делаем дальше?";
+      case 'idle': return "Контекст инициализируется...";
+      case 'need_repo_url': return "Укажи URL репозитория в Экстракторе.";
+      case 'ready_to_fetch': return repoUrlEntered ? "Нажми 'Извлечь файлы' или кнопку Fetch ниже!" : "Сначала укажи URL репозитория."; // Should be caught by need_repo_url
+      case 'fetching': return `Извлекаю файлы... ${fetchStatus === 'retrying' ? '(Попытка снова...)' : ''} ⏳`;
+      case 'fetch_failed': return "Не удалось извлечь файлы после нескольких попыток. 😢 Попробовать еще раз?";
+      case 'files_fetched': return "Файлы извлечены! Выбери нужные или опиши задачу.";
+      case 'files_fetched_highlights': return "Файлы извлечены. Есть связанные - выбрать их или иди к списку.";
+      case 'files_selected': return "Файлы выбраны! Добавь их в запрос для AI.";
+      case 'request_written': return "Запрос готов! Копируй и отправляй AI.";
+      case 'request_copied': return "Скопировано! Жду ответ от AI. Вставляй в Ассистента.";
+      case 'response_pasted': return "Ответ вставлен! Нажми '➡️', чтобы я его разобрал.";
+      case 'parsing_response': return "Разбираю ответ AI... 🧠";
+      case 'response_parsed': return "Разобрал! Проверь результат, выбери файлы для PR.";
+      case 'pr_ready': return "Файлы выбраны! Готов создать Pull Request?";
+      default:
+           // Exhaustive check guard
+           const _exhaustiveCheck: never = currentStep;
+           console.warn("Unhandled step in getXuinityMessage:", currentStep);
+           return "Что делаем дальше?";
     }
-  }, [currentStep, repoUrlEntered, primaryHighlightedPath]);
+  }, [currentStep, repoUrlEntered, fetchStatus]); // Dependencies look correct
 
 
   const value: RepoXmlPageContextType = {
-    currentStep,
-    repoUrlEntered,
-    filesFetched,
-    primaryHighlightedPath: primaryHighlightedPath,
-    secondaryHighlightedPaths: secondaryHighlightedPaths,
-    selectedFetcherFiles,
-    kworkInputHasContent,
-    requestCopied,
-    aiResponseHasContent,
-    filesParsed,
-    selectedAssistantFiles,
-    fetcherRef,
-    assistantRef,
-    kworkInputRef,
-    aiResponseInputRef,
-    prSectionRef,
-    setRepoUrlEntered: setRepoUrlEnteredState,
-    setFilesFetched,
-    setSelectedFetcherFiles: setSelectedFetcherFilesState,
-    setKworkInputHasContent: setKworkInputHasContentState,
-    setRequestCopied: setRequestCopiedState,
-    setAiResponseHasContent: setAiResponseHasContentState,
-    setFilesParsed: setFilesParsedState,
-    setSelectedAssistantFiles: setSelectedAssistantFilesState,
-    triggerFetch,
-    triggerSelectHighlighted,
-    triggerAddSelectedToKwork,
-    triggerCopyKwork,
-    triggerParseResponse,
-    triggerSelectAllParsed,
-    triggerCreatePR,
-    scrollToSection,
+    currentStep, fetchStatus, repoUrlEntered, filesFetched, primaryHighlightedPath,
+    secondaryHighlightedPaths, selectedFetcherFiles, kworkInputHasContent, requestCopied,
+    aiResponseHasContent, filesParsed, selectedAssistantFiles, assistantLoading,
+    fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef, prSectionRef,
+    // Pass memoized updaters/setters
+    setFetchStatus: setFetchStatusCallback,
+    setRepoUrlEntered: setRepoUrlEnteredState, // Direct setter ok
+    setFilesFetched: setFilesFetchedCallback,
+    setSelectedFetcherFiles: setSelectedFetcherFilesCallback,
+    setKworkInputHasContent: setKworkInputHasContentCallback,
+    setRequestCopied: setRequestCopiedCallback,
+    setAiResponseHasContent: setAiResponseHasContentCallback,
+    setFilesParsed: setFilesParsedCallback,
+    setSelectedAssistantFiles: setSelectedAssistantFilesCallback,
+    setAssistantLoading: setAssistantLoadingCallback,
+    // Pass memoized triggers
+    triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork,
+    triggerParseResponse, triggerSelectAllParsed, triggerCreatePR, scrollToSection,
     getXuinityMessage,
   };
 
