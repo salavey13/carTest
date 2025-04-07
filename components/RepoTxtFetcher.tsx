@@ -79,7 +79,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
   const ideaFromUrl = useMemo(() => { return searchParams.get("idea") ? decodeURIComponent(searchParams.get("idea")!) : ""; }, [searchParams]);
   const autoFetch = useMemo(() => !!highlightedPathFromUrl, [highlightedPathFromUrl]);
   const DEFAULT_TASK_IDEA = "Проанализируй предоставленный контекст кода страницы. Опиши его основные функции и предложи возможные улучшения без жаргона простым языком.";
-  const importantFiles = useMemo(() => [ "hooks/supabase.ts", "app/webhook-handlers/disable-dummy-mode.ts", "app/layout.tsx", "contexts/AppContext.tsx", "app/actions/dummy_actions.ts", "components/StickyChatButton.tsx” ], []);
+  const importantFiles = useMemo(() => [ "hooks/supabase.ts", "app/webhook-handlers/disable-dummy-mode.ts", "app/layout.tsx", "contexts/AppContext.tsx", "app/actions/dummy_actions.ts", "components/StickyChatButton.tsx" ], []);
 
   // === Refs ===
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
