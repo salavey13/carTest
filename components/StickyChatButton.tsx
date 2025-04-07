@@ -5,10 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
-    // Specific Icons for Repo XML page suggestions
-    FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard //, // Added Info & Keyboard
-   // FaRegGrinBeamSweat // Added for fun
-} from "react-icons/fa6";
+    FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard
+} from "react-icons/fa6"; // Keep icons needed for non-repo pages
 
 // Import Subcomponents
 import { FloatingActionButton } from "@/components/stickyChat_components/FloatingActionButton";
@@ -16,26 +14,28 @@ import { SpeechBubble } from "@/components/stickyChat_components/SpeechBubble";
 import { CharacterDisplay } from "@/components/stickyChat_components/CharacterDisplay";
 import { SuggestionList } from "@/components/stickyChat_components/SuggestionList";
 
-// Import Context & Actions
+// Import Context & Actions (ONLY AppContext and GitHub actions)
 import { useAppContext } from "@/contexts/AppContext";
 import { getGitHubUserProfile } from "@/app/actions_github/actions";
+// ****** REMOVED RepoXmlPageContext import ******
 
 // --- Constants & Types ---
 const AUTO_OPEN_DELAY_MS = 13000;
 const CHARACTER_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/character-images/public/x13.png";
 const CHARACTER_ALT_TEXT = "Xuinity Assistant";
 const HIRE_ME_TEXT = "Найми меня! ✨";
-const FIX_PAGE_ID = "fix-current-page";
+const FIX_PAGE_ID = "fix-current-page"; // ID for the "Fix this page" action
+// REMOVED DEFAULT_TASK_IDEA - Not needed here anymore
 
 interface Suggestion {
     id: string;
     text: string;
-    link?: string;
-    action?: () => void | Promise<void>;
+    link?: string; // Only links needed now for this component
+    // REMOVED action?: () => void | Promise<void>;
     icon?: React.ReactNode;
     isHireMe?: boolean;
-    isFixAction?: boolean;
-    disabled?: boolean;
+    isFixAction?: boolean; // Keep to track which link is the "fix" link
+    disabled?: boolean; // Keep for potential future use
 }
 interface GitHubProfile {
     login: string;
@@ -44,172 +44,183 @@ interface GitHubProfile {
     name?: string | null;
 }
 
-// --- Animation Variants ---
+// --- Helper Function for Predefined Tasks (REMOVED - Not needed here) ---
+// const getPredefinedTaskForPath = ...;
+
+// --- Animation Variants --- (Keep as is)
 const containerVariants = { hidden: { opacity: 0, x: -300 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 120, damping: 15, when: "beforeChildren", staggerChildren: 0.08, }, }, exit: { opacity: 0, x: -300, transition: { duration: 0.3 } }, };
 const childVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", bounce: 0.4 } }, exit: { opacity: 0, transition: { duration: 0.2 } }, };
 const fabVariants = { hidden: { scale: 0, opacity: 0 }, visible: { scale: 1, opacity: 1, rotate: [0, 10, -10, 5, -5, 0], transition: { scale: { duration: 0.4, ease: "easeOut" }, opacity: { duration: 0.4, ease: "easeOut" }, rotate: { repeat: Infinity, duration: 3, ease: "easeInOut", delay: 1 } } }, exit: { scale: 0, opacity: 0, transition: { duration: 0.3 } } };
 
+
 // --- Main Component (Orchestrator) ---
 const StickyChatButton: React.FC = () => {
-    // --- State ---
+    // --- State --- (Keep as is)
     const [isOpen, setIsOpen] = useState(false);
-    const [fixActionClicked, setFixActionClicked] = useState(false);
+    const [fixActionClicked, setFixActionClicked] = useState(false); // Keep to hide button after click
     const [hasAutoOpened, setHasAutoOpened] = useState(false);
     const [activeMessage, setActiveMessage] = useState<string>("Загрузка...");
     const [githubProfile, setGithubProfile] = useState<GitHubProfile | null>(null);
     const [githubLoading, setGithubLoading] = useState<boolean>(false);
-    const [prevGithubLoading, setPrevGithubLoading] = useState<boolean>(false); // Track previous loading state
+    const [prevGithubLoading, setPrevGithubLoading] = useState<boolean>(false);
 
-    // --- Hooks ---
+    // --- Hooks --- (Keep as is)
     const currentPath = usePathname();
     const router = useRouter();
     const { user: appContextUser, isLoading: isAppLoading } = useAppContext();
+    // ****** REMOVED useRepoXmlPageContext hook ******
 
-    // --- Fetch GitHub Profile ---
+    // --- Fetch GitHub Profile --- (Keep as is)
     useEffect(() => {
-        // Track previous loading state BEFORE fetching
         setPrevGithubLoading(githubLoading);
-
         if (isOpen && !isAppLoading && appContextUser?.username && !githubProfile && !githubLoading) {
             const fetchProfile = async () => {
                 setGithubLoading(true);
-                console.log(`Fetching GitHub profile for: ${appContextUser.username}`);
+                console.log(`(StickyChat) Fetching GitHub profile for: ${appContextUser.username}`);
                 const result = await getGitHubUserProfile(appContextUser.username!);
                 if (result.success && result.profile) {
-                    console.log("GitHub profile found:", result.profile);
+                    console.log("(StickyChat) GitHub profile found:", result.profile);
                     setGithubProfile(result.profile);
                 } else {
-                    console.warn("GitHub profile fetch failed:", result.error);
-                    setGithubProfile(null); // Explicitly set to null on failure/not found
+                    console.warn("(StickyChat) GitHub profile fetch failed:", result.error);
+                    setGithubProfile(null);
                 }
                 setGithubLoading(false);
             };
             fetchProfile();
         }
-        // Reset profile state if user context changes (e.g., logout/login simulation)
         if (!appContextUser) {
             setGithubProfile(null);
             setGithubLoading(false);
         }
-    }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading]); // Re-run if any of these change
+    }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading]);
 
 
-    // --- Define Suggestions (Page-Specific Logic) ---
+    // --- Define Suggestions (Simplified - No Repo Page Logic) ---
     const suggestions = useMemo((): Suggestion[] => {
-        const isOnRepoXmlPage = currentPath === '/repo-xml';
+        // REMOVED: const isOnRepoXmlPage = currentPath === '/repo-xml';
+        // REMOVED: if (isOnRepoXmlPage) { ... }
 
-        // --- Suggestions for Repo XML Page ---
-        if (isOnRepoXmlPage) {
-            const scrollTo = (id: string) => {
-                const element = document.getElementById(id);
-                console.log(`Scrolling to: ${id}`, element); // Debug Log
-                element?.scrollIntoView({ behavior: "smooth", block: "center" });
-                setIsOpen(false);
-            };
+        // --- Base Suggestions (Always shown when open, except on /repo-xml maybe?) ---
+        // We could hide this entire button on /repo-xml, or just show generic links.
+        // Let's hide the "Fix this page" link when ON the tool page itself.
+        const baseSuggestions: Suggestion[] = [];
+        const isToolPage = currentPath === '/repo-xml';
 
-            return [
-                // Guide the user through the page sections
-                { id: "scroll-intro", text: "Че за CYBER STUDIO? 🤔", action: () => scrollTo('intro'), icon: <FaCircleInfo className="mr-1.5" /> },
-                { id: "scroll-fetcher", text: "Дай Ссылку на GitHub! 🤖", action: () => scrollTo('extractor'), icon: <FaDownload className="mr-1.5" /> },
-                { id: "scroll-kwork", text: "Напиши Запрос Боту! ✍️", action: () => scrollTo('kwork-input-section'), icon: <FaKeyboard className="mr-1.5" /> },
-                { id: "scroll-assistant", text: "Вставь Ответ / Создай PR! 🚀", action: () => scrollTo('executor'), icon: <FaRocket className="mr-1.5" /> },
-                { id: "hire-me", text: HIRE_ME_TEXT, link: "/selfdev", isHireMe: true, icon: <FaStar className="mr-1.5" /> },
-            ];
-        }
-
-        // --- Base Suggestions (Other Pages) ---
-        else {
+        // Helper for page path (needed for fix link)
+        const getFixPageLink = () => {
+            // Use a generic "analyze this page" task idea if none provided by URL
+            const taskIdea = "Проанализируй код этой страницы и предложи улучшения.";
             const folderPath = currentPath === "/" ? "app" : `app${currentPath.split('?')[0]}`;
-            const baseSuggestions: Suggestion[] = [];
+            const encodedTaskIdea = encodeURIComponent(taskIdea);
+            return `/repo-xml?path=${encodeURIComponent(folderPath)}&idea=${encodedTaskIdea}`;
+        };
 
-            if (!fixActionClicked) {
-                baseSuggestions.push({ id: FIX_PAGE_ID, text: "Починить эту Страницу? 🤩", link: `/repo-xml?path=${folderPath}`, isFixAction: true, icon: <FaHighlighter className="mr-1.5" /> });
-            }
-            baseSuggestions.push({ id: "add-new", text: "Создать Новое с Нуля ✨", link: "/repo-xml", icon: <FaWandMagicSparkles className="mr-1.5" /> });
-            baseSuggestions.push({ id: "hire-me", text: HIRE_ME_TEXT, link: "/selfdev", isHireMe: true, icon: <FaStar className="mr-1.5" /> });
-
-            return baseSuggestions;
+        // Only show "Fix this Page" if not clicked *and* not on root *and* not on the tool page itself
+        if (!fixActionClicked && currentPath !== '/' && !isToolPage) {
+            baseSuggestions.push({
+                id: FIX_PAGE_ID,
+                text: "Прокачать эту Страницу? 🤩",
+                link: getFixPageLink(), // Generate link dynamically
+                isFixAction: true,
+                icon: <FaHighlighter className="mr-1.5" />
+             });
         }
-    }, [currentPath, fixActionClicked]);
+         // Offer "Create New" which goes to repo-xml without parameters
+        if (!isToolPage) { // Don't offer "Create New" when already on the tool page
+            baseSuggestions.push({ id: "add-new", text: "Создать Новое с Нуля ✨", link: "/repo-xml", icon: <FaWandMagicSparkles className="mr-1.5" /> });
+        }
+        // Always show "Hire Me"
+        baseSuggestions.push({ id: "hire-me", text: HIRE_ME_TEXT, link: "/selfdev", isHireMe: true, icon: <FaStar className="mr-1.5" /> });
+
+        return baseSuggestions;
+
+    }, [currentPath, fixActionClicked, router]); // Dependencies simplified
 
 
-    // --- Update Active Message Logic (Reacts to GitHub state changes) ---
+    // --- Update Active Message Logic (Simplified - No Repo Context) ---
     useEffect(() => {
-        // Show loading if app context or GitHub profile is loading
+        // Loading messages
         if (isAppLoading || githubLoading) {
              let loadingMsg = "Подключаюсь...";
              if (githubLoading) loadingMsg = `Ищу твой профиль на GitHub... 🧐`;
              setActiveMessage(loadingMsg);
-             return; // Exit early if loading
+             return;
         }
 
         // Determine user identifier
-        let userIdentifier = appContextUser?.first_name || appContextUser?.username || null;
-        if (githubProfile?.name) { // Prefer GitHub name if available
-            userIdentifier = githubProfile.name;
-        }
-
-        const baseGreeting = userIdentifier ? `Здарова, ${userIdentifier}!` : "Эй, Кодер!"; // More casual
+        let userIdentifier = githubProfile?.name || appContextUser?.first_name || appContextUser?.username || null;
+        const baseGreeting = userIdentifier ? `Здарова, ${userIdentifier}!` : "Эй, Кодер!";
+        const justLoadedProfile = prevGithubLoading && !githubLoading && githubProfile;
+        const isToolPage = currentPath === '/repo-xml';
 
         let message = "";
-        const isOnRepoXmlPage = currentPath === '/repo-xml';
-        const justLoadedProfile = prevGithubLoading && !githubLoading && githubProfile; // Profile was loading, now finished AND found
 
-        // --- Message Logic ---
-        if (justLoadedProfile) {
-            // Special "WOW" message when profile loads after initial check
-            const wowGreeting = userIdentifier ? `ВОУ, ${userIdentifier}!` : "ОПА!";
-            message = `${wowGreeting} Нашел твой GitHub! ✨ Крутой аватар! Готов зажечь?`;
-            if (isOnRepoXmlPage) message = `${wowGreeting} Нашел твой GitHub! ✨ Теперь ты точно готов к магии на этой странице! 😎👇`;
-
-        } else if (githubProfile) {
-            // Profile was already loaded or loaded instantly
-            message = `${baseGreeting} Рад видеть твой GitHub! Чем сегодня займемся?`;
-            if (isOnRepoXmlPage) message = `${baseGreeting} Вижу твой GitHub! Эта страница - твоя песочница. С чего начнем? 👇`;
-
-        } else {
-            // No profile loading, none found, or username missing
-             message = `${baseGreeting} GitHub-профиль не найден (или ты инкогнито 😉)... Это не важно! Главное - код! Что будем делать?`;
-            if (isOnRepoXmlPage) message = `${baseGreeting} GitHub не нужен для магии здесь! Просто укажи репо и погнали! 🔥👇`;
-             else if (currentPath !== '/') message = `${baseGreeting} Зацени эту страницу (${currentPath})... Хочешь её прокачать? 😉`;
-             else message = `${baseGreeting} Готов создать что-то крутое или починить баг? 😎`;
+        // --- Message Logic (No Repo Context/Workflow) ---
+         if (isToolPage) {
+             // Specific message for when user is ON the tool page
+             if (githubProfile) {
+                 message = `${baseGreeting} Ты на странице автоматизации! ✨ Используй Ассистента справа для помощи.`;
+             } else {
+                 message = `${baseGreeting} Ты на странице автоматизации! Используй Ассистента справа для помощи.`;
+             }
+         } else {
+            // On other pages, use the GitHub profile based greeting + offer to fix/create
+            if (justLoadedProfile) {
+                message = `ВОУ, ${userIdentifier}! ✨ Нашел твой GitHub! Хочешь эту страницу (${currentPath}) прокачать? 😉`;
+            } else if (githubProfile) {
+                message = `${baseGreeting} Рад видеть твой GitHub! Эту страницу (${currentPath}) будем править?`;
+            } else {
+                message = `${baseGreeting} GitHub-профиль не найден... Это не важно! Эту страницу (${currentPath}) будем улучшать? 😉`;
+            }
+             if (currentPath === '/') { // Special case for root
+                 if (githubProfile) message = `${baseGreeting} Рад видеть твой GitHub! Готов создать что-то новое или прокачать страницу?`;
+                 else message = `${baseGreeting} Готов создать что-то новое или прокачать страницу? 😎`;
+             }
         }
 
         setActiveMessage(message);
 
+        // REMOVED getXuinityMessage from dependency array
     }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading, prevGithubLoading, currentPath]);
 
 
-    // --- Auto-open Timer ---
+    // --- Auto-open Timer --- (Keep as is)
     useEffect(() => { if (!hasAutoOpened && !isOpen) { const timer = setTimeout(() => { setIsOpen(true); setHasAutoOpened(true); }, AUTO_OPEN_DELAY_MS); return () => clearTimeout(timer); } }, [hasAutoOpened, isOpen]);
 
-    // --- Handle Escape Key to Close Dialog ---
+    // --- Handle Escape Key --- (Keep as is)
     const handleEscKey = useCallback((event: KeyboardEvent) => { if (event.key === 'Escape') { setIsOpen(false); } }, []);
     useEffect(() => { if (isOpen) { document.addEventListener('keydown', handleEscKey); } else { document.removeEventListener('keydown', handleEscKey); } return () => { document.removeEventListener('keydown', handleEscKey); }; }, [isOpen, handleEscKey]);
 
+    // Reset fixActionClicked on path change (Keep as is)
+    useEffect(() => { setFixActionClicked(false); }, [currentPath]);
 
-    // --- Event Handlers ---
+
+    // --- Event Handlers --- (Simplified handleSuggestionClick)
     const handleSuggestionClick = (suggestion: Suggestion) => {
         if (suggestion.disabled) return;
+        console.log("(StickyChat) Suggestion Clicked:", suggestion.id);
         if (suggestion.link) {
-            if (suggestion.isFixAction) { setFixActionClicked(true); }
-            router.push(suggestion.link);
-        } else if (suggestion.action) {
-            suggestion.action(); // Triggers scrollTo for repo-xml page
+            if (suggestion.isFixAction) {
+                setFixActionClicked(true); // Keep track locally if the "fix" link was clicked
+            }
+            router.push(suggestion.link); // Navigate to the link
         }
-        setIsOpen(false);
+        // REMOVED: else if (suggestion.action) { ... }
+        setIsOpen(false); // Close after click
     };
     const handleOverlayClick = () => setIsOpen(false);
     const handleDialogClick = (e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
     const handleFabClick = () => { setIsOpen(!isOpen); if (!isOpen) setHasAutoOpened(true); };
 
 
-    // --- Render Logic ---
+    // --- Render Logic --- (Keep as is, FAB renders based on isOpen)
     return (
         <AnimatePresence>
             {isOpen ? (
                 <motion.div
                     key="dialog-overlay"
+                    // Position left
                     className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:justify-start p-4 bg-black bg-opacity-40 backdrop-blur-sm"
                     onClick={handleOverlayClick}
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -223,26 +234,35 @@ const StickyChatButton: React.FC = () => {
                     >
                         <h2 id="chat-suggestions-title" className="sr-only">Xuinity Suggestions</h2>
 
-                        <SpeechBubble message={activeMessage} variants={childVariants} />
+                        <SpeechBubble message={activeMessage} variants={childVariants} bubblePosition="left" />
 
                         <div className="flex flex-col sm:flex-row items-center sm:items-end w-full gap-4">
                             <CharacterDisplay
-                                githubProfile={githubProfile}
+                                githubProfile={githubProfile} // Still show GitHub profile here
                                 characterImageUrl={CHARACTER_IMAGE_URL}
                                 characterAltText={CHARACTER_ALT_TEXT}
                                 variants={childVariants}
                             />
                             <SuggestionList
-                                suggestions={suggestions} // Correct list based on page
+                                suggestions={suggestions} // Use the simplified suggestions list
                                 onSuggestionClick={handleSuggestionClick}
                                 listVariants={childVariants}
                                 itemVariants={childVariants}
+                                className="items-center sm:items-start" // Align left
                             />
                         </div>
                     </motion.div>
                 </motion.div>
             ) : (
-                <FloatingActionButton onClick={handleFabClick} variants={fabVariants} />
+                 // Render FAB on the left side
+                 !isAppLoading && // Optionally hide FAB until app context loads
+                 <div className="fixed bottom-4 left-4 z-40">
+                     <FloatingActionButton
+                        onClick={handleFabClick}
+                        variants={fabVariants}
+                        // Keep original icon/style
+                     />
+                 </div>
             )}
         </AnimatePresence>
     );
