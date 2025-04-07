@@ -1,3 +1,4 @@
+// /components/stickyChat_components/SuggestionList.tsx
 "use client";
 
 import React from 'react';
