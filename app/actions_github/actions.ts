@@ -36,9 +36,9 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string) {
     const octokit = new Octokit({ auth: token });
 
     // --- Define allowed extensions ---
-    const allowedExtensions = [".ts", ".tsx", ".css", ".sql"];
+    const allowedExtensions = [".ts", ".tsx", ".css", ".sql"];//, ".sql"
     // --- Define excluded paths/folders ---
-    const excludedPrefixes = ["components/ui/", "node_modules/", ".next/", "dist/", "build/"];
+    const excludedPrefixes = ["supabase/migrations/", "components/ui/", "node_modules/", ".next/", "dist/", "build/"];
 
     async function collectFiles(path: string = ""): Promise<FileInfo[]> {
       console.log(`Collecting files in path: ${path || 'root'}`);
