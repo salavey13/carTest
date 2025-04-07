@@ -608,8 +608,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
                     kworkInput={kworkInput}
                     setKworkInput={setKworkInput}
                     kworkInputRef={kworkInputRef} // Pass DOM ref from context
-                    onCopyToClipboard={handleCopyToClipboard} // Pass the memoized handler (intended to be called by wrapper in useImperativeHandle if needed)
-                    onClearAll={handleClearAll} // Pass the memoized handler
+                    onCopyToClipboard={() => handleCopyToClipboard()} // Apply the wrapper here
+                    onClearAll={handleClearAll} // Pass the memoized handler // Pass the memoized handler
                     isCopyDisabled={!kworkInput.trim()}
                     isClearDisabled={!kworkInput.trim() && selectedFiles.size === 0}
                  />
