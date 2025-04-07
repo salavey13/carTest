@@ -28,14 +28,14 @@ interface RepoTxtFetcherProps {}
 const getLanguage = (path: string): string => {
     const extension = path.split('.').pop()?.toLowerCase();
     switch(extension) {
-        case 'ts': return 'typescript';
-        case 'tsx': return 'typescript';
-        case 'js': return 'javascript';
-        case 'jsx': return 'javascript';
+        case 'ts': return 'ts';
+        case 'tsx': return 'tsx';
+        //case 'js': return 'javascript';
+        //case 'jsx': return 'javascript';
         case 'css': return 'css';
-        case 'html': return 'html';
-        case 'json': return 'json';
-        case 'py': return 'python';
+        //case 'html': return 'html';
+        //case 'json': return 'json';
+        //case 'py': return 'python';
         case 'sql': return 'sql';
         
         default: return ''; // Return empty string if no specific language known
@@ -357,11 +357,11 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
                 setSelectedFilesState(filesToSelect); setSelectedFetcherFiles(filesToSelect);
                 const task = ideaFromUrl || DEFAULT_TASK_IDEA; // Use idea from URL!
                 const prefix = "Контекст кода для анализа (отвечай полным кодом, не пропуская части):\n";
-                // Format: ```lang\n// File: path\ncontent```
+                // Format: ```lang\n// /path\ncontent```
                 const markdownTxt = fetchedFiles
                     .filter(f => filesToSelect.has(f.path))
                     .sort((a,b) => a.path.localeCompare(b.path))
-                    .map(f => `\`\`\`${getLanguage(f.path)}\n// File: ${f.path}\n${f.content}\n\`\`\``)
+                    .map(f => `\`\`\`${getLanguage(f.path)}\n// /${f.path}\n${f.content}\n\`\`\``)
                     .join("\n\n");
                 const combinedContent = `${task}\n\n${prefix}${markdownTxt}`;
                 console.log("Generated combined content for automation (first 200 chars):", combinedContent.substring(0, 200)); // Debug Log
