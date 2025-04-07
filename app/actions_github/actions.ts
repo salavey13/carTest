@@ -14,8 +14,8 @@ interface FileInfo {
 }
 
 // --- Constants for Batching ---
-const BATCH_SIZE = 10; // Number of files to fetch concurrently in one batch
-const DELAY_BETWEEN_BATCHES_MS = 1500; // Delay in milliseconds between batches
+const BATCH_SIZE = 1; // Number of files to fetch concurrently in one batch
+const DELAY_BETWEEN_BATCHES_MS = 113; // Delay in milliseconds between batches
 
 // Utility: Delay Function
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -38,7 +38,7 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string) {
     // --- Define allowed extensions ---
     const allowedExtensions = [".ts", ".tsx", ".css"];//, ".sql"
     // --- Define excluded paths/folders ---
-    const excludedPrefixes = ["supabase/", "components/ui/", "node_modules/", ".next/", "dist/", "build/"];
+    const excludedPrefixes = ["supabase/", "components/ui/", "node_modules/", ".next/", "dist/", "build/", "Configame/”];
 
     async function collectFiles(path: string = ""): Promise<FileInfo[]> {
       console.log(`Collecting files in path: ${path || 'root'}`);
