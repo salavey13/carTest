@@ -177,7 +177,7 @@ const AutomationBuddy: React.FC = () => {
                     </motion.div>
                 </motion.div>
             ) : (
-                <div className="fixed bottom-4 left-4 z-40">
+                <div className="fixed bottom-12 left-4 z-40">
                     <FloatingActionButton onClick={handleFabClick} variants={fabVariants} icon={<FaAngrycreative className="text-xl" />} className="bg-gradient-to-br from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white" />
                 </div>
             )}
