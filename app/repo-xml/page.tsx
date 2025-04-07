@@ -1,3 +1,4 @@
+// /app/repo-xml/page.tsx
 "use client";
 import React, { Suspense, useRef, useImperativeHandle } from "react";
 import RepoTxtFetcher from "@/components/RepoTxtFetcher";
@@ -5,13 +6,14 @@ import AICodeAssistant from "@/components/AICodeAssistant";
 import { RepoXmlPageProvider } from '@/contexts/RepoXmlPageContext'; // Import the provider
 import { FaRobot, FaFileCode, FaCode } from "react-icons/fa";
 import { motion } from "framer-motion";
+// Inside app/repo-xml/page.tsx component function
+import { RepoTxtFetcherRef } from "@/components/RepoTxtFetcher";
 
-// Forward Refs for child components to expose methods
-const ForwardedRepoTxtFetcher = React.forwardRef((props, ref) => {
-  // Assuming RepoTxtFetcher exposes methods via useImperativeHandle
-  return <RepoTxtFetcher {...props} ref={ref} />;
-});
-ForwardedRepoTxtFetcher.displayName = 'ForwardedRepoTxtFetcher';
+// Ref for the text area element itself
+const kworkInputRef = useRef<HTMLTextAreaElement | null>(null);
+
+// Ref to hold the imperative methods exposed by RepoTxtFetcher
+const fetcherRef = useRef<RepoTxtFetcherRef | null>(null);
 
 const ForwardedAICodeAssistant = React.forwardRef((props, ref) => {
   // Assuming AICodeAssistant exposes methods via useImperativeHandle
@@ -21,9 +23,9 @@ ForwardedAICodeAssistant.displayName = 'ForwardedAICodeAssistant';
 
 
 export default function RepoXmlPage() {
-  const fetcherRef = useRef<any>(null); // Ref for RepoTxtFetcher methods
+  //const fetcherRef = useRef<any>(null); // Ref for RepoTxtFetcher methods
   const assistantRef = useRef<any>(null); // Ref for AICodeAssistant methods
-  const kworkInputRef = useRef<HTMLTextAreaElement>(null);
+  //const kworkInputRef = useRef<HTMLTextAreaElement>(null);
   const aiResponseInputRef = useRef<HTMLTextAreaElement>(null);
   const prSectionRef = useRef<HTMLElement>(null); // Ref for the PR section element
 
@@ -54,7 +56,7 @@ export default function RepoXmlPage() {
                 <Suspense fallback={<div className="text-white">Загрузка...</div>}>
                     {/* Pass the ref here */}
                     <section id="extractor" className="mb-12 w-full max-w-2xl">
-                        <ForwardedRepoTxtFetcher ref={fetcherRef} kworkInputRef={kworkInputRef} />
+                        <RepoTxtFetcher />
                     </section>
                 </Suspense>
               
