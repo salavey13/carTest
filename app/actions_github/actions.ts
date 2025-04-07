@@ -1,3 +1,4 @@
+// /app/actions-github/actions.ts
 "use server";
 import { Octokit } from "@octokit/rest";
 import { notifyAdmins } from "@/app/actions"; // Keep this import
@@ -13,9 +14,20 @@ interface FileInfo {
   download_url: string;
 }
 
+
+
+// Define a type for the items we get from the Git Tree API that we care about
+interface GitTreeFile {
+    path: string;
+    sha: string; // Blob SHA
+    type: string; // 'blob', 'tree', etc.
+}
+
+
 // --- Constants for Batching ---
-const BATCH_SIZE = 1; // Number of files to fetch concurrently in one batch
-const DELAY_BETWEEN_BATCHES_MS = 113; // Delay in milliseconds between batches
+// Can potentially increase BATCH_SIZE now, e.g., 5 or 10
+const BATCH_SIZE = 5; // Number of blobs to fetch concurrently in one batch
+const DELAY_BETWEEN_BATCHES_MS = 200; // Delay in milliseconds between batches
 
 // Utility: Delay Function
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -26,8 +38,10 @@ function parseRepoUrl(repoUrl: string) {
   return { owner: match[1], repo: match[2] };
 }
 
+// --- NEW: Improved fetchRepoContents using Git Trees/Blobs ---
 export async function fetchRepoContents(repoUrl: string, customToken?: string) {
-  console.log(`Fetching repo contents for: ${repoUrl}`);
+  console.log(`Fetching repo contents for: ${repoUrl} using Git Trees API`);
+  const startTime = Date.now();
   try {
     const token = customToken || process.env.GITHUB_TOKEN;
     if (!token) throw new Error("GitHub token is missing");
@@ -35,98 +49,126 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string) {
     const { owner, repo } = parseRepoUrl(repoUrl);
     const octokit = new Octokit({ auth: token });
 
-    // --- Define allowed extensions ---
-    const allowedExtensions = [".ts", ".tsx", ".css"];//, ".sql"
-    // --- Define excluded paths/folders ---
-    const excludedPrefixes = ["supabase/", "components/ui/", "node_modules/", ".next/", "dist/", "build/", "Configame/”];
+    // --- Define allowed extensions & excluded paths ---
+    const allowedExtensions = [".ts", ".tsx", ".css"]; // ".sql" excluded as per original comment
+    const excludedPrefixes = ["supabase/", "components/ui/", "node_modules/", ".next/", "dist/", "build/", "Configame/"];
 
-    async function collectFiles(path: string = ""): Promise<FileInfo[]> {
-      console.log(`Collecting files in path: ${path || 'root'}`);
-      const { data: contents } = await octokit.repos.getContent({
+    // 1. Get the default branch
+    console.log("Fetching repository info...");
+    const { data: repoData } = await octokit.repos.get({ owner, repo });
+    const defaultBranch = repoData.default_branch;
+    console.log(`Default branch: ${defaultBranch}`);
+
+    // 2. Get the SHA of the latest commit on the default branch
+    console.log(`Fetching ref for branch ${defaultBranch}...`);
+    const { data: refData } = await octokit.git.getRef({
+      owner,
+      repo,
+      ref: `heads/${defaultBranch}`,
+    });
+    const latestCommitSha = refData.object.sha;
+    console.log(`Latest commit SHA: ${latestCommitSha}`);
+
+    // 3. Get the tree SHA for the latest commit
+     const { data: commitData } = await octokit.git.getCommit({
         owner,
         repo,
-        path,
-      });
+        commit_sha: latestCommitSha,
+     });
+     const treeSha = commitData.tree.sha;
+     console.log(`Tree SHA: ${treeSha}`);
 
-      let fileInfos: FileInfo[] = [];
 
-      for (const item of contents) {
-        // Skip excluded paths
-        if (excludedPrefixes.some(prefix => item.path.startsWith(prefix))) {
-            console.log(`Skipping excluded path: ${item.path}`);
-            continue;
-        }
+    // 4. Fetch the entire repository tree recursively
+    console.log("Fetching recursive tree...");
+    // Type assertion needed because Octokit types might not fully capture recursive response structure well
+    const { data: treeData } = await octokit.git.getTree({
+      owner,
+      repo,
+      tree_sha: treeSha,
+      recursive: '1', // Use string '1' as per some Octokit versions/docs
+    });
 
-        if (
-          item.type === "file" &&
-          allowedExtensions.some((ext) => item.path.endsWith(ext))
-        ) {
-          if (item.download_url) { // Ensure download_url exists
-            fileInfos.push({ path: item.path, download_url: item.download_url });
-          } else {
-            console.warn(`File item lacks download_url: ${item.path}`);
-          }
-        } else if (item.type === "dir") {
-          // Add a small delay before recursing into directories to be extra cautious with rate limits
-          await delay(150); // 50ms delay before fetching next directory content
-          const subFiles = await collectFiles(item.path);
-          fileInfos = fileInfos.concat(subFiles);
-        }
-      }
-      return fileInfos;
+    if (!treeData || !treeData.tree) {
+        throw new Error("Failed to fetch repository tree or tree data is missing.");
     }
+    console.log(`Received tree with ${treeData.tree.length} items. Filtering...`);
 
-    const fileInfos = await collectFiles();
-    console.log(`Collected ${fileInfos.length} file paths to fetch.`);
+    // 5. Filter the tree to get only desired file blobs
+    const filesToFetch: GitTreeFile[] = treeData.tree.filter((item): item is GitTreeFile => {
+        // Ensure item has path and sha, and is a blob
+        if (item.type !== 'blob' || !item.path || !item.sha) {
+            return false;
+        }
+        // Check against excluded prefixes
+        if (excludedPrefixes.some(prefix => item.path!.startsWith(prefix))) {
+            // console.log(`Excluding by prefix: ${item.path}`); // Optional: verbose logging
+            return false;
+        }
+        // Check against allowed extensions
+        if (!allowedExtensions.some(ext => item.path!.endsWith(ext))) {
+            // console.log(`Excluding by extension: ${item.path}`); // Optional: verbose logging
+            return false;
+        }
+        return true;
+    });
 
+    console.log(`Found ${filesToFetch.length} files matching criteria to fetch content for.`);
+
+    // 6. Batch fetch blob contents
     const allFiles: FileNode[] = [];
-    const totalFiles = fileInfos.length;
+    const totalFiles = filesToFetch.length;
 
-    // --- Batch Fetching Logic ---
     for (let i = 0; i < totalFiles; i += BATCH_SIZE) {
-      const batchInfos = fileInfos.slice(i, i + BATCH_SIZE);
+      const batchFiles = filesToFetch.slice(i, i + BATCH_SIZE);
       const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
       const totalBatches = Math.ceil(totalFiles / BATCH_SIZE);
-      console.log(`Fetching batch ${batchNumber}/${totalBatches} (Files ${i + 1} to ${Math.min(i + BATCH_SIZE, totalFiles)})`);
+      console.log(`Fetching content batch ${batchNumber}/${totalBatches} (Files ${i + 1} to ${Math.min(i + BATCH_SIZE, totalFiles)})`);
 
-      const batchPromises = batchInfos.map(async (fileInfo) => {
+      const batchPromises = batchFiles.map(async (fileInfo) => {
         try {
-            const response = await fetch(fileInfo.download_url, {
-                headers: { Authorization: `token ${token}` },
-                // Add a timeout per request (e.g., 15 seconds)
-                signal: AbortSignal.timeout(30000)
+            // Fetch blob content using its SHA
+            const { data: blobData } = await octokit.git.getBlob({
+                owner,
+                repo,
+                file_sha: fileInfo.sha,
             });
-            if (!response.ok) {
-                throw new Error(`Failed to fetch ${fileInfo.path}: ${response.status} ${response.statusText}`);
+
+            if (blobData.encoding !== 'base64') {
+                console.warn(`Unexpected encoding for blob ${fileInfo.path}: ${blobData.encoding}. Trying UTF-8 decode.`);
+                // Attempt direct decoding if not base64, though this is uncommon for getBlob
+                 return { path: fileInfo.path, content: blobData.content };
             }
-            const content = await response.text();
+
+            // Decode base64 content
+            const content = Buffer.from(blobData.content, 'base64').toString('utf-8');
+
+            // Add path comment (same logic as before)
             const contentLines = content.split("\n");
             let pathComment: string;
             if (fileInfo.path.endsWith(".ts") || fileInfo.path.endsWith(".tsx")) {
                 pathComment = `// /${fileInfo.path}`;
             } else if (fileInfo.path.endsWith(".css")) {
                 pathComment = `/* /${fileInfo.path} */`;
-            } else if (fileInfo.path.endsWith(".sql")) {
+            } else if (fileInfo.path.endsWith(".sql")) { // Re-added just in case
                 pathComment = `-- /${fileInfo.path}`;
             } else {
                 pathComment = `# /${fileInfo.path}`; // Default
-                console.warn(`Unhandled extension for path comment: ${fileInfo.path}`);
             }
 
-            // Check if the first line is already a comment (start of line, ignoring whitespace)
             const firstLineTrimmed = contentLines[0]?.trimStart();
             if (firstLineTrimmed?.match(/^(--|\/\/|\/\*|#)/)) {
                 contentLines[0] = pathComment; // Replace existing comment
             } else {
                 contentLines.unshift(pathComment); // Add new comment line
             }
+
             return { path: fileInfo.path, content: contentLines.join("\n") };
-        } catch (fetchError) {
-             // Log specific file fetch error and re-throw to fail the batch
-             console.error(`Error fetching file content for ${fileInfo.path}:`, fetchError);
-             // You could return a specific error object or null here if you want partial results
-             // For now, we let the Promise.all fail the batch
-             throw fetchError;
+
+        } catch (fetchError: any) {
+             console.error(`Error fetching blob content for ${fileInfo.path} (SHA: ${fileInfo.sha}):`, fetchError);
+             // Re-throw to fail the batch
+             throw new Error(`Failed to fetch blob ${fileInfo.path}: ${fetchError.message || fetchError}`);
         }
       });
 
@@ -136,12 +178,10 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string) {
           allFiles.push(...batchResults);
           console.log(`Batch ${batchNumber}/${totalBatches} completed successfully.`);
       } catch (batchError) {
-           console.error(`Error processing batch ${batchNumber}/${totalBatches}:`, batchError);
-           // Decide handling: throw to stop all, or log and continue?
-           // Let's throw to indicate the overall fetch failed if any batch fails.
+           console.error(`Error processing content batch ${batchNumber}/${totalBatches}:`, batchError);
+           // Throw to indicate the overall fetch failed if any batch fails.
            throw new Error(`Failed to fetch files in batch ${batchNumber}. Error: ${batchError instanceof Error ? batchError.message : batchError}`);
       }
-
 
       // Add delay before the next batch, but not after the last one
       if (i + BATCH_SIZE < totalFiles) {
@@ -151,12 +191,25 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string) {
     }
     // --- End Batch Fetching Logic ---
 
-    console.log(`Successfully fetched content for ${allFiles.length} files.`);
+    const endTime = Date.now();
+    console.log(`Successfully fetched content for ${allFiles.length} files in ${(endTime - startTime) / 1000} seconds.`);
     return { success: true, files: allFiles };
 
-  } catch (error) {
-    console.error("Error fetching repo contents:", error);
-    // Notify admins on failure
+  } catch (error: any) {
+    const endTime = Date.now();
+    console.error(`Error fetching repo contents after ${(endTime - startTime) / 1000} seconds:`, error);
+     // Check for specific GitHub API errors if possible
+     if (error.status === 403 && error.message?.includes('rate limit exceeded')) {
+        console.error("GitHub API rate limit exceeded.");
+        await notifyAdmins(`❌ Ошибка (Rate Limit) при извлечении файлов из репозитория ${repoUrl}. Попробуйте позже.`);
+        return { success: false, error: "GitHub API rate limit exceeded. Please try again later." };
+     }
+     if (error.status === 404) {
+        console.error("Repository or resource not found.");
+         await notifyAdmins(`❌ Ошибка (404 Not Found) при извлечении файлов из репозитория ${repoUrl}. Проверьте URL и права доступа.`);
+        return { success: false, error: "Repository or required resource not found (404)." };
+     }
+    // Generic error
     await notifyAdmins(`❌ Ошибка при извлечении файлов из репозитория ${repoUrl}:\n${error instanceof Error ? error.message : String(error)}`);
     return {
       success: false,
@@ -164,6 +217,8 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string) {
     };
   }
 }
+
+
 
 // --- createGitHubPullRequest function (Keep as is) ---
 export async function createGitHubPullRequest(
