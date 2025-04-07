@@ -15,7 +15,7 @@ interface FileInfo {
 
 // --- Constants for Batching ---
 const BATCH_SIZE = 10; // Number of files to fetch concurrently in one batch
-const DELAY_BETWEEN_BATCHES_MS = 500; // Delay in milliseconds between batches
+const DELAY_BETWEEN_BATCHES_MS = 1500; // Delay in milliseconds between batches
 
 // Utility: Delay Function
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -36,9 +36,9 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string) {
     const octokit = new Octokit({ auth: token });
 
     // --- Define allowed extensions ---
-    const allowedExtensions = [".ts", ".tsx", ".css", ".sql"];//, ".sql"
+    const allowedExtensions = [".ts", ".tsx", ".css"];//, ".sql"
     // --- Define excluded paths/folders ---
-    const excludedPrefixes = ["supabase/migrations/", "components/ui/", "node_modules/", ".next/", "dist/", "build/"];
+    const excludedPrefixes = ["supabase/", "components/ui/", "node_modules/", ".next/", "dist/", "build/"];
 
     async function collectFiles(path: string = ""): Promise<FileInfo[]> {
       console.log(`Collecting files in path: ${path || 'root'}`);
@@ -68,7 +68,7 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string) {
           }
         } else if (item.type === "dir") {
           // Add a small delay before recursing into directories to be extra cautious with rate limits
-          await delay(50); // 50ms delay before fetching next directory content
+          await delay(150); // 50ms delay before fetching next directory content
           const subFiles = await collectFiles(item.path);
           fileInfos = fileInfos.concat(subFiles);
         }
@@ -94,7 +94,7 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string) {
             const response = await fetch(fileInfo.download_url, {
                 headers: { Authorization: `token ${token}` },
                 // Add a timeout per request (e.g., 15 seconds)
-                signal: AbortSignal.timeout(15000)
+                signal: AbortSignal.timeout(30000)
             });
             if (!response.ok) {
                 throw new Error(`Failed to fetch ${fileInfo.path}: ${response.status} ${response.statusText}`);
