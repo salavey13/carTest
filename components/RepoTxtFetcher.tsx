@@ -204,7 +204,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
 
     // ***** PARSING FIX: Changed Markdown Formatting *****
     const handleAddSelected = useCallback((filesToAddParam?: Set<string>) => {
+        // Use component's state 'selectedFiles' if no specific set is passed
         const filesToAdd = filesToAddParam || selectedFiles;
+        console.log("[handleAddSelected] Called. Files to add:", filesToAdd); // Debugging
         if (filesToAdd.size === 0) {
             addToast("Сначала выберите файлы для добавления", 'error');
             return;
@@ -233,11 +235,13 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
 
         addToast(`${filesToAdd.size} файлов добавлено в запрос`, 'success');
         scrollToSection('kworkInput');
-    }, [files, selectedFiles, scrollToSection, addToast, setKworkInput, getLanguage]);
+    }, [files, selectedFiles, scrollToSection, addToast, setKworkInput, getLanguage]); // Keep selectedFiles dependency
 
     // Handles copying text (usually the kworkInput) to clipboard
     const handleCopyToClipboard = useCallback((textToCopy?: string, shouldScroll = true): boolean => {
+        // Use component's state 'kworkInput' if no specific text is passed
         const content = textToCopy ?? kworkInput;
+         console.log("[handleCopyToClipboard] Called. Content to copy (first 50):", content.substring(0, 50)); // Debugging
         if (!content.trim()) {
             addToast("Нет текста для копирования", 'error');
             return false;
@@ -255,7 +259,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
             addToast("Ошибка копирования", 'error');
             return false;
         }
-    }, [kworkInput, setRequestCopied, scrollToSection, addToast]);
+    }, [kworkInput, setRequestCopied, scrollToSection, addToast]); // Keep kworkInput dependency
 
     // Clears selections, input, and highlights
     const handleClearAll = useCallback(() => {
@@ -351,11 +355,11 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
                 setSelectedFilesState(filesToSelect); setSelectedFetcherFiles(filesToSelect);
                 const task = ideaFromUrl || DEFAULT_TASK_IDEA; // Use idea from URL!
                 const prefix = "Контекст кода для анализа (отвечай полным кодом, не пропуская части):\n";
-                // Format: ```lang\n// File: path\ncontent```
+                // Format: ```lang\n// /path\ncontent```
                 const markdownTxt = fetchedFiles
                     .filter(f => filesToSelect.has(f.path))
                     .sort((a,b) => a.path.localeCompare(b.path))
-                    .map(f => `\`\`\`${getLanguage(f.path)}\n// File: ${f.path}\n${f.content}\n\`\`\``)
+                    .map(f => `\`\`\`${getLanguage(f.path)}\n// /${f.path}\n${f.content}\n\`\`\``)
                     .join("\n\n");
                 const combinedContent = `${task}\n\n${prefix}${markdownTxt}`;
                 console.log("Generated combined content for automation (first 200 chars):", combinedContent.substring(0, 200)); // Debug Log
@@ -363,7 +367,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
 
                 await delay(350); // Delay for state update and UI render before copy
 
-                const copied = handleCopyToClipboard(combinedContent, false);
+                const copied = handleCopyToClipboard(combinedContent, false); // Uses component's handleCopyToClipboard
                 if (copied) {
                     addToast("КОНТЕКСТ В БУФЕРЕ! Открываю AI...", 'success');
                     scrollToSection('aiResponseInput');
@@ -405,7 +409,10 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
         getPageFilePath, extractImports, resolveImportPath, openLink,
         setFetchStatus, setRepoUrlEntered, setFilesFetched, setSelectedFetcherFiles,
         setKworkInput, setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles,
-        handleCopyToClipboard, scrollToSection, DEFAULT_TASK_IDEA,
+        handleCopyToClipboard, // Added handleCopyToClipboard as it's used internally now
+        scrollToSection, DEFAULT_TASK_IDEA, files // Added files dependency for automation sequence
+        // Note: Removed handleAddSelected/handleCopyToClipboard from *here* if they don't call handleFetch,
+        // but kept them if handleFetch *calls* them (like in the automation sequence). Added handleCopyToClipboard back.
    ]);
 
 
@@ -461,18 +468,23 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
   useEffect(() => { setKworkInputHasContent(kworkInput.trim().length > 0); }, [kworkInput, setKworkInputHasContent]);
   useEffect(() => { if (autoFetch && repoUrl && fetchStatus === 'idle') { console.log("Triggering auto-fetch..."); handleFetch(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus]); // handleFetch is stable
+  }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus]); // handleFetch dependency is implicitly covered by its own useCallback
   useEffect(() => { return () => { stopProgressSimulation(); }; }, [stopProgressSimulation]);
 
 
   // === Imperative Handle ===
+  // Expose the correctly memoized functions directly.
+  // The context triggers will call these exact same function instances.
+  // If the direct prop calls fail, it confirms the issue is likely stale props
+  // in the child components (FileList/RequestInput), not in RepoTxtFetcher itself.
   useImperativeHandle(ref, () => ({
-    handleFetch: (isManualRetry = false) => handleFetch(isManualRetry),
-    selectHighlightedFiles,
-    handleAddSelected: () => handleAddSelected(),
-    handleCopyToClipboard: (textToCopy?: string, shouldScroll = true) => handleCopyToClipboard(textToCopy, shouldScroll),
-    clearAll: handleClearAll,
-  }), [handleFetch, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll]);
+    handleFetch: handleFetch, // Expose the memoized function directly
+    selectHighlightedFiles: selectHighlightedFiles, // Expose the memoized function directly
+    handleAddSelected: handleAddSelected, // Expose the memoized function directly
+    handleCopyToClipboard: handleCopyToClipboard, // Expose the memoized function directly
+    clearAll: handleClearAll, // Expose the memoized function directly
+  }), [handleFetch, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll]); // Dependencies are the memoized functions themselves
+
 
   // --- Render ---
   const isLoading = fetchStatus === 'loading' || fetchStatus === 'retrying';
@@ -566,7 +578,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
                   importantFiles={importantFiles}
                   isLoading={isLoading}
                   toggleFileSelection={toggleFileSelection}
-                  onAddSelected={handleAddSelected}
+                  onAddSelected={handleAddSelected} // Pass the memoized handler
                   onAddImportant={handleAddImportantFiles}
                   onAddTree={handleAddFullTree}
                   onSelectHighlighted={selectHighlightedFiles}
@@ -581,8 +593,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
                     kworkInput={kworkInput}
                     setKworkInput={setKworkInput}
                     kworkInputRef={kworkInputRef} // Pass DOM ref from context
-                    onCopyToClipboard={handleCopyToClipboard} // Use component's handler
-                    onClearAll={handleClearAll} // Use component's handler
+                    onCopyToClipboard={handleCopyToClipboard} // Pass the memoized handler
+                    onClearAll={handleClearAll} // Pass the memoized handler
                     isCopyDisabled={!kworkInput.trim()}
                     isClearDisabled={!kworkInput.trim() && selectedFiles.size === 0}
                  />
