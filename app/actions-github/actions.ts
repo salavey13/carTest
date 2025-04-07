@@ -30,8 +30,8 @@ interface GitTreeResponseData {
 
 
 // --- Constants for Batching ---
-const BATCH_SIZE = 5; // Number of blobs to fetch concurrently in one batch
-const DELAY_BETWEEN_BATCHES_MS = 200; // Delay in milliseconds between batches
+const BATCH_SIZE = 69; // Number of blobs to fetch concurrently in one batch
+const DELAY_BETWEEN_BATCHES_MS = 420; // Delay in milliseconds between batches
 
 // Utility: Delay Function
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
