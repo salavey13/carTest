@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
     FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard,
-    FaCopy, FaListCheck, FaBug, FaSync, FaPlus, FaPaperPlane, FaBroom, FaCheck, FaRobot, FaRedo, FaArrowsRotate // Added FaArrowsRotate
+    FaCopy, FaListCheck, FaBug, FaSync, FaPlus, FaPaperPlane, FaBroom, FaCheck, FaRobot, FaRedo, FaArrowsRotate, FaAngrycreative
 } from "react-icons/fa6";
 
 // Import Subcomponents
@@ -177,8 +177,8 @@ const AutomationBuddy: React.FC = () => {
                     </motion.div>
                 </motion.div>
             ) : (
-                <div className="fixed bottom-4 right-4 z-40">
-                    <FloatingActionButton onClick={handleFabClick} variants={fabVariants} icon={<FaRobot className="text-xl" />} className="bg-gradient-to-br from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white" />
+                <div className="fixed bottom-4 left-4 z-40">
+                    <FloatingActionButton onClick={handleFabClick} variants={fabVariants} icon={<FaAngrycreative className="text-xl" />} className="bg-gradient-to-br from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white" />
                 </div>
             )}
         </AnimatePresence>
