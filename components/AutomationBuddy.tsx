@@ -1,3 +1,4 @@
+// /components/AutomationBuddy.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
@@ -19,7 +20,7 @@ import { useRepoXmlPageContext, FetchStatus } from "@/contexts/RepoXmlPageContex
 
 // --- Constants & Types ---
 const AUTO_OPEN_DELAY_MS_BUDDY = 5000;
-const BUDDY_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/character-images/public/automation_buddy.png"; // Placeholder
+const BUDDY_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/character-images/public/x13.png"; // Placeholder
 const BUDDY_ALT_TEXT = "Automation Buddy";
 
 interface Suggestion {
