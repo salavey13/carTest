@@ -1,7 +1,6 @@
 // /components/RepoTxtFetcher.tsx
 "use client";
 
-"use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useRef, useCallback, useMemo} from "react";
 import { useSearchParams } from "next/navigation";
@@ -301,7 +300,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
 
     setExtractLoading(true); setError(null); setFiles([]);
     setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set());
-    setKworkInput(""); // Clear input on new fetch
+    //setKworkInput(""); // Clear input on new fetch
     setFilesFetched(false, null, []); setRequestCopied(false);
     setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set());
     setPrimaryHighlightedPath(null); setSecondaryHighlightedPaths([]);
@@ -612,10 +611,10 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
                   importantFiles={importantFiles}
                   isLoading={isLoading} // Pass loading state
                   toggleFileSelection={toggleFileSelection}
-                  onAddSelected={handleAddSelected} // Pass handlers directly
-                  onAddImportant={handleAddImportantFiles}
-                  onAddTree={handleAddFullTree}
-                  onSelectHighlighted={selectHighlightedFiles} // Pass handler
+                  onAddSelected={() => handleAddSelected()} // Pass handlers directly
+                  onAddImportant={() => handleAddImportantFiles()}
+                  onAddTree={() => handleAddFullTree()}
+                  onSelectHighlighted={() => selectHighlightedFiles()} // Pass handler
                 />
              </div>
          )}
@@ -626,8 +625,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
                     kworkInput={kworkInput}
                     setKworkInput={setKworkInput}
                     kworkInputRef={kworkInputRef}
-                    onCopyToClipboard={handleCopyToClipboard} // Pass handler
-                    onClearAll={handleClearAll} // Pass handler
+                    onCopyToClipboard={() => handleCopyToClipboard()} // Pass handler
+                    onClearAll={() => handleClearAll()} // Pass handler
                     isCopyDisabled={isCopyDisabled} // Pass calculated state
                     isClearDisabled={isClearDisabled} // Pass calculated state
                  />
