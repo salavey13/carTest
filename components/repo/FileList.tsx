@@ -10,10 +10,13 @@ interface FileListProps {
     primaryHighlightedPath: string | null;
     secondaryHighlightedPaths: string[];
     importantFiles: string[];
+    isLoading: boolean; // Added to potentially disable actions during load
     toggleFileSelection: (path: string) => void;
     onAddSelected: () => void;
     onAddImportant: () => void;
     onAddTree: () => void;
+    onSelectHighlighted: () => void; // Added prop for consistency
+    id?: string; // Added id prop
 }
 
 // Helper Functions (can be moved to a utils file if shared)
@@ -48,15 +51,19 @@ const FileList: React.FC<FileListProps> = ({
     primaryHighlightedPath,
     secondaryHighlightedPaths,
     importantFiles,
+    isLoading,
     toggleFileSelection,
     onAddSelected,
     onAddImportant,
     onAddTree,
+    onSelectHighlighted, // Added destructuring
+    id, // Added id destructuring
 }) => {
     const grouped = groupFilesByFolder(files);
+    const hasHighlights = !!primaryHighlightedPath || secondaryHighlightedPaths.length > 0;
 
     return (
-        <div className="mb-6 bg-gray-800 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.3)]">
+        <div id={id} className="mb-6 bg-gray-800 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.3)]">
             <h3 className="text-xl font-bold text-cyan-400 mb-3">Консоль файлов ({files.length})</h3>
             <div className="max-h-60 overflow-y-auto pr-2 space-y-3 custom-scrollbar"> {/* Added custom-scrollbar class if you have global styles */}
                 {grouped.map(({ folder, files: folderFiles }) => (
@@ -74,6 +81,7 @@ const FileList: React.FC<FileListProps> = ({
                                         onChange={(e) => { e.stopPropagation(); toggleFileSelection(file.path); }}
                                         className="w-3.5 h-3.5 accent-cyan-500 cursor-pointer flex-shrink-0 form-checkbox rounded"
                                         aria-labelledby={`label-${file.path}`}
+                                        disabled={isLoading} // Disable checkbox during loading
                                     />
                                     <span
                                         id={`label-${file.path}`}
@@ -100,24 +108,40 @@ const FileList: React.FC<FileListProps> = ({
             <div className="flex flex-col sm:flex-row gap-2 mt-4">
                  <motion.button
                     onClick={onAddSelected}
-                    disabled={selectedFiles.size === 0}
-                    className={`flex-1 flex items-center justify-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-indigo-600 to-purple-500 transition-all shadow-[0_0_12px_rgba(99,102,241,0.3)] ${selectedFiles.size === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-[0_0_18px_rgba(99,102,241,0.5)]'}`}
-                    whileHover={{ scale: selectedFiles.size === 0 ? 1 : 1.05 }}
-                    whileTap={{ scale: selectedFiles.size === 0 ? 1 : 0.95 }}
+                    disabled={selectedFiles.size === 0 || isLoading}
+                    // *** UPDATED: rounded-full ***
+                    className={`flex-1 flex items-center justify-center gap-1 px-4 py-2 rounded-full font-semibold text-sm text-white bg-gradient-to-r from-indigo-600 to-purple-500 transition-all shadow-[0_0_12px_rgba(99,102,241,0.3)] ${(selectedFiles.size === 0 || isLoading) ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-[0_0_18px_rgba(99,102,241,0.5)]'}`}
+                    whileHover={{ scale: (selectedFiles.size === 0 || isLoading) ? 1 : 1.05 }}
+                    whileTap={{ scale: (selectedFiles.size === 0 || isLoading) ? 1 : 0.95 }}
                     >
                     <FaFileLines /> Добавить выбранные ({selectedFiles.size})
                 </motion.button>
+                {/* Optionally add button to select highlighted files if needed */}
+                {/* {hasHighlights && (
+                     <motion.button
+                        onClick={onSelectHighlighted}
+                        disabled={isLoading}
+                        className={`flex-1 flex items-center justify-center gap-1 px-4 py-2 rounded-full font-semibold text-sm text-white bg-gradient-to-r from-yellow-600 to-orange-500 transition-all shadow-[0_0_12px_rgba(245,158,11,0.3)] ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-[0_0_18px_rgba(245,158,11,0.5)]'}`}
+                        whileHover={{ scale: isLoading ? 1 : 1.05 }} whileTap={{ scale: isLoading ? 1 : 0.95 }}
+                     >
+                        <FaStar /> Выбрать связанные
+                    </motion.button>
+                )} */}
                 <motion.button
                     onClick={onAddImportant}
-                    className="flex-1 flex items-center justify-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-blue-600 to-cyan-500 transition-all shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:shadow-[0_0_18px_rgba(0,255,157,0.5)]"
-                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                    disabled={isLoading} // Disable during loading
+                    // *** UPDATED: rounded-full ***
+                    className={`flex-1 flex items-center justify-center gap-1 px-4 py-2 rounded-full font-semibold text-sm text-white bg-gradient-to-r from-blue-600 to-cyan-500 transition-all shadow-[0_0_12px_rgba(0,255,157,0.3)] ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-[0_0_18px_rgba(0,255,157,0.5)]'}`}
+                    whileHover={{ scale: isLoading ? 1 : 1.05 }} whileTap={{ scale: isLoading ? 1 : 0.95 }}
                     >
                     <FaKey /> Добавить важные
                 </motion.button>
                 <motion.button
                     onClick={onAddTree}
-                    className="flex-1 flex items-center justify-center gap-1 px-4 py-2 rounded-lg font-semibold text-sm text-white bg-gradient-to-r from-red-600 to-orange-500 transition-all shadow-[0_0_12px_rgba(255,107,107,0.3)] hover:shadow-[0_0_18px_rgba(255,107,107,0.5)]"
-                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                    disabled={isLoading} // Disable during loading
+                    // *** UPDATED: rounded-full ***
+                    className={`flex-1 flex items-center justify-center gap-1 px-4 py-2 rounded-full font-semibold text-sm text-white bg-gradient-to-r from-red-600 to-orange-500 transition-all shadow-[0_0_12px_rgba(255,107,107,0.3)] ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-[0_0_18px_rgba(255,107,107,0.5)]'}`}
+                    whileHover={{ scale: isLoading ? 1 : 1.05 }} whileTap={{ scale: isLoading ? 1 : 0.95 }}
                     >
                     <FaTree /> Добавить дерево
                 </motion.button>
