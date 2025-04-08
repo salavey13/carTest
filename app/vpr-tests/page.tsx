@@ -1,3 +1,6 @@
+// /app/vpr-tests/page.tsx
+"use client";
+
 "use client";
 import { useEffect, useState, useMemo } from "react"; // Добавлен useMemo
 import Link from "next/link";

@@ -49,7 +49,7 @@ tsx
 
 
 // /app/webhook-handlers/proxy.ts
-// ... (other imports)
+// .. (other imports)
 import { newTypeHandler } from "./new-type";
 
 const handlers = [
@@ -1283,4 +1283,3 @@ export async function findSimilarCars(resultEmbedding: number[]) {
     similarity: Math.round(car.similarity * 100),
   }));
 }
-

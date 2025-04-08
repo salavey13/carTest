@@ -1,3 +1,4 @@
+// /app/webhook-handlers/disable-dummy-mode.ts
 import { WebhookHandler } from "./types";
 import { sendTelegramMessage } from "../actions"; // Import from main actions
 import { debugLogger } from "@/lib/debugLogger";
