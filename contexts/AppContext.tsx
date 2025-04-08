@@ -1,4 +1,6 @@
 // /contexts/AppContext.tsx
+"use client";
+
 "use client"
 
 import type React from "react"
