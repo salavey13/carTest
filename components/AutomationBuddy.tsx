@@ -156,7 +156,12 @@ const AutomationBuddy: React.FC = () => {
 
 
     // --- Event Handlers ---
-    const handleSuggestionClick = (suggestion: Suggestion) => { if (suggestion.disabled) return; console.log("Automation Buddy Suggestion Clicked:", suggestion.id); if (suggestion.action) { const result = suggestion.action(); if (result instanceof Promise) { result.catch(err => console.error("Error executing buddy action:", err)); } } };
+    const handleSuggestionClick = (suggestion: Suggestion) => { if (suggestion.disabled) return; console.log("Automation Buddy Suggestion Clicked:", suggestion.id); if (suggestion.action) { const result = suggestion.action(); if (result instanceof Promise) {if (suggestion.id.startsWith('goto-')) {
++                           // Maybe don't close immediately for scroll actions to allow seeing the scroll
++                           setTimeout(() => setIsOpen(false), 300); // Close after a small delay
++                       } else {
++                           setIsOpen(false); // Close immediately for most actions
++                       }; result.catch(err => console.error("Error executing buddy action:", err)); } } };
     const handleOverlayClick = () => setIsOpen(false);
     const handleDialogClick = (e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
     const handleFabClick = () => { setIsOpen(!isOpen); if (!isOpen) setHasAutoOpened(true); };
