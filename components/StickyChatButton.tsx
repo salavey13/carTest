@@ -1,3 +1,6 @@
+// /components/StickyChatButton.tsx
+"use client";
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
@@ -100,7 +103,7 @@ const StickyChatButton: React.FC = () => {
             let taskIdea = "";
             // SPECIAL CASE: /vpr-test/*
             if (cleanPath.startsWith('/vpr-test/')) {
-                taskIdea = "скрой кнопку включения подсказок, пожалуйста";
+                taskIdea = "верни кнопку включения подсказок, пожалуйста";
                 console.log("Special task for /vpr-test/*:", taskIdea);
             } else {
                 // Default task for other pages
