@@ -1,9 +1,11 @@
+// (No changes needed based on the request)
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 // Removed fetch-related icons/props from here
 
 interface SettingsModalProps {
     isOpen: boolean;
+    onClose: () => void; // Added for potential external close triggers
     repoUrl: string;
     setRepoUrl: (url: string) => void;
     token: string;
@@ -18,6 +20,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     token,
     setToken,
     loading, // Receive loading state
+    // onClose, // Destructure if needed
 }) => {
     return (
         <AnimatePresence>
