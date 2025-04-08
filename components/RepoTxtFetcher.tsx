@@ -279,7 +279,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
             addToast("Ошибка копирования", 'error');
             return false;
         }
-    }, [kworkInput, setRequestCopied, scrollToSection, addToast]);
+    }, [files, selectedFiles, kworkInput, scrollToSection, addToast, getLanguage, setKworkInput]);
 
     // Clears selections, input, and highlights
     const handleClearAll = useCallback(() => {
