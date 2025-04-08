@@ -100,19 +100,19 @@ const AutomationBuddy: React.FC = () => {
                 break;
             case 'files_selected':
                 addSuggestion("add-selected", "Добавить в Запрос", triggerAddSelectedToKwork, <FaPlus />);
-                addSuggestion("goto-kwork", "К Редактору Запроса", () => scrollToSection('kworkInput'), <FaKeyboard />);
+                addSuggestion("goto-kwork", "К Редактору Запроса", () => scrollToSection('fetcher'), <FaKeyboard />);
                 break;
             case 'request_written':
                 addSuggestion("copy-kwork", "Скопировать Запрос", triggerCopyKwork, <FaCopy />, true, !kworkInputHasContent, !kworkInputHasContent ? "Запрос пуст" : "");
-                addSuggestion("goto-kwork", "К Редактору Запроса", () => scrollToSection('kworkInput'), <FaKeyboard />);
+                addSuggestion("goto-kwork", "К Редактору Запроса", () => scrollToSection('fetcher'), <FaKeyboard />);
                 break;
             case 'request_copied':
-                addSuggestion("goto-ai-response", "К Вводу Ответа AI", () => scrollToSection('aiResponseInput'), <FaArrowRight />);
+                addSuggestion("goto-ai-response", "К Вводу Ответа AI", () => scrollToSection('executor'), <FaArrowRight />);
                 addSuggestion("parse-response", "Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, aiResponseHasContent, !aiResponseHasContent, !aiResponseHasContent ? "Вставь ответ AI" : "");
                 break;
             case 'response_pasted':
                  addSuggestion("parse-response", "Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, true, !aiResponseHasContent, !aiResponseHasContent ? "Вставь ответ AI" : "");
-                 addSuggestion("goto-ai-response", "К Редактору Ответа", () => scrollToSection('aiResponseInput'), <FaKeyboard />);
+                 addSuggestion("goto-ai-response", "К Редактору Ответа", () => scrollToSection('executor'), <FaKeyboard />);
                 break;
             case 'parsing_response':
                  addSuggestion("loading-indicator", "Разбор Ответа...", () => {}, <FaBrain className="animate-pulse"/>, true, true );
@@ -124,7 +124,7 @@ const AutomationBuddy: React.FC = () => {
                 break;
              case 'pr_ready':
                 addSuggestion("create-pr", "Создать PR", triggerCreatePR, <FaGithub />);
-                addSuggestion("goto-pr-form", "К Форме PR", () => scrollToSection('assistant'), <FaRocket />);
+                addSuggestion("goto-pr-form", "К Форме PR", () => scrollToSection('executor'), <FaRocket />);
                 break;
             default: // idle
                  addSuggestion("goto-start", "К Началу...", () => scrollToSection('fetcher'), <FaCircleInfo />);
