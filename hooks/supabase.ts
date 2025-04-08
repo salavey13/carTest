@@ -646,4 +646,3 @@ export const updateRentalPaymentStatus = async (
     throw error
   }
 }
-
