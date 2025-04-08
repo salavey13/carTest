@@ -370,7 +370,7 @@ export default function VprTestPage() {
 
                     debugLogger.log("Attempt is active. Starting timer (if dummy mode isn't globally disabled or active).");
                     // Start timer only if not globally disabled and not initially active
-                     setIsTimerRunning(!isDummyModeActive && !isDummyModeGloballyDisabled);
+                     setIsTimerRunning(!isDummyModeActive);
                  }
 
             } catch (err: any) {
@@ -488,7 +488,7 @@ export default function VprTestPage() {
                 setCurrentQuestionIndex(nextIndex);
                 setIsCurrentQuestionNonAnswerable(nextIsNonAnswerable);
                 // Timer logic: Run only if not finishing AND dummy mode is OFF
-                if (!isDummyModeActive && !isDummyModeGloballyDisabled) { // Check global disable too
+                if (!isDummyModeActive) { // Check global disable too
                     setIsTimerRunning(true);
                     debugLogger.log(`Moved to question index: ${nextIndex}. Timer restarted.`);
                 } else {
@@ -532,7 +532,7 @@ export default function VprTestPage() {
         } finally {
             setIsSaving(false);
         }
-    }, [currentAttempt, isSaving, isTestComplete, timeUpModal, questions, currentQuestionIndex, user, subject, isDummyModeActive, isDummyModeGloballyDisabled]); // Added isDummyModeGloballyDisabled
+    }, [currentAttempt, isSaving, isTestComplete, timeUpModal, questions, currentQuestionIndex, user, subject, isDummyModeActive]); 
 
 
     // --- Reset Logic (Restoring context's version + dummy reset) ---
@@ -734,7 +734,7 @@ export default function VprTestPage() {
                             timeLimit={timeLimit}
                             onTimeUp={handleTimeUp}
                             // Adjust timer running condition based on merged logic
-                            isTimerRunning={isTimerRunning && !isSaving && !isTestComplete && !timeUpModal && !isDummyModeActive && !isDummyModeGloballyDisabled}
+                            isTimerRunning={isTimerRunning && !isSaving && !isTestComplete && !timeUpModal && !isDummyModeActive}
                         />
                         {/* --- Dummy Mode Toggle & Purchase Button --- */}
                         <div className="flex items-center space-x-3 self-center sm:self-auto">
