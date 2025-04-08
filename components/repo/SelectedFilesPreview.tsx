@@ -1,3 +1,4 @@
+// /components/repo/SelectedFilesPreview.tsx
 import React from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -17,8 +18,13 @@ const SelectedFilesPreview: React.FC<SelectedFilesPreviewProps> = ({
     // Create a sorted array from the Set for stable rendering order
     const sortedSelectedPaths = Array.from(selectedFiles).sort();
 
+    if (selectedFiles.size === 0) {
+        return null; // Don't render if no files selected
+    }
+
     return (
-         <details className="mb-6 bg-gray-800/50 border border-gray-700 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.2)]" open={selectedFiles.size > 0}>
+         // *** UPDATED: Removed 'open' prop to make it collapsed by default ***
+         <details className="mb-6 bg-gray-800/50 border border-gray-700 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.2)]">
             <summary className="text-lg font-bold text-cyan-400 cursor-pointer hover:text-cyan-300 transition-colors">Предпросмотр выбранных файлов ({selectedFiles.size})</summary>
             <div className="mt-3 max-h-96 overflow-y-auto space-y-4 custom-scrollbar">
                 {sortedSelectedPaths.map((path) => {
