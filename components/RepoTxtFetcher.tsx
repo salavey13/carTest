@@ -693,7 +693,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
                   isLoading={isLoading}
                   toggleFileSelection={toggleFileSelection}
                   // Pass imperative handle functions directly if they are stable
-                  onAddSelected={handleAddSelected}
+                  onAddSelected={() => handleAddSelected()}
                   onAddImportant={handleAddImportantFiles}
                   onAddTree={handleAddFullTree}
                   onSelectHighlighted={selectHighlightedFiles}
@@ -707,8 +707,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
                     kworkInput={kworkInput}
                     setKworkInput={setKworkInput} // Pass setter
                     kworkInputRef={kworkInputRef} // Pass DOM ref from context
-                    onCopyToClipboard={handleCopyToClipboard} // Pass the memoized handler
-                    onClearAll={handleClearAll} // Pass the memoized handler
+                    onCopyToClipboard={() => handleCopyToClipboard()} // Pass the memoized handler
+                    onClearAll={() => handleClearAll()} // Pass the memoized handler
                     isCopyDisabled={!kworkInput.trim() || isLoading} // Disable copy if no content or loading
                     isClearDisabled={(!kworkInput.trim() && selectedFiles.size === 0) || isLoading} // Disable clear if nothing to clear or loading
                  />
