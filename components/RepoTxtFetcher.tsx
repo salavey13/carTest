@@ -1,5 +1,7 @@
 // /components/RepoTxtFetcher.tsx
 "use client";
+
+"use client";
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useRef, useCallback, useMemo} from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -88,13 +90,81 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
         toast(message, { style: style, duration: type === 'error' ? 5000 : 3000 });
    }, []);
 
-   // Converts a URL path like '/some/route' or 'app/some/route' into 'app/some/route/page.tsx'
-   const getPageFilePath = useCallback((routePath: string): string => {
+   // *** UPDATED getPageFilePath ***
+   // Converts a URL path (e.g., '/vpr-test/35' or 'app/vpr-test/35') into a potential
+   // Next.js page file path (e.g., 'app/vpr-test/[subjectId]/page.tsx'),
+   // considering dynamic segments by comparing against actual available file paths.
+   const getPageFilePath = useCallback((routePath: string, allActualFilePaths: string[]): string => {
         const cleanPath = routePath.startsWith('/') ? routePath.substring(1) : routePath;
-        if (!cleanPath || cleanPath === 'app' || cleanPath === '/') return 'app/page.tsx';
-        const pathWithoutApp = cleanPath.startsWith('app/') ? cleanPath.substring(4) : cleanPath;
-        return `app/${pathWithoutApp}/page.tsx`;
-   }, []);
+
+        // Handle root case explicitly
+        if (!cleanPath || cleanPath === 'app' || cleanPath === '/') {
+            const rootPath = 'app/page.tsx';
+            if (allActualFilePaths.includes(rootPath)) return rootPath;
+            // If app/page.tsx doesn't exist but maybe app/index.tsx does? Less common.
+             if (allActualFilePaths.includes('app/index.tsx')) return 'app/index.tsx';
+             console.warn(`getPageFilePath: Root path ${rootPath} not found.`);
+             return rootPath; // Return expected root path even if not found
+        }
+
+        // Ensure path starts with 'app/' for consistent comparison logic
+        const pathWithApp = cleanPath.startsWith('app/') ? cleanPath : `app/${cleanPath}`;
+        const inputSegments = pathWithApp.split('/'); // e.g., ['app', 'vpr-test', '35']
+        const numInputSegments = inputSegments.length;
+
+        const potentialDirectPath = `${pathWithApp}/page.tsx`;
+        const potentialDirectIndexPath = `${pathWithApp}/index.tsx`; // Less common but possible
+
+        // --- 1. Check for Exact Direct Match ---
+        if (allActualFilePaths.includes(potentialDirectPath)) {
+            return potentialDirectPath;
+        }
+         if (allActualFilePaths.includes(potentialDirectIndexPath)) {
+            return potentialDirectIndexPath;
+        }
+
+        // --- 2. Check for Dynamic Segment Match ---
+        const pageFiles = allActualFilePaths.filter(p => p.startsWith('app/') && (p.endsWith('/page.tsx') || p.endsWith('/index.tsx')));
+
+        for (const actualPath of pageFiles) {
+            // Extract segments from the actual file path, excluding the final 'page.tsx' or 'index.tsx'
+            const actualPathEnd = actualPath.endsWith('/page.tsx') ? '/page.tsx' : '/index.tsx';
+            const actualPathBase = actualPath.substring(0, actualPath.length - actualPathEnd.length);
+            const actualSegments = actualPathBase.split('/'); // e.g., ['app', 'vpr-test', '[subjectId]']
+
+            // Basic check: must have the same number of segments
+            if (actualSegments.length !== numInputSegments) {
+                continue;
+            }
+
+            let isDynamicMatch = true;
+            for (let i = 0; i < numInputSegments; i++) {
+                const inputSeg = inputSegments[i];
+                const actualSeg = actualSegments[i];
+
+                if (inputSeg === actualSeg) {
+                    continue; // Segments match exactly
+                } else if (actualSeg.startsWith('[') && actualSeg.endsWith(']')) {
+                    continue; // Actual segment is dynamic, matches the input segment positionally
+                } else {
+                    isDynamicMatch = false; // Mismatch found
+                    break;
+                }
+            }
+
+            if (isDynamicMatch) {
+                console.log(`getPageFilePath: Dynamic match found for route "${routePath}" -> file "${actualPath}"`);
+                return actualPath; // Return the actual file path with dynamic placeholders
+            }
+        }
+
+        // --- 3. Fallback ---
+        // If no exact or dynamic match found, return the *most likely* direct path convention.
+        // The caller (`handleFetch`) should verify if this file actually exists later.
+        console.warn(`getPageFilePath: No direct or dynamic page file match found for route "${routePath}". Falling back to direct guess: "${potentialDirectPath}"`);
+        return potentialDirectPath;
+
+   }, []); // Dependency: No internal state/props used, relies only on arguments
 
    // Extracts potential import paths from file content
    const extractImports = useCallback((content: string): string[] => {
@@ -280,7 +350,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
             addToast("Ошибка копирования", 'error');
             return false;
         }
-    }, [files, selectedFiles, kworkInput, scrollToSection, addToast, getLanguage, setKworkInput]);
+    }, [kworkInput, scrollToSection, addToast, setRequestCopied]); // Simplified dependencies: relies on kworkInput state
 
     // Clears selections, input, and highlights
     const handleClearAll = useCallback(() => {
@@ -313,17 +383,11 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
     // If retrying manually, ensure status allows it (e.g., failed_retries, error)
     if (isManualRetry && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')) {
         console.warn(`Manual retry requested but status is ${fetchStatus}. Allowing anyway.`);
-        // Optionally prevent retry if status is success/loading etc.
-        // if (fetchStatus === 'success' || fetchStatus === 'loading' || fetchStatus === 'retrying') {
-        //     addToast("Извлечение уже завершено или идет.", "info");
-        //     return;
-        // }
     }
 
 
     setExtractLoading(true); setError(null); setFiles([]);
     setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set()); // Clear selections
-    // Keep kworkInput or clear it? Let's clear it for a fresh fetch.
     setKworkInput("");
     // Reset downstream context states for a clean slate
     setFilesFetched(false, null, []); setRequestCopied(false);
@@ -331,11 +395,10 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
     setPrimaryHighlightedPath(null); setSecondaryHighlightedPaths([]);
 
     addToast("Запрос репозитория...", 'info');
-    // *** Use the updated progress simulation ***
-    startProgressSimulation(20); // Start with a longer estimate (e.g., 20 seconds)
+    startProgressSimulation(20); // Start with a longer estimate
 
-    const maxRetries = 2; // Reduce retries slightly? Keep 3? Let's try 2 (total 3 attempts)
-    const retryDelayMs = 2000; // Increase delay between retries
+    const maxRetries = 2;
+    const retryDelayMs = 2000;
     let currentTry = 0; let result: Awaited<ReturnType<typeof fetchRepoContents>> | null = null;
     let filesToSelect = new Set<string>();
 
@@ -348,7 +411,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
         if (currentStatus === 'retrying') {
             addToast(`Попытка ${currentTry} из ${maxRetries+1}...`, 'info');
             await delay(retryDelayMs);
-            startProgressSimulation(15 + (currentTry * 5)); // Maybe increase duration on retries
+            startProgressSimulation(15 + (currentTry * 5)); // Increase duration on retries
         }
 
         try {
@@ -364,22 +427,26 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
 
             // --- File Highlighting/Selection ---
             const fetchedFiles = result.files;
+            const allActualFilePaths = fetchedFiles.map(f => f.path); // <<< Get all paths for getPageFilePath
             let primaryPath: string | null = null; let secondaryPaths: string[] = [];
-            filesToSelect = new Set<string>(); // Start fresh for selection logic
+            filesToSelect = new Set<string>();
+
             if (highlightedPathFromUrl) {
-                primaryPath = getPageFilePath(highlightedPathFromUrl);
-                console.log(`URL path: ${highlightedPathFromUrl}, Mapped file path: ${primaryPath}`);
+                // *** Use updated getPageFilePath with all actual paths ***
+                primaryPath = getPageFilePath(highlightedPathFromUrl, allActualFilePaths);
+                console.log(`URL path: "${highlightedPathFromUrl}", Mapped file path attempt: "${primaryPath}"`);
+
+                // Check if the potentially dynamic path actually exists in the fetched files
                 const pageFile = fetchedFiles.find((file) => file.path === primaryPath);
                 if (pageFile) {
                     console.log(`Primary file found: ${primaryPath}`);
                     filesToSelect.add(primaryPath);
                     const imports = extractImports(pageFile.content);
-                     // Pass fetchedFiles to resolveImportPath
                     secondaryPaths = imports.map((imp) => resolveImportPath(imp, pageFile.path, fetchedFiles)).filter((path): path is string => !!path && path !== primaryPath);
                     console.log(`Found ${secondaryPaths.length} related files:`, secondaryPaths);
                     secondaryPaths.forEach(path => filesToSelect.add(path));
                 } else {
-                    addToast(`Файл страницы для URL (${primaryPath}) не найден`, 'warning'); // Use warning
+                    addToast(`Файл страницы для URL (${highlightedPathFromUrl} -> ${primaryPath}) не найден в репозитории`, 'warning');
                     console.warn(`Primary file not found: ${primaryPath}`);
                     primaryPath = null; // Reset primaryPath if not found
                 }
@@ -390,8 +457,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
             importantFiles.forEach(path => { if (fetchedFiles.some(f => f.path === path) && !filesToSelect.has(path)) { console.log(`Adding important file: ${path}`); filesToSelect.add(path); } });
 
             setPrimaryHighlightedPath(primaryPath); setSecondaryHighlightedPaths(secondaryPaths);
-             // Update context AFTER success and processing highlights
-            setFilesFetched(true, primaryPath, secondaryPaths);
+            setFilesFetched(true, primaryPath, secondaryPaths); // Update context AFTER success
 
 
             // --- AUTOMATION SEQUENCE ---
@@ -400,7 +466,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
                  addToast(`Авто-выбор ${filesToSelect.size} файлов и генерация запроса...`, 'info');
                  setSelectedFilesState(filesToSelect); setSelectedFetcherFiles(filesToSelect);
                  const task = ideaFromUrl || DEFAULT_TASK_IDEA;
-                 // ***** PARSING FIX: Consistent Markdown Formatting *****
                  const prefix = "Контекст кода для анализа (отвечай полным кодом):\n";
                  const markdownTxt = fetchedFiles
                     .filter(f => filesToSelect.has(f.path))
@@ -413,8 +478,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
 
                 await delay(350); // Delay for state update and UI render
 
-                // Use the component's own handler
-                const copied = handleCopyToClipboard(combinedContent, false);
+                const copied = handleCopyToClipboard(combinedContent, false); // Use component's own handler
                 if (copied) {
                     addToast("КОНТЕКСТ В БУФЕРЕ! Открываю AI...", 'success');
                     scrollToSection('executor'); // Scroll first
@@ -425,13 +489,12 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
                 }
             } else { // Non-automation success path
                  console.log("Automation sequence skipped or conditions not met.");
-                 // Auto-select important/related files even if not automating fully
                 if (filesToSelect.size > 0) {
                     setSelectedFilesState(filesToSelect);
                     setSelectedFetcherFiles(filesToSelect); // Update context too
                     addToast(`Авто-выбрано ${filesToSelect.size} важных/связанных файлов`, 'info');
                 }
-                 // Scroll to highlighted file or list start
+                // Scroll to highlighted file or list start
                 if (primaryPath) {
                     setTimeout(() => {
                         const elementId = `file-${primaryPath}`; const fileElement = document.getElementById(elementId);
@@ -445,17 +508,15 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
             return; // Exit loop on success
 
           } else {
-              // Handle cases like result === null, result.success === false, or result.files is not an array
               const errorMessage = result?.error || "Не удалось получить файлы (ответ API не содержит ожидаемую структуру)";
               console.error(`[handleFetch] Attempt ${currentTry} failed: ${errorMessage}`);
-              throw new Error(errorMessage); // Throw to trigger retry or failure logic
+              throw new Error(errorMessage); // Trigger retry or failure logic
           }
         } catch (err: any) {
           console.error(`[handleFetch] Error during attempt ${currentTry}:`, err);
           const displayError = err?.message || "Неизвестная ошибка при извлечении";
-          setError(`Попытка ${currentTry}: ${displayError}`); // Show error related to the attempt
+          setError(`Попытка ${currentTry}: ${displayError}`);
 
-          // Check if it's the last attempt
           if (currentTry > maxRetries) {
             console.error(`[handleFetch] Final attempt failed. Max retries (${maxRetries}) reached.`);
             stopProgressSimulation();
@@ -466,16 +527,15 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
             setExtractLoading(false);
             return; // Exit loop after final failure
           }
-          // If not the last attempt, the loop will continue after the delay
+          // Loop continues after delay if not last attempt
         }
     } // End while loop
 
-    // Fallback cleanup (should ideally not be reached if logic above is correct)
+    // Fallback cleanup (should ideally not be reached)
     console.warn("[handleFetch] Reached end of function unexpectedly after loop.");
     stopProgressSimulation();
-    // Ensure status reflects failure if loop finishes without success
     if (fetchStatus !== 'success') {
-        setFetchStatus(error ? 'failed_retries' : 'error'); // Use 'failed_retries' if error was set
+        setFetchStatus(error ? 'failed_retries' : 'error');
         setProgress(0);
         setFilesFetched(false, null, []);
     }
@@ -484,10 +544,11 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
    }, [ // Dependencies
         repoUrl, token, fetchStatus, highlightedPathFromUrl, ideaFromUrl, importantFiles,
         addToast, startProgressSimulation, stopProgressSimulation, getLanguage,
-        getPageFilePath, extractImports, resolveImportPath, openLink, handleCopyToClipboard, // Added handleCopyToClipboard
+        getPageFilePath, // Now includes dynamic logic, depends only on args
+        extractImports, resolveImportPath, openLink, handleCopyToClipboard,
         setFetchStatus, setRepoUrlEntered, setFilesFetched, setSelectedFetcherFiles,
         setKworkInput, setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles,
-        scrollToSection, DEFAULT_TASK_IDEA, files, // Keep `files` dependency for resolveImportPath within handleFetch scope
+        scrollToSection, DEFAULT_TASK_IDEA, // `files` state is read *inside* callback after fetch, so not needed in outer deps
         // No need for handleAddSelected here as it's called separately
    ]);
 
@@ -516,12 +577,10 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
 
    // Toggles selection state for a single file
    const toggleFileSelection = useCallback((path: string) => {
-    // console.log(`[toggleFileSelection] Toggling: ${path}`); // Debug Log
     setSelectedFilesState(prevSet => {
         const newSet = new Set(prevSet);
         if (newSet.has(path)) newSet.delete(path); else newSet.add(path);
         setSelectedFetcherFiles(newSet); // Update context immediately
-        // console.log(`[toggleFileSelection] New selection size: ${newSet.size}`); // Debug Log
         return newSet;
     });
   }, [setSelectedFetcherFiles]);
