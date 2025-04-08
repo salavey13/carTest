@@ -1,3 +1,4 @@
+// /app/layout.tsx
 import StickyChatButton from "@/components/StickyChatButton";
 import type React from "react";
 import Script from "next/script";
