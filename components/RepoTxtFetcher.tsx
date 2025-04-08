@@ -257,7 +257,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
         });
 
         addToast(`${filesToAdd.size} файлов добавлено в запрос`, 'success');
-        scrollToSection('kworkInput');
+        scrollToSection('extractor');
     }, [files, selectedFiles, scrollToSection, addToast, getLanguage]); // Removed setKworkInput, will use setter from context/state
 
     // Handles copying text to clipboard
@@ -272,7 +272,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
             addToast("Запрос скопирован! ✅ Вставляй в AI", 'success');
             setRequestCopied(true); // Update context state
             if (shouldScroll) {
-                 scrollToSection('aiResponseInput');
+                 scrollToSection('executor');
             }
             return true;
         } catch (err) {
@@ -417,11 +417,11 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
                 const copied = handleCopyToClipboard(combinedContent, false);
                 if (copied) {
                     addToast("КОНТЕКСТ В БУФЕРЕ! Открываю AI...", 'success');
-                    scrollToSection('aiResponseInput'); // Scroll first
+                    scrollToSection('executor'); // Scroll first
                     setTimeout(() => openLink('https://aistudio.google.com'), 800); // Open link after short delay
                 } else {
                    addToast("Ошибка авто-копирования в буфер. Переход отменен.", 'error');
-                   scrollToSection('kworkInput'); // Scroll back to input
+                   scrollToSection('extractor'); // Scroll back to input
                 }
             } else { // Non-automation success path
                  console.log("Automation sequence skipped or conditions not met.");
@@ -557,7 +557,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>((props
         added = true;
         return trimmedPrev ? `${trimmedPrev}\n\n${treeContent}` : treeContent;
     });
-    if (added) { addToast("Дерево файлов добавлено в запрос", 'success'); scrollToSection('kworkInput'); }
+    if (added) { addToast("Дерево файлов добавлено в запрос", 'success'); scrollToSection('extractor'); }
     else { addToast("Дерево файлов уже добавлено", 'info'); }
   }, [files, setKworkInput, scrollToSection, addToast]);
 
