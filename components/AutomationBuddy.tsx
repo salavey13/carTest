@@ -76,7 +76,7 @@ const AutomationBuddy: React.FC = () => {
         // Build suggestions based on the current workflow step AND fetch status
         switch (currentStep) {
             case 'need_repo_url':
-                 addSuggestion("goto-fetcher-settings", "Указать URL Репо", () => scrollToSection('extractor'), <FaKeyboard />);
+                 addSuggestion("goto-fetcher-settings", "Указать URL Репо", () => scrollToSection('fetcher'), <FaKeyboard />);
                  break;
             case 'ready_to_fetch':
                 addSuggestion("fetch", "Извлечь Файлы", () => triggerFetch(), <FaDownload />, true, !repoUrlEntered, !repoUrlEntered ? "Сначала введи URL репо" : "");
@@ -86,48 +86,48 @@ const AutomationBuddy: React.FC = () => {
                 break;
             case 'fetch_failed':
                 addSuggestion("retry-fetch", "Попробовать Снова?", () => triggerFetch(true), <FaArrowRotateRight />, true, isLoading); // Allow retry click even if assistant loading? Check this interaction. Disable if isLoading.
-                addSuggestion("goto-fetcher-settings", "Проверить URL/Токен", () => scrollToSection('extractor'), <FaKeyboard />, !isLoading); // Disable if any loading
+                addSuggestion("goto-fetcher-settings", "Проверить URL/Токен", () => scrollToSection('fetcher'), <FaKeyboard />, !isLoading); // Disable if any loading
                 break;
             // --- States after successful fetch ---
             case 'files_fetched':
-                 addSuggestion("goto-files", "К Списку Файлов", () => scrollToSection('extractor'), <FaEye />);
+                 addSuggestion("goto-files", "К Списку Файлов", () => scrollToSection('fetcher'), <FaEye />);
                  addSuggestion("add-selected", "Добавить в Запрос", triggerAddSelectedToKwork, <FaPlus />, selectedFetcherFiles.size > 0);
                 break;
             case 'files_fetched_highlights':
                  addSuggestion("select-highlighted", "Выбрать Связанные", triggerSelectHighlighted, <FaHighlighter />);
-                 addSuggestion("goto-files", "К Списку Файлов", () => scrollToSection('extractor'), <FaEye />);
+                 addSuggestion("goto-files", "К Списку Файлов", () => scrollToSection('fetcher'), <FaEye />);
                  addSuggestion("add-selected", "Добавить в Запрос", triggerAddSelectedToKwork, <FaPlus />, selectedFetcherFiles.size > 0);
                 break;
             case 'files_selected':
                 addSuggestion("add-selected", "Добавить в Запрос", triggerAddSelectedToKwork, <FaPlus />);
-                addSuggestion("goto-kwork", "К Редактору Запроса", () => scrollToSection('extractor'), <FaKeyboard />);
+                addSuggestion("goto-kwork", "К Редактору Запроса", () => scrollToSection('fetcher'), <FaKeyboard />);
                 break;
             case 'request_written':
                 addSuggestion("copy-kwork", "Скопировать Запрос", triggerCopyKwork, <FaCopy />, true, !kworkInputHasContent, !kworkInputHasContent ? "Запрос пуст" : "");
-                addSuggestion("goto-kwork", "К Редактору Запроса", () => scrollToSection('extractor'), <FaKeyboard />);
+                addSuggestion("goto-kwork", "К Редактору Запроса", () => scrollToSection('fetcher'), <FaKeyboard />);
                 break;
             case 'request_copied':
-                addSuggestion("goto-ai-response", "К Вводу Ответа AI", () => scrollToSection('executor'), <FaArrowRight />);
+                addSuggestion("goto-ai-response", "К Вводу Ответа AI", () => scrollToSection('assistant'), <FaArrowRight />);
                 addSuggestion("parse-response", "Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, aiResponseHasContent, !aiResponseHasContent, !aiResponseHasContent ? "Вставь ответ AI" : "");
                 break;
             case 'response_pasted':
                  addSuggestion("parse-response", "Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, true, !aiResponseHasContent, !aiResponseHasContent ? "Вставь ответ AI" : "");
-                 addSuggestion("goto-ai-response", "К Редактору Ответа", () => scrollToSection('executor'), <FaKeyboard />);
+                 addSuggestion("goto-ai-response", "К Редактору Ответа", () => scrollToSection('assistant'), <FaKeyboard />);
                 break;
             case 'parsing_response':
                  addSuggestion("loading-indicator", "Разбор Ответа...", () => {}, <FaBrain className="animate-pulse"/>, true, true );
                  break;
             case 'response_parsed':
                  addSuggestion("select-all-parsed", "Выбрать Все для PR", triggerSelectAllParsed, <FaListCheck />, filesParsed);
-                 addSuggestion("goto-assistant-files", "К Файлам для PR", () => scrollToSection('executor'), <FaEye />);
+                 addSuggestion("goto-assistant-files", "К Файлам для PR", () => scrollToSection('assistant'), <FaEye />);
                  addSuggestion("create-pr", "Создать PR", triggerCreatePR, <FaGithub />, selectedAssistantFiles.size > 0, selectedAssistantFiles.size === 0, selectedAssistantFiles.size === 0 ? "Выбери файлы для PR" : "");
                 break;
              case 'pr_ready':
                 addSuggestion("create-pr", "Создать PR", triggerCreatePR, <FaGithub />);
-                addSuggestion("goto-pr-form", "К Форме PR", () => scrollToSection('executor'), <FaRocket />);
+                addSuggestion("goto-pr-form", "К Форме PR", () => scrollToSection('assistant'), <FaRocket />);
                 break;
             default: // idle
-                 addSuggestion("goto-start", "К Началу...", () => scrollToSection('extractor'), <FaCircleInfo />);
+                 addSuggestion("goto-start", "К Началу...", () => scrollToSection('fetcher'), <FaCircleInfo />);
         }
         // Add common actions if needed, disabling based on `isLoading`
         // e.g., addSuggestion("clear-all", "Очистить?", clearAllAction, <FaBroom/>, true, isLoading);
