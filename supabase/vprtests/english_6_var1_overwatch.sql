@@ -47,7 +47,7 @@ BEGIN
 
         -- Question 2 (Var 1, Grade 6) - Grammar (Present Simple 3rd Person)
         INSERT INTO public.vpr_questions (subject_id, variant_number, text, explanation, position)
-        VALUES (subj_en6_id, v_variant_number, E'Choose the correct word:\n\nMercy always ______ her teammates.', E'We use the -s form of the verb for the third person singular (He, She, It) in the Present Simple tense. Mercy is 'She', so we need 'helps'.', 2)
+        VALUES (subj_en6_id, v_variant_number, E'Choose the correct word:\n\nMercy always ______ her teammates.', E'We use the -s form of the verb for the third person singular (He, She, It) in the Present Simple tense. Mercy is "She", so we need "helps".', 2)
         RETURNING id INTO q_id;
         INSERT INTO public.vpr_answers (question_id, text, is_correct) VALUES
         (q_id, 'helps', true),
@@ -88,7 +88,7 @@ BEGIN
 
         -- Question 6 (Var 1, Grade 6) - Grammar (Comparative Adjectives)
         INSERT INTO public.vpr_questions (subject_id, variant_number, text, explanation, position)
-        VALUES (subj_en6_id, v_variant_number, E'Choose the correct form:\n\nReinhardt''s shield is ______ than Wrecking Ball''s health.', E'For short adjectives like 'big', we form the comparative by adding '-er' (bigger). 'More big' is incorrect.', 6)
+        VALUES (subj_en6_id, v_variant_number, E'Choose the correct form:\n\nReinhardt''s shield is ______ than Wrecking Ball''s health.', E'For short adjectives like "big", we form the comparative by adding "-er" (bigger). "More big" is incorrect.', 6)
         RETURNING id INTO q_id;
         INSERT INTO public.vpr_answers (question_id, text, is_correct) VALUES
         (q_id, 'bigger', true),
@@ -98,7 +98,7 @@ BEGIN
 
         -- Question 7 (Var 1, Grade 6) - Vocabulary (Game Terms)
         INSERT INTO public.vpr_questions (subject_id, variant_number, text, explanation, position)
-        VALUES (subj_en6_id, v_variant_number, E'In Overwatch 2, what does "Ultimate Ability" mean?', E'An "Ultimate Ability" or "Ult" is a hero's most powerful, special ability that needs time or actions to charge up.', 7)
+        VALUES (subj_en6_id, v_variant_number, E'In Overwatch 2, what does "Ultimate Ability" mean?', E'An "Ultimate Ability" or "Ult" is a heros most powerful, special ability that needs time or actions to charge up.', 7)
         RETURNING id INTO q_id;
         INSERT INTO public.vpr_answers (question_id, text, is_correct) VALUES
         (q_id, 'A hero''s special, powerful skill', true),
@@ -108,7 +108,7 @@ BEGIN
 
         -- Question 8 (Var 1, Grade 6) - Reading Comprehension (Dialogue)
         INSERT INTO public.vpr_questions (subject_id, variant_number, text, explanation, position)
-        VALUES (subj_en6_id, v_variant_number, E'Read the dialogue:\nLúcio: "Hey D.Va! Ready to drop the beat and push the payload?"\nD.Va: "You know it, Lúcio! Let''s show them our moves. My mech is ready!"\nLúcio: "Alright! Let''s bring the noise!"\n\nWhat are Lúcio and D.Va getting ready for?', E'The dialogue mentions "push the payload", "show them our moves", and "mech is ready", indicating they are preparing for a game or match in Overwatch.', 8)
+        VALUES (subj_en6_id, v_variant_number, E'Read the dialogue:\nLúcio: "Hey D.Va! Ready to drop the beat and push the payload?"\nD.Va: "You know it, Lúcio! Lets show them our moves. My mech is ready!"\nLúcio: "Alright! Let''s bring the noise!"\n\nWhat are Lúcio and D.Va getting ready for?', E'The dialogue mentions "push the payload", "show them our moves", and "mech is ready", indicating they are preparing for a game or match in Overwatch.', 8)
         RETURNING id INTO q_id;
         INSERT INTO public.vpr_answers (question_id, text, is_correct) VALUES
         (q_id, 'Playing a game match', true),
@@ -118,7 +118,7 @@ BEGIN
 
         -- Question 9 (Var 1, Grade 6) - Grammar (Past Simple Irregular)
         INSERT INTO public.vpr_questions (subject_id, variant_number, text, explanation, position)
-        VALUES (subj_en6_id, v_variant_number, E'Choose the correct verb form:\n\nYesterday, our Overwatch team ______ the final match.', E'The past tense of the irregular verb 'win' is 'won'. 'Yesterday' indicates we need the Past Simple tense.', 9)
+        VALUES (subj_en6_id, v_variant_number, E'Choose the correct verb form:\n\nYesterday, our Overwatch team ______ the final match.', E'The past tense of the irregular verb "win" is "won". "Yesterday" indicates we need the Past Simple tense.', 9)
         RETURNING id INTO q_id;
         INSERT INTO public.vpr_answers (question_id, text, is_correct) VALUES
         (q_id, 'won', true),
