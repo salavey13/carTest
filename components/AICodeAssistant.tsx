@@ -431,8 +431,8 @@ const AICodeAssistant = forwardRef<any, AICodeAssistantProps>(({ aiResponseInput
                  <SwapModal
                     isOpen={showModal}
                     onClose={() => setShowModal(false)}
-                    onSwap={handleSwap} // <<< Pass correct handler
-                    onSearch={handleSearch} // <<< Pass correct handler
+                    onSwap={() => handleSwap()} // <<< Pass correct handler
+                    onSearch={() => handleSearch()} // <<< Pass correct handler
                     initialMode={modalMode}
                  />
              )}
