@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { FaCheckSquare, FaRegSquare, FaPlus, FaCodeBranch, FaStar, FaHighlighter, FaKey, FaTree, FaFileLines } from 'react-icons/fa6'; // Include needed icons
+import { FaSquareCheck, FaRegSquare, FaPlus, FaCodeBranch, FaStar, FaHighlighter, FaKey, FaTree, FaFileLines } from 'react-icons/fa6'; // Include needed icons
 import { FileNode, ImportCategory } from '../RepoTxtFetcher'; // Import FileNode and ImportCategory type
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -216,7 +216,7 @@ const FileList: React.FC<FileListProps> = ({
                                                 <div className="flex items-center gap-2 overflow-hidden flex-grow min-w-0"> {/* Ensure text truncates */}
                                                      {/* Custom Checkbox simulation */}
                                                      {isSelected ? (
-                                                        <FaCheckSquare className="text-purple-400 flex-shrink-0 w-3.5 h-3.5"/>
+                                                        <FaSquareCheck className="text-purple-400 flex-shrink-0 w-3.5 h-3.5"/>
                                                      ) : (
                                                         <FaRegSquare className="text-gray-500 group-hover:text-gray-300 flex-shrink-0 w-3.5 h-3.5"/>
                                                      )}
