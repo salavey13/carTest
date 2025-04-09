@@ -37,7 +37,7 @@ BEGIN
         -- Question 1 (Var 1, Grade 6) - Vocabulary Matching (Heroes/Descriptions)
         INSERT INTO public.vpr_questions (subject_id, variant_number, text, explanation, position, visual_data)
         VALUES (subj_en6_id, v_variant_number, E'Match the hero with the description:\n\n[Image: Overwatch Heroes Grid]\n\nA) Tracer   B) Reinhardt   C) Mercy   D) Winston\n\n1. A scientist gorilla from the moon.\n2. A fast hero who can rewind time.\n3. An angel who can heal teammates.\n4. A large knight with a big shield.\n\nWrite the numbers for A, B, C, D.', E'A) Tracer matches description 2.\nB) Reinhardt matches description 4.\nC) Mercy matches description 3.\nD) Winston matches description 1.\nCorrect sequence: 2431.', 1,
-        '{"type": "image", "url": "/images/vpr/english/6/eng6_var1_q1_heroes_grid.png", "alt": "Overwatch Heroes Grid", "caption": "AI Prompt: Grid of 4 simple, friendly cartoon portraits in Overwatch 2 style: 1. Tracer (smiling, goggles on head, orange/brown hair). 2. Reinhardt (big smile, grey beard, inside helmet). 3. Mercy (smiling, blonde hair, halo). 4. Winston (gorilla wearing glasses, thoughtful smile)."}'::jsonb)
+        '{"type": "image", "url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/english/6/eng6_var1_q1_heroes_grid.png", "alt": "Overwatch Heroes Grid", "caption": "AI Prompt: Grid of 4 simple, friendly cartoon portraits in Overwatch 2 style: 1. Tracer (smiling, goggles on head, orange/brown hair). 2. Reinhardt (big smile, grey beard, inside helmet). 3. Mercy (smiling, blonde hair, halo). 4. Winston (gorilla wearing glasses, thoughtful smile)."}'::jsonb)
         RETURNING id INTO q_id;
         INSERT INTO public.vpr_answers (question_id, text, is_correct) VALUES
         (q_id, '2431', true),
@@ -78,7 +78,7 @@ BEGIN
         -- Question 5 (Var 1, Grade 6) - Image Interpretation (Action)
         INSERT INTO public.vpr_questions (subject_id, variant_number, text, explanation, position, visual_data)
         VALUES (subj_en6_id, v_variant_number, E'Look at the picture. What is the main action happening near the cart?\n\n[Image: Payload near Checkpoint]', E'The image shows a payload cart very close to a checkpoint marker on the ground, with a friendly hero nearby. This indicates the action of pushing the payload towards the objective.', 5,
-        '{"type": "image", "url": "images/vpr/english/6/eng6_var1_q5_payload_checkpoint.png", "alt": "Payload near Checkpoint", "caption": "AI Prompt: Simple cartoon scene from Overwatch 2 game. A bright blue glowing vehicle (payload) is inches away from a clearly marked white line (checkpoint) on a path. A large friendly character like Reinhardt stands protectively next to the payload. A shadowy enemy figure like Reaper is visible further down the path, looking towards them."}'::jsonb)
+        '{"type": "image", "url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/english/6/eng6_var1_q5_payload_checkpoint.png", "alt": "Payload near Checkpoint", "caption": "AI Prompt: Simple cartoon scene from Overwatch 2 game. A bright blue glowing vehicle (payload) is inches away from a clearly marked white line (checkpoint) on a path. A large friendly character like Reinhardt stands protectively next to the payload. A shadowy enemy figure like Reaper is visible further down the path, looking towards them."}'::jsonb)
         RETURNING id INTO q_id;
         INSERT INTO public.vpr_answers (question_id, text, is_correct) VALUES
         (q_id, 'Pushing the payload to the checkpoint', true),
@@ -150,7 +150,7 @@ BEGIN
         -- Question 12 (Var 1, Grade 6) - Image - Sentence Matching
         INSERT INTO public.vpr_questions (subject_id, variant_number, text, explanation, position, visual_data)
         VALUES (subj_en6_id, v_variant_number, E'Look at the picture and match the actions to the letters:\n\n[Image: Overwatch Actions]\n\nA) Soldier: 76   B) Pharah   C) Ana\n\n1. She is flying high in the sky.\n2. He is running on the ground.\n3. She is aiming her rifle carefully.\n\nWrite the numbers for A, B, C.', E'A) Soldier: 76 matches action 2 (running).\nB) Pharah matches action 1 (flying).\nC) Ana matches action 3 (aiming rifle).\nCorrect sequence: 213.', 12,
-        '{"type": "image", "url": "images/vpr/english/6/eng6_var1_q12_hero_actions.png", "alt": "Overwatch Actions", "caption": "AI Prompt: Simple, clear cartoon scene in Overwatch 2 style. Left: Soldier: 76 character running forward on ground level. Middle: Pharah character flying high up in a blue sky with clouds. Right: Ana character crouching slightly, aiming a long sniper rifle. Minimal background."}'::jsonb)
+        '{"type": "image", "url": "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/english/6/eng6_var1_q12_hero_actions.png", "alt": "Overwatch Actions", "caption": "AI Prompt: Simple, clear cartoon scene in Overwatch 2 style. Left: Soldier: 76 character running forward on ground level. Middle: Pharah character flying high up in a blue sky with clouds. Right: Ana character crouching slightly, aiming a long sniper rifle. Minimal background."}'::jsonb)
         RETURNING id INTO q_id;
         INSERT INTO public.vpr_answers (question_id, text, is_correct) VALUES
         (q_id, '213', true),
