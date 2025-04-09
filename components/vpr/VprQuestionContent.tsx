@@ -1,25 +1,25 @@
-import React from 'react'; // Import React
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Image } from 'lucide-react';
+import { Image as ImageIcon, AlertTriangle } from 'lucide-react'; // Renamed Image to ImageIcon
+
 // Import the visual components
 import { SimpleChart } from './SimpleChart';
 import { ComparisonDisplay } from './ComparisonDisplay';
 import { AxisDisplay } from './AxisDisplay';
 import { PlotDisplay } from './PlotDisplay';
-// Import the type if you defined a specific one, otherwise use 'any'
-import type { VprVisualDataType } from '@/lib/vprVisualData'; // Or remove if not using the static file
+// Import the type definition
+import type { VprVisualDataType } from '@/lib/vprVisualData';
 
 interface VprQuestionContentProps {
-    questionData: { // Pass the whole object
+    questionData: {
         text: string | undefined;
-        visual_data?: VprVisualDataType | null; // Use the data from DB
+        visual_data?: VprVisualDataType | any | null; // Use the data from DB, allow 'any' for flexibility if parsing fails client-side
     };
-    questionNumber: number; // Position (1-based)
+    questionNumber: number;
     totalQuestions: number;
-    // subjectId and variantNumber are no longer needed here if visual_data is passed directly
 }
 
-// Regex to find placeholders (keep for cleaning text even if visual_data exists)
+// Regex to find placeholders ONLY for cleaning text, not for rendering logic
 const placeholderRegex = /\[(Диаграмма|Изображение|Рисунок|График|Площадь|Коорд).*?\]/gi;
 
 export function VprQuestionContent({
@@ -30,57 +30,80 @@ export function VprQuestionContent({
 
     const { text: originalText, visual_data } = questionData;
 
-    if (!originalText) {
+    if (!originalText && !visual_data) {
         return <div className="text-center text-light-text/70 my-8">Вопрос загружается...</div>;
     }
 
-    // Clean the text regardless of whether visual_data exists, to remove the tag
-    const cleanedQuestionText = originalText.replace(placeholderRegex, '').trim();
-
-    // Check if any placeholder tag *was* present in the original text (for generic fallback)
-    const hasGenericPlaceholder = placeholderRegex.test(originalText);
+    // Clean the text to remove tags like [Рисунок], [Диаграмма], etc.
+    // The actual visual rendering is handled by visual_data now.
+    const cleanedQuestionText = originalText ? originalText.replace(placeholderRegex, '').trim() : '';
 
     const renderVisualComponent = () => {
-        // Prioritize visual_data from the database
-        if (visual_data) {
-            try {
-                // Assuming visual_data is already parsed JSON by Supabase client
-                const data = visual_data as VprVisualDataType; // Cast to the expected type
-
-                switch (data.type) {
-                    case 'chart':
-                        return <SimpleChart chartData={data} />;
-                    case 'compare':
-                        return <ComparisonDisplay compareData={data} />;
-                    case 'axis':
-                         // Ensure points exist before rendering
-                        return data.points && data.points.length > 0
-                               ? <AxisDisplay axisData={data} />
-                               : <div className="text-xs italic text-gray-500 text-center my-2">(Нет данных точек для оси)</div>; // Fallback if points are empty
-                    case 'plot':
-                        return data.points && data.points.length > 0
-                               ? <PlotDisplay plotData={data} />
-                               : <div className="text-xs italic text-gray-500 text-center my-2">(Нет данных точек для графика)</div>;
-                    default:
-                        console.warn("Unknown visual_data type:", (data as any)?.type);
-                        return null; // Unknown type
-                }
-            } catch (e) {
-                console.error("Error processing visual_data:", e, visual_data);
-                return <div className="text-red-500 text-center my-2">Ошибка отображения визуальных данных.</div>;
+        if (!visual_data) {
+            // Check if a placeholder tag existed even if visual_data is null/missing
+            // This helps identify questions that *should* have visuals but don't yet.
+            if (originalText && placeholderRegex.test(originalText)) {
+                return (
+                     <div className="mt-4 p-4 border border-dashed border-gray-600 rounded-md text-center text-gray-400 bg-dark-bg/30">
+                        <ImageIcon className="h-8 w-8 mx-auto mb-2 text-gray-500" />
+                        <p className="text-sm">Визуальный элемент (диаграмма/рисунок/график) для этого вопроса отсутствует в базе данных.</p>
+                     </div>
+                );
             }
+            return null; // No visual data and no placeholder tag found
         }
-        // Fallback: If no visual_data in DB, but a placeholder tag was found in text
-        else if (hasGenericPlaceholder) {
+
+        // Attempt to render based on visual_data type
+        try {
+            // Supabase client usually parses JSONB automatically, but double-check type
+            const data = visual_data as VprVisualDataType;
+
+            switch (data?.type) {
+                case 'chart':
+                    return <SimpleChart chartData={data} />;
+                case 'compare':
+                    return <ComparisonDisplay compareData={data} />;
+                case 'axis':
+                    return data.points && data.points.length > 0
+                           ? <AxisDisplay axisData={data} />
+                           : <div className="text-xs italic text-gray-500 text-center my-2">(Нет данных точек для оси)</div>;
+                case 'plot':
+                    return data.points && data.points.length > 0
+                           ? <PlotDisplay plotData={data} />
+                           : <div className="text-xs italic text-gray-500 text-center my-2">(Нет данных точек для графика)</div>;
+                case 'image': // Handle direct image type
+                    return (
+                        <div className="my-4 text-center">
+                            <img
+                                src={data.url}
+                                alt={data.alt || 'Изображение к вопросу'}
+                                className="max-w-full h-auto mx-auto rounded-md border border-gray-600"
+                                style={{
+                                    width: data.width || 'auto',
+                                    height: data.height || 'auto'
+                                }}
+                             />
+                             {data.caption && <p className="text-xs text-gray-400 mt-2 italic">{data.caption}</p>}
+                        </div>
+                    );
+                default:
+                    console.warn("Unknown or missing visual_data type:", data?.type, data);
+                     return (
+                         <div className="mt-4 p-3 border border-yellow-500/50 rounded-md text-center text-yellow-400 bg-yellow-900/20">
+                            <AlertTriangle className="h-6 w-6 mx-auto mb-1 text-yellow-500" />
+                            <p className="text-xs">Неизвестный тип визуальных данных.</p>
+                         </div>
+                     );
+            }
+        } catch (e) {
+            console.error("Error processing or rendering visual_data:", e, visual_data);
             return (
-                 <div className="mt-4 p-4 border border-dashed border-gray-600 rounded-md text-center text-gray-400 bg-dark-bg/30">
-                    <Image className="h-8 w-8 mx-auto mb-2 text-gray-500" />
-                    <p className="text-sm">Здесь должно быть изображение/диаграмма/рисунок/график.</p>
-                 </div>
+                <div className="mt-4 p-3 border border-red-500/50 rounded-md text-center text-red-400 bg-red-900/20">
+                   <AlertTriangle className="h-6 w-6 mx-auto mb-1 text-red-500" />
+                   <p className="text-xs">Ошибка отображения визуальных данных.</p>
+                </div>
             );
         }
-
-        return null; // No visual data and no placeholder tag found
     };
 
     return (
@@ -90,10 +113,13 @@ export function VprQuestionContent({
                 Вопрос {questionNumber} из {totalQuestions}
             </p>
 
-            {/* Question Text (Cleaned) */}
-            <div className="prose prose-invert max-w-none text-light-text text-lg md:text-xl prose-headings:text-brand-cyan prose-a:text-brand-blue prose-strong:text-light-text/90">
-                 {/* Use dangerouslySetInnerHTML or a safer alternative if Markdown needs complex HTML */}
-                <ReactMarkdown>{cleanedQuestionText || originalText}</ReactMarkdown> {/* Fallback to original if cleaning fails */}
+            {/* Question Text (Cleaned + Markdown) */}
+            {/* Added prose classes for Tailwind Typography styling */}
+            <div className="prose prose-invert prose-lg md:prose-xl max-w-none text-light-text mb-4 prose-headings:text-brand-cyan prose-a:text-brand-blue prose-strong:text-light-text/90 prose-img:rounded-md prose-img:border prose-img:border-gray-600 prose-img:max-w-full prose-img:h-auto prose-img:my-3">
+                 {/* Use ReactMarkdown to render text, allowing embedded images via Markdown */}
+                <ReactMarkdown>
+                    {cleanedQuestionText || (originalText ?? '')}
+                </ReactMarkdown>
             </div>
 
             {/* Render Visual Component (or fallback) */}

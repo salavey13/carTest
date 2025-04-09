@@ -1,13 +1,13 @@
 import { motion } from "framer-motion";
 import ReactMarkdown from 'react-markdown';
-import { Lightbulb, XOctagon, CheckCircle, ArrowRight } from "lucide-react"; // Added icons
+import { Lightbulb, XOctagon, CheckCircle, ArrowRight } from "lucide-react";
 
 interface ExplanationDisplayProps {
   explanation: string | null;
   isCorrect: boolean;
   onNext: () => void;
   isLastQuestion: boolean;
-  isDummyModeExplanation?: boolean; // <-- NEW PROP
+  isDummyModeExplanation?: boolean;
 }
 
 export function ExplanationDisplay({
@@ -15,7 +15,7 @@ export function ExplanationDisplay({
   isCorrect,
   onNext,
   isLastQuestion,
-  isDummyModeExplanation = false, // <-- Default value
+  isDummyModeExplanation = false,
 }: ExplanationDisplayProps) {
 
   const borderColor = isDummyModeExplanation ? 'border-yellow-500/50' : isCorrect ? 'border-green-500/50' : 'border-red-500/50';
@@ -34,10 +34,11 @@ export function ExplanationDisplay({
       <div className="flex items-start mb-3">
           <Icon className={`h-6 w-6 mr-3 flex-shrink-0 ${iconColor}`} />
           <h3 className={`text-lg font-semibold ${iconColor}`}>
-              {isDummyModeExplanation ? "Подсказка" : (isCorrect ? "Верно!" : "Неверно")}
+              {isDummyModeExplanation ? "Подсказка / Объяснение" : (isCorrect ? "Верно! Объяснение:" : "Неверно. Объяснение:")}
           </h3>
       </div>
-      <div className="prose prose-invert prose-sm max-w-none text-light-text/90 mb-4 prose-p:my-1">
+      {/* Added prose-img for image styling within explanations */}
+      <div className="prose prose-invert prose-sm max-w-none text-light-text/90 mb-4 prose-p:my-1 prose-img:rounded-md prose-img:border prose-img:border-gray-600 prose-img:max-w-full prose-img:h-auto prose-img:my-3">
            {explanation ? (
              <ReactMarkdown>{explanation}</ReactMarkdown>
            ) : (
