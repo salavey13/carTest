@@ -8,7 +8,7 @@ import {
     FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard,
     FaCopy, FaListCheck, FaBug, FaSync, FaPlus, FaPaperPlane, FaBroom, FaCheck,
     FaRobot, FaArrowRotateRight, FaArrowsRotate, FaAngrycreative, FaPoo,
-    FaList, FaCodeBranch, FaCodeBranch, FaExclamation // Added Cog and Exclamation
+    FaList, FaCodeBranch, FaExclamation // Added Cog and Exclamation
 } from "react-icons/fa6";
 
 // Import Subcomponents
