@@ -1,0 +1,6 @@
+import type { Database } from './database.types'; // Adjust path if needed
+
+// Extend the auto-generated type or define manually
+export type AiRequestRecord = Database['public']['Tables']['ai_requests']['Row'];
+export type AiRequestInsert = Database['public']['Tables']['ai_requests']['Insert'];
+export type AiRequestStatus = Database['public']['Enums']['ai_request_status'];

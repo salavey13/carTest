@@ -1,3 +1,4 @@
+// Merged and restored version based on previous implementation
 "use client";
 
     import React, { useState, useEffect, useImperativeHandle, forwardRef, useRef, useCallback, useMemo} from "react";
@@ -54,7 +55,6 @@
     export type ImportCategory = 'component' | 'context' | 'hook' | 'lib' | 'other';
 
     const categorizeResolvedPath = (resolvedPath: string): ImportCategory => {
-        // ... (keep existing implementation)
         if (!resolvedPath) return 'other'; // Handle null/undefined paths
         const pathLower = resolvedPath.toLowerCase();
         if (pathLower.includes('/contexts/') || pathLower.startsWith('contexts/')) return 'context';
@@ -74,15 +74,12 @@
       const [extractLoading, setExtractLoading] = useState<boolean>(false);
       const [progress, setProgress] = useState<number>(0);
       const [error, setError] = useState<string | null>(null);
-      // --- Use context for kworkInput ---
-      // const [kworkInput, setKworkInput] = useState<string>(""); // REMOVED
       const [primaryHighlightedPath, setPrimaryHighlightedPath] = useState<string | null>(null);
       const [secondaryHighlightedPaths, setSecondaryHighlightedPaths] = useState<Record<ImportCategory, string[]>>({
           component: [], context: [], hook: [], lib: [], other: [],
       });
       const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-      // NEW: Control auto-ask AI feature
-      const [autoAskAiEnabled, setAutoAskAiEnabled] = useState<boolean>(false); // Default to false as no cloud creds;(
+      const [autoAskAiEnabled, setAutoAskAiEnabled] = useState<boolean>(false); // Keep this toggle if you want the option
 
       // === Context ===
       const { user, openLink } = useAppContext();
@@ -91,9 +88,10 @@
         setSelectedFetcherFiles, kworkInputHasContent, setKworkInputHasContent, // Added setKworkInputHasContent
         setRequestCopied, scrollToSection, kworkInputRef,
         setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles,
-        triggerAskAi, // NEW: Use triggerAskAi from context
-        aiActionLoading, // Get AI loading state
-        currentStep // Get current step for button disabling
+        triggerAskAi, // Use the MODIFIED triggerAskAi from context
+        aiActionLoading, // Get AI loading state (now represents submission/waiting)
+        currentStep, // Keep for button disabling
+        currentAiRequestId // Get the pending request ID
       } = useRepoXmlPageContext();
 
       // === URL Params & Derived State ===
@@ -114,7 +112,6 @@
       // === Refs ===
       const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
       const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-      // --- Local Ref for Kwork Input ---
       const localKworkInputRef = useRef<HTMLTextAreaElement | null>(null); // Use this for direct access if needed
 
        // Assign context ref to local ref if available
@@ -126,7 +123,6 @@
 
       // === Utility Functions ===
        const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
-            // ... (keep existing implementation)
             console.log(`Toast [${type}]: ${message}`);
             let style = { background: "rgba(50, 50, 50, 0.9)", color: "#E1FF01", border: "1px solid rgba(225, 255, 1, 0.2)", backdropFilter: "blur(3px)" };
             if (type === 'success') style = { background: "rgba(22, 163, 74, 0.9)", color: "#ffffff", border: "1px solid rgba(34, 197, 94, 0.3)", backdropFilter: "blur(3px)" };
@@ -136,7 +132,6 @@
        }, []);
 
        const getPageFilePath = useCallback((routePath: string, allActualFilePaths: string[]): string => {
-            // ... (keep existing implementation)
             const cleanPath = routePath.startsWith('/') ? routePath.substring(1) : routePath;
             if (!cleanPath || cleanPath === 'app' || cleanPath === '/') { const rootPaths = ['app/page.tsx', 'app/page.js', 'app/index.tsx', 'app/index.js', 'src/app/page.tsx', 'src/app/page.js']; for (const rp of rootPaths) { if (allActualFilePaths.includes(rp)) return rp; } console.warn(`getPageFilePath: Root path mapping not found for "${routePath}". Defaulting to app/page.tsx`); return 'app/page.tsx'; }
             const pathWithApp = cleanPath.startsWith('app/') ? cleanPath : cleanPath.startsWith('src/app/') ? cleanPath : `app/${cleanPath}`;
@@ -156,12 +151,10 @@
        }, []);
 
        const extractImports = useCallback((content: string): string[] => {
-            // ... (keep existing implementation)
             const importRegex = /import(?:["'\s]*(?:[\w*{}\n\r\t, ]+)from\s*)?["']((?:@[/\w.-]+)|(?:[./]+[\w./-]+))["']/g; const requireRegex = /require\s*\(\s*["']((?:@[/\w.-]+)|(?:[./]+[\w./-]+))["']\s*\)/g; const imports = new Set<string>(); let match; while ((match = importRegex.exec(content)) !== null) if (match[1] && match[1] !== '.') imports.add(match[1]); while ((match = requireRegex.exec(content)) !== null) if (match[1] && match[1] !== '.') imports.add(match[1]); return Array.from(imports);
        }, []);
 
        const resolveImportPath = useCallback((importPath: string, currentFilePath: string, allFiles: FileNode[]): string | null => {
-            // ... (keep existing implementation)
             const allPaths = allFiles.map(f => f.path); const supportedExtensions = ['.ts', '.tsx', '.js', '.jsx', '.css', '.scss', '.json', '.md'];
             const tryPaths = (basePath: string): string | null => { const pathsToTry: string[] = []; const hasExplicitExtension = /\.\w+$/.test(basePath); if (hasExplicitExtension) { pathsToTry.push(basePath); } else { supportedExtensions.forEach(ext => pathsToTry.push(basePath + ext)); supportedExtensions.forEach(ext => pathsToTry.push(`${basePath}/index${ext}`)); } for (const p of pathsToTry) { if (allPaths.includes(p)) { return p; } } return null; };
             if (importPath.startsWith('@/')) { const possibleSrcBases = ['src/', 'app/', '']; const pathSegment = importPath.substring(2); for (const base of possibleSrcBases) { const resolved = tryPaths(base + pathSegment); if (resolved) return resolved; } const commonAliasRoots = ['components/', 'lib/', 'utils/', 'hooks/', 'contexts/', 'styles/']; for(const root of commonAliasRoots) { if (pathSegment.startsWith(root)) { const resolved = tryPaths(pathSegment); if (resolved) return resolved; } } }
@@ -172,12 +165,10 @@
 
     // --- Progress Simulation ---
     const stopProgressSimulation = useCallback(() => {
-        // ... (keep existing implementation)
         if (progressIntervalRef.current) clearInterval(progressIntervalRef.current); if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current); progressIntervalRef.current = null; fetchTimeoutRef.current = null;
     }, []);
 
     const startProgressSimulation = useCallback((estimatedDurationSeconds = 15) => {
-        // ... (keep existing implementation)
         stopProgressSimulation(); setProgress(0); setError(null); const intervalTime = 150; const totalSteps = (estimatedDurationSeconds * 1000) / intervalTime; const incrementBase = 100 / totalSteps;
         progressIntervalRef.current = setInterval(() => { setProgress((prev) => { const randomFactor = Math.random() * 0.7 + 0.6; let nextProgress = prev + (incrementBase * randomFactor); if (nextProgress >= 95 && (fetchStatus === 'loading' || fetchStatus === 'retrying') && fetchTimeoutRef.current) { nextProgress = Math.min(prev + incrementBase * 0.1, 99); } else if (nextProgress >= 100) { nextProgress = 99.9; } return nextProgress; }); }, intervalTime);
         fetchTimeoutRef.current = setTimeout(() => { if (progressIntervalRef.current) { clearInterval(progressIntervalRef.current); progressIntervalRef.current = null; if (fetchStatus === 'loading' || fetchStatus === 'retrying') { console.warn("Progress simulation timed out while fetch was still in progress."); setProgress(99); } } fetchTimeoutRef.current = null; }, estimatedDurationSeconds * 1000 + 5000);
@@ -232,13 +223,17 @@
         addToast(`${filesToAdd.size} файлов добавлено в запрос`, 'success');
         scrollToSection('kworkInput'); // Scroll to the input section
 
-        // --- Auto Ask AI Logic ---
+        // --- Auto Ask AI Logic (using the CONTEXT trigger) ---
         if (autoAskAi && autoAskAiEnabled) {
-            addToast("Автоматически отправляю запрос AI...", "info");
-            await triggerAskAi(); // Trigger the AI call via context
+            addToast("Автоматически отправляю запрос AI в очередь...", "info");
+            // Don't await here necessarily, let context handle loading state
+            triggerAskAi().catch(err => {
+                console.error("Error auto-triggering AI Ask:", err);
+                // Toast error is handled within triggerAskAi
+            });
         }
 
-    }, [selectedFiles, files, addToast, getKworkInputValue, updateKworkInput, scrollToSection, autoAskAiEnabled, triggerAskAi]); // Added dependencies
+    }, [selectedFiles, files, addToast, getKworkInputValue, updateKworkInput, scrollToSection, autoAskAiEnabled, triggerAskAi]); // Added triggerAskAi
 
 
     const handleCopyToClipboard = useCallback((textToCopy?: string, shouldScroll = true): boolean => {
@@ -282,7 +277,6 @@
 
 
     const handleFetch = useCallback(async (isManualRetry = false) => {
-        // ... (keep existing validation and setup)
         console.log(`[handleFetch] Called. isManualRetry: ${isManualRetry}, Current Status: ${fetchStatus}`);
         if (!repoUrl.trim()) { addToast("Введите URL репозитория", 'error'); setError("URL репозитория не может быть пустым."); setIsSettingsOpen(true); return; }
         if ((fetchStatus === 'loading' || fetchStatus === 'retrying') && !isManualRetry) { addToast("Извлечение уже идет...", "info"); return; }
@@ -292,7 +286,7 @@
         setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set());
         // Don't clear kworkInput here automatically, user might want to keep their task
         setFilesFetched(false, null, []); setRequestCopied(false);
-        // Reset AI-related states on new fetch
+        // Reset AI-related states on new fetch (Context handles currentAiRequestId reset via setFilesFetched)
         setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set());
         setPrimaryHighlightedPath(null);
         setSecondaryHighlightedPaths({ component: [], context: [], hook: [], lib: [], other: [] });
@@ -304,7 +298,6 @@
         let currentTry = 0; let result: Awaited<ReturnType<typeof fetchRepoContents>> | null = null;
 
         while (currentTry <= maxRetries) {
-            // ... (keep retry logic and API call)
             currentTry++;
             const currentStatus: FetchStatus = currentTry > 1 ? 'retrying' : 'loading';
             setFetchStatus(currentStatus);
@@ -360,10 +353,10 @@
                      addToast(`Авто-выбор ${filesToSelect.size} файлов и генерация запроса...`, 'info');
                      setSelectedFilesState(filesToSelect);
                      setSelectedFetcherFiles(filesToSelect);
-                     const task = ideaFromUrl || DEFAULT_TASK_IDEA;
+                     //const task = ideaFromUrl || DEFAULT_TASK_IDEA; // Task is handled by user input now
                      // Call handleAddSelected with autoAskAi=true
-                     await handleAddSelected(true, filesToSelect); // Pass true and the specific files
-                     // No need to copy/open link here anymore, handleAddSelected triggers triggerAskAi
+                     // NO AWAIT NEEDED - Let it run in background
+                     handleAddSelected(true, filesToSelect); // Pass files to select
                  } else {
                       // Auto-select files even if not generating full request
                       if (filesToSelect.size > 0 && (!highlightedPathFromUrl || !ideaFromUrl)) {
@@ -384,56 +377,47 @@
                 throw new Error(errorMessage);
               }
             } catch (err: any) {
-              // .. (keep existing catch block and final failure handling)
               console.error(`[handleFetch] Error during attempt ${currentTry}:`, err); const displayError = err?.message || "Неизвестная ошибка при извлечении"; setError(`Попытка ${currentTry}: ${displayError}`);
               if (currentTry > maxRetries) { console.error(`[handleFetch] Final attempt failed. Max retries (${maxRetries}) reached.`); stopProgressSimulation(); setFetchStatus('failed_retries'); setProgress(0); addToast(`Не удалось извлечь файлы после ${maxRetries + 1} попыток. ${displayError}`, 'error'); setFilesFetched(false, null, []); setExtractLoading(false); return; }
             }
         } // End while loop
 
-        // .. (keep cleanup at the end)
         console.warn("[handleFetch] Reached end of function unexpectedly after loop."); stopProgressSimulation(); if (fetchStatus !== 'success') { setFetchStatus(error ? 'failed_retries' : 'error'); setProgress(0); setFilesFetched(false, null, []); } setExtractLoading(false);
 
    }, [
-        // --- Keep existing dependencies ---
-        repoUrl, token, fetchStatus, files, selectedFiles, // kworkInput REMOVED
+        repoUrl, token, fetchStatus, // Removed files, selectedFiles - use state directly
         setFetchStatus, setFiles, setSelectedFilesState, setProgress, setError, setExtractLoading,
-        setPrimaryHighlightedPath, setSecondaryHighlightedPaths, setIsSettingsOpen, // setKworkInput REMOVED
+        setPrimaryHighlightedPath, setSecondaryHighlightedPaths, setIsSettingsOpen,
         setSelectedFetcherFiles, setFilesFetched, setRequestCopied, setAiResponseHasContent,
         setFilesParsed, setSelectedAssistantFiles, setRepoUrlEntered,
         highlightedPathFromUrl, ideaFromUrl, importantFiles, DEFAULT_TASK_IDEA,
         addToast, startProgressSimulation, stopProgressSimulation, getLanguage,
         getPageFilePath, extractImports, resolveImportPath, handleCopyToClipboard, // handleCopyToClipboard depends on getKworkInputValue now
         openLink, scrollToSection,
-        // --- Added dependencies ---
         getKworkInputValue, handleAddSelected, // handleAddSelected depends on autoAskAiEnabled, triggerAskAi
         autoAskAiEnabled, triggerAskAi, setKworkInputHasContent // Add context setter for input flag
-   ]);
+   ]); // Updated dependencies
 
 
     // --- Other Callbacks ---
     const selectHighlightedFiles = useCallback(() => {
-        // .. (keep existing implementation)
         const filesToSelect = new Set<string>(selectedFiles); let newlySelectedCount = 0; const allHighlightableSecondary = [ ...secondaryHighlightedPaths.component, ...secondaryHighlightedPaths.context, ...secondaryHighlightedPaths.hook, ...secondaryHighlightedPaths.lib, ]; if (primaryHighlightedPath && files.some(f => f.path === primaryHighlightedPath) && !filesToSelect.has(primaryHighlightedPath)) { filesToSelect.add(primaryHighlightedPath); newlySelectedCount++; } allHighlightableSecondary.forEach(path => { if (files.some(f => f.path === path) && !filesToSelect.has(path)) { filesToSelect.add(path); newlySelectedCount++; } }); if (newlySelectedCount > 0) { setSelectedFilesState(filesToSelect); setSelectedFetcherFiles(filesToSelect); addToast(`Добавлено ${newlySelectedCount} связанных файлов к выборке`, 'info'); } else { addToast("Все связанные файлы уже выбраны или не найдены", 'info'); }
     }, [ primaryHighlightedPath, secondaryHighlightedPaths, files, selectedFiles, setSelectedFetcherFiles, addToast ]);
 
     const toggleFileSelection = useCallback((path: string) => {
-        // .. (keep existing implementation)
         setSelectedFilesState(prevSet => { const newSet = new Set(prevSet); if (newSet.has(path)) newSet.delete(path); else newSet.add(path); setSelectedFetcherFiles(newSet); return newSet; });
     }, [setSelectedFetcherFiles]);
 
     const handleAddImportantFiles = useCallback(() => {
-        // .. (keep existing implementation)
         let addedCount = 0; const filesToAdd = new Set(selectedFiles); importantFiles.forEach(path => { if (files.some(f => f.path === path) && !selectedFiles.has(path)) { filesToAdd.add(path); addedCount++; } }); if (addedCount === 0) { addToast("Важные файлы уже выбраны или не найдены в репозитории", 'info'); return; } setSelectedFilesState(filesToAdd); setSelectedFetcherFiles(filesToAdd); addToast(`Добавлено ${addedCount} важных файлов к выборке`, 'success');
     }, [selectedFiles, importantFiles, files, setSelectedFetcherFiles, addToast]);
 
     const handleAddFullTree = useCallback(() => {
-        // ... (keep existing implementation)
         if (files.length === 0) { addToast("Нет файлов для отображения дерева", 'error'); return; } const treeOnly = files.map((file) => `- /${file.path}`).sort().join("\n"); const treeContent = `Структура файлов проекта:\n\`\`\`\n${treeOnly}\n\`\`\``; let added = false; updateKworkInput((prev) => { const trimmedPrev = prev.trim(); if (/Структура файлов проекта:\s*```/im.test(trimmedPrev)) { return prev; } added = true; return trimmedPrev ? `${trimmedPrev}\n\n${treeContent}` : treeContent; }); if (added) { addToast("Дерево файлов добавлено в запрос", 'success'); scrollToSection('kworkInput'); } else { addToast("Дерево файлов уже добавлено", 'info'); }
     }, [files, updateKworkInput, scrollToSection, addToast]); // Use updateKworkInput
 
     // --- Effects ---
     useEffect(() => { setRepoUrlEntered(repoUrl.trim().length > 0); }, [repoUrl, setRepoUrlEntered]);
-    // Removed effect for kworkInputHasContent, handled by updateKworkInput now
 
     useEffect(() => {
         if (autoFetch && repoUrl && (fetchStatus === 'idle' || fetchStatus === 'failed_retries' || fetchStatus === 'error')) {
@@ -441,7 +425,7 @@
             handleFetch();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus]);
+    }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus]); // Keep handleFetch out unless stable
 
     useEffect(() => {
         return () => { stopProgressSimulation(); };
@@ -452,7 +436,7 @@
     useImperativeHandle(ref, () => ({
         handleFetch,
         selectHighlightedFiles,
-        handleAddSelected, // Keep exposed, might be called externally
+        handleAddSelected, // Keep exposed
         handleCopyToClipboard,
         clearAll: handleClearAll,
         getKworkInputValue, // Expose getter
@@ -463,7 +447,7 @@
     const isLoading = fetchStatus === 'loading' || fetchStatus === 'retrying';
     const isFetchDisabled = isLoading || !repoUrl.trim();
     const showProgressBar = isLoading || fetchStatus === 'success' || fetchStatus === 'error' || fetchStatus === 'failed_retries';
-    // Disable Ask AI button if no input OR AI call is already loading
+    // Disable Ask AI if: No input OR already submitting/waiting OR fetch is loading
     const isAskAiDisabled = !kworkInputHasContent || aiActionLoading || isLoading;
     const isCopyDisabled = !kworkInputHasContent || isLoading || aiActionLoading;
     const isClearDisabled = (!kworkInputHasContent && selectedFiles.size === 0) || isLoading || aiActionLoading;
@@ -493,7 +477,13 @@
 
       {/* Fetch Button */}
        <div className="mb-4 flex justify-center">
-            <motion.button onClick={() => handleFetch(fetchStatus === 'failed_retries' || fetchStatus === 'error')} disabled={isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')} className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-white bg-gradient-to-r ${ fetchStatus === 'failed_retries' || fetchStatus === 'error' ? 'from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600 shadow-red-500/30 hover:shadow-red-500/40' : 'from-purple-600 to-cyan-500 shadow-purple-500/30 hover:shadow-cyan-500/40' } transition-all ${isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error') ? "opacity-60 cursor-not-allowed brightness-75" : "hover:brightness-110 active:scale-[0.98]"}`} whileHover={{ scale: (isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')) ? 1 : 1.03 }} whileTap={{ scale: (isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')) ? 1 : 0.97 }} >
+            <motion.button
+                onClick={() => handleFetch(fetchStatus === 'failed_retries' || fetchStatus === 'error')}
+                disabled={isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')}
+                className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-white bg-gradient-to-r ${ fetchStatus === 'failed_retries' || fetchStatus === 'error' ? 'from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600 shadow-red-500/30 hover:shadow-red-500/40' : 'from-purple-600 to-cyan-500 shadow-purple-500/30 hover:shadow-cyan-500/40' } transition-all ${isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error') ? "opacity-60 cursor-not-allowed brightness-75" : "hover:brightness-110 active:scale-[0.98]"}`}
+                whileHover={{ scale: (isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')) ? 1 : 1.03 }}
+                whileTap={{ scale: (isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')) ? 1 : 0.97 }}
+            >
                  {isLoading ? <FaArrowsRotate className="animate-spin" /> : (fetchStatus === 'failed_retries' || fetchStatus === 'error' ? <FaArrowsRotate /> : <FaDownload />)} {fetchStatus === 'retrying' ? "Повтор..." : isLoading ? "Загрузка..." : (fetchStatus === 'failed_retries' || fetchStatus === 'error' ? "Попробовать снова" : "Извлечь файлы")}
             </motion.button>
         </div>
@@ -525,8 +515,9 @@
                             checked={autoAskAiEnabled}
                             onChange={(e) => setAutoAskAiEnabled(e.target.checked)}
                             className="form-checkbox h-4 w-4 text-blue-500 bg-gray-600 border-gray-500 rounded focus:ring-blue-500/50 focus:ring-offset-gray-800 cursor-pointer"
+                            disabled={aiActionLoading} // Disable toggle while waiting for AI
                         />
-                        <label htmlFor="autoAskAiCheckbox" className="text-xs text-gray-300 cursor-pointer select-none">
+                        <label htmlFor="autoAskAiCheckbox" className={`text-xs cursor-pointer select-none ${aiActionLoading ? 'text-gray-500' : 'text-gray-300'}`}>
                            Авто-запрос AI после добавления файлов <span className="text-blue-400">(Add Selected & Ask)</span>
                         </label>
                     </div>
@@ -540,7 +531,7 @@
                     importantFiles={importantFiles}
                     isLoading={isLoading}
                     toggleFileSelection={toggleFileSelection}
-                    // Pass autoAskAiEnabled to onAddSelected
+                    // Pass autoAskAiEnabled to onAddSelected correctly
                     onAddSelected={() => handleAddSelected(autoAskAiEnabled)}
                     onAddImportant={() => handleAddImportantFiles()}
                     onAddTree={() => handleAddFullTree()}
@@ -553,21 +544,16 @@
          {(fetchStatus === 'success' || kworkInputHasContent || files.length > 0 ) ? (
              <div id="kwork-input-section" className="flex flex-col gap-3">
                  <RequestInput
-                    // Use local ref here
                     kworkInputRef={localKworkInputRef}
-                    // Set initial value or control externally if needed (currently uncontrolled within RequestInput)
-                    // initialValue={kworkInput} // If RequestInput accepts initialValue
                     onInputChange={(value) => setKworkInputHasContent(value.trim().length > 0)} // Update context flag on change
-                    // Disabled states passed to RequestInput's internal buttons
                     isCopyDisabled={isCopyDisabled}
                     isClearDisabled={isClearDisabled}
-                    // Actions triggered by buttons INSIDE RequestInput
                     onCopyToClipboard={() => handleCopyToClipboard()}
                     onClearAll={() => handleClearAll()}
                  />
-                 {/* NEW "Ask AI" Button */}
+                 {/* MODIFIED "Ask AI" Button */}
                  <motion.button
-                    onClick={triggerAskAi}
+                    onClick={() => triggerAskAi()} // Use context trigger directly
                     disabled={isAskAiDisabled}
                     className={`flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg font-semibold text-sm text-white ${
                         isAskAiDisabled
@@ -578,7 +564,8 @@
                     whileTap={{ scale: isAskAiDisabled ? 1 : 0.97 }}
                  >
                     {aiActionLoading ? <FaArrowsRotate className="animate-spin" /> : <FaRobot />}
-                    {aiActionLoading ? "Спрашиваю..." : "🤖 Спросить AI"}
+                    {/* Update button text based on state */}
+                    {aiActionLoading ? (currentAiRequestId ? "Жду ответ AI..." : "Отправка...") : "🤖 Спросить AI"}
                  </motion.button>
              </div>
          ) : null }
