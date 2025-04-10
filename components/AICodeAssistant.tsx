@@ -23,7 +23,7 @@ import { CodeRestorer } from './assistant_components/CodeRestorer';
 // UI & Utils
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
-import { FaCircleInfo, FaCodeBranch, FaCodeBranch, FaGithub } from "react-icons/fa6"; // Added FaCodeBranch, FaCodeBranch, FaGithub
+import { FaCircleInfo, FaCodeBranch, FaGithub } from "react-icons/fa6"; // Added FaCodeBranch, FaCodeBranch, FaGithub
 import clsx from "clsx";
 import { saveAs } from "file-saver";
 
