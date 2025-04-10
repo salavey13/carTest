@@ -13,8 +13,10 @@ if (!apiKey) {
   // notifyAdmins("🚨 CRITICAL ERROR: GEMINI_API_KEY is missing! AI features disabled.").catch(console.error);
 }
 
-// Corrected instantiation based on previous fix
-const genAI = apiKey ? new GoogleGenAI(apiKey) : null;
+// --- CORE FIX: Pass apiKey inside a configuration object ---
+// Old: const genAI = apiKey ? new GoogleGenAI(apiKey) : null;
+const genAI = apiKey ? new GoogleGenAI({ apiKey }) : null; // Pass as { apiKey: apiKey } or shorthand { apiKey }
+// ---------------------------------------------------------
 
 // Define safety settings (adjust as needed)
 const safetySettings = [
@@ -25,12 +27,11 @@ const safetySettings = [
 ];
 
 // Define generation config (optional, adjust as needed)
-// Note: Check model documentation for specific limits (e.g., output tokens)
 const generationConfig = {
     // temperature: 0.9,
     // topK: 1,
     // topP: 1,
-    // maxOutputTokens: 65536, // Example for gemini-2.5-pro-exp-03-25
+    // maxOutputTokens: 65536,
     // responseMimeType: "application/json",
 };
 
@@ -42,15 +43,15 @@ const generationConfig = {
  */
 export async function generateAiCode(
   prompt: string,
-  // Using the requested experimental model as default
   modelName: string = "gemini-2.5-pro-exp-03-25"
 ): Promise<{ success: boolean; text?: string; error?: string }> {
   logger.info(`[AI Action] Attempting to generate content with model: ${modelName}`);
 
   if (!genAI) {
-    const errorMsg = "Google AI SDK not initialized (GEMINI_API_KEY missing).";
+    const errorMsg = "Google AI SDK not initialized (API key missing or client creation failed)."; // Updated message slightly
     logger.error(`[AI Action] ${errorMsg}`);
-    await notifyAdmins(`❌ Ошибка AI: ${errorMsg}`).catch(logger.error);
+    // Avoid calling notifyAdmins if genAI is null *because* of the missing key, might cause loop if notifyAdmins uses AI
+    // await notifyAdmins(`❌ Ошибка AI: ${errorMsg}`).catch(logger.error);
     return { success: false, error: errorMsg };
   }
 
@@ -60,25 +61,18 @@ export async function generateAiCode(
   }
 
   try {
-    // ---------------------------------------------------------------------
-    // --- CORE FIX: Call generateContent directly on genAI.models ---
-    // ---------------------------------------------------------------------
+    // Use the corrected API call structure
     logger.info(`[AI Action] Sending prompt (length: ${prompt.length}) to model ${modelName} via genAI.models.generateContent...`);
 
     const result = await genAI.models.generateContent({
         model: modelName,
-        // Structure the prompt according to the 'contents' format
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         safetySettings: safetySettings,
         generationConfig: generationConfig,
     });
-    // ---------------------------------------------------------------------
 
-    // --- Robustness Checks (Remain the same) ---
-
-    const response = result.response; // Get the response object
-
-    // 1. Check for explicit safety blocking first
+    // --- Robustness Checks ---
+    const response = result.response;
     const promptFeedback = response.promptFeedback;
     if (promptFeedback?.blockReason) {
         const blockReason = promptFeedback.blockReason;
@@ -89,7 +83,6 @@ export async function generateAiCode(
         return { success: false, error: errorMsg };
     }
 
-    // 2. Check if generation finished unexpectedly
     const finishReason = response.candidates?.[0]?.finishReason;
     if (finishReason && finishReason !== "STOP") {
          const errorMsg = `AI generation stopped unexpectedly. Reason: ${finishReason}`;
@@ -98,7 +91,6 @@ export async function generateAiCode(
          return { success: false, error: errorMsg };
     }
 
-    // 3. Attempt to get the response text
     let text = "";
     try {
         if (response.candidates && response.candidates.length > 0) {
@@ -115,7 +107,6 @@ export async function generateAiCode(
          return { success: false, error: errorMsg };
     }
 
-    // 4. Check for empty text response (after other checks)
     if (!text || text.trim().length === 0) {
          if (promptFeedback?.blockReason) {
              const errorMsg = `AI generation blocked (reason found after empty text check): ${promptFeedback.blockReason}`;
@@ -134,18 +125,13 @@ export async function generateAiCode(
   } catch (error: any) {
     // --- Catch external API errors ---
     logger.error(`[AI Action] Error calling Google AI API (Model: ${modelName}):`, error);
-    let errorMessage = "An unknown error occurred while contacting the AI service.";
-    if (error instanceof Error) {
-      errorMessage = error.message; // This will now contain "c.getGenerativeModel is not a function" if the old code was run
-    } else if (typeof error === 'string') {
-      errorMessage = error;
-    }
+    // The error message will now clearly state the credentials issue if the fix doesn't work
+    let errorMessage = error instanceof Error ? error.message : "An unknown error occurred while contacting the AI service.";
 
+    // Add details if available (useful for debugging auth issues)
     if (error?.status) { errorMessage += ` (Status: ${error.status})`; }
-    // Add details if the error object has them (check GoogleGenerativeAIError structure if available)
-    if (error?.cause) { errorMessage += ` Cause: ${JSON.stringify(error.cause)}`; }
+    if (error?.cause) { errorMessage += ` Cause: ${JSON.stringify(error.cause)}`; } // Often contains auth details
     if (error?.details) { errorMessage += ` Details: ${error.details}`; }
-
 
     await notifyAdmins(`❌ Ошибка при вызове Gemini API (Модель: ${modelName}):\n${errorMessage}`).catch(logger.error);
     return { success: false, error: `AI API Error: ${errorMessage}` };
