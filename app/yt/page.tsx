@@ -50,7 +50,7 @@ export default function YTPage() {
             <Link href="/tasks" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
               Tasks
             </Link>
-            {isAdmin() && (
+            {isAdmin && (
               <Link href="/youtubeAdmin" className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition">
                 Admin
               </Link>
