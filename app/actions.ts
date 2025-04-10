@@ -510,6 +510,32 @@ export async function notifyCaptchaSuccess(userId: string, username?: string | n
   return notifyAdmins(message);
 }
 
+export async function notifySuccessfulUsers(userIds: string[]) {
+  try {
+    const message = `🎉 Поздравляем! Вы успешно прошли CAPTCHA и можете продолжить. 🚀`
+
+    for (const userId of userIds) {
+      const result = await sendTelegramMessage(
+        process.env.TELEGRAM_BOT_TOKEN!,
+        message,
+        [],
+        undefined,
+        userId
+      )
+      if (!result.success) {
+        console.error(`Failed to notify user ${userId}:`, result.error)
+      }
+    }
+
+    return { success: true }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to notify users",
+    }
+  }
+}
+
 // Notify specific users (e.g., after successful CAPTCHA)
 export async function notifyUsers(userIds: string[], message: string): Promise<{ success: boolean; error?: string }> {
   if (!userIds || userIds.length === 0) {
