@@ -1,9 +1,9 @@
+// /app/repo-xml/page.tsx
 "use client";
     import React, { Suspense, useRef } from "react";
     import RepoTxtFetcher from "@/components/RepoTxtFetcher";
     import AICodeAssistant from "@/components/AICodeAssistant";
-    // AutomationBuddy is not used in this implementation
-    // import AutomationBuddy from "@/components/AutomationBuddy";
+    import AutomationBuddy from "@/components/AutomationBuddy"; // Restore import
     import { RepoXmlPageProvider, RepoTxtFetcherRef, AICodeAssistantRef } from '@/contexts/RepoXmlPageContext';
     import { FaRobot, FaFileCode, FaCode, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles } from "react-icons/fa6";
 
@@ -19,8 +19,6 @@
 
       // Side nav scroll
       const scrollToSectionNav = (id: string) => {
-        // Use context's scrollToSection for potentially better handling
-        // but direct ID scroll is fine too.
         const element = document.getElementById(id);
         if (element) {
             const rect = element.getBoundingClientRect();
@@ -67,12 +65,15 @@
                               ✅ Интегрирован Google Gemini API! Используй кнопку <FaRobot className="inline mx-1" /> Спросить AI в Экстракторе.
                               <span className="text-gray-400 block mt-1">(Внешние AI: <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300 transition">Grok/Gemini</a>, <a href="https://chat.openai.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300 transition">ChatGPT</a>, <a href="https://t.me/webanybot" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300 transition">@WebAnyBot</a> все еще доступны для ручного копирования/вставки.)</span>
                           </p>
+                           <p className="text-sm text-cyan-400 mt-4 bg-gray-800/50 p-2 rounded-lg">
+                               ✅ Теперь можно извлекать файлы из веток открытых PR или указать ветку вручную!
+                           </p>
                     </section>
 
                     {/* Step Guides (Updated instructions) */}
                     <section id="step1" className="mb-12 text-center max-w-3xl">
                         <h2 className="text-2xl font-bold text-cyan-400 mb-4"> Шаг 1: Запрос + Контекст </h2>
-                        <p className="text-gray-300 text-sm"> Укажи репозиторий, извлеки файлы (<FaDownload className="inline mx-1"/>), выбери нужные для контекста, опиши задачу AI в поле ввода. </p>
+                        <p className="text-gray-300 text-sm"> Укажи репозиторий, выбери ветку (опционально), извлеки файлы (<FaDownload className="inline mx-1"/>), выбери нужные для контекста, опиши задачу AI в поле ввода. </p>
                     </section>
                     <section id="step2" className="mb-12 text-center max-w-3xl">
                        <h2 className="text-2xl font-bold text-cyan-400 mb-4"> Шаг 2: Ответ AI → PR </h2>
@@ -86,7 +87,8 @@
                         <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700/80 backdrop-blur-sm rounded-full hover:bg-gray-600 transition" title="Введение"> <FaCircleInfo className="text-lg" /> </button>
                     </nav>
 
-                    {/* AutomationBuddy removed, logic integrated */}
+                    {/* Automation Buddy RESTORED */}
+                    <AutomationBuddy />
 
                 </div>
             </>

@@ -1,45 +1,38 @@
+// /components/assistant_components/PullRequestForm.tsx
+"use client";
+
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tooltip } from '../AICodeAssistant'; // Adjust path
-import { FaList, FaRotate } from 'react-icons/fa6';
+import { FaRotate } from 'react-icons/fa6'; // Removed FaList
 
 interface PullRequestFormProps {
     repoUrl: string;
     prTitle: string;
-    //commitMessage: string; // Just needs the base commit subject now
     selectedFileCount: number;
     isLoading: boolean; // General loading (e.g., PR creation)
-    isLoadingPrList: boolean;
+    // isLoadingPrList removed
     onRepoUrlChange: (value: string) => void;
     onPrTitleChange: (value: string) => void;
-    // onCommitMessageChange: (value: string) => void; // Removed, generated dynamically
     onCreatePR: () => void;
-    onGetOpenPRs: () => void;
+    // onGetOpenPRs removed
 }
 
 export const PullRequestForm: React.FC<PullRequestFormProps> = ({
     repoUrl,
     prTitle,
-    // commitMessage, // No longer directly edited here
     selectedFileCount,
     isLoading,
-    isLoadingPrList,
+    // isLoadingPrList, // Removed
     onRepoUrlChange,
     onPrTitleChange,
-    // onCommitMessageChange,
     onCreatePR,
-    onGetOpenPRs
+    // onGetOpenPRs // Removed
 }) => {
-    const [showPRDetails, setShowPRDetails] = useState(false); // Local state for toggling form visibility
-
-    // Reset details visibility if file selection changes? Optional.
-    // useEffect(() => {
-    //     if (selectedFileCount > 0) setShowPRDetails(true);
-    //     else setShowPRDetails(false);
-    // }, [selectedFileCount]);
+    const [showPRDetails, setShowPRDetails] = useState(false);
 
     return (
-        <section id="pr-section" className="mb-4"> {/* Reduced margin */}
+        <section id="pr-section" className="mb-4">
             <div className="flex flex-col sm:flex-row justify-between items-center mb-3 gap-2">
                 <h2 className="text-lg font-semibold text-cyan-400">
                     Pull Request ({selectedFileCount} файлов)
@@ -55,11 +48,7 @@ export const PullRequestForm: React.FC<PullRequestFormProps> = ({
                          {isLoading ? <FaRotate className="animate-spin inline mr-1" /> : null}
                         Создать PR
                     </motion.button>
-                    <Tooltip text="Обновить список открытых PR" position="top">
-                        <button className="p-2 text-gray-400 hover:text-white transition disabled:opacity-50" onClick={onGetOpenPRs} disabled={isLoadingPrList || !repoUrl}>
-                            {isLoadingPrList ? <FaRotate className="animate-spin"/> : <FaList />}
-                        </button>
-                    </Tooltip>
+                    {/* Removed PR List Refresh Button */}
                     <Tooltip text="Показать/скрыть детали PR" position="top">
                        <button className="text-blue-400 hover:text-blue-300 transition text-sm p-1" onClick={() => setShowPRDetails(!showPRDetails)}>
                            {showPRDetails ? "Скрыть детали" : "Показать детали"}
@@ -98,11 +87,10 @@ export const PullRequestForm: React.FC<PullRequestFormProps> = ({
                                 value={prTitle}
                                 onChange={(e) => onPrTitleChange(e.target.value)}
                                 placeholder="Краткий заголовок для Pull Request (макс 70 симв.)"
-                                maxLength={70} // Add max length
+                                maxLength={70}
                                 disabled={isLoading}
                             />
                         </div>
-                        {/* Removed Description and Commit Message Textareas */}
                     </motion.div>
                 )}
             </AnimatePresence>
