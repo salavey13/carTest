@@ -42,7 +42,7 @@ const generationConfig = {
  */
 export async function generateAiCode(
   prompt: string,
-  // **FIXED**: Updated default model name to the requested experimental version
+  // Using the requested experimental model as default
   modelName: string = "gemini-2.5-pro-exp-03-25"
 ): Promise<{ success: boolean; text?: string; error?: string }> {
   logger.info(`[AI Action] Attempting to generate content with model: ${modelName}`);
@@ -60,16 +60,21 @@ export async function generateAiCode(
   }
 
   try {
-    const model = genAI.getGenerativeModel({
+    // ---------------------------------------------------------------------
+    // --- CORE FIX: Call generateContent directly on genAI.models ---
+    // ---------------------------------------------------------------------
+    logger.info(`[AI Action] Sending prompt (length: ${prompt.length}) to model ${modelName} via genAI.models.generateContent...`);
+
+    const result = await genAI.models.generateContent({
         model: modelName,
-        safetySettings,
-        generationConfig,
+        // Structure the prompt according to the 'contents' format
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        safetySettings: safetySettings,
+        generationConfig: generationConfig,
     });
+    // ---------------------------------------------------------------------
 
-    logger.info(`[AI Action] Sending prompt (length: ${prompt.length}) to model ${modelName}...`);
-    const result = await model.generateContent(prompt);
-
-    // --- Robustness Checks ---
+    // --- Robustness Checks (Remain the same) ---
 
     const response = result.response; // Get the response object
 
@@ -90,24 +95,20 @@ export async function generateAiCode(
          const errorMsg = `AI generation stopped unexpectedly. Reason: ${finishReason}`;
          logger.warn(`[AI Action] ${errorMsg} (Model: ${modelName})`);
          await notifyAdmins(`⚠️ AI генерация остановлена (Модель: ${modelName}): ${finishReason}`).catch(logger.error);
-         // Decide how to handle non-STOP finishes. Treating as error for now.
          return { success: false, error: errorMsg };
     }
 
     // 3. Attempt to get the response text
     let text = "";
     try {
-        // Ensure candidate exists before trying to access text, although finishReason check might cover this
         if (response.candidates && response.candidates.length > 0) {
-           text = response.text(); // Use the convenience method if available and structure is standard
+           text = response.text();
         } else {
-            // This case might indicate no valid candidate was returned, even if not explicitly blocked.
              logger.warn(`[AI Action] No candidates found in the response from model ${modelName}. Finish Reason: ${finishReason ?? 'N/A'}`);
              await notifyAdmins(`⚠️ AI не вернул кандидатов в ответе (Модель: ${modelName})`).catch(logger.error);
              return { success: false, error: "AI returned no response candidates." };
         }
     } catch (e: any) {
-         // Catch errors during text extraction (e.g., unexpected response structure)
          logger.error(`[AI Action] Error calling response.text() (Model: ${modelName}):`, e);
          const errorMsg = `AI response format error: Could not extract text. ${e.message || ''}`.trim();
          await notifyAdmins(`❌ Ошибка формата ответа AI (Модель: ${modelName})`).catch(logger.error);
@@ -116,7 +117,6 @@ export async function generateAiCode(
 
     // 4. Check for empty text response (after other checks)
     if (!text || text.trim().length === 0) {
-         // Re-check block reason just in case logic above missed it (unlikely but safe)
          if (promptFeedback?.blockReason) {
              const errorMsg = `AI generation blocked (reason found after empty text check): ${promptFeedback.blockReason}`;
              logger.error(`[AI Action] ${errorMsg}`);
@@ -136,13 +136,16 @@ export async function generateAiCode(
     logger.error(`[AI Action] Error calling Google AI API (Model: ${modelName}):`, error);
     let errorMessage = "An unknown error occurred while contacting the AI service.";
     if (error instanceof Error) {
-      errorMessage = error.message;
+      errorMessage = error.message; // This will now contain "c.getGenerativeModel is not a function" if the old code was run
     } else if (typeof error === 'string') {
       errorMessage = error;
     }
 
     if (error?.status) { errorMessage += ` (Status: ${error.status})`; }
+    // Add details if the error object has them (check GoogleGenerativeAIError structure if available)
+    if (error?.cause) { errorMessage += ` Cause: ${JSON.stringify(error.cause)}`; }
     if (error?.details) { errorMessage += ` Details: ${error.details}`; }
+
 
     await notifyAdmins(`❌ Ошибка при вызове Gemini API (Модель: ${modelName}):\n${errorMessage}`).catch(logger.error);
     return { success: false, error: `AI API Error: ${errorMessage}` };
