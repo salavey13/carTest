@@ -1259,38 +1259,7 @@ export async function setTelegramWebhook(): Promise<{ success: boolean; data?: a
   }
 }
 
-export async function notifyCaptchaSuccess(userId: string, username?: string | null) {
-  try {
-    const { data: admins, error: adminError } = await supabaseAdmin
-      .from("users")
-      .select("user_id")
-      .eq("status", "admin")
-    if (adminError) throw adminError
 
-    const adminChatIds = admins.map((admin) => admin.user_id)
-    const message = `🔔 Пользователь ${username || userId} успешно прошел CAPTCHA.`
-
-    for (const adminId of adminChatIds) {
-      const result = await sendTelegramMessage(
-        process.env.TELEGRAM_BOT_TOKEN!,
-        message,
-        [],
-        undefined,
-        adminId
-      )
-      if (!result.success) {
-        console.error(`Failed to notify admin ${adminId}:`, result.error)
-      }
-    }
-
-    return { success: true }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to notify admins",
-    }
-  }
-}
 
 // --- RESTORED / DEPRECATED? ---
 
