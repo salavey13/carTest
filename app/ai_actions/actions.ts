@@ -1,120 +1,139 @@
+// /app/ai_actions/actions.ts
 "use server";
 
-    import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
-    import { notifyAdmins } from "@/app/actions"; // For error notifications
-    import { logger } from "@/lib/logger"; // Optional: For more detailed server logs
+// Corrected import based on previous fix
+import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from "@google/genai";
+import { notifyAdmins } from "@/app/actions"; // For error notifications
+import { logger } from "@/lib/logger"; // Optional: For more detailed server logs
 
-    // Initialize the Google AI Client
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      logger.error("GEMINI_API_KEY is not set in environment variables.");
-      // Optionally notify admin immediately on server start/load if key is missing
-      // notifyAdmins("🚨 CRITICAL ERROR: GEMINI_API_KEY is missing! AI features disabled.").catch(console.error);
-    }
+// Initialize the Google AI Client
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  logger.error("GEMINI_API_KEY is not set in environment variables.");
+  // notifyAdmins("🚨 CRITICAL ERROR: GEMINI_API_KEY is missing! AI features disabled.").catch(console.error);
+}
 
-    const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
+// --- CORE FIX: Pass apiKey inside a configuration object ---
+// Old: const genAI = apiKey ? new GoogleGenAI(apiKey) : null;
+const genAI = apiKey ? new GoogleGenAI({ apiKey }) : null; // Pass as { apiKey: apiKey } or shorthand { apiKey }
+// ---------------------------------------------------------
 
-    // Define safety settings (adjust as needed)
-    // Refer to: https://ai.google.dev/docs/safety_setting_gemini
-    const safetySettings = [
-      { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE, },
-      { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE, },
-      { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE, },
-      { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE, },
-    ];
+// Define safety settings (adjust as needed)
+const safetySettings = [
+  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE, },
+  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE, },
+  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE, },
+  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE, },
+];
 
-    // Define generation config (optional, adjust as needed)
-    const generationConfig = {
-        // temperature: 0.9, // Controls randomness (0.0 - 1.0)
-        // topK: 1,          // Selects the next token from the top K most likely tokens
-        // topP: 1,          // Selects the next token from the smallest set whose probability sums to P
-        // maxOutputTokens: 2048, // Limit response size (check model limits)
-    };
+// Define generation config (optional, adjust as needed)
+const generationConfig = {
+    // temperature: 0.9,
+    // topK: 1,
+    // topP: 1,
+    // maxOutputTokens: 65536,
+    // responseMimeType: "application/json",
+};
 
-    /**
-     * Generates content using the Google Generative AI API (Gemini).
-     * @param prompt The combined prompt including user request and code context.
-     * @param modelName The specific Gemini model to use (e.g., "gemini-1.5-flash-latest").
-     * @returns An object with success status and the generated text or an error message.
-     */
-    export async function generateAiCode(
-      prompt: string,
-      modelName: string = "gemini-1.5-flash-latest" // Use latest flash model by default
-    ): Promise<{ success: boolean; text?: string; error?: string }> {
-      logger.info(`[AI Action] Attempting to generate content with model: ${modelName}`);
+/**
+ * Generates content using the Google Generative AI API (Gemini).
+ * @param prompt The combined prompt including user request and code context.
+ * @param modelName The specific Gemini model to use. Defaults to the experimental 2.5 Pro model.
+ * @returns An object with success status and the generated text or an error message.
+ */
+export async function generateAiCode(
+  prompt: string,
+  modelName: string = "gemini-2.5-pro-exp-03-25"
+): Promise<{ success: boolean; text?: string; error?: string }> {
+  logger.info(`[AI Action] Attempting to generate content with model: ${modelName}`);
 
-      if (!genAI) {
-        const errorMsg = "Google AI SDK not initialized (GEMINI_API_KEY missing).";
+  if (!genAI) {
+    const errorMsg = "Google AI SDK not initialized (API key missing or client creation failed)."; // Updated message slightly
+    logger.error(`[AI Action] ${errorMsg}`);
+    // Avoid calling notifyAdmins if genAI is null *because* of the missing key, might cause loop if notifyAdmins uses AI
+    // await notifyAdmins(`❌ Ошибка AI: ${errorMsg}`).catch(logger.error);
+    return { success: false, error: errorMsg };
+  }
+
+  if (!prompt || prompt.trim().length === 0) {
+      logger.warn("[AI Action] Received empty prompt.");
+      return { success: false, error: "Prompt cannot be empty." };
+  }
+
+  try {
+    // Use the corrected API call structure
+    logger.info(`[AI Action] Sending prompt (length: ${prompt.length}) to model ${modelName} via genAI.models.generateContent...`);
+
+    const result = await genAI.models.generateContent({
+        model: modelName,
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        safetySettings: safetySettings,
+        generationConfig: generationConfig,
+    });
+
+    // --- Robustness Checks ---
+    const response = result.response;
+    const promptFeedback = response.promptFeedback;
+    if (promptFeedback?.blockReason) {
+        const blockReason = promptFeedback.blockReason;
+        const safetyRatings = promptFeedback.safetyRatings?.map(r => `${r.category}: ${r.probability}`).join(', ') || 'N/A';
+        const errorMsg = `AI generation blocked due to safety settings. Reason: ${blockReason}. Ratings: [${safetyRatings}]`;
         logger.error(`[AI Action] ${errorMsg}`);
-        await notifyAdmins(`❌ Ошибка AI: ${errorMsg}`).catch(logger.error);
+        await notifyAdmins(`🚫 AI-Контент Заблокирован (Модель: ${modelName}): ${blockReason}`).catch(logger.error);
         return { success: false, error: errorMsg };
-      }
-
-      if (!prompt || prompt.trim().length === 0) {
-          logger.warn("[AI Action] Received empty prompt.");
-          return { success: false, error: "Prompt cannot be empty." };
-      }
-
-      try {
-        const model = genAI.getGenerativeModel({
-            model: modelName,
-            safetySettings,
-            generationConfig,
-        });
-
-        logger.info(`[AI Action] Sending prompt (length: ${prompt.length}) to model ${modelName}...`);
-        // Simple text-only generation for now
-        const result = await model.generateContent(prompt);
-
-        // Handle potential safety blocks or other issues in the response
-        if (!result.response) {
-            logger.error("[AI Action] No response received from the model.", result);
-             // Try to get more details if available
-             let blockReason = "Unknown reason";
-             try {
-                 // Accessing potentially private or non-standard properties, use with caution
-                 // @ts-ignore // Suppress TS error for potential non-standard access
-                 const candidate = result?.promptFeedback ?? result?.response?.candidates?.[0];
-                 if (candidate?.blockReason) {
-                     blockReason = candidate.blockReason;
-                 } else if (candidate?.finishReason && candidate.finishReason !== 'STOP') {
-                     blockReason = `Finish Reason: ${candidate.finishReason}`;
-                 }
-             } catch (e) { /* ignore potential errors accessing details */ }
-
-            const errorMsg = `AI generation failed or was blocked. Reason: ${blockReason}`;
-            logger.error(`[AI Action] ${errorMsg}`);
-            await notifyAdmins(`🚫 AI-Контент Заблокирован или Неудачен (Модель: ${modelName}): ${blockReason}`).catch(logger.error);
-            return { success: false, error: errorMsg };
-        }
-
-        const response = result.response;
-        const text = response.text(); // Get the text content
-
-        if (!text || text.trim().length === 0) {
-             logger.warn("[AI Action] Received empty text response from the model.");
-             await notifyAdmins(`⚠️ AI вернул пустой ответ (Модель: ${modelName})`).catch(logger.error);
-             return { success: false, error: "AI returned an empty response." };
-        }
-
-        logger.info(`[AI Action] Successfully received response (length: ${text.length}) from model ${modelName}.`);
-        return { success: true, text: text };
-
-      } catch (error: any) {
-        logger.error(`[AI Action] Error calling Google AI API (Model: ${modelName}):`, error);
-        let errorMessage = "An unknown error occurred while contacting the AI service.";
-        if (error instanceof Error) {
-          errorMessage = error.message;
-        } else if (typeof error === 'string') {
-          errorMessage = error;
-        }
-
-        // Check for specific error types if the SDK provides them (e.g., API key issues, rate limits)
-        // Example (pseudo-code, check actual SDK error structure):
-        // if (error?.code === 'API_KEY_INVALID') { errorMessage = "Invalid Gemini API Key."; }
-        // else if (error?.status === 429) { errorMessage = "Gemini API rate limit exceeded."; }
-
-        await notifyAdmins(`❌ Ошибка при вызове Gemini API (Модель: ${modelName}):\n${errorMessage}`).catch(logger.error);
-        return { success: false, error: `AI API Error: ${errorMessage}` };
-      }
     }
+
+    const finishReason = response.candidates?.[0]?.finishReason;
+    if (finishReason && finishReason !== "STOP") {
+         const errorMsg = `AI generation stopped unexpectedly. Reason: ${finishReason}`;
+         logger.warn(`[AI Action] ${errorMsg} (Model: ${modelName})`);
+         await notifyAdmins(`⚠️ AI генерация остановлена (Модель: ${modelName}): ${finishReason}`).catch(logger.error);
+         return { success: false, error: errorMsg };
+    }
+
+    let text = "";
+    try {
+        if (response.candidates && response.candidates.length > 0) {
+           text = response.text();
+        } else {
+             logger.warn(`[AI Action] No candidates found in the response from model ${modelName}. Finish Reason: ${finishReason ?? 'N/A'}`);
+             await notifyAdmins(`⚠️ AI не вернул кандидатов в ответе (Модель: ${modelName})`).catch(logger.error);
+             return { success: false, error: "AI returned no response candidates." };
+        }
+    } catch (e: any) {
+         logger.error(`[AI Action] Error calling response.text() (Model: ${modelName}):`, e);
+         const errorMsg = `AI response format error: Could not extract text. ${e.message || ''}`.trim();
+         await notifyAdmins(`❌ Ошибка формата ответа AI (Модель: ${modelName})`).catch(logger.error);
+         return { success: false, error: errorMsg };
+    }
+
+    if (!text || text.trim().length === 0) {
+         if (promptFeedback?.blockReason) {
+             const errorMsg = `AI generation blocked (reason found after empty text check): ${promptFeedback.blockReason}`;
+             logger.error(`[AI Action] ${errorMsg}`);
+             return { success: false, error: errorMsg };
+         }
+         logger.warn(`[AI Action] Received empty text response from the model ${modelName}.`);
+         await notifyAdmins(`⚠️ AI вернул пустой ответ (Модель: ${modelName})`).catch(logger.error);
+         return { success: false, error: "AI returned an empty response." };
+    }
+
+    // --- Success ---
+    logger.info(`[AI Action] Successfully received response (length: ${text.length}) from model ${modelName}.`);
+    return { success: true, text: text };
+
+  } catch (error: any) {
+    // --- Catch external API errors ---
+    logger.error(`[AI Action] Error calling Google AI API (Model: ${modelName}):`, error);
+    // The error message will now clearly state the credentials issue if the fix doesn't work
+    let errorMessage = error instanceof Error ? error.message : "An unknown error occurred while contacting the AI service.";
+
+    // Add details if available (useful for debugging auth issues)
+    if (error?.status) { errorMessage += ` (Status: ${error.status})`; }
+    if (error?.cause) { errorMessage += ` Cause: ${JSON.stringify(error.cause)}`; } // Often contains auth details
+    if (error?.details) { errorMessage += ` Details: ${error.details}`; }
+
+    await notifyAdmins(`❌ Ошибка при вызове Gemini API (Модель: ${modelName}):\n${errorMessage}`).catch(logger.error);
+    return { success: false, error: `AI API Error: ${errorMessage}` };
+  }
+}
