@@ -31,7 +31,7 @@ const COZE_USER_ID = process.env.COZE_USER_ID; // Removed default, should be con
 function checkEnvVars() {
   if (!TELEGRAM_BOT_TOKEN) {
     logger.error("Missing critical environment variable: TELEGRAM_BOT_TOKEN");
-    throw new Error("Telegram bot token not configured");
+    // new Error("Telegram bot token not configured");
   }
   if (!COZE_API_KEY) {
     logger.warn("Missing environment variable: COZE_API_KEY. Coze features may be disabled.");

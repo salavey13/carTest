@@ -363,12 +363,12 @@
         setPrimaryHighlightedPath(null); // Clear highlighting
         setSecondaryHighlightedPaths({ component: [], context: [], hook: [], lib: [], other: [] });
         // Reset downstream AI states via context setters
-        setAiResponseHasContent(false);
-        setFilesParsed(false);
-        setSelectedAssistantFiles(new Set());
+        //setAiResponseHasContent(false);
+        //setFilesParsed(false);
+        //setSelectedAssistantFiles(new Set());
         addToast("Поле ввода и выбор файлов очищены ✨", 'success');
         localKworkInputRef.current?.focus(); // Focus the kwork input
-    }, [ setSelectedFetcherFiles, updateKworkInput, addToast, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles ]); // Dependencies
+    }, [ setSelectedFetcherFiles, updateKworkInput, addToast]);//, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles ]); // Dependencies
 
 
     // --- Fetch Handler (Method exposed via ref, called by context's triggerFetch) ---
@@ -394,7 +394,7 @@
         setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set()); // Clear selections
         setFilesFetched(false, null, []); // Update context: reset fetched status and highlighting
         setRequestCopied(false); // Reset copied flag
-        setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set()); // Reset AI state
+        //setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set()); // Reset AI state
         setPrimaryHighlightedPath(null);
         setSecondaryHighlightedPaths({ component: [], context: [], hook: [], lib: [], other: [] });
 
@@ -545,7 +545,7 @@
         repoUrl, token, fetchStatus, // Local state needed for logic
         setFetchStatus, setFiles, setSelectedFilesState, setProgress, setError, setExtractLoading, // Local setters
         setPrimaryHighlightedPath, setSecondaryHighlightedPaths, // Local setters for highlighting
-        setSelectedFetcherFiles, setFilesFetched, setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, // Context setters
+        setSelectedFetcherFiles, setFilesFetched, setRequestCopied,// setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, // Context setters
         highlightedPathFromUrl, ideaFromUrl, importantFiles, DEFAULT_TASK_IDEA, // URL params and constants
         addToast, startProgressSimulation, stopProgressSimulation, getLanguage, getPageFilePath, extractImports, resolveImportPath, // Utilities
         handleCopyToClipboard, handleAddSelected, getKworkInputValue, // Callbacks depending on state
