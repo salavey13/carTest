@@ -82,7 +82,7 @@
       });
       const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
       // NEW: Control auto-ask AI feature
-      const [autoAskAiEnabled, setAutoAskAiEnabled] = useState<boolean>(true); // Default to true
+      const [autoAskAiEnabled, setAutoAskAiEnabled] = useState<boolean>(false); // Default to false as no cloud creds;(
 
       // === Context ===
       const { user, openLink } = useAppContext();

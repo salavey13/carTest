@@ -107,7 +107,7 @@ export default function YoutubeAdminPage() {
     }
   };
 
-  if (!isAdmin()) {
+  if (!isAdmin) {
     return (
       <div className="pt-24 p-4 bg-background min-h-screen flex items-center justify-center">
         <div className="text-center">
