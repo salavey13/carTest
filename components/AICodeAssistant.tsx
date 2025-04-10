@@ -1,4 +1,4 @@
-// Merged and restored version based on previous implementation
+// Full version
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, MutableRefObject, useCallback } from "react";
@@ -22,49 +22,47 @@ import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
 
-
-// --- Tooltip Component ---
+// Tooltip Component
 export const Tooltip = ({ children, text, position = 'bottom' }: { children: React.ReactNode; text: string; position?: 'top' | 'bottom' | 'left' | 'right' }) => { const [isVisible, setIsVisible] = useState(false); const positionClasses = { top: 'bottom-full left-1/2 transform -translate-x-1/2 mb-1', bottom: 'top-full left-1/2 transform -translate-x-1/2 mt-1', left: 'right-full top-1/2 transform -translate-y-3/4 mr-1', right: 'left-full top-1/2 transform -translate-y-1 ml-1', }; return ( <div className="relative inline-block group"> <div onMouseEnter={() => setIsVisible(true)} onMouseLeave={() => setIsVisible(false)}>{children}</div> <AnimatePresence> {isVisible && ( <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} transition={{ duration: 0.15 }} className={clsx("absolute z-[70] p-2 bg-gray-700 text-white text-[13px] rounded-lg shadow-lg w-max max-w-xs whitespace-pre-line", positionClasses[position])}> {text} </motion.div> )} </AnimatePresence> </div> ); }; Tooltip.displayName = 'Tooltip';
 
 
-// --- Interfaces ---
+// Interfaces
 interface FileEntry extends ValidationFileEntry {}
 interface AICodeAssistantProps {}
 interface OriginalFile { path: string; content: string; }
 
-// --- Helper: Robust Function Selection Logic ---
+// Helper: Robust Function Selection Logic
 const selectFunctionDefinition = (text: string, startIndex: number): [number, number] => { const declarationLineStart = text.lastIndexOf('\n', startIndex - 1) + 1; let braceStart = -1; let searchPos = declarationLineStart; let inSingleLineComment = false; let inMultiLineComment = false; let inString: '"' | "'" | null = null; let parenDepth = 0; while(searchPos < text.length) { const char = text[searchPos]; const prevChar = searchPos > 0 ? text[searchPos - 1] : ''; if (inSingleLineComment) { if (char === '\n') inSingleLineComment = false; } else if (inMultiLineComment) { if (char === '/' && prevChar === '*') inMultiLineComment = false; } else if (inString) { if (char === inString && prevChar !== '\\') inString = null; } else if (char === '/' && prevChar === '/') { inSingleLineComment = true; } else if (char === '*' && prevChar === '/') { inMultiLineComment = true; } else if (char === '"' || char === "'") { inString = char; } else if (char === '(') parenDepth++; else if (char === ')') parenDepth--; else if (char === '{' && parenDepth === 0) { const precedingText = text.substring(declarationLineStart, searchPos).trim(); if (precedingText.endsWith(')') || precedingText.endsWith('=>') || precedingText.match(/[a-zA-Z0-9_$]\s*$/)) { braceStart = searchPos; break; } if (precedingText.match(/[a-zA-Z0-9_$]+\s*\([^)]*\)$/)) { braceStart = searchPos; break; } } if (char === '\n' && text.substring(searchPos + 1).match(/^\s*(?:async\s+|function\s+|const\s+|let\s+|var\s+|class\s+|get\s+|set\s+|[a-zA-Z0-9_$]+\s*\(|\/\/|\/\*)/)) { if (braceStart === -1) break; } searchPos++; } if (braceStart === -1) return [-1, -1]; let depth = 1; let pos = braceStart + 1; inSingleLineComment = false; inMultiLineComment = false; inString = null; while (pos < text.length && depth > 0) { const char = text[pos]; const prevChar = pos > 0 ? text[pos - 1] : ''; if (inSingleLineComment) { if (char === '\n') inSingleLineComment = false; } else if (inMultiLineComment) { if (char === '/' && prevChar === '*') inMultiLineComment = false; } else if (inString) { if (char === inString && prevChar !== '\\') inString = null; } else if (char === '/' && prevChar === '/') { inSingleLineComment = true; } else if (char === '*' && prevChar === '/') { inMultiLineComment = true; } else if (char === '"' || char === "'") { inString = char; } else if (char === '{') depth++; else if (char === '}') depth--; pos++; } if (depth !== 0) return [-1,-1]; const closingBracePos = pos - 1; let closingLineEnd = text.indexOf('\n', closingBracePos); if (closingLineEnd === -1) closingLineEnd = text.length; return [declarationLineStart, closingLineEnd]; };
 
 
-// --- Helper: Extract Function Name ---
+// Helper: Extract Function Name
 const extractFunctionName = (line: string): string | null => { const funcMatch = line.match(/(?:export\s+)?(?:async\s+)?(?:function\s+|const\s+|let\s+|var\s+)?\s*([a-zA-Z0-9_$]+)\s*(?:[:=(]|\s*=>)/); if (funcMatch && funcMatch[1]) return funcMatch[1]; const methodMatch = line.match(/^\s*(?:async\s+)?(?:get\s+|set\s+)?([a-zA-Z0-9_$]+)\s*\(/); if (methodMatch && methodMatch[1] && !['if', 'for', 'while', 'switch', 'catch', 'constructor'].includes(methodMatch[1])) return methodMatch[1]; return null; };
 
 
-// --- Main Component ---
+// Main Component
 const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((props, ref) => {
-    // --- Hooks ---
+    // Hooks
     const { user } = useAppContext();
-    // Use hook with updated logic
     const {
         parsedFiles, rawDescription, validationStatus, validationIssues, isParsing,
         parseAndValidateResponse, autoFixIssues,
         setParsedFiles, setValidationStatus, setValidationIssues
     } = useCodeParsingAndValidation();
 
-    // --- Context Access ---
+    // Context Access
     const {
-        aiResponseInputRef, // Get ref from context
+        aiResponseInputRef,
         setAiResponseHasContent,
-        setFilesParsed, // Renamed for clarity from context perspective
+        setFilesParsed,
         setSelectedAssistantFiles,
         setAssistantLoading,
         assistantLoading,
-        aiActionLoading, // Get the repurposed AI loading state
-        currentAiRequestId // Get the pending request ID
+        aiActionLoading, // Represents submission OR waiting for Realtime
+        currentAiRequestId // ID of the request being monitored
     } = useRepoXmlPageContext();
 
-    // --- State ---
-    const [response, setResponse] = useState<string>(""); // Local state for textarea value
+    // State
+    const [response, setResponse] = useState<string>("");
     const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
     const [repoUrl, setRepoUrl] = useState<string>("https://github.com/salavey13/cartest");
     const [prTitle, setPrTitle] = useState<string>("");
@@ -77,68 +75,64 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const [originalRepoFiles, setOriginalRepoFiles] = useState<OriginalFile[]>([]);
     const [isFetchingOriginals, setIsFetchingOriginals] = useState(false);
 
-    // --- Helper ---
+    // Helper: Extract PR Title Hint
     const extractPRTitleHint = (text: string): string => { const lines = text.split('\n'); const firstLine = lines.find(l => l.trim() !== '') || "AI Assistant Update"; return firstLine.trim().substring(0, 70); };
 
-    // --- Effects ---
+    // Effect: Sync context flags and manage state based on response content
     useEffect(() => {
-        // Sync context flag with local state
         const hasContent = response.trim().length > 0;
         setAiResponseHasContent(hasContent);
-        // Reset downstream state if response is cleared MANUALLY
-        // Realtime updates handle their own state setting
-        if (!hasContent && !currentAiRequestId && !aiActionLoading) { // Only reset if not waiting for AI
+        // Reset downstream state if response is cleared MANUALLY and not waiting for AI
+        if (!hasContent && !currentAiRequestId && !aiActionLoading) {
             setFilesParsed(false);
             setSelectedAssistantFiles(new Set());
             setValidationStatus('idle');
             setValidationIssues([]);
             setOriginalRepoFiles([]);
         } else if (hasContent) {
-            // If response exists but isn't parsed yet, set status back to idle?
-            // Or let the parse button handle it.
+            // Reset validation if response exists but isn't parsed
             if (parsedFiles.length === 0 && validationStatus !== 'idle' && !isParsing && !assistantLoading) {
                  setValidationStatus('idle'); setValidationIssues([]);
             }
         }
     }, [
-      response, currentAiRequestId, aiActionLoading, // Add dependencies
+      response, currentAiRequestId, aiActionLoading,
       parsedFiles.length, isParsing, assistantLoading, setAiResponseHasContent,
       setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues
     ]);
 
+    // Effect: Load custom links
     useEffect(() => {
-        // Load custom links (keep existing implementation)
         const loadLinks = async () => { if (!user) { setCustomLinks([]); return; } try { const { data: userData, error } = await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id).single(); if (!error && userData?.metadata?.customLinks) setCustomLinks(userData.metadata.customLinks); else setCustomLinks([]); } catch (e) { console.error("Error loading links:", e); setCustomLinks([]); } }; loadLinks();
     }, [user]);
 
+    // Effect: Fetch original files for restoration
     const skippedCodeBlockIssues = validationIssues.filter(i => i.type === 'skippedCodeBlock');
     useEffect(() => {
-        // Fetch original files if needed for restoration (keep existing implementation)
         if (skippedCodeBlockIssues.length > 0 && originalRepoFiles.length === 0 && !isFetchingOriginals && repoUrl) { const fetchOriginals = async () => { setIsFetchingOriginals(true); toast.info("Загрузка оригиналов..."); try { const result = await fetchRepoContents(repoUrl); if (result.success && Array.isArray(result.files)) { setOriginalRepoFiles(result.files); toast.success("Оригиналы загружены."); } else { toast.error("Ошибка загрузки оригиналов: " + (result.error ?? 'Unknown error')); setOriginalRepoFiles([]); } } catch (error) { toast.error("Крит. ошибка загрузки оригиналов."); setOriginalRepoFiles([]); } finally { setIsFetchingOriginals(false); } }; fetchOriginals(); }
     }, [skippedCodeBlockIssues.length, originalRepoFiles.length, isFetchingOriginals, repoUrl]);
 
 
     // --- Handlers ---
 
+    // Parse and Validate AI Response
     const handleParse = useCallback(async () => {
-        setOriginalRepoFiles([]); // Clear originals before parsing new response
+        setOriginalRepoFiles([]);
         const { files: newlyParsedFiles, rawDescription: parsedRawDescription } = await parseAndValidateResponse(response);
         setFilesParsed(newlyParsedFiles.length > 0);
         const initialSelection = new Set(newlyParsedFiles.map(f => f.id));
         setSelectedFileIds(initialSelection);
         setSelectedAssistantFiles(new Set(newlyParsedFiles.map(f => f.path)));
-        if (newlyParsedFiles.length > 0) {
-            setPrTitle(extractPRTitleHint(parsedRawDescription || response));
-        } else {
-            setPrTitle('');
-        }
-    }, [response, parseAndValidateResponse, setFilesParsed, setSelectedAssistantFiles]); // Keep dependencies as they were
+        if (newlyParsedFiles.length > 0) { setPrTitle(extractPRTitleHint(parsedRawDescription || response)); }
+        else { setPrTitle(''); }
+    }, [response, parseAndValidateResponse, setFilesParsed, setSelectedAssistantFiles]);
 
+    // Auto-fix validation issues
     const handleAutoFix = useCallback(() => {
-        // autoFixIssues updates state internally via re-validation now
         autoFixIssues(parsedFiles, validationIssues);
     }, [autoFixIssues, parsedFiles, validationIssues]);
 
+    // Copy prompt to fix skipped comment blocks
     const handleCopyFixPrompt = useCallback(() => {
         const skipped = validationIssues.filter(i => i.type === 'skippedComment');
         if (skipped.length === 0) return toast.info("Нет маркеров '// ...' для исправления.");
@@ -147,6 +141,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         navigator.clipboard.writeText(p).then(() => toast.success("Prompt скопирован!")).catch(() => toast.error("Ошибка копирования."));
     }, [validationIssues]);
 
+    // Handle completion of code restoration
     const handleRestorationComplete = useCallback((updatedFiles: FileEntry[], successCount: number, errorCount: number) => {
         setParsedFiles(updatedFiles);
         const remainingIssues = validationIssues.filter(i => i.type !== 'skippedCodeBlock');
@@ -161,7 +156,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const handleCopyResponse = useCallback(() => { if (!response) return; navigator.clipboard.writeText(response).then(()=>toast.success("Скопировано!")).catch(()=>{toast.error("Ошибка копирования")});}, [response]);
     const handleOpenModal = useCallback((mode: 'replace' | 'search') => { setModalMode(mode); setShowModal(true); }, []);
 
-    // --- Swap/Search Handlers ---
+    // Swap Text in Response Area
     const handleSwap = useCallback((find: string, replace: string) => {
         if (!find) return;
         const textarea = aiResponseInputRef.current;
@@ -172,25 +167,24 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             const regex = new RegExp(escapedFind, 'g');
             const newValue = currentValue.replace(regex, replace);
             if (newValue !== currentValue) {
-                setResponse(newValue); // Update local state FIRST
+                setResponse(newValue);
                 requestAnimationFrame(() => { if (aiResponseInputRef.current) aiResponseInputRef.current.value = newValue; });
-                // Reset downstream states
                 setParsedFiles([]); setFilesParsed(false); setSelectedFileIds(new Set()); setSelectedAssistantFiles(new Set()); setValidationStatus('idle'); setValidationIssues([]);
                 toast.success(`"${find}" заменен на "${replace}". Нажмите '➡️' для перепроверки.`);
             } else {
                 toast.info(`"${find}" не найден.`);
             }
         } catch (e: any) { toast.error(`Ошибка замены: ${e.message}`); console.error("Swap Error:", e); }
-    }, [aiResponseInputRef, setParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues]); // Dependencies as they were
+    }, [aiResponseInputRef, setParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues]);
 
-
+    // Search or Magic Swap in Response Area
     const handleSearch = useCallback((searchText: string, isMultiline: boolean) => {
         if (!searchText) { toast.warn("Введите текст для поиска."); return; }
         const textarea = aiResponseInputRef.current;
         if (!textarea) return;
         const text = textarea.value;
 
-        if (isMultiline) { // --- Magic Swap Logic ---
+        if (isMultiline) { // Magic Swap
             const cleanedSearchText = searchText.split('\n').map(line => line.trim()).filter(line => line.length > 0).join('\n');
             if (!cleanedSearchText) { toast.error("Вставленный текст пуст после очистки."); return; }
             const firstLine = cleanedSearchText.split('\n')[0];
@@ -204,12 +198,11 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             const [startPos, endPos] = selectFunctionDefinition(text, matchIndex);
             if (startPos === -1 || endPos === -1) { toast.error("Не удалось корректно выделить функцию для замены (проверьте скобки или комментарии)."); return; }
             const newValue = text.substring(0, startPos) + cleanedSearchText + text.substring(endPos);
-            setResponse(newValue); // Update state
+            setResponse(newValue);
             requestAnimationFrame(() => { if (aiResponseInputRef.current) { aiResponseInputRef.current.value = newValue; aiResponseInputRef.current.focus(); aiResponseInputRef.current.setSelectionRange(startPos, startPos + cleanedSearchText.length); } });
-            // Reset downstream states
             setParsedFiles([]); setFilesParsed(false); setSelectedFileIds(new Set()); setSelectedAssistantFiles(new Set()); setValidationStatus('idle'); setValidationIssues([]);
             toast.success(`Функция "${functionName}" заменена! ✨ Нажмите '➡️'.`);
-        } else { // --- Single-line Search Logic ---
+        } else { // Single-line Search
             const searchLower = searchText.toLowerCase();
             const textLower = text.toLowerCase();
             const cursorPos = textarea.selectionStart || 0;
@@ -219,9 +212,9 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             textarea.focus(); textarea.setSelectionRange(index, index + searchText.length);
             toast(`Найдено: "${searchText}"`, { style: { background: "rgba(30, 64, 175, 0.9)", color:"#ffffff", border:"1px solid rgba(37, 99, 235, 0.3)", backdropFilter:"blur(3px)" }, duration: 2000 });
         }
-    }, [aiResponseInputRef, setParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues]); // Dependencies as they were
+    }, [aiResponseInputRef, setParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues]);
 
-
+    // Select containing function in Response Area
     const handleSelectFunction = useCallback(() => { const textarea = aiResponseInputRef.current; if (!textarea) return; const text = textarea.value; const cursorPos = textarea.selectionStart; let lineStartIndex = text.lastIndexOf('\n', cursorPos - 1) + 1; const [startPos, endPos] = selectFunctionDefinition(text, lineStartIndex); if (startPos !== -1 && endPos !== -1) { textarea.focus(); textarea.setSelectionRange(startPos, endPos); toast.success("Функция выделена!"); } else { let searchBackIndex = text.lastIndexOf('{', lineStartIndex); if(searchBackIndex > 0) { const [startPosBack, endPosBack] = selectFunctionDefinition(text, searchBackIndex); if (startPosBack !== -1 && endPosBack !== -1) { textarea.focus(); textarea.setSelectionRange(startPosBack, endPosBack); toast.success("Функция выделена (найдена выше)!"); return; } } toast.info("Не удалось выделить функцию. Убедитесь, что курсор в строке с объявлением или внутри функции."); textarea.focus(); } }, [aiResponseInputRef]);
 
     // --- File List & PR Handlers ---
@@ -235,6 +228,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const handleCreatePR = useCallback(async () => { const selectedFilesLocal = parsedFiles.filter(f => selectedFileIds.has(f.id)); if (!repoUrl || selectedFilesLocal.length === 0 || !prTitle) { return toast.error("Укажите URL, Заголовок PR и выберите файлы."); } let finalDescription = rawDescription.substring(0, 13000) + (rawDescription.length > 13000 ? "\n\n...(описание усечено)" : ""); finalDescription += `\n\n**Файлы в этом PR (${selectedFilesLocal.length}):**\n` + selectedFilesLocal.map(f => `- \`${f.path}\``).join('\n'); const unselectedUnnamed = parsedFiles.filter(f => f.path.startsWith('unnamed-') && !selectedFileIds.has(f.id)); if (unselectedUnnamed.length > 0) finalDescription += `\n\n**Примечание:** ${unselectedUnnamed.length} блоков кода без имени файла не были включены.`; const remainingIssues = validationIssues; if (remainingIssues.length > 0) { finalDescription += "\n\n**Обнаруженные Проблемы (не исправлено / не восстановлено):**\n"; remainingIssues.forEach(issue => { finalDescription += `- **${issue.filePath}**: ${issue.message}\n`; }); } const commitSubject = prTitle.substring(0, 50); let commitBody = `Apply AI changes to ${selectedFilesLocal.length} files.\n\n${rawDescription.split('\n').slice(0,10).join('\n').substring(0, 1000)}...`; const finalCommitMessage = `${commitSubject}\n\n${commitBody}`; setAssistantLoading(true); setIsCreatingPr(true); try { const filesToCommit = selectedFilesLocal.map(f => ({ path: f.path, content: f.content })); const result = await createGitHubPullRequest( repoUrl, filesToCommit, prTitle, finalDescription, finalCommitMessage ); if (result.success && result.prUrl) { toast.success(`PR создан: ${result.prUrl}`); await notifyAdmin(`Новый PR "${prTitle}" создан ${user?.username || user?.id}: ${result.prUrl}`); handleGetOpenPRs(); } else { toast.error("Ошибка создания PR: " + result.error); console.error("PR Creation Failed:", result.error); } } catch (err) { toast.error("Критическая ошибка создания PR."); console.error("Create PR error:", err); } finally { setAssistantLoading(false); setIsCreatingPr(false); } }, [parsedFiles, selectedFileIds, repoUrl, prTitle, rawDescription, validationIssues, user, setAssistantLoading, handleGetOpenPRs]);
     const handleAddCustomLink = useCallback(async () => { const n=prompt("Назв:"); const u=prompt("URL (https://..):"); if (!n||!u||!u.startsWith('http')) return; const nl={name: n, url: u}; const ul=[...customLinks,nl]; setCustomLinks(ul); if(user){try{const{data:ed}=await supabaseAdmin.from("users").select("metadata").eq("user_id",user.id).single(); await supabaseAdmin.from("users").upsert({user_id:user.id,metadata:{...(ed?.metadata||{}),customLinks:ul}},{onConflict:'user_id'}); toast.success(`Ссылка "${n}" добавлена.`);}catch(e){toast.error("Ошибка сохр.");setCustomLinks(customLinks);}} }, [customLinks, user]);
 
+    // Set Response Value programmatically (used by context/Realtime)
     const setResponseValue = useCallback((value: string) => {
         setResponse(value);
         if (aiResponseInputRef.current) {
@@ -250,12 +244,11 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         handleParse,
         selectAllParsedFiles: handleSelectAllFiles,
         handleCreatePR,
-        setResponseValue, // Keep this, it's used by the Realtime listener
+        setResponseValue,
      }), [handleParse, handleSelectAllFiles, handleCreatePR, setResponseValue]);
 
 
     // --- RENDER ---
-    // Now include aiActionLoading in the overall processing check
     const isProcessing = assistantLoading || aiActionLoading || isParsing || isCreatingPr;
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
 
@@ -284,8 +277,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                          value={response}
                          onChange={(e) => setResponse(e.target.value)}
                          placeholder={isWaitingForAiResponse ? "AI думает..." : "Ответ от AI появится здесь..."}
-                         // Disable manual editing while waiting for the response? Optional.
-                         // disabled={isProcessing || isWaitingForAiResponse}
                          disabled={isProcessing} // Keep disabled during general processing
                          spellCheck="false"
                      />
@@ -297,7 +288,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                          onCopy={handleCopyResponse}
                          onClear={handleClearResponse}
                          onSelectFunction={handleSelectFunction}
-                         // Disable parse button specifically while waiting for AI response to arrive
+                         // Disable parse button specifically while waiting for AI or if no content
                          isParseDisabled={isWaitingForAiResponse || isProcessing || !response.trim()}
                      />
                  </div>
@@ -306,17 +297,16 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                       <CodeRestorer
                          parsedFiles={parsedFiles}
                          originalFiles={originalRepoFiles}
-                         skippedIssues={skippedCodeBlockIssues} // Pass only relevant issues
+                         skippedIssues={skippedCodeBlockIssues}
                          onRestorationComplete={handleRestorationComplete}
-                         disabled={isProcessing || validationStatus === 'validating' || isFetchingOriginals || isWaitingForAiResponse} // Also disable while waiting
+                         disabled={isProcessing || validationStatus === 'validating' || isFetchingOriginals || isWaitingForAiResponse}
                       />
                       <ValidationStatusIndicator
                           status={validationStatus}
-                          issues={validationIssues} // Pass all issues for logic inside
+                          issues={validationIssues}
                           onAutoFix={handleAutoFix}
                           onCopyPrompt={handleCopyFixPrompt}
-                          // Disable fix buttons while waiting?
-                          isFixDisabled={isWaitingForAiResponse}
+                          isFixDisabled={isWaitingForAiResponse || isProcessing} // Disable fix buttons too
                       />
                  </div>
              </div>
