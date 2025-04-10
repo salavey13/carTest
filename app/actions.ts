@@ -1259,27 +1259,103 @@ export async function setTelegramWebhook(): Promise<{ success: boolean; data?: a
   }
 }
 
-// --- DEPRECATED / TO BE REMOVED? ---
+// --- RESTORED / DEPRECATED? ---
 
-// This function seems redundant with the consolidated user management.
-// If needed specifically for saving TG user info without full auth, keep it, otherwise remove.
-/*
+/**
+ * Saves user info from Telegram Mini App context.
+ * Consider if dbCreateOrUpdateUser covers this use case.
+ * @deprecated Check if this specific upsert logic is still needed.
+ */
 export async function saveUser(tgUser: WebAppUser) {
-  // ... implementation ... (Consider using dbCreateOrUpdateUser)
-}
-*/
+  // Input type 'any' in original, using WebAppUser now
+  if (!tgUser || !tgUser.id) {
+      logger.warn("saveUser called with invalid tgUser object", { tgUser });
+      return { success: false, error: "Invalid user data provided." };
+  }
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("users")
+      .upsert({
+        user_id: tgUser.id.toString(), // Ensure user_id is string
+        avatar_url: tgUser.photo_url,
+        full_name: `${tgUser.first_name || ""} ${tgUser.last_name || ""}`.trim(),
+        username: tgUser.username, // Changed from telegram_username to match newer schema
+        language_code: tgUser.language_code,
+      }, { onConflict: 'user_id' }) // Specify conflict target
+      .select() // Select the upserted/found row
+      .single(); // Expect one row
 
-// This function seems specific to a previous implementation flow.
-// If the current flow involves Mini Apps sending results differently, remove it.
-/*
+    if (error) {
+        logger.error("Error saving user in saveUser:", error);
+        throw error;
+    }
+    logger.info(`User saved/updated via saveUser: ${tgUser.username || tgUser.id}`);
+    return { success: true, data };
+  } catch (error) {
+    logger.error("Exception in saveUser:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Failed to save user" };
+  }
+}
+
+/**
+ * Sends a result (likely car info) back via Telegram Photo message.
+ * Might be specific to a particular Mini App flow.
+ * @deprecated Review if this specific message format/flow is still used.
+ */
 export async function sendResult(chatId: string, result: any) {
-  // ... implementation ...
-}
-*/
+    // Original had no explicit error handling or success/error return structure
+    if (!TELEGRAM_BOT_TOKEN) {
+        logger.error("sendResult failed: Telegram bot token not configured");
+        return { success: false, error: "Telegram bot token not configured" };
+    }
+    if (!chatId || !result || !result.imageUrl || !result.car || !result.car.id) {
+         logger.warn("sendResult called with missing data", { chatId, result });
+         return { success: false, error: "Missing required data for sendResult" };
+    }
 
-// The old webhook handler is commented out, which is good. Remove it completely.
-/*
-export async function handleWebhookUpdate(update: any) {
-  // ... old implementation ...
+    try {
+        const baseUrl = getBaseUrl();
+        const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
+
+        // Construct caption safely
+        const caption = `*${result.car.make || result.car.model || 'Car'}*\n${result.description || 'No description'}`; // Handle potential missing fields
+
+        const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            chat_id: chatId,
+            photo: result.imageUrl,
+            caption: caption,
+            parse_mode: "Markdown",
+            reply_markup: {
+            inline_keyboard: [
+                [
+                {
+                    text: "Rent This Car 🚗",
+                    url: `${baseUrl}/rent/${result.car.id}`, // Ensure car.id exists
+                },
+                {
+                    text: "Try Again 🔄",
+                    web_app: { url: baseUrl }, // Ensure web_app URL is correct
+                },
+                ],
+            ],
+            },
+        }),
+        });
+
+        const data: TelegramApiResponse = await response.json();
+
+        if (!data.ok) {
+            logger.error(`Error sending result via Telegram: ${data.description}`, { chatId, errorCode: data.error_code });
+            throw new Error(data.description || "Failed to send result photo");
+        }
+
+        logger.info(`Result sent successfully to chat ${chatId}`);
+        return { success: true, data: data.result };
+    } catch (error) {
+        logger.error(`Exception in sendResult for chat ${chatId}:`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Failed to send result" };
+    }
 }
-*/
