@@ -53,7 +53,7 @@ export default function TasksPage() {
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAdmin()) {
+    if (!isAdmin) {
       toast.error("Only admins can create tasks");
       return;
     }
@@ -159,7 +159,7 @@ export default function TasksPage() {
           </div>
         </div>
 
-        {isAdmin() && (
+        {isAdmin && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -281,7 +281,7 @@ export default function TasksPage() {
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold text-white">{task.title}</h3>
                     <div className="flex gap-2">
-                      {isAdmin() && (
+                      {isAdmin && (
                         <>
                           <button
                             onClick={() => setEditingTask(task)}
