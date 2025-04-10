@@ -1,3 +1,6 @@
+"use client";
+
+import { useMemo } from "react"; // <-- Import useMemo
 import { motion } from "framer-motion";
 import { AnswerOption } from "@/components/AnswerOption";
 import { VprAnswerData } from "@/app/vpr-test/[subjectId]/page";
@@ -8,8 +11,20 @@ interface VprAnswerListProps {
   showFeedback: boolean; // For normal feedback display
   timeUpModal: boolean;
   handleAnswer: (answer: VprAnswerData) => void;
-  isDummyModeActive: boolean; // <-- NEW PROP
+  isDummyModeActive: boolean;
 }
+
+// --- Helper: Fisher-Yates (Knuth) Shuffle ---
+// Creates a shuffled *copy* of the array
+function shuffleArray<T>(array: T[]): T[] {
+    const shuffled = [...array]; // Create a shallow copy
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]; // Swap elements
+    }
+    return shuffled;
+}
+// --- End Helper ---
 
 export function VprAnswerList({
   answers,
@@ -17,10 +32,22 @@ export function VprAnswerList({
   showFeedback,
   timeUpModal,
   handleAnswer,
-  isDummyModeActive, // <-- Destructure new prop
+  isDummyModeActive,
 }: VprAnswerListProps) {
 
-  const hasRealOptions = answers && answers.some(a => !/^\[(Рисунок|Ввод текста|Диаграмма|Изображение|Площадь)\].*/.test(a.text));
+  // --- Memoize the shuffled, standard answers ---
+  const shuffledStandardAnswers = useMemo(() => {
+    // Filter out non-standard answers *first*
+    const standardAnswers = answers.filter(
+      (answer) => !/^\[(Рисунок|Ввод текста|Диаграмма|Изображение|Площадь)\].*/.test(answer.text)
+    );
+    // Shuffle the filtered list
+    return shuffleArray(standardAnswers);
+  }, [answers]); // <-- Dependency array: re-shuffle ONLY when `answers` prop changes
+  // --- End Memoization ---
+
+  // Check if there are any options left after filtering
+  const hasRealOptions = shuffledStandardAnswers.length > 0;
 
   if (!hasRealOptions) {
      return (
@@ -39,41 +66,36 @@ export function VprAnswerList({
         animate={{ opacity: 1 }}
         transition={{ duration: 0.2 }}
     >
-      {answers.map((answer) => {
-        if (/^\[(Рисунок|Ввод текста|Диаграмма|Изображение|Площадь)\].*/.test(answer.text)) {
-             return null; // Skip non-standard answers
-        }
-
-        // Determine state for standard answers
+      {/* --- Map over the SHUFFLED standard answers --- */}
+      {shuffledStandardAnswers.map((answer) => {
+        // Logic remains mostly the same, but operates on the `answer` from the shuffled list
         const isSelected = answer.id === selectedAnswerId;
         const isCorrect = answer.is_correct;
 
-        // --- Dummy Mode Logic ---
         const highlightCorrectInDummy = isDummyModeActive && isCorrect;
         const disableInDummy = isDummyModeActive;
 
-        // --- Normal Feedback Logic ---
         const showCorrectnessInFeedback = showFeedback && isCorrect;
         const showIncorrectnessInFeedback = showFeedback && isSelected && !isCorrect;
         const disableInFeedback = showFeedback;
 
-        // Combine disabling conditions
         const isDisabled = disableInDummy || disableInFeedback || timeUpModal;
 
         return (
           <AnswerOption
+            // Use answer.id as the key - it's unique to the answer data
             key={answer.id}
             answer={answer}
-            isSelected={isSelected && !isDummyModeActive} // Don't show selection state in dummy mode
-            showCorrectness={showCorrectnessInFeedback || highlightCorrectInDummy} // Highlight if correct in feedback OR if dummy mode highlights it
-            showIncorrectness={showIncorrectnessInFeedback} // Only show incorrectness in normal feedback
+            isSelected={isSelected && !isDummyModeActive}
+            showCorrectness={showCorrectnessInFeedback || highlightCorrectInDummy}
+            showIncorrectness={showIncorrectnessInFeedback}
             isDisabled={isDisabled}
             onClick={handleAnswer}
-            // Add specific styling for dummy mode highlight if needed
             isDummyHighlighted={highlightCorrectInDummy}
           />
         );
       })}
+      {/* --- End Map --- */}
     </motion.div>
   );
 }
