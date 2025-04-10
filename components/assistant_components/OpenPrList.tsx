@@ -1,7 +1,11 @@
+// /components/assistant_components/OpenPrList.tsx
+// No changes needed here, it just displays the PRs passed to it.
+// It will now receive PRs from the context via AICodeAssistant props.
 import React from 'react';
+import { SimplePullRequest } from '@/contexts/RepoXmlPageContext'; // Import type
 
 interface OpenPrListProps {
-    openPRs: any[]; // Use more specific type if available from Octokit
+    openPRs: SimplePullRequest[]; // Use the shared type
 }
 
 export const OpenPrList: React.FC<OpenPrListProps> = ({ openPRs }) => {
@@ -21,8 +25,10 @@ export const OpenPrList: React.FC<OpenPrListProps> = ({ openPRs }) => {
                             #{pr.number}: {pr.title}
                         </a>
                         <span className="text-xs text-gray-500 ml-auto flex-shrink-0">
-                            by {pr.user?.login}
+                            by {pr.user?.login || 'unknown'}
                         </span>
+                         {/* Optionally display branch if needed for context */}
+                         {/* <span className="text-xs text-gray-600 ml-1 flex-shrink-0 truncate" title={`Branch: ${pr.head.ref}`}>({pr.head.ref})</span> */}
                     </li>
                 ))}
             </ul>

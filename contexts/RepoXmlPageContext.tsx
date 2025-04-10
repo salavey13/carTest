@@ -1,28 +1,42 @@
+// /contexts/RepoXmlPageContext.tsx
 "use client";
 
     import React, { createContext, useState, useContext, ReactNode, useCallback, MutableRefObject } from 'react';
-    import { generateAiCode } from '@/app/ai_actions/actions'; // Import the new AI action
-    import { toast } from "sonner"; // Import toast for feedback
+    import { generateAiCode } from '@/app/ai_actions/actions';
+    import { getOpenPullRequests, updateBranch } from '@/app/actions_github/actions'; // Added updateBranch
+    import { toast } from "sonner";
 
     // Define Ref Interfaces
     export interface RepoTxtFetcherRef {
-        handleFetch: (isManualRetry?: boolean) => Promise<void>;
+        handleFetch: (isManualRetry?: boolean, branchName?: string | null) => Promise<void>;
         selectHighlightedFiles: () => void;
-        handleAddSelected: (autoAskAi?: boolean) => Promise<void>; // Modified to accept flag & return promise
+        handleAddSelected: (autoAskAi?: boolean) => Promise<void>;
         handleCopyToClipboard: (textToCopy?: string, shouldScroll?: boolean) => boolean;
         clearAll: () => void;
-        getKworkInputValue: () => string; // Add method to get input value
+        getKworkInputValue: () => string;
     }
 
     export interface AICodeAssistantRef {
         handleParse: () => Promise<void>;
         selectAllParsedFiles: () => void;
-        handleCreatePR: () => Promise<void>;
-        setResponseValue: (value: string) => void; // Add method to set response value
+        handleCreatePR: () => Promise<void>; // Renamed in component to handleCreateOrUpdatePR
+        setResponseValue: (value: string) => void;
+        updateRepoUrl: (url: string) => void;
     }
 
     // Added fetch status type
     export type FetchStatus = 'idle' | 'loading' | 'success' | 'error' | 'retrying' | 'failed_retries';
+
+    // Pull Request Type (Simplified)
+    export interface SimplePullRequest {
+        id: number;
+        number: number;
+        title: string;
+        html_url: string;
+        user?: { login?: string };
+        head: { ref: string }; // Branch name
+        updated_at: string;
+    }
 
     export type WorkflowStep =
       | 'idle'
@@ -32,12 +46,11 @@
       | 'fetch_failed'
       | 'files_fetched'
       | 'files_fetched_highlights'
-      | 'files_selected' // Files selected, ready to add to kwork OR ask AI
-      | 'request_written' // Kwork has content manually added, ready to copy OR ask AI
-      // --- NEW STEP ---
-      | 'generating_ai_response' // Waiting for AI API call
-      | 'request_copied' // Kwork copied (manual path), waiting for AI response paste
-      | 'response_pasted' // AI Response pasted (manual path) OR received from API, ready to parse
+      | 'files_selected'
+      | 'request_written'
+      | 'generating_ai_response'
+      | 'request_copied'
+      | 'response_pasted'
       | 'parsing_response'
       | 'response_parsed'
       | 'pr_ready';
@@ -52,12 +65,17 @@
       secondaryHighlightedPaths: string[];
       selectedFetcherFiles: Set<string>;
       kworkInputHasContent: boolean;
-      requestCopied: boolean; // Still relevant for manual path
+      requestCopied: boolean;
       aiResponseHasContent: boolean;
       filesParsed: boolean;
       selectedAssistantFiles: Set<string>;
-      assistantLoading: boolean; // Loading for Assistant (Parse, PR Create)
-      aiActionLoading: boolean; // NEW: Loading specifically for the AI API call
+      assistantLoading: boolean; // General Assistant loading (parse, PR create/update)
+      aiActionLoading: boolean; // Specific AI generation loading
+      loadingPrs: boolean;
+      openPrs: SimplePullRequest[];
+      targetBranchName: string | null; // Final target branch (Manual > PR > Null/Default)
+      manualBranchName: string; // User manual input
+      isSettingsModalOpen: boolean; // Modal state
 
       // Refs
       fetcherRef: MutableRefObject<RepoTxtFetcherRef | null>;
@@ -72,59 +90,76 @@
       setFilesFetched: (fetched: boolean, primaryPath?: string | null, secondaryPaths?: string[]) => void;
       setSelectedFetcherFiles: (files: Set<string>) => void;
       setKworkInputHasContent: (hasContent: boolean) => void;
-      setRequestCopied: (copied: boolean) => void; // Still relevant
+      setRequestCopied: (copied: boolean) => void;
       setAiResponseHasContent: (hasContent: boolean) => void;
       setFilesParsed: (parsed: boolean) => void;
       setSelectedAssistantFiles: (files: Set<string>) => void;
       setAssistantLoading: (loading: boolean) => void;
-      setAiActionLoading: (loading: boolean) => void; // NEW Setter
+      setAiActionLoading: (loading: boolean) => void;
+      setTargetBranchName: (branch: string | null) => void;
+      setManualBranchName: (branch: string) => void;
+      setOpenPrs: (prs: SimplePullRequest[]) => void;
+      setLoadingPrs: (loading: boolean) => void;
+      setIsSettingsModalOpen: (isOpen: boolean) => void; // Modal setter
 
       // Action Triggers
       triggerFetch: (isManualRetry?: boolean) => Promise<void>;
+      triggerGetOpenPRs: (repoUrl: string) => Promise<void>;
       triggerSelectHighlighted: () => void;
-      triggerAddSelectedToKwork: (autoAskAi?: boolean) => Promise<void>; // Accept flag
-      triggerCopyKwork: () => void; // Still relevant
-      triggerAskAi: () => Promise<void>; // NEW: Explicit trigger for AI call
+      triggerAddSelectedToKwork: (autoAskAi?: boolean) => Promise<void>;
+      triggerCopyKwork: () => void;
+      triggerAskAi: () => Promise<void>;
       triggerParseResponse: () => Promise<void>;
       triggerSelectAllParsed: () => void;
-      triggerCreatePR: () => Promise<void>;
-      scrollToSection: (id: 'kworkInput' | 'aiResponseInput' | 'prSection' | 'fetcher' | 'assistant' | 'executor') => void; // Added executor alias
+      triggerCreatePR: () => Promise<void>; // Points to assistant's handleCreateOrUpdatePR
+      triggerUpdateBranch: (repoUrl: string, files: { path: string; content: string }[], commitMessage: string, branchName: string) => Promise<ReturnType<typeof updateBranch>>; // Specific update action trigger
+      triggerToggleSettingsModal: () => void; // Modal toggle trigger
+      scrollToSection: (id: 'kworkInput' | 'aiResponseInput' | 'prSection' | 'fetcher' | 'assistant' | 'executor' | 'settingsModalTrigger') => void;
 
-      // Messages
+      // Messages & Callbacks
       getXuinityMessage: () => string;
+      updateRepoUrlInAssistant: (url: string) => void;
     }
 
     const RepoXmlPageContext = createContext<RepoXmlPageContextType | undefined>(undefined);
 
     export const useRepoXmlPageContext = () => {
-      const context = useContext(RepoXmlPageContext);
-      if (context === undefined) {
-        console.error('useRepoXmlPageContext must be used within a RepoXmlPageProvider. Returning stub.');
-         // Provide default functions that warn if called unexpectedly
-         const warn = (name: string) => () => { console.warn(`Context not available: ${name} called.`); return Promise.resolve(); };
-         const warnSync = (name: string) => () => { console.warn(`Context not available: ${name} called.`); };
-         return {
-            currentStep: 'idle', fetchStatus: 'idle', repoUrlEntered: false, filesFetched: false,
-            primaryHighlightedPath: null, secondaryHighlightedPaths: [], selectedFetcherFiles: new Set(),
-            kworkInputHasContent: false, requestCopied: false, aiResponseHasContent: false,
-            filesParsed: false, selectedAssistantFiles: new Set(), assistantLoading: false, aiActionLoading: false, // Added default
-            fetcherRef: { current: null }, assistantRef: { current: null }, kworkInputRef: { current: null },
-            aiResponseInputRef: { current: null }, prSectionRef: { current: null },
-            setFetchStatus: warnSync('setFetchStatus'), setRepoUrlEntered: warnSync('setRepoUrlEntered'),
-            setFilesFetched: warnSync('setFilesFetched'), setSelectedFetcherFiles: warnSync('setSelectedFetcherFiles'),
-            setKworkInputHasContent: warnSync('setKworkInputHasContent'), setRequestCopied: warnSync('setRequestCopied'),
-            setAiResponseHasContent: warnSync('setAiResponseHasContent'), setFilesParsed: warnSync('setFilesParsed'),
-            setSelectedAssistantFiles: warnSync('setSelectedAssistantFiles'), setAssistantLoading: warnSync('setAssistantLoading'),
-            setAiActionLoading: warnSync('setAiActionLoading'), // Added default setter
-            triggerFetch: warn('triggerFetch'), triggerSelectHighlighted: warnSync('triggerSelectHighlighted'),
-            triggerAddSelectedToKwork: warn('triggerAddSelectedToKwork'), triggerCopyKwork: warnSync('triggerCopyKwork'),
-            triggerAskAi: warn('triggerAskAi'), // Added default trigger
-            triggerParseResponse: warn('triggerParseResponse'), triggerSelectAllParsed: warnSync('triggerSelectAllParsed'),
-            triggerCreatePR: warn('triggerCreatePR'), scrollToSection: warnSync('scrollToSection'),
-            getXuinityMessage: () => "Context unavailable",
-         } as RepoXmlPageContextType;
-      }
-      return context;
+        const context = useContext(RepoXmlPageContext);
+        if (context === undefined) {
+            console.error('useRepoXmlPageContext must be used within a RepoXmlPageProvider. Returning stub.');
+            const warn = (name: string): any => () => { console.warn(`Context stub: ${name} called.`); return Promise.resolve({ success: false, error: 'Context unavailable' }); };
+            const warnSync = (name: string): any => () => { console.warn(`Context stub: ${name} called.`); };
+            return {
+                 currentStep: 'idle', fetchStatus: 'idle', repoUrlEntered: false, filesFetched: false,
+                 primaryHighlightedPath: null, secondaryHighlightedPaths: [], selectedFetcherFiles: new Set(),
+                 kworkInputHasContent: false, requestCopied: false, aiResponseHasContent: false,
+                 filesParsed: false, selectedAssistantFiles: new Set(), assistantLoading: false, aiActionLoading: false,
+                 loadingPrs: false, openPrs: [], targetBranchName: null, manualBranchName: "",
+                 isSettingsModalOpen: false,
+                 fetcherRef: { current: null }, assistantRef: { current: null }, kworkInputRef: { current: null },
+                 aiResponseInputRef: { current: null }, prSectionRef: { current: null },
+                 setFetchStatus: warnSync('setFetchStatus'), setRepoUrlEntered: warnSync('setRepoUrlEntered'),
+                 setFilesFetched: warnSync('setFilesFetched'), setSelectedFetcherFiles: warnSync('setSelectedFetcherFiles'),
+                 setKworkInputHasContent: warnSync('setKworkInputHasContent'), setRequestCopied: warnSync('setRequestCopied'),
+                 setAiResponseHasContent: warnSync('setAiResponseHasContent'), setFilesParsed: warnSync('setFilesParsed'),
+                 setSelectedAssistantFiles: warnSync('setSelectedAssistantFiles'), setAssistantLoading: warnSync('setAssistantLoading'),
+                 setAiActionLoading: warnSync('setAiActionLoading'),
+                 setTargetBranchName: warnSync('setTargetBranchName'), setManualBranchName: warnSync('setManualBranchName'),
+                 setOpenPrs: warnSync('setOpenPrs'), setLoadingPrs: warnSync('setLoadingPrs'),
+                 setIsSettingsModalOpen: warnSync('setIsSettingsModalOpen'),
+                 triggerFetch: warn('triggerFetch'), triggerGetOpenPRs: warn('triggerGetOpenPRs'),
+                 triggerSelectHighlighted: warnSync('triggerSelectHighlighted'),
+                 triggerAddSelectedToKwork: warn('triggerAddSelectedToKwork'), triggerCopyKwork: warnSync('triggerCopyKwork'),
+                 triggerAskAi: warn('triggerAskAi'), triggerParseResponse: warn('triggerParseResponse'),
+                 triggerSelectAllParsed: warnSync('triggerSelectAllParsed'), triggerCreatePR: warn('triggerCreatePR'),
+                 triggerUpdateBranch: warn('triggerUpdateBranch'),
+                 triggerToggleSettingsModal: warnSync('triggerToggleSettingsModal'),
+                 scrollToSection: warnSync('scrollToSection'),
+                 getXuinityMessage: () => "Context unavailable",
+                 updateRepoUrlInAssistant: warnSync('updateRepoUrlInAssistant'),
+             } as RepoXmlPageContextType;
+        }
+        return context;
     };
 
     interface RepoXmlPageProviderProps {
@@ -156,38 +191,41 @@
       const [filesParsed, setFilesParsedState] = useState(false);
       const [selectedAssistantFiles, setSelectedAssistantFilesState] = useState<Set<string>>(new Set());
       const [assistantLoading, setAssistantLoadingState] = useState(false);
-      const [aiActionLoading, setAiActionLoadingState] = useState(false); // NEW state
+      const [aiActionLoading, setAiActionLoadingState] = useState(false);
+      const [loadingPrs, setLoadingPrsState] = useState(false);
+      const [openPrs, setOpenPrsState] = useState<SimplePullRequest[]>([]);
+      const [targetBranchName, setTargetBranchNameState] = useState<string | null>(null);
+      const [manualBranchName, setManualBranchNameState] = useState<string>("");
+      const [isSettingsModalOpen, setIsSettingsModalOpenState] = useState(false);
+
 
       // Derive current workflow step based on context state
       const getCurrentStep = useCallback((): WorkflowStep => {
         if (fetchStatus === 'loading' || fetchStatus === 'retrying') return 'fetching';
         if (fetchStatus === 'failed_retries') return 'fetch_failed';
-        if (aiActionLoading) return 'generating_ai_response'; // NEW: Check AI loading first
+        if (aiActionLoading) return 'generating_ai_response';
         if (assistantLoading) {
-            // This might need refinement - if parsing is loading, it's 'parsing_response'
-            // If PR creation is loading, it's maybe still 'pr_ready' but with a loading indicator
-            if (!filesParsed) return 'parsing_response';
-            return 'pr_ready'; // Assume PR creation or post-parse selection if assistant loading after parse
+            if (!filesParsed) return 'parsing_response'; // Assume parsing if files not parsed
+            return 'pr_ready'; // Assume PR create/update if parsed
         }
 
         if (!repoUrlEntered) return 'need_repo_url';
         if (!filesFetched) return 'ready_to_fetch';
 
-        // Files are fetched (fetchStatus === 'success')
+        // Files are fetched
         if (aiResponseHasContent) {
-             if (!filesParsed) return 'response_pasted'; // Response is present (from API or paste), ready to parse
-             if (selectedAssistantFiles.size === 0) return 'response_parsed'; // Parsed, ready to select files
-             return 'pr_ready'; // Files selected, ready for PR
+             if (!filesParsed) return 'response_pasted';
+             if (selectedAssistantFiles.size === 0) return 'response_parsed';
+             return 'pr_ready';
         }
-         // If AI response isn't present yet:
-        if (requestCopied) return 'request_copied'; // Manual path: copied, waiting for paste
-        if (kworkInputHasContent) return 'request_written'; // Request written, can ask AI or copy
-        if (selectedFetcherFiles.size > 0) return 'files_selected'; // Files selected, can add to kwork or ask AI
-        if (primaryHighlightedPath || secondaryHighlightedPaths.length > 0) return 'files_fetched_highlights'; // Files fetched with highlights
-        return 'files_fetched'; // Base fetched state
+        if (requestCopied) return 'request_copied';
+        if (kworkInputHasContent) return 'request_written';
+        if (selectedFetcherFiles.size > 0) return 'files_selected';
+        if (primaryHighlightedPath || secondaryHighlightedPaths.length > 0) return 'files_fetched_highlights';
+        return 'files_fetched';
 
       }, [
-        fetchStatus, repoUrlEntered, filesFetched, aiActionLoading, assistantLoading, // Added aiActionLoading
+        fetchStatus, repoUrlEntered, filesFetched, aiActionLoading, assistantLoading,
         primaryHighlightedPath, secondaryHighlightedPaths.length, selectedFetcherFiles.size,
         kworkInputHasContent, requestCopied, aiResponseHasContent, filesParsed,
         selectedAssistantFiles.size
@@ -195,14 +233,15 @@
 
       const currentStep = getCurrentStep();
 
-      // --- Updaters (Memoized) ---
+
+      // --- Updaters ---
       const setFetchStatusCallback = useCallback((status: FetchStatus) => setFetchStatusState(status), []);
+      const setRepoUrlEnteredCallback = useCallback((entered: boolean) => setRepoUrlEnteredState(entered), []);
       const setFilesFetchedCallback = useCallback((fetched: boolean, primaryPath: string | null = null, secondaryPaths: string[] = []) => {
         setFilesFetchedState(fetched);
         setPrimaryHighlightedPathState(primaryPath);
         setSecondaryHighlightedPathsState(secondaryPaths);
         if (!fetched) {
-            // Reset downstream states on fetch failure/reset
             setSelectedFetcherFilesState(new Set());
             setKworkInputHasContentState(false);
             setRequestCopiedState(false);
@@ -210,11 +249,10 @@
             setFilesParsedState(false);
             setSelectedAssistantFilesState(new Set());
             setAssistantLoadingState(false);
-            setAiActionLoadingState(false); // Reset AI loading too
-            // Clear the actual AI response input if fetch fails/resets
+            setAiActionLoadingState(false);
              if (assistantRef.current) assistantRef.current.setResponseValue("");
         } else {
-            setFetchStatusState('success');
+            setFetchStatusState('success'); // Ensure status is success if files are fetched
         }
       }, [assistantRef]); // Added assistantRef dependency
       const setSelectedFetcherFilesCallback = useCallback((files: Set<string>) => setSelectedFetcherFilesState(files), []);
@@ -232,177 +270,200 @@
           if (!parsed) {
               setSelectedAssistantFilesState(new Set());
           }
-          // Ensure assistant loading is off *after* parsing attempt completes
-          setAssistantLoadingState(false);
+          setAssistantLoadingState(false); // Turn off general loading after parsing attempt
       }, []);
       const setSelectedAssistantFilesCallback = useCallback((files: Set<string>) => setSelectedAssistantFilesState(files), []);
       const setAssistantLoadingCallback = useCallback((loading: boolean) => setAssistantLoadingState(loading), []);
-      const setAiActionLoadingCallback = useCallback((loading: boolean) => setAiActionLoadingState(loading), []); // NEW setter
+      const setAiActionLoadingCallback = useCallback((loading: boolean) => setAiActionLoadingState(loading), []);
+      const setTargetBranchNameCallback = useCallback((branch: string | null) => {
+          setTargetBranchNameState(branch);
+          // If a PR branch is deselected (branch is null), and manual is empty, ensure target is null
+          if (branch === null && !manualBranchName.trim()) {
+             setTargetBranchNameState(null);
+          }
+          // If a PR branch is selected, ensure manual input doesn't conflict visually (clear it)
+          // This is handled by the handleSelectPrBranch callback in Fetcher/Modal now
+       }, [manualBranchName]); // Dependency needed to check manual input when deselecting PR branch
+
+      const setManualBranchNameCallback = useCallback((branch: string) => {
+          setManualBranchNameState(branch);
+          // Update targetBranch based on manual input (overrides PR selection)
+          // If manual input is cleared, targetBranchName becomes null (unless a PR was selected - this logic needs care)
+          const trimmedBranch = branch.trim();
+          // Simple override: If manual has value, use it. Otherwise, let PR selection dictate.
+          // The state `targetBranchName` should reflect the *effective* target.
+          // If user clears manual input, what should happen? Revert to PR selection or default?
+          // Let's say clearing manual means "use PR selection or default".
+          if (trimmedBranch) {
+             setTargetBranchNameState(trimmedBranch); // Manual input takes precedence
+          } else {
+             // Manual input is empty. What was selected before?
+             // This requires knowing the source of the current targetBranchName, which is tricky.
+             // Simpler approach: The component calling this setter should handle the logic.
+             // Here, just set manualBranchName. The targetBranchName logic is better handled
+             // in the component or via `setTargetBranchNameCallback`.
+             // Let's refine: If manual becomes empty, revert targetBranchName based on PR list state?
+             // Find if any PR branch is currently "selected" visually in the modal.
+             // This state isn't directly here.
+             // Fallback: If manual is cleared, set targetBranchName to null (meaning default/PR)
+             setTargetBranchNameState(null); // Revert to PR selection / default
+          }
+      }, []); // No dependency on targetBranchName here, avoid loop
+
+      const setOpenPrsCallback = useCallback((prs: SimplePullRequest[]) => setOpenPrsState(prs), []);
+      const setLoadingPrsCallback = useCallback((loading: boolean) => setLoadingPrsState(loading), []);
+      const setIsSettingsModalOpenCallback = useCallback((isOpen: boolean) => setIsSettingsModalOpenState(isOpen), []);
 
 
-      // --- Action Triggers (Memoized) ---
+      // --- Action Triggers ---
       const triggerFetch = useCallback(async (isManualRetry = false) => {
         if (fetcherRef.current) {
-            await fetcherRef.current.handleFetch(isManualRetry);
-        } else { console.warn("triggerFetch called but fetcherRef is not yet available."); }
-      }, [fetcherRef]);
+            // Determine final branch: Manual > Selected PR > Default (null)
+            const branchToFetch = manualBranchName.trim() || targetBranchName; // Prioritize manual input
+            console.log("Context triggerFetch: Using branch ->", branchToFetch ?? "Default");
+            await fetcherRef.current.handleFetch(isManualRetry, branchToFetch);
+        } else { console.warn("triggerFetch: fetcherRef not ready."); }
+      }, [fetcherRef, targetBranchName, manualBranchName]); // Depend on both branch states
 
-      const triggerSelectHighlighted = useCallback(() => { if (fetcherRef.current) fetcherRef.current.selectHighlightedFiles(); else console.warn("triggerSelectHighlighted called but fetcherRef is not yet available."); }, [fetcherRef]);
+      const triggerGetOpenPRs = useCallback(async (repoUrl: string) => {
+            if (!repoUrl || !repoUrl.includes('github.com')) {
+                toast.error("Укажите валидный URL репозитория GitHub");
+                return;
+            }
+            setLoadingPrsState(true);
+            setOpenPrsState([]); // Clear previous PRs
+            try {
+                const result = await getOpenPullRequests(repoUrl);
+                if (result.success && result.pullRequests) {
+                    setOpenPrsState(result.pullRequests as SimplePullRequest[]);
+                    toast.success(`Загружено ${result.pullRequests.length} открытых PR.`);
+                } else {
+                    toast.error(`Ошибка загрузки PR: ${result.error || 'Неизвестная ошибка'}`);
+                }
+            } catch (error) {
+                 toast.error("Критическая ошибка при загрузке PR.");
+                 console.error("triggerGetOpenPRs error:", error);
+            } finally {
+                 setLoadingPrsState(false);
+            }
+       }, []);
 
-      // Modified trigger to handle auto-asking AI
-      const triggerAddSelectedToKwork = useCallback(async (autoAskAi = false) => {
-        if (fetcherRef.current) {
-           await fetcherRef.current.handleAddSelected(autoAskAi); // Pass flag
-        } else { console.warn("triggerAddSelectedToKwork called but fetcherRef is not yet available."); }
-      }, [fetcherRef]); // Removed triggerAskAi dependency as it's now handled internally
-
-      const triggerCopyKwork = useCallback(() => {
-          if (fetcherRef.current) {
-              const copied = fetcherRef.current.handleCopyToClipboard();
-              // If copy succeeds, set the state (relevant for manual flow)
-              if (copied) {
-                  setRequestCopiedState(true);
-                  // Reset AI response if user explicitly copies (they might want a fresh external response)
-                  setAiResponseHasContentState(false);
-                   if (assistantRef.current) assistantRef.current.setResponseValue("");
-              }
-          } else { console.warn("triggerCopyKwork called but fetcherRef is not yet available."); }
-      }, [fetcherRef, assistantRef]); // Added assistantRef
-
-      // NEW: Trigger AI generation using the current Kwork input
+      const triggerSelectHighlighted = useCallback(() => { if (fetcherRef.current) fetcherRef.current.selectHighlightedFiles(); else console.warn("triggerSelectHighlighted: fetcherRef not ready."); }, [fetcherRef]);
+      const triggerAddSelectedToKwork = useCallback(async (autoAskAi = false) => { if (fetcherRef.current) await fetcherRef.current.handleAddSelected(autoAskAi); else console.warn("triggerAddSelectedToKwork: fetcherRef not ready."); }, [fetcherRef]);
+      const triggerCopyKwork = useCallback(() => { if (fetcherRef.current) { const copied = fetcherRef.current.handleCopyToClipboard(); if (copied) { setRequestCopiedState(true); setAiResponseHasContentState(false); if (assistantRef.current) assistantRef.current.setResponseValue(""); } } else console.warn("triggerCopyKwork: fetcherRef not ready."); }, [fetcherRef, assistantRef]);
       const triggerAskAi = useCallback(async () => {
-          if (!fetcherRef.current || !assistantRef.current) {
-              toast.error("Компоненты еще не готовы.");
-              console.warn("triggerAskAi called but refs are not available.");
-              return;
-          }
-          const kworkValue = fetcherRef.current.getKworkInputValue();
-          if (!kworkValue.trim()) {
-              toast.error("Нет запроса для отправки AI.");
-              return;
-          }
+           if (!fetcherRef.current || !assistantRef.current) { toast.error("Компоненты не готовы."); return; }
+           const kworkValue = fetcherRef.current.getKworkInputValue(); if (!kworkValue.trim()) { toast.error("Нет запроса для AI."); return; }
+           setAiActionLoadingState(true); setAiResponseHasContentState(false); assistantRef.current.setResponseValue(""); toast.info("Отправка запроса AI..."); scrollToSection('executor');
+           try {
+               const result = await generateAiCode(kworkValue);
+               if (result.success && result.text) {
+                   toast.success("Ответ AI получен!"); assistantRef.current.setResponseValue(result.text); setAiResponseHasContentState(true);
+                   setTimeout(() => triggerParseResponse(), 100); // Auto-parse
+               } else { toast.error(`Ошибка AI: ${result.error || 'Unknown'}`); setAiResponseHasContentState(false); }
+           } catch (error) { toast.error("Крит. ошибка вызова AI."); console.error("triggerAskAi error:", error); setAiResponseHasContentState(false); }
+           finally { setAiActionLoadingState(false); }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+       }, [fetcherRef, assistantRef]); // Removed triggerParseResponse from deps
+      const triggerParseResponse = useCallback(async () => { if (assistantRef.current) { setAssistantLoadingState(true); await assistantRef.current.handleParse(); } else console.warn("triggerParseResponse: assistantRef not ready."); }, [assistantRef]);
+      const triggerSelectAllParsed = useCallback(() => { if (assistantRef.current) assistantRef.current.selectAllParsedFiles(); else console.warn("triggerSelectAllParsed: assistantRef not ready."); }, [assistantRef]);
+      const triggerCreatePR = useCallback(async () => { if (assistantRef.current) await assistantRef.current.handleCreatePR(); else console.warn("triggerCreatePR: assistantRef not ready."); }, [assistantRef]);
+      const triggerUpdateBranch = useCallback(async ( repoUrl: string, files: { path: string; content: string }[], commitMessage: string, branchName: string ): Promise<ReturnType<typeof updateBranch>> => {
+           setAssistantLoadingState(true);
+           try {
+                console.log(`Context triggerUpdateBranch: Calling action for branch '${branchName}'`);
+                const result = await updateBranch(repoUrl, files, commitMessage, branchName);
+                // Success/Error toasts are handled within the callback now
+                // if (result.success) toast.success(`Ветка '${branchName}' успешно обновлена!`);
+                // else toast.error(`Ошибка обновления ветки '${branchName}': ${result.error}`);
+                return result;
+           } catch (error) {
+                toast.error(`Критическая ошибка при обновлении ветки '${branchName}'.`); console.error("triggerUpdateBranch error:", error);
+                return { success: false, error: "Client-side error during update trigger." };
+           } finally { setAssistantLoadingState(false); }
+       }, []);
+      const triggerToggleSettingsModal = useCallback(() => setIsSettingsModalOpenState(prev => !prev), []);
 
-          setAiActionLoadingState(true);
-          setAiResponseHasContentState(false); // Clear previous response
-          assistantRef.current.setResponseValue(""); // Clear assistant textarea
-          toast.info("Отправка запроса AI...");
-          scrollToSection('executor'); // Scroll to assistant while waiting
-
-          try {
-              const result = await generateAiCode(kworkValue); // Call the server action
-
-              if (result.success && result.text) {
-                  toast.success("Ответ от AI получен!");
-                  // Programmatically set the response in AICodeAssistant
-                  assistantRef.current.setResponseValue(result.text);
-                  // Update context state immediately
-                  setAiResponseHasContentState(true);
-                   // Automatically trigger parsing
-                   // Small delay to allow state update and potential re-render
-                   setTimeout(() => {
-                       triggerParseResponse();
-                   }, 100);
-
-              } else {
-                  toast.error(`Ошибка AI: ${result.error || 'Неизвестная ошибка'}`);
-                  setAiResponseHasContentState(false); // Ensure state reflects failure
-              }
-          } catch (error) {
-              toast.error("Критическая ошибка при вызове AI.");
-              console.error("triggerAskAi critical error:", error);
-              setAiResponseHasContentState(false);
-          } finally {
-              setAiActionLoadingState(false);
-          }
-      }, [fetcherRef, assistantRef]); // Dependencies: refs
-
-       const triggerParseResponse = useCallback(async () => {
-           if (assistantRef.current) {
-                // Ensure assistant loading is true *before* calling parse
-                setAssistantLoadingState(true);
-                await assistantRef.current.handleParse();
-                // setAssistantLoadingState(false); // Loading state should be turned off by setFilesParsed callback
-           } else {
-                console.warn("triggerParseResponse called but assistantRef is not yet available.");
-           }
-        }, [assistantRef]);
-
-      const triggerSelectAllParsed = useCallback(() => { if (assistantRef.current) assistantRef.current.selectAllParsedFiles(); else console.warn("triggerSelectAllParsed called but assistantRef is not yet available."); }, [assistantRef]);
-      const triggerCreatePR = useCallback(async () => { if (assistantRef.current) await assistantRef.current.handleCreatePR(); else console.warn("triggerCreatePR called but assistantRef is not yet available."); }, [assistantRef]);
-
-      const scrollToSection = useCallback((id: 'kworkInput' | 'aiResponseInput' | 'prSection' | 'fetcher' | 'assistant' | 'executor') => {
+      const scrollToSection = useCallback((id: 'kworkInput' | 'aiResponseInput' | 'prSection' | 'fetcher' | 'assistant' | 'executor' | 'settingsModalTrigger') => {
          let element: HTMLElement | null = null;
-         const targetId = (id === 'assistant' || id === 'executor') ? 'executor' : (id === 'fetcher' ? 'extractor' : id); // Map aliases
-
+         const targetId = (id === 'assistant' || id === 'executor') ? 'executor'
+                         : (id === 'fetcher' ? 'extractor'
+                         : (id === 'settingsModalTrigger' ? 'settings-modal-trigger-assistant'
+                         : id));
          switch(targetId) {
             case 'kworkInput': element = kworkInputRef.current; break;
             case 'aiResponseInput': element = aiResponseInputRef.current; break;
             case 'prSection': element = prSectionRef.current; break;
             case 'extractor': element = document.getElementById('extractor'); break;
             case 'executor': element = document.getElementById('executor'); break;
+            case 'settings-modal-trigger-assistant': element = document.getElementById('settings-modal-trigger-assistant'); break;
          }
          if (element) {
-             // Try scrolling the specific element first if it's an input/section
-             if (targetId === 'kworkInput' || targetId === 'aiResponseInput' || targetId === 'prSection') {
+             if (targetId === 'kworkInput' || targetId === 'aiResponseInput' || targetId === 'prSection' || targetId === 'settings-modal-trigger-assistant') {
                   element.scrollIntoView({ behavior: 'smooth', block: 'center' });
              } else {
-                 // For top-level sections, scroll the window
-                 const rect = element.getBoundingClientRect();
-                 window.scrollTo({
-                     top: window.scrollY + rect.top - 80, // Adjust offset (e.g., for sticky header)
-                     behavior: 'smooth'
-                 });
+                 const rect = element.getBoundingClientRect(); window.scrollTo({ top: window.scrollY + rect.top - 80, behavior: 'smooth' });
              }
-         }
-         else { console.warn(`scrollToSection: Element for id "${targetId}" (mapped from "${id}") not found.`); }
+         } else console.warn(`scrollToSection: Element for id "${targetId}" (mapped from "${id}") not found.`);
       }, [kworkInputRef, aiResponseInputRef, prSectionRef]);
 
-      // --- Xuinity Message Logic (Memoized) ---
+
+      // --- Xuinity Message Logic ---
        const getXuinityMessage = useCallback((): string => {
+        const effectiveBranch = manualBranchName.trim() || targetBranchName;
+        const branchInfo = effectiveBranch ? ` (ветка: ${effectiveBranch})` : '';
         switch (currentStep) {
           case 'idle': return "Контекст инициализируется...";
-          case 'need_repo_url': return "Укажи URL репозитория в Экстракторе.";
-          case 'ready_to_fetch': return repoUrlEntered ? "Нажми 'Извлечь файлы' или кнопку Fetch ниже!" : "Сначала укажи URL репозитория.";
-          case 'fetching': return `Извлекаю файлы... ${fetchStatus === 'retrying' ? '(Попытка снова...)' : ''} ⏳`;
-          case 'fetch_failed': return "Не удалось извлечь файлы после нескольких попыток. 😢 Попробовать еще раз?";
-          case 'files_fetched': return "Файлы извлечены! Выбери нужные или опиши задачу.";
-          case 'files_fetched_highlights': return "Файлы извлечены. Есть связанные - выбрать их или иди к списку.";
-          case 'files_selected': return "Файлы выбраны! Добавь их в запрос ИЛИ нажми '🤖 Спросить AI'!";
-          case 'request_written': return "Запрос готов! Нажми '🤖 Спросить AI' ИЛИ скопируй вручную.";
-          case 'generating_ai_response': return "Общаюсь с Gemini... 🤖💭"; // NEW Message
-          case 'request_copied': return "Скопировано! Жду ответ от AI. Вставляй в Ассистента."; // Manual path
-          case 'response_pasted': return "Ответ получен! Нажми '➡️', чтобы я его разобрал."; // From API or Paste
+          case 'need_repo_url': return "Укажи URL репозитория в настройках.";
+          case 'ready_to_fetch': return repoUrlEntered ? `Готов извлечь файлы${branchInfo}. Нажми Fetch!` : "Сначала укажи URL.";
+          case 'fetching': return `Извлекаю файлы${branchInfo}... ${fetchStatus === 'retrying' ? '(Повтор...)' : ''} ⏳`;
+          case 'fetch_failed': return `Не удалось извлечь файлы${branchInfo}. 😢 Попробовать еще раз?`;
+          case 'files_fetched': return `Файлы извлечены${branchInfo}! Выбери нужные или опиши задачу.`;
+          case 'files_fetched_highlights': return `Файлы извлечены${branchInfo}. Есть связанные.`;
+          case 'files_selected': return `Файлы выбраны${branchInfo}! Добавь в запрос ИЛИ нажми '🤖 Спросить AI'!`;
+          case 'request_written': return "Запрос готов! Нажми '🤖 Спросить AI' ИЛИ скопируй.";
+          case 'generating_ai_response': return "Общаюсь с Gemini... 🤖💭";
+          case 'request_copied': return "Скопировано! Жду ответ от AI.";
+          case 'response_pasted': return "Ответ получен! Нажми '➡️' для разбора.";
           case 'parsing_response': return "Разбираю ответ AI... 🧠";
-          case 'response_parsed': return "Разобрал! Проверь результат, выбери файлы для PR.";
-          case 'pr_ready': return assistantLoading ? "Создаю PR...⏳" : "Файлы выбраны! Готов создать Pull Request?";
-          default:
-               const _exhaustiveCheck: never = currentStep;
-               console.warn("Unhandled step in getXuinityMessage:", currentStep);
-               return "Что делаем дальше?";
+          case 'response_parsed': return "Разобрал! Проверь, выбери файлы.";
+          case 'pr_ready': return assistantLoading ? (effectiveBranch ? "Обновляю ветку..." : "Создаю PR...") : (effectiveBranch ? `Готов обновить ветку '${effectiveBranch}'?` : "Готов создать Pull Request?");
+          default: return "Что делаем дальше?";
         }
-      }, [currentStep, repoUrlEntered, fetchStatus, assistantLoading]); // Dependencies
+      }, [currentStep, repoUrlEntered, fetchStatus, assistantLoading, targetBranchName, manualBranchName]);
 
 
+      // --- Callback for Repo URL update ---
+      const updateRepoUrlInAssistant = useCallback((url: string) => {
+          // This callback is primarily for the Assistant to inform the context/fetcher
+          // if its internal URL state changes. We might reset PRs/branch here too.
+          console.log("Context: Repo URL updated via Assistant to:", url);
+          // Maybe reset fetched PRs and branch selection if URL changes?
+          // setOpenPrsState([]);
+          // setTargetBranchNameState(null);
+          // setManualBranchNameState("");
+      }, []);
+
+
+      // --- Context Value ---
       const value: RepoXmlPageContextType = {
         currentStep, fetchStatus, repoUrlEntered, filesFetched, primaryHighlightedPath,
         secondaryHighlightedPaths, selectedFetcherFiles, kworkInputHasContent, requestCopied,
-        aiResponseHasContent, filesParsed, selectedAssistantFiles, assistantLoading, aiActionLoading, // Added aiActionLoading
+        aiResponseHasContent, filesParsed, selectedAssistantFiles, assistantLoading, aiActionLoading,
+        loadingPrs, openPrs, targetBranchName, manualBranchName, isSettingsModalOpen,
         fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef, prSectionRef,
-        setFetchStatus: setFetchStatusCallback,
-        setRepoUrlEntered: setRepoUrlEnteredState,
-        setFilesFetched: setFilesFetchedCallback,
-        setSelectedFetcherFiles: setSelectedFetcherFilesCallback,
-        setKworkInputHasContent: setKworkInputHasContentCallback,
-        setRequestCopied: setRequestCopiedCallback,
-        setAiResponseHasContent: setAiResponseHasContentCallback,
-        setFilesParsed: setFilesParsedCallback,
-        setSelectedAssistantFiles: setSelectedAssistantFilesCallback,
-        setAssistantLoading: setAssistantLoadingCallback,
-        setAiActionLoading: setAiActionLoadingCallback, // Added setter
-        triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork,
-        triggerAskAi, // Added trigger
-        triggerParseResponse, triggerSelectAllParsed, triggerCreatePR, scrollToSection,
-        getXuinityMessage,
+        setFetchStatus: setFetchStatusCallback, setRepoUrlEntered: setRepoUrlEnteredCallback,
+        setFilesFetched: setFilesFetchedCallback, setSelectedFetcherFiles: setSelectedFetcherFilesCallback,
+        setKworkInputHasContent: setKworkInputHasContentCallback, setRequestCopied: setRequestCopiedCallback,
+        setAiResponseHasContent: setAiResponseHasContentCallback, setFilesParsed: setFilesParsedCallback,
+        setSelectedAssistantFiles: setSelectedAssistantFilesCallback, setAssistantLoading: setAssistantLoadingCallback,
+        setAiActionLoading: setAiActionLoadingCallback, setTargetBranchName: setTargetBranchNameCallback,
+        setManualBranchName: setManualBranchNameCallback, setOpenPrs: setOpenPrsCallback,
+        setLoadingPrs: setLoadingPrsCallback, setIsSettingsModalOpen: setIsSettingsModalOpenCallback,
+        triggerFetch, triggerGetOpenPRs, triggerSelectHighlighted, triggerAddSelectedToKwork,
+        triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreatePR,
+        triggerUpdateBranch, triggerToggleSettingsModal, scrollToSection,
+        getXuinityMessage, updateRepoUrlInAssistant,
       };
 
       return <RepoXmlPageContext.Provider value={value}>{children}</RepoXmlPageContext.Provider>;
