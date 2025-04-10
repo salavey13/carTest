@@ -1,13 +1,11 @@
 // /components/assistant_components/CodeRestorer.tsx
 "use client";
 
-"use client";
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { ValidationIssue, FileEntry } from '@/hooks/useCodeParsingAndValidation'; // Adjust path
-import { FaCodeMerge, FaWandMagicSparkles, FaRotate, FaPoo, FaTimes } from 'react-icons/fa6'; // Added FaTimes
+import { FaCodeMerge, FaWandMagicSparkles, FaRotate, FaPoo, FaXmark } from 'react-icons/fa6'; // Added FaTimes
 import { Tooltip } from '../AICodeAssistant'; // Adjust path if necessary
 
 // --- Restore Modal Component ---
@@ -39,10 +37,10 @@ const RestoreSkippedModal: React.FC<RestoreSkippedModalProps> = ({
                 <div className="flex justify-between items-center mb-4">
                      <h3 className="text-xl font-bold text-indigo-400">Восстановление пропущенного кода</h3>
                      <button onClick={onClose} className="p-1 rounded-full text-gray-400 hover:text-white hover:bg-gray-700 transition">
-                         <FaTimes />
+                         <FaXmark />
                      </button>
                  </div>
-                <p className="text-sm text-gray-300 mb-3">Обнаружены маркеры <code className='text-xs bg-gray-700 px-1 rounded'>/* .. */</code> или <code className='text-xs bg-gray-700 px-1 rounded'>/* ... */</code>. Попытка автоматического восстановления из оригинальных файлов проекта:</p>
+                <p className="text-sm text-gray-300 mb-3">Обнаружены маркеры <code className='text-xs bg-gray-700 px-1 rounded'>/* ... */</code>. Попытка автоматического восстановления из оригинальных файлов проекта:</p>
                 <div className="text-xs mb-4 max-h-40 overflow-y-auto simple-scrollbar border border-gray-700 rounded p-2 bg-gray-900 space-y-1">
                     {issues.map(issue => ( <div key={issue.id} className="flex items-center gap-2"> {restoreStatus[issue.id] === 'pending' && <FaRotate className="animate-spin text-blue-400 flex-shrink-0" size={12}/>} {restoreStatus[issue.id] === 'success' && <FaCheck className="text-green-500 flex-shrink-0" size={12}/>} {(restoreStatus[issue.id] === 'not_found' || restoreStatus[issue.id] === 'failed_verification') && <FaPoo className="text-red-500 flex-shrink-0" size={12}/>} <code className="text-gray-400">{issue.filePath}</code> <span className='text-gray-500'>(строка ~{issue.details?.lineNumber})</span> {restoreStatus[issue.id] === 'not_found' && <span className='text-orange-400 ml-auto text-[10px]'>Не найдено в оригинале</span>} {restoreStatus[issue.id] === 'failed_verification' && <span className='text-red-400 ml-auto text-[10px]'>Ошибка проверки</span>} </div> ))}
                 </div>
@@ -68,8 +66,8 @@ interface CodeRestorerProps {
     disabled?: boolean;
 }
 
-// UPDATED Regex to match 2 or 3 dots
-const skippedCodeBlockMarkerRegex = /(\/\*\s*\.{2,3}\s*\*\/)|({\s*\/\*\s*\.{2,3}\s*\*\/\s*})|(\[\s*\/\*\s*\.{2,3}\s*\*\/\s*\])/; // Find the marker
+// UPDATED Regex to match only 3 dots
+const skippedCodeBlockMarkerRegex = /(\/\*\s*\.{3}\s*\*\/)|({\s*\/\*\s*\.{3}\s*\*\/\s*})|(\[\s*\/\*\s*\.{3}\s*\*\/\s*\])/; // Find the marker
 
 export const CodeRestorer: React.FC<CodeRestorerProps> = ({
     parsedFiles, originalFiles, skippedIssues, onRestorationComplete, disabled = false
@@ -315,7 +313,7 @@ export const CodeRestorer: React.FC<CodeRestorerProps> = ({
 
     return (
         <>
-            <Tooltip text="Восстановить код, отмеченный маркерами пропуска /* .. */" position="left">
+            <Tooltip text="Восстановить код, отмеченный маркерами пропуска /* ... */" position="left">
                 <button
                     onClick={() => { setIsModalOpen(true); setAllowManualRestore(false); setRestoreStatus({}); }}
                     disabled={disabled}
