@@ -1,47 +1,72 @@
 // /app/layout.tsx
-import StickyChatButton from "@/components/StickyChatButton";
 import type React from "react";
 import Script from "next/script";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import StickyChatButton from "@/components/StickyChatButton"; // Import the button
 import { AppProvider } from "@/contexts/AppContext";
-import { Toaster } from "sonner";
+import { Toaster } from "sonner"; // Assuming sonner is used for toasts
 import "./globals.css";
+import { cn } from "@/lib/utils"; // Utility for class names
+
+export const metadata = {
+  title: "V0 Car Test App", // Add a default title
+  description: "Find your perfect V0 car.", // Add a default description
+  // Add viewport settings for responsiveness and disabling zoom
+  viewport: "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no",
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="h-full"> {/* Ensure html takes full height */}
       <head>
+        {/* Prevent iOS auto-detection of phone numbers */}
         <meta name="format-detection" content="telephone=no" />
+        {/* Hint for Android to treat as a web app */}
         <meta name="mobile-web-app-capable" content="yes" />
+        {/* Telegram WebApp script, loaded early */}
         <Script
-          id="telegram-webapp"
+          id="telegram-webapp-script" // Renamed ID for clarity
           src="https://telegram.org/js/telegram-web-app.js"
-          strategy="beforeInteractive"
+          strategy="beforeInteractive" // Load before Next.js hydrates
+          // Optional: Add error handling if script fails to load
+          // onError={(e) => console.error("Failed to load Telegram WebApp script:", e)}
         />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
       </head>
-      <body className="bg-gray-900 text-white flex flex-col min-h-screen">
+      {/* Apply base styling to body, ensure flex column layout and min height */}
+      <body className={cn(
+          "flex min-h-screen flex-col bg-gray-900 text-white antialiased",
+          // Add font definitions if needed, e.g., using next/font
+          // inter.className
+      )}>
         <AppProvider>
-          <header className="w-full bg-gray-900 z-50">
-            <Header />
-          </header>
+          {/* Header: Sticky or fixed positioning might be handled within the Header component itself */}
+          <Header />
+
+          {/* Main content area that grows to fill available space */}
           <main className="flex-1">
             {children}
-            <StickyChatButton /> {/* No currentPath prop needed */}
           </main>
-          <footer className="w-full bg-gray-900">
-            <Footer />
-          </footer>
+
+          {/* Sticky Chat Button - Placed outside main, might need specific positioning CSS */}
+          <StickyChatButton />
+
+          {/* Footer */}
+          <Footer />
+
+          {/* Toast notifications configuration */}
           <Toaster
-            position="bottom-right"
+            position="bottom-right" // Common position
+            richColors // Use predefined color schemes if available
             toastOptions={{
-              style: {
-                background: "rgba(34, 34, 34, 0.8)",
-                color: "#00ff9d",
-                border: "1px solid rgba(0, 255, 157, 0.4)",
-                boxShadow: "0 0 10px rgba(0, 0, 0, 0.5)",
-                fontFamily: "monospace",
+              style: { // Custom styling for toasts
+                background: "rgba(34, 34, 34, 0.9)", // Slightly transparent dark background
+                color: "#00FF9D", // Neon green text
+                border: "1px solid rgba(0, 255, 157, 0.4)", // Subtle neon border
+                boxShadow: "0 2px 10px rgba(0, 255, 157, 0.2)", // Softer glow effect
+                fontFamily: "monospace", // Monospace font for consistency
               },
+              className: 'text-sm', // Adjust font size
             }}
           />
         </AppProvider>

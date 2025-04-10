@@ -1,1285 +1,1285 @@
 // /app/actions.ts
 "use server";
 
-import { generateCarEmbedding, createAuthenticatedClient, supabaseAdmin, supabaseAnon } from "@/hooks/supabase";
+import {
+  generateCarEmbedding, // Assuming this is only called server-side now
+  supabaseAdmin,
+  fetchUserData as dbFetchUserData,         // Renamed import
+  createOrUpdateUser as dbCreateOrUpdateUser, // Renamed import
+} from "@/hooks/supabase";
 import axios from "axios";
 import { verifyJwtToken, generateJwtToken } from "@/lib/auth";
 import { logger } from "@/lib/logger";
 import type { WebAppUser } from "@/types/telegram";
 import { createHash, randomBytes } from "crypto";
-import { handleWebhookProxy } from "./webhook-handlers/proxy"; // Import the proxy
+import { handleWebhookProxy } from "./webhook-handlers/proxy";
 import { getBaseUrl } from "@/lib/utils";
+import type { Database } from "@/types/database.types"; // Ensure this type is correctly defined
 
+// Type alias for Supabase User Row
+type User = Database["public"]["Tables"]["users"]["Row"];
 
+// --- Configuration ---
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const DEFAULT_CHAT_ID = "413553377"; // Your default Telegram chat ID
+const DEFAULT_CHAT_ID = "413553377"; // Consider moving to env vars if it changes per environment
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || DEFAULT_CHAT_ID;
-// Environment variables for Coze API with hardcoded defaults
 const COZE_API_KEY = process.env.COZE_API_KEY;
-const COZE_BOT_ID = process.env.COZE_BOT_ID || "7480584293518376966";
-const COZE_USER_ID = process.env.COZE_USER_ID || "341503612082";
+const COZE_BOT_ID = process.env.COZE_BOT_ID; // Removed default, should be configured
+const COZE_USER_ID = process.env.COZE_USER_ID; // Removed default, should be configured
+
+// Helper function to check essential environment variables
+function checkEnvVars() {
+  if (!TELEGRAM_BOT_TOKEN) {
+    logger.error("Missing critical environment variable: TELEGRAM_BOT_TOKEN");
+    throw new Error("Telegram bot token not configured");
+  }
+  if (!COZE_API_KEY) {
+    logger.warn("Missing environment variable: COZE_API_KEY. Coze features may be disabled.");
+    // Don't throw, maybe some parts of the app don't need Coze
+  }
+   if (!COZE_BOT_ID) {
+    logger.warn("Missing environment variable: COZE_BOT_ID. analyzeMessage may fail.");
+  }
+   if (!COZE_USER_ID) {
+    logger.warn("Missing environment variable: COZE_USER_ID. analyzeMessage may fail.");
+  }
+  // Add checks for other essential keys like Supabase keys if they weren't checked elsewhere
+}
+
+// Call check on server start (or lazily before first use)
+checkEnvVars();
+
+// --- Webhook Handling ---
 
 // Delegate webhook handling to the proxy
 export async function handleWebhookUpdate(update: any) {
-  await handleWebhookProxy(update);
-}
-
-/*
-Adding New Handlers
-To add a new handler (e.g., new-type.ts), you now only modify /app/webhook-handlers/proxy.ts:
-
-Create the New Handler:
-tsx
-
-
-
-// /app/webhook-handlers/new-type.ts
-import { WebhookHandler } from "./types";
-import { sendTelegramMessage } from "../actions";
-
-export const newTypeHandler: WebhookHandler = {
-  canHandle: (invoice) => invoice.type === "new_type",
-  handle: async (invoice, userId, userData, totalAmount, supabase, telegramToken, adminChatId) => {
-    await sendTelegramMessage(telegramToken, "New type handled!", [], undefined, userId);
-  },
-};
-Update proxy.ts:
-tsx
-
-
-
-// /app/webhook-handlers/proxy.ts
-// .. (other imports)
-import { newTypeHandler } from "./new-type";
-
-const handlers = [
-  subscriptionHandler,
-  carRentalHandler,
-  supportHandler,
-  donationHandler,
-  scriptAccessHandler,
-  inventoryScriptAccessHandler,
-  newTypeHandler, // Add here
-];
-*/
-
-
-
-
-
-
-
-/** Sends a Telegram document to a specified chat */
-export async function sendTelegramDocument(
-  chatId: string,
-  fileContent: string,
-  fileName: string
-) {
+  // Consider adding basic validation of the 'update' object structure here
+  if (!update) {
+    logger.warn("Received empty webhook update.");
+    return;
+  }
   try {
-    const token = TELEGRAM_BOT_TOKEN;
-    if (!token) {
-      throw new Error("Telegram bot token not configured");
-    }
-
-    const blob = new Blob([fileContent], { type: "text/plain;charset=utf-8" });
-    const formData = new FormData();
-    formData.append("chat_id", chatId);
-    formData.append("document", blob, fileName);
-
-    const response = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
-      method: "POST",
-      body: formData,
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.description || "Failed to send document");
-    }
-
-    return { success: true, data };
+    await handleWebhookProxy(update);
   } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "An unexpected error occurred",
-    };
+    logger.error("Error processing webhook update in handleWebhookProxy:", error);
+    // Depending on the error, might want to notify admin or return a specific response
   }
 }
 
-
+// --- Telegram API Interactions ---
 
 interface InlineButton {
   text: string;
   url: string;
 }
 
-type SendMessagePayload =
-  | {
-      chat_id: string;
-      text: string;
-      reply_markup?: {
-        inline_keyboard: Array<Array<{ text: string; url: string }>>;
-      };
-    }
-  | {
-      chat_id: string;
-      photo: string;
-      caption: string;
-      reply_markup?: {
-        inline_keyboard: Array<Array<{ text: string; url: string }>>;
-      };
-    };
-
-
-export async function notifyAdmin(message: string) {
-  await sendTelegramMessage(
-    process.env.TELEGRAM_BOT_TOKEN!,
-    message,
-    [],
-    undefined,
-    ADMIN_CHAT_ID
-  );
-  return { success: true };
+// Base type for Telegram API responses (adjust based on actual API)
+interface TelegramApiResponse {
+  ok: boolean;
+  result?: any;
+  description?: string;
+  error_code?: number;
 }
 
-export async function notifyAdmins(message: string) {
-  const { data: admins, error } = await supabaseAdmin
-    .from("users")
-    .select("user_id")
-    .eq("status", "admin");
-
-  if (error) throw error;
-
-  for (const admin of admins) {
-    await sendTelegramMessage(
-      process.env.TELEGRAM_BOT_TOKEN!,
-      message,
-      [],
-      undefined,
-      admin.user_id
-    );
-  }
-  return { success: true };
-}
-
-
-interface CaptchaSettings {
-  string_length: number;
-  character_set: "letters" | "numbers" | "both";
-  case_sensitive: boolean;
-  noise_level: number; // 0-100 (lines count)
-  font_size: number; // 20-50
-  background_color: string; // Hex code
-  text_color: string; // Hex code
-  distortion: number; // 0-1 (rotation intensity)
-}
-
-export async function generateCaptcha(settings: CaptchaSettings) {
-  const chars =
-    settings.character_set === "letters"
-      ? "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-      : settings.character_set === "numbers"
-      ? "0123456789"
-      : "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  const text = Array.from(
-    { length: settings.string_length },
-    () => chars[Math.floor(Math.random() * chars.length)]
-  ).join("");
-
-  const width = Math.max(200, settings.string_length * 40 + 60);
-  const height = 80;
-
-  // SVG with gradient background
-  let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`;
-  svg += `<defs><linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:${settings.background_color};stop-opacity:1" /><stop offset="100%" style="stop-color:${adjustColor(settings.background_color, -20)};stop-opacity:1" /></linearGradient></defs>`;
-  svg += `<rect width="${width}" height="${height}" fill="url(#grad)" />`;
-
-  // Distorted text with shadow
-  for (let i = 0; i < text.length; i++) {
-    const x = 30 + i * 40;
-    const y = height / 2 + settings.font_size / 2;
-    const rotation = (Math.random() - 0.5) * settings.distortion * 30; // Degrees
-    svg += `<text x="${x}" y="${y}" font-family="Courier New, monospace" font-size="${settings.font_size}" fill="${settings.text_color}" transform="rotate(${rotation}, ${x}, ${y})" filter="url(#shadow)">${text[i]}</text>`;
-  }
-
-  // Shadow filter
-  svg += `<defs><filter id="shadow"><feDropShadow dx="2" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.3)" /></filter></defs>`;
-
-  // Noise (wavy lines)
-  for (let i = 0; i < settings.noise_level / 10; i++) {
-    const x1 = Math.random() * width;
-    const y1 = Math.random() * height;
-    const cx = Math.random() * width;
-    const cy = Math.random() * height;
-    const x2 = Math.random() * width;
-    const y2 = Math.random() * height;
-    svg += `<path d="M${x1},${y1} Q${cx},${cy} ${x2},${y2}" stroke="rgba(150,150,150,0.5)" stroke-width="1" fill="none" />`;
-  }
-
-  svg += `</svg>`;
-
-  const image = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
-  const hash = createHash("sha256").update(text).digest("hex");
-
-  return { image, hash };
-}
-
-export async function verifyCaptcha(hash: string, userInput: string) {
-  const computedHash = createHash("sha256").update(userInput).digest("hex");
-  return computedHash === hash;
-}
-
-
-
-// Helper to adjust color brightness
-function adjustColor(hex: string, amount: number): string {
-  const color = hex.replace("#", "");
-  const r = Math.max(0, Math.min(255, parseInt(color.slice(0, 2), 16) + amount));
-  const g = Math.max(0, Math.min(255, parseInt(color.slice(2, 4), 16) + amount));
-  const b = Math.max(0, Math.min(255, parseInt(color.slice(4, 6), 16) + amount));
-  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
-}
-
-
-
-
-
-// Notify admins when a user successfully completes CAPTCHA
-export async function notifyCaptchaSuccess(userId: string, username?: string | null) {
-  try {
-    const { data: admins, error: adminError } = await supabaseAdmin
-      .from("users")
-      .select("user_id")
-      .eq("status", "admin")
-    if (adminError) throw adminError
-
-    const adminChatIds = admins.map((admin) => admin.user_id)
-    const message = `🔔 Пользователь ${username || userId} успешно прошел CAPTCHA.`
-
-    for (const adminId of adminChatIds) {
-      const result = await sendTelegramMessage(
-        process.env.TELEGRAM_BOT_TOKEN!,
-        message,
-        [],
-        undefined,
-        adminId
-      )
-      if (!result.success) {
-        console.error(`Failed to notify admin ${adminId}:`, result.error)
-      }
-    }
-
-    return { success: true }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to notify admins",
-    }
-  }
-}
-
-// Notify all successful users
-export async function notifySuccessfulUsers(userIds: string[]) {
-  try {
-    const message = `🎉 Поздравляем! Вы успешно прошли CAPTCHA и можете продолжить. 🚀`
-
-    for (const userId of userIds) {
-      const result = await sendTelegramMessage(
-        process.env.TELEGRAM_BOT_TOKEN!,
-        message,
-        [],
-        undefined,
-        userId
-      )
-      if (!result.success) {
-        console.error(`Failed to notify user ${userId}:`, result.error)
-      }
-    }
-
-    return { success: true }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to notify users",
-    }
-  }
-}
-
-
-// Add this new function to notify winners
-export async function notifyWinners(winningNumber: number, winners: any[]) {
-  try {
-    // Notify each winner
-    for (const winner of winners) {
-      await sendTelegramMessage(
-        process.env.TELEGRAM_BOT_TOKEN!,
-        `🎉 Congratulations! Your lucky number ${winningNumber} has been drawn in the Wheel of Fortune! You are a winner! 🏆`,
-        [],
-        undefined,
-        winner.user_id,
-      )
-    }
-
-    // Notify admin about the winners
-    const winnerNames = winners.map((w) => w.username || w.full_name || w.user_id).join(", ")
-    await sendTelegramMessage(
-      process.env.TELEGRAM_BOT_TOKEN!,
-      `🎮 Wheel of Fortune Results:\nWinning Number: ${winningNumber}\nWinners (${winners.length}): ${winnerNames}`,
-      [],
-      undefined,
-      ADMIN_CHAT_ID,
-    )
-
-    return { success: true }
-  } catch (error) {
-    logger.error("Error notifying winners:", error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to notify winners",
-    }
-  }
-}
-
-// Utility to delay execution (for polling)
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-export async function executeCozeAgent(
-  botId: string,
-  userId: string,
-  content: string,
-  metadata?: Record<string, any>
-) {
-  try {
-    // Step 1: Initiate the chat with the Coze API
-    const initResponse = await axios.post(
-      "https://api.coze.com/v3/chat",
-      {
-        bot_id: botId,
-        user_id: userId,
-        stream: false,
-        auto_save_history: true,
-        additional_messages: [{
-          role: "user",
-          content: content,
-          content_type: "text",
-        }],
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.COZE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    const chatId = initResponse.data.data?.id;
-    const conversationId = initResponse.data.data?.conversation_id;
-
-    if (!chatId || !conversationId) {
-      throw new Error("Missing chat ID or conversation ID in initial response");
-    }
-
-    // Step 2: Poll for the assistant's response
-    let attempts = 0;
-    const maxAttempts = 10;
-    const pollInterval = 2000; // 2 seconds
-
-    while (attempts < maxAttempts) {
-      const messagesResponse = await axios.get(
-        `https://api.coze.com/v3/chat/message/list?conversation_id=${conversationId}&chat_id=${chatId}`,
-        {
-          headers: { Authorization: `Bearer ${process.env.COZE_API_KEY}` },
-        }
-      );
-
-      const assistantAnswer = messagesResponse.data.data?.find(
-        (msg: any) => msg.role === "assistant" && msg.type === "answer"
-      )?.content;
-
-      if (assistantAnswer) {
-        // Step 3: Save the text response to Supabase
-        const { error } = await supabaseAdmin
-          .from("coze_responses")
-          .insert({
-            bot_id: botId,
-            user_id: userId,
-            content: content,
-            response: assistantAnswer, // Store as plain text
-            metadata: metadata || {},
-          });
-
-        if (error) throw error;
-
-        return { success: true, data: assistantAnswer }; // Return the text response
-      }
-
-      attempts++;
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
-    }
-
-    throw new Error("No response from Coze agent after maximum attempts");
-  } catch (error) {
-    console.error("Coze execution failed:", error);
-    return { success: false, error: error.message };
-  }
-}
-
-// Generalized function to run a Coze agent
-export async function runCozeAgent(botId: string, userId: string, content: string) {
-  try {
-    // Step 1: Initiate the chat
-    const initResponse = await axios.post(
-      "https://api.coze.com/v3/chat",
-      {
-        bot_id: botId,
-        user_id: userId,
-        stream: false,
-        auto_save_history: true,
-        additional_messages: [
-          {
-            role: "user",
-            content: content,
-            content_type: "text",
-          },
-        ],
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${COZE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    const chatId = initResponse.data.data?.id;
-    const conversationId = initResponse.data.data?.conversation_id;
-    if (!chatId || !conversationId) {
-      throw new Error("Missing chat ID or conversation ID in initial response");
-    }
-
-    // Step 2: Poll for chat messages until assistant's answer is available
-    let attempts = 0;
-    const maxAttempts = 10; // Limit polling
-    const pollInterval = 2000; // Poll every 2 seconds
-
-    while (attempts < maxAttempts) {
-      const messagesResponse = await axios.get(
-        `https://api.coze.com/v3/chat/message/list?conversation_id=${conversationId}&chat_id=${chatId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${COZE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const assistantAnswer = messagesResponse.data.data?.find(
-        (msg: any) => msg.role === "assistant" && msg.type === "answer"
-      )?.content;
-
-      if (assistantAnswer) {
-        return assistantAnswer; // Return plain text as requested
-      }
-
-      attempts++;
-      await delay(pollInterval);
-    }
-
-    throw new Error("No assistant answer received after maximum attempts");
-  } catch (error) {
-    console.error("Error running Coze agent:", error);
-    throw new Error("Failed to run Coze agent");
-  }
-}
-
-
-export async function analyzeMessage(content: string) {
-  try {
-    // Step 1: Initiate the chat
-    const initResponse = await axios.post(
-      'https://api.coze.com/v3/chat',
-      {
-        bot_id: COZE_BOT_ID,
-        user_id: COZE_USER_ID,
-        stream: false,
-        auto_save_history: true,
-        additional_messages: [
-          {
-            role: 'user',
-            content: content,
-            content_type: 'text',
-          },
-        ],
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${COZE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    console.log('Initial Coze API response.data:', initResponse.data);
-
-    const chatId = initResponse.data.data?.id;
-    const conversationId = initResponse.data.data?.conversation_id;
-    if (!chatId || !conversationId) {
-      throw new Error('Missing chat ID or conversation ID in initial response');
-    }
-
-    // Step 2: Poll for chat messages until assistant's answer is available
-    let attempts = 0;
-    const maxAttempts = 10; // Limit polling
-    const pollInterval = 2000; // Poll every 2 seconds
-
-    while (attempts < maxAttempts) {
-      const messagesResponse = await axios.get(
-        `https://api.coze.com/v3/chat/message/list?conversation_id=${conversationId}&chat_id=${chatId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${COZE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      console.log('Coze API messages response.data:', messagesResponse.data);
-
-      // Find the assistant's answer message
-      const assistantAnswer = messagesResponse.data.data?.find(
-        (msg: any) => msg.role === 'assistant' && msg.type === 'answer'
-      )?.content;
-
-      if (assistantAnswer) {
-        // Parse the content, assuming it's a JSON string
-        let parsedData;
-        try {
-          parsedData = JSON.parse(assistantAnswer);
-        } catch (e) {
-          // If parsing fails, assume plain text and use defaults
-          console.warn('Assistant content is not JSON, treating as plain text:', assistantAnswer);
-          parsedData = { emotional_comment: assistantAnswer };
-        }
-
-        return {
-          bullshit_percentage: parsedData.bullshit_percentage || 50,
-          emotional_comment: parsedData.emotional_comment || "Hmm, interesting...",
-          analyzed_content: parsedData.analyzed_content || content,
-          content_summary: parsedData.content_summary || "No summary available.",
-          animation: parsedData.animation || "neutral",
-        };
-      }
-
-      attempts++;
-      await delay(pollInterval); // Wait before next poll
-    }
-
-    throw new Error('No assistant answer received after maximum attempts');
-  } catch (error) {
-    console.error('Error analyzing message:', error);
-    throw new Error('Failed to analyze message');
-  }
-}
-
-
-
-
-
-export const generateEmbeddings = async () => {
-  const { data: cars } = await supabaseAdmin
-    .from("cars")
-    .select("id")
-    .is("embedding", null);
-
-  if (!cars?.length) return;
-
-  // Call the centralized embedding function for batch processing
-  await generateCarEmbedding(); // No carId means batch processing
-  console.log(`Triggered embedding generation for ${cars.length} cars`);
-};
-
-/** Sends a Telegram message with optional image and buttons */
+// Type for send message/photo payload
+type SendPayload = {
+  chat_id: string;
+  reply_markup?: {
+    inline_keyboard: Array<Array<{ text: string; url: string }>>;
+  };
+} & ({ text: string } | { photo: string; caption: string });
+
+
+/** Sends a Telegram message or photo with optional buttons */
 export async function sendTelegramMessage(
-  token: string,
   message: string,
   buttons: InlineButton[] = [],
   imageUrl?: string,
   chatId?: string,
-  carId?: string
-) {
-  try {
-    const finalChatId = chatId || ADMIN_CHAT_ID;
+  carId?: string // Keep carId specific to this function if needed
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  if (!TELEGRAM_BOT_TOKEN) {
+    return { success: false, error: "Telegram bot token not configured" };
+  }
+  const finalChatId = chatId || ADMIN_CHAT_ID;
 
+  try {
     let finalMessage = message;
+    // Fetch car details if carId is provided
     if (carId) {
       const { data: car, error } = await supabaseAdmin
         .from("cars")
         .select("make, model, daily_price")
         .eq("id", carId)
         .single();
-      if (error) throw new Error(`Failed to fetch car: ${error.message}`);
-      if (car) {
+      if (error) {
+        logger.error(`Failed to fetch car ${carId} for message: ${error.message}`);
+        // Decide whether to send message without car info or fail
+        // return { success: false, error: `Failed to fetch car info: ${error.message}` };
+      } else if (car) {
         finalMessage += `\n\nCar: ${car.make} ${car.model}\nDaily Price: ${car.daily_price} XTR`;
       }
     }
 
-    const payload: SendMessagePayload = imageUrl
+    const payload: SendPayload = imageUrl
       ? {
           chat_id: finalChatId,
           photo: imageUrl,
           caption: finalMessage,
-          reply_markup: buttons.length
-            ? {
-                inline_keyboard: [buttons.map((button) => ({ text: button.text, url: button.url }))],
-              }
-            : undefined,
         }
       : {
           chat_id: finalChatId,
           text: finalMessage,
-          reply_markup: buttons.length
-            ? {
-                inline_keyboard: [buttons.map((button) => ({ text: button.text, url: button.url }))],
-              }
-            : undefined,
         };
 
+    if (buttons.length > 0) {
+      payload.reply_markup = {
+        inline_keyboard: [buttons.map((button) => ({ text: button.text, url: button.url }))],
+      };
+    }
+
     const endpoint = imageUrl ? "sendPhoto" : "sendMessage";
-    const response = await fetch(`https://api.telegram.org/bot${token}/${endpoint}`, {
+    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${endpoint}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.description || "Failed to send message");
+    const data: TelegramApiResponse = await response.json();
+
+    if (!data.ok) {
+      logger.error(`Telegram API error (${endpoint}): ${data.description || "Unknown error"}`, { chatId: finalChatId, errorCode: data.error_code });
+      throw new Error(data.description || `Failed to ${endpoint}`);
     }
 
-    return { success: true, data };
+    return { success: true, data: data.result };
   } catch (error) {
+    logger.error(`Error in sendTelegramMessage (${chatId || ADMIN_CHAT_ID}):`, error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "An unexpected error occurred",
+      error: error instanceof Error ? error.message : "An unexpected error occurred while sending Telegram message",
     };
   }
 }
 
-/** Notifies an admin about a car-related action */
-export async function notifyCarAdmin(carId: string, message: string) {
-  const { data: car, error } = await supabaseAdmin
-    .from("cars")
-    .select("owner_id, image_url")
-    .eq("id", carId)
-    .single();
-
-  if (error) {
-    console.error("Error fetching car:", error);
-    return { success: false, error: error.message };
+/** Sends a Telegram document to a specified chat */
+export async function sendTelegramDocument(
+  chatId: string,
+  fileContent: string,
+  fileName: string
+): Promise<{ success: boolean; data?: any; error?: string }> {
+   if (!TELEGRAM_BOT_TOKEN) {
+    return { success: false, error: "Telegram bot token not configured" };
   }
 
-  const adminId = car.owner_id;
-  const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
-  if (!telegramToken) {
-    console.error("Telegram bot token not configured");
-    return { success: false, error: "Telegram bot token missing" };
-  }
-
-  const baseUrl = getBaseUrl();
-  const result = await sendTelegramMessage(
-    telegramToken,
-    message,
-    [{ text: "View Car", url: `${baseUrl}/rent/${carId}` }],
-    car.image_url,
-    adminId,
-    carId
-  );
-
-  if (!result.success) {
-    console.error("Failed to notify admin:", result.error);
-  }
-  return result;
-}
-
-/** Notifies all fleet admins about a fleet-wide event */
-export async function superNotification(message: string) {
-  const { data: owners, error } = await supabaseAdmin
-    .from("cars")
-    .select("owner_id")
-    .neq("owner_id", null)
-    .distinct();
-
-  if (error) {
-    console.error("Error fetching owners:", error);
-    return;
-  }
-
-  for (const owner of owners) {
-    await sendTelegramMessage(
-      process.env.TELEGRAM_BOT_TOKEN!,
-      message,
-      [],
-      undefined,
-      owner.owner_id
-    );
-  }
-}
-
-/** Broadcasts a message to all users or a specific role */
-export async function broadcastMessage(message: string, role?: string) {
-  const query = supabaseAdmin.from("users").select("user_id");
-  if (role) query.eq("role", role);
-
-  const { data: users, error } = await query;
-  if (error) {
-    console.error("Error fetching users:", error);
-    return;
-  }
-
-  for (const user of users) {
-    await sendTelegramMessage(
-      process.env.TELEGRAM_BOT_TOKEN!,
-      message,
-      [],
-      undefined,
-      user.user_id
-    );
-  }
-}
-
-/** Sends a donation invoice to the user and notifies the admin */
-export async function sendDonationInvoice(chatId: string, amount: number, message: string) {
   try {
-    const invoicePayload = `donation_${Date.now()}`; // Unique payload for the invoice
-    const title = "Donation to Leha";
-    const description = `Thank you for your support! ${message || "No message provided"}`;
+    const blob = new Blob([fileContent], { type: "text/plain;charset=utf-8" });
+    const formData = new FormData();
+    formData.append("chat_id", chatId);
+    formData.append("document", blob, fileName);
 
-    // Send the invoice using existing function
-    const invoiceResult = await sendTelegramInvoice(
-      chatId,
-      title,
-      description,
-      invoicePayload,
-      amount,
-      0, // No subscription ID for donations
-      undefined // No photo for donations
-    );
+    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument`, {
+      method: "POST",
+      body: formData, // Don't set Content-Type header when using FormData, browser does it
+    });
 
-    if (!invoiceResult.success) {
-      throw new Error(invoiceResult.error);
+    const data: TelegramApiResponse = await response.json();
+    if (!data.ok) {
+       logger.error(`Telegram API error (sendDocument): ${data.description || "Unknown error"}`, { chatId, errorCode: data.error_code });
+      throw new Error(data.description || "Failed to send document");
     }
 
-    // Store the invoice in the database with type "donation"
-    const { error: insertError } = await supabaseAdmin
-      .from("invoices")
-      .insert({
-        id: invoicePayload,
-        user_id: chatId,
-        amount,
-        type: "donation",
-        status: "pending",
-        metadata: { message },
-        subscription_id: 0,
-      });
-
-    if (insertError) {
-      throw new Error(`Failed to save invoice: ${insertError.message}`);
-    }
-
-    // Notify admin of the new donation attempt
-    const adminMessage = `New donation attempt!\nAmount: ${amount} XTR\nFrom: ${chatId}\nMessage: ${message || "No message"}`;
-    const adminResult = await sendTelegramMessage(
-      process.env.TELEGRAM_BOT_TOKEN!,
-      adminMessage,
-      [],
-      undefined,
-      ADMIN_CHAT_ID
-    );
-
-    if (!adminResult.success) {
-      logger.warn("Failed to notify admin:", adminResult.error);
-    }
-
-    return { success: true };
+    return { success: true, data: data.result };
   } catch (error) {
-    logger.error("Error in sendDonationInvoice:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Failed to process donation" };
+     logger.error(`Error in sendTelegramDocument (${chatId}):`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "An unexpected error occurred while sending document",
+    };
   }
 }
 
-/** Updates a car’s status and notifies the owner */
-export async function updateCarStatus(carId: string, newStatus: string) {
-  const { error } = await supabaseAdmin
-    .from("cars")
-    .update({ status: newStatus })
-    .eq("id", carId);
-
-  if (error) {
-    console.error("Error updating car status:", error);
-    return;
-  }
-
-  await notifyCarAdmin(carId, `Your car status has been updated to: ${newStatus}`);
-}
-
-export async function createOrUpdateUser(user: {
-  id: string;
-  username?: string | null;
-  first_name?: string;
-  last_name?: string;
-  language_code?: string;
-  photo_url?: string;
-}) {
-  try {
-    const { error: insertError } = await supabaseAdmin
-      .from("users")
-      .insert({
-        user_id: user.id,
-        username: user.username,
-        full_name: `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim(),
-        avatar_url: user.photo_url,
-        language_code: user.language_code,
-      });
-
-    if (insertError) {
-      logger.error("Insert error:", insertError);
-      throw insertError;
-    }
-
-    const { data: existingUser, error: fetchError } = await supabaseAdmin
-      .from("users")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (fetchError) {
-      logger.error("Fetch error:", fetchError);
-      throw fetchError;
-    }
-
-    // Notify default admin of new user
-    await sendTelegramMessage(
-      process.env.TELEGRAM_BOT_TOKEN!,
-      `New user registered: ${user.username || user.id}`,
-      [],
-      undefined,
-      ADMIN_CHAT_ID
-    );
-
-    return existingUser;
-  } catch (error) {
-    logger.error("Error creating/updating user:", error);
-    throw error;
-  }
-}
-
-export async function authenticateUser(chatId: string, userInfo?: Partial<WebAppUser>) {
-  try {
-    const { data: user, error } = await supabaseAdmin
-      .from("users")
-      .upsert(
-        {
-          user_id: chatId,
-          username: userInfo?.username,
-          full_name: `${userInfo?.first_name || ""} ${userInfo?.last_name || ""}`.trim(),
-          avatar_url: userInfo?.photo_url,
-          language_code: userInfo?.language_code,
-        },
-        { onConflict: "user_id" }
-      )
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    const token = generateJwtToken(chatId);
-    return { user, token };
-  } catch (error) {
-    throw new Error("Authentication failed");
-  }
-}
-
+/** Sends a Telegram invoice using the sendInvoice method */
 export async function sendTelegramInvoice(
   chatId: string,
   title: string,
   description: string,
-  payload: string,
-  amount: number,
-  subscription_id: number,
+  payload: string, // Unique invoice payload identifier
+  amount: number, // Amount in the smallest units of the currency (e.g., cents for USD, kopecks for RUB, but seems like XTR uses whole units here?)
+  subscription_id: number = 0, // Optional, defaults to 0
   photo_url?: string
-) {
-  try {
-    const PROVIDER_TOKEN = ""; // Empty string for XTR payments
-    const response = await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendInvoice`, {
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  if (!TELEGRAM_BOT_TOKEN) {
+    return { success: false, error: "Telegram bot token not configured" };
+  }
+  // Note: PROVIDER_TOKEN is empty for XTR (Telegram Stars)
+  const PROVIDER_TOKEN = "";
+  const currency = "XTR"; // Using Telegram Stars
+
+  // Prices array expects amount in smallest units. Assuming XTR is represented as whole units here.
+  const prices = [{ label: title, amount: amount }]; // Adjust label if needed
+
+  const requestBody: Record<string, any> = {
       chat_id: chatId,
       title,
       description,
       payload,
       provider_token: PROVIDER_TOKEN,
-      currency: "XTR",
-      prices: [{ label: "Аренда автомобиля", amount }],
-      start_parameter: "pay",
-      need_shipping_address: false,
-      is_flexible: false,
-      photo_url,
-      photo_size: 600,
-      photo_width: 600,
-      photo_height: 400,
+      currency,
+      prices,
+      start_parameter: "pay", // Optional: Deep-linking parameter
+      // need_shipping_address: false, // Default is false
+      // is_flexible: false, // Default is false
+  };
+
+  if (photo_url) {
+    requestBody.photo_url = photo_url;
+    requestBody.photo_size = 600; // Optional: size of the photo
+    requestBody.photo_width = 600; // Optional: photo width
+    requestBody.photo_height = 400; // Optional: photo height
+  }
+
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendInvoice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
     });
 
-    if (!response.data.ok) {
-      throw new Error(`Telegram API error: ${response.data.description || "Unknown error"}`);
+    const data: TelegramApiResponse = await response.json();
+
+    if (!data.ok) {
+      logger.error(`Telegram API error (sendInvoice): ${data.description || "Unknown error"}`, { chatId, payload, errorCode: data.error_code });
+      throw new Error(`Telegram API error: ${data.description || "Failed to send invoice"}`);
     }
 
-    return { success: true, data: response.data };
+    // Store the invoice in the database *after* successfully sending it
+    // Consider moving this DB logic to the caller function (e.g., purchaseDisableDummyMode)
+    // to keep this function focused only on Telegram API interaction.
+    // If kept here, ensure proper error handling for DB operation.
+    try {
+        const { error: insertError } = await supabaseAdmin
+            .from("invoices")
+            .insert({
+                id: payload, // Use the same unique payload as invoice ID
+                user_id: chatId,
+                amount: amount, // Store the amount (confirm if it should be divided by 100 for XTR)
+                type: payload.split("_")[0], // Infer type from payload prefix (e.g., "donation") - might be brittle
+                status: "pending",
+                metadata: { description, title }, // Store relevant info
+                subscription_id: subscription_id || 0, // Ensure subscription_id is stored
+            });
+
+        if (insertError) {
+            // Log the error, but maybe don't fail the whole operation if invoice was sent
+            logger.error(`Failed to save invoice ${payload} to DB after sending: ${insertError.message}`);
+            // Decide if this should return an error to the user.
+            // return { success: false, error: `Failed to save invoice to database: ${insertError.message}` };
+        }
+    } catch (dbError) {
+         logger.error(`Exception saving invoice ${payload} to DB after sending:`, dbError);
+    }
+
+
+    return { success: true, data: data.result };
   } catch (error) {
-    logger.error("Error in sendTelegramInvoice: " + error, error);
+    logger.error("Error in sendTelegramInvoice:", error);
     return { success: false, error: error instanceof Error ? error.message : "Failed to send invoice" };
   }
 }
 
-/*export async function handleWebhookUpdate(update: any) {
-  try {
-    if (update.pre_checkout_query) {
-      await axios.post(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery`, {
-        pre_checkout_query_id: update.pre_checkout_query.id,
-        ok: true,
-      });
-    }
 
-    if (update.message?.successful_payment) {
-      const { invoice_payload, total_amount } = update.message.successful_payment;
-
-      const { data: invoice, error: invoiceError } = await supabaseAdmin
-        .from("invoices")
-        .select("*")
-        .eq("id", invoice_payload)
-        .single();
-
-      if (invoiceError || !invoice) throw new Error(`Invoice error: ${invoiceError?.message}`);
-
-      await supabaseAdmin.from("invoices").update({ status: "paid" }).eq("id", invoice_payload);
-
-      const userId = update.message.chat.id;
-      const { data: userData, error: userError } = await supabaseAdmin
-        .from("users")
-        .select("*")
-        .eq("user_id", userId)
-        .single();
-
-      if (userError) throw new Error(`User fetch error: ${userError.message}`);
-
-      const baseUrl = getBaseUrl();
-
-      if (invoice.type === "subscription") {
-        let newStatus = "pro";
-        let newRole = "subscriber";
-        if (total_amount === 420) {
-          newStatus = "admin";
-          newRole = "admin";
-        }
-
-        await supabaseAdmin.from("users").update({ status: newStatus, role: newRole }).eq("user_id", userId);
-
-        await sendTelegramMessage(
-          process.env.TELEGRAM_BOT_TOKEN!,
-          "🎉 Оплата подписки прошла успешно! Спасибо за покупку.",
-          [],
-          undefined,
-          userId
-        );
-
-        await sendTelegramMessage(
-          process.env.TELEGRAM_BOT_TOKEN!,
-          `🔔 Пользователь ${userData.username || userData.user_id} обновил статус до ${newStatus.toUpperCase()}!`,
-          [],
-          undefined,
-          ADMIN_CHAT_ID
-        );
-      } else if (invoice.type === "car_rental") {
-        const metadata = invoice.metadata;
-        const { data: car, error: carError } = await supabaseAdmin
-          .from("cars")
-          .select("owner_id, make, model, image_url")
-          .eq("id", metadata.car_id)
-          .single();
-
-        if (carError) throw new Error(`Car fetch error: ${carError.message}`);
-
-        await sendTelegramMessage(
-          process.env.TELEGRAM_BOT_TOKEN!,
-          `🎉 Оплата аренды автомобиля ${metadata.car_make} ${metadata.car_model} прошла успешно!`,
-          [{ text: "View Rental", url: `${baseUrl}/rent/${metadata.car_id}` }],
-          undefined,
-          userId
-        );
-
-        await notifyAdmin(
-          metadata.car_id,
-          `Вашу ${car.make} ${car.model} арендовал ${userData.username || userData.user_id}!`
-        );
-
-        await sendTelegramMessage(
-          process.env.TELEGRAM_BOT_TOKEN!,
-          `🔔 Пользователь ${userData.username || userData.user_id} арендовал автомобиль ${car.make} ${car.model}.`,
-          [],
-          undefined,
-          ADMIN_CHAT_ID
-        );
-      } else if (invoice.type === "donation") {
-  // Новая логика для пожертвований
-  const message = invoice.metadata?.message || "Сообщение отсутствует";
-  await sendTelegramMessage(
-    process.env.TELEGRAM_BOT_TOKEN!,
-    `🎉 Поступило новое пожертвование!\nСумма: ${total_amount} XTR\nОт кого: ${userData.username || userData.user_id}\nСообщение: ${message}\nМы искренне благодарны за вашу щедрость!`,
-    [],
-    undefined,
-    ADMIN_CHAT_ID
-  );
-
-  await sendTelegramMessage(
-    process.env.TELEGRAM_BOT_TOKEN!,
-    "Большое спасибо за ваше пожертвование! 🌟 Ваша поддержка вдохновляет нас и помогает двигаться вперёд. Вы — часть нашего успеха!",
-    [],
-    undefined,
-    userId
-  );
-} else if (invoice.type === "script_access") {
-        // Grant access and send script links
-        await supabaseAdmin
-          .from("users")
-          .update({ has_script_access: true })
-          .eq("user_id", userId);
-
-        const scripts = [
-          { name: "Block'em All", url: "https://automa.app/marketplace/blockemall" },
-          { name: "Purge'em All", url: "https://automa.app/marketplace/purgeemall" },
-          { name: "Hunter", url: "https://automa.app/marketplace/hunter" },
-        ];
-
-        const message =
-          "Спасибо за покупку Automa Bot-Hunting Scripts! Вот ваши ссылки:\n" +
-          scripts.map((script) => `- [${script.name}](${script.url})`).join("\n");
-
-        await sendTelegramMessage(
-          process.env.TELEGRAM_BOT_TOKEN!,
-          message,
-          [],
-          undefined,
-          userId
-        );
-
-        await sendTelegramMessage(
-          process.env.TELEGRAM_BOT_TOKEN!,
-          `🔔 Пользователь ${userData.username || userData.user_id} приобрел доступ к Automa скриптам!`,
-          [],
-          undefined,
-          ADMIN_CHAT_ID
-        );
-      }
-    } else if (invoice.type === "inventory_script_access") {
-    // New case: Inventory script access for warehouse
-    await supabaseAdmin
-      .from("users")
-      .update({
-        metadata: {
-          ...userData.metadata, // Preserve existing metadata
-          has_inventory_script_access: true, // Add or update this flag
-        },
-      })
-      .eq("user_id", userId);
-
-    const inventoryScripts = [
-      { name: "Order Snatcher", url: "https://automa.site/workflow/16rZppoNhrm7HCJSncPJV" },
-    ];
-
-    const message =
-      "Спасибо, что купил Automa скрипты для склада! Хватай заказы и синкай химию:\n" +
-      inventoryScripts.map((script) => `- [${script.name}](${script.url})`).join("\n");
-
-    await sendTelegramMessage(
-      process.env.TELEGRAM_BOT_TOKEN!,
-      message,
-      [],
-      undefined,
-      userId
-    );
-
-    await sendTelegramMessage(
-      process.env.TELEGRAM_BOT_TOKEN!,
-      `🔔 ${userData.username || userData.user_id} схватил Automa скрипты для склада!`,
-      [],
-      undefined,
-      process.env.ADMIN_CHAT_ID!
-    );
-  } else if (invoice_payload.startsWith("support_")) {
-        await sendTelegramMessage(
-          process.env.TELEGRAM_BOT_TOKEN!,
-          `🔔 Новая оплаченная заявка на поддержку!\nСумма: ${total_amount} XTR\nОт: ${userData.username || userData.user_id}\nОписание: ${invoice.description}`,
-          [],
-          undefined,
-          process.env.ADMIN_CHAT_ID!
-        );
-
-        await sendTelegramMessage(
-          process.env.TELEGRAM_BOT_TOKEN!,
-          "Спасибо за оплату! Ваша заявка на поддержку принята, я свяжусь с вами в ближайшее время.",
-          [],
-          undefined,
-          userId
-        );
-      }
-  } catch (error) {
-    logger.error("Error handling webhook update:", error);
-  }
-}*/
-
-export async function confirmPayment(preCheckoutQueryId: string) {
-  const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+/** Confirms a pre-checkout query */
+export async function confirmPayment(preCheckoutQueryId: string): Promise<{ success: boolean; error?: string }> {
   if (!TELEGRAM_BOT_TOKEN) {
-    throw new Error("Missing TELEGRAM_BOT_TOKEN");
+    return { success: false, error: "Telegram bot token not configured" };
   }
 
-  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      pre_checkout_query_id: preCheckoutQueryId,
-      ok: true,
-    }),
-  });
-
-  const result = await response.json();
-  if (!result.ok) {
-    throw new Error("Failed to confirm payment");
-  }
-
-  return result;
-}
-
-export async function validateToken(token: string) {
   try {
-    const decoded = verifyJwtToken(token);
-    if (!decoded) return null;
-
-    const client = createAuthenticatedClient(token);
-    const { data: user } = await client.from("users").select("*").eq("user_id", decoded.sub).single();
-
-    return user;
-  } catch (error) {
-    return null;
-  }
-}
-
-export async function saveUser(tgUser: any) {
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("users")
-      .upsert({
-        id: tgUser.id.toString(),
-        avatar_url: tgUser.photo_url,
-        full_name: `${tgUser.first_name} ${tgUser.last_name || ""}`.trim(),
-        telegram_username: tgUser.username,
-        language_code: tgUser.language_code,
-      })
-      .select();
-
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error("Error saving user:", error);
-    return null;
-  }
-}
-
-export async function sendResult(chatId: string, result: any) {
-  try {
-    const baseUrl = getBaseUrl();
-    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendPhoto`;
-
-    const response = await fetch(url, {
+    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerPreCheckoutQuery`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        chat_id: chatId,
-        photo: result.imageUrl,
-        caption: `*${result.car}*\n${result.description}`,
-        parse_mode: "Markdown",
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: "Rent This Car 🚗",
-                url: `${baseUrl}/rent/${result.car.id}`,
-              },
-              {
-                text: "Try Again 🔄",
-                web_app: { url: baseUrl },
-              },
-            ],
-          ],
-        },
+        pre_checkout_query_id: preCheckoutQueryId,
+        ok: true, // Confirming the payment is possible
       }),
     });
 
-    return await response.json();
+    const result: TelegramApiResponse = await response.json();
+    if (!result.ok) {
+      logger.error(`Telegram API error (answerPreCheckoutQuery): ${result.description}`, { preCheckoutQueryId, errorCode: result.error_code });
+      throw new Error(result.description || "Failed to answer pre-checkout query");
+    }
+    logger.info(`Pre-checkout query ${preCheckoutQueryId} confirmed successfully.`);
+    return { success: true };
   } catch (error) {
-    console.error("Error sending Telegram message:", error);
-    return null;
+     logger.error(`Error confirming payment (preCheckoutQueryId: ${preCheckoutQueryId}):`, error);
+     return { success: false, error: error instanceof Error ? error.message : "Failed to confirm payment" };
   }
 }
 
-export async function setTelegramWebhook() {
-  const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-  const WEBHOOK_URL = `${getBaseUrl()}/api/telegramWebhook`;
 
-  if (!TELEGRAM_BOT_TOKEN) {
-    throw new Error("Missing TELEGRAM_BOT_TOKEN");
+// --- Notifications ---
+
+/** Notifies the primary admin */
+export async function notifyAdmin(message: string): Promise<{ success: boolean; error?: string }> {
+  const result = await sendTelegramMessage(message, [], undefined, ADMIN_CHAT_ID);
+  // Log only if there was an error sending the notification
+  if (!result.success) {
+     logger.error(`Failed to notify primary admin (${ADMIN_CHAT_ID}): ${result.error}`);
   }
-
-  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url: WEBHOOK_URL }),
-  });
-
-  const result = await response.json();
-  if (!result.ok) {
-    throw new Error("Failed to set webhook");
-  }
-
-  return result;
+  return { success: result.success, error: result.error };
 }
 
-export async function checkInvoiceStatus(token: string, invoiceId: string) {
+/** Notifies all users with 'admin' status */
+export async function notifyAdmins(message: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const user = await verifyJwtToken(token);
-    if (!user) {
-      throw new Error("Unauthorized");
+    const { data: admins, error } = await supabaseAdmin
+      .from("users")
+      .select("user_id")
+      .eq("status", "admin"); // Assuming 'status' field determines admin
+
+    if (error) {
+      logger.error("Failed to fetch admins for notification:", error);
+      throw error;
     }
 
-    const { data, error } = await supabaseAdmin.from("invoices").select("status").eq("id", invoiceId).single();
+    if (!admins || admins.length === 0) {
+      logger.warn("No admins found to notify.");
+      // Notify the default admin as a fallback?
+      // await notifyAdmin(`(No admins found) ${message}`);
+      return { success: true }; // No error, just no one to notify
+    }
 
-    if (error) throw error;
-
-    return { success: true, status: data.status };
+    let allSuccessful = true;
+    for (const admin of admins) {
+      const result = await sendTelegramMessage(message, [], undefined, admin.user_id);
+      if (!result.success) {
+        allSuccessful = false;
+        logger.error(`Failed to notify admin ${admin.user_id}: ${result.error}`);
+        // Continue notifying others
+      }
+    }
+    return { success: allSuccessful, error: allSuccessful ? undefined : "Failed to notify one or more admins" };
   } catch (error) {
-    logger.error("Error fetching invoice status:", error);
-    return { success: false, error: "Failed to fetch invoice status" };
+     logger.error("Error notifying admins:", error);
+     return { success: false, error: error instanceof Error ? error.message : "Failed to fetch or notify admins" };
   }
 }
 
-export async function findSimilarCars(resultEmbedding: number[]) {
-  const { data, error } = await supabaseAdmin.rpc("search_cars", {
-    query_embedding: resultEmbedding,
-    match_count: 3,
-  });
+/** Notifies a car owner about a car-related action */
+export async function notifyCarAdmin(carId: string, message: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: car, error } = await supabaseAdmin
+      .from("cars")
+      .select("owner_id, image_url, make, model") // Select necessary fields
+      .eq("id", carId)
+      .maybeSingle(); // Use maybeSingle to handle car not found gracefully
 
-  return data?.map((car) => ({
-    ...car,
-    similarity: Math.round(car.similarity * 100),
-  }));
+    if (error) {
+      logger.error(`Error fetching car ${carId} for notification:`, error);
+      return { success: false, error: `Failed to fetch car: ${error.message}` };
+    }
+
+    if (!car) {
+       logger.warn(`Car ${carId} not found for notification.`);
+       return { success: false, error: `Car with ID ${carId} not found.` };
+    }
+     if (!car.owner_id) {
+       logger.warn(`Car ${carId} has no owner_id set for notification.`);
+       // Notify default admin instead?
+       // await notifyAdmin(`Action on car ${carId} (owner unknown): ${message}`);
+       return { success: true }; // Success, but no one to notify
+    }
+
+
+    const adminId = car.owner_id;
+    const baseUrl = getBaseUrl();
+    const fullMessage = `${message}\nCar: ${car.make || 'N/A'} ${car.model || 'N/A'}`;
+    const buttons = [{ text: "View Car", url: `${baseUrl}/rent/${carId}` }]; // Adjust URL as needed
+
+    const result = await sendTelegramMessage(
+      fullMessage,
+      buttons,
+      car.image_url, // Send image if available
+      adminId
+      // carId is not needed by sendTelegramMessage if message already includes details
+    );
+
+    if (!result.success) {
+      logger.error(`Failed to notify car admin ${adminId} for car ${carId}: ${result.error}`);
+    }
+    return { success: result.success, error: result.error };
+  } catch (error) {
+      logger.error(`Unexpected error in notifyCarAdmin for car ${carId}:`, error);
+       return { success: false, error: error instanceof Error ? error.message : "Unexpected error notifying car admin" };
+  }
 }
+
+/** Notifies all distinct car owners */
+export async function superNotification(message: string): Promise<{ success: boolean; error?: string }> {
+   try {
+    // Select distinct owner_id where it's not null
+    const { data: owners, error } = await supabaseAdmin
+      .from("cars")
+      .select("owner_id", { count: 'exact', head: false }) // Get distinct owners
+      .neq("owner_id", null) // Ensure owner_id exists
+      .then(response => {
+          if (response.error) return response;
+          // Manual distinct filtering if Supabase distinct doesn't work as expected
+          const distinctOwners = Array.from(new Set(response.data?.map(o => o.owner_id)));
+          return { data: distinctOwners.map(id => ({ owner_id: id })), error: null };
+      });
+
+
+    if (error) {
+      logger.error("Error fetching distinct car owners for super notification:", error);
+      throw error;
+    }
+
+     if (!owners || owners.length === 0) {
+      logger.warn("No car owners found for super notification.");
+      return { success: true };
+    }
+
+    logger.info(`Sending super notification to ${owners.length} owners.`);
+
+    let allSuccessful = true;
+    for (const owner of owners) {
+       if (!owner.owner_id) continue; // Skip if somehow owner_id is null/undefined
+      const result = await sendTelegramMessage(message, [], undefined, owner.owner_id);
+       if (!result.success) {
+        allSuccessful = false;
+        logger.error(`Failed to send super notification to owner ${owner.owner_id}: ${result.error}`);
+      }
+    }
+    return { success: allSuccessful, error: allSuccessful ? undefined : "Failed to send super notification to one or more owners" };
+   } catch(error) {
+       logger.error("Error sending super notification:", error);
+       return { success: false, error: error instanceof Error ? error.message : "Failed to send super notification" };
+   }
+}
+
+/** Broadcasts a message to all users or users with a specific role */
+export async function broadcastMessage(message: string, role?: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    let query = supabaseAdmin.from("users").select("user_id");
+    if (role) {
+      query = query.eq("role", role); // Assuming 'role' field exists
+    } else {
+      // Optionally add a condition to exclude inactive/banned users?
+      // query = query.neq('status', 'banned');
+    }
+
+    const { data: users, error } = await query;
+
+    if (error) {
+      logger.error(`Error fetching users for broadcast (role: ${role || 'all'}):`, error);
+      throw error;
+    }
+
+     if (!users || users.length === 0) {
+      logger.warn(`No users found for broadcast (role: ${role || 'all'}).`);
+      return { success: true };
+    }
+
+    logger.info(`Broadcasting message to ${users.length} users (role: ${role || 'all'}).`);
+
+    let allSuccessful = true;
+    for (const user of users) {
+       if (!user.user_id) continue;
+      const result = await sendTelegramMessage(message, [], undefined, user.user_id);
+      if (!result.success) {
+        allSuccessful = false;
+        logger.error(`Failed to broadcast message to user ${user.user_id}: ${result.error}`);
+      }
+      // Add a small delay to avoid hitting Telegram rate limits for large broadcasts
+      await delay(50); // 50ms delay between messages (adjust as needed)
+    }
+    return { success: allSuccessful, error: allSuccessful ? undefined : "Failed to broadcast message to one or more users" };
+  } catch (error) {
+      logger.error("Error during broadcast:", error);
+       return { success: false, error: error instanceof Error ? error.message : "Failed to broadcast message" };
+  }
+}
+
+// Notify admins when a user successfully completes CAPTCHA
+export async function notifyCaptchaSuccess(userId: string, username?: string | null): Promise<{ success: boolean; error?: string }> {
+  const message = `🔔 Пользователь ${username || userId} (${userId}) успешно прошел CAPTCHA.`;
+  // Notify all admins using the dedicated function
+  return notifyAdmins(message);
+}
+
+// Notify specific users (e.g., after successful CAPTCHA)
+export async function notifyUsers(userIds: string[], message: string): Promise<{ success: boolean; error?: string }> {
+  if (!userIds || userIds.length === 0) {
+    return { success: true }; // Nothing to do
+  }
+  logger.info(`Notifying ${userIds.length} users.`);
+
+  let allSuccessful = true;
+  try {
+    for (const userId of userIds) {
+      const result = await sendTelegramMessage(message, [], undefined, userId);
+      if (!result.success) {
+        allSuccessful = false;
+        logger.error(`Failed to notify user ${userId}:`, result.error);
+      }
+       await delay(50); // Avoid rate limits
+    }
+    return { success: allSuccessful, error: allSuccessful ? undefined : "Failed to notify one or more users" };
+  } catch (error) {
+     logger.error("Error notifying multiple users:", error);
+     return { success: false, error: error instanceof Error ? error.message : "Failed to notify users" };
+  }
+}
+
+// Notify winners and admin about Wheel of Fortune results
+export async function notifyWinners(winningNumber: number, winners: User[]): Promise<{ success: boolean; error?: string }> {
+  if (!winners || winners.length === 0) {
+    logger.info("Wheel of Fortune: No winners to notify.");
+    return { success: true };
+  }
+
+  try {
+    const winnerNotificationMessage = `🎉 Congratulations! Your lucky number ${winningNumber} has been drawn in the Wheel of Fortune! You are a winner! 🏆`;
+    let allWinnersNotified = true;
+
+    // Notify each winner
+    for (const winner of winners) {
+      if (!winner.user_id) continue;
+      const result = await sendTelegramMessage(winnerNotificationMessage, [], undefined, winner.user_id);
+      if (!result.success) {
+        allWinnersNotified = false;
+        logger.error(`Failed to notify winner ${winner.user_id}: ${result.error}`);
+      }
+       await delay(50);
+    }
+
+    // Notify admin about the winners
+    const winnerNames = winners.map((w) => w.username || w.full_name || w.user_id).join(", ");
+    const adminMessage = `🎮 Wheel of Fortune Results:\nWinning Number: ${winningNumber}\nWinners (${winners.length}): ${winnerNames}`;
+    const adminNotifyResult = await notifyAdmin(adminMessage); // Use notifyAdmin
+
+    return {
+        success: allWinnersNotified && adminNotifyResult.success,
+        error: !allWinnersNotified || !adminNotifyResult.success ? "Failed to notify some winners or admin" : undefined
+    };
+  } catch (error) {
+    logger.error("Error notifying winners:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to notify winners",
+    };
+  }
+}
+
+
+// --- Coze API Interactions ---
+
+// Utility to delay execution
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Common function to poll Coze API for response
+async function pollCozeChat(conversationId: string, chatId: string, apiKey: string | undefined, maxAttempts = 15, pollInterval = 2000) {
+    if (!apiKey) throw new Error("Coze API Key not configured");
+
+    let attempts = 0;
+    while (attempts < maxAttempts) {
+        try {
+            const messagesResponse = await axios.get(
+                `https://api.coze.com/v3/chat/message/list?conversation_id=${conversationId}&chat_id=${chatId}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${apiKey}`,
+                        "Content-Type": "application/json", // Needed? Check Coze docs
+                    },
+                    timeout: 5000, // Add timeout for the request itself
+                }
+            );
+
+            // logger.debug('Coze API messages response.data:', messagesResponse.data); // Verbose logging
+
+            // Find the assistant's answer message
+            const assistantMessage = messagesResponse.data?.data?.find(
+                (msg: any) => msg.role === "assistant" && msg.type === "answer"
+            );
+
+            if (assistantMessage?.content) {
+                return assistantMessage.content; // Return the content string
+            }
+
+        } catch(pollError) {
+             logger.error(`Error polling Coze chat (Attempt ${attempts + 1}/${maxAttempts}):`, pollError);
+             // Optional: Implement backoff or different handling based on error type
+             if (axios.isAxiosError(pollError) && pollError.response?.status === 429) {
+                 logger.warn("Coze API rate limit hit, backing off...");
+                 await delay(pollInterval * 2); // Double delay on rate limit
+                 continue; // Try again after longer delay
+             }
+        }
+
+        attempts++;
+        await delay(pollInterval); // Wait before next poll
+    }
+
+    throw new Error(`No assistant answer received from Coze after ${maxAttempts} attempts`);
+}
+
+
+/**
+ * Executes a Coze agent, waits for the response, saves it, and returns the text.
+ * @deprecated Consider using runCozeAgentAndSave or runCozeAgent directly.
+ */
+export async function executeCozeAgent(
+  botId: string,
+  userId: string,
+  content: string,
+  metadata?: Record<string, any>
+): Promise<{ success: boolean; data?: string; error?: string }> {
+    if (!COZE_API_KEY) return { success: false, error: "Coze API Key not configured" };
+
+    try {
+        // Step 1: Initiate the chat
+        const initResponse = await axios.post(
+            "https://api.coze.com/v3/chat",
+            {
+                bot_id: botId,
+                user_id: userId,
+                stream: false,
+                auto_save_history: true, // Assuming this is desired
+                additional_messages: [{ role: "user", content: content, content_type: "text" }],
+            },
+            {
+                headers: { Authorization: `Bearer ${COZE_API_KEY}`, "Content-Type": "application/json" },
+                 timeout: 10000, // Timeout for initial request
+            }
+        );
+
+        const chatId = initResponse.data?.data?.id;
+        const conversationId = initResponse.data?.data?.conversation_id;
+
+        if (!chatId || !conversationId) {
+            logger.error("Missing chat ID or conversation ID in Coze init response:", initResponse.data);
+            throw new Error("Missing chat ID or conversation ID in Coze initial response");
+        }
+
+        // Step 2: Poll for the assistant's response
+        const assistantAnswer = await pollCozeChat(conversationId, chatId, COZE_API_KEY);
+
+        // Step 3: Save the text response to Supabase
+        const { error: insertError } = await supabaseAdmin
+            .from("coze_responses") // Ensure this table exists and has RLS if needed
+            .insert({
+                bot_id: botId,
+                user_id: userId, // Ensure this matches the user ID format in your 'users' table if linking
+                request_content: content, // Renamed field for clarity
+                response_content: assistantAnswer,
+                metadata: metadata || {}, // Store metadata if provided
+                coze_conversation_id: conversationId, // Store Coze IDs for reference
+                coze_chat_id: chatId,
+            });
+
+        if (insertError) {
+             logger.error("Failed to save Coze response to DB:", insertError);
+            // Decide whether to throw or just return success=false
+            throw new Error(`Failed to save Coze response: ${insertError.message}`);
+        }
+
+        return { success: true, data: assistantAnswer }; // Return the text response
+
+    } catch (error) {
+        logger.error(`Coze execution failed (Bot: ${botId}, User: ${userId}):`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Failed to execute Coze agent" };
+    }
+}
+
+/** Runs a Coze agent and returns the plain text response without saving it. */
+export async function runCozeAgent(
+    botId: string,
+    userId: string, // Coze User ID, may not be the same as your app's user ID
+    content: string
+): Promise<{ success: boolean; data?: string; error?: string }> {
+     if (!COZE_API_KEY) return { success: false, error: "Coze API Key not configured" };
+
+    try {
+        // Step 1: Initiate the chat
+        const initResponse = await axios.post(
+            "https://api.coze.com/v3/chat",
+            {
+                bot_id: botId,
+                user_id: userId, // Use the Coze user ID
+                stream: false,
+                auto_save_history: true,
+                additional_messages: [{ role: "user", content: content, content_type: "text" }],
+            },
+            {
+                headers: { Authorization: `Bearer ${COZE_API_KEY}`, "Content-Type": "application/json" },
+                 timeout: 10000,
+            }
+        );
+
+        const chatId = initResponse.data?.data?.id;
+        const conversationId = initResponse.data?.data?.conversation_id;
+        if (!chatId || !conversationId) {
+            logger.error("Missing chat ID or conversation ID in Coze init response:", initResponse.data);
+            throw new Error("Missing chat ID or conversation ID in Coze initial response");
+        }
+
+        // Step 2: Poll for the assistant's response
+        const assistantAnswer = await pollCozeChat(conversationId, chatId, COZE_API_KEY);
+
+        return { success: true, data: assistantAnswer };
+
+    } catch (error) {
+        logger.error(`Error running Coze agent (Bot: ${botId}, User: ${userId}):`, error);
+         return { success: false, error: error instanceof Error ? error.message : "Failed to run Coze agent" };
+    }
+}
+
+/** Analyzes a message using a specific Coze bot and parses the expected JSON response. */
+export async function analyzeMessage(content: string): Promise<{
+    success: boolean;
+    data?: {
+        bullshit_percentage: number;
+        emotional_comment: string;
+        analyzed_content: string;
+        content_summary: string;
+        animation: string; // Consider using a more specific type/enum if possible
+    };
+    error?: string;
+}> {
+    // Use the configured Bot ID and User ID for this specific analysis task
+    const botId = COZE_BOT_ID;
+    const userId = COZE_USER_ID;
+
+    if (!botId || !userId) {
+         return { success: false, error: "Coze Bot ID or User ID for analysis not configured" };
+    }
+     if (!COZE_API_KEY) return { success: false, error: "Coze API Key not configured" };
+
+
+    try {
+        logger.info(`Analyzing message with Coze Bot ${botId}...`);
+        // Reuse runCozeAgent to get the raw response
+        const agentResult = await runCozeAgent(botId, userId, content);
+
+        if (!agentResult.success || !agentResult.data) {
+            throw new Error(agentResult.error || "Failed to get response from Coze analysis agent");
+        }
+
+        const assistantAnswer = agentResult.data;
+        logger.debug("Raw response from Coze analysis bot:", assistantAnswer);
+
+        // Parse the content, expecting a JSON string
+        let parsedData;
+        try {
+            parsedData = JSON.parse(assistantAnswer);
+             // Optional: Add validation here using Zod or similar to ensure structure
+        } catch (e) {
+            logger.warn('Coze assistant content is not valid JSON, treating as plain text:', assistantAnswer);
+            // Fallback: Use the raw text as the emotional comment
+            return {
+                success: true, // Still successful in getting *a* response
+                data: {
+                    bullshit_percentage: 50, // Default value
+                    emotional_comment: assistantAnswer, // Use raw text
+                    analyzed_content: content, // Original content
+                    content_summary: "No summary available (response not JSON).",
+                    animation: "neutral", // Default animation
+                }
+            };
+        }
+
+        // Construct the result using parsed data, providing defaults for missing fields
+        const resultData = {
+            bullshit_percentage: typeof parsedData.bullshit_percentage === 'number' ? parsedData.bullshit_percentage : 50,
+            emotional_comment: parsedData.emotional_comment || "Analysis comment missing.",
+            analyzed_content: parsedData.analyzed_content || content,
+            content_summary: parsedData.content_summary || "No summary available.",
+            animation: parsedData.animation || "neutral",
+        };
+
+         logger.info(`Message analysis successful.`);
+        return { success: true, data: resultData };
+
+    } catch (error) {
+        logger.error('Error analyzing message:', error);
+         return { success: false, error: error instanceof Error ? error.message : 'Failed to analyze message' };
+    }
+}
+
+
+// --- Embeddings ---
+
+/** Triggers batch generation of embeddings for cars missing them. */
+export const generateEmbeddings = async (): Promise<{ success: boolean; message?: string; error?: string }> => {
+  try {
+    const { data: cars, error: fetchError, count } = await supabaseAdmin
+      .from("cars")
+      .select("id", { count: 'exact', head: true }) // Just get the count efficiently
+      .is("embedding", null);
+
+    if (fetchError) {
+       logger.error("Error fetching count of cars needing embeddings:", fetchError);
+      throw fetchError;
+    }
+
+    if (!count || count === 0) {
+      logger.info("No cars found needing embedding generation.");
+      return { success: true, message: "No cars needed embeddings." };
+    }
+
+    logger.info(`Found ${count} cars needing embeddings. Triggering batch generation...`);
+    // Call the centralized embedding function (now in supabase.ts) for batch processing
+    // Assuming generateCarEmbedding without args triggers batch mode via Edge Function
+    const result = await generateCarEmbedding(); // Expects generateCarEmbedding to handle the Edge Function call
+
+    logger.info(`Triggered embedding generation for ${count} cars. Result:`, result); // Log result if any
+    return { success: true, message: `Triggered embedding generation for ${count} cars.` };
+
+  } catch (error) {
+     logger.error("Error in generateEmbeddings action:", error);
+     return { success: false, error: error instanceof Error ? error.message : "Failed to trigger embedding generation" };
+  }
+};
+
+/** Finds cars similar to a given embedding vector */
+export async function findSimilarCars(
+    embedding: number[],
+    limit: number = 3
+): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    if (!embedding || embedding.length === 0) {
+        return { success: false, error: "Invalid embedding provided" };
+    }
+    try {
+        // Assuming search_cars RPC function exists and works
+        const { data, error } = await supabaseAdmin.rpc("search_cars", {
+            query_embedding: embedding,
+            match_count: limit,
+        });
+
+        if (error) {
+            logger.error("Error searching for similar cars:", error);
+            throw error;
+        }
+
+        // Format the result slightly
+        const formattedData = data?.map((car: any) => ({ // Use 'any' carefully, define type if possible
+            ...car,
+            similarity: car.similarity ? Math.round(car.similarity * 100) : 0, // Calculate percentage
+        })) || [];
+
+        return { success: true, data: formattedData };
+    } catch (error) {
+         logger.error("Error in findSimilarCars action:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Failed to find similar cars" };
+    }
+}
+
+// --- User Management & Authentication ---
+
+/** Creates or updates a user based on Telegram info, notifies admin. */
+export async function createOrUpdateUser(userInfo: WebAppUser): Promise<{ success: boolean; data?: User; error?: string }> {
+    if (!userInfo?.id) {
+        return { success: false, error: "Invalid user info provided" };
+    }
+    const userId = userInfo.id.toString();
+
+    try {
+         // Use the consolidated function from hooks/supabase.ts
+        const user = await dbCreateOrUpdateUser(userId, userInfo);
+
+        if (!user) {
+            // This case might indicate an issue within dbCreateOrUpdateUser if it's expected to always return a user
+            throw new Error("Failed to create or update user in database.");
+        }
+
+        logger.info(`User ${user.username || userId} created or updated successfully.`);
+
+        // Notify default admin of new *or updated* user (Consider if only new needed)
+        // Use notifyAdmin for simplicity
+        await notifyAdmin(`User registered/updated: ${user.username || userId} (${userId})`);
+
+        return { success: true, data: user };
+    } catch (error) {
+        logger.error(`Error creating/updating user ${userId}:`, error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Failed to create or update user",
+        };
+    }
+}
+
+
+/** Authenticates a user, upserts their data, and returns user + JWT */
+export async function authenticateUser(chatId: string, userInfo?: Partial<WebAppUser>): Promise<{ success: boolean; user?: User; token?: string; error?: string }> {
+    try {
+        // Upsert user data using the function from hooks/supabase.ts
+        const user = await dbCreateOrUpdateUser(chatId, userInfo || { id: parseInt(chatId, 10) }); // Provide base info if userInfo is missing
+
+        if (!user) {
+            throw new Error("Failed to create or update user during authentication.");
+        }
+
+        // Generate JWT token for the authenticated user
+        const token = await generateJwtToken(chatId); // Assuming generateJwtToken is async or handles async operations
+
+        logger.info(`User ${chatId} authenticated successfully.`);
+        return { success: true, user, token };
+    } catch (error) {
+        logger.error(`Authentication failed for user ${chatId}:`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Authentication failed" };
+    }
+}
+
+/** Validates a JWT token and returns the corresponding user data */
+export async function validateToken(token: string): Promise<{ success: boolean; user?: User | null; error?: string }> {
+  try {
+    const decoded = verifyJwtToken(token); // Assuming this synchronous or handles async internally
+    if (!decoded || !decoded.sub) {
+      logger.warn("Token validation failed: Invalid or expired token.");
+      return { success: false, error: "Invalid or expired token", user: null };
+    }
+
+    // Fetch user data using the validated user ID (subject of the token)
+    // Use the consolidated function from hooks/supabase.ts
+    const user = await dbFetchUserData(decoded.sub);
+
+    if (!user) {
+       logger.warn(`Token valid but user ${decoded.sub} not found in database.`);
+      // Decide if this is an error or just means user was deleted
+       return { success: false, error: "User not found", user: null };
+    }
+
+     logger.info(`Token validated successfully for user ${user.user_id}.`);
+    return { success: true, user };
+  } catch (error) {
+     logger.error("Error during token validation:", error);
+     // Differentiate between token format errors and DB errors?
+     if (error instanceof Error && (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError')) {
+          return { success: false, error: `Token validation failed: ${error.message}`, user: null };
+     }
+    return { success: false, error: error instanceof Error ? error.message : "Failed to validate token", user: null };
+  }
+}
+
+
+// --- CAPTCHA ---
+
+interface CaptchaSettings {
+  string_length: number;
+  character_set: "letters" | "numbers" | "both";
+  case_sensitive: boolean; // Note: verification logic needs to respect this
+  noise_level: number; // 0-100 (lines count)
+  font_size: number; // 20-50
+  background_color: string; // Hex code (e.g., "#FFFFFF")
+  text_color: string; // Hex code (e.g., "#000000")
+  distortion: number; // 0-1 (rotation intensity)
+}
+
+// Helper to adjust color brightness (used in CAPTCHA)
+function adjustColor(hex: string, amount: number): string {
+  try {
+      const color = hex.replace("#", "");
+      // Ensure hex is valid before parsing
+      if (!/^[0-9A-F]{6}$/i.test(color)) {
+          throw new Error("Invalid hex color format");
+      }
+      const r = Math.max(0, Math.min(255, parseInt(color.slice(0, 2), 16) + amount));
+      const g = Math.max(0, Math.min(255, parseInt(color.slice(2, 4), 16) + amount));
+      const b = Math.max(0, Math.min(255, parseInt(color.slice(4, 6), 16) + amount));
+      return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+  } catch (error) {
+       logger.error(`Failed to adjust color ${hex}:`, error);
+      return hex; // Return original color on error
+  }
+}
+
+
+export async function generateCaptcha(settings: CaptchaSettings): Promise<{
+    success: boolean;
+    data?: { image: string; hash: string; text: string /* Return text for verification */ };
+    error?: string;
+}> {
+    try {
+        // Validate settings
+        if (settings.string_length <= 0 || settings.noise_level < 0 || settings.font_size < 10 || settings.distortion < 0 || settings.distortion > 1) {
+             throw new Error("Invalid CAPTCHA settings provided.");
+        }
+
+        const chars =
+            settings.character_set === "letters"
+            ? "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            : settings.character_set === "numbers"
+            ? "0123456789"
+            : "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+        const captchaText = Array.from(
+            { length: settings.string_length },
+            () => chars[Math.floor(Math.random() * chars.length)]
+        ).join("");
+
+        const width = Math.max(200, settings.string_length * (settings.font_size * 0.8) + 60); // Adjust width based on font size
+        const height = Math.max(60, settings.font_size + 40); // Adjust height based on font size
+
+        // SVG generation (simplified for clarity, consider a library for complex SVG)
+        let svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg" style="background-color: ${settings.background_color};">`;
+        // Optional: Add gradient background
+        // svg += `<defs><linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:${settings.background_color};stop-opacity:1" /><stop offset="100%" style="stop-color:${adjustColor(settings.background_color, -20)};stop-opacity:1" /></linearGradient></defs>`;
+        // svg += `<rect width="${width}" height="${height}" fill="url(#grad)" />`;
+
+        // Noise (lines)
+        for (let i = 0; i < settings.noise_level / 5; i++) { // Reduced line count for performance/clarity
+            const x1 = Math.random() * width;
+            const y1 = Math.random() * height;
+            const x2 = Math.random() * width;
+            const y2 = Math.random() * height;
+            svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${adjustColor(settings.text_color, 80)}" stroke-width="1" opacity="0.5" />`;
+        }
+
+        // Text with distortion
+        const textY = height / 2 + settings.font_size / 3; // Center text vertically better
+        for (let i = 0; i < captchaText.length; i++) {
+            const x = 30 + i * (settings.font_size * 0.8); // Adjust spacing based on font size
+            const rotation = (Math.random() - 0.5) * settings.distortion * 45; // Rotation in degrees
+            const charColor = adjustColor(settings.text_color, Math.random() * 40 - 20); // Slight color variation per char
+            svg += `<text x="${x}" y="${textY}" font-family="monospace" font-size="${settings.font_size}" fill="${charColor}" transform="rotate(${rotation}, ${x}, ${textY})">${captchaText[i]}</text>`;
+        }
+
+        // Optional: Add more noise like dots
+        // ...
+
+        svg += `</svg>`;
+
+        const image = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+
+        // Store the *actual text* in the session or temporary storage for verification,
+        // not just the hash. Hashing the input during verification is better.
+        // The hash returned here might be for internal reference if needed.
+        const referenceHash = createHash("sha256")
+            .update(settings.case_sensitive ? captchaText : captchaText.toLowerCase())
+            .digest("hex");
+
+        return { success: true, data: { image, hash: referenceHash, text: captchaText } };
+    } catch (error) {
+         logger.error("Error generating CAPTCHA:", error);
+         return { success: false, error: error instanceof Error ? error.message : "Failed to generate CAPTCHA" };
+    }
+}
+
+// Verification should compare user input against the stored *text* (case-insensitively if needed)
+// This function is likely called from a context where the original CAPTCHA text is available (e.g., user session)
+export async function verifyCaptcha(
+    correctText: string, // The actual text generated
+    userInput: string,
+    caseSensitive: boolean
+): Promise<boolean> {
+    if (!correctText || userInput === null || userInput === undefined) {
+        return false;
+    }
+    if (caseSensitive) {
+        return correctText === userInput;
+    } else {
+        return correctText.toLowerCase() === userInput.toLowerCase();
+    }
+}
+
+
+// --- Misc Actions ---
+
+/** Sends a donation invoice and notifies admin */
+export async function sendDonationInvoice(chatId: string, amount: number, message: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        // Ensure amount is valid
+        if (isNaN(amount) || amount <= 0) {
+             return { success: false, error: "Invalid donation amount." };
+        }
+        // Convert amount to smallest unit if necessary (assuming XTR uses whole units)
+        const finalAmount = amount; // Adjust if XTR needs smallest units, e.g., amount * 100
+
+        const invoicePayload = `donation_${chatId}_${Date.now()}`; // Unique payload
+        const title = "Donation to Leha"; // Keep concise
+        const description = `Thank you for your support! Message: ${message || "No message"}`;
+
+        // Send the invoice using the dedicated function
+        const invoiceResult = await sendTelegramInvoice(
+            chatId,
+            title,
+            description,
+            invoicePayload,
+            finalAmount,
+            0, // No subscription ID for donations
+            undefined // No photo for donations (or add a generic thank you image)
+        );
+
+        if (!invoiceResult.success) {
+            // Error already logged by sendTelegramInvoice
+            throw new Error(invoiceResult.error || "Failed to send donation invoice via Telegram");
+        }
+
+        // Note: sendTelegramInvoice already attempts to save the invoice.
+        // If saving is moved out of sendTelegramInvoice, add the DB insert here.
+        /*
+        const { error: insertError } = await supabaseAdmin
+            .from("invoices")
+            .insert({
+                id: invoicePayload,
+                user_id: chatId,
+                amount: finalAmount, // Store amount consistently
+                type: "donation",
+                status: "pending",
+                metadata: { message: message || null, title },
+                subscription_id: 0,
+            });
+
+        if (insertError) {
+             logger.error(`Failed to save donation invoice ${invoicePayload} to DB:`, insertError);
+            // Decide if this should be a user-facing error
+            throw new Error(`Failed to save invoice record: ${insertError.message}`);
+        }
+        */
+
+        // Notify admin of the new donation *attempt*
+        const adminMessage = `💸 New donation attempt!\nAmount: ${amount} XTR\nFrom Chat ID: ${chatId}\nMessage: ${message || "None"}`;
+        await notifyAdmin(adminMessage); // Use notifyAdmin
+
+        return { success: true };
+    } catch (error) {
+        logger.error("Error in sendDonationInvoice:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Failed to process donation request" };
+    }
+}
+
+/** Updates a car’s status and notifies the owner */
+export async function updateCarStatus(carId: string, newStatus: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        // Optional: Validate newStatus against allowed values?
+        const allowedStatuses = ["available", "rented", "maintenance", "unavailable"];
+        if (!allowedStatuses.includes(newStatus)) {
+            return { success: false, error: `Invalid car status: ${newStatus}` };
+        }
+
+        // Update car status
+        const { error: updateError } = await supabaseAdmin
+            .from("cars")
+            .update({ status: newStatus, updated_at: new Date().toISOString() }) // Also update timestamp
+            .eq("id", carId);
+
+        if (updateError) {
+            logger.error(`Error updating status for car ${carId}:`, updateError);
+            throw updateError;
+        }
+
+         logger.info(`Car ${carId} status updated to ${newStatus}. Notifying owner...`);
+
+        // Notify the car owner using the dedicated function
+        const notifyResult = await notifyCarAdmin(carId, `🚗 Your car status has been updated to: ${newStatus}`);
+
+        // Return success even if notification fails, but log the failure
+         if (!notifyResult.success) {
+             logger.warn(`Failed to notify owner after updating status for car ${carId}: ${notifyResult.error}`);
+         }
+
+        return { success: true };
+    } catch (error) {
+         logger.error(`Failed to update status for car ${carId}:`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Failed to update car status" };
+    }
+}
+
+
+/** Checks the status of a specific invoice */
+export async function checkInvoiceStatus(token: string, invoiceId: string): Promise<{ success: boolean; status?: string; error?: string }> {
+    try {
+        // Validate the token and get user ID
+        const validationResult = await validateToken(token);
+        if (!validationResult.success || !validationResult.user) {
+            return { success: false, error: validationResult.error || "Unauthorized", status: undefined };
+        }
+        const userId = validationResult.user.user_id;
+
+        // Fetch invoice, ensuring it belongs to the user (if RLS isn't strictly enforced on this check)
+        const { data, error } = await supabaseAdmin
+            .from("invoices")
+            .select("status, user_id")
+            .eq("id", invoiceId)
+            .maybeSingle(); // Use maybeSingle
+
+        if (error) {
+            logger.error(`Error fetching invoice ${invoiceId} status:`, error);
+            throw error;
+        }
+
+        if (!data) {
+             return { success: false, error: "Invoice not found", status: undefined };
+        }
+
+        // Optional: Double-check ownership if needed (though RLS should handle this ideally)
+        // if (data.user_id !== userId) {
+        //    logger.warn(`User ${userId} attempted to check status of invoice ${invoiceId} owned by ${data.user_id}`);
+        //    return { success: false, error: "Access denied", status: undefined };
+        // }
+
+        return { success: true, status: data.status };
+    } catch (error) {
+        logger.error(`Error checking invoice ${invoiceId} status:`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Failed to fetch invoice status", status: undefined };
+    }
+}
+
+/** Sets the Telegram webhook URL */
+export async function setTelegramWebhook(): Promise<{ success: boolean; data?: any; error?: string }> {
+  if (!TELEGRAM_BOT_TOKEN) {
+    return { success: false, error: "Telegram bot token not configured" };
+  }
+  const webhookUrl = `${getBaseUrl()}/api/telegramWebhook`; // Ensure this API route exists and handles POST requests
+
+  logger.info(`Setting Telegram webhook to: ${webhookUrl}`);
+
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: webhookUrl }),
+    });
+
+    const result: TelegramApiResponse = await response.json();
+
+    if (!result.ok) {
+      logger.error(`Failed to set Telegram webhook: ${result.description}`, { errorCode: result.error_code });
+      throw new Error(result.description || "Failed to set webhook");
+    }
+
+    logger.info("Telegram webhook set successfully:", result.result);
+    return { success: true, data: result.result };
+  } catch (error) {
+     logger.error("Error setting Telegram webhook:", error);
+     return { success: false, error: error instanceof Error ? error.message : "Failed to set webhook" };
+  }
+}
+
+// --- DEPRECATED / TO BE REMOVED? ---
+
+// This function seems redundant with the consolidated user management.
+// If needed specifically for saving TG user info without full auth, keep it, otherwise remove.
+/*
+export async function saveUser(tgUser: WebAppUser) {
+  // ... implementation ... (Consider using dbCreateOrUpdateUser)
+}
+*/
+
+// This function seems specific to a previous implementation flow.
+// If the current flow involves Mini Apps sending results differently, remove it.
+/*
+export async function sendResult(chatId: string, result: any) {
+  // ... implementation ...
+}
+*/
+
+// The old webhook handler is commented out, which is good. Remove it completely.
+/*
+export async function handleWebhookUpdate(update: any) {
+  // ... old implementation ...
+}
+*/
