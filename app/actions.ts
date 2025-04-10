@@ -1259,43 +1259,41 @@ export async function setTelegramWebhook(): Promise<{ success: boolean; data?: a
   }
 }
 
-// --- RESTORED / DEPRECATED? ---
-
-/**
- * Saves user info from Telegram Mini App context.
- * Consider if dbCreateOrUpdateUser covers this use case.
- * @deprecated Check if this specific upsert logic is still needed.
- */
-export async function saveUser(tgUser: WebAppUser) {
-  // Input type 'any' in original, using WebAppUser now
-  if (!tgUser || !tgUser.id) {
-      logger.warn("saveUser called with invalid tgUser object", { tgUser });
-      return { success: false, error: "Invalid user data provided." };
-  }
+export async function notifyCaptchaSuccess(userId: string, username?: string | null) {
   try {
-    const { data, error } = await supabaseAdmin
+    const { data: admins, error: adminError } = await supabaseAdmin
       .from("users")
-      .upsert({
-        user_id: tgUser.id.toString(), // Ensure user_id is string
-        avatar_url: tgUser.photo_url,
-        full_name: `${tgUser.first_name || ""} ${tgUser.last_name || ""}`.trim(),
-        username: tgUser.username, // Changed from telegram_username to match newer schema
-        language_code: tgUser.language_code,
-      }, { onConflict: 'user_id' }) // Specify conflict target
-      .select() // Select the upserted/found row
-      .single(); // Expect one row
+      .select("user_id")
+      .eq("status", "admin")
+    if (adminError) throw adminError
 
-    if (error) {
-        logger.error("Error saving user in saveUser:", error);
-        throw error;
+    const adminChatIds = admins.map((admin) => admin.user_id)
+    const message = `🔔 Пользователь ${username || userId} успешно прошел CAPTCHA.`
+
+    for (const adminId of adminChatIds) {
+      const result = await sendTelegramMessage(
+        process.env.TELEGRAM_BOT_TOKEN!,
+        message,
+        [],
+        undefined,
+        adminId
+      )
+      if (!result.success) {
+        console.error(`Failed to notify admin ${adminId}:`, result.error)
+      }
     }
-    logger.info(`User saved/updated via saveUser: ${tgUser.username || tgUser.id}`);
-    return { success: true, data };
+
+    return { success: true }
   } catch (error) {
-    logger.error("Exception in saveUser:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Failed to save user" };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to notify admins",
+    }
   }
 }
+
+// --- RESTORED / DEPRECATED? ---
+
 
 /**
  * Sends a result (likely car info) back via Telegram Photo message.
