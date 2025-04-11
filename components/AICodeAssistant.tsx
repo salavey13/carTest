@@ -6,7 +6,7 @@ import React, { useState, useEffect, useImperativeHandle, forwardRef, MutableRef
 import {
     useRepoXmlPageContext, AICodeAssistantRef, SimplePullRequest
 } from "@/contexts/RepoXmlPageContext";
-import { createGitHubPullRequest, fetchRepoContents } from "@/app/actions_github/actions"; // Keep createGitHubPullRequest
+import { createGitHubPullRequest } from "@/app/actions_github/actions"; // Keep createGitHubPullRequest
 import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
@@ -23,11 +23,11 @@ import { CodeRestorer } from './assistant_components/CodeRestorer';
 // UI & Utils
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
-import { FaCircleInfo, FaCodeBranch, FaGithub } from "react-icons/fa6"; // Added FaCodeBranch, FaCodeBranch, FaGithub
+import { FaCircleInfo, FaCodeBranch, FaGithub, FaWandMagicSparkles } from "react-icons/fa6"; // Added FaCodeBranch, FaWandMagicSparkles
 import clsx from "clsx";
 import { saveAs } from "file-saver";
 
-// Tooltip Component
+// Tooltip Component (Copied here for self-containment, or import if shared)
 export const Tooltip = ({ children, text, position = 'bottom' }: { children: React.ReactNode; text: string; position?: 'top' | 'bottom' | 'left' | 'right' }) => {
     const [isVisible, setIsVisible] = useState(false);
     const positionClasses = {
@@ -65,7 +65,7 @@ interface FileEntry extends ValidationFileEntry {}
 interface AICodeAssistantProps {}
 interface OriginalFile { path: string; content: string; }
 
-// Helper: Robust Function Selection Logic
+// Helper: Robust Function Selection Logic (Keep as is)
 const selectFunctionDefinition = (text: string, startIndex: number): [number, number] => {
     const declarationLineStart = text.lastIndexOf('\n', startIndex - 1) + 1;
     let braceStart = -1; let searchPos = declarationLineStart;
@@ -119,7 +119,7 @@ const selectFunctionDefinition = (text: string, startIndex: number): [number, nu
     return [declarationLineStart, closingLineEnd];
 };
 
-// Helper: Extract Function Name
+// Helper: Extract Function Name (Keep as is)
 const extractFunctionName = (line: string): string | null => {
     // Match function declarations, const/let assignments to functions/arrows
     const funcMatch = line.match(/(?:export\s+)?(?:async\s+)?(?:function\s+|const\s+|let\s+|var\s+)?\s*([a-zA-Z0-9_$]+)\s*(?:[:=(]|\s*=>)/);
@@ -160,7 +160,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     // --- State ---
     const [response, setResponse] = useState<string>(""); // Local state for the AI response textarea
     const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set()); // IDs of files selected for PR/Update
-    const [repoUrl, setRepoUrl] = useState<string>("https://github.com/salavey13/cartest"); // Local state for PR form URL input
+    const [repoUrl, setRepoUrlState] = useState<string>("https://github.com/salavey13/cartest"); // Local state for PR form URL input
     const [prTitle, setPrTitle] = useState<string>(""); // Local state for PR title input
     const [customLinks, setCustomLinks] = useState<{ name: string; url: string }[]>([]); // User-defined links
     const [showModal, setShowModal] = useState(false); // State for Find/Replace modal
@@ -222,11 +222,12 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             const fetchOriginals = async () => {
                 setIsFetchingOriginals(true);
                 // Use the currently targeted branch from context
-                const branch = targetBranchName ?? 'default';
-                toast.info(`Загрузка оригиналов из ветки ${branch}...`);
+                const branch = targetBranchName ?? undefined; // Use undefined for default branch if targetBranchName is null
+                const branchDisplay = targetBranchName ?? 'default';
+                toast.info(`Загрузка оригиналов из ветки ${branchDisplay}...`);
                 try {
-                    // Pass targetBranchName to fetchRepoContents
-                    const result = await fetchRepoContents(repoUrl, undefined, targetBranchName);
+                    // Pass targetBranchName (or undefined for default) to fetchRepoContents
+                    const result = await fetchRepoContents(repoUrl, undefined, branch);
                     if (result.success && Array.isArray(result.files)) {
                         setOriginalRepoFiles(result.files);
                         toast.success("Оригиналы загружены.");
@@ -556,7 +557,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const handleCreateOrUpdatePR = useCallback(async () => {
         const selectedFilesLocal = parsedFiles.filter(f => selectedFileIds.has(f.id));
         if (!repoUrl || selectedFilesLocal.length === 0 || !prTitle) {
-            return toast.error("Укажите URL, Заголовок PR и выберите файлы.");
+            return toast.error("Укажите URL, Заголовок и выберите файлы.");
         }
 
         // Construct description and commit message (shared logic)
@@ -588,11 +589,12 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                 );
                 // Context trigger now handles success/error toasts
                 if (result.success) {
-                    // Maybe add a comment to the associated PR? Needs PR number lookup.
-                    // For now, just notify admin.
-                    await notifyAdmin(`Ветка '${targetBranchName}' обновлена ${user?.username || user?.id}. Commit: ${commitSubject}`);
+                    toast.success(`Ветка '${targetBranchName}' обновлена! Commit: ${result.commitSha?.substring(0,7)}`);
+                    // Admin notification is handled within the action
+                } else {
+                    toast.error(`Ошибка обновления ветки '${targetBranchName}': ${result.error}`);
+                     // Admin notification is handled within the action
                 }
-                // Error is already handled and toasted by the triggerUpdateBranch callback
 
             } else {
                 // --- CREATE NEW PR ---
@@ -609,8 +611,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                 );
                 if (result.success && result.prUrl) {
                     toast.success(`PR создан: ${result.prUrl}`);
-                    await notifyAdmin(`Новый PR "${prTitle}" (${result.branch}) создан ${user?.username || user?.id}: ${result.prUrl}`);
-                    // Optionally trigger PR list refresh in Fetcher? Context doesn't own repoUrl directly.
+                    // Admin notification is handled within the action
                 } else {
                     // Error occurred during PR creation
                     toast.error("Ошибка создания PR: " + result.error);
@@ -650,7 +651,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     // Update local repoUrl state when changed via context/Fetcher
     const updateRepoUrl = useCallback((url: string) => {
-        setRepoUrl(url);
+        setRepoUrlState(url);
     }, []);
 
     // Expose methods to parent/context
@@ -726,7 +727,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                          originalFiles={originalRepoFiles}
                          skippedIssues={skippedCodeBlockIssues}
                          onRestorationComplete={handleRestorationComplete}
-                         disabled={isProcessing || validationStatus === 'validating'}
+                         disabled={isProcessing || validationStatus === 'validating' || isFetchingOriginals}
                       />
                       <ValidationStatusIndicator
                           status={validationStatus}
@@ -754,12 +755,12 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
              {/* PR Form - Updated with dynamic button props */}
              <PullRequestForm
-                 repoUrl={repoUrl}
+                 repoUrl={repoUrl} // Use local state `repoUrlState` renamed to `repoUrl`
                  prTitle={prTitle}
                  selectedFileCount={selectedFileIds.size}
                  isLoading={isProcessingPR} // Pass the specific PR processing state
                  onRepoUrlChange={(url) => {
-                     setRepoUrl(url); // Update local state
+                     setRepoUrlState(url); // Update local state
                      updateRepoUrlInAssistant(url); // Notify context/Fetcher
                  }}
                  onPrTitleChange={setPrTitle}

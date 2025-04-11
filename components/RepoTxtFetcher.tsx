@@ -6,14 +6,13 @@
     import { toast } from "sonner";
     import {
         FaCircleChevronDown, FaCircleChevronUp, FaDownload, FaArrowsRotate, FaCircleCheck, FaXmark, FaCopy,
-        FaBroom, FaRobot, // Keep base icons
+        FaBroom, FaRobot, FaCodeBranch, // Use FaCodeBranch for settings
     } from "react-icons/fa6";
     import { motion } from "framer-motion";
 
     // Actions & Context
-    import { fetchRepoContents } from "@/app/actions_github/actions";
+    import { fetchRepoContents } from "@/app/actions_github/actions"; // Needed for return type only
     import { useAppContext } from "@/contexts/AppContext";
-    // CORRECTED Import: Removed categorizeResolvedPath and ImportCategory
     import { useRepoXmlPageContext, RepoTxtFetcherRef, FetchStatus, SimplePullRequest } from "@/contexts/RepoXmlPageContext";
 
     // Sub-components
@@ -84,9 +83,10 @@
         selectedFetcherFiles, setSelectedFetcherFiles, kworkInputHasContent, setKworkInputHasContent,
         setRequestCopied, aiActionLoading, currentStep, loadingPrs,
         // Branch & PR state
-        targetBranchName, setTargetBranchName,
-        manualBranchName, setManualBranchName,
-        openPrs, setOpenPrs, setLoadingPrs,
+        targetBranchName, setTargetBranchName, // Use context setter for PR selection
+        manualBranchName, setManualBranchName, // Use context setter for manual input
+        openPrs, // Get PR list from context
+        setLoadingPrs, // Context setter for PR loading
         // Modal state & trigger
         isSettingsModalOpen, triggerToggleSettingsModal,
         // Refs & Callbacks
@@ -281,10 +281,10 @@
         setRepoUrlEntered(url.trim().length > 0); // Update context flag
         updateRepoUrlInAssistant(url); // Notify Assistant component via context callback
         // Reset PR list and branch selection if URL changes
-        setOpenPrs([]);
-        setTargetBranchName(null); // Clear selected PR branch
-        setManualBranchName(""); // Clear manual branch input
-    }, [setRepoUrlEntered, updateRepoUrlInAssistant, setOpenPrs, setTargetBranchName, setManualBranchName]);
+        setOpenPrs([]); // Use context setter
+        setTargetBranchName(null); // Clear selected PR branch via context setter
+        setManualBranchName(""); // Clear manual branch input via context setter
+    }, [setRepoUrlEntered, updateRepoUrlInAssistant, setOpenPrs, setTargetBranchName, setManualBranchName]); // Use context setters
 
     // Update Kwork Input textarea value and context flag
     const updateKworkInput = useCallback((value: string) => {
@@ -335,16 +335,14 @@
 
 
     // Copy Kwork Input content to clipboard
-    const handleCopyToClipboard = useCallback((textToCopy?: string, shouldScroll = true): boolean => {
-        const content = textToCopy ?? getKworkInputValue(); // Get content from input ref
+    const handleCopyToClipboard = useCallback((): boolean => {
+        const content = getKworkInputValue(); // Get content from input ref
         if (!content.trim()) { addToast("Нет текста для копирования", 'error'); return false; }
         try {
             navigator.clipboard.writeText(content);
             addToast("Запрос скопирован! ✅ Вставляй в AI", 'success');
             setRequestCopied(true); // Update context flag (for manual flow tracking)
-            if (shouldScroll) {
-                 scrollToSection('executor'); // Scroll to the AI assistant section
-            }
+            scrollToSection('executor'); // Scroll to the AI assistant section
             return true;
         } catch (err) {
             console.error("Clipboard copy failed:", err);
@@ -362,13 +360,10 @@
         updateKworkInput(""); // Clear Kwork input textarea
         setPrimaryHighlightedPath(null); // Clear highlighting
         setSecondaryHighlightedPaths({ component: [], context: [], hook: [], lib: [], other: [] });
-        // Reset downstream AI states via context setters
-        //setAiResponseHasContent(false);
-        //setFilesParsed(false);
-        //setSelectedAssistantFiles(new Set());
+        // Reset AI state handled by other callbacks (e.g., setAiResponseHasContent)
         addToast("Поле ввода и выбор файлов очищены ✨", 'success');
         localKworkInputRef.current?.focus(); // Focus the kwork input
-    }, [ setSelectedFetcherFiles, updateKworkInput, addToast]);//, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles ]); // Dependencies
+    }, [ setSelectedFetcherFiles, updateKworkInput, addToast]);// Dependencies
 
 
     // --- Fetch Handler (Method exposed via ref, called by context's triggerFetch) ---
@@ -379,8 +374,7 @@
         // Validation
         if (!repoUrl.trim()) {
             addToast("Введите URL репозитория", 'error'); setError("URL репозитория не может быть пустым.");
-            // Don't toggle settings automatically, let user click
-            // triggerToggleSettingsModal(); // Open settings modal if URL is missing
+            triggerToggleSettingsModal(); // Open settings modal if URL is missing
             return;
         }
         // Prevent concurrent fetches unless it's a manual retry
@@ -394,7 +388,7 @@
         setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set()); // Clear selections
         setFilesFetched(false, null, []); // Update context: reset fetched status and highlighting
         setRequestCopied(false); // Reset copied flag
-        //setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set()); // Reset AI state
+        // Reset AI state via context setters if needed (handled by setFilesFetched now)
         setPrimaryHighlightedPath(null);
         setSecondaryHighlightedPaths({ component: [], context: [], hook: [], lib: [], other: [] });
 
@@ -545,13 +539,15 @@
         repoUrl, token, fetchStatus, // Local state needed for logic
         setFetchStatus, setFiles, setSelectedFilesState, setProgress, setError, setExtractLoading, // Local setters
         setPrimaryHighlightedPath, setSecondaryHighlightedPaths, // Local setters for highlighting
-        setSelectedFetcherFiles, setFilesFetched, setRequestCopied,// setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, // Context setters
+        setSelectedFetcherFiles, setFilesFetched, setRequestCopied, // Context setters
         highlightedPathFromUrl, ideaFromUrl, importantFiles, DEFAULT_TASK_IDEA, // URL params and constants
         addToast, startProgressSimulation, stopProgressSimulation, getLanguage, getPageFilePath, extractImports, resolveImportPath, // Utilities
-        handleCopyToClipboard, handleAddSelected, getKworkInputValue, // Callbacks depending on state
+        handleAddSelected, getKworkInputValue, // Callbacks depending on state
         openLink, scrollToSection, setKworkInputHasContent, // Other context items / callbacks
         isSettingsModalOpen, // Need modal state to close it on success
-        triggerToggleSettingsModal // Context modal trigger
+        triggerToggleSettingsModal, // Context modal trigger
+        updateKworkInput, // Need to update kwork input on auto-fetch
+        triggerAskAi // Need to trigger AI on auto-fetch
    ]);
 
 
@@ -620,21 +616,15 @@
         const treeContent = `Структура файлов проекта:\n\`\`\`\n${treeOnly}\n\`\`\``;
         let added = false;
         // Update Kwork Input, avoiding duplicates
-        
         const currentKworkValue = getKworkInputValue();
-// Extract existing content
-const trimmedValue = currentKworkValue.trim();
-// Check for existing tree structure to avoid duplicates
-const hasTreeStructure = /Структура файлов проекта:\s*```/im.test(trimmedValue);
+        const trimmedValue = currentKworkValue.trim();
+        const hasTreeStructure = /Структура файлов проекта:\s*```/im.test(trimmedValue);
 
-if (!hasTreeStructure) {
-    // Construct new content: existing content (if any) + new tree content
-    const newContent = trimmedValue ? `${trimmedValue}\n\n${treeContent}` : treeContent;
-    updateKworkInput(newContent); // Update the textarea
-    added = true;
-    
-}
-        
+        if (!hasTreeStructure) {
+            const newContent = trimmedValue ? `${trimmedValue}\n\n${treeContent}` : treeContent;
+            updateKworkInput(newContent);
+            added = true;
+        }
 
         if (added) {
             addToast("Дерево файлов добавлено в запрос", 'success');
@@ -642,22 +632,21 @@ if (!hasTreeStructure) {
         } else {
             addToast("Дерево файлов уже добавлено", 'info');
         }
-    }, [files, updateKworkInput, scrollToSection, addToast]); // Dependencies
+    }, [files, getKworkInputValue, updateKworkInput, scrollToSection, addToast]); // Dependencies
+
 
     // --- PR Selection Handler (Passed to SettingsModal) ---
     const handleSelectPrBranch = useCallback((branch: string | null) => {
-        setTargetBranchName(branch); // Update context's target branch
-        setManualBranchName(""); // Clear manual input when a PR is selected/deselected
+        setTargetBranchName(branch); // Update context's target branch (which handles manualBranchName clearing)
         if (branch) addToast(`Выбрана ветка PR: ${branch}`, 'success');
         else addToast(`Выбор ветки PR снят (используется default или ручная).`, 'info');
         // Modal closure is handled by user interaction within the modal
-    }, [setTargetBranchName, setManualBranchName, addToast]);
+    }, [setTargetBranchName, addToast]); // Use context setter
 
     // --- Manual Branch Input Handler (Passed to SettingsModal) ---
     const handleManualBranchChange = useCallback((name: string) => {
-        setManualBranchName(name); // Update context's manual branch state
-        // The context setter `setManualBranchNameCallback` handles updating the effective `targetBranchName`
-    }, [setManualBranchName]);
+        setManualBranchName(name); // Update context's manual branch state (which handles targetBranchName update)
+    }, [setManualBranchName]); // Use context setter
 
     // --- PR Load Handler (Passed to SettingsModal) ---
     const handleLoadPrs = useCallback(() => {
@@ -672,8 +661,8 @@ if (!hasTreeStructure) {
 
     // Auto-fetch if URL parameter 'path' is present and fetch is not already in progress/success
     useEffect(() => {
-        // Determine the branch to use for auto-fetch (Manual > PR > Default)
-        const branchForAutoFetch = manualBranchName.trim() || targetBranchName;
+        // Determine the branch to use for auto-fetch (Context state already holds the effective target)
+        const branchForAutoFetch = targetBranchName;
         if (autoFetch && repoUrl && (fetchStatus === 'idle' || fetchStatus === 'failed_retries' || fetchStatus === 'error')) {
             console.log(`Auto-fetching due to URL param 'path'. Branch: ${branchForAutoFetch ?? 'Default'}`);
             // Call the fetch handler method directly (exposed via ref)
@@ -681,7 +670,7 @@ if (!hasTreeStructure) {
         }
         // This effect should run when relevant dependencies change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus, targetBranchName, manualBranchName, handleFetch]); // Added handleFetch, manualBranchName to dependencies
+    }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus, targetBranchName, handleFetch]); // Only depend on targetBranchName now
 
     // Cleanup simulation timers on component unmount
     useEffect(() => { return () => stopProgressSimulation(); }, [stopProgressSimulation]);
@@ -692,7 +681,7 @@ if (!hasTreeStructure) {
         handleFetch, // Expose the fetch handler method
         selectHighlightedFiles,
         handleAddSelected,
-        handleCopyToClipboard,
+        handleCopyToClipboard, // Expose the fixed copy handler
         clearAll: handleClearAll,
         getKworkInputValue,
     }), [handleFetch, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll, getKworkInputValue]); // Dependencies
@@ -704,12 +693,13 @@ if (!hasTreeStructure) {
     const isFetchDisabled = isLoading || loadingPrs || !repoUrlEntered;
     const showProgressBar = isLoading || fetchStatus === 'success' || fetchStatus === 'error' || fetchStatus === 'failed_retries';
     // Disable AI/Copy/Clear buttons during any loading process
-    const isActionDisabled = isLoading || loadingPrs || aiActionLoading;
+    const isActionDisabled = isLoading || loadingPrs || aiActionLoading || assistantLoading; // Consider assistantLoading too
     const isAskAiDisabled = !kworkInputHasContent || isActionDisabled;
     const isCopyDisabled = !kworkInputHasContent || isActionDisabled;
     const isClearDisabled = (!kworkInputHasContent && selectedFiles.size === 0) || isActionDisabled;
-    // Determine effective branch for display
-    const effectiveBranchDisplay = manualBranchName.trim() || targetBranchName || "default";
+    const isAddSelectedDisabled = selectedFiles.size === 0 || isActionDisabled;
+    // Determine effective branch for display (using context's targetBranchName)
+    const effectiveBranchDisplay = targetBranchName || "default";
 
   return (
     <div id="extractor" className="w-full p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm text-gray-200 font-mono rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] border border-gray-700/50 relative overflow-hidden">
@@ -721,7 +711,7 @@ if (!hasTreeStructure) {
                 </h2>
                  {/* Instructions */}
                  <p className="text-yellow-300/80 text-xs md:text-sm mb-1">
-                    1. Укажи URL/токен/ветку в <span className="text-cyan-400 cursor-pointer hover:underline" onClick={triggerToggleSettingsModal}>настройках</span> (<FaCircleChevronDown className="inline text-cyan-400"/>).
+                    1. Укажи URL/токен/ветку в <span className="text-cyan-400 cursor-pointer hover:underline" onClick={triggerToggleSettingsModal}>настройках</span> (<FaCodeBranch className="inline text-cyan-400"/>).
                  </p>
                  <p className="text-yellow-300/80 text-xs md:text-sm mb-1">
                     2. Нажми <span className="font-bold text-purple-400 mx-1">"Извлечь файлы"</span>.
@@ -730,10 +720,10 @@ if (!hasTreeStructure) {
                     3. Выбери файлы для контекста AI.
                  </p>
                  <p className="text-yellow-300/80 text-xs md:text-sm mb-2">
-                    4. Опиши задачу ИЛИ оставь поле пустым.
+                    4. Опиши задачу ИЛИ добавь файлы кнопкой (+).
                  </p>
                  <p className="text-yellow-300/80 text-xs md:text-sm mb-2">
-                    5. Добавь код <span className="font-bold text-cyan-400 mx-1">И/ИЛИ</span> нажми <span className="font-bold text-blue-400 mx-1">"Спросить AI"</span>.
+                    5. Нажми <span className="font-bold text-blue-400 mx-1">"Спросить AI"</span> или скопируй <FaCopy className="inline text-sm mx-px"/>.
                  </p>
             </div>
             {/* Settings Toggle Button */}
@@ -746,14 +736,14 @@ if (!hasTreeStructure) {
                 aria-label={isSettingsModalOpen ? "Скрыть настройки" : "Показать настройки"}
                 aria-expanded={isSettingsModalOpen}
             >
-                {isSettingsModalOpen ? <FaCircleChevronUp className="text-cyan-400 text-xl" /> : <FaCircleChevronDown className="text-cyan-400 text-xl" />}
+                {isSettingsModalOpen ? <FaCircleChevronUp className="text-cyan-400 text-xl" /> : <FaCodeBranch className="text-cyan-400 text-xl" />}
             </motion.button>
         </div>
 
       {/* Settings Modal Component - Controlled by Context */}
       <SettingsModal
             isOpen={isSettingsModalOpen}
-            onClose={triggerToggleSettingsModal} // Use context trigger to close
+            // onClose={triggerToggleSettingsModal} // Closure handled by toggle
             repoUrl={repoUrl} // Pass local state for input control
             setRepoUrl={handleRepoUrlChange} // Pass handler to update local/context
             token={token} // Pass local state
@@ -861,22 +851,15 @@ if (!hasTreeStructure) {
                     isClearDisabled={isClearDisabled} // Pass disabled state
                     onCopyToClipboard={handleCopyToClipboard} // Pass callback
                     onClearAll={handleClearAll} // Pass callback
+                    // Pass Ask AI props
+                    onAskAi={triggerAskAi}
+                    isAskAiDisabled={isAskAiDisabled}
+                    aiActionLoading={aiActionLoading}
+                    // Pass Add Selected props
+                    onAddSelected={handleAddSelected}
+                    isAddSelectedDisabled={isAddSelectedDisabled}
+                    selectedFetcherFilesCount={selectedFiles.size}
                  />
-                 {/* Ask AI Button */}
-                 <motion.button
-                    onClick={triggerAskAi} // Use context trigger
-                    disabled={isAskAiDisabled} // Use calculated disabled state
-                    className={`flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg font-semibold text-sm text-white ${
-                        isAskAiDisabled
-                        ? 'bg-gray-600 opacity-60 cursor-not-allowed' // Disabled style
-                        : 'bg-gradient-to-r from-blue-600 to-indigo-500 hover:from-blue-700 hover:to-indigo-600 shadow-md shadow-blue-500/30 hover:shadow-lg hover:shadow-indigo-500/40' // Enabled style
-                    } transition-all`}
-                    whileHover={{ scale: isAskAiDisabled ? 1 : 1.03 }}
-                    whileTap={{ scale: isAskAiDisabled ? 1 : 0.97 }}
-                 >
-                    {aiActionLoading ? <FaArrowsRotate className="animate-spin" /> : <FaRobot />}
-                    {aiActionLoading ? "Спрашиваю..." : "🤖 Спросить AI"}
-                 </motion.button>
              </div>
          ) : null }
 

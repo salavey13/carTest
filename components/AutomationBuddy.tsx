@@ -3,12 +3,13 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner"; // Assuming sonner is available
 import {
     FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
     FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard,
     FaCopy, FaListCheck, FaBug, FaSync, FaPlus, FaPaperPlane, FaBroom, FaCheck,
     FaRobot, FaArrowRotateRight, FaArrowsRotate, FaAngrycreative, FaPoo,
-    FaList, FaCodeBranch, FaExclamation // Added Cog and Exclamation
+    FaList, FaCodeBranch, FaExclamation // Added FaCodeBranch and FaExclamation
 } from "react-icons/fa6";
 
 // Import Subcomponents
@@ -46,7 +47,7 @@ const AutomationBuddy: React.FC = () => {
     // --- State ---
     const [isOpen, setIsOpen] = useState(false);
     const [hasAutoOpened, setHasAutoOpened] = useState(false);
-    const [hasNewSuggestions, setHasNewSuggestions] = useState(false); // NEW: Indicator state
+    const [hasNewSuggestions, setHasNewSuggestions] = useState(false); // Indicator state
     const previousSuggestionIds = useRef<Set<string>>(new Set()); // Store previous suggestion IDs
 
     // --- Context ---
@@ -55,7 +56,8 @@ const AutomationBuddy: React.FC = () => {
         currentStep, fetchStatus, repoUrlEntered, filesFetched,
         selectedFetcherFiles, kworkInputHasContent, aiResponseHasContent, filesParsed,
         selectedAssistantFiles, assistantLoading, aiActionLoading, loadingPrs,
-        targetBranchName, manualBranchName, // Read branch states for context/text
+        targetBranchName, // Read effective target branch
+        manualBranchName, // Read manual input
         isSettingsModalOpen, // Read modal state
 
         // Triggers
@@ -81,15 +83,17 @@ const AutomationBuddy: React.FC = () => {
     // --- Get Welcoming Message ---
     // Overrides the base context message for a friendlier tone
     const getXuinityMessage = useCallback((): string => {
+        // Determine effective branch for display
         const effectiveBranch = manualBranchName.trim() || targetBranchName;
-        const branchInfo = effectiveBranch ? ` (ветка: ${effectiveBranch})` : '';
+        const branchInfo = effectiveBranch ? ` (ветка: ${effectiveBranch})` : ' (ветка по умолчанию)';
         const settingsIcon = "<FaCodeBranch className='inline mx-1 text-cyan-400'/>"; // Represent icon in text
 
+        // Message based on current step
         switch (currentStep) {
           case 'idle': return `Йо! Готов(а) кодить в потоке? ✨ Начнем!`;
           case 'need_repo_url': return `Давай начнем! Открой настройки ${settingsIcon}, чтобы указать ссылку на GitHub репо.`;
           case 'ready_to_fetch': return repoUrlEntered ? `Репо есть! 👍 Жми "Извлечь файлы"${branchInfo} или загляни в настройки ${settingsIcon} для выбора ветки/PR.` : `Сначала укажи URL репо в настройках ${settingsIcon}.`;
-          case 'fetching': return `Минутку, получаю код из ${branchInfo}... ⏳`;
+          case 'fetching': return `Минутку, получаю код из${branchInfo}... ⏳`;
           case 'fetch_failed': return `Упс! 😬 Не смог получить файлы${branchInfo}. Проверь ссылку/токен/ветку в настройках ${settingsIcon} или попробуй снова?`;
           case 'files_fetched': return `Код здесь! ✅ Выбери нужные файлы для AI или чекни настройки ${settingsIcon} для другой ветки.`;
           case 'files_fetched_highlights': return `Есть связанные файлы! 😎 Выбери их или настрой контекст сам(а). Ветку можно сменить в ${settingsIcon}.`;
@@ -99,7 +103,7 @@ const AutomationBuddy: React.FC = () => {
           case 'request_copied': return `Скопировано! ✅ Жду ответ от твоего AI. Вставляй его в Ассистента ниже.`;
           case 'response_pasted': return `Ответ получен! 🤘 Нажми '➡️' рядом с полем ввода, чтобы я его разобрал.`;
           case 'parsing_response': return `Анализирую ответ AI... 🧠 Почти готово!`;
-          case 'response_parsed': return `Разобрал! 💪 Проверь результат, выбери файлы и можно создавать/обновлять PR!`;
+          case 'response_parsed': return `Разобрал! 💪 Проверь результат, выбери файлы и можно ${effectiveBranch ? `обновлять ветку '${effectiveBranch}'` : 'создавать PR'}!`;
           case 'pr_ready': return assistantLoading
                                ? (effectiveBranch ? `Обновляю ветку ${branchInfo}...` : "Создаю PR...")
                                : (effectiveBranch ? `Готов(а) обновить ветку ${branchInfo}?` : "Готов(а) создать Pull Request?");
@@ -115,43 +119,54 @@ const AutomationBuddy: React.FC = () => {
         const suggestionsList: Suggestion[] = [];
         const isFetcherLoading = fetchStatus === 'loading' || fetchStatus === 'retrying';
         const isAnyLoading = isFetcherLoading || assistantLoading || aiActionLoading || loadingPrs;
+        // Determine effective branch for display
         const effectiveBranch = manualBranchName.trim() || targetBranchName;
         const branchInfo = effectiveBranch ? ` (${effectiveBranch})` : ' (default)';
+        const createOrUpdateActionText = effectiveBranch ? `Обновить Ветку '${effectiveBranch}'` : "Создать PR";
+        const createOrUpdateIcon = effectiveBranch ? <FaCodeBranch /> : <FaGithub />;
 
         const addSuggestion = (id: string, text: string, action: () => any, icon: React.ReactNode, condition = true, disabled = false, tooltip = '') => {
             if (condition) {
                 // Disable most actions when *anything* is loading, except retries and toggling settings *off*
-                const isDisabled = disabled || (isAnyLoading && !['retry-fetch', 'loading-indicator', 'toggle-settings'].includes(id));
-                // Special case: Allow closing settings even if loading
-                if (id === 'toggle-settings' && isSettingsModalOpen) {
-                     suggestionsList.push({ id, text, action, icon, disabled: false, tooltip }); // Always allow closing
-                } else {
-                     suggestionsList.push({ id, text, action, icon, disabled: isDisabled, tooltip });
+                let isDisabled = disabled;
+                if (isAnyLoading) {
+                   // Exceptions: Allow retry, allow closing settings, allow opening settings if *not* fetcher loading
+                   if (id === 'retry-fetch' || (id === 'toggle-settings' && isSettingsModalOpen)) {
+                       isDisabled = false;
+                   } else if (id === 'toggle-settings' && !isSettingsModalOpen && !isFetcherLoading) {
+                       isDisabled = false; // Allow opening if fetcher isn't busy
+                   }
+                   else {
+                       isDisabled = true; // Disable everything else if any loading
+                   }
                 }
+
+                 suggestionsList.push({ id, text, action, icon, disabled: isDisabled, tooltip });
             }
         };
 
         // --- Core Suggestions ---
 
-        // Settings Modal Toggle (Always available, conditionally disabled)
+        // Settings Modal Toggle (Conditionally available/disabled)
         addSuggestion(
             "toggle-settings",
             isSettingsModalOpen ? "Закрыть Настройки" : "Настройки (URL/Ветка/PR)",
             triggerToggleSettingsModal,
             <FaCodeBranch />,
-            true
+            true // Always potentially show
+            // Disabled logic handled within addSuggestion
         );
 
         // Main Actions based on step
         switch (currentStep) {
             case 'ready_to_fetch':
-                addSuggestion("fetch", `Извлечь Файлы${branchInfo}`, triggerFetch, <FaDownload />, true, !repoUrlEntered, !repoUrlEntered ? "URL?" : "");
+                addSuggestion("fetch", `Извлечь Файлы${branchInfo}`, triggerFetch, <FaDownload />, true, !repoUrlEntered, !repoUrlEntered ? "Сначала укажи URL в Настройках" : "");
                 break;
             case 'fetching':
                 addSuggestion("loading-indicator", `Загрузка Файлов${branchInfo}...`, () => {}, <FaArrowsRotate className="animate-spin"/>, true, true );
                 break;
             case 'fetch_failed':
-                addSuggestion("retry-fetch", `Попробовать Снова${branchInfo}?`, () => triggerFetch(true), <FaArrowRotateRight />, true, isAnyLoading);
+                addSuggestion("retry-fetch", `Попробовать Снова${branchInfo}?`, () => triggerFetch(true), <FaArrowRotateRight />, true); // Disabled handled by addSuggestion
                 break;
             case 'files_fetched':
                  addSuggestion("goto-files", "К Списку Файлов", () => scrollToSection('fetcher'), <FaEye />);
@@ -191,11 +206,15 @@ const AutomationBuddy: React.FC = () => {
             case 'pr_ready': // Combine suggestions for these states
                  addSuggestion("select-all-parsed", "Выбрать Все Файлы", triggerSelectAllParsed, <FaListCheck />, filesParsed);
                  addSuggestion("goto-assistant-files", "К Файлам Ниже", () => scrollToSection('assistant'), <FaEye />);
-                 if (effectiveBranch) {
-                      addSuggestion("update-branch", `Обновить Ветку '${effectiveBranch}'`, triggerCreatePR, <FaCodeBranch />, selectedAssistantFiles.size > 0, selectedAssistantFiles.size === 0, "Выбери файлы");
-                 } else {
-                      addSuggestion("create-pr", "Создать PR", triggerCreatePR, <FaGithub />, selectedAssistantFiles.size > 0, selectedAssistantFiles.size === 0, "Выбери файлы");
-                 }
+                 addSuggestion(
+                    effectiveBranch ? "update-branch" : "create-pr",
+                    createOrUpdateActionText,
+                    triggerCreatePR, // This now handles both create and update
+                    createOrUpdateIcon,
+                    selectedAssistantFiles.size > 0,
+                    selectedAssistantFiles.size === 0,
+                    "Выбери файлы для коммита"
+                 );
                  addSuggestion("goto-pr-form", "К Форме PR/Ветки", () => scrollToSection('prSection'), <FaRocket />);
                 break;
             default:
@@ -206,7 +225,7 @@ const AutomationBuddy: React.FC = () => {
         // --- Clear All Suggestion ---
         // Use optional chaining for safety, check if clearAll exists on the ref's current value
          if (fetcherRef?.current?.clearAll && (selectedFetcherFiles.size > 0 || kworkInputHasContent || aiResponseHasContent)) {
-             addSuggestion("clear-all", "Очистить Все?", fetcherRef.current.clearAll, <FaBroom/>, true, isAnyLoading); // Use Broom icon
+             addSuggestion("clear-all", "Очистить Все?", fetcherRef.current.clearAll, <FaBroom/>, true); // Disabled handled by addSuggestion
          }
 
         // Final processing (no changes needed here, happens in addSuggestion)
@@ -227,6 +246,7 @@ const AutomationBuddy: React.FC = () => {
     // --- Suggestion Change Detection for Notification ---
     useEffect(() => {
         const currentIds = new Set(suggestions.map(s => s.id));
+        const prevIds = previousSuggestionIds.current;
 
         if (isOpen) {
             // Reset notification when buddy is opened
@@ -235,18 +255,15 @@ const AutomationBuddy: React.FC = () => {
              previousSuggestionIds.current = currentIds;
         } else {
             // Check for changes only when closed
-            let changed = currentIds.size !== previousSuggestionIds.current.size;
+            let changed = currentIds.size !== prevIds.size;
             if (!changed) {
-                for (const id of currentIds) {
-                    if (!previousSuggestionIds.current.has(id)) {
-                        changed = true;
-                        break;
-                    }
-                }
+                for (const id of currentIds) { if (!prevIds.has(id)) { changed = true; break; } }
+                if (!changed) { for (const id of prevIds) { if (!currentIds.has(id)) { changed = true; break; } } }
             }
+
             // Set notification flag if suggestions changed meaningfully (ignore just loading indicators changing)
              const meaningfulChange = Array.from(currentIds).some(id => !id.includes('loading-indicator')) ||
-                                     Array.from(previousSuggestionIds.current).some(id => !id.includes('loading-indicator'));
+                                     Array.from(prevIds).some(id => !id.includes('loading-indicator'));
 
             if (changed && meaningfulChange) {
                 // Only set to true if not already true
@@ -255,10 +272,10 @@ const AutomationBuddy: React.FC = () => {
                      console.log("Buddy: New suggestions available!");
                 }
             }
-            // Update previous suggestions reference *only when closing* or when suggestions change while closed
-            // Let's update it here directly after comparison
-             previousSuggestionIds.current = currentIds;
-
+            // Update previous suggestions reference only when suggestions actually change while closed
+            if(changed) {
+                previousSuggestionIds.current = currentIds;
+            }
         }
     // Run whenever suggestions change OR when the buddy opens/closes
     }, [suggestions, isOpen, hasNewSuggestions]);
@@ -359,7 +376,7 @@ const AutomationBuddy: React.FC = () => {
                             className="bg-gradient-to-br from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white shadow-lg hover:shadow-xl" // Styling
                             aria-label="Open Automation Buddy"
                          />
-                         {/* NEW: Notification Badge */}
+                         {/* Notification Badge */}
                          <AnimatePresence>
                               {hasNewSuggestions && (
                                    <motion.div

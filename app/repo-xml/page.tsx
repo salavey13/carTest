@@ -60,24 +60,27 @@
                     <section id="intro" className="mb-12 text-center max-w-3xl">
                          <div className="flex justify-center mb-4"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" className="w-24 h-12"> <circle cx="50" cy="50" r="45" fill="none" stroke="url(#bgGlow)" strokeWidth="10" opacity="0.3" /> <circle cx="50" cy="50" r="20" fill="url(#robotFill)" stroke="url(#robotStroke)" strokeWidth="2" /> <circle cx="40" cy="45" r="3" fill="#E1FF01" /> <circle cx="60" cy="45" r="3" fill="#E1FF01" /> <rect x="37" y="53" width="26" height="3" fill="#E1FF01" /> <text x="100" y="60" fontSize="40" fill="url(#moneyFill)">💸</text> <defs> <radialGradient id="bgGlow"><stop offset="0%" stopColor="#E1FF01" stopOpacity="1" /><stop offset="100%" stopColor="#000" stopOpacity="0" /></radialGradient> <linearGradient id="robotFill" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#000" /><stop offset="100%" stopColor="#E1FF01" /></linearGradient> <linearGradient id="robotStroke" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#E1FF01" /><stop offset="100%" stopColor="#000" /></linearGradient> <linearGradient id="moneyFill" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#E1FF01" /><stop offset="100%" stopColor="#000" /></linearGradient> </defs> </svg> </div>
                           <h1 className="text-4xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse"> CYBER STUDIO </h1>
-                          <p className="text-lg text-gray-300 mt-2"> Автоматизация GitHub рутины: извлеки код → <span className="text-blue-400 font-semibold">получи ответ Gemini</span> → создай PR в один клик! </p>
+                          <p className="text-lg text-gray-300 mt-2"> Автоматизация GitHub рутины: извлеки код → <span className="text-blue-400 font-semibold">получи ответ Gemini</span> → создай/обнови PR в один клик! </p> {/* Updated text */}
                           <p className="text-sm text-green-400 mt-4 bg-gray-800/50 p-2 rounded-lg">
                               ✅ Интегрирован Google Gemini API! Используй кнопку <FaRobot className="inline mx-1" /> Спросить AI в Экстракторе.
                               <span className="text-gray-400 block mt-1">(Внешние AI: <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300 transition">Grok/Gemini</a>, <a href="https://chat.openai.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300 transition">ChatGPT</a>, <a href="https://t.me/webanybot" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300 transition">@WebAnyBot</a> все еще доступны для ручного копирования/вставки.)</span>
                           </p>
                            <p className="text-sm text-cyan-400 mt-4 bg-gray-800/50 p-2 rounded-lg">
-                               ✅ Теперь можно извлекать файлы из веток открытых PR или указать ветку вручную!
+                               ✅ Теперь можно извлекать файлы из веток открытых PR или указать ветку вручную в настройках!
+                           </p>
+                            <p className="text-sm text-orange-400 mt-4 bg-gray-800/50 p-2 rounded-lg">
+                                ✅ Можно обновлять существующую ветку (из PR/ручного ввода) или создавать новый PR!
                            </p>
                     </section>
 
                     {/* Step Guides (Updated instructions) */}
                     <section id="step1" className="mb-12 text-center max-w-3xl">
                         <h2 className="text-2xl font-bold text-cyan-400 mb-4"> Шаг 1: Запрос + Контекст </h2>
-                        <p className="text-gray-300 text-sm"> Укажи репозиторий, выбери ветку (опционально), извлеки файлы (<FaDownload className="inline mx-1"/>), выбери нужные для контекста, опиши задачу AI в поле ввода. </p>
+                        <p className="text-gray-300 text-sm"> Укажи репозиторий, выбери ветку/PR (в настройках), извлеки файлы (<FaDownload className="inline mx-1"/>), выбери нужные для контекста, опиши задачу AI в поле ввода. </p>
                     </section>
                     <section id="step2" className="mb-12 text-center max-w-3xl">
-                       <h2 className="text-2xl font-bold text-cyan-400 mb-4"> Шаг 2: Ответ AI → PR </h2>
-                        <p className="text-gray-300 text-sm"> Нажми <span className="text-blue-400 font-semibold">"🤖 Спросить AI"</span> или добавь/скопируй ответ вручную. В Ассистенте Кода (<FaRobot className="inline mx-1"/>) нажми '➡️', проверь/исправь <FaWandMagicSparkles className="inline mx-1" />, выбери файлы и создай PR <FaGithub className="inline mx-1" />! </p>
+                       <h2 className="text-2xl font-bold text-cyan-400 mb-4"> Шаг 2: Ответ AI → PR/Обновление </h2>
+                        <p className="text-gray-300 text-sm"> Нажми <span className="text-blue-400 font-semibold">"🤖 Спросить AI"</span> или добавь/скопируй ответ вручную. В Ассистенте Кода (<FaRobot className="inline mx-1"/>) нажми '➡️', проверь/исправь <FaWandMagicSparkles className="inline mx-1" />, выбери файлы и <span className="text-orange-400">обнови текущую ветку</span> или <span className="text-green-400">создай новый PR</span> <FaGithub className="inline mx-1" />! </p>
                     </section>
 
                     {/* Fixed Navigation Icons */}
