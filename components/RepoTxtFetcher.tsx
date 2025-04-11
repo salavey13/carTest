@@ -1,4 +1,5 @@
 // /components/RepoTxtFetcher.tsx
+// /components/RepoTxtFetcher.tsx
 "use client";
 
     import React, { useState, useEffect, useImperativeHandle, forwardRef, useRef, useCallback, useMemo} from "react";
@@ -81,11 +82,12 @@
         // Status & Flags
         fetchStatus, setFetchStatus, repoUrlEntered, setRepoUrlEntered, filesFetched, setFilesFetched,
         selectedFetcherFiles, setSelectedFetcherFiles, kworkInputHasContent, setKworkInputHasContent,
-        setRequestCopied, aiActionLoading, currentStep, loadingPrs,
+        setRequestCopied, aiActionLoading, currentStep, loadingPrs, assistantLoading, // Added assistantLoading
         // Branch & PR state
         targetBranchName, setTargetBranchName, // Use context setter for PR selection
         manualBranchName, setManualBranchName, // Use context setter for manual input
         openPrs, // Get PR list from context
+        setOpenPrs, // *** Get the setter function from context ***
         setLoadingPrs, // Context setter for PR loading
         // Modal state & trigger
         isSettingsModalOpen, triggerToggleSettingsModal,
@@ -281,10 +283,11 @@
         setRepoUrlEntered(url.trim().length > 0); // Update context flag
         updateRepoUrlInAssistant(url); // Notify Assistant component via context callback
         // Reset PR list and branch selection if URL changes
-        setOpenPrs([]); // Use context setter
+        setOpenPrs([]); // *** FIX: Use the setter from context ***
         setTargetBranchName(null); // Clear selected PR branch via context setter
         setManualBranchName(""); // Clear manual branch input via context setter
     }, [setRepoUrlEntered, updateRepoUrlInAssistant, setOpenPrs, setTargetBranchName, setManualBranchName]); // Use context setters
+
 
     // Update Kwork Input textarea value and context flag
     const updateKworkInput = useCallback((value: string) => {
