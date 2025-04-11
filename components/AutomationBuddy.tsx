@@ -86,17 +86,18 @@ const AutomationBuddy: React.FC = () => {
         // Determine effective branch for display
         const effectiveBranch = manualBranchName.trim() || targetBranchName;
         const branchInfo = effectiveBranch ? ` (ветка: ${effectiveBranch})` : ' (ветка по умолчанию)';
-        const settingsIcon = "<FaCodeBranch className='inline mx-1 text-cyan-400'/>"; // Represent icon in text
+        // Removed icon text tag
+        const settingsMention = "настройках";
 
         // Message based on current step
         switch (currentStep) {
           case 'idle': return `Йо! Готов(а) кодить в потоке? ✨ Начнем!`;
-          case 'need_repo_url': return `Давай начнем! Открой настройки ${settingsIcon}, чтобы указать ссылку на GitHub репо.`;
-          case 'ready_to_fetch': return repoUrlEntered ? `Репо есть! 👍 Жми "Извлечь файлы"${branchInfo} или загляни в настройки ${settingsIcon} для выбора ветки/PR.` : `Сначала укажи URL репо в настройках ${settingsIcon}.`;
+          case 'need_repo_url': return `Давай начнем! Открой ${settingsMention}, чтобы указать ссылку на GitHub репо.`;
+          case 'ready_to_fetch': return repoUrlEntered ? `Репо есть! 👍 Жми "Извлечь файлы"${branchInfo} или загляни в ${settingsMention} для выбора ветки/PR.` : `Сначала укажи URL репо в ${settingsMention}.`;
           case 'fetching': return `Минутку, получаю код из${branchInfo}... ⏳`;
-          case 'fetch_failed': return `Упс! 😬 Не смог получить файлы${branchInfo}. Проверь ссылку/токен/ветку в настройках ${settingsIcon} или попробуй снова?`;
-          case 'files_fetched': return `Код здесь! ✅ Выбери нужные файлы для AI или чекни настройки ${settingsIcon} для другой ветки.`;
-          case 'files_fetched_highlights': return `Есть связанные файлы! 😎 Выбери их или настрой контекст сам(а). Ветку можно сменить в ${settingsIcon}.`;
+          case 'fetch_failed': return `Упс! 😬 Не смог получить файлы${branchInfo}. Проверь ссылку/токен/ветку в ${settingsMention} или попробуй снова?`;
+          case 'files_fetched': return `Код здесь! ✅ Выбери нужные файлы для AI или чекни ${settingsMention} для другой ветки.`;
+          case 'files_fetched_highlights': return `Есть связанные файлы! 😎 Выбери их или настрой контекст сам(а). Ветку можно сменить в ${settingsMention}.`;
           case 'files_selected': return `Отлично, файлы выбраны${branchInfo}! Добавь их в запрос кнопкой (+) или сразу жми "🤖 Спросить AI"!`;
           case 'request_written': return `Запрос готов! 🔥 Отправляй его AI ("🤖 Спросить AI") или скопируй для другого бота.`;
           case 'generating_ai_response': return `Общаюсь с AI... 🤖💭 Магия происходит!`;
@@ -373,7 +374,7 @@ const AutomationBuddy: React.FC = () => {
                          <FloatingActionButton
                             onClick={handleFabClick}
                             icon={<FaAngrycreative className="text-xl" />} // Main icon
-                            className="bg-gradient-to-br from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white shadow-lg hover:shadow-xl" // Styling
+                            className="bg-gradient-to-br from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white shadow-lg hover:shadow-xl rounded-full" // Explicitly add rounded-full here for FAB styling
                             aria-label="Open Automation Buddy"
                          />
                          {/* Notification Badge */}

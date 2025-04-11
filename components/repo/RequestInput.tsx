@@ -1,9 +1,9 @@
-// /components/repo/RequestInput.tsx
 "use client";
 
 import React, { MutableRefObject, ChangeEventHandler } from 'react';
 import { motion } from 'framer-motion';
-import { FaClipboard, FaBroom, FaRobot, FaPlus } from 'react-icons/fa6'; // Added FaRobot, FaPlus
+import { FaClipboard, FaBroom, FaRobot, FaPlus, FaFileLines, FaArrowsRotate } from 'react-icons/fa6'; // Added FaFileLines, FaArrowsRotate
+import { toast } from 'sonner'; // Import toast
 
 interface RequestInputProps {
     kworkInputRef: MutableRefObject<HTMLTextAreaElement | null>;
@@ -22,6 +22,17 @@ interface RequestInputProps {
     isAddSelectedDisabled: boolean;
     selectedFetcherFilesCount: number;
 }
+
+// Instructions text constant
+const BOT_INSTRUCTIONS = `Wassup, fella vibe coding enthusiast! We are vibing next level selfevolving vibe dev platform oneSitePls - it's telegram bot has a full fledged web app with a lot of working outofthebox stuff, all boilerplate with, telegram auth, supabase, storage and one special automagic thing - repo-xml page, which allows to extract github project files into context for request to dev bot, whose reply can be copied in full in parsed back into Pull Request which can be then merged in 1 click and update production in a minute:) OR you can extract files from branch from PR and continue iterating by parsing and pushing back to PR's branch, think on this next level always;)
+
+Also try to:
+- don't skip code (skip whole file if unchanged)
+- don't use fa icons (use fa6), and especially avoid FaTimesCircle and FaCog (use FaBranch instead of FaCog)
+- mark "// .." comments with two dots for comments if you want, but use three dots only in skipped parts markers - i detect such issues during response parsing to reask for full version, no problem;)
+- first line of code in each file must be comment with path like "// /components/comp1.tsx" for example
+- first line of response is kinda important too - it will be parsed out into PR title, so try not to start response with generick phrases like "okey, lets do it" as my PR list only shows first like 50 symbols, make them  explicitly telling. And next couple of chapters please describe changes in russian, they will be visible in notification;)`;
+
 
 const RequestInput: React.FC<RequestInputProps> = ({
     kworkInputRef,
@@ -46,6 +57,18 @@ const RequestInput: React.FC<RequestInputProps> = ({
         }
     };
 
+    // Handler for copying instructions
+    const handleCopyInstructions = () => {
+        navigator.clipboard.writeText(BOT_INSTRUCTIONS)
+            .then(() => {
+                toast.success("Специи для бота готовы, вставляй!)");
+            })
+            .catch(err => {
+                console.error("Failed to copy instructions: ", err);
+                toast.error("Ошибка копирования инструкций");
+            });
+    };
+
     return (
         <div className="flex flex-col gap-3"> {/* Changed to flex-col */}
             <div className="relative">
@@ -59,7 +82,18 @@ const RequestInput: React.FC<RequestInputProps> = ({
                     placeholder="Опиши здесь вашу задачу... Затем добавь контекст кнопками ИЛИ нажми 'Спросить AI'."
                     disabled={isAskAiDisabled && isCopyDisabled && isClearDisabled} // Disable textarea if all actions are disabled
                 />
+                {/* Icon Buttons Container */}
                 <div className="absolute top-8 right-2 flex flex-col gap-2">
+                     {/* Copy Instructions Button */}
+                     <motion.button
+                        onClick={handleCopyInstructions}
+                        className="p-1.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full shadow-[0_0_8px_rgba(129,140,248,0.3)] transition-all hover:shadow-[0_0_12px_rgba(167,139,250,0.5)]"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        title="Скопировать инструкции для бота (role prompt)"
+                    >
+                        <FaFileLines className="text-white text-base" />
+                    </motion.button>
                     {/* Copy Button */}
                     <motion.button
                         onClick={onCopyToClipboard}
@@ -90,7 +124,7 @@ const RequestInput: React.FC<RequestInputProps> = ({
                  <motion.button
                       onClick={() => onAddSelected()}
                       disabled={isAddSelectedDisabled}
-                      className={`flex items-center justify-center gap-2 flex-grow px-4 py-2 rounded-lg font-semibold text-sm text-white ${
+                      className={`flex items-center justify-center gap-2 flex-grow px-4 py-2 rounded-full font-semibold text-sm text-white ${ // Use rounded-full
                         isAddSelectedDisabled
                           ? 'bg-gray-600 opacity-60 cursor-not-allowed'
                           : 'bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 shadow-md shadow-cyan-500/30 hover:shadow-lg hover:shadow-teal-500/40'
@@ -107,7 +141,7 @@ const RequestInput: React.FC<RequestInputProps> = ({
                  <motion.button
                     onClick={onAskAi}
                     disabled={isAskAiDisabled}
-                    className={`flex items-center justify-center gap-2 w-full sm:w-auto flex-grow px-4 py-2 rounded-lg font-semibold text-sm text-white ${
+                    className={`flex items-center justify-center gap-2 w-full sm:w-auto flex-grow px-4 py-2 rounded-full font-semibold text-sm text-white ${ // Use rounded-full
                         isAskAiDisabled
                         ? 'bg-gray-600 opacity-60 cursor-not-allowed'
                         : 'bg-gradient-to-r from-blue-600 to-indigo-500 hover:from-blue-700 hover:to-indigo-600 shadow-md shadow-blue-500/30 hover:shadow-lg hover:shadow-indigo-500/40'

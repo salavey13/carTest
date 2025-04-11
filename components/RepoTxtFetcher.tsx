@@ -1,5 +1,4 @@
 // /components/RepoTxtFetcher.tsx
-// /components/RepoTxtFetcher.tsx
 "use client";
 
     import React, { useState, useEffect, useImperativeHandle, forwardRef, useRef, useCallback, useMemo} from "react";
@@ -72,8 +71,8 @@
       const [extractLoading, setExtractLoading] = useState<boolean>(false); // Local loading for Fetch button UI only
       const [progress, setProgress] = useState<number>(0); // Fetch progress simulation
       const [error, setError] = useState<string | null>(null); // Fetch error message
-      const [primaryHighlightedPath, setPrimaryHighlightedPath] = useState<string | null>(null); // Path from URL param
-      const [secondaryHighlightedPaths, setSecondaryHighlightedPaths] = useState<Record<ImportCategory, string[]>>({ component: [], context: [], hook: [], lib: [], other: [] }); // Resolved imports
+      const [primaryHighlightedPath, setPrimaryHighlightedPathState] = useState<string | null>(null); // Path from URL param
+      const [secondaryHighlightedPaths, setSecondaryHighlightedPathsState] = useState<Record<ImportCategory, string[]>>({ component: [], context: [], hook: [], lib: [], other: [] }); // Resolved imports
       const [autoAskAiEnabled, setAutoAskAiEnabled] = useState<boolean>(false); // Toggle for auto-asking AI
 
       // === Context ===
@@ -361,8 +360,8 @@
         setSelectedFilesState(new Set()); // Clear local file selection
         setSelectedFetcherFiles(new Set()); // Clear context file selection
         updateKworkInput(""); // Clear Kwork input textarea
-        setPrimaryHighlightedPath(null); // Clear highlighting
-        setSecondaryHighlightedPaths({ component: [], context: [], hook: [], lib: [], other: [] });
+        setPrimaryHighlightedPathState(null); // Clear highlighting
+        setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] });
         // Reset AI state handled by other callbacks (e.g., setAiResponseHasContent)
         addToast("Поле ввода и выбор файлов очищены ✨", 'success');
         localKworkInputRef.current?.focus(); // Focus the kwork input
@@ -392,8 +391,8 @@
         setFilesFetched(false, null, []); // Update context: reset fetched status and highlighting
         setRequestCopied(false); // Reset copied flag
         // Reset AI state via context setters if needed (handled by setFilesFetched now)
-        setPrimaryHighlightedPath(null);
-        setSecondaryHighlightedPaths({ component: [], context: [], hook: [], lib: [], other: [] });
+        setPrimaryHighlightedPathState(null);
+        setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] });
 
         addToast(`Запрос репозитория (${effectiveBranch})...`, 'info');
         startProgressSimulation(20); // Start progress simulation
@@ -461,9 +460,9 @@
                 importantFiles.forEach(path => { if (fetchedFiles.some(f => f.path === path) && !filesToSelect.has(path)) filesToSelect.add(path); });
 
                 // --- Update State After Highlighting/Selection ---
-                setPrimaryHighlightedPath(primaryPath);
+                setPrimaryHighlightedPathState(primaryPath);
                 const finalSecondaryPathsState = { component: Array.from(categorizedSecondaryPaths.component), context: Array.from(categorizedSecondaryPaths.context), hook: Array.from(categorizedSecondaryPaths.hook), lib: Array.from(categorizedSecondaryPaths.lib), other: Array.from(categorizedSecondaryPaths.other) };
-                setSecondaryHighlightedPaths(finalSecondaryPathsState);
+                setSecondaryHighlightedPathsState(finalSecondaryPathsState);
                 setFilesFetched(true, primaryPath, Object.values(finalSecondaryPathsState).flat()); // Update context: files ARE fetched
 
                 // --- Auto-Generate Request / Auto-Ask AI ---
@@ -541,7 +540,7 @@
    }, [ // Dependencies
         repoUrl, token, fetchStatus, // Local state needed for logic
         setFetchStatus, setFiles, setSelectedFilesState, setProgress, setError, setExtractLoading, // Local setters
-        setPrimaryHighlightedPath, setSecondaryHighlightedPaths, // Local setters for highlighting
+        setPrimaryHighlightedPathState, setSecondaryHighlightedPathsState, // Local setters for highlighting
         setSelectedFetcherFiles, setFilesFetched, setRequestCopied, // Context setters
         highlightedPathFromUrl, ideaFromUrl, importantFiles, DEFAULT_TASK_IDEA, // URL params and constants
         addToast, startProgressSimulation, stopProgressSimulation, getLanguage, getPageFilePath, extractImports, resolveImportPath, // Utilities
@@ -732,7 +731,7 @@
             {/* Settings Toggle Button */}
             <motion.button
                 onClick={triggerToggleSettingsModal} // Use context trigger
-                className="p-2 bg-gray-700/50 rounded-full hover:bg-gray-600/70 transition-colors flex-shrink-0"
+                className="p-2 bg-gray-700/50 rounded-full hover:bg-gray-600/70 transition-colors flex-shrink-0" // Use rounded-full
                 whileHover={{ scale: 1.1, rotate: isSettingsModalOpen ? 10 : -10 }}
                 whileTap={{ scale: 0.95 }}
                 title={isSettingsModalOpen ? "Скрыть настройки" : "Настройки URL/Token/Ветки/PR"}
@@ -768,7 +767,7 @@
                 // Use context trigger which reads branch state internally
                 onClick={() => triggerFetch(fetchStatus === 'failed_retries' || fetchStatus === 'error')}
                 disabled={isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')}
-                className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-white bg-gradient-to-r ${
+                className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-white bg-gradient-to-r ${ // Use rounded-full
                     fetchStatus === 'failed_retries' || fetchStatus === 'error'
                     ? 'from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600' // Error state style
                     : 'from-purple-600 to-cyan-500' // Normal state style
