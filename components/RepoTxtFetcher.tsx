@@ -620,14 +620,22 @@
         const treeContent = `Структура файлов проекта:\n\`\`\`\n${treeOnly}\n\`\`\``;
         let added = false;
         // Update Kwork Input, avoiding duplicates
-        updateKworkInput((prev: string) => { // Assuming updateKworkInput can take a function
-            const trimmedPrev = prev.trim();
-            // Check if tree structure already exists (simple check)
-            if (/Структура файлов проекта:\s*```/im.test(trimmedPrev)) { return prev; } // Already added
-            added = true;
-            // Append or set content
-            return trimmedPrev ? `${trimmedPrev}\n\n${treeContent}` : treeContent;
-        });
+        
+        const currentKworkValue = getKworkInputValue();
+// Extract existing content
+const trimmedValue = currentKworkValue.trim();
+// Check for existing tree structure to avoid duplicates
+const hasTreeStructure = /Структура файлов проекта:\s*```/im.test(trimmedValue);
+
+if (!hasTreeStructure) {
+    // Construct new content: existing content (if any) + new tree content
+    const newContent = trimmedValue ? `${trimmedValue}\n\n${treeContent}` : treeContent;
+    updateKworkInput(newContent); // Update the textarea
+    added = true;
+    
+}
+        
+
         if (added) {
             addToast("Дерево файлов добавлено в запрос", 'success');
             scrollToSection('kworkInput'); // Scroll to input
