@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaCodeBranch, FaList, FaCheck, FaSquareArrowUp, FaArrowsRotate } from 'react-icons/fa6'; // Updated icons
+import { FaCodeBranch, FaList, FaCheck, FaSquareArrowUpRight, FaArrowsRotate } from 'react-icons/fa6'; // Updated icons
 import { SimplePullRequest } from '@/contexts/RepoXmlPageContext'; // Import type
 import { Tooltip } from '../AICodeAssistant'; // Assuming Tooltip is accessible
 
@@ -136,7 +136,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                                          ({pr.head.ref})
                                                      </span>
                                                       <a href={pr.html_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-gray-500 hover:text-blue-400" title="Open PR on GitHub">
-                                                           <FaSquareArrowUp size={12} />
+                                                           <FaSquareArrowUpRight size={12} />
                                                       </a>
                                                 </div>
                                             </button>
