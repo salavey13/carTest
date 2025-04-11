@@ -6,7 +6,7 @@ import React, { useState, useEffect, useImperativeHandle, forwardRef, MutableRef
 import {
     useRepoXmlPageContext, AICodeAssistantRef, SimplePullRequest
 } from "@/contexts/RepoXmlPageContext";
-import { createGitHubPullRequest } from "@/app/actions_github/actions"; // Keep createGitHubPullRequest
+import { createGitHubPullRequest, updateBranch, fetchRepoContents } from "@/app/actions_github/actions"; // Keep createGitHubPullRequest, added updateBranch, fetchRepoContents
 import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
@@ -23,7 +23,7 @@ import { CodeRestorer } from './assistant_components/CodeRestorer';
 // UI & Utils
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
-import { FaCircleInfo, FaCodeBranch, FaGithub, FaWandMagicSparkles } from "react-icons/fa6"; // Added FaCodeBranch, FaWandMagicSparkles
+import { FaCircleInfo, FaCodeBranch, FaGithub, FaWandMagicSparkles, FaArrowsRotate } from "react-icons/fa6"; // Added FaCodeBranch, FaWandMagicSparkles, FaArrowsRotate
 import clsx from "clsx";
 import { saveAs } from "file-saver";
 
@@ -47,7 +47,7 @@ export const Tooltip = ({ children, text, position = 'bottom' }: { children: Rea
                         exit={{ opacity: 0, scale: 0.9 }}
                         transition={{ duration: 0.15 }}
                         className={clsx(
-                            "absolute z-[70] p-2 bg-gray-700 text-white text-[13px] rounded-lg shadow-lg w-max max-w-xs whitespace-pre-line",
+                            "absolute z-[70] p-2 bg-gray-700 text-white text-[13px] rounded-lg shadow-lg w-max max-w-xs whitespace-pre-line", // Tooltip text uses rounded-lg for readability
                             positionClasses[position]
                         )}
                     >
@@ -623,6 +623,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             // Catch unexpected errors during the try block
             toast.error(`Критическая ошибка при ${targetBranchName ? 'обновлении ветки' : 'создании PR'}.`);
             console.error("Create/Update PR critical error:", err);
+            // Notify admin for unexpected errors? Maybe not, already notified in actions
         } finally {
              // Ensure loading states are turned off regardless of success/failure
              setIsProcessingPR(false);
@@ -630,7 +631,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         }
     }, [
         // Dependencies
-        parsedFiles, selectedFileIds, repoUrl, prTitle, rawDescription, validationIssues, user,
+        parsedFiles, selectedFileIds, repoUrl, prTitle, rawDescription, validationIssues,
         targetBranchName, // Key dependency to decide between create/update
         triggerUpdateBranch, // Context trigger for updating
         setAssistantLoading // Context setter for loading state
@@ -672,6 +673,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     // Dynamically set button text and icon based on whether updating or creating
     const prButtonText = targetBranchName ? `Обновить Ветку (${targetBranchName.substring(0, 15)}...)` : "Создать PR";
     const prButtonIcon = targetBranchName ? <FaCodeBranch /> : <FaGithub />;
+    const prButtonLoadingIcon = isProcessingPR ? <FaArrowsRotate className="animate-spin"/> : prButtonIcon;
 
     return (
         <div className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
@@ -767,8 +769,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                  onCreatePR={handleCreateOrUpdatePR} // Use the combined handler
                  // Pass new props for button text/icon/disabled state
                  buttonText={prButtonText}
-                 buttonIcon={prButtonIcon}
-                 isSubmitDisabled={!canSubmitPR} // Pass calculated disabled state
+                 buttonIcon={prButtonLoadingIcon} // Use loading icon if processing
+                 isSubmitDisabled={!canSubmitPR || isProcessingPR} // Also disable if processing PR
              />
 
              {/* Open PR List (Display Only - uses context data) */}

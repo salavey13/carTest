@@ -1,5 +1,4 @@
 // /contexts/RepoXmlPageContext.tsx
-// /contexts/RepoXmlPageContext.tsx
 "use client";
 
     import React, { createContext, useState, useContext, ReactNode, useCallback, MutableRefObject, useEffect } from 'react';
@@ -78,6 +77,7 @@
       manualBranchName: string; // User manual input
       isSettingsModalOpen: boolean; // Modal state
       currentAiRequestId: string | null; // Added for tracking AI request
+      isParsing: boolean; // Added for explicit parsing state
 
       // Refs
       fetcherRef: MutableRefObject<RepoTxtFetcherRef | null>;
@@ -104,6 +104,7 @@
       setLoadingPrs: (loading: boolean) => void;
       setIsSettingsModalOpen: (isOpen: boolean) => void; // Modal setter
       setCurrentAiRequestId: (id: string | null) => void; // Added setter for AI request ID
+      setIsParsing: (parsing: boolean) => void; // Setter for parsing state
 
       // Action Triggers
       triggerFetch: (isManualRetry?: boolean) => Promise<void>;
@@ -139,7 +140,7 @@
                  kworkInputHasContent: false, requestCopied: false, aiResponseHasContent: false,
                  filesParsed: false, selectedAssistantFiles: new Set(), assistantLoading: false, aiActionLoading: false,
                  loadingPrs: false, openPrs: [], targetBranchName: null, manualBranchName: "",
-                 isSettingsModalOpen: false, currentAiRequestId: null, // Added default
+                 isSettingsModalOpen: false, currentAiRequestId: null, isParsing: false, // Added default
                  fetcherRef: { current: null }, assistantRef: { current: null }, kworkInputRef: { current: null },
                  aiResponseInputRef: { current: null }, prSectionRef: { current: null },
                  setFetchStatus: warnSync('setFetchStatus'), setRepoUrlEntered: warnSync('setRepoUrlEntered'),
@@ -152,6 +153,7 @@
                  setOpenPrs: warnSync('setOpenPrs'), setLoadingPrs: warnSync('setLoadingPrs'),
                  setIsSettingsModalOpen: warnSync('setIsSettingsModalOpen'),
                  setCurrentAiRequestId: warnSync('setCurrentAiRequestId'), // Added stub setter
+                 setIsParsing: warnSync('setIsParsing'), // Added stub setter
                  triggerFetch: warn('triggerFetch'), triggerGetOpenPRs: warn('triggerGetOpenPRs'),
                  triggerSelectHighlighted: warnSync('triggerSelectHighlighted'),
                  triggerAddSelectedToKwork: warn('triggerAddSelectedToKwork'), triggerCopyKwork: warnSync('triggerCopyKwork'),
@@ -200,6 +202,7 @@
       const [loadingPrs, setLoadingPrsState] = useState(false);
       const [openPrs, setOpenPrsState] = useState<SimplePullRequest[]>([]);
       const [currentAiRequestId, setCurrentAiRequestIdState] = useState<string | null>(null); // Added state
+      const [isParsing, setIsParsingState] = useState(false); // Added state for explicit parsing
 
       // Branch state management
       const [manualBranchName, setManualBranchNameState] = useState<string>(""); // Manual input value
@@ -226,8 +229,8 @@
         // Handle loading states first
         if (fetchStatus === 'loading' || fetchStatus === 'retrying') return 'fetching';
         if (aiActionLoading && !aiResponseHasContent) return 'generating_ai_response'; // Specific AI gen loading
-        if (isParsing || (assistantLoading && !filesParsed && aiResponseHasContent)) return 'parsing_response'; // Parsing
-        if (assistantLoading && filesParsed) return 'pr_ready'; // Assume PR/Update loading if parsed
+        if (isParsing) return 'parsing_response'; // Explicit Parsing state
+        if (assistantLoading && filesParsed) return 'pr_ready'; // Assume PR/Update loading if files are parsed
 
         // Handle non-loading states
         if (fetchStatus === 'failed_retries') return 'fetch_failed';
@@ -258,7 +261,6 @@
 
 
       const currentStep = getCurrentStep();
-      const isParsing = assistantLoading && !filesParsed && aiResponseHasContent; // Derive parsing state
 
 
       // --- Updaters ---
@@ -277,6 +279,7 @@
             setSelectedAssistantFilesState(new Set());
             setAssistantLoadingState(false);
             setAiActionLoadingState(false);
+            setIsParsingState(false); // Reset parsing state
              if (assistantRef.current) assistantRef.current.setResponseValue("");
         } else {
             setFetchStatusState('success'); // Ensure status is success if files are fetched
@@ -298,6 +301,7 @@
           if (!parsed) {
               setSelectedAssistantFilesState(new Set());
           }
+          setIsParsingState(false); // Parsing finished
           setAssistantLoadingState(false); // Turn off general loading after parsing attempt
       }, []);
       const setSelectedAssistantFilesCallback = useCallback((files: Set<string>) => setSelectedAssistantFilesState(files), []);
@@ -316,11 +320,11 @@
             // Manual branch setting directly updates targetBranchName via useEffect
        }, []);
 
-
       const setOpenPrsCallback = useCallback((prs: SimplePullRequest[]) => setOpenPrsState(prs), []);
       const setLoadingPrsCallback = useCallback((loading: boolean) => setLoadingPrsState(loading), []);
       const setIsSettingsModalOpenCallback = useCallback((isOpen: boolean) => setIsSettingsModalOpenState(isOpen), []);
       const setCurrentAiRequestIdCallback = useCallback((id: string | null) => setCurrentAiRequestIdState(id), []); // Added setter
+      const setIsParsingCallback = useCallback((parsing: boolean) => setIsParsingState(parsing), []); // Added setter
 
 
       // --- Action Triggers ---
@@ -405,7 +409,14 @@
       // 4. setCurrentAiRequestIdCallback(null)
       // 5. Potentially triggerParseResponse()
 
-      const triggerParseResponse = useCallback(async () => { if (assistantRef.current) { await assistantRef.current.handleParse(); } else console.warn("triggerParseResponse: assistantRef not ready."); }, [assistantRef]); // Removed loading setter, handled in handleParse
+      const triggerParseResponse = useCallback(async () => {
+          if (assistantRef.current) {
+             setIsParsingState(true); // Start parsing
+             setAssistantLoadingState(true); // General loading can also be true
+             await assistantRef.current.handleParse();
+             // Setters for parsing/loading state are called inside the handleParse completion within the assistant
+          } else { console.warn("triggerParseResponse: assistantRef not ready."); }
+      }, [assistantRef]);
       const triggerSelectAllParsed = useCallback(() => { if (assistantRef.current) assistantRef.current.selectAllParsedFiles(); else console.warn("triggerSelectAllParsed: assistantRef not ready."); }, [assistantRef]);
       const triggerCreatePR = useCallback(async () => { if (assistantRef.current) await assistantRef.current.handleCreatePR(); else console.warn("triggerCreatePR: assistantRef not ready."); }, [assistantRef]);
       const triggerUpdateBranch = useCallback(async ( repoUrl: string, files: { path: string; content: string }[], commitMessage: string, branchName: string ): Promise<ReturnType<typeof updateBranch>> => {
@@ -485,7 +496,7 @@
         currentStep, fetchStatus, repoUrlEntered, filesFetched, primaryHighlightedPath,
         secondaryHighlightedPaths, selectedFetcherFiles, kworkInputHasContent, requestCopied,
         aiResponseHasContent, filesParsed, selectedAssistantFiles, assistantLoading, aiActionLoading,
-        loadingPrs, openPrs, targetBranchName, manualBranchName, isSettingsModalOpen, currentAiRequestId, // Added state
+        loadingPrs, openPrs, targetBranchName, manualBranchName, isSettingsModalOpen, currentAiRequestId, isParsing, // Added state
         fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef, prSectionRef,
         setFetchStatus: setFetchStatusCallback, setRepoUrlEntered: setRepoUrlEnteredCallback,
         setFilesFetched: setFilesFetchedCallback, setSelectedFetcherFiles: setSelectedFetcherFilesCallback,
@@ -499,6 +510,7 @@
         setOpenPrs: setOpenPrsCallback, // Correct setter passed
         setLoadingPrs: setLoadingPrsCallback, setIsSettingsModalOpen: setIsSettingsModalOpenCallback,
         setCurrentAiRequestId: setCurrentAiRequestIdCallback, // Added setter
+        setIsParsing: setIsParsingCallback, // Added setter
         triggerFetch, triggerGetOpenPRs, triggerSelectHighlighted, triggerAddSelectedToKwork,
         triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreatePR,
         triggerUpdateBranch, triggerToggleSettingsModal, scrollToSection,
