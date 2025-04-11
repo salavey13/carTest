@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tooltip } from '../AICodeAssistant';
-import { FaRotate, FaCodeBranch } from 'react-icons/fa6'; // Added FaCodeBranch as a default/fallback
+import { FaRotate, FaCodeBranch, FaGithub } from 'react-icons/fa6'; // Added FaCodeBranch, FaGithub
 
 interface PullRequestFormProps {
     repoUrl: string;
@@ -39,7 +39,7 @@ export const PullRequestForm: React.FC<PullRequestFormProps> = ({
         <section id="pr-section" className="mb-4">
             <div className="flex flex-col sm:flex-row justify-between items-center mb-3 gap-2">
                 <h2 className="text-lg font-semibold text-cyan-400">
-                    {/* Update title based on action? Optional */}
+                    {/* Update title based on action */}
                     {buttonText.includes("Обновить") ? "Обновление Ветки" : "Pull Request"} ({selectedFileCount} файлов)
                 </h2>
                 <div className="flex gap-2 items-center">
@@ -68,11 +68,34 @@ export const PullRequestForm: React.FC<PullRequestFormProps> = ({
                 </div>
             </div>
 
-            {/* Collapsible PR Details Form (Keep existing) */}
+            {/* Collapsible PR Details Form */}
             <AnimatePresence>
                 {showPRDetails && (
-                    <motion.div /* ... */ >
-                        {/* ... Repo URL and PR Title inputs ... */}
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-gray-800/60 rounded-lg border border-gray-700">
+                            <div>
+                                <label htmlFor="repo-url-input" className="block text-xs font-medium text-gray-400 mb-1">URL Репозитория</label>
+                                <input
+                                    id="repo-url-input" type="text" value={repoUrl} onChange={(e) => onRepoUrlChange(e.target.value)}
+                                    className="w-full p-2 bg-gray-700 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none text-xs text-white disabled:opacity-50"
+                                    placeholder="https://github.com/owner/repo" disabled={isLoading}
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="pr-title-input" className="block text-xs font-medium text-gray-400 mb-1">Заголовок PR/Commit</label>
+                                <input
+                                    id="pr-title-input" type="text" value={prTitle} onChange={(e) => onPrTitleChange(e.target.value)}
+                                    className="w-full p-2 bg-gray-700 rounded border border-gray-600 focus:border-cyan-500 focus:outline-none text-xs text-white disabled:opacity-50"
+                                    placeholder="Краткое описание изменений..." disabled={isLoading} maxLength={100}
+                                />
+                            </div>
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>

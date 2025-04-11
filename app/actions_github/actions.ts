@@ -50,6 +50,7 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
   console.log(`Fetching repo contents for: ${repoUrl}${branchName ? ` on branch ${branchName}` : ' (default branch)'} using Git Trees API`);
   const startTime = Date.now();
   let owner: string | undefined, repo: string | undefined;
+  let targetBranch = branchName; // Use mutable variable for potentially fetching default
 
   try {
     const token = customToken || process.env.GITHUB_TOKEN;
@@ -59,16 +60,15 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
     const allowedExtensions = [".ts", ".tsx", ".css", ".sql"]; // excluded as per original comment
     const excludedPrefixes = ["supabase/", "components/ui/", "node_modules/", ".next/", "dist/", "build/", "Configame/"];
 
-    let targetBranch = branchName;
     let latestCommitSha: string;
 
     if (!targetBranch) {
-        console.log("Fetching repository info for default branch...");
+        console.log("No branch specified, fetching repository info for default branch...");
         const { data: repoData } = await octokit.repos.get({ owner, repo });
         targetBranch = repoData.default_branch;
         console.log(`Default branch determined: ${targetBranch}`);
     } else {
-        console.log(`Using specified branch: ${targetBranch}`);
+        console.log(`Fetching content for specified branch: ${targetBranch}`);
     }
 
     console.log(`Fetching ref for branch ${targetBranch}...`);
@@ -77,7 +77,11 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
         latestCommitSha = refData.object.sha;
         console.log(`Latest commit SHA on ${targetBranch}: ${latestCommitSha}`);
     } catch (refError: any) {
-         if (refError.status === 404) throw new Error(`Branch '${targetBranch}' not found (404).`);
+         if (refError.status === 404) {
+             console.error(`Branch '${targetBranch}' not found (404).`);
+             throw new Error(`Branch '${targetBranch}' not found (404).`);
+         }
+         console.error(`Failed to get reference for branch '${targetBranch}':`, refError);
          throw new Error(`Failed to get reference for branch '${targetBranch}': ${refError.message}`);
     }
 
@@ -90,12 +94,12 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
     try {
         const response = await octokit.git.getTree({ owner, repo, tree_sha: treeSha, recursive: '1' });
         treeData = response.data as GitTreeResponseData;
-        // --- VITAL DEBUG LOGGING ---
-        // console.log("Raw treeData received:", JSON.stringify(treeData, null, 2).substring(0, 500) + '...');
+        // .. VITAL DEBUG LOGGING (Uncomment if needed)
+        // .. console.log("Raw treeData received:", JSON.stringify(treeData, null, 2).substring(0, 500) + '...');
         if (treeData?.truncated) {
             console.warn("WARNING: GitHub API reported the tree data was truncated. File list may be incomplete.");
-            // Decide if you want to notify admin about truncation
-            // await notifyAdmin(`⚠️ Tree data truncated for ${owner}/${repo} on branch ${targetBranch}. File list might be incomplete.`);
+            // .. Decide if you want to notify admin about truncation
+            // .. await notifyAdmin(`⚠️ Tree data truncated for ${owner}/${repo} on branch ${targetBranch}. File list might be incomplete.`);
         }
         if (!treeData || !Array.isArray(treeData.tree)) {
             console.error("Invalid tree structure received. Expected an object with a 'tree' array property, but got:", treeData);
@@ -142,7 +146,7 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
                      content = Buffer.from(blobData.content, 'base64').toString('utf-8');
                  } else if (blobData.encoding === 'utf-8') {
                      content = blobData.content;
-                     console.warn(`Received non-base64 encoding ('${blobData.encoding}') for blob ${fileInfo.path}. Using content directly.`);
+                     // .. console.warn(`Received non-base64 encoding ('${blobData.encoding}') for blob ${fileInfo.path}. Using content directly.`);
                  } else {
                      console.error(`Unsupported blob encoding for ${fileInfo.path}: ${blobData.encoding}. Cannot decode.`);
                      throw new Error(`Unsupported encoding '${blobData.encoding}' for file ${fileInfo.path}`);
@@ -155,8 +159,12 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
                  else { pathComment = `# /${fileInfo.path}`; } // Default
 
                  const firstLineTrimmed = contentLines[0]?.trimStart();
-                 if (firstLineTrimmed?.match(/^(--|\/\/|\/\*|#)/)) { contentLines[0] = pathComment; }
-                 else { contentLines.unshift(pathComment); }
+                 // .. Only replace if the first line LOOKS like a comment already
+                 if (firstLineTrimmed?.match(/^(--|\/\/|\/\*|#)/)) {
+                    contentLines[0] = pathComment;
+                 } else { // .. Otherwise, prepend
+                    contentLines.unshift(pathComment);
+                 }
                  return { path: fileInfo.path, content: contentLines.join("\n") };
              } catch (fetchError: any) {
                   console.error(`Error fetching blob content for ${fileInfo.path} (SHA: ${fileInfo.sha}):`, fetchError.status ? `${fetchError.message} (Status: ${fetchError.status})` : fetchError);
@@ -165,11 +173,11 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
         });
         try {
             const batchResults = await Promise.all(batchPromises); allFiles.push(...batchResults);
-            // console.log(`Batch ${batchNumber}/${totalBatches} completed.`);
+            // .. console.log(`Batch ${batchNumber}/${totalBatches} completed.`);
         } catch (batchError) {
              console.error(`Error processing content batch ${batchNumber}/${totalBatches}:`, batchError);
-             // Throw to indicate the overall fetch failed if any batch fails.
-             // It already includes the specific file error message from the inner catch
+             // .. Throw to indicate the overall fetch failed if any batch fails.
+             // .. It already includes the specific file error message from the inner catch
              throw new Error(`Failed to fetch files in batch ${batchNumber}. Error: ${batchError instanceof Error ? batchError.message : batchError}`);
         }
         if (i + BATCH_SIZE < totalFiles) {
@@ -185,7 +193,8 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
   } catch (error: any) {
         const endTime = Date.now();
         const repoIdentifier = owner && repo ? `${owner}/${repo}` : repoUrl;
-        const branchInfo = branchName ? ` on branch '${branchName}'` : ' on default branch';
+        // Use targetBranch (which might be the fetched default) in error messages
+        const branchInfo = targetBranch ? ` on branch '${targetBranch}'` : ' (default branch)';
         console.error(`Error fetching repo contents for ${repoIdentifier}${branchInfo} after ${(endTime - startTime) / 1000} seconds:`, error);
          // Use notifyAdmin for error notifications
          if (error.status === 403 && error.message?.includes('rate limit exceeded')) {
@@ -196,7 +205,7 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
          if (error.status === 404 || error.message?.includes('not found')) {
             console.error("Repository, branch, or resource not found.");
              await notifyAdmin(`❌ Ошибка (404 Not Found) при извлечении файлов из репозитория ${repoIdentifier}${branchInfo}. Проверьте URL, права доступа к токену и существование ветки/коммита.`);
-            return { success: false, error: "Repository, branch, or required resource not found (404). Check URL, token permissions, and branch/commit existence." };
+            return { success: false, error: `Repository, branch ('${targetBranch}'), or required resource not found (404). Check URL, token permissions, and branch/commit existence.` };
          }
          if (error.status === 401 || error.status === 403) {
              console.error(`GitHub API Authentication/Authorization error (Status: ${error.status})`);
@@ -263,7 +272,7 @@ export async function createGitHubPullRequest(
     const { data: pr } = await octokit.pulls.create({ owner, repo, title: prTitle, body: finalPrDescription, head: newBranch, base: baseBranch });
     console.log(`Pull request created: ${pr.html_url}`);
     // --- Notify (Success) ---
-    const adminMessage = `🔔 Созданы новые изменения в проекте!\nЧто меняем: ${prTitle}\nПодробности: ${prDescription}\nФайлы: ${changedFiles}\n\n[Посмотреть и одобрить на GitHub](https://github.com/${owner}/${repo}/pull/${pr.number})`;
+    const adminMessage = `🔔 Созданы новые изменения в проекте!\nЧто меняем: ${prTitle}\nПодробности: ${finalPrDescription}\nФайлы: ${changedFiles}\n\n[Посмотреть и одобрить на GitHub](https://github.com/${owner}/${repo}/pull/${pr.number})`;
     await notifyAdmins(adminMessage); // Use notifyAdmins for success broadcasts
     return { success: true, prUrl: pr.html_url, branch: newBranch };
 
@@ -317,7 +326,11 @@ export async function updateBranch(
         baseSha = refData.object.sha;
         console.log(`Current HEAD SHA for ${branchName}: ${baseSha}`);
     } catch (refError: any) {
-        if (refError.status === 404) throw new Error(`Branch '${branchName}' not found. Cannot update.`);
+        if (refError.status === 404) {
+            console.error(`Branch '${branchName}' not found. Cannot update.`);
+            throw new Error(`Branch '${branchName}' not found. Cannot update.`);
+        }
+        console.error(`Failed to get ref for ${branchName}:`, refError);
         throw new Error(`Failed to get ref for ${branchName}: ${refError.message}`);
     }
 
@@ -536,7 +549,18 @@ export async function getOpenPullRequests(repoUrl: string) {
     // console.log(`Fetching open PRs for ${owner}/${repo}...`);
     const { data } = await octokit.pulls.list({ owner, repo, state: "open" });
     // console.log(`Found ${data.length} open PRs.`);
-    return { success: true, pullRequests: data };
+    // Ensure essential data is present
+    const cleanData = data.map(pr => ({
+        id: pr.id,
+        number: pr.number,
+        title: pr.title || 'Untitled PR',
+        html_url: pr.html_url || '#',
+        user: { login: pr.user?.login || 'unknown' },
+        head: { ref: pr.head?.ref || 'unknown-branch' }, // Important: Ensure branch name is included
+        updated_at: pr.updated_at || new Date().toISOString(),
+    }));
+
+    return { success: true, pullRequests: cleanData };
   } catch (error: any) {
     console.error("Error fetching open PRs:", error);
     const repoIdentifier = owner && repo ? `${owner}/${repo}` : repoUrl;

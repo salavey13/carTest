@@ -1,6 +1,4 @@
 // /components/assistant_components/OpenPrList.tsx
-// No changes needed here, it just displays the PRs passed to it.
-// It will now receive PRs from the context via AICodeAssistant props.
 import React from 'react';
 import { SimplePullRequest } from '@/contexts/RepoXmlPageContext'; // Import type
 
@@ -27,8 +25,8 @@ export const OpenPrList: React.FC<OpenPrListProps> = ({ openPRs }) => {
                         <span className="text-xs text-gray-500 ml-auto flex-shrink-0">
                             by {pr.user?.login || 'unknown'}
                         </span>
-                         {/* Optionally display branch if needed for context */}
-                         {/* <span className="text-xs text-gray-600 ml-1 flex-shrink-0 truncate" title={`Branch: ${pr.head.ref}`}>({pr.head.ref})</span> */}
+                         {/* Display branch if needed for context */}
+                         <span className="text-xs text-gray-600 ml-1 flex-shrink-0 truncate" title={`Branch: ${pr.head.ref}`}>({pr.head.ref})</span>
                     </li>
                 ))}
             </ul>
