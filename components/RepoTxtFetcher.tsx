@@ -14,7 +14,7 @@
     import { fetchRepoContents } from "@/app/actions_github/actions";
     import { useAppContext } from "@/contexts/AppContext";
     // CORRECTED Import: Removed categorizeResolvedPath and ImportCategory
-    import { useRepoXmlPageContext, RepoTxtFetcherRef, FetchStatus, SimplePullRequest } from "@/contexts/RepoXmlPageContext";
+    import { useRepoXmlPageContext, RepoTxtFetcherRef, FetchStatus, SimplePullRequest, triggerFetch } from "@/contexts/RepoXmlPageContext";
 
     // Sub-components
     import SettingsModal from "./repo/SettingsModal";
