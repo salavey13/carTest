@@ -366,6 +366,31 @@
        // eslint-disable-next-line react-hooks/exhaustive-deps
        }, []); // No dependencies needed as it uses passed repoUrl
 
+       const scrollToSection = useCallback((id: 'kworkInput' | 'aiResponseInput' | 'prSection' | 'fetcher' | 'assistant' | 'executor' | 'settingsModalTrigger' | 'settings-modal-trigger-assistant') => {
+        let element: HTMLElement | null = null;
+        const targetId = (id === 'assistant' || id === 'executor') ? 'executor'
+                        : (id === 'fetcher' ? 'extractor'
+                        : (id === 'settingsModalTrigger' ? 'settings-modal-trigger-assistant' // Map to specific button ID
+                        : id));
+        switch(targetId) {
+           case 'kworkInput': element = kworkInputRef.current; break;
+           case 'aiResponseInput': element = aiResponseInputRef.current; break;
+           case 'prSection': element = prSectionRef.current; break;
+           case 'extractor': element = document.getElementById('extractor'); break;
+           case 'executor': element = document.getElementById('executor'); break;
+           case 'settings-modal-trigger-assistant': element = document.getElementById('settings-modal-trigger-assistant'); break;
+        }
+        if (element) {
+            // Scroll elements within assistant/fetcher into center view for better focus
+            if (targetId === 'kworkInput' || targetId === 'aiResponseInput' || targetId === 'prSection' || targetId === 'settings-modal-trigger-assistant') {
+                 element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else { // Scroll main sections with top offset
+                const rect = element.getBoundingClientRect(); window.scrollTo({ top: window.scrollY + rect.top - 80, behavior: 'smooth' });
+            }
+        } else console.warn(`scrollToSection: Element for id "${targetId}" (mapped from "${id}") not found.`);
+     }, [kworkInputRef, aiResponseInputRef, prSectionRef]);
+
+     
       const triggerSelectHighlighted = useCallback(() => { if (fetcherRef.current) fetcherRef.current.selectHighlightedFiles(); else console.warn("triggerSelectHighlighted: fetcherRef not ready."); }, [fetcherRef]);
       const triggerAddSelectedToKwork = useCallback(async (autoAskAi = false, filesToAddParam?: Set<string>) => { if (fetcherRef.current) await fetcherRef.current.handleAddSelected(autoAskAi, filesToAddParam); else console.warn("triggerAddSelectedToKwork: fetcherRef not ready."); }, [fetcherRef]);
       const triggerCopyKwork = useCallback(() => { if (fetcherRef.current) { const copied = fetcherRef.current.handleCopyToClipboard(); if (copied) { setRequestCopiedState(true); setAiResponseHasContentState(false); if (assistantRef.current) assistantRef.current.setResponseValue(""); } } else console.warn("triggerCopyKwork: fetcherRef not ready."); }, [fetcherRef, assistantRef]);
@@ -433,29 +458,7 @@
        }, []);
       const triggerToggleSettingsModal = useCallback(() => setIsSettingsModalOpenState(prev => !prev), []);
 
-      const scrollToSection = useCallback((id: 'kworkInput' | 'aiResponseInput' | 'prSection' | 'fetcher' | 'assistant' | 'executor' | 'settingsModalTrigger' | 'settings-modal-trigger-assistant') => {
-         let element: HTMLElement | null = null;
-         const targetId = (id === 'assistant' || id === 'executor') ? 'executor'
-                         : (id === 'fetcher' ? 'extractor'
-                         : (id === 'settingsModalTrigger' ? 'settings-modal-trigger-assistant' // Map to specific button ID
-                         : id));
-         switch(targetId) {
-            case 'kworkInput': element = kworkInputRef.current; break;
-            case 'aiResponseInput': element = aiResponseInputRef.current; break;
-            case 'prSection': element = prSectionRef.current; break;
-            case 'extractor': element = document.getElementById('extractor'); break;
-            case 'executor': element = document.getElementById('executor'); break;
-            case 'settings-modal-trigger-assistant': element = document.getElementById('settings-modal-trigger-assistant'); break;
-         }
-         if (element) {
-             // Scroll elements within assistant/fetcher into center view for better focus
-             if (targetId === 'kworkInput' || targetId === 'aiResponseInput' || targetId === 'prSection' || targetId === 'settings-modal-trigger-assistant') {
-                  element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-             } else { // Scroll main sections with top offset
-                 const rect = element.getBoundingClientRect(); window.scrollTo({ top: window.scrollY + rect.top - 80, behavior: 'smooth' });
-             }
-         } else console.warn(`scrollToSection: Element for id "${targetId}" (mapped from "${id}") not found.`);
-      }, [kworkInputRef, aiResponseInputRef, prSectionRef]);
+      
 
 
       // --- Xuinity Message Logic ---
