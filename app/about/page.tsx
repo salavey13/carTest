@@ -1,4 +1,5 @@
 // /app/about/page.tsx
+// /app/about/page.tsx
 "use client";
 import Head from "next/head";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -176,13 +177,13 @@ export default function AboutPage() {
                    <p className="text-sm md:text-base text-gray-300 mb-4">
                      Мой метод VIBE — это не просто кодинг, это <strong>парадигмальный сдвиг</strong>. Это ответ на вопрос: как создавать ценность в эпоху, когда AI может генерировать код с <strong>"near-perfect accuracy"</strong>? VIBE — это <strong>AI-усиленная алхимия</strong>, где фокус смещается с написания строк кода на <strong>архитектуру системы, UX-потоки и стратегическое видение</strong>.
                    </p>
-                   {/* Image 1 */}
+                   {/* Image 1 - Added overflow-hidden */}
                    <img
                        src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/00.png"
                        alt="VIBE Methodology Visualization - AI-assisted strategy and automation"
-                       className="rounded-lg shadow-[0_0_10px_#39FF14] my-4 w-full object-cover"
-                       style={{ aspectRatio: '16/9' }} // Enforce aspect ratio
-                       loading="lazy" // Add lazy loading
+                       className="rounded-lg overflow-hidden shadow-[0_0_10px_#39FF14] my-4 w-full object-cover" // Added overflow-hidden
+                       style={{ aspectRatio: '16/9' }}
+                       loading="lazy"
                    />
                    {/* Render directly with JSX */}
                    <p className="text-sm md:text-base text-gray-300 mb-4">
@@ -222,7 +223,7 @@ export default function AboutPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="mb-4">
-                    {/* Existing Video */}
+                    {/* Existing Video - Added overflow-hidden */}
                     <iframe
                       width="100%"
                       style={{ aspectRatio: '16/9' }} // Use aspect ratio for height
@@ -231,7 +232,7 @@ export default function AboutPage() {
                       frameBorder="0"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                       allowFullScreen
-                      className="rounded-lg shadow-[0_0_10px_#39FF14]"
+                      className="rounded-lg overflow-hidden shadow-[0_0_10px_#39FF14]" // Added overflow-hidden
                       loading="lazy"
                     ></iframe>
                   </div>
@@ -246,14 +247,15 @@ export default function AboutPage() {
                      <li>Подписки обходятся через уязвимости</li>
                    </ul>
 
-                  {/* Image 2 */}
+                  {/* Image 2 - Added overflow-hidden */}
                   <img
                       src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/11.png"
                       alt="Secure AI Development Pipeline - VIBE Coding with Security"
-                      className="rounded-lg shadow-[0_0_10px_#39FF14] my-4 w-full object-cover"
-                      style={{ aspectRatio: '16/9' }} // Enforce aspect ratio
+                      className="rounded-lg overflow-hidden shadow-[0_0_10px_#39FF14] my-4 w-full object-cover" // Added overflow-hidden
+                      style={{ aspectRatio: '16/9' }}
                       loading="lazy"
                   />
+
                    {/* Render directly with JSX */}
                    <p className="text-sm md:text-base mb-4 text-gray-300">
                      <strong>Мой подход:</strong> Мои 13 лет в <strong>enterprise security</strong> позволяют мне применять VIBE-методологию <strong>безопасно</strong>. Я интегрирую проверки на каждом шагу, чтобы AI-скорость не приводила к уязвимостям. Это <strong>оптимизация ресурсов</strong>: максимальная эффективность AI при сохранении человеческого контроля над критическими аспектами — безопасностью и стратегией.
@@ -335,14 +337,14 @@ export default function AboutPage() {
                      </div>
                    </div>
 
-                   {/* Video Integration */}
+                   {/* Video Integration - Added overflow-hidden */}
                    <div className="mt-6">
                      <iframe
                        width="100%"
                        style={{ aspectRatio: '16/9' }} // Use aspect ratio
                        src="https://www.youtube.com/embed/tHQnW0Vid9I"
                        title="Combining VIBE Development with Enterprise Security Video"
-                       className="rounded-lg shadow-[0_0_10px_#39FF14] mt-4"
+                       className="rounded-lg overflow-hidden shadow-[0_0_10px_#39FF14] mt-4" // Added overflow-hidden
                        frameBorder="0"
                        allowFullScreen
                        loading="lazy"
@@ -505,12 +507,12 @@ export default function AboutPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                   {/* Image 3 */}
+                   {/* Image 3 - Added overflow-hidden */}
                   <img
                       src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/22.png"
                       alt="Кибер-Гараж - AI-Powered Car Rental Ecosystem"
-                      className="rounded-lg shadow-[0_0_10px_#39FF14] my-4 w-full object-cover"
-                      style={{ aspectRatio: '16/9' }} // Enforce aspect ratio
+                      className="rounded-lg overflow-hidden shadow-[0_0_10px_#39FF14] my-4 w-full object-cover" // Added overflow-hidden
+                      style={{ aspectRatio: '16/9' }}
                       loading="lazy"
                   />
                   {/* Render directly with JSX */}
