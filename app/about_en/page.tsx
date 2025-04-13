@@ -25,7 +25,7 @@ export default function AboutEnPage() {
       <div className="relative min-h-screen">
         {/* Language Switcher Link */}
         <Link href="/about" legacyBehavior>
-          <a className="fixed top-20 right-4 z-50 p-2 bg-black/70 border border-[#39FF14]/50 rounded-md text-[#39FF14] hover:bg-[#39FF14] hover:text-black transition-colors text-sm font-mono shadow-glow-sm">
+          <a className="fixed top-10 right-4 z-50 p-2 bg-black/70 border border-[#39FF14]/50 rounded-md text-[#39FF14] hover:bg-[#39FF14] hover:text-black transition-colors text-sm font-mono shadow-glow-sm">
             RU
             {/* Or use an icon: <FaGlobe className="h-5 w-5" /> */}
           </a>
