@@ -5,6 +5,7 @@ import Head from "next/head";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import SupportForm from "@/components/SupportForm";
+import Link from "next/link"; // Import Link for internal navigation
 
 export default function AboutPage() {
   return (
@@ -23,6 +24,13 @@ export default function AboutPage() {
         />
       </Head>
       <div className="relative min-h-screen">
+        {/* Language Switcher Link */}
+        <Link href="/about_en" legacyBehavior>
+          <a className="fixed top-10 right-4 z-50 p-2 bg-black/70 border border-[#39FF14]/50 rounded-md text-[#39FF14] hover:bg-[#39FF14] hover:text-black transition-colors text-sm font-mono shadow-glow-sm">
+            EN
+            {/* Or use an icon: <FaGlobe className="h-5 w-5" /> */}
+          </a>
+        </Link>
         {/* Enhanced Cyberpunk SVG Background */}
         <div className="absolute inset-0 z-0">
           {/* Existing SVG Background */}
