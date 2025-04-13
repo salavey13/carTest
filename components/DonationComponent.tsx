@@ -266,7 +266,7 @@ export default function DonationComponent() {
               <Dialog>
                 <DialogTrigger asChild>
                    {/* Make the link button more subtle */}
-                  <Button variant="link" className="text-brand-green/80 hover:text-brand-green underline text-sm font-normal">
+                  <Button variant="link" className="text-brand-green/80 hover:text-brand-green underline text-xxs width-[169] font-normal">
                     {t.createOwn}
                   </Button>
                 </DialogTrigger>
