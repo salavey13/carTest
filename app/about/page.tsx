@@ -173,7 +173,7 @@ export default function AboutPage() {
                       "Cyberpunk visualization of the VIBE methodology. A central glowing brain/processor icon representing human strategy. Radiating outwards are streams of neon data flowing towards automated processes: 'AI Code Generation' (glowing code snippets), 'Automated Testing' (checkmarks), 'Business Validation' (graphs/charts), 'Deployment Pipelines' (gears/arrows). Dark, tech-infused background with subtle circuit traces. Dominant colors: #39FF14 green, electric blue, magenta accents. Aspect ratio 16:9."
                   */}
                   <img
-                      src="/placeholder-image-vibe-concept.webp"
+                      src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/00.png"
                       alt="VIBE Methodology Visualization - AI-assisted strategy and automation"
                       className="rounded-lg shadow-[0_0_10px_#39FF14] my-4 w-full object-cover"
                       style={{ aspectRatio: '16/9' }} // Enforce aspect ratio
@@ -240,7 +240,7 @@ export default function AboutPage() {
                       "Cyberpunk image depicting a secure AI development pipeline. Glowing green code streams flowing through holographic security shields (labeled OWASP, Static Analysis, Zero Trust). A robotic arm (representing AI) is coding, overseen by a vigilant human silhouette looking at security dashboards. Dark, server room background with neon blue and green lights. Style: Futuristic, secure, high-tech. Aspect ratio 16:9."
                   */}
                   <img
-                      src="/placeholder-image-secure-ai-dev.webp"
+                      src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/11.png"
                       alt="Secure AI Development Pipeline - VIBE Coding with Security"
                       className="rounded-lg shadow-[0_0_10px_#39FF14] my-4 w-full object-cover"
                       style={{ aspectRatio: '16/9' }} // Enforce aspect ratio
@@ -490,7 +490,7 @@ export default function AboutPage() {
                        "Cyberpunk scene of a futuristic garage ('Кибер-Гараж'). Holographic interfaces display car diagnostics and rental schedules. AI assistants (represented by glowing orbs or abstract energy forms) interact with the system. Chinese electric cars are visible, perhaps with augmented reality overlays showing specs or tour points. Neon signs in Russian and English. Style: Blade Runner meets automotive tech. Aspect ratio 16:9."
                    */}
                   <img
-                      src="/placeholder-image-cyber-garage.webp"
+                      src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/22.png"
                       alt="Кибер-Гараж - AI-Powered Car Rental Ecosystem"
                       className="rounded-lg shadow-[0_0_10px_#39FF14] my-4 w-full object-cover"
                       style={{ aspectRatio: '16/9' }} // Enforce aspect ratio
