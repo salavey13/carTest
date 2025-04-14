@@ -16,7 +16,7 @@ import {
 import {
   FaLightbulb, FaRoad, FaUsers, FaRocket, FaCodeBranch,
   FaArrowsSpin, FaNetworkWired, FaBookOpen, FaComments, FaBrain, FaEye, // fa6 icons (removed unused ones)
-  FaFileCode, FaRobot, FaMagicWandSparkles, FaBullseye, FaEnvelopeOpenText, // Added new icons
+  FaFileCode, FaRobot, FaWandMagicSparkles, FaBullseye, FaEnvelopeOpenText, // Added new icons
 } from "react-icons/fa6";
 import { debugLogger } from "@/lib/debugLogger";
 // import { logger } from "@/lib/logger"; // logger not used directly here, removed for cleanliness
@@ -309,7 +309,7 @@ export default function SelfDevLandingPage() {
                 {/* Section 5: How to Learn & Start (Intelligent Imitation) */}
                 <section className="space-y-4">
                   <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-purple mb-4">
-                     <FaMagicWandSparkles className="mr-3 text-brand-purple/80" /> Как Начать: Изучай Методологию и Имитируй
+                     <FaWandMagicSparkles className="mr-3 text-brand-purple/80" /> Как Начать: Изучай Методологию и Имитируй
                   </h2>
                   <p className="text-gray-300 text-base md:text-lg leading-relaxed">
                     Тебе не нужна книга инструкций. Ты <strong className="text-brand-purple font-semibold">уже</strong> окружен информацией. Научись учиться как художник: наблюдай, <strong className="text-brand-purple font-semibold">изучай методологию (Навык #2)</strong> и экспериментируй. Будь как <strong className="text-brand-purple font-semibold">продакт-менеджер</strong> своего SelfDev пути.
