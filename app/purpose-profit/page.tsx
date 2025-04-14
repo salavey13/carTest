@@ -11,8 +11,8 @@ import {
 } from "@/components/ui/tooltip";
 import {
   FaBookOpen, FaBriefcase, FaPersonRunning, FaMoneyBillWave, FaBrain,
-  FaLayerGroup, FaMagnifyingGlassChart, FaMapSigns, FaHandHoldingDollar,
-  FaKeyboard, FaBullseye, FaPaintBrush, FaUserCircle, // fa6 icons
+  FaLayerGroup, FaMagnifyingGlassChart, FaMapLocation, FaHandHoldingDollar,
+  FaKeyboard, FaBullseye, FaPaintBrush, FaCircleUser, // fa6 icons
 } from "react-icons/fa6";
 import { debugLogger } from "@/lib/debugLogger";
 import Image from "next/image";
@@ -186,7 +186,7 @@ const chapters = [
   },
   {
       id: "lifes_work",
-      icon: FaMapSigns,
+      icon: FaMapLocation,
       titleEn: "Your Life's Work",
       titleRu: "Дело Вашей Жизни",
       pointsEn: [
@@ -300,7 +300,7 @@ const chapters = [
   },
   {
       id: "author",
-      icon: FaUserCircle,
+      icon: FaCircleUser,
       titleEn: "About the Author",
       titleRu: "Об Авторе",
       pointsEn: [
