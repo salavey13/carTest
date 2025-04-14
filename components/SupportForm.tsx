@@ -1,17 +1,32 @@
 "use client";
 import { useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
-import { sendTelegramInvoice } from "@/app/actions";
+import { sendTelegramInvoice } from "@/app/actions"; // Предполагаем, что этот экшен существует
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { logger } from "@/lib/logger"; // Импортируем логгер
 
 export default function SupportForm() {
-  const { user } = useAppContext();
+  const contextValue = useAppContext(); // Сначала получаем весь контекст
   const [level, setLevel] = useState("1");
   const [message, setMessage] = useState("");
   const { toast } = useToast();
+
+  // Проверка на наличие контекста
+  if (!contextValue) {
+    logger.error("AppContext not available in SupportForm. Ensure AppProvider wraps this component.");
+    // Можно вернуть заглушку или null, чтобы избежать ошибки рендера
+    return (
+        <div className="text-center text-red-500 p-4 border border-red-500/50 rounded-lg bg-red-900/30">
+            Ошибка: Контекст приложения недоступен. Форма поддержки не может быть загружена.
+        </div>
+    );
+  }
+
+  // Теперь безопасно деструктурируем user
+  const { user } = contextValue;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,32 +39,48 @@ export default function SupportForm() {
       return;
     }
 
-    const amount = parseInt(level) * 1000; // 1 звезда = 1000 XTR
-    const description = `Заявка на поддержку: ${message}\nУровень: ${level} звезды`;
+    // Убедимся, что user.id существует
+    if (!user.id) {
+       toast({
+        title: "Ошибка",
+        description: "Не удалось получить ID пользователя. Попробуйте перезайти.",
+        variant: "destructive",
+      });
+      logger.error("User object is missing 'id' property in SupportForm handleSubmit", { user });
+      return;
+    }
+
+    const amount = parseInt(level) * 1000; // 1 звезда = 1000 XTR (Stars)
+    const description = `Заявка на поддержку (${level} ★): ${message || 'Без сообщения'}`; // Добавим звезду и обработку пустого сообщения
     const payload = `support_${user.id}_${Date.now()}`;
+    const title = `Поддержка VIBE (${level} ★)`; // Более информативный заголовок
 
     try {
       const result = await sendTelegramInvoice(
         user.id.toString(),
-        "Заявка на поддержку",
+        title,
         description,
         payload,
-        amount,
-        0 // No subscription ID
+        amount, // Сумма в минимальных единицах валюты (например, копейках для RUB, центах для USD, или Stars для XTR)
+        0, // No subscription ID
+        "XTR" // Указываем валюту
       );
 
-      if (!result.success) {
-        throw new Error(result.error || "Не удалось отправить заявку");
+      if (!result || !result.success) { // Добавим проверку на существование result
+        throw new Error(result?.error || "Не удалось отправить счет на оплату");
       }
 
       toast({
-        title: "Успех",
-        description: "Заявка отправлена! Ожидайте подтверждения оплаты.",
+        title: "Успех!",
+        description: "Счет на оплату поддержки отправлен вам в Telegram.",
       });
+      setMessage(""); // Очищаем форму после успеха
+      setLevel("1");
     } catch (error) {
+      logger.error("Failed to send support invoice:", error);
       toast({
-        title: "Ошибка",
-        description: "Не удалось отправить заявку. Попробуйте позже.",
+        title: "Ошибка отправки",
+        description: error instanceof Error ? error.message : "Не удалось отправить заявку. Попробуйте позже.",
         variant: "destructive",
       });
     }
@@ -57,24 +88,37 @@ export default function SupportForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+       <p className="text-sm text-gray-400 text-center">
+         Отправьте заявку на поддержку или консультацию. Оплата через Telegram Stars (XTR).
+       </p>
       <Input
-        placeholder="Ваше сообщение"
+        placeholder="Кратко опишите ваш вопрос или задачу"
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         required
-        className="w-full bg-black text-white border border-[#39FF14] rounded-lg text-sm md:text-base"
+        className="w-full bg-black/70 text-white border border-brand-green/50 rounded-lg text-sm md:text-base placeholder:text-gray-500 focus:border-brand-green focus:ring-brand-green"
       />
       <Select value={level} onValueChange={setLevel}>
-        <SelectTrigger className="w-full bg-black text-white border border-[#39FF14] rounded-lg text-sm md:text-base">
-          <SelectValue placeholder="Выберите уровень поддержки" />
+        <SelectTrigger className="w-full bg-black/70 text-white border border-brand-green/50 rounded-lg text-sm md:text-base focus:border-brand-green focus:ring-brand-green">
+          <SelectValue placeholder="Выберите уровень приоритета" />
         </SelectTrigger>
-        <SelectContent className="bg-black text-white border border-[#39FF14]">
-          <SelectItem value="1">1 звезда (1000 XTR ≈ 20$)</SelectItem>
-          <SelectItem value="2">2 звезды (2000 XTR ≈ 40$)</SelectItem>
-          <SelectItem value="3">3 звезды (3000 XTR ≈ 60$)</SelectItem>
+        <SelectContent className="bg-black text-white border border-brand-green/50">
+          <SelectItem value="1">★ Базовый (1000 XTR)</SelectItem>
+          <SelectItem value="2">★★ Средний (2000 XTR)</SelectItem>
+          <SelectItem value="3">★★★ Высокий (3000 XTR)</SelectItem>
         </SelectContent>
       </Select>
-      <Button type="submit" className="w-full bg-[#39FF14] text-black rounded-lg shadow-[0_0_5px_#39FF14] hover:bg-[#2CFF00]">Отправить заявку</Button>
+      <Button
+        type="submit"
+        disabled={!user} // Делаем кнопку неактивной, если пользователь не авторизован
+        className={cn(
+            "w-full text-black rounded-lg font-semibold transition-all duration-300 ease-in-out",
+            "bg-brand-green hover:bg-brand-green/80 shadow-[0_0_10px_rgba(0,255,157,0.5)] hover:shadow-[0_0_15px_rgba(0,255,157,0.7)]",
+            "disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed disabled:shadow-none"
+            )}
+       >
+        {user ? "Отправить Заявку (через Telegram)" : "Авторизуйтесь для отправки"}
+      </Button>
     </form>
   );
 }
