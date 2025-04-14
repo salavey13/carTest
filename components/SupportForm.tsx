@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { logger } from "@/lib/logger"; // Импортируем логгер
+import { cn } from "@/lib/utils"
 
 export default function SupportForm() {
   const contextValue = useAppContext(); // Сначала получаем весь контекст
