@@ -18,15 +18,34 @@ export const OpenPrList: React.FC<OpenPrListProps> = ({ openPRs }) => {
             </h2>
             <ul className="space-y-2 max-h-40 overflow-y-auto pr-2 simple-scrollbar">
                 {openPRs.map((pr) => (
-                    <li key={pr.id || pr.number} className="flex items-center gap-2 bg-gray-900 p-2 rounded text-sm border border-gray-700 shadow-sm">
-                        <a href={pr.html_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline truncate flex-grow" title={pr.title}>
-                            #{pr.number}: {pr.title}
+                    <li key={pr.id || pr.number} className="bg-gray-900 rounded-md text-sm border border-gray-700 shadow-sm hover:bg-gray-700/60 transition-colors duration-150">
+                        <a
+                            href={pr.html_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1 p-2 w-full" // Use flex-wrap for very small screens
+                            title={`${pr.title}\nBranch: ${pr.head.ref}\nby ${pr.user?.login || 'unknown'}`}
+                        >
+                            {/* Left side: PR Number and Title */}
+                            <div className="flex items-center gap-2 min-w-0 flex-grow basis-3/5 sm:basis-auto"> {/* Allow grow, shrink, basis for wrap */}
+                                <span className="text-blue-400 font-medium flex-shrink-0">
+                                    #{pr.number}:
+                                </span>
+                                <span className="text-gray-200 truncate" title={pr.title}>
+                                    {pr.title}
+                                </span>
+                            </div>
+
+                            {/* Right side: Author and Branch */}
+                            <div className="flex items-center gap-2 min-w-0 flex-shrink-0 basis-2/5 sm:basis-auto justify-end w-full sm:w-auto"> {/* Allow shrink, basis for wrap */}
+                                <span className="text-xs text-gray-500 flex-shrink-0">
+                                    by {pr.user?.login || 'unknown'}
+                                </span>
+                                <span className="text-xs text-gray-600 truncate min-w-0" title={`Branch: ${pr.head.ref}`}> {/* Allow truncate */}
+                                    ({pr.head.ref})
+                                </span>
+                            </div>
                         </a>
-                        <span className="text-xs text-gray-500 ml-auto flex-shrink-0">
-                            by {pr.user?.login || 'unknown'}
-                        </span>
-                         {/* Display branch if needed for context */}
-                         <span className="text-xs text-gray-600 ml-1 flex-shrink-0 truncate" title={`Branch: ${pr.head.ref}`}>({pr.head.ref})</span>
                     </li>
                 ))}
             </ul>
