@@ -1,4 +1,3 @@
-// /app/selfdev/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -8,9 +7,9 @@ import SupportForm from "@/components/SupportForm"; // Keep if consulting is sti
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
 import {
-  FaLightbulb, FaRoad, FaUsers, FaRocket, FaBranch,
+  FaLightbulb, FaRoad, FaUsers, FaRocket, FaCodeBranch,
   FaArrowsSpin, FaNetworkWired, FaBookOpen, FaComments, FaBrain, FaEye, // fa6 icons (removed unused ones)
-  FaFileCode, FaCodeBranch // Replaced FaCog with FaBranch
+  FaFileCode, FaCodeBranch // Replaced FaCog with FaCodeBranch
 } from "react-icons/fa6";
 import { debugLogger } from "@/lib/debugLogger";
 import { logger } from "@/lib/logger";
@@ -145,7 +144,7 @@ export default function SelfDevLandingPage() {
             {/* Section 5: How to Learn & Start (Intelligent Imitation) */}
             <section className="space-y-4">
               <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-purple mb-4">
-                 <FaBranch className="mr-3 text-brand-purple/80" /> Как Начать: Интеллектуальная Имитация
+                 <FaCodeBranch className="mr-3 text-brand-purple/80" /> Как Начать: Интеллектуальная Имитация
               </h2>
               <p className="text-gray-300 text-base md:text-lg leading-relaxed">
                 Тебе не нужна книга инструкций. Ты <strong className="text-brand-purple font-semibold">уже</strong> окружен информацией. Научись учиться как художник: наблюдай и экспериментируй.
