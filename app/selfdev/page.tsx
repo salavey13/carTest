@@ -3,377 +3,247 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button"; // Assuming you have a Button component
-import { Progress } from "@/components/ui/progress"; // Assuming you have a Progress component
-import { sendTelegramInvoice } from "../actions"; // Main actions file
-import { getRecentSelfDevPurchases, subscribeToSelfDevPurchases } from "./actions"; // NEW: Server actions for this page
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import SupportForm from "@/components/SupportForm"; // Keep if consulting is still offered
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
 import {
-  Zap, Wrench, Bot, Search, Star, GraduationCap, Camera, Rocket, Key,
-  Waves, FastForward, Brain, EyeOff, Sparkles, Infinity, HelpCircle, // Added HelpCircle
-  type LucideIcon, // Import type
-} from "lucide-react";
-import { debugLogger } from "@/lib/debugLogger"; // For debugging
-
-// --- Types ---
-interface Boost {
-  type: string;
-  title: string;
-  desc: string;
-  amount: number; // Amount in XTR (whole units)
-  icon: LucideIcon; // Use LucideIcon type
-}
-
-interface PurchaseRecord {
-  boost_type: string;
-  purchased_at: string; // ISO string or formatted time string
-}
-
-// --- Constants ---
-const BOOST_ICONS: Record<string, LucideIcon> = {
-  priority_review: Zap,
-  cyber_extractor_pro: Wrench,
-  custom_command: Bot,
-  ai_code_review: Search,
-  neon_avatar: Star,
-  vibe_session: GraduationCap,
-  ar_tour_generator: Camera,
-  code_warp_drive: Rocket,
-  cyber_garage_key: Key,
-  tsunami_rider: Waves,
-  bot_overclock: FastForward,
-  neural_tuner: Brain,
-  repo_stealth_mode: EyeOff,
-  glitch_fx_pack: Sparkles,
-  infinite_extract: Infinity,
-  default: HelpCircle, // Fallback icon
-};
-
-const TOP_BOOSTS = ["tsunami_rider", "cyber_garage_key", "infinite_extract"];
-const BOOST_OF_THE_DAY_DISCOUNT = 0.2; // 20% discount
-
-// Boosts data (define with types)
-const BOOSTS_DATA: Omit<Boost, 'icon'>[] = [
-  { type: "priority_review", title: "Приоритетный Обзор", desc: "Твой PR вливается за 24ч!", amount: 50 },
-  { type: "cyber_extractor_pro", title: "Кибер-Экстрактор Про", desc: "Дерево проекта + AI-подсказки.", amount: 100 },
-  { type: "custom_command", title: "Кастомная Команда Бота", desc: "Персональная команда.", amount: 200 },
-  { type: "ai_code_review", title: "AI Обзор Кода", desc: "Gemini смотрит твой код.", amount: 75 }, // Updated AI name
-  { type: "neon_avatar", title: "Неоновый Аватар", desc: "Киберпанк-аватар.", amount: 150 },
-  { type: "vibe_session", title: "Сессия Менторства VIBE", desc: "1-на-1 по VIBE!", amount: 300 },
-  { type: "ar_tour_generator", title: "Генератор AR-Туров", desc: "AI создаёт AR-туры.", amount: 250 },
-  { type: "code_warp_drive", title: "Кодовый Варп-Двигатель", desc: "Бот пишет фичу за 12ч.", amount: 400 },
-  { type: "cyber_garage_key", title: "VIP Ключ Кибер-Гаража", desc: "Доступ к премиум-тачкам.", amount: 500 },
-  { type: "tsunami_rider", title: "Значок Всадника Цунами", desc: "Элита + приоритет.", amount: 1000 },
-  { type: "bot_overclock", title: "Оверклок Бота", desc: "x2 скорость бота (30д).", amount: 600 },
-  { type: "neural_tuner", title: "Нейронный Тюнер", desc: "AI подбирает тачки.", amount: 350 },
-  { type: "repo_stealth_mode", title: "Стелс Репозитория", desc: "Скрой свои PR.", amount: 200 },
-  { type: "glitch_fx_pack", title: "Пакет Глитч-Эффектов", desc: "Эффекты для страниц.", amount: 120 },
-  { type: "infinite_extract", title: "Бесконечный Экстрактор", desc: "Извлечение без лимитов.", amount: 800 },
-];
-
-// Add icons to boosts data
-const boosts: Boost[] = BOOSTS_DATA.map(boost => ({
-  ...boost,
-  icon: BOOST_ICONS[boost.type] || BOOST_ICONS.default,
-}));
+  FaLightbulb, FaRoad, FaUsers, FaRocket, FaTools, FaRegCommentDots, FaRegUserCircle,
+  FaArrowsSpin, FaNetworkWired, FaBookOpen, FaSeedling, FaComments, FaBrain, FaEye, // fa6 icons
+  FaFileCode, FaCodeBranch // Replaced FaCog with FaBranch
+} from "react-icons/fa6";
+import { debugLogger } from "@/lib/debugLogger";
+import { logger } from "@/lib/logger";
+import Link from "next/link";
 
 // --- Component ---
-export default function SelfDevPage() {
+export default function SelfDevLandingPage() {
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAppContext();
   const [isMounted, setIsMounted] = useState(false);
-  const [boostOfTheDayType, setBoostOfTheDayType] = useState<string | null>(null);
-  const [recentPurchases, setRecentPurchases] = useState<PurchaseRecord[]>([]);
-  const [isLoadingPurchases, setIsLoadingPurchases] = useState(true);
-  const [xtrEarned, setXtrEarned] = useState(0); // Mock state
 
-  // Determine Boost of the Day (client-side consistent based on date)
   useEffect(() => {
     setIsMounted(true);
-    const daySeed = new Date().toDateString();
-    const seed = daySeed.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const randomIndex = seed % boosts.length;
-    setBoostOfTheDayType(boosts[randomIndex].type);
+    // Any client-side specific logic can go here
   }, []);
-
-  // Mock XTR earnings simulation
-  useEffect(() => {
-    if (!isMounted) return;
-    const interval = setInterval(() => {
-      setXtrEarned((prev) => Math.min(prev + Math.floor(Math.random() * 3) + 1, 1000)); // Simulate earning 1-3 XTR
-    }, 3000); // Every 3 seconds
-    return () => clearInterval(interval);
-  }, [isMounted]);
-
-  // Fetch initial recent purchases using Server Action
-  useEffect(() => {
-    if (!isMounted || !isAuthenticated) return; // Wait for mount and auth
-
-    const fetchPurchases = async () => {
-      debugLogger.log("[SelfDevPage] Fetching initial recent purchases...");
-      setIsLoadingPurchases(true);
-      try {
-        const result = await getRecentSelfDevPurchases(5); // Fetch last 5
-        if (result.success && result.data) {
-           debugLogger.log("[SelfDevPage] Fetched purchases:", result.data);
-           setRecentPurchases(result.data);
-        } else {
-           logger.warn("[SelfDevPage] Failed to fetch recent purchases:", result.error);
-           // Optional: Show error to user?
-        }
-      } catch (error) {
-         logger.error("[SelfDevPage] Error calling getRecentSelfDevPurchases:", error);
-      } finally {
-         setIsLoadingPurchases(false);
-      }
-    };
-
-    fetchPurchases();
-
-    // --- Real-time Subscription (using Server Action wrapper) ---
-    // This part is more complex to implement securely and efficiently on the client.
-    // The `subscribeToSelfDevPurchases` action would need to handle the Supabase channel
-    // and potentially use a mechanism like Server-Sent Events (SSE) or WebSockets
-    // to push updates back to the client securely.
-    //
-    // For simplicity in this refactor, we'll stick to fetching on load.
-    // If real-time is critical, a more robust solution is needed.
-    // Example (Conceptual - requires backend implementation):
-    /*
-    const unsubscribe = subscribeToSelfDevPurchases((newPurchase) => {
-       debugLogger.log("[SelfDevPage] Received new purchase via subscription:", newPurchase);
-       setRecentPurchases((prev) => [newPurchase, ...prev.slice(0, 4)]);
-       toast.info(`Кто-то купил: ${newPurchase.boost_type}!`);
-    });
-
-    return () => {
-       debugLogger.log("[SelfDevPage] Unsubscribing from purchases.");
-       unsubscribe(); // Clean up subscription
-    };
-    */
-
-  }, [isMounted, isAuthenticated]);
-
-
-  const handleBuyBoost = useCallback(async (boost: Boost) => {
-    if (!isAuthenticated || !user?.user_id) {
-      toast.error("Ошибка: Не удалось найти твой ID. Пожалуйста, перезагрузи приложение.");
-      debugLogger.error("[SelfDevPage] Buy boost failed: User not authenticated or user ID missing.", { isAuthenticated, userId: user?.user_id });
-      return;
-    }
-
-    const isBoostOfTheDay = boost.type === boostOfTheDayType;
-    const finalAmount = isBoostOfTheDay
-      ? Math.floor(boost.amount * (1 - BOOST_OF_THE_DAY_DISCOUNT))
-      : boost.amount;
-    const discountApplied = isBoostOfTheDay ? `${(BOOST_OF_THE_DAY_DISCOUNT * 100)}%` : "Нет";
-
-    // Unique payload for the invoice
-    const payload = `selfdev_${boost.type}_${user.user_id}_${Date.now()}`;
-    const title = boost.title + (isBoostOfTheDay ? " (Буст Дня!)" : "");
-    const description = `${boost.desc}\nСкидка: ${discountApplied}`;
-
-    debugLogger.log(`[SelfDevPage] Attempting to buy boost: ${boost.type} for user ${user.user_id} with amount ${finalAmount} XTR`);
-    toast.loading(`Создаем счет за "${boost.title}"...`);
-
-    try {
-      // Call the main sendTelegramInvoice action
-      const result = await sendTelegramInvoice(
-          user.user_id.toString(), // Ensure user ID is string
-          title,
-          description,
-          payload,
-          finalAmount,
-          0, // No subscription ID for boosts
-          undefined // No image for boost invoice (or add one?)
-      );
-
-      toast.dismiss(); // Dismiss loading toast
-
-      if (result.success) {
-        toast.success(`Счёт за "${title}" отправлен!`, {
-          description: `Сумма: ${finalAmount} XTR. Оплати в Telegram, чтобы активировать буст!`,
-        });
-        debugLogger.log(`[SelfDevPage] Invoice ${payload} sent successfully for boost ${boost.type}`);
-      } else {
-        toast.error("Не удалось отправить счёт.", {
-          description: result.error || "Попробуй ещё раз или свяжись с поддержкой.",
-        });
-         debugLogger.error(`[SelfDevPage] Failed to send invoice for boost ${boost.type}: ${result.error}`);
-      }
-    } catch (error) {
-        toast.dismiss();
-        toast.error("Произошла ошибка при покупке.", {
-            description: "Пожалуйста, попробуйте позже."
-        });
-        logger.error(`[SelfDevPage] Error calling sendTelegramInvoice for boost ${boost.type}:`, error);
-    }
-  }, [user, isAuthenticated, boostOfTheDayType]);
-
 
   // Render loading state or placeholder if not mounted or auth loading
   if (!isMounted || isAuthLoading) {
     return (
-        <div className="flex justify-center items-center min-h-screen">
-            <p>Загрузка кибер-лавки...</p>
-            {/* Optional: Add a spinner */}
-        </div>
+      <div className="flex justify-center items-center min-h-screen pt-20">
+        <p className="text-brand-green animate-pulse">Загрузка философии VIBE...</p>
+      </div>
     );
   }
-   // Handle case where user is not authenticated after loading
-   if (!isAuthenticated) {
-       return (
-           <div className="flex flex-col justify-center items-center min-h-screen text-center p-4">
-               <p className="text-lg font-semibold mb-4">Для доступа к Кибер-Лавке необходимо авторизоваться.</p>
-               <p className="text-sm text-gray-400">Пожалуйста, убедитесь, что вы используете приложение внутри Telegram.</p>
-               {/* Optional: Add a refresh button or instructions */}
-           </div>
-       );
-   }
 
-
-  const currentBoostOfTheDay = boosts.find(b => b.type === boostOfTheDayType);
+  // Handle case where user is not authenticated after loading
+  // Allow viewing the philosophy page even if not logged in.
+  // if (!isAuthenticated) {
+  //     // Optional: Show a message encouraging login for full features
+  // }
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      {/* Cyberpunk Background - Consider optimizing SVG or using CSS */}
-      <div className="absolute inset-0 z-0 opacity-50 animate-pulse-slow">
-         {/* Simplified background using CSS gradients for better performance */}
-         <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900"></div>
-         {/* Grid lines (optional, can be heavy) */}
-         <div
-            className="absolute inset-0 bg-repeat"
-            style={{
-                backgroundImage: `linear-gradient(to right, rgba(57, 255, 20, 0.1) 1px, transparent 1px),
-                                linear-gradient(to bottom, rgba(57, 255, 20, 0.1) 1px, transparent 1px)`,
-                backgroundSize: '40px 40px',
-            }}
-         ></div>
-      </div>
+    <div className="relative min-h-screen overflow-hidden pt-20 pb-10 bg-gradient-to-br from-gray-900 via-black to-gray-800">
+      {/* Subtle Background Grid */}
+      <div
+        className="absolute inset-0 bg-repeat opacity-5 z-0"
+        style={{
+          backgroundImage: `linear-gradient(to right, rgba(0, 255, 157, 0.2) 1px, transparent 1px),
+                            linear-gradient(to bottom, rgba(0, 255, 157, 0.2) 1px, transparent 1px)`,
+          backgroundSize: '50px 50px',
+        }}
+      ></div>
 
-      <div className="relative z-10 container mx-auto p-4 pt-20 md:pt-24 pb-10">
-        <Card className="max-w-4xl mx-auto bg-black/80 backdrop-blur-sm text-white rounded-xl border border-brand-green/30 shadow-[0_0_15px_rgba(0,255,157,0.3)]">
+      <div className="relative z-10 container mx-auto px-4">
+        <Card className="max-w-5xl mx-auto bg-black/80 backdrop-blur-md text-white rounded-2xl border border-brand-green/30 shadow-[0_0_25px_rgba(0,255,157,0.4)]">
           <CardHeader className="text-center border-b border-brand-green/20 pb-4">
-            <CardTitle className="text-2xl md:text-4xl font-bold text-brand-green cyber-text">
-              Кибер-Лавка Бустов
+            <CardTitle className="text-3xl md:text-5xl font-bold text-brand-green cyber-text glitch" data-text="SelfDev: Путь к Себе">
+              SelfDev: Путь к Себе
             </CardTitle>
-             <p className="text-sm md:text-base text-gray-300 mt-2">
-               Апгрейды для твоей кибер-жизни. Хватай бусты за XTR!
+            <p className="text-md md:text-lg text-gray-300 mt-3 font-mono">
+              Лучшая бизнес-модель — это не модель. Это образ жизни.
             </p>
           </CardHeader>
 
-          <CardContent className="space-y-6 p-4 md:p-6">
+          <CardContent className="space-y-10 p-4 md:p-8">
 
-             {/* --- Boost of the Day --- */}
-            {currentBoostOfTheDay && (
-                <div className="bg-brand-green/10 border border-brand-green/50 p-4 rounded-lg shadow-lg text-center animate-pulse">
-                    <h3 className="text-brand-green font-bold text-lg mb-1">🚀 Буст Дня! 🚀</h3>
-                    <p className="font-semibold">{currentBoostOfTheDay.title}</p>
-                    <p className="text-sm text-gray-300">{currentBoostOfTheDay.desc}</p>
-                    <p className="text-sm mt-1">
-                        Скидка <span className="font-bold">{BOOST_OF_THE_DAY_DISCOUNT * 100}%</span>!
-                        Цена: <span className="line-through text-gray-400">{currentBoostOfTheDay.amount} XTR</span>
-                        <span className="text-brand-green font-bold ml-2">
-                           {Math.floor(currentBoostOfTheDay.amount * (1 - BOOST_OF_THE_DAY_DISCOUNT))} XTR
-                        </span>
-                    </p>
-                    <Button
-                        size="sm"
-                        variant="ghost"
-                        className="mt-2 text-brand-green border-brand-green hover:bg-brand-green/20"
-                        onClick={() => handleBuyBoost(currentBoostOfTheDay)}
-                    >
-                        Купить со скидкой!
-                    </Button>
-                </div>
-            )}
-
-
-            {/* --- Boosts Grid --- */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-              {boosts.map((boost) => {
-                const isTopBoost = TOP_BOOSTS.includes(boost.type);
-                const isBoostOfTheDay = boost.type === boostOfTheDayType;
-                const finalAmount = isBoostOfTheDay ? Math.floor(boost.amount * (1 - BOOST_OF_THE_DAY_DISCOUNT)) : boost.amount;
-
-                return (
-                  <Button // Use Button for consistent styling and interaction
-                    key={boost.type}
-                    variant="outline" // Use outline or ghost variant
-                    onClick={() => handleBuyBoost(boost)}
-                    className={cn(
-                      "h-auto aspect-square p-2 md:p-3 flex flex-col items-center justify-center text-center",
-                      "bg-gray-900/70 border-brand-green/30 hover:bg-brand-green/10 hover:border-brand-green/70",
-                      "transition-all duration-300 group", // Added group for potential hover effects inside
-                      isBoostOfTheDay && "border-2 border-brand-green animate-pulse shadow-[0_0_10px_rgba(0,255,157,0.5)]",
-                      isTopBoost && "border-yellow-400/50 hover:border-yellow-400 shadow-[0_0_8px_rgba(225,255,1,0.4)]"
-                    )}
-                  >
-                      <boost.icon className={cn(
-                          "w-8 h-8 md:w-10 md:h-10 mb-1",
-                          isTopBoost ? "text-yellow-400" : "text-brand-green",
-                          "transition-transform group-hover:scale-110" // Example hover effect
-                      )} />
-                      <p className={cn(
-                          "font-semibold text-xs md:text-sm leading-tight",
-                           isTopBoost ? "text-yellow-300" : "text-brand-green"
-                      )}>{boost.title}</p>
-                      <p className="text-xs text-gray-400 mt-1 hidden md:block">{boost.desc}</p> {/* Hide desc on small screens */}
-                      <span className={cn(
-                          "block mt-1 font-mono text-xs md:text-sm",
-                          isBoostOfTheDay ? "text-brand-green font-bold" : "text-gray-300"
-                      )}>
-                          {isBoostOfTheDay && <span className="line-through text-gray-500 mr-1">{boost.amount}</span>}
-                          {finalAmount} XTR
-                      </span>
-                  </Button>
-                );
-              })}
-            </div>
-
-            {/* --- Recently Purchased Ticker --- */}
-            <div className="mt-6 bg-gray-900/50 p-3 rounded-lg border border-brand-green/20 shadow-inner overflow-hidden">
-              <p className="text-brand-green font-bold text-center text-sm mb-2">Недавно Куплено:</p>
-              <div className="relative h-6 overflow-hidden">
-                {isLoadingPurchases ? (
-                    <p className="text-center text-gray-400 text-sm">Загрузка...</p>
-                ) : recentPurchases.length > 0 ? (
-                    <div className="absolute animate-ticker whitespace-nowrap">
-                    {/* Duplicate the list for seamless looping */}
-                    {[...recentPurchases, ...recentPurchases].map((purchase, i) => {
-                         const boostMeta = boosts.find(b => b.type === purchase.boost_type);
-                        return (
-                          <span key={i} className="inline-flex items-center mx-4 text-sm text-gray-300">
-                             {boostMeta && <boostMeta.icon className="w-4 h-4 mr-1.5 text-brand-green/70" />}
-                             {boostMeta?.title || purchase.boost_type}
-                             <span className="text-gray-500 ml-1">({new Date(purchase.purchased_at).toLocaleTimeString()})</span>
-                          </span>
-                        );
-                    })}
-                    </div>
-                ) : (
-                    <p className="text-center text-gray-400 text-sm">Пока никто ничего не купил... Будь первым!</p>
-                )}
-              </div>
-            </div>
-
-            {/* --- XTR Earned Today Progress Bar (Mock) --- */}
-            <div className="mt-6">
-              <p className="text-center text-brand-green font-bold mb-1">XTR Заработано Сегодня (Симуляция)</p>
-              <Progress
-                value={(xtrEarned / 1000) * 100}
-                className="w-full h-3 bg-gray-800 border border-brand-green/30"
-                indicatorClassName="bg-brand-green" // Custom class for the indicator bar if Progress allows
-              />
-              <p className="text-center text-xs font-mono mt-1 text-gray-400">
-                  {xtrEarned} / 1000 XTR
+            {/* Section 1: The Old Paradigm Trap */}
+            <section className="space-y-4">
+              <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-pink mb-4">
+                <FaRoad className="mr-3 text-brand-pink/80" /> Ловушка Старой Парадигмы
+              </h2>
+              <p className="text-gray-300 text-base md:text-lg">
+                Многие новички слепо ищут "лучшие" навыки или бизнес-модели, чтобы заработать, уйти с работы, получить контроль. Они действуют из нужды, применяя школьный подход: найти "новую работу" (фриланс, агентство, eCom) и учиться по чужим правилам.
               </p>
-            </div>
+              {/* Image Prompt 1:
+                A visual metaphor. Left side: A figure looking confused at multiple complex road signs pointing to "Freelance", "SMMA", "eCom", leading towards a hamster wheel or cage labeled "New 9-5", "Trapped", "No Leverage". Right side: Clear path labeled "Your Ideal Life" leading towards an open landscape labeled "Purpose", "Enjoyment", "Leverage". Arrows show the flow. Use cyberpunk/neon aesthetics.
+              */}
+              <div className="my-6 p-2 border border-brand-pink/30 rounded-lg">
+                <img src="/placeholder-image-old-vs-new-path.png" alt="Инфографика: Старый путь (ловушка) против Нового пути (свобода)" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
+                <p className="text-xs text-center text-gray-400 mt-1">Старый путь ведет в ловушку, Новый - к свободе.</p>
+              </div>
+              <p className="text-gray-300 text-base md:text-lg">
+                В итоге они строят себе новую клетку 9-5, чувствуют себя зажатыми, без рычагов влияния. Их доход нестабилен, а работа не приносит радости, потому что она не связана с их истинными интересами или жизненными целями. Фокус только на деньгах уводит от главного.
+              </p>
+            </section>
 
-            <p className="text-sm text-center mt-6 text-gray-400">
-              Хочешь свой буст? Пиши в <a href="https://t.me/salavey13" target="_blank" rel="noopener noreferrer" className="text-brand-green hover:underline font-semibold">Telegram @salavey13</a>, обсудим!
-            </p>
+            {/* Section 2: The New Paradigm - Life First */}
+            <section className="space-y-4">
+              <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-blue mb-4">
+                <FaLightbulb className="mr-3 text-brand-blue/80" /> Новый Путь: Жизнь Прежде Всего
+              </h2>
+              <p className="text-gray-300 text-base md:text-lg">
+                Настоящий путь начинается с вопроса: "Какую жизнь я хочу жить?". Вместо того чтобы выбирать нишу или модель, ты <strong className="text-brand-blue">становишься нишей</strong>. Ты решаешь <strong className="text-brand-blue">свои</strong> проблемы, помогаешь <strong className="text-brand-blue">своему прошлому "я"</strong>, и строишь бизнес вокруг <strong className="text-brand-blue">своей аутентичности и экспертизы</strong>.
+              </p>
+               {/* Image Prompt 2:
+                 A creative mind map visualization. Center node: "YOU / Your Ideal Life". Radiating outwards: nodes for "Interests", "Skills", "Problems Solved", "Past Self's Needs", "Values". Arrows connecting these nodes to potential "Business Ideas" or "Audience Needs". Use interconnected glowing lines in a dark, techy style. Include small icons for each category (e.g., brain for skills, heart for interests, target for problems).
+               */}
+              <div className="my-6 p-2 border border-brand-blue/30 rounded-lg">
+                <img src="/placeholder-image-life-first-mindmap.png" alt="Майнд-карта: Построение бизнеса вокруг себя" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
+                 <p className="text-xs text-center text-gray-400 mt-1">Твои интересы, навыки и решенные проблемы - основа бизнеса.</p>
+              </div>
+              <p className="text-gray-300 text-base md:text-lg">
+                Деньги — это важный <strong className="text-brand-blue">ресурс</strong>, но не единственная <strong className="text-brand-blue">цель</strong>. Цель — жить осмысленно, занимаясь тем, что важно для <strong className="text-brand-blue">тебя</strong>. Твои ценности и интересы эволюционируют, и твой бизнес должен эволюционировать вместе с тобой.
+              </p>
+            </section>
+
+            {/* Section 3: The Power of Audience & Content */}
+            <section className="space-y-4">
+              <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-neon-lime mb-4">
+                <FaUsers className="mr-3 text-neon-lime/80" /> Сила Аудитории и Контента
+              </h2>
+              <p className="text-gray-300 text-base md:text-lg">
+                Для новичка без капитала, самый <strong className="text-neon-lime">высокорычажный</strong> старт — построение аудитории через контент. Почему?
+              </p>
+              <ul className="list-disc list-inside space-y-2 text-gray-300 pl-4 text-base md:text-lg">
+                <li><strong className="text-neon-lime">Бесплатное Обучение:</strong> Создавая контент, ты <strong className="text-neon-lime">учишься</strong> маркетингу, психологии, дизайну, копирайтингу — <strong className="text-neon-lime">на практике и бесплатно</strong>.</li>
+                <li><strong className="text-neon-lime">Построение Доверия:</strong> Делясь своими интересами и экспертизой, ты строишь доверие и привлекаешь людей, которым <strong className="text-neon-lime">резонируешь ты</strong>.</li>
+                <li><strong className="text-neon-lime">Рычаг Влияния:</strong> Аудитория — это твой актив. Ты можешь предлагать им продукты/услуги без агрессивных продаж, потому что они уже тебе доверяют.</li>
+                <li><strong className="text-neon-lime">Принцип T-Shaped:</strong> 80% контента — глубоко по твоей основной теме/истории. 20% — шире, о других интересах, чтобы экспериментировать и показать себя.</li>
+              </ul>
+              {/* Image Prompt 3:
+                Diagram illustrating the audience building funnel. Top: "Consistent T-Shaped Content (Value + Personality)". Middle layer: Arrows pointing down labeled "Builds Trust", "Teaches Skills (Marketing, Writing...)", "Attracts Right People". Bottom layer: "Loyal Audience". Side arrow pointing from Audience to "High-Leverage Sales (Products/Services)". Style: Clean lines, clear text, possibly using neon colors.
+              */}
+              <div className="my-6 p-2 border border-neon-lime/30 rounded-lg">
+                <img src="/placeholder-image-audience-content-funnel.png" alt="Диаграмма: Контент -> Доверие -> Аудитория -> Продажи" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
+                <p className="text-xs text-center text-gray-400 mt-1">Контент - двигатель доверия и роста.</p>
+              </div>
+              <p className="text-gray-300 text-base md:text-lg">
+                Создание контента — это не "быть контент-креатором", это <strong className="text-neon-lime">необходимый элемент любого современного бизнеса</strong>. Это твой способ доказать свою ценность.
+              </p>
+            </section>
+
+            {/* Section 4: Evolving Your Offers */}
+            <section className="space-y-4">
+               <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-orange mb-4">
+                 <FaArrowsSpin className="mr-3 text-brand-orange/80" /> Эволюция Предложений
+               </h2>
+               <p className="text-gray-300 text-base md:text-lg">
+                 Твой бизнес и твои предложения должны расти вместе с тобой и твоей аудиторией.
+               </p>
+               {/* Image Prompt 4:
+                 A timeline or flowchart graphic. Start: "Small Audience / Beginner". Arrow to: "Offer High-Ticket Service (Freelance/Coaching)" labeled "Low Volume, High Price, Requires Sales Skills". Arrow to: "Growing Audience". Arrow to: "Offer Scalable Product (Digital/Software/Physical)" labeled "Higher Volume, Lower Price (per unit), Leverages Audience Trust, Passive Income Potential". End: "More Control, More Impact". Use a sleek, futuristic timeline design.
+               */}
+               <div className="my-6 p-2 border border-brand-orange/30 rounded-lg">
+                 <img src="/placeholder-image-offer-evolution.png" alt="Схема: Эволюция предложений с ростом аудитории" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
+                  <p className="text-xs text-center text-gray-400 mt-1">От услуг к продуктам по мере роста.</p>
+               </div>
+               <ul className="list-disc list-inside space-y-2 text-gray-300 pl-4 text-base md:text-lg">
+                 <li><strong className="text-brand-orange">Начало (Маленькая аудитория):</strong> Предлагай <strong className="text-brand-orange">высокочековые услуги</strong> (фриланс, коучинг, консалтинг). Тебе нужно всего 2-4 клиента в месяц, чтобы заменить зарплату. Это требует навыков продаж и прямого общения.</li>
+                 <li><strong className="text-brand-orange">Рост (Аудитория растет):</strong> Постепенно создавай <strong className="text-brand-orange">масштабируемые продукты</strong> (цифровые продукты, шаблоны, курсы, ПО, физические товары). Они могут продаваться, пока ты спишь, и требуют меньше твоего времени на каждого клиента.</li>
+               </ul>
+               <p className="text-gray-300 text-base md:text-lg">
+                 Эта эволюция позволяет тебе <strong className="text-brand-orange">уменьшать время</strong>, затрачиваемое на выполнение работы, <strong className="text-brand-orange">увеличивать доход</strong> и получать <strong className="text-brand-orange">больше контроля</strong> над своим днем, используя растущую аудиторию как рычаг.
+               </p>
+            </section>
+
+            {/* Section 5: How to Learn & Start (Intelligent Imitation) */}
+            <section className="space-y-4">
+              <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-purple mb-4">
+                 <FaTools className="mr-3 text-brand-purple/80" /> Как Начать: Интеллектуальная Имитация
+              </h2>
+              <p className="text-gray-300 text-base md:text-lg">
+                Тебе не нужна книга инструкций. Ты <strong className="text-brand-purple">уже</strong> окружен информацией. Научись учиться как художник: наблюдай и экспериментируй.
+              </p>
+              {/* Image Prompt 5:
+                A visually engaging step-by-step infographic.
+                Step 1: Icon of an eye/magnifying glass over social media feeds/websites, labeled "Observe & Collect (3-5 Inspirations: Brands, Content, Products)".
+                Step 2: Icon of puzzle pieces/dissection tools, labeled "Analyze & Deconstruct (Structure, Hooks, Style, Why it Works?)".
+                Step 3: Icon of a small gear/building block, labeled "Imitate One Piece (Try a Hook, Apply a Color, Use a Format)".
+                Step 4: Icon of repeating gears/iteration symbol, labeled "Repeat & Combine (Take Another Piece, Then Another)".
+                Step 5: Icon of a book/graduation cap overlaying the process, labeled "Supplement & Understand (Learn the 'Why' As You Go)".
+                Use arrows to show the flow. Keep the style consistent (cyberpunk/neon).
+              */}
+               <div className="my-6 p-2 border border-brand-purple/30 rounded-lg">
+                 <img src="/placeholder-image-intelligent-imitation.png" alt="Инфографика: Процесс Интеллектуальной Имитации" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
+                 <p className="text-xs text-center text-gray-400 mt-1">Учись, наблюдая, разбирая и пробуя.</p>
+               </div>
+              <ol className="list-decimal list-inside space-y-2 text-gray-300 pl-4 text-base md:text-lg">
+                <li><strong className="text-brand-purple">Собери Вдохновение:</strong> Найди 3-5 брендов, авторов, продуктов, которые тебе нравятся и которые успешны.</li>
+                <li><strong className="text-brand-purple">Разбери на Части:</strong> Проанализируй их структуру, стиль, ключевые элементы (хуки, заголовки, формат контента, дизайн, УТП). Почему это работает?</li>
+                <li><strong className="text-brand-purple">Имитируй Маленький Кусочек:</strong> Возьми <strong className="text-brand-purple">один</strong> элемент (например, структуру поста, цветовую схему, тип заголовка) и попробуй применить его <strong className="text-brand-purple">в своем</strong> контенте/продукте/профиле.</li>
+                <li><strong className="text-brand-purple">Повторяй и Сочетай:</strong> Сделай это снова с другим элементом. И еще раз. Постепенно ты создашь <strong className="text-brand-purple">свой уникальный стиль</strong>.</li>
+                <li><strong className="text-brand-purple">Дополняй Знаниями:</strong> Параллельно изучай теорию (читай книги, смотри видео), чтобы понимать <strong className="text-brand-purple">"почему"</strong> то, что ты делаешь, работает.</li>
+              </ol>
+              <h3 className="flex items-center text-xl font-semibold text-brand-purple mt-6 mb-2">
+                 <FaNetworkWired className="mr-2 text-brand-purple/80" /> Внедряйся в "Племя"
+              </h3>
+              <p className="text-gray-300 text-base md:text-lg">
+                Найди 5-10 ключевых людей в своей нише. Сделай так, чтобы они тебя заметили:
+              </p>
+               <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg">
+                 <li>Комментируй их посты (<strong className="text-brand-purple">осмысленно!</strong>).</li>
+                 <li>Вступай в их сообщества.</li>
+                 <li>Делись их контентом (если он ценен).</li>
+                 <li>Напиши им в ЛС, чтобы начать диалог (без продаж!).</li>
+               </ul>
+               <h3 className="flex items-center text-xl font-semibold text-brand-purple mt-6 mb-2">
+                  <FaComments className="mr-2 text-brand-purple/80" /> Пиши Хорошие Комментарии
+               </h3>
+               <p className="text-gray-300 text-base md:text-lg">
+                 Самый простой способ выделиться. Забудь про "Отличный пост!". Начни с <strong className="text-brand-purple">"Я помню, когда..."</strong> и расскажи короткую <strong className="text-brand-purple">релевантную</strong> историю из своей жизни. Это вызывает любопытство к <strong className="text-brand-purple">тебе</strong>.
+               </p>
+            </section>
+
+             {/* Section 6: Cornerstone Content & Proof (Added) */}
+            <section className="space-y-4">
+              <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-green mb-4">
+                <FaBookOpen className="mr-3 text-brand-green/80" /> Фундамент: Контент и Доказательство Ценности
+              </h2>
+              <p className="text-gray-300 text-base md:text-lg">
+                Тебе нужно создать <strong className="text-brand-green">базовый уровень информации</strong>, чтобы люди могли понять, кто ты и чем можешь быть полезен, <strong className="text-brand-green">прежде чем</strong> они тебе доверятся. Несколько постов недостаточно.
+              </p>
+              {/* Image Prompt 6:
+                A visual of a solid foundation or cornerstone block labeled "Cornerstone Content (Your Story, Basics, Why)". Above it, smaller blocks representing different content formats (posts, videos, articles) resting on the foundation, labeled "Regular Content". Style: Architectural or blueprint-like, emphasizing stability.
+              */}
+               <div className="my-6 p-2 border border-brand-green/30 rounded-lg">
+                 <img src="/placeholder-image-cornerstone-content.png" alt="Визуализация: Фундаментальный контент как основа" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
+                 <p className="text-xs text-center text-gray-400 mt-1">Создай основу, на которую можно опереться.</p>
+               </div>
+              <p className="text-gray-300 text-base md:text-lg">
+                <strong className="text-brand-green">Контент "Почему":</strong> Большая часть твоего контента (80%) должна объяснять <strong className="text-brand-green">твою историю, основы твоей темы, почему это важно</strong>, и как это связано с твоей повседневной жизнью. Это контент для новичков и среднего уровня.
+              </p>
+              <p className="text-gray-300 text-base md:text-lg">
+                <strong className="text-brand-green">Продукты "Как":</strong> Твои платные продукты и услуги (или бесплатные лид-магниты) должны содержать <strong className="text-brand-green">конкретные инструкции "как"</strong> что-то сделать. Это для среднего и продвинутого уровня. Не путай!
+              </p>
+            </section>
+
+            {/* Call to Action */}
+            <section className="space-y-4 border-t border-brand-green/20 pt-8">
+              <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-green mb-4">
+                <FaRocket className="mr-3 text-brand-green/80" /> Готов Начать Свой Путь?
+              </h2>
+              <p className="text-gray-300 text-base md:text-lg">
+                 Этот новый путь — это марафон, а не спринт. Он требует работы, но это работа над <strong className="text-brand-green">собой</strong> и <strong className="text-brand-green">своей жизнью</strong>. Платформа <strong className="text-brand-green">oneSitePls</strong> и инструменты вроде <Link href="/repo-xml" className="text-brand-blue hover:underline">/repo-xml</Link> созданы, чтобы <strong className="text-brand-green">ускорить</strong> этот процесс, используя AI как помощника.
+              </p>
+               <p className="text-gray-300 text-base md:text-lg">
+                 Изучи <Link href="/about_en" className="text-brand-blue hover:underline">мою историю</Link>, посмотри на <a href="https://github.com/salavey13/carTest" target="_blank" rel="noopener noreferrer" className="text-brand-blue hover:underline">репозиторий carTest</a> как на пример VIBE-разработки, или свяжись со мной для менторства или консультации.
+               </p>
+               <div className="mt-6">
+                  <h3 className="text-xl font-semibold text-brand-green mb-3 text-center">Нужна Помощь?</h3>
+                  <SupportForm />
+               </div>
+            </section>
+
           </CardContent>
         </Card>
       </div>
@@ -381,22 +251,52 @@ export default function SelfDevPage() {
   );
 }
 
-
-// Add simple CSS animation for the ticker if not already present globally
-/* In your global CSS or a relevant style block:
-@keyframes ticker {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); } // Adjust based on content width if needed
-}
-.animate-ticker {
-  animation: ticker 40s linear infinite; // Adjust duration as needed
-  display: inline-block; // Ensure it works correctly
-}
-*/
-
-// Add CSS for cyber-text if not defined
+// Add CSS for cyber-text and glitch if not defined globally
 /*
 .cyber-text {
-   text-shadow: 0 0 5px rgba(0, 255, 157, 0.7), 0 0 10px rgba(0, 255, 157, 0.5);
+   text-shadow: 0 0 5px rgba(0, 255, 157, 0.7), 0 0 10px rgba(0, 255, 157, 0.5); // Adjust color based on context
 }
+
+@keyframes glitch {
+  0% { text-shadow: 0.05em 0 0 rgba(255,0,0,.75), -0.05em -0.025em 0 rgba(0,255,0,.75), -0.025em 0.05em 0 rgba(0,0,255,.75); }
+  14% { text-shadow: 0.05em 0 0 rgba(255,0,0,.75), -0.05em -0.025em 0 rgba(0,255,0,.75), -0.025em 0.05em 0 rgba(0,0,255,.75); }
+  15% { text-shadow: -0.05em -0.025em 0 rgba(255,0,0,.75), 0.025em 0.025em 0 rgba(0,255,0,.75), -0.05em -0.05em 0 rgba(0,0,255,.75); }
+  49% { text-shadow: -0.05em -0.025em 0 rgba(255,0,0,.75), 0.025em 0.025em 0 rgba(0,255,0,.75), -0.05em -0.05em 0 rgba(0,0,255,.75); }
+  50% { text-shadow: 0.025em 0.05em 0 rgba(255,0,0,.75), 0.05em 0 0 rgba(0,255,0,.75), 0 -0.05em 0 rgba(0,0,255,.75); }
+  99% { text-shadow: 0.025em 0.05em 0 rgba(255,0,0,.75), 0.05em 0 0 rgba(0,255,0,.75), 0 -0.05em 0 rgba(0,0,255,.75); }
+  100% { text-shadow: -0.025em 0 0 rgba(255,0,0,.75), -0.025em -0.025em 0 rgba(0,255,0,.75), -0.025em -0.05em 0 rgba(0,0,255,.75); }
+}
+
+.glitch {
+  position: relative;
+  animation: glitch 1s linear infinite;
+}
+
+.glitch::before,
+.glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: inherit; // Inherit background from parent
+  overflow: hidden;
+  clip: rect(0, 900px, 0, 0);
+}
+
+.glitch::before {
+  left: 2px;
+  text-shadow: -1px 0 red;
+  animation: glitch-anim-1 2s infinite linear alternate-reverse;
+}
+
+.glitch::after {
+  left: -2px;
+  text-shadow: -1px 0 blue;
+  animation: glitch-anim-2 2s infinite linear alternate-reverse;
+}
+
+@keyframes glitch-anim-1 { 0% { clip: rect(44px, 9999px, 49px, 0); } 5% { clip: rect(5px, 9999px, 100px, 0); } 10% { clip: rect(13px, 9999px, 60px, 0); } 15% { clip: rect(80px, 9999px, 40px, 0); } 20% { clip: rect(22px, 9999px, 75px, 0); } 25% { clip: rect(90px, 9999px, 15px, 0); } 30% { clip: rect(50px, 9999px, 88px, 0); } 35% { clip: rect(10px, 9999px, 45px, 0); } 40% { clip: rect(70px, 9999px, 30px, 0); } 45% { clip: rect(25px, 9999px, 95px, 0); } 50% { clip: rect(60px, 9999px, 20px, 0); } 55% { clip: rect(5px, 9999px, 55px, 0); } 60% { clip: rect(75px, 9999px, 35px, 0); } 65% { clip: rect(18px, 9999px, 80px, 0); } 70% { clip: rect(85px, 9999px, 22px, 0); } 75% { clip: rect(40px, 9999px, 65px, 0); } 80% { clip: rect(3px, 9999px, 90px, 0); } 85% { clip: rect(68px, 9999px, 28px, 0); } 90% { clip: rect(33px, 9999px, 77px, 0); } 95% { clip: rect(98px, 9999px, 10px, 0); } 100% { clip: rect(52px, 9999px, 58px, 0); } }
+@keyframes glitch-anim-2 { 0% { clip: rect(6px, 9999px, 94px, 0); } 5% { clip: rect(88px, 9999px, 12px, 0); } 10% { clip: rect(38px, 9999px, 68px, 0); } 15% { clip: rect(20px, 9999px, 85px, 0); } 20% { clip: rect(72px, 9999px, 18px, 0); } 25% { clip: rect(10px, 9999px, 90px, 0); } 30% { clip: rect(58px, 9999px, 32px, 0); } 35% { clip: rect(80px, 9999px, 8px, 0); } 40% { clip: rect(28px, 9999px, 78px, 0); } 45% { clip: rect(42px, 9999px, 52px, 0); } 50% { clip: rect(92px, 9999px, 25px, 0); } 55% { clip: rect(15px, 9999px, 82px, 0); } 60% { clip: rect(62px, 9999px, 42px, 0); } 65% { clip: rect(4px, 9999px, 70px, 0); } 70% { clip: rect(77px, 9999px, 10px, 0); } 75% { clip: rect(22px, 9999px, 88px, 0); } 80% { clip: rect(50px, 9999px, 48px, 0); } 85% { clip: rect(95px, 9999px, 38px, 0); } 90% { clip: rect(30px, 9999px, 60px, 0); } 95% { clip: rect(65px, 9999px, 15px, 0); } 100% { clip: rect(8px, 9999px, 98px, 0); } }
 */
