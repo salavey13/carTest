@@ -1,4 +1,3 @@
-// /app/selfdev/page.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -78,7 +77,7 @@ export default function SelfDevLandingPage() {
                 A visual metaphor. Left side: A figure looking confused at multiple complex road signs pointing to "Freelance", "SMMA", "eCom", leading towards a hamster wheel or cage labeled "New 9-5", "Trapped", "No Leverage". Right side: Clear path labeled "Your Ideal Life" leading towards an open landscape labeled "Purpose", "Enjoyment", "Leverage". Arrows show the flow. Use cyberpunk/neon aesthetics.
               */}
               <div className="my-6 p-2 border border-brand-pink/30 rounded-lg">
-                <img src="/placeholder-image-old-vs-new-path.png" alt="Инфографика: Старый путь (ловушка) против Нового пути (свобода)" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
+                <img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s101.png" alt="Инфографика: Старый путь (ловушка) против Нового пути (свобода)" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
                 <p className="text-xs text-center text-gray-400 mt-1">Старый путь ведет в ловушку, Новый - к свободе.</p>
               </div>
               <p className="text-gray-300 text-base md:text-lg">
@@ -98,7 +97,7 @@ export default function SelfDevLandingPage() {
                  A creative mind map visualization. Center node: "YOU / Your Ideal Life". Radiating outwards: nodes for "Interests", "Skills", "Problems Solved", "Past Self's Needs", "Values". Arrows connecting these nodes to potential "Business Ideas" or "Audience Needs". Use interconnected glowing lines in a dark, techy style. Include small icons for each category (e.g., brain for skills, heart for interests, target for problems).
                */}
               <div className="my-6 p-2 border border-brand-blue/30 rounded-lg">
-                <img src="/placeholder-image-life-first-mindmap.png" alt="Майнд-карта: Построение бизнеса вокруг себя" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
+                <img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s201.png" alt="Майнд-карта: Построение бизнеса вокруг себя" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
                  <p className="text-xs text-center text-gray-400 mt-1">Твои интересы, навыки и решенные проблемы - основа бизнеса.</p>
               </div>
               <p className="text-gray-300 text-base md:text-lg">
@@ -124,7 +123,7 @@ export default function SelfDevLandingPage() {
                 Diagram illustrating the audience building funnel. Top: "Consistent T-Shaped Content (Value + Personality)". Middle layer: Arrows pointing down labeled "Builds Trust", "Teaches Skills (Marketing, Writing...)", "Attracts Right People". Bottom layer: "Loyal Audience". Side arrow pointing from Audience to "High-Leverage Sales (Products/Services)". Style: Clean lines, clear text, possibly using neon colors.
               */}
               <div className="my-6 p-2 border border-neon-lime/30 rounded-lg">
-                <img src="/placeholder-image-audience-content-funnel.png" alt="Диаграмма: Контент -> Доверие -> Аудитория -> Продажи" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
+                <img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s301.png" alt="Диаграмма: Контент -> Доверие -> Аудитория -> Продажи" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
                 <p className="text-xs text-center text-gray-400 mt-1">Контент - двигатель доверия и роста.</p>
               </div>
               <p className="text-gray-300 text-base md:text-lg">
@@ -144,7 +143,7 @@ export default function SelfDevLandingPage() {
                  A timeline or flowchart graphic. Start: "Small Audience / Beginner". Arrow to: "Offer High-Ticket Service (Freelance/Coaching)" labeled "Low Volume, High Price, Requires Sales Skills". Arrow to: "Growing Audience". Arrow to: "Offer Scalable Product (Digital/Software/Physical)" labeled "Higher Volume, Lower Price (per unit), Leverages Audience Trust, Passive Income Potential". End: "More Control, More Impact". Use a sleek, futuristic timeline design.
                */}
                <div className="my-6 p-2 border border-brand-orange/30 rounded-lg">
-                 <img src="/placeholder-image-offer-evolution.png" alt="Схема: Эволюция предложений с ростом аудитории" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
+                 <img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s401.png" alt="Схема: Эволюция предложений с ростом аудитории" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
                   <p className="text-xs text-center text-gray-400 mt-1">От услуг к продуктам по мере роста.</p>
                </div>
                <ul className="list-disc list-inside space-y-2 text-gray-300 pl-4 text-base md:text-lg">
@@ -174,7 +173,7 @@ export default function SelfDevLandingPage() {
                 Use arrows to show the flow. Keep the style consistent (cyberpunk/neon).
               */}
                <div className="my-6 p-2 border border-brand-purple/30 rounded-lg">
-                 <img src="/placeholder-image-intelligent-imitation.png" alt="Инфографика: Процесс Интеллектуальной Имитации" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
+                 <img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s501.png" alt="Инфографика: Процесс Интеллектуальной Имитации" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
                  <p className="text-xs text-center text-gray-400 mt-1">Учись, наблюдая, разбирая и пробуя.</p>
                </div>
               <ol className="list-decimal list-inside space-y-2 text-gray-300 pl-4 text-base md:text-lg">
@@ -216,7 +215,7 @@ export default function SelfDevLandingPage() {
                 A visual of a solid foundation or cornerstone block labeled "Cornerstone Content (Your Story, Basics, Why)". Above it, smaller blocks representing different content formats (posts, videos, articles) resting on the foundation, labeled "Regular Content". Style: Architectural or blueprint-like, emphasizing stability.
               */}
                <div className="my-6 p-2 border border-brand-green/30 rounded-lg">
-                 <img src="/placeholder-image-cornerstone-content.png" alt="Визуализация: Фундаментальный контент как основа" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
+                 <img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s601.png" alt="Визуализация: Фундаментальный контент как основа" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
                  <p className="text-xs text-center text-gray-400 mt-1">Создай основу, на которую можно опереться.</p>
                </div>
               <p className="text-gray-300 text-base md:text-lg">
