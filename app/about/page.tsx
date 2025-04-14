@@ -1,7 +1,7 @@
 // /app/about/page.tsx
 "use client";
 import Head from "next/head";
-import { cn } from "@/lib/utils.ts"
+import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import SupportForm from "@/components/SupportForm";
