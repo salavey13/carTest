@@ -1,9 +1,8 @@
-// /components/assistant_components/ImageToolsModal.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaImages, FaTimes, FaUpload, FaCopy, FaCheck, FaSpinner, FaExclamationTriangle } from 'react-icons/fa6';
+import { FaImages, FaXmark, FaUpload, FaCopy, FaCheck, FaSpinner, FaExclamationTriangle } from 'react-icons/fa6';
 import { listPublicBuckets, uploadBatchImages } from '@/app/actions';
 import { Bucket } from '@supabase/storage-js';
 import { toast } from 'sonner';
@@ -160,7 +159,7 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({ isOpen, onClos
                             className="absolute top-3 right-3 text-gray-400 hover:text-white transition-colors p-1 rounded-full hover:bg-gray-700"
                             aria-label="Close modal"
                         >
-                            <FaTimes size={20} />
+                            <FaXmark size={20} />
                         </button>
 
                         <h2 className="text-xl font-semibold text-cyan-300 mb-4 flex items-center gap-2">
