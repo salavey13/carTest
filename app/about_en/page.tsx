@@ -1,6 +1,6 @@
 "use client";
 import Head from "next/head";
-import { cn } from "@/lib/utils.ts"
+import { cn } from "@/lib/utils"
 import Link from "next/link"; // Import Link for internal navigation
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
