@@ -99,7 +99,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                     <FaList /> Выберите PR для извлечения/обновления ветки:
                                 </h4>
                                 <div className="flex items-center gap-2">
-                                    <Tooltip text="Использовать ветку по умолчанию">
+                                    <Tooltip text="Использовать ветку по умолчанию" position='left'>
                                         <button
                                            onClick={() => { setManualBranchName(''); onSelectPrBranch(null); }} // Clear manual input when selecting default
                                            disabled={loading || loadingPrs}
@@ -111,7 +111,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                            Default
                                         </button>
                                      </Tooltip>
-                                     <Tooltip text="Обновить список PR">
+                                     <Tooltip text="Обновить список PR" position='left'>
                                           <button onClick={onLoadPrs} disabled={loading || loadingPrs || !repoUrl.includes('github.com')} className="p-1 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition">
                                               {loadingPrs ? <FaArrowsRotate className="animate-spin"/> : <FaList />}
                                           </button>
