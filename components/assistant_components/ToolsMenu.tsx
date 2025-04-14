@@ -33,41 +33,58 @@ export const ToolsMenu: React.FC<ToolsMenuProps> = ({ customLinks, onAddCustomLi
     const [showToolsMenu, setShowToolsMenu] = useState(false);
 
     return (
-        <div className="mb-4"> {/* Reduced margin */}
-            <div className="relative inline-block">
-                <button
-                    className={clsx(
-                        "flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)]",
-                        showToolsMenu && "bg-gray-700 ring-1 ring-cyan-500"
-                    )}
-                    onClick={() => setShowToolsMenu(!showToolsMenu)}
-                >
-                    <FaScrewdriverWrench className="text-gray-400" />
-                    <span className="text-sm text-white">Инструменты</span>
-                </button>
-                {showToolsMenu && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
-                        className="absolute left-0 bottom-full mb-2 w-56 bg-gray-700 rounded-sm shadow-lg z-20 border border-gray-600 overflow-hidden"
-                    >
-                        {predefinedLinks.map((link) => (
-                            <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-4 py-2 hover:bg-gray-600 text-sm transition text-white">
-                                {link.icon ?? <FaLink className="text-white" />} {/* Default icon */}
-                                <span className="flex-grow">{link.name}</span>
-                            </a>
-                        ))}
-                        {customLinks.map((link) => (
-                            <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-4 py-2 hover:bg-gray-600 text-sm transition text-white">
-                                <FaLink className="text-gray-400" />
-                                <span className="flex-grow">{link.name}</span>
-                            </a>
-                        ))}
-                        <button className="flex items-center gap-2.5 w-full text-left px-4 py-2 hover:bg-gray-600 text-sm text-cyan-400 transition" onClick={onAddCustomLink}>
-                            <FaPlus /> Добавить свою ссылку
-                        </button>
-                    </motion.div>
+        // Removed wrapper div with margin, margin is now on the parent flex container in AICodeAssistant
+        <div className="relative inline-block">
+            <button
+                className={clsx(
+                    "flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)]",
+                    showToolsMenu && "bg-gray-700 ring-1 ring-cyan-500"
                 )}
-            </div>
+                onClick={() => setShowToolsMenu(!showToolsMenu)}
+            >
+                <FaScrewdriverWrench className="text-gray-400" />
+                <span className="text-sm text-white">Инструменты</span>
+            </button>
+            {showToolsMenu && (
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+                    className="absolute left-0 bottom-full mb-2 w-56 bg-gray-700 rounded-lg shadow-lg z-20 border border-gray-600 overflow-hidden" // Use rounded-lg for consistency
+                >
+                    {/* Predefined Links Section */}
+                    <div className="py-1">
+                        {predefinedLinks.map((link) => (
+                            <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-4 py-2 hover:bg-gray-600 text-sm transition text-white group">
+                                <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                                     {link.icon ?? <FaLink className="text-gray-400 group-hover:text-white" />}
+                                </span>
+                                <span className="flex-grow truncate">{link.name}</span>
+                            </a>
+                        ))}
+                    </div>
+                    {/* Custom Links Section (if any) */}
+                    {customLinks.length > 0 && <hr className="border-gray-600" />}
+                    {customLinks.length > 0 && (
+                         <div className="py-1">
+                            {customLinks.map((link) => (
+                                <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-4 py-2 hover:bg-gray-600 text-sm transition text-white group">
+                                     <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                                         <FaLink className="text-gray-400 group-hover:text-white" />
+                                     </span>
+                                     <span className="flex-grow truncate">{link.name}</span>
+                                </a>
+                            ))}
+                         </div>
+                    )}
+                    {/* Add Link Button */}
+                     <hr className="border-gray-600" />
+                    <button className="flex items-center gap-2.5 w-full text-left px-4 py-2 hover:bg-gray-600 text-sm text-cyan-400 transition group" onClick={onAddCustomLink}>
+                        <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                             <FaPlus className="text-cyan-400 group-hover:text-cyan-300" />
+                        </span>
+                         Добавить свою ссылку
+                    </button>
+                </motion.div>
+            )}
         </div>
     );
 };

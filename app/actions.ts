@@ -1,4 +1,3 @@
-// /app/actions.ts
 "use server";
 
 import {
@@ -6,6 +5,7 @@ import {
   supabaseAdmin,
   fetchUserData as dbFetchUserData,         // Renamed import
   createOrUpdateUser as dbCreateOrUpdateUser, // Renamed import
+  uploadImage, // Import existing uploadImage function
 } from "@/hooks/supabase";
 import axios from "axios";
 import { verifyJwtToken, generateJwtToken } from "@/lib/auth";
@@ -15,6 +15,7 @@ import { createHash, randomBytes } from "crypto";
 import { handleWebhookProxy } from "./webhook-handlers/proxy";
 import { getBaseUrl } from "@/lib/utils";
 import type { Database } from "@/types/database.types"; // Ensure this type is correctly defined
+import { Bucket } from '@supabase/storage-js'; // Import Bucket type
 
 // Type alias for Supabase User Row
 type User = Database["public"]["Tables"]["users"]["Row"];
@@ -516,7 +517,7 @@ export async function notifySuccessfulUsers(userIds: string[]) {
 
     for (const userId of userIds) {
       const result = await sendTelegramMessage(
-        process.env.TELEGRAM_BOT_TOKEN!,
+        // process.env.TELEGRAM_BOT_TOKEN!, // removed !
         message,
         [],
         undefined,
@@ -1285,6 +1286,90 @@ export async function setTelegramWebhook(): Promise<{ success: boolean; data?: a
   }
 }
 
+
+// --- Image Upload Actions (NEW) ---
+
+/** Lists public Supabase Storage buckets */
+export async function listPublicBuckets(): Promise<{ success: boolean; data?: Bucket[]; error?: string }> {
+    try {
+        const { data: buckets, error } = await supabaseAdmin.storage.listBuckets();
+        if (error) {
+            logger.error("Error listing Supabase buckets:", error);
+            throw error;
+        }
+        // Filter for public buckets only
+        const publicBuckets = buckets.filter(bucket => bucket.public);
+        return { success: true, data: publicBuckets };
+    } catch (error) {
+        logger.error("Failed to list public buckets:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Could not list buckets" };
+    }
+}
+
+/** Uploads multiple images to a specified public bucket */
+export async function uploadBatchImages(
+    formData: FormData
+): Promise<{ success: boolean; data?: { name: string; url: string }[]; error?: string }> {
+    try {
+        const bucketName = formData.get("bucketName") as string;
+        const files = formData.getAll("files") as File[];
+
+        if (!bucketName) {
+            return { success: false, error: "Bucket name is required." };
+        }
+        if (!files || files.length === 0) {
+            return { success: false, error: "No files selected for upload." };
+        }
+
+        // Check if bucket exists and is public (optional, but good practice)
+        const { data: bucketData, error: bucketGetError } = await supabaseAdmin.storage.getBucket(bucketName);
+        if (bucketGetError || !bucketData) {
+            logger.error(`Error checking bucket ${bucketName}: ${bucketGetError?.message}`);
+            return { success: false, error: `Bucket '${bucketName}' not found or inaccessible.` };
+        }
+        if (!bucketData.public) {
+             return { success: false, error: `Bucket '${bucketName}' is not public.` };
+        }
+
+        const uploadPromises = files.map(async (file) => {
+            try {
+                // Reuse the existing uploadImage function from hooks/supabase
+                const imageUrl = await uploadImage(bucketName, file);
+                return { name: file.name, url: imageUrl };
+            } catch (uploadError) {
+                logger.error(`Failed to upload file ${file.name} to ${bucketName}:`, uploadError);
+                // Return an error object for this specific file
+                return { name: file.name, error: uploadError instanceof Error ? uploadError.message : "Upload failed" };
+            }
+        });
+
+        const results = await Promise.all(uploadPromises);
+
+        // Separate successful uploads from errors
+        const successfulUploads = results.filter(r => r && !r.error) as { name: string; url: string }[];
+        const uploadErrors = results.filter(r => r && r.error);
+
+        if (successfulUploads.length === 0) {
+            return { success: false, error: `All ${files.length} uploads failed. ${uploadErrors[0]?.error ?? ''}`, data: [] };
+        }
+
+        // Return partial success if some uploads failed
+        if (uploadErrors.length > 0) {
+             return {
+                 success: true, // Indicate partial success
+                 data: successfulUploads,
+                 error: `${uploadErrors.length} out of ${files.length} uploads failed.` // Provide a summary error
+             };
+        }
+
+        // All uploads successful
+        return { success: true, data: successfulUploads };
+
+    } catch (error) {
+        logger.error("Error in uploadBatchImages:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Batch image upload failed" };
+    }
+}
 
 
 // --- RESTORED / DEPRECATED? ---
