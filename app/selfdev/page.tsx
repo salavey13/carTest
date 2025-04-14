@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import {
   FaLightbulb, FaRoad, FaUsers, FaRocket, FaCodeBranch,
   FaArrowsSpin, FaNetworkWired, FaBookOpen, FaComments, FaBrain, FaEye, // fa6 icons (removed unused ones)
-  FaFileCode, FaCodeBranch // Replaced FaCog with FaCodeBranch
+  FaFileCode // Replaced FaCog with FaCodeBranch
 } from "react-icons/fa6";
 import { debugLogger } from "@/lib/debugLogger";
 import { logger } from "@/lib/logger";
