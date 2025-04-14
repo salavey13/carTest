@@ -18,12 +18,13 @@ import { ParsedFilesList } from './assistant_components/ParsedFilesList';
 import { PullRequestForm } from './assistant_components/PullRequestForm';
 import { OpenPrList } from './assistant_components/OpenPrList';
 import { ToolsMenu } from './assistant_components/ToolsMenu';
+import { ImageToolsModal } from './assistant_components/ImageToolsModal'; // NEW: Import ImageToolsModal
 import { SwapModal } from './assistant_components/SwapModal';
 import { CodeRestorer } from './assistant_components/CodeRestorer';
 // UI & Utils
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
-import { FaCircleInfo, FaCodeBranch, FaGithub, FaWandMagicSparkles, FaArrowsRotate } from "react-icons/fa6"; // Added FaCodeBranch, FaWandMagicSparkles, FaArrowsRotate
+import { FaCircleInfo, FaCodeBranch, FaGithub, FaWandMagicSparkles, FaArrowsRotate, FaImage } from "react-icons/fa6"; // Added FaImage
 import clsx from "clsx";
 import { saveAs } from "file-saver";
 
@@ -168,6 +169,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const [isProcessingPR, setIsProcessingPR] = useState(false); // Combined loading state for Create/Update PR actions
     const [originalRepoFiles, setOriginalRepoFiles] = useState<OriginalFile[]>([]); // State for original file content used by CodeRestorer
     const [isFetchingOriginals, setIsFetchingOriginals] = useState(false); // Loading state specifically for fetching originals
+    const [isImageModalOpen, setIsImageModalOpen] = useState(false); // NEW: State for Image Tools modal
 
     // --- Helper ---
     const extractPRTitleHint = (text: string): string => {
@@ -776,10 +778,25 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
              {/* Open PR List (Display Only - uses context data) */}
              <OpenPrList openPRs={contextOpenPrs} />
 
-             {/* Tools Menu */}
-             <ToolsMenu customLinks={customLinks} onAddCustomLink={handleAddCustomLink} />
+            {/* --- Toolbar Area --- */}
+            <div className="flex items-center gap-3 mb-2"> {/* NEW: Flex container for tools */}
+                {/* Tools Menu (Links) */}
+                <ToolsMenu customLinks={customLinks} onAddCustomLink={handleAddCustomLink} />
 
-             {/* Modals (Find/Replace) */}
+                 {/* NEW: Image Tools Button */}
+                 <Tooltip text="Загрузить картинки в Storage" position="left">
+                     <button
+                         onClick={() => setIsImageModalOpen(true)}
+                         className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500"
+                         disabled={isProcessing} // Disable if other actions are running
+                     >
+                         <FaImage className="text-gray-400" />
+                         <span className="text-sm text-white">Картинки</span>
+                     </button>
+                 </Tooltip>
+            </div> {/* --- End Toolbar Area --- */}
+
+             {/* Modals (Find/Replace & Image Tools) */}
              <AnimatePresence>
                  {showModal && (
                      <SwapModal
@@ -789,6 +806,13 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                          onSearch={handleSearch}
                          initialMode={modalMode}
                      />
+                 )}
+                 {/* NEW: Render Image Tools Modal */}
+                 {isImageModalOpen && (
+                      <ImageToolsModal
+                         isOpen={isImageModalOpen}
+                         onClose={() => setIsImageModalOpen(false)}
+                      />
                  )}
              </AnimatePresence>
         </div>
