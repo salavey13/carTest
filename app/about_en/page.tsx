@@ -5,13 +5,12 @@ import Link from "next/link"; // Import Link for internal navigation
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import SupportForm from "@/components/SupportForm";
-// Assuming you might want a flag or simple text for language switch
-import { FaGlobe } from "react-icons/fa6"; // Example icon import if needed
+import { FaGlobe } from "react-icons/fa6"; // Using FaGlobe for language switch
 
 export default function AboutEnPage() {
   return (
     <>
-      {/* SEO Optimizations */}
+      {/* .. SEO Optimizations */}
       <Head>
         <title>Pavel Solovyov - AI-Driven Development & Validation | oneSitePls</title>
         <meta
@@ -20,20 +19,20 @@ export default function AboutEnPage() {
         />
         <meta
           name="keywords"
-          content="developer, TypeScript, VIBE, AI development, AI validation, secure development, Framer, Supabase, Next.js, oneSitePls, Pavel Solovyov, mentorship, workflow automation"
+          content="developer, TypeScript, VIBE, AI development, AI validation, secure development, Framer, Supabase, Next.js, oneSitePls, Pavel Solovyov, mentorship, workflow automation, selfdev, purpose, profit" // Added keywords
         />
       </Head>
       <div className="relative min-h-screen">
-        {/* Language Switcher Link */}
+        {/* .. Language Switcher Link */}
         <Link href="/about" legacyBehavior>
           <a className="fixed top-10 right-4 z-5 p-2 bg-black/70 border border-[#39FF14]/50 rounded-md text-[#39FF14] hover:bg-[#39FF14] hover:text-black transition-colors text-sm font-mono shadow-glow-sm">
-            <FaGlobe className="h-5 w-5" />
+            <FaGlobe className="h-5 w-5" /> {/* Using icon */}
           </a>
         </Link>
 
-        {/* Enhanced Cyberpunk SVG Background */}
+        {/* .. Enhanced Cyberpunk SVG Background */}
         <div className="absolute inset-0 z-0">
-          {/* Existing SVG Background */}
+          {/* ... SVG content unchanged ... */}
           <svg
             className="w-full h-full opacity-70 animate-pulse-slow"
             xmlns="http://www.w3.org/2000/svg"
@@ -63,7 +62,7 @@ export default function AboutEnPage() {
             <circle cx="500" cy="500" r="200" stroke="#FF00FF" strokeWidth="1" fill="none" opacity="0.2" />
           </svg>
         </div>
-        {/* Adjusted padding for mobile */}
+        {/* .. Adjusted padding */}
         <div className="relative z-10 container mx-auto px-2 sm:px-4 py-4 pt-24">
           <Card className="max-w-4xl mx-auto bg-black text-white rounded-3xl shadow-[0_0_15px_#39FF14]">
             <CardHeader>
@@ -72,7 +71,7 @@ export default function AboutEnPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-8">
-              {/* Personal Info */}
+              {/* .. Personal Info */}
               <div className="flex flex-col items-center space-y-4">
                 <Avatar className="w-36 h-36 md:w-48 md:h-48 border-4 border-[#39FF14] shadow-[0_0_10px_#39FF14]">
                   <AvatarImage
@@ -84,7 +83,7 @@ export default function AboutEnPage() {
                 <div className="text-center">
                   <h2 className="text-2xl md:text-3xl font-bold text-[#39FF14] font-orbitron">Pavel Solovyov</h2>
                   <p className="text-base md:text-lg text-gray-300">Nizhny Novgorod, Russia | 04.03.1989</p>
-                  {/* Contact Info */}
+                  {/* .. Contact Info */}
                   <div className="mt-4 space-y-2 text-sm md:text-base">
                     <p>
                       <strong>Email:</strong>{" "}
@@ -108,7 +107,7 @@ export default function AboutEnPage() {
                 </div>
               </div>
 
-              {/* Professional Overview */}
+              {/* .. Professional Overview */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -135,12 +134,14 @@ export default function AboutEnPage() {
                     >
                       oneSitePls
                     </a>
-                    , I aim to make modern web development more accessible, and through mentorship, help others harness AI effectively. The goal isn't just faster code, but efficiently <strong>building the *right* things</strong>.
+                    , I aim to make modern web development more accessible, and through mentorship (inspired by{" "}
+                    <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">SelfDev</Link> principles), help others harness AI effectively. The goal isn't just faster code, but efficiently <strong>building the *right* things</strong>, integrating purpose and profit as outlined in{" "}
+                    <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>.
                   </p>
                 </CardContent>
               </Card>
 
-              {/* Skills */}
+              {/* .. Skills */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -164,14 +165,15 @@ export default function AboutEnPage() {
                     <div>
                       <h4 className="text-[#39FF14] font-bold">Methodologies & Focus</h4>
                        <p className="text-gray-300">
-                         Agile, Scrum, VIBE, <strong>AI-Assisted Development & Workflow Optimization</strong>
+                         Agile, Scrum, VIBE, <strong>AI-Assisted Development & Workflow Optimization</strong>,{" "}
+                         <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">SelfDev</Link> principles
                        </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* VIBE Methodology */}
+              {/* .. VIBE Methodology */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -180,9 +182,10 @@ export default function AboutEnPage() {
                 </CardHeader>
                 <CardContent>
                    <p className="text-sm md:text-base text-gray-300 mb-4">
-                     My VIBE method is a pragmatic response to the current AI landscape. It asks: how do we deliver value when AI can generate code with impressive accuracy? VIBE leverages AI, shifting the developer focus from line-by-line coding to <strong>system architecture, UX flows, and strategic direction</strong>. It's about using AI effectively, not just using AI.
+                     My VIBE method is a pragmatic response to the current AI landscape. It asks: how do we deliver value when AI can generate code with impressive accuracy? VIBE leverages AI, shifting the developer focus from line-by-line coding to <strong>system architecture, UX flows, and strategic direction</strong>. It's about using AI effectively, not just using AI. Explore the philosophy further in{" "}
+                     <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">SelfDev</Link>.
                    </p>
-                   {/* Image 1 */}
+                   {/* .. Image 1 */}
                    <img
                        src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/00.png"
                        alt="VIBE Methodology Visualization - AI-assisted strategy and automation"
@@ -194,7 +197,8 @@ export default function AboutEnPage() {
                      <strong>AI as Partner:</strong> I view AI as a <strong>"God-tier genius who never sleeps"</strong> – a partner handling laborious coding tasks, freeing up human developers for high-level design and complex problem-solving. Generating entire subsystems in days, not weeks, becomes feasible, accelerating innovation.
                    </p>
                    <p className="text-sm md:text-base text-gray-300">
-                     <strong>More than Code – Idea Validation:</strong> Why build fast if you're building the wrong thing? VIBE integrates <strong>AI-driven business validation</strong> to <strong>"fail faster"</strong> on weak ideas and accelerate promising ones. Using AI for market analysis, identifying user pain points, competitor research, and lean MVP testing (like the 5-step framework) drastically <strong>reduces the risk</strong> of building products nobody needs. It's not just faster – it's a fundamentally smarter way to build. This is core to projects like{" "}
+                     <strong>More than Code – Idea Validation:</strong> Why build fast if you're building the wrong thing? VIBE integrates <strong>AI-driven business validation</strong> to <strong>"fail faster"</strong> on weak ideas and accelerate promising ones. Using AI for market analysis, identifying user pain points, competitor research, and lean MVP testing (like the 5-step framework) drastically <strong>reduces the risk</strong> of building products nobody needs. It's not just faster – it's a fundamentally smarter way to build, aligning with the mental models in{" "}
+                     <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>. This is core to projects like{" "}
                      <a
                        href="https://github.com/salavey13/carTest"
                        target="_blank"
@@ -217,7 +221,7 @@ export default function AboutEnPage() {
                 </CardContent>
               </Card>
 
-             {/* VIBE CODING + SECURE DEVELOPMENT */}
+             {/* .. VIBE CODING + SECURE DEVELOPMENT */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -226,7 +230,7 @@ export default function AboutEnPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="mb-4">
-                    {/* Existing Video */}
+                    {/* .. Existing Video */}
                     <iframe
                       width="100%"
                       style={{ aspectRatio: '16/9' }}
@@ -248,7 +252,7 @@ export default function AboutEnPage() {
                      <li>Bypassed subscription logic</li>
                    </ul>
 
-                  {/* Image 2 */}
+                  {/* .. Image 2 */}
                   <img
                       src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/11.png"
                       alt="Secure AI Development Pipeline - VIBE Coding with Security"
@@ -260,7 +264,7 @@ export default function AboutEnPage() {
                    <p className="text-sm md:text-base mb-4 text-gray-300">
                      <strong>My Approach:</strong> My 13 years in <strong>enterprise security</strong> inform how I apply VIBE safely. Security checks are integrated throughout the AI-assisted workflow, ensuring speed doesn't compromise robustness. It's about <strong>resource optimization</strong>: maximizing AI efficiency while retaining human oversight on critical aspects like security and overall strategy.
                    </p>
-                  {/* Security Steps Grid */}
+                  {/* .. Security Steps Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-gray-900 p-4 rounded-lg border border-[#39FF14]/30">
                       <h4 className="font-bold text-[#39FF14] mb-2 text-sm md:text-base">1. AI + Security First</h4>
@@ -290,7 +294,7 @@ export default function AboutEnPage() {
                 </CardContent>
               </Card>
 
-              {/* Security Background */}
+              {/* .. Security Background */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                  <CardHeader>
                    <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -299,7 +303,7 @@ export default function AboutEnPage() {
                  </CardHeader>
                  <CardContent>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     {/* Security Experience */}
+                     {/* .. Security Experience */}
                      <div className="space-y-4">
                        <h3 className="font-bold text-[#39FF14] text-base md:text-lg">Enterprise Experience</h3>
                        <ul className="list-disc list-inside space-y-2 text-sm text-gray-300 pl-4">
@@ -311,7 +315,7 @@ export default function AboutEnPage() {
                        </ul>
                      </div>
 
-                     {/* VIBE Security Framework Summary */}
+                     {/* .. VIBE Security Framework Summary */}
                      <div className="space-y-4">
                        <h3 className="font-bold text-[#39FF14] text-base md:text-lg">VIBE Security Framework</h3>
                        <div className="flex items-start space-x-3">
@@ -333,7 +337,7 @@ export default function AboutEnPage() {
                      </div>
                    </div>
 
-                   {/* Video Integration */}
+                   {/* .. Video Integration */}
                    <div className="mt-6">
                      <iframe
                        width="100%"
@@ -350,7 +354,7 @@ export default function AboutEnPage() {
                      </p>
                    </div>
 
-                   {/* CV Highlights */}
+                   {/* .. CV Highlights */}
                    <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
                      <div className="bg-gray-900 p-3 rounded-lg border border-[#39FF14]/20">
                        <h4 className="font-bold text-[#39FF14] text-sm">13+ Years</h4>
@@ -368,7 +372,7 @@ export default function AboutEnPage() {
                  </CardContent>
               </Card>
 
-              {/* Experience */}
+              {/* .. Experience */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -409,7 +413,7 @@ export default function AboutEnPage() {
                 </CardContent>
               </Card>
 
-              {/* Certifications */}
+              {/* .. Certifications */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                  <CardHeader>
                    <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -423,7 +427,7 @@ export default function AboutEnPage() {
                  </CardContent>
               </Card>
 
-              {/* Education */}
+              {/* .. Education */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -442,7 +446,7 @@ export default function AboutEnPage() {
                 </CardContent>
               </Card>
 
-              {/* Mentorship */}
+              {/* .. Mentorship */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -451,7 +455,7 @@ export default function AboutEnPage() {
                 </CardHeader>
                 <CardContent>
                    <p className="text-sm md:text-base text-gray-300">
-                     Helping developers shift from traditional coding to <strong>strategic thinking</strong> in the AI world. Practical training via{" "}
+                     Helping developers shift from traditional coding to <strong>strategic thinking</strong> in the AI world, following the <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">SelfDev</Link> path. Practical training via{" "}
                      <a
                        href="https://github.com/salavey13/carTest"
                        target="_blank"
@@ -469,12 +473,13 @@ export default function AboutEnPage() {
                      >
                        oneSitePls
                      </a>{" "}
-                     platform, coupled with Telegram support and a free tier, aims to enable effective use of <strong>modern AI tools</strong> to focus on delivering value.
+                     platform, coupled with Telegram support and a free tier, aims to enable effective use of <strong>modern AI tools</strong> to focus on delivering value, integrating ideas from{" "}
+                     <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>.
                    </p>
                 </CardContent>
               </Card>
 
-              {/* Paid Support */}
+              {/* .. Paid Support */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -485,11 +490,11 @@ export default function AboutEnPage() {
                   <p className="text-sm md:text-base text-gray-300 mb-4">
                     Need targeted help with code, strategy, or implementing VIBE workflows? Fill out the form to leverage AI effectively!
                   </p>
-                  <SupportForm /> {/* Assuming this form is language-agnostic or you'll create an EN version */}
+                  <SupportForm /> {/* Assuming this form is language-agnostic */}
                 </CardContent>
               </Card>
 
-              {/* Project Overview: Cyber-Garage */}
+              {/* .. Project Overview: Cyber-Garage */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -497,7 +502,7 @@ export default function AboutEnPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                   {/* Image 3 */}
+                   {/* .. Image 3 */}
                   <img
                       src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/22.png"
                       alt="Cyber-Garage - AI-Powered Car Rental Ecosystem"
@@ -510,12 +515,13 @@ export default function AboutEnPage() {
                      <a href="/repo-xml" className="text-[#39FF14] hover:underline">
                        /repo-xml
                      </a>
-                     ), Telegram bots automate tasks, and the "Cyber-Garage" itself is a platform for experimenting with <strong>AI validation</strong> and rapid feature iteration (e.g., AR tours, AI-driven car recommendations). It's a chance to contribute to a project where <strong>AI is a practical tool, not just hype</strong>. Let's expand this world together!
+                     ), Telegram bots automate tasks, and the "Cyber-Garage" itself is a platform for experimenting with <strong>AI validation</strong> and rapid feature iteration (e.g., AR tours, AI-driven car recommendations). It's a chance to contribute to a project where <strong>AI is a practical tool, not just hype</strong>, guided by the philosophies explored in{" "}
+                      <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">SelfDev</Link> and <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>. Let's expand this world together!
                    </p>
                 </CardContent>
               </Card>
 
-              {/* How to Use /repo-xml */}
+              {/* .. How to Use /repo-xml */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                  <CardHeader>
                    <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -554,7 +560,7 @@ export default function AboutEnPage() {
                </Card>
 
 
-              {/* Call to Action */}
+              {/* .. Call to Action */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
