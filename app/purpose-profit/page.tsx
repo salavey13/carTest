@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAppContext } from "@/contexts/AppContext"; // Keep in case needed later
+import { Button } from "@/components/ui/button"; // Added Button for toggle
+import { useAppContext } from "@/contexts/AppContext";
 import {
   Tooltip,
   TooltipContent,
@@ -12,13 +13,16 @@ import {
 import {
   FaBookOpen, FaBriefcase, FaPersonRunning, FaMoneyBillWave, FaBrain,
   FaLayerGroup, FaMagnifyingGlassChart, FaMapLocation, FaHandHoldingDollar,
-  FaKeyboard, FaBullseye, FaPaintbrush, FaCircleUser, // fa6 icons
+  FaKeyboard, FaBullseye, FaPaintbrush, FaCircleUser, // Using user's provided icons
 } from "react-icons/fa6";
 import { debugLogger } from "@/lib/debugLogger";
 import Image from "next/image";
-import Link from "next/link"; // Added Link for potential internal links
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 
-// --- Chapter Data ---
+type Language = 'en' | 'ru';
+
+// --- Chapter Data Update ---
 const chapters = [
   {
     id: "intro",
@@ -38,8 +42,8 @@ const chapters = [
       "Представляет сырые мысли, призывая читать дважды для лучшего понимания.",
     ],
     imagePlaceholder: "/placeholders/pp/pp_intro.png",
-    imageAlt: "Infographic: Mindset vs Instructions for Purpose & Profit",
-    // <!-- IMG_PROMPT: Split infographic: Left side shows a rigid blueprint labeled 'Instructions', leading to a dead end. Right side shows interconnected thought bubbles labeled 'Mindset', 'Purpose', 'Profit', leading to an open road labeled 'Growth'. Style: Clean lines, symbolic, balanced colors. Text: 'Mindset over Instructions'. -->
+    imageAltEn: "Infographic: Mindset vs Instructions for Purpose & Profit",
+    imageAltRu: "Инфографика: Мышление против Инструкций для Цели и Прибыли",
     tooltipRu: "Визуализация сравнения: жесткие инструкции против гибких ментальных моделей как путь к интеграции цели и прибыли.",
   },
   {
@@ -60,8 +64,8 @@ const chapters = [
       "Поверхностное стремление к деньгам может стать путем к развитию навыков и призванию.",
     ],
     imagePlaceholder: "/placeholders/pp/pp_jobs.png",
-    imageAlt: "Infographic: Job vs Career vs Calling comparison",
-    // <!-- IMG_PROMPT: Three diverging paths infographic. Path 1: 'Job' labeled 'Survival', shows a hamster wheel. Path 2: 'Career' labeled 'Development', shows climbing steps. Path 3: 'Calling' labeled 'Passion', shows a glowing, self-drawn map. Style: Metaphorical, clear distinctions. Text: 'Job / Career / Calling'. -->
+    imageAltEn: "Infographic: Job vs Career vs Calling comparison",
+    imageAltRu: "Инфографика: Сравнение Работы, Карьеры и Призвания",
     tooltipRu: "Инфографика, иллюстрирующая различие между работой (выживание), карьерой (развитие) и призванием (страсть и самореализация).",
   },
   {
@@ -82,8 +86,8 @@ const chapters = [
           "Предпринимательство как 'развитие других': реши свои проблемы, поделись решениями, чтобы помочь другим.",
       ],
       imagePlaceholder: "/placeholders/pp/pp_entrepreneurship.png",
-      imageAlt: "Infographic: Complacent Employee vs High-Agency Entrepreneur",
-      // <!-- IMG_PROMPT: Split image. Left: A figure sitting comfortably in a defined box labeled 'Employment - Comfort Zone', looking bored. Right: A figure actively building stairs upwards out of an open box labeled 'Entrepreneurship - Growth Zone', looking determined. Style: Contrasting visuals, dynamic vs static. Text: 'Comfort vs Growth'. -->
+      imageAltEn: "Infographic: Complacent Employee vs High-Agency Entrepreneur",
+      imageAltRu: "Инфографика: Самодовольный Работник против Предпринимателя с высокой самостоятельностью",
       tooltipRu: "Сравнение: зона комфорта стандартного найма против зоны роста и неопределенности предпринимательского подхода, основанного на высокой самостоятельности.",
   },
   {
@@ -106,8 +110,8 @@ const chapters = [
           "Предпринимательство – путь к этичному созданию/использованию денег для цели.",
       ],
       imagePlaceholder: "/placeholders/pp/pp_money.png",
-      imageAlt: "Infographic: Money as a Neutral Tool vs Demonized Concept",
-      // <!-- IMG_PROMPT: Central image of a generic coin/bill icon. Arrows point towards it labeled 'Survival', 'Tool', 'Growth', 'Development'. Arrows point away from it labeled 'Demonization', 'Fear', 'Projection'. Style: Balanced, neutral colors for the tool aspect, darker/negative colors for demonization. Text: 'Money: Neutral Tool'. -->
+      imageAltEn: "Infographic: Money as a Neutral Tool vs Demonized Concept",
+      imageAltRu: "Инфографика: Деньги как Нейтральный Инструмент против Демонизированной Концепции",
       tooltipRu: "Визуализация денег как нейтрального инструмента для достижения целей (выживание, развитие) в противовес их демонизации, мешающей росту.",
   },
   {
@@ -132,9 +136,9 @@ const chapters = [
           "Самоактуализация (решение своих проблем) – предпосылка помощи другим.",
       ],
       imagePlaceholder: "/placeholders/pp/pp_generalism.png",
-      imageAlt: "Infographic: T-shaped Generalist vs I-shaped Specialist",
-      // <!-- IMG_PROMPT: Two figures side-by-side. Left: 'Specialist' represented by a tall, narrow 'I' shape, easily knocked over. Right: 'Generalist' represented by a 'T' shape (broad top, deep stem), stable base. Style: Clear visual metaphor, stability vs fragility. Text: 'Adaptable Generalist vs Fragile Specialist'. -->
-      tooltipRu: "Сравнение 'I'-образного специалиста (узкая экспертиза, уязвимость) и 'T'-образного глубокого генералиста (широкий кругозор, глубокая экспертиза в одной или нескольких областях, адаптивность).",
+      imageAltEn: "Infographic: T-shaped Generalist vs I-shaped Specialist",
+      imageAltRu: "Инфографика: T-образный Генералист против I-образного Специалиста",
+      tooltipRu: "Сравнение 'I'-образного специалиста (узкая экспертиза, уязвимость) и 'T'-образного глубокого генералиста (широкий кругозор, глубокая экспертиза, адаптивность).",
   },
    {
       id: "purpose_levels",
@@ -156,8 +160,8 @@ const chapters = [
           "Предпринимательство может способствовать развитию на этих уровнях.",
       ],
       imagePlaceholder: "/placeholders/pp/pp_purpose_levels.png",
-      imageAlt: "Infographic: Concentric Circles of Purpose Levels",
-      // <!-- IMG_PROMPT: Four concentric circles radiating outwards. Center: 'Survival' (basic needs icon). Next: 'Status' (social validation icon/trophy). Next: 'Creativity' (lightbulb/art icon). Outermost: 'Contribution' (helping hands/globe icon). Style: Expanding awareness visual, clear labels. Text: 'Levels: Survival -> Status -> Creativity -> Contribution'. -->
+      imageAltEn: "Infographic: Concentric Circles of Purpose Levels",
+      imageAltRu: "Инфографика: Концентрические Круги Уровней Цели",
       tooltipRu: "Визуализация четырех уровней цели/предназначения в виде концентрических кругов, от базового выживания до вклада в мир.",
   },
   {
@@ -180,13 +184,13 @@ const chapters = [
           "Требует постоянного экспериментирования (внутреннего, внешнего, глубокого погружения, итераций вверх).",
       ],
       imagePlaceholder: "/placeholders/pp/pp_progress.png",
-      imageAlt: "Infographic: Cycle of Progress - Nature's Compass",
-      // <!-- IMG_PROMPT: Circular flow diagram with 4 stages: 1. 'Lost' (question mark icon). 2. 'Interested' (spark/idea icon). 3. 'Obsessed' (focused eye/gear icon). 4. 'Understanding/New Problem' (check mark leading back to question mark). Arrow labeled 'Experimentation' drives the cycle. Style: Dynamic cycle, clear stages. Text: 'Nature's Compass: Lost -> Interested -> Obsessed -> Understand'. -->
+      imageAltEn: "Infographic: Cycle of Progress - Nature's Compass",
+      imageAltRu: "Инфографика: Цикл Прогресса - Компас Природы",
       tooltipRu: "Циклическая диаграмма 'Компаса Природы', иллюстрирующая процесс прогресса и создания знаний через экспериментирование и решение проблем.",
   },
   {
       id: "lifes_work",
-      icon: FaMapLocation,
+      icon: FaMapLocation, // Using user's provided icon
       titleEn: "Your Life's Work",
       titleRu: "Дело Вашей Жизни",
       pointsEn: [
@@ -202,9 +206,9 @@ const chapters = [
           "Компоненты плана: Анти-видение, Видение, Миссия, Стандарты, Цели, Проекты, Ограничения, Рычаги, Вызов, Любопытство.",
       ],
       imagePlaceholder: "/placeholders/pp/pp_lifes_work.png",
-      imageAlt: "Infographic: Personal Blueprint Components for Life's Work",
-      // <!-- IMG_PROMPT: Central compass icon labeled 'Life's Work / Direction'. Surrounding it are interconnected nodes/icons representing the plan components: 'Anti-Vision' (avoid sign), 'Vision' (star), 'Mission' (path), 'Standards' (shield), 'Goals' (target), 'Projects' (tools), 'Constraints' (funnel), 'Levers' (lever), 'Challenge' (mountain), 'Curiosity' (magnifying glass). Style: Mind map/blueprint aesthetic. Text: 'Your Personal Blueprint'. -->
-      tooltipRu: "Майнд-карта или чертеж, показывающий ключевые компоненты личного плана для навигации к 'Делу Вашей Жизни', с центральным компасом, указывающим направление.",
+      imageAltEn: "Infographic: Personal Blueprint Components for Life's Work",
+      imageAltRu: "Инфографика: Компоненты Личного Плана для Дела Жизни",
+      tooltipRu: "Майнд-карта или чертеж, показывающий ключевые компоненты личного плана для навигации к 'Делу Вашей Жизни'.",
   },
   {
       id: "value_creation",
@@ -224,13 +228,13 @@ const chapters = [
           "Ваше решение – уникальный *процесс* решения проблемы, часто найденный через самоэкспериментирование.",
       ],
       imagePlaceholder: "/placeholders/pp/pp_value.png",
-      imageAlt: "Infographic: Shaping Value Perception Questions",
-      // <!-- IMG_PROMPT: Central concept 'Value Proposition' surrounded by question bubbles: 'Who?' (person icon), 'What Problem?' (puzzle piece icon), 'Where (Result)?' (flag/finish line icon), 'When?' (clock icon), 'Why Care?' (heart/broken heart icon). Arrows pointing from answers to the central value proposition. Style: Question-driven infographic. Text: 'Shaping Value: Answer the 5 Ws'. -->
-      tooltipRu: "Инфографика, иллюстрирующая, что ценность субъективна и формируется путем ответа на ключевые вопросы (Кто, Что, Куда, Когда, Почему) для вашей аудитории.",
+      imageAltEn: "Infographic: Shaping Value Perception Questions",
+      imageAltRu: "Инфографика: Вопросы для Формирования Восприятия Ценности",
+      tooltipRu: "Инфографика, иллюстрирующая, что ценность субъективна и формируется путем ответа на ключевые вопросы (Кто, Что, Куда, Когда, Почему).",
   },
    {
       id: "meta_skill",
-      icon: FaKeyboard, // Changed from FaPencilAlt
+      icon: FaKeyboard,
       titleEn: "The Meta Skill",
       titleRu: "Мета-Навык",
       pointsEn: [
@@ -248,13 +252,13 @@ const chapters = [
           "Письмо доступно, фундаментально (даже для кода), дает рычаги без разрешения.",
       ],
       imagePlaceholder: "/placeholders/pp/pp_metaskill.png",
-      imageAlt: "Infographic: Writing as the Core Meta-Skill",
-      // <!-- IMG_PROMPT: Central icon of a keyboard/pen. Radiating outwards are connected nodes: 'Clear Thinking' (brain icon), 'Learning' (book icon), 'Earning' (money icon), 'Feedback Loop' (circular arrow), 'Vision/Taste' (eye icon), 'Storytelling' (speech bubble). Style: Hub-and-spoke model, emphasizing centrality of writing. Text: 'Writing: The Meta-Skill'. -->
-      tooltipRu: "Визуализация письма как центрального мета-навыка, соединяющего ясное мышление, обучение, заработок, получение обратной связи и развитие ключевых человеческих качеств в эпоху ИИ.",
+      imageAltEn: "Infographic: Writing as the Core Meta-Skill",
+      imageAltRu: "Инфографика: Письмо как Ключевой Мета-Навык",
+      tooltipRu: "Визуализация письма как центрального мета-навыка, соединяющего ясное мышление, обучение, заработок и развитие ключевых качеств.",
   },
   {
       id: "self_monetization",
-      icon: FaBullseye, // Changed from FaUserTie
+      icon: FaBullseye,
       titleEn: "Self-Monetization",
       titleRu: "Самомонетизация",
       pointsEn: [
@@ -272,13 +276,13 @@ const chapters = [
           "Позволяет создавать бизнесы одного человека с высоким рычагом (инфопродукты, товары, услуги).",
       ],
       imagePlaceholder: "/placeholders/pp/pp_selfmonetization.png",
-      imageAlt: "Infographic: 'You are the Niche' Self-Monetization Model",
-      // <!-- IMG_PROMPT: A diagram showing a loop: 1. A person icon experiencing a problem (question mark). 2. Icon conducting 'Self-Experimentation' (lab flask/tools). 3. Icon packaging a 'Solution' (gift box). 4. Icon offering the solution to similar person icons ('Your Authentic Niche'). Central text: 'You ARE the Niche'. Style: Cyclical process flow. -->
-      tooltipRu: "Диаграмма, иллюстрирующая цикл самомонетизации: решение собственных проблем через эксперименты, упаковка решения и предложение его своей аутентичной нише (людям, похожим на тебя).",
+      imageAltEn: "Infographic: 'You are the Niche' Self-Monetization Model",
+      imageAltRu: "Инфографика: Модель Самомонетизации 'Ты - это Ниша'",
+      tooltipRu: "Диаграмма цикла самомонетизации: решение собственных проблем -> упаковка решения -> предложение аутентичной нише.",
   },
   {
       id: "creator",
-      icon: FaPaintbrush,
+      icon: FaPaintbrush, // Using user's provided icon
       titleEn: "Become a Creator",
       titleRu: "Станьте Творцом",
       pointsEn: [
@@ -294,13 +298,13 @@ const chapters = [
           "Ключ к будущему: Перейти от мышления потребителя к мышлению творца (решать свои проблемы, публиковать решения, строить аудиторию, стать генералистом-оркестратором).",
       ],
       imagePlaceholder: "/placeholders/pp/pp_creator.png",
-      imageAlt: "Infographic: Shifting from Consumer to Creator Mindset",
-      // <!-- IMG_PROMPT: Two contrasting figures. Left: 'Consumer' passively receiving inputs (arrows pointing in), looking indifferent. Right: 'Creator' actively producing outputs (arrows pointing out), holding tools (brush, keyboard), looking engaged. Arrow indicating shift from left to right. Style: Clear contrast, active vs passive. Text: 'Consumer -> Creator'. -->
-      tooltipRu: "Сравнение пассивного потребителя и активного творца. Иллюстрация призыва к переходу от потребления к созданию, решению проблем и построению аудитории.",
+      imageAltEn: "Infographic: Shifting from Consumer to Creator Mindset",
+      imageAltRu: "Инфографика: Переход от Мышления Потребителя к Мышлению Творца",
+      tooltipRu: "Сравнение пассивного потребителя и активного творца. Призыв к созданию, решению проблем и построению аудитории.",
   },
   {
       id: "author",
-      icon: FaCircleUser,
+      icon: FaCircleUser, // Using user's provided icon
       titleEn: "About the Author",
       titleRu: "Об Авторе",
       pointsEn: [
@@ -309,8 +313,9 @@ const chapters = [
       pointsRu: [
           "Призыв к действию: Оставить отзыв, посетить веб-сайт (thedankoe.com), ознакомиться с книгой 'The Art of Focus'.",
       ],
-      imagePlaceholder: null, // No image needed for this section
-      imageAlt: "",
+      imagePlaceholder: null,
+      imageAltEn: "",
+      imageAltRu: "",
       tooltipRu: "",
   },
 ];
@@ -318,15 +323,21 @@ const chapters = [
 
 // --- Component ---
 export default function PurposeProfitPage() {
-  const { isAuthenticated, isLoading: isAuthLoading } = useAppContext(); // Keep context for potential future use
+  const { user } = useAppContext(); // Get user for language detection
   const [isMounted, setIsMounted] = useState(false);
+  const [selectedLang, setSelectedLang] = useState<Language>('ru'); // Default to Russian
 
   useEffect(() => {
     setIsMounted(true);
-    debugLogger.log("[PurposeProfitPage] Mounted.");
-  }, []);
+    // Detect initial language
+    const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'ru';
+    const telegramLang = user?.language_code;
+    const initialLang = telegramLang === 'ru' || (!telegramLang && browserLang === 'ru') ? 'ru' : 'en';
+    setSelectedLang(initialLang);
+    debugLogger.log(`[PurposeProfitPage] Mounted. Browser lang: ${browserLang}, TG lang: ${telegramLang}, Initial selected: ${initialLang}`);
+  }, [user]); // Rerun if user context updates
 
-  // Basic loading state
+  // Basic loading state until mounted
   if (!isMounted) {
     return (
       <div className="flex justify-center items-center min-h-screen pt-20 bg-gradient-to-br from-gray-900 via-black to-gray-800">
@@ -349,87 +360,109 @@ export default function PurposeProfitPage() {
 
       <TooltipProvider delayDuration={200}>
         <div className="relative z-10 container mx-auto px-4">
-          <Card className="max-w-4xl mx-auto bg-black/80 backdrop-blur-md text-white rounded-2xl border border-brand-purple/30 shadow-[0_0_25px_rgba(168,85,247,0.4)]"> {/* Changed border/shadow color */}
+          <Card className="max-w-4xl mx-auto bg-black/80 backdrop-blur-md text-white rounded-2xl border border-brand-purple/30 shadow-[0_0_25px_rgba(168,85,247,0.4)]">
             <CardHeader className="text-center border-b border-brand-purple/20 pb-4">
               <CardTitle className="text-3xl md:text-5xl font-bold text-brand-purple cyber-text glitch" data-text="Purpose & Profit Summary">
                 Purpose & Profit Summary
               </CardTitle>
               <p className="text-md md:text-lg text-gray-300 mt-3 font-mono">
-                Ключевые идеи и ментальные модели из книги Дэна Ко.
+                {selectedLang === 'ru'
+                    ? "Ключевые идеи и ментальные модели из книги Дэна Ко."
+                    : "Key Ideas and Mental Models from Dan Koe's Book."}
               </p>
             </CardHeader>
 
             <CardContent className="space-y-12 p-4 md:p-8">
+              {/* Language Toggle */}
+              <div className="flex justify-center space-x-2 mb-8">
+                  <Button
+                    variant={selectedLang === 'ru' ? 'secondary' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedLang('ru')}
+                    className={cn(
+                        "border-brand-purple/50",
+                        selectedLang === 'ru' ? 'bg-brand-purple/20 text-brand-purple hover:bg-brand-purple/30' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                    )}
+                  >
+                    🇷🇺 Русский
+                  </Button>
+                  <Button
+                     variant={selectedLang === 'en' ? 'secondary' : 'outline'}
+                     size="sm"
+                     onClick={() => setSelectedLang('en')}
+                     className={cn(
+                        "border-brand-blue/50", // Different color for EN?
+                        selectedLang === 'en' ? 'bg-brand-blue/20 text-brand-blue hover:bg-brand-blue/30' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                     )}
+                  >
+                    🇬🇧 English
+                  </Button>
+              </div>
+
+              {/* Chapters */}
               {chapters.map((chapter, index) => {
                 const IconComponent = chapter.icon;
-                // Assign different theme colors based on index or chapter ID for visual separation
                 const themeColor = ["text-brand-pink", "text-brand-blue", "text-neon-lime", "text-brand-orange", "text-brand-cyan", "text-brand-yellow", "text-brand-purple", "text-brand-green"][index % 8];
                 const borderColor = themeColor.replace("text-", "border-");
-                const bgColor = themeColor.replace("text-", "bg-"); // For tooltip maybe
+                const currentTitle = selectedLang === 'en' ? chapter.titleEn : chapter.titleRu;
+                const currentPoints = selectedLang === 'en' ? chapter.pointsEn : chapter.pointsRu;
+                const currentImageAlt = selectedLang === 'en' ? chapter.imageAltEn : chapter.imageAltRu;
 
                 return (
-                  <section key={chapter.id} className="space-y-4 border-l-4 pl-4 md:pl-6" style={{ borderColor: `var(--color-${themeColor.split('-')[2]})` }}> {/* Use dynamic border color */}
+                  <section key={chapter.id} className={`space-y-4 border-l-4 pl-4 md:pl-6 ${borderColor}`}>
+                    {/* Title */}
                     <h2 className={`flex items-center text-2xl md:text-3xl font-semibold ${themeColor} mb-4`}>
-                      <IconComponent className={`mr-3 ${themeColor}/80`} /> {chapter.titleEn}
+                      <IconComponent className={`mr-3 ${themeColor}/80`} /> {currentTitle}
                     </h2>
 
-                    {/* English Points */}
+                    {/* Points for selected language */}
                     <ul className="list-disc list-outside space-y-2 text-gray-300 pl-5 text-base md:text-lg leading-relaxed">
-                      {chapter.pointsEn.map((point, i) => (
-                        <li key={`en-${i}`}>{point}</li>
+                      {currentPoints.map((point, i) => (
+                        <li key={`${selectedLang}-${i}`}>{point}</li>
                       ))}
                     </ul>
 
-                    {/* Image Placeholder & Tooltip */}
+                    {/* Image Placeholder & Tooltip (Tooltip only for RU) */}
                     {chapter.imagePlaceholder && (
                       <div className={`my-6 p-2 border ${borderColor}/30 rounded-lg bg-black/30 max-w-md mx-auto`}>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-800/50 cursor-help">
-                              {/* Image generation prompt */}
-                              {/* {chapter.imagePromptComment} */}
                               <Image
                                 src={chapter.imagePlaceholder}
-                                alt={chapter.imageAlt}
-                                width={600} height={338} // Aspect ratio 16:9
-                                className="w-full h-full object-cover opacity-70 hover:opacity-100 transition-opacity" // Indicate placeholder visually slightly
+                                alt={currentImageAlt} // Use dynamic alt text
+                                width={600} height={338}
+                                className="w-full h-full object-cover opacity-70 hover:opacity-100 transition-opacity"
                                 loading="lazy"
                               />
                             </div>
                           </TooltipTrigger>
-                          {chapter.tooltipRu && (
+                          {/* Only show Russian tooltip if RU is selected */}
+                          {selectedLang === 'ru' && chapter.tooltipRu && (
                             <TooltipContent side="bottom" className={`max-w-[300px] text-center bg-gray-950 ${borderColor}/60 text-white p-3 shadow-lg border`}>
                               <p className="text-sm whitespace-pre-wrap">{chapter.tooltipRu}</p>
                             </TooltipContent>
                           )}
                         </Tooltip>
-                        <p className="text-xs text-center text-gray-400 mt-1 italic">{chapter.imageAlt}</p>
+                        {/* Dynamic Image Caption */}
+                        <p className="text-xs text-center text-gray-400 mt-1 italic">{currentImageAlt}</p>
                       </div>
                     )}
 
-                    {/* Russian Points */}
-                    <div className="mt-6 pt-4 border-t border-gray-700/50">
-                      <h3 className={`flex items-center text-xl md:text-2xl font-semibold ${themeColor}/90 mb-3`}>
-                        <IconComponent className={`mr-2 ${themeColor}/70 opacity-80`} size="0.9em" /> {chapter.titleRu}
-                      </h3>
-                      <ul className="list-disc list-outside space-y-2 text-gray-400 pl-5 text-base md:text-lg leading-relaxed">
-                        {chapter.pointsRu.map((point, i) => (
-                          <li key={`ru-${i}`}>{point}</li>
-                        ))}
-                      </ul>
-                    </div>
+                     {/* Separator for clarity, remove if not needed */}
+                     {/* <hr className={`${borderColor}/20 my-6`} /> */}
 
                   </section>
                 );
               })}
 
-              {/* Optional: Add a concluding section or link */}
+              {/* Concluding section */}
               <section className="text-center pt-8 border-t border-brand-purple/20 mt-10">
                  <p className="text-gray-400 italic">
-                    Это краткий конспект. Для полного понимания рекомендуется прочесть книгу.
+                   {selectedLang === 'ru' ? "Это краткий конспект. Для полного понимания рекомендуется прочесть книгу." : "This is a summary. Reading the full book is recommended for complete understanding."}
                  </p>
                  <p className="mt-4 text-gray-300">
-                   Узнайте больше о применении этих идей на практике в разделе <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">SelfDev</Link>.
+                   {selectedLang === 'ru' ? "Узнайте больше о применении этих идей на практике в разделе" : "Learn more about applying these ideas in the"} <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">SelfDev</Link> {selectedLang === 'ru' ? "" : "section."}
                  </p>
               </section>
 
