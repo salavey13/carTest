@@ -12,7 +12,7 @@ import {
 import {
   FaBookOpen, FaBriefcase, FaPersonRunning, FaMoneyBillWave, FaBrain,
   FaLayerGroup, FaMagnifyingGlassChart, FaMapLocation, FaHandHoldingDollar,
-  FaKeyboard, FaBullseye, FaPaintBrush, FaCircleUser, // fa6 icons
+  FaKeyboard, FaBullseye, FaPaintbrush, FaCircleUser, // fa6 icons
 } from "react-icons/fa6";
 import { debugLogger } from "@/lib/debugLogger";
 import Image from "next/image";
@@ -278,7 +278,7 @@ const chapters = [
   },
   {
       id: "creator",
-      icon: FaPaintBrush,
+      icon: FaPaintbrush,
       titleEn: "Become a Creator",
       titleRu: "Станьте Творцом",
       pointsEn: [
