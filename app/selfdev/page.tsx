@@ -1,3 +1,5 @@
+// No changes needed in this file based on the request.
+// /app/selfdev/page.tsx
 "use client";
 
 
@@ -61,7 +63,7 @@ export default function SelfDevLandingPage() {
 
   return (
     <div className="relative min-h-screen overflow-hidden pt-20 pb-10 bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200">
-      {/* Subtle Background Grid */}
+      {/* .. Subtle Background Grid */}
       <div
         className="absolute inset-0 bg-repeat opacity-5 z-0"
         style={{
@@ -71,7 +73,7 @@ export default function SelfDevLandingPage() {
         }}
       ></div>
 
-      {/* Wrap content potentially requiring tooltips with TooltipProvider */}
+      {/* .. Wrap content potentially requiring tooltips with TooltipProvider */}
       <TooltipProvider delayDuration={200}>
           <div className="relative z-10 container mx-auto px-4">
             <Card className="max-w-5xl mx-auto bg-black/80 backdrop-blur-md text-white rounded-2xl border border-brand-green/30 shadow-[0_0_25px_rgba(0,255,157,0.4)]">
@@ -84,9 +86,9 @@ export default function SelfDevLandingPage() {
                 </p>
               </CardHeader>
 
-              <CardContent className="space-y-12 p-4 md:p-8"> {/* Increased spacing */}
+              <CardContent className="space-y-12 p-4 md:p-8"> {/* .. Increased spacing */}
 
-                {/* Section 1: The Old Paradigm Trap */}
+                {/* .. Section 1: The Old Paradigm Trap */}
                 <section className="space-y-4">
                   <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-pink mb-4">
                     <FaRoad className="mr-3 text-brand-pink/80" /> Ловушка Старой Парадигмы
@@ -118,7 +120,7 @@ export default function SelfDevLandingPage() {
                   </p>
                 </section>
 
-                {/* Section 2: The New Paradigm - Life First */}
+                {/* .. Section 2: The New Paradigm - Life First */}
                 <section className="space-y-4">
                   <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-blue mb-4">
                     <FaLightbulb className="mr-3 text-brand-blue/80" /> Новый Путь: Жизнь Прежде Всего (Путь Черепахи)
@@ -150,7 +152,7 @@ export default function SelfDevLandingPage() {
                   </p>
                 </section>
 
-                {/* Section 3: The Power of Audience & Content */}
+                {/* .. Section 3: The Power of Audience & Content */}
                 <section className="space-y-4">
                   <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-neon-lime mb-4">
                     <FaUsers className="mr-3 text-neon-lime/80" /> Сила Аудитории и AI-Контента
@@ -189,7 +191,7 @@ export default function SelfDevLandingPage() {
                   </p>
                 </section>
 
-                {/* Section 4: Evolving Your Offers */}
+                {/* .. Section 4: Evolving Your Offers */}
                 <section className="space-y-4">
                    <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-orange mb-4">
                      <FaArrowsSpin className="mr-3 text-brand-orange/80" /> Эволюция Предложений с AI
@@ -225,7 +227,7 @@ export default function SelfDevLandingPage() {
                    </p>
                 </section>
 
-                {/* Section: AI как Усилитель (NEW) */}
+                {/* .. Section: AI как Усилитель */}
                 <section className="space-y-4">
                     <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-cyan mb-4">
                         <FaRobot className="mr-3 text-brand-cyan/80" /> AI как Усилитель: Твои Новые Суперсилы
@@ -237,7 +239,7 @@ export default function SelfDevLandingPage() {
                       <Tooltip>
                          <TooltipTrigger asChild>
                             <div className="aspect-square w-full h-auto overflow-hidden rounded-md bg-gray-800/50 cursor-help">
-                              {/* <!-- IMG_PROMPT: Infographic illustrating AI augmentation: A central human figure/brain icon connected by glowing lines to various AI tool icons (chatbot, code symbol, automation gear, data analysis graph), symbolizing enhanced capabilities. Style: Abstract, tech, neon cyan glow effect. --> */}
+                              {/* ... Image Placeholder ... */}
                               <Image
                                 src="/placeholders/s701.png" // Placeholder image
                                 alt="Инфографика: AI как усилитель человеческих возможностей"
@@ -264,7 +266,7 @@ export default function SelfDevLandingPage() {
                     </ul>
                 </section>
 
-                {/* Section: Персонализация в Масштабе (NEW) */}
+                {/* .. Section: Персонализация в Масштабе */}
                 <section className="space-y-4">
                     <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-yellow mb-4">
                          <FaBullseye className="mr-3 text-brand-yellow/80" /> Персонализация в Масштабе: Достучись до Каждого
@@ -276,7 +278,7 @@ export default function SelfDevLandingPage() {
                        <Tooltip>
                           <TooltipTrigger asChild>
                             <div className="aspect-square w-full h-auto overflow-hidden rounded-md bg-gray-800/50 cursor-help">
-                              {/* <!-- IMG_PROMPT: Diagram showing personalization at scale: Starts with a large pool of generic icons representing leads, funnels down through data enrichment icons (database, magnifying glass), leading to individually targeted email/message icons directed at specific user profile icons. Style: Clean data visualization, funnel metaphor, bright yellow connecting lines. --> */}
+                              {/* ... Image Placeholder ... */}
                               <Image
                                 src="/placeholders/s801.png" // Placeholder image
                                 alt="Инфографика: Персонализация аутрича с помощью AI"
@@ -306,7 +308,7 @@ export default function SelfDevLandingPage() {
                     </p>
                 </section>
 
-                {/* Section 5: How to Learn & Start (Intelligent Imitation) */}
+                {/* .. Section 5: How to Learn & Start */}
                 <section className="space-y-4">
                   <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-purple mb-4">
                      <FaWandMagicSparkles className="mr-3 text-brand-purple/80" /> Как Начать: Изучай Методологию и Имитируй
@@ -360,7 +362,7 @@ export default function SelfDevLandingPage() {
                    </p>
                 </section>
 
-                 {/* Section 6: Cornerstone Content & Proof (Updated) */}
+                 {/* .. Section 6: Cornerstone Content & Proof */}
                 <section className="space-y-4">
                   <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-green mb-4">
                     <FaBookOpen className="mr-3 text-brand-green/80" /> Фундамент: Контент "Почему" и Доказательство Ценности
@@ -395,20 +397,21 @@ export default function SelfDevLandingPage() {
                   </p>
                 </section>
 
-                {/* Call to Action */}
+                {/* .. Call to Action */}
                 <section className="space-y-4 border-t border-brand-green/20 pt-8 mt-10">
                   <h2 className="flex items-center justify-center text-2xl md:text-3xl font-semibold text-brand-green mb-4">
                     <FaRocket className="mr-3 text-brand-green/80" /> Готов Начать Свой Путь?
                   </h2>
                   <p className="text-gray-300 text-base md:text-lg text-center leading-relaxed">
-                     Этот новый путь — это марафон, а не спринт. Он требует работы, но это работа над <strong className="text-brand-green font-semibold">собой</strong> и <strong className="text-brand-green font-semibold">своей жизнью</strong>. Платформа <strong className="text-brand-green font-semibold">oneSitePls</strong> и инструменты вроде <Link href="/repo-xml" className="text-brand-blue hover:underline font-semibold">/repo-xml</Link> созданы, чтобы <strong className="text-brand-green font-semibold">ускорить</strong> этот процесс, используя AI как помощника, владеющего всеми этими <strong className="text-brand-green font-semibold">7 навыками</strong>.
+                     Этот новый путь — это марафон, а не спринт. Он требует работы, но это работа над <strong className="text-brand-green font-semibold">собой</strong> и <strong className="text-brand-green font-semibold">своей жизнью</strong>. Платформа <strong className="text-brand-green font-semibold">oneSitePls</strong> и инструменты вроде <Link href="/repo-xml" className="text-brand-blue hover:underline font-semibold">/repo-xml</Link> созданы, чтобы <strong className="text-brand-green font-semibold">ускорить</strong> этот процесс, используя AI как помощника, владеющего всеми этими <strong className="text-brand-green font-semibold">7 навыками</strong>. Глубже погрузиться в философию можно на странице{" "}
+                     <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>.
                   </p>
                    <p className="text-gray-300 text-base md:text-lg text-center leading-relaxed mt-4">
                      Изучи <Link href="/about" className="text-brand-blue hover:underline font-semibold">мою историю</Link>, посмотри на <a href="https://github.com/salavey13/carTest" target="_blank" rel="noopener noreferrer" className="text-brand-blue hover:underline font-semibold">репозиторий oneSitePls</a> как на пример VIBE-разработки, или свяжись со мной для менторства или консультации через форму ниже.
                    </p>
                    <div className="mt-8 max-w-md mx-auto">
                       <h3 className="text-xl font-semibold text-brand-green mb-4 text-center">Нужна Помощь или Консультация?</h3>
-                      {/* Проверка на isMounted уже выполнена выше, так что SupportForm можно рендерить */}
+                      {/* .. SupportForm */}
                       <SupportForm />
                    </div>
                 </section>
@@ -416,7 +419,7 @@ export default function SelfDevLandingPage() {
               </CardContent>
             </Card>
           </div>
-      </TooltipProvider> {/* Close TooltipProvider */}
+      </TooltipProvider> {/* .. Close TooltipProvider */}
     </div>
   );
 }
