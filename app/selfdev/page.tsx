@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import SupportForm from "@/components/SupportForm"; // Keep if consulting is still offered
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
 import {
-  FaLightbulb, FaRoad, FaUsers, FaRocket, FaTools, FaRegCommentDots, FaRegUserCircle,
-  FaArrowsSpin, FaNetworkWired, FaBookOpen, FaSeedling, FaComments, FaBrain, FaEye, // fa6 icons
+  FaLightbulb, FaRoad, FaUsers, FaRocket, FaTools,
+  FaArrowsSpin, FaNetworkWired, FaBookOpen, FaComments, FaBrain, FaEye, // fa6 icons (removed unused ones)
   FaFileCode, FaCodeBranch // Replaced FaCog with FaBranch
 } from "react-icons/fa6";
 import { debugLogger } from "@/lib/debugLogger";
@@ -23,7 +23,8 @@ export default function SelfDevLandingPage() {
   useEffect(() => {
     setIsMounted(true);
     // Any client-side specific logic can go here
-  }, []);
+    debugLogger.log("[SelfDevPage] Mounted. Auth loading:", isAuthLoading, "Is Authenticated:", isAuthenticated);
+  }, [isAuthLoading, isAuthenticated]);
 
   // Render loading state or placeholder if not mounted or auth loading
   if (!isMounted || isAuthLoading) {
@@ -34,10 +35,13 @@ export default function SelfDevLandingPage() {
     );
   }
 
-  // Handle case where user is not authenticated after loading
-  // Allow viewing the philosophy page even if not logged in.
+  // Optional: Handle non-authenticated state if needed, though page seems public
   // if (!isAuthenticated) {
-  //     // Optional: Show a message encouraging login for full features
+  //   return (
+  //     <div className="flex flex-col justify-center items-center min-h-screen text-center p-4">
+  //       <p className="text-lg font-semibold mb-4">Login required for full experience.</p>
+  //     </div>
+  //   );
   // }
 
   return (
@@ -77,6 +81,7 @@ export default function SelfDevLandingPage() {
                 A visual metaphor. Left side: A figure looking confused at multiple complex road signs pointing to "Freelance", "SMMA", "eCom", leading towards a hamster wheel or cage labeled "New 9-5", "Trapped", "No Leverage". Right side: Clear path labeled "Your Ideal Life" leading towards an open landscape labeled "Purpose", "Enjoyment", "Leverage". Arrows show the flow. Use cyberpunk/neon aesthetics.
               */}
               <div className="my-6 p-2 border border-brand-pink/30 rounded-lg">
+                {/* Placeholder for generated image */}
                 <img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s101.png" alt="Инфографика: Старый путь (ловушка) против Нового пути (свобода)" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
                 <p className="text-xs text-center text-gray-400 mt-1">Старый путь ведет в ловушку, Новый - к свободе.</p>
               </div>
@@ -97,6 +102,7 @@ export default function SelfDevLandingPage() {
                  A creative mind map visualization. Center node: "YOU / Your Ideal Life". Radiating outwards: nodes for "Interests", "Skills", "Problems Solved", "Past Self's Needs", "Values". Arrows connecting these nodes to potential "Business Ideas" or "Audience Needs". Use interconnected glowing lines in a dark, techy style. Include small icons for each category (e.g., brain for skills, heart for interests, target for problems).
                */}
               <div className="my-6 p-2 border border-brand-blue/30 rounded-lg">
+                 {/* Placeholder for generated image */}
                 <img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s201.png" alt="Майнд-карта: Построение бизнеса вокруг себя" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
                  <p className="text-xs text-center text-gray-400 mt-1">Твои интересы, навыки и решенные проблемы - основа бизнеса.</p>
               </div>
@@ -123,6 +129,7 @@ export default function SelfDevLandingPage() {
                 Diagram illustrating the audience building funnel. Top: "Consistent T-Shaped Content (Value + Personality)". Middle layer: Arrows pointing down labeled "Builds Trust", "Teaches Skills (Marketing, Writing...)", "Attracts Right People". Bottom layer: "Loyal Audience". Side arrow pointing from Audience to "High-Leverage Sales (Products/Services)". Style: Clean lines, clear text, possibly using neon colors.
               */}
               <div className="my-6 p-2 border border-neon-lime/30 rounded-lg">
+                 {/* Placeholder for generated image */}
                 <img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s301.png" alt="Диаграмма: Контент -> Доверие -> Аудитория -> Продажи" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
                 <p className="text-xs text-center text-gray-400 mt-1">Контент - двигатель доверия и роста.</p>
               </div>
@@ -143,6 +150,7 @@ export default function SelfDevLandingPage() {
                  A timeline or flowchart graphic. Start: "Small Audience / Beginner". Arrow to: "Offer High-Ticket Service (Freelance/Coaching)" labeled "Low Volume, High Price, Requires Sales Skills". Arrow to: "Growing Audience". Arrow to: "Offer Scalable Product (Digital/Software/Physical)" labeled "Higher Volume, Lower Price (per unit), Leverages Audience Trust, Passive Income Potential". End: "More Control, More Impact". Use a sleek, futuristic timeline design.
                */}
                <div className="my-6 p-2 border border-brand-orange/30 rounded-lg">
+                 {/* Placeholder for generated image */}
                  <img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s401.png" alt="Схема: Эволюция предложений с ростом аудитории" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
                   <p className="text-xs text-center text-gray-400 mt-1">От услуг к продуктам по мере роста.</p>
                </div>
@@ -173,15 +181,16 @@ export default function SelfDevLandingPage() {
                 Use arrows to show the flow. Keep the style consistent (cyberpunk/neon).
               */}
                <div className="my-6 p-2 border border-brand-purple/30 rounded-lg">
+                 {/* Placeholder for generated image */}
                  <img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s501.png" alt="Инфографика: Процесс Интеллектуальной Имитации" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
                  <p className="text-xs text-center text-gray-400 mt-1">Учись, наблюдая, разбирая и пробуя.</p>
                </div>
               <ol className="list-decimal list-inside space-y-2 text-gray-300 pl-4 text-base md:text-lg">
-                <li><strong className="text-brand-purple">Собери Вдохновение:</strong> Найди 3-5 брендов, авторов, продуктов, которые тебе нравятся и которые успешны.</li>
-                <li><strong className="text-brand-purple">Разбери на Части:</strong> Проанализируй их структуру, стиль, ключевые элементы (хуки, заголовки, формат контента, дизайн, УТП). Почему это работает?</li>
-                <li><strong className="text-brand-purple">Имитируй Маленький Кусочек:</strong> Возьми <strong className="text-brand-purple">один</strong> элемент (например, структуру поста, цветовую схему, тип заголовка) и попробуй применить его <strong className="text-brand-purple">в своем</strong> контенте/продукте/профиле.</li>
-                <li><strong className="text-brand-purple">Повторяй и Сочетай:</strong> Сделай это снова с другим элементом. И еще раз. Постепенно ты создашь <strong className="text-brand-purple">свой уникальный стиль</strong>.</li>
-                <li><strong className="text-brand-purple">Дополняй Знаниями:</strong> Параллельно изучай теорию (читай книги, смотри видео), чтобы понимать <strong className="text-brand-purple">"почему"</strong> то, что ты делаешь, работает.</li>
+                <li><strong className="text-brand-purple">Собери Вдохновение:</strong> <FaEye className="inline mr-1 mb-1"/> Найди 3-5 брендов, авторов, продуктов, которые тебе нравятся и которые успешны.</li>
+                <li><strong className="text-brand-purple">Разбери на Части:</strong> <FaFileCode className="inline mr-1 mb-1"/> Проанализируй их структуру, стиль, ключевые элементы (хуки, заголовки, формат контента, дизайн, УТП). Почему это работает?</li>
+                <li><strong className="text-brand-purple">Имитируй Маленький Кусочек:</strong> <FaCodeBranch className="inline mr-1 mb-1"/> Возьми <strong className="text-brand-purple">один</strong> элемент (например, структуру поста, цветовую схему, тип заголовка) и попробуй применить его <strong className="text-brand-purple">в своем</strong> контенте/продукте/профиле.</li>
+                <li><strong className="text-brand-purple">Повторяй и Сочетай:</strong> <FaArrowsSpin className="inline mr-1 mb-1"/> Сделай это снова с другим элементом. И еще раз. Постепенно ты создашь <strong className="text-brand-purple">свой уникальный стиль</strong>.</li>
+                <li><strong className="text-brand-purple">Дополняй Знаниями:</strong> <FaBrain className="inline mr-1 mb-1"/> Параллельно изучай теорию (читай книги, смотри видео), чтобы понимать <strong className="text-brand-purple">"почему"</strong> то, что ты делаешь, работает.</li>
               </ol>
               <h3 className="flex items-center text-xl font-semibold text-brand-purple mt-6 mb-2">
                  <FaNetworkWired className="mr-2 text-brand-purple/80" /> Внедряйся в "Племя"
@@ -215,6 +224,7 @@ export default function SelfDevLandingPage() {
                 A visual of a solid foundation or cornerstone block labeled "Cornerstone Content (Your Story, Basics, Why)". Above it, smaller blocks representing different content formats (posts, videos, articles) resting on the foundation, labeled "Regular Content". Style: Architectural or blueprint-like, emphasizing stability.
               */}
                <div className="my-6 p-2 border border-brand-green/30 rounded-lg">
+                 {/* Placeholder for generated image */}
                  <img src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s601.png" alt="Визуализация: Фундаментальный контент как основа" className="w-full h-auto rounded-md bg-gray-800/50 aspect-video object-cover" />
                  <p className="text-xs text-center text-gray-400 mt-1">Создай основу, на которую можно опереться.</p>
                </div>
@@ -235,10 +245,11 @@ export default function SelfDevLandingPage() {
                  Этот новый путь — это марафон, а не спринт. Он требует работы, но это работа над <strong className="text-brand-green">собой</strong> и <strong className="text-brand-green">своей жизнью</strong>. Платформа <strong className="text-brand-green">oneSitePls</strong> и инструменты вроде <Link href="/repo-xml" className="text-brand-blue hover:underline">/repo-xml</Link> созданы, чтобы <strong className="text-brand-green">ускорить</strong> этот процесс, используя AI как помощника.
               </p>
                <p className="text-gray-300 text-base md:text-lg">
-                 Изучи <Link href="/about_en" className="text-brand-blue hover:underline">мою историю</Link>, посмотри на <a href="https://github.com/salavey13/carTest" target="_blank" rel="noopener noreferrer" className="text-brand-blue hover:underline">репозиторий carTest</a> как на пример VIBE-разработки, или свяжись со мной для менторства или консультации.
+                 Изучи <Link href="/about" className="text-brand-blue hover:underline">мою историю</Link>, посмотри на <a href="https://github.com/salavey13/oneSitePls" target="_blank" rel="noopener noreferrer" className="text-brand-blue hover:underline">репозиторий oneSitePls</a> как на пример VIBE-разработки, или свяжись со мной для менторства или консультации.
                </p>
                <div className="mt-6">
                   <h3 className="text-xl font-semibold text-brand-green mb-3 text-center">Нужна Помощь?</h3>
+                  {/* Check if SupportForm component exists and is exported correctly */}
                   <SupportForm />
                </div>
             </section>
@@ -256,45 +267,12 @@ export default function SelfDevLandingPage() {
    text-shadow: 0 0 5px rgba(0, 255, 157, 0.7), 0 0 10px rgba(0, 255, 157, 0.5); // Adjust color based on context
 }
 
-@keyframes glitch {
-  0% { text-shadow: 0.05em 0 0 rgba(255,0,0,.75), -0.05em -0.025em 0 rgba(0,255,0,.75), -0.025em 0.05em 0 rgba(0,0,255,.75); }
-  14% { text-shadow: 0.05em 0 0 rgba(255,0,0,.75), -0.05em -0.025em 0 rgba(0,255,0,.75), -0.025em 0.05em 0 rgba(0,0,255,.75); }
-  15% { text-shadow: -0.05em -0.025em 0 rgba(255,0,0,.75), 0.025em 0.025em 0 rgba(0,255,0,.75), -0.05em -0.05em 0 rgba(0,0,255,.75); }
-  49% { text-shadow: -0.05em -0.025em 0 rgba(255,0,0,.75), 0.025em 0.025em 0 rgba(0,255,0,.75), -0.05em -0.05em 0 rgba(0,0,255,.75); }
-  50% { text-shadow: 0.025em 0.05em 0 rgba(255,0,0,.75), 0.05em 0 0 rgba(0,255,0,.75), 0 -0.05em 0 rgba(0,0,255,.75); }
-  99% { text-shadow: 0.025em 0.05em 0 rgba(255,0,0,.75), 0.05em 0 0 rgba(0,255,0,.75), 0 -0.05em 0 rgba(0,0,255,.75); }
-  100% { text-shadow: -0.025em 0 0 rgba(255,0,0,.75), -0.025em -0.025em 0 rgba(0,255,0,.75), -0.025em -0.05em 0 rgba(0,0,255,.75); }
-}
+@keyframes glitch { 0% { text-shadow: 0.05em 0 0 rgba(255,0,0,.75), -0.05em -0.025em 0 rgba(0,255,0,.75), -0.025em 0.05em 0 rgba(0,0,255,.75); } 14% { text-shadow: 0.05em 0 0 rgba(255,0,0,.75), -0.05em -0.025em 0 rgba(0,255,0,.75), -0.025em 0.05em 0 rgba(0,0,255,.75); } 15% { text-shadow: -0.05em -0.025em 0 rgba(255,0,0,.75), 0.025em 0.025em 0 rgba(0,255,0,.75), -0.05em -0.05em 0 rgba(0,0,255,.75); } 49% { text-shadow: -0.05em -0.025em 0 rgba(255,0,0,.75), 0.025em 0.025em 0 rgba(0,255,0,.75), -0.05em -0.05em 0 rgba(0,0,255,.75); } 50% { text-shadow: 0.025em 0.05em 0 rgba(255,0,0,.75), 0.05em 0 0 rgba(0,255,0,.75), 0 -0.05em 0 rgba(0,0,255,.75); } 99% { text-shadow: 0.025em 0.05em 0 rgba(255,0,0,.75), 0.05em 0 0 rgba(0,255,0,.75), 0 -0.05em 0 rgba(0,0,255,.75); } 100% { text-shadow: -0.025em 0 0 rgba(255,0,0,.75), -0.025em -0.025em 0 rgba(0,255,0,.75), -0.025em -0.05em 0 rgba(0,0,255,.75); } }
 
-.glitch {
-  position: relative;
-  animation: glitch 1s linear infinite;
-}
-
-.glitch::before,
-.glitch::after {
-  content: attr(data-text);
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  background: inherit; // Inherit background from parent
-  overflow: hidden;
-  clip: rect(0, 900px, 0, 0);
-}
-
-.glitch::before {
-  left: 2px;
-  text-shadow: -1px 0 red;
-  animation: glitch-anim-1 2s infinite linear alternate-reverse;
-}
-
-.glitch::after {
-  left: -2px;
-  text-shadow: -1px 0 blue;
-  animation: glitch-anim-2 2s infinite linear alternate-reverse;
-}
+.glitch { position: relative; animation: glitch 1s linear infinite; }
+.glitch::before, .glitch::after { content: attr(data-text); position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: inherit; overflow: hidden; clip: rect(0, 900px, 0, 0); }
+.glitch::before { left: 2px; text-shadow: -1px 0 red; animation: glitch-anim-1 2s infinite linear alternate-reverse; }
+.glitch::after { left: -2px; text-shadow: -1px 0 blue; animation: glitch-anim-2 2s infinite linear alternate-reverse; }
 
 @keyframes glitch-anim-1 { 0% { clip: rect(44px, 9999px, 49px, 0); } 5% { clip: rect(5px, 9999px, 100px, 0); } 10% { clip: rect(13px, 9999px, 60px, 0); } 15% { clip: rect(80px, 9999px, 40px, 0); } 20% { clip: rect(22px, 9999px, 75px, 0); } 25% { clip: rect(90px, 9999px, 15px, 0); } 30% { clip: rect(50px, 9999px, 88px, 0); } 35% { clip: rect(10px, 9999px, 45px, 0); } 40% { clip: rect(70px, 9999px, 30px, 0); } 45% { clip: rect(25px, 9999px, 95px, 0); } 50% { clip: rect(60px, 9999px, 20px, 0); } 55% { clip: rect(5px, 9999px, 55px, 0); } 60% { clip: rect(75px, 9999px, 35px, 0); } 65% { clip: rect(18px, 9999px, 80px, 0); } 70% { clip: rect(85px, 9999px, 22px, 0); } 75% { clip: rect(40px, 9999px, 65px, 0); } 80% { clip: rect(3px, 9999px, 90px, 0); } 85% { clip: rect(68px, 9999px, 28px, 0); } 90% { clip: rect(33px, 9999px, 77px, 0); } 95% { clip: rect(98px, 9999px, 10px, 0); } 100% { clip: rect(52px, 9999px, 58px, 0); } }
 @keyframes glitch-anim-2 { 0% { clip: rect(6px, 9999px, 94px, 0); } 5% { clip: rect(88px, 9999px, 12px, 0); } 10% { clip: rect(38px, 9999px, 68px, 0); } 15% { clip: rect(20px, 9999px, 85px, 0); } 20% { clip: rect(72px, 9999px, 18px, 0); } 25% { clip: rect(10px, 9999px, 90px, 0); } 30% { clip: rect(58px, 9999px, 32px, 0); } 35% { clip: rect(80px, 9999px, 8px, 0); } 40% { clip: rect(28px, 9999px, 78px, 0); } 45% { clip: rect(42px, 9999px, 52px, 0); } 50% { clip: rect(92px, 9999px, 25px, 0); } 55% { clip: rect(15px, 9999px, 82px, 0); } 60% { clip: rect(62px, 9999px, 42px, 0); } 65% { clip: rect(4px, 9999px, 70px, 0); } 70% { clip: rect(77px, 9999px, 10px, 0); } 75% { clip: rect(22px, 9999px, 88px, 0); } 80% { clip: rect(50px, 9999px, 48px, 0); } 85% { clip: rect(95px, 9999px, 38px, 0); } 90% { clip: rect(30px, 9999px, 60px, 0); } 95% { clip: rect(65px, 9999px, 15px, 0); } 100% { clip: rect(8px, 9999px, 98px, 0); } }
