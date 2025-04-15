@@ -1,3 +1,4 @@
+// /app/selfdev/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -21,26 +22,26 @@ export async function getRecentSelfDevPurchases(limit: number = 5): Promise<{
 }> {
     debugLogger.log(`[SelfDev Action] Fetching recent self-dev purchases (limit: ${limit})`);
     try {
-        const { data, error } = await supabaseAdmin
-            .from("invoices")
-            .select("metadata->>boost_type, created_at") // Select boost_type from metadata and timestamp
-            .eq("type", "selfdev_boost") // Filter by the correct invoice type
-            .eq("status", "paid")       // Only include paid invoices
-            .order("created_at", { ascending: false })
-            .limit(limit);
+        // Используем RPC для более чистого извлечения и обработки JSONB
+        const { data, error } = await supabaseAdmin.rpc(
+            'get_recent_paid_selfdev_invoices',
+            { limit_count: limit }
+        );
 
         if (error) {
-            logger.error("Error fetching recent self-dev purchases from DB:", error);
+            logger.error("Error fetching recent self-dev purchases via RPC from DB:", error);
             throw error;
         }
 
-        // Format the data
-        const purchases: PurchaseRecord[] = data.map((invoice: any) => ({ // Use 'any' carefully or define Invoice type
-            boost_type: invoice.boost_type || "unknown", // Extract boost_type, handle missing case
-            purchased_at: invoice.created_at,
+        // Данные из RPC должны уже быть в нужном формате { boost_type, created_at }
+        // Переименуем created_at в purchased_at для соответствия PurchaseRecord
+        const purchases: PurchaseRecord[] = data.map((item: any) => ({
+            boost_type: item.boost_type || "unknown",
+            purchased_at: item.created_at,
         }));
 
-        debugLogger.log(`[SelfDev Action] Successfully fetched ${purchases.length} purchases.`);
+
+        debugLogger.log(`[SelfDev Action] Successfully fetched ${purchases.length} purchases via RPC.`);
         return { success: true, data: purchases };
 
     } catch (error) {
@@ -51,6 +52,26 @@ export async function getRecentSelfDevPurchases(limit: number = 5): Promise<{
         };
     }
 }
+
+/*
+-- SQL Функция для Supabase (выполнить один раз в SQL Editor)
+-- Эта функция безопаснее и эффективнее извлекает нужные данные
+CREATE OR REPLACE FUNCTION get_recent_paid_selfdev_invoices(limit_count integer)
+RETURNS TABLE(boost_type text, created_at timestamp with time zone)
+LANGUAGE sql
+AS $$
+SELECT
+    metadata->>'boost_type' AS boost_type,
+    created_at
+FROM
+    public.invoices
+WHERE
+    type = 'selfdev_boost' AND status = 'paid'
+ORDER BY
+    created_at DESC
+LIMIT limit_count;
+$$;
+*/
 
 
 /**
@@ -67,54 +88,63 @@ export async function subscribeToSelfDevPurchases(
 ): Promise<() => void> {
     logger.info("[SelfDev Action] Attempting to subscribe to self-dev purchases (server-side only).");
 
-    // This subscription happens on the server where the action runs.
-    // It cannot directly push updates back to the specific client that called the action
-    // without additional infrastructure.
+    // Эта подписка происходит на сервере, где выполняется action.
+    // Она не может напрямую отправлять обновления клиенту без доп. инфраструктуры.
     const channel = supabaseAdmin
         .channel('realtime-selfdev-purchases')
-        .on(
+        .on<any>( // Используем <any> для payload, т.к. тип сложный
             'postgres_changes',
             {
                 event: 'INSERT',
                 schema: 'public',
                 table: 'invoices',
-                filter: 'type=eq.selfdev_boost' // Filter for relevant type
+                filter: 'type=eq.selfdev_boost' // Фильтр по типу
             },
             (payload) => {
                 logger.info('[SelfDev Action] Received new invoice insert via subscription (server-side).', payload);
-                // Check if the new invoice is paid (status might change later)
+                // Проверяем, что это новый оплаченный счет
                 if (payload.new && payload.new.status === 'paid') {
-                    const boostType = payload.new.metadata?.boost_type || "unknown";
-                    const createdAt = payload.new.created_at || new Date().toISOString();
+                    // Извлекаем boost_type из metadata, проверяя его наличие
+                    const boostType = payload.new.metadata?.boost_type ?? "unknown";
+                    const createdAt = payload.new.created_at ?? new Date().toISOString(); // Используем ?? для null/undefined
+
                     logger.info(`[SelfDev Action] New PAID selfdev_boost detected: ${boostType}`);
                     const purchase: PurchaseRecord = {
                         boost_type: boostType,
                         purchased_at: createdAt,
                     };
-                    // Calling the callback here will execute it on the server environment
-                    // where the action is running, NOT push it to the client's browser.
+                    // Вызов callback выполнится в серверной среде
                     try {
                         callback(purchase);
                     } catch (cbError) {
                         logger.error("[SelfDev Action] Error executing subscription callback:", cbError);
                     }
+                } else {
+                    // Логируем, если пришло событие INSERT, но статус не 'paid' (может быть 'pending' и т.д.)
+                    debugLogger.log('[SelfDev Action] Received non-paid or incomplete invoice insert event.', payload.new);
                 }
             }
         )
         .subscribe((status, err) => {
             if (status === 'SUBSCRIBED') {
                 logger.info('[SelfDev Action] Successfully subscribed to self-dev purchases on server.');
-            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                logger.error(`[SelfDev Action] Subscription error: ${status}`, err);
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') { // Добавим CLOSED
+                logger.error(`[SelfDev Action] Subscription error or closed: ${status}`, err);
+                // Здесь можно добавить логику переподключения, если нужно
             } else {
                  logger.info(`[SelfDev Action] Subscription status: ${status}`);
             }
         });
 
-    // Return a function to unsubscribe
+    // Возвращаем функцию для отписки
     const unsubscribe = async () => {
         logger.info("[SelfDev Action] Removing server-side subscription to self-dev purchases.");
-        await supabaseAdmin.removeChannel(channel);
+        try {
+            const removeStatus = await supabaseAdmin.removeChannel(channel);
+            logger.info("[SelfDev Action] Subscription removal status:", removeStatus);
+        } catch (removeError) {
+            logger.error("[SelfDev Action] Error removing subscription channel:", removeError);
+        }
     };
 
     return unsubscribe;
