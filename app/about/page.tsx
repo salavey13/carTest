@@ -1,40 +1,40 @@
-// /app/about/page.tsx
-// /app/about/page.tsx
 "use client";
 import Head from "next/head";
+import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import SupportForm from "@/components/SupportForm";
 import Link from "next/link"; // Import Link for internal navigation
+import { FaGlobe } from "react-icons/fa6"; // Example icon import if needed
 
 export default function AboutPage() {
   return (
     <>
-      {/* SEO Optimizations */}
+      {/* .. SEO Optimizations */}
       <Head>
-        {/* Updated Title & Description to reflect AI focus */}
+        {/* .. Updated Title & Description */}
         <title>Pavel Solovyov - Cyber-Alchemist | AI-Driven Development & Validation</title>
         <meta
           name="description"
-          content="13+ years in coding, pioneering the VIBE methodology for AI-accelerated development and business validation. Secure, efficient web solutions."
+          content="13+ лет в кодинге, пионер методологии VIBE для AI-ускоренной разработки и бизнес-валидации. Безопасные, эффективные веб-решения."
         />
         <meta
           name="keywords"
-          content="developer, TypeScript, VIBE, cyberpunk, security, Framer, Supabase, AI, AI development, AI validation, mentorship, Pavel Solovyov"
+          content="developer, TypeScript, VIBE, cyberpunk, security, Framer, Supabase, AI, AI development, AI validation, mentorship, Pavel Solovyov, selfdev, purpose, profit" // Added keywords
         />
       </Head>
       <div className="relative min-h-screen">
-        {/* Language Switcher Link */}
+        {/* .. Language Switcher Link */}
         <Link href="/about_en" legacyBehavior>
           <a className="fixed top-10 right-4 z-5 p-2 bg-black/70 border border-[#39FF14]/50 rounded-md text-[#39FF14] hover:bg-[#39FF14] hover:text-black transition-colors text-sm font-mono shadow-glow-sm">
             EN
             {/* Or use an icon: <FaGlobe className="h-5 w-5" /> */}
           </a>
         </Link>
-        {/* Enhanced Cyberpunk SVG Background */}
+        {/* .. Enhanced Cyberpunk SVG Background */}
         <div className="absolute inset-0 z-0">
-          {/* Existing SVG Background */}
-          <svg
+          {/* ... SVG content unchanged ... */}
+           <svg
             className="w-full h-full opacity-70 animate-pulse-slow"
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 1000 1000"
@@ -63,7 +63,7 @@ export default function AboutPage() {
             <circle cx="500" cy="500" r="200" stroke="#FF00FF" strokeWidth="1" fill="none" opacity="0.2" />
           </svg>
         </div>
-        {/* Adjusted padding for mobile */}
+        {/* .. Adjusted padding */}
         <div className="relative z-10 container mx-auto px-2 sm:px-4 py-4 pt-24">
           <Card className="max-w-4xl mx-auto bg-black text-white rounded-3xl shadow-[0_0_15px_#39FF14]">
             <CardHeader>
@@ -72,7 +72,7 @@ export default function AboutPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-8">
-              {/* Personal Info */}
+              {/* .. Personal Info */}
               <div className="flex flex-col items-center space-y-4">
                 <Avatar className="w-36 h-36 md:w-48 md:h-48 border-4 border-[#39FF14] shadow-[0_0_10px_#39FF14]">
                   <AvatarImage
@@ -84,7 +84,7 @@ export default function AboutPage() {
                 <div className="text-center">
                   <h2 className="text-2xl md:text-3xl font-bold text-[#39FF14] font-orbitron">Павел Соловьёв</h2>
                   <p className="text-base md:text-lg text-gray-300">Нижний Новгород, Россия | 04.03.1989</p>
-                  {/* Contact Info */}
+                  {/* .. Contact Info */}
                   <div className="mt-4 space-y-2 text-sm md:text-base">
                     <p>
                       <strong>Email:</strong>{" "}
@@ -108,7 +108,7 @@ export default function AboutPage() {
                 </div>
               </div>
 
-              {/* Professional Overview */}
+              {/* .. Professional Overview */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -116,7 +116,7 @@ export default function AboutPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {/* Render directly with JSX */}
+                   {/* Updated Russian text with links */}
                   <p className="text-sm md:text-base text-gray-300">
                     Я — Павел Соловьёв, кибер-ветеран с 13+ годами в коде. От Java и C++ я эволюционировал до пионера AI-ассистированной разработки. Сегодня я не просто пишу код — я <strong>архитектор цифровых решений</strong>, использующий AI как "carry team lead" для автоматизации рутины и фокусировки на <strong>стратегии, UX и бизнес-логике</strong>. Мой флагман{" "}
                     <a
@@ -136,12 +136,14 @@ export default function AboutPage() {
                     >
                       oneSitePls.framer.ai
                     </a>
-                    , я делаю веб-разработку доступной, а через менторство помогаю другим оседлать волну AI-трансформации. Моя цель — не просто кодить быстрее, а <strong>строить правильные вещи</strong> эффективно.
+                    , я делаю веб-разработку доступной, а через менторство, основанное на принципах{" "}
+                    <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">SelfDev</Link>, помогаю другим оседлать волну AI-трансформации. Моя цель — не просто кодить быстрее, а <strong>строить правильные вещи</strong> эффективно, интегрируя цель и прибыль, как описано в{" "}
+                    <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>.
                   </p>
                 </CardContent>
               </Card>
 
-              {/* Skills */}
+              {/* .. Skills */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -164,16 +166,17 @@ export default function AboutPage() {
                     </div>
                     <div>
                       <h4 className="text-[#39FF14] font-bold">Инструменты и методологии</h4>
-                       {/* Render directly with JSX */}
+                       {/* Updated Russian text with link */}
                        <p className="text-gray-300">
-                         GitHub, Grok, Agile, Scrum, VIBE, <strong>AI-Assisted Development & Workflow Optimization</strong>
+                         GitHub, Grok, Agile, Scrum, VIBE, <strong>AI-Assisted Development & Workflow Optimization</strong>, принципы{" "}
+                         <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">SelfDev</Link>
                        </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* VIBE Methodology */}
+              {/* .. VIBE Methodology */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -181,25 +184,26 @@ export default function AboutPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                   {/* Render directly with JSX */}
+                   {/* Updated Russian text with link */}
                    <p className="text-sm md:text-base text-gray-300 mb-4">
-                     Мой метод VIBE — это не просто кодинг, это <strong>парадигмальный сдвиг</strong>. Это ответ на вопрос: как создавать ценность в эпоху, когда AI может генерировать код с <strong>"near-perfect accuracy"</strong>? VIBE — это <strong>AI-усиленная алхимия</strong>, где фокус смещается с написания строк кода на <strong>архитектуру системы, UX-потоки и стратегическое видение</strong>.
+                     Мой метод VIBE — это не просто кодинг, это <strong>парадигмальный сдвиг</strong>. Это ответ на вопрос: как создавать ценность в эпоху, когда AI может генерировать код с <strong>"near-perfect accuracy"</strong>? VIBE — это <strong>AI-усиленная алхимия</strong>, где фокус смещается с написания строк кода на <strong>архитектуру системы, UX-потоки и стратегическое видение</strong>. Узнайте больше о философии в разделе{" "}
+                     <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">SelfDev</Link>.
                    </p>
-                   {/* Image 1 - Added overflow-hidden */}
+                   {/* .. Image 1 */}
                    <img
                        src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/00.png"
                        alt="VIBE Methodology Visualization - AI-assisted strategy and automation"
-                       className="rounded-lg overflow-hidden shadow-[0_0_10px_#39FF14] my-4 w-full object-cover" // Added overflow-hidden
+                       className="rounded-lg overflow-hidden shadow-[0_0_10px_#39FF14] my-4 w-full object-cover"
                        style={{ aspectRatio: '16/9' }}
                        loading="lazy"
                    />
-                   {/* Render directly with JSX */}
-                   <p className="text-sm md:text-base text-gray-300 mb-4">
+                    <p className="text-sm md:text-base text-gray-300 mb-4">
                      <strong>AI как Партнёр:</strong> Я рассматриваю AI не как инструмент, а как <strong>"God-tier genius who never sleeps"</strong> — партнёра, который берёт на себя рутинные, трудоёмкие задачи кодирования, позволяя мне и команде концентрироваться на <strong>высокоуровневом проектировании</strong>. Мы можем генерировать целые подсистемы за дни, а не недели, освобождая ресурсы для инноваций.
                    </p>
-                   {/* Render directly with JSX */}
+                   {/* Updated Russian text with link */}
                    <p className="text-sm md:text-base text-gray-300">
-                     <strong>Больше, чем Код — Валидация Идей:</strong> VIBE выходит за рамки разработки. Зачем строить быстро, если строишь не то? Я интегрирую <strong>AI-driven business validation</strong>, чтобы <strong>"fail faster"</strong> на плохих идеях и <strong>ускорять хорошие</strong>. Используя AI для анализа рынка, поиска реальной <strong>"боли"</strong> пользователей, оценки конкурентов и тестирования MVP с минимальными затратами (как в 5-шаговом фреймворке), мы радикально <strong>снижаем риск</strong> создания продуктов, которые никому не нужны. Это не просто быстрее – это <strong>"entirely different game"</strong>. VIBE — это сердце моих проектов, от{" "}
+                     <strong>Больше, чем Код — Валидация Идей:</strong> VIBE выходит за рамки разработки. Зачем строить быстро, если строишь не то? Я интегрирую <strong>AI-driven business validation</strong>, чтобы <strong>"fail faster"</strong> на плохих идеях и <strong>ускорять хорошие</strong>. Используя AI для анализа рынка, поиска реальной <strong>"боли"</strong> пользователей, оценки конкурентов и тестирования MVP с минимальными затратами (как в 5-шаговом фреймворке), мы радикально <strong>снижаем риск</strong> создания продуктов, которые никому не нужны. Это не просто быстрее – это <strong>"entirely different game"</strong>, основанное на ментальных моделях из{" "}
+                     <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>. VIBE — это сердце моих проектов, от{" "}
                      <a
                        href="https://github.com/salavey13/carTest"
                        target="_blank"
@@ -222,7 +226,7 @@ export default function AboutPage() {
                 </CardContent>
               </Card>
 
-             {/* VIBE CODING + SECURE DEVELOPMENT */}
+             {/* .. VIBE CODING + SECURE DEVELOPMENT */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -231,7 +235,7 @@ export default function AboutPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="mb-4">
-                    {/* Existing Video - Added overflow-hidden */}
+                    {/* .. Existing Video */}
                     <iframe
                       width="100%"
                       style={{ aspectRatio: '16/9' }} // Use aspect ratio for height
@@ -244,18 +248,17 @@ export default function AboutPage() {
                       loading="lazy"
                     ></iframe>
                   </div>
-                   {/* Render directly with JSX */}
-                  <p className="text-sm md:text-base mb-4 text-gray-300">
+                   <p className="text-sm md:text-base mb-4 text-gray-300">
                     <strong>VIBE CODING:</strong> Представьте генерацию 60kb рабочего кода за 48 часов. Это сила AI-ассистированной разработки. Но с великой силой приходит великая ответственность. Без должной <strong>кибер-брони</strong>, этот "vibe" может привести к катастрофам:
                   </p>
-                   {/* Existing list of risks */}
+                   {/* .. Existing list of risks */}
                    <ul className="list-disc list-inside space-y-2 text-sm md:text-base mb-4 text-gray-300 pl-4"> {/* Added padding */}
                      <li>API-ключи скрэйпятся ботами</li>
                      <li>Базы данных заполняются мусором</li>
                      <li>Подписки обходятся через уязвимости</li>
                    </ul>
 
-                  {/* Image 2 - Added overflow-hidden */}
+                  {/* .. Image 2 */}
                   <img
                       src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/11.png"
                       alt="Secure AI Development Pipeline - VIBE Coding with Security"
@@ -264,11 +267,10 @@ export default function AboutPage() {
                       loading="lazy"
                   />
 
-                   {/* Render directly with JSX */}
                    <p className="text-sm md:text-base mb-4 text-gray-300">
                      <strong>Мой подход:</strong> Мои 13 лет в <strong>enterprise security</strong> позволяют мне применять VIBE-методологию <strong>безопасно</strong>. Я интегрирую проверки на каждом шагу, чтобы AI-скорость не приводила к уязвимостям. Это <strong>оптимизация ресурсов</strong>: максимальная эффективность AI при сохранении человеческого контроля над критическими аспектами — безопасностью и стратегией.
                    </p>
-                  {/* Existing Security Steps Grid */}
+                  {/* .. Existing Security Steps Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="bg-gray-900 p-4 rounded-lg border border-[#39FF14]/30">
                       <h4 className="font-bold text-[#39FF14] mb-2 text-sm md:text-base">1. AI + Security First</h4>
@@ -299,7 +301,7 @@ export default function AboutPage() {
                 </CardContent>
               </Card>
 
-              {/* Кибер-Броня: 13 Лет Security Опыта */}
+              {/* .. Кибер-Броня: 13 Лет Security Опыта */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                  <CardHeader>
                    <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -307,9 +309,9 @@ export default function AboutPage() {
                    </CardTitle>
                  </CardHeader>
                  <CardContent>
-                   {/* Content emphasizes application of security to AI workflows */}
+                   {/* .. Content emphasizes application of security to AI workflows */}
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     {/* Security Experience */}
+                     {/* .. Security Experience */}
                      <div className="space-y-4">
                        <h3 className="font-bold text-[#39FF14] text-base md:text-lg">Enterprise-Grade Protection</h3>
                        <ul className="list-disc list-inside space-y-2 text-sm text-gray-300 pl-4"> {/* Added padding */}
@@ -317,19 +319,19 @@ export default function AboutPage() {
                          <li>Реализовал поддержку IPv6 с нулевым downtime</li>
                          <li>Сертифицированный специалист Qualys по управлению уязвимостями</li>
                          <li>4 успешных релиза механизма принятия решений ABRE (Java/Groovy)</li>
-                         <li> {/* Render directly with JSX */}
+                         <li> {/* Updated Russian text */}
                             Применение этого опыта для <strong>безопасной интеграции AI</strong> в разработку
                          </li>
                        </ul>
                      </div>
 
-                     {/* VIBE Security Framework */}
+                     {/* .. VIBE Security Framework */}
                      <div className="space-y-4">
                        <h3 className="font-bold text-[#39FF14] text-base md:text-lg">VIBE Security Framework</h3>
                        <div className="flex items-start space-x-3">
                          <div className="text-[#39FF14] mt-1 text-lg">⚡</div>
                          <div>
-                            {/* Render directly with JSX */}
+                            {/* Updated Russian text */}
                             <p className="text-sm text-gray-300">
                               <strong>AI-Генерация → Авто-аудит:</strong>
                               <br />
@@ -345,7 +347,7 @@ export default function AboutPage() {
                      </div>
                    </div>
 
-                   {/* Video Integration - Added overflow-hidden */}
+                   {/* .. Video Integration */}
                    <div className="mt-6">
                      <iframe
                        width="100%"
@@ -362,7 +364,7 @@ export default function AboutPage() {
                      </p>
                    </div>
 
-                   {/* CV Highlights */}
+                   {/* .. CV Highlights */}
                    <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
                      <div className="bg-gray-900 p-3 rounded-lg border border-[#39FF14]/20">
                        <h4 className="font-bold text-[#39FF14] text-sm">13+ Лет</h4>
@@ -380,7 +382,7 @@ export default function AboutPage() {
                  </CardContent>
               </Card>
 
-              {/* Experience */}
+              {/* .. Experience */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -392,7 +394,7 @@ export default function AboutPage() {
                     <h3 className="text-lg font-bold text-[#39FF14] mb-1">
                       Основатель/Разработчик, oneSitePls.framer.ai (2023 - н.в.)
                     </h3>
-                     {/* Render directly with JSX */}
+                     {/* Updated Russian text */}
                     <p className="text-gray-300">
                       Запустил платформу с <strong>AI</strong> для упрощённой веб-разработки. Создал{" "}
                       <a
@@ -412,12 +414,12 @@ export default function AboutPage() {
                     </h3>
                     <ul className="list-disc list-inside text-gray-300 space-y-2 pl-4"> {/* Added padding */}
                       <li>
-                        {/* Render directly with JSX */}
+                        {/* Updated Russian text */}
                         <strong>Java-разработчик (2016-2023):</strong> Улучшил Avaya Business Rules Engine и микросервисы
                         для Avaya Aura AS5300, применяя принципы надёжности, актуальные и для <strong>AI-эпохи</strong>.
                       </li>
                       <li>
-                         {/* Render directly with JSX */}
+                         {/* Updated Russian text */}
                         <strong>C++-разработчик (2010-2016):</strong> Поддерживал клиентское приложение Avaya Aura AS5300,
                         добавив IPv6 и <strong>фундаментальные security-практики</strong>.
                       </li>
@@ -426,7 +428,7 @@ export default function AboutPage() {
                 </CardContent>
               </Card>
 
-              {/* Certifications */}
+              {/* .. Certifications */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                  <CardHeader>
                    <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -440,7 +442,7 @@ export default function AboutPage() {
                  </CardContent>
               </Card>
 
-              {/* Education */}
+              {/* .. Education */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -459,7 +461,7 @@ export default function AboutPage() {
                 </CardContent>
               </Card>
 
-              {/* Mentorship */}
+              {/* .. Mentorship */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -467,9 +469,10 @@ export default function AboutPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                   {/* Render directly with JSX */}
+                   {/* Updated Russian text with links */}
                    <p className="text-sm md:text-base text-gray-300">
-                     Помогаю новичкам не просто кодить, а <strong>мыслить стратегически</strong> в мире AI. Обучение через практику на{" "}
+                     Помогаю новичкам не просто кодить, а <strong>мыслить стратегически</strong> в мире AI, следуя пути{" "}
+                     <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">SelfDev</Link>. Обучение через практику на{" "}
                      <a
                        href="https://github.com/salavey13/carTest"
                        target="_blank"
@@ -487,12 +490,13 @@ export default function AboutPage() {
                      >
                        oneSitePls.framer.ai
                      </a>
-                     , поддержка в Telegram и бесплатный стартовый план — всё для того, чтобы вы могли <strong>эффективно использовать современные AI-инструменты</strong> и сфокусироваться на создании ценности.
+                     , поддержка в Telegram и бесплатный стартовый план — всё для того, чтобы вы могли <strong>эффективно использовать современные AI-инструменты</strong> и сфокусироваться на создании ценности, интегрируя идеи из{" "}
+                     <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>.
                    </p>
                 </CardContent>
               </Card>
 
-              {/* Paid Support */}
+              {/* .. Paid Support */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -507,7 +511,7 @@ export default function AboutPage() {
                 </CardContent>
               </Card>
 
-              {/* Project Overview */}
+              {/* .. Project Overview */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -515,7 +519,7 @@ export default function AboutPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                   {/* Image 3 - Added overflow-hidden */}
+                   {/* .. Image 3 */}
                   <img
                       src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/22.png"
                       alt="Кибер-Гараж - AI-Powered Car Rental Ecosystem"
@@ -523,18 +527,19 @@ export default function AboutPage() {
                       style={{ aspectRatio: '16/9' }}
                       loading="lazy"
                   />
-                  {/* Render directly with JSX */}
+                   {/* Updated Russian text with links */}
                    <p className="text-sm md:text-base text-gray-300">
                      Это не просто страница — это <strong>живая киберпанк-экосистема</strong>, построенная на принципах VIBE. Здесь <strong>AI-ассистенты</strong> активно участвуют в разработке (через{" "}
                      <a href="/repo-xml" className="text-[#39FF14] hover:underline">
                        /repo-xml
                      </a>
-                     ), Telegram-боты автоматизируют задачи, а сам кибер-гараж — это платформа для экспериментов с <strong>AI-валидацией</strong> и быстрой итерацией фич (например, AR-туры или AI-подбор авто). Это твой шанс внести вклад в проект, где <strong>AI — не хайп, а рабочий инструмент</strong>. Го расширять этот мир вместе!
+                     ), Telegram-боты автоматизируют задачи, а сам кибер-гараж — это платформа для экспериментов с <strong>AI-валидацией</strong> и быстрой итерацией фич (например, AR-туры или AI-подбор авто). Это твой шанс внести вклад в проект, где <strong>AI — не хайп, а рабочий инструмент</strong>, руководствуясь философиями, изложенными в{" "}
+                      <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">SelfDev</Link> и <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>. Го расширять этот мир вместе!
                    </p>
                 </CardContent>
               </Card>
 
-              {/* How to Use /repo-xml */}
+              {/* .. How to Use /repo-xml */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                  <CardHeader>
                    <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
@@ -546,10 +551,10 @@ export default function AboutPage() {
                      Хочешь внести свой код в этот кибер-океан? Вот как работает подстраница{" "}
                      <a href="/repo-xml" className="text-[#39FF14] hover:underline">
                        /repo-xml
-                     </a>{" "}
+                     </a>
                      — твой пульт управления AI-волнами:
                    </p>
-                   {/* Render list items directly with JSX */}
+                   {/* .. Render list items directly with JSX */}
                    <ol className="list-decimal list-inside mt-4 space-y-2 text-sm md:text-base text-gray-300 pl-4"> {/* Added padding */}
                      <li>
                        <strong>Кидай задачу боту:</strong> Открывай Telegram, находи <strong>oneSitePlsBot</strong>,
@@ -583,15 +588,14 @@ export default function AboutPage() {
                        доработать. Дерево файлов тоже можно прикрутить — кидай идею!
                      </li>
                    </ol>
-                    {/* Render directly with JSX */}
-                   <p className="text-sm md:text-base mt-4 text-gray-300">
+                    <p className="text-sm md:text-base mt-4 text-gray-300">
                      Итог: GitHub почти не нужен! Весь воркфлоу построен вокруг <strong>AI-ассистентов и автоматизации</strong>. Бери ответ бота, разбирай, создавай PR, и я получаю оповещение. Обновляй страничку — и твоя версия уже в деле. Го кататься на этих AI-волнах вместе!
                    </p>
                  </CardContent>
                </Card>
 
 
-              {/* Call to Action */}
+              {/* .. Call to Action */}
               <Card className="bg-black text-white rounded-3xl shadow-[0_0_10px_#39FF14]">
                 <CardHeader>
                   <CardTitle className="text-xl md:text-2xl font-semibold text-[#39FF14] font-orbitron">
