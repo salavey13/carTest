@@ -1,4 +1,3 @@
-// /components/AICodeAssistant.tsx
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, MutableRefObject, useCallback } from "react";
@@ -676,6 +675,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const prButtonText = targetBranchName ? `Обновить Ветку (${targetBranchName.substring(0, 15)}...)` : "Создать PR";
     const prButtonIcon = targetBranchName ? <FaCodeBranch /> : <FaGithub />;
     const prButtonLoadingIcon = isProcessingPR ? <FaArrowsRotate className="animate-spin"/> : prButtonIcon;
+    const assistantTooltipText = `Вставьте ответ AI ИЛИ используйте кнопку 'Спросить AI'. Затем '➡️' → Проверьте/Исправьте → Выберите файлы → ${prButtonText}`; // Dynamic tooltip
 
     return (
         <div className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
@@ -683,7 +683,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
              <header className="flex justify-between items-center gap-2">
                  <div className="flex items-center gap-2">
                      <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse">AI Code Assistant</h1>
-                     <Tooltip text={`Вставьте ответ AI ИЛИ используйте кнопку 'Спросить AI'. Затем '➡️' → Проверьте/Исправьте → Выберите файлы → ${targetBranchName ? 'Обновить Ветку' : 'Создать PR'}`} position="bottom">
+                     <Tooltip text={assistantTooltipText} position="bottom">
                          <FaCircleInfo className="text-blue-400 cursor-help hover:text-blue-300 transition" />
                      </Tooltip>
                  </div>
@@ -787,7 +787,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                  <Tooltip text="Загрузить картинки в Storage" position="left">
                      <button
                          onClick={() => setIsImageModalOpen(true)}
-                         className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500"
+                         className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50" // Added disabled style
                          disabled={isProcessing} // Disable if other actions are running
                      >
                          <FaImage className="text-gray-400" />

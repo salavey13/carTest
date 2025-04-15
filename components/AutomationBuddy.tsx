@@ -1,4 +1,3 @@
-// /components/AutomationBuddy.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -59,6 +58,7 @@ const AutomationBuddy: React.FC = () => {
         targetBranchName, // Read effective target branch
         manualBranchName, // Read manual input
         isSettingsModalOpen, // Read modal state
+        isParsing, // NEW: read parsing state
 
         // Triggers
         triggerFetch = () => console.warn("triggerFetch not available"),
@@ -86,8 +86,7 @@ const AutomationBuddy: React.FC = () => {
         // Determine effective branch for display
         const effectiveBranch = manualBranchName.trim() || targetBranchName;
         const branchInfo = effectiveBranch ? ` (ветка: ${effectiveBranch})` : ' (ветка по умолчанию)';
-        // Removed icon text tag
-        const settingsMention = "настройках";
+        const settingsMention = "настройках"; // Removed icon text tag
 
         // Message based on current step
         switch (currentStep) {
@@ -103,14 +102,15 @@ const AutomationBuddy: React.FC = () => {
           case 'generating_ai_response': return `Общаюсь с AI... 🤖💭 Магия происходит!`;
           case 'request_copied': return `Скопировано! ✅ Жду ответ от твоего AI. Вставляй его в Ассистента ниже.`;
           case 'response_pasted': return `Ответ получен! 🤘 Нажми '➡️' рядом с полем ввода, чтобы я его разобрал.`;
-          case 'parsing_response': return `Анализирую ответ AI... 🧠 Почти готово!`;
+          case 'parsing_response': return `Анализирую ответ AI... 🧠 Почти готово!`; // NEW: Parsing message
           case 'response_parsed': return `Разобрал! 💪 Проверь результат, выбери файлы и можно ${effectiveBranch ? `обновлять ветку '${effectiveBranch}'` : 'создавать PR'}!`;
           case 'pr_ready': return assistantLoading
                                ? (effectiveBranch ? `Обновляю ветку ${branchInfo}...` : "Создаю PR...")
                                : (effectiveBranch ? `Готов(а) обновить ветку ${branchInfo}?` : "Готов(а) создать Pull Request?");
           default: return "Что дальше? 😉"; // Default friendly message
         }
-      }, [currentStep, repoUrlEntered, fetchStatus, assistantLoading, targetBranchName, manualBranchName]); // Dependencies
+      }, [currentStep, repoUrlEntered, fetchStatus, assistantLoading, targetBranchName, manualBranchName, isParsing]); // Dependencies
+
 
     const activeMessage = useMemo(() => getXuinityMessage(), [getXuinityMessage]);
 
@@ -119,7 +119,8 @@ const AutomationBuddy: React.FC = () => {
     const suggestions = useMemo((): Suggestion[] => {
         const suggestionsList: Suggestion[] = [];
         const isFetcherLoading = fetchStatus === 'loading' || fetchStatus === 'retrying';
-        const isAnyLoading = isFetcherLoading || assistantLoading || aiActionLoading || loadingPrs;
+        // Combine all loading states
+        const isAnyLoading = isFetcherLoading || assistantLoading || aiActionLoading || loadingPrs || isParsing;
         // Determine effective branch for display
         const effectiveBranch = manualBranchName.trim() || targetBranchName;
         const branchInfo = effectiveBranch ? ` (${effectiveBranch})` : ' (default)';
@@ -131,11 +132,11 @@ const AutomationBuddy: React.FC = () => {
                 // Disable most actions when *anything* is loading, except retries and toggling settings *off*
                 let isDisabled = disabled;
                 if (isAnyLoading) {
-                   // Exceptions: Allow retry, allow closing settings, allow opening settings if *not* fetcher loading
+                   // Exceptions: Allow retry, allow closing settings, allow opening settings if *not* fetcher loading or parsing
                    if (id === 'retry-fetch' || (id === 'toggle-settings' && isSettingsModalOpen)) {
                        isDisabled = false;
-                   } else if (id === 'toggle-settings' && !isSettingsModalOpen && !isFetcherLoading) {
-                       isDisabled = false; // Allow opening if fetcher isn't busy
+                   } else if (id === 'toggle-settings' && !isSettingsModalOpen && !isFetcherLoading && !isParsing) {
+                       isDisabled = false; // Allow opening if fetcher isn't busy and not parsing
                    }
                    else {
                        isDisabled = true; // Disable everything else if any loading
@@ -200,7 +201,7 @@ const AutomationBuddy: React.FC = () => {
                  addSuggestion("parse-response", "➡️ Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, true, !aiResponseHasContent, !aiResponseHasContent ? "Нет ответа" : "");
                  addSuggestion("goto-ai-response", "К Полю Ответа", () => scrollToSection('aiResponseInput'), <FaKeyboard />);
                 break;
-            case 'parsing_response':
+            case 'parsing_response': // NEW: Show parsing indicator
                  addSuggestion("loading-indicator", "Разбор Ответа...", () => {}, <FaBrain className="animate-pulse"/>, true, true );
                  break;
             case 'response_parsed':
@@ -224,7 +225,6 @@ const AutomationBuddy: React.FC = () => {
         }
 
         // --- Clear All Suggestion ---
-        // Use optional chaining for safety, check if clearAll exists on the ref's current value
          if (fetcherRef?.current?.clearAll && (selectedFetcherFiles.size > 0 || kworkInputHasContent || aiResponseHasContent)) {
              addSuggestion("clear-all", "Очистить Все?", fetcherRef.current.clearAll, <FaBroom/>, true); // Disabled handled by addSuggestion
          }
@@ -235,8 +235,8 @@ const AutomationBuddy: React.FC = () => {
     }, [ // Dependencies
         currentStep, fetchStatus, repoUrlEntered, filesFetched, selectedFetcherFiles,
         kworkInputHasContent, aiResponseHasContent, filesParsed, selectedAssistantFiles,
-        assistantLoading, aiActionLoading, loadingPrs, targetBranchName, manualBranchName,
-        isSettingsModalOpen, // Need modal state for toggle button logic
+        assistantLoading, aiActionLoading, loadingPrs, isParsing, // Added isParsing
+        targetBranchName, manualBranchName, isSettingsModalOpen, // Need modal state for toggle button logic
         triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork,
         triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreatePR,
         triggerToggleSettingsModal, // Need toggle trigger
@@ -359,7 +359,7 @@ const AutomationBuddy: React.FC = () => {
                     >
                         <h2 id="buddy-suggestions-title" className="sr-only">Automation Buddy Suggestions</h2>
                         {/* Speech Bubble with Message */}
-                        <SpeechBubble message={activeMessage} variants={childVariants} bubblePosition="right" />
+                        <SpeechBubble message={activeMessage} variants={childVariants} />
                         {/* Character & Suggestions List */}
                         <div className="flex flex-col sm:flex-row-reverse items-center sm:items-end w-full gap-4 mt-2">
                             <CharacterDisplay characterImageUrl={BUDDY_IMAGE_URL} characterAltText={BUDDY_ALT_TEXT} githubProfile={null} variants={childVariants} />

@@ -55,10 +55,10 @@ export const CharacterDisplay: React.FC<CharacterDisplayProps> = ({
                 transition={{ type: 'spring', stiffness: 300, damping: 15 }}
                 // Add pulse animation when profileJustLoaded is true
                 animate={profileJustLoaded ? {
-                    scale: [1, 1.1, 1] // Pulse effect
-                    
+                    scale: [1, 1.1, 1], // Pulse effect
+                    boxShadow: ["0 0 12px rgba(0, 255, 157, 0.6)", "0 0 25px rgba(0, 255, 157, 0.9)", "0 0 12px rgba(0, 255, 157, 0.6)"] // Add pulse to shadow
                 } : {}}
-                initial={{ scale: 1 }} // Ensure initial state is set
+                initial={{ scale: 1, boxShadow: "0 0 12px rgba(0, 255, 157, 0.6)" }} // Ensure initial state is set
             >
                 <Image
                     key={imageSrc} // Add key to force re-render on src change if needed

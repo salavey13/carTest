@@ -1,4 +1,3 @@
-// /contexts/RepoXmlPageContext.tsx
 "use client";
 
     import React, { createContext, useState, useContext, ReactNode, useCallback, MutableRefObject, useEffect } from 'react';
@@ -51,7 +50,7 @@
       | 'generating_ai_response'
       | 'request_copied'
       | 'response_pasted'
-      | 'parsing_response'
+      | 'parsing_response' // <-- Added Parsing Step
       | 'response_parsed'
       | 'pr_ready';
 
@@ -77,7 +76,7 @@
       manualBranchName: string; // User manual input
       isSettingsModalOpen: boolean; // Modal state
       currentAiRequestId: string | null; // Added for tracking AI request
-      isParsing: boolean; // Added for explicit parsing state
+      isParsing: boolean; // <-- Added Parsing State
 
       // Refs
       fetcherRef: MutableRefObject<RepoTxtFetcherRef | null>;
@@ -104,7 +103,7 @@
       setLoadingPrs: (loading: boolean) => void;
       setIsSettingsModalOpen: (isOpen: boolean) => void; // Modal setter
       setCurrentAiRequestId: (id: string | null) => void; // Added setter for AI request ID
-      setIsParsing: (parsing: boolean) => void; // Setter for parsing state
+      setIsParsing: (parsing: boolean) => void; // <-- Added Setter for Parsing State
 
       // Action Triggers
       triggerFetch: (isManualRetry?: boolean) => Promise<void>;
@@ -202,7 +201,7 @@
       const [loadingPrs, setLoadingPrsState] = useState(false);
       const [openPrs, setOpenPrsState] = useState<SimplePullRequest[]>([]);
       const [currentAiRequestId, setCurrentAiRequestIdState] = useState<string | null>(null); // Added state
-      const [isParsing, setIsParsingState] = useState(false); // Added state for explicit parsing
+      const [isParsing, setIsParsingState] = useState(false); // <-- Added Parsing State
 
       // Branch state management
       const [manualBranchName, setManualBranchNameState] = useState<string>(""); // Manual input value
@@ -229,7 +228,7 @@
         // Handle loading states first
         if (fetchStatus === 'loading' || fetchStatus === 'retrying') return 'fetching';
         if (aiActionLoading && !aiResponseHasContent) return 'generating_ai_response'; // Specific AI gen loading
-        if (isParsing) return 'parsing_response'; // Explicit Parsing state
+        if (isParsing) return 'parsing_response'; // <-- Explicit Parsing state
         if (assistantLoading && filesParsed) return 'pr_ready'; // Assume PR/Update loading if files are parsed
 
         // Handle non-loading states
@@ -253,7 +252,7 @@
         return 'files_fetched'; // Base state after successful fetch
 
       }, [
-        fetchStatus, repoUrlEntered, filesFetched, aiActionLoading, assistantLoading, isParsing,
+        fetchStatus, repoUrlEntered, filesFetched, aiActionLoading, assistantLoading, isParsing, // <-- Added isParsing dependency
         primaryHighlightedPath, secondaryHighlightedPaths.length, selectedFetcherFiles.size,
         kworkInputHasContent, requestCopied, aiResponseHasContent, filesParsed,
         selectedAssistantFiles.size
@@ -324,7 +323,7 @@
       const setLoadingPrsCallback = useCallback((loading: boolean) => setLoadingPrsState(loading), []);
       const setIsSettingsModalOpenCallback = useCallback((isOpen: boolean) => setIsSettingsModalOpenState(isOpen), []);
       const setCurrentAiRequestIdCallback = useCallback((id: string | null) => setCurrentAiRequestIdState(id), []); // Added setter
-      const setIsParsingCallback = useCallback((parsing: boolean) => setIsParsingState(parsing), []); // Added setter
+      const setIsParsingCallback = useCallback((parsing: boolean) => setIsParsingState(parsing), []); // <-- Added Setter Implementation
 
 
       // --- Action Triggers ---
@@ -390,7 +389,7 @@
         } else console.warn(`scrollToSection: Element for id "${targetId}" (mapped from "${id}") not found.`);
      }, [kworkInputRef, aiResponseInputRef, prSectionRef]);
 
-     
+
       const triggerSelectHighlighted = useCallback(() => { if (fetcherRef.current) fetcherRef.current.selectHighlightedFiles(); else console.warn("triggerSelectHighlighted: fetcherRef not ready."); }, [fetcherRef]);
       const triggerAddSelectedToKwork = useCallback(async (autoAskAi = false, filesToAddParam?: Set<string>) => { if (fetcherRef.current) await fetcherRef.current.handleAddSelected(autoAskAi, filesToAddParam); else console.warn("triggerAddSelectedToKwork: fetcherRef not ready."); }, [fetcherRef]);
       const triggerCopyKwork = useCallback(() => { if (fetcherRef.current) { const copied = fetcherRef.current.handleCopyToClipboard(); if (copied) { setRequestCopiedState(true); setAiResponseHasContentState(false); if (assistantRef.current) assistantRef.current.setResponseValue(""); } } else console.warn("triggerCopyKwork: fetcherRef not ready."); }, [fetcherRef, assistantRef]);
@@ -436,12 +435,12 @@
 
       const triggerParseResponse = useCallback(async () => {
           if (assistantRef.current) {
-             setIsParsingState(true); // Start parsing
+             setIsParsingState(true); // <-- Start parsing state
              setAssistantLoadingState(true); // General loading can also be true
              await assistantRef.current.handleParse();
              // Setters for parsing/loading state are called inside the handleParse completion within the assistant
           } else { console.warn("triggerParseResponse: assistantRef not ready."); }
-      }, [assistantRef]);
+      }, [assistantRef]); // Dependency on assistantRef
       const triggerSelectAllParsed = useCallback(() => { if (assistantRef.current) assistantRef.current.selectAllParsedFiles(); else console.warn("triggerSelectAllParsed: assistantRef not ready."); }, [assistantRef]);
       const triggerCreatePR = useCallback(async () => { if (assistantRef.current) await assistantRef.current.handleCreatePR(); else console.warn("triggerCreatePR: assistantRef not ready."); }, [assistantRef]);
       const triggerUpdateBranch = useCallback(async ( repoUrl: string, files: { path: string; content: string }[], commitMessage: string, branchName: string ): Promise<ReturnType<typeof updateBranch>> => {
@@ -458,7 +457,7 @@
        }, []);
       const triggerToggleSettingsModal = useCallback(() => setIsSettingsModalOpenState(prev => !prev), []);
 
-      
+
 
 
       // --- Xuinity Message Logic ---
@@ -478,12 +477,12 @@
           case 'generating_ai_response': return "Общаюсь с Gemini... 🤖💭";
           case 'request_copied': return "Скопировано! Жду ответ от AI.";
           case 'response_pasted': return "Ответ получен! Нажми '➡️' для разбора.";
-          case 'parsing_response': return "Разбираю ответ AI... 🧠";
+          case 'parsing_response': return "Разбираю ответ AI... 🧠"; // <-- Updated message for parsing
           case 'response_parsed': return "Разобрал! Проверь, выбери файлы.";
           case 'pr_ready': return assistantLoading ? (effectiveBranch ? "Обновляю ветку..." : "Создаю PR...") : (effectiveBranch ? `Готов обновить ветку '${effectiveBranch}'?` : "Готов создать Pull Request?");
           default: return "Что делаем дальше?";
         }
-      }, [currentStep, repoUrlEntered, fetchStatus, assistantLoading, targetBranchName]); // Use effective targetBranchName
+      }, [currentStep, repoUrlEntered, fetchStatus, assistantLoading, targetBranchName, isParsing]); // <-- Added isParsing dependency
 
 
       // --- Callback for Repo URL update ---
@@ -513,7 +512,7 @@
         setOpenPrs: setOpenPrsCallback, // Correct setter passed
         setLoadingPrs: setLoadingPrsCallback, setIsSettingsModalOpen: setIsSettingsModalOpenCallback,
         setCurrentAiRequestId: setCurrentAiRequestIdCallback, // Added setter
-        setIsParsing: setIsParsingCallback, // Added setter
+        setIsParsing: setIsParsingCallback, // <-- Added Setter
         triggerFetch, triggerGetOpenPRs, triggerSelectHighlighted, triggerAddSelectedToKwork,
         triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreatePR,
         triggerUpdateBranch, triggerToggleSettingsModal, scrollToSection,
