@@ -8,7 +8,7 @@
     import { debugLogger } from "@/lib/debugLogger";
     import { Button } from "@/components/ui/button"; // Import Button
     import { Card, CardContent } from "@/components/ui/card"; // Import Card for styling
-    import { FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaLevelUpAlt, FaHandSparkles, FaExternalLinkAlt, FaUserAstronaut, FaHeart } from "react-icons/fa6";
+    import { FaRobot, FaDownload, FaCircleInfo, FaGithub, FaMagicWand, FaLevelUpAlt, FaHandSparkles, FaExternalLinkAlt, FaUserAstronaut, FaHeart } from "react-icons/fa6";
     import Link from "next/link"; // Import Link for navigation
 
     // --- I18N Translations ---
@@ -205,7 +205,7 @@
                                 <h4 className="text-lg font-semibold text-cyan-400 pt-2">{t.stepsTitle}</h4>
                                 <div className="text-sm space-y-2">
                                      <p><strong className="text-cyan-500">{t.step1Title}</strong> {t.step1Desc} <FaDownload className="inline mx-1 text-blue-400"/> {t.step1DescEnd}</p>
-                                     <p><strong className="text-cyan-500">{t.step2Title}</strong> {t.step2Desc} <span className="text-blue-400 font-semibold">"🤖 {t.step2Button}"</span> {t.step2DescMid} <FaRobot className="inline mx-1 text-purple-400"/> {t.step2DescMid2} <FaWandMagicSparkles className="inline mx-1 text-yellow-400" /> {t.step2DescEnd} <FaGithub className="inline mx-1 text-green-400" /> {t.step2End}</p>
+                                     <p><strong className="text-cyan-500">{t.step2Title}</strong> {t.step2Desc} <span className="text-blue-400 font-semibold">"🤖 {t.step2Button}"</span> {t.step2DescMid} <FaRobot className="inline mx-1 text-purple-400"/> {t.step2DescMid2} <FaMagicWand className="inline mx-1 text-yellow-400" /> {t.step2DescEnd} <FaGithub className="inline mx-1 text-green-400" /> {t.step2End}</p>
                                 </div>
                             </div>
                         </details>
