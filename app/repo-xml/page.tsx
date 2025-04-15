@@ -8,7 +8,7 @@
     import { debugLogger } from "@/lib/debugLogger";
     import { Button } from "@/components/ui/button"; // Import Button
     import { Card, CardContent } from "@/components/ui/card"; // Import Card for styling
-    import { FaRobot, FaDownload, FaCircleInfo, FaGithub, FaMagicWand, FaLevelUpAlt, FaHandSparkles, FaExternalLinkAlt, FaUserAstronaut, FaHeart } from "react-icons/fa6";
+    import { FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparcles, FaUpLong, FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart } from "react-icons/fa6";
     import Link from "next/link"; // Import Link for navigation
 
     // --- I18N Translations ---
@@ -195,17 +195,17 @@
                         <details open className="bg-gray-900/70 border border-gray-700 rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4">
                             <summary className="text-xl font-semibold text-brand-purple p-4 cursor-pointer list-none flex justify-between items-center hover:bg-gray-800/50 rounded-t-lg">
                                 <span>{t.philosophyTitle}</span>
-                                <FaLevelUpAlt className="text-gray-500 group-open:rotate-180 transition-transform" />
+                                <FaUpLong className="text-gray-500 group-open:rotate-180 transition-transform" />
                             </summary>
                             <div className="px-6 pt-2 text-gray-300 space-y-3 text-base">
-                                <p>{t.philosophy1} <Link href={t.philosophyLink1} className="text-brand-purple hover:underline font-semibold">{t.philosophyLink1Text} <FaExternalLinkAlt className="inline h-3 w-3 ml-1" /></Link> {t.philosophy2}</p>
-                                <p>{t.philosophy3} <Link href={t.philosophyLink2} className="text-brand-blue hover:underline font-semibold">{t.philosophyLink2Text} <FaExternalLinkAlt className="inline h-3 w-3 ml-1" /></Link>{t.philosophy4}</p>
+                                <p>{t.philosophy1} <Link href={t.philosophyLink1} className="text-brand-purple hover:underline font-semibold">{t.philosophyLink1Text} <FaArrowUpRightFromSquare className="inline h-3 w-3 ml-1" /></Link> {t.philosophy2}</p>
+                                <p>{t.philosophy3} <Link href={t.philosophyLink2} className="text-brand-blue hover:underline font-semibold">{t.philosophyLink2Text} <FaArrowUpRightFromSquare className="inline h-3 w-3 ml-1" /></Link>{t.philosophy4}</p>
                                 <p>{t.philosophy5}</p>
                                 <hr className="border-gray-700 my-4"/>
                                 <h4 className="text-lg font-semibold text-cyan-400 pt-2">{t.stepsTitle}</h4>
                                 <div className="text-sm space-y-2">
                                      <p><strong className="text-cyan-500">{t.step1Title}</strong> {t.step1Desc} <FaDownload className="inline mx-1 text-blue-400"/> {t.step1DescEnd}</p>
-                                     <p><strong className="text-cyan-500">{t.step2Title}</strong> {t.step2Desc} <span className="text-blue-400 font-semibold">"🤖 {t.step2Button}"</span> {t.step2DescMid} <FaRobot className="inline mx-1 text-purple-400"/> {t.step2DescMid2} <FaMagicWand className="inline mx-1 text-yellow-400" /> {t.step2DescEnd} <FaGithub className="inline mx-1 text-green-400" /> {t.step2End}</p>
+                                     <p><strong className="text-cyan-500">{t.step2Title}</strong> {t.step2Desc} <span className="text-blue-400 font-semibold">"🤖 {t.step2Button}"</span> {t.step2DescMid} <FaRobot className="inline mx-1 text-purple-400"/> {t.step2DescMid2} <FaWandMagicSparcles className="inline mx-1 text-yellow-400" /> {t.step2DescEnd} <FaGithub className="inline mx-1 text-green-400" /> {t.step2End}</p>
                                 </div>
                             </div>
                         </details>
