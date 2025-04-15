@@ -1,6 +1,3 @@
-// /components/StickyChatButton.tsx
-"use client";
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
@@ -8,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
-    FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard, FaPaperPlane
+    FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard, FaPaperPlane, FaLightbulb // Added FaLightbulb
 } from "react-icons/fa6";
 
 // Import Subcomponents
@@ -23,7 +20,6 @@ import { useAppContext } from "@/contexts/AppContext";
 import { getGitHubUserProfile } from "@/app/actions_github/actions";
 
 // --- Constants & Types ---
-// .. (keep existing constants)
 const AUTO_OPEN_DELAY_MS = 13000;
 const CHARACTER_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/character-images/public/x13.png";
 const CHARACTER_ALT_TEXT = "Xuinity Assistant";
@@ -40,6 +36,7 @@ interface Suggestion {
     isHireMe?: boolean;
     isFixAction?: boolean;
     disabled?: boolean;
+    tooltip?: string; // Added tooltip field
 }
 interface GitHubProfile {
     login: string;
@@ -49,7 +46,6 @@ interface GitHubProfile {
 }
 
 // --- Animation Variants ---
-// .. (keep existing variants)
 const containerVariants = { hidden: { opacity: 0, x: -300 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 120, damping: 15, when: "beforeChildren", staggerChildren: 0.08, }, }, exit: { opacity: 0, x: -300, transition: { duration: 0.3 } }, };
 const childVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", bounce: 0.4 } }, exit: { opacity: 0, transition: { duration: 0.2 } }, };
 const fabVariants = { hidden: { scale: 0, opacity: 0 }, visible: { scale: 1, opacity: 1, rotate: [0, 10, -10, 5, -5, 0], transition: { scale: { duration: 0.4, ease: "easeOut" }, opacity: { duration: 0.4, ease: "easeOut" }, rotate: { repeat: Infinity, duration: 3, ease: "easeInOut", delay: 1 } } }, exit: { scale: 0, opacity: 0, transition: { duration: 0.3 } } };
@@ -65,8 +61,7 @@ const StickyChatButton: React.FC = () => {
     const [githubProfile, setGithubProfile] = useState<GitHubProfile | null>(null);
     const [githubLoading, setGithubLoading] = useState<boolean>(false);
     const [prevGithubLoading, setPrevGithubLoading] = useState<boolean>(false);
-    // --- NEW State for custom idea ---
-    const [customIdea, setCustomIdea] = useState<string>("");
+    const [customIdea, setCustomIdea] = useState<string>(""); // State for custom idea input
 
     // --- Hooks ---
     const currentPath = usePathname();
@@ -75,7 +70,6 @@ const StickyChatButton: React.FC = () => {
 
     // --- Fetch GitHub Profile ---
     useEffect(() => {
-        // .. (keep existing implementation)
         setPrevGithubLoading(githubLoading); if (isOpen && !isAppLoading && appContextUser?.username && !githubProfile && !githubLoading) { const fetchProfile = async () => { setGithubLoading(true); console.log(`(StickyChat) Fetching GitHub profile for: ${appContextUser.username}`); const result = await getGitHubUserProfile(appContextUser.username!); if (result.success && result.profile) { console.log("(StickyChat) GitHub profile found:", result.profile); setGithubProfile(result.profile); } else { console.warn("(StickyChat) GitHub profile fetch failed:", result.error); setGithubProfile(null); } setGithubLoading(false); }; fetchProfile(); } if (!appContextUser) { setGithubProfile(null); setGithubLoading(false); }
     }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading]);
 
@@ -113,22 +107,39 @@ const StickyChatButton: React.FC = () => {
             return `/repo-xml?path=${encodedPathParam}&idea=${encodedTaskIdea}`;
         };
 
-        // Add "Fix this Page" suggestion
+        // Add "Fix this Page" / "Send Idea" suggestion
         if (!fixActionClicked && cleanPath !== '/' && !isToolPage) {
-            baseSuggestions.push({
-                id: FIX_PAGE_ID,
-                text: customIdea.trim() ? "🤖 Отправить Идею + Контекст" : "Прокачать эту Страницу? 🤩",
-                link: getFixPageLink(), // Link generation now uses customIdea if present
-                isFixAction: true,
-                icon: customIdea.trim() ? <FaPaperPlane className="mr-1.5" /> : <FaHighlighter className="mr-1.5" />
+             const isCustomIdeaEntered = customIdea.trim().length > 0;
+             baseSuggestions.push({
+                 id: FIX_PAGE_ID,
+                 text: isCustomIdeaEntered ? "🤖 Отправить Идею + Контекст" : "Прокачать эту Страницу? 🤩",
+                 link: getFixPageLink(),
+                 isFixAction: true,
+                 icon: isCustomIdeaEntered ? <FaPaperPlane className="mr-1.5" /> : <FaHighlighter className="mr-1.5" />,
+                 tooltip: isCustomIdeaEntered
+                           ? "Отправит твою идею и код этой страницы в СуперВайб Студию"
+                           : "Перейти в СуперВайб Студию с кодом этой страницы для улучшения"
              });
         }
 
         // Add other suggestions
         if (!isToolPage) {
-            baseSuggestions.push({ id: ADD_NEW_ID, text: "Создать Новое с Нуля ✨", link: "/repo-xml", icon: <FaWandMagicSparkles className="mr-1.5" /> });
+            baseSuggestions.push({
+                id: ADD_NEW_ID,
+                text: "Создать Новое с Нуля ✨",
+                link: "/repo-xml",
+                icon: <FaWandMagicSparkles className="mr-1.5" />,
+                tooltip: "Перейти в СуперВайб Студию без контекста"
+            });
         }
-        baseSuggestions.push({ id: HIRE_ME_ID, text: HIRE_ME_TEXT, link: "/selfdev", isHireMe: true, icon: <FaStar className="mr-1.5" /> });
+        baseSuggestions.push({
+            id: HIRE_ME_ID,
+            text: HIRE_ME_TEXT,
+            link: "/selfdev",
+            isHireMe: true,
+            icon: <FaStar className="mr-1.5" />,
+            tooltip: "Узнать о SelfDev пути и заказать консультацию"
+        });
 
         return baseSuggestions;
 
@@ -137,11 +148,10 @@ const StickyChatButton: React.FC = () => {
 
     // --- Update Active Message Logic ---
     useEffect(() => {
-        // .. (keep existing implementation)
         if (isAppLoading || githubLoading) { let loadingMsg = "Подключаюсь..."; if (githubLoading) loadingMsg = `Ищу твой профиль на GitHub... 🧐`; setActiveMessage(loadingMsg); return; }
         let userIdentifier = githubProfile?.name || appContextUser?.first_name || appContextUser?.username || null; const baseGreeting = userIdentifier ? `Здарова, ${userIdentifier}!` : "Эй, Кодер!"; const justLoadedProfile = prevGithubLoading && !githubLoading && githubProfile; const cleanPath = currentPath.split('?')[0]; const isToolPage = cleanPath === '/repo-xml'; let message = "";
-        if (isToolPage) { if (githubProfile) message = `${baseGreeting} Ты на странице автоматизации! ✨ Используй Бадди справа для помощи.`; else message = `${baseGreeting} Ты на странице автоматизации! Используй Бадди справа для помощи.`; }
-        else { const pageName = cleanPath === '/' ? 'главную' : `страницу (${cleanPath})`; if (justLoadedProfile) message = `ВОУ, ${userIdentifier}! ✨ Нашел твой GitHub! Хочешь ${pageName} прокачать? 😉`; else if (githubProfile) message = `${baseGreeting} Рад видеть твой GitHub! ${pageName.charAt(0).toUpperCase() + pageName.slice(1)} будем править?`; else message = `${baseGreeting} GitHub-профиль не найден... Это не важно! ${pageName.charAt(0).toUpperCase() + pageName.slice(1)} будем улучшать? 😉`; }
+        if (isToolPage) { if (githubProfile) message = `${baseGreeting} Ты в СуперВайб Студии! ✨ Используй Бадди справа для помощи.`; else message = `${baseGreeting} Ты в СуперВайб Студии! Используй Бадди справа для помощи.`; }
+        else { const pageName = cleanPath === '/' ? 'главную' : `страницу (${cleanPath})`; if (justLoadedProfile) message = `ВОУ, ${userIdentifier}! ✨ Нашел твой GitHub! Хочешь ${pageName} прокачать? 😉 Или дай свою идею!`; else if (githubProfile) message = `${baseGreeting} Рад видеть твой GitHub! ${pageName.charAt(0).toUpperCase() + pageName.slice(1)} будем править? Или есть своя идея?`; else message = `${baseGreeting} GitHub не найден... Не важно! ${pageName.charAt(0).toUpperCase() + pageName.slice(1)} будем улучшать? 😉 Или дай свою идею!`; }
         setActiveMessage(message);
     }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading, prevGithubLoading, currentPath]);
 
@@ -162,13 +172,11 @@ const StickyChatButton: React.FC = () => {
         if (suggestion.disabled) return;
         console.log("(StickyChat) Suggestion Clicked:", suggestion.id);
 
-        // <<<<<<<<<<<<<< NEW: Check if custom idea exists for FIX_PAGE action >>>>>>>>>>>>
-        if (suggestion.id === FIX_PAGE_ID && !customIdea.trim()) {
-            // If clicking "Прокачать страницу" without custom idea, use default flow
-        } else if (suggestion.id === FIX_PAGE_ID && customIdea.trim()) {
+        if (suggestion.id === FIX_PAGE_ID && customIdea.trim()) {
              toast.info("Отправляю твою идею и контекст страницы...");
+        } else if (suggestion.id === FIX_PAGE_ID) {
+             toast.info("Перехожу к улучшению страницы...");
         }
-        // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
         if (suggestion.link) {
             if (suggestion.isFixAction) setFixActionClicked(true);
@@ -193,15 +201,17 @@ const StickyChatButton: React.FC = () => {
                     <motion.div variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="relative p-4 w-full max-w-xs sm:max-w-sm md:max-w-md flex flex-col items-center sm:items-start bg-transparent" onClick={handleDialogClick}>
                         <h2 id="chat-suggestions-title" className="sr-only">Xuinity Suggestions</h2>
                         <SpeechBubble message={activeMessage} variants={childVariants} bubblePosition="left" />
-                        <div className="flex flex-col sm:flex-row items-center sm:items-end w-full gap-4">
+                        <div className="flex flex-col sm:flex-row items-center sm:items-end w-full gap-4 mt-2"> {/* Adjusted gap */}
                             <CharacterDisplay githubProfile={githubProfile} characterImageUrl={CHARACTER_IMAGE_URL} characterAltText={CHARACTER_ALT_TEXT} variants={childVariants} />
                             <div className="flex flex-col items-center sm:items-start gap-2 w-full"> {/* Container for suggestions and input */}
                                 <SuggestionList suggestions={suggestions} onSuggestionClick={handleSuggestionClick} listVariants={childVariants} itemVariants={childVariants} className="items-center sm:items-start" />
 
                                 {/* NEW: Custom Idea Input Area */}
                                 {showCustomInput && (
-                                     <motion.div variants={childVariants} className="w-full mt-2">
-                                         <label htmlFor="custom-idea-input" className="block text-xs font-medium mb-1 text-gray-300">Или введи свою идею для этой страницы:</label>
+                                     <motion.div variants={childVariants} className="w-full mt-1"> {/* Reduced margin-top */}
+                                         <label htmlFor="custom-idea-input" className="block text-xs font-medium mb-1 text-gray-300 flex items-center">
+                                            <FaLightbulb className="text-yellow-400 mr-1"/> Или введи свою идею для этой страницы:
+                                          </label>
                                          <textarea
                                              id="custom-idea-input"
                                              rows={2}

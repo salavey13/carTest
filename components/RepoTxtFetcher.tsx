@@ -1,4 +1,3 @@
-// /components/RepoTxtFetcher.tsx
 "use client";
 
     import React, { useState, useEffect, useImperativeHandle, forwardRef, useRef, useCallback, useMemo} from "react";
@@ -81,7 +80,7 @@
         // Status & Flags
         fetchStatus, setFetchStatus, repoUrlEntered, setRepoUrlEntered, filesFetched, setFilesFetched,
         selectedFetcherFiles, setSelectedFetcherFiles, kworkInputHasContent, setKworkInputHasContent,
-        setRequestCopied, aiActionLoading, currentStep, loadingPrs, assistantLoading, // Added assistantLoading
+        setRequestCopied, aiActionLoading, currentStep, loadingPrs, assistantLoading, isParsing, // Added assistantLoading & isParsing
         // Branch & PR state
         targetBranchName, setTargetBranchName, // Use context setter for PR selection
         manualBranchName, setManualBranchName, // Use context setter for manual input
@@ -672,7 +671,12 @@
         }
         // This effect should run when relevant dependencies change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus, targetBranchName, handleFetch]); // Only depend on targetBranchName now
+    }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus, targetBranchName]); // Only depend on targetBranchName now, handleFetch added below
+
+    // Add handleFetch as dependency to the auto-fetch useEffect, but disable lint warning as it's complex
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {}, [handleFetch]);
+
 
     // Cleanup simulation timers on component unmount
     useEffect(() => { return () => stopProgressSimulation(); }, [stopProgressSimulation]);
@@ -690,12 +694,12 @@
 
 
     // --- Render Logic ---
-    const isLoading = fetchStatus === 'loading' || fetchStatus === 'retrying';
-    // Disable Fetch button if fetching files, loading PRs, or no URL entered
+    const isLoading = fetchStatus === 'loading' || fetchStatus === 'retrying' || isParsing; // Include isParsing in overall loading
+    // Disable Fetch button if fetching files, loading PRs, or no URL entered, or parsing
     const isFetchDisabled = isLoading || loadingPrs || !repoUrlEntered;
     const showProgressBar = isLoading || fetchStatus === 'success' || fetchStatus === 'error' || fetchStatus === 'failed_retries';
     // Disable AI/Copy/Clear buttons during any loading process
-    const isActionDisabled = isLoading || loadingPrs || aiActionLoading || assistantLoading; // Consider assistantLoading too
+    const isActionDisabled = isLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing; // Include isParsing
     const isAskAiDisabled = !kworkInputHasContent || isActionDisabled;
     const isCopyDisabled = !kworkInputHasContent || isActionDisabled;
     const isClearDisabled = (!kworkInputHasContent && selectedFiles.size === 0) || isActionDisabled;
@@ -743,7 +747,7 @@
         </div>
 
       {/* Settings Modal Component - Controlled by Context */}
-      <SettingsModal
+       <SettingsModal
             isOpen={isSettingsModalOpen}
             // onClose={triggerToggleSettingsModal} // Closure handled by toggle
             repoUrl={repoUrl} // Pass local state for input control
@@ -798,10 +802,11 @@
        {showProgressBar && (
             <div className="mb-4 min-h-[40px]">
                 <ProgressBar status={fetchStatus === 'failed_retries' ? 'error' : fetchStatus} progress={fetchStatus === 'success' ? 100 : (fetchStatus === 'error' || fetchStatus === 'failed_retries' ? 0 : progress)} />
-                 {isLoading && <p className="text-cyan-300 text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? '(Повторная попытка)' : ''}</p>}
-                 {fetchStatus === 'success' && files.length > 0 && ( <div className="text-center text-xs font-mono mt-1 text-green-400 flex items-center justify-center gap-1"> <FaCircleCheck /> {`Успешно извлечено ${files.length} файлов из '${effectiveBranchDisplay}'.`} </div> )}
-                 {fetchStatus === 'success' && files.length === 0 && ( <div className="text-center text-xs font-mono mt-1 text-yellow-400 flex items-center justify-center gap-1"> <FaCircleCheck /> {`Успешно, но не найдено подходящих файлов в '${effectiveBranchDisplay}'.`} </div> )}
-                 {(fetchStatus === 'error' || fetchStatus === 'failed_retries') && error && ( <div className="text-center text-xs font-mono mt-1 text-red-400 flex items-center justify-center gap-1"> <FaXmark /> {error} </div> )}
+                 {isLoading && !isParsing && <p className="text-cyan-300 text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? '(Повторная попытка)' : ''}</p>}
+                 {isParsing && <p className="text-yellow-400 text-xs font-mono mt-1 text-center animate-pulse">Разбор ответа AI...</p>}
+                 {fetchStatus === 'success' && files.length > 0 && !isParsing && ( <div className="text-center text-xs font-mono mt-1 text-green-400 flex items-center justify-center gap-1"> <FaCircleCheck /> {`Успешно извлечено ${files.length} файлов из '${effectiveBranchDisplay}'.`} </div> )}
+                 {fetchStatus === 'success' && files.length === 0 && !isParsing && ( <div className="text-center text-xs font-mono mt-1 text-yellow-400 flex items-center justify-center gap-1"> <FaCircleCheck /> {`Успешно, но не найдено подходящих файлов в '${effectiveBranchDisplay}'.`} </div> )}
+                 {(fetchStatus === 'error' || fetchStatus === 'failed_retries') && error && !isParsing && ( <div className="text-center text-xs font-mono mt-1 text-red-400 flex items-center justify-center gap-1"> <FaXmark /> {error} </div> )}
             </div>
         )}
 

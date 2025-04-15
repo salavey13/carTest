@@ -8,7 +8,7 @@
     import { debugLogger } from "@/lib/debugLogger";
     import { Button } from "@/components/ui/button"; // Import Button
     import { Card, CardContent } from "@/components/ui/card"; // Import Card for styling
-    import { FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong, FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart } from "react-icons/fa6";
+    import { FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong, FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye } from "react-icons/fa6"; // Added FaBullseye
     import Link from "next/link"; // Import Link for navigation
 
     // --- I18N Translations ---
@@ -17,19 +17,23 @@
         loading: "Loading SUPERVIBE...",
         pageTitle: "SUPERVIBE STUDIO",
         welcome: "Yo,", // Personalized welcome
-        intro1: "Still scared of 'code'? Forget that noise! This ain't your grandpa's coding class. This is the **FUTURE**, right here, right now.",
+        intro1: "Still scared of 'code'? Forget that noise! This is the **FUTURE**, your personal code accelerant.",
         intro2: "Think of this like a magic playground. You have ideas? Cool. You speak 'em, AI builds 'em, I make sure it all works. Simple.",
-        intro3: "Stop being a consumer, start being a CREATOR. This tool helps you build YOUR reality, solve YOUR problems, maybe even make some cash doing what YOU vibe with.",
+        intro3: "Stop being a consumer, start being a CREATOR. This tool helps you build YOUR reality, solve YOUR problems, **validate ideas FAST**, maybe even make cash doing what YOU vibe with.", // Added validation mention
         philosophyTitle: "The Philosophy: Why This Shit Works (Tap to Learn)",
-        philosophy1: "This isn't just about building apps. It's about unlocking YOUR potential, like Dan Koe talks about (check",
+        philosophy1: "This isn't just about building apps. It's about unlocking YOUR potential (like in", // Simplified
         philosophyLink1: "/purpose-profit",
         philosophyLink1Text: "Purpose & Profit ideas",
         philosophy2: "). Stop chasing jobs, start building YOUR world. You ARE the niche.",
-        philosophy3: "AI isn't here to replace you, dude. It's your superpower, your amplifier. Learn to use it (like explained in",
+        philosophy3: "AI isn't here to replace you, dude. It's your superpower, your co-pilot. Learn to leverage it (ideas in", // Changed to leverage
         philosophyLink2: "/selfdev",
         philosophyLink2Text: "SelfDev Path",
-        philosophy4: "), or get left behind by someone who does. Simple choice.",
-        philosophy5: "This studio makes it easy. Grab ideas, talk to the AI, see magic happen. No scary code monsters here.",
+        philosophy4: "), or get left behind. Simple choice.", // Simplified
+        philosophy5: "This studio makes it easy. Grab ideas, talk to the AI, see magic happen. No scary code monsters.",
+        philosophy6: "**Validate first!** Use AI to check if your idea has legs *before* building (more on this in", // NEW: Validation emphasis
+        philosophyLink3: "/selfdev#validation", // NEW: Link to validation section
+        philosophyLink3Text: "SelfDev Validation", // NEW
+        philosophy7: "). Kill bad ideas quickly, save time & money.", // NEW
         stepsTitle: "Quick Vibe Guide (It's Easy AF):",
         step1Title: "1. Grab + Wish:",
         step1Desc: "Point at app part -> Hit", // Download icon inserted below
@@ -54,19 +58,23 @@
         loading: "Загрузка SUPERVIBE...",
         pageTitle: "SUPERVIBE СТУДИЯ",
         welcome: "Йоу,", // Personalized welcome
-        intro1: "Все еще боишься 'кода'? Забудь эту хрень! Это не уроки программирования твоего деда. Это **БУДУЩЕЕ**, прямо здесь и сейчас.",
+        intro1: "Все еще боишься 'кода'? Забудь эту хрень! Это **БУДУЩЕЕ**, твой личный ускоритель кода.", // Updated
         intro2: "Думай об этом как о волшебной песочнице. Есть идеи? Круто. Ты их говоришь, AI их строит, я слежу, чтобы все работало. Просто.",
-        intro3: "Хватит быть потребителем, стань ТВОРЦОМ. Этот инструмент поможет тебе строить ТВОЮ реальность, решать ТВОИ проблемы, может даже заработать на том, что ТЕБЕ по кайфу.",
+        intro3: "Хватит быть потребителем, стань ТВОРЦОМ. Этот инструмент поможет тебе строить ТВОЮ реальность, решать ТВОИ проблемы, **быстро валидировать идеи**, может даже заработать на том, что ТЕБЕ по кайфу.", // Added validation mention
         philosophyTitle: "Философия: Почему Эта Хрень Работает (Нажми Узнать)",
-        philosophy1: "Это не просто про создание приложений. Это про раскрытие ТВОЕГО потенциала, как говорит Дэн Ко (чекни",
+        philosophy1: "Это не просто про создание приложений. Это про раскрытие ТВОЕГО потенциала (как в", // Simplified
         philosophyLink1: "/purpose-profit",
-        philosophyLink1Text: "идеи Purpose & Profit",
+        philosophyLink1Text: "идеях Purpose & Profit",
         philosophy2: "). Хватит гоняться за работами, начни строить СВОЙ мир. Ты И ЕСТЬ ниша.",
-        philosophy3: "AI здесь не чтобы заменить тебя, чувак. Это твоя суперсила, твой усилитель. Научись им пользоваться (как объяснено в",
+        philosophy3: "AI здесь не чтобы заменить тебя, чувак. Это твоя суперсила, твой второй пилот. Научись использовать его рычаги (идеи в", // Changed to leverage
         philosophyLink2: "/selfdev",
         philosophyLink2Text: "Пути SelfDev",
-        philosophy4: "), или останешься позади тех, кто научился. Простой выбор.",
+        philosophy4: "), или останешься позади. Простой выбор.", // Simplified
         philosophy5: "Эта студия делает все просто. Хватай идеи, говори с AI, наблюдай магию. Никаких страшных код-монстров.",
+        philosophy6: "**Сначала валидируй!** Используй AI, чтобы проверить, взлетит ли твоя идея, *прежде* чем строить (подробнее в", // NEW: Validation emphasis
+        philosophyLink3: "/selfdev#validation", // NEW: Link to validation section
+        philosophyLink3Text: "SelfDev Валидации", // NEW
+        philosophy7: "). Убивай плохие идеи быстро, экономь время и деньги.", // NEW
         stepsTitle: "Краткий Vibe-Гайд (Это П*здец Как Просто):",
         step1Title: "1. Хватай + Желай:",
         step1Desc: "Укажи на часть -> Жми", // Download icon inserted below
@@ -165,7 +173,7 @@
                     {/* === TOP SECTION: Intro & Persuasion === */}
                     <section id="intro" className="mb-12 text-center max-w-3xl w-full">
                         <div className="flex justify-center mb-4"> {/* SVG icon */}
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" className="w-24 h-12"> {/* ... SVG paths ... */} <defs> {/* ... SVG defs ... */} </defs> </svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" className="w-24 h-12"> <path fill="#333" d="M0 0h200v100H0z"/><path fill="#E1FF01" d="M50 20h100v60H50z"/><path fill="#444" d="M60 30h80v40H60z"/><path fill="#E1FF01" d="M70 40h60v20H70z"/><path fill="#555" d="M80 45h40v10H80z"/><path fill="#E1FF01" d="M90 48h20v4H90z"/><path fill="#333" d="M40 10h120v80H40z" opacity=".1"/><path fill="url(#a)" d="M0 0h200v100H0z"/> <defs> <radialGradient id="a" cx="50%" cy="50%" r="70%" fx="50%" fy="50%"> <stop offset="0%" stop-color="#fff" stop-opacity=".1"/> <stop offset="100%" stop-color="#fff" stop-opacity="0"/> </radialGradient> </defs> </svg>
                         </div>
                         <h1 className="text-4xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse"> {t.pageTitle} </h1>
                         <p className="text-xl text-gray-200 mt-4 font-semibold">
@@ -201,11 +209,12 @@
                                 <p>{t.philosophy1} <Link href={t.philosophyLink1} className="text-brand-purple hover:underline font-semibold">{t.philosophyLink1Text} <FaArrowUpRightFromSquare className="inline h-3 w-3 ml-1" /></Link> {t.philosophy2}</p>
                                 <p>{t.philosophy3} <Link href={t.philosophyLink2} className="text-brand-blue hover:underline font-semibold">{t.philosophyLink2Text} <FaArrowUpRightFromSquare className="inline h-3 w-3 ml-1" /></Link>{t.philosophy4}</p>
                                 <p>{t.philosophy5}</p>
+                                <p className="font-semibold text-yellow-400 flex items-center gap-1"><FaBullseye className="text-yellow-500"/> {t.philosophy6} <Link href={t.philosophyLink3} className="text-brand-yellow hover:underline font-semibold">{t.philosophyLink3Text} <FaArrowUpRightFromSquare className="inline h-3 w-3 ml-1" /></Link>{t.philosophy7}</p>
                                 <hr className="border-gray-700 my-4"/>
                                 <h4 className="text-lg font-semibold text-cyan-400 pt-2">{t.stepsTitle}</h4>
                                 <div className="text-sm space-y-2">
                                      <p><strong className="text-cyan-500">{t.step1Title}</strong> {t.step1Desc} <FaDownload className="inline mx-1 text-blue-400"/> {t.step1DescEnd}</p>
-                                     <p><strong className="text-cyan-500">{t.step2Title}</strong> {t.step2Desc} <span className="text-blue-400 font-semibold">"🤖 {t.step2Button}"</span> {t.step2DescMid} <FaRobot className="inline mx-1 text-purple-400"/> {t.step2DescMid2} <FaWandMagicSparkles className="inline mx-1 text-yellow-400" /> {t.step2DescEnd} <FaGithub className="inline mx-1 text-green-400" /> {t.step2End}</p>
+                                     <p><strong className="text-cyan-500">{t.step2Title}</strong> {t.step2Desc} <span className="text-blue-400 font-semibold">"🤖 {t.step2Button}"</span> {t.step2DescMid} <FaRobot className="inline mx-1 text-purple-400"/> {t.step2DescMid2} <FaWandMagicSparkles className="inline mx-1 text-yellow-400" /> {t.step2DescEnd} <FaGithub className="inline mx-1 text-green-400" /> </p>
                                 </div>
                             </div>
                         </details>

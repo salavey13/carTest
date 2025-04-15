@@ -5,7 +5,7 @@ import { supportHandler } from "./support";
 import { donationHandler } from "./donation";
 import { scriptAccessHandler } from "./script-access";
 import { inventoryScriptAccessHandler } from "./inventory-script-access";
-
+import { selfDevBoostHandler } from "./selfdev-boost"; // *** Import SelfDev Handler ***
 import { disableDummyModeHandler } from "./disable-dummy-mode"; // Handler for DISABLING
 // Import the specific supabaseAdmin instance from your hook
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -24,10 +24,8 @@ const handlers: WebhookHandler[] = [
   donationHandler,
   scriptAccessHandler,
   inventoryScriptAccessHandler,
-
+  selfDevBoostHandler, // *** Add SelfDev Handler ***
   disableDummyModeHandler, // Keep the handler for disabling dummy mode
-  // Add selfDevBoostHandler if it should also exist:
-  // selfDevBoostHandler,
 ];
 
 export async function handleWebhookProxy(update: any) {
@@ -68,15 +66,11 @@ export async function handleWebhookProxy(update: any) {
 
       if (invoiceError) {
         logger.error(`Webhook Proxy: Error fetching invoice ${invoice_payload}:`, invoiceError);
-        // Don't throw immediately, maybe log and notify admin later if needed
-        // Let's throw for now as invoice is crucial
         throw new Error(`Invoice fetch error: ${invoiceError.message}`);
       }
 
       if (!invoice) {
-        // Critical issue: Payment received but no matching invoice
         logger.error(`Webhook Proxy: Invoice not found in DB for payload: ${invoice_payload}. Payment amount: ${total_amount}, User: ${userId}`);
-        // Notify admin about the orphaned payment
         await sendTelegramMessage(
           TELEGRAM_BOT_TOKEN,
           `🚨 ВНИМАНИЕ: Получен платеж (${total_amount / 100} XTR) с неизвестным payload: ${invoice_payload} от пользователя ${userId}. Инвойс не найден в базе!`,
@@ -84,7 +78,6 @@ export async function handleWebhookProxy(update: any) {
           undefined,
           ADMIN_CHAT_ID
         );
-        // Throw an error to stop processing this payment further
         throw new Error(`Invoice not found for payload: ${invoice_payload}`);
       }
 
@@ -102,7 +95,6 @@ export async function handleWebhookProxy(update: any) {
 
       if (updateInvoiceError) {
         logger.error(`Webhook Proxy: Error marking invoice ${invoice_payload} as paid:`, updateInvoiceError);
-        // Decide if you should stop processing. For now, throw.
         throw new Error(`Failed to update invoice status: ${updateInvoiceError.message}`);
       }
       logger.log(`Webhook Proxy: Invoice ${invoice_payload} marked as paid.`);
@@ -114,11 +106,9 @@ export async function handleWebhookProxy(update: any) {
         .eq("user_id", userId)
         .single(); // Assuming user must exist if they made a payment
 
-      // userData can be null if user deleted account between payment and webhook processing
-      if (userError && userError.code !== 'PGRST116') { // PGRST116 = 'No rows returned' which is handled by !userData check
+      if (userError && userError.code !== 'PGRST116') {
          logger.error(`Webhook Proxy: Error fetching user ${userId} for invoice ${invoice_payload}:`, userError);
-         // If user data is critical for all handlers, might throw here.
-         // For now, proceed and let handlers decide.
+         // Proceed and let handlers decide.
       }
       if (!userData) {
           logger.warn(`Webhook Proxy: User ${userId} not found in DB for invoice ${invoice_payload}. Proceeding with basic info.`);
@@ -128,28 +118,32 @@ export async function handleWebhookProxy(update: any) {
       }
 
       // Find the appropriate handler based on invoice type or payload structure
-      const handler = handlers.find(h => h.canHandle(invoice, invoice_payload)); // Pass both invoice data and raw payload
+      // Use invoice.type primarily, fallback to checking payload for handlers like support
+      const handler = handlers.find(h => {
+         if (invoice.type) { // If type exists in invoice, use it
+             return h.canHandle(invoice, invoice_payload); // Pass both for flexibility
+         } else { // Fallback for older/other handlers that relied on payload prefix
+             return h.canHandle(invoice, invoice_payload); // Still pass both
+         }
+      });
+
 
       if (handler) {
-        logger.log(`Webhook Proxy: Found handler for invoice type "${invoice.type || 'type not in DB'}". Executing...`);
+        logger.log(`Webhook Proxy: Found handler for invoice type "${invoice.type || 'type not in DB / checking payload'}". Executing...`);
         const baseUrl = getBaseUrl(); // Get base URL dynamically
-        // Execute the handler, passing the supabaseAdmin client instance
         await handler.handle(
           invoice,
           userId,
-          // Provide a default object if userData is null/undefined
           userData || { user_id: userId, metadata: {} },
-          total_amount / 100, // Pass amount in actual currency units (e.g., XTR)
-          supabaseAdmin,      // Pass the imported supabaseAdmin client
+          total_amount / 100,
+          supabaseAdmin,
           TELEGRAM_BOT_TOKEN,
           ADMIN_CHAT_ID,
-          baseUrl             // Pass base URL if needed by handlers
+          baseUrl
         );
         logger.log(`Webhook Proxy: Handler for invoice ${invoice_payload} executed successfully.`);
       } else {
-        // No handler found for this invoice type
         logger.warn(`Webhook Proxy: No handler found for invoice type "${invoice.type || 'unknown'}" with payload ${invoice_payload}.`);
-        // Notify admin about unhandled payment type
         await sendTelegramMessage(
           TELEGRAM_BOT_TOKEN,
           `⚠️ Необработанный платеж! Тип: ${invoice.type || 'Неизвестен (из payload?)'}, Payload: ${invoice_payload}, Сумма: ${total_amount / 100} XTR, Пользователь: ${userId}`,
@@ -159,9 +153,7 @@ export async function handleWebhookProxy(update: any) {
         );
       }
     } catch (error) {
-      // Catch any errors during the process
       logger.error("Webhook Proxy: Error processing successful_payment:", error);
-      // Notify admin about the failure
       await sendTelegramMessage(
         TELEGRAM_BOT_TOKEN,
         `🚨 Ошибка обработки успешного платежа! Payload: ${update.message?.successful_payment?.invoice_payload || 'N/A'}, User: ${update.message?.chat?.id || 'N/A'}. Ошибка: ${error instanceof Error ? error.message : String(error)}`,
@@ -171,7 +163,6 @@ export async function handleWebhookProxy(update: any) {
       );
     }
   } else {
-    // Log if the update is neither pre_checkout_query nor successful_payment
     logger.log("Webhook Proxy: Received update that is not pre_checkout_query or successful_payment. Ignoring.", { type: Object.keys(update) });
   }
 }

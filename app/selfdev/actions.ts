@@ -1,4 +1,3 @@
-// /app/selfdev/actions.ts
 "use server";
 
 import { supabaseAdmin } from "@/hooks/supabase";
@@ -71,6 +70,10 @@ ORDER BY
     created_at DESC
 LIMIT limit_count;
 $$;
+
+-- NB: You might need to enable this function for the service_role or relevant user.
+-- Example: GRANT EXECUTE ON FUNCTION get_recent_paid_selfdev_invoices(integer) TO service_role;
+-- Example: ALTER FUNCTION get_recent_paid_selfdev_invoices(integer) SECURITY DEFINER; (Use with caution)
 */
 
 
