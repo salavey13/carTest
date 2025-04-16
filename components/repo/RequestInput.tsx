@@ -14,7 +14,8 @@ interface RequestInputProps {
     onInputChange?: (value: string) => void; // Optional callback for parent
     initialValue?: string; // Optional initial value
     // New props for Ask AI button
-    onAskAi: () => Promise<void>;
+    // === FIX: Correct the expected return type for onAskAi ===
+    onAskAi: () => Promise<{ success: boolean; requestId?: string; error?: string }>; // Changed from Promise<void>
     isAskAiDisabled: boolean;
     aiActionLoading: boolean;
     // New prop for Add Selected

@@ -1,4 +1,8 @@
-import { FaCode, FaRobot, FaLock, FaShieldAlt, FaTelegram } from "react-icons/fa";
+"use client";
+
+"use client"
+import React from "react"; // Import React if using JSX elements like icons
+import { FaCode, FaRobot, FaLock, FaShieldCat, FaTelegram } from "react-icons/fa6"; // Corrected import, added FaShieldCat
 
 export const donationTranslations = {
   en: {
@@ -36,7 +40,13 @@ export const donationTranslations = {
       {
         text: "Got my first donation within hours of setting this up. The templates saved me weeks of work.",
         author: "Sam, Open Source Maintainer"
+      },
+      // --- NEW TESTIMONIAL ADDED ---
+      {
+        text: "This feels exactly like Tony Stark building his suit with Jarvis – the complex engineering is done, now it's time to customize, fly, and kick ass. The Supervibe Studio is the Jarvis for this generation of makers.",
+        author: "AI Bot Assistant"
       }
+      // --- END NEW TESTIMONIAL ---
     ],
     guide: {
       step1: "Fork our GitHub template repository",
@@ -89,7 +99,13 @@ export const donationTranslations = {
       {
         text: "Получил первое пожертвование через несколько часов после настройки. Шаблоны сэкономили мне недели работы.",
         author: "Сэм, Разработчик Open-Source"
+      },
+      // --- NEW TESTIMONIAL ADDED ---
+      {
+        text: "Это как Тони Старк, собирающий свой костюм с Джарвисом – сложная инженерия уже сделана, теперь время кастомизировать, летать и надирать задницы. Supervibe Studio – это Джарвис для этого поколения мейкеров.",
+        author: "AI Bot Assistant"
       }
+      // --- END NEW TESTIMONIAL ---
     ],
     guide: {
       step1: "Сделайте форк нашего шаблона на GitHub",
@@ -110,7 +126,7 @@ export const donationTranslations = {
 };
 
 export const donationBenefits = [
-  {
+   {
     title: {
       en: "Instant Setup",
       ru: "Мгновенная Настройка"
@@ -152,7 +168,7 @@ export const donationBenefits = [
       en: "Bank-grade security for all transactions",
       ru: "Банковский уровень безопасности для всех транзакций"
     },
-    icon: <FaShieldAlt className="text-2xl" />
+    icon: <FaShieldCat className="text-2xl" /> // Using FaShieldCat from fa6
   },
   {
     title: {
