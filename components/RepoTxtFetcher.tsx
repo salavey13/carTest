@@ -6,12 +6,12 @@
     import {
         FaAngleDown, FaAngleUp, // Replaced circle chevrons
         FaDownload, FaArrowsRotate, FaCircleCheck, FaXmark, FaCopy,
-        FaBroom, FaRobot, FaCodeBranch, // Use FaCodeBranch for settings
+        FaBroom, FaRobot, FaCodeBranch, FaPlus, FaFileLines // FaPlus, FaFileLines added for RequestInput
     } from "react-icons/fa6";
     import { motion } from "framer-motion";
 
     // Actions & Context
-    import { fetchRepoContents } from "@/app/actions_github/actions"; // Needed for return type only
+    import { fetchRepoContents } from "@/app/actions_github/actions";
     import { useAppContext } from "@/contexts/AppContext";
     import { useRepoXmlPageContext, RepoTxtFetcherRef, FetchStatus, SimplePullRequest } from "@/contexts/RepoXmlPageContext";
 
@@ -103,8 +103,8 @@
       const DEFAULT_TASK_IDEA = "Проанализируй предоставленный контекст кода. Опиши его основные функции и предложи возможные улучшения или рефакторинг.";
       const importantFiles = useMemo(() => [
           "contexts/AppContext.tsx", "hooks/useTelegram.ts", "app/layout.tsx",
-          "hooks/supabase.ts", "app/actions.ts", "app/actions/dummy_actions.ts",
-           "app/ai_actions/actions.ts", "app/webhook-handlers/disable-dummy-mode.ts",
+          "hooks/supabase.ts", "app/actions.ts", // Removed dummy_actions path
+           "app/ai_actions/actions.ts", "app/webhook-handlers/proxy.ts", // Example webhook handler path
            "package.json", "tailwind.config.ts"
       ], []);
 
@@ -186,7 +186,7 @@
     // Add selected file contents to the Kwork Input
     const handleAddSelected = useCallback(async (autoAskAi = false, filesToAddParam?: Set<string>) => {
         const filesToAdd = filesToAddParam || selectedFiles; if (filesToAdd.size === 0) { addToast("Сначала выберите файлы для добавления", 'error'); return; }
-        const prefix = "Контекст кода для анализа:\n"; // Removed full code instruction
+        const prefix = "Контекст кода для анализа:\n"; // No "отвечай полным кодом" here
         const markdownTxt = files.filter((file) => filesToAdd.has(file.path)).sort((a, b) => a.path.localeCompare(b.path)).map((file) => `\`\`\`${getLanguage(file.path)}\n// /${file.path}\n${file.content}\n\`\`\``).join("\n\n");
         const currentKworkValue = getKworkInputValue(); const taskText = currentKworkValue.split(prefix)[0]?.trim() || ""; const newContent = `${taskText ? taskText + '\n\n' : ''}${prefix}${markdownTxt}`;
         updateKworkInput(newContent); addToast(`${filesToAdd.size} файлов добавлено в запрос`, 'success'); scrollToSection('kworkInput');
@@ -256,6 +256,8 @@
     const isFetchDisabled = isLoading || loadingPrs || !repoUrlEntered;
     const showProgressBar = isLoading || fetchStatus === 'success' || fetchStatus === 'error' || fetchStatus === 'failed_retries';
     const isActionDisabled = isLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing;
+    // Corrected isAskAiDisabled logic
+    const isAskAiDisabled = !kworkInputHasContent || isActionDisabled;
     const isCopyDisabled = !kworkInputHasContent || isActionDisabled;
     const isClearDisabled = (!kworkInputHasContent && selectedFiles.size === 0) || isActionDisabled;
     const isAddSelectedDisabled = selectedFiles.size === 0 || isActionDisabled;
@@ -264,29 +266,94 @@
 
   return (
     <div id="extractor" className="w-full p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm text-gray-200 font-mono rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] border border-gray-700/50 relative overflow-hidden">
+      {/* Header & Settings Toggle Button */}
        <div className="flex justify-between items-start mb-4 gap-4">
             <div>
                 <h2 className="text-xl md:text-2xl font-bold tracking-tight text-emerald-400 mb-2 flex items-center gap-2">
                     <FaDownload className="text-purple-400" /> Кибер-Экстрактор Кода
                 </h2>
-                 <p className="text-yellow-300/80 text-xs md:text-sm mb-1"> 1. Укажи URL/токен/ветку в <span className="text-cyan-400 cursor-pointer hover:underline" onClick={triggerToggleSettingsModal}>настройках</span> (<FaCodeBranch className="inline text-cyan-400"/>). </p>
-                 <p className="text-yellow-300/80 text-xs md:text-sm mb-1"> 2. Нажми <span className="font-bold text-purple-400 mx-1">"Извлечь файлы"</span>. </p>
-                 <p className="text-yellow-300/80 text-xs md:text-sm mb-1"> 3. Выбери файлы для контекста AI. </p>
-                 <p className="text-yellow-300/80 text-xs md:text-sm mb-2"> 4. Опиши задачу ИЛИ добавь файлы кнопкой (+). </p>
-                 <p className="text-yellow-300/80 text-xs md:text-sm mb-2"> 5. Нажми <span className="font-bold text-blue-400 mx-1">"Спросить AI"</span> <span className="text-gray-400 text-xs">(Админ получит уведомление)</span> или скопируй <FaCopy className="inline text-sm mx-px"/>. </p>
+                 {/* Instructions */}
+                 <p className="text-yellow-300/80 text-xs md:text-sm mb-1">
+                    1. Укажи URL/токен/ветку в <span className="text-cyan-400 cursor-pointer hover:underline" onClick={triggerToggleSettingsModal}>настройках</span> (<FaCodeBranch className="inline text-cyan-400"/>).
+                 </p>
+                 <p className="text-yellow-300/80 text-xs md:text-sm mb-1">
+                    2. Нажми <span className="font-bold text-purple-400 mx-1">"Извлечь файлы"</span>.
+                 </p>
+                 <p className="text-yellow-300/80 text-xs md:text-sm mb-1">
+                    3. Выбери файлы для контекста AI.
+                 </p>
+                 <p className="text-yellow-300/80 text-xs md:text-sm mb-2">
+                    4. Опиши задачу ИЛИ добавь файлы кнопкой (+).
+                 </p>
+                 <p className="text-yellow-300/80 text-xs md:text-sm mb-2">
+                    5. Нажми <span className="font-bold text-blue-400 mx-1">"Спросить AI"</span> <span className="text-gray-400 text-xs">(Админ получит уведомление)</span> или скопируй <FaCopy className="inline text-sm mx-px"/>.
+                 </p>
             </div>
-            <motion.button onClick={triggerToggleSettingsModal} className="p-2 bg-gray-700/50 rounded-full hover:bg-gray-600/70 transition-colors flex-shrink-0" whileHover={{ scale: 1.1, rotate: isSettingsModalOpen ? 10 : -10 }} whileTap={{ scale: 0.95 }} title={isSettingsModalOpen ? "Скрыть настройки" : "Настройки URL/Token/Ветки/PR"} aria-label={isSettingsModalOpen ? "Скрыть настройки" : "Показать настройки URL/Token"} aria-expanded={isSettingsModalOpen} >
+            {/* Settings Toggle Button */}
+            <motion.button
+                onClick={triggerToggleSettingsModal} // Use context trigger
+                className="p-2 bg-gray-700/50 rounded-full hover:bg-gray-600/70 transition-colors flex-shrink-0" // Use rounded-full
+                whileHover={{ scale: 1.1, rotate: isSettingsModalOpen ? 10 : -10 }}
+                whileTap={{ scale: 0.95 }}
+                title={isSettingsModalOpen ? "Скрыть настройки" : "Настройки URL/Token/Ветки/PR"}
+                aria-label={isSettingsModalOpen ? "Скрыть настройки" : "Показать настройки URL/Token"}
+                aria-expanded={isSettingsModalOpen}
+            >
+                 {/* Using FaAngleDown/Up instead of FaCircleChevronDown/Up */}
                  {isSettingsModalOpen ? <FaAngleUp className="text-cyan-400 text-xl" /> : <FaAngleDown className="text-cyan-400 text-xl" />}
             </motion.button>
         </div>
-       <SettingsModal isOpen={isSettingsModalOpen} repoUrl={repoUrl} setRepoUrl={handleRepoUrlChange} token={token} setToken={setToken} manualBranchName={manualBranchName} setManualBranchName={handleManualBranchChange} currentTargetBranch={targetBranchName} openPrs={openPrs} loadingPrs={loadingPrs} onSelectPrBranch={handleSelectPrBranch} onLoadPrs={handleLoadPrs} loading={isLoading || loadingPrs} />
+
+      {/* Settings Modal Component - Controlled by Context */}
+       <SettingsModal
+            isOpen={isSettingsModalOpen}
+            repoUrl={repoUrl} // Pass local state for input control
+            setRepoUrl={handleRepoUrlChange} // Pass handler to update local/context
+            token={token} // Pass local state
+            setToken={setToken} // Pass setter for local state
+            manualBranchName={manualBranchName} // Pass context state
+            setManualBranchName={handleManualBranchChange} // Pass handler to update context
+            currentTargetBranch={targetBranchName} // Pass context state for display
+            openPrs={openPrs}
+            loadingPrs={loadingPrs}
+            onSelectPrBranch={handleSelectPrBranch} // Pass selection handler
+            onLoadPrs={handleLoadPrs} // Pass load handler
+            loading={isLoading || loadingPrs} // Pass combined loading state
+       />
+
+      {/* Fetch Button */}
        <div className="mb-4 flex justify-center">
-            <motion.button onClick={() => triggerFetch(fetchStatus === 'failed_retries' || fetchStatus === 'error')} disabled={isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')} className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-white bg-gradient-to-r ${ fetchStatus === 'failed_retries' || fetchStatus === 'error' ? 'from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600' : 'from-purple-600 to-cyan-500' } transition-all shadow-lg shadow-purple-500/30 hover:shadow-cyan-500/40 ${ isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error') ? "opacity-60 cursor-not-allowed" : "hover:brightness-110 active:scale-[0.98]" }`} whileHover={{ scale: (isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')) ? 1 : 1.03 }} whileTap={{ scale: (isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')) ? 1 : 0.97 }} title={`Извлечь файлы из ветки: ${effectiveBranchDisplay}`} >
-                 {isLoading ? <FaArrowsRotate className="animate-spin" /> : (fetchStatus === 'failed_retries' || fetchStatus === 'error' ? <FaArrowsRotate /> : <FaDownload />)}
-                 {fetchStatus === 'retrying' ? "Повтор..." : isLoading ? "Загрузка..." : (fetchStatus === 'failed_retries' || fetchStatus === 'error' ? "Попробовать снова" : "Извлечь файлы")}
+            <motion.button
+                onClick={() => triggerFetch(fetchStatus === 'failed_retries' || fetchStatus === 'error')}
+                disabled={isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')}
+                className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-white bg-gradient-to-r ${ // Use rounded-full
+                    fetchStatus === 'failed_retries' || fetchStatus === 'error'
+                    ? 'from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600' // Error state style
+                    : 'from-purple-600 to-cyan-500' // Normal state style
+                 } transition-all shadow-lg shadow-purple-500/30 hover:shadow-cyan-500/40 ${
+                     isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')
+                     ? "opacity-60 cursor-not-allowed" // Disabled style
+                     : "hover:brightness-110 active:scale-[0.98]" // Enabled style
+                 }`}
+                whileHover={{ scale: (isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')) ? 1 : 1.03 }}
+                whileTap={{ scale: (isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')) ? 1 : 0.97 }}
+                title={`Извлечь файлы из ветки: ${effectiveBranchDisplay}`} // Tooltip shows effective branch
+            >
+                 {/* Icon based on state */}
+                 {isLoading ? <FaArrowsRotate className="animate-spin" />
+                  : (fetchStatus === 'failed_retries' || fetchStatus === 'error' ? <FaArrowsRotate />
+                  : <FaDownload />)}
+                 {/* Text based on state */}
+                 {fetchStatus === 'retrying' ? "Повтор..."
+                  : isLoading ? "Загрузка..."
+                  : (fetchStatus === 'failed_retries' || fetchStatus === 'error' ? "Попробовать снова"
+                  : "Извлечь файлы")}
+                 {/* Branch indicator */}
                  <span className="text-xs opacity-80 hidden sm:inline">({effectiveBranchDisplay})</span>
             </motion.button>
         </div>
+
+      {/* Progress Bar & Status Area */}
        {showProgressBar && (
             <div className="mb-4 min-h-[40px]">
                 <ProgressBar status={fetchStatus === 'failed_retries' ? 'error' : fetchStatus} progress={fetchStatus === 'success' ? 100 : (fetchStatus === 'error' || fetchStatus === 'failed_retries' ? 0 : progress)} />
@@ -297,41 +364,72 @@
                  {(fetchStatus === 'error' || fetchStatus === 'failed_retries') && error && !isParsing && ( <div className="text-center text-xs font-mono mt-1 text-red-400 flex items-center justify-center gap-1"> <FaXmark /> {error} </div> )}
             </div>
         )}
+
+      {/* Main Content Area (Files & Input) */}
        <div className={`grid grid-cols-1 ${files.length > 0 || kworkInputHasContent ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-4 md:gap-6`}>
+
+         {/* Left Column: File List & Controls */}
          {(isLoading || (files.length > 0 && fetchStatus !== 'error' && fetchStatus !== 'failed_retries')) && (
              <div className="flex flex-col gap-4">
                 <SelectedFilesPreview selectedFiles={selectedFiles} allFiles={files} getLanguage={getLanguage} />
+                 {/* Auto Ask AI Toggle */}
                  {files.length > 0 && (
                      <div className="flex items-center justify-start gap-2 p-2 bg-gray-700/30 rounded-md">
-                        <input type="checkbox" id="autoAskAiCheckbox" checked={autoAskAiEnabled} onChange={(e) => setAutoAskAiEnabled(e.target.checked)} className="form-checkbox h-4 w-4 text-blue-500 bg-gray-600 border-gray-500 rounded focus:ring-blue-500/50 focus:ring-offset-gray-800 cursor-pointer" disabled={isActionDisabled} />
-                        <label htmlFor="autoAskAiCheckbox" className={`text-xs cursor-pointer select-none ${isActionDisabled ? 'text-gray-500' : 'text-gray-300'}`}> Авто-запрос AI после добавления файлов <span className="text-blue-400">(Add Selected & Ask)</span> </label>
+                        <input
+                            type="checkbox" id="autoAskAiCheckbox" checked={autoAskAiEnabled}
+                            onChange={(e) => setAutoAskAiEnabled(e.target.checked)}
+                            className="form-checkbox h-4 w-4 text-blue-500 bg-gray-600 border-gray-500 rounded focus:ring-blue-500/50 focus:ring-offset-gray-800 cursor-pointer"
+                            disabled={isActionDisabled} // Disable if any action is running
+                        />
+                        <label htmlFor="autoAskAiCheckbox" className={`text-xs cursor-pointer select-none ${isActionDisabled ? 'text-gray-500' : 'text-gray-300'}`}>
+                           Авто-запрос AI после добавления файлов <span className="text-blue-400">(Add Selected & Ask)</span>
+                        </label>
                     </div>
                  )}
-                 <FileList id="file-list-container" files={files} selectedFiles={selectedFiles} primaryHighlightedPath={primaryHighlightedPath} secondaryHighlightedPaths={secondaryHighlightedPaths} importantFiles={importantFiles} isLoading={isLoading} toggleFileSelection={toggleFileSelection} onAddSelected={() => handleAddSelected(autoAskAiEnabled)} onAddImportant={handleAddImportantFiles} onAddTree={handleAddFullTree} onSelectHighlighted={selectHighlightedFiles} />
+                 {/* File List Component */}
+                 <FileList
+                    id="file-list-container"
+                    files={files}
+                    selectedFiles={selectedFiles}
+                    primaryHighlightedPath={primaryHighlightedPath}
+                    secondaryHighlightedPaths={secondaryHighlightedPaths}
+                    importantFiles={importantFiles}
+                    isLoading={isLoading} // Pass general fetch loading
+                    toggleFileSelection={toggleFileSelection}
+                    onAddSelected={() => handleAddSelected(autoAskAiEnabled)} // Pass auto-ask flag
+                    onAddImportant={handleAddImportantFiles}
+                    onAddTree={handleAddFullTree}
+                    onSelectHighlighted={selectHighlightedFiles}
+                 />
              </div>
          )}
-         {(fetchStatus === 'success' || kworkInputHasContent || files.length > 0 ) ? (
+
+         {/* Right Column: Request Input & AI Trigger */}
+         {(fetchStatus === 'success' || kworkInputHasContent || files.length > 0 ) ? ( // Show if files fetched OR input has content
              <div id="kwork-input-section" className="flex flex-col gap-3">
-                 {/* RequestInput now implicitly contains the Ask AI button functionality */}
+                 {/* === FIX: Pass ALL necessary props to RequestInput === */}
                  <RequestInput
                       kworkInputRef={localKworkInputRef}
-                      onInputChange={(value) => setKworkInputHasContent(value.trim().length > 0)}
-                      isCopyDisabled={isCopyDisabled}
-                      isClearDisabled={isClearDisabled}
                       onCopyToClipboard={() => handleCopyToClipboard(undefined, true)}
                       onClearAll={handleClearAll}
-                      isAskAiDisabled={!kworkInputHasContent || isActionDisabled} // Updated disabled logic
-                      onAskAi={triggerAskAi} // Pass the context trigger function
-                      aiActionLoading={aiActionLoading} // Pass loading state for internal button
+                      isCopyDisabled={isCopyDisabled}
+                      isClearDisabled={isClearDisabled}
+                      onInputChange={(value) => setKworkInputHasContent(value.trim().length > 0)}
+                      // Pass Ask AI related props
+                      onAskAi={triggerAskAi}
+                      isAskAiDisabled={isAskAiDisabled} // Correctly calculated disable state
+                      aiActionLoading={aiActionLoading} // Pass the loading state
+                      // Pass Add Selected related props
+                      onAddSelected={() => handleAddSelected(autoAskAiEnabled)}
                       isAddSelectedDisabled={isAddSelectedDisabled}
                       selectedFetcherFilesCount={selectedFiles.size}
-                      onAddSelected={() => handleAddSelected(autoAskAiEnabled)} // Pass callback for Add Selected (+) button
                  />
-                 {/* --- The standalone Ask AI button is REMOVED from here --- */}
+                 {/* Standalone "Ask AI" button is confirmed REMOVED here */}
              </div>
          ) : null }
-      </div>
-    </div>
+
+      </div> {/* End Grid */}
+    </div> // End Component Root
   );
 });
 RepoTxtFetcher.displayName = 'RepoTxtFetcher';
