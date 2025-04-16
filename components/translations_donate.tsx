@@ -1,9 +1,8 @@
-// PR Title: feat: Add AI Bot testimonial to donation page translations
+"use client";
 
-// Добавил библейский отзыв от AI Bot Assistant в список testimonial для страницы донатов.
-// Теперь даже AI подтверждает крутость Supervibe!
-
-import { FaCode, FaRobot, FaLock, FaShieldHalved, FaTelegram } from "react-icons/fa6"; // Corrected import
+"use client"
+import React from "react"; // Import React if using JSX elements like icons
+import { FaCode, FaRobot, FaLock, FaShieldCat, FaTelegram } from "react-icons/fa6"; // Corrected import, added FaShieldCat
 
 export const donationTranslations = {
   en: {
@@ -169,7 +168,7 @@ export const donationBenefits = [
       en: "Bank-grade security for all transactions",
       ru: "Банковский уровень безопасности для всех транзакций"
     },
-    icon: <FaShieldHalved className="text-2xl" /> // Using FaShieldHalved from fa6
+    icon: <FaShieldCat className="text-2xl" /> // Using FaShieldCat from fa6
   },
   {
     title: {

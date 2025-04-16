@@ -14,7 +14,7 @@ export interface RepoTxtFetcherRef {
     handleFetch: (isManualRetry?: boolean, branchName?: string | null) => Promise<void>;
     selectHighlightedFiles: () => void;
     handleAddSelected: (autoAskAi?: boolean, filesToAddParam?: Set<string>) => Promise<void>;
-    handleCopyToClipboard: (textToCopy?: string, shouldScroll?: boolean) => boolean; // Added optional params
+    handleCopyToClipboard: (textToCopy?: string, shouldScroll?: boolean) => boolean;
     clearAll: () => void;
     getKworkInputValue: () => string;
 }
@@ -22,7 +22,7 @@ export interface RepoTxtFetcherRef {
 export interface AICodeAssistantRef {
     handleParse: () => Promise<void>;
     selectAllParsedFiles: () => void;
-    handleCreatePR: () => Promise<void>; // Points to handleCreateOrUpdatePR
+    handleCreatePR: () => Promise<void>;
     setResponseValue: (value: string) => void;
     updateRepoUrl: (url: string) => void;
 }
@@ -74,14 +74,14 @@ interface RepoXmlPageContextType {
     aiResponseHasContent: boolean;
     filesParsed: boolean;
     selectedAssistantFiles: Set<string>;
-    assistantLoading: boolean; // Assistant-specific loading (parse, PR)
-    aiActionLoading: boolean; // AI request submission/waiting loading
+    assistantLoading: boolean;
+    aiActionLoading: boolean;
     loadingPrs: boolean;
     openPrs: SimplePullRequest[];
-    targetBranchName: string | null; // Final target branch (Manual > PR > Null/Default)
-    manualBranchName: string; // User manual input
-    isSettingsModalOpen: boolean; // Modal state
-    currentAiRequestId: string | null; // ID of the request being monitored
+    targetBranchName: string | null;
+    manualBranchName: string;
+    isSettingsModalOpen: boolean;
+    currentAiRequestId: string | null;
     isParsing: boolean;
 
     // Refs
@@ -107,8 +107,8 @@ interface RepoXmlPageContextType {
     setManualBranchName: (branch: string) => void; // Handles manual input logic
     setOpenPrs: (prs: SimplePullRequest[]) => void;
     setLoadingPrs: (loading: boolean) => void;
-    setIsSettingsModalOpen: (isOpen: boolean) => void; // Modal setter
-    setCurrentAiRequestId: (id: string | null) => void; // Setter for AI request ID
+    setIsSettingsModalOpen: (isOpen: boolean) => void;
+    setCurrentAiRequestId: (id: string | null) => void;
     setIsParsing: (parsing: boolean) => void;
 
     // Action Triggers
@@ -117,12 +117,12 @@ interface RepoXmlPageContextType {
     triggerSelectHighlighted: () => void;
     triggerAddSelectedToKwork: (autoAskAi?: boolean, filesToAddParam?: Set<string>) => Promise<void>;
     triggerCopyKwork: () => void;
-    triggerAskAi: () => Promise<{ success: boolean; requestId?: string; error?: string }>; // Now returns request info
+    triggerAskAi: () => Promise<{ success: boolean; requestId?: string; error?: string }>;
     triggerParseResponse: () => Promise<void>;
     triggerSelectAllParsed: () => void;
-    triggerCreatePR: () => Promise<void>; // Points to assistant's handleCreateOrUpdatePR
-    triggerUpdateBranch: (repoUrl: string, files: { path: string; content: string }[], commitMessage: string, branchName: string) => Promise<ReturnType<typeof updateBranch>>; // Specific update action trigger
-    triggerToggleSettingsModal: () => void; // Modal toggle trigger
+    triggerCreatePR: () => Promise<void>;
+    triggerUpdateBranch: (repoUrl: string, files: { path: string; content: string }[], commitMessage: string, branchName: string) => Promise<ReturnType<typeof updateBranch>>;
+    triggerToggleSettingsModal: () => void;
     scrollToSection: (id: 'kworkInput' | 'aiResponseInput' | 'prSection' | 'fetcher' | 'assistant' | 'executor' | 'settingsModalTrigger' | 'settings-modal-trigger-assistant') => void;
 
     // Messages & Callbacks
@@ -138,9 +138,9 @@ export const useRepoXmlPageContext = () => {
     const context = useContext(RepoXmlPageContext);
     if (context === undefined) {
         console.error('useRepoXmlPageContext must be used within a RepoXmlPageProvider. Returning stub.');
-        // Return a default stub object to prevent runtime errors in consuming components
         const warn = (name: string): any => () => { console.warn(`Context stub: ${name} called.`); return Promise.resolve({ success: false, error: 'Context unavailable' }); };
         const warnSync = (name: string): any => () => { console.warn(`Context stub: ${name} called.`); };
+        // Provide a complete stub matching the interface
         return {
             currentStep: 'idle', fetchStatus: 'idle', repoUrlEntered: false, filesFetched: false,
             primaryHighlightedPath: null, secondaryHighlightedPaths: [], selectedFetcherFiles: new Set(),

@@ -2,7 +2,7 @@
 
 // Re-export necessary actions for now, keeps things organized.
 // More Jumpstart-specific actions can be added here later.
-import { notifyAdmin } from "@/app/actions"; 
+import { notifyAdmin } from "@/app/actions";
 import { logger } from "@/lib/logger";
 
 // Example: Notify admin about a new Jumpstart Kit request
