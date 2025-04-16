@@ -93,7 +93,7 @@
         // Modal state & trigger
         isSettingsModalOpen, triggerToggleSettingsModal,
         // Refs & Callbacks
-        kworkInputRef, triggerAskAi, triggerGetOpenPRs, updateRepoUrlInAssistant, scrollToSection, triggerFetch
+        kworkInputRef, triggerAskAi, triggerGetOpenPRs, updateRepoUrlInAssistant, scrollToSection, triggerFetch, setFilesParsed, setAiResponseHasContent,  setSelectedAssistantFiles
       } = useRepoXmlPageContext();
 
       // === URL Params & Derived State ===
@@ -757,18 +757,20 @@
              <div id="kwork-input-section" className="flex flex-col gap-3">
                  {/* Request Input Component */}
                  <RequestInput
-                    kworkInputRef={localKworkInputRef} // Pass local ref
-                    onInputChange={(value) => setKworkInputHasContent(value.trim().length > 0)} // Update context flag on change
-                    isCopyDisabled={isCopyDisabled} // Pass disabled state
-                    isClearDisabled={isClearDisabled} // Pass disabled state
-                    onCopyToClipboard={() => handleCopyToClipboard(undefined, true)} // Pass callback
-                    onClearAll={handleClearAll} // Pass callback
-                    isActionDisabled={isActionDisabled} // Disable while loading
-                    // Pass Add Selected props
-                    onAddSelected={() => handleAddSelected(autoAskAiEnabled)}
-                    isAddSelectedDisabled={isAddSelectedDisabled}
-                    selectedFetcherFilesCount={selectedFiles.size}
-                 />
+                          kworkInputRef={localKworkInputRef} // Pass local ref
+                          onInputChange={(value) => setKworkInputHasContent(value.trim().length > 0)} // Update context flag on change
+                          isCopyDisabled={isCopyDisabled} // Pass disabled state
+                          isClearDisabled={isClearDisabled} // Pass disabled state
+                          onCopyToClipboard={() => handleCopyToClipboard(undefined, true)} // Pass callback
+                          onClearAll={handleClearAll} // Pass callback
+                          isAskAiDisabled={isActionDisabled} // Disable while loading
+
+                          // Pass Add Selected props
+                          onAddSelected={() => handleAddSelected(autoAskAiEnabled)}
+                          isAddSelectedDisabled={isAddSelectedDisabled}
+                          selectedFetcherFilesCount={selectedFiles.size} onAskAi={function (): Promise<void> {
+                              throw new Error("Function not implemented.");
+                          } } aiActionLoading={false}                 />
                   {/* Ask AI Button */}
                   <motion.button
                      onClick={() => triggerAskAi().catch(err => console.error("Error in triggerAskAi from button:", err))}
