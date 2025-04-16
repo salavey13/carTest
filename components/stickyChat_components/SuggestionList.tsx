@@ -52,7 +52,8 @@ export const SuggestionList: React.FC<SuggestionListProps> = ({
                         whileHover={!suggestion.disabled ? { scale: 1.03, x: 3 } : {}} // Add subtle hover effect
                         whileTap={!suggestion.disabled ? { scale: 0.98 } : {}}     // Add subtle tap effect
                         className={clsx( // Dynamically apply classes
-                            "flex items-center w-full text-left px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ease-in-out", // Changed to rounded-lg
+                            // Reverted back to rounded-full for buttons
+                            "flex items-center w-full text-left px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ease-in-out",
                             "shadow-[0_0_8px_rgba(0,255,157,0.3)] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-opacity-75",
                             { // Conditional classes
                                 "bg-gradient-to-r from-yellow-500 to-orange-500 text-white hover:from-yellow-400 hover:to-orange-400": suggestion.isHireMe && !suggestion.disabled,
