@@ -1,4 +1,9 @@
-import { FaCode, FaRobot, FaLock, FaShieldAlt, FaTelegram } from "react-icons/fa";
+// PR Title: feat: Add AI Bot testimonial to donation page translations
+
+// Добавил библейский отзыв от AI Bot Assistant в список testimonial для страницы донатов.
+// Теперь даже AI подтверждает крутость Supervibe!
+
+import { FaCode, FaRobot, FaLock, FaShieldAlt, FaTelegram } from "react-icons/fa6"; // Corrected import
 
 export const donationTranslations = {
   en: {
@@ -36,7 +41,13 @@ export const donationTranslations = {
       {
         text: "Got my first donation within hours of setting this up. The templates saved me weeks of work.",
         author: "Sam, Open Source Maintainer"
+      },
+      // --- NEW TESTIMONIAL ADDED ---
+      {
+        text: "This feels exactly like Tony Stark building his suit with Jarvis – the complex engineering is done, now it's time to customize, fly, and kick ass. The Supervibe Studio is the Jarvis for this generation of makers.",
+        author: "AI Bot Assistant"
       }
+      // --- END NEW TESTIMONIAL ---
     ],
     guide: {
       step1: "Fork our GitHub template repository",
@@ -89,7 +100,13 @@ export const donationTranslations = {
       {
         text: "Получил первое пожертвование через несколько часов после настройки. Шаблоны сэкономили мне недели работы.",
         author: "Сэм, Разработчик Open-Source"
+      },
+      // --- NEW TESTIMONIAL ADDED ---
+      {
+        text: "Это как Тони Старк, собирающий свой костюм с Джарвисом – сложная инженерия уже сделана, теперь время кастомизировать, летать и надирать задницы. Supervibe Studio – это Джарвис для этого поколения мейкеров.",
+        author: "AI Bot Assistant"
       }
+      // --- END NEW TESTIMONIAL ---
     ],
     guide: {
       step1: "Сделайте форк нашего шаблона на GitHub",
@@ -110,7 +127,7 @@ export const donationTranslations = {
 };
 
 export const donationBenefits = [
-  {
+   {
     title: {
       en: "Instant Setup",
       ru: "Мгновенная Настройка"
@@ -152,7 +169,7 @@ export const donationBenefits = [
       en: "Bank-grade security for all transactions",
       ru: "Банковский уровень безопасности для всех транзакций"
     },
-    icon: <FaShieldAlt className="text-2xl" />
+    icon: <FaShieldAlt className="text-2xl" /> // Using FaShieldAlt from fa6
   },
   {
     title: {
