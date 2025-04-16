@@ -124,7 +124,20 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         }
     }, [response, parseAndValidateResponse, setFilesParsed, setSelectedAssistantFiles, setIsParsing, setValidationStatus, setValidationIssues]); // Added setIsParsing
     const handleAutoFix = useCallback(() => { autoFixIssues(parsedFiles, validationIssues); }, [autoFixIssues, parsedFiles, validationIssues]);
-    const handleCopyFixPrompt = useCallback(() => { const s=validationIssues.filter(i=>i.type==='skippedComment'); if(s.length===0) return toast.info("Нет '// .. .'"); const fL=s.map(i=>`- ${i.filePath} (~${i.details?.lineNumber})`).join('\n'); const p=`Восстанови пропуски ('// ..''.') в новых файлах, используя старые как референс:\n${fL}\n\nВерни полные новые версии.`; navigator.clipboard.writeText(p).then(()=>toast.success("Промпт скопирован!")).catch(()=>toast.error("Ошибка.")); }, [validationIssues]);
+    // Copy prompt to fix skipped comment blocks - with user suggested fix
+    const handleCopyFixPrompt = useCallback(() => {
+        const skipped = validationIssues.filter(i => i.type === 'skippedComment');
+        if (skipped.length === 0) {
+            toast.info("Нет маркеров '// ..''.' для исправления."); // Adjusted marker
+            return;
+        }
+        const fileList = skipped.map(i => `- ${i.filePath} (~ строка ${i.details?.lineNumber})`).join('\n');
+        // Changed '// ..\.' to '// ..''.' to avoid self-triggering
+        const prompt = `Восстанови пропуски ('// ..''.') в новых файлах, используя старые как референс:\n${fileList}\n\nВерни полные новые версии.`;
+        navigator.clipboard.writeText(prompt)
+            .then(() => toast.success("Prompt для исправления пропусков скопирован!"))
+            .catch(() => toast.error("Ошибка копирования промпта."));
+    }, [validationIssues]);
     const handleRestorationComplete = useCallback((updatedFiles: FileEntry[], sC: number, eC: number) => { setParsedFiles(updatedFiles); const rI = validationIssues.filter(i => i.type !== 'skippedCodeBlock'); setValidationIssues(rI); setValidationStatus(rI.length > 0 ? (rI.some(i=>!i.fixable&&!i.restorable)?'error':'warning') : 'success'); if(sC>0) toast.success(`${sC} блоков восстановлено.`); if(eC>0) toast.error(`${eC} блоков не удалось восстановить.`); }, [validationIssues, setParsedFiles, setValidationIssues, setValidationStatus]);
     const handleClearResponse = useCallback(() => { setResponse(""); toast.info("Поле ответа очищено."); }, []);
     const handleCopyResponse = useCallback(() => { if (!response) return; navigator.clipboard.writeText(response).then(()=>toast.success("Скопировано!")).catch(()=>{toast.error("Ошибка копирования")});}, [response]);
