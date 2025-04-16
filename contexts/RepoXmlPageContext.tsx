@@ -474,7 +474,7 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
 
     // --- triggerAskAi (Updated Flow) ---
     const triggerAskAi = useCallback(async (): Promise<{ success: boolean; requestId?: string; error?: string }> => {
-        if (!fetcherRef.current || !user?.id || !user.dbUser) { // Check for dbUser for better notification
+        if (!fetcherRef.current || !user?.id ) { // Check for dbUser for better notification
             const m = !user?.id ? "Пользователь не аутентифицирован." : "Компоненты не готовы.";
             toast.error(m);
             return { success: false, error: m };
@@ -497,7 +497,7 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
             // 1. Save the request to the database
             const requestData: AiRequestInsert = {
                 prompt: kworkValue,
-                user_id: user.id,
+                user_id: String(user.id),
                 status: 'pending' // Initial status
             };
             const { data, error: insertError } = await supabaseAnon
@@ -513,7 +513,7 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
             console.log("AI Request submitted to DB. Monitoring ID:", newRequestId);
 
             // 2. Notify Admin (You!) via Telegram - Fire and forget
-            const userNameOrId = user.dbUser.username || user.dbUser.full_name || user.id;
+            const userNameOrId = user.username || user.first_name || String(user.id);
             const promptExcerpt = kworkValue.substring(0, 300) + (kworkValue.length > 300 ? '...' : '');
             const notificationMessage = `🤖 Новый AI Запрос (#${newRequestId.substring(0, 6)}...)\nОт: ${userNameOrId} (${user.id})\nПромпт:\n\`\`\`\n${promptExcerpt}\n\`\`\``;
             notifyAdmin(notificationMessage).catch(err => console.error("Failed to notify admin:", err)); // Log error if notify fails
@@ -624,8 +624,8 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
                     const updatedRecord = payload.new;
 
                     // Ensure the update is for the ID we are currently monitoring
-                    if (updatedRecord.id !== currentAiRequestIdState) { // Use state variable for check
-                        console.log(`[RT Mismatch] Update for ${updatedRecord.id}, but monitoring ${currentAiRequestIdState}. Ignoring.`);
+                    if (updatedRecord.id !== currentAiRequestId) { // Use state variable for check
+                        console.log(`[RT Mismatch] Update for ${updatedRecord.id}, but monitoring ${currentAiRequestId}. Ignoring.`);
                         return;
                     }
 
@@ -661,17 +661,15 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
                     console.error(`[RT Status] Subscription error for ${channelId}: ${status}`, err);
                     toast.error("Ошибка Realtime подписки.");
                     // Stop loading if subscription fails critically
-                    if (currentAiRequestIdState === currentAiRequestId) { // Check if still relevant
+// Check if still relevant
                         setAiActionLoadingState(false);
                         setCurrentAiRequestIdState(null);
-                    }
+
                 } else if (status === 'CLOSED') {
                     console.log(`[RT Status] Channel explicitly closed for ${channelId}`);
                      // If closed unexpectedly while we were loading, reset state
-                    if (currentAiRequestIdState === currentAiRequestId) {
                         setAiActionLoadingState(false);
                         setCurrentAiRequestIdState(null);
-                    }
                 }
             });
 
@@ -685,7 +683,7 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
                 realtimeChannelRef.current = null;
             }
         };
-    }, [currentAiRequestId, assistantRef, triggerParseResponse, currentAiRequestIdState]); // Added currentAiRequestIdState to deps for internal checks
+    }, [currentAiRequestId, assistantRef, triggerParseResponse]); // Added currentAiRequestIdState to deps for internal checks
 
 
     // --- Xuinity Message Logic (Dynamic based on current state) ---

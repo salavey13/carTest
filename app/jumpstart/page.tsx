@@ -90,7 +90,7 @@ export default function JumpstartPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                   <div>
                      <p className="text-gray-300 text-lg md:text-xl leading-relaxed">
-                       {t.section1.p1} <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">{t.section1.link1}</Link> {t.section1.p1_cont} <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">{t.section1.link2}</Link>{t.section1.p1_end}
+                       {t.section1.p1} <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">{t.section1.link1}</Link> {t.section1.p1_cont} <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">PP</Link>
                      </p>
                      <p className="mt-4 text-gray-400 text-base leading-relaxed">
                        {t.section1.p2} (<Link href="/about" className="text-brand-blue hover:underline font-semibold">Pavel</Link>){t.section1.p2_cont} <strong className="text-white">{t.section1.p2_highlight}</strong>{t.section1.p2_end}
