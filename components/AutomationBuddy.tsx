@@ -182,7 +182,7 @@ const AutomationBuddy: React.FC = () => {
                  addSuggestion("parse-response", "➡️ Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, true, !aiResponseHasContent, !aiResponseHasContent ? "Нет ответа" : "");
                  addSuggestion("goto-ai-response", "К Полю Ответа", () => scrollToSection('aiResponseInput'), <FaKeyboard />);
                 break;
-            case 'parsing_response':
+            case 'parsing_response': // NEW: Show parsing indicator
                  addSuggestion("loading-indicator", "Разбор Ответа...", () => {}, <FaBrain className="animate-pulse"/>, true, true );
                  break;
             case 'response_parsed':
@@ -205,7 +205,7 @@ const AutomationBuddy: React.FC = () => {
     }, [ // Dependencies
         currentStep, fetchStatus, repoUrlEntered, filesFetched, selectedFetcherFiles,
         kworkInputHasContent, aiResponseHasContent, filesParsed, selectedAssistantFiles,
-        assistantLoading, aiActionLoading, loadingPrs, isParsing, currentAiRequestId, // Added currentAiRequestId
+        assistantLoading, aiActionLoading, loadingPrs, isParsing, currentAiRequestId,
         targetBranchName, manualBranchName, isSettingsModalOpen,
         triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork,
         triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreatePR,
@@ -213,8 +213,53 @@ const AutomationBuddy: React.FC = () => {
     ]);
 
 
-    // --- Suggestion Change Detection ---
-    useEffect(() => { const cI=new Set(suggestions.map(s=>s.id)); const pI=previousSuggestionIds.current; if(isOpen){ setHasNewSuggestions(false); previousSuggestionIds.current = cI; } else { let chg=cI.size!==pI.size; if(!chg){ for(const id of cI){if(!pI.has(id)){chg=true;break;}} if(!chg){for(const id of pI){if(!cI.has(id)){chg=true;break;}}} const mC=Array.from(cI).some(id=>!id.includes('loading-indicator'))||Array.from(pI).some(id=>!id.includes('loading-indicator')); if(chg&&mC&&!hasNewSuggestions){setHasNewSuggestions(true);console.log("Buddy: New suggestions!");} if(chg){previousSuggestionIds.current = cI;}} }, [suggestions, isOpen, hasNewSuggestions]);
+    // --- Suggestion Change Detection for Notification ---
+    // Use the standard, readable useEffect logic here
+    useEffect(() => {
+        const currentIds = new Set(suggestions.map(s => s.id));
+        const prevIds = previousSuggestionIds.current;
+
+        if (isOpen) {
+            setHasNewSuggestions(false);
+            previousSuggestionIds.current = currentIds;
+        } else {
+            let changed = currentIds.size !== prevIds.size;
+            if (!changed) {
+                // Check if any new ID is not in the old set
+                for (const id of currentIds) {
+                    if (!prevIds.has(id)) {
+                        changed = true;
+                        break;
+                    }
+                }
+                // Check if any old ID is not in the new set (if still not changed)
+                if (!changed) {
+                    for (const id of prevIds) {
+                        if (!currentIds.has(id)) {
+                            changed = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Ignore changes that only involve loading indicators appearing/disappearing
+            const meaningfulChange = Array.from(currentIds).some(id => !id.includes('loading-indicator')) ||
+                                     Array.from(prevIds).some(id => !id.includes('loading-indicator'));
+
+            if (changed && meaningfulChange && !hasNewSuggestions) {
+                setHasNewSuggestions(true);
+                console.log("Buddy: New suggestions available!");
+            }
+
+            // Update previous suggestions reference only when suggestions actually change while closed
+            if(changed) {
+                previousSuggestionIds.current = currentIds;
+            }
+        }
+    }, [suggestions, isOpen, hasNewSuggestions]);
+
+
     // --- Auto-open Timer ---
     useEffect(() => { let t:NodeJS.Timeout|null=null; if(!hasAutoOpened&&!isOpen){t=setTimeout(()=>{setIsOpen(true);setHasAutoOpened(true);},AUTO_OPEN_DELAY_MS_BUDDY);} return()=>{if(t)clearTimeout(t);}; }, [hasAutoOpened, isOpen]);
     // --- Handle Escape Key ---
