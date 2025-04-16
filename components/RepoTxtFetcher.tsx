@@ -580,7 +580,7 @@
             handleFetch(false, branchForAutoFetch);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus, targetBranchName, handleFetch]); // handleFetch included
+    }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus, targetBranchName]); // handleFetch removed to avoid loop
 
     // Cleanup simulation timers
     useEffect(() => { return () => stopProgressSimulation(); }, [stopProgressSimulation]);
@@ -779,7 +779,7 @@
                      whileTap={{ scale: isAskAiDisabled ? 1 : 0.97 }}
                  >
                       {aiActionLoading ? <FaArrowsRotate className="animate-spin" /> : <FaRobot />}
-                      {aiActionLoading ? (currentAiRequestId ? "⏳ Жду AI..." : "Отправка...") : "🤖 Спросить AI"}
+                      {aiActionLoading ? (currentAiRequestId ? `⏳ Жду AI (${currentAiRequestId.substring(0,6)}...)` : "Отправка...") : "🤖 Спросить AI"}
                   </motion.button>
              </div>
          ) : null }

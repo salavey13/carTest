@@ -7,7 +7,7 @@ import {
 } from "@/contexts/RepoXmlPageContext";
 import { createGitHubPullRequest, updateBranch, fetchRepoContents } from "@/app/actions_github/actions";
 import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
-import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/hooks/supabase"; // Use Admin for DB writes if needed from client (secure rules!)
 import { useAppContext } from "@/contexts/AppContext";
 // Hooks & Components
 import { useCodeParsingAndValidation, ValidationIssue, FileEntry as ValidationFileEntry } from "@/hooks/useCodeParsingAndValidation";
@@ -124,7 +124,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         }
     }, [response, parseAndValidateResponse, setFilesParsed, setSelectedAssistantFiles, setIsParsing, setValidationStatus, setValidationIssues]); // Added setIsParsing
     const handleAutoFix = useCallback(() => { autoFixIssues(parsedFiles, validationIssues); }, [autoFixIssues, parsedFiles, validationIssues]);
-    const handleCopyFixPrompt = useCallback(() => { const s=validationIssues.filter(i=>i.type==='skippedComment'); if(s.length===0) return toast.info("Нет '// ...'"); const fL=s.map(i=>`- ${i.filePath} (~${i.details?.lineNumber})`).join('\n'); const p=`Восстанови пропуски ('// ...') в новых файлах, используя старые как референс:\n${fL}\n\nВерни полные новые версии.`; navigator.clipboard.writeText(p).then(()=>toast.success("Промпт скопирован!")).catch(()=>toast.error("Ошибка.")); }, [validationIssues]);
+    const handleCopyFixPrompt = useCallback(() => { const s=validationIssues.filter(i=>i.type==='skippedComment'); if(s.length===0) return toast.info("Нет '// .. .'"); const fL=s.map(i=>`- ${i.filePath} (~${i.details?.lineNumber})`).join('\n'); const p=`Восстанови пропуски ('// ..''.') в новых файлах, используя старые как референс:\n${fL}\n\nВерни полные новые версии.`; navigator.clipboard.writeText(p).then(()=>toast.success("Промпт скопирован!")).catch(()=>toast.error("Ошибка.")); }, [validationIssues]);
     const handleRestorationComplete = useCallback((updatedFiles: FileEntry[], sC: number, eC: number) => { setParsedFiles(updatedFiles); const rI = validationIssues.filter(i => i.type !== 'skippedCodeBlock'); setValidationIssues(rI); setValidationStatus(rI.length > 0 ? (rI.some(i=>!i.fixable&&!i.restorable)?'error':'warning') : 'success'); if(sC>0) toast.success(`${sC} блоков восстановлено.`); if(eC>0) toast.error(`${eC} блоков не удалось восстановить.`); }, [validationIssues, setParsedFiles, setValidationIssues, setValidationStatus]);
     const handleClearResponse = useCallback(() => { setResponse(""); toast.info("Поле ответа очищено."); }, []);
     const handleCopyResponse = useCallback(() => { if (!response) return; navigator.clipboard.writeText(response).then(()=>toast.success("Скопировано!")).catch(()=>{toast.error("Ошибка копирования")});}, [response]);
