@@ -14,7 +14,7 @@ export default function Footer() {
     // .. (share logic remains the same)
     const shareUrl = "https://t.me/share/url?url=" + encodeURIComponent("https://t.me/oneSitePlsBot/Friends") + "&text=" + encodeURIComponent("Зацени Affordable Chinese Rent Cars!");
     if (isInTelegramContext && tg) {
-      tg.openTelegramLink(shareUrl);
+      tg.openLink(shareUrl);
     } else {
       window.open(shareUrl, "_blank");
     }
@@ -58,7 +58,20 @@ export default function Footer() {
                  <Link
                    href="/repo-xml"
                    // --- Измененные стили для выделения ---
-                   className="text-base font-bold text-gradient font-mono flex items-center gap-2 transition-all hover:brightness-125 hover:scale-105 text-glow shadow-[0_0_15px_rgba(128,0,128,0.7)] hover:shadow-[0_0_25px_rgba(128,0,128,0.9)] px-3 py-1 rounded-md bg-purple-900/30 border border-purple-600/50"
+                   className="text-base font-bold text-gradient font-mono flex items-center gap-2 transition-all hover:brightness-125 hover:scale-105 text-glow shadow-[0_0_15px_rgba(128,0,128,0.7)] hover:shadow-[0_0_25px_rgba(128,0,128,0.9)] px-3 py-1 rounded-full bg-purple-900/30 border border-purple-600/50"
+                   // Добавил немного фона, рамку, тень и увеличил размер шрифта
+                 >
+                   {/* --- Измененная иконка --- */}
+                   <Sparkles className="w-5 h-5 text-yellow-400 animate-pulse" /> {/* Сделал иконку чуть больше и добавил пульсацию */}
+                   SUPERVIBE ✨ {/* Добавил эмодзи для доп. акцента */}
+                 </Link>
+               </li>
+               {/* --- Ссылка JUMPSTART --- */}
+               <li>
+                 <Link
+                   href="/jumpstart"
+                   // --- Измененные стили для выделения ---
+                   className="text-base font-bold text-gradient font-mono flex items-center gap-2 transition-all hover:brightness-125 hover:scale-105 text-glow shadow-[0_0_15px_rgba(128,0,128,0.7)] hover:shadow-[0_0_25px_rgba(128,0,128,0.9)] px-3 py-1 rounded-full bg-purple-900/30 border border-cyan-600/50"
                    // Добавил немного фона, рамку, тень и увеличил размер шрифта
                  >
                    {/* --- Измененная иконка --- */}
