@@ -8,6 +8,7 @@ interface ValidationStatusProps {
     issues: ValidationIssue[];
     onAutoFix: () => void;
     onCopyPrompt: () => void;
+    isFixDisabled: boolean;
 }
 
 export const ValidationStatusIndicator: React.FC<ValidationStatusProps> = ({

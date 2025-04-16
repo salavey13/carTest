@@ -1,4 +1,3 @@
-// /components/stickyChat_components/FloatingActionButton.tsx
 "use client";
 
 import React from 'react';
@@ -7,7 +6,7 @@ import { FaRobot } from 'react-icons/fa6'; // Keep FaRobot as main icon
 
 interface FloatingActionButtonProps {
     onClick: () => void;
-    variants: any; // Or define specific variant type
+    variants?: any; // Variants are optional now
     icon?: React.ReactNode; // Allow custom icon
     className?: string; // Allow custom styling from parent
     'aria-label'?: string; // Allow custom aria-label
@@ -15,7 +14,7 @@ interface FloatingActionButtonProps {
 
 export const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
     onClick,
-    variants,
+    variants, // Receive variants but apply conditionally
     icon = <FaRobot className="text-2xl" aria-hidden="true" />, // Default icon
     className = '',
     'aria-label': ariaLabel = "Открыть меню помощи Xuinity",
@@ -33,22 +32,28 @@ export const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
         bg-cyan-600 hover:bg-cyan-500 text-white
     `;
 
+    // Use motion.button only if variants are provided
+    const ButtonComponent = variants ? motion.button : 'button';
+    const commonProps = {
+        'aria-label': ariaLabel,
+        onClick: onClick,
+        className: `${baseClasses} ${defaultStyleClasses} ${className}`,
+    };
+    const motionProps = variants ? {
+        key: "fab", // Keep key for AnimatePresence if using motion
+        variants: variants,
+        initial: "hidden",
+        animate: "visible",
+        exit: "exit",
+        whileHover: { scale: 1.1 },
+        whileTap: { scale: 0.95 },
+    } : {};
+
+
     return (
-        <motion.button
-            key="fab" // Keep key for AnimatePresence
-            aria-label={ariaLabel}
-            onClick={onClick}
-            // Combine base classes, default styles, and custom classes
-            className={`${baseClasses} ${defaultStyleClasses} ${className}`}
-            variants={variants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-        >
+        <ButtonComponent {...commonProps} {...motionProps}>
             {icon}
-        </motion.button>
+        </ButtonComponent>
     );
 };
 

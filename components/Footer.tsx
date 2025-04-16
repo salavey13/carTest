@@ -107,13 +107,12 @@ export default function Footer() {
                   <ExternalLink className="w-4 h-4" /> GitHub
                 </a>
               </li>
-              {/* Удалили старую ссылку Кибер-Экстрактор */}
               <li>
                 <Link
-                  href="/cyber-garage" // TODO: Rename or remove if not relevant to oneSitePls
+                  href="https://linkgraph.net/stack/RH7eHk3vSe" 
                   className="text-sm text-muted-foreground hover:text-primary font-mono flex items-center gap-2 transition-colors text-glow"
                 >
-                  <Lock className="w-4 h-4" /> Кибер-Гараж {/* TODO: Rename? */}
+                  <Lock className="w-4 h-4" /> linkgraph
                 </Link>
               </li>
               <li>

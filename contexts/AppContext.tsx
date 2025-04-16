@@ -1,4 +1,3 @@
-// /contexts/AppContext.tsx
 "use client";
 
 import type React from "react";
@@ -37,21 +36,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Centralize the "User Authorized" toast notification
   useEffect(() => {
-    // Show success toast only once when authentication completes successfully
-    if (contextValue.isAuthenticated && !contextValue.isLoading && !contextValue.error) {
-        // Use a unique ID to prevent the toast from showing multiple times on rapid updates
-        toast.success("Пользователь авторизован", { id: "auth-success-toast", duration: 2000 });
+    let currentToastId: string | number | undefined;
+
+    // Show loading toast only if loading takes a noticeable amount of time
+    if (contextValue.isLoading) {
+       // Optionally, delay the loading toast slightly
+       // const loadingTimer = setTimeout(() => {
+       //    currentToastId = toast.loading("Авторизация...", { id: "auth-loading-toast" });
+       // }, 300); // e.g., wait 300ms
+       // return () => clearTimeout(loadingTimer); // Clear timer if component unmounts or deps change
+    } else {
+        toast.dismiss("auth-loading-toast"); // Dismiss loading if no longer loading
+
+        // Show success toast only once when authentication completes successfully
+        if (contextValue.isAuthenticated && !contextValue.error) {
+            // Use a unique ID to prevent the toast from showing multiple times on rapid updates
+            currentToastId = toast.success("Пользователь авторизован", { id: "auth-success-toast", duration: 2000 });
+        }
+        // Optional: Show error toast if authentication fails
+        else if (contextValue.error) {
+             currentToastId = toast.error("Ошибка авторизации", { id: "auth-error-toast", description: contextValue.error.message });
+        }
     }
-    // Optional: Show error toast if authentication fails
-    else if (!contextValue.isLoading && contextValue.error) {
-         toast.error("Ошибка авторизации", { id: "auth-error-toast", description: contextValue.error.message });
-    }
-     // Optional: Show loading toast? Could be annoying.
-     // else if (contextValue.isLoading) {
-     //     toast.loading("Авторизация...", { id: "auth-loading-toast" });
-     // } else {
-     //     toast.dismiss("auth-loading-toast"); // Dismiss loading if no longer loading
-     // }
+
+    // Cleanup function to dismiss the toast if the component unmounts
+    // or the dependencies change before the toast auto-dismisses
+    return () => {
+        if (currentToastId) {
+            // toast.dismiss(currentToastId); // Optional: dismiss immediately on change/unmount
+        }
+    };
 
   }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.error]);
 
