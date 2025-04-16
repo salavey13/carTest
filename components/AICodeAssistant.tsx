@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useImperativeHandle, forwardRef, MutableRefObject, useCallback } from "react";
+import React, { useState, useEffect, useImperativeHandle, forwardRef, MutableRefObject, useCallback, Dispatch, SetStateAction } from "react";
 // Context & Actions
 import {
     useRepoXmlPageContext, AICodeAssistantRef, SimplePullRequest
@@ -10,9 +10,9 @@ import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 import { supabaseAdmin } from "@/hooks/supabase"; // Use Admin for DB writes if needed from client (secure rules!)
 import { useAppContext } from "@/contexts/AppContext";
 // Hooks & Components
-import { useCodeParsingAndValidation, ValidationIssue, FileEntry as ValidationFileEntry } from "@/hooks/useCodeParsingAndValidation";
+import { useCodeParsingAndValidation, ValidationIssue, FileEntry as ValidationFileEntry, ValidationStatus } from "@/hooks/useCodeParsingAndValidation"; // Added ValidationStatus import
 import { TextAreaUtilities } from './assistant_components/TextAreaUtilities';
-import { ValidationStatusIndicator } from './assistant_components/ValidationStatus';
+import { ValidationStatusIndicator } from './assistant_components/ValidationStatus'; // Renamed from ValidationStatus to ValidationStatusIndicator
 import { ParsedFilesList } from './assistant_components/ParsedFilesList';
 import { PullRequestForm } from './assistant_components/PullRequestForm';
 import { OpenPrList } from './assistant_components/OpenPrList';
@@ -47,7 +47,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const {
         parsedFiles, rawDescription, validationStatus, validationIssues, isParsing,
         parseAndValidateResponse, autoFixIssues,
-        setParsedFiles, setValidationStatus, setValidationIssues, setIsParsing // Added setIsParsing
+        setParsedFiles, setValidationStatus, setValidationIssues, // Removed setIsParsing here, it's managed internally by the hook
     } = useCodeParsingAndValidation();
 
     // --- Context Access ---
@@ -66,6 +66,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         triggerUpdateBranch,
         updateRepoUrlInAssistant,
         loadingPrs,
+        setIsParsing: setContextIsParsing // Get context setter for parsing
     } = useRepoXmlPageContext();
 
     // --- State ---
@@ -101,7 +102,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     // --- Handlers ---
     const handleParse = useCallback(async () => {
-        setIsParsing(true); // Set parsing state
+        setContextIsParsing(true); // Use context setter
         setOriginalRepoFiles([]);
         try {
              const { files: newlyParsedFiles, rawDescription: parsedRawDescription } = await parseAndValidateResponse(response);
@@ -118,22 +119,25 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
              setSelectedFileIds(new Set());
              setSelectedAssistantFiles(new Set());
              setValidationStatus('error'); // Indicate error
-             setValidationIssues([{type: 'general', message: 'Ошибка парсинга ответа.', fixable: false, restorable: false, id:'parse_error'}]);
+             setValidationIssues([{type: 'general', message: 'Ошибка парсинга ответа.', fixable: false, restorable: false, id:'parse_error', fileId: 'general', filePath: 'N/A'}]); // Added missing fields to satisfy ValidationIssue
         } finally {
-             setIsParsing(false); // Reset parsing state
+             setContextIsParsing(false); // Use context setter
         }
-    }, [response, parseAndValidateResponse, setFilesParsed, setSelectedAssistantFiles, setIsParsing, setValidationStatus, setValidationIssues]); // Added setIsParsing
+        // Removed explicit Promise<void> return type here - useCallback infers it correctly when the function body doesn't return.
+        // Adding it is fine too, but not strictly necessary for *this* function's fix.
+    }, [response, parseAndValidateResponse, setFilesParsed, setSelectedAssistantFiles, setContextIsParsing, setValidationStatus, setValidationIssues]); // Use context setter
+
     const handleAutoFix = useCallback(() => { autoFixIssues(parsedFiles, validationIssues); }, [autoFixIssues, parsedFiles, validationIssues]);
     // Copy prompt to fix skipped comment blocks - with user suggested fix
     const handleCopyFixPrompt = useCallback(() => {
         const skipped = validationIssues.filter(i => i.type === 'skippedComment');
         if (skipped.length === 0) {
-            toast.info("Нет маркеров '// ..''.' для исправления."); // Adjusted marker
+            toast.info("Нет маркеров '// ...' для исправления."); // Adjusted marker description
             return;
         }
         const fileList = skipped.map(i => `- ${i.filePath} (~ строка ${i.details?.lineNumber})`).join('\n');
-        // Changed '// ..\.' to '// ..''.' to avoid self-triggering
-        const prompt = `Восстанови пропуски ('// ..''.') в новых файлах, используя старые как референс:\n${fileList}\n\nВерни полные новые версии.`;
+        // Changed marker description for clarity
+        const prompt = `Восстанови пропуски ('// ...') в новых файлах, используя старые как референс:\n${fileList}\n\nВерни полные новые версии файлов.`;
         navigator.clipboard.writeText(prompt)
             .then(() => toast.success("Prompt для исправления пропусков скопирован!"))
             .catch(() => toast.error("Ошибка копирования промпта."));
@@ -152,7 +156,62 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const handleDownloadZip = useCallback(async () => { const ftz = parsedFiles.filter(f => selectedFileIds.has(f.id)); if (ftz.length === 0) return; setIsProcessingPR(true); try { const JSZip = (await import("jszip")).default; const zip = new JSZip(); ftz.forEach((f) => zip.file(f.path, f.content)); const blob = await zip.generateAsync({type:"blob"}); saveAs(blob, `ai_files_${Date.now()}.zip`); toast.success("Архив скачан."); } catch (error) { toast.error("Ошибка ZIP."); console.error(error); } finally { setIsProcessingPR(false); }}, [parsedFiles, selectedFileIds]);
     const handleSendToTelegram = useCallback(async (file: FileEntry) => { if (!user?.id) return; setIsProcessingPR(true); try { const r=await sendTelegramDocument(String(user.id), file.content, file.path.split("/").pop()||"file.txt"); if (!r.success) throw new Error(r.error??"TG Error"); toast.success(`"${file.path}" отправлен.`); } catch (err:any) { toast.error(`Ошибка отправки: ${err.message}`); console.error(err); } finally { setIsProcessingPR(false); }}, [user]);
     const handleAddCustomLink = useCallback(async () => { const n=prompt("Назв:"); if(!n) return; const u=prompt("URL (https://..):"); if(!u||!u.startsWith('http')){toast.error("Некорр. URL."); return;} const nl={name:n,url:u}; const ul=[...customLinks,nl]; setCustomLinks(ul); if(user){try{const{data:ed}=await supabaseAdmin.from("users").select("metadata").eq("user_id",user.id).single(); await supabaseAdmin.from("users").upsert({user_id:user.id,metadata:{...(ed?.metadata||{}),customLinks:ul}},{onConflict:'user_id'}); toast.success(`Ссылка "${n}" добавлена.`);}catch(e){toast.error("Ошибка сохр."); console.error(e); setCustomLinks(customLinks);}} }, [customLinks, user]);
-    const handleCreateOrUpdatePR = useCallback(async () => { const sfl = parsedFiles.filter(f => selectedFileIds.has(f.id)); if (!repoUrl || sfl.length === 0 || !prTitle) { return toast.error("Укажите URL, Заголовок и выберите файлы."); } let fD = rawDescription.substring(0, 60000) + (rawDescription.length > 60000 ? "\n\n...(описание усечено)" : ""); fD += `\n\n**Файлы (${sfl.length}):**\n` + sfl.map(f => `- \`${f.path}\``).join('\n'); const rI = validationIssues.filter(i => i.type !== 'skippedCodeBlock' && i.type !== 'skippedComment'); if (rI.length > 0) { fD += "\n\n**Обнаруженные Проблемы:**\n" + rI.map(i => `- **${i.filePath}**: ${i.message}`).join('\n'); } const cS = prTitle.substring(0, 70); let cB = `Apply AI changes to ${sfl.length} files.\nRef: ${rawDescription.split('\n')[0]?.substring(0,100) ?? ''}...`; const fCM = `${cS}\n\n${cB}`; const ftC = sfl.map(f => ({ path: f.path, content: f.content })); setIsProcessingPR(true); setAssistantLoading(true); try { if (targetBranchName) { toast.info(`Обновление ветки '${targetBranchName}'...`); const r=await triggerUpdateBranch(repoUrl,ftC,fCM,targetBranchName); if(r.success){ toast.success(`Ветка '${targetBranchName}' обновлена! Commit: ${r.commitSha?.substring(0,7)}`); } else { toast.error(`Ошибка ветки '${targetBranchName}': ${r.error}`); } } else { toast.info(`Создание нового PR...`); const r=await createGitHubPullRequest(repoUrl,ftC,prTitle,fD,fCM); if(r.success&&r.prUrl){ toast.success(`PR создан: ${r.prUrl}`); await notifyAdmin(`Новый PR "${prTitle}" создан ${user?.username || user?.id}: ${r.prUrl}`); } else { toast.error("Ошибка PR: "+r.error); console.error("PR Failed:", r.error); } } } catch (err) { toast.error(`Крит. ошибка при ${targetBranchName?'обновлении':'создании PR'}.`); console.error(err); } finally { setIsProcessingPR(false); setAssistantLoading(false); } }, [ parsedFiles, selectedFileIds, repoUrl, prTitle, rawDescription, validationIssues, targetBranchName, triggerUpdateBranch, setAssistantLoading, user ]);
+
+    // **********************************************************
+    // * FIX 1: Add explicit 'Promise<void>' return type here *
+    // **********************************************************
+    const handleCreateOrUpdatePR = useCallback(async (): Promise<void> => { // <-- Explicit return type
+        const sfl = parsedFiles.filter(f => selectedFileIds.has(f.id));
+        if (!repoUrl || sfl.length === 0 || !prTitle) {
+            toast.error("Укажите URL, Заголовок и выберите файлы.");
+            return; // Return early, satisfies Promise<void>
+        }
+
+        let fD = rawDescription.substring(0, 60000) + (rawDescription.length > 60000 ? "\n\n...(описание усечено)" : "");
+        fD += `\n\n**Файлы (${sfl.length}):**\n` + sfl.map(f => `- \`${f.path}\``).join('\n');
+        const rI = validationIssues.filter(i => i.type !== 'skippedCodeBlock' && i.type !== 'skippedComment');
+        if (rI.length > 0) {
+            fD += "\n\n**Обнаруженные Проблемы:**\n" + rI.map(i => `- **${i.filePath}**: ${i.message}`).join('\n');
+        }
+
+        const cS = prTitle.substring(0, 70);
+        let cB = `Apply AI changes to ${sfl.length} files.\nRef: ${rawDescription.split('\n')[0]?.substring(0,100) ?? ''}...`;
+        const fCM = `${cS}\n\n${cB}`;
+        const ftC = sfl.map(f => ({ path: f.path, content: f.content }));
+
+        setIsProcessingPR(true);
+        setAssistantLoading(true); // Use context loading state
+
+        try {
+            if (targetBranchName) {
+                toast.info(`Обновление ветки '${targetBranchName}'...`);
+                const r = await triggerUpdateBranch(repoUrl, ftC, fCM, targetBranchName);
+                if (r.success) {
+                    toast.success(`Ветка '${targetBranchName}' обновлена! Commit: ${r.commitSha?.substring(0,7)}`);
+                } else {
+                    toast.error(`Ошибка ветки '${targetBranchName}': ${r.error}`);
+                }
+            } else {
+                toast.info(`Создание нового PR...`);
+                const r = await createGitHubPullRequest(repoUrl, ftC, prTitle, fD, fCM);
+                if (r.success && r.prUrl) {
+                    toast.success(`PR создан: ${r.prUrl}`);
+                    await notifyAdmin(`Новый PR "${prTitle}" создан ${user?.username || user?.id}: ${r.prUrl}`);
+                } else {
+                    toast.error("Ошибка PR: "+ (r.error || "Неизвестная ошибка")); // Ensure error is string
+                    console.error("PR Failed:", r.error);
+                }
+            }
+        } catch (err) {
+            toast.error(`Крит. ошибка при ${targetBranchName?'обновлении':'создании PR'}.`);
+            console.error(err);
+        } finally {
+            setIsProcessingPR(false);
+            setAssistantLoading(false); // Use context loading state
+        }
+        // No explicit return needed here; async function implicitly returns Promise<undefined>
+    }, [ parsedFiles, selectedFileIds, repoUrl, prTitle, rawDescription, validationIssues, targetBranchName, triggerUpdateBranch, setAssistantLoading, user, notifyAdmin ]); // Dependencies
+
     const setResponseValue = useCallback((value: string) => { setResponse(value); if (aiResponseInputRef.current) { aiResponseInputRef.current.value = value; const event = new Event('input', { bubbles: true }); aiResponseInputRef.current.dispatchEvent(event); } }, [aiResponseInputRef]);
     const updateRepoUrl = useCallback((url: string) => { setRepoUrlState(url); }, []);
 
@@ -168,6 +227,12 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const assistantTooltipText = `Вставьте ответ AI ИЛИ используйте кнопку 'Спросить AI'. Затем '➡️' → Проверьте/Исправьте → Выберите файлы → ${prButtonText}`;
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
 
+    // Determine disabled states based on overall processing state
+    const commonDisabled = isProcessingAny;
+    const parseButtonDisabled = commonDisabled || isWaitingForAiResponse || !response.trim();
+    const fixButtonDisabled = commonDisabled || isWaitingForAiResponse;
+    const submitButtonDisabled = !canSubmitPR || isProcessingPR; // Specific submit logic
+
     return (
         <div className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
             {/* Header */}
@@ -179,7 +244,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                      </Tooltip>
                  </div>
                  <Tooltip text="Настройки URL/Token/Ветки/PR" position="left">
-                      <button id="settings-modal-trigger-assistant" onClick={triggerToggleSettingsModal} className="p-2 text-gray-400 hover:text-cyan-400 transition rounded-full hover:bg-gray-700/50 disabled:opacity-50" disabled={isProcessingAny} > <FaCodeBranch className="text-xl" /> </button>
+                      <button id="settings-modal-trigger-assistant" onClick={triggerToggleSettingsModal} className="p-2 text-gray-400 hover:text-cyan-400 transition rounded-full hover:bg-gray-700/50 disabled:opacity-50" disabled={commonDisabled} > <FaCodeBranch className="text-xl" /> </button>
                  </Tooltip>
              </header>
 
@@ -198,18 +263,22 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                          value={response}
                          onChange={(e) => setResponse(e.target.value)}
                          placeholder={isWaitingForAiResponse ? "AI думает..." : "Ответ от AI появится здесь..."}
-                         disabled={isProcessingAny}
+                         disabled={commonDisabled}
                          spellCheck="false"
                      />
+                     {/*
+                       * FIX 2 (External): Ensure TextAreaUtilitiesProps interface in its file
+                       * includes: isParseDisabled?: boolean;
+                     */}
                      <TextAreaUtilities
                          response={response}
-                         isLoading={isProcessingAny}
+                         isLoading={commonDisabled}
                          onParse={handleParse}
                          onOpenModal={handleOpenModal}
                          onCopy={handleCopyResponse}
                          onClear={handleClearResponse}
                          onSelectFunction={handleSelectFunction}
-                         isParseDisabled={isWaitingForAiResponse || isProcessingAny || !response.trim()}
+                         isParseDisabled={parseButtonDisabled} // Use calculated state
                      />
                  </div>
                  {/* Validation Status and Actions */}
@@ -219,14 +288,18 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                          originalFiles={originalRepoFiles}
                          skippedIssues={skippedCodeBlockIssues}
                          onRestorationComplete={handleRestorationComplete}
-                         disabled={isProcessingAny || validationStatus === 'validating' || isFetchingOriginals}
+                         disabled={commonDisabled || validationStatus === 'validating' || isFetchingOriginals}
                       />
+                      {/*
+                        * FIX 3 (External): Ensure ValidationStatusProps interface in its file
+                        * includes: isFixDisabled?: boolean;
+                      */}
                       <ValidationStatusIndicator
                           status={validationStatus}
                           issues={validationIssues}
                           onAutoFix={handleAutoFix}
                           onCopyPrompt={handleCopyFixPrompt}
-                          isFixDisabled={isWaitingForAiResponse || isProcessingAny}
+                          isFixDisabled={fixButtonDisabled} // Use calculated state
                       />
                  </div>
              </div>
@@ -243,22 +316,26 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                  onDownloadZip={handleDownloadZip}
                  onSendToTelegram={handleSendToTelegram}
                  isUserLoggedIn={!!user}
-                 isLoading={isProcessingAny}
+                 isLoading={commonDisabled}
              />
 
              {/* PR Form */}
+              {/*
+                * FIX 4 (External): Ensure PullRequestFormProps interface in its file
+                * includes: isLoadingPrList?: boolean;
+              */}
              <PullRequestForm
                   repoUrl={repoUrl}
                   prTitle={prTitle}
                   selectedFileCount={selectedFileIds.size}
-                 isLoading={isProcessingPR}
-                 isLoadingPrList={loadingPrs} // Pass PR loading state
+                 isLoading={isProcessingPR} // Specific loading for PR submit button
+                 isLoadingPrList={loadingPrs} // Pass PR list loading state
                  onRepoUrlChange={(url) => { setRepoUrlState(url); updateRepoUrlInAssistant(url); }}
                  onPrTitleChange={setPrTitle}
                  onCreatePR={handleCreateOrUpdatePR}
                  buttonText={prButtonText}
                  buttonIcon={prButtonLoadingIcon}
-                 isSubmitDisabled={!canSubmitPR || isProcessingPR}
+                 isSubmitDisabled={submitButtonDisabled} // Use calculated state
              />
 
              {/* Open PR List */}
@@ -268,7 +345,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             <div className="flex items-center gap-3 mb-2">
                 <ToolsMenu customLinks={customLinks} onAddCustomLink={handleAddCustomLink} />
                  <Tooltip text="Загрузить картинки в Storage" position="left">
-                     <button onClick={() => setIsImageModalOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50" disabled={isProcessingAny} > <FaImage className="text-gray-400" /> <span className="text-sm text-white">Картинки</span> </button>
+                     <button onClick={() => setIsImageModalOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50" disabled={commonDisabled} > <FaImage className="text-gray-400" /> <span className="text-sm text-white">Картинки</span> </button>
                  </Tooltip>
             </div>
 
