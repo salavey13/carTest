@@ -3,7 +3,7 @@
 // Добавил библейский отзыв от AI Bot Assistant в список testimonial для страницы донатов.
 // Теперь даже AI подтверждает крутость Supervibe!
 
-import { FaCode, FaRobot, FaLock, FaShieldAlt, FaTelegram } from "react-icons/fa6"; // Corrected import
+import { FaCode, FaRobot, FaLock, FaShieldHalved, FaTelegram } from "react-icons/fa6"; // Corrected import
 
 export const donationTranslations = {
   en: {
@@ -169,7 +169,7 @@ export const donationBenefits = [
       en: "Bank-grade security for all transactions",
       ru: "Банковский уровень безопасности для всех транзакций"
     },
-    icon: <FaShieldAlt className="text-2xl" /> // Using FaShieldAlt from fa6
+    icon: <FaShieldHalved className="text-2xl" /> // Using FaShieldHalved from fa6
   },
   {
     title: {
