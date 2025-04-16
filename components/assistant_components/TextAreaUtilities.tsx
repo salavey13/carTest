@@ -13,6 +13,8 @@ interface TextAreaUtilitiesProps {
     onCopy: () => void;
     onClear: () => void;
     onSelectFunction: () => void; // <<< ADDED PROP
+    isProcessingPR: boolean;
+    isParseDisabled: boolean; // <<< ADDED PROP
 }
 
 export const TextAreaUtilities: React.FC<TextAreaUtilitiesProps> = ({

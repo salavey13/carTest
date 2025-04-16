@@ -18,6 +18,7 @@ interface PullRequestFormProps {
     buttonText: string;
     buttonIcon: React.ReactNode;
     isSubmitDisabled: boolean;
+    isLoadingPrList: boolean;
 }
 
 export const PullRequestForm: React.FC<PullRequestFormProps> = ({
