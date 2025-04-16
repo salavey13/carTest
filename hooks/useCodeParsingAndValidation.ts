@@ -459,6 +459,6 @@ export function useCodeParsingAndValidation() {
         parsedFiles, rawDescription, validationStatus, validationIssues, isParsing,
         parseAndValidateResponse, autoFixIssues,
         // Expose setters if needed by other components, though usually internal state is managed here
-        setParsedFiles, setValidationStatus, setValidationIssues,
+        setParsedFiles, setValidationStatus, setValidationIssues, setIsParsing, setRawDescription,
     };
 }

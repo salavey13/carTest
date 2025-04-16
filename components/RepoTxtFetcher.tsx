@@ -1,11 +1,12 @@
-// /components/RepoTxtFetcher.tsx
 "use client";
 
     import React, { useState, useEffect, useImperativeHandle, forwardRef, useRef, useCallback, useMemo} from "react";
     import { useSearchParams } from "next/navigation";
     import { toast } from "sonner";
     import {
-        FaCircleChevronDown, FaCircleChevronUp, FaDownload, FaArrowsRotate, FaCircleCheck, FaXmark, FaCopy,
+        // Removed: FaCircleChevronDown, FaCircleChevronUp,
+        FaAngleDown, FaAngleUp, // Added valid alternatives
+        FaDownload, FaArrowsRotate, FaCircleCheck, FaXmark, FaCopy,
         FaBroom, FaRobot, FaCodeBranch, // Use FaCodeBranch for settings
     } from "react-icons/fa6";
     import { motion } from "framer-motion";
@@ -81,7 +82,8 @@
         // Status & Flags
         fetchStatus, setFetchStatus, repoUrlEntered, setRepoUrlEntered, filesFetched, setFilesFetched,
         selectedFetcherFiles, setSelectedFetcherFiles, kworkInputHasContent, setKworkInputHasContent,
-        setRequestCopied, aiActionLoading, currentStep, loadingPrs, assistantLoading, // Added assistantLoading
+        setRequestCopied, aiActionLoading, currentStep, loadingPrs, assistantLoading, isParsing, // Added assistantLoading & isParsing
+        currentAiRequestId, // <-- Get the request ID being monitored
         // Branch & PR state
         targetBranchName, setTargetBranchName, // Use context setter for PR selection
         manualBranchName, setManualBranchName, // Use context setter for manual input
@@ -91,7 +93,7 @@
         // Modal state & trigger
         isSettingsModalOpen, triggerToggleSettingsModal,
         // Refs & Callbacks
-        kworkInputRef, triggerAskAi, triggerGetOpenPRs, updateRepoUrlInAssistant, scrollToSection, triggerFetch
+        kworkInputRef, triggerAskAi, triggerGetOpenPRs, updateRepoUrlInAssistant, scrollToSection, triggerFetch, setFilesParsed, setAiResponseHasContent,  setSelectedAssistantFiles
       } = useRepoXmlPageContext();
 
       // === URL Params & Derived State ===
@@ -329,22 +331,24 @@
 
         // Optionally trigger AI automatically
         if (autoAskAi && autoAskAiEnabled) {
-            addToast("Автоматически отправляю запрос AI...", "info");
-            await triggerAskAi(); // Use context trigger
+            addToast("Автоматически отправляю запрос AI в очередь...", "info");
+            await triggerAskAi().catch(err => console.error("Error auto-triggering AI Ask:", err));
         }
 
     }, [selectedFiles, files, addToast, getKworkInputValue, updateKworkInput, scrollToSection, autoAskAiEnabled, triggerAskAi]); // Dependencies
 
 
     // Copy Kwork Input content to clipboard
-    const handleCopyToClipboard = useCallback((): boolean => {
-        const content = getKworkInputValue(); // Get content from input ref
+    const handleCopyToClipboard = useCallback((textToCopy?: string, shouldScroll = true): boolean => {
+        const content = textToCopy ?? getKworkInputValue(); // Use provided text or get from input
         if (!content.trim()) { addToast("Нет текста для копирования", 'error'); return false; }
         try {
             navigator.clipboard.writeText(content);
             addToast("Запрос скопирован! ✅ Вставляй в AI", 'success');
             setRequestCopied(true); // Update context flag (for manual flow tracking)
-            scrollToSection('executor'); // Scroll to the AI assistant section
+            if (shouldScroll) {
+                 scrollToSection('executor'); // Scroll to the AI assistant section
+            }
             return true;
         } catch (err) {
             console.error("Clipboard copy failed:", err);
@@ -362,10 +366,13 @@
         updateKworkInput(""); // Clear Kwork input textarea
         setPrimaryHighlightedPathState(null); // Clear highlighting
         setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] });
-        // Reset AI state handled by other callbacks (e.g., setAiResponseHasContent)
+        // Reset downstream AI states via context
+        setAiResponseHasContent(false);
+        setFilesParsed(false);
+        setSelectedAssistantFiles(new Set());
         addToast("Поле ввода и выбор файлов очищены ✨", 'success');
         localKworkInputRef.current?.focus(); // Focus the kwork input
-    }, [ setSelectedFetcherFiles, updateKworkInput, addToast]);// Dependencies
+    }, [ setSelectedFetcherFiles, updateKworkInput, addToast, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles ]); // Added AI state setters
 
 
     // --- Fetch Handler (Method exposed via ref, called by context's triggerFetch) ---
@@ -481,27 +488,11 @@
                           // Create informative toast message about auto-selection
                           const numHighlighted = categorizedSecondaryPaths.component.size + categorizedSecondaryPaths.context.size + categorizedSecondaryPaths.hook.size + categorizedSecondaryPaths.lib.size;
                           const numImportantOnly = filesToSelect.size - (primaryPath ? 1 : 0) - numHighlighted;
-                          let selectMsg = `Авто-выбрано: `; const parts = [];
-                          if(primaryPath) parts.push(`1 основной`);
-                          if(numHighlighted > 0) parts.push(`${numHighlighted} связанных`);
-                          if(numImportantOnly > 0) parts.push(`${numImportantOnly} важных`);
-                          selectMsg += parts.join(', ') + '.'; addToast(selectMsg, 'info');
+                          let selectMsg = `Авто-выбрано: `; const parts = []; if(primaryPath) parts.push(`1 основной`); if(numHighlighted > 0) parts.push(`${numHighlighted} связанных`); if(numImportantOnly > 0) parts.push(`${numImportantOnly} важных`); selectMsg += parts.join(', ') + '.'; addToast(selectMsg, 'info');
                       }
                      // --- Scroll to Highlighted File ---
-                     if (primaryPath) {
-                         setTimeout(() => { // Delay slightly for DOM update
-                             const elementId = `file-${primaryPath}`; const fileElement = document.getElementById(elementId);
-                             if (fileElement) {
-                                 fileElement.scrollIntoView({ behavior: "smooth", block: "center" });
-                                 // Add temporary visual highlight
-                                 fileElement.classList.add('ring-2', 'ring-offset-2', 'ring-cyan-400', 'rounded-md', 'transition-all', 'duration-1000', 'ring-offset-gray-800');
-                                 setTimeout(() => fileElement.classList.remove('ring-2', 'ring-offset-2', 'ring-cyan-400', 'rounded-md', 'transition-all', 'duration-1000', 'ring-offset-gray-800'), 2500);
-                             } else { console.warn(`Element with ID ${elementId} not found for scrolling.`); }
-                         }, 400);
-                     } else if (fetchedFiles.length > 0) { // If no primary, scroll to top of file list
-                         const el = document.getElementById('file-list-container');
-                         el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                     }
+                     if (primaryPath) { setTimeout(() => { const elementId = `file-${primaryPath}`; const fileElement = document.getElementById(elementId); if (fileElement) { fileElement.scrollIntoView({ behavior: "smooth", block: "center" }); fileElement.classList.add('ring-2', 'ring-offset-2', 'ring-cyan-400', 'rounded-md', 'transition-all', 'duration-1000', 'ring-offset-gray-800'); setTimeout(() => fileElement.classList.remove('ring-2', 'ring-offset-2', 'ring-cyan-400', 'rounded-md', 'transition-all', 'duration-1000', 'ring-offset-gray-800'), 2500); } else { console.warn(`Element with ID ${elementId} not found for scrolling.`); } }, 400); }
+                     else if (fetchedFiles.length > 0) { const el = document.getElementById('file-list-container'); el?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
                  }
                  return; // <<< SUCCESS EXIT POINT >>>
 
@@ -541,7 +532,7 @@
         repoUrl, token, fetchStatus, // Local state needed for logic
         setFetchStatus, setFiles, setSelectedFilesState, setProgress, setError, setExtractLoading, // Local setters
         setPrimaryHighlightedPathState, setSecondaryHighlightedPathsState, // Local setters for highlighting
-        setSelectedFetcherFiles, setFilesFetched, setRequestCopied, // Context setters
+        setSelectedFetcherFiles, setFilesFetched, setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, // Context setters
         highlightedPathFromUrl, ideaFromUrl, importantFiles, DEFAULT_TASK_IDEA, // URL params and constants
         addToast, startProgressSimulation, stopProgressSimulation, getLanguage, getPageFilePath, extractImports, resolveImportPath, // Utilities
         handleAddSelected, getKworkInputValue, // Callbacks depending on state
@@ -559,149 +550,64 @@
         const filesToSelect = new Set<string>(selectedFiles); // Start with currently selected
         let newlySelectedCount = 0;
         // Combine all potentially highlightable secondary paths (excluding 'other')
-        const allHighlightableSecondary = [
-            ...secondaryHighlightedPaths.component, ...secondaryHighlightedPaths.context,
-            ...secondaryHighlightedPaths.hook, ...secondaryHighlightedPaths.lib,
-        ];
+        const allHighlightableSecondary = [ ...secondaryHighlightedPaths.component, ...secondaryHighlightedPaths.context, ...secondaryHighlightedPaths.hook, ...secondaryHighlightedPaths.lib, ];
         // Add primary path if it exists, is found, and not already selected
-        if (primaryHighlightedPath && files.some(f => f.path === primaryHighlightedPath) && !filesToSelect.has(primaryHighlightedPath)) {
-            filesToSelect.add(primaryHighlightedPath); newlySelectedCount++;
-        }
+        if (primaryHighlightedPath && files.some(f => f.path === primaryHighlightedPath) && !filesToSelect.has(primaryHighlightedPath)) { filesToSelect.add(primaryHighlightedPath); newlySelectedCount++; }
         // Add highlightable secondary paths if found and not already selected
-        allHighlightableSecondary.forEach(path => {
-            if (files.some(f => f.path === path) && !filesToSelect.has(path)) {
-                filesToSelect.add(path); newlySelectedCount++;
-            }
-        });
-        if (newlySelectedCount > 0) {
-            setSelectedFilesState(filesToSelect); // Update local selection
-            setSelectedFetcherFiles(filesToSelect); // Update context selection
-            addToast(`Добавлено ${newlySelectedCount} связанных файлов к выборке`, 'info');
-        } else {
-            addToast("Все связанные файлы уже выбраны или не найдены", 'info');
-        }
+        allHighlightableSecondary.forEach(path => { if (files.some(f => f.path === path) && !filesToSelect.has(path)) { filesToSelect.add(path); newlySelectedCount++; } });
+        if (newlySelectedCount > 0) { setSelectedFilesState(filesToSelect); setSelectedFetcherFiles(filesToSelect); addToast(`Добавлено ${newlySelectedCount} связанных файлов к выборке`, 'info'); } else { addToast("Все связанные файлы уже выбраны или не найдены", 'info'); }
     }, [ primaryHighlightedPath, secondaryHighlightedPaths, files, selectedFiles, setSelectedFetcherFiles, addToast ]); // Dependencies
 
     // Toggle selection of a single file
-    const toggleFileSelection = useCallback((path: string) => {
-        setSelectedFilesState(prevSet => {
-            const newSet = new Set(prevSet);
-            if (newSet.has(path)) newSet.delete(path); else newSet.add(path);
-            setSelectedFetcherFiles(newSet); // Update context selection
-            return newSet; // Update local selection
-        });
-    }, [setSelectedFetcherFiles]);
-
+    const toggleFileSelection = useCallback((path: string) => { setSelectedFilesState(prevSet => { const newSet = new Set(prevSet); if (newSet.has(path)) newSet.delete(path); else newSet.add(path); setSelectedFetcherFiles(newSet); return newSet; }); }, [setSelectedFetcherFiles]);
     // Add predefined important files to selection
-    const handleAddImportantFiles = useCallback(() => {
-        let addedCount = 0;
-        const filesToAdd = new Set(selectedFiles); // Start with current selection
-        importantFiles.forEach(path => {
-            // Add if file exists in fetched files and is not already selected
-            if (files.some(f => f.path === path) && !selectedFiles.has(path)) {
-                filesToAdd.add(path); addedCount++;
-            }
-        });
-        if (addedCount === 0) {
-            addToast("Важные файлы уже выбраны или не найдены в репозитории", 'info'); return;
-        }
-        setSelectedFilesState(filesToAdd); // Update local selection
-        setSelectedFetcherFiles(filesToAdd); // Update context selection
-        addToast(`Добавлено ${addedCount} важных файлов к выборке`, 'success');
-    }, [selectedFiles, importantFiles, files, setSelectedFetcherFiles, addToast]); // Dependencies
-
+    const handleAddImportantFiles = useCallback(() => { let addedCount = 0; const filesToAdd = new Set(selectedFiles); importantFiles.forEach(path => { if (files.some(f => f.path === path) && !selectedFiles.has(path)) { filesToAdd.add(path); addedCount++; } }); if (addedCount === 0) { addToast("Важные файлы уже выбраны или не найдены в репозитории", 'info'); return; } setSelectedFilesState(filesToAdd); setSelectedFetcherFiles(filesToAdd); addToast(`Добавлено ${addedCount} важных файлов к выборке`, 'success'); }, [selectedFiles, importantFiles, files, setSelectedFetcherFiles, addToast]); // Dependencies
     // Add file tree structure to Kwork Input
-    const handleAddFullTree = useCallback(() => {
-        if (files.length === 0) { addToast("Нет файлов для отображения дерева", 'error'); return; }
-        // Create sorted list of file paths
-        const treeOnly = files.map((file) => `- /${file.path}`).sort().join("\n");
-        const treeContent = `Структура файлов проекта:\n\`\`\`\n${treeOnly}\n\`\`\``;
-        let added = false;
-        // Update Kwork Input, avoiding duplicates
-        const currentKworkValue = getKworkInputValue();
-        const trimmedValue = currentKworkValue.trim();
-        const hasTreeStructure = /Структура файлов проекта:\s*```/im.test(trimmedValue);
-
-        if (!hasTreeStructure) {
-            const newContent = trimmedValue ? `${trimmedValue}\n\n${treeContent}` : treeContent;
-            updateKworkInput(newContent);
-            added = true;
-        }
-
-        if (added) {
-            addToast("Дерево файлов добавлено в запрос", 'success');
-            scrollToSection('kworkInput'); // Scroll to input
-        } else {
-            addToast("Дерево файлов уже добавлено", 'info');
-        }
-    }, [files, getKworkInputValue, updateKworkInput, scrollToSection, addToast]); // Dependencies
-
-
+    const handleAddFullTree = useCallback(() => { if (files.length === 0) { addToast("Нет файлов для отображения дерева", 'error'); return; } const treeOnly = files.map((file) => `- /${file.path}`).sort().join("\n"); const treeContent = `Структура файлов проекта:\n\`\`\`\n${treeOnly}\n\`\`\``; let added = false; const currentKworkValue = getKworkInputValue(); const trimmedValue = currentKworkValue.trim(); const hasTreeStructure = /Структура файлов проекта:\s*```/im.test(trimmedValue); if (!hasTreeStructure) { const newContent = trimmedValue ? `${trimmedValue}\n\n${treeContent}` : treeContent; updateKworkInput(newContent); added = true; } if (added) { addToast("Дерево файлов добавлено в запрос", 'success'); scrollToSection('kworkInput'); } else { addToast("Дерево файлов уже добавлено", 'info'); } }, [files, getKworkInputValue, updateKworkInput, scrollToSection, addToast]); // Dependencies
     // --- PR Selection Handler (Passed to SettingsModal) ---
-    const handleSelectPrBranch = useCallback((branch: string | null) => {
-        setTargetBranchName(branch); // Update context's target branch (which handles manualBranchName clearing)
-        if (branch) addToast(`Выбрана ветка PR: ${branch}`, 'success');
-        else addToast(`Выбор ветки PR снят (используется default или ручная).`, 'info');
-        // Modal closure is handled by user interaction within the modal
-    }, [setTargetBranchName, addToast]); // Use context setter
-
+    const handleSelectPrBranch = useCallback((branch: string | null) => { setTargetBranchName(branch); if (branch) addToast(`Выбрана ветка PR: ${branch}`, 'success'); else addToast(`Выбор ветки PR снят (используется default или ручная).`, 'info'); }, [setTargetBranchName, addToast]); // Use context setter
     // --- Manual Branch Input Handler (Passed to SettingsModal) ---
-    const handleManualBranchChange = useCallback((name: string) => {
-        setManualBranchName(name); // Update context's manual branch state (which handles targetBranchName update)
-    }, [setManualBranchName]); // Use context setter
-
+    const handleManualBranchChange = useCallback((name: string) => { setManualBranchName(name); }, [setManualBranchName]); // Use context setter
     // --- PR Load Handler (Passed to SettingsModal) ---
-    const handleLoadPrs = useCallback(() => {
-        // Trigger the PR fetching via context, passing the current repo URL from local state
-        triggerGetOpenPRs(repoUrl);
-    }, [triggerGetOpenPRs, repoUrl]);
-
+    const handleLoadPrs = useCallback(() => { triggerGetOpenPRs(repoUrl); }, [triggerGetOpenPRs, repoUrl]);
 
     // --- Effects ---
-    // Sync repoUrlEntered flag with local repoUrl input state
-    useEffect(() => { setRepoUrlEntered(repoUrl.trim().length > 0); }, [repoUrl, setRepoUrlEntered]);
+    useEffect(() => { setRepoUrlEntered(repoUrl.trim().length > 0); updateRepoUrlInAssistant(repoUrl); }, [repoUrl, setRepoUrlEntered, updateRepoUrlInAssistant]);
 
-    // Auto-fetch if URL parameter 'path' is present and fetch is not already in progress/success
+    // Auto-fetch effect
     useEffect(() => {
-        // Determine the branch to use for auto-fetch (Context state already holds the effective target)
         const branchForAutoFetch = targetBranchName;
         if (autoFetch && repoUrl && (fetchStatus === 'idle' || fetchStatus === 'failed_retries' || fetchStatus === 'error')) {
             console.log(`Auto-fetching due to URL param 'path'. Branch: ${branchForAutoFetch ?? 'Default'}`);
-            // Call the fetch handler method directly (exposed via ref)
             handleFetch(false, branchForAutoFetch);
         }
-        // This effect should run when relevant dependencies change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus, targetBranchName, handleFetch]); // Only depend on targetBranchName now
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus, targetBranchName]); // handleFetch removed to avoid loop
 
-    // Cleanup simulation timers on component unmount
+    // Cleanup simulation timers
     useEffect(() => { return () => stopProgressSimulation(); }, [stopProgressSimulation]);
-
 
     // === Imperative Handle (Expose methods to parent/context) ===
     useImperativeHandle(ref, () => ({
-        handleFetch, // Expose the fetch handler method
+        handleFetch,
         selectHighlightedFiles,
         handleAddSelected,
-        handleCopyToClipboard, // Expose the fixed copy handler
+        handleCopyToClipboard,
         clearAll: handleClearAll,
         getKworkInputValue,
     }), [handleFetch, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll, getKworkInputValue]); // Dependencies
 
-
     // --- Render Logic ---
-    const isLoading = fetchStatus === 'loading' || fetchStatus === 'retrying';
-    // Disable Fetch button if fetching files, loading PRs, or no URL entered
+    const isLoading = fetchStatus === 'loading' || fetchStatus === 'retrying' || isParsing;
     const isFetchDisabled = isLoading || loadingPrs || !repoUrlEntered;
     const showProgressBar = isLoading || fetchStatus === 'success' || fetchStatus === 'error' || fetchStatus === 'failed_retries';
-    // Disable AI/Copy/Clear buttons during any loading process
-    const isActionDisabled = isLoading || loadingPrs || aiActionLoading || assistantLoading; // Consider assistantLoading too
+    const isActionDisabled = isLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing;
     const isAskAiDisabled = !kworkInputHasContent || isActionDisabled;
     const isCopyDisabled = !kworkInputHasContent || isActionDisabled;
     const isClearDisabled = (!kworkInputHasContent && selectedFiles.size === 0) || isActionDisabled;
     const isAddSelectedDisabled = selectedFiles.size === 0 || isActionDisabled;
-    // Determine effective branch for display (using context's targetBranchName)
     const effectiveBranchDisplay = targetBranchName || "default";
+    const isWaitingForAi = aiActionLoading && !!currentAiRequestId; // Specific waiting state
 
   return (
     <div id="extractor" className="w-full p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm text-gray-200 font-mono rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] border border-gray-700/50 relative overflow-hidden">
@@ -725,7 +631,7 @@
                     4. Опиши задачу ИЛИ добавь файлы кнопкой (+).
                  </p>
                  <p className="text-yellow-300/80 text-xs md:text-sm mb-2">
-                    5. Нажми <span className="font-bold text-blue-400 mx-1">"Спросить AI"</span> или скопируй <FaCopy className="inline text-sm mx-px"/>.
+                    5. Нажми <span className="font-bold text-blue-400 mx-1">"Спросить AI"</span> <span className="text-gray-400 text-xs">(ответ придет через ~5 мин)</span> или скопируй <FaCopy className="inline text-sm mx-px"/>.
                  </p>
             </div>
             {/* Settings Toggle Button */}
@@ -735,15 +641,16 @@
                 whileHover={{ scale: 1.1, rotate: isSettingsModalOpen ? 10 : -10 }}
                 whileTap={{ scale: 0.95 }}
                 title={isSettingsModalOpen ? "Скрыть настройки" : "Настройки URL/Token/Ветки/PR"}
-                aria-label={isSettingsModalOpen ? "Скрыть настройки" : "Показать настройки"}
+                aria-label={isSettingsModalOpen ? "Скрыть настройки" : "Показать настройки URL/Token"}
                 aria-expanded={isSettingsModalOpen}
             >
-                {isSettingsModalOpen ? <FaCircleChevronUp className="text-cyan-400 text-xl" /> : <FaCodeBranch className="text-cyan-400 text-xl" />}
+                 {/* Using FaAngleDown/Up instead of FaCircleChevronDown/Up */}
+                 {isSettingsModalOpen ? <FaAngleUp className="text-cyan-400 text-xl" /> : <FaAngleDown className="text-cyan-400 text-xl" />}
             </motion.button>
         </div>
 
       {/* Settings Modal Component - Controlled by Context */}
-      <SettingsModal
+       <SettingsModal
             isOpen={isSettingsModalOpen}
             // onClose={triggerToggleSettingsModal} // Closure handled by toggle
             repoUrl={repoUrl} // Pass local state for input control
@@ -758,7 +665,7 @@
             loadingPrs={loadingPrs}
             onSelectPrBranch={handleSelectPrBranch} // Pass selection handler
             onLoadPrs={handleLoadPrs} // Pass load handler
-            loading={isLoading} // Pass general fetch loading state
+            loading={isLoading || loadingPrs} // Pass combined loading state
        />
 
       {/* Fetch Button */}
@@ -798,10 +705,11 @@
        {showProgressBar && (
             <div className="mb-4 min-h-[40px]">
                 <ProgressBar status={fetchStatus === 'failed_retries' ? 'error' : fetchStatus} progress={fetchStatus === 'success' ? 100 : (fetchStatus === 'error' || fetchStatus === 'failed_retries' ? 0 : progress)} />
-                 {isLoading && <p className="text-cyan-300 text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? '(Повторная попытка)' : ''}</p>}
-                 {fetchStatus === 'success' && files.length > 0 && ( <div className="text-center text-xs font-mono mt-1 text-green-400 flex items-center justify-center gap-1"> <FaCircleCheck /> {`Успешно извлечено ${files.length} файлов из '${effectiveBranchDisplay}'.`} </div> )}
-                 {fetchStatus === 'success' && files.length === 0 && ( <div className="text-center text-xs font-mono mt-1 text-yellow-400 flex items-center justify-center gap-1"> <FaCircleCheck /> {`Успешно, но не найдено подходящих файлов в '${effectiveBranchDisplay}'.`} </div> )}
-                 {(fetchStatus === 'error' || fetchStatus === 'failed_retries') && error && ( <div className="text-center text-xs font-mono mt-1 text-red-400 flex items-center justify-center gap-1"> <FaXmark /> {error} </div> )}
+                 {isLoading && !isParsing && <p className="text-cyan-300 text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? '(Повторная попытка)' : ''}</p>}
+                 {isParsing && <p className="text-yellow-400 text-xs font-mono mt-1 text-center animate-pulse">Разбор ответа AI...</p>}
+                 {fetchStatus === 'success' && files.length > 0 && !isParsing && ( <div className="text-center text-xs font-mono mt-1 text-green-400 flex items-center justify-center gap-1"> <FaCircleCheck /> {`Успешно извлечено ${files.length} файлов из '${effectiveBranchDisplay}'.`} </div> )}
+                 {fetchStatus === 'success' && files.length === 0 && !isParsing && ( <div className="text-center text-xs font-mono mt-1 text-yellow-400 flex items-center justify-center gap-1"> <FaCircleCheck /> {`Успешно, но не найдено подходящих файлов в '${effectiveBranchDisplay}'.`} </div> )}
+                 {(fetchStatus === 'error' || fetchStatus === 'failed_retries') && error && !isParsing && ( <div className="text-center text-xs font-mono mt-1 text-red-400 flex items-center justify-center gap-1"> <FaXmark /> {error} </div> )}
             </div>
         )}
 
@@ -818,8 +726,10 @@
                         <input
                             type="checkbox" id="autoAskAiCheckbox" checked={autoAskAiEnabled}
                             onChange={(e) => setAutoAskAiEnabled(e.target.checked)}
-                            className="form-checkbox h-4 w-4 text-blue-500 bg-gray-600 border-gray-500 rounded focus:ring-blue-500/50 focus:ring-offset-gray-800 cursor-pointer" />
-                        <label htmlFor="autoAskAiCheckbox" className="text-xs text-gray-300 cursor-pointer select-none">
+                            className="form-checkbox h-4 w-4 text-blue-500 bg-gray-600 border-gray-500 rounded focus:ring-blue-500/50 focus:ring-offset-gray-800 cursor-pointer"
+                            disabled={isActionDisabled} // Disable if any action is running
+                        />
+                        <label htmlFor="autoAskAiCheckbox" className={`text-xs cursor-pointer select-none ${isActionDisabled ? 'text-gray-500' : 'text-gray-300'}`}>
                            Авто-запрос AI после добавления файлов <span className="text-blue-400">(Add Selected & Ask)</span>
                         </label>
                     </div>
@@ -847,21 +757,35 @@
              <div id="kwork-input-section" className="flex flex-col gap-3">
                  {/* Request Input Component */}
                  <RequestInput
-                    kworkInputRef={localKworkInputRef} // Pass local ref
-                    onInputChange={(value) => setKworkInputHasContent(value.trim().length > 0)} // Update context flag on change
-                    isCopyDisabled={isCopyDisabled} // Pass disabled state
-                    isClearDisabled={isClearDisabled} // Pass disabled state
-                    onCopyToClipboard={handleCopyToClipboard} // Pass callback
-                    onClearAll={handleClearAll} // Pass callback
-                    // Pass Ask AI props
-                    onAskAi={triggerAskAi}
-                    isAskAiDisabled={isAskAiDisabled}
-                    aiActionLoading={aiActionLoading}
-                    // Pass Add Selected props
-                    onAddSelected={handleAddSelected}
-                    isAddSelectedDisabled={isAddSelectedDisabled}
-                    selectedFetcherFilesCount={selectedFiles.size}
-                 />
+                          kworkInputRef={localKworkInputRef} // Pass local ref
+                          onInputChange={(value) => setKworkInputHasContent(value.trim().length > 0)} // Update context flag on change
+                          isCopyDisabled={isCopyDisabled} // Pass disabled state
+                          isClearDisabled={isClearDisabled} // Pass disabled state
+                          onCopyToClipboard={() => handleCopyToClipboard(undefined, true)} // Pass callback
+                          onClearAll={handleClearAll} // Pass callback
+                          isAskAiDisabled={isActionDisabled} // Disable while loading
+
+                          // Pass Add Selected props
+                          onAddSelected={() => handleAddSelected(autoAskAiEnabled)}
+                          isAddSelectedDisabled={isAddSelectedDisabled}
+                          selectedFetcherFilesCount={selectedFiles.size} onAskAi={function (): Promise<void> {
+                              throw new Error("Function not implemented.");
+                          } } aiActionLoading={false}                 />
+                  {/* Ask AI Button */}
+                  <motion.button
+                     onClick={() => triggerAskAi().catch(err => console.error("Error in triggerAskAi from button:", err))}
+                     disabled={isAskAiDisabled}
+                     className={`flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg font-semibold text-sm text-white ${
+                         isAskAiDisabled
+                         ? 'bg-gray-600 opacity-60 cursor-not-allowed'
+                         : 'bg-gradient-to-r from-blue-600 to-indigo-500 hover:from-blue-700 hover:to-indigo-600 shadow-blue-500/30 hover:shadow-indigo-500/40 transition-all hover:brightness-110 active:scale-[0.98]'
+                     }`}
+                     whileHover={{ scale: isAskAiDisabled ? 1 : 1.03 }}
+                     whileTap={{ scale: isAskAiDisabled ? 1 : 0.97 }}
+                 >
+                      {aiActionLoading ? <FaArrowsRotate className="animate-spin" /> : <FaRobot />}
+                      {aiActionLoading ? (currentAiRequestId ? `⏳ Жду AI (${currentAiRequestId.substring(0,6)}...)` : "Отправка...") : "🤖 Спросить AI"}
+                  </motion.button>
              </div>
          ) : null }
 

@@ -1,10 +1,10 @@
-// /components/stickyChat_components/SuggestionList.tsx
 "use client";
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { FaPaperPlane } from 'react-icons/fa6';
+import { Tooltip } from '@/components/AICodeAssistant'; // Assuming Tooltip is exportable
 
 interface Suggestion {
     id: string;
@@ -15,6 +15,7 @@ interface Suggestion {
     isHireMe?: boolean;
     isFixAction?: boolean;
     disabled?: boolean;
+    tooltip?: string; // Added tooltip prop
 }
 
 interface SuggestionListProps {
@@ -51,7 +52,8 @@ export const SuggestionList: React.FC<SuggestionListProps> = ({
                         whileHover={!suggestion.disabled ? { scale: 1.03, x: 3 } : {}} // Add subtle hover effect
                         whileTap={!suggestion.disabled ? { scale: 0.98 } : {}}     // Add subtle tap effect
                         className={clsx( // Dynamically apply classes
-                            "flex items-center w-full text-left px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ease-in-out", // Use rounded-full
+                            // Reverted back to rounded-full for buttons
+                            "flex items-center w-full text-left px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ease-in-out",
                             "shadow-[0_0_8px_rgba(0,255,157,0.3)] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-opacity-75",
                             { // Conditional classes
                                 "bg-gradient-to-r from-yellow-500 to-orange-500 text-white hover:from-yellow-400 hover:to-orange-400": suggestion.isHireMe && !suggestion.disabled,
@@ -61,9 +63,20 @@ export const SuggestionList: React.FC<SuggestionListProps> = ({
                             }
                         )}
                     >
-                        {/* Display icon or default */}
-                        {suggestion.icon || <FaPaperPlane className="mr-1.5" />}
-                        <span className="flex-grow">{suggestion.text}</span>
+                        {/* Wrap button content in Tooltip if tooltip text exists */}
+                        {suggestion.tooltip ? (
+                            <Tooltip text={suggestion.tooltip} position="right">
+                                <div className="flex items-center w-full">
+                                    {suggestion.icon || <FaPaperPlane className="mr-1.5" />}
+                                    <span className="flex-grow">{suggestion.text}</span>
+                                </div>
+                            </Tooltip>
+                        ) : (
+                            <div className="flex items-center w-full">
+                                {suggestion.icon || <FaPaperPlane className="mr-1.5" />}
+                                <span className="flex-grow">{suggestion.text}</span>
+                            </div>
+                        )}
                     </motion.button>
                 ))}
             </AnimatePresence>

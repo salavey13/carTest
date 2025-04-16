@@ -2,6 +2,8 @@
 "use client"
 import { useState } from "react"
 import { useWorker } from "@/hooks/useWorker"
+import { supabaseAdmin } from "@/hooks/supabase"
+
 
 export default function AddCarForm() {
   const [description, setDescription] = useState("")
@@ -14,7 +16,7 @@ export default function AddCarForm() {
     // Generate embedding
     const embedding = await generateEmbedding(description)
 
-    await supabase.from("cars").insert({
+    await supabaseAdmin.from("cars").insert({
       make: formData.get("make"),
       model: formData.get("model"),
       description,
