@@ -1,4 +1,4 @@
-// --- Paste the FULL restored content of /hooks/supabase.ts here ---
+// /hooks/supabase.ts
 // (This should be the "CURRENT SUPABASE HOOK" provided in the prompt,
 // ensuring functions like fetchCars, fetchCarById, createInvoice, getUserRentals etc.
 // are present as used/needed by the actions and components)
