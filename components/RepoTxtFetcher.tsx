@@ -4,7 +4,9 @@
     import { useSearchParams } from "next/navigation";
     import { toast } from "sonner";
     import {
-        FaCircleChevronDown, FaCircleChevronUp, FaDownload, FaArrowsRotate, FaCircleCheck, FaXmark, FaCopy,
+        // Removed: FaCircleChevronDown, FaCircleChevronUp,
+        FaAngleDown, FaAngleUp, // Added valid alternatives
+        FaDownload, FaArrowsRotate, FaCircleCheck, FaXmark, FaCopy,
         FaBroom, FaRobot, FaCodeBranch, // Use FaCodeBranch for settings
     } from "react-icons/fa6";
     import { motion } from "framer-motion";
@@ -642,7 +644,8 @@
                 aria-label={isSettingsModalOpen ? "Скрыть настройки" : "Показать настройки URL/Token"}
                 aria-expanded={isSettingsModalOpen}
             >
-                {isSettingsModalOpen ? <FaCircleChevronUp className="text-cyan-400 text-xl" /> : <FaCodeBranch className="text-cyan-400 text-xl" />}
+                 {/* Using FaAngleDown/Up instead of FaCircleChevronDown/Up */}
+                 {isSettingsModalOpen ? <FaAngleUp className="text-cyan-400 text-xl" /> : <FaAngleDown className="text-cyan-400 text-xl" />}
             </motion.button>
         </div>
 
