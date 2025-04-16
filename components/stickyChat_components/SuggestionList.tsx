@@ -4,7 +4,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { FaPaperPlane } from 'react-icons/fa6';
-import { Tooltip } from '@/components/AICodeAssistant'; // Assuming Tooltip is exported or importable
+import { Tooltip } from '@/components/AICodeAssistant'; // Assuming Tooltip is exportable
 
 interface Suggestion {
     id: string;
