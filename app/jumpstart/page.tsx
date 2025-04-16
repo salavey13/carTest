@@ -8,7 +8,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  FaRocket, FaGamepad, FaBoxOpen, FaBullseye, FaHandHoldingDollar, FaBrain, FaCubes, FaUsers, FaChartLine, FaRobot, FaMoneyBillWave, FaExternalLinkAlt, FaArrowUpRightFromSquare, FaLightbulb, FaRoad, FaFileCode, FaEye, FaArrowsSpin, FaNetworkWired, FaComments, FaWandMagicSparkles, FaListCheck, FaEnvelopeOpenText, FaShareAlt, FaPlay, FaLevelUpAlt, FaTachometerAlt, FaBolt, FaGift // Added FaBolt, FaGift
+  FaRocket, FaGamepad, FaBoxOpen, FaBullseye, FaHandHoldingDollar, FaBrain, FaCubes, FaUsers, FaChartLine, FaRobot, FaMoneyBillWave, FaArrowUpRightFromSquare, FaLightbulb, FaRoad, FaFileCode, FaEye, FaArrowsSpin, FaNetworkWired, FaComments, FaWandMagicSparkles, FaListCheck, FaEnvelopeOpenText, FaPlay, FaInfinity, FaBolt, FaGift // Added FaBolt, FaGift
 } from "react-icons/fa6"; 
 import { debugLogger } from "@/lib/debugLogger";
 import Link from "next/link";
@@ -107,7 +107,7 @@ export default function JumpstartPage() {
                   {/* // TODO: Add visual: [Prompt: Animated GIF or short video showing: 1. GitHub Fork button click -> 2. Vercel deploy screen with one ENV VAR field -> 3. Live site preview with working donation button] */}
                  <div className="p-2 border border-neon-lime/30 rounded-lg bg-black/30 my-6 max-w-3xl mx-auto">
                    <Image src={PLACEHOLDER_URL} alt="Visual: 5-Minute Setup - Fork, ENV, Deploy, Live!" width={800} height={450} className="rounded-md opacity-70" loading="lazy" />
-                   <p className="text-xs text-center text-gray-400 mt-1 italic">Seriously. Fork -> Set Token -> Deploy -> Profit? (Okay, needs *your* niche vibe too).</p>
+                   <p className="text-xs text-center text-gray-400 mt-1 italic">Seriously. Fork -{'>'} Set Token -{'>'} Deploy -{'>'} Profit? (Okay, needs *your* niche vibe too).</p>
                  </div>
               </section>
 
@@ -141,7 +141,7 @@ export default function JumpstartPage() {
                      <CardContent><p className="text-sm text-gray-300">Deploy specialized Bots. Focus *only* on your unique human value-add. **Quest:** Scale profit OR free up your time drastically.</p></CardContent>
                   </Card>
                    <Card className="bg-neon-lime/10 border-2 border-neon-lime/50 shadow-glow-md hover:border-neon-lime transition-colors">
-                     <CardHeader><CardTitle className="text-xl text-neon-lime">Level 5: THRIVE <FaTachometerAlt className="inline ml-2 text-lime-300"/></CardTitle></CardHeader>
+                     <CardHeader><CardTitle className="text-xl text-neon-lime">Level 5: THRIVE <FaInfinity className="inline ml-2 text-lime-300"/></CardTitle></CardHeader>
                      <CardContent><p className="text-sm text-gray-200">System hums. You guide, strategize, or... jump to the next game! **Quest:** Sustainable profit with minimal direct ops. **F*ck Off Independence Achieved.**</p></CardContent>
                   </Card>
                   {/* Level 6 implicit: You repeat the cycle or exit */}
