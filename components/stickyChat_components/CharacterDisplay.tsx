@@ -49,31 +49,33 @@ export const CharacterDisplay: React.FC<CharacterDisplayProps> = ({
             className="flex-shrink-0 self-center sm:self-end"
             style={{ perspective: '500px' }}
         >
-            {/* Image container with conditional pulse */}
+            {/* Image container with conditional pulse & ensured rounded-full */}
             <motion.div
                 whileHover={{ scale: 1.05, rotateY: 10 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-                // Add pulse animation when profileJustLoaded is true
                 animate={profileJustLoaded ? {
-                    scale: [1, 1.1, 1], // Pulse effect
-                    boxShadow: ["0 0 12px rgba(0, 255, 157, 0.6)", "0 0 25px rgba(0, 255, 157, 0.9)", "0 0 12px rgba(0, 255, 157, 0.6)"] // Add pulse to shadow
+                    scale: [1, 1.1, 1],
+                    boxShadow: ["0 0 12px rgba(0, 255, 157, 0.6)", "0 0 25px rgba(0, 255, 157, 0.9)", "0 0 12px rgba(0, 255, 157, 0.6)"]
                 } : {}}
-                initial={{ scale: 1, boxShadow: "0 0 12px rgba(0, 255, 157, 0.6)" }} // Ensure initial state is set
+                initial={{ scale: 1, boxShadow: "0 0 12px rgba(0, 255, 157, 0.6)" }}
+                // Apply rounded-full directly here to ensure the container crops the glow
+                className="rounded-full"
             >
                 <Image
-                    key={imageSrc} // Add key to force re-render on src change if needed
+                    key={imageSrc}
                     src={imageSrc}
                     alt={imageAlt}
                     width={120}
                     height={120}
                     priority
+                    // Ensure image itself is rounded
                     className="rounded-full drop-shadow-[0_0_12px_rgba(0,255,157,0.6)] border-2 border-cyan-400/50"
                     unoptimized={!!githubProfile?.avatar_url}
                 />
             </motion.div>
             {/* GitHub Link */}
             {githubProfile && (
-                <motion.a // Animate the link appearance too
+                <motion.a
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
