@@ -97,13 +97,13 @@ ALTER TABLE public.ai_requests ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow authenticated insert for self" ON public.ai_requests
 AS PERMISSIVE FOR INSERT
 TO authenticated
-WITH CHECK (auth.uid()::text = user_id);
+WITH CHECK (auth.jwt() ->> 'chat_id' = user_id);
 
 -- Policy: Users can select their own requests
 CREATE POLICY "Allow authenticated select for self" ON public.ai_requests
 AS PERMISSIVE FOR SELECT
 TO authenticated
-USING (auth.uid()::text = user_id);
+USING (auth.jwt() ->> 'chat_id' = user_id);
 
 -- Policy: Users can update the status/response/error of their own requests (or service_role for edge function)
 -- Note: This allows users to update their *own* requests.
@@ -112,8 +112,8 @@ USING (auth.uid()::text = user_id);
 -- CREATE POLICY "Allow authenticated update for self" ON public.ai_requests
 -- AS PERMISSIVE FOR UPDATE
 -- TO authenticated
--- USING (auth.uid()::text = user_id)
--- WITH CHECK (auth.uid()::text = user_id);
+-- USING (auth.jwt() ->> 'chat_id' = user_id)
+-- WITH CHECK (auth.jwt() ->> 'chat_id' = user_id);
 
 -- Grant permissions on the trigger functions (important!)
 GRANT EXECUTE ON FUNCTION public.handle_updated_at() TO postgres, anon, authenticated, service_role;
