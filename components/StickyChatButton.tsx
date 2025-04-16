@@ -100,7 +100,14 @@ const StickyChatButton: React.FC = () => {
             }
             // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-            const folderPathParam = cleanPath === "/" ? "app" : `app${cleanPath}`;
+            // Ensure the path starts with "app/" for proper mapping, handle root case
+            let folderPathParam = cleanPath === "/" ? "app/page.tsx" : `app${cleanPath}`; // Basic guess, may need refinement if nested layouts exist without 'app' prefix in URL
+             // Crude check for file extension, if user pastes a direct file path (less likely)
+             if (!folderPathParam.match(/\.[^/.]+$/)) {
+                 folderPathParam = folderPathParam.endsWith('/') ? folderPathParam + 'page.tsx' : folderPathParam + '/page.tsx'; // Append default page file if missing
+             }
+
+
             const encodedTaskIdea = encodeURIComponent(taskIdea);
             const encodedPathParam = encodeURIComponent(folderPathParam);
 

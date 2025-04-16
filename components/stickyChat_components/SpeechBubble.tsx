@@ -16,6 +16,7 @@ export const SpeechBubble: React.FC<SpeechBubbleProps> = ({ message, variants, b
 
     return (
         <motion.div
+            key={message} // Re-add key to force re-animation on message change
             variants={variants}
             className="relative mb-3 w-full bg-white bg-opacity-95 p-3 rounded-lg shadow-[0_0_15px_rgba(0,255,157,0.6)]" // Changed to rounded-lg for standard look
         >
