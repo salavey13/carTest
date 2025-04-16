@@ -1,7 +1,8 @@
-"use client"
-"use jumpstart"; // Using a unique directive for fun ;)
+"use client";
+// Ensure client-side rendering
+"use jumpstart"; // Your custom directive :)
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react"; // Import React explicitly if needed by bundler/setup
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
@@ -9,14 +10,14 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  FaRocket, FaGamepad, FaBoxOpen, FaBullseye, FaHandHoldingDollar, FaBrain, FaCubes, FaUsers, FaChartLine, FaRobot, FaMoneyBillWave, FaArrowUpRightFromSquare, FaLightbulb, FaRoad, FaFileCode, FaEye, FaArrowsSpin, FaNetworkWired, FaComments, FaWandMagicSparkles, FaListCheck, FaEnvelopeOpenText, FaPlay, FaInfinity, FaBolt, FaGift, FaGithub, FaCode, FaTelegram // Added FaGithub, FaCode, FaTelegram, FaInfinity used for Level 5
-} from "react-icons/fa6"; 
+  FaRocket, FaGamepad, FaBoxOpen, FaBullseye, FaHandHoldingDollar, FaBrain, FaCubes, FaUsers, FaChartLine, FaRobot, FaMoneyBillWave, FaArrowUpRightFromSquare, FaLightbulb, FaRoad, FaFileCode, FaEye, FaArrowsSpin, FaNetworkWired, FaComments, FaWandMagicSparkles, FaListCheck, FaEnvelopeOpenText, FaPlay, FaInfinity, FaBolt, FaGift, FaGithub, FaCode, FaTelegram, FaShieldHalved // Added missing FaShieldHalved
+} from "react-icons/fa6";
 import { debugLogger } from "@/lib/debugLogger";
 import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import SupportForm from "@/components/SupportForm"; 
-import { jumpstartTranslations } from "@/components/translations_jumpstart"; // Import new translations
+import SupportForm from "@/components/SupportForm";
+import { jumpstartTranslations } from "@/components/translations_jumpstart"; // Import translations
 
 // Placeholder URL
 const PLACEHOLDER_URL = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjQ1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjQ1MCIgZmlsbD0iIzQwNDA0MCIvPjwvc3ZnPg==";
@@ -25,7 +26,7 @@ export default function JumpstartPage() {
   const { user } = useAppContext();
   const [isMounted, setIsMounted] = useState(false);
   const [language, setLanguage] = useState<"en" | "ru">('en'); // Default to EN
-  const userName = user?.first_name || 'Viberider'; 
+  const userName = user?.first_name || 'Viberider';
 
   useEffect(() => {
     setIsMounted(true);
@@ -37,7 +38,8 @@ export default function JumpstartPage() {
   }, [user?.language_code]);
 
   // Get translations based on selected language
-  const t = jumpstartTranslations[language];
+  // Add a check in case translations are not loaded yet (though unlikely here)
+  const t = jumpstartTranslations[language] || jumpstartTranslations['en'];
 
   if (!isMounted) {
     return (
@@ -47,7 +49,7 @@ export default function JumpstartPage() {
     );
   }
 
-  return ( 
+  return ( // Ensure main JSX is wrapped
     <div className="relative min-h-screen overflow-hidden pt-20 pb-10 bg-gradient-to-br from-gray-950 via-black to-purple-900/20 text-gray-200">
       {/* Subtle Background Grid */}
        <div
@@ -156,6 +158,7 @@ export default function JumpstartPage() {
                      <CardHeader><CardTitle className="text-xl text-neon-lime">{t.section3.level5.title} <FaInfinity className="inline ml-2 text-lime-300"/></CardTitle></CardHeader>
                      <CardContent><p className="text-sm text-gray-200">{t.section3.level5.desc} <strong className="text-neon-lime">{t.section3.level5.quest}</strong> {t.section3.level5.reward} {t.section3.level5.tactic}</p></CardContent>
                   </Card>
+                  {/* Level 6 implicit: You repeat the cycle or exit */}
                 </div>
                  {/* // TODO: Link specific quests to unlocking features in the dashboard or enabling new bot capabilities. */}
                  {/* // TODO: Integrate Configame mention maybe in Level 1 or as a related tool. */}
