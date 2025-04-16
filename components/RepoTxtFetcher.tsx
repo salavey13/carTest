@@ -6,7 +6,7 @@
     import {
         FaAngleDown, FaAngleUp, // Replaced circle chevrons
         FaDownload, FaArrowsRotate, FaCircleCheck, FaXmark, FaCopy,
-        FaBroom, FaRobot, FaCodeBranch, FaPlus, FaFileLines // FaPlus, FaFileLines added for RequestInput
+        FaBroom, FaRobot, FaCodeBranch, FaPlus, FaFileLines // Added FaPlus, FaFileLines
     } from "react-icons/fa6";
     import { motion } from "framer-motion";
 
@@ -19,7 +19,7 @@
     import SettingsModal from "./repo/SettingsModal";
     import FileList from "./repo/FileList";
     import SelectedFilesPreview from "./repo/SelectedFilesPreview";
-    import RequestInput from "./repo/RequestInput"; // Assume this has its own Ask AI button logic
+    import RequestInput from "./repo/RequestInput";
     import ProgressBar from "./repo/ProgressBar";
 
     // Define FileNode locally or import if shared
@@ -81,14 +81,14 @@
         // Status & Flags
         fetchStatus, setFetchStatus, repoUrlEntered, setRepoUrlEntered, filesFetched, setFilesFetched,
         selectedFetcherFiles, setSelectedFetcherFiles, kworkInputHasContent, setKworkInputHasContent,
-        setRequestCopied, aiActionLoading, currentStep, loadingPrs, assistantLoading, isParsing, // Added assistantLoading & isParsing
-        currentAiRequestId, // <-- Get the request ID being monitored
+        setRequestCopied, aiActionLoading, currentStep, loadingPrs, assistantLoading, isParsing,
+        currentAiRequestId,
         // Branch & PR state
-        targetBranchName, setTargetBranchName, // Use context setter for PR selection
-        manualBranchName, setManualBranchName, // Use context setter for manual input
-        openPrs, // Get PR list from context
-        setOpenPrs, // Get the setter function from context
-        setLoadingPrs, // Context setter for PR loading
+        targetBranchName, setTargetBranchName,
+        manualBranchName, setManualBranchName,
+        openPrs,
+        setOpenPrs,
+        setLoadingPrs,
         // Modal state & trigger
         isSettingsModalOpen, triggerToggleSettingsModal,
         // Refs & Callbacks
@@ -103,7 +103,7 @@
       const DEFAULT_TASK_IDEA = "Проанализируй предоставленный контекст кода. Опиши его основные функции и предложи возможные улучшения или рефакторинг.";
       const importantFiles = useMemo(() => [
           "contexts/AppContext.tsx", "hooks/useTelegram.ts", "app/layout.tsx",
-          "hooks/supabase.ts", "app/actions.ts", // Removed dummy_actions path
+          "hooks/supabase.ts", "app/actions.ts",
            "app/ai_actions/actions.ts", "app/webhook-handlers/proxy.ts", // Example webhook handler path
            "package.json", "tailwind.config.ts"
       ], []);
@@ -245,7 +245,18 @@
 
     // --- Effects ---
     useEffect(() => { setRepoUrlEntered(repoUrl.trim().length > 0); updateRepoUrlInAssistant(repoUrl); }, [repoUrl, setRepoUrlEntered, updateRepoUrlInAssistant]);
-    useEffect(() => { const branchForAutoFetch = targetBranchName; if (autoFetch && repoUrl && (fetchStatus === 'idle' || fetchStatus === 'failed_retries' || fetchStatus === 'error')) { console.log(`Auto-fetching due to URL param 'path'. Branch: ${branchForAutoFetch ?? 'Default'}`); handleFetch(false, branchForAutoFetch); } }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus, targetBranchName, handleFetch]); // Include handleFetch
+
+    // Auto-fetch effect (FIXED dependency array)
+    useEffect(() => {
+        const branchForAutoFetch = targetBranchName;
+        if (autoFetch && repoUrl && (fetchStatus === 'idle' || fetchStatus === 'failed_retries' || fetchStatus === 'error')) {
+            console.log(`Auto-fetching due to URL param 'path'. Branch: ${branchForAutoFetch ?? 'Default'}`);
+            handleFetch(false, branchForAutoFetch);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus, targetBranchName]); // Removed handleFetch
+
+    // Cleanup simulation timers
     useEffect(() => { return () => stopProgressSimulation(); }, [stopProgressSimulation]);
 
     // === Imperative Handle ===
@@ -407,7 +418,7 @@
          {/* Right Column: Request Input & AI Trigger */}
          {(fetchStatus === 'success' || kworkInputHasContent || files.length > 0 ) ? ( // Show if files fetched OR input has content
              <div id="kwork-input-section" className="flex flex-col gap-3">
-                 {/* === FIX: Pass ALL necessary props to RequestInput === */}
+                 {/* Pass ALL necessary props to RequestInput */}
                  <RequestInput
                       kworkInputRef={localKworkInputRef}
                       onCopyToClipboard={() => handleCopyToClipboard(undefined, true)}
@@ -416,15 +427,15 @@
                       isClearDisabled={isClearDisabled}
                       onInputChange={(value) => setKworkInputHasContent(value.trim().length > 0)}
                       // Pass Ask AI related props
-                      onAskAi={triggerAskAi}
-                      isAskAiDisabled={isAskAiDisabled} // Correctly calculated disable state
-                      aiActionLoading={aiActionLoading} // Pass the loading state
+                      onAskAi={triggerAskAi} // Correct: Pass the function from context
+                      isAskAiDisabled={isAskAiDisabled} // Correct: Pass calculated disabled state
+                      aiActionLoading={aiActionLoading} // Correct: Pass AI loading state
                       // Pass Add Selected related props
-                      onAddSelected={() => handleAddSelected(autoAskAiEnabled)}
-                      isAddSelectedDisabled={isAddSelectedDisabled}
-                      selectedFetcherFilesCount={selectedFiles.size}
+                      onAddSelected={() => handleAddSelected(autoAskAiEnabled)} // Correct: Pass addSelected handler
+                      isAddSelectedDisabled={isAddSelectedDisabled} // Correct: Pass addSelected disabled state
+                      selectedFetcherFilesCount={selectedFiles.size} // Correct: Pass file count
                  />
-                 {/* Standalone "Ask AI" button is confirmed REMOVED here */}
+                 {/* No standalone Ask AI button here */}
              </div>
          ) : null }
 
