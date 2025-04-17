@@ -1,266 +1,221 @@
 "use client";
+
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
-import { useState, useEffect } from "react";
+import { LuLayoutGrid, LuX, LuSearch } from "lucide-react"; // Use Lucide icons
+import { useState, useEffect, useMemo, useCallback } from "react";
 import UserInfo from "@/components/user-info";
-import SemanticSearch from "@/components/SemanticSearch";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
+import { useAppContext } from "@/contexts/AppContext";
+import { cn } from "@/lib/utils";
+import {
+  FaCar, FaCircleUser, FaWandMagicSparkles, FaRocket, FaRoad, FaBookOpen,
+  FaBrain, FaRobot, FaMagnifyingGlass, FaGift, FaUserShield, FaCarOn,
+  FaYoutube, FaFileInvoiceDollar, FaCreditCard, FaHeart, FaPalette,
+  FaCircleInfo, FaListCheck
+} from "react-icons/fa6"; // Use specific icons from Fa6
 
-// Define groups (feature packs) with display names, icons, and colors
-const groups = {
-  "SLY13": { displayName: "SLY13", icon: "🚀", color: "bg-blue-500" },
-  "RuliBeri": { displayName: "RuliBeri", icon: "🏎️", color: "bg-red-500" },
-  "9GAG": { displayName: "9GAG", icon: "😂", color: "bg-green-500" },
-  "YT": { displayName: "YT", icon: "🎥", color: "bg-yellow-500" },
-  "Tips": { displayName: "Tips", icon: "💡", color: "bg-purple-500" },
-  "CRM": { displayName: "CRM", icon: "📊", color: "bg-orange-500" },
-  "Dev": { displayName: "Dev", icon: "💻", color: "bg-pink-500" },
-  "Gifts": { displayName: "Gifts", icon: "🎁", color: "bg-teal-500" },
-};
+// --- Page Definitions ---
+interface PageInfo {
+  path: string;
+  name: string;
+  icon?: React.ComponentType<any>; // Icon component
+  isImportant?: boolean;
+  isAdminOnly?: boolean;
+  color?: string; // Optional color for tile accent
+}
 
-// Map pages to their groups and define display names
-const pageGroups: Record<string, string> = {
-  "/about": "SLY13",
-  "/onesiteplsinstructions": "SLY13",
-  "/onesitepls": "SLY13",
-  "/admin": "RuliBeri",
-  "/botbusters": "9GAG",
-  "/bullshitdetector": "YT",
-  "/buy-subscription": "RuliBeri",
-  "/cyber-garage": "RuliBeri",
-  "/donate": "Tips",
-  "/invoices": "RuliBeri",
-  "/": "RuliBeri",
-  "/pavele0903": "CRM",
-  "/rent-car": "RuliBeri",
-  "/rent/[id]": "RuliBeri",
-  "/repo-xml": "Dev",
-  "/selfdev": "Dev",
-  "/shadow-fleet-admin": "RuliBeri",
-  "/style-guide": "Dev",
-  "/supercar-test": "RuliBeri",
-  "/tasks": "YT",
-  "/wheel-of-fortune": "Gifts",
-  "/youtubeAdmin": "YT",
-};
+const allPages: PageInfo[] = [
+  { path: "/", name: "Cyber Garage", icon: FaCar, isImportant: true, color: "cyan" },
+  { path: "/about", name: "About Me", icon: FaCircleUser, isImportant: true, color: "blue" },
+  { path: "/repo-xml", name: "SUPERVIBE Studio", icon: FaWandMagicSparkles, isImportant: true, color: "yellow" },
+  { path: "/jumpstart", name: "Jumpstart Kit", icon: FaRocket, isImportant: true, color: "lime" },
+  { path: "/selfdev", name: "SelfDev Path", icon: FaRoad, isImportant: true, color: "green" },
+  { path: "/purpose-profit", name: "Purpose & Profit", icon: FaBookOpen, color: "purple" },
+  { path: "/expmind", name: "Experimental Mindset", icon: FaBrain, color: "pink" },
+  { path: "/botbusters", name: "Bot Busters", icon: FaRobot },
+  { path: "/bullshitdetector", name: "BS Detector", icon: FaMagnifyingGlass },
+  { path: "/wheel-of-fortune", name: "Wheel of Fortune", icon: FaGift },
+  { path: "/admin", name: "Admin Panel", icon: FaUserShield, isAdminOnly: true, color: "red" },
+  { path: "/shadow-fleet-admin", name: "Fleet Admin", icon: FaCarOn, isAdminOnly: true, color: "red" },
+  { path: "/youtubeAdmin", name: "YT Admin", icon: FaYoutube, isAdminOnly: true, color: "red" },
+  { path: "/invoices", name: "My Invoices", icon: FaFileInvoiceDollar },
+  { path: "/buy-subscription", name: "Subscribe", icon: FaCreditCard },
+  { path: "/donate", name: "Donate", icon: FaHeart, color: "red" },
+  { path: "/style-guide", name: "Style Guide", icon: FaPalette },
+  // Add other pages as needed, ensure paths are correct
+  // { path: "/onesitepls", name: "oneSitePls Info", icon: FaCircleInfo },
+  // { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: FaListCheck },
+];
 
-const pageLogos: Record<string, string> = {
-  "/about": "SLY13",
-  "/admin": "RuliBeri",
-  "/botbusters": "9GAG",
-  "/bullshitdetector": "YT",
-  "/buy-subscription": "RuliBeri",
-  "/cyber-garage": "RuliBeri",
-  "/donate": "Tips",
-  "/invoices": "RuliBeri",
-  "/": "RuliBeri",
-  "/pavele0903": "CRM",
-  "/rent-car": "RuliBeri",
-  "/rent/[id]": "RuliBeri",
-  "/repo-xml": "Dev",
-  "/selfdev": "Dev",
-  "/shadow-fleet-admin": "RuliBeri",
-  "/style-guide": "Dev",
-  "/supercar-test": "RuliBeri",
-  "/tasks": "YT",
-  "/wheel-of-fortune": "Gifts",
-  "/youtubeAdmin": "YT",
-  "/onesiteplsinstructions": "SLY13",
-  "/onesitepls": "SLY13",
-};
-
-const pageDisplayNames: Record<string, string> = {
-  "/about": "About",
-  "/onesiteplsinstructions": "oneSitePls Instructions",
-  "/onesitepls": "oneSitePls",
-  "/admin": "Admin Panel",
-  "/botbusters": "Bot Busters",
-  "/bullshitdetector": "BS Detector",
-  "/buy-subscription": "Subscribe",
-  "/cyber-garage": "Cyber Garage",
-  "/donate": "Donate",
-  "/invoices": "Invoices",
-  "/": "Home",
-  "/pavele0903": "CRM Dashboard",
-  "/rent-car": "Rent a Car",
-  "/rent/[id]": "Car Details",
-  "/repo-xml": "XML Repo",
-  "/selfdev": "Self Dev",
-  "/shadow-fleet-admin": "Fleet Admin",
-  "/style-guide": "Style Guide",
-  "/supercar-test": "Supercar Test",
-  "/tasks": "Tasks",
-  "/wheel-of-fortune": "Wheel of Fortune",
-  "/youtubeAdmin": "YT Admin",
-};
-
-// Tooltip description for Dev pages
-const devTooltip = "These pages are the hidden pearls of the Vibe Coding Template—showcasing innovative dev tools and style guides that power our creative chaos!";
-
-// Organize pages into grouped and ungrouped
-const uniqueGroups = Array.from(new Set(Object.values(pageGroups)));
-const groupedPages: Record<string, string[]> = {};
-uniqueGroups.forEach((group) => {
-  groupedPages[group] = Object.entries(pageGroups)
-    .filter(([_, g]) => g === group)
-    .map(([path]) => path);
-});
-const ungroupedPages = Object.keys(pageLogos).filter((path) => !pageGroups[path]);
-
+// --- Header Component ---
 export default function Header() {
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const { user, dbUser, isAdmin } = useAppContext(); // Get isAdmin status
+  const [isNavOpen, setIsNavOpen] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
   const pathname = usePathname();
 
-  // Determine the current logo text based on the pathname
-  const currentLogoText = pageLogos[pathname] || "RuliBeri";
+  // Determine the current logo text based on the pathname or default
+  const currentLogoText = useMemo(() => {
+    const currentPage = allPages.find(p => p.path === pathname);
+    return currentPage?.name.split(' ')[0] || "VIBE"; // Use first word or default
+  }, [pathname]);
 
-  // Handle scroll events and auto-hide header after 2 seconds, unless dropdown or search is open
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-
-      if (currentScrollY > lastScrollY && currentScrollY > 50 && !isDropdownOpen && !isSearchOpen) {
-        // Scrolling down, hide only if past threshold and no dropdown/search
-        setIsHeaderVisible(false);
-      } else if (currentScrollY < lastScrollY) {
-        // Scrolling up
-        setIsHeaderVisible(true);
+  // Filter pages based on search term and admin status
+  const filteredPages = useMemo(() => {
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    return allPages.filter(page => {
+      const isAdminPage = page.isAdminOnly === true;
+      // Show admin pages only if the user is admin
+      if (isAdminPage && !isAdmin) {
+        return false;
       }
+      // Filter by search term
+      return page.name.toLowerCase().includes(lowerSearchTerm);
+    });
+  }, [searchTerm, isAdmin]); // Depend on searchTerm and isAdmin status
 
-      setLastScrollY(currentScrollY);
-
-      // Reset the timer on scroll, but only if dropdown/search isn't active
-      if (!isDropdownOpen && !isSearchOpen) {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          setIsHeaderVisible(false);
-        }, 2000);
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll);
-
-    // Initial timer to hide header after 2 seconds, unless dropdown/search is active
-    if (!isDropdownOpen && !isSearchOpen) {
-      timeoutId = setTimeout(() => {
-        setIsHeaderVisible(false);
-      }, 2000);
+  // Handle scroll to hide/show header
+  const handleScroll = useCallback(() => {
+    const currentScrollY = window.scrollY;
+    // Don't hide if nav is open
+    if (isNavOpen) {
+      setIsHeaderVisible(true);
+    } else if (currentScrollY > lastScrollY && currentScrollY > 50) {
+      setIsHeaderVisible(false); // Hide on scroll down
+    } else if (currentScrollY < lastScrollY) {
+      setIsHeaderVisible(true); // Show on scroll up
     }
+    setLastScrollY(currentScrollY);
+  }, [lastScrollY, isNavOpen]);
 
+  useEffect(() => {
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", handleScroll);
-      clearTimeout(timeoutId);
     };
-  }, [lastScrollY, isDropdownOpen, isSearchOpen]);
+  }, [handleScroll]);
+
+  // Close nav when pathname changes
+  useEffect(() => {
+    setIsNavOpen(false);
+  }, [pathname]);
+
+  // Prevent body scroll when nav is open
+  useEffect(() => {
+    if (isNavOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    // Cleanup function
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isNavOpen]);
 
   return (
-    <motion.header
-      className={`fixed top-0 left-0 right-0 z-50 bg-card bg-opacity-80 border-b border-muted shadow-[0_0_15px_rgba(255,107,107,0.3)] backdrop-blur-lg transition-transform duration-300 rounded-lg m-2 ${
-        isHeaderVisible ? "translate-y-0" : "-translate-y-full"
-      }`}
-    >
-      <div className="container mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
-          {/* Logo with enhanced dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="text-xl md:text-3xl font-bold text-gradient cyber-text glitch hover:text-glow px-4 py-2"
-              data-text={currentLogoText}
-            >
+    <>
+      <motion.header
+        className={`fixed top-0 left-0 right-0 z-50 bg-black/70 border-b border-brand-purple/30 shadow-lg backdrop-blur-md transition-transform duration-300 ease-in-out ${
+          isHeaderVisible ? "translate-y-0" : "-translate-y-full"
+        }`}
+        initial={{ y: 0 }}
+        animate={{ y: isHeaderVisible ? 0 : "-100%" }}
+        transition={{ type: "tween", duration: 0.3 }}
+      >
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            {/* Logo */}
+            <Link href="/" className="text-2xl md:text-3xl font-bold text-brand-purple cyber-text glitch hover:text-glow" data-text={currentLogoText}>
               {currentLogoText}
-            </button>
-            {isDropdownOpen && (
-              <div className="absolute top-full left-0 mt-2 w-72 bg-card border border-muted rounded-xl shadow-lg max-h-[80vh] overflow-y-auto px-2 py-3">
-                <ul className="py-2">
-                  {/* Grouped pages */}
-                  {uniqueGroups.map((group) => (
-                    <li key={group} className="mb-2">
-                      <div className={`px-4 py-2 text-sm font-bold text-white ${groups[group].color} rounded-lg`}>
-                        {groups[group].icon} {groups[group].displayName}
-                      </div>
-                      <ul>
-                        {groupedPages[group].map((path) => (
-                          <li key={path} className="relative group">
-                            <Link
-                              href={path}
-                              className="block px-4 py-2 text-sm text-foreground hover:bg-muted rounded-lg flex items-center"
-                              onClick={() => setIsDropdownOpen(false)}
-                            >
-                              {pageDisplayNames[path]}
-                              {group === "Dev" && (
-                                <span className="ml-2 text-pink-400">ℹ️</span>
-                              )}
-                            </Link>
-                            {group === "Dev" && (
-                              <div className="absolute left-full top-0 mt-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                {devTooltip}
-                              </div>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </li>
-                  ))}
-                  {/* Ungrouped pages */}
-                  {ungroupedPages.length > 0 && (
-                    <li className="mt-4">
-                      <div className="px-4 py-2 text-sm font-bold text-white bg-gray-500 rounded-lg">
-                        Other
-                      </div>
-                      <ul>
-                        {ungroupedPages.map((path) => (
-                          <li key={path}>
-                            <Link
-                              href={path}
-                              className="block px-4 py-2 text-sm text-foreground hover:bg-muted rounded-lg"
-                              onClick={() => setIsDropdownOpen(false)}
-                            >
-                              {pageDisplayNames[path]}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </li>
-                  )}
-                </ul>
-              </div>
-            )}
-          </div>
+            </Link>
 
-          <div className="hidden md:flex flex-1 max-w-xl px-6">
-            <SemanticSearch />
-          </div>
-
-          <div className="flex items-center gap-4">
-            <UserInfo />
-            <button
-              className="md:hidden flex items-center gap-2 text-sm text-primary hover:text-primary/80 font-mono transition-colors text-glow"
-              onClick={() => setIsSearchOpen(!isSearchOpen)}
-            >
-              {isSearchOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              <span>{isSearchOpen ? "Закрыть" : "Поиск"}</span>
-            </button>
+            {/* Right side: User Info and Nav Toggle */}
+            <div className="flex items-center gap-4">
+              <UserInfo />
+              <button
+                onClick={() => setIsNavOpen(!isNavOpen)}
+                className="p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md"
+                aria-label={isNavOpen ? "Close navigation" : "Open navigation"}
+                aria-expanded={isNavOpen}
+              >
+                {isNavOpen ? <LuX className="h-6 w-6" /> : <LuLayoutGrid className="h-6 w-6" />}
+              </button>
+            </div>
           </div>
         </div>
+      </motion.header>
 
-        {isSearchOpen && (
+      {/* Navigation Overlay */}
+      <AnimatePresence>
+        {isNavOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: "-50%" }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="md:hidden mt-4"
+            exit={{ opacity: 0, y: "-50%" }}
+            transition={{ type: "spring", stiffness: 300, damping: 30, duration: 0.4 }}
+            className="fixed inset-0 z-40 bg-black/90 backdrop-blur-xl overflow-y-auto pt-20 pb-10 px-4 md:pt-24" // Added padding top matching header potential height
           >
-            <SemanticSearch compact />
+            <div className="container mx-auto max-w-4xl">
+              {/* Search Input */}
+              <div className="relative mb-8">
+                <input
+                  type="search"
+                  placeholder="Search pages..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-gray-800/60 border border-brand-green/40 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-green focus:border-transparent text-lg"
+                />
+                <LuSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500" />
+              </div>
+
+              {/* Page Tiles Grid */}
+              {filteredPages.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+                  {filteredPages.map((page) => {
+                    const Icon = page.icon;
+                    const isCurrentPage = page.path === pathname;
+                    return (
+                      <Link
+                        key={page.path}
+                        href={page.path}
+                        onClick={() => setIsNavOpen(false)}
+                        className={cn(
+                          "group relative flex flex-col items-center justify-center p-4 rounded-lg border transition-all duration-300 aspect-square text-center",
+                          page.isImportant
+                            ? "col-span-2 sm:col-span-1 md:col-span-1 bg-gradient-to-br from-brand-purple/20 to-brand-blue/20 border-brand-purple/50 hover:border-brand-purple hover:shadow-[0_0_20px_rgba(168,85,247,0.6)] scale-105" // Important style
+                            : "bg-gray-800/70 border-gray-700/80 hover:bg-gray-700/90 hover:border-brand-green/70", // Regular style
+                           isCurrentPage ? 'ring-2 ring-brand-green ring-offset-2 ring-offset-black' : ''
+                        )}
+                        style={page.color ? { '--tile-color': `var(--color-brand-${page.color})` } as React.CSSProperties : {}} // Example for color usage later
+                      >
+                        {Icon && <Icon className={cn(
+                            "h-6 w-6 md:h-8 md:h-8 mb-2 transition-transform duration-300 group-hover:scale-110",
+                            page.isImportant ? "text-brand-yellow" : "text-brand-cyan" // Different icon colors
+                        )} />}
+                        <span className={cn(
+                            "text-xs md:text-sm font-semibold transition-colors",
+                            page.isImportant ? "text-white" : "text-gray-300 group-hover:text-brand-green"
+                        )}>
+                          {page.name}
+                        </span>
+                        {page.isAdminOnly && (
+                           <span title="Admin Only" className="absolute top-1 right-1 text-xs text-red-500">🛡️</span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-center text-gray-500 text-lg mt-10">No pages found matching "{searchTerm}"</p>
+              )}
+            </div>
           </motion.div>
         )}
-      </div>
-    </motion.header>
+      </AnimatePresence>
+    </>
   );
 }
