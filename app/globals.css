@@ -151,11 +151,11 @@ webkit-scrollbar-track {
   background: transparent;
 }
 .simple-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(107, 114, 128, 0.5); // gray-500 with opacity
+  background-color: rgba(107, 114, 128, 0.5);
   border-radius: 3px;
 }
 .simple-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(107, 114, 128, 0.7); // darker on hover
+  background-color: rgba(107, 114, 128, 0.7); 
 }
 
 .cyber-text {
