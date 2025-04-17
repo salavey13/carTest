@@ -15,7 +15,7 @@ import {
   FaCircleInfo, FaListCheck // Keep commented or uncomment if needed
 } from "react-icons/fa6"; // Use specific icons from Fa6
 
-// --- Page Definitions ---
+// --- Page Definitions --- (assuming this remains the same)
 interface PageInfo {
   path: string;
   name: string;
@@ -25,7 +25,6 @@ interface PageInfo {
   color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red'; // Specific color keys
 }
 
-// Define all known pages with their properties
 const allPages: PageInfo[] = [
   { path: "/", name: "Cyber Garage", icon: FaCar, isImportant: true, color: "cyan" },
   { path: "/about", name: "About Me", icon: FaCircleUser, isImportant: true, color: "blue" },
@@ -50,57 +49,47 @@ const allPages: PageInfo[] = [
   // { path: "/tasks", name: "Tasks", icon: FaListCheck },
 ];
 
+
 // --- Header Component ---
 export default function Header() {
-  const { isAdmin } = useAppContext(); // Get isAdmin status
+  const { isAdmin } = useAppContext();
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const pathname = usePathname();
 
-  // Determine the current logo text based on the pathname or default
   const currentLogoText = useMemo(() => {
     const currentPage = allPages.find(p => p.path === pathname);
-    // Use first word of the page name for logo, fallback to VIBE
     return currentPage?.name.split(' ')[0] || "VIBE";
   }, [pathname]);
 
-  // Filter pages based on search term and admin status
   const filteredPages = useMemo(() => {
     const lowerSearchTerm = searchTerm.toLowerCase();
     return allPages.filter(page => {
       const isAdminPage = page.isAdminOnly === true;
-      // Hide admin pages if user is not admin
       if (isAdminPage && !isAdmin) {
         return false;
       }
-      // Filter by search term (check page name)
       return page.name.toLowerCase().includes(lowerSearchTerm);
     });
-  }, [searchTerm, isAdmin]); // Depend on searchTerm and isAdmin status
+  }, [searchTerm, isAdmin]);
 
-  // Handle scroll to hide/show header
   const handleScroll = useCallback(() => {
     const currentScrollY = window.scrollY;
-
-    // If nav is open, keep header visible and update scroll position
     if (isNavOpen) {
       setIsHeaderVisible(true);
       setLastScrollY(currentScrollY);
       return;
     }
-
-    // Show/hide header based on scroll direction
-    if (currentScrollY > lastScrollY && currentScrollY > 50) { // Hiding threshold
-      setIsHeaderVisible(false); // Hide on scroll down
+    if (currentScrollY > lastScrollY && currentScrollY > 50) {
+      setIsHeaderVisible(false);
     } else if (currentScrollY < lastScrollY) {
-      setIsHeaderVisible(true); // Show on scroll up
+      setIsHeaderVisible(true);
     }
     setLastScrollY(currentScrollY);
   }, [lastScrollY, isNavOpen]);
 
-  // Effect for scroll event listener
   useEffect(() => {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
@@ -108,13 +97,11 @@ export default function Header() {
     };
   }, [handleScroll]);
 
-  // Close nav when pathname changes
   useEffect(() => {
     setIsNavOpen(false);
-    setSearchTerm(""); // Also clear search on navigation
+    setSearchTerm("");
   }, [pathname]);
 
-  // Prevent body scroll when nav is open
   useEffect(() => {
     if (isNavOpen) {
       document.body.style.overflow = 'hidden';
@@ -126,7 +113,7 @@ export default function Header() {
     };
   }, [isNavOpen]);
 
-  // Define tile colors map - Tailwind classes
+  // Define tile colors map - Tailwind classes (Remains the same)
   const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> = {
     purple: "border-brand-purple/50 hover:border-brand-purple hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] text-brand-purple",
     blue: "border-brand-blue/50 hover:border-brand-blue hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] text-brand-blue",
@@ -139,9 +126,10 @@ export default function Header() {
     default: "border-gray-700/80 hover:border-brand-green/70 text-brand-cyan" // Default styling
   };
 
+
   return (
     <>
-      {/* Header Bar */}
+      {/* Header Bar (Remains mostly the same) */}
       <motion.header
         className={`fixed top-0 left-0 right-0 z-40 bg-black/70 border-b border-brand-purple/30 shadow-lg backdrop-blur-md transition-transform duration-300 ease-in-out`}
         initial={{ y: 0 }}
@@ -150,17 +138,14 @@ export default function Header() {
       >
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            {/* Logo */}
             <Link href="/" className="text-2xl md:text-3xl font-bold text-brand-purple cyber-text glitch hover:text-glow" data-text={currentLogoText}>
               {currentLogoText}
             </Link>
-
-            {/* Right side: User Info and Nav Toggle */}
             <div className="flex items-center gap-4">
               <UserInfo />
               <button
                 onClick={() => setIsNavOpen(!isNavOpen)}
-                className="p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md relative z-50" // Ensure button is clickable (z-50 needed if header is lower than overlay)
+                className="p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md relative z-50"
                 aria-label={isNavOpen ? "Close navigation" : "Open navigation"}
                 aria-expanded={isNavOpen}
               >
@@ -180,17 +165,18 @@ export default function Header() {
             animate={{ opacity: 1, clipPath: 'circle(150% at 100% 0)' }}
             exit={{ opacity: 0, clipPath: 'circle(0% at 100% 0)' }}
             transition={{ type: "spring", stiffness: 260, damping: 30 }}
-            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto pt-20 pb-10 px-4 md:pt-24" // Higher z-index
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto pt-20 pb-10 px-4 md:pt-24"
           >
-            <div className="container mx-auto max-w-4xl">
-              {/* Search Input */}
-              <div className="relative mb-8">
+             {/* Reduced max-width slightly to better fit more columns */}
+            <div className="container mx-auto max-w-3xl xl:max-w-4xl">
+              {/* Search Input (Remains the same) */}
+              <div className="relative mb-6 md:mb-8">
                 <input
                   type="search"
                   placeholder="Search pages..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-gray-800/60 border border-brand-green/40 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-green focus:border-transparent text-lg"
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-800/60 border border-brand-green/40 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-green focus:border-transparent text-base md:text-lg" // Slightly smaller base py
                   aria-label="Search pages"
                 />
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500 pointer-events-none" />
@@ -198,61 +184,52 @@ export default function Header() {
 
               {/* Page Tiles Grid */}
               {filteredPages.length > 0 ? (
-                // --- GRID DEFINITION ---
-                // grid-cols-2: Base, starts with 2 columns on mobile (smallest screens)
-                // sm:grid-cols-3: Switches to 3 columns at the 'sm' breakpoint (640px)
-                // md:grid-cols-4: Switches to 4 columns at the 'md' breakpoint (768px)
-                // gap-3 md:gap-4: Adjusts spacing between tiles based on screen size
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+                // --- NEW GRID DEFINITION ---
+                // grid-cols-2: Base, starts with 2 columns
+                // sm:grid-cols-4: Switches to 4 columns at 'sm' (640px)
+                // md:grid-cols-8: Switches to 8 columns at 'md' (768px)
+                // gap-2 sm:gap-2 md:gap-1.5: Reduced gaps between tiles
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 sm:gap-2 md:gap-1.5">
                   {filteredPages.map((page) => {
                     const PageIcon = page.icon;
                     const isCurrentPage = page.path === pathname;
                     const tileColorClass = tileColorClasses[page.color || 'default'];
 
-                    // --- TILE STYLING ---
-                    // cn(...) combines base styles with conditional ones
-                    // Base: flex layout, padding, rounding, border, transition, aspect-square (makes them square)
-                    // Hover: subtle scale effect (hover:scale-[1.03])
-                    // isImportant Styles:
-                    //   - Background gradient
-                    //   - Column Span:
-                    //     - `col-span-2`: Takes full width (2/2) on the smallest screens (base)
-                    //     - `sm:col-span-1`: Takes 1/3 width on 'sm' screens
-                    //     - `md:col-span-2`: Takes 1/2 width (2/4) on 'md' screens and up, making it stand out more
-                    // Regular Tile Styles:
-                    //   - Darker background, changes slightly on hover
-                    // Color/Border/Shadow: Applied via tileColorClass based on page.color
-                    // Current Page: Ring indicator
+                    // --- ADJUSTED TILE STYLING ---
                     return (
                       <Link
                         key={page.path}
                         href={page.path}
-                        onClick={() => setIsNavOpen(false)} // Close nav on selection
+                        onClick={() => setIsNavOpen(false)}
                         className={cn(
-                          "group relative flex flex-col items-center justify-center p-4 rounded-lg border transition-all duration-300 aspect-square text-center hover:scale-[1.03]", // Base styles
+                          "group relative flex flex-col items-center justify-center rounded-lg border transition-all duration-300 aspect-square text-center hover:scale-[1.03]",
+                          // Base/SM/MD Padding: Progressively smaller padding
+                          "p-2.5 sm:p-2 md:p-1.5",
                           page.isImportant
-                            ? "bg-gradient-to-br from-purple-900/30 via-black/50 to-blue-900/30 col-span-2 sm:col-span-1 md:col-span-2" // Important tile styles + UPDATED col-span logic
+                            ? // UPDATED Col Span for new grid: 2 -> 2 -> 2
+                              "bg-gradient-to-br from-purple-900/30 via-black/50 to-blue-900/30 col-span-2 sm:col-span-2 md:col-span-2"
                             : "bg-gray-800/70 hover:bg-gray-700/90", // Regular tile styles
                           tileColorClass, // Apply color-specific border/text/shadow
-                          isCurrentPage ? 'ring-2 ring-offset-2 ring-offset-black ring-brand-green' : '' // Current page indicator
+                          isCurrentPage ? 'ring-1 sm:ring-2 ring-offset-1 sm:ring-offset-2 ring-offset-black ring-brand-green' : '' // Adjusted ring thickness/offset
                         )}
                       >
                         {PageIcon && ( // Render icon if it exists
                             <PageIcon className={cn(
-                                // Adjusted icon sizes for better fit in potentially larger tiles
-                                "h-7 w-7 md:h-9 md:w-9 mb-2 transition-transform duration-300 group-hover:scale-110",
-                                page.isImportant ? "text-brand-yellow" : "inherit" // Special color for important icons
+                                // UPDATED Icon Sizes: Progressively smaller
+                                "h-6 w-6 sm:h-5 sm:w-5 md:h-4 md:w-4 mb-1 transition-transform duration-300 group-hover:scale-110",
+                                page.isImportant ? "text-brand-yellow sm:h-6 sm:w-6 md:h-5 md:w-5" : "inherit" // Important icons slightly larger than regulars at md
                             )} />
                         )}
                         <span className={cn(
-                            // Slightly larger base text size
-                            "text-sm md:text-base font-semibold transition-colors leading-tight", // Adjusted line-height
-                            page.isImportant ? "text-white" : "text-gray-300 group-hover:text-white" // Text color logic
+                            // UPDATED Text Sizes: Progressively smaller, tighter leading
+                            "font-semibold transition-colors leading-tight",
+                            "text-xs sm:text-[0.7rem] md:text-[0.6rem] md:leading-none", // Tiny text at md
+                            page.isImportant ? "text-white sm:text-xs md:text-[0.7rem]" : "text-gray-300 group-hover:text-white" // Important text slightly larger
                         )}>
                           {page.name}
                         </span>
-                        {page.isAdminOnly && ( // Admin badge indicator
-                           <span title="Admin Only" className="absolute top-1.5 right-1.5 text-xs text-red-400 bg-black/60 rounded-full px-1.5 py-0.5 leading-none">🛡️</span>
+                        {page.isAdminOnly && ( // Admin badge indicator - smaller text, tighter position
+                           <span title="Admin Only" className="absolute top-1 right-1 text-[0.55rem] text-red-400 bg-black/60 rounded-full px-1 py-0 leading-none">🛡️</span>
                         )}
                       </Link>
                     );
@@ -260,7 +237,7 @@ export default function Header() {
                 </div>
               ) : (
                  // Message when no search results found
-                <p className="text-center text-gray-500 text-lg mt-10">No pages found matching "{searchTerm}"</p>
+                <p className="text-center text-gray-500 text-base md:text-lg mt-8 md:mt-10">No pages found matching "{searchTerm}"</p> // Adjusted text size/margin
               )}
             </div>
           </motion.div>
