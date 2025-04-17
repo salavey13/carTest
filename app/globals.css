@@ -147,7 +147,16 @@ section {
   background-image: linear-gradient(to right, rgba(255, 107, 107, 0.1) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 107, 107, 0.1) 1px, transparent 1px);
 }
-
+webkit-scrollbar-track {
+  background: transparent;
+}
+.simple-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(107, 114, 128, 0.5);
+  border-radius: 3px;
+}
+.simple-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(107, 114, 128, 0.7); 
+}
 
 .cyber-text {
    text-shadow: 0 0 5px rgba(0, 255, 157, 0.7), 0 0 10px rgba(0, 255, 157, 0.5); 
