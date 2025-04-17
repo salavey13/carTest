@@ -186,7 +186,7 @@ export default function Header() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
                   {filteredPages.map((page) => {
                     // Use React.ComponentType or specific icon type if available
-                    const Icon: React.ComponentType<any> | undefined = page.icon;
+                    const PageIcon = page.icon; // Assign to a capitalized variable IF NEEDED, but direct use is safer 
                     const isCurrentPage = page.path === pathname;
                     // Define tile colors - map page.color to Tailwind classes
                     const colorClasses = {
@@ -219,10 +219,9 @@ export default function Header() {
                           isCurrentPage ? 'ring-2 ring-offset-2 ring-offset-black ring-brand-green' : '' // Current page indicator
                         )}
                       >
-                        {Icon && (
-                            <Icon className={cn(
+                        {PageIcon && ( // Check if PageIcon exists before rendering
+                            <PageIcon className={cn(
                                 "h-6 w-6 md:h-8 md:w-8 mb-2 transition-transform duration-300 group-hover:scale-110",
-                                // Icon color inherits from tileColorClass unless it's important
                                 page.isImportant ? "text-brand-yellow" : "inherit"
                             )} />
                         )}
