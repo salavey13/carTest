@@ -7,11 +7,11 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-^3-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Telegram](https://img.shields.io/badge/Telegram-Bot%20%26%20Mini%20App-blue?logo=telegram)](https://t.me/oneSitePlsBot)
 
-**Stop *just* coding. Start *VIBING*. Build, Validate, and Launch Secure Web Apps at Lightspeed with AI & Telegram – No Local Setup Required for Contributions!**
+**Build, Validate, and Launch Secure Web Apps at Lightspeed with AI & Telegram – Contribute Without a Local Setup!**
 
-oneSitePls isn't just another framework; it's a **revolution in development workflow**, built on the **VIBE methodology**. Developed by Pavel Solovyov ([@salavey13](https://github.com/salavey13)), it transforms web development by deeply integrating AI (Gemini, Coze) and leveraging **Telegram** as the primary interface for contribution and project management.
+oneSitePls is more than a framework; it's a **new approach to development**, built on the **VIBE methodology**. Developed by Pavel Solovyov ([@salavey13](https://github.com/salavey13)), it streamlines web development by deeply integrating AI (Gemini, Coze) and using **Telegram** as the central hub for contribution and project interaction.
 
-**Forget complex local setups and Git commands for simple contributions.** Anyone with a Telegram account can contribute ideas, suggest changes, and even generate code via AI, directly through the [@oneSitePlsBot](https://t.me/oneSitePlsBot) and its embedded **Supervibe Studio** (`/repo-xml` Mini App).
+**Forget complex local setups and Git commands for many contributions.** Anyone with a Telegram account can suggest ideas, propose changes, and even generate code with AI assistance, directly through the [@oneSitePlsBot](https://t.me/oneSitePlsBot) and its embedded **Supervibe Studio** Mini App (`/repo-xml` command).
 
 **See it in action (Screenshots from the Telegram Mini App):**
 
@@ -35,13 +35,13 @@ oneSitePls isn't just another framework; it's a **revolution in development work
 - [The VIBE Revolution](#the-vibe-revolution)
   - [What is VIBE?](#what-is-vibe)
 - [Key Features](#key-features)
-- [⚡ The Supervibe Workflow (Contribute via Telegram!)](#-the-supervibe-workflow-contribute-via-telegram)
-- [🔥 Example: Forging the Jumpstart Page (PR #267)](#-example-forging-the-jumpstart-page-pr-267)
+- [🚀 Contribute Easily via Telegram!](#-contribute-easily-via-telegram)
+- [🔥 See VIBE in Action: The Jumpstart Page (PR #267)](#-see-vibe-in-action-the-jumpstart-page-pr-267)
 - [Want Your Own Engine? (Advanced Setup)](#want-your-own-engine-advanced-setup)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
-  - [Running Locally (Advanced)](#running-locally-advanced)
-- [Configuration (Advanced)](#configuration-advanced)
+  - [Running Locally](#running-locally)
+  - [Configuration](#configuration)
 - [Technology Stack](#technology-stack)
 - [Project Structure](#project-structure)
 - [Core Concepts](#core-concepts)
@@ -50,9 +50,8 @@ oneSitePls isn't just another framework; it's a **revolution in development work
   - [Purpose & Profit (`/purpose-profit`)](#purpose--profit-purpose-profit)
   - [Security](#security)
 - [Contributing](#contributing)
-  - [✅ Easy Mode: Telegram + Supervibe Studio](#-easy-mode-telegram--supervibe-studio)
-  - [⚙️ Advanced Mode: GitHub Workflow](#️-advanced-mode-github-workflow)
-  - [Code Style](#code-style)
+  - [✅ The Easy Way: Telegram + Supervibe Studio](#-the-easy-way-telegram--supervibe-studio)
+  - [⚙️ The Advanced Way: Standard GitHub Workflow](#️-the-advanced-way-standard-github-workflow)
 - [License](#license)
 - [Contact](#contact)
 
@@ -62,99 +61,99 @@ oneSitePls isn't just another framework; it's a **revolution in development work
 
 ## Disclaimer
 
-oneSitePls and the VIBE methodology are under active development by Pavel Solovyov ([@salavey13](https://github.com/salavey13)). Expect rapid changes, potential bugs, and evolving features. This is an experimental approach pushing the boundaries of development workflows. Community feedback, bug reports, and contributions (especially via the Telegram workflow!) are highly encouraged!
+oneSitePls and the VIBE methodology are under active development by Pavel Solovyov ([@salavey13](https://github.com/salavey13)). Expect rapid changes, potential bugs, and evolving features. This is an experimental approach exploring new development workflows. Community feedback, bug reports, and contributions (especially via the easy Telegram method!) are highly encouraged!
 
 ---
 
 ## The VIBE Revolution
 
-The traditional development cycle can be slow, frustrating, and often leads to building features nobody wants. In the AI era, the bottleneck isn't just writing code anymore – it's **directing the AI effectively, validating ideas quickly, and ensuring security and quality.**
+Traditional development can be slow and disconnected from real needs. In the age of AI, the challenge shifts from just *writing* code to **effectively directing AI, validating ideas quickly, and maintaining quality and security.**
 
-oneSitePls tackles this head-on by:
+oneSitePls addresses this by:
 
-1.  **Leveraging AI as a Co-Pilot:** AI (Gemini, Coze) assists with code generation, analysis, and even idea validation, freeing humans for strategic thinking.
-2.  **Automating Tedious Tasks:** GitHub interactions (fetching code, creating PRs) are handled via the Supervibe Studio and server actions, reducing friction.
-3.  **Democratizing Contribution:** **Anyone with Telegram** can suggest changes or improvements using the `/repo-xml` Mini App. No need to clone repos, install dependencies, or even have a GitHub account for basic contributions. Describe your idea, let AI help, and submit – Pavel reviews and merges.
-4.  **Integrating Philosophy with Practice:** It's not just about *faster* code, but building the *right* things, aligned with personal growth and purpose (see `/selfdev`, `/purpose-profit`).
-5.  **Prioritizing Security:** Building fast doesn't mean compromising security. VIBE includes checkpoints and emphasizes secure practices even with AI assistance (see `/about_en`).
+1.  **Using AI as a Co-Pilot:** AI (Gemini, Coze) assists with code generation, analysis, and idea validation, freeing humans for higher-level strategy.
+2.  **Automating Tedium:** GitHub interactions (fetching code, creating PRs) are handled via the Supervibe Studio and backend actions, reducing friction.
+3.  **Democratizing Contribution:** **Anyone with Telegram** can suggest changes or improvements using the `/repo-xml` Mini App. No need to clone repos, install dependencies, or use Git for many tasks. Just describe your idea, get AI help (optional), and submit – Pavel reviews and integrates.
+4.  **Integrating Philosophy:** It's not just about *faster* code, but building *meaningful* products aligned with personal growth and purpose (see `/selfdev`, `/purpose-profit`).
+5.  **Prioritizing Security:** Building fast doesn't mean compromising safety. VIBE emphasizes secure practices even within the AI-assisted workflow (see `/about_en`).
 
 ### What is VIBE?
 
-VIBE represents the core principles guiding oneSitePls development:
+VIBE guides the oneSitePls development approach:
 
 1.  **Validation:** Use AI and lean methods to test ideas *before* heavy investment. Fail fast, learn faster. (`/selfdev#validation`)
-2.  **Iteration:** Leverage AI code generation (`/repo-xml`, Gemini/Coze) and automated workflows (Supervibe Studio, GitHub Actions, Telegram Bots) for rapid prototyping and feature deployment.
-3.  **Business Logic & UX:** Free up human developers to architect robust systems, design intuitive user experiences, and implement complex business rules – areas where human insight excels.
-4.  **Enhancement & Security:** Continuously improve the application and integrate security checks throughout the AI-assisted pipeline, ensuring speed doesn't compromise robustness.
+2.  **Iteration:** Leverage AI code generation (`/repo-xml`, Gemini/Coze) and automated workflows (Supervibe Studio, GitHub Actions, Telegram Bots) for rapid prototyping and deployment.
+3.  **Business Logic & UX:** Focus human developers on architecting robust systems, designing intuitive interfaces, and implementing complex business rules – areas where human insight shines.
+4.  **Enhancement & Security:** Continuously improve the application and integrate security checks throughout the pipeline, ensuring speed doesn't compromise robustness.
 
 ---
 
 ## Key Features
 
--   💬 **Telegram-First Interface:** Contribute code ideas, fetch repo context, and trigger actions directly via the [@oneSitePlsBot](https://t.me/oneSitePlsBot) and its Mini App (`/repo-xml`).
--   🤖 **Supervibe Studio (`/repo-xml`):** The core Mini App for the AI workflow: fetch code, manage AI prompts, parse/validate AI responses, create/update GitHub PRs/branches.
--   🧠 **Deep AI Integration:** Utilize Google Gemini & Coze for code generation, analysis, and validation tasks (`/ai_actions`, `/selfdev#validation`).
--   🔒 **Integrated Security:** Automated workflow includes code parsing, validation hints, and secure GitHub operations. Security principles baked into the methodology (`/about_en`).
--   🔄 **Seamless GitHub Automation:** Server actions (`/actions_github`) handle repo fetching, branch/PR management, and user profile lookups via the GitHub API, triggered from the Mini App.
+-   💬 **Telegram-First Interface:** Interact with the project, suggest changes, and trigger actions via [@oneSitePlsBot](https://t.me/oneSitePlsBot) and its Mini App (`/repo-xml`).
+-   🤖 **Supervibe Studio (`/repo-xml`):** The core Mini App for the AI workflow: fetch code, manage AI prompts, parse AI responses, create/update GitHub PRs/branches directly from Telegram.
+-   🧠 **Deep AI Integration:** Utilizes Google Gemini & Coze for code generation, analysis, and validation (`/ai_actions`, `/selfdev#validation`).
+-   🔒 **Integrated Security:** Automated workflow includes code parsing, validation hints, and secure backend GitHub operations. Security principles are part of the methodology (`/about_en`).
+-   🔄 **Seamless GitHub Automation:** Backend actions (`/actions_github`) handle repo fetching, branch/PR management, triggered from the Mini App.
 -   🌱 **SelfDev & Purpose Framework:** Pages (`/selfdev`, `/purpose-profit`) outlining a philosophy for thriving as a creator in the AI age.
 -   🚀 **Jumpstart Concept (`/jumpstart`):** Vision for easily bootstrapping new projects based on VIBE principles.
 -   ⚙️ **Modern Tech Stack:** Built with Next.js 14 (App Router), TypeScript, Supabase, Tailwind CSS, Shadcn/UI.
--   🔔 **Realtime Updates & Notifications:** Uses Supabase Realtime for AI response monitoring and Telegram bots for admin/user notifications.
+-   🔔 **Realtime Updates & Notifications:** Uses Supabase Realtime for monitoring AI tasks and Telegram bots for notifications.
 
 ---
 
-## ⚡ The Supervibe Workflow (Contribute via Telegram!)
+## 🚀 Contribute Easily via Telegram!
 
-**This is the easiest way to contribute, even without coding experience!**
+**This is the simplest way to contribute, perfect even if you're not a coder or don't want to set up a local development environment.**
 
-1.  **Open the Bot:** Go to [@oneSitePlsBot](https://t.me/oneSitePlsBot) in Telegram.
-2.  **Launch the Studio:** Open the Mini App (often via a button in the chat or the attachment menu). Navigate to the **Supervibe Studio (`/repo-xml`)**.
-3.  **Fetch Context (Optional but Recommended):**
-    *   Use the "Settings" (<FaCodeBranch /> icon) to ensure the correct GitHub repo URL is set (defaults to `salavey13/carTest`).
-    *   Click "Извлечь файлы" (`Fetch Files`) to load the current codebase into the "Кибер-Экстрактор".
-    *   Select relevant files from the list to provide context for your idea.
-4.  **Describe Your Task / Idea:** In the "Твой Запрос к AI" (`Your AI Request`) text area, clearly describe the change or feature you want.
-    *   *(Optional)* Click "Добавить (+)" (`Add Selected`) to append the content of selected files to your request.
-5.  **Get AI Assistance (Optional):**
-    *   Click "🤖 Спросить AI" (`Ask AI`). Your request (with context) is sent to the backend AI (Gemini). *Pavel gets notified.*
-    *   Wait for the AI response to appear in the "AI Code Assistant" text area below (this happens via Realtime).
-    *   *(Alternative)* Copy the request (<FaCopy />) and paste it into your preferred AI (like AIStudio, ChatGPT, Grok, Qwen), then paste the *full AI response* back into the "AI Code Assistant" textarea.
-6.  **Parse & Review:** Click the "➡️ Разобрать Ответ" (`Parse Response`) button next to the AI response textarea. The Studio will extract code blocks and identify files. Review the proposed changes.
-7.  **Submit:** Select the files you want to include in the change. Add a descriptive "PR Title". Click "Создать PR" (`Create PR`) or "Обновить Ветку" (`Update Branch`).
-8.  **Done!** A Pull Request is automatically created on the GitHub repository *on your behalf* (your Telegram @username might be mentioned for credit). Pavel gets notified to review and merge.
+1.  **Open the Bot:** Start a chat with [@oneSitePlsBot](https://t.me/oneSitePlsBot) in Telegram.
+2.  **Launch the Studio:** Open the Mini App (usually via a button in the chat or the attachment menu / slash command). Navigate to the **Supervibe Studio (`/repo-xml`)**.
+3.  **Fetch Code (Optional but helpful):**
+    *   Use "Settings" (<FaCodeBranch /> icon) to ensure the correct GitHub repo is targeted (defaults to `salavey13/carTest`).
+    *   Click "Извлечь файлы" (`Fetch Files`) to load the current codebase structure.
+    *   Select relevant files from the list to give the AI (and Pavel) context for your suggestion.
+4.  **Describe Your Idea:** In the "Твой Запрос к AI" (`Your AI Request`) box, clearly explain the change, feature, or improvement you have in mind. Be specific!
+    *   *(Optional)* Click "Добавить (+)" (`Add Selected`) to include the content of selected files in your request for better AI context.
+5.  **Get AI Help (Optional):**
+    *   Click "🤖 Спросить AI" (`Ask AI`). Your request (and any selected file context) is sent to the backend AI (Gemini). *Pavel gets notified.*
+    *   Wait for the AI's suggested code/text to appear in the "AI Code Assistant" box below (this uses Realtime, so it updates automatically).
+    *   *(Alternative)* You can copy the request (<FaCopy />), use your own AI tool (like ChatGPT, Claude, etc.), and then paste the *full AI response* back into the "AI Code Assistant" box.
+6.  **Review & Prepare:** Click "➡️ Разобрать Ответ" (`Parse Response`) next to the AI response. The tool extracts code blocks and identifies files. Review the changes. Does it match your idea?
+7.  **Submit:** Select the files you want included. Add a descriptive "PR Title" (e.g., "Fix typo on about page", "Add new feature description"). Click "Создать PR" (`Create PR`) or "Обновить Ветку" (`Update Branch`).
+8.  **Done!** A Pull Request is automatically created on the GitHub repository. Pavel gets notified to review, discuss (if needed), and merge your contribution. Your Telegram username might be mentioned for credit.
 
-**That's it! You've contributed to a real-world project using AI and Telegram, potentially without writing a single line of code yourself or setting up any local development environment.**
+**That's it! You've contributed to a real project using AI and Telegram, potentially without writing code yourself or touching Git.**
 
 ---
 
-## 🔥 Example: Forging the Jumpstart Page (PR #267)
+## 🔥 See VIBE in Action: The Jumpstart Page (PR #267)
 
-**Curious what a VIBE session looks like?** Check out **[PR #267: Supervibe Jumpstart Playbook page](https://github.com/salavey13/carTest/pull/267)**!
+**Want proof of concept?** Check out **[PR #267: Supervibe Jumpstart Playbook page](https://github.com/salavey13/carTest/pull/267)**!
 
-This entire feature page (`/jumpstart/page.tsx`), built around the game-changing **'Product Maker Maker'** concept (giving users an *instant*, AI-powered business template!), was forged in a single **~5-hour VIBE session**.
+This entire feature page (`/jumpstart`), built around the innovative **'Product Maker Maker'** concept (giving users an instant, AI-powered business template!), was created in a single **~5-hour VIBE session**.
 
-**How it went down (see PR comments for the full dialogue):**
+**How it happened (see PR comments for details):**
 
-1.  **Concept Refinement:** A dynamic conversation between Pavel and the AI assistant (Gemini via AI Studio) honed the core idea – moving from just teaching to *giving* users a ready-to-go engine ("Pimp My Friend!").
-2.  **AI Code Generation:** The AI generated the initial code structure, React components, and content based on the refined prompts.
-3.  **Iteration & Debugging:** Pavel and the AI worked together to fix syntax errors, implement translations, refine UI elements, and ensure the code aligned with the VIBE philosophy.
-4.  **Orchestration via Supervibe Studio:** While the AI dialogue happened externally (AI Studio), the process of fetching existing code, parsing AI responses, and ultimately submitting the changes (as 16 distinct commits!) was likely managed through the Supervibe Studio (`/repo-xml`) interface within Telegram.
-5.  **Outcome:** A fully functional, visually polished, and merged feature page, ready for users.
+1.  **Concept Refinement:** Dialogue between Pavel and AI (Gemini via AI Studio) refined the idea.
+2.  **AI Code Generation:** AI generated initial React components, structure, and content.
+3.  **Iteration & Debugging:** Pavel and AI worked together to fix errors, refine UI, and ensure alignment.
+4.  **Orchestration:** The Supervibe Studio (`/repo-xml`) in Telegram was likely used to manage fetching code, parsing AI responses, and submitting the changes across 16 commits.
+5.  **Outcome:** A merged, functional, polished feature page.
 
 **This PR perfectly demonstrates:**
 
--   **AI as a true co-pilot:** Assisting in conceptualization, coding, and refinement.
--   **Rapid Iteration:** Building and improving a complex feature in hours, not days.
--   **Human Oversight:** Pavel guiding the AI, reviewing code, and ensuring quality.
--   **The Power of the Telegram Workflow:** How complex changes can be orchestrated through a simple interface, making contribution accessible.
+-   **AI as a collaborator:** Assisting in ideation, coding, and refinement.
+-   **Rapid Iteration:** Building a significant feature in hours.
+-   **Human Oversight:** Pavel guiding the process, reviewing, and ensuring quality.
+-   **The Power of the Telegram Workflow:** Orchestrating complex changes through a user-friendly interface.
 
-**This is the speed and collaborative power the VIBE workflow unlocks – a workflow *you* can participate in directly via Telegram!**
+**This is the speed and collaboration the VIBE workflow enables – a workflow *you* can easily participate in!**
 
 ---
 
 ## Want Your Own Engine? (Advanced Setup)
 
-If you want to fork this project, run it locally, customize it deeply, or deploy your own instance with your own tokens:
+This section is for developers who want to fork the project, run it locally, deploy their own instance, or contribute via the traditional Git workflow.
 
 ### Prerequisites
 
@@ -163,20 +162,33 @@ If you want to fork this project, run it locally, customize it deeply, or deploy
 -   [Git](https://git-scm.com/)
 -   A Supabase account and project.
 -   Your *own* Telegram Bot Token.
--   Your *own* API Keys for AI services (Gemini, Coze).
--   Your *own* GitHub Personal Access Token (`repo` scope).
+-   Your *own* API Keys for AI services (Google AI Studio/Gemini, Coze).
+-   Your *own* GitHub Personal Access Token (classic or fine-grained with `repo` scope).
 
 ### Installation
 
-1.  **Clone:** `git clone https://github.com/salavey13/carTest.git && cd carTest`
-2.  **Install:** `npm install` or `yarn install`
-3.  **Environment:** Create `.env.local` from `.env.example` (if exists) or manually. See [Configuration (Advanced)](#configuration-advanced).
-4.  **Supabase Setup:**
-    *   Run necessary SQL migrations (check for a `/supabase/migrations` folder or examine `/types/database.types.ts` and `/hooks/supabase.ts` for table structures: `users`, `cars`, `invoices`, `ai_requests`, etc.).
-    *   Set up Auth, Storage buckets (`carpix`, `about`, etc. - make public if needed), and potentially Edge Functions (`generate-embeddings`).
-    *   Create required RPC functions (`search_cars`, `get_recent_paid_selfdev_invoices`, etc.). Find examples in `/hooks/supabase.ts` or `/app/selfdev/actions.ts`.
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/salavey13/carTest.git
+    cd carTest
+    ```
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    # or
+    yarn install
+    ```
+3.  **Set up environment variables:**
+    *   Create a `.env.local` file in the root directory by copying `.env.example` (if it exists) or creating it manually.
+    *   Fill in the required values as described in the [Configuration](#configuration) section below using *your own keys and project details*.
+4.  **Set up Supabase:**
+    *   In your Supabase project, run the necessary SQL migrations. Check the `/supabase/migrations` folder (if present) or examine `/types/database.types.ts` and database interactions (e.g., in `/hooks/supabase.ts`, `/app/**/actions.ts`) to understand the required tables (e.g., `users`, `ai_requests`, `invoices`, etc.). You might need to create these manually if migrations aren't provided.
+    *   Configure Supabase Auth settings.
+    *   Set up required Storage buckets (e.g., `carpix`, `about` - check code for usage) and configure their policies (e.g., public access if needed).
+    *   Create required database functions (RPC) if used (e.g., `search_cars`, `get_recent_paid_selfdev_invoices`). Check `/hooks/supabase.ts` or `/app/**/actions.ts` for function calls.
+    *   Enable Row Level Security (RLS) on your tables and define appropriate policies for security.
 
-### Running Locally (Advanced)
+### Running Locally
 
 ```bash
 npm run dev
@@ -184,43 +196,48 @@ npm run dev
 yarn dev
 ```
 
-Access via `http://localhost:3000`. For full Telegram Mini App testing, use `ngrok` or deploy to a platform like Vercel and configure the bot's Mini App URL.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
----
+**Note:** For full Telegram Mini App functionality testing (including receiving user data from Telegram), you'll need to:
+1.  Deploy your local instance to the web using a tunneling service like `ngrok`.
+2.  Configure your Telegram Bot's Mini App URL (via [@BotFather](https://t.me/BotFather)) to point to your `ngrok` HTTPS URL.
 
-## Configuration (Advanced)
+### Configuration
 
-Create `.env.local` and fill these (replace placeholders):
+Create a `.env.local` file in the project root and add the following variables with *your own credentials*. **Never commit this file to Git.**
 
 ```env
-# Supabase (YOUR Project)
+# Supabase (YOUR Project Credentials)
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key # SERVER-SIDE ONLY
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-public-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key # Used server-side only
 
-# Telegram (YOUR Bot)
-TELEGRAM_BOT_TOKEN=your-telegram-bot-token
-ADMIN_CHAT_ID=your-telegram-admin-chat-id # YOUR Admin ID
+# Telegram (YOUR Bot Credentials)
+TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
+ADMIN_CHAT_ID=your_personal_telegram_chat_id # For receiving admin notifications
 
-# GitHub (YOUR Token)
-GITHUB_TOKEN=ghp_yourgithubpersonalaccesstoken # Needs repo scope
+# GitHub (YOUR Personal Access Token)
+# Needs 'repo' scope for accessing repositories
+GITHUB_TOKEN=ghp_yourgithubpersonalaccesstoken
 
-# AI Services (YOUR Keys)
-GEMINI_API_KEY=your-google-ai-gemini-api-key
-COZE_API_KEY=your-coze-api-key
-COZE_BOT_ID=your-coze-bot-id
-COZE_USER_ID=your-coze-user-id
+# AI Services (YOUR API Keys)
+GEMINI_API_KEY=your_google_ai_studio_or_gemini_api_key
+# COZE_API_KEY=your_coze_api_key # Add if using Coze
+# COZE_BOT_ID=your_coze_bot_id
+# COZE_USER_ID=your_coze_user_id # Usually '29032...'
 
-# Mock User (Optional, for dev outside Telegram)
-NEXT_PUBLIC_USE_MOCK_USER=false
-# ... (Mock user details if needed) ...
+# Deployment URL (Required for Webhooks, Links in messages)
+# Vercel automatically sets NEXT_PUBLIC_VERCEL_URL.
+# If deploying elsewhere, set NEXT_PUBLIC_SITE_URL.
+# Example: NEXT_PUBLIC_SITE_URL=https://your-app-domain.com
 
-# Base URL (Needed for webhooks, links in notifications)
-# Vercel sets NEXT_PUBLIC_VERCEL_URL automatically. Set manually otherwise.
-# NEXT_PUBLIC_SITE_URL=https://your-deployment-url.com
+# Mock User (Optional: For development outside Telegram environment)
+# Set to true to simulate a Telegram user without the actual WebApp context
+# NEXT_PUBLIC_USE_MOCK_USER=false
+# MOCK_USER_DETAILS='{"id":123456,"first_name":"Mock","last_name":"User","username":"mockuser","language_code":"en"}' # Example
 ```
 
-**Security:** Protect your `.env.local` file and never commit sensitive keys.
+**Security Reminder:** Keep your `.env.local` file secure and out of version control.
 
 ---
 
@@ -228,12 +245,13 @@ NEXT_PUBLIC_USE_MOCK_USER=false
 
 -   **Framework:** [Next.js](https://nextjs.org/) (v14+ App Router)
 -   **Language:** [TypeScript](https://www.typescriptlang.org/)
--   **Backend & DB:** [Supabase](https://supabase.io/) (Auth, Postgres, Storage, Realtime, Edge Functions?)
--   **Styling:** [Tailwind CSS](https://tailwindcss.com/) & [Shadcn/UI](https://ui.shadcn.com/)
--   **AI Models:** [Google Gemini](https://ai.google.dev/), [Coze AI](https://www.coze.com/)
--   **Platform:** [Telegram](https://telegram.org/) (Bot API, WebApp SDK)
--   **GitHub API:** [Octokit](https://github.com/octokit/octokit.js)
--   **State Management:** React Context API
+-   **Backend & DB:** [Supabase](https://supabase.io/) (Auth, Postgres DB, Storage, Realtime)
+-   **Styling:** [Tailwind CSS](https://tailwindcss.com/)
+-   **UI Components:** [Shadcn/UI](https://ui.shadcn.com/)
+-   **AI Models:** [Google Gemini](https://ai.google.dev/), [Coze AI](https://www.coze.com/) (via API)
+-   **Platform Integration:** [Telegram Bot API](https://core.telegram.org/bots/api), [Telegram WebApp SDK](https://core.telegram.org/bots/webapps)
+-   **GitHub Interaction:** [Octokit](https://github.com/octokit/octokit.js) (via GitHub API)
+-   **State Management:** React Context API, Server Actions
 -   **Linting/Formatting:** ESLint, Prettier
 
 ---
@@ -242,45 +260,42 @@ NEXT_PUBLIC_USE_MOCK_USER=false
 
 ```
 /
-├── app/                  # Next.js App Router Pages & Layouts
-│   ├── (page_routes)/    # Route groups (e.g., about, donate, repo-xml)
-│   │   ├── page.tsx      # Page component
-│   │   └── actions.ts    # Server Actions specific to the route (optional)
-│   ├── actions.ts        # General Server Actions (Telegram, DB, etc.)
-│   ├── actions_github/   # Server Actions for GitHub API
+├── app/                  # Next.js App Router: Pages, Layouts, Server Actions
+│   ├── (page_routes)/    # Feature-specific route groups (e.g., repo-xml, selfdev)
+│   │   ├── page.tsx      # Page component for the route
+│   │   └── actions.ts    # Server Actions specific to this route (optional)
+│   ├── actions.ts        # General Server Actions (e.g., DB interactions)
+│   ├── actions_github/   # Server Actions dedicated to GitHub API calls
 │   │   └── actions.ts
-│   ├── ai_actions/       # Server Actions for AI models
+│   ├── ai_actions/       # Server Actions for interacting with AI models
 │   │   └── actions.ts
-│   ├── webhook-handlers/ # Logic for Telegram payment webhooks
-│   │   ├── *.ts
-│   │   └── types.ts
-│   ├── api/              # API Routes (e.g., /api/telegramWebhook)
-│   ├── layout.tsx        # Root Layout
-│   └── globals.css       # Global Styles
-├── components/           # Shared React Components
-│   ├── ui/               # Shadcn/UI components (likely generated)
-│   ├── assistant_components/ # Components for AICodeAssistant
-│   ├── repo/             # Components for RepoTxtFetcher
-│   ├── stickyChat_components/ # Components for StickyChatButton/AutomationBuddy
+│   ├── api/              # API Routes (e.g., /api/telegramWebhook for bot updates)
+│   ├── webhook-handlers/ # Logic for specific webhooks (e.g., Telegram payments)
+│   ├── layout.tsx        # Root application layout
+│   └── globals.css       # Global styles
+├── components/           # Reusable React components
+│   ├── ui/               # Shadcn/UI components (often generated)
+│   ├── assistant_components/ # Components used in the AI Assistant UI
+│   ├── repo/             # Components for the Supervibe Studio (`/repo-xml`)
 │   └── *.tsx             # Other shared components (Header, Footer, etc.)
-├── contexts/             # React Context Providers
+├── contexts/             # React Context providers for global state
 │   ├── AppContext.tsx
 │   └── RepoXmlPageContext.tsx
 ├── hooks/                # Custom React Hooks
-│   ├── supabase.ts       # Supabase client setup & DB helpers
-│   ├── useTelegram.ts    # Hook for Telegram WebApp interaction
-│   └── *.ts              # Other custom hooks (e.g., useCodeParsing)
-├── lib/                  # Utility functions, constants, types
-│   ├── auth.ts           # JWT generation/verification
-│   ├── logger.ts         # Logging utility
-│   ├── utils.ts          # General utility functions (cn, getBaseUrl)
+│   ├── supabase.ts       # Supabase client setup & helper functions
+│   ├── useTelegram.ts    # Hook for interacting with Telegram WebApp SDK
+│   └── *.ts              # Other custom hooks
+├── lib/                  # Utility functions, constants, shared types
+│   ├── auth.ts           # Authentication related utilities (if any)
+│   ├── logger.ts         # Logging setup
+│   ├── utils.ts          # General utility functions (e.g., cn, getBaseUrl)
 │   └── *.ts
-├── public/               # Static assets
-├── styles/               # Additional global styles (if needed)
+├── public/               # Static assets (images, fonts, etc.)
+├── styles/               # Additional global styles if needed
 ├── types/                # TypeScript type definitions
-│   ├── database.types.ts # Supabase generated types
-│   ├── telegram.ts       # Telegram specific types
-│   └── ai.types.ts       # AI request/response types
+│   ├── database.types.ts # Auto-generated Supabase types (important!)
+│   ├── telegram.ts       # Types related to Telegram API/WebApp
+│   └── ai.types.ts       # Types for AI request/response structures
 ├── .env.local            # Local Environment Variables (DO NOT COMMIT)
 ├── .eslintrc.json        # ESLint configuration
 ├── next.config.mjs       # Next.js configuration
@@ -297,38 +312,53 @@ NEXT_PUBLIC_USE_MOCK_USER=false
 
 ### Supervibe Studio (`/repo-xml`)
 
-The central Mini App for the AI-driven workflow. It allows users (via Telegram) to: Fetch GitHub code → Select context → Describe task → Interact with AI (submit request, receive response via Realtime) → Parse & Validate AI output → Create/Update GitHub PRs/Branches. **This makes GitHub contribution accessible without local setup.**
+This is the Telegram Mini App that powers the easy contribution workflow. It enables users to: Fetch GitHub code context → Describe a task → Interact with AI (send prompt, receive code/text via Realtime) → Parse AI output → Validate changes → Create/Update GitHub Pull Requests or Branches. **It makes contributing accessible without needing Git or a local setup.**
 
 ### SelfDev Philosophy (`/selfdev`)
 
-Explores the mindset shift required in the AI era: becoming an **authentic creator/generalist**, leveraging AI, **validating ideas fast**, and building purpose-driven ventures. Connects deeply with the VIBE methodology.
+Explores the mindset for creators in the AI era: leveraging AI effectively, validating ideas rapidly, focusing on unique strengths, and building purpose-driven projects. This philosophy underpins the VIBE methodology.
 
 ### Purpose & Profit (`/purpose-profit`)
 
-Summarizes key ideas (inspired by Dan Koe) on **integrating personal purpose with practical business building**. Covers mental models for value, the "Deep Generalism" concept, and the "Self-Monetization" approach (being your own niche).
+Draws inspiration (e.g., from Dan Koe) on aligning personal purpose with building valuable products/services. Touches on concepts like "Deep Generalism" and sustainable monetization strategies.
 
 ### Security
 
-A core tenet of VIBE. While AI accelerates development, security isn't sacrificed:
+Security is integral to the VIBE approach:
 
--   **Secure GitHub Flow:** Controlled via backend actions and tokens.
--   **AI Code Review:** Parsing/validation steps in the Studio encourage human review.
--   **Secure Configuration:** Sensitive keys managed via environment variables.
--   **Supabase RLS:** Essential for data protection.
+-   **Secure GitHub Operations:** Handled via backend server actions using protected tokens.
+-   **AI Output Review:** The Supervibe Studio's parsing and validation steps encourage human review before submission.
+-   **Secure Configuration:** Sensitive API keys and credentials managed via environment variables (`.env.local`) and not exposed client-side unless necessary (and safe).
+-   **Supabase RLS:** Row Level Security should be configured in Supabase to protect data access.
 
+---
 
-### Pull Requests
+## Contributing
 
--   Provide a clear title and description for your PR, explaining the "what" and "why" of your changes.
--   Link to any relevant issues.
--   Ensure all CI checks (linting, type checking, tests) pass.
--   Be responsive to feedback from maintainers.
+We welcome contributions of all kinds! Here are the main ways to contribute:
 
-### Code Style
+### ✅ The Easy Way: Telegram + Supervibe Studio
 
--   Follow the existing code style enforced by ESLint and Prettier.
--   Use TypeScript for type safety.
--   Write clear, maintainable, and well-documented code where necessary.
+-   **Ideal for:** Suggesting features, reporting bugs, proposing text changes, simple code adjustments, or generating code ideas with AI assistance.
+-   **How:** Use the [@oneSitePlsBot](https://t.me/oneSitePlsBot) and its `/repo-xml` Mini App (Supervibe Studio) as described in the [🚀 Contribute Easily via Telegram!](#-contribute-easily-via-telegram) section above.
+-   **No local setup or Git knowledge required!**
+
+### ⚙️ The Advanced Way: Standard GitHub Workflow
+
+-   **Ideal for:** More complex features, bug fixes requiring local debugging, refactoring, dependency updates, or for those comfortable with Git and GitHub.
+-   **How:**
+    1.  **Fork** the repository on GitHub.
+    2.  **Clone** your fork locally: `git clone https://github.com/YOUR_USERNAME/carTest.git`
+    3.  **Create a new branch** for your changes: `git checkout -b feature/your-feature-name` or `fix/issue-description`.
+    4.  **Make your changes:** Write code, fix bugs, add tests.
+    5.  **Commit** your changes with clear, descriptive messages: `git commit -m "feat: Add new login method"`
+    6.  **Push** your branch to your fork: `git push origin feature/your-feature-name`
+    7.  **Open a Pull Request (PR)** from your branch on your fork to the `main` branch of the original `salavey13/carTest` repository.
+    8.  **Describe your PR:** Clearly explain the purpose of your changes and link any relevant issues (e.g., `Fixes #123`).
+    9.  **Ensure Checks Pass:** Make sure any automated checks (linting, tests, builds) configured for the repository pass.
+    10. **Respond to Feedback:** Engage in discussion and address any feedback from maintainers.
+
+-   **Code Style:** Please follow the existing code style, enforced by ESLint and Prettier. Run `npm run lint` and `npm run format` (or equivalent `yarn` commands) before committing. Use TypeScript effectively. Write clear, maintainable code.
 
 ---
 
@@ -344,9 +374,9 @@ Pavel Solovyov (salavey13)
 
 -   **GitHub:** [https://github.com/salavey13](https://github.com/salavey13)
 -   **Telegram:** [@salavey13](https://t.me/salavey13)
+-   **Project Bot:** [@oneSitePlsBot](https://t.me/oneSitePlsBot)
 -   **Email:** [salavey13@gmail.com](mailto:salavey13@gmail.com)
 
 Feel free to reach out with questions, feedback, or collaboration ideas!
 
 ---
-```
