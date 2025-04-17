@@ -1288,28 +1288,17 @@ export async function setTelegramWebhook(): Promise<{ success: boolean; data?: a
 
 
 // --- Image Upload Actions (NEW) ---
+// /app/actions.ts (or wherever your actions are defined)
+"use server"; // Ensure this is a server action
 
-/** Lists public Supabase Storage buckets */
-export async function listPublicBuckets(): Promise<{ success: boolean; data?: Bucket[]; error?: string }> {
-    try {
-        const { data: buckets, error } = await supabaseAdmin.storage.listBuckets();
-        if (error) {
-            logger.error("Error listing Supabase buckets:", error);
-            throw error;
-        }
-        // Filter for public buckets only
-        const publicBuckets = buckets.filter(bucket => bucket.public);
-        return { success: true, data: publicBuckets };
-    } catch (error) {
-        logger.error("Failed to list public buckets:", error);
-        return { success: false, error: error instanceof Error ? error.message : "Could not list buckets" };
-    }
-}
+import { supabaseAdmin } from "@/hooks/supabase"; // Assuming correct path
+import { logger } from "@/lib/logger"; // Assuming correct path
+import { v4 as uuidv4 } from 'uuid'; // Import UUID for unique filenames
 
-/** Uploads multiple images to a specified public bucket */
+// Ensure this function is exported if it's in actions.ts
 export async function uploadBatchImages(
     formData: FormData
-): Promise<{ success: boolean; data?: { name: string; url: string }[]; error?: string }> {
+): Promise<{ success: boolean; data?: { name: string; url: string; error?: undefined }[]; error?: string; failed?: { name: string; error: string }[] }> {
     try {
         const bucketName = formData.get("bucketName") as string;
         const files = formData.getAll("files") as File[];
@@ -1321,56 +1310,112 @@ export async function uploadBatchImages(
             return { success: false, error: "No files selected for upload." };
         }
 
-        // Check if bucket exists and is public (optional, but good practice)
-        const { data: bucketData, error: bucketGetError } = await supabaseAdmin.storage.getBucket(bucketName);
-        if (bucketGetError || !bucketData) {
-            logger.error(`Error checking bucket ${bucketName}: ${bucketGetError?.message}`);
-            return { success: false, error: `Bucket '${bucketName}' not found or inaccessible.` };
+        // --- Bucket Check (Optional but recommended) ---
+        try {
+            const { data: bucketData, error: bucketGetError } = await supabaseAdmin.storage.getBucket(bucketName);
+            if (bucketGetError) throw bucketGetError; // Re-throw Supabase error
+            if (!bucketData) throw new Error(`Bucket '${bucketName}' not found.`);
+            if (!bucketData.public) throw new Error(`Bucket '${bucketName}' must be public.`);
+        } catch (bucketCheckError) {
+            const errorMsg = bucketCheckError instanceof Error ? bucketCheckError.message : "Failed to verify bucket";
+            logger.error(`Bucket check failed for ${bucketName}:`, errorMsg);
+            return { success: false, error: `Bucket check failed: ${errorMsg}` };
         }
-        if (!bucketData.public) {
-             return { success: false, error: `Bucket '${bucketName}' is not public.` };
-        }
+        // --- End Bucket Check ---
 
         const uploadPromises = files.map(async (file) => {
+            const fileExt = file.name.split('.').pop();
+            // Create a unique path, e.g., 'some-folder/image-uuid.png'
+            // You might want a different folder structure
+            const filePath = `${file.name.replace(/\.[^/.]+$/, "")}-${uuidv4()}.${fileExt}`;
+
             try {
-                // Reuse the existing uploadImage function from hooks/supabase
-                const imageUrl = await uploadImage(bucketName, file);
-                return { name: file.name, url: imageUrl };
+                // Upload the file
+                const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+                    .from(bucketName)
+                    .upload(filePath, file, {
+                       cacheControl: '3600', // Optional: Set cache control
+                       upsert: false, // Optional: Prevent overwriting existing files with the same path
+                    });
+
+                if (uploadError) {
+                    throw uploadError; // Throw Supabase upload error
+                }
+
+                if (!uploadData?.path) {
+                     throw new Error("Upload succeeded but path is missing.");
+                }
+
+                // Get the public URL
+                const { data: urlData } = supabaseAdmin.storage
+                    .from(bucketName)
+                    .getPublicUrl(uploadData.path); // Use the path returned by the upload
+
+                if (!urlData?.publicUrl) {
+                    throw new Error("Could not get public URL after upload.");
+                }
+
+                // Return success object for this file
+                return { name: file.name, url: urlData.publicUrl };
+
             } catch (uploadError) {
-                logger.error(`Failed to upload file ${file.name} to ${bucketName}:`, uploadError);
+                const errorMsg = uploadError instanceof Error ? uploadError.message : "Unknown upload error";
+                logger.error(`Failed to upload file ${file.name} to ${bucketName}/${filePath}:`, errorMsg);
                 // Return an error object for this specific file
-                return { name: file.name, error: uploadError instanceof Error ? uploadError.message : "Upload failed" };
+                return { name: file.name, error: errorMsg };
             }
         });
 
         const results = await Promise.all(uploadPromises);
 
         // Separate successful uploads from errors
-        const successfulUploads = results.filter(r => r && !r.error) as { name: string; url: string }[];
-        const uploadErrors = results.filter(r => r && r.error);
+        const successfulUploads = results.filter(r => r && 'url' in r) as { name: string; url: string }[];
+        const uploadErrors = results.filter(r => r && 'error' in r) as { name: string; error: string }[];
 
-        if (successfulUploads.length === 0) {
-            return { success: false, error: `All ${files.length} uploads failed. ${uploadErrors[0]?.error ?? ''}`, data: [] };
-        }
 
-        // Return partial success if some uploads failed
-        if (uploadErrors.length > 0) {
+        if (successfulUploads.length === 0 && uploadErrors.length > 0) {
+            // All failed
+             return {
+                 success: false,
+                 error: `All ${files.length} uploads failed. First error: ${uploadErrors[0]?.error ?? 'Unknown'}`,
+                 failed: uploadErrors
+             };
+        } else if (uploadErrors.length > 0) {
+            // Partial success
              return {
                  success: true, // Indicate partial success
                  data: successfulUploads,
-                 error: `${uploadErrors.length} out of ${files.length} uploads failed.` // Provide a summary error
+                 error: `${uploadErrors.length} out of ${files.length} uploads failed.`, // Provide a summary error
+                 failed: uploadErrors
              };
+        } else if (successfulUploads.length === 0 && uploadErrors.length === 0) {
+             // Should not happen, but handle defensively
+             return { success: false, error: "Upload process completed without any results." };
         }
 
         // All uploads successful
         return { success: true, data: successfulUploads };
 
     } catch (error) {
-        logger.error("Error in uploadBatchImages:", error);
-        return { success: false, error: error instanceof Error ? error.message : "Batch image upload failed" };
+        logger.error("Critical error in uploadBatchImages:", error);
+        const errorMsg = error instanceof Error ? error.message : "Batch image upload failed due to an unexpected error.";
+        return { success: false, error: errorMsg };
     }
 }
 
+// Also ensure listPublicBuckets is defined and exported correctly if it's in the same file
+export async function listPublicBuckets(): Promise<{ success: boolean; data?: Bucket[]; error?: string }> {
+    try {
+        const { data, error } = await supabaseAdmin.storage.listBuckets();
+        if (error) throw error;
+        const publicBuckets = data.filter(bucket => bucket.public);
+        return { success: true, data: publicBuckets };
+    } catch (error) {
+        logger.error("Failed to list public buckets:", error);
+        const errorMsg = error instanceof Error ? error.message : "Could not fetch public buckets";
+        return { success: false, error: errorMsg };
+    }
+}
 
 // --- RESTORED / DEPRECATED? ---
 
