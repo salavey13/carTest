@@ -98,7 +98,7 @@ export default function Header() {
       setIsHeaderVisible(true); // Show on scroll up
     }
     setLastScrollY(currentScrollY);
-  }, [lastScrollY, isNavOpen]); // Removed isHeaderVisible dependency as it's implicitly handled
+  }, [lastScrollY, isNavOpen]);
 
   // Effect for scroll event listener
   useEffect(() => {
@@ -106,13 +106,13 @@ export default function Header() {
     return () => {
       window.removeEventListener("scroll", handleScroll);
     };
-  }, [handleScroll]); // Dependency: handleScroll
+  }, [handleScroll]);
 
   // Close nav when pathname changes
   useEffect(() => {
     setIsNavOpen(false);
     setSearchTerm(""); // Also clear search on navigation
-  }, [pathname]); // Dependency: pathname
+  }, [pathname]);
 
   // Prevent body scroll when nav is open
   useEffect(() => {
@@ -121,11 +121,10 @@ export default function Header() {
     } else {
       document.body.style.overflow = '';
     }
-    // Cleanup function to restore scroll on component unmount
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isNavOpen]); // Dependency: isNavOpen
+  }, [isNavOpen]);
 
   // Define tile colors map - Tailwind classes
   const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> = {
@@ -177,11 +176,11 @@ export default function Header() {
         {isNavOpen && (
           <motion.div
             key="nav-overlay"
-            initial={{ opacity: 0, clipPath: 'circle(0% at 100% 0)' }} // Animate from top-right corner
-            animate={{ opacity: 1, clipPath: 'circle(150% at 100% 0)' }} // Expand to cover screen
-            exit={{ opacity: 0, clipPath: 'circle(0% at 100% 0)' }} // Collapse back to corner
-            transition={{ type: "spring", stiffness: 260, damping: 30 }} // Spring animation
-            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto pt-20 pb-10 px-4 md:pt-24" // Higher z-index than header, padding top to avoid header content area
+            initial={{ opacity: 0, clipPath: 'circle(0% at 100% 0)' }}
+            animate={{ opacity: 1, clipPath: 'circle(150% at 100% 0)' }}
+            exit={{ opacity: 0, clipPath: 'circle(0% at 100% 0)' }}
+            transition={{ type: "spring", stiffness: 260, damping: 30 }}
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto pt-20 pb-10 px-4 md:pt-24" // Higher z-index
           >
             <div className="container mx-auto max-w-4xl">
               {/* Search Input */}
@@ -199,41 +198,61 @@ export default function Header() {
 
               {/* Page Tiles Grid */}
               {filteredPages.length > 0 ? (
+                // --- GRID DEFINITION ---
+                // grid-cols-2: Base, starts with 2 columns on mobile (smallest screens)
+                // sm:grid-cols-3: Switches to 3 columns at the 'sm' breakpoint (640px)
+                // md:grid-cols-4: Switches to 4 columns at the 'md' breakpoint (768px)
+                // gap-3 md:gap-4: Adjusts spacing between tiles based on screen size
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
                   {filteredPages.map((page) => {
                     const PageIcon = page.icon;
                     const isCurrentPage = page.path === pathname;
-                    // Get the specific color class or the default one
                     const tileColorClass = tileColorClasses[page.color || 'default'];
 
+                    // --- TILE STYLING ---
+                    // cn(...) combines base styles with conditional ones
+                    // Base: flex layout, padding, rounding, border, transition, aspect-square (makes them square)
+                    // Hover: subtle scale effect (hover:scale-[1.03])
+                    // isImportant Styles:
+                    //   - Background gradient
+                    //   - Column Span:
+                    //     - `col-span-2`: Takes full width (2/2) on the smallest screens (base)
+                    //     - `sm:col-span-1`: Takes 1/3 width on 'sm' screens
+                    //     - `md:col-span-2`: Takes 1/2 width (2/4) on 'md' screens and up, making it stand out more
+                    // Regular Tile Styles:
+                    //   - Darker background, changes slightly on hover
+                    // Color/Border/Shadow: Applied via tileColorClass based on page.color
+                    // Current Page: Ring indicator
                     return (
                       <Link
                         key={page.path}
                         href={page.path}
                         onClick={() => setIsNavOpen(false)} // Close nav on selection
                         className={cn(
-                          "group relative flex flex-col items-center justify-center p-4 rounded-lg border transition-all duration-300 aspect-square text-center hover:scale-[1.03]", // Base styles + subtle scale
+                          "group relative flex flex-col items-center justify-center p-4 rounded-lg border transition-all duration-300 aspect-square text-center hover:scale-[1.03]", // Base styles
                           page.isImportant
-                            ? "col-span-2 sm:col-span-1 md:col-span-1 bg-gradient-to-br from-purple-900/30 via-black/50 to-blue-900/30" // Background for important tiles
-                            : "bg-gray-800/70 hover:bg-gray-700/90", // Background for regular tiles
+                            ? "bg-gradient-to-br from-purple-900/30 via-black/50 to-blue-900/30 col-span-2 sm:col-span-1 md:col-span-2" // Important tile styles + UPDATED col-span logic
+                            : "bg-gray-800/70 hover:bg-gray-700/90", // Regular tile styles
                           tileColorClass, // Apply color-specific border/text/shadow
                           isCurrentPage ? 'ring-2 ring-offset-2 ring-offset-black ring-brand-green' : '' // Current page indicator
                         )}
                       >
                         {PageIcon && ( // Render icon if it exists
                             <PageIcon className={cn(
-                                "h-6 w-6 md:h-8 md:w-8 mb-2 transition-transform duration-300 group-hover:scale-110", // Icon size and hover effect
+                                // Adjusted icon sizes for better fit in potentially larger tiles
+                                "h-7 w-7 md:h-9 md:w-9 mb-2 transition-transform duration-300 group-hover:scale-110",
                                 page.isImportant ? "text-brand-yellow" : "inherit" // Special color for important icons
                             )} />
                         )}
                         <span className={cn(
-                            "text-xs md:text-sm font-semibold transition-colors", // Text styling
+                            // Slightly larger base text size
+                            "text-sm md:text-base font-semibold transition-colors leading-tight", // Adjusted line-height
                             page.isImportant ? "text-white" : "text-gray-300 group-hover:text-white" // Text color logic
                         )}>
                           {page.name}
                         </span>
                         {page.isAdminOnly && ( // Admin badge indicator
-                           <span title="Admin Only" className="absolute top-1 right-1 text-xs text-red-400 bg-black/60 rounded-full px-1.5 py-0.5 leading-none">🛡️</span>
+                           <span title="Admin Only" className="absolute top-1.5 right-1.5 text-xs text-red-400 bg-black/60 rounded-full px-1.5 py-0.5 leading-none">🛡️</span>
                         )}
                       </Link>
                     );
