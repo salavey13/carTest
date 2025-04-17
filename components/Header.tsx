@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { LuLayoutGrid, LuX, LuSearch } from "lucide-react"; // Use Lucide icons
-import React, { useState, useEffect, useMemo, useCallback } from "react"; // Import React
+import { LuLayoutGrid, LuX, LuSearch } from "lucide-react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import UserInfo from "@/components/user-info";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
@@ -12,17 +12,17 @@ import {
   FaCar, FaCircleUser, FaWandMagicSparkles, FaRocket, FaRoad, FaBookOpen,
   FaBrain, FaRobot, FaMagnifyingGlass, FaGift, FaUserShield, FaCarOn,
   FaYoutube, FaFileInvoiceDollar, FaCreditCard, FaHeart, FaPalette,
-  FaCircleInfo, FaListCheck
+  // FaCircleInfo, FaListCheck // Keep commented or uncomment if needed
 } from "react-icons/fa6"; // Use specific icons from Fa6
 
 // --- Page Definitions ---
 interface PageInfo {
   path: string;
   name: string;
-  icon?: React.ComponentType<any>; // Icon component
+  icon?: React.ComponentType<{ className?: string }>; // More specific type for icon component
   isImportant?: boolean;
   isAdminOnly?: boolean;
-  color?: string; // Optional color for tile accent (e.g., 'purple', 'green', 'blue')
+  color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red'; // Specific color keys
 }
 
 // Define all known pages with their properties
@@ -44,11 +44,10 @@ const allPages: PageInfo[] = [
   { path: "/buy-subscription", name: "Subscribe", icon: FaCreditCard },
   { path: "/donate", name: "Donate", icon: FaHeart, color: "red" },
   { path: "/style-guide", name: "Style Guide", icon: FaPalette },
-  // Uncomment or add other pages if needed
   // { path: "/onesitepls", name: "oneSitePls Info", icon: FaCircleInfo },
   // { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: FaListCheck },
-  // { path: "/rent-car", name: "Rent a Car", icon: FaCar }, // Example if rent-car page exists
-  // { path: "/tasks", name: "Tasks", icon: FaListCheck }, // Example if tasks page exists
+  // { path: "/rent-car", name: "Rent a Car", icon: FaCar },
+  // { path: "/tasks", name: "Tasks", icon: FaListCheck },
 ];
 
 // --- Header Component ---
@@ -72,11 +71,11 @@ export default function Header() {
     const lowerSearchTerm = searchTerm.toLowerCase();
     return allPages.filter(page => {
       const isAdminPage = page.isAdminOnly === true;
-      // Show admin pages only if the user is admin
+      // Hide admin pages if user is not admin
       if (isAdminPage && !isAdmin) {
         return false;
       }
-      // Filter by search term
+      // Filter by search term (check page name)
       return page.name.toLowerCase().includes(lowerSearchTerm);
     });
   }, [searchTerm, isAdmin]); // Depend on searchTerm and isAdmin status
@@ -84,33 +83,36 @@ export default function Header() {
   // Handle scroll to hide/show header
   const handleScroll = useCallback(() => {
     const currentScrollY = window.scrollY;
-    // Keep header visible if nav is open
+
+    // If nav is open, keep header visible and update scroll position
     if (isNavOpen) {
-      if (!isHeaderVisible) setIsHeaderVisible(true); // Ensure it's visible when nav opens
-      setLastScrollY(currentScrollY); // Update scroll position even if nav is open
+      setIsHeaderVisible(true);
+      setLastScrollY(currentScrollY);
       return;
     }
 
-    // Regular hide/show logic
+    // Show/hide header based on scroll direction
     if (currentScrollY > lastScrollY && currentScrollY > 50) { // Hiding threshold
       setIsHeaderVisible(false); // Hide on scroll down
     } else if (currentScrollY < lastScrollY) {
       setIsHeaderVisible(true); // Show on scroll up
     }
     setLastScrollY(currentScrollY);
-  }, [lastScrollY, isNavOpen, isHeaderVisible]); // Added isHeaderVisible dependency
+  }, [lastScrollY, isNavOpen]); // Removed isHeaderVisible dependency as it's implicitly handled
 
+  // Effect for scroll event listener
   useEffect(() => {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", handleScroll);
     };
-  }, [handleScroll]);
+  }, [handleScroll]); // Dependency: handleScroll
 
   // Close nav when pathname changes
   useEffect(() => {
     setIsNavOpen(false);
-  }, [pathname]);
+    setSearchTerm(""); // Also clear search on navigation
+  }, [pathname]); // Dependency: pathname
 
   // Prevent body scroll when nav is open
   useEffect(() => {
@@ -119,16 +121,30 @@ export default function Header() {
     } else {
       document.body.style.overflow = '';
     }
-    // Cleanup function
+    // Cleanup function to restore scroll on component unmount
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isNavOpen]);
+  }, [isNavOpen]); // Dependency: isNavOpen
+
+  // Define tile colors map - Tailwind classes
+  const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> = {
+    purple: "border-brand-purple/50 hover:border-brand-purple hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] text-brand-purple",
+    blue: "border-brand-blue/50 hover:border-brand-blue hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] text-brand-blue",
+    yellow: "border-brand-yellow/50 hover:border-brand-yellow hover:shadow-[0_0_15px_rgba(234,179,8,0.5)] text-brand-yellow",
+    lime: "border-brand-lime/50 hover:border-brand-lime hover:shadow-[0_0_15px_rgba(163,230,53,0.5)] text-brand-lime",
+    green: "border-brand-green/50 hover:border-brand-green hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] text-brand-green",
+    pink: "border-brand-pink/50 hover:border-brand-pink hover:shadow-[0_0_15px_rgba(236,72,153,0.5)] text-brand-pink",
+    cyan: "border-brand-cyan/50 hover:border-brand-cyan hover:shadow-[0_0_15px_rgba(6,182,212,0.5)] text-brand-cyan",
+    red: "border-red-500/50 hover:border-red-500 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)] text-red-500",
+    default: "border-gray-700/80 hover:border-brand-green/70 text-brand-cyan" // Default styling
+  };
 
   return (
     <>
+      {/* Header Bar */}
       <motion.header
-        className={`fixed top-0 left-0 right-0 z-[60] bg-black/70 border-b border-brand-purple/30 shadow-lg backdrop-blur-md transition-transform duration-300 ease-in-out`}
+        className={`fixed top-0 left-0 right-0 z-40 bg-black/70 border-b border-brand-purple/30 shadow-lg backdrop-blur-md transition-transform duration-300 ease-in-out`}
         initial={{ y: 0 }}
         animate={{ y: isHeaderVisible ? 0 : "-100%" }}
         transition={{ type: "tween", duration: 0.3 }}
@@ -145,7 +161,7 @@ export default function Header() {
               <UserInfo />
               <button
                 onClick={() => setIsNavOpen(!isNavOpen)}
-                className="p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md z-50" // Ensure button is clickable over overlay when open
+                className="p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md relative z-50" // Ensure button is clickable (z-50 needed if header is lower than overlay)
                 aria-label={isNavOpen ? "Close navigation" : "Open navigation"}
                 aria-expanded={isNavOpen}
               >
@@ -160,12 +176,12 @@ export default function Header() {
       <AnimatePresence>
         {isNavOpen && (
           <motion.div
-            key="nav-overlay" // Add key for AnimatePresence
-            initial={{ opacity: 0, clipPath: 'circle(0% at 100% 0)' }} // Animate from top-right
-            animate={{ opacity: 1, clipPath: 'circle(150% at 100% 0)' }} // Expand to cover
-            exit={{ opacity: 0, clipPath: 'circle(0% at 100% 0)' }} // Collapse back
-            transition={{ type: "spring", stiffness: 200, damping: 25 }}
-            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto pt-20 pb-10 px-4 md:pt-24" // Use higher z-index than header
+            key="nav-overlay"
+            initial={{ opacity: 0, clipPath: 'circle(0% at 100% 0)' }} // Animate from top-right corner
+            animate={{ opacity: 1, clipPath: 'circle(150% at 100% 0)' }} // Expand to cover screen
+            exit={{ opacity: 0, clipPath: 'circle(0% at 100% 0)' }} // Collapse back to corner
+            transition={{ type: "spring", stiffness: 260, damping: 30 }} // Spring animation
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto pt-20 pb-10 px-4 md:pt-24" // Higher z-index than header, padding top to avoid header content area
           >
             <div className="container mx-auto max-w-4xl">
               {/* Search Input */}
@@ -185,60 +201,46 @@ export default function Header() {
               {filteredPages.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
                   {filteredPages.map((page) => {
-                    // Use React.ComponentType or specific icon type if available
-                    const PageIcon = page.icon; // Assign to a capitalized variable IF NEEDED, but direct use is safer 
+                    const PageIcon = page.icon;
                     const isCurrentPage = page.path === pathname;
-                    // Define tile colors - map page.color to Tailwind classes
-                    const colorClasses = {
-                      purple: "border-brand-purple/50 hover:border-brand-purple hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] text-brand-purple",
-                      blue: "border-brand-blue/50 hover:border-brand-blue hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] text-brand-blue",
-                      yellow: "border-brand-yellow/50 hover:border-brand-yellow hover:shadow-[0_0_15px_rgba(234,179,8,0.5)] text-brand-yellow",
-                      lime: "border-brand-lime/50 hover:border-brand-lime hover:shadow-[0_0_15px_rgba(163,230,53,0.5)] text-brand-lime", // Assuming brand-lime exists
-                      green: "border-brand-green/50 hover:border-brand-green hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] text-brand-green",
-                      pink: "border-brand-pink/50 hover:border-brand-pink hover:shadow-[0_0_15px_rgba(236,72,153,0.5)] text-brand-pink",
-                      cyan: "border-brand-cyan/50 hover:border-brand-cyan hover:shadow-[0_0_15px_rgba(6,182,212,0.5)] text-brand-cyan",
-                      red: "border-red-500/50 hover:border-red-500 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)] text-red-500",
-                      default: "border-gray-700/80 hover:border-brand-green/70 text-brand-cyan"
-                    };
-                    // Get color class based on page.color or default
-                    const tileColorClass = page.color && colorClasses[page.color as keyof typeof colorClasses]
-                                           ? colorClasses[page.color as keyof typeof colorClasses]
-                                           : colorClasses.default;
+                    // Get the specific color class or the default one
+                    const tileColorClass = tileColorClasses[page.color || 'default'];
 
                     return (
                       <Link
                         key={page.path}
                         href={page.path}
-                        onClick={() => setIsNavOpen(false)} // Close nav on click
+                        onClick={() => setIsNavOpen(false)} // Close nav on selection
                         className={cn(
-                          "group relative flex flex-col items-center justify-center p-4 rounded-lg border transition-all duration-300 aspect-square text-center hover:scale-105", // Base styles
+                          "group relative flex flex-col items-center justify-center p-4 rounded-lg border transition-all duration-300 aspect-square text-center hover:scale-[1.03]", // Base styles + subtle scale
                           page.isImportant
-                            ? "col-span-2 sm:col-span-1 md:col-span-1 bg-gradient-to-br from-purple-900/30 via-black/50 to-blue-900/30" // Important background
-                            : "bg-gray-800/70 hover:bg-gray-700/90", // Regular background
-                          tileColorClass, // Apply color specific border/text/shadow
+                            ? "col-span-2 sm:col-span-1 md:col-span-1 bg-gradient-to-br from-purple-900/30 via-black/50 to-blue-900/30" // Background for important tiles
+                            : "bg-gray-800/70 hover:bg-gray-700/90", // Background for regular tiles
+                          tileColorClass, // Apply color-specific border/text/shadow
                           isCurrentPage ? 'ring-2 ring-offset-2 ring-offset-black ring-brand-green' : '' // Current page indicator
                         )}
                       >
-                        {PageIcon && ( // Check if PageIcon exists before rendering
+                        {PageIcon && ( // Render icon if it exists
                             <PageIcon className={cn(
-                                "h-6 w-6 md:h-8 md:w-8 mb-2 transition-transform duration-300 group-hover:scale-110",
-                                page.isImportant ? "text-brand-yellow" : "inherit"
+                                "h-6 w-6 md:h-8 md:w-8 mb-2 transition-transform duration-300 group-hover:scale-110", // Icon size and hover effect
+                                page.isImportant ? "text-brand-yellow" : "inherit" // Special color for important icons
                             )} />
                         )}
                         <span className={cn(
-                            "text-xs md:text-sm font-semibold transition-colors",
-                            page.isImportant ? "text-white" : "text-gray-300 group-hover:text-white" // Adjust text color for hover
+                            "text-xs md:text-sm font-semibold transition-colors", // Text styling
+                            page.isImportant ? "text-white" : "text-gray-300 group-hover:text-white" // Text color logic
                         )}>
                           {page.name}
                         </span>
-                        {page.isAdminOnly && (
-                           <span title="Admin Only" className="absolute top-1 right-1 text-xs text-red-400 bg-black/60 rounded-full px-1.5 py-0.5">🛡️</span>
+                        {page.isAdminOnly && ( // Admin badge indicator
+                           <span title="Admin Only" className="absolute top-1 right-1 text-xs text-red-400 bg-black/60 rounded-full px-1.5 py-0.5 leading-none">🛡️</span>
                         )}
                       </Link>
                     );
                   })}
                 </div>
               ) : (
+                 // Message when no search results found
                 <p className="text-center text-gray-500 text-lg mt-10">No pages found matching "{searchTerm}"</p>
               )}
             </div>
