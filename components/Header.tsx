@@ -1,266 +1,248 @@
 "use client";
+
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
-import { useState, useEffect } from "react";
+import { LayoutGrid, X, Search } from "lucide-react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import UserInfo from "@/components/user-info";
-import SemanticSearch from "@/components/SemanticSearch";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
+import { useAppContext } from "@/contexts/AppContext";
+import { cn } from "@/lib/utils";
+import {
+  FaCar, FaCircleUser, FaWandMagicSparkles, FaRocket, FaRoad, FaBookOpen,
+  FaBrain, FaRobot, FaMagnifyingGlass, FaGift, FaUserShield, FaCarOn,
+  FaYoutube, FaFileInvoiceDollar, FaCreditCard, FaHeart, FaPalette,
+  FaCircleInfo, FaListCheck // Keep commented or uncomment if needed
+} from "react-icons/fa6"; // Use specific icons from Fa6
 
-// Define groups (feature packs) with display names, icons, and colors
-const groups = {
-  "SLY13": { displayName: "SLY13", icon: "🚀", color: "bg-blue-500" },
-  "RuliBeri": { displayName: "RuliBeri", icon: "🏎️", color: "bg-red-500" },
-  "9GAG": { displayName: "9GAG", icon: "😂", color: "bg-green-500" },
-  "YT": { displayName: "YT", icon: "🎥", color: "bg-yellow-500" },
-  "Tips": { displayName: "Tips", icon: "💡", color: "bg-purple-500" },
-  "CRM": { displayName: "CRM", icon: "📊", color: "bg-orange-500" },
-  "Dev": { displayName: "Dev", icon: "💻", color: "bg-pink-500" },
-  "Gifts": { displayName: "Gifts", icon: "🎁", color: "bg-teal-500" },
-};
+// --- Page Definitions --- (assuming this remains the same)
+interface PageInfo {
+  path: string;
+  name: string;
+  icon?: React.ComponentType<{ className?: string }>; // More specific type for icon component
+  isImportant?: boolean;
+  isAdminOnly?: boolean;
+  color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red'; // Specific color keys
+}
 
-// Map pages to their groups and define display names
-const pageGroups: Record<string, string> = {
-  "/about": "SLY13",
-  "/onesiteplsinstructions": "SLY13",
-  "/onesitepls": "SLY13",
-  "/admin": "RuliBeri",
-  "/botbusters": "9GAG",
-  "/bullshitdetector": "YT",
-  "/buy-subscription": "RuliBeri",
-  "/cyber-garage": "RuliBeri",
-  "/donate": "Tips",
-  "/invoices": "RuliBeri",
-  "/": "RuliBeri",
-  "/pavele0903": "CRM",
-  "/rent-car": "RuliBeri",
-  "/rent/[id]": "RuliBeri",
-  "/repo-xml": "Dev",
-  "/selfdev": "Dev",
-  "/shadow-fleet-admin": "RuliBeri",
-  "/style-guide": "Dev",
-  "/supercar-test": "RuliBeri",
-  "/tasks": "YT",
-  "/wheel-of-fortune": "Gifts",
-  "/youtubeAdmin": "YT",
-};
+const allPages: PageInfo[] = [
+  { path: "/", name: "Cyber Garage", icon: FaCar, isImportant: true, color: "cyan" },
+  { path: "/about", name: "About Me", icon: FaCircleUser, isImportant: true, color: "blue" },
+  { path: "/repo-xml", name: "SUPERVIBE Studio", icon: FaWandMagicSparkles, isImportant: true, color: "yellow" },
+  { path: "/jumpstart", name: "Jumpstart Kit", icon: FaRocket, isImportant: true, color: "lime" },
+  { path: "/selfdev", name: "SelfDev Path", icon: FaRoad, isImportant: true, color: "green" },
+  { path: "/purpose-profit", name: "Purpose & Profit", icon: FaBookOpen, color: "purple" },
+  { path: "/expmind", name: "Experimental Mindset", icon: FaBrain, color: "pink" },
+  { path: "/botbusters", name: "Bot Busters", icon: FaRobot },
+  { path: "/bullshitdetector", name: "BS Detector", icon: FaMagnifyingGlass },
+  { path: "/wheel-of-fortune", name: "Wheel of Fortune", icon: FaGift },
+  { path: "/admin", name: "Admin Panel", icon: FaUserShield, isAdminOnly: true, color: "red" },
+  { path: "/shadow-fleet-admin", name: "Fleet Admin", icon: FaCarOn, isAdminOnly: true, color: "red" },
+  { path: "/youtubeAdmin", name: "YT Admin", icon: FaYoutube, isAdminOnly: true, color: "red" },
+  { path: "/invoices", name: "My Invoices", icon: FaFileInvoiceDollar },
+  { path: "/buy-subscription", name: "Subscribe", icon: FaCreditCard },
+  { path: "/donate", name: "Donate", icon: FaHeart, color: "red" },
+  { path: "/style-guide", name: "Style Guide", icon: FaPalette },
+  { path: "/onesitepls", name: "oneSitePls Info", icon: FaCircleInfo },
+  { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: FaListCheck },
+  { path: "/rent-car", name: "Rent a Car", icon: FaCar },
+  // { path: "/tasks", name: "Tasks", icon: FaListCheck },
+];
 
-const pageLogos: Record<string, string> = {
-  "/about": "SLY13",
-  "/admin": "RuliBeri",
-  "/botbusters": "9GAG",
-  "/bullshitdetector": "YT",
-  "/buy-subscription": "RuliBeri",
-  "/cyber-garage": "RuliBeri",
-  "/donate": "Tips",
-  "/invoices": "RuliBeri",
-  "/": "RuliBeri",
-  "/pavele0903": "CRM",
-  "/rent-car": "RuliBeri",
-  "/rent/[id]": "RuliBeri",
-  "/repo-xml": "Dev",
-  "/selfdev": "Dev",
-  "/shadow-fleet-admin": "RuliBeri",
-  "/style-guide": "Dev",
-  "/supercar-test": "RuliBeri",
-  "/tasks": "YT",
-  "/wheel-of-fortune": "Gifts",
-  "/youtubeAdmin": "YT",
-  "/onesiteplsinstructions": "SLY13",
-  "/onesitepls": "SLY13",
-};
 
-const pageDisplayNames: Record<string, string> = {
-  "/about": "About",
-  "/onesiteplsinstructions": "oneSitePls Instructions",
-  "/onesitepls": "oneSitePls",
-  "/admin": "Admin Panel",
-  "/botbusters": "Bot Busters",
-  "/bullshitdetector": "BS Detector",
-  "/buy-subscription": "Subscribe",
-  "/cyber-garage": "Cyber Garage",
-  "/donate": "Donate",
-  "/invoices": "Invoices",
-  "/": "Home",
-  "/pavele0903": "CRM Dashboard",
-  "/rent-car": "Rent a Car",
-  "/rent/[id]": "Car Details",
-  "/repo-xml": "XML Repo",
-  "/selfdev": "Self Dev",
-  "/shadow-fleet-admin": "Fleet Admin",
-  "/style-guide": "Style Guide",
-  "/supercar-test": "Supercar Test",
-  "/tasks": "Tasks",
-  "/wheel-of-fortune": "Wheel of Fortune",
-  "/youtubeAdmin": "YT Admin",
-};
-
-// Tooltip description for Dev pages
-const devTooltip = "These pages are the hidden pearls of the Vibe Coding Template—showcasing innovative dev tools and style guides that power our creative chaos!";
-
-// Organize pages into grouped and ungrouped
-const uniqueGroups = Array.from(new Set(Object.values(pageGroups)));
-const groupedPages: Record<string, string[]> = {};
-uniqueGroups.forEach((group) => {
-  groupedPages[group] = Object.entries(pageGroups)
-    .filter(([_, g]) => g === group)
-    .map(([path]) => path);
-});
-const ungroupedPages = Object.keys(pageLogos).filter((path) => !pageGroups[path]);
-
+// --- Header Component ---
 export default function Header() {
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const { isAdmin } = useAppContext();
+  const [isNavOpen, setIsNavOpen] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
   const pathname = usePathname();
 
-  // Determine the current logo text based on the pathname
-  const currentLogoText = pageLogos[pathname] || "RuliBeri";
+  const currentLogoText = useMemo(() => {
+    const currentPage = allPages.find(p => p.path === pathname);
+    return currentPage?.name.split(' ')[0] || "VIBE";
+  }, [pathname]);
 
-  // Handle scroll events and auto-hide header after 2 seconds, unless dropdown or search is open
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-
-      if (currentScrollY > lastScrollY && currentScrollY > 50 && !isDropdownOpen && !isSearchOpen) {
-        // Scrolling down, hide only if past threshold and no dropdown/search
-        setIsHeaderVisible(false);
-      } else if (currentScrollY < lastScrollY) {
-        // Scrolling up
-        setIsHeaderVisible(true);
+  const filteredPages = useMemo(() => {
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    return allPages.filter(page => {
+      const isAdminPage = page.isAdminOnly === true;
+      if (isAdminPage && !isAdmin) {
+        return false;
       }
+      return page.name.toLowerCase().includes(lowerSearchTerm);
+    });
+  }, [searchTerm, isAdmin]);
 
+  const handleScroll = useCallback(() => {
+    const currentScrollY = window.scrollY;
+    if (isNavOpen) {
+      setIsHeaderVisible(true);
       setLastScrollY(currentScrollY);
-
-      // Reset the timer on scroll, but only if dropdown/search isn't active
-      if (!isDropdownOpen && !isSearchOpen) {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          setIsHeaderVisible(false);
-        }, 2000);
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll);
-
-    // Initial timer to hide header after 2 seconds, unless dropdown/search is active
-    if (!isDropdownOpen && !isSearchOpen) {
-      timeoutId = setTimeout(() => {
-        setIsHeaderVisible(false);
-      }, 2000);
+      return;
     }
+    if (currentScrollY > lastScrollY && currentScrollY > 50) {
+      setIsHeaderVisible(false);
+    } else if (currentScrollY < lastScrollY) {
+      setIsHeaderVisible(true);
+    }
+    setLastScrollY(currentScrollY);
+  }, [lastScrollY, isNavOpen]);
 
+  useEffect(() => {
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", handleScroll);
-      clearTimeout(timeoutId);
     };
-  }, [lastScrollY, isDropdownOpen, isSearchOpen]);
+  }, [handleScroll]);
+
+  useEffect(() => {
+    setIsNavOpen(false);
+    setSearchTerm("");
+  }, [pathname]);
+
+  useEffect(() => {
+    if (isNavOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isNavOpen]);
+
+  // Define tile colors map - Tailwind classes (Remains the same)
+  const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> = {
+    purple: "border-brand-purple/50 hover:border-brand-purple hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] text-brand-purple",
+    blue: "border-brand-blue/50 hover:border-brand-blue hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] text-brand-blue",
+    yellow: "border-brand-yellow/50 hover:border-brand-yellow hover:shadow-[0_0_15px_rgba(234,179,8,0.5)] text-brand-yellow",
+    lime: "border-brand-lime/50 hover:border-brand-lime hover:shadow-[0_0_15px_rgba(163,230,53,0.5)] text-brand-lime",
+    green: "border-brand-green/50 hover:border-brand-green hover:shadow-[0_0_15px_rgba(16,185,129,0.5)] text-brand-green",
+    pink: "border-brand-pink/50 hover:border-brand-pink hover:shadow-[0_0_15px_rgba(236,72,153,0.5)] text-brand-pink",
+    cyan: "border-brand-cyan/50 hover:border-brand-cyan hover:shadow-[0_0_15px_rgba(6,182,212,0.5)] text-brand-cyan",
+    red: "border-red-500/50 hover:border-red-500 hover:shadow-[0_0_15px_rgba(239,68,68,0.5)] text-red-500",
+    default: "border-gray-700/80 hover:border-brand-green/70 text-brand-cyan" // Default styling
+  };
+
 
   return (
-    <motion.header
-      className={`fixed top-0 left-0 right-0 z-50 bg-card bg-opacity-80 border-b border-muted shadow-[0_0_15px_rgba(255,107,107,0.3)] backdrop-blur-lg transition-transform duration-300 rounded-lg m-2 ${
-        isHeaderVisible ? "translate-y-0" : "-translate-y-full"
-      }`}
-    >
-      <div className="container mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
-          {/* Logo with enhanced dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="text-xl md:text-3xl font-bold text-gradient cyber-text glitch hover:text-glow px-4 py-2"
-              data-text={currentLogoText}
-            >
+    <>
+      {/* Header Bar (Remains mostly the same) */}
+      <motion.header
+        className={`fixed top-0 left-0 right-0 z-40 bg-black/70 border-b border-brand-purple/30 shadow-lg backdrop-blur-md transition-transform duration-300 ease-in-out`}
+        initial={{ y: 0 }}
+        animate={{ y: isHeaderVisible ? 0 : "-100%" }}
+        transition={{ type: "tween", duration: 0.3 }}
+      >
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <Link href="/" className="text-2xl md:text-3xl font-bold text-brand-purple cyber-text glitch hover:text-glow" data-text={currentLogoText}>
               {currentLogoText}
-            </button>
-            {isDropdownOpen && (
-              <div className="absolute top-full left-0 mt-2 w-72 bg-card border border-muted rounded-xl shadow-lg max-h-[80vh] overflow-y-auto px-2 py-3">
-                <ul className="py-2">
-                  {/* Grouped pages */}
-                  {uniqueGroups.map((group) => (
-                    <li key={group} className="mb-2">
-                      <div className={`px-4 py-2 text-sm font-bold text-white ${groups[group].color} rounded-lg`}>
-                        {groups[group].icon} {groups[group].displayName}
-                      </div>
-                      <ul>
-                        {groupedPages[group].map((path) => (
-                          <li key={path} className="relative group">
-                            <Link
-                              href={path}
-                              className="block px-4 py-2 text-sm text-foreground hover:bg-muted rounded-lg flex items-center"
-                              onClick={() => setIsDropdownOpen(false)}
-                            >
-                              {pageDisplayNames[path]}
-                              {group === "Dev" && (
-                                <span className="ml-2 text-pink-400">ℹ️</span>
-                              )}
-                            </Link>
-                            {group === "Dev" && (
-                              <div className="absolute left-full top-0 mt-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                {devTooltip}
-                              </div>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </li>
-                  ))}
-                  {/* Ungrouped pages */}
-                  {ungroupedPages.length > 0 && (
-                    <li className="mt-4">
-                      <div className="px-4 py-2 text-sm font-bold text-white bg-gray-500 rounded-lg">
-                        Other
-                      </div>
-                      <ul>
-                        {ungroupedPages.map((path) => (
-                          <li key={path}>
-                            <Link
-                              href={path}
-                              className="block px-4 py-2 text-sm text-foreground hover:bg-muted rounded-lg"
-                              onClick={() => setIsDropdownOpen(false)}
-                            >
-                              {pageDisplayNames[path]}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </li>
-                  )}
-                </ul>
-              </div>
-            )}
-          </div>
-
-          <div className="hidden md:flex flex-1 max-w-xl px-6">
-            <SemanticSearch />
-          </div>
-
-          <div className="flex items-center gap-4">
-            <UserInfo />
-            <button
-              className="md:hidden flex items-center gap-2 text-sm text-primary hover:text-primary/80 font-mono transition-colors text-glow"
-              onClick={() => setIsSearchOpen(!isSearchOpen)}
-            >
-              {isSearchOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              <span>{isSearchOpen ? "Закрыть" : "Поиск"}</span>
-            </button>
+            </Link>
+            <div className="flex items-center gap-4">
+              <UserInfo />
+              <button
+                onClick={() => setIsNavOpen(!isNavOpen)}
+                className="p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md relative z-50"
+                aria-label={isNavOpen ? "Close navigation" : "Open navigation"}
+                aria-expanded={isNavOpen}
+              >
+                {isNavOpen ? <X className="h-6 w-6" /> : <LayoutGrid className="h-6 w-6" />}
+              </button>
+            </div>
           </div>
         </div>
+      </motion.header>
 
-        {isSearchOpen && (
+      {/* Navigation Overlay */}
+      <AnimatePresence>
+        {isNavOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="md:hidden mt-4"
+            key="nav-overlay"
+            initial={{ opacity: 0, clipPath: 'circle(0% at 100% 0)' }}
+            animate={{ opacity: 1, clipPath: 'circle(150% at 100% 0)' }}
+            exit={{ opacity: 0, clipPath: 'circle(0% at 100% 0)' }}
+            transition={{ type: "spring", stiffness: 260, damping: 30 }}
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto pt-20 pb-10 px-4 md:pt-24"
           >
-            <SemanticSearch compact />
+             {/* Reduced max-width slightly to better fit more columns */}
+            <div className="container mx-auto max-w-3xl xl:max-w-4xl">
+              {/* Search Input (Remains the same) */}
+              <div className="relative mb-6 md:mb-8">
+                <input
+                  type="search"
+                  placeholder="Search pages..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-800/60 border border-brand-green/40 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-green focus:border-transparent text-base md:text-lg" // Slightly smaller base py
+                  aria-label="Search pages"
+                />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500 pointer-events-none" />
+              </div>
+
+              {/* Page Tiles Grid */}
+              {filteredPages.length > 0 ? (
+                // --- NEW GRID DEFINITION ---
+                // grid-cols-2: Base, starts with 2 columns
+                // sm:grid-cols-4: Switches to 4 columns at 'sm' (640px)
+                // md:grid-cols-8: Switches to 8 columns at 'md' (768px)
+                // gap-2 sm:gap-2 md:gap-1.5: Reduced gaps between tiles
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2 sm:gap-2 md:gap-1.5">
+                  {filteredPages.map((page) => {
+                    const PageIcon = page.icon;
+                    const isCurrentPage = page.path === pathname;
+                    const tileColorClass = tileColorClasses[page.color || 'default'];
+
+                    // --- ADJUSTED TILE STYLING ---
+                    return (
+                      <Link
+                        key={page.path}
+                        href={page.path}
+                        onClick={() => setIsNavOpen(false)}
+                        className={cn(
+                          "group relative flex flex-col items-center justify-center rounded-lg border transition-all duration-300 aspect-square text-center hover:scale-[1.03]",
+                          // Base/SM/MD Padding: Progressively smaller padding
+                          "p-2.5 sm:p-2 md:p-1.5",
+                          page.isImportant
+                            ? // UPDATED Col Span for new grid: 2 -> 2 -> 2
+                              "bg-gradient-to-br from-purple-900/30 via-black/50 to-blue-900/30 col-span-2 sm:col-span-2 md:col-span-2"
+                            : "bg-gray-800/70 hover:bg-gray-700/90", // Regular tile styles
+                          tileColorClass, // Apply color-specific border/text/shadow
+                          isCurrentPage ? 'ring-1 sm:ring-2 ring-offset-1 sm:ring-offset-2 ring-offset-black ring-brand-green' : '' // Adjusted ring thickness/offset
+                        )}
+                      >
+                        {PageIcon && ( // Render icon if it exists
+                            <PageIcon className={cn(
+                                // UPDATED Icon Sizes: Progressively smaller
+                                "h-6 w-6 sm:h-5 sm:w-5 md:h-4 md:w-4 mb-1 transition-transform duration-300 group-hover:scale-110",
+                                page.isImportant ? "text-brand-yellow sm:h-6 sm:w-6 md:h-5 md:w-5" : "inherit" // Important icons slightly larger than regulars at md
+                            )} />
+                        )}
+                        <span className={cn(
+                            // UPDATED Text Sizes: Progressively smaller, tighter leading
+                            "font-semibold transition-colors leading-tight",
+                            "text-xs sm:text-[0.7rem] md:text-[0.6rem] md:leading-none", // Tiny text at md
+                            page.isImportant ? "text-white sm:text-xs md:text-[0.7rem]" : "text-gray-300 group-hover:text-white" // Important text slightly larger
+                        )}>
+                          {page.name}
+                        </span>
+                        {page.isAdminOnly && ( // Admin badge indicator - smaller text, tighter position
+                           <span title="Admin Only" className="absolute top-1 right-1 text-[0.55rem] text-red-400 bg-black/60 rounded-full px-1 py-0 leading-none">🛡️</span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : (
+                 // Message when no search results found
+                <p className="text-center text-gray-500 text-base md:text-lg mt-8 md:mt-10">No pages found matching "{searchTerm}"</p> // Adjusted text size/margin
+              )}
+            </div>
           </motion.div>
         )}
-      </div>
-    </motion.header>
+      </AnimatePresence>
+    </>
   );
 }
