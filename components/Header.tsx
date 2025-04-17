@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LuLayoutGrid, LuX, LuSearch } from "lucide-react";
+import { LayoutGrid, X, Search } from "lucide-react";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import UserInfo from "@/components/user-info";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,7 +12,7 @@ import {
   FaCar, FaCircleUser, FaWandMagicSparkles, FaRocket, FaRoad, FaBookOpen,
   FaBrain, FaRobot, FaMagnifyingGlass, FaGift, FaUserShield, FaCarOn,
   FaYoutube, FaFileInvoiceDollar, FaCreditCard, FaHeart, FaPalette,
-  // FaCircleInfo, FaListCheck // Keep commented or uncomment if needed
+  FaCircleInfo, FaListCheck // Keep commented or uncomment if needed
 } from "react-icons/fa6"; // Use specific icons from Fa6
 
 // --- Page Definitions ---
@@ -44,9 +44,9 @@ const allPages: PageInfo[] = [
   { path: "/buy-subscription", name: "Subscribe", icon: FaCreditCard },
   { path: "/donate", name: "Donate", icon: FaHeart, color: "red" },
   { path: "/style-guide", name: "Style Guide", icon: FaPalette },
-  // { path: "/onesitepls", name: "oneSitePls Info", icon: FaCircleInfo },
-  // { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: FaListCheck },
-  // { path: "/rent-car", name: "Rent a Car", icon: FaCar },
+  { path: "/onesitepls", name: "oneSitePls Info", icon: FaCircleInfo },
+  { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: FaListCheck },
+  { path: "/rent-car", name: "Rent a Car", icon: FaCar },
   // { path: "/tasks", name: "Tasks", icon: FaListCheck },
 ];
 
@@ -165,7 +165,7 @@ export default function Header() {
                 aria-label={isNavOpen ? "Close navigation" : "Open navigation"}
                 aria-expanded={isNavOpen}
               >
-                {isNavOpen ? <LuX className="h-6 w-6" /> : <LuLayoutGrid className="h-6 w-6" />}
+                {isNavOpen ? <X className="h-6 w-6" /> : <LayoutGrid className="h-6 w-6" />}
               </button>
             </div>
           </div>
@@ -194,7 +194,7 @@ export default function Header() {
                   className="w-full pl-10 pr-4 py-3 bg-gray-800/60 border border-brand-green/40 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-green focus:border-transparent text-lg"
                   aria-label="Search pages"
                 />
-                <LuSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500 pointer-events-none" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500 pointer-events-none" />
               </div>
 
               {/* Page Tiles Grid */}
