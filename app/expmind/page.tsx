@@ -12,9 +12,12 @@ import {
 } from "@/components/ui/tooltip";
 import {
   FaBrain, FaUserAstronaut, FaLock, FaFlaskVial, FaClipboardList, FaChartLine,
-  FaCheckDouble, FaRegLightbulb, FaRoute, FaBan, FaRocket, FaTools, FaBalanceScale, FaAward,
-  FaSadTear, FaRunning, FaSearchDollar, FaExclamationTriangle, FaLowVision, FaQuestionCircle
-} from "react-icons/fa"; // Diverse icons
+  FaCheckDouble, FaRegLightbulb, FaRoute, FaBan, FaRocket,
+  FaFaceSadTear, // Corrected from FaSadTear
+  FaPersonRunning, // Corrected from FaRunning
+  FaMagnifyingGlassDollar, // Corrected from FaSearchDollar
+  FaTriangleExclamation, // Corrected from FaExclamationTriangle
+} from "react-icons/fa6"; // Specify fa6 explicitly if needed, or keep as fa if library handles it
 import { LuActivity, LuEye, LuClipboardCheck, LuRotateCcw, LuPauseCircle, LuPlayCircle, LuThumbsUp, LuThumbsDown, LuZap } from "react-icons/lu"; // Lucide icons
 
 import { debugLogger } from "@/lib/debugLogger";
@@ -58,7 +61,7 @@ const sections = [
   },
   {
     id: "speaker-journey",
-    icon: FaRoute, // Changed icon
+    icon: FaRoute, // Kept icon
     titleEn: "Speaker's Journey: Linear vs. Experimental",
     titleRu: "Путь Спикера: Линейный против Экспериментального",
     // Nested structure for the two paths
@@ -68,7 +71,7 @@ const sections = [
             titleRu: "Глава 1: Линейный Путь (Автопилот)",
             borderColor: "border-red-500", // Use semantic color
             textColor: "text-red-400",
-            icon: FaExclamationTriangle,
+            icon: FaTriangleExclamation, // Corrected icon
             pointsEn: [
                 "Followed <strong class='font-semibold text-red-400'>traditional scripts</strong>: good grades -> Google -> corporate ladder.",
                 "External success masked internal <strong class='font-semibold text-red-400'>emptiness, boredom, and burnout</strong>.",
@@ -123,21 +126,21 @@ const sections = [
     gridItems: [
         {
             titleEn: "Cynical Mindset", titleRu: "Циничное Мышление",
-            icon: FaSadTear, color: "gray",
+            icon: FaFaceSadTear, color: "gray", // Corrected icon
             pointsEn: ["Low Curiosity, Low Ambition.", "Lost drive, mocks earnestness.", "Stuck in survival mode."],
             pointsRu: ["Низкое Любопытство, Низкие Амбиции.", "Потерял(а) драйв, высмеивает искренность.", "Застрял(а) в режиме выживания."],
             leadsToEn: "Doomscrolling, negativity, 'what's the point?'", leadsToRu: "Думскроллинг, негатив, 'какой смысл?'"
         },
         {
             titleEn: "Escapist Mindset", titleRu: "Эскапистское Мышление",
-            icon: FaRunning, color: "blue",
+            icon: FaPersonRunning, color: "blue", // Corrected icon
             pointsEn: ["High Curiosity, Low Ambition.", "Curious but avoids responsibility.", "Seeks escape."],
             pointsRu: ["Высокое Любопытство, Низкие Амбиции.", "Любопытен(на), но избегает ответственности.", "Ищет побега."],
             leadsToEn: "Binge-watching, retail therapy, endless dream planning.", leadsToRu: "Запойный просмотр, шопинг-терапия, бесконечное планирование мечты."
         },
         {
             titleEn: "Perfectionist Mindset", titleRu: "Перфекционистское Мышление",
-            icon: FaSearchDollar, color: "red", // Changed icon
+            icon: FaMagnifyingGlassDollar, color: "red", // Corrected icon
             pointsEn: ["Low Curiosity, High Ambition.", "Escapes uncertainty via work.", "Defers happiness for external goals."],
             pointsRu: ["Низкое Любопытство, Высокие Амбиции.", "Избегает неопределенности через работу.", "Откладывает счастье ради внешних целей."],
             leadsToEn: "Overworking, toxic productivity, burnout.", leadsToRu: "Переработки, токсичная продуктивность, выгорание."
@@ -408,7 +411,7 @@ export default function ExperimentalMindsetPage() {
                      {section.gridItems && (
                        <div className="grid md:grid-cols-3 gap-4 my-4">
                          {section.gridItems.map((item, itemIndex) => {
-                           const ItemIcon = item.icon;
+                           const ItemIcon = item.icon; // Icon already corrected in section data
                            const itemTitle = selectedLang === 'en' ? item.titleEn : item.titleRu;
                            const itemPoints = selectedLang === 'en' ? item.pointsEn : item.pointsRu;
                            const itemLeadsTo = selectedLang === 'en' ? item.leadsToEn : item.leadsToRu;
