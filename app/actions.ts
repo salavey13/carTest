@@ -16,6 +16,7 @@ import { handleWebhookProxy } from "./webhook-handlers/proxy";
 import { getBaseUrl } from "@/lib/utils";
 import type { Database } from "@/types/database.types"; // Ensure this type is correctly defined
 import { Bucket } from '@supabase/storage-js'; // Import Bucket type
+import { v4 as uuidv4 } from 'uuid'; // Import UUID for unique filenames
 
 // Type alias for Supabase User Row
 type User = Database["public"]["Tables"]["users"]["Row"];
@@ -1288,12 +1289,6 @@ export async function setTelegramWebhook(): Promise<{ success: boolean; data?: a
 
 
 // --- Image Upload Actions (NEW) ---
-// /app/actions.ts (or wherever your actions are defined)
-"use server"; // Ensure this is a server action
-
-import { supabaseAdmin } from "@/hooks/supabase"; // Assuming correct path
-import { logger } from "@/lib/logger"; // Assuming correct path
-import { v4 as uuidv4 } from 'uuid'; // Import UUID for unique filenames
 
 // Ensure this function is exported if it's in actions.ts
 export async function uploadBatchImages(
