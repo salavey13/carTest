@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaImages, FaXmark, FaUpload, FaCopy, FaCheck, FaSpinner, FaExclamationTriangle } from 'react-icons/fa6';
+import { FaImages, FaXmark, FaUpload, FaCopy, FaCheck, FaSpinner, FaTriangleExclamation } from 'react-icons/fa6';
 import { listPublicBuckets, uploadBatchImages } from '@/app/actions';
 import { Bucket } from '@supabase/storage-js';
 import { toast } from 'sonner';
@@ -177,7 +177,7 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({ isOpen, onClos
                                 </div>
                             ) : fetchError ? (
                                 <div className="text-red-400 text-sm flex items-center gap-1">
-                                    <FaExclamationTriangle /> {fetchError}
+                                    <FaTriangleExclamation /> {fetchError}
                                 </div>
                             ) : buckets.length > 0 ? (
                                 <select
@@ -258,7 +258,7 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({ isOpen, onClos
                                                  </Tooltip>
                                              ) : (
                                                  <Tooltip text={result.error || "Ошибка"} position="left">
-                                                     <FaExclamationTriangle className="text-red-400 flex-shrink-0" />
+                                                     <FaTriangleExclamation className="text-red-400 flex-shrink-0" />
                                                  </Tooltip>
                                              )}
                                          </li>
@@ -268,7 +268,7 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({ isOpen, onClos
                         )}
                          {uploadError && uploadResults.length === 0 && ( // Show general error if no individual results shown
                              <div className="mt-4 text-red-400 text-sm flex items-center gap-1">
-                                <FaExclamationTriangle /> {uploadError}
+                                <FaTriangleExclamation /> {uploadError}
                              </div>
                          )}
 
