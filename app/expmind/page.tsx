@@ -539,9 +539,9 @@ export default function ExperimentalMindsetPage() {
                    {selectedLang === 'ru' ? "Резюме основано на видео. Применение требует практики и саморефлексии." : "Summary based on video insights. Application requires practice and self-reflection."}
                  </p>
                  {/* Optional link back to related concepts */}
-                 {/* <p className="mt-4 text-gray-300">
+                 <p className="mt-4 text-gray-300">
                    Explore related concepts in <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>.
-                 </p> */}
+                 </p>
               </section>
 
             </CardContent>
