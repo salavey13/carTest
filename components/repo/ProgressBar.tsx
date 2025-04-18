@@ -1,4 +1,3 @@
-// (No changes needed based on the request)
 import React from 'react';
 import { motion } from 'framer-motion';
 import { FetchStatus } from '@/contexts/RepoXmlPageContext'; // Import FetchStatus if needed for typing
@@ -34,7 +33,7 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ status, progress }) => {
                 // Animate only if not in error state
                 animate={{ width: `${progress}%` }}
                 transition={{
-                    duration: (status === 'loading' || status === 'retrying') ? 0.2 : 0.5, // Faster updates during loading/retrying simulation ticks
+                    duration: (status === 'loading' || status === 'retrying') ? 0.2 : 0.3, // Faster updates during loading/retrying simulation ticks
                     ease: "linear"
                  }}
             />
