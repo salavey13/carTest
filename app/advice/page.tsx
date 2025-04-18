@@ -11,8 +11,8 @@ import { logger } from "@/lib/logger";
 import { debugLogger } from "@/lib/debugLogger";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm'; // Github Flavored Markdown (tables, etc.)
-import remarkBreaks from 'remark-breaks'; // <-- Re-enable remark-breaks for single newlines
+import remarkGfm from 'remark-gfm'; // Needed for lists (*), bold (**), etc.
+import remarkBreaks from 'remark-breaks'; // Needed now to convert real \n (after replace) to <br>
 
 // Define types based on your database schema
 type Article = Database["public"]["Tables"]["articles"]["Row"];
@@ -43,6 +43,7 @@ export default function AdvicePage() {
   const userId = dbUser?.user_id || tgUser?.id?.toString();
 
   // --- Data Fetching ---
+  // .. (Fetching logic remains the same as previous version)
   useEffect(() => {
     const loadInitialMetadata = async () => {
       if (!userId) {
@@ -117,6 +118,7 @@ export default function AdvicePage() {
   }, [userMetadata]);
 
   // --- Broadcast Logic ---
+  // .. (Broadcast logic remains the same as previous version)
   const handleToggleBroadcast = async () => {
     if (!userId || !selectedArticle || isUpdatingBroadcast || userMetadata === null) {
         debugLogger.warn("handleToggleBroadcast skipped: Missing userId, selectedArticle, updating, or metadata not loaded.");
@@ -179,7 +181,9 @@ export default function AdvicePage() {
     setIsUpdatingBroadcast(false);
   };
 
+
   // --- Navigation & UI ---
+  // .. (Navigation logic remains the same)
   const handleGoBack = useCallback(() => {
     setSelectedArticle(null);
     setSections([]);
@@ -204,6 +208,7 @@ export default function AdvicePage() {
       }
     };
   }, [webApp, selectedArticle, handleGoBack]);
+
 
   // --- Render Logic ---
   const showGlobalLoading = isAuthLoading || userMetadata === null;
@@ -243,7 +248,8 @@ export default function AdvicePage() {
     )}>
       <div className="relative z-10 container mx-auto px-4 max-w-4xl">
         {!selectedArticle ? (
-          // --- Articles List View ---
+          // Articles List View
+          // .. (List view remains the same)
           <div className="space-y-6">
             <h1 className="text-3xl md:text-4xl font-bold text-center text-brand-green cyber-text glitch" data-text="Мудрые Советы">
                 Мудрые Советы
@@ -280,7 +286,7 @@ export default function AdvicePage() {
             )}
           </div>
         ) : (
-          // --- Single Article View ---
+          // Single Article View
           <div>
              <h1 className="text-3xl md:text-4xl font-bold mb-3 text-brand-green cyber-text">{selectedArticle.title}</h1>
             {selectedArticle.description && (
@@ -299,7 +305,7 @@ export default function AdvicePage() {
             ) : (
               <div>
                  {userId && sections.length > 0 && (
-                  <div className="my-8 p-5 bg-gradient-to-r from-blue-900/30 via-purple-900/20 to-blue-900/30 border border-brand-purple/40 rounded-lg shadow-lg text-center">
+                   <div className="my-8 p-5 bg-gradient-to-r from-blue-900/30 via-purple-900/20 to-blue-900/30 border border-brand-purple/40 rounded-lg shadow-lg text-center">
                     <h3 className="text-xl font-semibold mb-3 flex items-center justify-center text-brand-purple">
                         <FontAwesomeIcon icon={faTelegram} className="mr-2 text-brand-blue" />
                         Часовая Рассылка
@@ -345,45 +351,44 @@ export default function AdvicePage() {
                   <p className="text-gray-500">В этой статье пока нет секций.</p>
                 ) : (
                   <div className="space-y-6">
-                    {sections.map((section) => (
-                      <div key={section.id} className={cn(
+                    {sections.map((section) => {
+                      // --- Preprocess the content ---
+                      const processedContent = (section.content ?? '')
+                        .replace(/\\n/g, '\n'); // Replace literal "\\n" with actual newline
+
+                      return (
+                        <div key={section.id} className={cn(
                           "p-5 border rounded-lg transition-shadow duration-300",
                           "bg-black/50 border-gray-700/50 hover:border-brand-green/50 hover:shadow-md hover:shadow-brand-green/20"
-                      )}>
-                        {section.title && (
-                          <h3 className="text-lg font-semibold mb-2 text-brand-green flex items-baseline">
-                             <span className="text-brand-blue mr-2">{section.section_order}.</span> {section.title}
-                          </h3>
-                        )}
-                         {/* --- Use ReactMarkdown with remarkBreaks and GFM --- */}
-                         <ReactMarkdown
-                              // **Key Change:** Add remarkBreaks here
-                              remarkPlugins={[remarkGfm, remarkBreaks]}
-                              // .. Keep prose classes for general styling, but list styling might be better handled directly if prose conflicts
-                              className={cn(
+                        )}>
+                          {section.title && (
+                            <h3 className="text-lg font-semibold mb-2 text-brand-green flex items-baseline">
+                              <span className="text-brand-blue mr-2">{section.section_order}.</span> {section.title}
+                            </h3>
+                          )}
+                          {/* --- Render the PREPROCESSED content --- */}
+                          <ReactMarkdown
+                            // GFM for lists, breaks for the \n we just created
+                            remarkPlugins={[remarkGfm, remarkBreaks]}
+                            className={cn(
                                   "prose prose-invert prose-sm md:prose-base max-w-none text-gray-300",
                                   "prose-headings:text-brand-cyan prose-strong:text-brand-lime",
                                   "prose-a:text-brand-blue hover:prose-a:text-brand-purple prose-a:transition-colors",
                                   "prose-code:text-brand-pink prose-code:before:content-none prose-code:after:content-none prose-code:font-normal prose-code:bg-gray-700/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded",
                                   "prose-blockquote:border-brand-purple prose-blockquote:text-gray-400",
-                                  // .. Let remarkGfm handle list rendering, Tailwind prose might interfere sometimes
-                                  // .. Removed prose list specific classes like prose-ul:list-disc etc. Let's see if default HTML list rendering works better now with remark-breaks
-                                  // "prose-ul:list-disc prose-ol:list-decimal prose-li:marker:text-brand-blue",
-                                  // "prose-ul:pl-5 prose-ol:pl-5 prose-li:my-1.5",
-                                  // Removed whitespace-pre-line as remark-breaks should handle \n -> <br>
-                              )}
-                              components={{
-                                  a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="hover:underline" />,
-                                  // You might need to add custom components for ul, ol, li if default rendering isn't styled enough
-                                  // ul: ({node, ...props}) => <ul className="list-disc list-outside ml-5 space-y-1" {...props} />,
-                                  // ol: ({node, ...props}) => <ol className="list-decimal list-outside ml-5 space-y-1" {...props} />,
-                                  // li: ({node, ...props}) => <li className="text-gray-300" {...props} />,
-                              }}
-                         >
-                            {section.content ?? ''}
-                         </ReactMarkdown>
-                      </div>
-                    ))}
+                                  "prose-li:marker:text-brand-blue", // Style list markers
+                                  // Add some default margin/padding for lists if prose doesn't handle it enough
+                                  "prose-ul:my-2 prose-ul:ml-5 prose-ol:my-2 prose-ol:ml-5 prose-li:my-1"
+                            )}
+                            components={{
+                                a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="hover:underline" />,
+                            }}
+                          >
+                            {processedContent}
+                          </ReactMarkdown>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
