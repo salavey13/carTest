@@ -13,9 +13,38 @@ import { cn } from "@/lib/utils";
 
 // --- Instruction Generation ---
 const SYSTEM_INSTRUCTION_TEMPLATE = `
-You are an expert content processor... [Instructions remain the same as before] ... Do NOT include any introductory text, explanations, or \`\`\`csv \`\`\` markers before or after the CSV data itself.
-`;
+You are an expert content processor and technical writer. Your task is to watch the YouTube video at the following URL and convert its spoken content into a structured CSV format suitable for import into a database, adhering strictly to the format and constraints below.
 
+YouTube Video URL: %%YOUTUBE_URL%%
+
+**Constraints & Formatting:**
+
+1.  **Section Limit:** Aim to create a concise article structure with a **maximum of 13 sections**. Group related ideas or steps into single sections where logical. If the video is very long or dense, prioritize the most impactful or actionable advice.
+2.  **CSV Structure:**
+    *   The CSV MUST have the following columns in this exact order: \`"article_title", "article_slug", "article_description", "section_order", "section_title", "section_content"\`.
+    *   Use a comma (,) as the delimiter.
+    *   Enclose ALL text fields in double quotes (\`"\`). This is crucial for fields containing commas, newlines, or double quotes.
+    *   Escape double quotes within field content by doubling them (e.g., \`"He said ""hello""."\`).
+3.  **Output Format:** Output ONLY the raw CSV data, starting *directly* with the header row. Do NOT include *any* introductory text, explanations, summaries, \`\`\`csv \`\`\` markers, or any other text before or after the CSV data itself.
+
+**Column Definitions:**
+
+4. "article_title": The main title of the article derived from the video. Use this same title for all rows belonging to this article.
+5. "article_slug": A URL-friendly version of the title (lowercase, spaces replaced with hyphens, remove special characters). Use this same slug for all rows belonging to this article. Keep it relatively short but descriptive. Example: "how-to-meditate-effectively".
+6. "article_description": A brief (1-2 sentence) summary of the entire article/video content. Use this same description for all rows belonging to this article.
+7. "section_order": A sequential integer number (1, 2, 3, ...) indicating the order of the section within the article. Each section should represent a logical chunk or topic from the video.
+8. "section_title": (Optional) A short, descriptive title for the specific section. Leave blank if no obvious title emerges, but try to create one if possible.
+9. "section_content": The transcribed and *lightly edited* text content of that specific section. Focus on clarity and readability. Remove filler words ("uh", "um"), correct obvious grammatical errors, and structure into paragraphs where appropriate. Preserve the core meaning and advice given in the video for that section. Ensure the content is properly quoted for CSV safety.
+
+Processing Steps:
+1. Watch the video carefully.
+2. Identify the main topic and formulate the "article_title", "article_slug", and "article_description".
+3. Break the video content down into logical sections based on topic shifts or distinct pieces of advice.
+4. For each section, assign a sequential "section_order".5. Extract or formulate a "section_title" for each section if possible.
+6. Transcribe the spoken content for each section, edit it lightly for clarity (as described above), and place it in the "section_content" column, ensuring correct CSV quoting.
+7. Combine all sections into a single CSV output, repeating the article-level information (title, slug, description) for each section's row.Example Row:"How to Meditate Effectively","how-to-meditate-effectively","Learn the basics of mindfulness meditation to reduce stress and improve focus.",1,"Finding a Quiet Space","Find a comfortable and quiet location where you won't be disturbed. This could be a corner of your room, a park bench, or anywhere you feel at ease. Turn off notifications on your phone."
+VERY IMPORTANT: Output ONLY the raw CSV data, starting directly with the header row ("article_title", "article_slug", ...). Do NOT include any introductory text, explanations, or \`\`\`csv \`\`\` markers before or after the CSV data itself.
+;`
 // Interface for parsed CSV row data (used for preview)
 interface AdviceCsvRow {
     article_title: string;
