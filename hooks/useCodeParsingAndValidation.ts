@@ -1,5 +1,4 @@
-// /hooks/useCodeParsingAndValidation.ts
-"use client"; // Add use client here automatically
+"use client"
 
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
@@ -8,39 +7,239 @@ import { toast } from 'sonner';
 export interface FileEntry { id: string; path: string; content: string; extension: string; }
 export interface ValidationIssue {
     id: string; fileId: string; filePath: string;
-    type: 'icon' | 'useClient' | 'import' | 'skippedCodeBlock' | 'skippedComment' | 'parseError'; // Added parseError
+    // .. Updated issue types
+    type: 'iconLegacy' | 'useClient' | 'import' | 'skippedCodeBlock' | 'skippedComment' | 'parseError' | 'incorrectFa6IconName' | 'unknownFa6IconName';
     message: string;
     details?: any;
     fixable: boolean;
     restorable?: boolean; // For skippedCodeBlock
+    severity?: 'error' | 'warning' | 'info'; // Added severity
 }
 export type ValidationStatus = 'idle' | 'validating' | 'success' | 'error' | 'warning';
 
 // --- Constants ---
-const iconReplacements: Record<string, string> = {
+// .. Legacy react-icons/fa replacements
+const legacyIconReplacements: Record<string, string> = {
     'FaSync': 'FaRotate', 'FaTools': 'FaScrewdriverWrench', 'FaCheckSquare': 'FaSquareCheck',
     'FaTelegramPlane': 'FaPaperPlane', 'FaEllipsisV': 'FaEllipsisVertical', 'FaInfoCircle': 'FaCircleInfo',
-    'FaTrashAlt': 'FaPoo', 'FaCheckCircle': 'FaCircleCheck', 'FaTimesCircle': 'FaCircleTimes',
+    'FaTrashAlt': 'FaPoo', // Example: maybe FaTrashCan is better? // [SALAVEY13] No:)
+    'FaCheckCircle': 'FaCircleCheck', 'FaTimesCircle': 'FaCircleXmark', // Corrected FaCircleTimes to FaCircleXmark
 };
 const badIconImportSource = 'react-icons/fa';
 
+// .. New: Map for known Fa6 corrections
+const fa6IconCorrectionMap: Record<string, string> = {
+    FaExclamationTriangle: 'FaTriangleExclamation',
+    FaBalanceScale: 'FaScaleBalanced',
+    FaTools: 'FaToolbox', // Corrected: FaToolbox is in the list
+    FaUserCog: 'FaUserGear',
+    FaProjectDiagram: 'FaDiagramProject',
+    FaCog: 'FaGear', // Added common error
+    FaUserCircle: 'FaCircleUser', // Added common error
+    FaTimesCircle: 'FaCircleXmark', // Corrected target name
+    FaMapSigns: 'FaMapLocation', // Example from instructions
+    // Add more known typos/errors here if discovered
+    FaRunning: 'FaPersonRunning',
+    FaSadTear: 'FaFaceSadTear',
+    FaSearchDollar: 'FaMagnifyingGlassDollar',
+};
+const knownIncorrectFa6Names = Object.keys(fa6IconCorrectionMap);
+
+// .. Full list of valid Fa6 icons (critical for unknown check) - shortened for brevity in // .. Shortened, more relevant list of valid Fa6 icons
+const validFa6Icons = new Set([
+    // Common UI & Actions
+    'FaAlignCenter','FaAlignJustify','FaAlignLeft','FaAlignRight','FaAngleDown','FaAngleLeft',
+    'FaAngleRight','FaAngleUp','FaAnglesDown','FaAnglesLeft','FaAnglesRight','FaAnglesUp',
+    'FaArrowDown','FaArrowLeft','FaArrowPointer','FaArrowRightArrowLeft','FaArrowRightFromBracket',
+    'FaArrowRightLong','FaArrowRightToBracket','FaArrowRight','FaArrowRotateLeft','FaArrowRotateRight',
+    'FaArrowTrendDown','FaArrowTrendUp','FaArrowTurnDown','FaArrowTurnUp','FaArrowUpFromBracket',
+    'FaArrowUpRightFromSquare','FaArrowUp','FaArrowsLeftRight','FaArrowsRotate','FaArrowsSpin',
+    'FaArrowsUpDownLeftRight','FaArrowsUpDown','FaArrowsUpToLine','FaAt','FaBackwardFast','FaBackwardStep',
+    'FaBackward','FaBan','FaBarsProgress','FaBarsStaggered','FaBars','FaBellSlash','FaBell',
+    'FaBolt','FaBookBookmark','FaBookOpenReader','FaBookOpen','FaBook','FaBookmark','FaBoxArchive',
+    'FaBoxOpen','FaBox','FaBoxesStacked','FaBrain','FaBriefcase','FaBugSlash','FaBug','FaBuilding',
+    'FaBullhorn','FaBullseye','FaBurger','FaBus','FaCalculator','FaCalendarCheck','FaCalendarDay',
+    'FaCalendarDays','FaCalendarMinus','FaCalendarPlus','FaCalendarWeek','FaCalendarXmark','FaCalendar',
+    'FaCameraRetro','FaCameraRotate','FaCamera','FaCaretDown','FaCaretLeft','FaCaretRight','FaCaretUp',
+    'FaCartArrowDown','FaCartPlus','FaCartShopping','FaChartArea','FaChartBar','FaChartColumn','FaChartGantt',
+    'FaChartLine','FaChartPie','FaChartSimple','FaCheckDouble','FaCheckToSlot','FaCheck','FaChevronDown',
+    'FaChevronLeft','FaChevronRight','FaChevronUp','FaCircleCheck','FaCircleDot','FaCircleDown','FaCircleExclamation',
+    'FaCircleHalfStroke','FaCircleInfo','FaCircleLeft','FaCircleMinus','FaCircleNodes','FaCircleNotch',
+    'FaCirclePause','FaCirclePlay','FaCirclePlus','FaCircleQuestion','FaCircleRight','FaCircleStop',
+    'FaCircleUp','FaCircleUser','FaCircleXmark','FaCircle','FaClipboardCheck','FaClipboardList','FaClipboardQuestion',
+    'FaClipboardUser','FaClipboard','FaClockRotateLeft','FaClock','FaClone','FaClosedCaptioning','FaCloudArrowDown',
+    'FaCloudArrowUp','FaCloudBolt','FaCloudRain','FaCloudShowersHeavy','FaCloudSunRain','FaCloudSun','FaCloud',
+    'FaCodeBranch','FaCodeCommit','FaCodeCompare','FaCodeFork','FaCodeMerge','FaCodePullRequest','FaCode',
+    'FaCoins','FaCommentDollar','FaCommentDots','FaCommentMedical','FaCommentSlash','FaCommentSms','FaComment',
+    'FaCommentsDollar','FaComments','FaCompassDrafting','FaCompass','FaCompress','FaComputerMouse','FaComputer',
+    'FaCopy','FaCopyright','FaCreditCard','FaCropSimple','FaCrop','FaCrosshairs','FaCube','FaCubesStacked',
+    'FaCubes','FaDatabase','FaDeleteLeft','FaDesktop','FaDiagramNext','FaDiagramPredecessor','FaDiagramProject',
+    'FaDiagramSuccessor','FaDisplay','FaDivide','FaDollarSign','FaDoorClosed','FaDoorOpen','FaDownLeftAndUpRightToCenter',
+    'FaDownLong','FaDownload','FaDropletSlash','FaDroplet','FaDumbbell','FaEarDeaf','FaEarListen','FaEject',
+    'FaEllipsisVertical','FaEllipsis','FaEnvelopeCircleCheck','FaEnvelopeOpenText','FaEnvelopeOpen','FaEnvelope',
+    'FaEnvelopesBulk','FaEquals','FaEraser','FaExclamation','FaExpand','FaEyeDropper','FaEyeLowVision',
+    'FaEyeSlash','FaEye','FaFaceAngry','FaFaceDizzy','FaFaceFlushed','FaFaceFrownOpen','FaFaceFrown',
+    'FaFaceGrimace','FaFaceGrinBeamSweat','FaFaceGrinBeam','FaFaceGrinHearts','FaFaceGrinSquintTears','FaFaceGrinSquint',
+    'FaFaceGrinStars','FaFaceGrinTears','FaFaceGrinTongueSquint','FaFaceGrinTongueWink','FaFaceGrinTongue',
+    'FaFaceGrinWide','FaFaceGrinWink','FaFaceGrin','FaFaceKissBeam','FaFaceKissWinkHeart','FaFaceKiss',
+    'FaFaceLaughBeam','FaFaceLaughSquint','FaFaceLaughWink','FaFaceLaugh','FaFaceMehBlank','FaFaceMeh',
+    'FaFaceRollingEyes','FaFaceSadCry','FaFaceSadTear','FaFaceSmileBeam','FaFaceSmileWink','FaFaceSmile',
+    'FaFaceSurprise','FaFaceTired','FaFileArrowDown','FaFileArrowUp','FaFileAudio','FaFileCircleCheck',
+    'FaFileCircleExclamation','FaFileCircleMinus','FaFileCirclePlus','FaFileCircleQuestion','FaFileCircleXmark',
+    'FaFileCode','FaFileCsv','FaFileExcel','FaFileExport','FaFileImage','FaFileImport','FaFileInvoiceDollar',
+    'FaFileInvoice','FaFileLines','FaFileMedical','FaFilePdf','FaFilePen','FaFilePowerpoint','FaFilePrescription',
+    'FaFileShield','FaFileSignature','FaFileVideo','FaFileWaveform','FaFileWord','FaFileZipper','FaFile',
+    'FaFilm','FaFilterCircleDollar','FaFilterCircleXmark','FaFilter','FaFingerprint','FaFireExtinguisher',
+    'FaFireFlameCurved','FaFireFlameSimple','FaFire','FaFlagCheckered','FaFlagUsa','FaFlag','FaFlaskVial','FaFlask',
+    'FaFloppyDisk','FaFolderClosed','FaFolderMinus','FaFolderOpen','FaFolderPlus','FaFolderTree','FaFolder',
+    'FaFont','FaForwardFast','FaForwardStep','FaForward','FaFutbol','FaGamepad','FaGasPump','FaGaugeHigh',
+    'FaGaugeSimpleHigh','FaGaugeSimple','FaGauge','FaGavel','FaGear','FaGears','FaGem','FaGift','FaGifts',
+    'FaGlobe','FaGraduationCap','FaGripLinesVertical','FaGripLines','FaGripVertical','FaGrip','FaGroupArrowsRotate',
+    'FaGun','FaHammer','FaHandBackFist','FaHandDots','FaHandFist','FaHandHoldingDollar','FaHandHoldingDroplet',
+    'FaHandHoldingHand','FaHandHoldingHeart','FaHandHoldingMedical','FaHandHolding','FaHandLizard','FaHandMiddleFinger',
+    'FaHandPeace','FaHandPointDown','FaHandPointLeft','FaHandPointRight','FaHandPointUp','FaHandPointer',
+    'FaHandScissors','FaHandSparkles','FaHandSpock','FaHand','FaHandshakeAngle','FaHandshakeSimpleSlash',
+    'FaHandshakeSimple','FaHandshakeSlash','FaHandshake','FaHardDrive','FaHashtag','FaHeadphonesSimple',
+    'FaHeadphones','FaHeadset','FaHeartCircleBolt','FaHeartCircleCheck','FaHeartCircleExclamation','FaHeartCircleMinus',
+    'FaHeartCirclePlus','FaHeartCircleXmark','FaHeartCrack','FaHeartPulse','FaHeart','FaHighlighter','FaHistory', // Kept FaHistory
+    'FaHome', // Assuming FaHouse equivalent
+    'FaHospitalUser','FaHospital','FaHourglassEnd','FaHourglassHalf','FaHourglassStart','FaHourglass',
+    'FaHouseChimney','FaHouseCircleCheck','FaHouseCircleExclamation','FaHouseCircleXmark','FaHouseCrack','FaHouseFire',
+    'FaHouseFlag','FaHouseLaptop','FaHouseLock','FaHouseMedical','FaHouseSignal','FaHouseUser','FaHouse',
+    'FaICursor','FaImagePortrait','FaImage','FaImages','FaInbox','FaIndent','FaIndustry','FaInfinity','FaInfo',
+    'FaItalic','FaKey','FaKeyboard','FaKitMedical','FaLanguage','FaLaptopCode','FaLaptopFile','FaLaptopMedical',
+    'FaLaptop','FaLayerGroup','FaLeaf','FaLeftLong','FaLeftRight','FaLemon','FaLifeRing','FaLightbulb',
+    'FaLinkSlash','FaLink','FaListCheck','FaListOl','FaListUl','FaList','FaLocationArrow','FaLocationCrosshairs',
+    'FaLocationDot','FaLocationPinLock','FaLocationPin','FaLockOpen','FaLock','FaLongArrowAltDown', // Example renaming if needed
+    'FaLongArrowAltLeft','FaLongArrowAltRight','FaLongArrowAltUp','FaLowVision', // Example renaming if needed
+    'FaMagnet','FaMagnifyingGlassArrowRight','FaMagnifyingGlassChart','FaMagnifyingGlassDollar','FaMagnifyingGlassLocation',
+    'FaMagnifyingGlassMinus','FaMagnifyingGlassPlus','FaMagnifyingGlass','FaMapLocationDot','FaMapLocation','FaMapPin',
+    'FaMap','FaMarker','FaMedal','FaMemory','FaMessage','FaMicrochip','FaMicrophoneLinesSlash','FaMicrophoneLines',
+    'FaMicrophoneSlash','FaMicrophone','FaMicroscope','FaMinimize','FaMinus','FaMobileButton','FaMobileRetro',
+    'FaMobileScreenButton','FaMobileScreen','FaMobile','FaMoneyBill1Wave','FaMoneyBill1','FaMoneyBillTransfer',
+    'FaMoneyBillTrendUp','FaMoneyBillWave','FaMoneyBill','FaMoneyBills','FaMoneyCheckDollar','FaMoneyCheck',
+    'FaMoon','FaMusic','FaNetworkWired','FaNewspaper','FaNoteSticky','FaNotesMedical','FaObjectGroup','FaObjectUngroup',
+    'FaOutdent','FaPaintbrush','FaPalette','FaPaperPlane','FaPaperclip','FaParagraph','FaPaste','FaPause','FaPaw',
+    'FaPenClip','FaPenFancy','FaPenNib','FaPenRuler','FaPenToSquare','FaPen','FaPencil','FaPeopleArrows',
+    'FaPeopleCarryBox','FaPeopleGroup','FaPeopleLine','FaPercent','FaPersonArrowDownToLine','FaPersonArrowUpFromLine',
+    'FaPersonBiking','FaPersonBooth','FaPersonChalkboard','FaPersonCircleCheck','FaPersonCircleExclamation',
+    'FaPersonCircleMinus','FaPersonCirclePlus','FaPersonCircleQuestion','FaPersonCircleXmark','FaPersonDotsFromLine',
+    'FaPersonDress','FaPersonHiking','FaPersonPraying','FaPersonRunning','FaPersonShelter','FaPersonSkating',
+    'FaPersonSkiing','FaPersonWalking','FaPerson','FaPhoneFlip','FaPhoneSlash','FaPhoneVolume','FaPhone','FaPhotoFilm',
+    'FaPiggyBank','FaPills','FaPlay','FaPlugCircleBolt','FaPlugCircleCheck','FaPlugCircleExclamation',
+    'FaPlugCircleMinus','FaPlugCirclePlus','FaPlugCircleXmark','FaPlug','FaPlusMinus','FaPlus','FaPodcast',
+    'FaPoo','FaPowerOff','FaPrint','FaPuzzlePiece','FaQrcode','FaQuestion','FaQuoteLeft','FaQuoteRight','FaRadiation',
+    'FaRecordVinyl','FaRectangleAd','FaRectangleList','FaRectangleXmark','FaRecycle','FaRegistered','FaRepeat',
+    'FaReplyAll','FaReply','FaRetweet','FaRibbon','FaRightFromBracket','FaRightLeft','FaRightLong','FaRightToBracket',
+    'FaRoadBarrier','FaRoadBridge','FaRoadCircleCheck','FaRoadCircleExclamation','FaRoadCircleXmark','FaRoadLock',
+    'FaRoadSpikes','FaRoad','FaRobot','FaRocket','FaRotateLeft','FaRotateRight','FaRotate','FaRoute','FaRss',
+    'FaRulerCombined','FaRulerHorizontal','FaRulerVertical','FaRuler','FaSave', // Assuming FaFloppyDisk equiv
+    'FaScaleBalanced','FaScaleUnbalancedFlip','FaScaleUnbalanced','FaSchool','FaScissors','FaScrewdriverWrench',
+    'FaScrewdriver','FaScroll','FaSdCard','FaSearch', // Assuming FaMagnifyingGlass equiv
+    'FaSearchMinus', // Assuming FaMagnifyingGlassMinus equiv
+    'FaSearchPlus', // Assuming FaMagnifyingGlassPlus equiv
+    'FaSection','FaSeedling','FaServer','FaShapes','FaShareFromSquare','FaShareNodes','FaShare','FaShieldAlt', // Assuming FaShieldHalved equiv
+    'FaShieldHalved','FaShieldVirus','FaShield','FaShip','FaShirt','FaShoePrints','FaShopLock','FaShopSlash','FaShop',
+    'FaShower','FaShuffle','FaSignHanging','FaSignal','FaSignature','FaSignsPost','FaSitemap','FaSlidersH', // Assuming FaSliders equiv
+    'FaSliders','FaSmoking','FaSnowflake','FaSortAlphaDown', // Assuming FaArrowDownAZ equiv
+    'FaSortAlphaUp', // Assuming FaArrowUpAZ equiv
+    'FaSortAmountDown', // Assuming FaArrowDownWideShort equiv
+    'FaSortAmountUp', // Assuming FaArrowUpWideShort equiv
+    'FaSortDown','FaSortNumericDown', // Assuming FaArrowDown19 equiv
+    'FaSortNumericUp', // Assuming FaArrowUp19 equiv
+    'FaSortUp','FaSort','FaSpinner','FaSplotch','FaSprayCanSparkles','FaSprayCan','FaSquareArrowUpRight',
+    'FaSquareCaretDown','FaSquareCaretLeft','FaSquareCaretRight','FaSquareCaretUp','FaSquareCheck','FaSquareEnvelope',
+    'FaSquareFull','FaSquareH','FaSquareMinus','FaSquareParking','FaSquarePen','FaSquarePhoneFlip','FaSquarePhone',
+    'FaSquarePlus','FaSquarePollHorizontal','FaSquarePollVertical','FaSquareRootVariable','FaSquareRss','FaSquareShareNodes',
+    'FaSquareUpRight','FaSquareVirus','FaSquareXmark','FaSquare','FaStarHalfStroke','FaStarHalf','FaStar','FaStepBackward', // Assuming FaBackwardStep equiv
+    'FaStepForward', // Assuming FaForwardStep equiv
+    'FaStethoscope','FaStickyNote', // Assuming FaNoteSticky equiv
+    'FaStop','FaStopwatch20','FaStopwatch','FaStoreSlash','FaStore','FaStreetView','FaStrikethrough','FaSubscript',
+    'FaSuitcaseMedical','FaSuitcaseRolling','FaSuitcase','FaSun','FaSuperscript','FaSync', // Assuming FaRotate equiv
+    'FaSyringe','FaTableCellsLarge','FaTableCells','FaTableColumns','FaTableList','FaTable','FaTabletAlt', // Assuming FaTablet equiv
+    'FaTabletButton','FaTabletScreenButton','FaTablet','FaTablets','FaTachometerAlt', // Assuming FaGauge equiv
+    'FaTag','FaTags','FaTasks', // Assuming FaListCheck equiv
+    'FaTaxi','FaTerminal','FaTextHeight','FaTextSlash','FaTextWidth','FaThermometer','FaThumbsDown','FaThumbsUp',
+    'FaThumbtack','FaTicketAlt', // Assuming FaTicket equiv
+    'FaTicketSimple','FaTicket','FaTimes', // Assuming FaXmark equiv
+    'FaTimeline','FaTint', // Assuming FaDroplet equiv
+    'FaTintSlash', // Assuming FaDropletSlash equiv
+    'FaToggleOff','FaToggleOn','FaToolbox','FaTools', // Keeping FaTools temporarily if used, prefer FaToolbox
+    'FaTooth','FaTrashAlt', // Assuming FaTrashCan equiv
+    'FaTrashArrowUp','FaTrashCanArrowUp','FaTrashCan','FaTrash','FaTree','FaTriangleExclamation','FaTrophy',
+    'FaTruckFast','FaTruckMedical','FaTruckMoving','FaTruckPickup','FaTruck','FaTv','FaUnderline','FaUndo', // Assuming FaArrowRotateLeft equiv
+    'FaUniversalAccess','FaUniversity', // Assuming FaBuildingColumns equiv
+    'FaUnlockAlt', // Assuming FaUnlockKeyhole equiv
+    'FaUnlockKeyhole','FaUnlock','FaUnlink', // Assuming FaLinkSlash equiv
+    'FaUpDownLeftRight','FaUpDown','FaUpLong','FaUpRightAndDownLeftFromCenter','FaUpRightFromSquare','FaUpload',
+    'FaUserAlt', // Assuming FaCircleUser equiv
+    'FaUserAstronaut','FaUserCheck','FaUserClock','FaUserDoctor','FaUserEdit', // Assuming FaUserPen equiv
+    'FaUserFriends', // Assuming FaUsers equiv
+    'FaUserGear','FaUserGraduate','FaUserGroup','FaUserInjured','FaUserLargeSlash','FaUserLarge','FaUserLock',
+    'FaUserMd', // Assuming FaUserDoctor equiv
+    'FaUserMinus','FaUserNinja','FaUserNurse','FaUserPen','FaUserPlus','FaUserSecret','FaUserShield','FaUserSlash',
+    'FaUserTag','FaUserTie','FaUserTimes', // Assuming FaUserXmark equiv
+    'FaUserXmark','FaUser','FaUsersBetweenLines','FaUsersCog', // Assuming FaUsersGear equiv
+    'FaUsersGear','FaUsersLine','FaUsersRays','FaUsersRectangle','FaUsersSlash','FaUsersViewfinder','FaUsers',
+    'FaUtensils','FaVectorSquare','FaVial','FaVials','FaVideoSlash','FaVideo','FaVolumeDown', // Assuming FaVolumeLow equiv
+    'FaVolumeHigh','FaVolumeLow','FaVolumeMute', // Assuming FaVolumeXmark equiv
+    'FaVolumeOff','FaVolumeUp', // Assuming FaVolumeHigh equiv
+    'FaVolumeXmark','FaWallet','FaWandMagicSparkles','FaWandMagic','FaWandSparkles','FaWarehouse','FaWater',
+    'FaWeightHanging','FaWeightScale','FaWifi','FaWind','FaWindowClose', // Assuming FaRectangleXmark equiv
+    'FaWindowMaximize','FaWindowMinimize','FaWindowRestore','FaWineGlass','FaWrench','FaXRay','FaXmark','FaYenSign', // JPY Symbol
+    'FaRegAddressBook','FaRegAddressCard','FaRegBellSlash','FaRegBell','FaRegBookmark','FaRegBuilding','FaRegCalendarCheck',
+    'FaRegCalendarDays','FaRegCalendarMinus','FaRegCalendarPlus','FaRegCalendarXmark','FaRegCalendar','FaRegChartBar',
+    'FaRegCheckCircle', // Assuming FaRegCircleCheck equiv
+    'FaRegCheckSquare', // Assuming FaRegSquareCheck equiv
+    'FaRegCircleCheck','FaRegCircleDot','FaRegCircleDown','FaRegCircleLeft','FaRegCirclePause','FaRegCirclePlay',
+    'FaRegCircleQuestion','FaRegCircleRight','FaRegCircleStop','FaRegCircleUp','FaRegCircleUser','FaRegCircleXmark',
+    'FaRegCircle','FaRegClipboard','FaRegClock','FaRegClone','FaRegClosedCaptioning','FaRegCommentDots','FaRegComment',
+    'FaRegComments','FaRegCompass','FaRegCopy','FaRegCopyright','FaRegCreditCard','FaRegEdit', // Assuming FaRegPenToSquare equiv
+    'FaRegEnvelopeOpen','FaRegEnvelope','FaRegEyeSlash','FaRegEye','FaRegFaceAngry','FaRegFaceDizzy','FaRegFaceFlushed',
+    'FaRegFaceFrownOpen','FaRegFaceFrown','FaRegFaceGrimace','FaRegFaceGrinBeamSweat','FaRegFaceGrinBeam',
+    'FaRegFaceGrinHearts','FaRegFaceGrinSquintTears','FaRegFaceGrinSquint','FaRegFaceGrinStars','FaRegFaceGrinTears',
+    'FaRegFaceGrinTongueSquint','FaRegFaceGrinTongueWink','FaRegFaceGrinTongue','FaRegFaceGrinWide','FaRegFaceGrinWink',
+    'FaRegFaceGrin','FaRegFaceKissBeam','FaRegFaceKissWinkHeart','FaRegFaceKiss','FaRegFaceLaughBeam','FaRegFaceLaughSquint',
+    'FaRegFaceLaughWink','FaRegFaceLaugh','FaRegFaceMehBlank','FaRegFaceMeh','FaRegFaceRollingEyes','FaRegFaceSadCry',
+    'FaRegFaceSadTear','FaRegFaceSmileBeam','FaRegFaceSmileWink','FaRegFaceSmile','FaRegFaceSurprise','FaRegFaceTired',
+    'FaRegFileAlt', // Assuming FaRegFileLines equiv
+    'FaRegFileArchive', // Assuming FaRegFileZipper equiv
+    'FaRegFileAudio','FaRegFileCode','FaRegFileExcel','FaRegFileImage','FaRegFileLines','FaRegFilePdf','FaRegFilePowerpoint',
+    'FaRegFileVideo','FaRegFileWord','FaRegFileZipper','FaRegFile','FaRegFlag','FaRegFloppyDisk','FaRegFolderClosed',
+    'FaRegFolderOpen','FaRegFolder','FaRegFutbol','FaRegGem','FaRegHandLizard','FaRegHandPeace','FaRegHandPointDown',
+    'FaRegHandPointLeft','FaRegHandPointRight','FaRegHandPointUp','FaRegHandPointer','FaRegHandScissors','FaRegHandSpock',
+    'FaRegHand','FaRegHandshake','FaRegHardDrive','FaRegHeart','FaRegHospital','FaRegHourglass','FaRegIdBadge',
+    'FaRegIdCard','FaRegImage','FaRegImages','FaRegKeyboard','FaRegLemon','FaRegLifeRing','FaRegLightbulb','FaRegListAlt', // Assuming FaRegRectangleList equiv
+    'FaRegMap','FaRegMeh', // Assuming FaRegFaceMeh equiv
+    'FaRegMessage','FaRegMoneyBill1','FaRegMoon','FaRegNewspaper','FaRegNoteSticky','FaRegObjectGroup','FaRegObjectUngroup',
+    'FaRegPaperPlane','FaRegPaste','FaRegPauseCircle', // Assuming FaRegCirclePause equiv
+    'FaRegPenToSquare','FaRegPlayCircle', // Assuming FaRegCirclePlay equiv
+    'FaRegQuestionCircle', // Assuming FaRegCircleQuestion equiv
+    'FaRegRectangleList','FaRegRectangleXmark','FaRegRegistered','FaRegSave', // Assuming FaRegFloppyDisk equiv
+    'FaRegShareFromSquare','FaRegSmile', // Assuming FaRegFaceSmile equiv
+    'FaRegSmileBeam', // Assuming FaRegFaceSmileBeam equiv
+    'FaRegSmileWink', // Assuming FaRegFaceSmileWink equiv
+    'FaRegSnowflake','FaRegSquareCaretDown','FaRegSquareCaretLeft','FaRegSquareCaretRight','FaRegSquareCaretUp',
+    'FaRegSquareCheck','FaRegSquareFull','FaRegSquareMinus','FaRegSquarePlus','FaRegSquare','FaRegStarHalfStroke',
+    'FaRegStarHalf','FaRegStar','FaRegStopCircle', // Assuming FaRegCircleStop equiv
+    'FaRegSun','FaRegThumbsDown','FaRegThumbsUp','FaRegTimesCircle', // Assuming FaRegCircleXmark equiv
+    'FaRegTrashAlt', // Assuming FaRegTrashCan equiv
+    'FaRegTrashCan','FaRegUserCircle', // Assuming FaRegCircleUser equiv
+    'FaRegUser','FaRegWindowMaximize','FaRegWindowMinimize','FaRegWindowRestore',
+]);
+
+
+
+// .. Other constants remain the same
 const importChecks = [
     { name: 'motion', usageRegex: /<motion\./, importRegex: /import .* from ['"]framer-motion['"]/, importStatement: `import { motion } from "framer-motion";` },
     { name: 'clsx', usageRegex: /clsx\(/, importRegex: /import clsx from ['"]clsx['"]/, importStatement: `import clsx from "clsx";` },
-    // Add more common imports if needed
 ];
-
-// Regex for skipped code blocks (accepts 2 or 3 dots)
 const skippedCodeBlockMarkerRegex = /(\/\*\s*\.{2,3}\s*\*\/)|({\s*\/\*\s*\.{2,3}\s*\*\/\s*})|(\[\s*\/\*\s*\.{2,3}\s*\*\/\s*\])/;
-// Regex specifically for the false positive "keep" comment
 const skippedCommentKeepRegex = /\/\/\s*\.{3}\s*\(keep\s/;
-// Regex for actual skipped comments (only 3 dots, not followed by "(keep ")
 const skippedCommentRealRegex = /\/\/\s*\.{3}(?!\s*\()/;
-
-// Regex for code block boundaries allowing leading spaces
 const codeBlockStartRegex = /^\s*```(\w*)\s*$/;
 const codeBlockEndRegex = /^\s*```\s*$/;
-// Regex for path comments allowing leading spaces
 const pathCommentRegex = /^\s*(?:\/\/|\/\*|--|#)\s*([\w\-\/\.\[\]]+?\.\w+)/;
 
 const generateId = () => '_' + Math.random().toString(36).substring(2, 9);
@@ -53,73 +252,48 @@ export function useCodeParsingAndValidation() {
     const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
     const [isParsing, setIsParsing] = useState(false);
 
-    // --- Parsing Logic ---
+    // .. Parsing Logic remains the same ...
     const parseFilesFromText = useCallback((text: string): { files: FileEntry[], description: string, parseErrors: ValidationIssue[] } => {
         const files: FileEntry[] = [];
         const parseErrors: ValidationIssue[] = [];
         let lastIndex = 0;
         const descriptionParts: string[] = [];
-
-        // Enhanced regex to capture file path potentially declared before OR after the block
-        // Group 1: Path before block, Group 2: Language, Group 3: Content, Group 4: Path after block
         const codeBlockRegex = /(?:(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([\w\-\/\.\[\]]+?\.\w+)\s*(?:\*\/)?\s*$)\n*)?^\s*```(\w+)?\n([\s\S]*?)\n^\s*```(?:\n*(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([\w\-\/\.\[\]]+?\.\w+)\s*(?:\*\/)?\s*$))?/gm;
         let match;
 
         while ((match = codeBlockRegex.exec(text)) !== null) {
             const currentMatchIndex = match.index;
-
-            // Capture description text between blocks or before the first block
             if (currentMatchIndex > lastIndex) {
                 descriptionParts.push(text.substring(lastIndex, currentMatchIndex).trim());
             }
-            lastIndex = codeBlockRegex.lastIndex; // Update lastIndex to end of current match
+            lastIndex = codeBlockRegex.lastIndex;
 
-            let path = (match[1] || match[4] || `unnamed-${files.length + 1}`).trim(); // Path before OR after
-            let content = match[3].trim(); // Content group
-            let lang = match[2] || ''; // Language group
-            let extension = path.split('.').pop()?.toLowerCase() || lang || 'txt'; // Guess extension
+            let path = (match[1] || match[4] || `unnamed-${files.length + 1}`).trim();
+            let content = match[3].trim();
+            let lang = match[2] || '';
+            let extension = path.split('.').pop()?.toLowerCase() || lang || 'txt';
 
-            // If path is still unnamed, try to extract from the first line of content
             if (path.startsWith('unnamed-')) {
                 const lines = content.split('\n');
-                const potentialPathLine = lines[0]?.trimStart(); // Trim start only
+                const potentialPathLine = lines[0]?.trimStart();
                 if (potentialPathLine) {
                     const pathMatch = potentialPathLine.match(pathCommentRegex);
                     if (pathMatch && pathMatch[1]) {
                         path = pathMatch[1].trim();
-                        content = lines.slice(1).join('\n').trim(); // Re-trim content after removing path line
+                        content = lines.slice(1).join('\n').trim();
                         extension = path.split('.').pop()?.toLowerCase() || lang || 'txt';
                     }
                 }
             }
+            if (path !== '/') path = path.replace(/^[\/\\]+/, '');
 
-            // Clean up leading slashes from path only if it's not just "/"
-            if (path !== '/') {
-                 path = path.replace(/^[\/\\]+/, '');
-            }
-
-
-            // Check for nested ``` - basic check, might not catch all edge cases
             if (content.includes('```')) {
                  const fileId = generateId();
-                 parseErrors.push({
-                    id: generateId(), fileId: fileId, // Assign ID even for error files
-                    filePath: path || `parse-error-${fileId}`, type: 'parseError',
-                    message: `Обнаружен вложенный блок кода (\`\`\`). Разбор может быть некорректным.`,
-                    details: { lineNumber: -1 }, fixable: false, restorable: false
-                 });
-                 // Optionally try to split or just skip? For now, add error and include the file as is.
+                 parseErrors.push({ id: generateId(), fileId: fileId, filePath: path || `parse-error-${fileId}`, type: 'parseError', message: `Обнаружен вложенный блок кода (\`\`\`). Разбор может быть некорректным.`, details: { lineNumber: -1 }, fixable: false, restorable: false, severity: 'error' });
             }
-
-            // Add the file (even if there was a parse error warning)
             files.push({ id: generateId(), path, content, extension });
         }
-
-        // Capture any remaining text after the last code block as description
-        if (lastIndex < text.length) {
-            descriptionParts.push(text.substring(lastIndex).trim());
-        }
-
+        if (lastIndex < text.length) { descriptionParts.push(text.substring(lastIndex).trim()); }
         const description = descriptionParts.filter(Boolean).join('\n\n');
         return { files, description, parseErrors };
     }, []);
@@ -132,301 +306,234 @@ export function useCodeParsingAndValidation() {
         const clientHookPatterns = /(useState|useEffect|useRef|useContext|useReducer|useCallback|useMemo|useLayoutEffect|useImperativeHandle|useDebugValue)\s*\(/;
 
         for (const file of filesToValidate) {
-            // Skip validation for fundamentally broken files (e.g., unnamed ones we couldn't fix)
-            if (file.path.startsWith('unnamed-') || file.path.startsWith('parse-error-')) {
-                continue; // Maybe add a different kind of issue if needed
-            }
-
+            if (file.path.startsWith('unnamed-') || file.path.startsWith('parse-error-')) continue;
             const lines = file.content.split('\n');
+            const fileId = file.id;
+            const filePath = file.path;
 
-            // 1. Icon Check (react-icons/fa only)
-            const iconImportRegex = /import\s+{([^}]*)}\s+from\s+['"](react-icons\/fa)['"]/g;
-            let importMatch;
-            while ((importMatch = iconImportRegex.exec(file.content)) !== null) {
-                const importedIcons = importMatch[1].split(',').map(i => i.trim().split(/\s+as\s+/)[0]).filter(Boolean);
-                importedIcons.forEach(iconName => {
-                    const replacement = iconReplacements[iconName];
-                    // Regex to find usage as a component tag, avoiding matches within strings or comments (basic check)
+            // .. 1. Legacy Icon Check (react-icons/fa) - Kept for backward compatibility?
+            const legacyIconImportRegex = /import\s+{([^}]*)}\s+from\s+['"]react-icons\/fa['"]/g;
+            let legacyImportMatch;
+            while ((legacyImportMatch = legacyIconImportRegex.exec(file.content)) !== null) {
+                const legacyImportLineNumber = file.content.substring(0, legacyImportMatch.index).split('\n').length;
+                const legacyImportedIcons = legacyImportMatch[1].split(',').map(i => i.trim().split(/\s+as\s+/)[0]).filter(Boolean);
+                legacyImportedIcons.forEach(iconName => {
+                    const replacement = legacyIconReplacements[iconName];
                     const usageRegex = new RegExp(`<${iconName}(?![-_a-zA-Z0-9])(\\s|\\/?>)`);
-                    const linesWithIcon = file.content.split('\n');
-                    let firstUsageLine = -1;
-                    for (let i = 0; i < linesWithIcon.length; i++) {
-                        // Simple check to avoid matching commented out lines
-                        if (!linesWithIcon[i].trim().startsWith('//') && !linesWithIcon[i].trim().startsWith('/*') && usageRegex.test(linesWithIcon[i])) {
-                            firstUsageLine = i + 1;
-                            break;
-                        }
-                    }
-
-                    if (firstUsageLine !== -1) { // Check if usage was found
-                         issues.push({
-                            id: generateId(), fileId: file.id, filePath: file.path, type: 'icon',
-                            message: `Старая иконка ${iconName} из 'react-icons/fa'. ${replacement ? `Заменить на ${replacement} из /fa6?` : 'Аналог?'}`,
-                            details: { badIcon: iconName, goodIcon: replacement, lineNumber: firstUsageLine },
-                            fixable: !!replacement // Fixable only if we have a direct replacement suggestion
-                         });
+                    if (usageRegex.test(file.content)) { // Simple usage check
+                         issues.push({ id: generateId(), fileId, filePath, type: 'iconLegacy', message: `Legacy icon ${iconName} from 'react-icons/fa'. ${replacement ? `Replace with ${replacement} from /fa6?` : 'Replace?'}`, details: { badIcon: iconName, goodIcon: replacement, lineNumber: legacyImportLineNumber }, fixable: !!replacement, severity: 'warning' });
                      }
                 });
             }
 
-            // 2. "use client" Check (Only for .tsx/.jsx)
-            if (/\.(tsx|jsx)$/.test(file.path)) {
-                const firstRealLineIndex = lines.findIndex(line => line.trim() !== '');
-                const firstRealLine = firstRealLineIndex !== -1 ? lines[firstRealLineIndex].trim() : null;
-                const hasUseClient = firstRealLine === '"use client";' || firstRealLine === "'use client';";
+             // .. 2. NEW: Fa6 Icon Checks (Correctness & Existence)
+             const fa6ImportRegex = /import\s+{([^}]+)}\s+from\s+['"]react-icons\/fa6['"];?/g;
+             let fa6Match;
+             while ((fa6Match = fa6ImportRegex.exec(file.content)) !== null) {
+                 const importList = fa6Match[1];
+                 const importLineNumber = file.content.substring(0, fa6Match.index).split('\n').length;
+                 const importedFa6IconsRaw = importList.split(',').map(i => i.trim()).filter(Boolean);
 
-                // Check for hooks OR event handlers (like onClick={...})
-                const usesClientFeatures = clientHookPatterns.test(file.content) || /on[A-Z][a-zA-Z]*\s*=\s*{/.test(file.content);
+                 importedFa6IconsRaw.forEach(rawImport => {
+                     // Handle potential aliases like "FaTools as MyTool" -> only check "FaTools"
+                     const iconName = rawImport.split(/\s+as\s+/)[0].trim();
+                     if (!iconName) return; // Skip empty/invalid entries
 
-                if (!hasUseClient && usesClientFeatures) {
-                     // Try to find the line number of the first client feature usage for better detail
-                     let firstUsageLine = -1;
-                     const hookMatch = clientHookPatterns.exec(file.content);
-                     const eventMatch = /on[A-Z][a-zA-Z]*\s*=\s*{/.exec(file.content);
-
-                     if (hookMatch || eventMatch) {
-                         const searchIndex = Math.min(hookMatch?.index ?? Infinity, eventMatch?.index ?? Infinity);
-                         if (searchIndex !== Infinity) {
-                             const textBefore = file.content.substring(0, searchIndex);
-                             firstUsageLine = (textBefore.match(/\n/g) || []).length + 1;
-                         }
+                     // Check if it's a known incorrect name needing correction
+                     if (knownIncorrectFa6Names.includes(iconName)) {
+                         const correctName = fa6IconCorrectionMap[iconName];
+                         issues.push({
+                             id: generateId(), fileId, filePath, type: 'incorrectFa6IconName',
+                             message: `Некорректное имя иконки: '${iconName}'. Исправить на '${correctName}'?`,
+                             details: { lineNumber: importLineNumber, incorrectName: iconName, correctName: correctName, importStatement: fa6Match[0] },
+                             fixable: true, // Can be auto-fixed
+                             severity: 'warning'
+                         });
                      }
-                     const hookName = hookMatch?.[1] ?? (eventMatch ? 'обработчик событий' : 'клиентская фича');
+                     // Check if it's NOT in the valid list AND not slated for correction
+                     else if (!validFa6Icons.has(iconName)) {
+                         issues.push({
+                             id: generateId(), fileId, filePath, type: 'unknownFa6IconName',
+                             message: `Неизвестная/несуществующая иконка Fa6: '${iconName}'. Проверьте имя или замените.`,
+                             details: { lineNumber: importLineNumber, unknownName: iconName, importStatement: fa6Match[0] },
+                             fixable: false, // Cannot be auto-fixed
+                             severity: 'error'
+                         });
+                     }
+                     // Else: It's a known correct icon, do nothing
+                 });
+             }
 
-                    issues.push({
-                        id: generateId(), fileId: file.id, filePath: file.path, type: 'useClient',
-                        message: `Найден ${hookName} без "use client".`,
-                        details: { lineNumber: firstUsageLine > 0 ? firstUsageLine : undefined },
-                        fixable: true // Mark as fixable
-                    });
-                }
-            }
 
-            // 3. Skipped Code Block Check (/* ... */)
+            // .. 3. "use client" Check
+            if (/\.(tsx|jsx)$/.test(filePath)) {
+                 const firstRealLineIndex = lines.findIndex(line => line.trim() !== '');
+                 const firstRealLine = firstRealLineIndex !== -1 ? lines[firstRealLineIndex].trim() : null;
+                 const hasUseClient = firstRealLine === '"use client";' || firstRealLine === "'use client';";
+                 const usesClientFeatures = clientHookPatterns.test(file.content) || /on[A-Z][a-zA-Z]*\s*=\s*{/.test(file.content);
+
+                 if (!hasUseClient && usesClientFeatures) {
+                      let firstUsageLine = -1;
+                      const hookMatch = clientHookPatterns.exec(file.content);
+                      const eventMatch = /on[A-Z][a-zA-Z]*\s*=\s*{/.exec(file.content);
+                      if (hookMatch || eventMatch) {
+                          const searchIndex = Math.min(hookMatch?.index ?? Infinity, eventMatch?.index ?? Infinity);
+                          if (searchIndex !== Infinity) {
+                              firstUsageLine = (file.content.substring(0, searchIndex).match(/\n/g) || []).length + 1;
+                          }
+                      }
+                      const featureName = hookMatch?.[1] ?? (eventMatch ? 'event handler' : 'client feature');
+                     issues.push({ id: generateId(), fileId, filePath, type: 'useClient', message: `Found ${featureName} without "use client".`, details: { lineNumber: firstUsageLine > 0 ? firstUsageLine : undefined }, fixable: true, severity: 'warning' });
+                 }
+             }
+
+            // .. 4. Skipped Code Block Check
             for (let i = 0; i < lines.length; i++) {
-                // Trim the line before testing the regex
                 if (skippedCodeBlockMarkerRegex.test(lines[i].trimStart())) {
-                    issues.push({
-                        id: generateId(), fileId: file.id, filePath: file.path, type: 'skippedCodeBlock',
-                        message: `Пропущен блок кода (строка ${i + 1}). Можно попытаться восстановить.`,
-                        details: { markerLineContent: lines[i], lineNumber: i + 1 }, // Store original line with indent
-                        fixable: false,
-                        restorable: true // Mark as restorable
-                    });
+                    issues.push({ id: generateId(), fileId, filePath, type: 'skippedCodeBlock', message: `Skipped code block (line ${i + 1}). Can attempt restore.`, details: { markerLineContent: lines[i], lineNumber: i + 1 }, fixable: false, restorable: true, severity: 'warning' });
                 }
             }
 
-            // 4. Skipped Comment Check (// ...) - Distinguish real skips from "keep" comments
+            // .. 5. Skipped Comment Check
             for (let i = 0; i < lines.length; i++) {
                 const trimmedLine = lines[i].trimStart();
-                if (skippedCommentRealRegex.test(trimmedLine)) {
-                     // It's a real skipped comment if it matches the "real" regex
-                     // AND does NOT match the "keep" regex
-                     if (!skippedCommentKeepRegex.test(trimmedLine)) {
-                         issues.push({
-                             id: generateId(), fileId: file.id, filePath: file.path, type: 'skippedComment',
-                             message: `Пропущен комментарий '// ...' (строка ${i + 1}).`,
-                             details: { lineNumber: i + 1 },
-                             fixable: false,
-                             restorable: false
-                         });
-                     } else {
-                         // Optional: Log the "keep" comment if needed for debugging
-                         // console.log(`Ignoring "keep" comment in ${file.path} line ${i + 1}`);
-                     }
-                }
+                if (skippedCommentRealRegex.test(trimmedLine) && !skippedCommentKeepRegex.test(trimmedLine)) {
+                     issues.push({ id: generateId(), fileId, filePath, type: 'skippedComment', message: `Skipped comment '// ..''.' (line ${i + 1}). Needs manual review.`, details: { lineNumber: i + 1 }, fixable: false, restorable: false, severity: 'warning' });
+                 }
             }
 
-
-            // 5. Import Checks (Only for .tsx/.jsx)
-            if (/\.(tsx|jsx)$/.test(file.path)) {
+            // .. 6. Import Checks
+            if (/\.(tsx|jsx)$/.test(filePath)) {
                 importChecks.forEach(check => {
                     if (check.usageRegex.test(file.content) && !check.importRegex.test(file.content)) {
-                         // Find first usage line number
                          let firstUsageLine = -1;
                          const usageMatch = check.usageRegex.exec(file.content);
-                         if (usageMatch) {
-                              const textBefore = file.content.substring(0, usageMatch.index);
-                              firstUsageLine = (textBefore.match(/\n/g) || []).length + 1;
-                         }
-                        issues.push({
-                            id: generateId(), fileId: file.id, filePath: file.path, type: 'import',
-                            message: `Используется '${check.name}', но импорт отсутствует.`,
-                            details: { name: check.name, importStatement: check.importStatement, lineNumber: firstUsageLine > 0 ? firstUsageLine : undefined },
-                            fixable: true // Mark as fixable
-                        });
+                         if (usageMatch) { firstUsageLine = (file.content.substring(0, usageMatch.index).match(/\n/g) || []).length + 1; }
+                         issues.push({ id: generateId(), fileId, filePath, type: 'import', message: `Using '${check.name}' but import is missing.`, details: { name: check.name, importStatement: check.importStatement, lineNumber: firstUsageLine > 0 ? firstUsageLine : undefined }, fixable: true, severity: 'warning' });
                     }
                 });
             }
-        }
+        } // End loop through files
 
-        setValidationIssues(issues); // Update state with found issues
+        setValidationIssues(issues);
         if (issues.length > 0) {
-            const hasHardErrors = issues.some(issue => !issue.fixable && !issue.restorable);
-            const hasRestorable = issues.some(issue => issue.restorable);
-            const hasOnlyFixable = issues.every(issue => issue.fixable || issue.restorable);
-
-            if(hasHardErrors) {
-                 setValidationStatus('error');
-            } else if (hasOnlyFixable || hasRestorable) { // If only fixable or restorable issues exist
-                 setValidationStatus('warning');
-            } else {
-                 setValidationStatus('error'); // Should not happen if logic is right, but fallback
-            }
+            const hasErrors = issues.some(issue => issue.severity === 'error' || (!issue.fixable && !issue.restorable)); // Treat unknown icons as errors for status
+            const hasWarnings = issues.some(issue => issue.severity === 'warning');
+            setValidationStatus(hasErrors ? 'error' : (hasWarnings ? 'warning' : 'error')); // Fallback error
         } else {
-            setValidationStatus('success'); // No issues found
+            setValidationStatus('success');
         }
         return issues;
-    }, []); // Dependencies are stable
+    }, []); // Dependencies stable
 
 
-    // --- Main Parsing and Validation Trigger ---
-    const parseAndValidateResponse = useCallback(async (response: string) => {
+    // .. Main Parsing and Validation Trigger remains the same ...
+     const parseAndValidateResponse = useCallback(async (response: string) => {
         setIsParsing(true); setValidationStatus('idle'); setValidationIssues([]); setParsedFiles([]); setRawDescription("");
         if (!response.trim()) { toast.info("Поле ответа пусто."); setIsParsing(false); return { files: [], description: "", issues: [] }; }
 
         try {
-             // Parse first
             const { files, description, parseErrors } = parseFilesFromText(response);
             setParsedFiles(files); setRawDescription(description);
-
             let validationIssuesResult: ValidationIssue[] = [];
             if (files.length > 0) {
                 toast.info(`${files.length} файлов найдено. Запуск проверки...`, { duration: 1500 });
-                 // Validate the successfully parsed files
                 validationIssuesResult = await validateParsedFiles(files);
             } else {
                 toast.info("В ответе не найдено файлов кода для разбора.");
                 setValidationStatus('idle');
             }
 
-             // Combine parsing errors with validation issues
             const allIssues = [...parseErrors, ...validationIssuesResult];
-            setValidationIssues(allIssues); // Update state with combined issues
+            setValidationIssues(allIssues);
 
-             // Update overall status based on combined issues
             if (allIssues.length > 0) {
-                const hasHardErrors = allIssues.some(issue => !issue.fixable && !issue.restorable);
-                 const hasOnlyFixableOrRestorable = allIssues.every(issue => issue.fixable || issue.restorable);
-                 setValidationStatus(hasHardErrors ? 'error' : (hasOnlyFixableOrRestorable ? 'warning' : 'error'));
-            } else if (files.length > 0) { // Only set success if files were parsed AND no issues
+                const hasErrors = allIssues.some(issue => issue.severity === 'error' || (!issue.fixable && !issue.restorable));
+                const hasWarnings = allIssues.some(issue => issue.severity === 'warning');
+                setValidationStatus(hasErrors ? 'error' : (hasWarnings ? 'warning' : 'error'));
+            } else if (files.length > 0) {
                 setValidationStatus('success');
             } else {
-                 setValidationStatus('idle'); // No files, no issues
+                setValidationStatus('idle');
             }
-
             setIsParsing(false);
             return { files, description, issues: allIssues };
-
          } catch (error) {
              console.error("Critical error during parsing/validation:", error);
              toast.error("Критическая ошибка при разборе ответа.");
-             setIsParsing(false);
-             setValidationStatus('error');
-             // Create a generic error issue
-             const genericError: ValidationIssue = {
-                id: generateId(), fileId: 'general', filePath: 'N/A', type: 'parseError',
-                message: `Критическая ошибка разбора: ${error instanceof Error ? error.message : String(error)}`,
-                details: null, fixable: false, restorable: false
-             };
+             setIsParsing(false); setValidationStatus('error');
+             const genericError: ValidationIssue = { id: generateId(), fileId: 'general', filePath: 'N/A', type: 'parseError', message: `Критическая ошибка разбора: ${error instanceof Error ? error.message : String(error)}`, details: null, fixable: false, restorable: false, severity: 'error' };
              setValidationIssues([genericError]);
              return { files: [], description: rawDescription, issues: [genericError] };
          }
-    }, [parseFilesFromText, validateParsedFiles, rawDescription]); // Added rawDescription dependency
+    }, [parseFilesFromText, validateParsedFiles, rawDescription]);
 
 
     // --- Auto-Fixing Logic ---
     const autoFixIssues = useCallback((filesToFix: FileEntry[], issuesToFix: ValidationIssue[]): FileEntry[] => {
         let changesMadeCount = 0; const fixedMessages: string[] = [];
-        // Filter only issues that are marked as 'fixable' by the validation logic
         const fixableIssues = issuesToFix.filter(issue => issue.fixable);
 
         if (fixableIssues.length === 0) {
              toast.info("Не найдено проблем для автоматического исправления.");
-             return filesToFix; // Return original files if nothing to fix
+             return filesToFix;
         }
 
         const updatedFiles = filesToFix.map(file => {
             let currentContent = file.content; let fileChanged = false;
             const fileIssues = fixableIssues.filter(issue => issue.fileId === file.id);
-            if (fileIssues.length === 0) return file; // No fixable issues for this file
+            if (fileIssues.length === 0) return file;
 
-            // Apply fixes for this file
             fileIssues.forEach(issue => {
-                try { // Add try-catch around each fix attempt
-                    if (issue.type === 'icon' && issue.details?.badIcon && issue.details?.goodIcon) {
-                        // .. (keep existing icon fix logic)
-                        const bad = issue.details.badIcon; const good = issue.details.goodIcon; const usageOpenRegex = new RegExp(`<${bad}(?![-_a-zA-Z0-9])(\\s|\\/?>)`, 'g'); const lines = currentContent.split('\n'); let changed = false;
-                        const newLines = lines.map(line => { if (!line.trim().startsWith('//') && !line.trim().startsWith('/*') && usageOpenRegex.test(line)) { changed = true; let newLine = line.replace(usageOpenRegex, `<${good}$1`); newLine = newLine.replaceAll(`</${bad}>`, `</${good}>`); return newLine; } return line; });
-                        if (changed) { currentContent = newLines.join('\n'); fileChanged = true; fixedMessages.push(`✅ Иконка: ${bad} -> ${good} в ${file.path}`);
-                            // Add a comment near the import to check fa6
-                            const importRegexFa = new RegExp(`(import\\s+{[^}]*}\\s+from\\s+['"]react-icons/fa['"])`);
-                            if (importRegexFa.test(currentContent)) {
-                                currentContent = currentContent.replace(importRegexFa, `$1;\n// TODO: Consider changing import to 'react-icons/fa6' for ${good}`);
-                            }
+                try {
+                    // .. 1. NEW: Fix incorrect Fa6 icon names
+                    if (issue.type === 'incorrectFa6IconName' && issue.details?.incorrectName && issue.details?.correctName && issue.details?.importStatement) {
+                         const lines = currentContent.split('\n');
+                         const importLineIndex = lines.findIndex(line => line.includes(issue.details.importStatement));
+                         if (importLineIndex !== -1) {
+                             const nameRegex = new RegExp(`\\b${issue.details.incorrectName}\\b`);
+                             // Ensure we replace only within the specific import line found
+                             if (nameRegex.test(lines[importLineIndex])) {
+                                lines[importLineIndex] = lines[importLineIndex].replace(nameRegex, issue.details.correctName);
+                                currentContent = lines.join('\n');
+                                fileChanged = true;
+                                fixedMessages.push(`✅ Fa6 Иконка: ${issue.details.incorrectName} -> ${issue.details.correctName} в ${file.path}`);
+                             } else {
+                                console.warn(`Incorrect icon name ${issue.details.incorrectName} not found in specific import line: ${file.path}`);
+                             }
+                         } else {
+                             console.warn(`Could not find import line for Fa6 icon fix: ${file.path}`);
                          }
 
+                    // .. 2. Fix legacy icons (keep existing logic, update type check)
+                    } else if (issue.type === 'iconLegacy' && issue.details?.badIcon && issue.details?.goodIcon) {
+                        const bad = issue.details.badIcon; const good = issue.details.goodIcon; const usageOpenRegex = new RegExp(`<${bad}(?![-_a-zA-Z0-9])(\\s|\\/?>)`, 'g'); const usageCloseRegex = new RegExp(`</${bad}>`, 'g'); const lines = currentContent.split('\n'); let changedInLegacyFix = false;
+                        const newLines = lines.map(line => { if (!line.trim().startsWith('//') && !line.trim().startsWith('/*') && (usageOpenRegex.test(line) || usageCloseRegex.test(line))) { changedInLegacyFix = true; let newLine = line.replace(usageOpenRegex, `<${good}$1`); newLine = newLine.replace(usageCloseRegex, `</${good}>`); return newLine; } return line; });
+                        if (changedInLegacyFix) { currentContent = newLines.join('\n'); fileChanged = true; fixedMessages.push(`✅ Legacy Icon: ${bad} -> ${good} в ${file.path}`);
+                            const importRegexFa = new RegExp(`(import\\s+{[^}]*}\\s+from\\s+['"]react-icons/fa['"])`);
+                            if (importRegexFa.test(currentContent)) { currentContent = currentContent.replace(importRegexFa, `$1;\n// TODO: Consider changing import to 'react-icons/fa6' for ${good}`); }
+                         }
+
+                    // .. 3. Fix "use client" (keep existing logic)
                     } else if (issue.type === 'useClient') {
-                        // Find the first non-empty, non-comment line
-                        const lines = currentContent.split('\n');
-                        let firstCodeLineIndex = -1;
-                        for (let i = 0; i < lines.length; i++) {
-                            const trimmedLine = lines[i].trim();
-                            if (trimmedLine !== '' && !trimmedLine.startsWith('//') && !trimmedLine.startsWith('/*')) {
-                                firstCodeLineIndex = i;
-                                break;
-                            }
-                        }
+                        const lines = currentContent.split('\n'); let firstCodeLineIndex = -1;
+                        for (let i = 0; i < lines.length; i++) { const trimmedLine = lines[i].trim(); if (trimmedLine !== '' && !trimmedLine.startsWith('//') && !trimmedLine.startsWith('/*')) { firstCodeLineIndex = i; break; } }
+                        const alreadyHasUseClient = firstCodeLineIndex !== -1 && (lines[firstCodeLineIndex] === '"use client";' || lines[firstCodeLineIndex] === "'use client';");
+                        if (!alreadyHasUseClient) { const insertIndex = firstCodeLineIndex !== -1 ? firstCodeLineIndex : 0; const newLineChar = insertIndex === 0 || (firstCodeLineIndex !== -1 && lines[insertIndex].trim() !== '') ? '\n' : ''; lines.splice(insertIndex, 0, '"use client";' + newLineChar); currentContent = lines.join('\n'); fixedMessages.push(`✅ Added "use client"; to ${file.path}`); fileChanged = true; }
 
-                        // Check if "use client" is already the very first non-comment/empty line
-                        const alreadyHasUseClient = firstCodeLineIndex !== -1 &&
-                           (lines[firstCodeLineIndex] === '"use client";' || lines[firstCodeLineIndex] === "'use client';");
-
-                        if (!alreadyHasUseClient) {
-                            // Insert "use client" at the determined index (or 0 if no code found)
-                            const insertIndex = firstCodeLineIndex !== -1 ? firstCodeLineIndex : 0;
-                            // Add newline after if inserting at the top or before existing code
-                            const newLineChar = insertIndex === 0 || (firstCodeLineIndex !== -1 && lines[insertIndex].trim() !== '') ? '\n' : '';
-                            lines.splice(insertIndex, 0, '"use client";' + newLineChar);
-                            currentContent = lines.join('\n');
-                            fixedMessages.push(`✅ Добавлено "use client"; в ${file.path}`);
-                            fileChanged = true;
-                        }
-
+                    // .. 4. Fix missing imports (keep existing logic)
                     } else if (issue.type === 'import' && issue.details?.importStatement && issue.details?.importRegex) {
-                        const importRegex: RegExp = issue.details.importRegex; // Cast if needed
-                        // Add import only if it doesn't already exist
+                        const importRegex: RegExp = issue.details.importRegex;
                         if (!importRegex.test(currentContent)) {
-                            const lines = currentContent.split('\n');
-                            let insertIndex = 0;
-                            let useClientIndex = -1;
-
-                             // Find where to insert: after "use client" or after last import
-                             for (let i = 0; i < lines.length; i++) {
-                                const tl = lines[i].trim();
-                                if (tl === '"use client";' || tl === "'use client';") {
-                                    useClientIndex = i;
-                                    insertIndex = i + 1; // Default after "use client"
-                                } else if (tl.startsWith('import ')) {
-                                    insertIndex = i + 1; // Place after the last import found so far
-                                } else if (tl !== '' && !tl.startsWith('//') && !tl.startsWith('/*')) {
-                                     // If we hit code before finding imports/use client, insert at the top (index 0) unless use client was found
-                                     if (insertIndex === 0 && useClientIndex === -1) insertIndex = 0;
-                                     break; // Stop searching once code starts
-                                }
-                            }
-                             // Add extra newline if inserting after "use client" or imports
+                            const lines = currentContent.split('\n'); let insertIndex = 0; let useClientIndex = -1;
+                             for (let i = 0; i < lines.length; i++) { const tl = lines[i].trim(); if (tl === '"use client";' || tl === "'use client';") { useClientIndex = i; insertIndex = i + 1; } else if (tl.startsWith('import ')) { insertIndex = i + 1; } else if (tl !== '' && !tl.startsWith('//') && !tl.startsWith('/*')) { if (insertIndex === 0 && useClientIndex === -1) insertIndex = 0; break; } }
                              const prefixNewLine = (useClientIndex !== -1 || insertIndex > 0) && lines[insertIndex]?.trim() !== '' ? '\n' : '';
-                            lines.splice(insertIndex, 0, prefixNewLine + issue.details.importStatement);
-                            currentContent = lines.join('\n');
-                            fixedMessages.push(`✅ Добавлен импорт для '${issue.details.name}' в ${file.path}`);
-                            fileChanged = true;
+                             lines.splice(insertIndex, 0, prefixNewLine + issue.details.importStatement); currentContent = lines.join('\n'); fixedMessages.push(`✅ Added import for '${issue.details.name}' to ${file.path}`); fileChanged = true;
                         }
                     }
                  } catch (fixError) {
                       console.error(`Error auto-fixing issue ${issue.id} (${issue.type}) in file ${file.path}:`, fixError);
                       toast.error(`Ошибка исправления ${issue.type} в ${file.path}`);
-                      // Optionally mark the issue as unfixable now? Or just log it.
                  }
             });
 
@@ -435,30 +542,28 @@ export function useCodeParsingAndValidation() {
         });
 
         if (changesMadeCount > 0) {
-            setParsedFiles(updatedFiles); // Update the state with fixed files
+            setParsedFiles(updatedFiles);
             fixedMessages.forEach(msg => toast.success(msg, { duration: 4000 }));
-
-            // Re-validate AFTER fixing to update the status correctly
-            // This is important to remove fixed issues and potentially change status from warning/error to success
             console.log("Re-validating files after auto-fix...");
-            validateParsedFiles(updatedFiles); // Re-run validation on the modified files
-
+            validateParsedFiles(updatedFiles); // Re-validate AFTER fixing
         } else {
-            // toast.info("Авто-исправление не внесло изменений."); // Already handled if fixableIssues was empty
-            // If no changes were made but status was 'warning', and no non-fixable/non-restorable issues remain, set to success.
-             const nonFixableOrRestorable = validationIssues.some(i => !i.fixable && !i.restorable);
-             if (validationStatus === 'warning' && !nonFixableOrRestorable) {
+            // If no changes were made but there were fixable issues, something might be wrong
+            if (fixableIssues.length > 0) {
+                 toast.warning("Авто-исправление было запущено, но не внесло изменений. Возможно, проблемы уже исправлены или логика фиксации нуждается в проверке.");
+            }
+            // Check if only non-fixable, non-restorable issues remain
+            const nonFixableOrRestorable = validationIssues.some(i => !i.fixable && !i.restorable);
+            if (validationStatus === 'warning' && !nonFixableOrRestorable) {
                 setValidationStatus('success');
-             }
+            }
         }
-        return updatedFiles; // Return the potentially modified files
-    }, [validationIssues, validationStatus, validateParsedFiles]); // Added validateParsedFiles dependency
+        return updatedFiles;
+    }, [validationIssues, validationStatus, validateParsedFiles]);
 
 
     return {
         parsedFiles, rawDescription, validationStatus, validationIssues, isParsing,
         parseAndValidateResponse, autoFixIssues,
-        // Expose setters if needed by other components, though usually internal state is managed here
         setParsedFiles, setValidationStatus, setValidationIssues, setIsParsing, setRawDescription,
     };
 }
