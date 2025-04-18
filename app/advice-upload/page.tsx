@@ -38,7 +38,7 @@ Processing Steps:
 Example Row:
 "How to Meditate Effectively","how-to-meditate-effectively","Learn the basics of mindfulness meditation to reduce stress and improve focus.",1,"Finding a Quiet Space","Find a comfortable and quiet location where you won't be disturbed. This could be a corner of your room, a park bench, or anywhere you feel at ease. Turn off notifications on your phone."
 
-VERY IMPORTANT: Output ONLY the raw CSV data, starting directly with the header row ("article_title", "article_slug", ...). Do NOT include any introductory text, explanations, or ```csv ``` markers before or after the CSV data itself.
+VERY IMPORTANT: Output ONLY the raw CSV data, starting directly with the header row ("article_title", "article_slug", ...). Do NOT include any introductory text, explanations, or "csv" markers before or after the CSV data itself.
 `;
 
 export default function AdminAdviceUploadPage() {
