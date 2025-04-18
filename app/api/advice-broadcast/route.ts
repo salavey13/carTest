@@ -46,7 +46,8 @@ export async function POST(request: Request) {
     const { data: users, error: fetchError } = await supabaseAdmin
       .from('users')
       .select('user_id, metadata')
-      .eq('metadata->advice_broadcast->>enabled', 'true') // Note the '->>' for text comparison
+      // Correct way to query JSONB boolean in Supabase/Postgres
+      .filter('metadata->advice_broadcast->>enabled', 'eq', 'true')
       .limit(MAX_USERS_PER_RUN); // Process in batches
 
     if (fetchError) {
@@ -65,50 +66,68 @@ export async function POST(request: Request) {
     for (const user of users) {
       processedUsers++;
       const userId = user.user_id;
-      const metadata = user.metadata as UserMetadata | null;
+      // Safely cast metadata, assuming it might be null or incorrect structure
+      const metadata = user.metadata as UserMetadata | null | undefined;
       const broadcastInfo = metadata?.advice_broadcast;
 
-      if (!broadcastInfo || !broadcastInfo.enabled || !broadcastInfo.remaining_section_ids || broadcastInfo.remaining_section_ids.length === 0) {
-        logger.warn(`User ${userId} has inconsistent broadcast data. Disabling.`);
+      // Added stricter checks for required fields
+      if (!broadcastInfo || broadcastInfo.enabled !== true || !broadcastInfo.article_id || !Array.isArray(broadcastInfo.remaining_section_ids) || broadcastInfo.remaining_section_ids.length === 0) {
+        logger.warn(`User ${userId} has inconsistent or finished broadcast data. Disabling.`);
         // Attempt to disable the inconsistent state
         const { error: disableError } = await supabaseAdmin
           .from('users')
-          .update({ metadata: { ...metadata, advice_broadcast: { enabled: false } } }) // Disable cleanly
+          .update({
+              // Set metadata to disable, preserving other parts if they exist
+              metadata: {
+                  ...(metadata || {}), // Keep existing metadata
+                  advice_broadcast: { // Overwrite/set advice_broadcast part
+                      ...(broadcastInfo || {}), // Keep existing broadcast info if possible
+                      enabled: false, // Explicitly disable
+                      remaining_section_ids: [] // Clear remaining IDs
+                  }
+              }
+          })
           .eq('user_id', userId);
         if (disableError) {
           logger.error(`Failed to disable inconsistent broadcast for user ${userId}:`, disableError);
           errors.push(`User ${userId}: Failed to disable inconsistent state - ${disableError.message}`);
+        } else {
+           debugLogger.log(`Disabled broadcast for user ${userId} due to inconsistent/finished data.`);
         }
         failedUsers++;
         continue; // Skip to the next user
       }
 
       const nextSectionId = broadcastInfo.remaining_section_ids[0];
-      debugLogger.log(`Processing user ${userId}, next section ID: ${nextSectionId}`);
+      debugLogger.log(`Processing user ${userId}, article ${broadcastInfo.article_id}, next section ID: ${nextSectionId}`);
 
       try {
         // 4. --- Fetch Section Content ---
+        // Include article_id in the query for better matching
         const { data: section, error: sectionError } = await supabaseAdmin
           .from('article_sections')
-          .select('title, content')
+          .select('id, title, content') // Select id for logging/debugging
           .eq('id', nextSectionId)
+          // Optional: Add check for article_id if sections can belong to multiple articles
+          // .eq('article_id', broadcastInfo.article_id)
           .single();
 
         if (sectionError || !section) {
-          logger.error(`Failed to fetch section ${nextSectionId} for user ${userId}:`, sectionError);
+          logger.error(`Failed to fetch section ${nextSectionId} (Article: ${broadcastInfo.article_id}) for user ${userId}:`, sectionError);
           errors.push(`User ${userId}: Failed to fetch section ${nextSectionId} - ${sectionError?.message || 'Not Found'}`);
           failedUsers++;
           // Consider disabling broadcast for this user if section is permanently missing?
+          // Or maybe just log and retry next time? For now, continue.
           continue;
         }
 
         // 5. --- Send Message via Telegram ---
-        const messagePrefix = section.title ? `*${section.title}*\n\n` : '';
-        // Use Markdown formatting (ensure sendTelegramMessage supports it or adjust)
-        // Note: Telegram Markdown needs escaping for chars like ., -, !, etc. This is a simplified version.
-        const messageContent = `${messagePrefix}${section.content}`;
+        // Use Markdown formatting. Ensure special chars in title/content are handled by Telegram's parser.
+        // Legacy markdown `*bold*` and `_italic_` are used. `\n` for newlines.
+        const messagePrefix = section.title ? `*${section.title.trim()}*\n\n` : '';
+        const messageContent = `${messagePrefix}${section.content.trim()}`;
 
-        // Use the Server Action to send the message
+        // Use the Server Action to send the message. sendTelegramMessage now handles parse_mode.
         const sendResult = await sendTelegramMessage(
           messageContent,
           [], // No buttons for broadcast messages
@@ -117,8 +136,9 @@ export async function POST(request: Request) {
         );
 
         if (!sendResult.success) {
+           // Error includes API description if available
            logger.error(`Failed to send section ${nextSectionId} to user ${userId}: ${sendResult.error}`);
-           errors.push(`User ${userId}: Failed to send message - ${sendResult.error}`);
+           errors.push(`User ${userId}: Failed to send message (Section ${nextSectionId}) - ${sendResult.error}`);
            failedUsers++;
            // Don't update metadata if sending failed, retry next time
            continue;
@@ -129,33 +149,38 @@ export async function POST(request: Request) {
 
         // 6. --- Update User Metadata ---
         const updatedRemainingIds = broadcastInfo.remaining_section_ids.slice(1);
+        const isFinished = updatedRemainingIds.length === 0;
         const newBroadcastState: UserMetadata['advice_broadcast'] = {
           ...broadcastInfo,
           remaining_section_ids: updatedRemainingIds,
           last_sent_at: new Date().toISOString(),
-          enabled: updatedRemainingIds.length > 0, // Disable if list is empty
+          enabled: !isFinished, // Disable ONLY if list is now empty
         };
 
         const { error: updateError } = await supabaseAdmin
           .from('users')
+           // Ensure correct update structure for JSONB
           .update({ metadata: { ...metadata, advice_broadcast: newBroadcastState } })
           .eq('user_id', userId);
 
         if (updateError) {
           logger.error(`Failed to update metadata for user ${userId} after sending section ${nextSectionId}:`, updateError);
-          errors.push(`User ${userId}: Failed metadata update - ${updateError.message}`);
+          errors.push(`User ${userId}: Failed metadata update (Section ${nextSectionId}) - ${updateError.message}`);
           // Message was sent, but state not updated - potential duplicate next run. Critical issue.
           failedUsers++; // Count as failed for reporting
         } else {
            debugLogger.log(`Updated metadata for user ${userId}. Remaining sections: ${updatedRemainingIds.length}. Enabled: ${newBroadcastState.enabled}`);
+           if (isFinished) {
+               debugLogger.log(`User ${userId} finished broadcast for article ${broadcastInfo.article_id}.`);
+           }
         }
 
-        // Add a small delay between users to avoid hitting Telegram rate limits
-        await delay(100); // 100ms delay
+        // Add a small delay between users to potentially avoid hitting Telegram rate limits
+        await delay(100); // 100ms delay (adjust as needed)
 
       } catch (innerError) {
-        logger.error(`Unexpected error processing user ${userId}:`, innerError);
-        errors.push(`User ${userId}: Unexpected error - ${innerError instanceof Error ? innerError.message : 'Unknown'}`);
+        logger.error(`Unexpected error processing user ${userId} (Section ${nextSectionId}):`, innerError);
+        errors.push(`User ${userId}: Unexpected error (Section ${nextSectionId}) - ${innerError instanceof Error ? innerError.message : 'Unknown'}`);
         failedUsers++;
       }
     } // End user loop
@@ -164,6 +189,7 @@ export async function POST(request: Request) {
     const summaryMessage = `Advice broadcast run complete. Processed: ${processedUsers}. Sent: ${sentMessages}. Failed: ${failedUsers}.`;
     debugLogger.log(summaryMessage);
     if (errors.length > 0) {
+        // Log all errors, but only return a sample
         logger.warn('Advice broadcast finished with errors:', errors);
     }
 
@@ -172,7 +198,7 @@ export async function POST(request: Request) {
       processedUsers,
       sentMessages,
       failedUsers,
-      errors: errors.slice(0, 10), // Limit reported errors
+      errors: errors.slice(0, 10), // Limit reported errors in response
     });
 
   } catch (error) {
