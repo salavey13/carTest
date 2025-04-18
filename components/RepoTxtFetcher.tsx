@@ -4,9 +4,9 @@
     import { useSearchParams } from "next/navigation";
     import { toast } from "sonner";
     import {
-        FaAngleDown, FaAngleUp, // Replaced circle chevrons
+        FaAngleDown, FaAngleUp,
         FaDownload, FaArrowsRotate, FaCircleCheck, FaXmark, FaCopy,
-        FaBroom, FaRobot, FaCodeBranch, FaPlus, FaFileLines // Added FaPlus, FaFileLines
+        FaBroom, FaRobot, FaCodeBranch, FaPlus, FaFileLines
     } from "react-icons/fa6";
     import { motion } from "framer-motion";
 
@@ -64,34 +64,25 @@
     // --- Component ---
     const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       // === State ===
-      const [repoUrl, setRepoUrlState] = useState<string>("https://github.com/salavey13/cartest"); // Local state for input field in modal
-      const [token, setToken] = useState<string>(""); // Local state for token input in modal
-      const [files, setFiles] = useState<FileNode[]>([]); // Fetched files
-      const [selectedFiles, setSelectedFilesState] = useState<Set<string>>(new Set()); // Paths of selected files in Fetcher list
-      const [extractLoading, setExtractLoading] = useState<boolean>(false); // Local loading for Fetch button UI only
-      const [progress, setProgress] = useState<number>(0); // Fetch progress simulation
-      const [error, setError] = useState<string | null>(null); // Fetch error message
-      const [primaryHighlightedPath, setPrimaryHighlightedPathState] = useState<string | null>(null); // Path from URL param
-      const [secondaryHighlightedPaths, setSecondaryHighlightedPathsState] = useState<Record<ImportCategory, string[]>>({ component: [], context: [], hook: [], lib: [], other: [] }); // Resolved imports
-      const [autoAskAiEnabled, setAutoAskAiEnabled] = useState<boolean>(false); // Toggle for auto-asking AI
+      const [repoUrl, setRepoUrlState] = useState<string>("https://github.com/salavey13/cartest");
+      const [token, setToken] = useState<string>("");
+      const [files, setFiles] = useState<FileNode[]>([]);
+      const [selectedFiles, setSelectedFilesState] = useState<Set<string>>(new Set());
+      const [extractLoading, setExtractLoading] = useState<boolean>(false);
+      const [progress, setProgress] = useState<number>(0);
+      const [error, setError] = useState<string | null>(null);
+      const [primaryHighlightedPath, setPrimaryHighlightedPathState] = useState<string | null>(null);
+      const [secondaryHighlightedPaths, setSecondaryHighlightedPathsState] = useState<Record<ImportCategory, string[]>>({ component: [], context: [], hook: [], lib: [], other: [] });
+      const [autoAskAiEnabled, setAutoAskAiEnabled] = useState<boolean>(false);
 
       // === Context ===
       const { user, openLink } = useAppContext();
       const {
-        // Status & Flags
         fetchStatus, setFetchStatus, repoUrlEntered, setRepoUrlEntered, filesFetched, setFilesFetched,
         selectedFetcherFiles, setSelectedFetcherFiles, kworkInputHasContent, setKworkInputHasContent,
         setRequestCopied, aiActionLoading, currentStep, loadingPrs, assistantLoading, isParsing,
-        currentAiRequestId,
-        // Branch & PR state
-        targetBranchName, setTargetBranchName,
-        manualBranchName, setManualBranchName,
-        openPrs,
-        setOpenPrs,
-        setLoadingPrs,
-        // Modal state & trigger
-        isSettingsModalOpen, triggerToggleSettingsModal,
-        // Refs & Callbacks
+        currentAiRequestId, targetBranchName, setTargetBranchName, manualBranchName, setManualBranchName,
+        openPrs, setOpenPrs, setLoadingPrs, isSettingsModalOpen, triggerToggleSettingsModal,
         kworkInputRef, triggerAskAi, triggerGetOpenPRs, updateRepoUrlInAssistant, scrollToSection, triggerFetch, setFilesParsed, setAiResponseHasContent,  setSelectedAssistantFiles
       } = useRepoXmlPageContext();
 
@@ -104,7 +95,7 @@
       const importantFiles = useMemo(() => [
           "contexts/AppContext.tsx", "hooks/useTelegram.ts", "app/layout.tsx",
           "hooks/supabase.ts", "app/actions.ts",
-           "app/ai_actions/actions.ts", "app/webhook-handlers/proxy.ts", // Example webhook handler path
+           "app/ai_actions/actions.ts", "app/webhook-handlers/proxy.ts",
            "package.json", "tailwind.config.ts"
       ], []);
 
@@ -112,7 +103,6 @@
       const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
       const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
       const localKworkInputRef = useRef<HTMLTextAreaElement | null>(null);
-      // Link context ref to local ref
       useEffect(() => { if (kworkInputRef) kworkInputRef.current = localKworkInputRef.current; }, [kworkInputRef]);
 
       // === Utility Functions ===
@@ -125,7 +115,6 @@
             toast(message, { style: style, duration: type === 'error' ? 5000 : 3000 });
        }, []);
 
-       // Find page file path corresponding to a URL route path
        const getPageFilePath = useCallback((routePath: string, allActualFilePaths: string[]): string => {
             const cleanPath = routePath.startsWith('/') ? routePath.substring(1) : routePath;
             if (!cleanPath || cleanPath === 'app' || cleanPath === '/') { const rootPaths = ['app/page.tsx', 'app/page.js', 'app/index.tsx', 'app/index.js', 'src/app/page.tsx', 'src/app/page.js']; for (const rp of rootPaths) { if (allActualFilePaths.includes(rp)) return rp; } console.warn(`getPageFilePath: Root path mapping not found for "${routePath}". Defaulting to app/page.tsx`); return 'app/page.tsx'; }
@@ -137,12 +126,10 @@
             console.warn(`getPageFilePath: No direct or dynamic match for route "${routePath}". Falling back to guess: "${potentialDirectPaths[0]}"`); return potentialDirectPaths[0];
        }, []);
 
-       // Extract import paths from file content
        const extractImports = useCallback((content: string): string[] => {
             const importRegex = /import(?:["'\s]*(?:[\w*{}\n\r\t, ]+)from\s*)?["']((?:@[/\w.-]+)|(?:[./]+[\w./-]+))["']/g; const requireRegex = /require\s*\(\s*["']((?:@[/\w.-]+)|(?:[./]+[\w./-]+))["']\s*\)/g; const imports = new Set<string>(); let match; while ((match = importRegex.exec(content)) !== null) if (match[1] && match[1] !== '.') imports.add(match[1]); while ((match = requireRegex.exec(content)) !== null) if (match[1] && match[1] !== '.') imports.add(match[1]); return Array.from(imports);
        }, []);
 
-       // Resolve import path to actual file path within the fetched files
        const resolveImportPath = useCallback((importPath: string, currentFilePath: string, allFiles: FileNode[]): string | null => {
             const allPaths = allFiles.map(f => f.path); const supportedExtensions = ['.ts', '.tsx', '.js', '.jsx', '.css', '.scss', '.json', '.md'];
             const tryPaths = (basePath: string): string | null => { const pathsToTry: string[] = []; const hasExplicitExtension = /\.\w+$/.test(basePath); if (hasExplicitExtension) pathsToTry.push(basePath); else { supportedExtensions.forEach(ext => pathsToTry.push(basePath + ext)); supportedExtensions.forEach(ext => pathsToTry.push(`${basePath}/index${ext}`)); } for (const p of pathsToTry) { if (allPaths.includes(p)) return p; } return null; };
@@ -159,42 +146,56 @@
         progressIntervalRef.current = null; fetchTimeoutRef.current = null;
     }, []);
 
-    const startProgressSimulation = useCallback((estimatedDurationSeconds = 15) => {
+    const startProgressSimulation = useCallback((estimatedDurationSeconds = 7) => {
         stopProgressSimulation(); setProgress(0); setError(null); const intervalTime = 150; const totalSteps = (estimatedDurationSeconds * 1000) / intervalTime; const incrementBase = 100 / totalSteps;
-        progressIntervalRef.current = setInterval(() => { setProgress((prev) => { const randomFactor = Math.random() * 0.7 + 0.6; let nextProgress = prev + (incrementBase * randomFactor); if (nextProgress >= 95 && (fetchStatus === 'loading' || fetchStatus === 'retrying') && fetchTimeoutRef.current) { nextProgress = Math.min(prev + incrementBase * 0.1, 99); } else if (nextProgress >= 100) { nextProgress = 99.9; } return nextProgress; }); }, intervalTime);
+        progressIntervalRef.current = setInterval(() => { setProgress((prev) => { const randomFactor = Math.random() * 0.7 + 0.6; let nextProgress = prev + (incrementBase * randomFactor); if (nextProgress >= 95 && (fetchStatus === 'loading' || fetchStatus === 'retrying') && fetchTimeoutRef.current) { nextProgress = Math.min(prev + incrementBase * 0.1, 69); } else if (nextProgress >= 100) { nextProgress = 69.420; } return nextProgress; }); }, intervalTime);
         fetchTimeoutRef.current = setTimeout(() => { if (progressIntervalRef.current) { clearInterval(progressIntervalRef.current); progressIntervalRef.current = null; if (fetchStatus === 'loading' || fetchStatus === 'retrying') { console.warn("Progress simulation timed out while fetch was still in progress."); setProgress(99); } } fetchTimeoutRef.current = null; }, estimatedDurationSeconds * 1000 + 5000);
     }, [stopProgressSimulation, fetchStatus]);
 
 
     // === Core Logic Callbacks ===
 
-    // Update local repoUrl state and notify context/assistant
     const handleRepoUrlChange = useCallback((url: string) => {
         setRepoUrlState(url); setRepoUrlEntered(url.trim().length > 0); updateRepoUrlInAssistant(url); setOpenPrs([]); setTargetBranchName(null); setManualBranchName("");
     }, [setRepoUrlEntered, updateRepoUrlInAssistant, setOpenPrs, setTargetBranchName, setManualBranchName]);
 
-
-    // Update Kwork Input textarea value and context flag
     const updateKworkInput = useCallback((value: string) => {
         if (localKworkInputRef.current) { localKworkInputRef.current.value = value; const event = new Event('input', { bubbles: true }); localKworkInputRef.current.dispatchEvent(event); setKworkInputHasContent(value.trim().length > 0); } else { console.warn("updateKworkInput: localKworkInputRef is null"); }
     }, [setKworkInputHasContent]);
 
-    // Get current value from Kwork Input textarea
     const getKworkInputValue = useCallback((): string => localKworkInputRef.current?.value || "", []);
 
 
     // Add selected file contents to the Kwork Input
+    // .. FIX: Prevent adding duplicate path comment
     const handleAddSelected = useCallback(async (autoAskAi = false, filesToAddParam?: Set<string>) => {
         const filesToAdd = filesToAddParam || selectedFiles; if (filesToAdd.size === 0) { addToast("Сначала выберите файлы для добавления", 'error'); return; }
-        const prefix = "Контекст кода для анализа:\n"; // No "отвечай полным кодом" here
-        const markdownTxt = files.filter((file) => filesToAdd.has(file.path)).sort((a, b) => a.path.localeCompare(b.path)).map((file) => `\`\`\`${getLanguage(file.path)}\n// /${file.path}\n${file.content}\n\`\`\``).join("\n\n");
-        const currentKworkValue = getKworkInputValue(); const taskText = currentKworkValue.split(prefix)[0]?.trim() || ""; const newContent = `${taskText ? taskText + '\n\n' : ''}${prefix}${markdownTxt}`;
-        updateKworkInput(newContent); addToast(`${filesToAdd.size} файлов добавлено в запрос`, 'success'); scrollToSection('kworkInput');
-        if (autoAskAi && autoAskAiEnabled) { addToast("Автоматически отправляю запрос AI в очередь...", "info"); await triggerAskAi().catch(err => console.error("Error auto-triggering AI Ask:", err)); }
-    }, [selectedFiles, files, addToast, getKworkInputValue, updateKworkInput, scrollToSection, autoAskAiEnabled, triggerAskAi]);
+        const prefix = "Контекст кода для анализа:\n";
+        const markdownTxt = files
+            .filter((file) => filesToAdd.has(file.path))
+            .sort((a, b) => a.path.localeCompare(b.path))
+            .map((file) => {
+                const pathComment = `// /${file.path}`;
+                // .. Check if the raw file content already starts with this comment line (ignoring leading whitespace)
+                const contentAlreadyHasComment = file.content.trimStart().startsWith(pathComment);
+                // .. Add the comment ONLY if it's not already the first line of the content
+                const contentToAdd = contentAlreadyHasComment ? file.content : `${pathComment}\n${file.content}`;
+                return `\`\`\`${getLanguage(file.path)}\n${contentToAdd}\n\`\`\``;
+            })
+            .join("\n\n");
+        const currentKworkValue = getKworkInputValue();
+        const taskText = currentKworkValue.split(prefix)[0]?.trim() || ""; // .. Extract text before the code context prefix
+        const newContent = `${taskText ? taskText + '\n\n' : ''}${prefix}${markdownTxt}`; // .. Rebuild: Task + Prefix + New Markdown Code
+        updateKworkInput(newContent);
+        addToast(`${filesToAdd.size} файлов добавлено в запрос`, 'success');
+        scrollToSection('kworkInput');
+        if (autoAskAi && autoAskAiEnabled) {
+            addToast("Автоматически отправляю запрос AI в очередь...", "info");
+            await triggerAskAi().catch(err => console.error("Error auto-triggering AI Ask:", err));
+        }
+    }, [selectedFiles, files, addToast, getKworkInputValue, updateKworkInput, scrollToSection, autoAskAiEnabled, triggerAskAi, getLanguage]); // Added getLanguage dependency
 
 
-    // Copy Kwork Input content to clipboard
     const handleCopyToClipboard = useCallback((textToCopy?: string, shouldScroll = true): boolean => {
         const content = textToCopy ?? getKworkInputValue(); if (!content.trim()) { addToast("Нет текста для копирования", 'error'); return false; }
         try { navigator.clipboard.writeText(content); addToast("Запрос скопирован! ✅ Вставляй в AI", 'success'); setRequestCopied(true); if (shouldScroll) scrollToSection('executor'); return true; }
@@ -202,13 +203,12 @@
     }, [getKworkInputValue, scrollToSection, addToast, setRequestCopied]);
 
 
-    // Clear selections and inputs
     const handleClearAll = useCallback(() => {
         console.log("[handleClearAll] Clearing Fetcher state."); setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set()); updateKworkInput(""); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set()); addToast("Поле ввода и выбор файлов очищены ✨", 'success'); localKworkInputRef.current?.focus();
     }, [ setSelectedFetcherFiles, updateKworkInput, addToast, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles ]);
 
 
-    // --- Fetch Handler (Method exposed via ref, called by context's triggerFetch) ---
+    // --- Fetch Handler ---
     const handleFetch = useCallback(async (isManualRetry = false, branchNameToFetch?: string | null) => {
         const effectiveBranch = branchNameToFetch ?? 'default'; console.log(`[Fetcher:handleFetch] Called. isManualRetry: ${isManualRetry}, Branch: ${effectiveBranch}`);
         if (!repoUrl.trim()) { addToast("Введите URL репозитория", 'error'); setError("URL репозитория не может быть пустым."); triggerToggleSettingsModal(); return; }
@@ -248,13 +248,15 @@
 
     // Auto-fetch effect (FIXED dependency array)
     useEffect(() => {
-        const branchForAutoFetch = targetBranchName;
+        const branchForAutoFetch = targetBranchName; // Use branch from context if set
         if (autoFetch && repoUrl && (fetchStatus === 'idle' || fetchStatus === 'failed_retries' || fetchStatus === 'error')) {
             console.log(`Auto-fetching due to URL param 'path'. Branch: ${branchForAutoFetch ?? 'Default'}`);
-            handleFetch(false, branchForAutoFetch);
+            // .. Trigger fetch using the context function to ensure consistency
+            triggerFetch(false, branchForAutoFetch);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus, targetBranchName]); // Removed handleFetch
+    }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus, targetBranchName, triggerFetch]); // Added triggerFetch dependency
+
 
     // Cleanup simulation timers
     useEffect(() => { return () => stopProgressSimulation(); }, [stopProgressSimulation]);
@@ -267,12 +269,11 @@
     const isFetchDisabled = isLoading || loadingPrs || !repoUrlEntered;
     const showProgressBar = isLoading || fetchStatus === 'success' || fetchStatus === 'error' || fetchStatus === 'failed_retries';
     const isActionDisabled = isLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing;
-    // Corrected isAskAiDisabled logic
     const isAskAiDisabled = !kworkInputHasContent || isActionDisabled;
     const isCopyDisabled = !kworkInputHasContent || isActionDisabled;
     const isClearDisabled = (!kworkInputHasContent && selectedFiles.size === 0) || isActionDisabled;
     const isAddSelectedDisabled = selectedFiles.size === 0 || isActionDisabled;
-    const effectiveBranchDisplay = targetBranchName || "default";
+    const effectiveBranchDisplay = targetBranchName || manualBranchName || "default"; // Show manual branch if target PR branch isn't selected
     const isWaitingForAi = aiActionLoading && !!currentAiRequestId;
 
   return (
@@ -310,7 +311,6 @@
                 aria-label={isSettingsModalOpen ? "Скрыть настройки" : "Показать настройки URL/Token"}
                 aria-expanded={isSettingsModalOpen}
             >
-                 {/* Using FaAngleDown/Up instead of FaCircleChevronDown/Up */}
                  {isSettingsModalOpen ? <FaAngleUp className="text-cyan-400 text-xl" /> : <FaAngleDown className="text-cyan-400 text-xl" />}
             </motion.button>
         </div>
@@ -318,48 +318,45 @@
       {/* Settings Modal Component - Controlled by Context */}
        <SettingsModal
             isOpen={isSettingsModalOpen}
-            repoUrl={repoUrl} // Pass local state for input control
-            setRepoUrl={handleRepoUrlChange} // Pass handler to update local/context
-            token={token} // Pass local state
-            setToken={setToken} // Pass setter for local state
-            manualBranchName={manualBranchName} // Pass context state
-            setManualBranchName={handleManualBranchChange} // Pass handler to update context
-            currentTargetBranch={targetBranchName} // Pass context state for display
+            repoUrl={repoUrl}
+            setRepoUrl={handleRepoUrlChange}
+            token={token}
+            setToken={setToken}
+            manualBranchName={manualBranchName}
+            setManualBranchName={handleManualBranchChange}
+            currentTargetBranch={targetBranchName}
             openPrs={openPrs}
             loadingPrs={loadingPrs}
-            onSelectPrBranch={handleSelectPrBranch} // Pass selection handler
-            onLoadPrs={handleLoadPrs} // Pass load handler
-            loading={isLoading || loadingPrs} // Pass combined loading state
+            onSelectPrBranch={handleSelectPrBranch}
+            onLoadPrs={handleLoadPrs}
+            loading={isLoading || loadingPrs}
        />
 
       {/* Fetch Button */}
        <div className="mb-4 flex justify-center">
             <motion.button
-                onClick={() => triggerFetch(fetchStatus === 'failed_retries' || fetchStatus === 'error')}
+                onClick={() => triggerFetch(fetchStatus === 'failed_retries' || fetchStatus === 'error', targetBranchName || manualBranchName || null)} // Pass effective branch to triggerFetch
                 disabled={isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')}
-                className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-white bg-gradient-to-r ${ // Use rounded-full
+                className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-white bg-gradient-to-r ${
                     fetchStatus === 'failed_retries' || fetchStatus === 'error'
-                    ? 'from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600' // Error state style
-                    : 'from-purple-600 to-cyan-500' // Normal state style
+                    ? 'from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600'
+                    : 'from-purple-600 to-cyan-500'
                  } transition-all shadow-lg shadow-purple-500/30 hover:shadow-cyan-500/40 ${
                      isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')
-                     ? "opacity-60 cursor-not-allowed" // Disabled style
-                     : "hover:brightness-110 active:scale-[0.98]" // Enabled style
+                     ? "opacity-60 cursor-not-allowed"
+                     : "hover:brightness-110 active:scale-[0.98]"
                  }`}
                 whileHover={{ scale: (isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')) ? 1 : 1.03 }}
                 whileTap={{ scale: (isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')) ? 1 : 0.97 }}
-                title={`Извлечь файлы из ветки: ${effectiveBranchDisplay}`} // Tooltip shows effective branch
+                title={`Извлечь файлы из ветки: ${effectiveBranchDisplay}`}
             >
-                 {/* Icon based on state */}
                  {isLoading ? <FaArrowsRotate className="animate-spin" />
                   : (fetchStatus === 'failed_retries' || fetchStatus === 'error' ? <FaArrowsRotate />
                   : <FaDownload />)}
-                 {/* Text based on state */}
                  {fetchStatus === 'retrying' ? "Повтор..."
                   : isLoading ? "Загрузка..."
                   : (fetchStatus === 'failed_retries' || fetchStatus === 'error' ? "Попробовать снова"
                   : "Извлечь файлы")}
-                 {/* Branch indicator */}
                  <span className="text-xs opacity-80 hidden sm:inline">({effectiveBranchDisplay})</span>
             </motion.button>
         </div>
@@ -383,21 +380,19 @@
          {(isLoading || (files.length > 0 && fetchStatus !== 'error' && fetchStatus !== 'failed_retries')) && (
              <div className="flex flex-col gap-4">
                 <SelectedFilesPreview selectedFiles={selectedFiles} allFiles={files} getLanguage={getLanguage} />
-                 {/* Auto Ask AI Toggle */}
                  {files.length > 0 && (
                      <div className="flex items-center justify-start gap-2 p-2 bg-gray-700/30 rounded-md">
                         <input
                             type="checkbox" id="autoAskAiCheckbox" checked={autoAskAiEnabled}
                             onChange={(e) => setAutoAskAiEnabled(e.target.checked)}
                             className="form-checkbox h-4 w-4 text-blue-500 bg-gray-600 border-gray-500 rounded focus:ring-blue-500/50 focus:ring-offset-gray-800 cursor-pointer"
-                            disabled={isActionDisabled} // Disable if any action is running
+                            disabled={isActionDisabled}
                         />
                         <label htmlFor="autoAskAiCheckbox" className={`text-xs cursor-pointer select-none ${isActionDisabled ? 'text-gray-500' : 'text-gray-300'}`}>
                            Авто-запрос AI после добавления файлов <span className="text-blue-400">(Add Selected & Ask)</span>
                         </label>
                     </div>
                  )}
-                 {/* File List Component */}
                  <FileList
                     id="file-list-container"
                     files={files}
@@ -405,9 +400,9 @@
                     primaryHighlightedPath={primaryHighlightedPath}
                     secondaryHighlightedPaths={secondaryHighlightedPaths}
                     importantFiles={importantFiles}
-                    isLoading={isLoading} // Pass general fetch loading
+                    isLoading={isLoading}
                     toggleFileSelection={toggleFileSelection}
-                    onAddSelected={() => handleAddSelected(autoAskAiEnabled)} // Pass auto-ask flag
+                    onAddSelected={() => handleAddSelected(autoAskAiEnabled)}
                     onAddImportant={handleAddImportantFiles}
                     onAddTree={handleAddFullTree}
                     onSelectHighlighted={selectHighlightedFiles}
@@ -418,7 +413,6 @@
          {/* Right Column: Request Input & AI Trigger */}
          {(fetchStatus === 'success' || kworkInputHasContent || files.length > 0 ) ? ( // Show if files fetched OR input has content
              <div id="kwork-input-section" className="flex flex-col gap-3">
-                 {/* Pass ALL necessary props to RequestInput */}
                  <RequestInput
                       kworkInputRef={localKworkInputRef}
                       onCopyToClipboard={() => handleCopyToClipboard(undefined, true)}
@@ -426,16 +420,13 @@
                       isCopyDisabled={isCopyDisabled}
                       isClearDisabled={isClearDisabled}
                       onInputChange={(value) => setKworkInputHasContent(value.trim().length > 0)}
-                      // Pass Ask AI related props
-                      onAskAi={triggerAskAi} // Correct: Pass the function from context
-                      isAskAiDisabled={isAskAiDisabled} // Correct: Pass calculated disabled state
-                      aiActionLoading={aiActionLoading} // Correct: Pass AI loading state
-                      // Pass Add Selected related props
-                      onAddSelected={() => handleAddSelected(autoAskAiEnabled)} // Correct: Pass addSelected handler
-                      isAddSelectedDisabled={isAddSelectedDisabled} // Correct: Pass addSelected disabled state
-                      selectedFetcherFilesCount={selectedFiles.size} // Correct: Pass file count
+                      onAskAi={triggerAskAi}
+                      isAskAiDisabled={isAskAiDisabled}
+                      aiActionLoading={aiActionLoading}
+                      onAddSelected={() => handleAddSelected(autoAskAiEnabled)}
+                      isAddSelectedDisabled={isAddSelectedDisabled}
+                      selectedFetcherFilesCount={selectedFiles.size}
                  />
-                 {/* No standalone Ask AI button here */}
              </div>
          ) : null }
 
