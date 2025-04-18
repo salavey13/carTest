@@ -12,7 +12,7 @@ import { debugLogger } from "@/lib/debugLogger";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm'; // Needed for lists (*), bold (**), etc.
-import remarkBreaks from 'remark-breaks'; // Needed now to convert real \n (after replace) to <br>
+import remarkBreaks from 'remark-breaks'; // Treat single newlines (after replace) as <br>
 
 // Define types based on your database schema
 type Article = Database["public"]["Tables"]["articles"]["Row"];
@@ -43,7 +43,7 @@ export default function AdvicePage() {
   const userId = dbUser?.user_id || tgUser?.id?.toString();
 
   // --- Data Fetching ---
-  // .. (Fetching logic remains the same as previous version)
+  // .. (Fetching logic remains the same)
   useEffect(() => {
     const loadInitialMetadata = async () => {
       if (!userId) {
@@ -118,7 +118,7 @@ export default function AdvicePage() {
   }, [userMetadata]);
 
   // --- Broadcast Logic ---
-  // .. (Broadcast logic remains the same as previous version)
+  // .. (Broadcast logic remains the same)
   const handleToggleBroadcast = async () => {
     if (!userId || !selectedArticle || isUpdatingBroadcast || userMetadata === null) {
         debugLogger.warn("handleToggleBroadcast skipped: Missing userId, selectedArticle, updating, or metadata not loaded.");
@@ -249,7 +249,6 @@ export default function AdvicePage() {
       <div className="relative z-10 container mx-auto px-4 max-w-4xl">
         {!selectedArticle ? (
           // Articles List View
-          // .. (List view remains the same)
           <div className="space-y-6">
             <h1 className="text-3xl md:text-4xl font-bold text-center text-brand-green cyber-text glitch" data-text="Мудрые Советы">
                 Мудрые Советы
@@ -352,9 +351,9 @@ export default function AdvicePage() {
                 ) : (
                   <div className="space-y-6">
                     {sections.map((section) => {
-                      // --- Preprocess the content ---
+                      // --- Preprocess: Replace literal "\\n" with "\n\n" for paragraphs ---
                       const processedContent = (section.content ?? '')
-                        .replace(/\\n/g, '\n'); // Replace literal "\\n" with actual newline
+                        .replace(/\\n/g, '\n\n'); // Replace literal "\\n" with DOUBLE newline
 
                       return (
                         <div key={section.id} className={cn(
@@ -366,22 +365,26 @@ export default function AdvicePage() {
                               <span className="text-brand-blue mr-2">{section.section_order}.</span> {section.title}
                             </h3>
                           )}
-                          {/* --- Render the PREPROCESSED content --- */}
+                          {/* --- Render preprocessed content with custom list components --- */}
                           <ReactMarkdown
-                            // GFM for lists, breaks for the \n we just created
+                            // GFM for basic syntax, breaks for any potential single \n that remain or are intended as <br>
                             remarkPlugins={[remarkGfm, remarkBreaks]}
                             className={cn(
+                                  // General prose styling for non-list elements
                                   "prose prose-invert prose-sm md:prose-base max-w-none text-gray-300",
                                   "prose-headings:text-brand-cyan prose-strong:text-brand-lime",
                                   "prose-a:text-brand-blue hover:prose-a:text-brand-purple prose-a:transition-colors",
                                   "prose-code:text-brand-pink prose-code:before:content-none prose-code:after:content-none prose-code:font-normal prose-code:bg-gray-700/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded",
                                   "prose-blockquote:border-brand-purple prose-blockquote:text-gray-400",
-                                  "prose-li:marker:text-brand-blue", // Style list markers
-                                  // Add some default margin/padding for lists if prose doesn't handle it enough
-                                  "prose-ul:my-2 prose-ul:ml-5 prose-ol:my-2 prose-ol:ml-5 prose-li:my-1"
+                                  // Remove list-specific prose classes to avoid conflicts
+                                  // "prose-ul:list-disc prose-ol:list-decimal prose-li:marker:text-brand-blue",
                             )}
                             components={{
                                 a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="hover:underline" />,
+                                // --- Custom components for UL and LI ---
+                                ul: ({node, ...props}) => <ul className="list-disc list-outside pl-5 mt-2 space-y-1" {...props} />,
+                                li: ({node, ...props}) => <li className="text-gray-300 mb-1" {...props} />,
+                                // ol: ({node, ...props}) => <ol className="list-decimal list-outside pl-5 mt-2 space-y-1" {...props} />, // If numbered lists needed
                             }}
                           >
                             {processedContent}
