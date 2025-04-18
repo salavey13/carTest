@@ -154,7 +154,7 @@ export default function Header() {
               {/* .. Navigation Toggle Button - Increased Z-index */}
               <button
                 onClick={() => setIsNavOpen(!isNavOpen)}
-                className="p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md relative z-69" // Increased z-index to 60
+                className="p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md relative z-169" // Increased z-index to 60
                 aria-label={isNavOpen ? "Close navigation" : "Open navigation"}
                 aria-expanded={isNavOpen}
               >
