@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 const SYSTEM_INSTRUCTION_TEMPLATE = `
 You are an expert content processor and technical writer. Your task is to watch the YouTube video at the following URL and convert its spoken content into a structured CSV format suitable for import into a database, adhering strictly to the format and constraints below.
 
+Please translate to russian on the fly and give full russian csv, and add markdown to content;)
+
 YouTube Video URL: %%YOUTUBE_URL%%
 
 **Constraints & Formatting:**
