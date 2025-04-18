@@ -1,15 +1,18 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useAppContext } from "@/contexts/AppContext"; // Use AppContext
+import { useAppContext } from "@/contexts/AppContext";
 import { fetchArticles, fetchArticleSections, updateUserMetadata, fetchUserData } from "@/hooks/supabase";
 import type { Database } from "@/types/database.types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBookOpen, faArrowLeft, faSpinner, faCheckCircle, faStopCircle, faPaperPlane, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons"; // fa6 solid icons
-import { faTelegram } from "@fortawesome/free-brands-svg-icons"; // fa6 Brand icon
+import { faBookOpen, faArrowLeft, faSpinner, faCheckCircle, faStopCircle, faPaperPlane, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons";
+import { faTelegram } from "@fortawesome/free-brands-svg-icons";
 import { logger } from "@/lib/logger";
 import { debugLogger } from "@/lib/debugLogger";
-import { cn } from "@/lib/utils"; // For class names
+import { cn } from "@/lib/utils";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm'; // Needed for lists (*), bold (**), etc.
+import remarkBreaks from 'remark-breaks'; // Treat single newlines (after replace) as <br>
 
 // Define types based on your database schema
 type Article = Database["public"]["Tables"]["articles"]["Row"];
@@ -18,12 +21,11 @@ type ArticleSection = Database["public"]["Tables"]["article_sections"]["Row"];
 // Define the structure expected in the user's metadata for this feature
 type UserMetadata = {
   advice_broadcast?: {
-    enabled: boolean;        // Is the broadcast active?
-    article_id: string;      // Which article is being broadcast?
-    remaining_section_ids: string[]; // Ordered list of section IDs yet to be sent
-    last_sent_at?: string; // Optional: Timestamp of the last sent section (for cron logic)
+    enabled: boolean;
+    article_id: string;
+    remaining_section_ids: string[];
+    last_sent_at?: string;
   };
-  // Potentially other metadata fields unrelated to advice
 };
 
 export default function AdvicePage() {
@@ -31,16 +33,17 @@ export default function AdvicePage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [sections, setSections] = useState<ArticleSection[]>([]);
-  const [isLoadingArticles, setIsLoadingArticles] = useState(true); // Loading state for articles specifically
+  const [isLoadingArticles, setIsLoadingArticles] = useState(true);
   const [isLoadingSections, setIsLoadingSections] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [broadcastEnabled, setBroadcastEnabled] = useState(false); // Is broadcast active *for the selected article*?
+  const [broadcastEnabled, setBroadcastEnabled] = useState(false);
   const [isUpdatingBroadcast, setIsUpdatingBroadcast] = useState(false);
-  const [userMetadata, setUserMetadata] = useState<UserMetadata | null>(null); // Store the entire user metadata
+  const [userMetadata, setUserMetadata] = useState<UserMetadata | null>(null);
 
   const userId = dbUser?.user_id || tgUser?.id?.toString();
 
   // --- Data Fetching ---
+  // .. (Fetching logic remains the same)
   useEffect(() => {
     const loadInitialMetadata = async () => {
       if (!userId) {
@@ -57,18 +60,20 @@ export default function AdvicePage() {
       } catch (err) {
         logger.error("Failed to load initial user metadata:", err);
         setError("Не удалось загрузить настройки пользователя.");
-        setIsLoadingArticles(false);
+        setUserMetadata({});
       }
     };
     if (!isAuthLoading) {
-      loadInitialMetadata();
+        loadInitialMetadata();
     }
   }, [userId, isAuthLoading]);
 
   useEffect(() => {
     const loadArticles = async () => {
+      if (userMetadata === null) return;
       setIsLoadingArticles(true);
       setError(null);
+      debugLogger.log("Starting to load articles...");
       const { data, error: fetchError } = await fetchArticles();
       if (fetchError) {
         logger.error("Failed to fetch articles:", fetchError);
@@ -79,13 +84,8 @@ export default function AdvicePage() {
       }
       setIsLoadingArticles(false);
     };
-    if (userMetadata !== null) {
-        loadArticles();
-    } else if (!isAuthLoading && userMetadata === null) {
-        setIsLoadingArticles(false);
-        setError("Не удалось загрузить данные статей из-за ошибки настроек.");
-    }
-  }, [userMetadata, isAuthenticated, isAuthLoading]);
+     loadArticles();
+  }, [userMetadata]);
 
   const handleSelectArticle = useCallback(async (article: Article) => {
     setSelectedArticle(article);
@@ -94,33 +94,40 @@ export default function AdvicePage() {
     setError(null);
     setBroadcastEnabled(false);
     debugLogger.log(`Article selected: ${article.title} (${article.id})`);
+
     const { data, error: fetchError } = await fetchArticleSections(article.id);
     if (fetchError) {
       logger.error(`Failed to fetch sections for article ${article.id}:`, fetchError);
       setError("Не удалось загрузить секции статьи.");
+      setIsLoadingSections(false);
+      return;
+    }
+
+    const sortedSections = (data || []).sort((a, b) => a.section_order - b.section_order);
+    setSections(sortedSections);
+    debugLogger.log(`Loaded ${sortedSections.length || 0} sections for article ${article.id}.`);
+
+    if (userMetadata?.advice_broadcast?.enabled && userMetadata.advice_broadcast.article_id === article.id) {
+        setBroadcastEnabled(true);
+        debugLogger.log(`Broadcast is currently ACTIVE for selected article ${article.id}`);
     } else {
-      const sortedSections = (data || []).sort((a, b) => a.section_order - b.section_order);
-      setSections(sortedSections);
-      debugLogger.log(`Loaded ${sortedSections.length || 0} sections for article ${article.id}.`);
-      if (userMetadata?.advice_broadcast?.enabled && userMetadata.advice_broadcast.article_id === article.id) {
-          setBroadcastEnabled(true);
-          debugLogger.log(`Broadcast is currently ACTIVE for selected article ${article.id}`);
-      } else {
-          setBroadcastEnabled(false);
-          debugLogger.log(`Broadcast is currently INACTIVE for selected article ${article.id}`);
-      }
+        setBroadcastEnabled(false);
+        debugLogger.log(`Broadcast is currently INACTIVE for selected article ${article.id}`);
     }
     setIsLoadingSections(false);
   }, [userMetadata]);
 
   // --- Broadcast Logic ---
+  // .. (Broadcast logic remains the same)
   const handleToggleBroadcast = async () => {
-    if (!userId || !selectedArticle || isUpdatingBroadcast) {
-        debugLogger.warn("handleToggleBroadcast skipped: Missing userId, selectedArticle, or already updating.");
+    if (!userId || !selectedArticle || isUpdatingBroadcast || userMetadata === null) {
+        debugLogger.warn("handleToggleBroadcast skipped: Missing userId, selectedArticle, updating, or metadata not loaded.");
+        if (userMetadata === null) setError("Настройки пользователя еще не загружены.");
         return;
     }
      if (sections.length === 0 && !broadcastEnabled) {
         webApp?.showPopup({title: "Нет разделов", message: "В этой статье нет разделов для рассылки.", buttons: [{type: 'ok'}]});
+        setError("В этой статье нет секций для рассылки.");
         return;
     }
 
@@ -128,18 +135,18 @@ export default function AdvicePage() {
     setError(null);
     let newMetadata: UserMetadata;
     let successMessage: string;
-    const currentlyEnabled = userMetadata?.advice_broadcast?.enabled && userMetadata.advice_broadcast.article_id === selectedArticle.id;
-    debugLogger.log(`Toggling broadcast. Currently enabled for this article: ${currentlyEnabled}`);
+    const currentlyEnabled = broadcastEnabled;
+    debugLogger.log(`Toggling broadcast. Currently enabled (state): ${currentlyEnabled}`);
 
     if (currentlyEnabled) {
-      // --- Disable ---
-      const { advice_broadcast, ...restMetadata } = userMetadata || {};
+      // Disable
+      const { advice_broadcast, ...restMetadata } = userMetadata;
       newMetadata = restMetadata;
       successMessage = "Рассылка советов отключена.";
       debugLogger.log(`Disabling broadcast for article ${selectedArticle.id}`);
     } else {
-      // --- Enable ---
-      const sortedSectionIds = sections.map(s => s.id); // Already sorted in handleSelectArticle
+      // Enable
+      const sortedSectionIds = sections.map(s => s.id);
       if (sortedSectionIds.length === 0) {
           setError("В этой статье нет секций для рассылки.");
           setIsUpdatingBroadcast(false);
@@ -157,7 +164,7 @@ export default function AdvicePage() {
       debugLogger.log(`Enabling broadcast for article ${selectedArticle.id} with sections:`, sortedSectionIds);
     }
 
-    // --- Update DB ---
+    // Update DB
     const { success, error: updateError, data: updatedUserData } = await updateUserMetadata(userId, newMetadata);
     if (success && updatedUserData) {
       setUserMetadata(updatedUserData.metadata as UserMetadata | null ?? {});
@@ -167,14 +174,16 @@ export default function AdvicePage() {
     } else {
       logger.error("Failed to update user metadata for broadcast:", updateError);
       const actionText = currentlyEnabled ? 'отключить' : 'включить';
-      const errorMsg = `Не удалось ${actionText} рассылку: ${updateError || 'Неизвестная ошибка'}`;
+      const errorMsg = `Не удалось ${actionText} рассылку: ${updateError?.message || 'Неизвестная ошибка'}`;
       setError(errorMsg);
-      webApp?.showPopup({title: "Ошибка", message: `Не удалось ${actionText} рассылку.`, buttons: [{type: 'ok'}]});
+      webApp?.showPopup({title: "Ошибка", message: errorMsg, buttons: [{type: 'ok'}]});
     }
     setIsUpdatingBroadcast(false);
   };
 
+
   // --- Navigation & UI ---
+  // .. (Navigation logic remains the same)
   const handleGoBack = useCallback(() => {
     setSelectedArticle(null);
     setSections([]);
@@ -186,22 +195,25 @@ export default function AdvicePage() {
     if (!webApp) return;
     const backButtonClickHandler = () => { handleGoBack(); };
     if (selectedArticle) {
-      if (webApp.BackButton?.show) webApp.BackButton.show();
-      if (webApp.BackButton?.onClick) webApp.BackButton.onClick(backButtonClickHandler);
+      webApp.BackButton?.show();
+      webApp.BackButton?.onClick(backButtonClickHandler);
     } else {
-      if (webApp.BackButton?.offClick) webApp.BackButton.offClick(backButtonClickHandler);
-      if (webApp.BackButton?.hide) webApp.BackButton.hide();
+      webApp.BackButton?.offClick(backButtonClickHandler);
+      webApp.BackButton?.hide();
     }
     return () => {
       if (webApp.BackButton?.isVisible) {
-          if (webApp.BackButton?.offClick) webApp.BackButton.offClick(backButtonClickHandler);
-          if (webApp.BackButton?.hide) webApp.BackButton.hide();
+          webApp.BackButton?.offClick(backButtonClickHandler);
+          webApp.BackButton?.hide();
       }
     };
   }, [webApp, selectedArticle, handleGoBack]);
 
+
   // --- Render Logic ---
-  if (isAuthLoading || (isLoadingArticles && articles.length === 0) || userMetadata === null) {
+  const showGlobalLoading = isAuthLoading || userMetadata === null;
+
+  if (showGlobalLoading) {
     return (
       <div className="flex justify-center items-center h-screen pt-36 bg-black">
         <FontAwesomeIcon icon={faSpinner} spin size="3x" className="text-brand-green" />
@@ -219,30 +231,33 @@ export default function AdvicePage() {
      );
   }
 
-  // Error loading articles list
   if (error && !selectedArticle && !isLoadingArticles) {
     return (
-      <div className="p-6 pt-32 text-center text-brand-pink bg-black/50 rounded-lg shadow-lg border border-brand-pink/30 mx-4">
+       <div className="p-6 pt-32 text-center text-brand-pink bg-black/50 rounded-lg shadow-lg border border-brand-pink/30 mx-4">
          <FontAwesomeIcon icon={faTriangleExclamation} className="mr-2 text-2xl" />
-         <p className="font-semibold text-xl mt-2">Ошибка загрузки статей</p>
+         <p className="font-semibold text-xl mt-2">Ошибка загрузки данных</p>
          <p className="text-gray-400 mt-1">{error}</p>
-      </div>
-    );
+       </div>
+     );
   }
 
   return (
     <div className={cn(
-        "min-h-screen pt-36 pb-10 font-mono", // Added pt-36
-        "bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200" // Base cyberpunk background
+        "min-h-screen pt-36 pb-10 font-mono",
+        "bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200"
     )}>
       <div className="relative z-10 container mx-auto px-4 max-w-4xl">
         {!selectedArticle ? (
-          // --- Articles List View ---
+          // Articles List View
           <div className="space-y-6">
             <h1 className="text-3xl md:text-4xl font-bold text-center text-brand-green cyber-text glitch" data-text="Мудрые Советы">
                 Мудрые Советы
             </h1>
-            {articles.length === 0 ? (
+            {isLoadingArticles ? (
+                 <div className="flex justify-center items-center pt-16">
+                     <FontAwesomeIcon icon={faSpinner} spin size="2x" className="text-brand-blue" />
+                 </div>
+             ) : articles.length === 0 ? (
                <p className="text-center text-gray-500 dark:text-gray-400 mt-10 text-lg">Пока нет доступных статей.</p>
             ) : (
               <ul className="space-y-4">
@@ -270,30 +285,26 @@ export default function AdvicePage() {
             )}
           </div>
         ) : (
-          // --- Single Article View ---
+          // Single Article View
           <div>
-            {/* Back Button is handled by Telegram Hook */}
              <h1 className="text-3xl md:text-4xl font-bold mb-3 text-brand-green cyber-text">{selectedArticle.title}</h1>
             {selectedArticle.description && (
               <p className="text-base md:text-lg text-gray-400 mb-6 italic">{selectedArticle.description}</p>
             )}
 
-            {/* Loading Sections State */}
             {isLoadingSections ? (
                <div className="flex justify-center items-center py-16">
                  <FontAwesomeIcon icon={faSpinner} spin size="3x" className="text-brand-blue"/>
                </div>
-            ) : error && sections.length === 0 ? ( // Error loading sections
+            ) : error && sections.length === 0 ? (
                <div className="p-4 my-6 text-brand-pink bg-pink-900/20 border border-brand-pink/40 rounded-lg shadow-md text-center">
                   <FontAwesomeIcon icon={faTriangleExclamation} className="mr-2 text-xl" />
                   <p className="mt-1">{error}</p>
                </div>
             ) : (
-              // --- Sections Loaded ---
               <div>
-                 {/* "Entertain Me" Button Area */}
                  {userId && sections.length > 0 && (
-                  <div className="my-8 p-5 bg-gradient-to-r from-blue-900/30 via-purple-900/20 to-blue-900/30 border border-brand-purple/40 rounded-lg shadow-lg text-center">
+                   <div className="my-8 p-5 bg-gradient-to-r from-blue-900/30 via-purple-900/20 to-blue-900/30 border border-brand-purple/40 rounded-lg shadow-lg text-center">
                     <h3 className="text-xl font-semibold mb-3 flex items-center justify-center text-brand-purple">
                         <FontAwesomeIcon icon={faTelegram} className="mr-2 text-brand-blue" />
                         Часовая Рассылка
@@ -322,14 +333,12 @@ export default function AdvicePage() {
                         {isUpdatingBroadcast ? 'Обновление...' : broadcastEnabled ? 'Отключить рассылку' : 'Развлеки меня'}
                       </span>
                     </button>
-                    {/* Status Indicator */}
                     {broadcastEnabled && !isUpdatingBroadcast && (
                        <p className="text-xs text-brand-green mt-3 flex items-center justify-center">
                          <FontAwesomeIcon icon={faCheckCircle} className="mr-1" /> Рассылка активна для этой статьи.
                        </p>
                      )}
-                     {/* Display error specific to broadcast update */}
-                     {error && !isLoadingSections && (
+                     {error && !isUpdatingBroadcast && !isLoadingSections && (
                           <p className="text-xs text-brand-pink mt-2">{error}</p>
                       )}
                    </div>
@@ -337,26 +346,52 @@ export default function AdvicePage() {
 
                 {/* Sections Content */}
                 <h2 className="text-2xl font-semibold mt-8 mb-4 border-b border-brand-blue/30 pb-2 text-brand-blue">Содержание:</h2>
-                {sections.length === 0 && !isLoadingSections ? (
+                {sections.length === 0 && !isLoadingSections && !error ? (
                   <p className="text-gray-500">В этой статье пока нет секций.</p>
                 ) : (
                   <div className="space-y-6">
-                    {sections.map((section) => (
-                      <div key={section.id} className={cn(
+                    {sections.map((section) => {
+                      // --- Preprocess: Replace literal "\\n" with "\n\n" for paragraphs ---
+                      const processedContent = (section.content ?? '')
+                        .replace(/\\n/g, '\n\n'); // Replace literal "\\n" with DOUBLE newline
+
+                      return (
+                        <div key={section.id} className={cn(
                           "p-5 border rounded-lg transition-shadow duration-300",
                           "bg-black/50 border-gray-700/50 hover:border-brand-green/50 hover:shadow-md hover:shadow-brand-green/20"
-                      )}>
-                        {section.title && (
-                          <h3 className="text-lg font-semibold mb-2 text-brand-green flex items-baseline">
-                             <span className="text-brand-blue mr-2">{section.section_order}.</span> {section.title}
-                          </h3>
-                        )}
-                         <div
-                           className="prose prose-invert prose-sm md:prose-base max-w-none text-gray-300 prose-headings:text-brand-cyan prose-strong:text-brand-lime prose-a:text-brand-blue hover:prose-a:text-brand-purple"
-                           dangerouslySetInnerHTML={{ __html: section.content }} // CAUTION: TRUSTED HTML ONLY
-                         />
-                      </div>
-                    ))}
+                        )}>
+                          {section.title && (
+                            <h3 className="text-lg font-semibold mb-2 text-brand-green flex items-baseline">
+                              <span className="text-brand-blue mr-2">{section.section_order}.</span> {section.title}
+                            </h3>
+                          )}
+                          {/* --- Render preprocessed content with custom list components --- */}
+                          <ReactMarkdown
+                            // GFM for basic syntax, breaks for any potential single \n that remain or are intended as <br>
+                            remarkPlugins={[remarkGfm, remarkBreaks]}
+                            className={cn(
+                                  // General prose styling for non-list elements
+                                  "prose prose-invert prose-sm md:prose-base max-w-none text-gray-300",
+                                  "prose-headings:text-brand-cyan prose-strong:text-brand-lime",
+                                  "prose-a:text-brand-blue hover:prose-a:text-brand-purple prose-a:transition-colors",
+                                  "prose-code:text-brand-pink prose-code:before:content-none prose-code:after:content-none prose-code:font-normal prose-code:bg-gray-700/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded",
+                                  "prose-blockquote:border-brand-purple prose-blockquote:text-gray-400",
+                                  // Remove list-specific prose classes to avoid conflicts
+                                  // "prose-ul:list-disc prose-ol:list-decimal prose-li:marker:text-brand-blue",
+                            )}
+                            components={{
+                                a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="hover:underline" />,
+                                // --- Custom components for UL and LI ---
+                                ul: ({node, ...props}) => <ul className="list-disc list-outside pl-5 mt-2 space-y-1" {...props} />,
+                                li: ({node, ...props}) => <li className="text-gray-300 mb-1" {...props} />,
+                                // ol: ({node, ...props}) => <ol className="list-decimal list-outside pl-5 mt-2 space-y-1" {...props} />, // If numbered lists needed
+                            }}
+                          >
+                            {processedContent}
+                          </ReactMarkdown>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
