@@ -96,7 +96,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         <div className="border border-gray-700 p-3 rounded-lg bg-gray-800/50"> {/* Kept rounded-lg */}
                             <div className="flex justify-between items-center mb-2">
                                 <h4 className="text-base font-semibold text-purple-300 flex items-center gap-2">
-                                    <FaList /> Выберите PR для извлечения/обновления ветки:
+                                    Выберите PR для извлечения/обновления ветки:
                                 </h4>
                                 <div className="flex items-center gap-2">
                                     <Tooltip text="Использовать ветку по умолчанию" position='left'>
