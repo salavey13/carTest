@@ -10,11 +10,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+// .. Corrected Icons Import
 import {
-  FaBrain, FaExclamationTriangle, FaChartLine, FaBalanceScale, FaBriefcase,
-  FaTools, FaUsers, FaUserCog, FaCubes, FaUserGraduate, FaBullseye,
+  FaBrain, FaTriangleExclamation, FaChartLine, FaScaleBalanced, FaBriefcase,
+  FaToolbox, FaUsers, FaUserGear, FaCubes, FaUserGraduate, FaBullseye, // FaTools -> FaToolbox, FaBalanceScale -> FaScaleBalanced, FaExclamationTriangle -> FaTriangleExclamation, FaUserCog -> FaUserGear
   FaLightbulb, FaRoad, FaNetworkWired, FaComments, FaRecycle, FaUsersCog,
-  FaProjectDiagram, FaHistory, FaQuestionCircle, FaWind // Added FaWind for Hype Cycle
+  FaDiagramProject, FaHistory, FaQuestionCircle, FaWind // FaProjectDiagram -> FaDiagramProject
 } from "react-icons/fa6"; // Using FontAwesome 6 icons
 
 import { debugLogger } from "@/lib/debugLogger";
@@ -24,16 +25,16 @@ import { cn } from "@/lib/utils";
 
 type Language = 'en' | 'ru';
 
-// Placeholder for image URLs - replace with actual URLs if available
+// .. Placeholder for image URLs - replace with actual URLs if available
 const STORAGE_BASE_URL_AIWORK = "https://placehold.co"; // Placeholder URL base
 
 const PLACEHOLDER_BLUR_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="; // Tiny transparent png
 
-// --- Section Data (Generated from Transcript) ---
+// --- Section Data (Generated from Transcript with CORRECTED Icons) ---
 const sections = [
   {
     id: "intro-threat",
-    icon: FaExclamationTriangle,
+    icon: FaTriangleExclamation, // Corrected Icon
     titleEn: "AI Risk vs. Leadership & Systems",
     titleRu: "Риск ИИ против Лидерства и Систем",
     pointsEn: [
@@ -56,7 +57,7 @@ const sections = [
   },
   {
     id: "efficiency-trap",
-    icon: FaBalanceScale,
+    icon: FaScaleBalanced, // Corrected Icon
     titleEn: "The Efficiency Trap",
     titleRu: "Ловушка Эффективности",
     pointsEn: [
@@ -81,7 +82,7 @@ const sections = [
   },
   {
     id: "leadership-approach",
-    icon: FaBrain,
+    icon: FaBrain, // OK
     titleEn: "New Leadership Approach Needed",
     titleRu: "Необходим Новый Подход к Лидерству",
     pointsEn: [
@@ -108,7 +109,7 @@ const sections = [
   },
   {
     id: "tools-implementation",
-    icon: FaTools,
+    icon: FaToolbox, // Corrected Icon (Replaced FaTools)
     titleEn: "Beyond Basic Tools: Integration & Adoption",
     titleRu: "Больше Чем Базовые Инструменты: Интеграция и Внедрение",
     pointsEn: [
@@ -135,7 +136,7 @@ const sections = [
   },
    {
     id: "jobs-vs-work",
-    icon: FaBriefcase,
+    icon: FaBriefcase, // OK
     titleEn: "Jobs are Dead, Long Live Work",
     titleRu: "Должности Мертвы, Да Здравствует Работа",
     pointsEn: [
@@ -162,7 +163,7 @@ const sections = [
   },
   {
     id: "risk-levels",
-    icon: FaUsers,
+    icon: FaUsers, // OK
     titleEn: "Who's Most at Risk?",
     titleRu: "Кто в Наибольшей Зоне Риска?",
     pointsEn: [
@@ -187,7 +188,7 @@ const sections = [
   },
   {
     id: "augmented-teams",
-    icon: FaUserCog, // Changed from FaUsersCog for clarity
+    icon: FaUserGear, // Corrected Icon
     titleEn: "Augmented Teams & Digital Twins",
     titleRu: "Дополненные Команды и Цифровые Двойники",
     pointsEn: [
@@ -212,7 +213,7 @@ const sections = [
   },
   {
     id: "winners-losers",
-    icon: FaProjectDiagram, // Changed icon
+    icon: FaDiagramProject, // Corrected Icon
     titleEn: "Winners & Losers: It's Complicated",
     titleRu: "Победители и Проигравшие: Все Сложно",
     pointsEn: [
@@ -239,7 +240,7 @@ const sections = [
   },
   {
     id: "transformation-approach",
-    icon: FaRecycle,
+    icon: FaRecycle, // OK
     titleEn: "Approach to Transformation: Radical & Practical",
     titleRu: "Подход к Трансформации: Радикально и Практично",
     pointsEn: [
@@ -266,7 +267,7 @@ const sections = [
   },
   {
     id: "foresight-agency",
-    icon: FaLightbulb,
+    icon: FaLightbulb, // OK
     titleEn: "Foresight & Human Agency",
     titleRu: "Форсайт и Человеческая Активность",
     pointsEn: [
@@ -291,7 +292,7 @@ const sections = [
   },
   {
     id: "skill-flux",
-    icon: FaUserGraduate,
+    icon: FaUserGraduate, // OK
     titleEn: "Skill Flux & The Future of Learning",
     titleRu: "Текучесть Навыков и Будущее Обучения",
     pointsEn: [
@@ -320,7 +321,7 @@ const sections = [
   },
    {
     id: "hype-vs-reality",
-    icon: FaWind, // Icon for hype cycle
+    icon: FaWind, // OK
     titleEn: "Hype vs. Reality: Agents",
     titleRu: "Хайп против Реальности: Агенты",
     pointsEn: [
@@ -347,7 +348,7 @@ const sections = [
   },
   {
     id: "metrics-matter",
-    icon: FaChartLine,
+    icon: FaChartLine, // OK
     titleEn: "Metrics Must Evolve",
     titleRu: "Метрики Должны Эволюционировать",
     pointsEn: [
@@ -372,7 +373,7 @@ const sections = [
   },
    {
     id: "conclusion-pioneers",
-    icon: FaRoad,
+    icon: FaRoad, // OK
     titleEn: "Conclusion: We Are All Pioneers",
     titleRu: "Заключение: Мы Все Первопроходцы",
     pointsEn: [
@@ -402,16 +403,15 @@ const sections = [
 export default function AiWorkFuturePage() {
   const { user } = useAppContext();
   const [isMounted, setIsMounted] = useState(false);
-  const [selectedLang, setSelectedLang] = useState<Language>('ru'); // Default to RU
+  const [selectedLang, setSelectedLang] = useState<Language>('ru');
 
   useEffect(() => {
     setIsMounted(true);
     const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'ru';
-     // Use user language preference if available, otherwise browser language
     const initialLang = user?.language_code === 'ru' || (!user?.language_code && browserLang === 'ru') ? 'ru' : 'en';
     setSelectedLang(initialLang);
     debugLogger.log(`[AiWorkFuturePage] Mounted. Browser lang: ${browserLang}, User lang: ${user?.language_code}, Initial selected: ${initialLang}`);
-  }, [user?.language_code]); // Depend on user language code
+  }, [user?.language_code]);
 
   if (!isMounted) {
     return (
@@ -421,14 +421,14 @@ export default function AiWorkFuturePage() {
     );
   }
 
-  const pageThemeColor = "brand-cyan"; // Main theme for this page
+  const pageThemeColor = "brand-cyan";
   const pageBorderColor = `border-${pageThemeColor}/30`;
   const pageTextColor = `text-${pageThemeColor}`;
-  const pageShadowColor = `shadow-[0_0_30px_rgba(0,194,255,0.4)]`; // Adjusted shadow for cyan
+  const pageShadowColor = `shadow-[0_0_30px_rgba(0,194,255,0.4)]`;
 
   return (
     <div className="relative min-h-screen overflow-hidden pt-20 pb-10 bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200">
-      {/* Background Grid */}
+      {/* .. Background Grid */}
       <div
         className="absolute inset-0 bg-repeat opacity-[0.03] z-0"
         style={{
@@ -460,14 +460,14 @@ export default function AiWorkFuturePage() {
             </CardHeader>
 
             <CardContent className="space-y-12 p-4 md:p-8">
-              {/* Language Toggle */}
+              {/* .. Language Toggle */}
               <div className="flex justify-center space-x-2 mb-8">
                  <Button
                    variant={selectedLang === 'ru' ? 'secondary' : 'outline'}
                    size="sm"
                    onClick={() => setSelectedLang('ru')}
                    className={cn(
-                       `border-${pageThemeColor}/50`, // Use page theme for RU button border
+                       `border-${pageThemeColor}/50`,
                        selectedLang === 'ru' ? `bg-${pageThemeColor}/20 ${pageTextColor} hover:bg-${pageThemeColor}/30` : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
                    )}
                  >
@@ -478,7 +478,7 @@ export default function AiWorkFuturePage() {
                     size="sm"
                     onClick={() => setSelectedLang('en')}
                     className={cn(
-                       "border-brand-green/50", // Keep green for EN button or choose another contrast color
+                       "border-brand-green/50",
                        selectedLang === 'en' ? 'bg-brand-green/20 text-brand-green hover:bg-brand-green/30' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
                     )}
                  >
@@ -486,26 +486,23 @@ export default function AiWorkFuturePage() {
                  </Button>
               </div>
 
-              {/* Sections Rendering */}
+              {/* .. Sections Rendering */}
               {sections.map((section, index) => {
                 const IconComponent = section.icon;
-                // Rotate through a selection of colors for section borders/titles
                 const themeColor = ["text-brand-pink", "text-brand-orange", "text-neon-lime", "text-brand-blue", "text-brand-green", "text-brand-purple"][index % 6];
                 const borderColor = themeColor.replace("text-", "border-");
                 const currentTitle = selectedLang === 'en' ? section.titleEn : section.titleRu;
                 const currentPoints = section.pointsEn && section.pointsRu ? (selectedLang === 'en' ? section.pointsEn : section.pointsRu) : [];
                 const currentImageAlt = section.imageAltEn && section.imageAltRu ? (selectedLang === 'en' ? section.imageAltEn : section.imageAltRu) : "";
                 const currentImageUrl = section.imageUrlEn && section.imageUrlRu ? (selectedLang === 'en' ? section.imageUrlEn : section.imageUrlRu) : null;
-                const currentTooltip = selectedLang === 'ru' ? section.tooltipRu : null; // Only show RU tooltips
+                const currentTooltip = selectedLang === 'ru' ? section.tooltipRu : null;
 
                 return (
                   <section key={section.id} className={`space-y-4 border-l-4 pl-4 md:pl-6 ${borderColor}`}>
-                    {/* Section Title */}
                     <h2 className={`flex items-center text-2xl md:text-3xl font-semibold ${themeColor} mb-4 font-orbitron`}>
                       <IconComponent className={`mr-3 ${themeColor}/80 flex-shrink-0`} /> {currentTitle}
                     </h2>
 
-                    {/* Section Points */}
                     {currentPoints.length > 0 && (
                       <ul className="list-disc list-outside space-y-2 text-gray-300 pl-5 text-base md:text-lg leading-relaxed">
                         {currentPoints.map((point, i) => (
@@ -514,7 +511,6 @@ export default function AiWorkFuturePage() {
                       </ul>
                     )}
 
-                    {/* Section Image & Tooltip */}
                     {currentImageUrl && (
                       <div className={`my-6 p-2 border ${borderColor}/30 rounded-lg bg-black/30 max-w-md mx-auto`}>
                         <Tooltip>
@@ -526,12 +522,12 @@ export default function AiWorkFuturePage() {
                                 loading="lazy" placeholder="blur" blurDataURL={PLACEHOLDER_BLUR_URL}
                                 onError={(e) => {
                                   debugLogger.error(`Failed to load image: ${currentImageUrl}`);
-                                  e.currentTarget.style.display = 'none'; // Hide broken image
+                                  e.currentTarget.style.display = 'none';
                                 }}
                               />
                             </div>
                           </TooltipTrigger>
-                          {currentTooltip && ( // Only render tooltip content if text exists
+                          {currentTooltip && (
                             <TooltipContent side="bottom" className={`max-w-[300px] text-center bg-gray-950 ${borderColor}/60 text-white p-3 shadow-lg border`}>
                               <p className="text-sm whitespace-pre-wrap">{currentTooltip}</p>
                             </TooltipContent>
@@ -540,17 +536,15 @@ export default function AiWorkFuturePage() {
                         <p className="text-xs text-center text-gray-400 mt-1 italic">{currentImageAlt}</p>
                       </div>
                     )}
-                     {/* Render other specific structures like intro/outro if added to section data */}
                   </section>
                 );
               })}
 
-              {/* Concluding section */}
+              {/* .. Concluding section */}
               <section className="text-center pt-8 border-t border-brand-cyan/20 mt-10">
                  <p className="text-gray-400 italic">
                    {selectedLang === 'ru' ? "Резюме основано на беседе с Иэном Бикрафтом. Будущее требует адаптации и смелости." : "Summary based on the conversation with Ian Beacraft. The future requires adaptation and courage."}
                  </p>
-                 {/* Optional links to related concepts */}
                  <p className="mt-4 text-gray-300">
                    Explore related concepts in <Link href="/expmind" className="text-brand-green hover:underline font-semibold">Experimental Mindset</Link> and <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>.
                  </p>
