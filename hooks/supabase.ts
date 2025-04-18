@@ -1,4 +1,4 @@
-// --- Paste the FULL restored content of /hooks/supabase.ts here ---
+// /hooks/supabase.ts
 // (This should be the "CURRENT SUPABASE HOOK" provided in the prompt,
 // ensuring functions like fetchCars, fetchCarById, createInvoice, getUserRentals etc.
 // are present as used/needed by the actions and components)
@@ -18,6 +18,9 @@ type DbTask = Database["public"]["Tables"]["tasks"]["Row"]; // Added for Tasks
 type DbCharacter = Database["public"]["Tables"]["characters"]["Row"]; // Added for Characters
 type DbVideo = Database["public"]["Tables"]["videos"]["Row"]; // Added for Videos
 type DbSubscription = Database["public"]["Tables"]["subscriptions"]["Row"]; // Assuming you have a subscriptions table
+type DbArticle = Database["public"]["Tables"]["articles"]["Row"]; // Added for Articles
+type DbArticleSection = Database["public"]["Tables"]["article_sections"]["Row"]; // Added for Article Sections
+
 
 // --- Supabase Client Initialization ---
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://inmctohsodgdohamhzag.supabase.co";
@@ -99,7 +102,7 @@ export const fetchUserData = async (userId: string): Promise<DbUser | null> => {
     try {
         const { data, error } = await supabaseAdmin
             .from("users")
-            .select("*")
+            .select("*") // Select all fields including metadata
             .eq("user_id", userId)
             .maybeSingle(); // Handles user not found returning null instead of error
 
@@ -118,7 +121,7 @@ export const fetchUserData = async (userId: string): Promise<DbUser | null> => {
 };
 
 /** Creates or updates a user in the database. Uses admin client. */
-export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAppUser & { role?: string; status?: string }>): Promise<DbUser | null> => {
+export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAppUser & { role?: string; status?: string; metadata?: Record<string, any> }>): Promise<DbUser | null> => {
     if (!userId) {
         debugLogger.error("createOrUpdateUser called with empty userId");
         return null;
@@ -138,9 +141,10 @@ export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAp
             full_name: `${userInfo.first_name || ""} ${userInfo.last_name || ""}`.trim() || null,
             avatar_url: userInfo.photo_url || null,
             language_code: userInfo.language_code || null,
-            // Only include role/status if provided in userInfo, avoid overwriting on updates unless specified
+            // Only include role/status/metadata if provided in userInfo, avoid overwriting on updates unless specified
             ...(userInfo.role && { role: userInfo.role }),
             ...(userInfo.status && { status: userInfo.status }),
+            ...(userInfo.metadata && { metadata: userInfo.metadata }), // Include metadata if provided
             // Set default role/status on creation? Upsert handles this if ON CONFLICT DO UPDATE
             updated_at: new Date().toISOString(), // Ensure updated_at is set on upsert
         };
@@ -179,9 +183,45 @@ export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAp
     }
 };
 
+/** Updates only the metadata field for a specific user. Uses authenticated client for RLS. */
+export const updateUserMetadata = async (
+  userId: string,
+  metadata: Record<string, any> | null // Pass null to clear metadata or specific object to set/update
+): Promise<{ success: boolean; data?: DbUser; error?: string }> => {
+  if (!userId) return { success: false, error: "User ID is required." };
+
+  const client = await createAuthenticatedClient(userId);
+  if (!client) return { success: false, error: "Failed to create authenticated client." };
+
+  debugLogger.log(`Updating metadata for user ${userId}`, metadata);
+  try {
+    const { data, error } = await client
+      .from("users")
+      .update({ metadata: metadata, updated_at: new Date().toISOString() }) // Update metadata and timestamp
+      .eq("user_id", userId)
+      .select() // Select the updated user row
+      .single(); // Expect a single row
+
+    if (error) {
+      logger.error(`Error updating metadata for user ${userId}:`, error);
+      if (error.code === 'PGRST116') return { success: false, error: `User ${userId} not found.` };
+      // Handle potential RLS violation errors if policy is incorrect
+      if (error.code === '42501') return { success: false, error: `Permission denied to update metadata for user ${userId}. Check RLS policy.` };
+      throw error;
+    }
+    if (!data) return { success: false, error: `User ${userId} not found after metadata update attempt.` };
+
+    debugLogger.log(`Successfully updated metadata for user ${userId}.`);
+    return { success: true, data };
+  } catch (catchError) {
+    logger.error(`Exception in updateUserMetadata for user ${userId}:`, catchError);
+    return { success: false, error: catchError instanceof Error ? catchError.message : "Failed to update user metadata" };
+  }
+};
+
 
 // --- Embeddings & Car Search ---
-
+// ... (embedding and car search functions remain unchanged) ...
 // Match the vector dimensions defined in the database function/column
 const VECTOR_DIMENSIONS = 384; // Make sure this is correct
 
@@ -422,9 +462,50 @@ export const getSimilarCars = async (carId: string, matchCount: number = 3): Pro
     }
 };
 
+// --- Advice Articles & Sections ---
 
-// --- Test Progress --- (Keeping as is, seems unrelated to YouTube)
+/** Fetches all advice articles. Uses anon client based on RLS policy. */
+export const fetchArticles = async (): Promise<{ success: boolean; data?: DbArticle[]; error?: string }> => {
+  if (!supabaseAnon) return { success: false, error: "Anon client not available." };
+  try {
+    const { data, error } = await supabaseAnon
+      .from("articles")
+      .select("*")
+      .order("created_at", { ascending: true }); // Or order by title, etc.
 
+    if (error) throw error;
+    debugLogger.log(`Fetched ${data?.length || 0} articles.`);
+    return { success: true, data: data || [] };
+  } catch (error) {
+    logger.error("Error fetching articles:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch articles" };
+  }
+};
+
+/** Fetches all sections for a specific article ID. Uses anon client based on RLS policy. */
+export const fetchArticleSections = async (articleId: string): Promise<{ success: boolean; data?: DbArticleSection[]; error?: string }> => {
+  if (!articleId) return { success: false, error: "Article ID is required." };
+  if (!supabaseAnon) return { success: false, error: "Anon client not available." };
+
+  try {
+    const { data, error } = await supabaseAnon
+      .from("article_sections")
+      .select("*")
+      .eq("article_id", articleId)
+      .order("section_order", { ascending: true }); // Crucial for correct sequence
+
+    if (error) throw error;
+    debugLogger.log(`Fetched ${data?.length || 0} sections for article ${articleId}.`);
+    return { success: true, data: data || [] };
+  } catch (error) {
+    logger.error(`Error fetching sections for article ${articleId}:`, error);
+    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch article sections" };
+  }
+};
+
+
+// --- Test Progress ---
+// ... (test progress functions remain unchanged) ...
 export const saveTestProgress = async (userId: string, progress: any): Promise<{ success: boolean; error?: string }> => {
     const client = await createAuthenticatedClient(userId);
     if (!client) return { success: false, error: "Failed to create authenticated client." };
@@ -469,8 +550,9 @@ export const loadTestProgress = async (userId: string): Promise<{ success: boole
     }
 };
 
-// --- Subscriptions --- (Keeping as is, potentially reusable)
 
+// --- Subscriptions ---
+// ... (subscription functions remain unchanged) ...
 export const updateUserSubscription = async (
   userId: string,
   subscriptionId: string | number | null // Allow null to remove subscription
@@ -535,8 +617,8 @@ export const getUserSubscription = async (
 };
 
 
-// --- Invoice Management --- (Keeping as is, potentially reusable)
-
+// --- Invoice Management ---
+// ... (invoice functions remain unchanged) ...
 export const createInvoice = async (
     type: string,
     id: string,
@@ -659,8 +741,9 @@ export const getUserInvoices = async (userId: string): Promise<{ success: boolea
     }
 };
 
-// --- Rental Management --- (Keeping as is, potentially reusable)
 
+// --- Rental Management ---
+// ... (rental functions remain unchanged) ...
 export interface Rental extends DbRental { // Combine DB type with potential joined fields
   car_make?: string | null;
   car_model?: string | null;
@@ -762,7 +845,7 @@ export const updateRentalPaymentStatus = async (
 
 
 // --- Image Upload ---
-
+// ... (image upload function remains unchanged) ...
 export const uploadImage = async (bucketName: string, file: File, fileName?: string): Promise<{ success: boolean; publicUrl?: string; error?: string }> => {
      if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
      if (!bucketName || !file) return { success: false, error: "Bucket name and file are required." };
@@ -805,8 +888,8 @@ export const uploadImage = async (bucketName: string, file: File, fileName?: str
 };
 
 
-// --- Generic Data Fetching (Examples, potentially reusable) ---
-
+// --- Generic Data Fetching (Examples) ---
+// ... (fetchQuestions, fetchAnswers remain unchanged) ...
 export const fetchQuestions = async () => {
     if (!supabaseAnon) throw new Error("Anon client not available.");
     const { data, error } = await supabaseAnon.from("questions").select("*");
@@ -821,6 +904,7 @@ export const fetchAnswers = async () => {
     return data;
 };
 
+// ... (fetchCars, fetchCarById remain unchanged) ...
 // Fetch all cars (publicly accessible)
 export const fetchCars = async (): Promise<{ success: boolean; data?: DbCar[]; error?: string }> => {
   if (!supabaseAnon) return { success: false, error: "Anon client not available." };
@@ -852,8 +936,9 @@ export const fetchCarById = async (id: string): Promise<{ success: boolean; data
   }
 }
 
-// --- User Results (Saving/Fetching user choices/matches) ---
 
+// --- User Results (Saving/Fetching user choices/matches) ---
+// ... (saveUserResult, getUserResults remain unchanged) ...
 export const saveUserResult = async (userId: string, carId: string): Promise<{ success: boolean; error?: string }> => {
     const client = await createAuthenticatedClient(userId);
     if (!client) return { success: false, error: "Failed to create authenticated client." };
@@ -894,5 +979,6 @@ export const getUserResults = async (userId: string): Promise<{ success: boolean
         return { success: false, error: error instanceof Error ? error.message : "Failed to fetch user results" };
     }
 };
+
 
 // --- END OF /hooks/supabase.ts ---
