@@ -41,7 +41,7 @@ const allPages: PageInfo[] = [
   { path: "/bullshitdetector", name: "BS Detector", icon: FaMagnifyingGlass },
   { path: "/wheel-of-fortune", name: "Wheel of Fortune", icon: FaGift },
   // .. Added new 'Upload Advice' admin page link and marked as important:
-  { path: "/admin/advice-upload", name: "Upload Advice", icon: FaUpload, isAdminOnly: true, isImportant: true, color: "red" },
+  { path: "/advice-upload", name: "Upload Advice", icon: FaUpload, isAdminOnly: true, isImportant: true, color: "red" },
   { path: "/admin", name: "Admin Panel", icon: FaUserShield, isAdminOnly: true, color: "red" },
   { path: "/shadow-fleet-admin", name: "Fleet Admin", icon: FaCarOn, isAdminOnly: true, color: "red" },
   { path: "/youtubeAdmin", name: "YT Admin", icon: FaYoutube, isAdminOnly: true, color: "red" },
