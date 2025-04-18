@@ -51,14 +51,10 @@ async function verifyAdmin(userId: string | undefined): Promise<boolean> {
      }
 }
 
-
-// --- The Server Action for CSV Upload ---
 export async function uploadAdviceCsv(
-    formData: FormData
+    csvContent: string, // Changed from FormData to string
+    userId: string | undefined // Keep userId for verification
 ): Promise<{ success: boolean; message?: string; error?: string }> {
-
-    const file = formData.get('csvFile') as File | null;
-    const userId = formData.get('userId') as string | undefined;
 
     // 1. --- Security Check: Verify User is Admin ---
     const isAdmin = await verifyAdmin(userId);
@@ -68,52 +64,61 @@ export async function uploadAdviceCsv(
     }
 
     // 2. --- Basic Validation ---
-    if (!file) {
-        return { success: false, error: 'No CSV file provided.' };
-    }
-    if (file.type !== 'text/csv' || !file.name.toLowerCase().endsWith('.csv')) {
-         return { success: false, error: 'Invalid file type. Please upload a .csv file.' };
+    if (!csvContent || !csvContent.trim()) {
+        return { success: false, error: 'No CSV data provided.' };
     }
      if (!supabaseAdmin) {
         return { success: false, error: "Database client is unavailable." };
     }
 
-    debugLogger.log(`Admin user ${userId} initiated CSV upload: ${file.name}`);
+    debugLogger.log(`Admin user ${userId} initiated CSV upload via text area.`);
 
     try {
-        const fileContent = await file.text();
-
-        // 3. --- Parse CSV ---
-        const parseResult = Papa.parse<AdviceCsvRow>(fileContent, {
-            header: true,       // Expect header row
-            skipEmptyLines: true, // Skip empty lines
-            transformHeader: header => header.trim(), // Trim header whitespace
-            transform: (value) => value.trim(), // Trim cell whitespace
+        // 3. --- Parse CSV (Server-Side) ---
+        const parseResult = Papa.parse<AdviceCsvRow>(csvContent.trim(), {
+            header: true,
+            skipEmptyLines: 'greedy',
+            transformHeader: header => header.trim(),
+            transform: value => value.trim(),
         });
 
         if (parseResult.errors.length > 0) {
              logger.error('CSV parsing errors:', parseResult.errors);
-             // Provide more specific error if possible
              const firstError = parseResult.errors[0];
-            return { success: false, error: `CSV Parsing Error (Row ${firstError.row}): ${firstError.message}. Please check CSV format and quoting.` };
+            return { success: false, error: `CSV Parsing Error (Row ${firstError.row + 1}): ${firstError.message}. Check format/quoting.` };
         }
         if (!parseResult.data || parseResult.data.length === 0) {
-            return { success: false, error: 'CSV file is empty or contains no data rows.' };
+            return { success: false, error: 'CSV data is empty or contains no valid data rows.' };
         }
 
         const rows = parseResult.data;
-        debugLogger.log(`Parsed ${rows.length} rows from CSV.`);
+        debugLogger.log(`Parsed ${rows.length} rows from CSV content.`);
 
         // 4. --- Process and Validate Data ---
         const articlesToProcess: Map<string, ProcessedArticle> = new Map();
         const validationErrors: string[] = [];
+        const requiredHeaders = ["article_title", "article_slug", "section_order", "section_content"];
+        const actualHeaders = Object.keys(rows[0] || {});
+        const missingHeaders = requiredHeaders.filter(h => !actualHeaders.includes(h));
+
+        if (missingHeaders.length > 0) {
+             return { success: false, error: `Missing required CSV columns: ${missingHeaders.join(', ')}` };
+        }
 
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
-            const rowIndex = i + 2; // +1 for 0-based index, +1 for header row
+            const rowIndex = i + 2; // For error reporting (1-based index + header)
 
-            // Basic row validation
-            if (!row.article_title?.trim() || !row.article_slug?.trim() || !row.section_order?.trim() || !row.section_content?.trim()) {
+            // Trim all string values in the row object
+            Object.keys(row).forEach(key => {
+              if (typeof row[key] === 'string') {
+                row[key] = row[key].trim();
+              }
+            });
+
+
+            // Basic row validation (check non-empty required fields after trim)
+            if (!row.article_title || !row.article_slug || !row.section_order || !row.section_content) {
                 validationErrors.push(`Row ${rowIndex}: Missing required fields (article_title, article_slug, section_order, section_content).`);
                 continue;
             }
@@ -124,65 +129,65 @@ export async function uploadAdviceCsv(
                  continue;
             }
 
-             // Ensure slug is reasonably URL-safe (basic check)
-            if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(row.article_slug.trim())) {
+            if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(row.article_slug)) {
                 validationErrors.push(`Row ${rowIndex}: Invalid article_slug "${row.article_slug}". Should be lowercase, alphanumeric, with hyphens.`);
                 continue;
             }
 
-            const articleKey = row.article_slug.trim(); // Use slug as the unique key for grouping
+            const articleKey = row.article_slug;
 
             if (!articlesToProcess.has(articleKey)) {
-                // First time seeing this article slug
                 articlesToProcess.set(articleKey, {
                     articleData: {
-                        title: row.article_title.trim(),
+                        title: row.article_title,
                         slug: articleKey,
-                        description: row.article_description?.trim() || null, // Handle optional description
+                        description: row.article_description || null,
                     },
                     sectionsData: [],
                 });
             }
 
-            // Add section data
             const articleEntry = articlesToProcess.get(articleKey);
             if (articleEntry) {
-                 // Check for duplicate section orders within the same article (in the CSV)
                  if (articleEntry.sectionsData.some(s => s.section_order === sectionOrderNum)) {
                      validationErrors.push(`Row ${rowIndex}: Duplicate section_order "${sectionOrderNum}" found for article slug "${articleKey}".`);
-                     continue; // Skip this duplicate section row
+                     continue;
                  }
-
                  articleEntry.sectionsData.push({
                     section_order: sectionOrderNum,
-                    title: row.section_title?.trim() || null, // Handle optional title
-                    content: row.section_content.trim(),
+                    title: row.section_title || null,
+                    content: row.section_content,
                  });
+                 // Sort sections within the entry as they are added to maintain order for DB check later if needed
+                 articleEntry.sectionsData.sort((a, b) => a.section_order - b.section_order);
             }
         }
 
         if (validationErrors.length > 0) {
             logger.error("CSV Validation failed:", validationErrors);
-            return { success: false, error: `CSV Validation Failed:\n- ${validationErrors.join('\n- ')}` };
+            // Limit number of errors shown?
+            const limitedErrors = validationErrors.slice(0, 5);
+            const errorString = `- ${limitedErrors.join('\n- ')}${validationErrors.length > 5 ? '\n- ... (more errors)' : ''}`;
+            return { success: false, error: `CSV Validation Failed:\n${errorString}` };
         }
 
         if (articlesToProcess.size === 0) {
              return { success: false, error: 'No valid articles found in the CSV after processing.' };
         }
 
-        debugLogger.log(`Processing ${articlesToProcess.size} unique articles.`);
+        debugLogger.log(`Processing ${articlesToProcess.size} unique articles from CSV.`);
 
-        // 5. --- Database Operations (Transaction per article) ---
+        // 5. --- Database Operations ---
         let articlesProcessedCount = 0;
         const processingErrors: string[] = [];
 
         for (const [slug, processedArticle] of articlesToProcess.entries()) {
             try {
-                // **Upsert Article:** Create or update based on slug.
+                // Upsert Article
                 const { data: upsertedArticle, error: articleError } = await supabaseAdmin
                     .from('articles')
                     .upsert(processedArticle.articleData, { onConflict: 'slug' })
-                    .select('id') // Get the ID of the created/updated article
+                    .select('id')
                     .single();
 
                 if (articleError) throw new Error(`Failed to upsert article "${slug}": ${articleError.message}`);
@@ -191,21 +196,17 @@ export async function uploadAdviceCsv(
                 const articleId = upsertedArticle.id;
                 debugLogger.log(`Upserted article "${slug}", ID: ${articleId}`);
 
-                 // **Manage Sections:** Delete existing sections for this article before inserting new ones.
-                 // This ensures the CSV fully replaces the article's content.
+                // Delete existing sections
                 const { error: deleteError } = await supabaseAdmin
                     .from('article_sections')
                     .delete()
                     .eq('article_id', articleId);
-
                  if (deleteError) {
-                    // Log warning but attempt to continue insertion? Or fail the article? Let's fail.
                     throw new Error(`Failed to delete existing sections for article ID ${articleId}: ${deleteError.message}`);
                  }
                  debugLogger.log(`Deleted existing sections for article ID: ${articleId}`);
 
-
-                // **Insert Sections:** Prepare section data with the obtained article_id.
+                // Insert Sections
                 const sectionsToInsert = processedArticle.sectionsData.map(section => ({
                     ...section,
                     article_id: articleId,
@@ -215,30 +216,28 @@ export async function uploadAdviceCsv(
                     const { error: sectionError } = await supabaseAdmin
                         .from('article_sections')
                         .insert(sectionsToInsert);
-
                     if (sectionError) throw new Error(`Failed to insert sections for article "${slug}" (ID ${articleId}): ${sectionError.message}`);
                      debugLogger.log(`Inserted ${sectionsToInsert.length} sections for article ID: ${articleId}`);
                 } else {
                      debugLogger.log(`No sections to insert for article ID: ${articleId}`);
                 }
-
                 articlesProcessedCount++;
-
             } catch (error) {
                 const errorMsg = error instanceof Error ? error.message : 'Unknown error';
                 logger.error(`Error processing article "${slug}":`, error);
-                processingErrors.push(`Article "${processedArticle.articleData.title}" (slug: ${slug}): ${errorMsg}`);
-                // Continue to next article, report errors at the end
+                processingErrors.push(`Article "${processedArticle.articleData.title || slug}": ${errorMsg}`);
             }
         }
 
         // 6. --- Final Result ---
         const finalMessage = `Processed ${articlesProcessedCount} / ${articlesToProcess.size} articles.`;
         if (processingErrors.length > 0) {
+            const limitedErrors = processingErrors.slice(0, 3);
+            const errorString = `- ${limitedErrors.join('\n- ')}${processingErrors.length > 3 ? '\n- ... (more errors)' : ''}`;
             return {
-                success: false, // Indicate partial or full failure
-                message: `${finalMessage} Errors occurred during database operations.`,
-                error: `Processing Errors:\n- ${processingErrors.join('\n- ')}`,
+                success: articlesProcessedCount > 0, // Success if at least one article processed
+                message: `${finalMessage} Some errors occurred.`,
+                error: `Processing Errors:\n${errorString}`,
             };
         } else {
             return { success: true, message: `${finalMessage} All articles processed successfully.` };
@@ -250,5 +249,7 @@ export async function uploadAdviceCsv(
     }
 }
 
-// --- Other actions below ---
-// ... (handleWebhookUpdate, sendTelegramMessage, etc.)
+
+    
+
+        
