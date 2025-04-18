@@ -1,15 +1,15 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-// import { useTelegram } from "@/providers/TelegramProvider"; // Replaced with AppContext
 import { useAppContext } from "@/contexts/AppContext"; // Use AppContext
 import { fetchArticles, fetchArticleSections, updateUserMetadata, fetchUserData } from "@/hooks/supabase";
 import type { Database } from "@/types/database.types";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faBookOpen, faArrowLeft, faSpinner, faCheckCircle, faStopCircle, faPaperPlane, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons"; // fa6 solid icons (using faTriangleExclamation instead of FaWarning which is not in fa6 solid)
+import { faBookOpen, faArrowLeft, faSpinner, faCheckCircle, faStopCircle, faPaperPlane, faTriangleExclamation } from "@fortawesome/free-solid-svg-icons"; // fa6 solid icons
 import { faTelegram } from "@fortawesome/free-brands-svg-icons"; // fa6 Brand icon
 import { logger } from "@/lib/logger";
 import { debugLogger } from "@/lib/debugLogger";
+import { cn } from "@/lib/utils"; // For class names
 
 // Define types based on your database schema
 type Article = Database["public"]["Tables"]["articles"]["Row"];
@@ -27,7 +27,6 @@ type UserMetadata = {
 };
 
 export default function AdvicePage() {
-  // Use AppContext instead of useTelegram directly
   const { user: tgUser, tg: webApp, dbUser, isLoading: isAuthLoading, isAuthenticated } = useAppContext();
   const [articles, setArticles] = useState<Article[]>([]);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
@@ -39,46 +38,37 @@ export default function AdvicePage() {
   const [isUpdatingBroadcast, setIsUpdatingBroadcast] = useState(false);
   const [userMetadata, setUserMetadata] = useState<UserMetadata | null>(null); // Store the entire user metadata
 
-  // Use dbUser's ID if available, otherwise fall back to tgUser ID
-  const userId = dbUser?.user_id || tgUser?.id?.toString(); // Ensure userId is string for Supabase operations
+  const userId = dbUser?.user_id || tgUser?.id?.toString();
 
   // --- Data Fetching ---
-
-  // Fetch initial user metadata on component mount or when userId changes
-  // Use dbUser?.user_id as dependency to ensure fetch happens after user is potentially loaded from DB
   useEffect(() => {
     const loadInitialMetadata = async () => {
       if (!userId) {
         debugLogger.log("loadInitialMetadata skipped: no userId");
-        setUserMetadata({}); // Reset metadata if userId becomes null
+        setUserMetadata({});
         return;
       };
-      // Don't set loading here yet, wait for articles too
       try {
         debugLogger.log(`loadInitialMetadata fetching for userId: ${userId}`);
-        // Use fetchUserData which gets full user data including metadata
         const userData = await fetchUserData(userId);
         const metadata = userData?.metadata as UserMetadata | null;
-        setUserMetadata(metadata ?? {}); // Initialize with empty object if null/undefined
+        setUserMetadata(metadata ?? {});
         debugLogger.log("Initial user metadata loaded:", metadata);
       } catch (err) {
         logger.error("Failed to load initial user metadata:", err);
         setError("Не удалось загрузить настройки пользователя.");
-        // Set loading false here if articles won't load due to this error
-        setIsLoadingArticles(false); // Stop article loading if metadata fails critically
+        setIsLoadingArticles(false);
       }
     };
-    // Only fetch if authenticated or potentially authenticated (not explicitly loading auth)
     if (!isAuthLoading) {
       loadInitialMetadata();
     }
-  }, [userId, isAuthLoading]); // Depend on userId and auth loading state
+  }, [userId, isAuthLoading]);
 
-  // Fetch articles list after metadata has been attempted
   useEffect(() => {
     const loadArticles = async () => {
       setIsLoadingArticles(true);
-      setError(null); // Clear previous errors
+      setError(null);
       const { data, error: fetchError } = await fetchArticles();
       if (fetchError) {
         logger.error("Failed to fetch articles:", fetchError);
@@ -89,40 +79,29 @@ export default function AdvicePage() {
       }
       setIsLoadingArticles(false);
     };
-
-    // Load articles only after metadata fetch attempt is done (userMetadata is not null)
-    // And ensure user is authenticated to see articles (optional, depends on requirements)
-    if (userMetadata !== null /*&& isAuthenticated*/) {
+    if (userMetadata !== null) {
         loadArticles();
     } else if (!isAuthLoading && userMetadata === null) {
-        // Handle case where metadata failed to load but auth finished
-        setIsLoadingArticles(false); // Stop loading indicator
+        setIsLoadingArticles(false);
         setError("Не удалось загрузить данные статей из-за ошибки настроек.");
     }
+  }, [userMetadata, isAuthenticated, isAuthLoading]);
 
-  }, [userMetadata, isAuthenticated, isAuthLoading]); // Depend on metadata, auth status, and auth loading state
-
-  // Fetch sections when an article is selected
-  // useCallback helps prevent re-fetching if userMetadata object reference changes unnecessarily
   const handleSelectArticle = useCallback(async (article: Article) => {
     setSelectedArticle(article);
     setIsLoadingSections(true);
-    setSections([]); // Clear previous sections
-    setError(null);   // Clear previous errors related to sections
-    setBroadcastEnabled(false); // Reset broadcast status assumption for the new article
-
+    setSections([]);
+    setError(null);
+    setBroadcastEnabled(false);
     debugLogger.log(`Article selected: ${article.title} (${article.id})`);
-
     const { data, error: fetchError } = await fetchArticleSections(article.id);
-
     if (fetchError) {
       logger.error(`Failed to fetch sections for article ${article.id}:`, fetchError);
       setError("Не удалось загрузить секции статьи.");
     } else {
-      setSections(data || []);
-      debugLogger.log(`Loaded ${data?.length || 0} sections for article ${article.id}.`);
-
-      // Now check if broadcast is enabled *for this specific article* using the loaded metadata
+      const sortedSections = (data || []).sort((a, b) => a.section_order - b.section_order);
+      setSections(sortedSections);
+      debugLogger.log(`Loaded ${sortedSections.length || 0} sections for article ${article.id}.`);
       if (userMetadata?.advice_broadcast?.enabled && userMetadata.advice_broadcast.article_id === article.id) {
           setBroadcastEnabled(true);
           debugLogger.log(`Broadcast is currently ACTIVE for selected article ${article.id}`);
@@ -132,52 +111,40 @@ export default function AdvicePage() {
       }
     }
     setIsLoadingSections(false);
-  }, [userMetadata]); // Re-run this check if userMetadata changes while an article is selected
+  }, [userMetadata]);
 
   // --- Broadcast Logic ---
-
   const handleToggleBroadcast = async () => {
-    // Pre-conditions check
     if (!userId || !selectedArticle || isUpdatingBroadcast) {
         debugLogger.warn("handleToggleBroadcast skipped: Missing userId, selectedArticle, or already updating.");
         return;
     }
-     if (sections.length === 0 && !broadcastEnabled) { // Prevent enabling if no sections (check before setting loading state)
+     if (sections.length === 0 && !broadcastEnabled) {
         webApp?.showPopup({title: "Нет разделов", message: "В этой статье нет разделов для рассылки.", buttons: [{type: 'ok'}]});
         return;
     }
 
-
     setIsUpdatingBroadcast(true);
-    setError(null); // Clear section/broadcast specific errors
-
+    setError(null);
     let newMetadata: UserMetadata;
     let successMessage: string;
-    // Recalculate based on current metadata state right before update
     const currentlyEnabled = userMetadata?.advice_broadcast?.enabled && userMetadata.advice_broadcast.article_id === selectedArticle.id;
-
     debugLogger.log(`Toggling broadcast. Currently enabled for this article: ${currentlyEnabled}`);
 
     if (currentlyEnabled) {
-      // --- Disable broadcast ---
+      // --- Disable ---
       const { advice_broadcast, ...restMetadata } = userMetadata || {};
       newMetadata = restMetadata;
       successMessage = "Рассылка советов отключена.";
       debugLogger.log(`Disabling broadcast for article ${selectedArticle.id}`);
-
     } else {
-      // --- Enable broadcast ---
-      const sortedSectionIds = sections
-        .sort((a, b) => a.section_order - b.section_order)
-        .map(s => s.id);
-
+      // --- Enable ---
+      const sortedSectionIds = sections.map(s => s.id); // Already sorted in handleSelectArticle
       if (sortedSectionIds.length === 0) {
-          // This check is technically redundant due to the check at the start, but good for safety
           setError("В этой статье нет секций для рассылки.");
           setIsUpdatingBroadcast(false);
           return;
       }
-
       newMetadata = {
         ...userMetadata,
         advice_broadcast: {
@@ -190,223 +157,213 @@ export default function AdvicePage() {
       debugLogger.log(`Enabling broadcast for article ${selectedArticle.id} with sections:`, sortedSectionIds);
     }
 
-    // --- Update Supabase ---
+    // --- Update DB ---
     const { success, error: updateError, data: updatedUserData } = await updateUserMetadata(userId, newMetadata);
-
     if (success && updatedUserData) {
-      // Update local metadata state accurately from the response
       setUserMetadata(updatedUserData.metadata as UserMetadata | null ?? {});
-      setBroadcastEnabled(!currentlyEnabled); // Toggle button state on success
+      setBroadcastEnabled(!currentlyEnabled);
       webApp?.showPopup({title: "Успех", message: successMessage, buttons: [{type: 'ok'}]});
       debugLogger.log("Metadata update successful.");
     } else {
       logger.error("Failed to update user metadata for broadcast:", updateError);
       const actionText = currentlyEnabled ? 'отключить' : 'включить';
       const errorMsg = `Не удалось ${actionText} рассылку: ${updateError || 'Неизвестная ошибка'}`;
-      setError(errorMsg); // Set error state to display near the button
+      setError(errorMsg);
       webApp?.showPopup({title: "Ошибка", message: `Не удалось ${actionText} рассылку.`, buttons: [{type: 'ok'}]});
     }
-
     setIsUpdatingBroadcast(false);
   };
 
   // --- Navigation & UI ---
-
   const handleGoBack = useCallback(() => {
     setSelectedArticle(null);
     setSections([]);
-    setError(null); // Clear errors when going back
-    setBroadcastEnabled(false); // Reset state when going back
+    setError(null);
+    setBroadcastEnabled(false);
   }, []);
 
-  // Configure Telegram Back Button using the hook's webApp object
   useEffect(() => {
-    if (!webApp) return; // Check if webApp object is available from context
-
-    const backButtonClickHandler = () => {
-        debugLogger.log("Back button clicked");
-        handleGoBack();
-    };
-
-    // Ensure webApp methods exist before calling
+    if (!webApp) return;
+    const backButtonClickHandler = () => { handleGoBack(); };
     if (selectedArticle) {
       if (webApp.BackButton?.show) webApp.BackButton.show();
       if (webApp.BackButton?.onClick) webApp.BackButton.onClick(backButtonClickHandler);
-      debugLogger.log("Back button shown and click handler attached.");
     } else {
-      if (webApp.BackButton?.offClick) webApp.BackButton.offClick(backButtonClickHandler); // Clean up listener first
+      if (webApp.BackButton?.offClick) webApp.BackButton.offClick(backButtonClickHandler);
       if (webApp.BackButton?.hide) webApp.BackButton.hide();
-      debugLogger.log("Back button hidden and click handler removed.");
     }
-
-    // Cleanup function
     return () => {
-      // Check visibility before trying to remove/hide
       if (webApp.BackButton?.isVisible) {
           if (webApp.BackButton?.offClick) webApp.BackButton.offClick(backButtonClickHandler);
           if (webApp.BackButton?.hide) webApp.BackButton.hide();
-           debugLogger.log("Back button hidden and click handler removed on cleanup.");
       }
     };
-  }, [webApp, selectedArticle, handleGoBack]); // Re-run when selection or webApp object changes
+  }, [webApp, selectedArticle, handleGoBack]);
 
   // --- Render Logic ---
-
-  // Combined initial loading state (Auth + Metadata + Articles)
-  if (isAuthLoading || isLoadingArticles || userMetadata === null) {
+  if (isAuthLoading || (isLoadingArticles && articles.length === 0) || userMetadata === null) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <FontAwesomeIcon icon={faSpinner} spin size="3x" className="text-blue-500" />
+      <div className="flex justify-center items-center h-screen pt-24 bg-black">
+        <FontAwesomeIcon icon={faSpinner} spin size="3x" className="text-brand-green" />
       </div>
     );
   }
 
-   // If not authenticated after loading attempt
-  if (!isAuthenticated) {
+   if (!isAuthenticated) {
      return (
-       <div className="p-6 text-center text-red-600">
+       <div className="p-6 pt-32 text-center text-brand-pink">
          <FontAwesomeIcon icon={faTriangleExclamation} size="2x" className="mb-2" />
-         <p className="font-semibold">Ошибка Авторизации</p>
-         <p>{error || "Не удалось подтвердить пользователя. Попробуйте перезапустить приложение."}</p>
+         <p className="font-semibold text-xl">Ошибка Авторизации</p>
+         <p className="text-gray-400">{error || "Не удалось подтвердить пользователя. Попробуйте перезапустить приложение."}</p>
        </div>
      );
   }
 
-  // Error loading articles list (show if no article selected and loading finished)
+  // Error loading articles list
   if (error && !selectedArticle && !isLoadingArticles) {
     return (
-      <div className="p-6 text-red-600 bg-red-100 dark:bg-red-900/30 rounded-lg text-center shadow">
-         <FontAwesomeIcon icon={faTriangleExclamation} className="mr-2 size='lg'" />
-         <p className="font-semibold">Ошибка загрузки статей</p>
-         <p>{error}</p>
+      <div className="p-6 pt-32 text-center text-brand-pink bg-black/50 rounded-lg shadow-lg border border-brand-pink/30 mx-4">
+         <FontAwesomeIcon icon={faTriangleExclamation} className="mr-2 text-2xl" />
+         <p className="font-semibold text-xl mt-2">Ошибка загрузки статей</p>
+         <p className="text-gray-400 mt-1">{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="p-4 font-sans max-w-3xl mx-auto">
-      {!selectedArticle ? (
-        // --- Articles List View ---
-        <div>
-          <h1 className="text-2xl font-bold mb-6 text-center text-gray-800 dark:text-gray-200 border-b pb-2 dark:border-gray-700">
-              Мудрые Советы
-          </h1>
-          {articles.length === 0 && !isLoadingArticles ? ( // Check loading state here too
-             <p className="text-center text-gray-500 dark:text-gray-400 mt-10">Пока нет доступных статей.</p>
-          ) : (
-            <ul className="space-y-3">
-              {articles.map((article) => (
-                <li key={article.id}>
-                  <button
-                    onClick={() => handleSelectArticle(article)}
-                    className="w-full text-left p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg hover:bg-blue-50 dark:hover:bg-gray-700 transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
-                  >
-                    <h2 className="text-lg font-semibold text-blue-700 dark:text-blue-400 flex items-center">
-                       <FontAwesomeIcon icon={faBookOpen} className="mr-3 text-gray-500 dark:text-gray-400 w-5 h-5" />
-                       {article.title}
-                    </h2>
-                    {article.description && (
-                      <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 ml-8">{article.description}</p>
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      ) : (
-        // --- Single Article View ---
-        <div>
-          <h1 className="text-3xl font-bold mb-2 text-gray-900 dark:text-gray-100">{selectedArticle.title}</h1>
-          {selectedArticle.description && (
-            <p className="text-md text-gray-600 dark:text-gray-400 mb-6 italic">{selectedArticle.description}</p>
-          )}
-
-          {/* Loading Sections State */}
-          {isLoadingSections ? (
-             <div className="flex justify-center items-center py-10">
-               <FontAwesomeIcon icon={faSpinner} spin size="2x" className="text-blue-500"/>
-             </div>
-          ) : error && sections.length === 0 ? ( // Error loading sections (show only if sections failed to load)
-             <div className="p-4 my-4 text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/40 rounded-lg shadow">
-                <FontAwesomeIcon icon={faTriangleExclamation} className="mr-2" /> {error}
-             </div>
-          ) : (
-            // --- Sections Loaded ---
-            <div>
-               {/* "Entertain Me" Button Area */}
-               {userId && sections.length > 0 && ( // Only show if user exists and there are sections
-                <div className="my-6 p-4 bg-gradient-to-r from-blue-100 to-purple-100 dark:from-gray-800 dark:to-gray-800 border dark:border-gray-700 rounded-lg shadow-inner text-center">
-                  <h3 className="text-lg font-semibold mb-2 flex items-center justify-center text-gray-800 dark:text-gray-200">
-                      <FontAwesomeIcon icon={faTelegram} className="mr-2 text-blue-500" />
-                      Часовая Рассылка
-                  </h3>
-                   <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">
-                       {broadcastEnabled
-                         ? "Получайте по одному разделу этой статьи каждый час прямо в Telegram!"
-                         : "Хотите получать эту мудрость порционно? Включите часовую рассылку!"}
-                   </p>
-                  <button
-                    onClick={handleToggleBroadcast}
-                    disabled={isUpdatingBroadcast}
-                    className={`w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 rounded-lg font-semibold transition duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 space-x-2 shadow-md
-                      ${isUpdatingBroadcast
-                        ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed text-gray-600 dark:text-gray-400'
-                        : broadcastEnabled
-                          ? 'bg-red-500 hover:bg-red-600 text-white focus:ring-red-400'
-                          : 'bg-green-500 hover:bg-green-600 text-white focus:ring-green-400'
-                      }`}
-                  >
-                    {isUpdatingBroadcast ? (
-                      <FontAwesomeIcon icon={faSpinner} spin />
-                    ) : broadcastEnabled ? (
-                      <FontAwesomeIcon icon={faStopCircle} />
-                    ) : (
-                      <FontAwesomeIcon icon={faPaperPlane} />
-                    )}
-                    <span>
-                      {isUpdatingBroadcast ? 'Обновление...' : broadcastEnabled ? 'Отключить рассылку' : 'Развлеки меня'}
-                    </span>
-                  </button>
-                  {/* Status Indicator */}
-                  {broadcastEnabled && !isUpdatingBroadcast && (
-                     <p className="text-xs text-green-700 dark:text-green-400 mt-3 flex items-center justify-center">
-                       <FontAwesomeIcon icon={faCheckCircle} className="mr-1" /> Рассылка активна для этой статьи.
-                     </p>
-                   )}
-                   {/* Display error specific to broadcast update */}
-                   {error && !isLoadingSections && ( // Show error message related to broadcast toggle if relevant
-                        <p className="text-xs text-red-600 dark:text-red-400 mt-2">{error}</p>
-                    )}
-                 </div>
-               )}
-
-              {/* Sections Content */}
-              <h2 className="text-xl font-semibold mt-8 mb-4 border-b pb-2 dark:border-gray-700 text-gray-800 dark:text-gray-200">Содержание:</h2>
-              {sections.length === 0 && !isLoadingSections ? ( // Check loading state
-                <p className="text-gray-500 dark:text-gray-400">В этой статье пока нет секций.</p>
-              ) : (
-                <div className="space-y-6">
-                  {sections.map((section) => (
-                    <div key={section.id} className="p-5 border rounded-lg dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm transition-shadow hover:shadow-md">
-                      {section.title && (
-                        <h3 className="text-lg font-semibold mb-2 text-blue-800 dark:text-blue-300">
-                           {section.section_order}. {section.title}
-                        </h3>
+    <div className={cn(
+        "min-h-screen pt-24 pb-10 font-mono", // Added pt-24
+        "bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200" // Base cyberpunk background
+    )}>
+      <div className="relative z-10 container mx-auto px-4 max-w-4xl">
+        {!selectedArticle ? (
+          // --- Articles List View ---
+          <div className="space-y-6">
+            <h1 className="text-3xl md:text-4xl font-bold text-center text-brand-green cyber-text glitch" data-text="Мудрые Советы">
+                Мудрые Советы
+            </h1>
+            {articles.length === 0 ? (
+               <p className="text-center text-gray-500 dark:text-gray-400 mt-10 text-lg">Пока нет доступных статей.</p>
+            ) : (
+              <ul className="space-y-4">
+                {articles.map((article) => (
+                  <li key={article.id}>
+                    <button
+                      onClick={() => handleSelectArticle(article)}
+                      className={cn(
+                          "w-full text-left p-4 md:p-5 rounded-lg transition duration-300 ease-in-out",
+                          "bg-black/60 backdrop-blur-sm border border-brand-blue/30 hover:border-brand-blue/70",
+                          "shadow-md hover:shadow-lg hover:shadow-brand-blue/30 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:ring-opacity-50"
                       )}
-                       {/* Render content safely - Assuming trusted HTML */}
-                       <div
-                         className="prose prose-blue dark:prose-invert max-w-none text-gray-800 dark:text-gray-300" // Tailwind prose styles recommended
-                         dangerouslySetInnerHTML={{ __html: section.content }} // CAUTION: Use only if HTML is sanitized/trusted!
-                       />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+                    >
+                      <h2 className="text-lg md:text-xl font-semibold text-brand-blue flex items-center">
+                         <FontAwesomeIcon icon={faBookOpen} className="mr-3 text-brand-blue/70 w-5 h-5" />
+                         {article.title}
+                      </h2>
+                      {article.description && (
+                        <p className="text-sm md:text-base text-gray-400 mt-1 ml-8">{article.description}</p>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : (
+          // --- Single Article View ---
+          <div>
+            {/* Back Button is handled by Telegram Hook */}
+             <h1 className="text-3xl md:text-4xl font-bold mb-3 text-brand-green cyber-text">{selectedArticle.title}</h1>
+            {selectedArticle.description && (
+              <p className="text-base md:text-lg text-gray-400 mb-6 italic">{selectedArticle.description}</p>
+            )}
+
+            {/* Loading Sections State */}
+            {isLoadingSections ? (
+               <div className="flex justify-center items-center py-16">
+                 <FontAwesomeIcon icon={faSpinner} spin size="3x" className="text-brand-blue"/>
+               </div>
+            ) : error && sections.length === 0 ? ( // Error loading sections
+               <div className="p-4 my-6 text-brand-pink bg-pink-900/20 border border-brand-pink/40 rounded-lg shadow-md text-center">
+                  <FontAwesomeIcon icon={faTriangleExclamation} className="mr-2 text-xl" />
+                  <p className="mt-1">{error}</p>
+               </div>
+            ) : (
+              // --- Sections Loaded ---
+              <div>
+                 {/* "Entertain Me" Button Area */}
+                 {userId && sections.length > 0 && (
+                  <div className="my-8 p-5 bg-gradient-to-r from-blue-900/30 via-purple-900/20 to-blue-900/30 border border-brand-purple/40 rounded-lg shadow-lg text-center">
+                    <h3 className="text-xl font-semibold mb-3 flex items-center justify-center text-brand-purple">
+                        <FontAwesomeIcon icon={faTelegram} className="mr-2 text-brand-blue" />
+                        Часовая Рассылка
+                    </h3>
+                     <p className="text-sm text-gray-300 mb-4">
+                         {broadcastEnabled
+                           ? "Получайте по одному разделу этой статьи каждый час прямо в Telegram!"
+                           : "Хотите получать эту мудрость порционно? Включите часовую рассылку!"}
+                     </p>
+                    <button
+                      onClick={handleToggleBroadcast}
+                      disabled={isUpdatingBroadcast}
+                      className={cn(
+                          "w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 rounded-md font-semibold transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-black space-x-2 shadow-md",
+                          isUpdatingBroadcast
+                            ? 'bg-gray-600 cursor-not-allowed text-gray-400'
+                            : broadcastEnabled
+                              ? 'bg-red-600 hover:bg-red-700 text-white focus:ring-red-500 shadow-red-500/30 hover:shadow-red-500/50'
+                              : 'bg-green-600 hover:bg-green-700 text-white focus:ring-green-500 shadow-green-500/30 hover:shadow-green-500/50'
+                      )}
+                    >
+                      {isUpdatingBroadcast ? (<FontAwesomeIcon icon={faSpinner} spin />)
+                       : broadcastEnabled ? (<FontAwesomeIcon icon={faStopCircle} />)
+                       : (<FontAwesomeIcon icon={faPaperPlane} />)}
+                      <span>
+                        {isUpdatingBroadcast ? 'Обновление...' : broadcastEnabled ? 'Отключить рассылку' : 'Развлеки меня'}
+                      </span>
+                    </button>
+                    {/* Status Indicator */}
+                    {broadcastEnabled && !isUpdatingBroadcast && (
+                       <p className="text-xs text-brand-green mt-3 flex items-center justify-center">
+                         <FontAwesomeIcon icon={faCheckCircle} className="mr-1" /> Рассылка активна для этой статьи.
+                       </p>
+                     )}
+                     {/* Display error specific to broadcast update */}
+                     {error && !isLoadingSections && (
+                          <p className="text-xs text-brand-pink mt-2">{error}</p>
+                      )}
+                   </div>
+                 )}
+
+                {/* Sections Content */}
+                <h2 className="text-2xl font-semibold mt-8 mb-4 border-b border-brand-blue/30 pb-2 text-brand-blue">Содержание:</h2>
+                {sections.length === 0 && !isLoadingSections ? (
+                  <p className="text-gray-500">В этой статье пока нет секций.</p>
+                ) : (
+                  <div className="space-y-6">
+                    {sections.map((section) => (
+                      <div key={section.id} className={cn(
+                          "p-5 border rounded-lg transition-shadow duration-300",
+                          "bg-black/50 border-gray-700/50 hover:border-brand-green/50 hover:shadow-md hover:shadow-brand-green/20"
+                      )}>
+                        {section.title && (
+                          <h3 className="text-lg font-semibold mb-2 text-brand-green flex items-baseline">
+                             <span className="text-brand-blue mr-2">{section.section_order}.</span> {section.title}
+                          </h3>
+                        )}
+                         <div
+                           className="prose prose-invert prose-sm md:prose-base max-w-none text-gray-300 prose-headings:text-brand-cyan prose-strong:text-brand-lime prose-a:text-brand-blue hover:prose-a:text-brand-purple"
+                           dangerouslySetInnerHTML={{ __html: section.content }} // CAUTION: TRUSTED HTML ONLY
+                         />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
