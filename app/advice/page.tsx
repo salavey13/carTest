@@ -10,6 +10,8 @@ import { faTelegram } from "@fortawesome/free-brands-svg-icons"; // fa6 Brand ic
 import { logger } from "@/lib/logger";
 import { debugLogger } from "@/lib/debugLogger";
 import { cn } from "@/lib/utils"; // For class names
+import ReactMarkdown from 'react-markdown'; // <-- Import react-markdown
+import remarkGfm from 'remark-gfm'; // <-- Import remark-gfm for GitHub Flavored Markdown support (tables, etc.)
 
 // Define types based on your database schema
 type Article = Database["public"]["Tables"]["articles"]["Row"];
@@ -57,11 +59,15 @@ export default function AdvicePage() {
       } catch (err) {
         logger.error("Failed to load initial user metadata:", err);
         setError("Не удалось загрузить настройки пользователя.");
-        setIsLoadingArticles(false);
+        setIsLoadingArticles(false); // Ensure loading stops on error
       }
     };
-    if (!isAuthLoading) {
+    if (!isAuthLoading && userId) { // Trigger only when auth is done and userId is available
       loadInitialMetadata();
+    } else if (!isAuthLoading && !userId) {
+      // Handle case where user is authenticated but ID is missing (unlikely with AppContext logic)
+      setUserMetadata({});
+      debugLogger.warn("loadInitialMetadata skipped: Auth done but no userId found.");
     }
   }, [userId, isAuthLoading]);
 
@@ -79,29 +85,33 @@ export default function AdvicePage() {
       }
       setIsLoadingArticles(false);
     };
+    // .. Load articles only after metadata is loaded (or determined to be empty)
     if (userMetadata !== null) {
         loadArticles();
     } else if (!isAuthLoading && userMetadata === null) {
+        // This condition means metadata loading failed before
         setIsLoadingArticles(false);
-        setError("Не удалось загрузить данные статей из-за ошибки настроек.");
+        setError("Не удалось загрузить статьи из-за ошибки загрузки настроек.");
+        debugLogger.error("Article loading skipped due to previous metadata loading error.");
     }
-  }, [userMetadata, isAuthenticated, isAuthLoading]);
+  }, [userMetadata, isAuthLoading]); // Depend on metadata and auth loading status
 
   const handleSelectArticle = useCallback(async (article: Article) => {
     setSelectedArticle(article);
     setIsLoadingSections(true);
     setSections([]);
-    setError(null);
-    setBroadcastEnabled(false);
+    setError(null); // Clear previous section errors
+    setBroadcastEnabled(false); // Reset broadcast status for the new article
     debugLogger.log(`Article selected: ${article.title} (${article.id})`);
     const { data, error: fetchError } = await fetchArticleSections(article.id);
     if (fetchError) {
       logger.error(`Failed to fetch sections for article ${article.id}:`, fetchError);
-      setError("Не удалось загрузить секции статьи.");
+      setError("Не удалось загрузить секции статьи."); // Set error for section loading
     } else {
       const sortedSections = (data || []).sort((a, b) => a.section_order - b.section_order);
       setSections(sortedSections);
       debugLogger.log(`Loaded ${sortedSections.length || 0} sections for article ${article.id}.`);
+      // .. Check broadcast status *against the loaded userMetadata*
       if (userMetadata?.advice_broadcast?.enabled && userMetadata.advice_broadcast.article_id === article.id) {
           setBroadcastEnabled(true);
           debugLogger.log(`Broadcast is currently ACTIVE for selected article ${article.id}`);
@@ -111,7 +121,8 @@ export default function AdvicePage() {
       }
     }
     setIsLoadingSections(false);
-  }, [userMetadata]);
+  }, [userMetadata]); // Depend on userMetadata to correctly check broadcast status
+
 
   // --- Broadcast Logic ---
   const handleToggleBroadcast = async () => {
@@ -119,38 +130,44 @@ export default function AdvicePage() {
         debugLogger.warn("handleToggleBroadcast skipped: Missing userId, selectedArticle, or already updating.");
         return;
     }
-     if (sections.length === 0 && !broadcastEnabled) {
+     // .. Check sections *before* toggling state
+    if (sections.length === 0 && !broadcastEnabled) { // Prevent enabling if no sections
         webApp?.showPopup({title: "Нет разделов", message: "В этой статье нет разделов для рассылки.", buttons: [{type: 'ok'}]});
+        setError("В этой статье нет секций для рассылки."); // Also show error locally
         return;
     }
 
     setIsUpdatingBroadcast(true);
-    setError(null);
+    setError(null); // Clear previous errors
     let newMetadata: UserMetadata;
     let successMessage: string;
-    const currentlyEnabled = userMetadata?.advice_broadcast?.enabled && userMetadata.advice_broadcast.article_id === selectedArticle.id;
-    debugLogger.log(`Toggling broadcast. Currently enabled for this article: ${currentlyEnabled}`);
+    // .. Read current broadcast state directly from component state (updated by handleSelectArticle)
+    const currentlyEnabled = broadcastEnabled;
+    debugLogger.log(`Toggling broadcast. Currently enabled (state): ${currentlyEnabled}`);
 
     if (currentlyEnabled) {
       // --- Disable ---
-      const { advice_broadcast, ...restMetadata } = userMetadata || {};
+      // .. Create new metadata object excluding the advice_broadcast part
+      const { advice_broadcast, ...restMetadata } = userMetadata || {}; // Use loaded metadata as base
       newMetadata = restMetadata;
       successMessage = "Рассылка советов отключена.";
       debugLogger.log(`Disabling broadcast for article ${selectedArticle.id}`);
     } else {
       // --- Enable ---
-      const sortedSectionIds = sections.map(s => s.id); // Already sorted in handleSelectArticle
+      const sortedSectionIds = sections.map(s => s.id);
       if (sortedSectionIds.length === 0) {
+          // This check is technically redundant due to the check at the beginning, but safe to keep
           setError("В этой статье нет секций для рассылки.");
           setIsUpdatingBroadcast(false);
           return;
       }
       newMetadata = {
-        ...userMetadata,
+        ...userMetadata, // Use loaded metadata as base
         advice_broadcast: {
           enabled: true,
           article_id: selectedArticle.id,
           remaining_section_ids: sortedSectionIds,
+          // last_sent_at: undefined, // Optionally clear last sent time if needed by backend logic
         },
       };
       successMessage = "Рассылка советов включена! Ожидайте первый выпуск.";
@@ -160,8 +177,8 @@ export default function AdvicePage() {
     // --- Update DB ---
     const { success, error: updateError, data: updatedUserData } = await updateUserMetadata(userId, newMetadata);
     if (success && updatedUserData) {
-      setUserMetadata(updatedUserData.metadata as UserMetadata | null ?? {});
-      setBroadcastEnabled(!currentlyEnabled);
+      setUserMetadata(updatedUserData.metadata as UserMetadata | null ?? {}); // Update local metadata state
+      setBroadcastEnabled(!currentlyEnabled); // Update local broadcast state *after* successful DB update
       webApp?.showPopup({title: "Успех", message: successMessage, buttons: [{type: 'ok'}]});
       debugLogger.log("Metadata update successful.");
     } else {
@@ -186,22 +203,25 @@ export default function AdvicePage() {
     if (!webApp) return;
     const backButtonClickHandler = () => { handleGoBack(); };
     if (selectedArticle) {
-      if (webApp.BackButton?.show) webApp.BackButton.show();
-      if (webApp.BackButton?.onClick) webApp.BackButton.onClick(backButtonClickHandler);
+      webApp.BackButton?.show();
+      webApp.BackButton?.onClick(backButtonClickHandler);
     } else {
-      if (webApp.BackButton?.offClick) webApp.BackButton.offClick(backButtonClickHandler);
-      if (webApp.BackButton?.hide) webApp.BackButton.hide();
+      webApp.BackButton?.offClick(backButtonClickHandler);
+      webApp.BackButton?.hide();
     }
+    // .. Cleanup function to remove listener and hide button when component unmounts or article changes
     return () => {
       if (webApp.BackButton?.isVisible) {
-          if (webApp.BackButton?.offClick) webApp.BackButton.offClick(backButtonClickHandler);
-          if (webApp.BackButton?.hide) webApp.BackButton.hide();
+          webApp.BackButton?.offClick(backButtonClickHandler);
+          webApp.BackButton?.hide();
       }
     };
   }, [webApp, selectedArticle, handleGoBack]);
 
   // --- Render Logic ---
-  if (isAuthLoading || (isLoadingArticles && articles.length === 0) || userMetadata === null) {
+  // .. Show loading spinner if auth is loading OR metadata hasn't loaded yet OR articles are loading
+  const showGlobalLoading = isAuthLoading || userMetadata === null || (isLoadingArticles && articles.length === 0 && !selectedArticle);
+  if (showGlobalLoading) {
     return (
       <div className="flex justify-center items-center h-screen pt-36 bg-black">
         <FontAwesomeIcon icon={faSpinner} spin size="3x" className="text-brand-green" />
@@ -209,6 +229,7 @@ export default function AdvicePage() {
     );
   }
 
+   // .. Show auth error if not authenticated after loading
    if (!isAuthenticated) {
      return (
        <div className="p-6 pt-32 text-center text-brand-pink">
@@ -219,21 +240,21 @@ export default function AdvicePage() {
      );
   }
 
-  // Error loading articles list
+  // .. Show error loading articles list (if it happened and we are in list view)
   if (error && !selectedArticle && !isLoadingArticles) {
     return (
-      <div className="p-6 pt-32 text-center text-brand-pink bg-black/50 rounded-lg shadow-lg border border-brand-pink/30 mx-4">
+       <div className="p-6 pt-32 text-center text-brand-pink bg-black/50 rounded-lg shadow-lg border border-brand-pink/30 mx-4">
          <FontAwesomeIcon icon={faTriangleExclamation} className="mr-2 text-2xl" />
          <p className="font-semibold text-xl mt-2">Ошибка загрузки статей</p>
          <p className="text-gray-400 mt-1">{error}</p>
-      </div>
-    );
+       </div>
+     );
   }
 
   return (
     <div className={cn(
-        "min-h-screen pt-36 pb-10 font-mono", // Added pt-36
-        "bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200" // Base cyberpunk background
+        "min-h-screen pt-36 pb-10 font-mono",
+        "bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200"
     )}>
       <div className="relative z-10 container mx-auto px-4 max-w-4xl">
         {!selectedArticle ? (
@@ -242,7 +263,11 @@ export default function AdvicePage() {
             <h1 className="text-3xl md:text-4xl font-bold text-center text-brand-green cyber-text glitch" data-text="Мудрые Советы">
                 Мудрые Советы
             </h1>
-            {articles.length === 0 ? (
+            {isLoadingArticles ? (
+                 <div className="flex justify-center items-center pt-16">
+                     <FontAwesomeIcon icon={faSpinner} spin size="2x" className="text-brand-blue" />
+                 </div>
+             ) : articles.length === 0 ? (
                <p className="text-center text-gray-500 dark:text-gray-400 mt-10 text-lg">Пока нет доступных статей.</p>
             ) : (
               <ul className="space-y-4">
@@ -272,7 +297,6 @@ export default function AdvicePage() {
         ) : (
           // --- Single Article View ---
           <div>
-            {/* Back Button is handled by Telegram Hook */}
              <h1 className="text-3xl md:text-4xl font-bold mb-3 text-brand-green cyber-text">{selectedArticle.title}</h1>
             {selectedArticle.description && (
               <p className="text-base md:text-lg text-gray-400 mb-6 italic">{selectedArticle.description}</p>
@@ -283,16 +307,16 @@ export default function AdvicePage() {
                <div className="flex justify-center items-center py-16">
                  <FontAwesomeIcon icon={faSpinner} spin size="3x" className="text-brand-blue"/>
                </div>
-            ) : error && sections.length === 0 ? ( // Error loading sections
+            ) : error && sections.length === 0 ? ( // Error loading sections specific view
                <div className="p-4 my-6 text-brand-pink bg-pink-900/20 border border-brand-pink/40 rounded-lg shadow-md text-center">
                   <FontAwesomeIcon icon={faTriangleExclamation} className="mr-2 text-xl" />
-                  <p className="mt-1">{error}</p>
+                  <p className="mt-1">{error}</p> {/* Display the specific error */}
                </div>
             ) : (
               // --- Sections Loaded ---
               <div>
                  {/* "Entertain Me" Button Area */}
-                 {userId && sections.length > 0 && (
+                 {userId && sections.length > 0 && ( // Only show if sections exist
                   <div className="my-8 p-5 bg-gradient-to-r from-blue-900/30 via-purple-900/20 to-blue-900/30 border border-brand-purple/40 rounded-lg shadow-lg text-center">
                     <h3 className="text-xl font-semibold mb-3 flex items-center justify-center text-brand-purple">
                         <FontAwesomeIcon icon={faTelegram} className="mr-2 text-brand-blue" />
@@ -329,7 +353,7 @@ export default function AdvicePage() {
                        </p>
                      )}
                      {/* Display error specific to broadcast update */}
-                     {error && !isLoadingSections && (
+                     {error && isUpdatingBroadcast === false && !isLoadingSections && ( // Show error only if NOT currently updating
                           <p className="text-xs text-brand-pink mt-2">{error}</p>
                       )}
                    </div>
@@ -337,7 +361,7 @@ export default function AdvicePage() {
 
                 {/* Sections Content */}
                 <h2 className="text-2xl font-semibold mt-8 mb-4 border-b border-brand-blue/30 pb-2 text-brand-blue">Содержание:</h2>
-                {sections.length === 0 && !isLoadingSections ? (
+                {sections.length === 0 && !isLoadingSections && !error ? ( // Handle case where article has 0 sections successfully loaded
                   <p className="text-gray-500">В этой статье пока нет секций.</p>
                 ) : (
                   <div className="space-y-6">
@@ -351,10 +375,18 @@ export default function AdvicePage() {
                              <span className="text-brand-blue mr-2">{section.section_order}.</span> {section.title}
                           </h3>
                         )}
-                         <div
-                           className="prose prose-invert prose-sm md:prose-base max-w-none text-gray-300 prose-headings:text-brand-cyan prose-strong:text-brand-lime prose-a:text-brand-blue hover:prose-a:text-brand-purple"
-                           dangerouslySetInnerHTML={{ __html: section.content }} // CAUTION: TRUSTED HTML ONLY
-                         />
+                         {/* --- Use ReactMarkdown to render content --- */}
+                         <ReactMarkdown
+                             remarkPlugins={[remarkGfm]} // Enable GitHub Flavored Markdown (tables, strikethrough, etc.)
+                             className="prose prose-invert prose-sm md:prose-base max-w-none text-gray-300 prose-headings:text-brand-cyan prose-strong:text-brand-lime prose-a:text-brand-blue hover:prose-a:text-brand-purple prose-code:text-brand-pink prose-code:before:content-none prose-code:after:content-none prose-blockquote:border-brand-purple"
+                             // .. You can customize components if needed, e.g., for links:
+                              components={{
+                                 a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="hover:underline" />,
+                                // .. Add other custom components if necessary
+                             }}
+                         >
+                            {section.content}
+                         </ReactMarkdown>
                       </div>
                     ))}
                   </div>
