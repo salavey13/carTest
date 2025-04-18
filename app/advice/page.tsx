@@ -11,8 +11,8 @@ import { logger } from "@/lib/logger";
 import { debugLogger } from "@/lib/debugLogger";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-// import remarkBreaks from 'remark-breaks'; // <-- Keep this commented out for now, we'll try CSS first
+import remarkGfm from 'remark-gfm'; // Github Flavored Markdown (tables, etc.)
+import remarkBreaks from 'remark-breaks'; // <-- Re-enable remark-breaks for single newlines
 
 // Define types based on your database schema
 type Article = Database["public"]["Tables"]["articles"]["Row"];
@@ -69,7 +69,7 @@ export default function AdvicePage() {
 
   useEffect(() => {
     const loadArticles = async () => {
-      if (userMetadata === null) return; // Wait for metadata
+      if (userMetadata === null) return;
       setIsLoadingArticles(true);
       setError(null);
       debugLogger.log("Starting to load articles...");
@@ -243,7 +243,7 @@ export default function AdvicePage() {
     )}>
       <div className="relative z-10 container mx-auto px-4 max-w-4xl">
         {!selectedArticle ? (
-          // Articles List View
+          // --- Articles List View ---
           <div className="space-y-6">
             <h1 className="text-3xl md:text-4xl font-bold text-center text-brand-green cyber-text glitch" data-text="Мудрые Советы">
                 Мудрые Советы
@@ -280,7 +280,7 @@ export default function AdvicePage() {
             )}
           </div>
         ) : (
-          // Single Article View
+          // --- Single Article View ---
           <div>
              <h1 className="text-3xl md:text-4xl font-bold mb-3 text-brand-green cyber-text">{selectedArticle.title}</h1>
             {selectedArticle.description && (
@@ -355,29 +355,33 @@ export default function AdvicePage() {
                              <span className="text-brand-blue mr-2">{section.section_order}.</span> {section.title}
                           </h3>
                         )}
-                         {/* --- Use ReactMarkdown with CSS for newlines --- */}
+                         {/* --- Use ReactMarkdown with remarkBreaks and GFM --- */}
                          <ReactMarkdown
-                              remarkPlugins={[remarkGfm]} // GFM handles most things, including basic lists
-                              // Apply Tailwind Typography AND white-space: pre-line
-                              // Updated Prose classes for better list styling
+                              // **Key Change:** Add remarkBreaks here
+                              remarkPlugins={[remarkGfm, remarkBreaks]}
+                              // .. Keep prose classes for general styling, but list styling might be better handled directly if prose conflicts
                               className={cn(
                                   "prose prose-invert prose-sm md:prose-base max-w-none text-gray-300",
                                   "prose-headings:text-brand-cyan prose-strong:text-brand-lime",
                                   "prose-a:text-brand-blue hover:prose-a:text-brand-purple prose-a:transition-colors",
                                   "prose-code:text-brand-pink prose-code:before:content-none prose-code:after:content-none prose-code:font-normal prose-code:bg-gray-700/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded",
                                   "prose-blockquote:border-brand-purple prose-blockquote:text-gray-400",
-                                  "prose-ul:list-disc prose-ol:list-decimal prose-li:marker:text-brand-blue", // Ensure list style type
-                                  "prose-ul:pl-5 prose-ol:pl-5 prose-li:my-1.5", // Indentation and spacing for lists
-                                  "whitespace-pre-line" // <-- Add this class to handle \n as line breaks
+                                  // .. Let remarkGfm handle list rendering, Tailwind prose might interfere sometimes
+                                  // .. Removed prose list specific classes like prose-ul:list-disc etc. Let's see if default HTML list rendering works better now with remark-breaks
+                                  // "prose-ul:list-disc prose-ol:list-decimal prose-li:marker:text-brand-blue",
+                                  // "prose-ul:pl-5 prose-ol:pl-5 prose-li:my-1.5",
+                                  // Removed whitespace-pre-line as remark-breaks should handle \n -> <br>
                               )}
                               components={{
                                   a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="hover:underline" />,
-                                  // Custom component for list items if needed for extra styling/logic
-                                  // li: ({node, ordered, ...props}) => <li className="my-1" {...props} />,
+                                  // You might need to add custom components for ul, ol, li if default rendering isn't styled enough
+                                  // ul: ({node, ...props}) => <ul className="list-disc list-outside ml-5 space-y-1" {...props} />,
+                                  // ol: ({node, ...props}) => <ol className="list-decimal list-outside ml-5 space-y-1" {...props} />,
+                                  // li: ({node, ...props}) => <li className="text-gray-300" {...props} />,
                               }}
-                          >
-                             {section.content ?? ''}
-                          </ReactMarkdown>
+                         >
+                            {section.content ?? ''}
+                         </ReactMarkdown>
                       </div>
                     ))}
                   </div>
