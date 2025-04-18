@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, ChangeEvent } from 'react';
-import { useTelegram } from '@/hooks/useTelegram';
+import { useAppContext } from '@/contexts/AppContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faUpload, faCopy, faSpinner, faCheckCircle, faTimesCircle, faFileCsv, faCircleInfo, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
 import { uploadAdviceCsv } from '@/app/advice-upload/actions'; // We'll create this server action next
@@ -42,7 +42,7 @@ VERY IMPORTANT: Output ONLY the raw CSV data, starting directly with the header 
 `;
 
 export default function AdminAdviceUploadPage() {
-    const { user } = useTelegram();
+    const { user, isAdmin } = useAppContext();
     const [youtubeUrl, setYoutubeUrl] = useState('');
     const [generatedInstruction, setGeneratedInstruction] = useState('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -138,9 +138,7 @@ export default function AdminAdviceUploadPage() {
     };
 
     // --- Admin Access Control ---
-    // Replace 'admin' with your actual admin role/status identifier
-    const isAdmin = user?.status === 'admin' || user?.role === 'admin';
-
+    
     if (!user) {
         return (
             <div className="flex justify-center items-center h-screen">
@@ -151,7 +149,7 @@ export default function AdminAdviceUploadPage() {
 
     if (!isAdmin) {
         return (
-            <div className="p-6 text-center text-red-600">
+            <div className="p-6 pt-32 text-center text-red-600">
                 <FontAwesomeIcon icon={faTriangleExclamation} size="2x" className="mb-2" />
                 <p className="font-semibold">Access Denied</p>
                 <p>You do not have permission to access this page.</p>
