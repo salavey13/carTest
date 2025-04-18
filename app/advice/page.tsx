@@ -203,7 +203,7 @@ export default function AdvicePage() {
   // --- Render Logic ---
   if (isAuthLoading || (isLoadingArticles && articles.length === 0) || userMetadata === null) {
     return (
-      <div className="flex justify-center items-center h-screen pt-24 bg-black">
+      <div className="flex justify-center items-center h-screen pt-36 bg-black">
         <FontAwesomeIcon icon={faSpinner} spin size="3x" className="text-brand-green" />
       </div>
     );
@@ -232,7 +232,7 @@ export default function AdvicePage() {
 
   return (
     <div className={cn(
-        "min-h-screen pt-24 pb-10 font-mono", // Added pt-24
+        "min-h-screen pt-36 pb-10 font-mono", // Added pt-36
         "bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200" // Base cyberpunk background
     )}>
       <div className="relative z-10 container mx-auto px-4 max-w-4xl">

@@ -1,19 +1,26 @@
 "use server";
 
-import { supabaseAdmin, DbArticle, DbArticleSection } from '@/hooks/supabase'; // Assuming types are exported correctly
+import { supabaseAdmin } from '@/hooks/supabase';
+// Import types directly if not re-exported from hooks/supabase
+import type { Database } from "@/types/database.types";
 import { logger } from '@/lib/logger';
 import { debugLogger } from '@/lib/debugLogger';
 import Papa from 'papaparse'; // CSV parsing library
-import { v4 as uuidv4 } from 'uuid'; // For potential temporary IDs if needed
+import { v4 as uuidv4 } from 'uuid';
 
-// Interface for parsed CSV row data
+// Define types based on your database schema
+type DbArticle = Database["public"]["Tables"]["articles"]["Row"];
+type DbArticleSection = Database["public"]["Tables"]["article_sections"]["Row"];
+
+// Interface for parsed CSV row data (matches client-side structure but used server-side now)
 interface AdviceCsvRow {
     article_title: string;
     article_slug: string;
-    article_description: string;
-    section_order: string; // Initially string from CSV
+    article_description?: string | null; // Optional from CSV, becomes null if missing/empty
+    section_order: string; // String from CSV, parsed to number later
     section_title?: string | null; // Optional
     section_content: string;
+    [key: string]: any; // Allow extra columns from PapaParse
 }
 
 // Interface for grouped data before DB insertion
@@ -23,7 +30,6 @@ interface ProcessedArticle {
 }
 
 // --- Helper function to verify admin status ---
-// IMPORTANT: Implement robust admin verification based on your user schema
 async function verifyAdmin(userId: string | undefined): Promise<boolean> {
      if (!userId) return false;
      if (!supabaseAdmin) {
@@ -32,16 +38,15 @@ async function verifyAdmin(userId: string | undefined): Promise<boolean> {
      }
      try {
         const { data: user, error } = await supabaseAdmin
-            .from('users') // Adjust if your user table is different
-            .select('status, role') // Select fields used for admin check
-            .eq('user_id', userId) // Adjust column name if needed
+            .from('users')
+            .select('status, role')
+            .eq('user_id', userId)
             .single();
 
         if (error || !user) {
             logger.warn(`Admin verification failed for user ${userId}: ${error?.message || 'User not found'}`);
             return false;
         }
-        // Adjust condition based on how you identify admins (e.g., role or status)
         const isAdmin = user.status === 'admin' || user.role === 'admin';
         debugLogger.log(`Admin verification for ${userId}: ${isAdmin}`);
         return isAdmin;
@@ -51,6 +56,7 @@ async function verifyAdmin(userId: string | undefined): Promise<boolean> {
      }
 }
 
+// --- The Server Action for CSV Upload (Now takes raw CSV string) ---
 export async function uploadAdviceCsv(
     csvContent: string, // Changed from FormData to string
     userId: string | undefined // Keep userId for verification
@@ -248,8 +254,3 @@ export async function uploadAdviceCsv(
         return { success: false, error: error instanceof Error ? error.message : 'An unexpected server error occurred.' };
     }
 }
-
-
-    
-
-        
