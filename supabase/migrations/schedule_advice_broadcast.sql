@@ -19,8 +19,10 @@ BEGIN
             -- Cron syntax for "at minute 0 of every hour"
             'SELECT net.http_post(
                 url:=''https://inmctohsodgdohamhzag.supabase.co/functions/v1/smooth-responder'',
-                headers:=''{"Content-Type": "application/json", "Authorization": "Bearer SECRET"}''::jsonb 
-            );'
+                headers:=''{”Content-Type”: ”application/json”, ”Authorization”: ”Bearer SECRET”}’’::jsonb, 
+                body:=’’{ "name": "Functions" }''::jsonb,
+                timeout_milliseconds:=4200
+             );'
         );
         RAISE NOTICE 'Cron job "hourly-advice-broadcast-job" created.';
     ELSE
