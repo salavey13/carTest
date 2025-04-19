@@ -184,7 +184,7 @@ export default function SelfDevLandingPage() {
                   {/* Added span wrapper */}
                   <span>
                     <div className="aspect-square w-full h-auto overflow-hidden rounded-md bg-gray-800/50 cursor-help">
-                      <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s401.png" alt="Схема: Эволюция предложений с ростом аудитории" width={800} height={800} className="w-full h-full object-cover" loading="lazy" />
+                      <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/4-9a800381-390b-4153-a1a8-dae1f8850088.png" alt="Схема: Эволюция предложений с ростом аудитории" width={800} height={800} className="w-full h-full object-cover" loading="lazy" />
                     </div>
                   </span>
                   </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[300px] text-center bg-gray-950 border border-brand-orange/60 text-white p-3 shadow-lg"> <p className="text-sm whitespace-pre-wrap">{tooltipDescriptions['s401.png']}</p> </TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">От услуг к продуктам по мере роста.</p> </div> <ul className="list-disc list-inside space-y-2 text-gray-300 pl-4 text-base md:text-lg leading-relaxed"> <li><strong className="text-brand-orange font-semibold">Начало:</strong> <strong className="text-brand-orange font-semibold">Высокочековые услуги</strong> (фриланс, коучинг).</li> <li><strong className="text-brand-orange font-semibold">Рост:</strong> <strong className="text-brand-orange font-semibold">Масштабируемые продукты</strong>. Используй AI для разработки (курсы, ПО, шаблоны).</li> </ul> <p className="text-gray-300 text-base md:text-lg leading-relaxed"> AI позволяет <strong className="text-brand-orange font-semibold">уменьшать время</strong>, <strong className="text-brand-orange font-semibold">увеличивать доход</strong> и <strong className="text-brand-orange font-semibold">контроль</strong>. </p> </section>
@@ -247,7 +247,7 @@ export default function SelfDevLandingPage() {
                          {/* Added span wrapper */}
                          <span>
                            <div className="aspect-square w-full h-auto overflow-hidden rounded-md bg-gray-800/50 cursor-help">
-                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s601.png" alt="Визуализация: Фундаментальный контент как основа" width={800} height={800} className="w-full h-full object-cover" loading="lazy" />
+                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about//6-f7ea171b-8d11-4ca0-bb81-1b4965ea03ad.png" alt="Визуализация: Фундаментальный контент как основа" width={800} height={800} className="w-full h-full object-cover" loading="lazy" />
                            </div>
                          </span>
                        </TooltipTrigger>
