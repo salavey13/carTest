@@ -183,7 +183,7 @@ export default function SelfDevLandingPage() {
                 <section className="space-y-4"> <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-orange mb-4"> <FaArrowsSpin className="mr-3 text-brand-orange/80" /> Эволюция Предложений с AI </h2> <p className="text-gray-300 text-base md:text-lg leading-relaxed"> Твой бизнес растет с тобой. AI помогает масштабироваться. </p> <div className="my-6 p-2 border border-brand-orange/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
                   {/* Added span wrapper */}
                   <span>
-                    <div className="aspect-square w-full h-auto overflow-hidden rounded-md bg-gray-800/50 cursor-help">
+                    <div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-800/50 cursor-help">
                       <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/4-9a800381-390b-4153-a1a8-dae1f8850088.png" alt="Схема: Эволюция предложений с ростом аудитории" width={800} height={800} className="w-full h-full object-cover" loading="lazy" />
                     </div>
                   </span>
