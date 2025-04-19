@@ -6,10 +6,28 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-    FaGlobeAmericas, FaMapMarkedAlt, FaCompass, FaRulerCombined, FaMountain,
-    FaRoute, FaUserSecret, FaWater, FaThermometerHalf, FaCloudSunRain, FaWind,
-    FaTree, FaPaw, FaGlobe, FaAtlas, FaTable, FaChartBar, FaRegCompass, FaImage,
-    FaPercent, FaMap // Added FaMap for consistency
+    FaGlobeAmericas, // Correct, exists
+    FaMapLocationDot, // Correct replacement for FaMapMarkedAlt
+    FaCompass, // Correct, exists
+    FaRulerCombined, // Correct, exists
+    FaMountain, // Correct, exists
+    FaRoute, // Correct, exists
+    FaUserSecret, // Correct, exists
+    FaWater, // Correct, exists
+    FaThermometerHalf, // Correct, exists
+    FaCloudSunRain, // Correct, exists
+    FaWind, // Correct, exists
+    FaTree, // Correct, exists
+    FaPaw, // Correct, exists
+    FaGlobe, // Correct, exists
+    FaAtlas, // Correct, exists
+    FaTable, // Correct, exists
+    FaChartBar, // Correct, exists
+    FaRegCompass, // Correct, exists
+    FaImage, // Correct, exists
+    FaPercent, // Correct, exists
+    FaMap, // Correct, exists
+    FaUsers // Correct, exists (Added)
 } from "react-icons/fa6"; // Using Fa6 icons
 import Link from "next/link"; // If any internal links are needed
 import Image from "next/image";
@@ -102,7 +120,8 @@ const VprGeographyCheatsheet: React.FC = () => {
                 {/* Section: Топографическая Карта */}
                 <section className="space-y-4 border-t border-orange-500/20 pt-8">
                   <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-orange-400 mb-4">
-                    <FaMapMarkedAlt className="mr-3 text-orange-400/80" /> 🗺️ Топографическая Карта: Читаем Местность
+                    {/* Replaced FaMapMarkedAlt with FaMapLocationDot */}
+                    <FaMapLocationDot className="mr-3 text-orange-400/80" /> 🗺️ Топографическая Карта: Читаем Местность
                   </h2>
                    {/* Image Placeholder: Топографическая карта */}
                    <div className="my-6 p-2 border border-orange-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild> <span> <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/geo-topo-map.png" alt="Фрагмент топографической карты с условными знаками" width={600} height={338} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div> </span> </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-orange-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['geo-topo-map.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Понимаешь эти знаки?</p> </div>
@@ -195,6 +214,7 @@ const VprGeographyCheatsheet: React.FC = () => {
                 {/* Section: Человек на Земле */}
                 <section className="space-y-4 border-t border-yellow-500/20 pt-8">
                   <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-yellow-400 mb-4">
+                    {/* Added FaUsers import */}
                     <FaUsers className="mr-3 text-yellow-400/80" /> 🧍 Человек на Земле
                   </h2>
                   <ul className="list-disc list-inside space-y-2 text-gray-300 pl-4 text-base md:text-lg">

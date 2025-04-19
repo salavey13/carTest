@@ -7,13 +7,15 @@ import {
 } from "@/components/ui/tooltip";
 import {
     FaLandmark, FaBookOpen, FaScroll, FaCalendarDays, FaUserShield, FaShieldHalved,
-    FaCross, FaGavel, FaMoneyBill1, FaMapLocationDot, FaRoute, FaFeather, FaPalette,
+    FaCross, FaGavel, FaMoneyBill1, // Corrected: FaMoneyBill1 exists
+    FaMapLocationDot, // Corrected: FaMapLocationDot exists
+    FaRoute, FaFeather, FaPalette,
     FaChurch, FaGraduationCap, FaUsers, FaBuildingColumns, FaShip, FaCrown, FaChessKing,
     FaBookBible, FaPlaceOfWorship, FaUniversity, FaBalanceScale, FaHandsPraying,
-    FaMedal, FaStar, FaMonument, FaMusic, // FaMicrophoneLines potentially for songs
-    FaMap // For the map tip
-} from "react-icons/fa6"; // Using Fa6 for consistency
-import Link from "next/link"; // Assuming internal links if needed
+    FaMedal, FaStar, FaMonument, FaMusic,
+    FaMap
+} from "react-icons/fa6";
+import Link from "next/link";
 import Image from "next/image";
 
 // --- Component ---
@@ -42,7 +44,7 @@ const VprHistoryCheatsheet: React.FC = () => {
         style={{
           backgroundImage: `linear-gradient(to right, rgba(0, 255, 157, 0.2) 1px, transparent 1px),
                             linear-gradient(to bottom, rgba(0, 255, 157, 0.2) 1px, transparent 1px)`,
-          backgroundSize: '50px 50px', // Adjusted grid size
+          backgroundSize: '50px 50px',
         }}
       ></div>
 
@@ -82,7 +84,10 @@ const VprHistoryCheatsheet: React.FC = () => {
                     <div className="p-2 border border-blue-500/30 rounded-lg bg-black/30">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <span> {/* Image placeholder: Призвание варягов */} <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-varangians.png" alt="Иллюстрация: Варяжские воины (Рюрик с дружиной?) прибывают на ладьях к славянскому поселению." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div> </span>
+                            {/* FIXED: Added span wrapper */}
+                            <span>
+                               <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-varangians.png" alt="Иллюстрация: Варяжские воины (Рюрик с дружиной?) прибывают на ладьях к славянскому поселению." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
+                            </span>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-blue-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-varangians.png']}</p></TooltipContent>
                         </Tooltip>
@@ -91,7 +96,10 @@ const VprHistoryCheatsheet: React.FC = () => {
                     <div className="p-2 border border-blue-500/30 rounded-lg bg-black/30">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                             <span> {/* Image placeholder: Крещение Руси */} <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-baptism.png" alt="Иллюстрация: Князь Владимир Святой стоит на берегу Днепра во время массового крещения киевлян византийскими священниками." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div> </span>
+                             {/* FIXED: Added span wrapper */}
+                             <span>
+                                <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-baptism.png" alt="Иллюстрация: Князь Владимир Святой стоит на берегу Днепра во время массового крещения киевлян византийскими священниками." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
+                             </span>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-blue-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-baptism.png']}</p></TooltipContent>
                         </Tooltip>
@@ -111,7 +119,12 @@ const VprHistoryCheatsheet: React.FC = () => {
                      <li><strong>Юрий Долгорукий, Андрей Боголюбский:</strong> Рост Северо-Восточной Руси.</li>
                    </ul>
                    {/* Image Placeholder: Ярослав Мудрый */}
-                   <div className="my-6 p-2 border border-blue-500/30 rounded-lg bg-black/30 max-w-sm mx-auto"> <Tooltip> <TooltipTrigger asChild> <span> <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-yaroslav.png" alt="Иллюстрация: Князь Ярослав Мудрый со свитком 'Русской Правды'." width={400} height={400} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div> </span> </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-blue-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-yaroslav.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Ярослав Мудрый - расцвет Руси.</p> </div>
+                   <div className="my-6 p-2 border border-blue-500/30 rounded-lg bg-black/30 max-w-sm mx-auto"> <Tooltip> <TooltipTrigger asChild>
+                     {/* FIXED: Added span wrapper */}
+                     <span>
+                        <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-yaroslav.png" alt="Иллюстрация: Князь Ярослав Мудрый со свитком 'Русской Правды'." width={400} height={400} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
+                     </span>
+                    </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-blue-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-yaroslav.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Ярослав Мудрый - расцвет Руси.</p> </div>
 
                    {/* Subsection: Термины и Культура */}
                    <h3 className="flex items-center text-xl font-semibold text-blue-300 mt-6 mb-2">
@@ -140,7 +153,12 @@ const VprHistoryCheatsheet: React.FC = () => {
                     <li><strong>Термины Ига:</strong> Ярлык (грамота на княжение), Выход (дань), Баскаки (сборщики дани).</li>
                   </ul>
                   {/* Image Placeholder: Монгольское нашествие */}
-                  <div className="my-6 p-2 border border-red-600/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild> <span> <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-mongols.png" alt="Иллюстрация: Монгольская конница штурмует русский город." width={600} height={338} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div> </span> </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-mongols.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Нашествие Батыя (1237-1241)</p> </div>
+                  <div className="my-6 p-2 border border-red-600/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
+                      {/* FIXED: Added span wrapper */}
+                      <span>
+                        <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-mongols.png" alt="Иллюстрация: Монгольская конница штурмует русский город." width={600} height={338} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
+                      </span>
+                    </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-mongols.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Нашествие Батыя (1237-1241)</p> </div>
 
                   {/* Subsection: Борьба с захватчиками */}
                    <h3 className="flex items-center text-xl font-semibold text-blue-300 mt-6 mb-2">
@@ -151,8 +169,18 @@ const VprHistoryCheatsheet: React.FC = () => {
                      <li><strong>Дмитрий Донской:</strong> Куликовская битва (1380).</li>
                    </ul>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-                     <div className="p-2 border border-cyan-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild> <span> {/* Image Placeholder: Ледовое побоище */} <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-nevsky.png" alt="Иллюстрация: Александр Невский в Ледовом побоище." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div> </span> </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-cyan-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-nevsky.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Ледовое побоище (1242)</p> </div>
-                     <div className="p-2 border border-orange-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild> <span> {/* Image Placeholder: Куликовская битва */} <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-kulikovo.png" alt="Иллюстрация: Куликовская битва, поединок Пересвета и Челубея." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div> </span> </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-orange-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-kulikovo.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Куликовская битва (1380)</p> </div>
+                     <div className="p-2 border border-cyan-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
+                         {/* FIXED: Added span wrapper */}
+                         <span>
+                            <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-nevsky.png" alt="Иллюстрация: Александр Невский в Ледовом побоище." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
+                         </span>
+                        </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-cyan-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-nevsky.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Ледовое побоище (1242)</p> </div>
+                     <div className="p-2 border border-orange-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
+                         {/* FIXED: Added span wrapper */}
+                         <span>
+                            <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-kulikovo.png" alt="Иллюстрация: Куликовская битва, поединок Пересвета и Челубея." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
+                         </span>
+                         </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-orange-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-kulikovo.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Куликовская битва (1380)</p> </div>
                    </div>
 
                   {/* Subsection: Объединение Руси */}
@@ -164,7 +192,12 @@ const VprHistoryCheatsheet: React.FC = () => {
                      <li><strong>Иван III Великий:</strong> Присоединение Новгорода, Твери; Конец ига (Стояние на Угре, 1480); Судебник 1497 г.</li>
                    </ul>
                    {/* Image Placeholder: Стояние на Угре */}
-                   <div className="my-6 p-2 border border-green-500/30 rounded-lg bg-black/30 max-w-md mx-auto"> <Tooltip> <TooltipTrigger asChild> <span> <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-ivan3.png" alt="Иллюстрация: Стояние на Угре. Иван III и хан Ахмат." width={500} height={281} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div> </span> </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-green-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ivan3.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Стояние на Угре (1480) - конец ига.</p> </div>
+                   <div className="my-6 p-2 border border-green-500/30 rounded-lg bg-black/30 max-w-md mx-auto"> <Tooltip> <TooltipTrigger asChild>
+                      {/* FIXED: Added span wrapper */}
+                      <span>
+                        <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-ivan3.png" alt="Иллюстрация: Стояние на Угре. Иван III и хан Ахмат." width={500} height={281} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
+                      </span>
+                     </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-green-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ivan3.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Стояние на Угре (1480) - конец ига.</p> </div>
                 </section>
 
                 {/* Section: Средние века (Зарубежная) */}
@@ -183,8 +216,18 @@ const VprHistoryCheatsheet: React.FC = () => {
                     <li><strong className="text-purple-400">Культура:</strong> Готика (Нотр-Дам), университеты.</li>
                   </ul>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-                     <div className="p-2 border border-purple-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild> <span> {/* Image Placeholder: Феодализм */} <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-feudalism.png" alt="Схема: Феодальная лестница в Европе." width={400} height={400} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div> </span> </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-purple-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-feudalism.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Феодальная система.</p> </div>
-                     <div className="p-2 border border-purple-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild> <span> {/* Image Placeholder: Крестоносцы */} <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-crusades.png" alt="Иллюстрация: Рыцари-крестоносцы в походе." width={400} height={400} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div> </span> </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-purple-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-crusades.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Крестовые походы.</p> </div>
+                     <div className="p-2 border border-purple-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
+                         {/* FIXED: Added span wrapper */}
+                         <span>
+                            <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-feudalism.png" alt="Схема: Феодальная лестница в Европе." width={400} height={400} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
+                         </span>
+                        </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-purple-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-feudalism.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Феодальная система.</p> </div>
+                     <div className="p-2 border border-purple-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
+                         {/* FIXED: Added span wrapper */}
+                         <span>
+                           <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-crusades.png" alt="Иллюстрация: Рыцари-крестоносцы в походе." width={400} height={400} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
+                         </span>
+                        </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-purple-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-crusades.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Крестовые походы.</p> </div>
                    </div>
                 </section>
 
@@ -201,8 +244,18 @@ const VprHistoryCheatsheet: React.FC = () => {
                     <li><strong className="text-red-500">Памятники:</strong> Мамаев курган ("Родина-мать").</li>
                   </ul>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-                     <div className="p-2 border border-red-600/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild> <span> {/* Image Placeholder: Знамя над Рейхстагом */} <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-ww2-victory.png" alt="Иллюстрация: Водружение Знамени Победы над Рейхстагом." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div> </span> </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ww2-victory.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Знамя Победы над Рейхстагом.</p> </div>
-                     <div className="p-2 border border-red-600/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild> <span> {/* Image Placeholder: Родина-мать */} <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-ww2-monument.png" alt="Фото: Монумент 'Родина-мать зовет!' на Мамаевом кургане." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div> </span> </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ww2-monument.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">"Родина-мать зовет!".</p> </div>
+                     <div className="p-2 border border-red-600/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
+                         {/* FIXED: Added span wrapper */}
+                         <span>
+                            <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-ww2-victory.png" alt="Иллюстрация: Водружение Знамени Победы над Рейхстагом." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
+                         </span>
+                        </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ww2-victory.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Знамя Победы над Рейхстагом.</p> </div>
+                     <div className="p-2 border border-red-600/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
+                         {/* FIXED: Added span wrapper */}
+                         <span>
+                           <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-ww2-monument.png" alt="Фото: Монумент 'Родина-мать зовет!' на Мамаевом кургане." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
+                         </span>
+                         </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ww2-monument.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">"Родина-мать зовет!".</p> </div>
                    </div>
                 </section>
 
