@@ -36,19 +36,19 @@ const VprHistoryCheatsheet: React.FC = () => {
       'history-ww2-monument.png': "Изображение: Монумент 'Родина-мать зовет!' на Мамаевом кургане в Волгограде. Величественный и скорбный.",
   };
 
-  // URLs for the previously placeholder images
+  // == REVISED Image URLs ==
   const imageUrls: Record<string, string> = {
-      'history-varangians.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Vasnetsov_Varangians.jpg/800px-Vasnetsov_Varangians.jpg",
-      'history-baptism.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Vladimir_baptizing.jpg/800px-Vladimir_baptizing.jpg",
-      'history-yaroslav.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Yaroslav_the_Wise_%28imagined_portrait%29.jpg/800px-Yaroslav_the_Wise_%28imagined_portrait%29.jpg",
-      'history-mongols.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Siege_of_Kozelsk.jpg/800px-Siege_of_Kozelsk.jpg",
-      'history-nevsky.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/Ledovoe_poboische.jpg/800px-Ledovoe_poboische.jpg",
-      'history-kulikovo.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Peresvet.jpg/800px-Peresvet.jpg",
-      'history-ivan3.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Ugra_standoff.jpg/800px-Ugra_standoff.jpg",
-      'history-feudalism.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/Feudalism_diagram.svg/600px-Feudalism_diagram.svg.png",
-      'history-crusades.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Siege_of_Antioch_-_First_Crusade.jpg/800px-Siege_of_Antioch_-_First_Crusade.jpg",
-      'history-ww2-victory.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/Soviet_flag_on_Reichstag_roof.jpg/800px-Soviet_flag_on_Reichstag_roof.jpg",
-      'history-ww2-monument.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/The_Motherland_Calls_Statue.jpg/800px-The_Motherland_Calls_Statue.jpg",
+      'history-varangians.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Vasnetsov_Varangians.jpg/1024px-Vasnetsov_Varangians.jpg", // Vasnetsov painting
+      'history-baptism.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Vladimir_baptizing.jpg/1024px-Vladimir_baptizing.jpg", // Vasnetsov painting
+      'history-yaroslav.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Yaroslav_Mudry_by_Vasnetsov.jpg/800px-Yaroslav_Mudry_by_Vasnetsov.jpg", // Vasnetsov portrait (alternative, might be more recognizable)
+      'history-mongols.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Batu_Khan_invades_Rus.jpg/1024px-Batu_Khan_invades_Rus.jpg", // Miniature showing invasion scene
+      'history-nevsky.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/Ledovoe_poboische.jpg/1024px-Ledovoe_poboische.jpg", // Painting of Battle on the Ice
+      'history-kulikovo.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Peresvet.jpg/1024px-Peresvet.jpg", // Painting of Peresvet vs Chelubey
+      'history-ivan3.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Ugra_standoff.jpg/1024px-Ugra_standoff.jpg", // Painting of Stand on the Ugra
+      'history-feudalism.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/Feudalism_diagram.svg/800px-Feudalism_diagram.svg.png", // Feudalism diagram (SVG rendered as PNG - usually reliable)
+      'history-crusades.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Siege_of_Antioch_-_First_Crusade.jpg/1024px-Siege_of_Antioch_-_First_Crusade.jpg", // Siege of Antioch miniature
+      'history-ww2-victory.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/Soviet_flag_on_Reichstag_roof.jpg/1024px-Soviet_flag_on_Reichstag_roof.jpg", // Khaldei photo
+      'history-ww2-monument.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/The_Motherland_Calls_Statue.jpg/1024px-The_Motherland_Calls_Statue.jpg", // Motherland Calls statue photo
   };
 
 
@@ -155,10 +155,10 @@ const VprHistoryCheatsheet: React.FC = () => {
                         {/* === UPDATED IMAGE === */}
                         <Image
                           src={imageUrls['history-yaroslav.png']}
-                          alt="Условный портрет Ярослава Мудрого"
+                          alt="Портрет Ярослава Мудрого (В. Васнецов)"
                           width={400}
                           height={400}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover" // Use cover for portraits usually
                           loading="lazy"
                           unoptimized
                          />
@@ -197,7 +197,7 @@ const VprHistoryCheatsheet: React.FC = () => {
                          {/* === UPDATED IMAGE === */}
                          <Image
                            src={imageUrls['history-mongols.png']}
-                           alt="Миниатюра 'Оборона Козельска'"
+                           alt="Миниатюра 'Нашествие Батыя на Русь'"
                            width={600}
                            height={338}
                            className="w-full h-full object-cover"
