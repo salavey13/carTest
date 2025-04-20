@@ -204,7 +204,7 @@
 
 
     const handleClearAll = useCallback(() => {
-        console.log("[handleClearAll] Clearing Fetcher state."); setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set()); updateKworkInput(""); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set()); addToast("Поле ввода и выбор файлов очищены ✨", 'success'); localKworkInputRef.current?.focus();
+        console.log("[handleClearAll] Clearing Fetcher state."); setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set()); updateKworkInput(""); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set()); addToast("Поле ввода и выбор файлов очищены ✨", 'success'); if (localKworkInputRef.current) localKworkInputRef.current.focus();
     }, [ setSelectedFetcherFiles, updateKworkInput, addToast, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles ]);
 
 
@@ -411,7 +411,7 @@
          )}
 
          {/* Right Column: Request Input & AI Trigger */}
-         {(fetchStatus === 'success' || kworkInputHasContent || files.length > 0 ) ? ( // Show if files fetched OR input has content
+         {(fetchStatus === 'success' || kworkInputHasContent || files.length > 0 || (highlightedPathFromUrl && ideaFromUrl) ) ? ( // Show if files fetched OR input has content OR URL params were provided
              <div id="kwork-input-section" className="flex flex-col gap-3">
                  <RequestInput
                       kworkInputRef={localKworkInputRef}

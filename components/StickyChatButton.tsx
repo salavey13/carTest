@@ -150,7 +150,7 @@ const StickyChatButton: React.FC = () => {
 
         return baseSuggestions;
 
-    }, [currentPath, fixActionClicked, router, customIdea]); // Added customIdea dependency
+    }, [currentPath, fixActionClicked, customIdea]); // Added customIdea dependency, removed router
 
 
     // --- Update Active Message Logic ---
@@ -180,9 +180,9 @@ const StickyChatButton: React.FC = () => {
         console.log("(StickyChat) Suggestion Clicked:", suggestion.id);
 
         if (suggestion.id === FIX_PAGE_ID && customIdea.trim()) {
-             toast.info("Отправляю твою идею и контекст страницы...");
+             toast.info("🚀 Отправляю твою идею и контекст страницы в СуперВайб Студию!"); // Improved message
         } else if (suggestion.id === FIX_PAGE_ID) {
-             toast.info("Перехожу к улучшению страницы...");
+             toast.info("🚀 Перехожу к улучшению страницы в СуперВайб Студии..."); // Improved message
         }
 
         if (suggestion.link) {
@@ -217,7 +217,7 @@ const StickyChatButton: React.FC = () => {
                                 {showCustomInput && (
                                      <motion.div variants={childVariants} className="w-full mt-1"> {/* Reduced margin-top */}
                                          <label htmlFor="custom-idea-input" className="block text-xs font-medium mb-1 text-gray-300 flex items-center">
-                                            <FaLightbulb className="text-yellow-400 mr-1"/> Или введи свою идею для этой страницы:
+                                            <FaLightbulb className="text-yellow-400 mr-1.5 text-sm"/> Или введи свою идею для этой страницы:
                                           </label>
                                          <textarea
                                              id="custom-idea-input"
