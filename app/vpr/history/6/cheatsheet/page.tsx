@@ -7,8 +7,8 @@ import {
 } from "@/components/ui/tooltip";
 import {
     FaLandmark, FaBookOpen, FaScroll, FaCalendarDays, FaUserShield, FaShieldHalved,
-    FaCross, FaGavel, FaMoneyBill1, // Corrected: FaMoneyBill1 exists
-    FaMapLocationDot, // Corrected: FaMapLocationDot exists
+    FaCross, FaGavel, FaMoneyBill1,
+    FaMapLocationDot,
     FaRoute, FaFeather, FaPalette,
     FaChurch, FaGraduationCap, FaUsers, FaBuildingColumns, FaShip, FaCrown, FaChessKing,
     FaBookBible, FaPlaceOfWorship, FaUniversity, FaBalanceScale, FaHandsPraying,
@@ -21,19 +21,34 @@ import Image from "next/image";
 // --- Component ---
 const VprHistoryCheatsheet: React.FC = () => {
 
-  // Tooltip descriptions for image placeholders
+  // Tooltip descriptions for image placeholders (kept for reference)
   const tooltipDescriptions: Record<string, string> = {
-      'history-varangians.png': "Иллюстрация: Варяжские воины (Рюрик с дружиной?) прибывают на ладьях к славянскому поселению. Атмосфера ожидания и надежды.",
-      'history-baptism.png': "Иллюстрация: Князь Владимир Святой стоит на берегу Днепра во время массового крещения киевлян византийскими священниками. Солнечный день, преображение.",
-      'history-yaroslav.png': "Иллюстрация: Князь Ярослав Мудрый в богатых одеждах сидит с развернутым свитком 'Русской Правды'. На фоне виднеется строящийся Софийский собор.",
-      'history-mongols.png': "Иллюстрация: Монгольская конница во главе с ханом Батыем штурмует стены русского города (например, Рязани). Дым, огонь, драматизм.",
-      'history-nevsky.png': "Иллюстрация: Сцена Ледового побоища. Александр Невский на коне ведет дружину в бой против тевтонских рыцарей на льду Чудского озера.",
-      'history-kulikovo.png': "Иллюстрация: Куликовская битва. Поединок Пересвета и Челубея как центральный элемент. На фоне - русские и ордынские полки.",
-      'history-ivan3.png': "Иллюстрация: Иван III Великий стоит на берегу Угры напротив хана Ахмата. Спокойная решимость на лице Ивана, растерянность у ордынцев. Символ конца ига.",
+      'history-varangians.png': "Иллюстрация: Варяжские воины (Рюрик с дружиной?) прибывают на ладьях к славянскому поселению. Атмосфера ожидания и надежды. (Изображение: Картина В. Васнецова 'Варяги')",
+      'history-baptism.png': "Иллюстрация: Князь Владимир Святой стоит на берегу Днепра во время массового крещения киевлян византийскими священниками. Солнечный день, преображение. (Изображение: Картина В. Васнецова 'Крещение Руси')",
+      'history-yaroslav.png': "Иллюстрация: Князь Ярослав Мудрый в богатых одеждах сидит с развернутым свитком 'Русской Правды'. На фоне виднеется строящийся Софийский собор. (Изображение: Условный портрет Ярослава Мудрого)",
+      'history-mongols.png': "Иллюстрация: Монгольская конница во главе с ханом Батыем штурмует стены русского города (например, Рязани). Дым, огонь, драматизм. (Изображение: Миниатюра 'Оборона Козельска')",
+      'history-nevsky.png': "Иллюстрация: Сцена Ледового побоища. Александр Невский на коне ведет дружину в бой против тевтонских рыцарей на льду Чудского озера. (Изображение: Картина 'Ледовое побоище')",
+      'history-kulikovo.png': "Иллюстрация: Куликовская битва. Поединок Пересвета и Челубея как центральный элемент. На фоне - русские и ордынские полки. (Изображение: Картина 'Поединок Пересвета с Челубеем')",
+      'history-ivan3.png': "Иллюстрация: Иван III Великий стоит на берегу Угры напротив хана Ахмата. Спокойная решимость на лице Ивана, растерянность у ордынцев. Символ конца ига. (Изображение: Картина 'Стояние на Угре')",
       'history-feudalism.png': "Схема: Классическая феодальная лестница в Европе. Король наверху, ниже - герцоги/графы (его вассалы, сеньоры для баронов), бароны, рыцари. Стрелки показывают вассальные обязательства.",
-      'history-crusades.png': "Иллюстрация: Европейские рыцари-крестоносцы с крестами на плащах в походе на Иерусалим. Пустынный пейзаж, тяготы пути.",
-      'history-ww2-victory.png': "Иллюстрация: Советские солдаты водружают Знамя Победы над Рейхстагом в Берлине. Символ окончания войны.",
+      'history-crusades.png': "Иллюстрация: Европейские рыцари-крестоносцы с крестами на плащах в походе на Иерусалим. Пустынный пейзаж, тяготы пути. (Изображение: Средневековая миниатюра 'Осада Антиохии')",
+      'history-ww2-victory.png': "Иллюстрация: Советские солдаты водружают Знамя Победы над Рейхстагом в Берлине. Символ окончания войны. (Изображение: Фотография Е. Халдея)",
       'history-ww2-monument.png': "Изображение: Монумент 'Родина-мать зовет!' на Мамаевом кургане в Волгограде. Величественный и скорбный.",
+  };
+
+  // == REVISED Image URLs ==
+  const imageUrls: Record<string, string> = {
+      'history-varangians.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Vasnetsov_Varangians.jpg/1024px-Vasnetsov_Varangians.jpg", // Vasnetsov painting
+      'history-baptism.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Vladimir_baptizing.jpg/1024px-Vladimir_baptizing.jpg", // Vasnetsov painting
+      'history-yaroslav.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Yaroslav_Mudry_by_Vasnetsov.jpg/800px-Yaroslav_Mudry_by_Vasnetsov.jpg", // Vasnetsov portrait (alternative, might be more recognizable)
+      'history-mongols.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Batu_Khan_invades_Rus.jpg/1024px-Batu_Khan_invades_Rus.jpg", // Miniature showing invasion scene
+      'history-nevsky.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/Ledovoe_poboische.jpg/1024px-Ledovoe_poboische.jpg", // Painting of Battle on the Ice
+      'history-kulikovo.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Peresvet.jpg/1024px-Peresvet.jpg", // Painting of Peresvet vs Chelubey
+      'history-ivan3.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Ugra_standoff.jpg/1024px-Ugra_standoff.jpg", // Painting of Stand on the Ugra
+      'history-feudalism.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/Feudalism_diagram.svg/800px-Feudalism_diagram.svg.png", // Feudalism diagram (SVG rendered as PNG - usually reliable)
+      'history-crusades.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Siege_of_Antioch_-_First_Crusade.jpg/1024px-Siege_of_Antioch_-_First_Crusade.jpg", // Siege of Antioch miniature
+      'history-ww2-victory.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/Soviet_flag_on_Reichstag_roof.jpg/1024px-Soviet_flag_on_Reichstag_roof.jpg", // Khaldei photo
+      'history-ww2-monument.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/The_Motherland_Calls_Statue.jpg/1024px-The_Motherland_Calls_Statue.jpg", // Motherland Calls statue photo
   };
 
 
@@ -84,10 +99,18 @@ const VprHistoryCheatsheet: React.FC = () => {
                     <div className="p-2 border border-blue-500/30 rounded-lg bg-black/30">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            {/* FIXED: Added span wrapper */}
-                            <span>
-                               <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-varangians.png" alt="Иллюстрация: Варяжские воины (Рюрик с дружиной?) прибывают на ладьях к славянскому поселению." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
-                            </span>
+                           <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                             {/* === UPDATED IMAGE === */}
+                             <Image
+                               src={imageUrls['history-varangians.png']}
+                               alt="Картина В. Васнецова 'Варяги'"
+                               width={400}
+                               height={225}
+                               className="w-full h-full object-cover"
+                               loading="lazy"
+                               unoptimized
+                              />
+                           </div>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-blue-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-varangians.png']}</p></TooltipContent>
                         </Tooltip>
@@ -96,10 +119,18 @@ const VprHistoryCheatsheet: React.FC = () => {
                     <div className="p-2 border border-blue-500/30 rounded-lg bg-black/30">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                             {/* FIXED: Added span wrapper */}
-                             <span>
-                                <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-baptism.png" alt="Иллюстрация: Князь Владимир Святой стоит на берегу Днепра во время массового крещения киевлян византийскими священниками." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
-                             </span>
+                             <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                               {/* === UPDATED IMAGE === */}
+                               <Image
+                                 src={imageUrls['history-baptism.png']}
+                                 alt="Картина В. Васнецова 'Крещение Руси'"
+                                 width={400}
+                                 height={225}
+                                 className="w-full h-full object-cover"
+                                 loading="lazy"
+                                 unoptimized
+                               />
+                              </div>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-blue-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-baptism.png']}</p></TooltipContent>
                         </Tooltip>
@@ -120,10 +151,18 @@ const VprHistoryCheatsheet: React.FC = () => {
                    </ul>
                    {/* Image Placeholder: Ярослав Мудрый */}
                    <div className="my-6 p-2 border border-blue-500/30 rounded-lg bg-black/30 max-w-sm mx-auto"> <Tooltip> <TooltipTrigger asChild>
-                     {/* FIXED: Added span wrapper */}
-                     <span>
-                        <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-yaroslav.png" alt="Иллюстрация: Князь Ярослав Мудрый со свитком 'Русской Правды'." width={400} height={400} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
-                     </span>
+                      <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                        {/* === UPDATED IMAGE === */}
+                        <Image
+                          src={imageUrls['history-yaroslav.png']}
+                          alt="Портрет Ярослава Мудрого (В. Васнецов)"
+                          width={400}
+                          height={400}
+                          className="w-full h-full object-cover" // Use cover for portraits usually
+                          loading="lazy"
+                          unoptimized
+                         />
+                      </div>
                     </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-blue-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-yaroslav.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Ярослав Мудрый - расцвет Руси.</p> </div>
 
                    {/* Subsection: Термины и Культура */}
@@ -154,10 +193,18 @@ const VprHistoryCheatsheet: React.FC = () => {
                   </ul>
                   {/* Image Placeholder: Монгольское нашествие */}
                   <div className="my-6 p-2 border border-red-600/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                      {/* FIXED: Added span wrapper */}
-                      <span>
-                        <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-mongols.png" alt="Иллюстрация: Монгольская конница штурмует русский город." width={600} height={338} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
-                      </span>
+                      <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                         {/* === UPDATED IMAGE === */}
+                         <Image
+                           src={imageUrls['history-mongols.png']}
+                           alt="Миниатюра 'Нашествие Батыя на Русь'"
+                           width={600}
+                           height={338}
+                           className="w-full h-full object-cover"
+                           loading="lazy"
+                           unoptimized
+                          />
+                       </div>
                     </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-mongols.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Нашествие Батыя (1237-1241)</p> </div>
 
                   {/* Subsection: Борьба с захватчиками */}
@@ -170,16 +217,32 @@ const VprHistoryCheatsheet: React.FC = () => {
                    </ul>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
                      <div className="p-2 border border-cyan-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                         {/* FIXED: Added span wrapper */}
-                         <span>
-                            <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-nevsky.png" alt="Иллюстрация: Александр Невский в Ледовом побоище." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
-                         </span>
+                         <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                           {/* === UPDATED IMAGE === */}
+                           <Image
+                             src={imageUrls['history-nevsky.png']}
+                             alt="Картина 'Ледовое побоище'"
+                             width={400}
+                             height={225}
+                             className="w-full h-full object-cover"
+                             loading="lazy"
+                             unoptimized
+                           />
+                          </div>
                         </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-cyan-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-nevsky.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Ледовое побоище (1242)</p> </div>
                      <div className="p-2 border border-orange-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                         {/* FIXED: Added span wrapper */}
-                         <span>
-                            <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-kulikovo.png" alt="Иллюстрация: Куликовская битва, поединок Пересвета и Челубея." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
-                         </span>
+                         <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                            {/* === UPDATED IMAGE === */}
+                            <Image
+                              src={imageUrls['history-kulikovo.png']}
+                              alt="Картина 'Поединок Пересвета с Челубеем'"
+                              width={400}
+                              height={225}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                              unoptimized
+                            />
+                          </div>
                          </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-orange-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-kulikovo.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Куликовская битва (1380)</p> </div>
                    </div>
 
@@ -193,10 +256,18 @@ const VprHistoryCheatsheet: React.FC = () => {
                    </ul>
                    {/* Image Placeholder: Стояние на Угре */}
                    <div className="my-6 p-2 border border-green-500/30 rounded-lg bg-black/30 max-w-md mx-auto"> <Tooltip> <TooltipTrigger asChild>
-                      {/* FIXED: Added span wrapper */}
-                      <span>
-                        <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-ivan3.png" alt="Иллюстрация: Стояние на Угре. Иван III и хан Ахмат." width={500} height={281} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
-                      </span>
+                       <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                          {/* === UPDATED IMAGE === */}
+                          <Image
+                            src={imageUrls['history-ivan3.png']}
+                            alt="Картина 'Стояние на Угре'"
+                            width={500}
+                            height={281}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            unoptimized
+                           />
+                        </div>
                      </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-green-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ivan3.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Стояние на Угре (1480) - конец ига.</p> </div>
                 </section>
 
@@ -217,16 +288,32 @@ const VprHistoryCheatsheet: React.FC = () => {
                   </ul>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
                      <div className="p-2 border border-purple-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                         {/* FIXED: Added span wrapper */}
-                         <span>
-                            <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-feudalism.png" alt="Схема: Феодальная лестница в Европе." width={400} height={400} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
-                         </span>
+                         <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                           {/* === UPDATED IMAGE === */}
+                           <Image
+                             src={imageUrls['history-feudalism.png']}
+                             alt="Схема феодальной лестницы"
+                             width={400}
+                             height={400}
+                             className="w-full h-full object-contain bg-white p-1" // Contain + White BG for diagram
+                             loading="lazy"
+                             unoptimized
+                           />
+                          </div>
                         </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-purple-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-feudalism.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Феодальная система.</p> </div>
                      <div className="p-2 border border-purple-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                         {/* FIXED: Added span wrapper */}
-                         <span>
-                           <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-crusades.png" alt="Иллюстрация: Рыцари-крестоносцы в походе." width={400} height={400} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
-                         </span>
+                         <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                           {/* === UPDATED IMAGE === */}
+                           <Image
+                             src={imageUrls['history-crusades.png']}
+                             alt="Средневековая миниатюра 'Осада Антиохии' (Крестовый поход)"
+                             width={400}
+                             height={400}
+                             className="w-full h-full object-cover"
+                             loading="lazy"
+                             unoptimized
+                           />
+                          </div>
                         </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-purple-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-crusades.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Крестовые походы.</p> </div>
                    </div>
                 </section>
@@ -245,16 +332,32 @@ const VprHistoryCheatsheet: React.FC = () => {
                   </ul>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
                      <div className="p-2 border border-red-600/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                         {/* FIXED: Added span wrapper */}
-                         <span>
-                            <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-ww2-victory.png" alt="Иллюстрация: Водружение Знамени Победы над Рейхстагом." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
-                         </span>
+                         <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                            {/* === UPDATED IMAGE === */}
+                            <Image
+                              src={imageUrls['history-ww2-victory.png']}
+                              alt="Фотография Е. Халдея 'Знамя Победы над Рейхстагом'"
+                              width={400}
+                              height={225}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                              unoptimized
+                             />
+                          </div>
                         </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ww2-victory.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Знамя Победы над Рейхстагом.</p> </div>
                      <div className="p-2 border border-red-600/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                         {/* FIXED: Added span wrapper */}
-                         <span>
-                           <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/history-ww2-monument.png" alt="Фото: Монумент 'Родина-мать зовет!' на Мамаевом кургане." width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
-                         </span>
+                         <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                           {/* === UPDATED IMAGE === */}
+                           <Image
+                              src={imageUrls['history-ww2-monument.png']}
+                              alt="Фото: Монумент 'Родина-мать зовет!' на Мамаевом кургане."
+                              width={400}
+                              height={225}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                              unoptimized
+                            />
+                          </div>
                          </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ww2-monument.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">"Родина-мать зовет!".</p> </div>
                    </div>
                 </section>
