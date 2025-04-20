@@ -517,8 +517,7 @@ export default function VprTestPage() {
             debugLogger.log("useEffect cleanup: component unmounting or dependencies changed.");
         };
      // Dependencies: user/dbUser for auth, subjectId state, resetCounter for manual trigger, token/loading for context, global disable flag.
-     }, [user, dbUser, subjectId, resetCounter, token, isUserLoading, isDummyModeGloballyDisabled, error, isLoading]); // Added error, isLoading to deps
-
+     }, [user, dbUser, subjectId, resetCounter, token, isUserLoading, isDummyModeGloballyDisabled]);
 
     // --- Answer Handling ---
     const handleAnswer = useCallback(async (selectedAnswer: VprAnswerData) => {
@@ -748,7 +747,7 @@ export default function VprTestPage() {
         } finally {
             setIsSaving(false);
         }
-    }, [currentAttempt, isSaving, isTestComplete, timeUpModal, questions, currentQuestionIndex, user, dbUser, subject, isDummyModeActive, isDummyModeGloballyDisabled, error]); // Added error dependency
+    }, [currentAttempt, isSaving, isTestComplete, timeUpModal, questions, currentQuestionIndex, user, dbUser, subject, isDummyModeActive, isDummyModeGloballyDisabled]);
 
 
     // --- Reset Logic ---
