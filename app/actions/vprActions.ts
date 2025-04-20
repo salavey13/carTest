@@ -5,12 +5,11 @@ import { debugLogger } from "@/lib/debugLogger";
 import { logger } from "@/lib/logger";
 import type { VprTestAttempt, SubjectData, VprQuestionData, VprAnswerData } from "@/app/vpr-test/[subjectId]/page";
 import { notifyAdmins } from "@/app/actions"; // Assuming this is your main notify action
-import { formatDistanceStrict } from 'date-fns'; // For notification duration
-import { ru } from 'date-fns/locale'; // For notification duration
+// Removed date-fns as timing details are removed from notification
 
 // --- Types for Return Values ---
 interface StartAttemptResult {
-  success: boolean; // Added success flag
+  success: boolean;
   attempt?: VprTestAttempt | null;
   subject?: SubjectData | null;
   questions?: VprQuestionData[];
@@ -19,13 +18,13 @@ interface StartAttemptResult {
 }
 
 interface RecordAnswerResult {
-  success: boolean; // Added success flag
+  success: boolean;
   updatedAttempt?: VprTestAttempt | null;
   error?: string;
 }
 
 interface UpdateProgressResult {
-  success: boolean; // Added success flag
+  success: boolean;
   updatedAttempt?: VprTestAttempt | null;
   error?: string;
 }
@@ -34,6 +33,108 @@ interface ResetResult {
     success: boolean;
     error?: string;
 }
+
+// --- Helper Function for Notifications ---
+// Consolidate fetching and formatting logic for notifications
+async function sendCompletionNotification(
+    updatedAttempt: VprTestAttempt,
+    totalQuestionsAttempted: number, // Pass total questions for percentage calculation
+    isTimeUp: boolean = false
+) {
+    if (!updatedAttempt?.id) return; // Should not happen if called correctly
+
+    try {
+        // Fetch necessary data
+        const { data: subjectData } = await supabaseAdmin
+            .from('subjects')
+            .select('name')
+            .eq('id', updatedAttempt.subject_id)
+            .single();
+
+        const { data: userData } = await supabaseAdmin
+            .from('users')
+            .select('username, full_name')
+            .eq('user_id', updatedAttempt.user_id)
+            .single();
+
+        // Fetch answers for this attempt, joining with questions for position
+        const { data: answersData, error: answersError } = await supabaseAdmin
+            .from('vpr_attempt_answers')
+            .select(`
+                was_correct,
+                question:vpr_questions ( position )
+            `)
+            .eq('attempt_id', updatedAttempt.id)
+            .order('question(position)', { ascending: true }); // Ensure correct order
+
+        if (answersError) {
+            throw new Error(`Failed to fetch attempt answers: ${answersError.message}`);
+        }
+
+        // Process answers
+        const correctPositions: number[] = [];
+        const incorrectPositions: number[] = [];
+        (answersData || []).forEach(answer => {
+            // Handle potential null join result
+            const position = answer.question?.position;
+            if (typeof position === 'number') {
+                if (answer.was_correct) {
+                    correctPositions.push(position);
+                } else {
+                    incorrectPositions.push(position);
+                }
+            } else {
+                logger.warn(`[Notification] Could not find position for an answer in attempt ${updatedAttempt.id}`);
+            }
+        });
+
+        // Prepare common message parts
+        const userIdentifier = userData?.full_name
+            ? `${userData.full_name} (${userData.username || 'no_tg'})`
+            : (userData?.username || `ID: ${updatedAttempt.user_id}`);
+
+        const score = updatedAttempt.score ?? 0;
+        // Use total_questions from the attempt if available, otherwise fallback
+        const total = typeof updatedAttempt.total_questions === 'number'
+            ? updatedAttempt.total_questions
+            : totalQuestionsAttempted;
+        const percentage = total > 0 ? ((score / total) * 100).toFixed(1) : '0.0';
+
+        const subjectName = subjectData?.name || 'Неизвестный Предмет';
+        const variantNumber = updatedAttempt.variant_number;
+
+        // Construct the detailed performance message
+        let message = `📊 *Результаты ВПР: ${subjectName} (Вар. ${variantNumber})*\n\n`;
+        message += `👤 *Пользователь:* ${userIdentifier}\n`;
+        message += `🎯 *Итог:* ${score} из ${total} (${percentage}%)\n\n`;
+
+        if (incorrectPositions.length > 0) {
+            message += `❌ *Ошибки в вопросах:* № ${incorrectPositions.join(', ')}\n`;
+        } else {
+            message += `👍 *Ошибок нет!*\n`;
+        }
+
+        if (correctPositions.length > 0) {
+             message += `✅ *Верные ответы:* № ${correctPositions.join(', ')}\n`;
+             // Alternative: Just show count
+             // message += `✅ *Верные ответы:* ${correctPositions.length} шт.\n`;
+        } else {
+             message += `🤔 *Нет верных ответов.*\n`;
+        }
+
+        message += `\n*Тест ${isTimeUp ? 'завершен (Время вышло!)' : 'завершен'} ${isTimeUp ? '⏳' : '✅'}*`;
+
+        // Send the notification
+        await notifyAdmins(message);
+        debugLogger.log(`[VprAction] Sent performance notification for attempt ${updatedAttempt.id}. TimeUp: ${isTimeUp}`);
+
+    } catch (error) {
+        logger.error(`[VprAction] Failed to send completion notification for attempt ${updatedAttempt.id}:`, error);
+        // Optionally notify admin about the notification failure itself
+        // await notifyAdmins(`⚠️ Ошибка отправки уведомления о результатах для попытки ${updatedAttempt.id}`).catch(logger.error);
+    }
+}
+
 
 // --- Action Implementations ---
 
@@ -103,9 +204,8 @@ export async function startOrResumeVprAttempt(userId: string, subjectId: number)
             attemptToUse = newAttemptData; debugLogger.log(`[VprAction] New attempt created ID: ${attemptToUse.id}`);
         }
 
-        // ***** SUCCESS RETURN (Added success: true) *****
         return {
-            success: true,
+            success: true, // Added
             attempt: attemptToUse,
             subject: subjectData,
             questions: questionData,
@@ -114,9 +214,8 @@ export async function startOrResumeVprAttempt(userId: string, subjectId: number)
 
     } catch (err: any) {
         logger.error(`[VprAction] Error in startOrResumeVprAttempt (user: ${userId}, subject: ${subjectId}):`, err);
-        // ***** ERROR RETURN (Added success: false) *****
         return {
-            success: false,
+            success: false, // Added
             attempt: null,
             subject: null,
             questions: [],
@@ -147,8 +246,8 @@ export async function recordVprAnswer(attemptId: string, questionId: number, sel
         if (recordError && recordError.code !== '23505') {
             logger.error('[VprAction] Insert into vpr_attempt_answers FAILED:', recordError);
             throw new Error(`Ошибка записи ответа: ${recordError.message} (Code: ${recordError.code})`);
-        } else if (recordError?.code === '23505') { debugLogger.warn(`[VprAction] Duplicate answer insert attempted for question ${questionId}, attempt ${attemptId}. Ignoring insert error.`); }
-        else { debugLogger.log(`[VprAction] Insert into vpr_attempt_answers successful for question ${questionId}.`); }
+        } else if (recordError?.code === '23505') { debugLogger.warn(`[VprAction] Duplicate answer insert attempted...`); }
+        else { debugLogger.log(`[VprAction] Insert successful.`); }
 
         // --- Step 2: Update score in vpr_test_attempts ---
         debugLogger.log(`[VprAction] Attempting to update score for attempt ${attemptId} to ${newScore}.`);
@@ -157,15 +256,13 @@ export async function recordVprAnswer(attemptId: string, questionId: number, sel
             logger.error('[VprAction] Update score FAILED:', updateScoreError);
             throw new Error(`Ошибка обновления счета: ${updateScoreError.message} (Code: ${updateScoreError.code})`);
         }
-        if (!updatedData) { logger.error(`[VprAction] Update score returned no data for attempt ${attemptId}.`); throw new Error("Attempt data not returned after score update."); }
+        if (!updatedData) { logger.error(`[VprAction] Update score returned no data...`); throw new Error("Attempt data not returned after score update."); }
 
         debugLogger.log(`[VprAction] Attempt ${attemptId} score updated successfully.`);
-        // ***** SUCCESS RETURN (Corrected) *****
         return { success: true, updatedAttempt: updatedData };
 
     } catch (err: any) {
         logger.error(`[VprAction] Caught error in recordVprAnswer (attempt: ${attemptId}, question: ${questionId}):`, err);
-        // ***** ERROR RETURN (Corrected) *****
         return { success: false, error: err.message || "Не удалось сохранить ответ (неизвестная ошибка)." };
     }
 }
@@ -175,7 +272,7 @@ export async function recordVprAnswer(attemptId: string, questionId: number, sel
  */
 export async function updateVprAttemptProgress(attemptId: string, nextIndex: number, totalQuestions: number): Promise<UpdateProgressResult> {
     debugLogger.log(`[VprAction] updateVprAttemptProgress called for attempt: ${attemptId}, nextIndex: ${nextIndex}`);
-    if (!attemptId || nextIndex === null || totalQuestions === null) { // Added totalQuestions check
+    if (!attemptId || nextIndex === null || totalQuestions === null) {
         return { success: false, error: "Attempt ID, next index, and total questions are required." };
     }
 
@@ -191,31 +288,16 @@ export async function updateVprAttemptProgress(attemptId: string, nextIndex: num
         if (!updatedAttempt) throw new Error("Attempt not found after progress update.");
         debugLogger.log(`[VprAction] Attempt ${attemptId} progress updated.`);
 
-        // Notify Admin on Normal Completion
-        if (isFinishing) { // Removed && updatedAttempt check, it's guaranteed here
-            try {
-                const { data: subjectData } = await supabaseAdmin.from('subjects').select('name').eq('id', updatedAttempt.subject_id).single();
-                const { data: userData } = await supabaseAdmin.from('users').select('username, full_name').eq('user_id', updatedAttempt.user_id).single();
-
-                const score = updatedAttempt.score ?? 0;
-                const total = typeof updatedAttempt.total_questions === 'number' ? updatedAttempt.total_questions : totalQuestions;
-                const percentage = total > 0 ? ((score / total) * 100).toFixed(1) : '0.0';
-                let durationStr = 'N/A';
-                if (updatedAttempt.started_at && updatedAttempt.completed_at) {
-                   try { durationStr = formatDistanceStrict(new Date(updatedAttempt.completed_at), new Date(updatedAttempt.started_at), { locale: ru, unit: 'minute', roundingMethod: 'ceil' }); } catch {}
-                }
-                const userIdentifier = userData?.full_name ? `${userData.full_name} (${userData.username || 'no_tg_username'})` : (userData?.username || `ID:${updatedAttempt.user_id}`);
-                const message = `✅ *Тест ВПР Завершен:* 📊 ${userIdentifier}, Предмет: *${subjectData?.name || '??'}*, Вар ${updatedAttempt.variant_number}, Рез: *${score}*/*${total}* (${percentage}%), Время: ${durationStr}, ID: \`${updatedAttempt.id}\``; // Shortened message
-                await notifyAdmins(message);
-            } catch (notifyError) { logger.error(`[VprAction] Failed to fetch data/notify admin about normal completion for attempt ${attemptId}:`, notifyError); }
+        // --- Notify Admin on Normal Completion (Using Helper) ---
+        if (isFinishing) {
+            await sendCompletionNotification(updatedAttempt, totalQuestions, false);
         }
+        // --- End Notification ---
 
-        // ***** SUCCESS RETURN (Corrected) *****
         return { success: true, updatedAttempt: updatedAttempt };
 
     } catch (err: any) {
         logger.error(`[VprAction] Error updating progress (attempt: ${attemptId}):`, err);
-        // ***** ERROR RETURN (Corrected) *****
         return { success: false, error: err.message || "Не удалось обновить прогресс." };
     }
 }
@@ -225,7 +307,7 @@ export async function updateVprAttemptProgress(attemptId: string, nextIndex: num
  */
 export async function forceCompleteVprAttempt(attemptId: string, currentScore: number, totalQuestions: number): Promise<UpdateProgressResult> {
     debugLogger.log(`[VprAction] forceCompleteVprAttempt called for attempt: ${attemptId}`);
-    if (!attemptId || currentScore === null || totalQuestions === null) { // Added checks
+    if (!attemptId || currentScore === null || totalQuestions === null) {
         return { success: false, error: "Attempt ID, current score, and total questions are required." };
     }
 
@@ -237,28 +319,14 @@ export async function forceCompleteVprAttempt(attemptId: string, currentScore: n
         if (!updatedAttempt) throw new Error("Attempt not found after forced completion update.");
         debugLogger.log(`[VprAction] Attempt ${attemptId} forcibly completed.`);
 
-        // Notify Admin on Time Up Completion
-        try { // Separate try/catch for notification
-            const { data: subjectData } = await supabaseAdmin.from('subjects').select('name').eq('id', updatedAttempt.subject_id).single();
-            const { data: userData } = await supabaseAdmin.from('users').select('username, full_name').eq('user_id', updatedAttempt.user_id).single();
-            const score = updatedAttempt.score ?? 0;
-            const total = typeof updatedAttempt.total_questions === 'number' ? updatedAttempt.total_questions : totalQuestions;
-            const percentage = total > 0 ? ((score / total) * 100).toFixed(1) : '0.0';
-            let durationStr = 'N/A';
-            if (updatedAttempt.started_at && updatedAttempt.completed_at) {
-               try { durationStr = formatDistanceStrict(new Date(updatedAttempt.completed_at), new Date(updatedAttempt.started_at), { locale: ru, unit: 'minute', roundingMethod: 'ceil' }); } catch {}
-            }
-            const userIdentifier = userData?.full_name ? `${userData.full_name} (${userData.username || 'no_tg_username'})` : (userData?.username || `ID:${updatedAttempt.user_id}`);
-            const message = `🔔 *Тест ВПР (Время вышло!):* ⏳ ${userIdentifier}, Предмет: *${subjectData?.name || '??'}*, Вар ${updatedAttempt.variant_number}, Рез: *${score}*/*${total}* (${percentage}%), Время: ${durationStr}, ID: \`${updatedAttempt.id}\``; // Shortened message
-            await notifyAdmins(message);
-        } catch (notifyError) { logger.error(`[VprAction] Failed to fetch data/notify admin about time-up completion for attempt ${attemptId}:`, notifyError); }
+        // --- Notify Admin on Time Up Completion (Using Helper) ---
+        await sendCompletionNotification(updatedAttempt, totalQuestions, true);
+        // --- End Notification ---
 
-        // ***** SUCCESS RETURN (Corrected) *****
         return { success: true, updatedAttempt: updatedAttempt };
 
     } catch (err: any) {
         logger.error(`[VprAction] Error forcing completion (attempt: ${attemptId}):`, err);
-        // ***** ERROR RETURN (Corrected) *****
         return { success: false, error: err.message || "Не удалось принудительно завершить тест." };
     }
 }
@@ -271,18 +339,16 @@ export async function resetVprTest(userId: string, subjectId: number): Promise<R
     if (!userId || !subjectId) {
         return { success: false, error: "User ID and Subject ID are required for reset." };
     }
-
     try {
         const { error: deleteError } = await supabaseAdmin.from('vpr_test_attempts').delete().eq('user_id', userId).eq('subject_id', subjectId).is('completed_at', null);
         if (deleteError) {
-            logger.error(`[VprAction] Error deleting active attempts during reset (user: ${userId}, subject: ${subjectId}):`, deleteError);
+            logger.error(`[VprAction] Error deleting active attempts during reset...`, deleteError);
             return { success: false, error: `Не удалось удалить предыдущие незавершенные попытки: ${deleteError.message}` };
         }
         debugLogger.log(`[VprAction] Active attempts deleted for user ${userId}, subject ${subjectId}.`);
-        return { success: true }; // Correct
-
+        return { success: true };
     } catch (err: any) {
-        logger.error(`[VprAction] Exception during reset (user: ${userId}, subject: ${subjectId}):`, err);
-        return { success: false, error: err.message || "Произошла ошибка при сбросе теста." }; // Correct
+        logger.error(`[VprAction] Exception during reset...`, err);
+        return { success: false, error: err.message || "Произошла ошибка при сбросе теста." };
     }
 }
