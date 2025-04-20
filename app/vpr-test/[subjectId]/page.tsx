@@ -32,7 +32,7 @@ import { VprTimeUpModal } from "@/components/vpr/VprTimeUpModal";
 
 import { toast } from "sonner";
 // Import specific actions needed
-import { notifyAdmin } from "@/app/actions";
+import { notifyAdmins } from "@/app/actions";
 import { purchaseDisableDummyMode } from "@/app/actions/dummy_actions";
 
 // Optional: Use a date library for cleaner duration formatting in notifications
@@ -242,7 +242,7 @@ export default function VprTestPage() {
 *Notification generated: ${new Date().toLocaleString('ru-RU')}*`;
 
                   try {
-                      await notifyAdmin(message);
+                      await notifyAdmins(message);
                       debugLogger.log(`Admin notified (VERBOSE) of time-up completion. Attempt ID: ${updatedAttempt.id}`);
                   } catch (notifyError) {
                       debugLogger.error("Failed to notify admin about time-up completion (VERBOSE):", notifyError);
@@ -723,7 +723,7 @@ export default function VprTestPage() {
 *Notification generated: ${new Date().toLocaleString('ru-RU')}*`;
 
                     try {
-                        await notifyAdmin(message);
+                        await notifyAdmins(message);
                         debugLogger.log(`Admin notified (VERBOSE) of normal test completion. Attempt ID: ${updatedAttempt.id}`);
                     } catch (notifyError) {
                         debugLogger.error("Failed to notify admin about normal completion (VERBOSE):", notifyError);
