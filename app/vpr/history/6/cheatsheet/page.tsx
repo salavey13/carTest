@@ -36,19 +36,19 @@ const VprHistoryCheatsheet: React.FC = () => {
       'history-ww2-monument.png': "Изображение: Монумент 'Родина-мать зовет!' на Мамаевом кургане в Волгограде. Величественный и скорбный.",
   };
 
-  // == REVISED Image URLs ==
+  // == UPDATED Image URLs ==
   const imageUrls: Record<string, string> = {
-      'history-varangians.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Vasnetsov_Varangians.jpg/1024px-Vasnetsov_Varangians.jpg", // Vasnetsov painting
-      'history-baptism.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Vladimir_baptizing.jpg/1024px-Vladimir_baptizing.jpg", // Vasnetsov painting
-      'history-yaroslav.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Yaroslav_Mudry_by_Vasnetsov.jpg/800px-Yaroslav_Mudry_by_Vasnetsov.jpg", // Vasnetsov portrait (alternative, might be more recognizable)
-      'history-mongols.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Batu_Khan_invades_Rus.jpg/1024px-Batu_Khan_invades_Rus.jpg", // Miniature showing invasion scene
-      'history-nevsky.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/Ledovoe_poboische.jpg/1024px-Ledovoe_poboische.jpg", // Painting of Battle on the Ice
-      'history-kulikovo.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Peresvet.jpg/1024px-Peresvet.jpg", // Painting of Peresvet vs Chelubey
-      'history-ivan3.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Ugra_standoff.jpg/1024px-Ugra_standoff.jpg", // Painting of Stand on the Ugra
-      'history-feudalism.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/Feudalism_diagram.svg/800px-Feudalism_diagram.svg.png", // Feudalism diagram (SVG rendered as PNG - usually reliable)
-      'history-crusades.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e9/Siege_of_Antioch_-_First_Crusade.jpg/1024px-Siege_of_Antioch_-_First_Crusade.jpg", // Siege of Antioch miniature
-      'history-ww2-victory.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/Soviet_flag_on_Reichstag_roof.jpg/1024px-Soviet_flag_on_Reichstag_roof.jpg", // Khaldei photo
-      'history-ww2-monument.png': "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/The_Motherland_Calls_Statue.jpg/1024px-The_Motherland_Calls_Statue.jpg", // Motherland Calls statue photo
+      'history-varangians.png': "https://upload.wikimedia.org/wikipedia/commons/1/16/%D0%92%D0%B0%D1%80%D1%8F%D0%B3%D0%B8.jpg", // 16:9
+      'history-baptism.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/the-baptism-of-russia-1896.jpg!Large-71324dba-453c-4b24-b587-ef83b807fd17.jpg", // 9:16
+      'history-yaroslav.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/Yaroslav_the_Wise-09415836-fa19-4ee5-9816-47a06ac717ed.jpg", // 9:16
+      'history-mongols.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/1573709092_batyja-na-rus-miniatjura-iz-zhitija-evfrosini-suzdalskoj-xvii-vek-2e27ed16-3791-472a-84fd-37d982c8ab6b.jpg", // 1:1
+      'history-nevsky.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/0027_NEVSKY-FINAL-FRAME-1750x875-5599046e-d438-49ea-a57b-1cb458c5098e.jpg", // 16:9
+      'history-kulikovo.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/1299747-84c22ba5-9f6d-4fc9-be34-bdb06f69d557.jpg", // 9:16
+      'history-ivan3.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/album_alb3350347-007001aa-c7c3-40b7-89fe-50a4491004ca.jpg", // 16:9
+      'history-feudalism.png': "https://ru-static.z-dn.net/files/d62/328673063ea0e22a24d9392a9c99959e.jpg", // 16:10
+      'history-crusades.png': "https://upload.wikimedia.org/wikipedia/commons/d/d3/SiegeofAntioch.jpeg", // 1:1
+      'history-ww2-victory.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250420_135854-b056be47-8e5b-44f9-bccd-d14ca75fd294.jpg", // 9:16
+      'history-ww2-monument.png': "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/motherland-calls.jpg-660bb17c-5de2-4b61-9744-f03b780bf455.jpg", // 16:9
   };
 
 
@@ -99,16 +99,17 @@ const VprHistoryCheatsheet: React.FC = () => {
                     <div className="p-2 border border-blue-500/30 rounded-lg bg-black/30">
                         <Tooltip>
                           <TooltipTrigger asChild>
+                           {/* Container forces 16:9 aspect ratio */}
                            <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
-                             {/* === UPDATED IMAGE === */}
+                             {/* === IMAGE USES UPDATED URL === */}
                              <Image
-                               src={imageUrls['history-varangians.png']}
+                               src={imageUrls['history-varangians.png']} // 16:9 image fits well
                                alt="Картина В. Васнецова 'Варяги'"
-                               width={400}
-                               height={225}
-                               className="w-full h-full object-cover"
+                               width={400} // Hint for Next.js, actual display controlled by div+object-cover
+                               height={225} // Hint for Next.js (16:9 ratio)
+                               className="w-full h-full object-cover" // Fill container, cropping if needed
                                loading="lazy"
-                               unoptimized
+                               unoptimized // Use if external host doesn't support optimization
                               />
                            </div>
                           </TooltipTrigger>
@@ -119,14 +120,15 @@ const VprHistoryCheatsheet: React.FC = () => {
                     <div className="p-2 border border-blue-500/30 rounded-lg bg-black/30">
                         <Tooltip>
                           <TooltipTrigger asChild>
+                             {/* Container forces 16:9 aspect ratio */}
                              <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
-                               {/* === UPDATED IMAGE === */}
+                               {/* === IMAGE USES UPDATED URL === */}
                                <Image
-                                 src={imageUrls['history-baptism.png']}
+                                 src={imageUrls['history-baptism.png']} // 9:16 image will be cropped
                                  alt="Картина В. Васнецова 'Крещение Руси'"
-                                 width={400}
-                                 height={225}
-                                 className="w-full h-full object-cover"
+                                 width={400} // Hint for Next.js
+                                 height={711} // Hint for Next.js (9:16 ratio)
+                                 className="w-full h-full object-cover" // Fill container, cropping portrait image
                                  loading="lazy"
                                  unoptimized
                                />
@@ -150,20 +152,27 @@ const VprHistoryCheatsheet: React.FC = () => {
                      <li><strong>Юрий Долгорукий, Андрей Боголюбский:</strong> Рост Северо-Восточной Руси.</li>
                    </ul>
                    {/* Image Placeholder: Ярослав Мудрый */}
-                   <div className="my-6 p-2 border border-blue-500/30 rounded-lg bg-black/30 max-w-sm mx-auto"> <Tooltip> <TooltipTrigger asChild>
-                      <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
-                        {/* === UPDATED IMAGE === */}
-                        <Image
-                          src={imageUrls['history-yaroslav.png']}
-                          alt="Портрет Ярослава Мудрого (В. Васнецов)"
-                          width={400}
-                          height={400}
-                          className="w-full h-full object-cover" // Use cover for portraits usually
-                          loading="lazy"
-                          unoptimized
-                         />
-                      </div>
-                    </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-blue-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-yaroslav.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Ярослав Мудрый - расцвет Руси.</p> </div>
+                   <div className="my-6 p-2 border border-blue-500/30 rounded-lg bg-black/30 max-w-sm mx-auto">
+                     <Tooltip>
+                       <TooltipTrigger asChild>
+                          {/* Container forces 1:1 aspect ratio */}
+                          <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                            {/* === IMAGE USES UPDATED URL === */}
+                            <Image
+                              src={imageUrls['history-yaroslav.png']} // 9:16 image will be cropped
+                              alt="Портрет Ярослава Мудрого (В. Васнецов)"
+                              width={400} // Hint
+                              height={711} // Hint (9:16 ratio)
+                              className="w-full h-full object-cover" // Fill container, cropping portrait image
+                              loading="lazy"
+                              unoptimized
+                             />
+                          </div>
+                       </TooltipTrigger>
+                       <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-blue-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-yaroslav.png']}</p></TooltipContent>
+                     </Tooltip>
+                     <p className="text-xs text-center text-gray-400 mt-1 italic">Ярослав Мудрый - расцвет Руси.</p>
+                   </div>
 
                    {/* Subsection: Термины и Культура */}
                    <h3 className="flex items-center text-xl font-semibold text-blue-300 mt-6 mb-2">
@@ -192,20 +201,27 @@ const VprHistoryCheatsheet: React.FC = () => {
                     <li><strong>Термины Ига:</strong> Ярлык (грамота на княжение), Выход (дань), Баскаки (сборщики дани).</li>
                   </ul>
                   {/* Image Placeholder: Монгольское нашествие */}
-                  <div className="my-6 p-2 border border-red-600/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                      <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
-                         {/* === UPDATED IMAGE === */}
-                         <Image
-                           src={imageUrls['history-mongols.png']}
-                           alt="Миниатюра 'Нашествие Батыя на Русь'"
-                           width={600}
-                           height={338}
-                           className="w-full h-full object-cover"
-                           loading="lazy"
-                           unoptimized
-                          />
-                       </div>
-                    </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-mongols.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Нашествие Батыя (1237-1241)</p> </div>
+                  <div className="my-6 p-2 border border-red-600/30 rounded-lg bg-black/30">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                          {/* Container forces 16:9 aspect ratio */}
+                          <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                             {/* === IMAGE USES UPDATED URL === */}
+                             <Image
+                               src={imageUrls['history-mongols.png']} // 1:1 image will be cropped (letterboxed if 'object-contain')
+                               alt="Миниатюра 'Нашествие Батыя на Русь'"
+                               width={600} // Hint
+                               height={600} // Hint (1:1 ratio)
+                               className="w-full h-full object-cover" // Fill container, cropping square image
+                               loading="lazy"
+                               unoptimized
+                              />
+                           </div>
+                       </TooltipTrigger>
+                       <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-mongols.png']}</p></TooltipContent>
+                    </Tooltip>
+                    <p className="text-xs text-center text-gray-400 mt-1 italic">Нашествие Батыя (1237-1241)</p>
+                  </div>
 
                   {/* Subsection: Борьба с захватчиками */}
                    <h3 className="flex items-center text-xl font-semibold text-blue-300 mt-6 mb-2">
@@ -216,34 +232,48 @@ const VprHistoryCheatsheet: React.FC = () => {
                      <li><strong>Дмитрий Донской:</strong> Куликовская битва (1380).</li>
                    </ul>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-                     <div className="p-2 border border-cyan-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                         <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
-                           {/* === UPDATED IMAGE === */}
-                           <Image
-                             src={imageUrls['history-nevsky.png']}
-                             alt="Картина 'Ледовое побоище'"
-                             width={400}
-                             height={225}
-                             className="w-full h-full object-cover"
-                             loading="lazy"
-                             unoptimized
-                           />
-                          </div>
-                        </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-cyan-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-nevsky.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Ледовое побоище (1242)</p> </div>
-                     <div className="p-2 border border-orange-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                         <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
-                            {/* === UPDATED IMAGE === */}
-                            <Image
-                              src={imageUrls['history-kulikovo.png']}
-                              alt="Картина 'Поединок Пересвета с Челубеем'"
-                              width={400}
-                              height={225}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                              unoptimized
-                            />
-                          </div>
-                         </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-orange-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-kulikovo.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Куликовская битва (1380)</p> </div>
+                     <div className="p-2 border border-cyan-500/30 rounded-lg bg-black/30">
+                       <Tooltip>
+                         <TooltipTrigger asChild>
+                             {/* Container forces 16:9 aspect ratio */}
+                             <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                               {/* === IMAGE USES UPDATED URL === */}
+                               <Image
+                                 src={imageUrls['history-nevsky.png']} // 16:9 image fits well
+                                 alt="Картина 'Ледовое побоище'"
+                                 width={400} // Hint
+                                 height={225} // Hint (16:9 ratio)
+                                 className="w-full h-full object-cover"
+                                 loading="lazy"
+                                 unoptimized
+                               />
+                              </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-cyan-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-nevsky.png']}</p></TooltipContent>
+                         </Tooltip>
+                         <p className="text-xs text-center text-gray-400 mt-1 italic">Ледовое побоище (1242)</p>
+                      </div>
+                     <div className="p-2 border border-orange-500/30 rounded-lg bg-black/30">
+                       <Tooltip>
+                         <TooltipTrigger asChild>
+                             {/* Container forces 16:9 aspect ratio */}
+                             <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                                {/* === IMAGE USES UPDATED URL === */}
+                                <Image
+                                  src={imageUrls['history-kulikovo.png']} // 9:16 image will be cropped
+                                  alt="Картина 'Поединок Пересвета с Челубеем'"
+                                  width={400} // Hint
+                                  height={711} // Hint (9:16 ratio)
+                                  className="w-full h-full object-cover" // Fill container, cropping portrait image
+                                  loading="lazy"
+                                  unoptimized
+                                />
+                              </div>
+                           </TooltipTrigger>
+                           <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-orange-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-kulikovo.png']}</p></TooltipContent>
+                         </Tooltip>
+                         <p className="text-xs text-center text-gray-400 mt-1 italic">Куликовская битва (1380)</p>
+                       </div>
                    </div>
 
                   {/* Subsection: Объединение Руси */}
@@ -255,20 +285,27 @@ const VprHistoryCheatsheet: React.FC = () => {
                      <li><strong>Иван III Великий:</strong> Присоединение Новгорода, Твери; Конец ига (Стояние на Угре, 1480); Судебник 1497 г.</li>
                    </ul>
                    {/* Image Placeholder: Стояние на Угре */}
-                   <div className="my-6 p-2 border border-green-500/30 rounded-lg bg-black/30 max-w-md mx-auto"> <Tooltip> <TooltipTrigger asChild>
-                       <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
-                          {/* === UPDATED IMAGE === */}
-                          <Image
-                            src={imageUrls['history-ivan3.png']}
-                            alt="Картина 'Стояние на Угре'"
-                            width={500}
-                            height={281}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                            unoptimized
-                           />
-                        </div>
-                     </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-green-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ivan3.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Стояние на Угре (1480) - конец ига.</p> </div>
+                   <div className="my-6 p-2 border border-green-500/30 rounded-lg bg-black/30 max-w-md mx-auto">
+                     <Tooltip>
+                       <TooltipTrigger asChild>
+                           {/* Container forces 16:9 aspect ratio */}
+                           <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                              {/* === IMAGE USES UPDATED URL === */}
+                              <Image
+                                src={imageUrls['history-ivan3.png']} // 16:9 image fits well
+                                alt="Картина 'Стояние на Угре'"
+                                width={500} // Hint
+                                height={281} // Hint (16:9 ratio)
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                                unoptimized
+                               />
+                            </div>
+                         </TooltipTrigger>
+                         <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-green-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ivan3.png']}</p></TooltipContent>
+                       </Tooltip>
+                       <p className="text-xs text-center text-gray-400 mt-1 italic">Стояние на Угре (1480) - конец ига.</p>
+                    </div>
                 </section>
 
                 {/* Section: Средние века (Зарубежная) */}
@@ -287,34 +324,48 @@ const VprHistoryCheatsheet: React.FC = () => {
                     <li><strong className="text-purple-400">Культура:</strong> Готика (Нотр-Дам), университеты.</li>
                   </ul>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-                     <div className="p-2 border border-purple-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                         <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
-                           {/* === UPDATED IMAGE === */}
-                           <Image
-                             src={imageUrls['history-feudalism.png']}
-                             alt="Схема феодальной лестницы"
-                             width={400}
-                             height={400}
-                             className="w-full h-full object-contain bg-white p-1" // Contain + White BG for diagram
-                             loading="lazy"
-                             unoptimized
-                           />
-                          </div>
-                        </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-purple-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-feudalism.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Феодальная система.</p> </div>
-                     <div className="p-2 border border-purple-500/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                         <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
-                           {/* === UPDATED IMAGE === */}
-                           <Image
-                             src={imageUrls['history-crusades.png']}
-                             alt="Средневековая миниатюра 'Осада Антиохии' (Крестовый поход)"
-                             width={400}
-                             height={400}
-                             className="w-full h-full object-cover"
-                             loading="lazy"
-                             unoptimized
-                           />
-                          </div>
-                        </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-purple-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-crusades.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Крестовые походы.</p> </div>
+                     <div className="p-2 border border-purple-500/30 rounded-lg bg-black/30">
+                       <Tooltip>
+                         <TooltipTrigger asChild>
+                             {/* Container forces 1:1 aspect ratio */}
+                             <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                               {/* === IMAGE USES UPDATED URL === */}
+                               <Image
+                                 src={imageUrls['history-feudalism.png']} // 16:10 image, use contain
+                                 alt="Схема феодальной лестницы"
+                                 width={400} // Hint
+                                 height={250} // Hint (16:10 ratio)
+                                 className="w-full h-full object-contain bg-white p-1" // Fit inside container, add white bg for clarity
+                                 loading="lazy"
+                                 unoptimized
+                               />
+                              </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-purple-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-feudalism.png']}</p></TooltipContent>
+                        </Tooltip>
+                        <p className="text-xs text-center text-gray-400 mt-1 italic">Феодальная система.</p>
+                     </div>
+                     <div className="p-2 border border-purple-500/30 rounded-lg bg-black/30">
+                       <Tooltip>
+                         <TooltipTrigger asChild>
+                             {/* Container forces 1:1 aspect ratio */}
+                             <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                               {/* === IMAGE USES UPDATED URL === */}
+                               <Image
+                                 src={imageUrls['history-crusades.png']} // 1:1 image fits well
+                                 alt="Средневековая миниатюра 'Осада Антиохии' (Крестовый поход)"
+                                 width={400} // Hint
+                                 height={400} // Hint (1:1 ratio)
+                                 className="w-full h-full object-cover"
+                                 loading="lazy"
+                                 unoptimized
+                               />
+                              </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-purple-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-crusades.png']}</p></TooltipContent>
+                        </Tooltip>
+                        <p className="text-xs text-center text-gray-400 mt-1 italic">Крестовые походы.</p>
+                     </div>
                    </div>
                 </section>
 
@@ -331,34 +382,48 @@ const VprHistoryCheatsheet: React.FC = () => {
                     <li><strong className="text-red-500">Памятники:</strong> Мамаев курган ("Родина-мать").</li>
                   </ul>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
-                     <div className="p-2 border border-red-600/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                         <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
-                            {/* === UPDATED IMAGE === */}
-                            <Image
-                              src={imageUrls['history-ww2-victory.png']}
-                              alt="Фотография Е. Халдея 'Знамя Победы над Рейхстагом'"
-                              width={400}
-                              height={225}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                              unoptimized
-                             />
-                          </div>
-                        </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ww2-victory.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Знамя Победы над Рейхстагом.</p> </div>
-                     <div className="p-2 border border-red-600/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                         <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
-                           {/* === UPDATED IMAGE === */}
-                           <Image
-                              src={imageUrls['history-ww2-monument.png']}
-                              alt="Фото: Монумент 'Родина-мать зовет!' на Мамаевом кургане."
-                              width={400}
-                              height={225}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                              unoptimized
-                            />
-                          </div>
-                         </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ww2-monument.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">"Родина-мать зовет!".</p> </div>
+                     <div className="p-2 border border-red-600/30 rounded-lg bg-black/30">
+                       <Tooltip>
+                         <TooltipTrigger asChild>
+                             {/* Container forces 16:9 aspect ratio */}
+                             <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                                {/* === IMAGE USES UPDATED URL === */}
+                                <Image
+                                  src={imageUrls['history-ww2-victory.png']} // 9:16 image will be cropped
+                                  alt="Фотография Е. Халдея 'Знамя Победы над Рейхстагом'"
+                                  width={400} // Hint
+                                  height={711} // Hint (9:16 ratio)
+                                  className="w-full h-full object-cover" // Fill container, cropping portrait image
+                                  loading="lazy"
+                                  unoptimized
+                                 />
+                              </div>
+                           </TooltipTrigger>
+                           <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ww2-victory.png']}</p></TooltipContent>
+                          </Tooltip>
+                          <p className="text-xs text-center text-gray-400 mt-1 italic">Знамя Победы над Рейхстагом.</p>
+                     </div>
+                     <div className="p-2 border border-red-600/30 rounded-lg bg-black/30">
+                       <Tooltip>
+                         <TooltipTrigger asChild>
+                             {/* Container forces 16:9 aspect ratio */}
+                             <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
+                               {/* === IMAGE USES UPDATED URL === */}
+                               <Image
+                                  src={imageUrls['history-ww2-monument.png']} // 16:9 image fits well
+                                  alt="Фото: Монумент 'Родина-мать зовет!' на Мамаевом кургане."
+                                  width={400} // Hint
+                                  height={225} // Hint (16:9 ratio)
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  unoptimized
+                                />
+                              </div>
+                           </TooltipTrigger>
+                           <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ww2-monument.png']}</p></TooltipContent>
+                          </Tooltip>
+                          <p className="text-xs text-center text-gray-400 mt-1 italic">"Родина-мать зовет!".</p>
+                     </div>
                    </div>
                 </section>
 
