@@ -66,7 +66,7 @@
       // === State ===
       const [repoUrl, setRepoUrlState] = useState<string>("https://github.com/salavey13/cartest");
       const [token, setToken] = useState<string>("");
-      const [files, setFiles] = useState<FileNode[]>([]);
+      const [files, setFiles] = useState<FileNode[]>([]); // <-- Component state for all fetched files
       const [selectedFiles, setSelectedFilesState] = useState<Set<string>>(new Set());
       const [extractLoading, setExtractLoading] = useState<boolean>(false);
       const [progress, setProgress] = useState<number>(0);
@@ -103,6 +103,7 @@
       const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
       const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
       const localKworkInputRef = useRef<HTMLTextAreaElement | null>(null);
+      const prevSelectedFilesRef = useRef<Set<string>>(new Set()); // Ref to track previous selection for manual auto-select
       useEffect(() => { if (kworkInputRef) kworkInputRef.current = localKworkInputRef.current; }, [kworkInputRef]);
 
       // === Utility Functions ===
@@ -115,15 +116,39 @@
             toast(message, { style: style, duration: type === 'error' ? 5000 : 3000 });
        }, []);
 
-       const getPageFilePath = useCallback((routePath: string, allActualFilePaths: string[]): string => {
+       // --- FIX: Revised getPageFilePath logic ---
+       const getPageFilePath = useCallback((routePath: string, allActualFilePaths: string[]): string | null => {
             const cleanPath = routePath.startsWith('/') ? routePath.substring(1) : routePath;
-            if (!cleanPath || cleanPath === 'app' || cleanPath === '/') { const rootPaths = ['app/page.tsx', 'app/page.js', 'app/index.tsx', 'app/index.js', 'src/app/page.tsx', 'src/app/page.js']; for (const rp of rootPaths) { if (allActualFilePaths.includes(rp)) return rp; } console.warn(`getPageFilePath: Root path mapping not found for "${routePath}". Defaulting to app/page.tsx`); return 'app/page.tsx'; }
+            if (!cleanPath || cleanPath === 'app' || cleanPath === '/') { const rootPaths = ['app/page.tsx', 'app/page.js', 'app/index.tsx', 'app/index.js', 'src/app/page.tsx', 'src/app/page.js']; for (const rp of rootPaths) { if (allActualFilePaths.includes(rp)) return rp; } console.warn(`getPageFilePath: Root path mapping not found for "${routePath}". Defaulting to null`); return null; }
+
             const pathWithApp = cleanPath.startsWith('app/') ? cleanPath : cleanPath.startsWith('src/app/') ? cleanPath : `app/${cleanPath}`;
+
+            // 1. Check if pathWithApp exists directly
+            if (allActualFilePaths.includes(pathWithApp)) {
+                console.log(`getPageFilePath: Direct match found: "${routePath}" -> "${pathWithApp}"`);
+                return pathWithApp;
+            }
+
+            // 2. Check standard page/index variations (only if direct match failed)
+            const potentialDirectPaths = [`${pathWithApp}/page.tsx`, `${pathWithApp}/page.js`, `${pathWithApp}/index.tsx`, `${pathWithApp}/index.js`];
+            for (const pdp of potentialDirectPaths) {
+                if (allActualFilePaths.includes(pdp)) {
+                    console.log(`getPageFilePath: Standard page/index match found: "${routePath}" -> "${pdp}"`);
+                    return pdp;
+                }
+            }
+
+            // 3. Dynamic matching (/[param]/page.tsx etc.)
             const inputSegments = pathWithApp.split('/'); const numInputSegments = inputSegments.length;
-            const potentialDirectPaths = [`${pathWithApp}/page.tsx`, `${pathWithApp}/page.js`, `${pathWithApp}/index.tsx`, `${pathWithApp}/index.js`]; for (const pdp of potentialDirectPaths) { if (allActualFilePaths.includes(pdp)) return pdp; }
             const pageFiles = allActualFilePaths.filter(p => (p.startsWith('app/') || p.startsWith('src/app/')) && (p.endsWith('/page.tsx') || p.endsWith('/page.js') || p.endsWith('/index.tsx') || p.endsWith('/index.js')));
             for (const actualPath of pageFiles) { const suffix = ['/page.tsx', '/page.js', '/index.tsx', '/index.js'].find(s => actualPath.endsWith(s)); if (!suffix) continue; const actualPathBase = actualPath.substring(0, actualPath.length - suffix.length); const actualSegments = actualPathBase.split('/'); if (actualSegments.length !== numInputSegments) continue; let isDynamicMatch = true; for (let i = 0; i < numInputSegments; i++) { const inputSeg = inputSegments[i]; const actualSeg = actualSegments[i]; if (inputSeg === actualSeg) continue; else if (actualSeg.startsWith('[') && actualSeg.endsWith(']')) continue; else { isDynamicMatch = false; break; } } if (isDynamicMatch) { console.log(`getPageFilePath: Dynamic match found: "${routePath}" -> "${actualPath}"`); return actualPath; } }
-            console.warn(`getPageFilePath: No direct or dynamic match for route "${routePath}". Falling back to guess: "${potentialDirectPaths[0]}"`); return potentialDirectPaths[0];
+
+            console.warn(`getPageFilePath: No direct, standard, or dynamic match for route "${routePath}". Returning null.`);
+            // Fallback: return the *first* potential path, even if it doesn't exist, but log a stronger warning.
+            // This might be better than null if some later logic expects *a* path. Revisit if this causes issues.
+            // console.warn(`getPageFilePath: No direct or dynamic match for route "${routePath}". Falling back to GUESS: "${potentialDirectPaths[0]}"`);
+            // return potentialDirectPaths[0];
+             return null; // Return null if truly not found
        }, []);
 
        const extractImports = useCallback((content: string): string[] => {
@@ -165,35 +190,49 @@
 
     const getKworkInputValue = useCallback((): string => localKworkInputRef.current?.value || "", []);
 
+    // --- FIX: handleAddSelected now accepts optional allFilesParam to avoid state race condition ---
+    const handleAddSelected = useCallback(async (autoAskAi = false, filesToAddParam?: Set<string>, allFilesParam?: FileNode[]) => {
+        const filesToProcess = allFilesParam || files; // Use passed files if available, else use state
+        const filesToAdd = filesToAddParam || selectedFiles;
 
-    // Add selected file contents to the Kwork Input
-    // .. FIX: Prevent adding duplicate path comment
-    const handleAddSelected = useCallback(async (autoAskAi = false, filesToAddParam?: Set<string>) => {
-        const filesToAdd = filesToAddParam || selectedFiles; if (filesToAdd.size === 0) { addToast("Сначала выберите файлы для добавления", 'error'); return; }
+        if (filesToProcess.length === 0 && filesToAdd.size > 0) {
+            addToast("Ошибка: Файлы для добавления еще не загружены. Повторите попытку.", 'error');
+            console.error("handleAddSelected: Attempted to add files but filesToProcess is empty. filesToAdd:", filesToAdd);
+            return;
+        }
+        if (filesToAdd.size === 0) {
+            addToast("Сначала выберите файлы для добавления", 'error');
+            return;
+        }
+
         const prefix = "Контекст кода для анализа:\n";
-        const markdownTxt = files
+        const markdownTxt = filesToProcess // Process the correct list of files
             .filter((file) => filesToAdd.has(file.path))
             .sort((a, b) => a.path.localeCompare(b.path))
             .map((file) => {
                 const pathComment = `// /${file.path}`;
-                // .. Check if the raw file content already starts with this comment line (ignoring leading whitespace)
                 const contentAlreadyHasComment = file.content.trimStart().startsWith(pathComment);
-                // .. Add the comment ONLY if it's not already the first line of the content
                 const contentToAdd = contentAlreadyHasComment ? file.content : `${pathComment}\n${file.content}`;
                 return `\`\`\`${getLanguage(file.path)}\n${contentToAdd}\n\`\`\``;
             })
             .join("\n\n");
+
         const currentKworkValue = getKworkInputValue();
-        const taskText = currentKworkValue.split(prefix)[0]?.trim() || ""; // .. Extract text before the code context prefix
-        const newContent = `${taskText ? taskText + '\n\n' : ''}${prefix}${markdownTxt}`; // .. Rebuild: Task + Prefix + New Markdown Code
+        const taskText = currentKworkValue.split(prefix)[0]?.trim() || "";
+        const newContent = `${taskText ? taskText + '\n\n' : ''}${prefix}${markdownTxt}`;
+
         updateKworkInput(newContent);
-        addToast(`${filesToAdd.size} файлов добавлено в запрос`, 'success');
+        // Only show generic success if not part of auto-add flow
+        if (!allFilesParam) {
+             addToast(`${filesToAdd.size} файлов добавлено в запрос`, 'success');
+        }
         scrollToSection('kworkInput');
+
         if (autoAskAi && autoAskAiEnabled) {
             addToast("Автоматически отправляю запрос AI в очередь...", "info");
             await triggerAskAi().catch(err => console.error("Error auto-triggering AI Ask:", err));
         }
-    }, [selectedFiles, files, addToast, getKworkInputValue, updateKworkInput, scrollToSection, autoAskAiEnabled, triggerAskAi, getLanguage]); // Added getLanguage dependency
+    }, [files, selectedFiles, addToast, getKworkInputValue, updateKworkInput, scrollToSection, autoAskAiEnabled, triggerAskAi, getLanguage]); // Keep 'files' state as fallback
 
 
     const handleCopyToClipboard = useCallback((textToCopy?: string, shouldScroll = true): boolean => {
@@ -217,15 +256,78 @@
         const maxRetries = 2; const retryDelayMs = 2000; let currentTry = 0; let result: Awaited<ReturnType<typeof fetchRepoContents>> | null = null;
         while (currentTry <= maxRetries) { currentTry++; const currentStatus: FetchStatus = currentTry > 1 ? 'retrying' : 'loading'; setFetchStatus(currentStatus); if (currentStatus === 'retrying') { addToast(`Попытка ${currentTry} из ${maxRetries+1}...`, 'info'); await delay(retryDelayMs); startProgressSimulation(15 + (currentTry * 5)); }
             try { result = await fetchRepoContents(repoUrl, token || undefined, branchNameToFetch); console.log(`[Fetcher:handleFetch] Attempt ${currentTry} raw result:`, result);
-              if (result?.success && Array.isArray(result.files)) { stopProgressSimulation(); setProgress(100); setFetchStatus('success'); addToast(`Извлечено ${result.files.length} файлов из ${effectiveBranch}!`, 'success'); setFiles(result.files); if (isSettingsModalOpen) triggerToggleSettingsModal(); setExtractLoading(false);
-                const fetchedFiles = result.files; const allActualFilePaths = fetchedFiles.map(f => f.path); let primaryPath: string | null = null; const categorizedSecondaryPaths: Record<ImportCategory, Set<string>> = { component: new Set(), context: new Set(), hook: new Set(), lib: new Set(), other: new Set() }; let filesToSelect = new Set<string>();
-                if (highlightedPathFromUrl) { primaryPath = getPageFilePath(highlightedPathFromUrl, allActualFilePaths); const pageFile = fetchedFiles.find((file) => file.path === primaryPath); if (pageFile) { console.log(`Primary file found: ${primaryPath}`); filesToSelect.add(primaryPath); const rawImports = extractImports(pageFile.content); console.log(`Raw imports from ${primaryPath}:`, rawImports); for (const imp of rawImports) { const resolvedPath = resolveImportPath(imp, pageFile.path, fetchedFiles); if (resolvedPath && resolvedPath !== primaryPath) { const category = categorizeResolvedPath(resolvedPath); categorizedSecondaryPaths[category].add(resolvedPath); if (category !== 'other') filesToSelect.add(resolvedPath); console.log(`  Resolved import: '${imp}' -> '${resolvedPath}' (Category: ${category})`); } else if (!resolvedPath) { console.log(`  Could not resolve import: '${imp}'`); } } } else { addToast(`Файл страницы для URL (${highlightedPathFromUrl} -> ${primaryPath || 'not found'}) не найден в ветке '${effectiveBranch}'.`, 'warning'); primaryPath = null; } }
+              if (result?.success && Array.isArray(result.files)) {
+                  const fetchedFiles = result.files; // Keep fetched files in a local variable
+
+                  stopProgressSimulation(); setProgress(100); setFetchStatus('success'); addToast(`Извлечено ${fetchedFiles.length} файлов из ${effectiveBranch}!`, 'success');
+                  setFiles(fetchedFiles); // Update state
+                  if (isSettingsModalOpen) triggerToggleSettingsModal();
+                  setExtractLoading(false);
+
+                const allActualFilePaths = fetchedFiles.map(f => f.path); let primaryPath: string | null = null; const categorizedSecondaryPaths: Record<ImportCategory, Set<string>> = { component: new Set(), context: new Set(), hook: new Set(), lib: new Set(), other: new Set() }; let filesToSelect = new Set<string>();
+
+                if (highlightedPathFromUrl) {
+                    // --- FIX: Use revised getPageFilePath ---
+                    primaryPath = getPageFilePath(highlightedPathFromUrl, allActualFilePaths);
+                    if (primaryPath) {
+                        const pageFile = fetchedFiles.find((file) => file.path === primaryPath);
+                        if (pageFile) {
+                             console.log(`Primary file found: ${primaryPath}`); filesToSelect.add(primaryPath); const rawImports = extractImports(pageFile.content); console.log(`Raw imports from ${primaryPath}:`, rawImports); for (const imp of rawImports) { const resolvedPath = resolveImportPath(imp, pageFile.path, fetchedFiles); if (resolvedPath && resolvedPath !== primaryPath) { const category = categorizeResolvedPath(resolvedPath); categorizedSecondaryPaths[category].add(resolvedPath); if (category !== 'other') filesToSelect.add(resolvedPath); console.log(`  Resolved import: '${imp}' -> '${resolvedPath}' (Category: ${category})`); } else if (!resolvedPath) { console.log(`  Could not resolve import: '${imp}'`); } }
+                        } else {
+                             // This case should be less likely now with the fixed getPageFilePath returning null
+                             console.error(`Primary file path resolved to ${primaryPath}, but not found in fetchedFiles!`);
+                             addToast(`Ошибка: Найденный путь (${primaryPath}) не соответствует файлу в репо.`, 'error');
+                             primaryPath = null; // Reset primaryPath if file object not found
+                        }
+                    } else {
+                         addToast(`Файл страницы для URL (${highlightedPathFromUrl}) не найден в ветке '${effectiveBranch}'.`, 'warning');
+                    }
+                }
                 importantFiles.forEach(path => { if (fetchedFiles.some(f => f.path === path) && !filesToSelect.has(path)) filesToSelect.add(path); });
+
                 setPrimaryHighlightedPathState(primaryPath); const finalSecondaryPathsState = { component: Array.from(categorizedSecondaryPaths.component), context: Array.from(categorizedSecondaryPaths.context), hook: Array.from(categorizedSecondaryPaths.hook), lib: Array.from(categorizedSecondaryPaths.lib), other: Array.from(categorizedSecondaryPaths.other) }; setSecondaryHighlightedPathsState(finalSecondaryPathsState); setFilesFetched(true, primaryPath, Object.values(finalSecondaryPathsState).flat());
-                if (highlightedPathFromUrl && ideaFromUrl && filesToSelect.size > 0) { addToast(`Авто-выбор ${filesToSelect.size} файлов и генерация запроса...`, 'info'); setSelectedFilesState(filesToSelect); setSelectedFetcherFiles(filesToSelect); const task = ideaFromUrl || DEFAULT_TASK_IDEA; updateKworkInput(task); await handleAddSelected(true, filesToSelect); }
-                else { if (filesToSelect.size > 0 && (!highlightedPathFromUrl || !ideaFromUrl)) { setSelectedFilesState(filesToSelect); setSelectedFetcherFiles(filesToSelect); const numHighlighted = categorizedSecondaryPaths.component.size + categorizedSecondaryPaths.context.size + categorizedSecondaryPaths.hook.size + categorizedSecondaryPaths.lib.size; const numImportantOnly = filesToSelect.size - (primaryPath ? 1 : 0) - numHighlighted; let selectMsg = `Авто-выбрано: `; const parts = []; if(primaryPath) parts.push(`1 основной`); if(numHighlighted > 0) parts.push(`${numHighlighted} связанных`); if(numImportantOnly > 0) parts.push(`${numImportantOnly} важных`); selectMsg += parts.join(', ') + '.'; addToast(selectMsg, 'info'); }
-                  if (primaryPath) { setTimeout(() => { const elementId = `file-${primaryPath}`; const fileElement = document.getElementById(elementId); if (fileElement) { fileElement.scrollIntoView({ behavior: "smooth", block: "center" }); fileElement.classList.add('ring-2', 'ring-offset-2', 'ring-cyan-400', 'rounded-md', 'transition-all', 'duration-1000', 'ring-offset-gray-800'); setTimeout(() => fileElement.classList.remove('ring-2', 'ring-offset-2', 'ring-cyan-400', 'rounded-md', 'transition-all', 'duration-1000', 'ring-offset-gray-800'), 2500); } else { console.warn(`Element with ID ${elementId} not found for scrolling.`); } }, 400); }
-                  else if (fetchedFiles.length > 0) { const el = document.getElementById('file-list-container'); el?.scrollIntoView({ behavior: "smooth", block: "nearest" }); } }
+
+                // Set selection state *before* adding to kwork
+                setSelectedFilesState(filesToSelect);
+                setSelectedFetcherFiles(filesToSelect);
+
+                if (highlightedPathFromUrl && ideaFromUrl && filesToSelect.size > 0) {
+                    const numSecondary = categorizedSecondaryPaths.component.size + categorizedSecondaryPaths.context.size + categorizedSecondaryPaths.hook.size + categorizedSecondaryPaths.lib.size;
+                    const numImportantOnly = filesToSelect.size - (primaryPath ? 1 : 0) - numSecondary;
+                    let selectMsg = `✅ Авто-выбор: `;
+                    const parts = [];
+                    if(primaryPath) parts.push(`1 страница`);
+                    if(numSecondary > 0) parts.push(`${numSecondary} связанных`);
+                    if(numImportantOnly > 0) parts.push(`${numImportantOnly} важных`);
+                    selectMsg += parts.join(', ') + ` (${filesToSelect.size} всего). Идея из URL добавлена.`;
+                    addToast(selectMsg, 'success'); // Changed to success and improved message
+
+                    const task = ideaFromUrl || DEFAULT_TASK_IDEA;
+                    updateKworkInput(task);
+
+                    // --- FIX: Call handleAddSelected with fetchedFiles to avoid race condition ---
+                    await handleAddSelected(true, filesToSelect, fetchedFiles); // Pass fetchedFiles here
+
+                    // --- FIX: Add reminder toast for instructions ---
+                    setTimeout(() => { // Short delay for visual clarity
+                         addToast("💡 Не забудь добавить инструкции (<FaFileLines />) в начало запроса, если нужно!", "info");
+                    }, 500);
+
+                } else {
+                     if (filesToSelect.size > 0 && (!highlightedPathFromUrl || !ideaFromUrl)) {
+                        const numHighlighted = categorizedSecondaryPaths.component.size + categorizedSecondaryPaths.context.size + categorizedSecondaryPaths.hook.size + categorizedSecondaryPaths.lib.size;
+                        const numImportantOnly = filesToSelect.size - (primaryPath ? 1 : 0) - numHighlighted;
+                        let selectMsg = `Авто-выбрано: `;
+                        const parts = [];
+                        if(primaryPath) parts.push(`1 основной`);
+                        if(numHighlighted > 0) parts.push(`${numHighlighted} связанных`);
+                        if(numImportantOnly > 0) parts.push(`${numImportantOnly} важных`);
+                        selectMsg += parts.join(', ') + '.';
+                        addToast(selectMsg, 'info');
+                     }
+                    if (primaryPath) { setTimeout(() => { const elementId = `file-${primaryPath}`; const fileElement = document.getElementById(elementId); if (fileElement) { fileElement.scrollIntoView({ behavior: "smooth", block: "center" }); fileElement.classList.add('ring-2', 'ring-offset-2', 'ring-cyan-400', 'rounded-md', 'transition-all', 'duration-1000', 'ring-offset-gray-800'); setTimeout(() => fileElement.classList.remove('ring-2', 'ring-offset-2', 'ring-cyan-400', 'rounded-md', 'transition-all', 'duration-1000', 'ring-offset-gray-800'), 2500); } else { console.warn(`Element with ID ${elementId} not found for scrolling.`); } }, 400); }
+                    else if (fetchedFiles.length > 0) { const el = document.getElementById('file-list-container'); el?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+                }
                 return; // <<< SUCCESS EXIT POINT >>>
               } else { throw new Error(result?.error || `Не удалось получить файлы из ${effectiveBranch}`); }
             } catch (err: any) { console.error(`[Fetcher:handleFetch] Error during attempt ${currentTry}:`, err); const displayError = err?.message || "Неизвестная ошибка при извлечении"; setError(`Попытка ${currentTry}: ${displayError}`); if (currentTry > maxRetries) { console.error(`[Fetcher:handleFetch] Final attempt failed. Max retries (${maxRetries}) reached.`); stopProgressSimulation(); setFetchStatus('failed_retries'); setProgress(0); addToast(`Не удалось извлечь файлы после ${maxRetries + 1} попыток. ${displayError}`, 'error'); setFilesFetched(false, null, []); setExtractLoading(false); return; } }
@@ -236,7 +338,24 @@
 
     // --- Other Callbacks ---
     const selectHighlightedFiles = useCallback(() => { const filesToSelect = new Set<string>(selectedFiles); let newlySelectedCount = 0; const allHighlightableSecondary = [ ...secondaryHighlightedPaths.component, ...secondaryHighlightedPaths.context, ...secondaryHighlightedPaths.hook, ...secondaryHighlightedPaths.lib, ]; if (primaryHighlightedPath && files.some(f => f.path === primaryHighlightedPath) && !filesToSelect.has(primaryHighlightedPath)) { filesToSelect.add(primaryHighlightedPath); newlySelectedCount++; } allHighlightableSecondary.forEach(path => { if (files.some(f => f.path === path) && !filesToSelect.has(path)) { filesToSelect.add(path); newlySelectedCount++; } }); if (newlySelectedCount > 0) { setSelectedFilesState(filesToSelect); setSelectedFetcherFiles(filesToSelect); addToast(`Добавлено ${newlySelectedCount} связанных файлов к выборке`, 'info'); } else { addToast("Все связанные файлы уже выбраны или не найдены", 'info'); } }, [ primaryHighlightedPath, secondaryHighlightedPaths, files, selectedFiles, setSelectedFetcherFiles, addToast ]);
-    const toggleFileSelection = useCallback((path: string) => { setSelectedFilesState(prevSet => { const newSet = new Set(prevSet); if (newSet.has(path)) newSet.delete(path); else newSet.add(path); setSelectedFetcherFiles(newSet); return newSet; }); }, [setSelectedFetcherFiles]);
+
+    // --- FIX: Simplified toggle, auto-select logic moved to useEffect ---
+    const toggleFileSelection = useCallback((path: string) => {
+        setSelectedFilesState(prevSet => {
+            const newSet = new Set(prevSet);
+            if (newSet.has(path)) {
+                newSet.delete(path);
+                 console.log(`File deselected: ${path}`);
+            } else {
+                newSet.add(path);
+                 console.log(`File selected: ${path}`);
+            }
+            // Propagate change to context immediately
+            setSelectedFetcherFiles(newSet);
+            return newSet;
+        });
+    }, [setSelectedFetcherFiles]); // Only depends on context setter now
+
     const handleAddImportantFiles = useCallback(() => { let addedCount = 0; const filesToAdd = new Set(selectedFiles); importantFiles.forEach(path => { if (files.some(f => f.path === path) && !selectedFiles.has(path)) { filesToAdd.add(path); addedCount++; } }); if (addedCount === 0) { addToast("Важные файлы уже выбраны или не найдены в репозитории", 'info'); return; } setSelectedFilesState(filesToAdd); setSelectedFetcherFiles(filesToAdd); addToast(`Добавлено ${addedCount} важных файлов к выборке`, 'success'); }, [selectedFiles, importantFiles, files, setSelectedFetcherFiles, addToast]);
     const handleAddFullTree = useCallback(() => { if (files.length === 0) { addToast("Нет файлов для отображения дерева", 'error'); return; } const treeOnly = files.map((file) => `- /${file.path}`).sort().join("\n"); const treeContent = `Структура файлов проекта:\n\`\`\`\n${treeOnly}\n\`\`\``; let added = false; const currentKworkValue = getKworkInputValue(); const trimmedValue = currentKworkValue.trim(); const hasTreeStructure = /Структура файлов проекта:\s*```/im.test(trimmedValue); if (!hasTreeStructure) { const newContent = trimmedValue ? `${trimmedValue}\n\n${treeContent}` : treeContent; updateKworkInput(newContent); added = true; } if (added) { addToast("Дерево файлов добавлено в запрос", 'success'); scrollToSection('kworkInput'); } else { addToast("Дерево файлов уже добавлено", 'info'); } }, [files, getKworkInputValue, updateKworkInput, scrollToSection, addToast]);
     const handleSelectPrBranch = useCallback((branch: string | null) => { setTargetBranchName(branch); if (branch) addToast(`Выбрана ветка PR: ${branch}`, 'success'); else addToast(`Выбор ветки PR снят (используется default или ручная).`, 'info'); }, [setTargetBranchName, addToast]);
@@ -246,17 +365,83 @@
     // --- Effects ---
     useEffect(() => { setRepoUrlEntered(repoUrl.trim().length > 0); updateRepoUrlInAssistant(repoUrl); }, [repoUrl, setRepoUrlEntered, updateRepoUrlInAssistant]);
 
-    // Auto-fetch effect (FIXED dependency array)
+    // Auto-fetch effect
     useEffect(() => {
         const branchForAutoFetch = targetBranchName; // Use branch from context if set
         if (autoFetch && repoUrl && (fetchStatus === 'idle' || fetchStatus === 'failed_retries' || fetchStatus === 'error')) {
             console.log(`Auto-fetching due to URL param 'path'. Branch: ${branchForAutoFetch ?? 'Default'}`);
-            // .. Trigger fetch using the context function to ensure consistency
             triggerFetch(false, branchForAutoFetch);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [highlightedPathFromUrl, repoUrl, autoFetch, fetchStatus, targetBranchName, triggerFetch]); // Added triggerFetch dependency
 
+    // --- FIX: useEffect for auto-selecting related files on manual selection ---
+    useEffect(() => {
+        if (files.length === 0) return; // Don't run if no files are loaded
+
+        const newlySelectedPaths = new Set<string>();
+        selectedFiles.forEach(path => {
+            if (!prevSelectedFilesRef.current.has(path)) {
+                newlySelectedPaths.add(path);
+            }
+        });
+
+        if (newlySelectedPaths.size === 0) {
+             // Update ref if only deselection happened or no changes
+             prevSelectedFilesRef.current = new Set(selectedFiles);
+             return; // No newly selected files
+        }
+
+        const pageFileSuffixes = ['/page.tsx', '/page.js', '/index.tsx', '/index.js'];
+        const newPageFiles = Array.from(newlySelectedPaths).filter(path =>
+            pageFileSuffixes.some(suffix => path.endsWith(suffix))
+        );
+
+        if (newPageFiles.length > 0) {
+            console.log("Newly selected page files detected:", newPageFiles);
+            const relatedFilesToSelect = new Set<string>();
+            let foundRelatedCount = 0;
+
+            newPageFiles.forEach(pagePath => {
+                const pageFile = files.find(f => f.path === pagePath);
+                if (pageFile) {
+                    const imports = extractImports(pageFile.content);
+                    console.log(` Imports for ${pagePath}:`, imports);
+                    imports.forEach(imp => {
+                        const resolvedPath = resolveImportPath(imp, pageFile.path, files);
+                        if (resolvedPath && resolvedPath !== pagePath) {
+                            const category = categorizeResolvedPath(resolvedPath);
+                            if (category !== 'other') {
+                                // Only add if not already selected
+                                if (!selectedFiles.has(resolvedPath)) {
+                                    relatedFilesToSelect.add(resolvedPath);
+                                    foundRelatedCount++;
+                                    console.log(`  -> Auto-selecting ${category}: ${resolvedPath}`);
+                                }
+                            }
+                        }
+                    });
+                }
+            });
+
+            if (relatedFilesToSelect.size > 0) {
+                // Merge newly found related files with the current selection
+                const finalSelection = new Set([...selectedFiles, ...relatedFilesToSelect]);
+                 // Update component state first
+                 setSelectedFilesState(finalSelection);
+                 // Then update context state
+                 setSelectedFetcherFiles(finalSelection);
+                addToast(`🔗 Автоматически добавлено ${foundRelatedCount} связанных файлов`, 'info');
+                // Update ref immediately after setting state to prevent re-triggering for the same additions
+                prevSelectedFilesRef.current = finalSelection;
+                return; // Exit effect early as we modified selectedFiles
+            }
+        }
+
+         // Update ref if no related files were added for the new selections
+         prevSelectedFilesRef.current = new Set(selectedFiles);
+
+    }, [selectedFiles, files, extractImports, resolveImportPath, categorizeResolvedPath, setSelectedFetcherFiles, addToast]); // Dependencies
 
     // Cleanup simulation timers
     useEffect(() => { return () => stopProgressSimulation(); }, [stopProgressSimulation]);
@@ -396,13 +581,13 @@
                  <FileList
                     id="file-list-container"
                     files={files}
-                    selectedFiles={selectedFiles}
+                    selectedFiles={selectedFiles} // Pass the state here for FileList to read
                     primaryHighlightedPath={primaryHighlightedPath}
                     secondaryHighlightedPaths={secondaryHighlightedPaths}
                     importantFiles={importantFiles}
                     isLoading={isLoading}
-                    toggleFileSelection={toggleFileSelection}
-                    onAddSelected={() => handleAddSelected(autoAskAiEnabled)}
+                    toggleFileSelection={toggleFileSelection} // Pass the simple toggle function
+                    onAddSelected={() => handleAddSelected(autoAskAiEnabled)} // Calls the fixed handleAddSelected
                     onAddImportant={handleAddImportantFiles}
                     onAddTree={handleAddFullTree}
                     onSelectHighlighted={selectHighlightedFiles}
@@ -423,9 +608,9 @@
                       onAskAi={triggerAskAi}
                       isAskAiDisabled={isAskAiDisabled}
                       aiActionLoading={aiActionLoading}
-                      onAddSelected={() => handleAddSelected(autoAskAiEnabled)}
+                      onAddSelected={() => handleAddSelected(autoAskAiEnabled)} // Calls the fixed handleAddSelected
                       isAddSelectedDisabled={isAddSelectedDisabled}
-                      selectedFetcherFilesCount={selectedFiles.size}
+                      selectedFetcherFilesCount={selectedFiles.size} // Read size from state
                  />
              </div>
          ) : null }
