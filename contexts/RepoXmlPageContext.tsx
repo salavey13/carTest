@@ -474,7 +474,7 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
 
     // --- triggerAskAi (Updated Flow) ---
     const triggerAskAi = useCallback(async (): Promise<{ success: boolean; requestId?: string; error?: string }> => {
-        if (!fetcherRef.current || !user?.id ) { // Check for dbUser for better notification
+        if (!fetcherRef.current || !user?.id ) { // Check for user?.id
             const m = !user?.id ? "Пользователь не аутентифицирован." : "Компоненты не готовы.";
             toast.error(m);
             return { success: false, error: m };
@@ -589,6 +589,8 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
 
     // --- Realtime Subscription Logic ---
     useEffect(() => {
+        let isMounted = true; // Flag to track mount status
+
         // If no ID to monitor or no client, clean up any existing channel
         if (!currentAiRequestId || !supabaseAnon) {
             if (realtimeChannelRef.current) {
@@ -596,12 +598,12 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
                 supabaseAnon?.removeChannel(realtimeChannelRef.current).catch(e => console.error("[RT Cleanup] Error removing channel:", e));
                 realtimeChannelRef.current = null;
             }
-            return;
+            return () => { isMounted = false }; // Cleanup function for isMounted
         }
 
         const channelId = `ai-request-${currentAiRequestId}`;
         // Avoid re-subscribing if already on the correct channel
-        if (realtimeChannelRef.current?.topic === channelId) return;
+        if (realtimeChannelRef.current?.topic === channelId) return () => { isMounted = false }; // Cleanup function for isMounted
 
         // Unsubscribe from the previous channel if switching IDs
         if (realtimeChannelRef.current) {
@@ -620,6 +622,7 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
                     filter: `id=eq.${currentAiRequestId}` // Filter specific request ID
                 },
                 (payload) => {
+                     if (!isMounted) return; // Check if component is still mounted
                     console.log('[RT Received] AI Request Updated:', payload.new);
                     const updatedRecord = payload.new;
 
@@ -640,7 +643,9 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
 
                         // Auto-parse after a short delay to allow state updates
                         setTimeout(() => {
-                            triggerParseResponse().catch(err => console.error("Error during auto-parsing:", err));
+                            if (isMounted) { // Check mount status before parsing
+                                triggerParseResponse().catch(err => console.error("Error during auto-parsing:", err));
+                            }
                         }, 300);
 
                     } else if (updatedRecord.status === 'failed') {
@@ -655,21 +660,26 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
                 }
             )
             .subscribe((status, err) => {
+                if (!isMounted) return; // Check if component is still mounted
+
                 if (status === 'SUBSCRIBED') {
                     console.log(`[RT Status] Successfully subscribed to ${channelId}`);
                 } else if (['CHANNEL_ERROR', 'TIMED_OUT'].includes(status)) {
                     console.error(`[RT Status] Subscription error for ${channelId}: ${status}`, err);
                     toast.error("Ошибка Realtime подписки.");
-                    // Stop loading if subscription fails critically
-// Check if still relevant
-                        setAiActionLoadingState(false);
-                        setCurrentAiRequestIdState(null);
+                    // Stop loading if subscription fails critically and still loading
+                    if (aiActionLoading) { // Check if still relevant
+                         setAiActionLoadingState(false);
+                         setCurrentAiRequestIdState(null);
+                    }
 
                 } else if (status === 'CLOSED') {
                     console.log(`[RT Status] Channel explicitly closed for ${channelId}`);
                      // If closed unexpectedly while we were loading, reset state
-                        setAiActionLoadingState(false);
-                        setCurrentAiRequestIdState(null);
+                     if (aiActionLoading) { // Check if still relevant
+                         setAiActionLoadingState(false);
+                         setCurrentAiRequestIdState(null);
+                    }
                 }
             });
 
@@ -677,13 +687,14 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
 
         // Cleanup function: remove the channel when the component unmounts or the ID changes
         return () => {
+            isMounted = false; // Set isMounted to false on cleanup
             if (realtimeChannelRef.current && realtimeChannelRef.current.topic === channelId) {
                 console.log(`[RT Cleanup] Removing channel: ${realtimeChannelRef.current.topic}`);
                 supabaseAnon.removeChannel(realtimeChannelRef.current).catch(e => console.error("[RT Cleanup] Error removing channel:", e));
                 realtimeChannelRef.current = null;
             }
         };
-    }, [currentAiRequestId, assistantRef, triggerParseResponse]); // Added currentAiRequestIdState to deps for internal checks
+    }, [currentAiRequestId, assistantRef, triggerParseResponse, aiActionLoading]); // Added aiActionLoading dependency
 
 
     // --- Xuinity Message Logic (Dynamic based on current state) ---
@@ -700,7 +711,7 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
             case 'files_fetched_highlights': return `Файлы извлечены${branchInfo}. Есть связанные. 🤔 Выбери или опиши задачу.`;
             case 'files_selected': return `Файлы выбраны${branchInfo}! 👍 Добавь в 'Твой Запрос' ИЛИ сразу жми '🤖 Спросить AI'!`;
             case 'request_written': return aiActionLoading ? "Отправка запроса AI..." : "Запрос готов! 🔥 Жми '🤖 Спросить AI' ИЛИ скопируй для Grok.";
-            case 'generating_ai_response': return "Запрос в очереди AI. ⏳ Ожидаем магию... (Админ получил уведомление!) ✨"; // Updated message
+            case 'generating_ai_response': return `Запрос #${currentAiRequestId?.substring(0, 6)}... улетел к AI. 🚀 Ожидаем магию... (Админ в курсе!) ✨`; // Updated message
             case 'request_copied': return "Скопировано! 📋 Жду ответ от внешнего AI. Вставляй результат сюда. 👇";
             case 'response_pasted': return "Ответ AI получен! ✅ Нажми '➡️ Разобрать Ответ' для анализа.";
             case 'parsing_response': return "Разбираю ответ AI... 🧠";

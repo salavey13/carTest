@@ -1,3 +1,4 @@
+// No changes needed in this file. Logic relies on props.
 "use client";
 
 import React from 'react';
