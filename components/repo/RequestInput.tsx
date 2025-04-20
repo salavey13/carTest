@@ -5,8 +5,9 @@ import { motion } from 'framer-motion';
 import { FaClipboard, FaBroom, FaRobot, FaPlus, FaFileLines, FaArrowsRotate } from 'react-icons/fa6';
 import { toast } from 'sonner';
 // --- Import the prompt ---
-import { ULTIMATE_VIBE_MASTER_PROMPT } from './prompt'; // Adjust path if needed
+import { ULTIMATE_VIBE_MASTER_PROMPT } from './prompt'; // Adjust path as needed
 
+// ... (Keep the interface and the rest of the component logic as before) ...
 interface RequestInputProps {
     kworkInputRef: MutableRefObject<HTMLTextAreaElement | null>;
     onCopyToClipboard: () => void;
@@ -67,6 +68,7 @@ const RequestInput: React.FC<RequestInputProps> = ({
                     placeholder="Опиши здесь вашу задачу... Затем добавь контекст кнопками ИЛИ нажми 'Спросить AI'."
                     disabled={isAskAiDisabled && isCopyDisabled && isClearDisabled}
                 />
+                {/* Icon Buttons Container */}
                 <div className="absolute top-8 right-2 flex flex-col gap-2">
                      {/* Copy Instructions Button */}
                      <motion.button
@@ -102,6 +104,7 @@ const RequestInput: React.FC<RequestInputProps> = ({
                     </motion.button>
                 </div>
             </div>
+            {/* Action Buttons below Textarea */}
             <div className="flex flex-col sm:flex-row gap-3">
                  {/* Add Selected Button */}
                  <motion.button
