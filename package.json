@@ -11,6 +11,8 @@
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
     "@google/genai": "latest",
+    "google-it": "latest",
+    "cheerio": "latest",
     "@hookform/resolvers": "^3.9.1",
     "@huggingface/transformers": "latest",
     "@octokit/rest": "latest",
