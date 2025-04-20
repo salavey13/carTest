@@ -12,7 +12,7 @@ interface RequestInputProps {
     isCopyDisabled: boolean;
     isClearDisabled: boolean;
     onInputChange?: (value: string) => void; // Optional callback for parent
-    initialValue?: string; // Optional initial value
+    // initialValue?: string; // Removed - value set dynamically after fetch/selection
     // New props for Ask AI button
     // === FIX: Correct the expected return type for onAskAi ===
     onAskAi: () => Promise<{ success: boolean; requestId?: string; error?: string }>; // Changed from Promise<void>
@@ -2066,7 +2066,6 @@ const RequestInput: React.FC<RequestInputProps> = ({
     isCopyDisabled,
     isClearDisabled,
     onInputChange,
-    initialValue = "",
     // New props
     onAskAi,
     isAskAiDisabled,
@@ -2101,7 +2100,7 @@ const RequestInput: React.FC<RequestInputProps> = ({
                 <textarea
                     id="kwork-input"
                     ref={kworkInputRef}
-                    defaultValue={initialValue} // Use defaultValue for uncontrolled with ref
+                    // defaultValue removed, value is controlled via ref and updateKworkInput
                     onChange={handleChange} // Notify parent on change
                     className="w-full p-3 pr-14 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition shadow-[0_0_8px_rgba(0,255,157,0.3)] resize-y min-h-[120px] text-sm placeholder-gray-500"
                     placeholder="Опиши здесь вашу задачу... Затем добавь контекст кнопками ИЛИ нажми 'Спросить AI'."
@@ -2156,7 +2155,7 @@ const RequestInput: React.FC<RequestInputProps> = ({
                       } transition-all`}
                       whileHover={{ scale: isAddSelectedDisabled ? 1 : 1.03 }}
                       whileTap={{ scale: isAddSelectedDisabled ? 1 : 0.97 }}
-                      title={`Добавить ${selectedFetcherFilesCount} выбранных файлов в запрос`}
+                      title={`Добавить ${selectedFetcherFilesCount} выбранных файлов в поле ввода выше`} // Clarified title
                   >
                       <FaPlus />
                       Добавить файлы ({selectedFetcherFilesCount})

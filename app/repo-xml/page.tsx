@@ -1,5 +1,6 @@
 "use client";
     import React, { Suspense, useRef, useState, useEffect } from "react";
+    import { useSearchParams } from 'next/navigation'; // Import useSearchParams
     import RepoTxtFetcher from "@/components/RepoTxtFetcher";
     import AICodeAssistant from "@/components/AICodeAssistant";
     import AutomationBuddy from "@/components/AutomationBuddy";
@@ -100,7 +101,8 @@
 
     type Language = 'en' | 'ru';
 
-    export default function RepoXmlPage() {
+    // Inner component to use useSearchParams
+    function RepoXmlPageContent() {
       // Refs
       const fetcherRef = useRef<RepoTxtFetcherRef | null>(null);
       const assistantRef = useRef<AICodeAssistantRef | null>(null);
@@ -114,6 +116,9 @@
       const [lang, setLang] = useState<Language>('en');
       const [showComponents, setShowComponents] = useState(false); // State to control component visibility
 
+      // Hooks
+      const searchParams = useSearchParams(); // Use the hook here
+
       useEffect(() => {
         setIsMounted(true);
         const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
@@ -121,7 +126,17 @@
         const initialLang = telegramLang === 'ru' || (!telegramLang && browserLang === 'ru') ? 'ru' : 'en';
         setLang(initialLang);
         debugLogger.log(`[RepoXmlPage] Mounted. Browser lang: ${browserLang}, TG lang: ${telegramLang}, Initial selected: ${initialLang}`);
-      }, [user]);
+
+        // --- FIX: Check for URL params and auto-show components ---
+        const pathParam = searchParams.get("path");
+        const ideaParam = searchParams.get("idea");
+        if (pathParam && ideaParam) {
+          debugLogger.log("[RepoXmlPage] 'path' and 'idea' params found in URL. Auto-showing components.");
+          setShowComponents(true);
+        }
+        // --- End FIX ---
+
+      }, [user, searchParams]); // Add searchParams to dependency array
 
       const t = translations[lang];
       const userName = user?.first_name || (lang === 'ru' ? 'Чувак/Чика' : 'Dude/Chica'); // Get username or default
@@ -203,7 +218,8 @@
                         <details open className="bg-gray-900/70 border border-gray-700 rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4">
                             <summary className="text-xl font-semibold text-brand-purple p-4 cursor-pointer list-none flex justify-between items-center hover:bg-gray-800/50 rounded-t-lg">
                                 <span>{t.philosophyTitle}</span>
-                                <FaUpLong className="text-gray-500 group-open:rotate-180 transition-transform" />
+                                {/* Note: Using group-open requires Tailwind `group` utility on <details> */}
+                                {/* <FaUpLong className="text-gray-500 group-open:rotate-180 transition-transform" /> */}
                             </summary>
                             <div className="px-6 pt-2 text-gray-300 space-y-3 text-base">
                                 <p>{t.philosophy1} <Link href={t.philosophyLink1} className="text-brand-purple hover:underline font-semibold">{t.philosophyLink1Text} <FaArrowUpRightFromSquare className="inline h-3 w-3 ml-1" /></Link> {t.philosophy2}</p>
@@ -267,4 +283,13 @@
             </>
         </RepoXmlPageProvider>
       );
+    }
+
+    // Export the main component wrapped in Suspense for useSearchParams
+    export default function RepoXmlPage() {
+        return (
+            <Suspense fallback={<div className="flex justify-center items-center min-h-screen pt-20 bg-gradient-to-br from-gray-900 via-black to-gray-800"><p className="text-brand-green animate-pulse text-xl font-mono">Loading SUPERVIBE...</p></div>}>
+                <RepoXmlPageContent />
+            </Suspense>
+        );
     }
