@@ -216,7 +216,7 @@ export async function recordVprAnswer(attemptId: string, questionId: number, sel
         if (!updatedData) throw new Error("Attempt data not returned after score update.");
 
         debugLogger.log(`[VprAction] Attempt ${attemptId} score updated.`);
-        return { updatedAttempt: updatedData };
+        return { success: true, updatedAttempt: updatedData };
 
     } catch (err: any) {
         logger.error(`[VprAction] Error recording answer (attempt: ${attemptId}, question: ${questionId}):`, err);
