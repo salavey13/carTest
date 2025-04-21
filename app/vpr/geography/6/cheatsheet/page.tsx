@@ -237,9 +237,9 @@ const GeographyCheatsheet: NextPage = () => {
                 </section>
 
                  <div className="text-center mt-8">
-                     <Link href="/education" legacyBehavior>
+                     <Link href="/vpr-tests" legacyBehavior>
                        <a className="text-blue-600 dark:text-blue-400 hover:underline">
-                         &larr; Вернуться к разделу Образование
+                         &larr; Вернуться к тестам
                        </a>
                      </Link>
                  </div>
