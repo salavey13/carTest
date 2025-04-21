@@ -1083,7 +1083,7 @@ export async function generateCaptcha(settings: CaptchaSettings): Promise<{
         }
 
         // Optional: Add more noise like dots
-        // ...
+     
 
         svg += `</svg>`;
 

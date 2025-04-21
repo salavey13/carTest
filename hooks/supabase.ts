@@ -1,5 +1,3 @@
-// (Restored Type Aliases section using reference)
-
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { generateJwtToken } from "@/lib/auth";
 import type { WebAppUser } from "@/types/telegram";
@@ -21,7 +19,7 @@ type DbArticle = Database["public"]["Tables"]["articles"]["Row"]; // Added for A
 type DbArticleSection = Database["public"]["Tables"]["article_sections"]["Row"]; // Added for Article Sections
 // Add other types if needed, e.g., VPR types if used in this hook file
 // type DbVprSubject = Database["public"]["Tables"]["subjects"]["Row"];
-// ... etc.
+// .. etc.
 
 
 // --- Supabase Client Initialization ---
