@@ -306,29 +306,7 @@ export default function PPlanPage() {
         </div>
       </TooltipProvider>
         {/* CSS Variables for border colors (без изменений тут) */}
-        <style jsx global>{`
-            :root {
-              --color-brand-blue: #00C2FF;
-              --color-brand-green: #00FF9D;
-              --color-brand-pink: #FF007A;
-              --color-brand-orange: #FF6B00;
-              --color-neon-lime: #AEFF00;
-              --color-brand-cyan: #00FFFF;
-              --color-gray-400: #9CA3AF; /* Цвет для UserNinja */
-              --color-brand-yellow: #FACC15; /* Цвет для MoneyBill */
-              --color-red-500: #EF4444; /* Цвет для ExclamationTriangle */
-              --color-brand-purple: #9D00FF; /* Цвет для Brain/Atom */
-            }
-            /* Стиль для плейсхолдера иконки в тексте (без изменений тут) */
-             span[title] { /* Стиль для span с текстом иконки */
-               font-family: monospace;
-               font-size: 0.9em;
-               padding: 0 0.2em;
-               border: 1px solid currentColor; /* Рамка в цвет текста */
-               border-radius: 3px;
-               opacity: 0.8;
-             }
-        `}</style>
+        
     </div>
   );
 }
