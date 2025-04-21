@@ -8,13 +8,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
-// Убедимся, что FaUserNinja импортирован
+// .. Импортируем новые иконки
 import {
   FaCar, FaCircleUser, FaWandMagicSparkles, FaRocket, FaRoad, FaBookOpen,
   FaBrain, FaRobot, FaMagnifyingGlass, FaGift, FaUserShield, FaCarOn,
   FaYoutube, FaFileInvoiceDollar, FaCreditCard, FaHeart, FaPalette,
   FaCircleInfo, FaListCheck, FaNetworkWired, FaRegLightbulb, FaUpload,
-  FaUserNinja // <-- Добавлен импорт
+  FaUserNinja, FaGlobeEurope, FaLandmarkDome // <-- Добавлены иконки для шпаргалок и ВПР
 } from "react-icons/fa6";
 
 // --- Page Definitions ---
@@ -28,27 +28,26 @@ interface PageInfo {
   color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red';
 }
 
-// .. Добавляем VIBE Plan рядом с важными ссылками
+// .. Добавляем новые страницы
 const allPages: PageInfo[] = [
+  // --- Важные ссылки ---
   { path: "/", name: "Cyber Garage", icon: FaCar, isImportant: true, color: "cyan" },
   { path: "/about", name: "About Me", icon: FaCircleUser, isImportant: true, color: "blue" },
   { path: "/repo-xml", name: "SUPERVIBE Studio", icon: FaWandMagicSparkles, isImportant: true, color: "yellow" },
   { path: "/jumpstart", name: "Jumpstart Kit", icon: FaRocket, isImportant: true, color: "lime" },
   { path: "/selfdev", name: "SelfDev Path", icon: FaRoad, isImportant: true, color: "green" },
-  // --- Новая страница VIBE Plan ---
   { path: "/p-plan", name: "VIBE Plan", icon: FaUserNinja, isImportant: true, isHot: true, color: "yellow" },
-  // --------------------------------
+  { path: "/ai-work-future", name: "AI & Future of Work", icon: FaNetworkWired, color: "cyan", isImportant: true },
   { path: "/advice", name: "Advice", icon: FaRegLightbulb, isImportant: true, color: "purple" },
+  // --- Новая большая плитка ВПР Тесты ---
+  { path: "/vpr-tests", name: "VPR Tests", icon: FaListCheck, isImportant: true, color: 'pink' },
+  // --------------------------------------
+  // --- Обычные ссылки ---
   { path: "/purpose-profit", name: "Purpose & Profit", icon: FaBookOpen, color: "purple" },
   { path: "/expmind", name: "Experimental Mindset", icon: FaBrain, color: "pink" },
-  { path: "/ai-work-future", name: "AI & Future of Work", icon: FaNetworkWired, color: "cyan", isImportant: true },
   { path: "/botbusters", name: "Bot Busters", icon: FaRobot },
   { path: "/bullshitdetector", name: "BS Detector", icon: FaMagnifyingGlass },
   { path: "/wheel-of-fortune", name: "Wheel of Fortune", icon: FaGift },
-  { path: "/advice-upload", name: "Upload Advice", icon: FaUpload, isAdminOnly: true, isImportant: true, color: "red" },
-  { path: "/admin", name: "Admin Panel", icon: FaUserShield, isAdminOnly: true, color: "red" },
-  { path: "/shadow-fleet-admin", name: "Fleet Admin", icon: FaCarOn, isAdminOnly: true, color: "red" },
-  { path: "/youtubeAdmin", name: "YT Admin", icon: FaYoutube, isAdminOnly: true, color: "red" },
   { path: "/invoices", name: "My Invoices", icon: FaFileInvoiceDollar },
   { path: "/buy-subscription", name: "Subscribe", icon: FaCreditCard },
   { path: "/donate", name: "Donate", icon: FaHeart, color: "red" },
@@ -56,6 +55,15 @@ const allPages: PageInfo[] = [
   { path: "/onesitepls", name: "oneSitePls Info", icon: FaCircleInfo },
   { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: FaListCheck },
   { path: "/rent-car", name: "Rent a Car", icon: FaCar },
+  // --- Новые маленькие плитки-шпаргалки ---
+  { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: FaGlobeEurope, color: 'green' },
+  { path: "/vpr/history/6/cheatsheet", name: "History Cheatsheet 6", icon: FaLandmarkDome, color: 'yellow' },
+  // -----------------------------------------
+  // --- Админские ссылки ---
+  { path: "/advice-upload", name: "Upload Advice", icon: FaUpload, isAdminOnly: true, isImportant: true, color: "red" },
+  { path: "/admin", name: "Admin Panel", icon: FaUserShield, isAdminOnly: true, color: "red" },
+  { path: "/shadow-fleet-admin", name: "Fleet Admin", icon: FaCarOn, isAdminOnly: true, color: "red" },
+  { path: "/youtubeAdmin", name: "YT Admin", icon: FaYoutube, isAdminOnly: true, color: "red" },
 ];
 
 // --- Translations ---
@@ -66,11 +74,12 @@ const translations: Record<string, Record<string, string>> = {
     "SUPERVIBE Studio": "SUPERVIBE Studio",
     "Jumpstart Kit": "Jumpstart Kit",
     "SelfDev Path": "SelfDev Path",
-    "VIBE Plan": "VIBE Plan", // <-- Добавлен перевод EN
+    "VIBE Plan": "VIBE Plan",
     "Advice": "Advice",
+    "AI & Future of Work": "AI & Future of Work",
+    "VPR Tests": "VPR Tests", // <-- Добавлен перевод EN
     "Purpose & Profit": "Purpose & Profit",
     "Experimental Mindset": "Experimental Mindset",
-    "AI & Future of Work": "AI & Future of Work",
     "Bot Busters": "Bot Busters",
     "BS Detector": "BS Detector",
     "Wheel of Fortune": "Wheel of Fortune",
@@ -85,13 +94,15 @@ const translations: Record<string, Record<string, string>> = {
     "oneSitePls Info": "oneSitePls Info",
     "oneSitePls How-To": "oneSitePls How-To",
     "Rent a Car": "Rent a Car",
+    "Geo Cheatsheet 6": "Geo Cheatsheet 6", // <-- Добавлен перевод EN
+    "History Cheatsheet 6": "History Cheatsheet 6", // <-- Добавлен перевод EN
     "Search pages...": "Search pages...",
     "No pages found matching": "No pages found matching",
     "Admin Only": "Admin Only",
     "Toggle Language": "Toggle Language",
     "Open navigation": "Open navigation",
     "Close navigation": "Close navigation",
-    "Hot": "Hot", // <-- Добавлен перевод для title/aria-label
+    "Hot": "Hot",
   },
   ru: {
     "Cyber Garage": "Кибер Гараж",
@@ -99,11 +110,12 @@ const translations: Record<string, Record<string, string>> = {
     "SUPERVIBE Studio": "SUPERVIBE Studio",
     "Jumpstart Kit": "Набор Jumpstart",
     "SelfDev Path": "Путь Саморазвития",
-    "VIBE Plan": "VIBE План", // <-- Добавлен перевод RU
+    "VIBE Plan": "VIBE План",
     "Advice": "Советы",
+    "AI & Future of Work": "ИИ и Будущее Работы",
+    "VPR Tests": "ВПР Тесты", // <-- Добавлен перевод RU
     "Purpose & Profit": "Цель и Прибыль",
     "Experimental Mindset": "Эксперим. Мышление",
-    "AI & Future of Work": "ИИ и Будущее Работы",
     "Bot Busters": "Охотники за Ботами",
     "BS Detector": "Детектор Чуши",
     "Wheel of Fortune": "Колесо Фортуны",
@@ -118,13 +130,15 @@ const translations: Record<string, Record<string, string>> = {
     "oneSitePls Info": "Инфо oneSitePls",
     "oneSitePls How-To": "Как юзать oneSitePls",
     "Rent a Car": "Аренда Авто",
+    "Geo Cheatsheet 6": "Шпаргалка Гео 6", // <-- Добавлен перевод RU
+    "History Cheatsheet 6": "Шпаргалка Ист 6", // <-- Добавлен перевод RU
     "Search pages...": "Поиск страниц...",
     "No pages found matching": "Страницы не найдены по запросу",
     "Admin Only": "Только для админа",
     "Toggle Language": "Переключить язык",
     "Open navigation": "Открыть навигацию",
     "Close navigation": "Закрыть навигацию",
-    "Hot": "Новинка", // <-- Добавлен перевод для title/aria-label
+    "Hot": "Новинка",
   }
 };
 
@@ -166,6 +180,10 @@ export default function Header() {
 
   const currentLogoText = useMemo(() => {
     const currentPage = allPages.find(p => p.path === pathname);
+    // .. Специальное правило для шпаргалок и тестов ВПР, чтобы в лого было VPR
+    if (pathname?.startsWith('/vpr')) {
+        return "VPR";
+    }
     const baseName = currentPage?.name || "VIBE";
     const translatedFirstName = t(baseName)?.split(' ')[0];
     return translatedFirstName || baseName.split(' ')[0] || "VIBE";
