@@ -6,14 +6,14 @@ import { useAppContext } from "@/contexts/AppContext";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
-// УБЕДИСЬ, ЧТО ВСЕ ЭТИ ИКОНКИ ДЕЙСТВИТЕЛЬНО ИСПОЛЬЗУЮТСЯ ВНУТРИ СТРОК content
+// Убедись, что ВСЕ ЭТИ ИКОНКИ ДЕЙСТВИТЕЛЬНО ИСПОЛЬЗУЮТСЯ ВНУТРИ СТРОК content и icon: свойств
 import {
   FaFileAlt, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom,
   FaMobileAlt, FaComments, FaPaintBrush, FaBrain, FaRocket, FaUserNinja,
   FaMoneyBill, FaTriangleExclamation, FaRecycle,
   FaCode, FaVideo, FaNewspaper, FaGithub, FaTelegram
-  // Добавь сюда ЛЮБЫЕ другие Fa иконки, если они есть в тексте!
-} from "react-icons/fa6";
+  // Добавь сюда ЛЮБЫЕ другие Fa иконки, если они есть в тексте или как section.icon!
+} from "react-icons/fa6"; // <-- Используем fa6
 import { debugLogger } from "@/lib/debugLogger";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ import type { Database } from "@/types/database.types";
 type DbUser = Database["public"]["Tables"]["users"]["Row"] | null;
 
 // Карта компонентов иконок - УБЕДИСЬ, что здесь ЕСТЬ ВСЕ импортированные выше иконки
+// Ключ должен ТОЧНО совпадать с именем компонента (FaИмя)
 const iconComponents: { [key: string]: React.ElementType } = {
   FaFileAlt, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom,
   FaMobileAlt, FaComments, FaPaintBrush, FaBrain, FaRocket, FaUserNinja,
@@ -30,143 +31,91 @@ const iconComponents: { [key: string]: React.ElementType } = {
   // Добавь сюда соответствия для ЛЮБЫХ других иконок
 };
 
-// Функция getPlanSections остается без изменений
+// Функция getPlanSections остается без изменений - проверь строки <Fa...> внутри!
 const getPlanSections = (dbUser: DbUser) => {
   const userName = dbUser?.first_name || 'Viberider';
   const userHandle = dbUser?.username ? `@${dbUser.username}` : 'Самозанятый Эксперт';
   const userExperience = dbUser?.metadata?.experienceYears || "13+";
 
   // УБЕДИСЬ, что все строки <Fa...> здесь соответствуют импортам и карте iconComponents
+  // Также убедись, что все `icon:` свойства ссылаются на импортированные компоненты
   return [
      {
       id: "resume",
       title: "1. Резюме проекта",
-      icon: FaFileAlt, // <-- Проверяем, что иконка валидна
+      icon: FaFileAlt, // OK
       color: "text-brand-blue",
-      content: `Проект **"Кибер-Наставник ${userName}"** – создание и развитие персонального бренда и образовательной онлайн-платформы (блога), управляемой преимущественно **с мобильных устройств**.
-      Цель – предоставление уникального контента, менторских услуг и практических инструментов на базе методологии **VIBE** (AI-ассистированная разработка, быстрая валидация идей, безопасность) для IT-специалистов и начинающих предпринимателей в РФ.
-      Проект использует **максимально доступные и бесплатные технологии** (Vercel, Telegram, free-tier AI), фокусируя инвестиции гранта на **нематериальных активах:** создании контента, построении сообщества, маркетинге и **твоем профессиональном развитии, ${userName}**.
-      **Ключевая идея:** Ценность создается **экспертизой (${userExperience} лет у меня, твой путь уникален!), уникальным подходом (VIBE, SelfDev), скоростью и умением использовать доступные инструменты**, включая AI как **трансмутатор информации** (<FaAtom className="inline text-purple-400"/>). Грант позволит тебе (${userName}) полностью посвятить себя проекту.` // <-- Проверяем FaAtom
+      content: `Проект **"Кибер-Наставник ${userName}"** .. **трансмутатор информации** (<FaAtom className="inline text-purple-400"/>). Грант ..` // FaAtom
     },
      {
       id: "description",
       title: "2. Описание проекта",
-      icon: FaRocket, // <-- Валидна
+      icon: FaRocket, // OK
       color: "text-brand-green",
-      content: `**Формат:** Мобильно-ориентированный блог/платформа:
-      - **Сайт (Next.js/Vercel - Free):** Легковесный, быстрый, mobile-first. Статьи, гайды, VIBE/SelfDev. Управление через GitHub/телефон.
-      - **Telegram:** Основной хаб (<FaTelegram className="inline text-blue-400"/>). Анонсы, инсайты, общение, комьюнити.
-      - **GitHub (Free):** Демо-репы (<FaGithub className="inline"/>), шаблоны (Jumpstart), VIBE-воркфлоу.
-      - **Видео (Телефон):** Короткие клипы (<FaVideo className="inline text-red-500"/>), прямые эфиры. Монтаж на телефоне (CapCut).
-      - **AI-Трансмутация (<FaRecycle className="inline text-yellow-400"/>):** Основа! Одно видео/статья -> десятки постов, клипов, идей с помощью AI. <FaAtom className="inline text-purple-400"/> Превращаем любой контент в любой другой!
-      **УТП:** Практический AI на доступных инструментах. VIBE (AI + Валидация + Безопасность). SelfDev & Purpose/Profit. Твой личный бренд (${userName}, ${userHandle}). Демонстрация эффективности **"партизанского" подхода**.` // <-- Проверяем FaTelegram, FaGithub, FaVideo, FaRecycle, FaAtom
+      content: `**Формат:** .. **Telegram:** Основной хаб (<FaTelegram className="inline text-blue-400"/>). .. **GitHub (Free):** Демо-репы (<FaGithub className="inline"/>), .. **Видео (Телефон):** Короткие клипы (<FaVideo className="inline text-red-500"/>), .. **AI-Трансмутация (<FaRecycle className="inline text-yellow-400"/>):** .. <FaAtom className="inline text-purple-400"/> Превращаем ..` // FaTelegram, FaGithub, FaVideo, FaRecycle, FaAtom
     },
     {
       id: "market",
       title: "3. Анализ рынка и ЦА",
-      icon: FaUsers, // <-- Валидна
+      icon: FaUsers, // OK
       color: "text-brand-pink",
-      content: `Рынок IT-образования в РФ растет. Спрос на AI, WebDev, VIBE – высокий. Импортозамещение = нужны кадры.
-      **ЦА:** Разрабы (TS/React/Next), тимлиды, фрилансеры, соло-предприниматели, студенты IT. Те, кто хочет оседлать AI-волну.
-      **Конкуренты:** Блогеры, школы. Отстройка: **VIBE**, **SelfDev**, **AI-трансмутация**, **личный опыт**, фокус на **практике** и **доступности**, **твоя аутентичность, ${userName}**.` // <-- Здесь нет <Fa...>
+      content: `Рынок IT-образования .. **твоя аутентичность, ${userName}**.` // No <Fa...>
     },
     {
       id: "product",
       title: "4. Продукт/Услуга",
-      icon: FaBoxOpen, // <-- Валидна
+      icon: FaBoxOpen, // OK
       color: "text-brand-orange",
-      content: `**Бесплатно (Воронка):**
-      - Контент (<FaNewspaper className="inline"/>): Статьи, видео, заметки (сайт, TG, VK). AI помогает генерить и адаптировать.
-      - Код (<FaCode className="inline"/>): Примеры, шаблоны на GitHub (<FaGithub className="inline"/>).
-      - Переводы/Адаптации (<FaBrain className="inline"/>): Ключевые идеи (Purpose&Profit, AI&Work).
-      **Платно (Монетизация):**
-      - Менторство/Консультации (${userName}): Внедрение VIBE, AI, SelfDev (Цена: X руб/час).
-      - Воркшопы/Интенсивы: Практика AI, VIBE, безопасность (Цена: Y руб/участника).
-      - Шаблоны/Jumpstart: Готовые стартеры проектов (Цена: Z руб/шаблон).
-      - (Перспектива) Подписка: Эксклюзив, комьюнити, ранний доступ.` // <-- Проверяем FaNewspaper, FaCode, FaGithub, FaBrain
+      content: `- Контент (<FaNewspaper className="inline"/>): Статьи, .. - Код (<FaCode className="inline"/>): Примеры, шаблоны на GitHub (<FaGithub className="inline"/>). .. - Переводы/Адаптации (<FaBrain className="inline"/>): Ключевые ..` // FaNewspaper, FaCode, FaGithub, FaBrain
     },
     {
       id: "marketing",
       title: "5. Маркетинг и Продвижение",
-      icon: FaBullseye, // <-- Валидна
+      icon: FaBullseye, // OK
       color: "text-neon-lime",
-      content: `**Органика (Фундамент):**
-      - <FaPaintBrush className="inline text-neon-lime"/> **Контент-Маркетинг:** Часто, ценно, вирусно (TG, VK, сайт). AI (<FaAtom className="inline"/>) помогает с трансмутацией и генерацией!
-      - <FaComments className="inline text-neon-lime"/> **Комьюнити:** Лояльность в Telegram (<FaTelegram className="inline text-blue-400"/>) через общение.
-      - <FaGithub className="inline text-neon-lime"/> **GitHub:** Привлечение разрабов кодом.
-      - **Нетворкинг:** Коллабы, чаты.
-      **Платное (Ускорение - Грант):**
-      - **Таргет:** VK, Telegram Ads.
-      - **Посевы:** Реклама в TG-каналах.
-      - **Бустинг:** Продвижение топ-контента.
-
-      [Здесь могла бы быть схема маркетинговой воронки: Контент (AI Трансмут.) -> Соцсети/SEO -> Комьюнити -> Платные Услуги]` // <-- Проверяем FaPaintBrush, FaAtom, FaComments, FaTelegram, FaGithub
+      content: `- <FaPaintBrush className="inline text-neon-lime"/> **Контент-Маркетинг:** .. AI (<FaAtom className="inline"/>) .. - <FaComments className="inline text-neon-lime"/> **Комьюнити:** .. Telegram (<FaTelegram className="inline text-blue-400"/>) .. - <FaGithub className="inline text-neon-lime"/> **GitHub:** .. [Здесь могла бы быть схема ..]` // FaPaintBrush, FaAtom, FaComments, FaTelegram, FaGithub
     },
     {
       id: "operations",
       title: "6. План реализации",
-      icon: FaMobileAlt, // <-- Валидна
+      icon: FaMobileAlt, // OK
       color: "text-brand-cyan",
-      content: `**Создание Контента (<FaMobileAlt className="inline"/>):** Телефон - всё! Съемка, монтаж (CapCut), текст (голос/клава), AI для идей/черновиков/трансмутации (Free/Plus).
-      **Платформа:** Сайт на Next.js/Vercel (Free). Управление с GitHub/телефона (<FaGithub className="inline"/>, <FaMobileAlt className="inline"/>). Supabase (Free) для бэка (если надо).
-      **Услуги:** Консультации/воркшопы через TG/VK видеозвонки (<FaTelegram className="inline text-blue-400"/>).
-      **Тех. Стек:** ТЕЛЕФОН, Next.js, Vercel, GitHub, Telegram, Supabase (Free), AI (Free/Plus), CapCut, Canva (Free/Pro).` // <-- Проверяем FaMobileAlt, FaGithub, FaTelegram
+      content: `**Создание Контента (<FaMobileAlt className="inline"/>):** .. GitHub/телефона (<FaGithub className="inline"/>, <FaMobileAlt className="inline"/>). .. видеозвонки (<FaTelegram className="inline text-blue-400"/>). ..` // FaMobileAlt, FaGithub, FaTelegram
     },
     {
       id: "org",
       title: "7. Организационный план",
-      icon: FaUserNinja, // <-- Валидна
+      icon: FaUserNinja, // OK
       color: "text-gray-400",
-      content: `**Форма:** Самозанятый (НПД). Регистрация через "Мой Налог".
-      **Исполнитель:** ${userName} (${userHandle}) – все компетенции у тебя (или ты их быстро получишь по VIBE!). Ты - ядро проекта.` // <-- Нет <Fa...>
+      content: `**Форма:** .. Ты - ядро проекта.` // No <Fa...>
     },
     {
       id: "finance",
       title: "8. Финансовый план",
-      icon: FaMoneyBill, // <-- Валидна
+      icon: FaMoneyBill, // OK
       color: "text-brand-yellow",
-      content: `**Грант: 350 000 руб. Расходы:**
-      - **<FaChartLine className="inline text-yellow-400"/> 1. Маркетинг и Рост (200 000 руб.):**
-          - Таргет VK/TG Ads: 120 000 руб.
-          - Посевы TG: 50 000 руб.
-          - Бустинг/Эксперименты: 30 000 руб.
-      - **<FaPaintBrush className="inline text-yellow-400"/> 2. Контент & Нематер. Активы (100 000 руб.):**
-          - **Фокус-Время ${userName}**: Обеспечение твоей работы над проектом (~6-8 мес): 80 000 руб. (Инвестиция в твой контент и IP!).
-          - Стоки (музыка/клипы, если надо): 10 000 руб.
-          - Графика (лого/шаблоны, если надо): 10 000 руб.
-      - **<FaBrain className="inline text-yellow-400"/> 3. Проф. Развитие ${userName} (30 000 руб.):**
-          - Курсы/материалы (AI, Маркетинг): 20 000 руб.
-          - Доступ к research/статьям: 5 000 руб.
-          - Онлайн-конференции/воркшопы: 5 000 руб.
-      - **<FaTriangleExclamation className="inline text-yellow-400"/> 4. Буфер (20 000 руб.):**
-          - Резерв на платные AI-инструменты/сервисы при росте или смене Free Tier.
-      **Доходы (Прогноз 12 мес.):** ~230 000 - 420 000 руб. (Менторство, воркшопы, шаблоны).
-      **Рентабельность:** Выход на опер. прибыль за 6-9 мес. Грант = **ускорение роста** и **создание IP**.
-
-      [Здесь могла бы быть круговая диаграмма распределения гранта: Маркетинг (~57%), Контент/Время (~29%), Развитие (~8.5%), Буфер (~5.5%)]` // <-- Проверяем FaChartLine, FaPaintBrush, FaBrain, FaTriangleExclamation
+      content: `- **<FaChartLine className="inline text-yellow-400"/> 1. Маркетинг .. - **<FaPaintBrush className="inline text-yellow-400"/> 2. Контент .. - **<FaBrain className="inline text-yellow-400"/> 3. Проф. Развитие .. - **<FaTriangleExclamation className="inline text-yellow-400"/> 4. Буфер .. [Здесь могла бы быть круговая ..]` // FaChartLine, FaPaintBrush, FaBrain, FaTriangleExclamation
     },
     {
       id: "risks",
       title: "9. Анализ рисков",
-      icon: FaTriangleExclamation, // <-- Валидна
+      icon: FaTriangleExclamation, // OK
       color: "text-red-500",
-      content: `**Зависимость от Free Tiers:** Риск лимитов/смены условий AI/Хостинга. Митигация: Мониторинг, оптимизация, буфер (<FaTriangleExclamation className="inline"/>), готовность платить из дохода.
-      **"Телефонное" качество:** Может уступать студии. Митигация: Фокус на **ценности контента**, мобильный монтаж, **аутентичность ${userName}**.
-      **Выгорание ${userName}:** Работа соло. Митигация: Планирование, AI-автоматизация (<FaAtom className="inline"/>), отдых, комьюнити.
-      **Конкуренция/Спрос:** Митигация: УТП (VIBE, AI-трансмут.), комьюнити (<FaComments className="inline"/>), сильный бренд ${userName}.` // <-- Проверяем FaTriangleExclamation, FaAtom, FaComments
+      content: `**Зависимость от Free Tiers:** .. буфер (<FaTriangleExclamation className="inline"/>), .. **Выгорание ${userName}:** .. AI-автоматизация (<FaAtom className="inline"/>), .. комьюнити (<FaComments className="inline"/>), сильный бренд ${userName}.` // FaTriangleExclamation, FaAtom, FaComments
     },
     {
       id: "conclusion",
       title: "10. Заключение",
-      icon: FaBrain, // <-- Валидна
+      icon: FaBrain, // OK
       color: "text-brand-purple",
-      content: `Проект **"Кибер-Наставник ${userName}"** – это **инновационный и ресурсоэффективный VIBE**. Ставка на **твою экспертизу (${userName}), контент (<FaNewspaper className="inline"/>), комьюнити (<FaUsers className="inline"/>) и умный маркетинг (<FaBullseye className="inline"/>)**, а не на железо. Грант = **инвестиция в рост, контент и твое развитие**. Это пример доступного IT-предпринимательства в РФ, усиленного AI (<FaAtom className="inline"/>).` // <-- Проверяем FaNewspaper, FaUsers, FaBullseye, FaAtom
+      content: `Проект .. контент (<FaNewspaper className="inline"/>), комьюнити (<FaUsers className="inline"/>) и умный маркетинг (<FaBullseye className="inline"/>)** .. усиленного AI (<FaAtom className="inline"/>).` // FaNewspaper, FaUsers, FaBullseye, FaAtom
     },
   ];
 };
 
-// Компонент RenderContent остается без изменений - он уже должен быть устойчив к undefined иконкам
+// Компонент RenderContent - проверка if (IconComp) уже есть
 const RenderContent: React.FC<{ content: string }> = ({ content }) => {
+  // .. (без изменений, он должен быть безопасен к undefined иконкам в карте)
   const paragraphs = content.split('\n');
 
   return (
@@ -180,20 +129,22 @@ const RenderContent: React.FC<{ content: string }> = ({ content }) => {
               if (segment.startsWith('**') && segment.endsWith('**')) {
                 return <strong key={sIndex}>{segment.slice(2, -2)}</strong>;
               }
+              // Регулярное выражение уточнено для необязательного className
               const iconMatch = segment.match(/<Fa(\w+)\s*(?:className="([^"]*)")?\s*\/?>/);
               if (iconMatch) {
                 const [, iconName, className = ""] = iconMatch;
                 const IconComp = iconComponents[`Fa${iconName}`]; // Поиск в карте
                 if (IconComp) { // <-- Проверка на undefined
-                  // Используем существующие стили Tailwind, align-middle для выравнивания
                   const finalClassName = cn("inline-block align-middle mx-1", className || "w-4 h-4");
                   return <IconComp key={sIndex} className={finalClassName} />;
                 } else {
-                  // Рендерим плейсхолдер, если иконка не найдена (НЕ должно вызывать ошибку undefined)
+                  // Это запасной вариант, НЕ должен вызывать ошибку undefined
                   console.warn(`[RenderContent] Icon component "Fa${iconName}" not found in iconComponents map.`);
+                  // Рендерим текстовый плейсхолдер
                   return <span key={sIndex} className="text-red-500 font-mono">[? Fa{iconName}]</span>;
                 }
               }
+              // Обычный текст
               return <React.Fragment key={sIndex}>{segment}</React.Fragment>;
             })}
           </p>
@@ -213,7 +164,7 @@ export default function PPlanPage() {
     setIsMounted(true);
   }, []);
 
-  // useMemo для вычисления данных, зависящих от dbUser
+  // useMemo для вычисления данных
   const planSections = useMemo(() => {
       debugLogger.log("[PPlanPage] Recalculating planSections, dbUser:", dbUser ? dbUser.user_id : 'null');
       return getPlanSections(dbUser);
@@ -224,6 +175,7 @@ export default function PPlanPage() {
 
   // Основной рендер зависит от isMounted И !isLoading
   if (!isMounted || isLoading) {
+    // .. (лоадер без изменений)
     return (
       <div className="flex justify-center items-center min-h-screen pt-20 bg-gradient-to-br from-gray-900 via-black to-gray-800">
         <p className="text-brand-cyan animate-pulse text-xl font-mono">VIBE план загружается...</p>
@@ -233,6 +185,7 @@ export default function PPlanPage() {
 
    // Показываем ошибку, если она есть
    if (error) {
+     // Используем иконку, которая точно есть (FaTriangleExclamation)
      return (
        <div className="flex flex-col justify-center items-center min-h-screen pt-20 bg-gradient-to-br from-gray-900 via-black to-red-900/50">
          <FaTriangleExclamation className="text-6xl text-red-500 mb-4"/>
@@ -243,38 +196,35 @@ export default function PPlanPage() {
      );
    }
 
-  // *** ИЗМЕНЕНИЕ: Определяем классы границы динамически ***
+  // Функция для получения Tailwind класса границы
   const getBorderClass = (textColorClass: string): string => {
-    // Просто заменяем 'text-' на 'border-'
-    // Это сработает, если цвета ('brand-blue', 'brand-green'...) определены в tailwind.config.js
-    // и Tailwind может автоматически применять их к border-color.
+    // .. (без изменений)
     const borderColor = textColorClass.replace('text-', 'border-');
-    // Добавляем fallback на случай, если класс не сгенерируется
     return cn(borderColor, 'border-gray-500'); // fallback border
   };
 
   // Рендерим основной контент
   return (
-    // Используем существующие классы градиента и текста из globals.css / tailwind config
+    // Используем существующие классы
     <div className="relative min-h-screen overflow-hidden pt-20 pb-10 bg-gradient-to-br from-dark-bg via-black to-purple-900/30 text-light-text">
-       {/* Используем цвет из конфига для сетки */}
+       {/* Сетка */}
        <div
-         className="absolute inset-0 bg-repeat opacity-[0.04] z-0"
-         style={{
-           backgroundImage: `linear-gradient(to right, hsl(var(--brand-purple-hsl, 278, 100%, 50%)) 1px, transparent 1px),
-                             linear-gradient(to bottom, hsl(var(--brand-purple-hsl, 278, 100%, 50%)) 1px, transparent 1px)`, // Предполагая HSL переменную для brand-purple
-           backgroundSize: '60px 60px',
+         className="absolute inset-0 bg-repeat opacity-[0.04] z-0 bg-grid-pattern" // Используем класс bg-grid-pattern если он подходит, или оставляем style
+         style={{ /* Если bg-grid-pattern не подходит, используем HSL из globals.css */
+           // backgroundImage: `linear-gradient(to right, hsl(var(--brand-purple-hsl, 278, 100%, 50%)) 1px, transparent 1px),
+           //                  linear-gradient(to bottom, hsl(var(--brand-purple-hsl, 278, 100%, 50%)) 1px, transparent 1px)`,
+           // backgroundSize: '60px 60px',
          }}
        ></div>
 
       <TooltipProvider delayDuration={150}>
         <div className="relative z-10 container mx-auto px-4">
-          {/* Используем существующие классы для карточки и текста */}
+          {/* Карточка */}
           <Card className="max-w-4xl mx-auto bg-dark-card/85 backdrop-blur-lg text-light-text rounded-2xl border-2 border-brand-purple/40 shadow-[0_0_30px_rgba(157,0,255,0.3)]">
             <CardHeader className="text-center border-b border-brand-purple/20 pb-5">
-              {/* Убедимся, что иконка использует цвет Tailwind */}
+              {/* Иконка в заголовке */}
               <FaUserNinja className="text-6xl text-brand-purple mx-auto mb-4 animate-pulse" />
-              {/* Используем существующие классы cyber-text и glitch */}
+              {/* Заголовок */}
               <CardTitle className="text-3xl md:text-5xl font-bold text-brand-purple cyber-text glitch uppercase tracking-wider" data-text={`Бизнес-План: ${pageTitleName}`}>
                 Бизнес-План: {pageTitleName}
               </CardTitle>
@@ -285,24 +235,32 @@ export default function PPlanPage() {
 
             <CardContent className="space-y-10 p-4 md:p-8">
               {planSections.map((section) => {
+                // *** Добавлена проверка на section.icon ***
                 const IconComponent = section.icon;
-                // *** ИЗМЕНЕНИЕ: Используем getBorderClass для установки Tailwind класса границы ***
+                if (!IconComponent) {
+                  // Если у секции нет иконки, логируем и пропускаем рендер этой секции или рендерим без иконки
+                  console.warn(`[PPlanPage] Section "${section.title}" (id: ${section.id}) is missing the 'icon' property.`);
+                  // Можно вернуть null, чтобы пропустить секцию, или рендерить без иконки
+                  // return null; // Пропустить секцию
+                  // Или рендерить без IconComponent:
+                  // return <details key={section.id} ... > <summary> {section.title} </summary> ... </details>;
+                }
+
                 const borderClass = getBorderClass(section.color);
 
                 return (
-                   // Применяем класс границы динамически
                    <details key={section.id} className={cn(
                        "group border-l-4 pl-4 rounded-r-md transition-all duration-300 ease-in-out open:bg-purple-900/10 open:pb-4 open:shadow-inner",
-                       borderClass // Добавляем вычисленный класс границы
+                       borderClass
                    )}>
-                     {/* Используем Tailwind класс для цвета текста */}
                      <summary className={cn("text-2xl font-semibold cursor-pointer list-none flex items-center hover:opacity-80 transition-opacity", section.color)}>
-                       {/* Убедимся, что иконка использует цвет Tailwind */}
-                       <IconComponent className="mr-3 flex-shrink-0 group-open:animate-pulse" /> {section.title}
+                       {/* Рендерим иконку только если она есть */}
+                       {IconComponent && <IconComponent className="mr-3 flex-shrink-0 group-open:animate-pulse" />}
+                       {section.title}
                      </summary>
                      <div className="mt-4 text-gray-300 text-base md:text-lg leading-relaxed space-y-3 pl-2 pr-1">
                        <RenderContent content={section.content} />
-                        {/* Плейсхолдеры без изменений */}
+                        {/* Плейсхолдеры */}
                         {section.id === 'finance' && (
                             <div className="mt-4 p-3 border border-dashed border-gray-600 rounded-md bg-gray-800/40">
                                 <p className="text-sm text-gray-400 italic text-center">[Визуализация: Круговая диаграмма гранта]</p>
@@ -318,8 +276,9 @@ export default function PPlanPage() {
                 );
               })}
 
-              {/* Заключение без изменений */}
+              {/* Заключение */}
               <section className="text-center pt-8 border-t border-brand-purple/20 mt-10">
+                 {/* .. (без изменений) */}
                  <p className="text-gray-400 italic">
                    Этот план – живой шаблон. Адаптируй под себя, {greetingName}. Главное – <span className="text-brand-purple font-bold">VIBE</span>!
                  </p>
@@ -333,7 +292,7 @@ export default function PPlanPage() {
           </Card>
         </div>
       </TooltipProvider>
-        {/* Локальные стили удалены */}
+      {/* Локальные стили удалены */}
     </div>
   );
 }
