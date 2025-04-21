@@ -102,7 +102,7 @@ const VprGeographyCheatsheet6: NextPage = () => {
                                     <div className="border-l-4 border-cyan-700 pl-4">
                                         <h3 className="flex items-center text-xl font-semibold text-cyan-300 mb-3"> <FontAwesomeIcon icon={FaWater} className="mr-2 text-cyan-300/80 fa-fw" /> Материки и Океаны </h3>
                                         <p className="text-gray-300 text-base md:text-lg mb-4">Необходимо уверенно находить на карте 6 материков (Евразия, Африка, Северная Америка, Южная Америка, Австралия, Антарктида) и 4-5 океанов (Тихий, Атлантический, Индийский, Северный Ледовитый; Южный). Обращай внимание на их относительные размеры и расположение друг относительно друга (кто соседи?).</p>
-                                        <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/continents-99913414-d4cb-4624-9779-6a7498cbf67a.png" alt="Материки и океаны: Где какой?" width={600} height={338} tooltipKeyPart="continents-*.png" aspect="video" />
+                                        <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/continents-99913414-d4cb-4624-9779-6a7498cbf67a.png" alt="Материки и океаны: Где какой?" width={600} height={338} tooltipKeyPart="continents-*.png" aspect="square" />
                                     </div>
                                     {/* Subsection: Координаты и Направления */}
                                     <div className="border-l-4 border-cyan-700 pl-4">
