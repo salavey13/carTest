@@ -229,6 +229,18 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         if (errorCount > 0) toast.error(`${errorCount} блоков не удалось восстановить.`);
     }, [validationIssues, setHookParsedFiles, setValidationIssues, setValidationStatus]);
 
+    // --- FIX: Add the missing handler ---
+    const handleUpdateParsedFiles = useCallback((updatedFiles: ValidationFileEntry[]) => {
+        logger.log("AICodeAssistant: handleUpdateParsedFiles called with", updatedFiles.length, "files");
+        // Update the source of truth (the hook's state)
+        setHookParsedFiles(updatedFiles);
+        // The useEffect watching hookParsedFiles will update componentParsedFiles
+        toast.info("Файлы обновлены после замены плейсхолдеров картинок.");
+        // Reset validation status since content changed
+        setValidationStatus('idle');
+        setValidationIssues([]);
+    }, [setHookParsedFiles, setValidationStatus, setValidationIssues]); // Add dependencies
+
     const handleClearResponse = useCallback(() => {
         setResponse(""); // Clear local state
         // Other state resets happen via useEffect hook watching 'response'
@@ -667,7 +679,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                         isOpen={isImageModalOpen}
                         onClose={() => setIsImageModalOpen(false)}
                         parsedFiles={componentParsedFiles} // Use local state
-                        onUpdateParsedFiles={handleUpdateParsedFiles} // Pass handler
+                        onUpdateParsedFiles={handleUpdateParsedFiles} // Pass the DEFINED handler
                     />
                  )}
              </AnimatePresence>
