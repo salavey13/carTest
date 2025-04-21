@@ -1,13 +1,11 @@
 "use client";
 
-// Добавлен импорт React
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react"; // Добавлен useMemo
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAppContext } from "@/contexts/AppContext"; // Импорт контекста для данных юзера
+import { useAppContext } from "@/contexts/AppContext";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
-// Убедитесь, что ВСЕ иконки, используемые в строках контента, импортированы
 import {
   FaFileAlt, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom,
   FaMobileAlt, FaComments, FaPaintBrush, FaBrain, FaRocket, FaUserNinja,
@@ -17,13 +15,10 @@ import {
 import { debugLogger } from "@/lib/debugLogger";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import type { Database } from "@/types/database.types"; // Импорт типа базы
+import type { Database } from "@/types/database.types";
 
-// --- Тип пользователя из базы ---
 type DbUser = Database["public"]["Tables"]["users"]["Row"] | null;
 
-// --- Карта для сопоставления строковых имен иконок с реальными компонентами ---
-// Ключевой элемент для рендеринга компонентов из строк
 const iconComponents: { [key: string]: React.ElementType } = {
   FaFileAlt, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom,
   FaMobileAlt, FaComments, FaPaintBrush, FaBrain, FaRocket, FaUserNinja,
@@ -31,32 +26,29 @@ const iconComponents: { [key: string]: React.ElementType } = {
   FaCode, FaVideo, FaNewspaper, FaGithub, FaTelegram
 };
 
-// --- Функция getPlanSections (Оставляем без изменений, т.к. она возвращает строки) ---
+// Функция getPlanSections остается без изменений
 const getPlanSections = (dbUser: DbUser) => {
-  // Используем данные из dbUser, если они есть, иначе дефолтные значения
   const userName = dbUser?.first_name || 'Viberider';
   const userHandle = dbUser?.username ? `@${dbUser.username}` : 'Самозанятый Эксперт';
-  // TODO: Потенциально добавить поле "опыт" в профиль или оставить общим/хардкодом
-  const userExperience = dbUser?.metadata?.experienceYears || "13+"; // Пример: можно хранить в metadata
+  const userExperience = dbUser?.metadata?.experienceYears || "13+";
 
   return [
+    // ... (все секции как были)
     {
       id: "resume",
       title: "1. Резюме проекта",
       icon: FaFileAlt,
       color: "text-brand-blue",
-      // Вставляем userName и userExperience
       content: `Проект **"Кибер-Наставник ${userName}"** – создание и развитие персонального бренда и образовательной онлайн-платформы (блога), управляемой преимущественно **с мобильных устройств**.
       Цель – предоставление уникального контента, менторских услуг и практических инструментов на базе методологии **VIBE** (AI-ассистированная разработка, быстрая валидация идей, безопасность) для IT-специалистов и начинающих предпринимателей в РФ.
       Проект использует **максимально доступные и бесплатные технологии** (Vercel, Telegram, free-tier AI), фокусируя инвестиции гранта на **нематериальных активах:** создании контента, построении сообщества, маркетинге и **твоем профессиональном развитии, ${userName}**.
       **Ключевая идея:** Ценность создается **экспертизой (${userExperience} лет у меня, твой путь уникален!), уникальным подходом (VIBE, SelfDev), скоростью и умением использовать доступные инструменты**, включая AI как **трансмутатор информации** (<FaAtom className="inline text-purple-400"/>). Грант позволит тебе (${userName}) полностью посвятить себя проекту.`
     },
-    {
+     {
       id: "description",
       title: "2. Описание проекта",
       icon: FaRocket,
       color: "text-brand-green",
-       // Вставляем userName, userHandle, добавляем иконки TG, GH, Video, Recycle, Atom
       content: `**Формат:** Мобильно-ориентированный блог/платформа:
       - **Сайт (Next.js/Vercel - Free):** Легковесный, быстрый, mobile-first. Статьи, гайды, VIBE/SelfDev. Управление через GitHub/телефон.
       - **Telegram:** Основной хаб (<FaTelegram className="inline text-blue-400"/>). Анонсы, инсайты, общение, комьюнити.
@@ -70,7 +62,6 @@ const getPlanSections = (dbUser: DbUser) => {
       title: "3. Анализ рынка и ЦА",
       icon: FaUsers,
       color: "text-brand-pink",
-      // Добавляем userName для акцента на аутентичности
       content: `Рынок IT-образования в РФ растет. Спрос на AI, WebDev, VIBE – высокий. Импортозамещение = нужны кадры.
       **ЦА:** Разрабы (TS/React/Next), тимлиды, фрилансеры, соло-предприниматели, студенты IT. Те, кто хочет оседлать AI-волну.
       **Конкуренты:** Блогеры, школы. Отстройка: **VIBE**, **SelfDev**, **AI-трансмутация**, **личный опыт**, фокус на **практике** и **доступности**, **твоя аутентичность, ${userName}**.`
@@ -80,7 +71,6 @@ const getPlanSections = (dbUser: DbUser) => {
       title: "4. Продукт/Услуга",
       icon: FaBoxOpen,
       color: "text-brand-orange",
-      // Вставляем userName, добавляем иконки Newspaper, Code, Brain
       content: `**Бесплатно (Воронка):**
       - Контент (<FaNewspaper className="inline"/>): Статьи, видео, заметки (сайт, TG, VK). AI помогает генерить и адаптировать.
       - Код (<FaCode className="inline"/>): Примеры, шаблоны на GitHub (<FaGithub className="inline"/>).
@@ -96,7 +86,6 @@ const getPlanSections = (dbUser: DbUser) => {
       title: "5. Маркетинг и Продвижение",
       icon: FaBullseye,
       color: "text-neon-lime",
-      // Добавляем иконки PaintBrush, Comments, Github
       content: `**Органика (Фундамент):**
       - <FaPaintBrush className="inline text-neon-lime"/> **Контент-Маркетинг:** Часто, ценно, вирусно (TG, VK, сайт). AI (<FaAtom className="inline"/>) помогает с трансмутацией и генерацией!
       - <FaComments className="inline text-neon-lime"/> **Комьюнити:** Лояльность в Telegram (<FaTelegram className="inline text-blue-400"/>) через общение.
@@ -114,7 +103,6 @@ const getPlanSections = (dbUser: DbUser) => {
       title: "6. План реализации",
       icon: FaMobileAlt,
       color: "text-brand-cyan",
-      // Добавляем иконку MobileAlt
       content: `**Создание Контента (<FaMobileAlt className="inline"/>):** Телефон - всё! Съемка, монтаж (CapCut), текст (голос/клава), AI для идей/черновиков/трансмутации (Free/Plus).
       **Платформа:** Сайт на Next.js/Vercel (Free). Управление с GitHub/телефона (<FaGithub className="inline"/>, <FaMobileAlt className="inline"/>). Supabase (Free) для бэка (если надо).
       **Услуги:** Консультации/воркшопы через TG/VK видеозвонки (<FaTelegram className="inline text-blue-400"/>).
@@ -125,7 +113,6 @@ const getPlanSections = (dbUser: DbUser) => {
       title: "7. Организационный план",
       icon: FaUserNinja,
       color: "text-gray-400",
-       // Вставляем userName и userHandle
       content: `**Форма:** Самозанятый (НПД). Регистрация через "Мой Налог".
       **Исполнитель:** ${userName} (${userHandle}) – все компетенции у тебя (или ты их быстро получишь по VIBE!). Ты - ядро проекта.`
     },
@@ -134,7 +121,6 @@ const getPlanSections = (dbUser: DbUser) => {
       title: "8. Финансовый план",
       icon: FaMoneyBill,
       color: "text-brand-yellow",
-      // Вставляем userName, добавляем иконки ChartLine, PaintBrush, Brain, ExclamationTriangle
       content: `**Грант: 350 000 руб. Расходы:**
       - **<FaChartLine className="inline text-yellow-400"/> 1. Маркетинг и Рост (200 000 руб.):**
           - Таргет VK/TG Ads: 120 000 руб.
@@ -160,7 +146,6 @@ const getPlanSections = (dbUser: DbUser) => {
       title: "9. Анализ рисков",
       icon: FaExclamationTriangle,
       color: "text-red-500",
-      // Вставляем userName
       content: `**Зависимость от Free Tiers:** Риск лимитов/смены условий AI/Хостинга. Митигация: Мониторинг, оптимизация, буфер (<FaExclamationTriangle className="inline"/>), готовность платить из дохода.
       **"Телефонное" качество:** Может уступать студии. Митигация: Фокус на **ценности контента**, мобильный монтаж, **аутентичность ${userName}**.
       **Выгорание ${userName}:** Работа соло. Митигация: Планирование, AI-автоматизация (<FaAtom className="inline"/>), отдых, комьюнити.
@@ -171,54 +156,38 @@ const getPlanSections = (dbUser: DbUser) => {
       title: "10. Заключение",
       icon: FaBrain,
       color: "text-brand-purple",
-       // Вставляем userName дважды для акцента
       content: `Проект **"Кибер-Наставник ${userName}"** – это **инновационный и ресурсоэффективный VIBE**. Ставка на **твою экспертизу (${userName}), контент (<FaNewspaper className="inline"/>), комьюнити (<FaUsers className="inline"/>) и умный маркетинг (<FaBullseye className="inline"/>)**, а не на железо. Грант = **инвестиция в рост, контент и твое развитие**. Это пример доступного IT-предпринимательства в РФ, усиленного AI (<FaAtom className="inline"/>).`
     },
   ];
 };
 
-// --- Компонент для безопасного рендеринга контента (замена dangerouslySetInnerHTML) ---
+// Компонент RenderContent остается без изменений
 const RenderContent: React.FC<{ content: string }> = ({ content }) => {
-  // Разбиваем на параграфы
   const paragraphs = content.split('\n');
 
   return (
     <>
       {paragraphs.map((paragraph, pIndex) => {
-        // Используем Regex для разделения строки по тегам **bold** и <FaIcon.../>, сохраняя разделители.
-        // Этот Regex сложный: он захватывает текст вне тегов, жирный текст и теги иконок по отдельности.
         const segments = paragraph.split(/(\*\*.*?\*\*|<Fa\w+\s*.*?\/?>)/g).filter(Boolean);
 
         return (
-          // Используем React.Fragment, чтобы избежать лишних div, если параграф пуст
-          <p key={pIndex} className="mb-2 last:mb-0"> {/* Добавляем немного отступа между параграфами */}
+          <p key={pIndex} className="mb-2 last:mb-0">
             {segments.map((segment, sIndex) => {
-              // Проверяем на **bold**
               if (segment.startsWith('**') && segment.endsWith('**')) {
-                // Отрезаем ** и рендерим <strong>
                 return <strong key={sIndex}>{segment.slice(2, -2)}</strong>;
               }
-
-              // Проверяем на тег иконки <FaIconName className="..." />
-              // Добавлено ? после \s* и / для необязательности пробела и слеша
               const iconMatch = segment.match(/<Fa(\w+)\s*(?:className="([^"]*)")?\s*\/?>/);
               if (iconMatch) {
-                const [, iconName, className = ""] = iconMatch; // className может отсутствовать
+                const [, iconName, className = ""] = iconMatch;
                 const IconComp = iconComponents[`Fa${iconName}`];
                 if (IconComp) {
-                  // Рендерим НАСТОЯЩИЙ компонент иконки
-                  // Добавляем классы по умолчанию для inline отображения, если className не задан полностью
-                  const finalClassName = cn("inline-block mx-1", className || "w-4 h-4"); // Убедимся, что иконка inline и имеет базовый размер
+                  const finalClassName = cn("inline-block align-middle mx-1", className || "w-4 h-4"); // Добавлен align-middle
                   return <IconComp key={sIndex} className={finalClassName} />;
                 } else {
-                  // Запасной вариант, если иконка не найдена в карте
-                  console.warn(`[RenderContent] Icon component "Fa${iconName}" not found in iconComponents map.`);
+                  console.warn(`[RenderContent] Icon component "Fa${iconName}" not found.`);
                   return <span key={sIndex} className="text-red-500 font-mono">[? Fa{iconName}]</span>;
                 }
               }
-
-              // В противном случае, это обычный текст
-              // Используем React.Fragment, чтобы текст рендерился напрямую
               return <React.Fragment key={sIndex}>{segment}</React.Fragment>;
             })}
           </p>
@@ -231,32 +200,27 @@ const RenderContent: React.FC<{ content: string }> = ({ content }) => {
 
 // --- Компонент Страницы ---
 export default function PPlanPage() {
-  // Получаем dbUser и isLoading из контекста
   const { dbUser, isLoading, error } = useAppContext();
   const [isMounted, setIsMounted] = useState(false);
-  // Используем функциональную форму setState для инициализации, чтобы getPlanSections вызвалась один раз
-  const [planSections, setPlanSections] = useState(() => getPlanSections(null));
 
   useEffect(() => {
-    // Флаг isMounted все еще полезен для избежания рендеринга на сервере до гидратации
-    // или для условного рендеринга только на клиенте
     setIsMounted(true);
   }, []);
 
-  // Отдельный эффект для обновления секций, когда dbUser меняется (только на клиенте)
-  useEffect(() => {
-    // Обновляем секции, когда dbUser становится доступен ИЛИ если он уже был доступен при монтировании
-    // А также сбрасываем к дефолту, если dbUser становится null
-    setPlanSections(getPlanSections(dbUser)); // Просто передаем dbUser (может быть null)
-    if (dbUser) {
-        debugLogger.log("[PPlanPage] Effect triggered, dbUser data applied:", {firstName: dbUser.first_name, username: dbUser.username});
-    } else {
-        debugLogger.log("[PPlanPage] Effect triggered, using default data (dbUser is null/undefined).");
-    }
-  }, [dbUser]); // *** Зависимость теперь только от dbUser ***
+  // *** ИЗМЕНЕНИЕ: Вычисляем planSections, pageTitleName, greetingName с помощью useMemo ***
+  // Это гарантирует, что они пересчитываются ТОЛЬКО когда dbUser действительно меняется.
+  const planSections = useMemo(() => {
+      debugLogger.log("[PPlanPage] Recalculating planSections, dbUser:", dbUser ? dbUser.user_id : 'null');
+      return getPlanSections(dbUser);
+  }, [dbUser]);
 
-  // Используем isLoading из контекста и isMounted для прелоадера
+  const pageTitleName = useMemo(() => dbUser?.first_name || "Кибер-Наставник", [dbUser]);
+  const greetingName = useMemo(() => dbUser?.first_name || 'Viberider', [dbUser]);
+
+  // *** ИЗМЕНЕНИЕ: Основной рендер теперь зависит от isMounted И !isLoading ***
+  // Мы не рендерим основной контент, пока не выполнится монтирование И загрузка не завершится.
   if (!isMounted || isLoading) {
+    // Показываем лоадер, пока не смонтировано ИЛИ пока идет загрузка
     return (
       <div className="flex justify-center items-center min-h-screen pt-20 bg-gradient-to-br from-gray-900 via-black to-gray-800">
         <p className="text-brand-cyan animate-pulse text-xl font-mono">VIBE план загружается...</p>
@@ -264,7 +228,7 @@ export default function PPlanPage() {
     );
   }
 
-   // Если есть ошибка после загрузки
+   // Показываем ошибку, если она есть (после загрузки и монтирования)
    if (error) {
      return (
        <div className="flex flex-col justify-center items-center min-h-screen pt-20 bg-gradient-to-br from-gray-900 via-black to-red-900/50">
@@ -276,10 +240,9 @@ export default function PPlanPage() {
      );
    }
 
-  // Определяем имя для заголовка (используем dbUser)
-  const pageTitleName = dbUser?.first_name || "Кибер-Наставник";
-  const greetingName = dbUser?.first_name || 'Viberider'; // Имя для приветствия в конце
-
+  // *** Теперь можно безопасно рендерить основной контент ***
+  // На этом этапе isMounted = true и isLoading = false,
+  // а planSections, pageTitleName, greetingName вычислены на основе актуального dbUser.
   return (
     <div className="relative min-h-screen overflow-hidden pt-20 pb-10 bg-gradient-to-br from-gray-950 via-black to-purple-900/30 text-gray-200">
        {/* Background Grid */}
@@ -294,10 +257,10 @@ export default function PPlanPage() {
 
       <TooltipProvider delayDuration={150}>
         <div className="relative z-10 container mx-auto px-4">
+          {/* Используем вычисленные planSections, pageTitleName, greetingName */}
           <Card className="max-w-4xl mx-auto bg-black/85 backdrop-blur-lg text-white rounded-2xl border-2 border-brand-purple/40 shadow-[0_0_30px_rgba(157,0,255,0.3)]">
             <CardHeader className="text-center border-b border-brand-purple/20 pb-5">
               <FaUserNinja className="text-6xl text-brand-purple mx-auto mb-4 animate-pulse" />
-              {/* Динамический заголовок */}
               <CardTitle className="text-3xl md:text-5xl font-bold text-brand-purple cyber-text glitch uppercase tracking-wider" data-text={`Бизнес-План: ${pageTitleName}`}>
                 Бизнес-План: {pageTitleName}
               </CardTitle>
@@ -309,20 +272,15 @@ export default function PPlanPage() {
             <CardContent className="space-y-10 p-4 md:p-8">
               {planSections.map((section) => {
                 const IconComponent = section.icon;
-                // Определяем цвет границы через CSS переменную
                 const borderColorVar = section.color.replace('text-', '--color-');
 
                 return (
-                   // Используем details/summary для аккордеона
-                   <details key={section.id} className={`group border-l-4 pl-4 rounded-r-md transition-all duration-300 ease-in-out open:bg-purple-900/10 open:pb-4 open:shadow-inner`} style={{ borderColor: `var(${borderColorVar}, #888)` }}> {/* Добавлен fallback цвет */}
+                   <details key={section.id} className={`group border-l-4 pl-4 rounded-r-md transition-all duration-300 ease-in-out open:bg-purple-900/10 open:pb-4 open:shadow-inner`} style={{ borderColor: `var(${borderColorVar}, #888)` }}>
                      <summary className={cn("text-2xl font-semibold cursor-pointer list-none flex items-center hover:opacity-80 transition-opacity", section.color)}>
                        <IconComponent className="mr-3 flex-shrink-0 group-open:animate-pulse" /> {section.title}
                      </summary>
                      <div className="mt-4 text-gray-300 text-base md:text-lg leading-relaxed space-y-3 pl-2 pr-1">
-                       {/* Используем новый компонент RenderContent вместо dangerouslySetInnerHTML */}
                        <RenderContent content={section.content} />
-
-                        {/* Placeholder для визуализации (оставляем как есть) */}
                         {section.id === 'finance' && (
                             <div className="mt-4 p-3 border border-dashed border-gray-600 rounded-md bg-gray-800/40">
                                 <p className="text-sm text-gray-400 italic text-center">[Визуализация: Круговая диаграмма гранта: Маркетинг (~57%), Контент/Время (~29%), Развитие (~8.5%), Буфер (~5.5%)]</p>
@@ -338,7 +296,6 @@ export default function PPlanPage() {
                 );
               })}
 
-              {/* Conclusion/CTA (оставляем как есть) */}
               <section className="text-center pt-8 border-t border-brand-purple/20 mt-10">
                  <p className="text-gray-400 italic">
                    Этот план – живой шаблон. Адаптируй под себя, {greetingName}. Главное – <span className="text-brand-purple font-bold">VIBE</span>!
@@ -348,12 +305,11 @@ export default function PPlanPage() {
                    <Link href="/about" className="text-brand-blue hover:underline font-semibold">контакты</Link> или форму <Link href="/jumpstart#jumpstart-form" className="text-neon-lime hover:underline font-semibold">Jumpstart</Link>.
                  </p>
               </section>
-
             </CardContent>
           </Card>
         </div>
       </TooltipProvider>
-        {/* CSS Variables for border colors (оставляем как есть) */}
+        {/* CSS Variables */}
         <style jsx global>{`
           :root {
             --color-brand-blue: #00C2FF;
@@ -361,9 +317,9 @@ export default function PPlanPage() {
             --color-brand-pink: #FF007A;
             --color-brand-orange: #FF6B00;
             --color-neon-lime: #AEFF00;
-            --color-brand-cyan: #00E0FF; /* Пример, подберите нужный */
+            --color-brand-cyan: #00E0FF;
             --color-gray-400: #9CA3AF;
-            --color-brand-yellow: #FFD700; /* Пример, подберите нужный */
+            --color-brand-yellow: #FFD700;
             --color-red-500: #EF4444;
             --color-brand-purple: #9D00FF;
           }
