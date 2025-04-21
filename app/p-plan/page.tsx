@@ -9,7 +9,7 @@ import {
 import {
   FaFileAlt, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom, // FaTasks -> FaAtom (трансмутация)
   FaMobileAlt, FaComments, FaPaintBrush, FaBrain, FaRocket, FaUserNinja,
-  FaHandHoldingUsd, FaExclamationTriangle, FaRecycle, // FaRecycle для трансмутации/ресайклинга контента
+  FaMoneyBill, FaExclamationTriangle, FaRecycle, // FaRecycle для трансмутации/ресайклинга контента
   FaCode, FaVideo, FaNewspaper, FaGithub, FaTelegram // Доп. иконки для деталей
 } from "react-icons/fa6";
 import { debugLogger } from "@/lib/debugLogger";
@@ -80,7 +80,7 @@ const getPlanSections = (user: any) => { // Функция для генерац
     { id: "org", title: "7. Организационный план", icon: FaUserNinja, color: "text-gray-400", content: `**Форма:** Самозанятый (НПД). Регистрация через "Мой Налог".
       **Исполнитель:** ${userName} (${userHandle}) – все компетенции у тебя (или ты их быстро получишь по VIBE!).`
     },
-    { id: "finance", title: "8. Финансовый план", icon: FaHandHoldingUsd, color: "text-brand-yellow", content: `**Грант: 350 000 руб. Расходы:**
+    { id: "finance", title: "8. Финансовый план", icon: FaMoneyBill, color: "text-brand-yellow", content: `**Грант: 350 000 руб. Расходы:**
       - **<FaChartLine className="inline text-yellow-400"/> 1. Маркетинг и Рост (200 000 руб.):**
           - Таргет VK/TG Ads: 120 000 руб.
           - Посевы TG: 50 000 руб.
