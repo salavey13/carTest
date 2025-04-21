@@ -142,7 +142,7 @@ const VprGeographyCheatsheet6: NextPage = () => {
                                             <li><strong>Расчет:</strong> Умножь измеренное расстояние (см) на величину именованного масштаба (число метров или км в 1 см). Пример: на карте 3 см, масштаб в 1 см 100 м. Расстояние = 3 * 100 = 300 м.</li>
                                             <li><strong>Точность:</strong> Старайся измерять как можно точнее, особенно если линия изогнутая (используй нитку или курвиметр, если разрешено).</li>
                                         </ul>
-                                        <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250420_010735.jpg" alt="Масштаб: Как рассчитать расстояние?" width={600} height={338} tooltipKeyPart="IMG_20250420_010735.jpg" aspect="square" />
+                                        <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250420_010735.jpg" alt="Масштаб: Как рассчитать расстояние?" width={600} height={338} tooltipKeyPart="IMG_20250420_010735.jpg" aspect="video" />
                                     </div>
 
                                     {/* Subsection: Направления и Азимут */}
@@ -205,7 +205,7 @@ const VprGeographyCheatsheet6: NextPage = () => {
                                              <li><strong>Саванны:</strong> Субэкваториальный пояс, жарко, четкий сухой и влажный сезоны, высокие травы, редкие деревья (акация, баобаб), красно-бурые почвы, слоны, жирафы, зебры, львы (особенно в Африке).</li>
                                              <li><strong>Влажные экваториальные леса (Гилея):</strong> Экваториальный пояс, жарко и влажно круглый год, многоярусный вечнозеленый лес, лианы, красно-желтые ферраллитные почвы, обезьяны, попугаи, змеи, огромное разнообразие насекомых.</li>
                                         </ul>
-                                         <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/geo-natural-zones-3f1c6f06-3cdd-49e4-91ee-b551ed244290.png" alt="Природные зоны: Где кто живет?" width={600} height={338} tooltipKeyPart="geo-natural-zones-*.png" aspect="video" />
+                                         <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/geo-natural-zones-3f1c6f06-3cdd-49e4-91ee-b551ed244290.png" alt="Природные зоны: Где кто живет?" width={600} height={338} tooltipKeyPart="geo-natural-zones-*.png" aspect="square" />
                                     </div>
                                      {/* Subsection: Погода и Климат */}
                                     <div className="border-l-4 border-green-700 pl-4">
