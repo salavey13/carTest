@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+// Добавлен импорт React
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppContext } from "@/contexts/AppContext"; // Импорт контекста для данных юзера
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
-// Импортируем только разрешенные Fa6 иконки
+// Убедитесь, что ВСЕ иконки, используемые в строках контента, импортированы
 import {
   FaFileAlt, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom,
   FaMobileAlt, FaComments, FaPaintBrush, FaBrain, FaRocket, FaUserNinja,
@@ -21,8 +22,16 @@ import type { Database } from "@/types/database.types"; // Импорт типа
 // --- Тип пользователя из базы ---
 type DbUser = Database["public"]["Tables"]["users"]["Row"] | null;
 
-// --- Текстовое наполнение (из "Кибер-Партизан" версии, доработано + динамика) ---
-// Функция теперь принимает DbUser или null
+// --- Карта для сопоставления строковых имен иконок с реальными компонентами ---
+// Ключевой элемент для рендеринга компонентов из строк
+const iconComponents: { [key: string]: React.ElementType } = {
+  FaFileAlt, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom,
+  FaMobileAlt, FaComments, FaPaintBrush, FaBrain, FaRocket, FaUserNinja,
+  FaMoneyBill, FaExclamationTriangle, FaRecycle,
+  FaCode, FaVideo, FaNewspaper, FaGithub, FaTelegram
+};
+
+// --- Функция getPlanSections (Оставляем без изменений, т.к. она возвращает строки) ---
 const getPlanSections = (dbUser: DbUser) => {
   // Используем данные из dbUser, если они есть, иначе дефолтные значения
   const userName = dbUser?.first_name || 'Viberider';
@@ -168,40 +177,89 @@ const getPlanSections = (dbUser: DbUser) => {
   ];
 };
 
+// --- Компонент для безопасного рендеринга контента (замена dangerouslySetInnerHTML) ---
+const RenderContent: React.FC<{ content: string }> = ({ content }) => {
+  // Разбиваем на параграфы
+  const paragraphs = content.split('\n');
+
+  return (
+    <>
+      {paragraphs.map((paragraph, pIndex) => {
+        // Используем Regex для разделения строки по тегам **bold** и <FaIcon.../>, сохраняя разделители.
+        // Этот Regex сложный: он захватывает текст вне тегов, жирный текст и теги иконок по отдельности.
+        const segments = paragraph.split(/(\*\*.*?\*\*|<Fa\w+\s*.*?\/?>)/g).filter(Boolean);
+
+        return (
+          // Используем React.Fragment, чтобы избежать лишних div, если параграф пуст
+          <p key={pIndex} className="mb-2 last:mb-0"> {/* Добавляем немного отступа между параграфами */}
+            {segments.map((segment, sIndex) => {
+              // Проверяем на **bold**
+              if (segment.startsWith('**') && segment.endsWith('**')) {
+                // Отрезаем ** и рендерим <strong>
+                return <strong key={sIndex}>{segment.slice(2, -2)}</strong>;
+              }
+
+              // Проверяем на тег иконки <FaIconName className="..." />
+              // Добавлено ? после \s* и / для необязательности пробела и слеша
+              const iconMatch = segment.match(/<Fa(\w+)\s*(?:className="([^"]*)")?\s*\/?>/);
+              if (iconMatch) {
+                const [, iconName, className = ""] = iconMatch; // className может отсутствовать
+                const IconComp = iconComponents[`Fa${iconName}`];
+                if (IconComp) {
+                  // Рендерим НАСТОЯЩИЙ компонент иконки
+                  // Добавляем классы по умолчанию для inline отображения, если className не задан полностью
+                  const finalClassName = cn("inline-block mx-1", className || "w-4 h-4"); // Убедимся, что иконка inline и имеет базовый размер
+                  return <IconComp key={sIndex} className={finalClassName} />;
+                } else {
+                  // Запасной вариант, если иконка не найдена в карте
+                  console.warn(`[RenderContent] Icon component "Fa${iconName}" not found in iconComponents map.`);
+                  return <span key={sIndex} className="text-red-500 font-mono">[? Fa{iconName}]</span>;
+                }
+              }
+
+              // В противном случае, это обычный текст
+              // Используем React.Fragment, чтобы текст рендерился напрямую
+              return <React.Fragment key={sIndex}>{segment}</React.Fragment>;
+            })}
+          </p>
+        );
+      })}
+    </>
+  );
+};
+
+
 // --- Компонент Страницы ---
 export default function PPlanPage() {
   // Получаем dbUser и isLoading из контекста
   const { dbUser, isLoading, error } = useAppContext();
   const [isMounted, setIsMounted] = useState(false);
-  // Инициализируем с null, чтобы getPlanSections вызвалась с дефолтом сначала
-  const [planSections, setPlanSections] = useState(getPlanSections(null));
+  // Используем функциональную форму setState для инициализации, чтобы getPlanSections вызвалась один раз
+  const [planSections, setPlanSections] = useState(() => getPlanSections(null));
 
   useEffect(() => {
-    // Этот флаг все еще полезен, чтобы избежать рендеринга на сервере до гидратации
+    // Флаг isMounted все еще полезен для избежания рендеринга на сервере до гидратации
+    // или для условного рендеринга только на клиенте
     setIsMounted(true);
   }, []);
 
-  // Отдельный эффект для обновления секций, когда dbUser меняется
+  // Отдельный эффект для обновления секций, когда dbUser меняется (только на клиенте)
   useEffect(() => {
     // Обновляем секции, когда dbUser становится доступен ИЛИ если он уже был доступен при монтировании
-    // А также сбрасываем к дефолту, если dbUser становится null (например, при ошибке или логауте)
+    // А также сбрасываем к дефолту, если dbUser становится null
+    setPlanSections(getPlanSections(dbUser)); // Просто передаем dbUser (может быть null)
     if (dbUser) {
-        setPlanSections(getPlanSections(dbUser));
         debugLogger.log("[PPlanPage] Effect triggered, dbUser data applied:", {firstName: dbUser.first_name, username: dbUser.username});
     } else {
-        // Если dbUser стал null/undefined (после того как был), используем дефолтные значения
-        setPlanSections(getPlanSections(null));
-        debugLogger.log("[PPlanPage] Effect triggered, using default data (dbUser is null).");
+        debugLogger.log("[PPlanPage] Effect triggered, using default data (dbUser is null/undefined).");
     }
-  }, [dbUser]); // *** Зависимость теперь от dbUser ***
+  }, [dbUser]); // *** Зависимость теперь только от dbUser ***
 
   // Используем isLoading из контекста и isMounted для прелоадера
   if (!isMounted || isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen pt-20 bg-gradient-to-br from-gray-900 via-black to-gray-800">
         <p className="text-brand-cyan animate-pulse text-xl font-mono">VIBE план загружается...</p>
-        {/* Можно добавить отображение ошибки здесь, если она есть */}
-        {/* {error && <p className="text-red-500 mt-4">Ошибка: {error.message}</p>} */}
       </div>
     );
   }
@@ -256,25 +314,15 @@ export default function PPlanPage() {
 
                 return (
                    // Используем details/summary для аккордеона
-                   <details key={section.id} className={`group border-l-4 pl-4 rounded-r-md transition-all duration-300 ease-in-out open:bg-purple-900/10 open:pb-4 open:shadow-inner`} style={{ borderColor: `var(${borderColorVar})` }}>
+                   <details key={section.id} className={`group border-l-4 pl-4 rounded-r-md transition-all duration-300 ease-in-out open:bg-purple-900/10 open:pb-4 open:shadow-inner`} style={{ borderColor: `var(${borderColorVar}, #888)` }}> {/* Добавлен fallback цвет */}
                      <summary className={cn("text-2xl font-semibold cursor-pointer list-none flex items-center hover:opacity-80 transition-opacity", section.color)}>
                        <IconComponent className="mr-3 flex-shrink-0 group-open:animate-pulse" /> {section.title}
                      </summary>
                      <div className="mt-4 text-gray-300 text-base md:text-lg leading-relaxed space-y-3 pl-2 pr-1">
-                       {/* Используем dangerouslySetInnerHTML для рендера <strong> и простых inline-иконок (без изменений тут) */}
-                       {section.content.split('\n').map((paragraph, index) => (
-                         <p key={index} dangerouslySetInnerHTML={{ __html: paragraph.replace(/<Fa(\w+)\s*(.*?)\/>/g, (match) => {
-                            // Упрощенный рендер иконки как текст с базовым цветом.
-                            const iconName = match.match(/Fa(\w+)/)?.[1];
-                            const classes = match.match(/className="([^"]*)"/)?.[1] || '';
-                            const colorClass = classes.split(' ').find(cls => cls.startsWith('text-')) || 'text-gray-400';
-                             // Отображаем имя иконки текстом, обернутое в span с цветом
-                             // ВАЖНО: Это НЕ рендерит иконку, а только ее текстовое представление.
-                            return `<span class="inline-block mx-1 ${colorClass}" title="${iconName}">[${iconName}]</span>`;
-                          }).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Замена ** на <strong>
-                         }} />
-                       ))}
-                        {/* Placeholder для визуализации */}
+                       {/* Используем новый компонент RenderContent вместо dangerouslySetInnerHTML */}
+                       <RenderContent content={section.content} />
+
+                        {/* Placeholder для визуализации (оставляем как есть) */}
                         {section.id === 'finance' && (
                             <div className="mt-4 p-3 border border-dashed border-gray-600 rounded-md bg-gray-800/40">
                                 <p className="text-sm text-gray-400 italic text-center">[Визуализация: Круговая диаграмма гранта: Маркетинг (~57%), Контент/Время (~29%), Развитие (~8.5%), Буфер (~5.5%)]</p>
@@ -290,7 +338,7 @@ export default function PPlanPage() {
                 );
               })}
 
-              {/* Conclusion/CTA */}
+              {/* Conclusion/CTA (оставляем как есть) */}
               <section className="text-center pt-8 border-t border-brand-purple/20 mt-10">
                  <p className="text-gray-400 italic">
                    Этот план – живой шаблон. Адаптируй под себя, {greetingName}. Главное – <span className="text-brand-purple font-bold">VIBE</span>!
@@ -305,8 +353,21 @@ export default function PPlanPage() {
           </Card>
         </div>
       </TooltipProvider>
-        {/* CSS Variables for border colors (без изменений тут) */}
-        
+        {/* CSS Variables for border colors (оставляем как есть) */}
+        <style jsx global>{`
+          :root {
+            --color-brand-blue: #00C2FF;
+            --color-brand-green: #00FF9D;
+            --color-brand-pink: #FF007A;
+            --color-brand-orange: #FF6B00;
+            --color-neon-lime: #AEFF00;
+            --color-brand-cyan: #00E0FF; /* Пример, подберите нужный */
+            --color-gray-400: #9CA3AF;
+            --color-brand-yellow: #FFD700; /* Пример, подберите нужный */
+            --color-red-500: #EF4444;
+            --color-brand-purple: #9D00FF;
+          }
+        `}</style>
     </div>
   );
 }
