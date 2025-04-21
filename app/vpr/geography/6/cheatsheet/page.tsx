@@ -142,7 +142,7 @@ const VprGeographyCheatsheet6: NextPage = () => {
                                             <li><strong>Расчет:</strong> Умножь измеренное расстояние (см) на величину именованного масштаба (число метров или км в 1 см). Пример: на карте 3 см, масштаб в 1 см 100 м. Расстояние = 3 * 100 = 300 м.</li>
                                             <li><strong>Точность:</strong> Старайся измерять как можно точнее, особенно если линия изогнутая (используй нитку или курвиметр, если разрешено).</li>
                                         </ul>
-                                        <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250420_010735.jpg" alt="Масштаб: Как рассчитать расстояние?" width={600} height={338} tooltipKeyPart="IMG_20250420_010735.jpg" aspect="video" />
+                                        <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250420_010735.jpg" alt="Масштаб: Как рассчитать расстояние?" width={600} height={338} tooltipKeyPart="IMG_20250420_010735.jpg" aspect="square" />
                                     </div>
 
                                     {/* Subsection: Направления и Азимут */}
@@ -166,7 +166,7 @@ const VprGeographyCheatsheet6: NextPage = () => {
                                             <li><strong>Профиль рельефа:</strong> График, показывающий вид местности в разрезе по заданной линии. Строится по высотам точек пересечения линии с горизонталями.</li>
                                             <li><strong>Выбор участка:</strong> Анализируй карту для выбора места под разные цели (ровная площадка для футбола - горизонтали далеко; крутой склон для санок - горизонтали близко; ферма - у воды, у дороги, на ровном месте).</li>
                                         </ul>
-                                        <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/3topo.png" alt="Топокарта: Читаем рельеф и знаки?" width={600} height={338} tooltipKeyPart="3topo.png" aspect="video" />
+                                        <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/3topo.png" alt="Топокарта: Читаем рельеф и знаки?" width={600} height={338} tooltipKeyPart="3topo.png" aspect="square" />
                                     </div>
                                 </div>
                             </section>
@@ -188,8 +188,8 @@ const VprGeographyCheatsheet6: NextPage = () => {
                                         </ul>
                                          <p className="text-gray-300 text-base md:text-lg mb-4">Умей относить природные явления (дождь, землетрясение, цветение, извержение вулкана, таяние ледника) к соответствующей оболочке.</p>
                                          <div className="space-y-4">
-                                            <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/geo-atmosphere-collage-eff574ec-a074-4dea-be8c-4746a9175e86.png" alt="Атмосфера: Гроза и торнадо?" width={400} height={225} tooltipKeyPart="geo-atmosphere-*.png" aspect="video" />
-                                            <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/life-77b646d5-16f4-45e1-ab80-a810340f6c40.png" alt="Биосфера: Разнообразие жизни?" width={400} height={225} tooltipKeyPart="life-*.png" aspect="video" />
+                                            <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/geo-atmosphere-collage-eff574ec-a074-4dea-be8c-4746a9175e86.png" alt="Атмосфера: Гроза и торнадо?" width={400} height={225} tooltipKeyPart="geo-atmosphere-*.png" aspect="square" />
+                                            <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/life-77b646d5-16f4-45e1-ab80-a810340f6c40.png" alt="Биосфера: Разнообразие жизни?" width={400} height={225} tooltipKeyPart="life-*.png" aspect="square" />
                                          </div>
                                     </div>
                                     {/* Subsection: Природные Зоны */}
