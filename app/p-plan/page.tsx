@@ -16,13 +16,19 @@ import {
 import { debugLogger } from "@/lib/debugLogger";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import type { Database } from "@/types/database.types"; // Импорт типа базы
+
+// --- Тип пользователя из базы ---
+type DbUser = Database["public"]["Tables"]["users"]["Row"] | null;
 
 // --- Текстовое наполнение (из "Кибер-Партизан" версии, доработано + динамика) ---
-const getPlanSections = (user: any) => { // Функция для генерации секций с данными пользователя
-  const userName = user?.first_name || 'Viberider'; // Используем имя из профиля или дефолт
-  const userHandle = user?.username ? `@${user.username}` : 'Самозанятый Эксперт'; // Используем хэндл или дефолт
+// Функция теперь принимает DbUser или null
+const getPlanSections = (dbUser: DbUser) => {
+  // Используем данные из dbUser, если они есть, иначе дефолтные значения
+  const userName = dbUser?.first_name || 'Viberider';
+  const userHandle = dbUser?.username ? `@${dbUser.username}` : 'Самозанятый Эксперт';
   // TODO: Потенциально добавить поле "опыт" в профиль или оставить общим/хардкодом
-  const userExperience = "13+"; // Пример опыта, можно сделать динамичным в будущем
+  const userExperience = dbUser?.metadata?.experienceYears || "13+"; // Пример: можно хранить в metadata
 
   return [
     {
@@ -97,7 +103,7 @@ const getPlanSections = (user: any) => { // Функция для генерац
     {
       id: "operations",
       title: "6. План реализации",
-      icon: FaMobileAlt, // Проверил, FaMobileAlt часто используется, хоть и не в топ списке, но валидна во многих FontAwesome версиях. Оставляем.
+      icon: FaMobileAlt,
       color: "text-brand-cyan",
       // Добавляем иконку MobileAlt
       content: `**Создание Контента (<FaMobileAlt className="inline"/>):** Телефон - всё! Съемка, монтаж (CapCut), текст (голос/клава), AI для идей/черновиков/трансмутации (Free/Plus).
@@ -164,35 +170,57 @@ const getPlanSections = (user: any) => { // Функция для генерац
 
 // --- Компонент Страницы ---
 export default function PPlanPage() {
-  const { user } = useAppContext(); // Получаем данные юзера
+  // Получаем dbUser и isLoading из контекста
+  const { dbUser, isLoading, error } = useAppContext();
   const [isMounted, setIsMounted] = useState(false);
   // Инициализируем с null, чтобы getPlanSections вызвалась с дефолтом сначала
   const [planSections, setPlanSections] = useState(getPlanSections(null));
 
   useEffect(() => {
+    // Этот флаг все еще полезен, чтобы избежать рендеринга на сервере до гидратации
     setIsMounted(true);
-    // Обновляем секции, когда user становится доступен ИЛИ если он уже был доступен при монтировании
-    if (user) {
-        setPlanSections(getPlanSections(user));
-        debugLogger.log("[PPlanPage] Mounted, user data applied:", {firstName: user.first_name, username: user.username});
-    } else {
-        // Если user все еще null/undefined после монтирования, используем дефолтные значения (уже установлено в useState)
-        debugLogger.log("[PPlanPage] Mounted, using default user data.");
-    }
-  }, [user]); // Зависимость от user
+  }, []);
 
-  if (!isMounted) {
-    // Прелоадер пока компонент не смонтирован на клиенте
+  // Отдельный эффект для обновления секций, когда dbUser меняется
+  useEffect(() => {
+    // Обновляем секции, когда dbUser становится доступен ИЛИ если он уже был доступен при монтировании
+    // А также сбрасываем к дефолту, если dbUser становится null (например, при ошибке или логауте)
+    if (dbUser) {
+        setPlanSections(getPlanSections(dbUser));
+        debugLogger.log("[PPlanPage] Effect triggered, dbUser data applied:", {firstName: dbUser.first_name, username: dbUser.username});
+    } else {
+        // Если dbUser стал null/undefined (после того как был), используем дефолтные значения
+        setPlanSections(getPlanSections(null));
+        debugLogger.log("[PPlanPage] Effect triggered, using default data (dbUser is null).");
+    }
+  }, [dbUser]); // *** Зависимость теперь от dbUser ***
+
+  // Используем isLoading из контекста и isMounted для прелоадера
+  if (!isMounted || isLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen pt-20 bg-gradient-to-br from-gray-900 via-black to-gray-800">
         <p className="text-brand-cyan animate-pulse text-xl font-mono">VIBE план загружается...</p>
+        {/* Можно добавить отображение ошибки здесь, если она есть */}
+        {/* {error && <p className="text-red-500 mt-4">Ошибка: {error.message}</p>} */}
       </div>
     );
   }
 
-  // Определяем имя для заголовка (если юзер есть, иначе общее)
-  const pageTitleName = user?.first_name || "Кибер-Наставник";
-  const greetingName = user?.first_name || 'Viberider'; // Имя для приветствия в конце
+   // Если есть ошибка после загрузки
+   if (error) {
+     return (
+       <div className="flex flex-col justify-center items-center min-h-screen pt-20 bg-gradient-to-br from-gray-900 via-black to-red-900/50">
+         <FaExclamationTriangle className="text-6xl text-red-500 mb-4"/>
+         <p className="text-red-400 text-xl font-mono">Ошибка загрузки плана</p>
+         <p className="text-red-500 mt-2 text-sm max-w-md text-center">{error.message}</p>
+         <p className="text-gray-400 mt-4 text-xs">Попробуйте перезагрузить приложение.</p>
+       </div>
+     );
+   }
+
+  // Определяем имя для заголовка (используем dbUser)
+  const pageTitleName = dbUser?.first_name || "Кибер-Наставник";
+  const greetingName = dbUser?.first_name || 'Viberider'; // Имя для приветствия в конце
 
   return (
     <div className="relative min-h-screen overflow-hidden pt-20 pb-10 bg-gradient-to-br from-gray-950 via-black to-purple-900/30 text-gray-200">
@@ -233,15 +261,16 @@ export default function PPlanPage() {
                        <IconComponent className="mr-3 flex-shrink-0 group-open:animate-pulse" /> {section.title}
                      </summary>
                      <div className="mt-4 text-gray-300 text-base md:text-lg leading-relaxed space-y-3 pl-2 pr-1">
-                       {/* Используем dangerouslySetInnerHTML для рендера <strong> и простых inline-иконок */}
+                       {/* Используем dangerouslySetInnerHTML для рендера <strong> и простых inline-иконок (без изменений тут) */}
                        {section.content.split('\n').map((paragraph, index) => (
                          <p key={index} dangerouslySetInnerHTML={{ __html: paragraph.replace(/<Fa(\w+)\s*(.*?)\/>/g, (match) => {
-                            // Упрощенный рендер иконки как текст с базовым цветом. В реальном приложении нужен парсер или MDX.
+                            // Упрощенный рендер иконки как текст с базовым цветом.
                             const iconName = match.match(/Fa(\w+)/)?.[1];
                             const classes = match.match(/className="([^"]*)"/)?.[1] || '';
-                            // Попробуем извлечь цвет из класса для спана
                             const colorClass = classes.split(' ').find(cls => cls.startsWith('text-')) || 'text-gray-400';
-                            return `<span class="inline-block mx-1 ${colorClass}"><${iconName}/></span>`; // Отображаем имя иконки внутри span
+                             // Отображаем имя иконки текстом, обернутое в span с цветом
+                             // ВАЖНО: Это НЕ рендерит иконку, а только ее текстовое представление.
+                            return `<span class="inline-block mx-1 ${colorClass}" title="${iconName}">[${iconName}]</span>`;
                           }).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Замена ** на <strong>
                          }} />
                        ))}
@@ -276,7 +305,7 @@ export default function PPlanPage() {
           </Card>
         </div>
       </TooltipProvider>
-        {/* CSS Variables for border colors (для style=...) */}
+        {/* CSS Variables for border colors (без изменений тут) */}
         <style jsx global>{`
             :root {
               --color-brand-blue: #00C2FF;
@@ -290,18 +319,15 @@ export default function PPlanPage() {
               --color-red-500: #EF4444; /* Цвет для ExclamationTriangle */
               --color-brand-purple: #9D00FF; /* Цвет для Brain/Atom */
             }
-            /* Простая анимация для иконки в открытом <details> */
-            details[open] summary svg {
-                /* Можно добавить анимацию, если нужно */
-            }
-            /* Стиль для плейсхолдера иконки в тексте */
-            span > svg { /* Селектор для иконки внутри span от dangerouslySetInnerHTML */
-              display: inline-block;
-              vertical-align: middle; /* Выравнивание иконки */
-              margin-bottom: 0.125em; /* Небольшой отступ снизу */
-              width: 1em; /* Размер иконки */
-              height: 1em;
-            }
+            /* Стиль для плейсхолдера иконки в тексте (без изменений тут) */
+             span[title] { /* Стиль для span с текстом иконки */
+               font-family: monospace;
+               font-size: 0.9em;
+               padding: 0 0.2em;
+               border: 1px solid currentColor; /* Рамка в цвет текста */
+               border-radius: 3px;
+               opacity: 0.8;
+             }
         `}</style>
     </div>
   );
