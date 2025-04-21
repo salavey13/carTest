@@ -229,7 +229,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         if (errorCount > 0) toast.error(`${errorCount} блоков не удалось восстановить.`);
     }, [validationIssues, setHookParsedFiles, setValidationIssues, setValidationStatus]);
 
-    // --- FIX: Add the missing handler ---
     const handleUpdateParsedFiles = useCallback((updatedFiles: ValidationFileEntry[]) => {
         logger.log("AICodeAssistant: handleUpdateParsedFiles called with", updatedFiles.length, "files");
         // Update the source of truth (the hook's state)
@@ -241,11 +240,16 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         setValidationIssues([]);
     }, [setHookParsedFiles, setValidationStatus, setValidationIssues]); // Add dependencies
 
+    // --- FIX for Clear Button ---
     const handleClearResponse = useCallback(() => {
-        setResponse(""); // Clear local state
+        setResponse(""); // Clear React state
+        // Manually clear the textarea value as well
+        if (aiResponseInputRef.current) {
+            aiResponseInputRef.current.value = "";
+        }
         // Other state resets happen via useEffect hook watching 'response'
         toast.info("Поле ответа очищено.");
-    }, []);
+    }, [aiResponseInputRef]); // Add aiResponseInputRef dependency
 
     const handleCopyResponse = useCallback(() => {
         if (!response) return;
@@ -564,7 +568,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
              <header className="flex justify-between items-center gap-2">
                  <div className="flex items-center gap-2">
                      <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse">AI Code Assistant</h1>
-                     <Tooltip text={assistantTooltipText} position="bottom">
+                     {/* --- FIX: Changed tooltip position --- */}
+                     <Tooltip text={assistantTooltipText} position="left">
                          <FaCircleInfo className="text-blue-400 cursor-help hover:text-blue-300 transition" />
                      </Tooltip>
                  </div>
@@ -585,7 +590,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                          id="response-input"
                          ref={aiResponseInputRef}
                          className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm min-h-[180px] resize-y"
-                         defaultValue={response} // Use defaultValue if state updates textarea value
+                         defaultValue={response} // Use defaultValue for initial load controlled by state
                          onChange={(e) => setResponse(e.target.value)}
                          placeholder={isWaitingForAiResponse ? "AI думает..." : "Ответ от AI появится здесь..."}
                          disabled={commonDisabled}
@@ -597,7 +602,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                          onParse={handleParse}
                          onOpenModal={handleOpenModal}
                          onCopy={handleCopyResponse}
-                         onClear={handleClearResponse}
+                         onClear={handleClearResponse} // Pass the fixed handler
                          onSelectFunction={handleSelectFunction}
                          isParseDisabled={parseButtonDisabled}
                          isProcessingPR={isProcessingPR}
