@@ -1,5 +1,7 @@
+"use client";
+
 import React from 'react';
-import { Tooltip } from '../AICodeAssistant'; // Adjust path
+import { Tooltip } from '@/components/ui/Tooltip'; // <<<--- CORRECT PATH
 import { ValidationStatus, ValidationIssue } from '../../hooks/useCodeParsingAndValidation'; // Adjust path
 import { FaRotate, FaCircleCheck, FaCircleExclamation, FaBroom, FaClipboardQuestion } from 'react-icons/fa6';
 

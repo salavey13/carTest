@@ -1,9 +1,8 @@
-// /components/assistant_components/PullRequestForm.tsx
 "use client";
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Tooltip } from '../AICodeAssistant';
+import { Tooltip } from '@/components/ui/Tooltip'; // <<<--- CORRECT PATH
 import { FaRotate, FaCodeBranch, FaGithub } from 'react-icons/fa6'; // Added FaCodeBranch, FaGithub
 
 interface PullRequestFormProps {
