@@ -63,6 +63,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         aiResponseInputRef,
         setAiResponseHasContent,
         setFilesParsed,
+        filesParsed,
         setSelectedAssistantFiles,
         setAssistantLoading,
         assistantLoading,
