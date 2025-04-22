@@ -10,7 +10,9 @@ import { listPublicBuckets, uploadBatchImages } from '@/app/actions';
 import { searchAndGetFirstImageUrl } from '@/app/repo-xml/google_actions';
 import { Bucket } from '@supabase/storage-js';
 import { toast } from 'sonner';
-import { Tooltip } from '../AICodeAssistant';
+// Removed import from AICodeAssistant as it's now in its own file
+// import { Tooltip } from '../AICodeAssistant';
+import { Tooltip } from '@/components/ui/Tooltip'; // Correct import
 import { FileEntry as ParsedFileEntry } from "@/hooks/useCodeParsingAndValidation";
 import { logger } from '@/lib/logger';
 import { useAppContext } from '@/contexts/AppContext'; // Import AppContext hook
@@ -52,6 +54,7 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
     const { openLink } = useAppContext(); // Get openLink function
 
     // --- State ---
+    const [isMounted, setIsMounted] = useState(false); // <<<--- ADD isMounted STATE
     const [buckets, setBuckets] = useState<Bucket[]>([]);
     const [selectedBucket, setSelectedBucket] = useState<string>('');
     const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
@@ -69,9 +72,17 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
 
 
     // --- Effects ---
-    // Parse prompts_imgs.txt
+
+    // Set mounted state
     useEffect(() => {
-        if (isOpen && parsedFiles.length > 0) {
+        setIsMounted(true);
+        return () => { setIsMounted(false); }; // Optional cleanup
+    }, []);
+
+    // Parse prompts_imgs.txt (runs only client-side after mount)
+    useEffect(() => {
+        // Only run if mounted and modal is open
+        if (isMounted && isOpen && parsedFiles.length > 0) {
             logger.log("ImageToolsModal: Checking for /prompts_imgs.txt");
             const promptsFile = parsedFiles.find(f => f.path === '/prompts_imgs.txt');
             if (promptsFile) {
@@ -82,14 +93,15 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
                         if (match) {
                             const placeholder = match[1].trim();
                             const prompt = match[2].trim();
+                            // Client-side check for existence
                             const existsInCode = parsedFiles.some(f =>
-                                f.path !== '/prompts_imgs.txt' && f.content.includes(placeholder)
+                                f.path !== '/prompts_imgs.txt' && f.content?.includes(placeholder)
                             );
                             return {
-                                id: `${placeholder}-${index}`,
+                                id: `${placeholder}-${index}-${Math.random().toString(36).substring(7)}`, // More robust ID
                                 placeholder, prompt,
                                 status: existsInCode ? 'pending' : 'error_swap',
-                                errorMessage: existsInCode ? undefined : 'Placeholder не найден',
+                                errorMessage: existsInCode ? undefined : 'Placeholder не найден в коде',
                                 manualUrlInput: '', // Initialize manual input
                             } as ImagePrompt;
                         }
@@ -98,34 +110,42 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
                     .filter((p): p is ImagePrompt => p !== null);
 
                 if (prompts.length > 0) {
-                    toast.success(`🤖 Обнаружен /prompts_imgs.txt (${prompts.length} промптов)`);
+                    // Avoid immediate toast if parsing happens instantly
+                    // toast.success(`🤖 Обнаружен /prompts_imgs.txt (${prompts.length} промптов)`);
                     setImagePrompts(prompts);
                     logger.log("Parsed image prompts:", prompts);
-                } else { setImagePrompts([]); logger.log("/prompts_imgs.txt found but no prompts parsed."); }
+                } else { setImagePrompts([]); logger.log("/prompts_imgs.txt found but no valid prompts parsed."); }
             } else { setImagePrompts([]); logger.log("/prompts_imgs.txt not found."); }
-        } else if (!isOpen) { setImagePrompts([]); }
-    }, [isOpen, parsedFiles]);
+        } else if (!isOpen) {
+            // Reset prompts when modal closes
+            setImagePrompts([]);
+        }
+    }, [isOpen, parsedFiles, isMounted]); // Add isMounted dependency
 
-    // Fetch buckets
+
+    // Fetch buckets (runs only client-side after mount)
     const fetchBuckets = useCallback(async () => {
+         if (!isMounted) return; // Don't fetch if not mounted
          setIsLoadingBuckets(true); setFetchError(null); setBuckets([]); setSelectedBucket('');
          try {
              const result = await listPublicBuckets();
+             if (!isMounted) return; // Check again after await
              if (result.success && result.data) {
                  setBuckets(result.data);
                  if (result.data.length > 0) setSelectedBucket(result.data[0].name);
                  else { setFetchError("Не найдено публичных бакетов."); toast.warn("Публичные бакеты не найдены."); }
              } else { const e = result.error || "Не удалось загрузить бакеты."; setFetchError(e); toast.error(e); }
          } catch (error) { const e = "Ошибка при загрузке бакетов."; setFetchError(e); toast.error(e); logger.error("Fetch buckets error:", error); }
-         finally { setIsLoadingBuckets(false); }
-    }, []);
+         finally { if (isMounted) setIsLoadingBuckets(false); }
+    }, [isMounted]); // Add isMounted dependency
 
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && isMounted) { // Ensure mounted before fetching
             fetchBuckets(); setSelectedFiles(null); setUploadResults([]); setUploadError(null); setCopiedUrlIndex(null);
             if (fileInputRef.current) fileInputRef.current.value = "";
         }
-    }, [isOpen, fetchBuckets]);
+    }, [isOpen, fetchBuckets, isMounted]); // Add isMounted dependency
+
 
     // --- Core Logic ---
     const performSwap = useCallback((placeholder: string, newUrl: string | null | undefined, source: 'google' | 'upload' | 'manual'): boolean => {
@@ -137,12 +157,12 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
 
         let swapOccurred = false;
         const updatedParsedFiles = parsedFiles.map(file => {
-            if (file.path === '/prompts_imgs.txt' || !file.content?.includes(placeholder)) return file;
+            // Ensure content exists before trying to replace
+            if (file.path === '/prompts_imgs.txt' || !file.content || !file.content.includes(placeholder)) return file;
 
             logger.log(`Attempting swap for "${placeholder}" in ${file.path} with URL from ${source}`);
             swapOccurred = true;
             try {
-                // Replace all occurrences
                 const newContent = file.content.replaceAll(placeholder, newUrl);
                 if (newContent !== file.content) {
                     logger.log(`Successfully swapped "${placeholder}" -> "${newUrl}" in ${file.path}`);
@@ -165,15 +185,16 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
             return true;
         } else {
             logger.warn(`performSwap: Placeholder "${placeholder}" not found via includes() in any file content during mapping.`);
+            // Only set error if not already swapped
             setImagePrompts(prev => prev.map(p =>
                 p.placeholder === placeholder && !p.status.startsWith('swapped_')
                  ? { ...p, status: 'error_swap', errorMessage: 'Placeholder не найден при замене' } : p
              ));
              return false;
         }
-    }, [parsedFiles, onUpdateParsedFiles]);
+    }, [parsedFiles, onUpdateParsedFiles]); // Keep dependencies
 
-    // --- Handlers ---
+    // --- Handlers (remain largely the same, wrapped in useCallback) ---
     const handleGoogleSwap = useCallback(async (placeholder: string, prompt: string) => {
         logger.log(`Google Swap triggered for: ${placeholder}`);
         setImagePrompts(prev => prev.map(p => p.placeholder === placeholder ? { ...p, status: 'searching' } : p));
@@ -272,12 +293,11 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
         setIsSwappingAll(false);
     }, [imagePrompts, performSwap]);
 
-    // --- Existing Manual Batch Upload Handlers ---
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
         setSelectedFiles(event.target.files); setUploadResults([]); setUploadError(null); setCopiedUrlIndex(null);
-    };
-    const handleUpload = async () => {
-        // ... (existing handleUpload logic - unchanged) ...
+    }, []);
+
+    const handleUpload = useCallback(async () => {
          if (!selectedBucket || !selectedFiles || selectedFiles.length === 0) { toast.warn("Выберите бакет и файлы для загрузки."); return; }
          setIsUploading(true); setUploadError(null); setUploadResults([]); setCopiedUrlIndex(null);
          const formData = new FormData(); formData.append("bucketName", selectedBucket);
@@ -285,17 +305,34 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
          try {
              const result = await uploadBatchImages(formData);
              let finalResults: UploadResult[] = [];
-             if (result.success && result.data) { /* ... result processing ... */ finalResults = result.data.map(d => ({ name: d.name, url: typeof d.url === 'string' ? d.url : undefined, error: d.error })); const successCount = finalResults.filter(r => r.url).length; const errorCount = finalResults.filter(r => r.error).length; if (successCount > 0) toast.success(`${successCount} из ${originalFiles.length} файлов успешно загружено!`); if (errorCount > 0) { const generalErrorMsg = result.error || `${errorCount} файлов не удалось загрузить.`; setUploadError(generalErrorMsg); toast.error(generalErrorMsg); const successfulNames = new Set(finalResults.filter(r => r.url).map(r => r.name)); originalFiles.forEach(file => { if (!successfulNames.has(file.name) && !finalResults.some(r => r.name === file.name && r.error)) { finalResults.push({ name: file.name, error: "Upload failed" }); } }); } else if (successCount === 0 && !result.error) { const errorMsg = "Загрузка завершилась, но не удалось получить URL."; setUploadError(errorMsg); toast.error(errorMsg); finalResults = originalFiles.map(file => ({ name: file.name, error: "No URL returned" })); } }
-             else { const errorMsg = result.error || "Не удалось загрузить файлы."; setUploadError(errorMsg); toast.error(errorMsg); finalResults = originalFiles.map(file => ({ name: file.name, error: errorMsg })); }
+             if (result.success) {
+                  if (result.data) {
+                      finalResults = result.data.map(d => ({ name: d.name, url: d.url, error: undefined }));
+                  }
+                  if (result.failed) {
+                      finalResults = finalResults.concat(result.failed.map(f => ({ name: f.name, url: undefined, error: f.error })));
+                  }
+                  const successCount = finalResults.filter(r => r.url).length;
+                  const errorCount = finalResults.filter(r => r.error).length;
+                  if (successCount > 0) toast.success(`${successCount} из ${originalFiles.length} файлов успешно загружено!`);
+                  if (errorCount > 0) { const generalErrorMsg = result.error || `${errorCount} файлов не удалось загрузить.`; setUploadError(generalErrorMsg); toast.error(generalErrorMsg); }
+                  // Ensure all original files have a result entry
+                   const resultSet = new Set(finalResults.map(r => r.name));
+                   originalFiles.forEach(file => { if (!resultSet.has(file.name)) { finalResults.push({ name: file.name, error: "No result returned" }); } });
+
+             } else { // Overall failure
+                 const errorMsg = result.error || "Не удалось загрузить файлы."; setUploadError(errorMsg); toast.error(errorMsg); finalResults = originalFiles.map(file => ({ name: file.name, error: errorMsg }));
+             }
              setUploadResults(finalResults);
          } catch (error) { const errorMsg = "Критическая ошибка при загрузке."; setUploadError(errorMsg); toast.error(errorMsg); logger.error("Upload error:", error); setUploadResults(originalFiles.map(file => ({ name: file.name, error: "Critical error" }))); }
          finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""; setSelectedFiles(null); }
-    };
-    const copyUrl = (url: string | undefined, index: number) => {
-        // ... (existing copyUrl logic - unchanged) ...
+    }, [selectedBucket, selectedFiles]);
+
+    const copyUrl = useCallback((url: string | undefined, index: number) => {
          if (!url || typeof url !== 'string') { toast.error("Неверный URL"); return; }
          navigator.clipboard.writeText(url).then(() => { setCopiedUrlIndex(index); toast.success("URL скопирован!"); setTimeout(() => setCopiedUrlIndex(null), 1500); }).catch((err) => { toast.error("Не удалось скопировать URL"); logger.error("Copy URL error:", err); });
-    };
+    }, []);
+
 
     // --- Render ---
     const anyLoading = isUploading || isSwappingAll || imagePrompts.some(p => ['searching', 'uploading', 'swapping'].includes(p.status));
@@ -337,66 +374,76 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
                                          </button>
                                      </Tooltip>
                                 </div>
-                                {imagePrompts.length === 0 ? (
-                                    <p className="text-center text-gray-500 text-sm mt-4 flex-grow flex items-center justify-center">Файл <code className="text-xs bg-gray-700 px-1 rounded mx-1">/prompts_imgs.txt</code> не найден или пуст.</p>
-                                ) : (
-                                    <div className="space-y-2 flex-grow overflow-y-auto simple-scrollbar pr-1">
-                                        {imagePrompts.map((item) => (
-                                            <div key={item.id} className="flex items-center gap-2 p-2 rounded-md bg-gray-700/50 border border-gray-600/50 text-xs">
-                                                {/* Status Indicator */}
-                                                <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
-                                                     {/* ... (status icons as before) ... */}
-                                                     {item.status === 'pending' && <FaImage className="text-gray-500" title="Ожидание" />} {(item.status === 'searching' || item.status === 'uploading' || item.status === 'swapping') && <FaSpinner className="animate-spin text-blue-400" title="В процессе..." />} {(item.status === 'swapped_google' || item.status === 'swapped_upload') && <FaCheck className="text-green-500" title="Заменено!" />} {(item.status === 'error_search' || item.status === 'error_upload' || item.status === 'error_swap') && <Tooltip text={item.errorMessage || 'Ошибка'} position="top"><FaTriangleExclamation className="text-red-500 cursor-help" title="Ошибка" /></Tooltip>}
-                                                </div>
-                                                {/* Placeholder, Prompt, Manual Input */}
-                                                <div className="flex-grow overflow-hidden space-y-1">
-                                                    <p className="text-gray-300 font-mono truncate" title={item.placeholder}>{item.placeholder}</p>
-                                                    <p className="text-gray-400 truncate italic" title={item.prompt}>{item.prompt}</p>
-                                                    {/* Manual URL Input */}
-                                                    <div className="flex items-center gap-1">
-                                                        <Input
-                                                            type="url"
-                                                            placeholder="Вставь URL вручную..."
-                                                            value={item.manualUrlInput}
-                                                            onChange={(e) => handleManualUrlInputChange(item.id, e.target.value)}
-                                                            onFocus={() => setActiveManualInput(item.id)}
-                                                            onBlur={() => setTimeout(() => setActiveManualInput(null), 150)} // Delay blur to allow button click
-                                                            disabled={anyLoading || item.status.startsWith('swapped_')}
-                                                            className={`h-6 px-1.5 text-xs bg-gray-600 border-gray-500 placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 flex-grow ${activeManualInput === item.id ? 'ring-1 ring-indigo-500' : ''}`}
-                                                        />
-                                                         <Tooltip text="Заменить на URL из поля" position="top">
-                                                            <button
-                                                                onClick={() => handleManualUrlSwap(item.placeholder, item.manualUrlInput)}
-                                                                disabled={anyLoading || !item.manualUrlInput.trim() || !item.manualUrlInput.startsWith('http') || item.status.startsWith('swapped_')}
-                                                                className="p-1 rounded text-gray-400 hover:text-white hover:bg-purple-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                                                            > <FaPaperPlane size={11}/> </button>
-                                                         </Tooltip>
+
+                                {/* <<<--- Wrap Conditional Rendering --- >>> */}
+                                {isMounted && ( // Only render this section client-side
+                                    <>
+                                        {imagePrompts.length === 0 ? (
+                                            <p className="text-center text-gray-500 text-sm mt-4 flex-grow flex items-center justify-center">Файл <code className="text-xs bg-gray-700 px-1 rounded mx-1">/prompts_imgs.txt</code> не найден или пуст.</p>
+                                        ) : (
+                                            <div className="space-y-2 flex-grow overflow-y-auto simple-scrollbar pr-1">
+                                                {imagePrompts.map((item) => (
+                                                    <div key={item.id} className="flex items-center gap-2 p-2 rounded-md bg-gray-700/50 border border-gray-600/50 text-xs">
+                                                        {/* Status Indicator */}
+                                                        <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+                                                             {item.status === 'pending' && <FaImage className="text-gray-500" title="Ожидание" />} {(item.status === 'searching' || item.status === 'uploading' || item.status === 'swapping') && <FaSpinner className="animate-spin text-blue-400" title="В процессе..." />} {(item.status === 'swapped_google' || item.status === 'swapped_upload') && <FaCheck className="text-green-500" title="Заменено!" />} {(item.status === 'error_search' || item.status === 'error_upload' || item.status === 'error_swap') && <Tooltip text={item.errorMessage || 'Ошибка'} position="top"><FaTriangleExclamation className="text-red-500 cursor-help" title="Ошибка" /></Tooltip>}
+                                                        </div>
+                                                        {/* Placeholder, Prompt, Manual Input */}
+                                                        <div className="flex-grow overflow-hidden space-y-1">
+                                                            <p className="text-gray-300 font-mono truncate" title={item.placeholder}>{item.placeholder}</p>
+                                                            <p className="text-gray-400 truncate italic" title={item.prompt}>{item.prompt}</p>
+                                                            {/* Manual URL Input */}
+                                                            <div className="flex items-center gap-1">
+                                                                <Input
+                                                                    type="url"
+                                                                    placeholder="Вставь URL вручную..."
+                                                                    value={item.manualUrlInput}
+                                                                    onChange={(e) => handleManualUrlInputChange(item.id, e.target.value)}
+                                                                    onFocus={() => setActiveManualInput(item.id)}
+                                                                    onBlur={() => setTimeout(() => setActiveManualInput(null), 150)} // Delay blur to allow button click
+                                                                    disabled={anyLoading || item.status.startsWith('swapped_')}
+                                                                    className={`h-6 px-1.5 text-xs bg-gray-600 border-gray-500 placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 flex-grow ${activeManualInput === item.id ? 'ring-1 ring-indigo-500' : ''}`}
+                                                                />
+                                                                 <Tooltip text="Заменить на URL из поля" position="top">
+                                                                    <button
+                                                                        onClick={() => handleManualUrlSwap(item.placeholder, item.manualUrlInput)}
+                                                                        disabled={anyLoading || !item.manualUrlInput.trim() || !item.manualUrlInput.startsWith('http') || item.status.startsWith('swapped_')}
+                                                                        className="p-1 rounded text-gray-400 hover:text-white hover:bg-purple-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                                                                    > <FaPaperPlane size={11}/> </button>
+                                                                 </Tooltip>
+                                                            </div>
+                                                        </div>
+                                                        {/* Action Buttons */}
+                                                        <div className="flex-shrink-0 flex flex-col gap-1 ml-2">
+                                                            {/* Auto Google Swap */}
+                                                            <Tooltip text="Авто-поиск в Google и Замена" position="left">
+                                                                 <button onClick={() => handleGoogleSwap(item.placeholder, item.prompt)} disabled={anyLoading || item.status.startsWith('swapped_')} className="p-1 rounded text-gray-400 hover:text-white hover:bg-blue-600/50 disabled:opacity-50 disabled:cursor-not-allowed"> <FaGoogle size={12}/> </button>
+                                                             </Tooltip>
+                                                             {/* Open Google Search Tab */}
+                                                            <Tooltip text="Открыть Google Картинки в новой вкладке" position="left">
+                                                                <button onClick={() => handleOpenGoogleSearch(item.prompt)} disabled={anyLoading} className="p-1 rounded text-gray-400 hover:text-white hover:bg-red-600/50 disabled:opacity-50"> <FaLink size={12}/> </button>
+                                                            </Tooltip>
+                                                            {/* Upload & Swap */}
+                                                             <Tooltip text="Загрузить свой файл и Заменить" position="left">
+                                                                 <button onClick={() => handleSpecificUploadAndSwap(item.placeholder)} disabled={anyLoading || !selectedBucket || item.status.startsWith('swapped_')} className="p-1 rounded text-gray-400 hover:text-white hover:bg-green-600/50 disabled:opacity-50 disabled:cursor-not-allowed"> <FaUpload size={12}/> </button>
+                                                             </Tooltip>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                {/* Action Buttons */}
-                                                <div className="flex-shrink-0 flex flex-col gap-1 ml-2">
-                                                    {/* Auto Google Swap */}
-                                                    <Tooltip text="Авто-поиск в Google и Замена" position="left">
-                                                         <button onClick={() => handleGoogleSwap(item.placeholder, item.prompt)} disabled={anyLoading || item.status.startsWith('swapped_')} className="p-1 rounded text-gray-400 hover:text-white hover:bg-blue-600/50 disabled:opacity-50 disabled:cursor-not-allowed"> <FaGoogle size={12}/> </button>
-                                                     </Tooltip>
-                                                     {/* Open Google Search Tab */}
-                                                    <Tooltip text="Открыть Google Картинки в новой вкладке" position="left">
-                                                        <button onClick={() => handleOpenGoogleSearch(item.prompt)} disabled={anyLoading} className="p-1 rounded text-gray-400 hover:text-white hover:bg-red-600/50 disabled:opacity-50"> <FaLink size={12}/> </button>
-                                                    </Tooltip>
-                                                    {/* Upload & Swap */}
-                                                     <Tooltip text="Загрузить свой файл и Заменить" position="left">
-                                                         <button onClick={() => handleSpecificUploadAndSwap(item.placeholder)} disabled={anyLoading || !selectedBucket || item.status.startsWith('swapped_')} className="p-1 rounded text-gray-400 hover:text-white hover:bg-green-600/50 disabled:opacity-50 disabled:cursor-not-allowed"> <FaUpload size={12}/> </button>
-                                                     </Tooltip>
-                                                </div>
+                                                ))}
                                             </div>
-                                        ))}
+                                        )}
+                                    </>
+                                )}
+                                {!isMounted && ( // Show a placeholder during SSR/initial mount
+                                     <div className="text-center text-gray-500 text-sm mt-4 flex-grow flex items-center justify-center">
+                                        <FaSpinner className="animate-spin mr-2" /> Загрузка данных...
                                     </div>
                                 )}
                                 {/* Hidden input for specific uploads */}
                                 <input type="file" ref={specificUploadInputRef} onChange={handleSpecificFileChange} accept="image/*, video/*, audio/*" style={{ display: 'none' }} aria-hidden="true"/>
                             </div>
 
-                            {/* --- Right Column: Manual Batch Upload --- */}
+                            {/* --- Right Column: Manual Batch Upload (Unchanged) --- */}
                             <div className="border border-cyan-600/30 rounded-lg p-4 bg-cyan-900/10 flex flex-col">
                                 <h3 className="text-lg font-medium text-cyan-300 mb-3 flex-shrink-0">Ручная Загрузка Файлов</h3>
                                 <div className="space-y-4 flex-grow overflow-y-auto simple-scrollbar pr-1">
@@ -438,4 +485,4 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
     );
 };
 
-ImageToolsModal.displayName = 'ImageToolsModal';
+ImageToolsModal.displayName = 'ImageToolsModal'; // Keep display name
