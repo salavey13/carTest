@@ -1,9 +1,10 @@
-// /components/assistant_components/TextAreaUtilities.tsx
+"use client";
+
 "use client"
 import React from "react";
 import { motion } from "framer-motion";
 import { FaCopy, FaPoo, FaRightLeft, FaArrowRight, FaRotate, FaMagnifyingGlass, FaCode } from "react-icons/fa6"; // Added FaCode
-import { Tooltip } from "@/components/AICodeAssistant";
+import { Tooltip } from '@/components/ui/Tooltip'; // <<<--- CORRECTED IMPORT PATH
 
 interface TextAreaUtilitiesProps {
     response: string;
@@ -14,7 +15,7 @@ interface TextAreaUtilitiesProps {
     onClear: () => void;
     onSelectFunction: () => void; // <<< ADDED PROP
     isProcessingPR: boolean;
-    isParseDisabled: boolean; // <<< ADDED PROP
+    isParseDisabled: boolean; // <<< Use this prop
 }
 
 export const TextAreaUtilities: React.FC<TextAreaUtilitiesProps> = ({
@@ -24,9 +25,10 @@ export const TextAreaUtilities: React.FC<TextAreaUtilitiesProps> = ({
     onOpenModal,
     onCopy,
     onClear,
-    onSelectFunction // <<< Destructure prop
+    onSelectFunction, // <<< Destructure prop
+    isParseDisabled // <<< Destructure prop
 }) => {
-    const hasResponse = !!response;
+    const hasResponse = !!response && response.trim().length > 0; // Check if response has actual content
 
     return (
         <>
@@ -36,9 +38,9 @@ export const TextAreaUtilities: React.FC<TextAreaUtilitiesProps> = ({
                      <motion.button
                         className="p-1.5 rounded-full bg-gradient-to-r from-purple-600 to-cyan-500 text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_8px_rgba(0,255,157,0.3)] hover:shadow-[0_0_12px_rgba(0,255,157,0.5)]"
                         onClick={onParse}
-                        disabled={isLoading || !hasResponse}
-                        whileHover={{ scale: (isLoading || !hasResponse) ? 1 : 1.1 }}
-                        whileTap={{ scale: (isLoading || !hasResponse) ? 1 : 0.95 }}
+                        disabled={isParseDisabled || isLoading} // Use the passed disabled state
+                        whileHover={{ scale: (isParseDisabled || isLoading) ? 1 : 1.1 }}
+                        whileTap={{ scale: (isParseDisabled || isLoading) ? 1 : 0.95 }}
                     >
                         {isLoading ? <FaRotate size={14} className="animate-spin" /> : <FaArrowRight size={14} />}
                     </motion.button>
