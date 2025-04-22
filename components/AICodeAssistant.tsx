@@ -72,7 +72,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         targetBranchName,
         triggerToggleSettingsModal,
         triggerUpdateBranch,
-        triggerCreatePR, 
+        triggerCreateOrUpdatePR, 
         updateRepoUrlInAssistant,
         loadingPrs,
         setIsParsing: setContextIsParsing, // Use context setter alias
@@ -210,12 +210,12 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             } else {
                 // Create New Pull Request (Use context trigger which calls the action)
                 toast.info(`Создание нового PR...`);
-                await triggerCreatePR(); // Calls the combined handler via context
+                await triggerCreateOrUpdatePR(); // Calls the combined handler via context
             }
         } catch (err) {
             toast.error(`Критическая ошибка при ${targetBranchName ? 'обновлении ветки' : 'создании PR'}.`); logger.error("PR/Update critical error:", err);
         } finally { setIsProcessingPR(false); setAssistantLoading(false); }
-    }, [ componentParsedFiles, selectedFileIds, repoUrl, prTitle, rawDescription, validationIssues, targetBranchName, triggerUpdateBranch, setAssistantLoading, user, triggerCreatePR ]); 
+    }, [ componentParsedFiles, selectedFileIds, repoUrl, prTitle, rawDescription, validationIssues, targetBranchName, triggerUpdateBranch, setAssistantLoading, user, triggerCreateOrUpdatePR ]); 
 
 
     // --- NEW: Direct Image Replacement Handler ---
@@ -252,7 +252,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                 else toast.error(`Ошибка обновления ветки '${targetBranchName}': ${result.error}`);
             } else {
                 toast.info(`Создание нового PR (замена картинки)...`);
-                 // Call the original action directly as triggerCreatePR is for parsed files
+                 // Call the original action directly as triggerCreateOrUpdatePR is for parsed files
                  const result = await createGitHubPullRequest(repoUrl, filesToCommit, prTitle, prDescription, fullCommitMessage);
                  if (result.success && result.prUrl) { toast.success(`PR для замены картинки создан: ${result.prUrl}`); await notifyAdmin(`🖼️ PR для замены картинки в ${task.targetPath} создан ${user?.username || user?.id}: ${result.prUrl}`); }
                  else { toast.error("Ошибка создания PR: " + (result.error || "Неизвестная ошибка")); logger.error("PR Creation Failed (Image Replace):", result.error); }
