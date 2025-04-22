@@ -5,7 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
-    FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard, FaPaperPlane, FaLightbulb, FaImages, FaUpload, FaLink // Added relevant icons
+    FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard,
+    FaPaperPlane, FaLightbulb, FaImages, FaSquareArrowUpRight // Corrected icon import
 } from "react-icons/fa6";
 
 // Import Subcomponents
@@ -13,19 +14,20 @@ import { FloatingActionButton } from "@/components/stickyChat_components/Floatin
 import { SpeechBubble } from "@/components/stickyChat_components/SpeechBubble";
 import { CharacterDisplay } from "@/components/stickyChat_components/CharacterDisplay";
 import { SuggestionList } from "@/components/stickyChat_components/SuggestionList";
+import { ImageReplaceTool } from "@/components/stickyChat_components/ImageReplaceTool"; // IMPORT the new component
 import { toast } from "sonner";
 
 // Import Context & Actions
 import { useAppContext } from "@/contexts/AppContext";
 import { getGitHubUserProfile } from "@/app/actions_github/actions";
-import { uploadImage } from "@/app/actions"; // Needed for image upload
+// NO LONGER NEED uploadImage here
 
 // --- Constants & Types ---
 const AUTO_OPEN_DELAY_MS = 13000;
 const CHARACTER_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/character-images/public/x13.png";
 const CHARACTER_ALT_TEXT = "Xuinity Assistant";
 const HIRE_ME_TEXT = "Найми меня! ✨";
-const REPLACE_IMAGE_ID = "replace-image-trigger"; // ID for image replacement trigger
+const REPLACE_IMAGE_ID = "replace-image-trigger";
 const ADD_NEW_ID = "add-new";
 const HIRE_ME_ID = "hire-me";
 
@@ -35,8 +37,8 @@ interface Suggestion {
     link?: string;
     icon?: React.ReactNode;
     isHireMe?: boolean;
-    isFixAction?: boolean; // Kept for potential future use
-    isImageReplaceAction?: boolean; // New flag
+    isFixAction?: boolean;
+    isImageReplaceAction?: boolean;
     disabled?: boolean;
     tooltip?: string;
 }
@@ -57,110 +59,14 @@ const isImageUrl = (url: string): boolean => {
   if (!url) return false;
   try {
     const parsedUrl = new URL(url);
-    // Basic check for common image extensions
     return /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(parsedUrl.pathname);
-  } catch (e) {
-    return false; // Invalid URL
-  }
+  } catch (e) { return false; }
 };
-const isValidUrl = (url: string): boolean => {
-  try {
-    new URL(url);
-    return url.startsWith('http://') || url.startsWith('https://');
-  } catch (_) {
-    return false;
-  }
+const isValidUrl = (url: string): boolean => { // Keep this helper here or move to utils
+  if (!url) return false;
+  try { new URL(url); return url.startsWith('http://') || url.startsWith('https://'); }
+  catch (_) { return false; }
 };
-
-// --- NEW: Image Replace Tool Component ---
-interface ImageReplaceToolProps {
-    oldImageUrl: string;
-    onReplaceConfirmed: (newImageUrl: string) => void;
-    onCancel: () => void;
-}
-
-const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl, onReplaceConfirmed, onCancel }) => {
-    const [newImageUrlInput, setNewImageUrlInput] = useState("");
-    const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-    const [isUploading, setIsUploading] = useState(false);
-    const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
-
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            setUploadedFile(file);
-            setNewImageUrlInput(""); // Clear URL input if file is selected
-            setUploadedUrl(null); // Clear previously uploaded URL
-            handleUpload(file); // Trigger upload immediately
-        }
-    };
-
-    const handleUpload = async (file: File) => {
-        if (!file) return;
-        setIsUploading(true);
-        setUploadedUrl(null);
-        toast.info("Загрузка картинки...");
-        try {
-            // Use the actual uploadImage server action
-            const result = await uploadImage("about", file); // Specify bucket name (e.g., "about")
-            if (result.success && result.publicUrl) {
-                setUploadedUrl(result.publicUrl);
-                toast.success("Картинка загружена!");
-            } else {
-                throw new Error(result.error || "Не удалось загрузить картинку.");
-            }
-        } catch (error) {
-            console.error("Upload failed:", error);
-            toast.error(error instanceof Error ? error.message : "Ошибка загрузки.");
-            setUploadedFile(null); // Clear file selection on error
-        } finally {
-            setIsUploading(false);
-        }
-    };
-
-    const handleConfirm = () => {
-        const finalNewUrl = uploadedUrl || newImageUrlInput;
-        if (!finalNewUrl || !isValidUrl(finalNewUrl)) {
-            toast.error("Введите корректный новый URL или загрузите файл.");
-            return;
-        }
-        onReplaceConfirmed(finalNewUrl);
-    };
-
-    const canConfirm = !isUploading && (uploadedUrl || (isValidUrl(newImageUrlInput) && !uploadedFile));
-
-    return (
-        <motion.div variants={childVariants} className="w-full mt-2 p-3 bg-gray-700/80 backdrop-blur-sm border border-blue-500/50 rounded-lg shadow-lg flex flex-col gap-3">
-            <p className="text-xs text-gray-300">Заменить эту картинку:</p>
-            <input type="text" readOnly value={oldImageUrl} className="w-full p-1 text-xs bg-gray-800 border border-gray-600 rounded text-gray-400 truncate" />
-            <p className="text-xs text-gray-300">Новой картинкой:</p>
-            <div className="flex items-center gap-2">
-                <label htmlFor="image-upload-input" className={`flex-shrink-0 p-2 rounded border transition-colors cursor-pointer ${uploadedFile ? 'bg-green-600 border-green-500' : 'bg-gray-600 border-gray-500 hover:bg-gray-500'}`}>
-                    <FaUpload className={`text-sm ${uploadedFile ? 'text-white' : 'text-gray-300'}`} />
-                </label>
-                <input id="image-upload-input" type="file" accept="image/*" onChange={handleFileChange} className="hidden" disabled={isUploading} />
-                <span className="text-xs text-gray-400">или</span>
-                <input
-                    type="url"
-                    value={newImageUrlInput}
-                    onChange={(e) => { setNewImageUrlInput(e.target.value); setUploadedFile(null); setUploadedUrl(null); }}
-                    placeholder="Вставьте новый URL..."
-                    className="flex-grow p-1.5 text-xs bg-gray-600 border border-gray-500 rounded focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none text-white disabled:opacity-50"
-                    disabled={isUploading || !!uploadedFile}
-                />
-            </div>
-             {isUploading && <p className="text-xs text-blue-300 animate-pulse text-center">Загрузка файла...</p>}
-             {uploadedUrl && <p className="text-xs text-green-400 break-all">Загружен: {uploadedUrl}</p>}
-            <div className="flex justify-end gap-2 mt-2">
-                <button onClick={onCancel} className="px-3 py-1 text-xs bg-gray-500 hover:bg-gray-400 text-white rounded transition">Отмена</button>
-                <button onClick={handleConfirm} disabled={!canConfirm} className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded transition disabled:opacity-50 disabled:cursor-not-allowed">
-                    Заменить
-                </button>
-            </div>
-        </motion.div>
-    );
-};
-
 
 // --- Main Component (Orchestrator) ---
 const StickyChatButton: React.FC = () => {
@@ -172,8 +78,8 @@ const StickyChatButton: React.FC = () => {
     const [githubLoading, setGithubLoading] = useState<boolean>(false);
     const [prevGithubLoading, setPrevGithubLoading] = useState<boolean>(false);
     const [customIdea, setCustomIdea] = useState<string>("");
-    const [potentialOldImageUrl, setPotentialOldImageUrl] = useState<string | null>(null); // State for detected image URL
-    const [showReplaceTool, setShowReplaceTool] = useState<boolean>(false); // State to show the replacement tool
+    const [potentialOldImageUrl, setPotentialOldImageUrl] = useState<string | null>(null);
+    const [showReplaceTool, setShowReplaceTool] = useState<boolean>(false);
 
     // --- Hooks ---
     const currentPath = usePathname();
@@ -226,7 +132,8 @@ const StickyChatButton: React.FC = () => {
 
         return baseSuggestions;
 
-    }, [currentPath, potentialOldImageUrl, showReplaceTool]); // Depend on potentialOldImageUrl and showReplaceTool
+    }, [currentPath, potentialOldImageUrl, showReplaceTool]);
+
 
     // --- Update Active Message Logic ---
     useEffect(() => {
@@ -234,10 +141,10 @@ const StickyChatButton: React.FC = () => {
         let userIdentifier = githubProfile?.name || appContextUser?.first_name || appContextUser?.username || null; const baseGreeting = userIdentifier ? `Здарова, ${userIdentifier}!` : "Эй, Кодер!"; const justLoadedProfile = prevGithubLoading && !githubLoading && githubProfile; const cleanPath = currentPath.split('?')[0]; const isToolPage = cleanPath === '/repo-xml'; let message = "";
         if (isToolPage) { if (githubProfile) message = `${baseGreeting} Ты в СуперВайб Студии! ✨ Используй Бадди справа для помощи.`; else message = `${baseGreeting} Ты в СуперВайб Студии! Используй Бадди справа для помощи.`; }
         else { const pageName = cleanPath === '/' ? 'главную' : `страницу (${cleanPath})`;
-            if (potentialOldImageUrl && !showReplaceTool) {
-                message = `${baseGreeting} Заметил URL картинки в поле ввода. Хочешь заменить её?`;
-            } else if (showReplaceTool) {
+            if (showReplaceTool) { // Prioritize showing replace tool message
                 message = `Окей, ${userIdentifier || 'дружок'}, давай заменим картинку! 👇`;
+            } else if (potentialOldImageUrl) {
+                 message = `${baseGreeting} Заметил URL картинки в поле ввода. Хочешь заменить её?`;
             } else if (justLoadedProfile) {
                 message = `ВОУ, ${userIdentifier}! ✨ Нашел твой GitHub! Хочешь ${pageName} прокачать? 😉 Или введи идею/URL картинки!`;
             } else if (githubProfile) {
@@ -254,28 +161,20 @@ const StickyChatButton: React.FC = () => {
     useEffect(() => { if (!hasAutoOpened && !isOpen) { const timer = setTimeout(() => { setIsOpen(true); setHasAutoOpened(true); }, AUTO_OPEN_DELAY_MS); return () => clearTimeout(timer); } }, [hasAutoOpened, isOpen]);
 
     // --- Handle Escape Key ---
-    const handleEscKey = useCallback((event: KeyboardEvent) => { if (event.key === 'Escape' && isOpen) { setIsOpen(false); setShowReplaceTool(false); /* Close tool on Esc */ } }, [isOpen]);
+    const handleEscKey = useCallback((event: KeyboardEvent) => { if (event.key === 'Escape' && isOpen) { setIsOpen(false); setShowReplaceTool(false); } }, [isOpen]);
     useEffect(() => { if (isOpen) { document.addEventListener('keydown', handleEscKey); } else { document.removeEventListener('keydown', handleEscKey); } return () => { document.removeEventListener('keydown', handleEscKey); }; }, [isOpen, handleEscKey]);
 
     // Reset state on path change
-    useEffect(() => {
-        setCustomIdea("");
-        setPotentialOldImageUrl(null);
-        setShowReplaceTool(false);
-        setIsOpen(false); // Optionally close the button on path change
-        setHasAutoOpened(false); // Reset auto-open timer trigger
-    }, [currentPath]);
+    useEffect(() => { setCustomIdea(""); setPotentialOldImageUrl(null); setShowReplaceTool(false); setIsOpen(false); setHasAutoOpened(false); }, [currentPath]);
 
     // Detect Image URL in Custom Input
     useEffect(() => {
-        if (isImageUrl(customIdea)) {
-            setPotentialOldImageUrl(customIdea);
+        const trimmedIdea = customIdea.trim();
+        if (trimmedIdea && isImageUrl(trimmedIdea)) {
+            setPotentialOldImageUrl(trimmedIdea);
         } else {
             setPotentialOldImageUrl(null);
-             // If user types something else after detecting URL, hide the tool
-            if (showReplaceTool) {
-                setShowReplaceTool(false);
-            }
+            if (showReplaceTool) { setShowReplaceTool(false); } // Hide tool if user types something else
         }
     }, [customIdea, showReplaceTool]);
 
@@ -286,13 +185,13 @@ const StickyChatButton: React.FC = () => {
         console.log("(StickyChat) Suggestion Clicked:", suggestion.id, suggestion.action);
 
         if (suggestion.action) {
-            suggestion.action(); // Execute action if provided (like opening the replace tool)
+            suggestion.action();
         } else if (suggestion.link) {
-            // --- Handle Redirection ---
             let finalLink = suggestion.link;
-            // If custom idea exists AND this isn't the image replace trigger, treat it as a standard idea
+            // If custom idea exists AND this isn't the image replace trigger AND link is to repo-xml, format it
             if (customIdea.trim() && suggestion.id !== REPLACE_IMAGE_ID && suggestion.link === '/repo-xml') {
                  const cleanPath = currentPath.split('?')[0];
+                 // Determine target path (you might need more robust logic here)
                  let targetPath = cleanPath === "/" ? "app/page.tsx" : `app${cleanPath}`;
                  if (!targetPath.match(/\.[^/.]+$/)) {
                      targetPath = targetPath.endsWith('/') ? targetPath + 'page.tsx' : targetPath + '/page.tsx';
@@ -305,32 +204,27 @@ const StickyChatButton: React.FC = () => {
                  toast.info("🚀 Перехожу...");
             }
             router.push(finalLink);
+            setIsOpen(false); // Close after navigation
         }
 
-        // Close the popup unless it's the action to open the replace tool
+        // Close the popup UNLESS it's the action to OPEN the replace tool
         if (suggestion.id !== REPLACE_IMAGE_ID) {
              setIsOpen(false);
         }
     };
 
     const handleReplaceConfirmed = (newImageUrl: string) => {
-        if (!potentialOldImageUrl) {
-            toast.error("Ошибка: Старый URL картинки не найден.");
-            return;
-        }
+        if (!potentialOldImageUrl) { toast.error("Ошибка: Старый URL картинки не найден."); return; }
         // Format the special idea string
         const structuredIdea = `ImageReplace|OldURL=${encodeURIComponent(potentialOldImageUrl)}|NewURL=${encodeURIComponent(newImageUrl)}`;
-
-        // Get target path (similar logic as before)
+        // Get target path
         const cleanPath = currentPath.split('?')[0];
         let targetPath = cleanPath === "/" ? "app/page.tsx" : `app${cleanPath}`;
-        if (!targetPath.match(/\.[^/.]+$/)) {
-            targetPath = targetPath.endsWith('/') ? targetPath + 'page.tsx' : targetPath + '/page.tsx';
-        }
+        if (!targetPath.match(/\.[^/.]+$/)) { targetPath = targetPath.endsWith('/') ? targetPath + 'page.tsx' : targetPath + '/page.tsx'; }
         const encodedTargetPath = encodeURIComponent(targetPath);
         const encodedIdea = encodeURIComponent(structuredIdea);
-
         const redirectUrl = `/repo-xml?path=${encodedTargetPath}&idea=${encodedIdea}`;
+
         toast.info("🚀 Перехожу в Студию для замены картинки...");
         router.push(redirectUrl);
         setIsOpen(false); // Close the main dialog
@@ -339,25 +233,26 @@ const StickyChatButton: React.FC = () => {
 
     const handleCancelReplace = () => {
         setShowReplaceTool(false);
-        setPotentialOldImageUrl(null); // Clear detection maybe?
-        setCustomIdea(""); // Clear the input that triggered it
+        // setPotentialOldImageUrl(null); // Keep potential URL for suggestion logic
+        // setCustomIdea(""); // Keep custom idea for potential other actions
     };
 
     const handleOverlayClick = () => { setIsOpen(false); setShowReplaceTool(false); };
     const handleDialogClick = (e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
     const handleFabClick = () => {
         setIsOpen(!isOpen);
-        if (!isOpen) {
+        if (!isOpen) { // Opening
             setHasAutoOpened(true);
-            setShowReplaceTool(false); // Ensure tool is closed when FAB is clicked to open
-            setCustomIdea(""); // Clear idea when reopening
-            setPotentialOldImageUrl(null);
-        } else {
-            setShowReplaceTool(false); // Close tool if main dialog is closed
+            setShowReplaceTool(false);
+            // setCustomIdea(""); // Clear idea only when opening? Or maybe keep it? Decide based on desired UX
+            // setPotentialOldImageUrl(null);
+        } else { // Closing
+            setShowReplaceTool(false);
         }
     };
 
     // --- Render Logic ---
+    // Determine if the custom input area should be shown
     const showInputArea = isOpen && !showReplaceTool && currentPath !== '/repo-xml';
 
     return (
