@@ -1,4 +1,3 @@
-// /components/assistant_components/CodeRestorer.tsx
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -6,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { ValidationIssue, FileEntry } from '@/hooks/useCodeParsingAndValidation'; // Adjust path
 import { FaCodeMerge, FaWandMagicSparkles, FaRotate, FaPoo, FaXmark } from 'react-icons/fa6'; // Added FaTimes
-import { Tooltip } from '../AICodeAssistant'; // Adjust path if necessary
+import { Tooltip } from '@/components/ui/Tooltip'; // <<<--- CORRECT PATH
 
 // --- Restore Modal Component ---
 interface RestoreSkippedModalProps {
