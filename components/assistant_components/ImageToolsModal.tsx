@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FaImages, FaXmark, FaUpload, FaCopy, FaCheck, FaSpinner, FaTriangleExclamation,
-    FaGoogle, FaImage, FaSync, FaExternalLinkAlt, FaPaste, FaPaperPlane // Added ExternalLink, Paste, PaperPlane
+    FaGoogle, FaImage, FaSync, FaLink, FaPaste, FaPaperPlane // Added ExternalLink, Paste, PaperPlane
 } from 'react-icons/fa6';
 import { listPublicBuckets, uploadBatchImages } from '@/app/actions';
 import { searchAndGetFirstImageUrl } from '@/app/repo-xml/google_actions';
@@ -381,7 +381,7 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
                                                      </Tooltip>
                                                      {/* Open Google Search Tab */}
                                                     <Tooltip text="Открыть Google Картинки в новой вкладке" position="left">
-                                                        <button onClick={() => handleOpenGoogleSearch(item.prompt)} disabled={anyLoading} className="p-1 rounded text-gray-400 hover:text-white hover:bg-red-600/50 disabled:opacity-50"> <FaExternalLinkAlt size={12}/> </button>
+                                                        <button onClick={() => handleOpenGoogleSearch(item.prompt)} disabled={anyLoading} className="p-1 rounded text-gray-400 hover:text-white hover:bg-red-600/50 disabled:opacity-50"> <FaLink size={12}/> </button>
                                                     </Tooltip>
                                                     {/* Upload & Swap */}
                                                      <Tooltip text="Загрузить свой файл и Заменить" position="left">
