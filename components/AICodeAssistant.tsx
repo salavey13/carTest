@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect, useImperativeHandle, forwardRef, MutableRefObject, useCallback } from "react";
 // Context & Actions
 import {
-    useRepoXmlPageContext, AICodeAssistantRef, SimplePullRequest, ImageReplaceTask // Import ImageReplaceTask
+    useRepoXmlPageContext, AICodeAssistantRef, SimplePullRequest, ImageReplaceTask
 } from "@/contexts/RepoXmlPageContext";
 import { createGitHubPullRequest, updateBranch, fetchRepoContents } from "@/app/actions_github/actions";
 import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
@@ -23,11 +23,12 @@ import { CodeRestorer } from './assistant_components/CodeRestorer';
 // UI & Utils
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
-import { FaCircleInfo, FaCodeBranch, FaGithub, FaWandMagicSparkles, FaArrowsRotate, FaImage, FaImages, FaSpinner } from "react-icons/fa6"; // Added FaImages, FaSpinner
+import { FaCircleInfo, FaCodeBranch, FaGithub, FaWandMagicSparkles, FaArrowsRotate, FaImage, FaImages, FaSpinner } from "react-icons/fa6";
 import clsx from "clsx";
 import { saveAs } from "file-saver";
-import { logger } from "@/lib/logger"; // Import logger
-import { Tooltip } from "@/components/ui/Tooltip"; // Correct import
+import { logger } from "@/lib/logger";
+import { Tooltip } from "@/components/ui/Tooltip";
+import { selectFunctionDefinition, extractFunctionName } from "@/lib/codeUtils"; // <<<--- IMPORT HELPERS HERE
 
 // Interfaces
 interface FileEntry extends ValidationFileEntry {}
@@ -35,105 +36,7 @@ interface AICodeAssistantProps {}
 interface OriginalFile { path: string; content: string; }
 
 
-// Helper: Robust Function Selection Logic
-const selectFunctionDefinition = (text: string, startIndex: number): [number, number] => {
-    const declarationLineStart = text.lastIndexOf('\n', startIndex - 1) + 1;
-    let braceStart = -1;
-    let searchPos = declarationLineStart;
-    let inSingleLineComment = false;
-    let inMultiLineComment = false;
-    let inString: '"' | "'" | null = null;
-    let parenDepth = 0;
 
-    while(searchPos < text.length) {
-        const char = text[searchPos];
-        const prevChar = searchPos > 0 ? text[searchPos - 1] : '';
-
-        if (inSingleLineComment) {
-            if (char === '\n') inSingleLineComment = false;
-        } else if (inMultiLineComment) {
-            if (char === '/' && prevChar === '*') inMultiLineComment = false;
-        } else if (inString) {
-            if (char === inString && prevChar !== '\\') inString = null;
-        } else if (char === '/' && prevChar === '/') {
-            inSingleLineComment = true;
-        } else if (char === '*' && prevChar === '/') {
-            inMultiLineComment = true;
-        } else if (char === '"' || char === "'") {
-            inString = char;
-        } else if (char === '(') {
-            parenDepth++;
-        } else if (char === ')') {
-            parenDepth--;
-        } else if (char === '{' && parenDepth === 0) {
-            // Check if '{' likely starts a function/class body
-            const precedingText = text.substring(declarationLineStart, searchPos).trim();
-            // Arrow function, method definition, function declaration
-            if (precedingText.endsWith(')') || precedingText.endsWith('=>') || precedingText.match(/[a-zA-Z0-9_$]\s*$/)) {
-                braceStart = searchPos;
-                break;
-            }
-             // Class or object method shorthand
-            if (precedingText.match(/[a-zA-Z0-9_$]+\s*\([^)]*\)$/)) {
-                braceStart = searchPos;
-                break;
-            }
-        }
-
-        // Optimization: If we hit a potential new top-level declaration on a new line,
-        // and haven't found the opening brace yet, stop searching this potential block.
-        if (char === '\n' && text.substring(searchPos + 1).match(/^\s*(?:async\s+|function\s+|const\s+|let\s+|var\s+|class\s+|get\s+|set\s+|[a-zA-Z0-9_$]+\s*\(|\/\/|\/\*)/)) {
-             if (braceStart === -1) break; // Didn't find opening brace for current potential function
-        }
-        searchPos++;
-    }
-
-    if (braceStart === -1) return [-1, -1]; // Opening brace not found
-
-    // Find matching closing brace
-    let depth = 1;
-    let pos = braceStart + 1;
-    inSingleLineComment = false;
-    inMultiLineComment = false;
-    inString = null;
-
-    while (pos < text.length && depth > 0) {
-        const char = text[pos];
-        const prevChar = pos > 0 ? text[pos - 1] : '';
-
-        if (inSingleLineComment) { if (char === '\n') inSingleLineComment = false; }
-        else if (inMultiLineComment) { if (char === '/' && prevChar === '*') inMultiLineComment = false; }
-        else if (inString) { if (char === inString && prevChar !== '\\') inString = null; }
-        else if (char === '/' && prevChar === '/') { inSingleLineComment = true; }
-        else if (char === '*' && prevChar === '/') { inMultiLineComment = true; }
-        else if (char === '"' || char === "'") { inString = char; }
-        else if (char === '{') depth++;
-        else if (char === '}') depth--;
-        pos++;
-    }
-
-     if (depth !== 0) return [-1,-1]; // No matching closing brace found
-
-     const closingBracePos = pos - 1;
-     // Include the entire line where the closing brace is found
-     let closingLineEnd = text.indexOf('\n', closingBracePos);
-     if (closingLineEnd === -1) closingLineEnd = text.length; // End of file
-
-     return [declarationLineStart, closingLineEnd];
-};
-// Helper: Extract Function Name
-const extractFunctionName = (line: string): string | null => {
-    // Match common function/variable declarations (including async)
-    const funcMatch = line.match(/(?:export\s+)?(?:async\s+)?(?:function\s+|const\s+|let\s+|var\s+)?\s*([a-zA-Z0-9_$]+)\s*(?:[:=(]|\s*=>)/);
-    if (funcMatch && funcMatch[1]) return funcMatch[1];
-
-    // Match method definitions (class or object literal, including async, get, set)
-    const methodMatch = line.match(/^\s*(?:async\s+)?(?:get\s+|set\s+)?([a-zA-Z0-9_$]+)\s*\(/);
-    // Exclude common keywords that look like method calls
-    if (methodMatch && methodMatch[1] && !['if', 'for', 'while', 'switch', 'catch', 'constructor'].includes(methodMatch[1])) return methodMatch[1];
-
-    return null;
-};
 
 // --- Main Component ---
 const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((props, ref) => {
@@ -156,7 +59,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     } = useRepoXmlPageContext();
 
     // --- State ---
-    const [isMounted, setIsMounted] = useState(false); // <<<--- ADD isMounted STATE
+    const [isMounted, setIsMounted] = useState(false);
     const [response, setResponse] = useState<string>("");
     const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
     const [repoUrl, setRepoUrlState] = useState<string>("https://github.com/salavey13/cartest");
@@ -196,7 +99,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         } else if (isMounted && hasContent && componentParsedFiles.length === 0 && validationStatus !== 'idle' && !isParsing && !assistantLoading && !imageReplaceTask) {
             setValidationStatus('idle'); setValidationIssues([]);
         }
-    }, [ response, currentAiRequestId, aiActionLoading, componentParsedFiles.length, isParsing, assistantLoading, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setHookParsedFiles, imageReplaceTask, isMounted ]); // Added isMounted
+    }, [ response, currentAiRequestId, aiActionLoading, componentParsedFiles.length, isParsing, assistantLoading, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setHookParsedFiles, imageReplaceTask, isMounted ]);
 
     useEffect(() => {
         const loadLinks = async () => { if (!user) { setCustomLinks([]); return; } try { const { data: d, error: e } = await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id).single(); if (!e && d?.metadata?.customLinks) setCustomLinks(d.metadata.customLinks); else setCustomLinks([]); } catch (e) { console.error("Error loading custom links:", e); setCustomLinks([]); } }; loadLinks();
@@ -229,12 +132,17 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const handleSwap = useCallback((find: string, replace: string) => {
         if (!find || !aiResponseInputRef.current) return; try { const textArea = aiResponseInputRef.current; const currentValue = textArea.value; const escapedFind = find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); const regex = new RegExp(escapedFind, 'g'); const newValue = currentValue.replace(regex, replace); if (newValue !== currentValue) { setResponse(newValue); requestAnimationFrame(() => { if (aiResponseInputRef.current) aiResponseInputRef.current.value = newValue; }); setHookParsedFiles([]); setFilesParsed(false); setSelectedFileIds(new Set()); setSelectedAssistantFiles(new Set()); setValidationStatus('idle'); setValidationIssues([]); toast.success(`"${find}" -> "${replace}". Жми '➡️'.`); } else { toast.info(`"${find}" не найден.`); } } catch (e: any) { toast.error(`Ошибка замены: ${e.message}`); }
     }, [aiResponseInputRef, setHookParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues]);
+
+    // Use imported helpers
     const handleSearch = useCallback((searchText: string, isMultiline: boolean) => {
         if (!searchText || !aiResponseInputRef.current) return; const textArea = aiResponseInputRef.current; const textContent = textArea.value;
         if (isMultiline) { const cleanedSearchText = searchText.split('\n').map(l => l.trim()).filter(l => l.length > 0).join('\n'); if (!cleanedSearchText) { toast.error("Текст для мультилайн поиска пуст."); return; } const firstLine = cleanedSearchText.split('\n')[0]; const funcName = extractFunctionName(firstLine ?? ''); if (!funcName) { toast.error("Не удалось извлечь имя функции из первой строки для поиска."); return; } const funcRegex = new RegExp(`(^|\\n|\\s)(?:export\\s+|async\\s+)*?(?:function\\s+|class\\s+|const\\s+|let\\s+|var\\s+)${funcName}\\s*(?:\\(|[:=]|<)`, 'm'); let match = funcRegex.exec(textContent); if (!match) { const methodRegex = new RegExp(`(^|\\n|\\s)(?:async\\s+|get\\s+|set\\s+)*?${funcName}\\s*\\(`, 'm'); match = methodRegex.exec(textContent); } if (!match || match.index === undefined) { toast.info(`Функция "${funcName}" не найдена.`); return; } const matchStartIndex = match.index + (match[1]?.length || 0); const [startPos, endPos] = selectFunctionDefinition(textContent, matchStartIndex); if (startPos === -1 || endPos === -1) { toast.error("Не удалось выделить тело найденной функции."); return; } const newValue = textContent.substring(0, startPos) + cleanedSearchText + textContent.substring(endPos); setResponse(newValue); requestAnimationFrame(() => { if (aiResponseInputRef.current) { aiResponseInputRef.current.value = newValue; aiResponseInputRef.current.focus(); aiResponseInputRef.current.setSelectionRange(startPos, startPos + cleanedSearchText.length); } }); setHookParsedFiles([]); setFilesParsed(false); setSelectedFileIds(new Set()); setSelectedAssistantFiles(new Set()); setValidationStatus('idle'); setValidationIssues([]); toast.success(`Функция "${funcName}" заменена! ✨ Жми '➡️'.`);
         } else { const searchTextLower = searchText.toLowerCase(); const textContentLower = textContent.toLowerCase(); const currentPosition = textArea.selectionStart || 0; let foundIndex = textContentLower.indexOf(searchTextLower, currentPosition); if (foundIndex === -1) { foundIndex = textContentLower.indexOf(searchTextLower, 0); if (foundIndex === -1 || foundIndex >= currentPosition) { toast.info(`"${searchText}" не найден.`); textArea.focus(); return; } toast.info("Поиск с начала документа."); } textArea.focus(); textArea.setSelectionRange(foundIndex, foundIndex + searchText.length); toast(`Найдено: "${searchText}"`, { style: { background: "rgba(30, 64, 175, 0.9)", color: "#fff", border: "1px solid rgba(37, 99, 235, 0.3)", backdropFilter: "blur(3px)" }, duration: 2000 }); }
     }, [aiResponseInputRef, setHookParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues]);
+
+    // Use imported helper
     const handleSelectFunction = useCallback(() => { const textArea = aiResponseInputRef.current; if (!textArea) return; const textContent = textArea.value; const cursorPos = textArea.selectionStart || 0; const lineStartIndex = textContent.lastIndexOf('\n', cursorPos - 1) + 1; const [startPos, endPos] = selectFunctionDefinition(textContent, lineStartIndex); if (startPos !== -1 && endPos !== -1) { textArea.focus(); textArea.setSelectionRange(startPos, endPos); toast.success("Функция выделена!"); } else { let searchUpIndex = textContent.lastIndexOf('{', lineStartIndex); if (searchUpIndex > 0) { const [upStartPos, upEndPos] = selectFunctionDefinition(textContent, searchUpIndex); if (upStartPos !== -1 && upEndPos !== -1) { textArea.focus(); textArea.setSelectionRange(upStartPos, upEndPos); toast.success("Функция найдена выше!"); return; } } toast.info("Не удалось выделить функцию."); textArea.focus(); } }, [aiResponseInputRef]);
+
     const handleToggleFileSelection = useCallback((fileId: string) => {
         setSelectedFileIds(prev => { const newSet = new Set(prev); if (newSet.has(fileId)) newSet.delete(fileId); else newSet.add(fileId); const selectedPaths = new Set( Array.from(newSet).map(id => componentParsedFiles.find(f => f.id === id)?.path).filter(Boolean) as string[] ); setSelectedAssistantFiles(selectedPaths); return newSet; });
     }, [componentParsedFiles, setSelectedAssistantFiles]);
@@ -342,7 +250,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
             if (branchToUpdate) {
                 toast.info(`Обновление ветки '${branchToUpdate}' (замена картинки)...`);
-                const result = await triggerUpdateBranch( // Use context trigger for consistency
+                const result = await triggerUpdateBranch(
                     repoUrl, filesToCommit, fullCommitMessage, branchToUpdate,
                     existingPrNumber, prDescription
                 );
@@ -362,7 +270,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         } finally {
             setIsProcessingPR(false);
             setAssistantLoading(false);
-            setImageReplaceTask(null); // Clear the task upon completion/failure
+            setImageReplaceTask(null);
         }
 
     }, [ allFetchedFiles, contextOpenPrs, targetBranchName, repoUrl, notifyAdmin, user, setAssistantLoading, setImageReplaceTask, triggerGetOpenPRs, triggerUpdateBranch ]);
@@ -379,11 +287,11 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     useImperativeHandle(ref, () => ({
         handleParse,
         selectAllParsedFiles: handleSelectAllFiles,
-        handleCreatePR: handleCreateOrUpdatePR, // Point to the combined handler
+        handleCreatePR: handleCreateOrUpdatePR,
         setResponseValue,
         updateRepoUrl,
-        handleDirectImageReplace, // Expose the new method
-    }), [handleParse, handleSelectAllFiles, handleCreateOrUpdatePR, setResponseValue, updateRepoUrl, handleDirectImageReplace]); // Add new method dependency
+        handleDirectImageReplace,
+    }), [handleParse, handleSelectAllFiles, handleCreateOrUpdatePR, setResponseValue, updateRepoUrl, handleDirectImageReplace]);
 
     // --- RENDER ---
     const isProcessingAny = assistantLoading || aiActionLoading || contextIsParsing || isProcessingPR || isFetchingOriginals || loadingPrs;
@@ -393,11 +301,10 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const prButtonLoadingIcon = isProcessingPR ? <FaArrowsRotate className="animate-spin"/> : prButtonIcon;
     const assistantTooltipText = `Вставьте ответ AI ИЛИ используйте кнопку 'Спросить AI'. Затем '➡️' → Проверьте/Исправьте → Выберите файлы → ${prButtonText}`;
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
-    const commonDisabled = isProcessingAny || !!imageReplaceTask; // Disable most things during image replace too
+    const commonDisabled = isProcessingAny || !!imageReplaceTask;
     const parseButtonDisabled = commonDisabled || isWaitingForAiResponse || !response.trim();
     const fixButtonDisabled = commonDisabled || isWaitingForAiResponse;
     const submitButtonDisabled = !canSubmitRegularPR || isProcessingPR || !!imageReplaceTask;
-    // <<<--- MODIFIED: Use isMounted to control initial render state --- >>>
     const showStandardAssistantUI = isMounted && !imageReplaceTask;
     const showImageReplaceUI = isMounted && !!imageReplaceTask;
 
@@ -407,7 +314,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
              <header className="flex justify-between items-center gap-2">
                  <div className="flex items-center gap-2">
                      <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse">AI Code Assistant</h1>
-                     {/* Only show tooltip if standard UI is visible AND mounted */}
                      {showStandardAssistantUI && (
                          <Tooltip text={assistantTooltipText} position="left">
                              <FaCircleInfo className="text-blue-400 cursor-help hover:text-blue-300 transition" />
@@ -419,7 +325,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                  </Tooltip>
              </header>
 
-            {/* Conditionally render standard UI vs Image Replace message based on mount status */}
+            {/* Conditionally render based on mount status and image task */}
             {!isMounted && (
                 <div className="flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed border-gray-600 min-h-[200px]">
                     <FaSpinner className="text-gray-400 text-3xl mb-4 animate-spin" />
@@ -462,7 +368,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                           {/* Validation Status and Actions */}
                            <div className="flex justify-end items-start mt-1 gap-2 min-h-[30px]">
                                <CodeRestorer
-                                  parsedFiles={componentParsedFiles} // Pass local state
+                                  parsedFiles={componentParsedFiles}
                                   originalFiles={originalRepoFiles}
                                   skippedIssues={skippedCodeBlockIssues}
                                   onRestorationComplete={handleRestorationComplete}
@@ -480,7 +386,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
                      {/* Parsed Files List */}
                      <ParsedFilesList
-                         parsedFiles={componentParsedFiles} // Use local state
+                         parsedFiles={componentParsedFiles}
                          selectedFileIds={selectedFileIds}
                          validationIssues={validationIssues}
                          onToggleSelection={handleToggleFileSelection}
@@ -498,14 +404,14 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                           repoUrl={repoUrl}
                           prTitle={prTitle}
                           selectedFileCount={selectedFileIds.size}
-                          isLoading={isProcessingPR} // Use specific PR processing state
+                          isLoading={isProcessingPR}
                           isLoadingPrList={loadingPrs}
                           onRepoUrlChange={(url) => { setRepoUrlState(url); updateRepoUrlInAssistant(url); }}
                           onPrTitleChange={setPrTitle}
-                          onCreatePR={handleCreateOrUpdatePR} // Use combined handler
+                          onCreatePR={handleCreateOrUpdatePR}
                           buttonText={prButtonText}
                           buttonIcon={prButtonLoadingIcon}
-                          isSubmitDisabled={submitButtonDisabled} // Use updated disabled logic
+                          isSubmitDisabled={submitButtonDisabled}
                      />
 
                      {/* Open PR List */}
