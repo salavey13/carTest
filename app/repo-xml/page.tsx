@@ -4,7 +4,7 @@
     import RepoTxtFetcher from "@/components/RepoTxtFetcher";
     import AICodeAssistant from "@/components/AICodeAssistant";
     import AutomationBuddy from "@/components/AutomationBuddy";
-    import { RepoXmlPageProvider, RepoTxtFetcherRef, AICodeAssistantRef } from '@/contexts/RepoXmlPageContext';
+    import { RepoXmlPageProvider, RepoTxtFetcherRef, AICodeAssistantRef, ImageReplaceTask } from '@/contexts/RepoXmlPageContext'; // Import ImageReplaceTask
     import { useAppContext } from "@/contexts/AppContext";
     import { debugLogger } from "@/lib/debugLogger";
     import { Button } from "@/components/ui/button"; // Import Button
@@ -101,7 +101,7 @@
 
     type Language = 'en' | 'ru';
 
-    // Inner component to use useSearchParams
+    // Inner component to use useSearchParams and context
     function RepoXmlPageContent() {
       // Refs
       const fetcherRef = useRef<RepoTxtFetcherRef | null>(null);
@@ -112,6 +112,7 @@
 
       // State
       const { user } = useAppContext();
+      const { setImageReplaceTask } = useRepoXmlPageContext(); // Get the setter from context
       const [isMounted, setIsMounted] = useState(false);
       const [lang, setLang] = useState<Language>('en');
       const [showComponents, setShowComponents] = useState(false); // State to control component visibility
@@ -127,16 +128,65 @@
         setLang(initialLang);
         debugLogger.log(`[RepoXmlPage] Mounted. Browser lang: ${browserLang}, TG lang: ${telegramLang}, Initial selected: ${initialLang}`);
 
-        // --- FIX: Check for URL params and auto-show components ---
+        // --- MODIFIED: Parse URL params for idea AND image replacement task ---
         const pathParam = searchParams.get("path");
         const ideaParam = searchParams.get("idea");
-        if (pathParam && ideaParam) {
-          debugLogger.log("[RepoXmlPage] 'path' and 'idea' params found in URL. Auto-showing components.");
-          setShowComponents(true);
-        }
-        // --- End FIX ---
 
-      }, [user, searchParams]); // Add searchParams to dependency array
+        if (pathParam && ideaParam) {
+            const decodedIdea = decodeURIComponent(ideaParam);
+            const decodedPath = decodeURIComponent(pathParam);
+
+            // Check if it's an image replacement task
+            if (decodedIdea.startsWith("ImageReplace|")) {
+                debugLogger.log("[RepoXmlPage] Image Replace task detected in URL params.");
+                try {
+                    const parts = decodedIdea.split('|');
+                    const oldUrlPart = parts.find(p => p.startsWith("OldURL="));
+                    const newUrlPart = parts.find(p => p.startsWith("NewURL="));
+
+                    if (oldUrlPart && newUrlPart) {
+                        const oldUrl = decodeURIComponent(oldUrlPart.substring("OldURL=".length));
+                        const newUrl = decodeURIComponent(newUrlPart.substring("NewURL=".length));
+
+                        if (decodedPath && oldUrl && newUrl) {
+                            const task: ImageReplaceTask = { targetPath: decodedPath, oldUrl, newUrl };
+                            console.log("[RepoXmlPage] Setting image replace task in context:", task);
+                            setImageReplaceTask(task); // Set the task in context
+                        } else {
+                             console.error("[RepoXmlPage] Invalid image replace task data:", { decodedPath, oldUrl, newUrl });
+                             setImageReplaceTask(null); // Clear any previous task
+                        }
+                    } else {
+                         console.error("[RepoXmlPage] Could not parse OldURL/NewURL from image replace idea:", decodedIdea);
+                         setImageReplaceTask(null); // Clear any previous task
+                    }
+                } catch (e) {
+                    console.error("[RepoXmlPage] Error parsing image replace task:", e);
+                    setImageReplaceTask(null); // Clear any previous task
+                }
+            } else {
+                 // It's a regular idea, handle it as before (e.g., populate kwork input)
+                 debugLogger.log("[RepoXmlPage] Regular 'path' and 'idea' params found. Auto-showing components.");
+                 if (kworkInputRef.current) {
+                      kworkInputRef.current.value = decodedIdea;
+                      // Optionally trigger input event if needed
+                      const event = new Event('input', { bubbles: true });
+                      kworkInputRef.current.dispatchEvent(event);
+                      console.log("[RepoXmlPage] Populated kwork input with idea from URL.");
+                 }
+                 setImageReplaceTask(null); // Ensure image task is cleared
+            }
+
+            // Auto-show components regardless of idea type if path and idea are present
+            setShowComponents(true);
+
+        } else {
+             // No path/idea params, clear any potential image task
+             setImageReplaceTask(null);
+        }
+        // --- End MODIFICATION ---
+
+      }, [user, searchParams, setImageReplaceTask, kworkInputRef]); // Add dependencies
 
       const t = translations[lang];
       const userName = user?.first_name || (lang === 'ru' ? 'Чувак/Чика' : 'Dude/Chica'); // Get username or default
@@ -218,7 +268,6 @@
                         <details open className="bg-gray-900/70 border border-gray-700 rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4">
                             <summary className="text-xl font-semibold text-brand-purple p-4 cursor-pointer list-none flex justify-between items-center hover:bg-gray-800/50 rounded-t-lg">
                                 <span>{t.philosophyTitle}</span>
-                                {/* Note: Using group-open requires Tailwind `group` utility on <details> */}
                                 {/* <FaUpLong className="text-gray-500 group-open:rotate-180 transition-transform" /> */}
                             </summary>
                             <div className="px-6 pt-2 text-gray-300 space-y-3 text-base">

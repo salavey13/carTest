@@ -5,26 +5,35 @@ import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import { supabaseAnon } from "@/hooks/supabase"; // Use anon client
 import { notifyAdmin } from "@/app/actions"; // Import notifyAdmin from main actions
-import { getOpenPullRequests, updateBranch } from '@/app/actions_github/actions';
+import { getOpenPullRequests, updateBranch, createGitHubPullRequest } from '@/app/actions_github/actions'; // Import createGitHubPullRequest
 import type { AiRequestRecord, AiRequestInsert, AiRequestStatus } from '@/types/ai.types'; // Import types
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import type { FileNode } from '@/components/RepoTxtFetcher'; // Import FileNode
 
 // Define Ref Interfaces
 export interface RepoTxtFetcherRef {
     handleFetch: (isManualRetry?: boolean, branchName?: string | null) => Promise<void>;
     selectHighlightedFiles: () => void;
-    handleAddSelected: (autoAskAi?: boolean, filesToAddParam?: Set<string>) => Promise<void>;
+    handleAddSelected: (autoAskAi?: boolean, filesToAddParam?: Set<string>, allFilesParam?: FileNode[]) => Promise<void>; // Updated signature
     handleCopyToClipboard: (textToCopy?: string, shouldScroll?: boolean) => boolean;
     clearAll: () => void;
     getKworkInputValue: () => string;
 }
 
+// NEW: Image Replace Task Interface
+export interface ImageReplaceTask {
+    targetPath: string;
+    oldUrl: string;
+    newUrl: string;
+}
+
 export interface AICodeAssistantRef {
     handleParse: () => Promise<void>;
     selectAllParsedFiles: () => void;
-    handleCreatePR: () => Promise<void>;
+    handleCreatePR: () => Promise<void>; // This likely handles the update/create logic now
     setResponseValue: (value: string) => void;
     updateRepoUrl: (url: string) => void;
+    handleDirectImageReplace: (task: ImageReplaceTask) => Promise<void>; // NEW METHOD
 }
 
 // Fetch status type
@@ -48,7 +57,8 @@ export type WorkflowStep =
   | 'ready_to_fetch'
   | 'fetching'
   | 'fetch_failed'
-  | 'files_fetched'
+  | 'files_fetched' // General files fetched state
+  | 'files_fetched_image_replace' // Specific state when files fetched for image replace task
   | 'files_fetched_highlights'
   | 'files_selected'
   | 'request_written'
@@ -57,7 +67,7 @@ export type WorkflowStep =
   | 'response_pasted' // Response received (Realtime or manual paste)
   | 'parsing_response'
   | 'response_parsed'
-  | 'pr_ready';
+  | 'pr_ready'; // Can mean ready for PR creation OR update
 
 // Context Type Definition
 interface RepoXmlPageContextType {
@@ -66,6 +76,7 @@ interface RepoXmlPageContextType {
     fetchStatus: FetchStatus;
     repoUrlEntered: boolean;
     filesFetched: boolean;
+    allFetchedFiles: FileNode[]; // NEW: Hold all raw fetched files
     primaryHighlightedPath: string | null;
     secondaryHighlightedPaths: string[];
     selectedFetcherFiles: Set<string>;
@@ -74,15 +85,16 @@ interface RepoXmlPageContextType {
     aiResponseHasContent: boolean;
     filesParsed: boolean;
     selectedAssistantFiles: Set<string>;
-    assistantLoading: boolean;
-    aiActionLoading: boolean;
+    assistantLoading: boolean; // General loading for Assistant actions (parse, PR create/update)
+    aiActionLoading: boolean; // Loading specifically for AI request submission/waiting
     loadingPrs: boolean;
     openPrs: SimplePullRequest[];
-    targetBranchName: string | null;
-    manualBranchName: string;
+    targetBranchName: string | null; // Effective target branch (manual or PR)
+    manualBranchName: string; // Manually entered branch name
     isSettingsModalOpen: boolean;
     currentAiRequestId: string | null;
     isParsing: boolean;
+    imageReplaceTask: ImageReplaceTask | null; // NEW STATE
 
     // Refs
     fetcherRef: MutableRefObject<RepoTxtFetcherRef | null>;
@@ -94,7 +106,8 @@ interface RepoXmlPageContextType {
     // Updaters
     setFetchStatus: (status: FetchStatus) => void;
     setRepoUrlEntered: (entered: boolean) => void;
-    setFilesFetched: (fetched: boolean, primaryPath?: string | null, secondaryPaths?: string[]) => void;
+    setFilesFetched: (fetched: boolean, allFilesData?: FileNode[], primaryPath?: string | null, secondaryPaths?: string[]) => void; // Updated signature
+    setAllFetchedFiles: (files: FileNode[]) => void; // NEW Setter
     setSelectedFetcherFiles: (files: Set<string>) => void;
     setKworkInputHasContent: (hasContent: boolean) => void;
     setRequestCopied: (copied: boolean) => void;
@@ -103,16 +116,17 @@ interface RepoXmlPageContextType {
     setSelectedAssistantFiles: (files: Set<string>) => void;
     setAssistantLoading: (loading: boolean) => void;
     setAiActionLoading: (loading: boolean) => void;
-    setTargetBranchName: (branch: string | null) => void; // Handles PR selection logic
-    setManualBranchName: (branch: string) => void; // Handles manual input logic
+    setTargetBranchName: (branch: string | null) => void;
+    setManualBranchName: (branch: string) => void;
     setOpenPrs: (prs: SimplePullRequest[]) => void;
     setLoadingPrs: (loading: boolean) => void;
     setIsSettingsModalOpen: (isOpen: boolean) => void;
     setCurrentAiRequestId: (id: string | null) => void;
     setIsParsing: (parsing: boolean) => void;
+    setImageReplaceTask: (task: ImageReplaceTask | null) => void; // NEW SETTER
 
     // Action Triggers
-    triggerFetch: (isManualRetry?: boolean) => Promise<void>;
+    triggerFetch: (isManualRetry?: boolean, branchNameToFetch?: string | null) => Promise<void>; // Updated signature
     triggerGetOpenPRs: (repoUrl: string) => Promise<void>;
     triggerSelectHighlighted: () => void;
     triggerAddSelectedToKwork: (autoAskAi?: boolean, filesToAddParam?: Set<string>) => Promise<void>;
@@ -120,7 +134,9 @@ interface RepoXmlPageContextType {
     triggerAskAi: () => Promise<{ success: boolean; requestId?: string; error?: string }>;
     triggerParseResponse: () => Promise<void>;
     triggerSelectAllParsed: () => void;
-    triggerCreatePR: () => Promise<void>;
+    // Renamed for clarity, points to the combined logic in assistant
+    triggerCreateOrUpdatePR: () => Promise<void>;
+    // Kept triggerUpdateBranch if needed directly, but usually called via triggerCreateOrUpdatePR
     triggerUpdateBranch: (repoUrl: string, files: { path: string; content: string }[], commitMessage: string, branchName: string) => Promise<ReturnType<typeof updateBranch>>;
     triggerToggleSettingsModal: () => void;
     scrollToSection: (id: 'kworkInput' | 'aiResponseInput' | 'prSection' | 'fetcher' | 'assistant' | 'executor' | 'settingsModalTrigger' | 'settings-modal-trigger-assistant') => void;
@@ -142,16 +158,17 @@ export const useRepoXmlPageContext = () => {
         const warnSync = (name: string): any => () => { console.warn(`Context stub: ${name} called.`); };
         // Provide a complete stub matching the interface
         return {
-            currentStep: 'idle', fetchStatus: 'idle', repoUrlEntered: false, filesFetched: false,
+            currentStep: 'idle', fetchStatus: 'idle', repoUrlEntered: false, filesFetched: false, allFetchedFiles: [],
             primaryHighlightedPath: null, secondaryHighlightedPaths: [], selectedFetcherFiles: new Set(),
             kworkInputHasContent: false, requestCopied: false, aiResponseHasContent: false,
             filesParsed: false, selectedAssistantFiles: new Set(), assistantLoading: false, aiActionLoading: false,
             loadingPrs: false, openPrs: [], targetBranchName: null, manualBranchName: "",
-            isSettingsModalOpen: false, currentAiRequestId: null, isParsing: false,
+            isSettingsModalOpen: false, currentAiRequestId: null, isParsing: false, imageReplaceTask: null,
             fetcherRef: { current: null }, assistantRef: { current: null }, kworkInputRef: { current: null },
             aiResponseInputRef: { current: null }, prSectionRef: { current: null },
             setFetchStatus: warnSync('setFetchStatus'), setRepoUrlEntered: warnSync('setRepoUrlEntered'),
-            setFilesFetched: warnSync('setFilesFetched'), setSelectedFetcherFiles: warnSync('setSelectedFetcherFiles'),
+            setFilesFetched: warnSync('setFilesFetched'), setAllFetchedFiles: warnSync('setAllFetchedFiles'),
+            setSelectedFetcherFiles: warnSync('setSelectedFetcherFiles'),
             setKworkInputHasContent: warnSync('setKworkInputHasContent'), setRequestCopied: warnSync('setRequestCopied'),
             setAiResponseHasContent: warnSync('setAiResponseHasContent'), setFilesParsed: warnSync('setFilesParsed'),
             setSelectedAssistantFiles: warnSync('setSelectedAssistantFiles'), setAssistantLoading: warnSync('setAssistantLoading'),
@@ -161,12 +178,13 @@ export const useRepoXmlPageContext = () => {
             setIsSettingsModalOpen: warnSync('setIsSettingsModalOpen'),
             setCurrentAiRequestId: warnSync('setCurrentAiRequestId'),
             setIsParsing: warnSync('setIsParsing'),
+            setImageReplaceTask: warnSync('setImageReplaceTask'), // Add new setter stub
             triggerFetch: warn('triggerFetch'), triggerGetOpenPRs: warn('triggerGetOpenPRs'),
             triggerSelectHighlighted: warnSync('triggerSelectHighlighted'),
             triggerAddSelectedToKwork: warn('triggerAddSelectedToKwork'), triggerCopyKwork: warnSync('triggerCopyKwork'),
             triggerAskAi: warn('triggerAskAi'),
             triggerParseResponse: warn('triggerParseResponse'), triggerSelectAllParsed: warnSync('triggerSelectAllParsed'),
-            triggerCreatePR: warn('triggerCreatePR'),
+            triggerCreateOrUpdatePR: warn('triggerCreateOrUpdatePR'), // Renamed stub
             triggerUpdateBranch: warn('triggerUpdateBranch'),
             triggerToggleSettingsModal: warnSync('triggerToggleSettingsModal'),
             scrollToSection: warnSync('scrollToSection'),
@@ -195,6 +213,7 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
     const [fetchStatus, setFetchStatusState] = useState<FetchStatus>('idle');
     const [repoUrlEntered, setRepoUrlEnteredState] = useState(false);
     const [filesFetched, setFilesFetchedState] = useState(false);
+    const [allFetchedFiles, setAllFetchedFilesState] = useState<FileNode[]>([]); // NEW: Store all fetched files
     const [primaryHighlightedPath, setPrimaryHighlightedPathState] = useState<string | null>(null);
     const [secondaryHighlightedPaths, setSecondaryHighlightedPathsState] = useState<string[]>([]);
     const [selectedFetcherFiles, setSelectedFetcherFilesState] = useState<Set<string>>(new Set());
@@ -203,16 +222,17 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
     const [aiResponseHasContent, setAiResponseHasContentState] = useState(false);
     const [filesParsed, setFilesParsedState] = useState(false);
     const [selectedAssistantFiles, setSelectedAssistantFilesState] = useState<Set<string>>(new Set());
-    const [assistantLoading, setAssistantLoadingState] = useState(false); // Loading for parse/PR/update
-    const [aiActionLoading, setAiActionLoadingState] = useState(false); // Loading for submitting/waiting AI response
+    const [assistantLoading, setAssistantLoadingState] = useState(false); // General loading for Assistant actions (parse, PR create/update)
+    const [aiActionLoading, setAiActionLoadingState] = useState(false); // Loading specifically for AI request submission/waiting
     const [loadingPrs, setLoadingPrsState] = useState(false);
     const [openPrs, setOpenPrsState] = useState<SimplePullRequest[]>([]);
-    const [currentAiRequestId, setCurrentAiRequestIdState] = useState<string | null>(null);
-    const [isParsing, setIsParsingState] = useState(false);
     const [manualBranchName, setManualBranchNameState] = useState<string>("");
     const [selectedPrBranch, setSelectedPrBranchState] = useState<string | null>(null);
-    const [targetBranchName, setTargetBranchNameState] = useState<string | null>(null);
+    const [targetBranchName, setTargetBranchNameState] = useState<string | null>(null); // Derived effective branch
     const [isSettingsModalOpen, setIsSettingsModalOpenState] = useState(false);
+    const [currentAiRequestId, setCurrentAiRequestIdState] = useState<string | null>(null);
+    const [isParsing, setIsParsingState] = useState(false);
+    const [imageReplaceTask, setImageReplaceTaskState] = useState<ImageReplaceTask | null>(null); // NEW State
 
     const { user } = useAppContext(); // Get user context
     const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
@@ -223,7 +243,7 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
         setTargetBranchNameState(trimmedManual || selectedPrBranch);
     }, [manualBranchName, selectedPrBranch]);
 
-    // Effect: Load Initial AI Request State from user metadata on mount/user change
+     // Effect: Load Initial AI Request State from user metadata on mount/user change
     useEffect(() => {
         let isMounted = true;
         if (!user?.id) {
@@ -234,73 +254,52 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
         const fetchInitialAiState = async () => {
             console.log("[Init Effect] Fetching initial user data for AI state...");
             try {
-                // Check if user metadata exists and has last_ai_request_id
                 const { data: userData, error: userError } = await supabaseAnon
                     .from('users')
                     .select('metadata')
                     .eq('user_id', user.id)
                     .single();
 
-                if (userError && userError.code !== 'PGRST116') { // Ignore 'not found' error
-                    console.error("[Init Effect] Error fetching user metadata:", userError);
-                    return;
+                if (userError && userError.code !== 'PGRST116') {
+                    console.error("[Init Effect] Error fetching user metadata:", userError); return;
                 }
 
                 const lastRequestId = userData?.metadata?.last_ai_request_id;
                 if (lastRequestId && typeof lastRequestId === 'string') {
                     console.log(`[Init Effect] Found last AI request ID: ${lastRequestId}`);
-                    // Check the status of the last known request
                     const { data: reqData, error: reqError } = await supabaseAnon
                         .from('ai_requests')
                         .select('status, response, error_message')
                         .eq('id', lastRequestId)
                         .single();
 
-                    if (reqError) {
-                        console.error(`[Init Effect] Error fetching status for ${lastRequestId}:`, reqError);
-                        if (isMounted) setCurrentAiRequestIdState(null); // Reset if request fetch failed
-                        return;
-                    }
-                    if (!isMounted) return; // Check mount status after async operation
+                    if (reqError) { console.error(`[Init Effect] Error fetching status for ${lastRequestId}:`, reqError); if (isMounted) setCurrentAiRequestIdState(null); return; }
+                    if (!isMounted) return;
 
                     console.log(`[Init Effect] Status for ${lastRequestId}: ${reqData.status}`);
                     if (reqData.status === 'pending' || reqData.status === 'processing') {
-                        // If still processing, set the ID and loading state
                         console.log(`[Init Effect] Last request ${lastRequestId} still ${reqData.status}. Setting state.`);
-                        setCurrentAiRequestIdState(lastRequestId);
-                        setAiActionLoadingState(true);
-                        setAiResponseHasContentState(false);
-                        if (assistantRef.current) assistantRef.current.setResponseValue(""); // Clear response area
-                    } else if (reqData.status === 'completed' && !aiResponseHasContent) {
-                        // If completed and response area is empty, populate it
+                        setCurrentAiRequestIdState(lastRequestId); setAiActionLoadingState(true); setAiResponseHasContentState(false);
+                        if (assistantRef.current) assistantRef.current.setResponseValue("");
+                    } else if (reqData.status === 'completed' && !aiResponseHasContentState) { // Use state getter
                         console.log(`[Init Effect] Last request ${lastRequestId} completed. Populating.`);
                         if (assistantRef.current) assistantRef.current.setResponseValue(reqData.response || "");
-                        setAiResponseHasContentState(!!reqData.response); // Set based on actual response
-                        setCurrentAiRequestIdState(null);
-                        setAiActionLoadingState(false);
+                        setAiResponseHasContentState(!!reqData.response); setCurrentAiRequestIdState(null); setAiActionLoadingState(false);
                     } else {
-                        // If failed or completed but already handled, reset
                         console.log(`[Init Effect] Last request ${lastRequestId} has status ${reqData.status} or handled. Resetting.`);
-                        setCurrentAiRequestIdState(null);
-                        setAiActionLoadingState(false);
+                        setCurrentAiRequestIdState(null); setAiActionLoadingState(false);
                     }
                 } else {
-                    // No last request ID found in metadata
                     console.log("[Init Effect] No last AI request ID found.");
-                    setCurrentAiRequestIdState(null);
-                    setAiActionLoadingState(false);
+                    setCurrentAiRequestIdState(null); setAiActionLoadingState(false);
                 }
             } catch (error) {
-                console.error("[Init Effect] Unexpected error:", error);
-                if (isMounted) { // Check mount status before setting state in catch block
-                    setCurrentAiRequestIdState(null);
-                    setAiActionLoadingState(false);
-                }
+                console.error("[Init Effect] Unexpected error:", error); if (isMounted) { setCurrentAiRequestIdState(null); setAiActionLoadingState(false); }
             }
         };
         fetchInitialAiState();
-        return () => { isMounted = false; }; // Cleanup function
-    }, [user?.id, assistantRef, aiResponseHasContent]); // Added aiResponseHasContent dependency
+        return () => { isMounted = false; };
+    }, [user?.id, assistantRef]); // Removed aiResponseHasContentState dependency
 
 
     // Derive current workflow step based on state
@@ -310,39 +309,75 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
         if (fetchStatus === 'failed_retries') return 'fetch_failed';
         if (aiActionLoading && currentAiRequestId) return 'generating_ai_response';
         if (isParsing) return 'parsing_response';
-        if (assistantLoading && filesParsed) return 'pr_ready'; // Indicates PR/Update loading
+        if (assistantLoading && (filesParsed || imageReplaceTask)) return 'pr_ready'; // Loading for PR/Update (including image replace)
 
         // Check progress states
         if (!repoUrlEntered) return 'need_repo_url';
         if (!filesFetched) return 'ready_to_fetch';
+
+        // Specific state for image replace after fetch, before PR
+        if (imageReplaceTask && filesFetched) return 'files_fetched_image_replace';
+
         if (aiResponseHasContent) {
             if (!filesParsed) return 'response_pasted'; // Got response, needs parsing
             if (selectedAssistantFiles.size > 0) return 'pr_ready'; // Parsed, files selected for PR/Update
             return 'response_parsed'; // Parsed, but no files selected yet
         }
-        if (requestCopied) return 'request_copied'; // Manual path: copied request, waiting for manual paste
-        if (kworkInputHasContent) return 'request_written'; // Prompt written, ready to send or copy
-        if (selectedFetcherFiles.size > 0) return 'files_selected'; // Files selected in fetcher, ready to add to prompt
+        if (requestCopied) return 'request_copied'; // Manual path
+        if (kworkInputHasContent) return 'request_written'; // Prompt written
+        if (selectedFetcherFiles.size > 0) return 'files_selected'; // Files selected in fetcher
         if (primaryHighlightedPath || secondaryHighlightedPaths.length > 0) return 'files_fetched_highlights'; // Files fetched with highlights
-        return 'files_fetched'; // Files fetched, no selection/prompt yet
+        return 'files_fetched'; // Generic files fetched state
     }, [
         fetchStatus, repoUrlEntered, filesFetched, aiActionLoading, assistantLoading, isParsing,
-        currentAiRequestId,
+        currentAiRequestId, imageReplaceTask, // Added imageReplaceTask
         primaryHighlightedPath, secondaryHighlightedPaths.length, selectedFetcherFiles.size,
         kworkInputHasContent, requestCopied, aiResponseHasContent, filesParsed,
         selectedAssistantFiles.size
     ]);
     const currentStep = getCurrentStep();
 
+
     // --- State Updaters (Memoized) ---
     const setFetchStatusCallback = useCallback((status: FetchStatus) => setFetchStatusState(status), []);
     const setRepoUrlEnteredCallback = useCallback((entered: boolean) => setRepoUrlEnteredState(entered), []);
-    const setFilesFetchedCallback = useCallback((fetched: boolean, primaryPath: string | null = null, secondaryPaths: string[] = []) => {
+
+    // MODIFIED: setFilesFetchedCallback includes allFilesData and triggers replacement task
+    const setFilesFetchedCallback = useCallback((
+        fetched: boolean,
+        allFilesData: FileNode[] = [], // Default to empty array
+        primaryPath: string | null = null,
+        secondaryPaths: string[] = []
+    ) => {
         setFilesFetchedState(fetched);
+        setAllFetchedFilesState(allFilesData); // Store all fetched files
         setPrimaryHighlightedPathState(primaryPath);
         setSecondaryHighlightedPathsState(secondaryPaths);
-        // Reset downstream state if fetch is cleared
-        if (!fetched) {
+
+        if (fetched && imageReplaceTask && assistantRef.current) {
+            console.log("[Context:setFilesFetched] Files fetched, triggering direct image replacement for:", imageReplaceTask);
+            setTimeout(() => {
+                if (assistantRef.current) {
+                    assistantRef.current.handleDirectImageReplace(imageReplaceTask)
+                        .then(() => {
+                            setImageReplaceTaskState(null); // Clear task after attempt
+                            console.log("[Context:setFilesFetched] Direct image replacement trigger finished.");
+                            // Optionally set assistant loading false here if needed, or let handleDirectImageReplace do it
+                        })
+                        .catch(err => {
+                            console.error("[Context:setFilesFetched] Error triggering direct image replacement:", err);
+                            toast.error("Ошибка запуска авто-замены картинки.");
+                            setImageReplaceTaskState(null); // Clear task on error
+                        });
+                } else {
+                    console.warn("[Context:setFilesFetched] Assistant ref not ready when trying to trigger replacement.");
+                    toast.error("Ошибка: Компонент ассистента не готов для авто-замены.");
+                    setImageReplaceTaskState(null); // Clear task if ref is missing
+                }
+            }, 200); // Increased delay slightly
+        } else if (!fetched) {
+            // Reset logic
+            setAllFetchedFilesState([]); // Clear fetched files
             setSelectedFetcherFilesState(new Set());
             setKworkInputHasContentState(false);
             setRequestCopiedState(false);
@@ -351,29 +386,26 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
             setSelectedAssistantFilesState(new Set());
             setAssistantLoadingState(false);
             setIsParsingState(false);
-            setCurrentAiRequestIdState(null); // Reset monitored request ID
+            setCurrentAiRequestIdState(null);
+            setImageReplaceTaskState(null); // Also clear task if fetch is reset
             if (assistantRef.current) assistantRef.current.setResponseValue("");
         } else {
-            setFetchStatusState('success'); // Mark as success if files were fetched
+            setFetchStatusState('success'); // Mark as success if files were fetched (and not image replace task)
         }
-    }, [assistantRef]); // assistantRef dependency for clearing value
+    }, [assistantRef, imageReplaceTask]); // Added dependencies
+
+    const setAllFetchedFilesCallback = useCallback((files: FileNode[]) => setAllFetchedFilesState(files), []); // NEW Setter
     const setSelectedFetcherFilesCallback = useCallback((files: Set<string>) => setSelectedFetcherFilesState(files), []);
     const setKworkInputHasContentCallback = useCallback((hasContent: boolean) => setKworkInputHasContentState(hasContent), []);
     const setRequestCopiedCallback = useCallback((copied: boolean) => setRequestCopiedState(copied), []);
     const setAiResponseHasContentCallback = useCallback((hasContent: boolean) => {
         setAiResponseHasContentState(hasContent);
-        // Reset downstream state if response is cleared manually AND we're not waiting for AI
         if (!hasContent && !aiActionLoading) {
-            setFilesParsedState(false);
-            setSelectedAssistantFilesState(new Set());
-            setCurrentAiRequestIdState(null); // Clear monitored ID
+            setFilesParsedState(false); setSelectedAssistantFilesState(new Set()); setCurrentAiRequestIdState(null);
         }
-    }, [aiActionLoading]); // Dependency on aiActionLoading
+    }, [aiActionLoading]);
     const setFilesParsedCallback = useCallback((parsed: boolean) => {
-        setFilesParsedState(parsed);
-        if (!parsed) setSelectedAssistantFilesState(new Set());
-        setIsParsingState(false); // Ensure parsing flag is reset
-        setAssistantLoadingState(false); // Ensure general assistant loading is reset
+        setFilesParsedState(parsed); if (!parsed) setSelectedAssistantFilesState(new Set()); setIsParsingState(false); setAssistantLoadingState(false);
     }, []);
     const setSelectedAssistantFilesCallback = useCallback((files: Set<string>) => setSelectedAssistantFilesState(files), []);
     const setAssistantLoadingCallback = useCallback((loading: boolean) => setAssistantLoadingState(loading), []);
@@ -385,321 +417,114 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
     const setIsSettingsModalOpenCallback = useCallback((isOpen: boolean) => setIsSettingsModalOpenState(isOpen), []);
     const setCurrentAiRequestIdCallback = useCallback((id: string | null) => setCurrentAiRequestIdState(id), []);
     const setIsParsingCallback = useCallback((parsing: boolean) => setIsParsingState(parsing), []);
+    const setImageReplaceTaskCallback = useCallback((task: ImageReplaceTask | null) => setImageReplaceTaskState(task), []); // NEW Setter
 
     // --- Action Triggers (Memoized) ---
-    const triggerFetch = useCallback(async (isManualRetry = false) => {
-        if (fetcherRef.current) await fetcherRef.current.handleFetch(isManualRetry, targetBranchName);
+    const triggerFetch = useCallback(async (isManualRetry = false, branchNameToFetch?: string | null) => { // Updated signature
+        if (fetcherRef.current) await fetcherRef.current.handleFetch(isManualRetry, branchNameToFetch); // Pass branch name
         else console.warn("triggerFetch: fetcherRef not ready.");
-    }, [fetcherRef, targetBranchName]);
+    }, [fetcherRef]); // Removed targetBranchName dependency, it's passed explicitly
 
     const triggerGetOpenPRs = useCallback(async (repoUrl: string) => {
-        if (!repoUrl || !repoUrl.includes('github.com')) {
-            toast.error("Укажите валидный URL GitHub репо в настройках.");
-            return;
-        }
-        setLoadingPrsState(true);
-        setOpenPrsState([]); // Clear previous PRs
-        setTargetBranchNameFromPr(null); // Reset selected PR branch
-        setManualBranchNameInput(""); // Clear manual branch input
+        if (!repoUrl || !repoUrl.includes('github.com')) { toast.error("Укажите валидный URL GitHub репо в настройках."); return; }
+        setLoadingPrsState(true); setOpenPrsState([]); setTargetBranchNameFromPr(null); setManualBranchNameInput("");
         try {
             const result = await getOpenPullRequests(repoUrl);
-            if (result.success && result.pullRequests) {
-                setOpenPrsState(result.pullRequests);
-                toast.success(`Загружено ${result.pullRequests.length} открытых PR.`);
-            } else {
-                toast.error(`Ошибка загрузки PR: ${result.error || 'Неизвестная ошибка'}`);
-            }
-        } catch (error) {
-            toast.error("Критическая ошибка при загрузке PR.");
-            console.error("triggerGetOpenPRs error:", error);
-        } finally {
-            setLoadingPrsState(false);
-        }
-    }, [setTargetBranchNameFromPr, setManualBranchNameInput]); // Dependencies
+            if (result.success && result.pullRequests) { setOpenPrsState(result.pullRequests); toast.success(`Загружено ${result.pullRequests.length} открытых PR.`); }
+            else { toast.error(`Ошибка загрузки PR: ${result.error || 'Неизвестная ошибка'}`); }
+        } catch (error) { toast.error("Критическая ошибка при загрузке PR."); console.error("triggerGetOpenPRs error:", error); }
+        finally { setLoadingPrsState(false); }
+    }, [setTargetBranchNameFromPr, setManualBranchNameInput]);
 
     const scrollToSection = useCallback((id: 'kworkInput' | 'aiResponseInput' | 'prSection' | 'fetcher' | 'assistant' | 'executor' | 'settingsModalTrigger' | 'settings-modal-trigger-assistant') => {
         let element: HTMLElement | null = null;
-        // Map semantic names to actual DOM IDs if needed
         const targetId = (id === 'assistant' || id === 'executor') ? 'executor' : (id === 'fetcher' ? 'extractor' : (id === 'settingsModalTrigger' ? 'settings-modal-trigger-assistant' : id));
-
         switch (targetId) {
             case 'kworkInput': element = kworkInputRef.current; break;
             case 'aiResponseInput': element = aiResponseInputRef.current; break;
             case 'prSection': element = prSectionRef.current; break;
-            // Use document.getElementById for sections outside direct refs
             case 'extractor': element = document.getElementById('extractor'); break;
             case 'executor': element = document.getElementById('executor'); break;
             case 'settings-modal-trigger-assistant': element = document.getElementById('settings-modal-trigger-assistant'); break;
         }
-
         if (element) {
-            // Scroll input/textarea elements into center view for better focus
-            if (['kworkInput', 'aiResponseInput', 'prSection', 'settings-modal-trigger-assistant'].includes(targetId)) {
-                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            } else {
-                // Scroll sections towards the top, considering potential fixed header offset
-                const rect = element.getBoundingClientRect();
-                const headerOffset = 80; // Adjust this value based on your header height
-                window.scrollTo({ top: window.scrollY + rect.top - headerOffset, behavior: 'smooth' });
-            }
-        } else {
-            console.warn(`scrollToSection: Element with target ID "${targetId}" (mapped from "${id}") not found.`);
-        }
-    }, [kworkInputRef, aiResponseInputRef, prSectionRef]); // Refs as dependencies
+            if (['kworkInput', 'aiResponseInput', 'prSection', 'settings-modal-trigger-assistant'].includes(targetId)) { element.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+            else { const rect = element.getBoundingClientRect(); const headerOffset = 80; window.scrollTo({ top: window.scrollY + rect.top - headerOffset, behavior: 'smooth' }); }
+        } else { console.warn(`scrollToSection: Element with target ID "${targetId}" (mapped from "${id}") not found.`); }
+    }, [kworkInputRef, aiResponseInputRef, prSectionRef]);
 
     const triggerSelectHighlighted = useCallback(() => {
-        if (fetcherRef.current) fetcherRef.current.selectHighlightedFiles();
-        else console.warn("triggerSelectHighlighted: fetcherRef not ready.");
+        if (fetcherRef.current) fetcherRef.current.selectHighlightedFiles(); else console.warn("triggerSelectHighlighted: fetcherRef not ready.");
     }, [fetcherRef]);
 
     const triggerAddSelectedToKwork = useCallback(async (autoAskAi = false, filesToAddParam?: Set<string>) => {
-        if (fetcherRef.current) await fetcherRef.current.handleAddSelected(autoAskAi, filesToAddParam);
+        if (fetcherRef.current) await fetcherRef.current.handleAddSelected(autoAskAi, filesToAddParam, allFetchedFiles); // Pass allFetchedFiles
         else console.warn("triggerAddSelectedToKwork: fetcherRef not ready.");
-    }, [fetcherRef]);
+    }, [fetcherRef, allFetchedFiles]); // Add allFetchedFiles dependency
 
     const triggerCopyKwork = useCallback(() => {
         if (fetcherRef.current) {
-            // Copy, scroll to AI response input, update state
             const copied = fetcherRef.current.handleCopyToClipboard(undefined, true);
-            if (copied) {
-                setRequestCopiedState(true);
-                setAiResponseHasContentState(false); // Clear any old response
-                if (assistantRef.current) assistantRef.current.setResponseValue(""); // Clear textarea
-                scrollToSection('aiResponseInput'); // Focus on where to paste
-            }
-        } else {
-            console.warn("triggerCopyKwork: fetcherRef not ready.");
-        }
-    }, [fetcherRef, assistantRef, scrollToSection]); // Dependencies
+            if (copied) { setRequestCopiedState(true); setAiResponseHasContentState(false); if (assistantRef.current) assistantRef.current.setResponseValue(""); scrollToSection('aiResponseInput'); }
+        } else { console.warn("triggerCopyKwork: fetcherRef not ready."); }
+    }, [fetcherRef, assistantRef, scrollToSection]);
 
-    // --- triggerAskAi (Updated Flow) ---
     const triggerAskAi = useCallback(async (): Promise<{ success: boolean; requestId?: string; error?: string }> => {
-        if (!fetcherRef.current || !user?.id ) { // Check for user?.id
-            const m = !user?.id ? "Пользователь не аутентифицирован." : "Компоненты не готовы.";
-            toast.error(m);
-            return { success: false, error: m };
-        }
-        const kworkValue = fetcherRef.current.getKworkInputValue();
-        if (!kworkValue.trim()) {
-            toast.error("Запрос для AI пуст. Напишите что-нибудь!");
-            return { success: false, error: "Prompt empty." };
-        }
-
-        setAiActionLoadingState(true);       // Set loading state (waiting for DB + Realtime)
-        setAiResponseHasContentState(false); // Clear previous response content
-        setCurrentAiRequestIdState(null);    // Clear previous request ID being monitored
-        if (assistantRef.current) assistantRef.current.setResponseValue(""); // Clear response textarea
-
-        toast.info("Отправка запроса AI в очередь...");
-        scrollToSection('executor'); // Scroll to the assistant section
-
+        if (!fetcherRef.current || !user?.id ) { const m = !user?.id ? "Пользователь не аутентифицирован." : "Компоненты не готовы."; toast.error(m); return { success: false, error: m }; }
+        const kworkValue = fetcherRef.current.getKworkInputValue(); if (!kworkValue.trim()) { toast.error("Запрос для AI пуст. Напишите что-нибудь!"); return { success: false, error: "Prompt empty." }; }
+        setAiActionLoadingState(true); setAiResponseHasContentState(false); setCurrentAiRequestIdState(null); if (assistantRef.current) assistantRef.current.setResponseValue(""); toast.info("Отправка запроса AI в очередь..."); scrollToSection('executor');
         try {
-            // 1. Save the request to the database
-            const requestData: AiRequestInsert = {
-                prompt: kworkValue,
-                user_id: String(user.id),
-                status: 'pending' // Initial status
-            };
-            const { data, error: insertError } = await supabaseAnon
-                .from('ai_requests')
-                .insert(requestData)
-                .select('id') // Select only the ID of the newly inserted row
-                .single(); // Expect only one row
+            const requestData: AiRequestInsert = { prompt: kworkValue, user_id: String(user.id), status: 'pending' };
+            const { data, error: insertError } = await supabaseAnon.from('ai_requests').insert(requestData).select('id').single();
+            if (insertError) { throw new Error(`DB Insert Error: ${insertError.message}`); } if (!data?.id) { throw new Error("No Request ID returned after insert."); }
+            const newRequestId = data.id; console.log("AI Request submitted to DB. Monitoring ID:", newRequestId);
+            const userNameOrId = user.username || user.first_name || String(user.id); const promptExcerpt = kworkValue.substring(0, 300) + (kworkValue.length > 300 ? '...' : ''); const notificationMessage = `🤖 Новый AI Запрос (#${newRequestId.substring(0, 6)}...)\nОт: ${userNameOrId} (${user.id})\nПромпт:\n\`\`\`\n${promptExcerpt}\n\`\`\``;
+            notifyAdmin(notificationMessage).catch(err => console.error("Failed to notify admin:", err));
+            toast.success("Запрос поставлен в очередь! Ожидаем ответ AI... 🤖💭"); setCurrentAiRequestIdState(newRequestId);
+            return { success: true, requestId: newRequestId };
+        } catch (error: any) { toast.error("Критическая ошибка при отправке запроса AI."); console.error("triggerAskAi error:", error); setAiActionLoadingState(false); setCurrentAiRequestIdState(null); return { success: false, error: error.message ?? "Unknown submit error." }; }
+    }, [fetcherRef, user, assistantRef, scrollToSection]);
 
-            if (insertError) { throw new Error(`DB Insert Error: ${insertError.message}`); }
-            if (!data?.id) { throw new Error("No Request ID returned after insert."); }
-
-            const newRequestId = data.id;
-            console.log("AI Request submitted to DB. Monitoring ID:", newRequestId);
-
-            // 2. Notify Admin (You!) via Telegram - Fire and forget
-            const userNameOrId = user.username || user.first_name || String(user.id);
-            const promptExcerpt = kworkValue.substring(0, 300) + (kworkValue.length > 300 ? '...' : '');
-            const notificationMessage = `🤖 Новый AI Запрос (#${newRequestId.substring(0, 6)}...)\nОт: ${userNameOrId} (${user.id})\nПромпт:\n\`\`\`\n${promptExcerpt}\n\`\`\``;
-            notifyAdmin(notificationMessage).catch(err => console.error("Failed to notify admin:", err)); // Log error if notify fails
-
-            // 3. Set state to monitor Realtime for this ID
-            toast.success("Запрос поставлен в очередь! Ожидаем ответ AI... 🤖💭");
-            setCurrentAiRequestIdState(newRequestId); // Start monitoring this ID
-            // aiActionLoading remains true until Realtime callback updates it
-
-            return { success: true, requestId: newRequestId }; // Indicate success and return the ID
-
-        } catch (error: any) {
-            toast.error("Критическая ошибка при отправке запроса AI.");
-            console.error("triggerAskAi error:", error);
-            setAiActionLoadingState(false); // Stop loading on error
-            setCurrentAiRequestIdState(null); // Clear ID on error
-            return { success: false, error: error.message ?? "Unknown submit error." };
-        }
-    }, [fetcherRef, user, assistantRef, scrollToSection]); // Dependencies
-
-
-    // --- Parse Trigger ---
     const triggerParseResponse = useCallback(async () => {
-        if (assistantRef.current) {
-            setIsParsingState(true);
-            setAssistantLoadingState(true); // Also set general assistant loading during parse
-            try {
-                await assistantRef.current.handleParse(); // Assumes handleParse updates filesParsed state internally or via context setter
-            } catch (err) {
-                console.error("Error during parsing:", err);
-                toast.error("Ошибка при разборе ответа AI.");
-                setFilesParsedCallback(false); // Ensure parsed state is false on error
-            } finally {
-                setIsParsingState(false);
-                setAssistantLoadingState(false); // Reset general loading
-            }
-        } else {
-            console.warn("triggerParseResponse: assistantRef not ready.");
-        }
-    }, [assistantRef, setFilesParsedCallback]); // Use callback setter
+        if (assistantRef.current) { setIsParsingState(true); setAssistantLoadingState(true); try { await assistantRef.current.handleParse(); } catch (err) { console.error("Error during parsing:", err); toast.error("Ошибка при разборе ответа AI."); setFilesParsedCallback(false); } finally { setIsParsingState(false); setAssistantLoadingState(false); } }
+        else { console.warn("triggerParseResponse: assistantRef not ready."); }
+    }, [assistantRef, setFilesParsedCallback]);
 
     const triggerSelectAllParsed = useCallback(() => {
-        if (assistantRef.current) assistantRef.current.selectAllParsedFiles();
-        else console.warn("triggerSelectAllParsed: assistantRef not ready.");
+        if (assistantRef.current) assistantRef.current.selectAllParsedFiles(); else console.warn("triggerSelectAllParsed: assistantRef not ready.");
     }, [assistantRef]);
 
-    const triggerCreatePR = useCallback(async () => {
-        if (assistantRef.current) await assistantRef.current.handleCreatePR();
-        else console.warn("triggerCreatePR: assistantRef not ready.");
+    const triggerCreateOrUpdatePR = useCallback(async () => { // Renamed trigger
+        if (assistantRef.current) await assistantRef.current.handleCreatePR(); // Points to the combined function
+        else console.warn("triggerCreateOrUpdatePR: assistantRef not ready.");
     }, [assistantRef]);
 
     const triggerUpdateBranch = useCallback(async (repoUrl: string, files: { path: string; content: string }[], commitMessage: string, branchName: string): Promise<ReturnType<typeof updateBranch>> => {
-        setAssistantLoadingState(true); // Use general assistant loading state
-        try {
-            console.log(`Context triggerUpdateBranch: Calling action for branch '${branchName}'`);
-            const result = await updateBranch(repoUrl, files, commitMessage, branchName);
-            if(result.success) {
-                toast.success(`Ветка '${branchName}' успешно обновлена!`);
-            } else {
-                toast.error(`Ошибка обновления ветки '${branchName}': ${result.error}`);
-            }
-            return result;
-        } catch (error) {
-            toast.error(`Критическая ошибка обновления ветки '${branchName}'.`);
-            console.error("triggerUpdateBranch error:", error);
-            return { success: false, error: error instanceof Error ? error.message : "Client-side error." };
-        } finally {
-            setAssistantLoadingState(false);
-        }
-    }, []); // Empty dependency array if updateBranch is stable
+        setAssistantLoadingState(true); try { console.log(`Context triggerUpdateBranch: Calling action for branch '${branchName}'`); const result = await updateBranch(repoUrl, files, commitMessage, branchName); if(result.success) { toast.success(`Ветка '${branchName}' успешно обновлена!`); } else { toast.error(`Ошибка обновления ветки '${branchName}': ${result.error}`); } return result; } catch (error) { toast.error(`Критическая ошибка обновления ветки '${branchName}'.`); console.error("triggerUpdateBranch error:", error); return { success: false, error: error instanceof Error ? error.message : "Client-side error." }; } finally { setAssistantLoadingState(false); }
+    }, []);
 
     const triggerToggleSettingsModal = useCallback(() => setIsSettingsModalOpenState(prev => !prev), []);
 
     // --- Realtime Subscription Logic ---
     useEffect(() => {
-        let isMounted = true; // Flag to track mount status
-
-        // If no ID to monitor or no client, clean up any existing channel
-        if (!currentAiRequestId || !supabaseAnon) {
-            if (realtimeChannelRef.current) {
-                console.log(`[RT Cleanup] No request ID or Supabase client. Removing channel: ${realtimeChannelRef.current.topic}`);
-                supabaseAnon?.removeChannel(realtimeChannelRef.current).catch(e => console.error("[RT Cleanup] Error removing channel:", e));
-                realtimeChannelRef.current = null;
-            }
-            return () => { isMounted = false }; // Cleanup function for isMounted
-        }
-
-        const channelId = `ai-request-${currentAiRequestId}`;
-        // Avoid re-subscribing if already on the correct channel
-        if (realtimeChannelRef.current?.topic === channelId) return () => { isMounted = false }; // Cleanup function for isMounted
-
-        // Unsubscribe from the previous channel if switching IDs
-        if (realtimeChannelRef.current) {
-            console.log(`[RT Switch] Removing old channel: ${realtimeChannelRef.current.topic}`);
-            supabaseAnon.removeChannel(realtimeChannelRef.current).catch(e => console.error("[RT Switch] Error removing old channel:", e));
-        }
-
+        let isMounted = true;
+        if (!currentAiRequestId || !supabaseAnon) { if (realtimeChannelRef.current) { console.log(`[RT Cleanup] No request ID or Supabase client. Removing channel: ${realtimeChannelRef.current.topic}`); supabaseAnon?.removeChannel(realtimeChannelRef.current).catch(e => console.error("[RT Cleanup] Error removing channel:", e)); realtimeChannelRef.current = null; } return () => { isMounted = false }; }
+        const channelId = `ai-request-${currentAiRequestId}`; if (realtimeChannelRef.current?.topic === channelId) return () => { isMounted = false };
+        if (realtimeChannelRef.current) { console.log(`[RT Switch] Removing old channel: ${realtimeChannelRef.current.topic}`); supabaseAnon.removeChannel(realtimeChannelRef.current).catch(e => console.error("[RT Switch] Error removing old channel:", e)); }
         console.log(`[RT Setup] Attempting to subscribe to ${channelId}`);
-        const channel = supabaseAnon.channel(channelId)
-            .on<AiRequestRecord>( // Type the payload
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'ai_requests',
-                    filter: `id=eq.${currentAiRequestId}` // Filter specific request ID
-                },
-                (payload) => {
-                     if (!isMounted) return; // Check if component is still mounted
-                    console.log('[RT Received] AI Request Updated:', payload.new);
-                    const updatedRecord = payload.new;
-
-                    // Ensure the update is for the ID we are currently monitoring
-                    if (updatedRecord.id !== currentAiRequestId) { // Use state variable for check
-                        console.log(`[RT Mismatch] Update for ${updatedRecord.id}, but monitoring ${currentAiRequestId}. Ignoring.`);
-                        return;
-                    }
-
-                    if (updatedRecord.status === 'completed') {
-                        toast.success("🤖✨ Ответ от AI получен!");
-                        if (assistantRef.current) {
-                            assistantRef.current.setResponseValue(updatedRecord.response || "");
-                        }
-                        setAiResponseHasContentState(true);
-                        setAiActionLoadingState(false); // Stop loading
-                        setCurrentAiRequestIdState(null); // Stop monitoring this ID
-
-                        // Auto-parse after a short delay to allow state updates
-                        setTimeout(() => {
-                            if (isMounted) { // Check mount status before parsing
-                                triggerParseResponse().catch(err => console.error("Error during auto-parsing:", err));
-                            }
-                        }, 300);
-
-                    } else if (updatedRecord.status === 'failed') {
-                        const errorMsg = updatedRecord.error_message || 'Неизвестная ошибка AI';
-                        toast.error(`❌ Ошибка AI: ${errorMsg}`);
-                        setAiActionLoadingState(false); // Stop loading
-                        setCurrentAiRequestIdState(null); // Stop monitoring this ID
-                    } else if (updatedRecord.status === 'processing') {
-                        // Optional: Update toast or UI element to show processing
-                        toast.info("⏳ AI всё ещё думает...", { id: `ai-processing-${currentAiRequestId}`, duration: 5000 });
-                    }
-                }
-            )
-            .subscribe((status, err) => {
-                if (!isMounted) return; // Check if component is still mounted
-
-                if (status === 'SUBSCRIBED') {
-                    console.log(`[RT Status] Successfully subscribed to ${channelId}`);
-                } else if (['CHANNEL_ERROR', 'TIMED_OUT'].includes(status)) {
-                    console.error(`[RT Status] Subscription error for ${channelId}: ${status}`, err);
-                    toast.error("Ошибка Realtime подписки.");
-                    // Stop loading if subscription fails critically and still loading
-                    if (aiActionLoading) { // Check if still relevant
-                         setAiActionLoadingState(false);
-                         setCurrentAiRequestIdState(null);
-                    }
-
-                } else if (status === 'CLOSED') {
-                    console.log(`[RT Status] Channel explicitly closed for ${channelId}`);
-                     // If closed unexpectedly while we were loading, reset state
-                     if (aiActionLoading) { // Check if still relevant
-                         setAiActionLoadingState(false);
-                         setCurrentAiRequestIdState(null);
-                    }
-                }
-            });
-
+        const channel = supabaseAnon.channel(channelId).on<AiRequestRecord>('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'ai_requests', filter: `id=eq.${currentAiRequestId}` }, (payload) => { if (!isMounted) return; console.log('[RT Received] AI Request Updated:', payload.new); const updatedRecord = payload.new; if (updatedRecord.id !== currentAiRequestIdState) { console.log(`[RT Mismatch] Update for ${updatedRecord.id}, but monitoring ${currentAiRequestIdState}. Ignoring.`); return; } // Use state getter here
+            if (updatedRecord.status === 'completed') { toast.success("🤖✨ Ответ от AI получен!"); if (assistantRef.current) { assistantRef.current.setResponseValue(updatedRecord.response || ""); } setAiResponseHasContentState(true); setAiActionLoadingState(false); setCurrentAiRequestIdState(null); setTimeout(() => { if (isMounted) { triggerParseResponse().catch(err => console.error("Error during auto-parsing:", err)); } }, 300); }
+            else if (updatedRecord.status === 'failed') { const errorMsg = updatedRecord.error_message || 'Неизвестная ошибка AI'; toast.error(`❌ Ошибка AI: ${errorMsg}`); setAiActionLoadingState(false); setCurrentAiRequestIdState(null); }
+            else if (updatedRecord.status === 'processing') { toast.info("⏳ AI всё ещё думает...", { id: `ai-processing-${currentAiRequestIdState}`, duration: 5000 }); } // Use state getter here
+         }).subscribe((status, err) => { if (!isMounted) return; if (status === 'SUBSCRIBED') { console.log(`[RT Status] Successfully subscribed to ${channelId}`); } else if (['CHANNEL_ERROR', 'TIMED_OUT'].includes(status)) { console.error(`[RT Status] Subscription error for ${channelId}: ${status}`, err); toast.error("Ошибка Realtime подписки."); if (aiActionLoading) { setAiActionLoadingState(false); setCurrentAiRequestIdState(null); } } else if (status === 'CLOSED') { console.log(`[RT Status] Channel explicitly closed for ${channelId}`); if (aiActionLoading) { setAiActionLoadingState(false); setCurrentAiRequestIdState(null); } } });
         realtimeChannelRef.current = channel;
-
-        // Cleanup function: remove the channel when the component unmounts or the ID changes
-        return () => {
-            isMounted = false; // Set isMounted to false on cleanup
-            if (realtimeChannelRef.current && realtimeChannelRef.current.topic === channelId) {
-                console.log(`[RT Cleanup] Removing channel: ${realtimeChannelRef.current.topic}`);
-                supabaseAnon.removeChannel(realtimeChannelRef.current).catch(e => console.error("[RT Cleanup] Error removing channel:", e));
-                realtimeChannelRef.current = null;
-            }
-        };
-    }, [currentAiRequestId, assistantRef, triggerParseResponse, aiActionLoading]); // Added aiActionLoading dependency
+        return () => { isMounted = false; if (realtimeChannelRef.current && realtimeChannelRef.current.topic === channelId) { console.log(`[RT Cleanup] Removing channel: ${realtimeChannelRef.current.topic}`); supabaseAnon.removeChannel(realtimeChannelRef.current).catch(e => console.error("[RT Cleanup] Error removing channel:", e)); realtimeChannelRef.current = null; } };
+    }, [currentAiRequestIdState, assistantRef, triggerParseResponse, aiActionLoading]); // Use state getter dependency
 
 
     // --- Xuinity Message Logic (Dynamic based on current state) ---
     const getXuinityMessage = useCallback((): string => {
-        const effectiveBranch = targetBranchName; // Uses the derived state
+        const effectiveBranch = targetBranchName;
         const branchInfo = effectiveBranch ? ` (ветка: ${effectiveBranch})` : '';
         switch (currentStep) {
             case 'idle': return "Инициализация студии...";
@@ -707,11 +532,12 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
             case 'ready_to_fetch': return repoUrlEntered ? `Готов извлечь файлы${branchInfo}. Жми 'Fetch Files'! 🎣` : "Сначала укажи URL.";
             case 'fetching': return `Извлекаю файлы${branchInfo}... ${fetchStatus === 'retrying' ? '(Повтор...)' : ''} ⏳`;
             case 'fetch_failed': return `Ошибка извлечения${branchInfo}. 😭 Попробовать еще раз?`;
+            case 'files_fetched_image_replace': return `Файлы извлечены${branchInfo}! ✅ Готовлюсь к замене картинки... 🤖`; // NEW Message
             case 'files_fetched': return `Файлы извлечены${branchInfo}! ✅ Выбери нужные ИЛИ опиши задачу ниже. 👇`;
             case 'files_fetched_highlights': return `Файлы извлечены${branchInfo}. Есть связанные. 🤔 Выбери или опиши задачу.`;
             case 'files_selected': return `Файлы выбраны${branchInfo}! 👍 Добавь в 'Твой Запрос' ИЛИ сразу жми '🤖 Спросить AI'!`;
             case 'request_written': return aiActionLoading ? "Отправка запроса AI..." : "Запрос готов! 🔥 Жми '🤖 Спросить AI' ИЛИ скопируй для Grok.";
-            case 'generating_ai_response': return `Запрос #${currentAiRequestId?.substring(0, 6)}... улетел к AI. 🚀 Ожидаем магию... (Админ в курсе!) ✨`; // Updated message
+            case 'generating_ai_response': return `Запрос #${currentAiRequestId?.substring(0, 6)}... улетел к AI. 🚀 Ожидаем магию... (Админ в курсе!) ✨`;
             case 'request_copied': return "Скопировано! 📋 Жду ответ от внешнего AI. Вставляй результат сюда. 👇";
             case 'response_pasted': return "Ответ AI получен! ✅ Нажми '➡️ Разобрать Ответ' для анализа.";
             case 'parsing_response': return "Разбираю ответ AI... 🧠";
@@ -719,7 +545,7 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
             case 'pr_ready': return assistantLoading ? (effectiveBranch ? `Обновляю ветку '${effectiveBranch}'...` : "Создаю Pull Request...") : (effectiveBranch ? `Готов обновить ветку '${effectiveBranch}'? 🚀` : "Готов создать Pull Request? ✨");
             default: return "Что будем вайбить дальше?";
         }
-    }, [currentStep, repoUrlEntered, fetchStatus, assistantLoading, aiActionLoading, targetBranchName, isParsing, currentAiRequestId]);
+    }, [currentStep, repoUrlEntered, fetchStatus, assistantLoading, aiActionLoading, targetBranchName, isParsing, currentAiRequestId]); // Added imageReplaceTask dependency
 
 
     // --- Callback for Repo URL update in Assistant ---
@@ -729,25 +555,30 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
 
     // --- Context Value ---
     const value: RepoXmlPageContextType = {
-        currentStep, fetchStatus, repoUrlEntered, filesFetched, primaryHighlightedPath,
-        secondaryHighlightedPaths, selectedFetcherFiles, kworkInputHasContent, requestCopied,
+        currentStep, fetchStatus, repoUrlEntered, filesFetched, allFetchedFiles, // Added allFetchedFiles
+        primaryHighlightedPath, secondaryHighlightedPaths, selectedFetcherFiles, kworkInputHasContent, requestCopied,
         aiResponseHasContent, filesParsed, selectedAssistantFiles, assistantLoading, aiActionLoading,
         loadingPrs, openPrs, targetBranchName, manualBranchName, isSettingsModalOpen, currentAiRequestId, isParsing,
+        imageReplaceTask, // Added imageReplaceTask
         fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef, prSectionRef,
         setFetchStatus: setFetchStatusCallback, setRepoUrlEntered: setRepoUrlEnteredCallback,
-        setFilesFetched: setFilesFetchedCallback, setSelectedFetcherFiles: setSelectedFetcherFilesCallback,
+        setFilesFetched: setFilesFetchedCallback, // Updated setter
+        setAllFetchedFiles: setAllFetchedFilesCallback, // Added setter
+        setSelectedFetcherFiles: setSelectedFetcherFilesCallback,
         setKworkInputHasContent: setKworkInputHasContentCallback, setRequestCopied: setRequestCopiedCallback,
         setAiResponseHasContent: setAiResponseHasContentCallback, setFilesParsed: setFilesParsedCallback,
         setSelectedAssistantFiles: setSelectedAssistantFilesCallback, setAssistantLoading: setAssistantLoadingCallback,
         setAiActionLoading: setAiActionLoadingCallback,
-        setTargetBranchName: setTargetBranchNameFromPr, // Corrected setter name for clarity
+        setTargetBranchName: setTargetBranchNameFromPr, // Keep clarity
         setManualBranchName: setManualBranchNameInput,
         setOpenPrs: setOpenPrsCallback, setLoadingPrs: setLoadingPrsCallback,
         setIsSettingsModalOpen: setIsSettingsModalOpenCallback,
         setCurrentAiRequestId: setCurrentAiRequestIdCallback,
         setIsParsing: setIsParsingCallback,
+        setImageReplaceTask: setImageReplaceTaskCallback, // Added setter
         triggerFetch, triggerGetOpenPRs, triggerSelectHighlighted, triggerAddSelectedToKwork,
-        triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreatePR,
+        triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed,
+        triggerCreateOrUpdatePR: triggerCreatePR, // Keep alias for clarity
         triggerUpdateBranch, triggerToggleSettingsModal, scrollToSection,
         getXuinityMessage, updateRepoUrlInAssistant,
     };
