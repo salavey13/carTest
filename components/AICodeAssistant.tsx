@@ -23,7 +23,7 @@ import { CodeRestorer } from './assistant_components/CodeRestorer';
 // UI & Utils
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
-import { FaCircleInfo, FaCodeBranch, FaGithub, FaWandMagicSparkles, FaArrowsRotate, FaImage } from "react-icons/fa6";
+import { FaCircleInfo, FaCodeBranch, FaGithub, FaWandMagicSparkles, FaArrowsRotate, FaImage, FaImages } from "react-icons/fa6"; // Added FaImages
 import clsx from "clsx";
 import { saveAs } from "file-saver";
 import { logger } from "@/lib/logger"; // Import logger
@@ -63,7 +63,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         aiResponseInputRef,
         setAiResponseHasContent,
         setFilesParsed,
-        filesParsed,
         setSelectedAssistantFiles,
         setAssistantLoading,
         assistantLoading,
@@ -72,14 +71,15 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         openPrs: contextOpenPrs,
         targetBranchName,
         triggerToggleSettingsModal,
-        triggerUpdateBranch,
-        triggerCreateOrUpdatePR, 
+        triggerUpdateBranch, // Keep triggerUpdateBranch for direct calls if needed
+        triggerCreateOrUpdatePR, // Get the context trigger for normal PRs
         updateRepoUrlInAssistant,
         loadingPrs,
         setIsParsing: setContextIsParsing, // Use context setter alias
         isParsing: contextIsParsing, // Use context state alias
         allFetchedFiles, // Get raw fetched files from context
-        imageReplaceTask, // Get image replace task from context
+        imageReplaceTask, // <<< --- Get image replace task from context --- >>>
+        setImageReplaceTask, // <<< --- Get setter to clear the task --- >>>
     } = useRepoXmlPageContext();
 
     // --- State ---
@@ -131,6 +131,11 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     // --- Handlers ---
     const handleParse = useCallback(async () => {
+        // Don't parse if it's an image replacement task
+        if (imageReplaceTask) {
+             toast.warn("Разбор ответа не требуется для замены картинки.");
+             return;
+        }
         setContextIsParsing(true); setOriginalRepoFiles([]);
         try {
             const { files: newlyParsedFiles, description: parsedRawDescription } = await parseAndValidateResponse(response);
@@ -138,7 +143,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             if (newlyParsedFiles.length > 0) { setPrTitle(extractPRTitleHint(parsedRawDescription || response)); } else { setPrTitle(''); }
         } catch (error) { logger.error("Error during parseAndValidateResponse:", error); toast.error("Ошибка разбора ответа AI."); setFilesParsed(false); setHookParsedFiles([]); setSelectedFileIds(new Set()); setSelectedAssistantFiles(new Set()); setValidationStatus('error'); setValidationIssues([{type: 'parseError', message: 'Ошибка парсинга ответа.', fixable: false, restorable: false, id:'parse_error', fileId: 'general', filePath: 'N/A'}]); }
         finally { setContextIsParsing(false); }
-    }, [response, parseAndValidateResponse, setFilesParsed, setSelectedAssistantFiles, setContextIsParsing, setValidationStatus, setValidationIssues, setHookParsedFiles]);
+    }, [response, parseAndValidateResponse, setFilesParsed, setSelectedAssistantFiles, setContextIsParsing, setValidationStatus, setValidationIssues, setHookParsedFiles, imageReplaceTask]); // Added imageReplaceTask check
 
     const handleAutoFix = useCallback(() => { autoFixIssues(componentParsedFiles, validationIssues); }, [autoFixIssues, componentParsedFiles, validationIssues]);
 
@@ -182,8 +187,13 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     const handleAddCustomLink = useCallback(async () => { const name = prompt("Название ссылки:"); if (!name) return; const url = prompt("URL (начиная с https://):"); if (!url || !url.startsWith('http')) { toast.error("Некорректный URL."); return; } const newLink = { name: name, url: url }; const updatedLinks = [...customLinks, newLink]; setCustomLinks(updatedLinks); if (user) { try { const { data: existingData } = await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id).single(); await supabaseAdmin.from("users").upsert({ user_id: user.id, metadata: { ...(existingData?.metadata || {}), customLinks: updatedLinks } }, { onConflict: 'user_id' }); toast.success(`Ссылка "${name}" добавлена.`); } catch (e) { toast.error("Ошибка сохранения ссылки."); logger.error("Save custom link error:", e); setCustomLinks(customLinks); } } }, [customLinks, user]);
 
-    // --- MODIFIED: Combined PR/Update Handler ---
+    // --- Combined PR/Update Handler (For Regular AI Flow) ---
     const handleCreateOrUpdatePR = useCallback(async (): Promise<void> => {
+         // <<< --- Add check to prevent running during image replace --- >>>
+         if (imageReplaceTask) {
+             toast.warn("Действие недоступно во время замены картинки.");
+             return;
+         }
         // Only use PARSED files for regular PR/Update
         const selectedFilesContent = componentParsedFiles.filter(f => selectedFileIds.has(f.id));
         if (!repoUrl || selectedFilesContent.length === 0 || !prTitle) {
@@ -206,8 +216,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             if (targetBranchName) {
                 // Update Existing Branch
                 toast.info(`Обновление ветки '${targetBranchName}'...`);
-                const result = await triggerUpdateBranch(repoUrl, filesToCommit, fullCommitMessage, targetBranchName);
-                // Toasts handled by context triggerUpdateBranch
+                // Use context trigger which calls the action and handles toast
+                await triggerUpdateBranch(repoUrl, filesToCommit, fullCommitMessage, targetBranchName);
             } else {
                 // Create New Pull Request (Use context trigger which calls the action)
                 toast.info(`Создание нового PR...`);
@@ -216,10 +226,10 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         } catch (err) {
             toast.error(`Критическая ошибка при ${targetBranchName ? 'обновлении ветки' : 'создании PR'}.`); logger.error("PR/Update critical error:", err);
         } finally { setIsProcessingPR(false); setAssistantLoading(false); }
-    }, [ componentParsedFiles, selectedFileIds, repoUrl, prTitle, rawDescription, validationIssues, targetBranchName, triggerUpdateBranch, setAssistantLoading, user, triggerCreateOrUpdatePR ]); 
+    }, [ componentParsedFiles, selectedFileIds, repoUrl, prTitle, rawDescription, validationIssues, targetBranchName, triggerUpdateBranch, setAssistantLoading, user, triggerCreateOrUpdatePR, imageReplaceTask ]); // Added imageReplaceTask
 
 
-    // --- NEW: Direct Image Replacement Handler ---
+    // --- Direct Image Replacement Handler ---
     const handleDirectImageReplace = useCallback(async (task: ImageReplaceTask): Promise<void> => {
         console.log("AICodeAssistant: handleDirectImageReplace called with task:", task);
         setIsProcessingPR(true); setAssistantLoading(true); // Indicate processing
@@ -231,9 +241,9 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
             // 2. Perform replacement
             let currentContent = targetFile.content;
-            if (!currentContent.includes(task.oldUrl)) { toast.warn(`Старый URL картинки не найден в файле ${task.targetPath}. Изменений не будет.`); setIsProcessingPR(false); setAssistantLoading(false); return; }
+            if (!currentContent.includes(task.oldUrl)) { toast.warn(`Старый URL картинки не найден в файле ${task.targetPath}. Изменений не будет.`); setIsProcessingPR(false); setAssistantLoading(false); setImageReplaceTask(null); return; } // <<< Clear task here too
             const modifiedContent = currentContent.replaceAll(task.oldUrl, task.newUrl);
-            if (modifiedContent === currentContent) { toast.info(`Контент файла ${task.targetPath} не изменился после замены.`); setIsProcessingPR(false); setAssistantLoading(false); return; }
+            if (modifiedContent === currentContent) { toast.info(`Контент файла ${task.targetPath} не изменился после замены.`); setIsProcessingPR(false); setAssistantLoading(false); setImageReplaceTask(null); return; } // <<< Clear task here too
 
             console.log(`Performing replacement in ${task.targetPath}. Old URL length: ${task.oldUrl.length}, New URL length: ${task.newUrl.length}`);
 
@@ -242,27 +252,32 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             const commitTitle = `chore: Update image in ${task.targetPath}`;
             const commitBody = `Replaced image via SuperVibe Studio.\n\nOld: ${task.oldUrl}\nNew: ${task.newUrl}`;
             const fullCommitMessage = `${commitTitle}\n\n${commitBody}`;
-            const prTitle = commitTitle;
+            const prTitle = commitTitle; // Use commit title for PR title
             const prDescription = commitBody;
 
-            // 4. Call GitHub action (Update branch or Create PR)
+            // 4. Call GitHub action DIRECTLY (Update branch or Create PR)
             if (targetBranchName) {
                 toast.info(`Обновление ветки '${targetBranchName}' (замена картинки)...`);
-                const result = await triggerUpdateBranch(repoUrl, filesToCommit, fullCommitMessage, targetBranchName); // Use context trigger
+                // Call action directly, not context trigger
+                const result = await updateBranch(repoUrl, filesToCommit, fullCommitMessage, targetBranchName);
                 if (result.success) toast.success(`Ветка '${targetBranchName}' обновлена (картинка)!`);
                 else toast.error(`Ошибка обновления ветки '${targetBranchName}': ${result.error}`);
             } else {
                 toast.info(`Создание нового PR (замена картинки)...`);
-                 // Call the original action directly as triggerCreateOrUpdatePR is for parsed files
+                 // Call the original action directly
                  const result = await createGitHubPullRequest(repoUrl, filesToCommit, prTitle, prDescription, fullCommitMessage);
                  if (result.success && result.prUrl) { toast.success(`PR для замены картинки создан: ${result.prUrl}`); await notifyAdmin(`🖼️ PR для замены картинки в ${task.targetPath} создан ${user?.username || user?.id}: ${result.prUrl}`); }
                  else { toast.error("Ошибка создания PR: " + (result.error || "Неизвестная ошибка")); logger.error("PR Creation Failed (Image Replace):", result.error); }
             }
         } catch (err: any) {
             toast.error(`Ошибка при замене картинки: ${err.message}`); logger.error("handleDirectImageReplace error:", err);
-        } finally { setIsProcessingPR(false); setAssistantLoading(false); }
+        } finally {
+            setIsProcessingPR(false);
+            setAssistantLoading(false);
+            setImageReplaceTask(null); // <<< --- Clear the task upon completion/failure --- >>>
+        }
 
-    }, [ allFetchedFiles, targetBranchName, triggerUpdateBranch, repoUrl, notifyAdmin, user, setAssistantLoading ]); // Added dependencies
+    }, [ allFetchedFiles, targetBranchName, repoUrl, notifyAdmin, user, setAssistantLoading, setImageReplaceTask ]); // Added dependencies
 
 
     // --- Response Setting and URL Update Callbacks ---
@@ -284,19 +299,20 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     // --- RENDER ---
     const isProcessingAny = assistantLoading || aiActionLoading || contextIsParsing || isProcessingPR || isFetchingOriginals || loadingPrs;
-    const canSubmitPR = !isProcessingAny && filesParsed && selectedFileIds.size > 0 && !!prTitle && !!repoUrl; // Ensure files are PARSED for normal PR
+    const canSubmitRegularPR = !isProcessingAny && filesParsed && selectedFileIds.size > 0 && !!prTitle && !!repoUrl;
     const prButtonText = targetBranchName ? `Обновить Ветку (${targetBranchName.substring(0, 15)}...)` : "Создать PR";
     const prButtonIcon = targetBranchName ? <FaCodeBranch /> : <FaGithub />;
     const prButtonLoadingIcon = isProcessingPR ? <FaArrowsRotate className="animate-spin"/> : prButtonIcon;
     const assistantTooltipText = `Вставьте ответ AI ИЛИ используйте кнопку 'Спросить AI'. Затем '➡️' → Проверьте/Исправьте → Выберите файлы → ${prButtonText}`;
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
-    const commonDisabled = isProcessingAny;
+    const commonDisabled = isProcessingAny || !!imageReplaceTask; // Disable most things during image replace too
     const parseButtonDisabled = commonDisabled || isWaitingForAiResponse || !response.trim();
     const fixButtonDisabled = commonDisabled || isWaitingForAiResponse;
-    const submitButtonDisabled = !canSubmitPR || isProcessingPR || imageReplaceTask != null; // Disable PR button during image replace flow
+    // *** MODIFIED: Disable regular PR button if it's an image replace task ***
+    const submitButtonDisabled = !canSubmitRegularPR || isProcessingPR || !!imageReplaceTask;
 
-    // Hide regular assistant elements if image replacement task is active and files are fetched
-    const showAssistantUI = !imageReplaceTask || fetchStatus !== 'success';
+    // *** MODIFIED: Conditionally render UI vs Image Replace message ***
+    const showStandardAssistantUI = !imageReplaceTask;
 
     return (
         <div id="executor" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
@@ -304,7 +320,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
              <header className="flex justify-between items-center gap-2">
                  <div className="flex items-center gap-2">
                      <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse">AI Code Assistant</h1>
-                     {showAssistantUI && ( // Only show tooltip if UI is visible
+                     {/* Only show tooltip if standard UI is visible */}
+                     {showStandardAssistantUI && (
                          <Tooltip text={assistantTooltipText} position="left">
                              <FaCircleInfo className="text-blue-400 cursor-help hover:text-blue-300 transition" />
                          </Tooltip>
@@ -316,7 +333,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
              </header>
 
             {/* Conditionally render standard UI vs Image Replace message */}
-            {showAssistantUI ? (
+            {showStandardAssistantUI ? (
                  <>
                      {/* AI Response Input Area */}
                       <div>
@@ -387,14 +404,14 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                           repoUrl={repoUrl}
                           prTitle={prTitle}
                           selectedFileCount={selectedFileIds.size}
-                          isLoading={isProcessingPR}
+                          isLoading={isProcessingPR} // Use specific PR processing state
                           isLoadingPrList={loadingPrs}
                           onRepoUrlChange={(url) => { setRepoUrlState(url); updateRepoUrlInAssistant(url); }}
                           onPrTitleChange={setPrTitle}
                           onCreatePR={handleCreateOrUpdatePR} // Use combined handler
                           buttonText={prButtonText}
                           buttonIcon={prButtonLoadingIcon}
-                          isSubmitDisabled={submitButtonDisabled}
+                          isSubmitDisabled={submitButtonDisabled} // Use updated disabled logic
                      />
 
                      {/* Open PR List */}
@@ -417,10 +434,19 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             ) : (
                  // Message shown during image replacement processing
                  <div className="flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed border-blue-400 min-h-[200px]">
-                     <FaArrowsRotate className="text-blue-400 text-4xl mb-4 animate-spin" />
-                     <p className="text-lg font-semibold text-blue-300">Заменяю картинку в файле...</p>
-                     <p className="text-sm text-gray-400 mt-2">Создаю коммит и Pull Request. Это может занять несколько секунд.</p>
-                     {imageReplaceTask && <p className="text-xs text-gray-500 mt-3">Файл: {imageReplaceTask.targetPath}</p>}
+                     {/* Use assistantLoading to show spinner */}
+                     {assistantLoading ? (
+                        <FaArrowsRotate className="text-blue-400 text-4xl mb-4 animate-spin" />
+                     ) : (
+                         <FaImages className="text-blue-400 text-4xl mb-4" /> // Static icon if done/failed?
+                     )}
+                     <p className="text-lg font-semibold text-blue-300">
+                         {assistantLoading ? "Заменяю картинку..." : "Задача замены картинки"}
+                     </p>
+                     <p className="text-sm text-gray-400 mt-2">
+                          {assistantLoading ? "Создаю коммит и Pull Request. Это может занять несколько секунд." : "Процесс завершен или ожидает запуска."}
+                     </p>
+                     {imageReplaceTask && <p className="text-xs text-gray-500 mt-3 break-all">Файл: {imageReplaceTask.targetPath}<br/>Старый URL: {imageReplaceTask.oldUrl.substring(0,50)}...<br/>Новый URL: {imageReplaceTask.newUrl.substring(0,50)}...</p>}
                  </div>
             )}
 

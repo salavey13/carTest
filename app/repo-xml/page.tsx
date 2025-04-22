@@ -5,7 +5,7 @@
     import RepoTxtFetcher from "@/components/RepoTxtFetcher";
     import AICodeAssistant from "@/components/AICodeAssistant";
     import AutomationBuddy from "@/components/AutomationBuddy";
-    import { 
+    import {
 useRepoXmlPageContext,
 RepoXmlPageProvider, RepoTxtFetcherRef, AICodeAssistantRef, ImageReplaceTask } from '@/contexts/RepoXmlPageContext'; // Import ImageReplaceTask
     import { useAppContext } from "@/contexts/AppContext";
@@ -155,6 +155,7 @@ RepoXmlPageProvider, RepoTxtFetcherRef, AICodeAssistantRef, ImageReplaceTask } f
                             const task: ImageReplaceTask = { targetPath: decodedPath, oldUrl, newUrl };
                             console.log("[RepoXmlPage] Setting image replace task in context:", task);
                             setImageReplaceTask(task); // Set the task in context
+                             // DO NOT populate kworkInputRef here
                         } else {
                              console.error("[RepoXmlPage] Invalid image replace task data:", { decodedPath, oldUrl, newUrl });
                              setImageReplaceTask(null); // Clear any previous task
@@ -168,24 +169,30 @@ RepoXmlPageProvider, RepoTxtFetcherRef, AICodeAssistantRef, ImageReplaceTask } f
                     setImageReplaceTask(null); // Clear any previous task
                 }
             } else {
-                 // It's a regular idea, handle it as before (e.g., populate kwork input)
-                 debugLogger.log("[RepoXmlPage] Regular 'path' and 'idea' params found. Auto-showing components.");
+                 // --- It's a regular idea ---
+                 debugLogger.log("[RepoXmlPage] Regular 'path' and 'idea' params found.");
+                 setImageReplaceTask(null); // Ensure image task is cleared
+                 // Populate kwork input
                  if (kworkInputRef.current) {
                       kworkInputRef.current.value = decodedIdea;
                       // Optionally trigger input event if needed
                       const event = new Event('input', { bubbles: true });
                       kworkInputRef.current.dispatchEvent(event);
                       console.log("[RepoXmlPage] Populated kwork input with idea from URL.");
+                 } else {
+                     console.warn("[RepoXmlPage] kworkInputRef is null when trying to populate idea from URL.");
                  }
-                 setImageReplaceTask(null); // Ensure image task is cleared
             }
 
-            // Auto-show components regardless of idea type if path and idea are present
+            // Auto-show components (fetcher + assistant container) if path and idea/task are present
+            // The assistant itself will decide whether to show its full UI or a message
             setShowComponents(true);
+            console.log("[RepoXmlPage] Auto-showing components due to URL params.");
 
         } else {
              // No path/idea params, clear any potential image task
              setImageReplaceTask(null);
+             console.log("[RepoXmlPage] No path/idea params found in URL.");
         }
         // --- End MODIFICATION ---
 
@@ -340,7 +347,7 @@ RepoXmlPageProvider, RepoTxtFetcherRef, AICodeAssistantRef, ImageReplaceTask } f
     // Export the main component wrapped in Suspense for useSearchParams
     export default function RepoXmlPage() {
         return (
-            <Suspense fallback={<div className="flex justify-center items-center min-h-screen pt-20 bg-gradient-to-br from-gray-900 via-black to-gray-800"><p className="text-brand-green animate-pulse text-xl font-mono">Loading SUPERVIBE...</p></div>}>
+            <Suspense fallback={<div className="flex justify-center items-center min-h-screen pt-20 bg-gradient-to-br from-gray-900 via-black to-gray-800"><p className="text-brand-green animate-pulse text-xl font-mono">Загрузка SUPERVIBE...</p></div>}>
                 <RepoXmlPageContent />
             </Suspense>
         );

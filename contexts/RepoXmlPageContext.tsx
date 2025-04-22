@@ -58,7 +58,7 @@ export type WorkflowStep =
   | 'fetching'
   | 'fetch_failed'
   | 'files_fetched' // General files fetched state
-  | 'files_fetched_image_replace' // Specific state when files fetched for image replace task
+  | 'files_fetched_image_replace' // <<< --- NEW STEP --- >>> Specific state when files fetched for image replace task
   | 'files_fetched_highlights'
   | 'files_selected'
   | 'request_written'
@@ -302,22 +302,25 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
     }, [user?.id, assistantRef]); // Removed aiResponseHasContentState dependency
 
 
-    // Derive current workflow step based on state
+    // Derive current workflow step based on state (MODIFIED for Image Replace)
     const getCurrentStep = useCallback((): WorkflowStep => {
         // Loading states take precedence
         if (fetchStatus === 'loading' || fetchStatus === 'retrying') return 'fetching';
         if (fetchStatus === 'failed_retries') return 'fetch_failed';
         if (aiActionLoading && currentAiRequestId) return 'generating_ai_response';
         if (isParsing) return 'parsing_response';
-        if (assistantLoading && (filesParsed || imageReplaceTask)) return 'pr_ready'; // Loading for PR/Update (including image replace)
+        // *** MODIFIED: Check assistantLoading condition ***
+        // Assistant is loading EITHER for parsing/regular PR OR for image replace PR
+        if (assistantLoading) return 'pr_ready';
 
         // Check progress states
         if (!repoUrlEntered) return 'need_repo_url';
         if (!filesFetched) return 'ready_to_fetch';
 
-        // Specific state for image replace after fetch, before PR
+        // *** NEW: Specific state for image replace after fetch, before PR is triggered ***
         if (imageReplaceTask && filesFetched) return 'files_fetched_image_replace';
 
+        // Regular AI flow states
         if (aiResponseHasContent) {
             if (!filesParsed) return 'response_pasted'; // Got response, needs parsing
             if (selectedAssistantFiles.size > 0) return 'pr_ready'; // Parsed, files selected for PR/Update
@@ -354,29 +357,38 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
         setPrimaryHighlightedPathState(primaryPath);
         setSecondaryHighlightedPathsState(secondaryPaths);
 
-        if (fetched && imageReplaceTask && assistantRef.current) {
-            console.log("[Context:setFilesFetched] Files fetched, triggering direct image replacement for:", imageReplaceTask);
-            setTimeout(() => {
-                if (assistantRef.current) {
-                    assistantRef.current.handleDirectImageReplace(imageReplaceTask)
-                        .then(() => {
-                            setImageReplaceTaskState(null); // Clear task after attempt
-                            console.log("[Context:setFilesFetched] Direct image replacement trigger finished.");
-                            // Optionally set assistant loading false here if needed, or let handleDirectImageReplace do it
-                        })
-                        .catch(err => {
-                            console.error("[Context:setFilesFetched] Error triggering direct image replacement:", err);
-                            toast.error("Ошибка запуска авто-замены картинки.");
-                            setImageReplaceTaskState(null); // Clear task on error
-                        });
-                } else {
-                    console.warn("[Context:setFilesFetched] Assistant ref not ready when trying to trigger replacement.");
-                    toast.error("Ошибка: Компонент ассистента не готов для авто-замены.");
-                    setImageReplaceTaskState(null); // Clear task if ref is missing
-                }
-            }, 200); // Increased delay slightly
-        } else if (!fetched) {
-            // Reset logic
+        if (fetched) {
+            // Trigger Image Replace *immediately* after files are available
+            if (imageReplaceTaskState && assistantRef.current) { // Use imageReplaceTaskState getter
+                console.log("[Context:setFilesFetched] Files fetched, triggering direct image replacement for:", imageReplaceTaskState);
+                setAssistantLoadingState(true); // Set loading *before* calling
+                // Use setTimeout to allow state update and component re-render before calling ref method
+                setTimeout(() => {
+                    if (assistantRef.current) {
+                        assistantRef.current.handleDirectImageReplace(imageReplaceTaskState) // Pass the task
+                            .then(() => {
+                                console.log("[Context:setFilesFetched] Direct image replacement process finished/triggered.");
+                                // Let handleDirectImageReplace handle clearing task and loading state
+                            })
+                            .catch(err => {
+                                console.error("[Context:setFilesFetched] Error triggering/running direct image replacement:", err);
+                                toast.error("Ошибка авто-замены картинки.");
+                                setImageReplaceTaskState(null); // Clear task on error
+                                setAssistantLoadingState(false); // Reset loading on error
+                            });
+                    } else {
+                        console.warn("[Context:setFilesFetched] Assistant ref not ready when trying to trigger replacement.");
+                        toast.error("Ошибка: Компонент ассистента не готов для авто-замены.");
+                        setImageReplaceTaskState(null); // Clear task if ref is missing
+                        setAssistantLoadingState(false); // Reset loading
+                    }
+                }, 50); // Short delay
+            } else {
+                 // Normal fetch success (not image replace)
+                 setFetchStatusState('success');
+            }
+        } else {
+            // Reset logic when un-fetching
             setAllFetchedFilesState([]); // Clear fetched files
             setSelectedFetcherFilesState(new Set());
             setKworkInputHasContentState(false);
@@ -388,11 +400,10 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
             setIsParsingState(false);
             setCurrentAiRequestIdState(null);
             setImageReplaceTaskState(null); // Also clear task if fetch is reset
+            setFetchStatusState('idle'); // Reset status
             if (assistantRef.current) assistantRef.current.setResponseValue("");
-        } else {
-            setFetchStatusState('success'); // Mark as success if files were fetched (and not image replace task)
         }
-    }, [assistantRef, imageReplaceTask]); // Added dependencies
+    }, [assistantRef, imageReplaceTaskState]); // Dependency on the state getter
 
     const setAllFetchedFilesCallback = useCallback((files: FileNode[]) => setAllFetchedFilesState(files), []); // NEW Setter
     const setSelectedFetcherFilesCallback = useCallback((files: Set<string>) => setSelectedFetcherFilesState(files), []);
@@ -494,49 +505,59 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
         if (assistantRef.current) assistantRef.current.selectAllParsedFiles(); else console.warn("triggerSelectAllParsed: assistantRef not ready.");
     }, [assistantRef]);
 
-    const triggerCreateOrUpdatePR = useCallback(async () => { // Renamed trigger
-        if (assistantRef.current) await assistantRef.current.handleCreatePR(); // Points to the combined function
+    // MODIFIED: This now strictly points to the AICodeAssistant's combined handler
+    const triggerCreateOrUpdatePR = useCallback(async () => {
+        if (imageReplaceTaskState) {
+            toast.warn("Действие недоступно во время замены картинки.");
+            console.warn("triggerCreateOrUpdatePR called while imageReplaceTask is active. Aborting.");
+            return;
+        }
+        if (assistantRef.current) await assistantRef.current.handleCreatePR(); // Points to the combined function in Assistant
         else console.warn("triggerCreateOrUpdatePR: assistantRef not ready.");
-    }, [assistantRef]);
+    }, [assistantRef, imageReplaceTaskState]); // Added imageReplaceTaskState dependency
 
+    // This remains for potential direct use but is generally wrapped by triggerCreateOrUpdatePR now
     const triggerUpdateBranch = useCallback(async (repoUrl: string, files: { path: string; content: string }[], commitMessage: string, branchName: string): Promise<ReturnType<typeof updateBranch>> => {
         setAssistantLoadingState(true); try { console.log(`Context triggerUpdateBranch: Calling action for branch '${branchName}'`); const result = await updateBranch(repoUrl, files, commitMessage, branchName); if(result.success) { toast.success(`Ветка '${branchName}' успешно обновлена!`); } else { toast.error(`Ошибка обновления ветки '${branchName}': ${result.error}`); } return result; } catch (error) { toast.error(`Критическая ошибка обновления ветки '${branchName}'.`); console.error("triggerUpdateBranch error:", error); return { success: false, error: error instanceof Error ? error.message : "Client-side error." }; } finally { setAssistantLoadingState(false); }
     }, []);
 
     const triggerToggleSettingsModal = useCallback(() => setIsSettingsModalOpenState(prev => !prev), []);
 
-    // --- Realtime Subscription Logic ---
+    // --- Realtime Subscription Logic (No changes needed here for this fix) ---
     useEffect(() => {
         let isMounted = true;
         if (!currentAiRequestId || !supabaseAnon) { if (realtimeChannelRef.current) { console.log(`[RT Cleanup] No request ID or Supabase client. Removing channel: ${realtimeChannelRef.current.topic}`); supabaseAnon?.removeChannel(realtimeChannelRef.current).catch(e => console.error("[RT Cleanup] Error removing channel:", e)); realtimeChannelRef.current = null; } return () => { isMounted = false }; }
         const channelId = `ai-request-${currentAiRequestId}`; if (realtimeChannelRef.current?.topic === channelId) return () => { isMounted = false };
         if (realtimeChannelRef.current) { console.log(`[RT Switch] Removing old channel: ${realtimeChannelRef.current.topic}`); supabaseAnon.removeChannel(realtimeChannelRef.current).catch(e => console.error("[RT Switch] Error removing old channel:", e)); }
         console.log(`[RT Setup] Attempting to subscribe to ${channelId}`);
-        const channel = supabaseAnon.channel(channelId).on<AiRequestRecord>('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'ai_requests', filter: `id=eq.${currentAiRequestId}` }, (payload) => { if (!isMounted) return; console.log('[RT Received] AI Request Updated:', payload.new); const updatedRecord = payload.new; if (updatedRecord.id !== currentAiRequestId) { console.log(`[RT Mismatch] Update for ${updatedRecord.id}, but monitoring ${currentAiRequestIdState}. Ignoring.`); return; } // Use state getter here
+        const channel = supabaseAnon.channel(channelId).on<AiRequestRecord>('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'ai_requests', filter: `id=eq.${currentAiRequestId}` }, (payload) => { if (!isMounted) return; console.log('[RT Received] AI Request Updated:', payload.new); const updatedRecord = payload.new; if (updatedRecord.id !== currentAiRequestIdState) { console.log(`[RT Mismatch] Update for ${updatedRecord.id}, but monitoring ${currentAiRequestIdState}. Ignoring.`); return; } // Use state getter here
             if (updatedRecord.status === 'completed') { toast.success("🤖✨ Ответ от AI получен!"); if (assistantRef.current) { assistantRef.current.setResponseValue(updatedRecord.response || ""); } setAiResponseHasContentState(true); setAiActionLoadingState(false); setCurrentAiRequestIdState(null); setTimeout(() => { if (isMounted) { triggerParseResponse().catch(err => console.error("Error during auto-parsing:", err)); } }, 300); }
             else if (updatedRecord.status === 'failed') { const errorMsg = updatedRecord.error_message || 'Неизвестная ошибка AI'; toast.error(`❌ Ошибка AI: ${errorMsg}`); setAiActionLoadingState(false); setCurrentAiRequestIdState(null); }
-            else if (updatedRecord.status === 'processing') { toast.info("⏳ AI всё ещё думает...", { id: `ai-processing-${currentAiRequestId}`, duration: 5000 }); } // Use state getter here
-         }).subscribe((status, err) => { if (!isMounted) return; if (status === 'SUBSCRIBED') { console.log(`[RT Status] Successfully subscribed to ${channelId}`); } else if (['CHANNEL_ERROR', 'TIMED_OUT'].includes(status)) { console.error(`[RT Status] Subscription error for ${channelId}: ${status}`, err); toast.error("Ошибка Realtime подписки."); if (aiActionLoading) { setAiActionLoadingState(false); setCurrentAiRequestIdState(null); } } else if (status === 'CLOSED') { console.log(`[RT Status] Channel explicitly closed for ${channelId}`); if (aiActionLoading) { setAiActionLoadingState(false); setcurrentAiRequestId(null); } } });
+            else if (updatedRecord.status === 'processing') { toast.info("⏳ AI всё ещё думает...", { id: `ai-processing-${currentAiRequestIdState}`, duration: 5000 }); } // Use state getter here
+         }).subscribe((status, err) => { if (!isMounted) return; if (status === 'SUBSCRIBED') { console.log(`[RT Status] Successfully subscribed to ${channelId}`); } else if (['CHANNEL_ERROR', 'TIMED_OUT'].includes(status)) { console.error(`[RT Status] Subscription error for ${channelId}: ${status}`, err); toast.error("Ошибка Realtime подписки."); if (aiActionLoading) { setAiActionLoadingState(false); setCurrentAiRequestIdState(null); } } else if (status === 'CLOSED') { console.log(`[RT Status] Channel explicitly closed for ${channelId}`); if (aiActionLoading) { setAiActionLoadingState(false); setCurrentAiRequestIdState(null); } } });
         realtimeChannelRef.current = channel;
         return () => { isMounted = false; if (realtimeChannelRef.current && realtimeChannelRef.current.topic === channelId) { console.log(`[RT Cleanup] Removing channel: ${realtimeChannelRef.current.topic}`); supabaseAnon.removeChannel(realtimeChannelRef.current).catch(e => console.error("[RT Cleanup] Error removing channel:", e)); realtimeChannelRef.current = null; } };
-    }, [currentAiRequestId, assistantRef, triggerParseResponse, aiActionLoading]); // Use state getter dependency
+    }, [currentAiRequestIdState, assistantRef, triggerParseResponse, aiActionLoading]); // Use state getter dependency
 
 
-    // --- Xuinity Message Logic (Dynamic based on current state) ---
-    const getXuinityMessage = useCallback((): string => {
-        const effectiveBranch = targetBranchName;
-        const branchInfo = effectiveBranch ? ` (ветка: ${effectiveBranch})` : '';
+    // --- Xuinity Message Logic (MODIFIED for Image Replace) ---
+     const getXuinityMessage = useCallback((): string => {
+        const effectiveBranch = targetBranchName; // Use derived state
+        const branchInfo = effectiveBranch ? ` (ветка: ${effectiveBranch})` : ' (ветка по умолчанию)';
+        const settingsMention = "настройках"; // Moved common mention
+
         switch (currentStep) {
             case 'idle': return "Инициализация студии...";
-            case 'need_repo_url': return "👈 Укажи URL GitHub репозитория в настройках.";
-            case 'ready_to_fetch': return repoUrlEntered ? `Готов извлечь файлы${branchInfo}. Жми 'Fetch Files'! 🎣` : "Сначала укажи URL.";
+            case 'need_repo_url': return `👈 Укажи URL GitHub репозитория в ${settingsMention}.`;
+            case 'ready_to_fetch': return repoUrlEntered ? `Готов извлечь файлы${branchInfo}. Жми 'Извлечь файлы'! 🎣 Или загляни в ${settingsMention}.` : `Сначала укажи URL в ${settingsMention}.`;
             case 'fetching': return `Извлекаю файлы${branchInfo}... ${fetchStatus === 'retrying' ? '(Повтор...)' : ''} ⏳`;
             case 'fetch_failed': return `Ошибка извлечения${branchInfo}. 😭 Попробовать еще раз?`;
-            case 'files_fetched_image_replace': return `Файлы извлечены${branchInfo}! ✅ Готовлюсь к замене картинки... 🤖`; // NEW Message
-            case 'files_fetched': return `Файлы извлечены${branchInfo}! ✅ Выбери нужные ИЛИ опиши задачу ниже. 👇`;
-            case 'files_fetched_highlights': return `Файлы извлечены${branchInfo}. Есть связанные. 🤔 Выбери или опиши задачу.`;
-            case 'files_selected': return `Файлы выбраны${branchInfo}! 👍 Добавь в 'Твой Запрос' ИЛИ сразу жми '🤖 Спросить AI'!`;
-            case 'request_written': return aiActionLoading ? "Отправка запроса AI..." : "Запрос готов! 🔥 Жми '🤖 Спросить AI' ИЛИ скопируй для Grok.";
+            // *** NEW MESSAGE FOR IMAGE REPLACE STEP ***
+            case 'files_fetched_image_replace': return `Файлы извлечены${branchInfo}! ✅ Запускаю замену картинки и создание PR... 🤖🖼️`;
+            case 'files_fetched': return `Файлы извлечены${branchInfo}! ✅ Выбери нужные ИЛИ опиши задачу ниже. 👇 Или смени ветку в ${settingsMention}.`;
+            case 'files_fetched_highlights': return `Файлы извлечены${branchInfo}. Есть связанные. 🤔 Выбери или опиши задачу. Ветку можно сменить в ${settingsMention}.`;
+            case 'files_selected': return `Файлы выбраны${branchInfo}! 👍 Добавь в 'Твой Запрос' (+) ИЛИ сразу жми '🤖 Спросить AI'!`;
+            case 'request_written': return aiActionLoading && !currentAiRequestId ? "Отправка запроса AI в очередь..." : "Запрос готов! 🔥 Жми '🤖 Спросить AI' ИЛИ скопируй для Grok.";
             case 'generating_ai_response': return `Запрос #${currentAiRequestId?.substring(0, 6)}... улетел к AI. 🚀 Ожидаем магию... (Админ в курсе!) ✨`;
             case 'request_copied': return "Скопировано! 📋 Жду ответ от внешнего AI. Вставляй результат сюда. 👇";
             case 'response_pasted': return "Ответ AI получен! ✅ Нажми '➡️ Разобрать Ответ' для анализа.";
@@ -545,7 +566,7 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
             case 'pr_ready': return assistantLoading ? (effectiveBranch ? `Обновляю ветку '${effectiveBranch}'...` : "Создаю Pull Request...") : (effectiveBranch ? `Готов обновить ветку '${effectiveBranch}'? 🚀` : "Готов создать Pull Request? ✨");
             default: return "Что будем вайбить дальше?";
         }
-    }, [currentStep, repoUrlEntered, fetchStatus, assistantLoading, aiActionLoading, targetBranchName, isParsing, currentAiRequestId]); // Added imageReplaceTask dependency
+    }, [currentStep, repoUrlEntered, fetchStatus, assistantLoading, aiActionLoading, targetBranchName, isParsing, currentAiRequestId, imageReplaceTask]); // Added imageReplaceTask dependency
 
 
     // --- Callback for Repo URL update in Assistant ---
@@ -578,7 +599,7 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
         setImageReplaceTask: setImageReplaceTaskCallback, // Added setter
         triggerFetch, triggerGetOpenPRs, triggerSelectHighlighted, triggerAddSelectedToKwork,
         triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed,
-        triggerCreateOrUpdatePR,
+        triggerCreateOrUpdatePR, // Use renamed trigger
         triggerUpdateBranch, triggerToggleSettingsModal, scrollToSection,
         getXuinityMessage, updateRepoUrlInAssistant,
     };
