@@ -84,38 +84,8 @@ const AutomationBuddy: React.FC = () => {
 
     } = useRepoXmlPageContext();
 
-    // --- Get Welcoming Message (Updated for Image Replace) ---
-    const getXuinityMessage = useCallback((): string => {
-        const effectiveBranch = manualBranchName.trim() || targetBranchName;
-        const branchInfo = effectiveBranch ? ` (ветка: ${effectiveBranch})` : ' (ветка по умолчанию)';
-        const settingsMention = "настройках";
-
-        switch (currentStep) {
-          case 'idle': return `Йо! Готов(а) кодить в потоке? ✨ Начнем!`;
-          case 'need_repo_url': return `Давай начнем! Открой ${settingsMention}, чтобы указать ссылку на GitHub репо.`;
-          case 'ready_to_fetch': return repoUrlEntered ? `Репо есть! 👍 Жми "Извлечь файлы"${branchInfo} или загляни в ${settingsMention} для выбора ветки/PR.` : `Сначала укажи URL репо в ${settingsMention}.`;
-          case 'fetching': return `Минутку, получаю код из${branchInfo}... ⏳`;
-          case 'fetch_failed': return `Упс! 😬 Не смог получить файлы${branchInfo}. Проверь ссылку/токен/ветку в ${settingsMention} или попробуй снова?`;
-          case 'files_fetched_image_replace': return `Файл для замены картинки загружен${branchInfo}! 🖼️ Запускаю процесс создания PR...`; // NEW state message
-          case 'files_fetched': return `Код здесь! ✅ Выбери нужные файлы для AI или чекни ${settingsMention} для другой ветки.`;
-          case 'files_fetched_highlights': return `Есть связанные файлы! 😎 Выбери их или настрой контекст сам(а). Ветку можно сменить в ${settingsMention}.`;
-          case 'files_selected': return `Отлично, файлы выбраны${branchInfo}! Добавь их в запрос кнопкой (+) или сразу жми "🤖 Спросить AI"!`;
-          case 'request_written': return aiActionLoading && !currentAiRequestId ? "Отправка запроса в очередь..." : "Запрос готов! 🔥 Отправляй его AI (\"🤖 Спросить AI\") или скопируй.";
-          case 'generating_ai_response': return `Запрос ${currentAiRequestId ? `(${currentAiRequestId.substring(0,6)}...) ` : ''}в очереди. Ожидаю ответ AI... 🤖💭`;
-          case 'request_copied': return `Скопировано! ✅ Жду ответ от твоего AI. Вставляй его в Ассистента ниже.`;
-          case 'response_pasted': return `Ответ получен! 🤘 Нажми '➡️' рядом с полем ввода, чтобы я его разобрал.`;
-          case 'parsing_response': return `Анализирую ответ AI... 🧠 Почти готово!`;
-          case 'response_parsed': return `Разобрал! 💪 Проверь результат, выбери файлы и можно ${effectiveBranch ? `обновлять ветку '${effectiveBranch}'` : 'создавать PR'}!`;
-          case 'pr_ready': return assistantLoading
-                               ? (effectiveBranch ? `Обновляю ветку ${branchInfo}...` : "Создаю PR...")
-                               : (effectiveBranch ? `Готов(а) обновить ветку ${branchInfo}?` : "Готов(а) создать Pull Request?");
-          default: return "Что дальше? 😉";
-        }
-      }, [currentStep, repoUrlEntered, fetchStatus, assistantLoading, targetBranchName, manualBranchName, isParsing, aiActionLoading, currentAiRequestId]); // Removed imageReplaceTask dependency as it's handled within currentStep logic now
-
-
-    const activeMessage = useMemo(() => getXuinityMessage(), [getXuinityMessage]);
-
+    // --- Get Welcoming Message (Uses Context's getXuinityMessage) ---
+    const activeMessage = useMemo(() => getBaseMessage(), [getBaseMessage]);
 
     // --- Define Suggestions (Updated for Image Replace) ---
     const suggestions = useMemo((): Suggestion[] => {
@@ -131,25 +101,19 @@ const AutomationBuddy: React.FC = () => {
         // Helper to add suggestions with loading state check
         const addSuggestion = (id: string, text: string, action: () => any, icon: React.ReactNode, condition = true, disabled = false, tooltip = '') => {
             if (condition) {
-                let isDisabled = disabled;
-                 // Disable most actions during any loading, except specific ones
-                 if (isAnyLoading) {
-                   // Allow closing settings, retrying fetch, or scrolling
-                    if (id === 'retry-fetch' || (id === 'toggle-settings' && isSettingsModalOpen) || id.startsWith('goto-')) {
-                         isDisabled = false; // Keep enabled
-                   } else if (id === 'toggle-settings' && !isSettingsModalOpen && !isFetcherLoading && !isParsing && !aiActionLoading && !assistantLoading) {
-                       isDisabled = false; // Allow opening settings if not loading anything else
-                   }
-                    else {
-                         isDisabled = true; // Disable everything else
-                    }
-                 }
+                 // Apply general loading disable logic first
+                 let isDisabled = isAnyLoading && !['retry-fetch', 'toggle-settings-close', 'goto-'].some(prefix => id.startsWith(prefix));
+
+                 // Specific overrides or conditions
+                 if (id === 'toggle-settings-open' && !isAnyLoading) isDisabled = false;
+                 if (disabled) isDisabled = true; // Explicitly passed disabled prop overrides
+
                  suggestionsList.push({ id, text, action, icon, disabled: isDisabled, tooltip });
             }
         };
 
-        // --- Core Suggestions ---
-        addSuggestion( "toggle-settings", isSettingsModalOpen ? "Закрыть Настройки" : "Настройки (URL/Ветка/PR)", triggerToggleSettingsModal, <FaCodeBranch />, true );
+        const settingsButtonId = isSettingsModalOpen ? 'toggle-settings-close' : 'toggle-settings-open';
+        addSuggestion( settingsButtonId, isSettingsModalOpen ? "Закрыть Настройки" : "Настройки (URL/Ветка/PR)", triggerToggleSettingsModal, <FaCodeBranch />, true );
 
         // --- Suggestions based on Workflow Step ---
         switch (currentStep) {
@@ -162,9 +126,10 @@ const AutomationBuddy: React.FC = () => {
             case 'fetch_failed':
                 addSuggestion("retry-fetch", `Попробовать Снова${branchInfo}?`, () => triggerFetch(true, effectiveBranch || null), <FaArrowRotateRight />, true);
                 break;
-            case 'files_fetched_image_replace': // NEW State
-                 addSuggestion("loading-indicator-img", "Замена Картинки...", () => {}, <FaImages className="animate-pulse"/>, true, true );
-                 addSuggestion("goto-pr-form-img", "К Процессу PR", () => scrollToSection('prSection'), <FaRocket />);
+            // *** NEW: Suggestions for Image Replace Step ***
+            case 'files_fetched_image_replace':
+                 addSuggestion("loading-indicator-img", "Замена Картинки...", () => {}, <FaImages className="animate-pulse text-blue-400"/>, true, true );
+                 addSuggestion("goto-pr-form-img", "К Статусу Задачи", () => scrollToSection('executor'), <FaRocket />); // Scroll to assistant where msg is shown
                  break;
             case 'files_fetched':
                  addSuggestion("goto-files", "К Списку Файлов", () => scrollToSection('fetcher'), <FaEye />);
@@ -195,7 +160,7 @@ const AutomationBuddy: React.FC = () => {
                 addSuggestion("parse-response", "Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, aiResponseHasContent, !aiResponseHasContent, !aiResponseHasContent ? "Вставь ответ AI" : "");
                 break;
             case 'response_pasted':
-                 addSuggestion("parse-response", "➡️ Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, true, !aiResponseHasContent, !aiResponseHasContent ? "Нет ответа" : "");
+                 addSuggestion("parse-response", "➡️ Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, true, !aiResponseHasContent || !!imageReplaceTask, !aiResponseHasContent ? "Нет ответа" : (!!imageReplaceTask ? "Замена картинки" : "")); // Disable parse during img replace
                  addSuggestion("goto-ai-response", "К Полю Ответа", () => scrollToSection('aiResponseInput'), <FaKeyboard />);
                 break;
             case 'parsing_response':
@@ -203,22 +168,22 @@ const AutomationBuddy: React.FC = () => {
                  break;
             case 'response_parsed': // Fallthrough intended
             case 'pr_ready':
-                 // Show PR/Update button ONLY if not in image replace flow OR if image replace is finished (assistantLoading is false)
-                 if (!imageReplaceTask || (imageReplaceTask && !assistantLoading)) {
-                      addSuggestion("select-all-parsed", "Выбрать Все Файлы", triggerSelectAllParsed, <FaListCheck />, filesParsed);
-                      addSuggestion("goto-assistant-files", "К Файлам Ниже", () => scrollToSection('assistant'), <FaEye />);
-                      addSuggestion( effectiveBranch ? "update-branch" : "create-pr", createOrUpdateActionText, triggerCreateOrUpdatePR, createOrUpdateIcon, selectedAssistantFiles.size > 0, selectedAssistantFiles.size === 0, "Выбери файлы для коммита" );
-                      addSuggestion("goto-pr-form", "К Форме PR/Ветки", () => scrollToSection('prSection'), <FaRocket />);
-                 } else if (imageReplaceTask && assistantLoading) {
-                      // Show loading specifically for the image PR/update
-                      addSuggestion("loading-indicator-pr", effectiveBranch ? "Обновляю ветку..." : "Создаю PR...", () => {}, <FaArrowsRotate className="animate-spin"/>, true, true );
-                 }
+                // Show PR/Update button ONLY if NOT an image replace task OR if image replace is finished (assistantLoading is false)
+                if (!imageReplaceTask || (imageReplaceTask && !assistantLoading)) {
+                    addSuggestion("select-all-parsed", "Выбрать Все Файлы", triggerSelectAllParsed, <FaListCheck />, filesParsed && !imageReplaceTask); // Hide if image replace task was just done
+                    addSuggestion("goto-assistant-files", "К Файлам Ниже", () => scrollToSection('executor'), <FaEye />);
+                    addSuggestion( effectiveBranch ? "update-branch" : "create-pr", createOrUpdateActionText, triggerCreateOrUpdatePR, createOrUpdateIcon, selectedAssistantFiles.size > 0 && !imageReplaceTask, selectedAssistantFiles.size === 0 || !!imageReplaceTask, selectedAssistantFiles.size === 0 ? "Выбери файлы для коммита" : (!!imageReplaceTask ? "Замена картинки" : "") ); // Disable if image replace
+                    addSuggestion("goto-pr-form", "К Форме PR/Ветки", () => scrollToSection('prSection'), <FaRocket />);
+                } else if (imageReplaceTask && assistantLoading) {
+                    // Show loading specifically for the image PR/update
+                    addSuggestion("loading-indicator-pr", effectiveBranch ? "Обновляю ветку..." : "Создаю PR...", () => {}, <FaArrowsRotate className="animate-spin text-blue-400"/>, true, true );
+                }
                 break;
             default: break;
         }
 
         // --- Clear All Suggestion ---
-        // Hide Clear All during image replace flow after files are fetched
+        // Hide Clear All during image replace flow
          if (fetcherRef?.current?.clearAll && !imageReplaceTask && (selectedFetcherFiles.size > 0 || kworkInputHasContent || aiResponseHasContent)) {
              addSuggestion("clear-all", "Очистить Все?", fetcherRef.current.clearAll, <FaBroom/>, true);
          }
@@ -255,7 +220,7 @@ const AutomationBuddy: React.FC = () => {
     useEffect(() => { document.addEventListener('keydown',handleEscKey); return()=>{document.removeEventListener('keydown',handleEscKey);}; }, [handleEscKey]);
 
     // --- Event Handlers ---
-    const handleSuggestionClick = (suggestion: Suggestion) => { if(suggestion.disabled)return; console.log("Buddy Click:",suggestion.id); if(suggestion.action){ const r=suggestion.action(); if(!suggestion.id.startsWith('goto-')&&suggestion.id!=='loading-indicator'&&suggestion.id!=='toggle-settings'){setIsOpen(false);} else if(suggestion.id.startsWith('goto-')){setTimeout(()=>setIsOpen(false),300);} if(r instanceof Promise){r.catch(err=>{console.error(`Buddy action (${suggestion.id}) error:`, err); toast.error(`Действие "${suggestion.text}" не удалось.`);});} } else {setIsOpen(false);} };
+    const handleSuggestionClick = (suggestion: Suggestion) => { if(suggestion.disabled)return; console.log("Buddy Click:",suggestion.id); if(suggestion.action){ const r=suggestion.action(); if(!suggestion.id.startsWith('goto-')&&suggestion.id!=='loading-indicator'&&suggestion.id!=='toggle-settings-close'&& suggestion.id!=='toggle-settings-open'){setIsOpen(false);} else if(suggestion.id.startsWith('goto-')){setTimeout(()=>setIsOpen(false),300);} if(r instanceof Promise){r.catch(err=>{console.error(`Buddy action (${suggestion.id}) error:`, err); toast.error(`Действие "${suggestion.text}" не удалось.`);});} } else {setIsOpen(false);} };
     const handleOverlayClick = () => setIsOpen(false);
     const handleDialogClick = (e:React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
     const handleFabClick = () => { setIsOpen(!isOpen); if(!isOpen){setHasAutoOpened(true);setHasNewSuggestions(false);} };
