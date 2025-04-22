@@ -4,8 +4,9 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FaUpload, FaPaperPlane, FaSpinner } from 'react-icons/fa6';
 import { toast } from 'sonner';
-import { uploadImage } from '@/app/actions'; // Import the server action
-import { Input } from '@/components/ui/input'; // Assuming Shadcn Input
+// ИСПОЛЬЗУЕМ ЭКШЕН uploadBatchImages, КАК В МОДАЛКЕ
+import { uploadBatchImages } from '@/app/actions';
+import { Input } from '@/components/ui/input';
 
 // --- Helper Function ---
 // (Assume this is defined or imported from lib/utils)
@@ -51,14 +52,26 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
         setIsUploading(true);
         setUploadedUrl(null);
         toast.info("Загрузка картинки...");
+
+        // --- ИСПОЛЬЗУЕМ uploadBatchImages ---
+        const formData = new FormData();
+        // !!! ВАЖНО: Убедись, что бакет 'about' существует и публичен, или используй другой бакет !!!
+        const bucketName = "about";
+        formData.append("bucketName", bucketName);
+        formData.append("files", file); // Добавляем один файл
+
         try {
-            // IMPORTANT: Ensure the bucket name 'about' is correct or make it configurable
-            const result = await uploadImage("about", file);
-            if (result.success && result.publicUrl) {
-                setUploadedUrl(result.publicUrl);
+            const result = await uploadBatchImages(formData); // Вызываем Batch экшен
+
+            // Обрабатываем результат batch экшена (ожидаем один файл в ответе)
+            if (result.success && result.data && result.data.length > 0 && result.data[0].url) {
+                const uploadedUrlResult = result.data[0].url;
+                setUploadedUrl(uploadedUrlResult);
                 toast.success("Картинка загружена!");
             } else {
-                throw new Error(result.error || "Не удалось загрузить картинку.");
+                // Обработка ошибки из batch экшена
+                const errorMsg = result.error || result.failed?.[0]?.error || "Не удалось загрузить картинку.";
+                throw new Error(errorMsg);
             }
         } catch (error) {
             console.error("Upload failed:", error);
@@ -67,6 +80,7 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
         } finally {
             setIsUploading(false);
         }
+        // --- КОНЕЦ ИСПОЛЬЗОВАНИЯ uploadBatchImages ---
     };
 
     const handleConfirm = () => {
@@ -112,7 +126,7 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
                     disabled={isUploading}
                 />
                 <span className="text-xs text-gray-400">или</span>
-                <Input // Using Shadcn Input component
+                <Input
                     type="url"
                     value={newImageUrlInput}
                     onChange={(e) => {
@@ -121,7 +135,7 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
                         setUploadedUrl(null);
                     }}
                     placeholder="Вставьте новый URL..."
-                    className="flex-grow p-1.5 text-xs h-8 bg-gray-600 border-gray-500 placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-50 text-white" // Adjusted styling
+                    className="flex-grow p-1.5 text-xs h-8 bg-gray-600 border-gray-500 placeholder-gray-400 focus:border-blue-400 focus:ring-1 focus:ring-blue-400 disabled:opacity-50 text-white"
                     disabled={isUploading || !!uploadedFile}
                 />
             </div>
