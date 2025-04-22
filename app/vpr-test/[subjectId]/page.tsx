@@ -1,10 +1,9 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RotateCcw, Loader2, Zap, HelpCircle, Sparkles, Eye, EyeOff, Lock } from "lucide-react"; // Added icons
+import { RotateCcw, Loader2, Sparkles, Lock } from "lucide-react";
 
-
-import { supabaseAdmin } from "@/hooks/supabase"; // Used for deleting attempts on reset
+// Removed supabaseAdmin import from client
 import { useAppContext } from "@/contexts/AppContext";
 import { debugLogger } from "@/lib/debugLogger";
 import { useParams, useRouter } from 'next/navigation';
@@ -17,7 +16,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// Import VPR components (Restoring original paths from context)
+// Import VPR components (paths remain same)
 import { VprProgressIndicator } from "@/components/VprProgressIndicator";
 import { ExplanationDisplay } from "@/components/ExplanationDisplay";
 import { VprLoadingIndicator } from "@/components/vpr/VprLoadingIndicator";
@@ -30,20 +29,24 @@ import { VprAnswerList } from "@/components/vpr/VprAnswerList";
 import { VprTimeUpModal } from "@/components/vpr/VprTimeUpModal";
 
 import { toast } from "sonner";
-// Import specific actions needed (Restoring notifyAdmin, adding new dummy action)
-import { notifyAdmin } from "@/app/actions";
-import { purchaseDisableDummyMode } from "@/app/actions/dummy_actions";
+// Import Server Actions
+import {
+    startOrResumeVprAttempt,
+    recordVprAnswer,
+    updateVprAttemptProgress,
+    forceCompleteVprAttempt,
+    resetVprTest
+} from "@/app/actions/vprActions"; // Adjusted path
+import { purchaseDisableDummyMode } from "@/app/actions/dummy_actions"; // Keep this one
 
-// --- Interfaces --- (Restoring original definitions from context)
-interface SubjectData {
+// --- Interfaces (Can potentially be moved to a shared types file) ---
+export interface SubjectData { // Export if needed by actions, otherwise keep internal
     id: number;
     name: string;
     description?: string;
-    // Assuming grade_level might be needed based on schema, adding it back if relevant
-    grade_level?: number; // Make optional or ensure it's always fetched
+    grade_level?: number;
 }
-
-interface VprQuestionData {
+export interface VprQuestionData {
     id: number;
     subject_id: number;
     variant_number: number;
@@ -51,47 +54,46 @@ interface VprQuestionData {
     explanation?: string;
     position: number;
     vpr_answers: VprAnswerData[];
-    visual_data?: any | null; // Keep 'any' or define specific type
+    visual_data?: any | null;
 }
-
 export interface VprAnswerData {
     id: number;
     question_id: number;
     text: string;
     is_correct: boolean;
 }
-
-interface VprTestAttempt {
-    id: string;
+export interface VprTestAttempt {
+    id: string; // UUID typically
     user_id: string;
     subject_id: number;
     variant_number: number;
-    started_at: string;
-    completed_at?: string;
-    score?: number;
+    started_at: string; // ISO timestamp string
+    completed_at?: string | null; // ISO timestamp string or null
+    score?: number | null;
     total_questions: number;
     last_question_index: number;
-    // Add metadata field based on previous thought process
+    status?: string | null;
     metadata?: Record<string, any> | null;
+    created_at?: string;
+    updated_at?: string;
 }
 // --- End Interfaces ---
 
 export default function VprTestPage() {
     // --- States ---
-    // Using `user` from useAppContext as per context, rename dbUser usage to user
-    const { user, token, isLoading: isUserLoading } = useAppContext(); // Use `user`, get loading state
-
+    const { user, dbUser, isLoading: isUserLoading } = useAppContext(); // Removed token, no longer needed directly here
     const params = useParams();
     const router = useRouter();
-    const subjectId = parseInt(params.subjectId as string, 10);
+    const subjectIdParam = params.subjectId as string;
+    const [subjectId, setSubjectId] = useState<number | null>(null);
 
-    // .. (keep existing states from context, matching names)
+    // Component States (mostly UI related now)
     const [subject, setSubject] = useState<SubjectData | null>(null);
     const [questions, setQuestions] = useState<VprQuestionData[]>([]);
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [currentAttempt, setCurrentAttempt] = useState<VprTestAttempt | null>(null);
-    const [isLoading, setIsLoading] = useState(true); // General test loading
-    const [isSaving, setIsSaving] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false); // Still useful for disabling buttons during action calls
     const [error, setError] = useState<string | null>(null);
     const [selectedAnswerId, setSelectedAnswerId] = useState<number | null>(null);
     const [showFeedback, setShowFeedback] = useState(false);
@@ -102,618 +104,499 @@ export default function VprTestPage() {
     const [showDescription, setShowDescription] = useState(false);
     const [timerKey, setTimerKey] = useState(Date.now());
     const [isTimerRunning, setIsTimerRunning] = useState(false);
-    const [timeLimit] = useState(3600); // 1 hour
+    const [timeLimit] = useState(3600);
     const [timeUpModal, setTimeUpModal] = useState(false);
     const [isCurrentQuestionNonAnswerable, setIsCurrentQuestionNonAnswerable] = useState(false);
-    const [resetCounter, setResetCounter] = useState(0);
+    const [resetCounter, setResetCounter] = useState(0); // Still used to trigger re-initialization
     const [selectedVariant, setSelectedVariant] = useState<number | null>(null);
-
-    // --- NEW Dummy Mode States ---
     const [isDummyModeActive, setIsDummyModeActive] = useState(false);
     const [isPurchasingDisable, setIsPurchasingDisable] = useState(false);
 
-    // Check if dummy mode is permanently disabled using `user.metadata`
-    // Use optional chaining for safety during initial load
-    const isDummyModeGloballyDisabled = true // user?.metadata?.is_dummy_mode_disabled_by_parent === true;
-    // --- End Dummy Mode States ---
+    // Derived State
+    const isDummyModeGloballyDisabled = dbUser?.metadata?.is_dummy_mode_disabled_by_parent === true;
 
-    // --- Timer Functions --- (Restoring originals and adding dummy check)
+    // --- Parse subjectId safely ---
+    useEffect(() => {
+        const parsedId = parseInt(subjectIdParam, 10);
+        debugLogger.log(`Parsing subjectIdParam: ${subjectIdParam} -> ${parsedId}`);
+        if (!isNaN(parsedId)) {
+            // Only update if different to avoid unnecessary re-renders
+            if (subjectId !== parsedId) {
+                setSubjectId(parsedId);
+                // Reset error ONLY if it was specifically the URL error
+                if (error === "Неверный ID предмета в URL.") setError(null);
+            }
+        } else {
+            setError("Неверный ID предмета в URL.");
+            setIsLoading(false); // Stop loading if ID is invalid from the start
+            setSubjectId(null);
+        }
+    }, [subjectIdParam, error, subjectId]); // Added subjectId to prevent loops if param changes but result is same
+
+
+    // --- Timer Functions ---
     const handleTimeUp = useCallback(() => {
         debugLogger.log("Timer: Time is up!");
-        // Don't trigger time up if dummy mode is active or test already handled
         if (!isTestComplete && !timeUpModal && !isDummyModeActive) {
             setIsTimerRunning(false);
-            setShowFeedback(false); // Hide any pending feedback
-            setTimeUpModal(true);   // Show the time up modal
+            setShowFeedback(false);
+            setTimeUpModal(true);
         } else if (isDummyModeActive) {
             debugLogger.log("Timer: Time up ignored, Dummy Mode is active.");
         }
-    }, [isTestComplete, timeUpModal, isDummyModeActive]); // Add isDummyModeActive dependency
+    }, [isTestComplete, timeUpModal, isDummyModeActive]);
 
+    // Refactored to use Server Action
     const completeTestDueToTime = useCallback(async () => {
          setTimeUpModal(false);
          if (!currentAttempt || isSaving || isTestComplete) return;
-         debugLogger.log("Completing test due to time up for attempt:", currentAttempt.id);
+         debugLogger.log("Completing test due to time up via action for attempt:", currentAttempt.id);
          setIsSaving(true);
+         setError(null);
+
          try {
              const currentScore = currentAttempt.score || 0;
-             const updates: Partial<VprTestAttempt> = {
-                 last_question_index: questions.length, // Mark all questions as 'passed'
-                 completed_at: new Date().toISOString(),
-                 score: currentScore // Keep the score as it was
-             };
+             const totalQ = currentAttempt.total_questions || questions.length || 0; // Get total questions safely
 
-             // Let's use supabaseAdmin for consistency with original context's completion logic
-             const { data: updatedAttempt, error: updateError } = await supabaseAdmin
-                 .from('vpr_test_attempts')
-                 .update(updates)
-                 .eq('id', currentAttempt.id)
-                 .select()
-                 .single();
+             // Call Server Action
+             const result = await forceCompleteVprAttempt(currentAttempt.id, currentScore, totalQ);
 
-              if (updateError) throw updateError;
-              if (!updatedAttempt) throw new Error("Attempt not found after forced completion update.");
-
-              // --- Notify Admin (Time up) - Using `user` from context ---
-              if (user && subject && updatedAttempt) {
-                const message = `🔔 Тест ВПР завершен (Время вышло)!
-Пользователь: ${user.username || user.id} (${user.id})
-Предмет: ${subject?.name || 'Неизвестный'}
-Вариант: ${updatedAttempt.variant_number}
-Результат: ${updatedAttempt.score ?? 0} из ${updatedAttempt.total_questions}`;
-                  try {
-                      await notifyAdmin(message); // Use imported notifyAdmin
-                      debugLogger.log("Admin notified of time-up completion.");
-                  } catch (notifyError) {
-                      debugLogger.error("Failed to notify admin about time-up completion:", notifyError);
-                  }
-              } else {
-                  debugLogger.warn("Could not notify admin (time-up): missing user, subject, or attempt data.");
+              if (!result.success || !result.updatedAttempt) {
+                  throw new Error(result.error || "Не удалось принудительно завершить тест через сервер.");
               }
-              // --- End Notify Admin ---
 
-              setCurrentAttempt(updatedAttempt);
+              // Update client state based on server action result
+              setCurrentAttempt(result.updatedAttempt);
               setIsTestComplete(true);
-              setFinalScore(updatedAttempt.score ?? 0);
+              setFinalScore(result.updatedAttempt.score ?? 0);
               toast.warning("Время вышло! Тест завершен.", { duration: 5000 });
+              // Admin notification is handled within the server action
+
          } catch (err: any) {
-             debugLogger.error("Error forcing test completion:", err);
-             setError(`Не удалось завершить тест (${err.message || 'Неизвестная ошибка'}). Попробуйте обновить страницу.`);
+             debugLogger.error("Error forcing test completion via action:", err);
+             setError(err.message || "Не удалось завершить тест.");
              toast.error("Ошибка принудительного завершения теста.");
          } finally {
             setIsSaving(false);
          }
-    }, [currentAttempt, isSaving, isTestComplete, questions.length, user, subject]); // Keep dependencies
+    }, [currentAttempt, isSaving, isTestComplete, questions.length]); // Removed dependencies not needed by action call
 
 
-    // --- Data Fetching & Attempt Handling (Restoring context's useEffect logic) ---
+    // --- Data Fetching & Attempt Handling (Refactored to use Server Action) ---
     useEffect(() => {
-        debugLogger.log(`useEffect running. Reset Counter: ${resetCounter}`);
-
-        // Wait for user data from context if it's loading
-        if (isUserLoading) {
-            debugLogger.log("Waiting for user data from AppContext...");
-            setIsLoading(true); // Keep general loading true while waiting for user
+        // --- Early Exits ---
+        if (subjectId === null && !error) {
+            if (!isLoading) setIsLoading(true);
+            debugLogger.log("useEffect waiting for valid subjectId.");
             return;
         }
-
-        // Use `user.id` as per context
-        if (!user?.id || !subjectId || isNaN(subjectId)) {
-            if (!user?.id) {
-                 // If still no user after context loaded, show error/redirect
-                 debugLogger.error("No user ID found in AppContext after loading.");
-                 setError("Не удалось получить данные пользователя. Попробуйте перезайти.");
-                 setIsLoading(false);
-                 // Consider redirecting: router.push('/auth-error');
-            }
-            else if (isNaN(subjectId)) {
-                 setError("Неверный ID предмета");
-                 setIsLoading(false);
-            }
+         if (isUserLoading) {
+             if (!isLoading) setIsLoading(true);
+            debugLogger.log("useEffect waiting for user data from AppContext...");
             return;
         }
+        if (error) {
+             debugLogger.log(`useEffect aborted due to existing error: ${error}`);
+             if (isLoading) setIsLoading(false);
+             return;
+        }
+        if (!user?.id) {
+             debugLogger.error("No user ID found in AppContext after loading.");
+             setError("Не удалось получить данные пользователя. Попробуйте перезайти.");
+             if (isLoading) setIsLoading(false); // Stop loading on critical error
+             return;
+        }
+        if (typeof subjectId !== 'number' || isNaN(subjectId)) {
+             debugLogger.error(`Invalid subjectId in main effect: ${subjectId}`);
+             setError("Внутренняя ошибка: ID предмета не установлен.");
+             if (isLoading) setIsLoading(false); // Stop loading on critical error
+             return;
+        }
+        // --- End Early Exits ---
 
-        debugLogger.log(`Initializing test for Subject ID: ${subjectId}, User ID: ${user.id}`);
+        debugLogger.log(`Initialize effect running for Subject: ${subjectId}, User: ${user.id}, Reset: ${resetCounter}`);
         let isMounted = true;
 
+        const initialize = async () => {
+            if (!isMounted) return;
+            debugLogger.log("Initialize action starting...");
+            setIsLoading(true);
+            setError(null); // Clear previous errors before fetching
 
-        const initializeTest = async () => {
-            if (!isMounted) {
-                debugLogger.log("InitializeTest aborted: component unmounted.");
-                return;
-            }
-            debugLogger.log("InitializeTest starting...");
-            // Reset states thoroughly
-            setIsLoading(true); setError(null); setShowDescription(false);
-            setIsTestComplete(false); setShowFeedback(false); setSelectedAnswerId(null);
-            setIsTimerRunning(false); setTimerKey(Date.now()); setTimeUpModal(false);
-            setIsCorrect(false); setFeedbackExplanation(null); setFinalScore(0);
-            setCurrentQuestionIndex(0); setCurrentAttempt(null); setQuestions([]);
-            setIsCurrentQuestionNonAnswerable(false); setSelectedVariant(null);
-            setIsDummyModeActive(false); // Reset dummy mode on init/reset
+            // Call the server action to get all initial data
+            const result = await startOrResumeVprAttempt(user.id, subjectId);
 
-            let variantToLoad: number | null = null;
+            if (!isMounted) return; // Check again after await
 
-            try {
-                // --- Variant Selection Logic (using supabaseAdmin) ---
-                debugLogger.log("Selecting variant...");
-                // Using supabaseAdmin for reads
-                const { data: variantData, error: variantError } = await supabaseAdmin
-                    .from('vpr_questions')
-                    .select('variant_number')
-                    .eq('subject_id', subjectId);
+            if (result.error || !result.attempt || !result.subject || result.selectedVariant === null) {
+                debugLogger.error("Initialization failed:", result.error || "Missing data from server action.");
+                setError(result.error || "Не удалось загрузить данные теста.");
+                // Clear potentially inconsistent state if action failed partially
+                setCurrentAttempt(null); setSubject(null); setQuestions([]); setSelectedVariant(null);
+            } else {
+                // --- Success: Update client state from action result ---
+                debugLogger.log("Initialization successful. Setting state.");
+                setCurrentAttempt(result.attempt);
+                setSubject(result.subject);
+                setQuestions(result.questions);
+                setSelectedVariant(result.selectedVariant);
+                setFinalScore(result.attempt.score || 0);
 
-                 if (!isMounted) return;
-                 if (variantError) throw new Error(`Ошибка получения вариантов: ${variantError.message}`);
-                 if (!variantData || variantData.length === 0) throw new Error('Для этого предмета не найдено ни одного варианта.');
-                 const allAvailableVariants = [...new Set(variantData.map(q => q.variant_number))].sort((a,b) => a - b);
+                const loadedQuestionCount = result.questions.length;
+                const resumeIndex = Math.max(0, result.attempt.last_question_index);
+                const validResumeIndex = Math.min(resumeIndex, loadedQuestionCount); // Index cannot exceed length
 
-                 // Using supabaseAdmin for reads
-                 const { data: completedAttemptsData, error: completedError } = await supabaseAdmin
-                     .from('vpr_test_attempts')
-                     .select('variant_number')
-                     .eq('user_id', user.id) // Use user.id
-                     .eq('subject_id', subjectId)
-                     .not('completed_at', 'is', null);
-                  if (!isMounted) return;
-                  if (completedError) throw new Error(`Ошибка получения пройденных попыток: ${completedError.message}`);
-                  const completedVariants = [...new Set(completedAttemptsData.map(a => a.variant_number))];
-                  const untriedVariants = allAvailableVariants.filter(v => !completedVariants.includes(v));
-                  if (untriedVariants.length > 0) { variantToLoad = untriedVariants[Math.floor(Math.random() * untriedVariants.length)]; }
-                  else if (allAvailableVariants.length > 0) { variantToLoad = allAvailableVariants[Math.floor(Math.random() * allAvailableVariants.length)]; }
-                  else { throw new Error('Не удалось определить вариант для загрузки.'); }
-                  setSelectedVariant(variantToLoad);
-                  if (!variantToLoad) throw new Error("Variant selection failed.");
-
-                // --- Fetch Subject Data (using supabaseAdmin) ---
-                debugLogger.log("Fetching subject data...");
-                const { data: subjectData, error: subjectError } = await supabaseAdmin
-                    .from('subjects')
-                    .select('*') // Select all fields, including potential grade_level
-                    .eq('id', subjectId)
-                    .single();
-                 if (!isMounted) return;
-                 if (subjectError || !subjectData) throw subjectError || new Error('Предмет не найден');
-                 setSubject(subjectData);
-                 debugLogger.log("Subject data loaded:", subjectData.name);
-
-                // --- Fetch Questions (using supabaseAdmin) ---
-                debugLogger.log(`Fetching questions for selected variant ${variantToLoad}...`);
-                const { data: questionData, error: questionError } = await supabaseAdmin
-                    .from('vpr_questions')
-                    .select(`*, vpr_answers ( * )`) // Fetch nested answers
-                    .eq('subject_id', subjectId)
-                    .eq('variant_number', variantToLoad)
-                    .order('position', { ascending: true });
-                 if (!isMounted) return;
-                 if (questionError || !questionData || questionData.length === 0) throw questionError || new Error(`Вопросы для варианта ${variantToLoad} не найдены`);
-                 setQuestions(questionData);
-                 debugLogger.log(`Loaded ${questionData.length} questions.`);
-
-                // --- Find or Create Attempt (using supabaseAdmin for read, supabaseAdmin for delete, supabaseAdmin for insert for simplicity/permissions) ---
-                debugLogger.log(`Finding active test attempt for variant ${variantToLoad}...`);
-                 // Using supabaseAdmin for consistency, ensure RLS would allow user reads if switching later
-                const { data: existingAttempts, error: attemptError } = await supabaseAdmin
-                    .from('vpr_test_attempts')
-                    .select('*')
-                    .eq('user_id', user.id) // Use user.id
-                    .eq('subject_id', subjectId)
-                    .eq('variant_number', variantToLoad)
-                    .is('completed_at', null)
-                    .order('started_at', { ascending: false })
-                    .limit(1);
-                 if (!isMounted) return;
-                 if (attemptError) throw new Error(`Ошибка поиска попытки: ${attemptError.message}`);
-
-                let attemptToUse: VprTestAttempt | null = null;
-
-                if (existingAttempts && existingAttempts.length > 0) {
-                    const potentialAttempt = existingAttempts[0];
-                    if (potentialAttempt.total_questions !== questionData.length) {
-                        debugLogger.warn(`Question count mismatch for variant ${variantToLoad}. Active attempt outdated. Deleting old and creating new.`);
-                        try {
-                            // Use supabaseAdmin for delete as per original reset logic
-                            const { error: deleteErr } = await supabaseAdmin.from('vpr_test_attempts').delete().eq('id', potentialAttempt.id);
-                            if (deleteErr) throw deleteErr;
-                            debugLogger.log(`Deleted outdated attempt ID: ${potentialAttempt.id}`);
-                        } catch (deleteErr: any) {
-                             debugLogger.error("Failed to delete outdated attempt:", deleteErr);
-                             toast.error("Не удалось удалить старую попытку, возможны несоответствия.");
-                             // Continue to create a new one
-                        }
-                    } else {
-                        attemptToUse = potentialAttempt;
-                        debugLogger.log(`Resuming active attempt ID: ${attemptToUse.id} for variant ${variantToLoad}, Last Index: ${attemptToUse.last_question_index}`);
-                        setFinalScore(attemptToUse.score || 0); // Restore score on resume
-                    }
-                } else {
-                     debugLogger.log(`No active attempt found in DB for variant ${variantToLoad}.`);
-                }
-
-                // Create new attempt if needed (using supabaseAdmin)
-                if (!attemptToUse) {
-                     debugLogger.log(`Creating new attempt for variant ${variantToLoad}.`);
-                     // Use supabaseAdmin for insert (simplifies permissions for now)
-                     const { data: newAttemptData, error: newAttemptError } = await supabaseAdmin
-                         .from('vpr_test_attempts')
-                         .insert({ user_id: user.id, subject_id: subjectId, variant_number: variantToLoad, total_questions: questionData.length, last_question_index: 0, score: 0 })
-                         .select()
-                         .single();
-                     if (!isMounted) return;
-                     if (newAttemptError || !newAttemptData) throw newAttemptError || new Error('Не удалось создать новую попытку');
-                     attemptToUse = newAttemptData;
-                     debugLogger.log(`New attempt created ID: ${attemptToUse.id}`);
-                     setFinalScore(0); // Reset score for new attempt
-                }
-
-                setCurrentAttempt(attemptToUse);
-                const resumeIndex = Math.max(0, Math.min(attemptToUse.last_question_index, questionData.length - 1));
-                // Ensure resumeIndex doesn't exceed actual questions length if attempt is somehow ahead
-                 const validResumeIndex = Math.min(resumeIndex, questionData.length > 0 ? questionData.length - 1 : 0);
-
-                 // If attempt is already completed, jump to the end state immediately
-                 if (attemptToUse.completed_at) {
-                    debugLogger.log("Attempt already completed, setting completion state.");
-                    setCurrentQuestionIndex(questionData.length); // Go past last question index
+                if (result.attempt.completed_at || (validResumeIndex >= loadedQuestionCount && loadedQuestionCount > 0)) {
+                    debugLogger.log(`Attempt ${result.attempt.id} already completed.`);
+                    setCurrentQuestionIndex(loadedQuestionCount);
                     setIsTestComplete(true);
-                    setFinalScore(attemptToUse.score ?? 0);
+                    setIsTimerRunning(false);
+                 } else if (loadedQuestionCount === 0) {
+                    debugLogger.error("No questions loaded, cannot proceed.");
+                    setError("Вопросы не загрузились, тест не может быть продолжен.");
                     setIsTimerRunning(false);
                  } else {
+                     // Attempt is active
+                    setIsTestComplete(false); // Ensure test is not marked complete
                     setCurrentQuestionIndex(validResumeIndex);
                     debugLogger.log(`Setting current question index to: ${validResumeIndex}`);
 
-                    const currentQ = questionData[validResumeIndex];
+                    const currentQ = result.questions[validResumeIndex];
                     const currentAnswers = currentQ?.vpr_answers || [];
                     const isNonAnswerable = currentAnswers.length > 0 && currentAnswers.every(a => /^\[(Рисунок|Ввод текста|Диаграмма|Изображение|Площадь)\].*/.test(a.text));
                     setIsCurrentQuestionNonAnswerable(isNonAnswerable);
-                    debugLogger.log(`Is current question (${validResumeIndex}) non-answerable? ${isNonAnswerable}`);
 
-                    debugLogger.log("Attempt is active. Starting timer (if dummy mode isn't globally disabled or active).");
-                    // Start timer only if not globally disabled and not initially active
-                     setIsTimerRunning(!isDummyModeActive);
-                 }
-
-            } catch (err: any) {
-                if (!isMounted) return;
-                debugLogger.error("Error during test initialization:", err);
-                setError(err.message || 'Произошла ошибка при загрузке теста');
-                setIsTimerRunning(false);
-            } finally {
-                 if (isMounted) {
-                    setIsLoading(false);
-                    debugLogger.log("InitializeTest finished.");
+                    // Reset dummy mode state on each successful initialization
+                    setIsDummyModeActive(false);
+                    // Start timer only if active, not dummy, and not globally disabled
+                    const shouldTimerRun = !isDummyModeGloballyDisabled; // Start assuming dummy is off initially
+                    setIsTimerRunning(shouldTimerRun);
+                    debugLogger.log(`Attempt is active. Timer running: ${shouldTimerRun}`);
                  }
             }
+            // --- End Success ---
+
+            setIsLoading(false); // Stop loading regardless of success/error
+            debugLogger.log("Initialize action finished.");
         };
 
-        // Removing createNewAttempt helper as insert is done directly above
-        initializeTest();
+        initialize();
 
+        // Cleanup function
         return () => {
             isMounted = false;
-            debugLogger.log("useEffect cleanup: component unmounting or dependencies changed.");
+            debugLogger.log("useEffect cleanup triggered.");
         };
-     }, [user, subjectId, resetCounter, router, token, isUserLoading]); // Added isUserLoading dependency
+     // Dependencies trigger re-initialization if user, subject, or resetCounter changes
+     }, [user, subjectId, resetCounter, isUserLoading, isDummyModeGloballyDisabled]); // Removed error, token
 
 
-    // --- Answer Handling (Restoring context's version + dummy check) ---
+    // --- Answer Handling (Refactored to use Server Action) ---
     const handleAnswer = useCallback(async (selectedAnswer: VprAnswerData) => {
-        // --- Add check for Dummy Mode ---
         if (isDummyModeActive) {
-            debugLogger.log("Answer clicked while Dummy Mode is active. Ignoring.");
             toast.info("В Режиме Подсказок выбор ответа отключен.", { duration: 2000 });
             return;
         }
-        // --- End Dummy Mode Check ---
+        const currentQ = questions[currentQuestionIndex];
+        if (!currentAttempt || !currentQ || showFeedback || isTestComplete || isSaving || !isTimerRunning || timeUpModal) {
+             debugLogger.warn("handleAnswer prevented: UI/State checks failed.");
+             return;
+        }
 
-        // Standard checks from context
-        if (!currentAttempt || showFeedback || isTestComplete || isSaving || !isTimerRunning || timeUpModal || !questions[currentQuestionIndex]) return;
-
-        debugLogger.log(`Handling answer selection: Answer ID ${selectedAnswer.id} for Question ID ${questions[currentQuestionIndex].id} (Variant: ${currentAttempt.variant_number})`);
-        setIsTimerRunning(false); // Pause timer on answer selection
-        setIsSaving(true);
+        debugLogger.log(`Handling answer UI: Answer ID ${selectedAnswer.id}`);
+        setIsTimerRunning(false); // Pause timer visually
+        setIsSaving(true); // Show saving state
         setSelectedAnswerId(selectedAnswer.id);
+        setError(null);
 
         const correct = selectedAnswer.is_correct;
-        setIsCorrect(correct);
-        setFeedbackExplanation(questions[currentQuestionIndex]?.explanation || "Объяснение отсутствует.");
-        setShowFeedback(true); // Show normal feedback
+        setIsCorrect(correct); // Update UI feedback state immediately
+        setFeedbackExplanation(currentQ?.explanation || "Объяснение отсутствует.");
+        setShowFeedback(true);
 
-        const scoreIncrement = correct ? 1 : 0;
-        const newScore = (currentAttempt.score || 0) + scoreIncrement;
-        debugLogger.log(`Answer Correct: ${correct}. Proposed Score: ${newScore}`);
+        const currentScore = typeof currentAttempt.score === 'number' ? currentAttempt.score : 0;
 
-        // Use supabaseAdmin for DB operations as per original context
-        try {
-            debugLogger.log("Recording answer to DB using supabaseAdmin...");
-            const { error: recordError } = await supabaseAdmin.from('vpr_attempt_answers').insert({ attempt_id: currentAttempt.id, question_id: questions[currentQuestionIndex].id, selected_answer_id: selectedAnswer.id, was_correct: correct });
-            // Игнорируем ошибку дубликата (23505), но выводим остальные
-            if (recordError && recordError.code !== '23505') throw new Error(`Ошибка записи ответа: ${recordError.message}`);
-            if (recordError?.code === '23505') debugLogger.warn("Attempt answer already recorded."); else debugLogger.log("Answer recorded successfully.");
+        // Call Server Action to record answer and update score
+        const result = await recordVprAnswer(
+            currentAttempt.id,
+            currentQ.id,
+            selectedAnswer.id,
+            correct,
+            currentScore
+        );
 
-            debugLogger.log("Updating attempt score in DB using supabaseAdmin...");
-            const { data: updatedData, error: updateScoreError } = await supabaseAdmin.from('vpr_test_attempts').update({ score: newScore }).eq('id', currentAttempt.id).select().single();
-            if (updateScoreError) throw new Error(`Ошибка обновления счета: ${updateScoreError.message}`);
-            if (!updatedData) throw new Error("Attempt data not returned after score update.");
+        setIsSaving(false); // Hide saving state
 
-            setCurrentAttempt(updatedData); // Update local state with confirmed score from DB
-            debugLogger.log("Attempt score updated successfully.");
-        } catch (err: any) {
-            debugLogger.error("Error saving answer/score:", err);
-            toast.error(`Не удалось сохранить результат: ${err.message}`);
-            // Keep feedback showing even if save fails
-        } finally {
-             setIsSaving(false);
-             // Timer remains paused until 'Next' is clicked
+        if (!result.success || !result.updatedAttempt) {
+            debugLogger.error("Failed to record answer via action:", result.error);
+            setError(result.error || "Не удалось сохранить ответ.");
+            toast.error(result.error || "Не удалось сохранить ответ.");
+            // Optionally revert UI feedback? Or leave it to show user their choice?
+            // setShowFeedback(false); setIsCorrect(false); setSelectedAnswerId(null);
+        } else {
+            debugLogger.log("Answer recorded successfully via action. Updating local attempt state.");
+            // Sync local state with the confirmed state from the server
+            setCurrentAttempt(result.updatedAttempt);
+            // Score is already updated in the attempt object
         }
-    }, [currentAttempt, showFeedback, isTestComplete, isSaving, isTimerRunning, timeUpModal, questions, currentQuestionIndex, isDummyModeActive]); // Removed token dependency as supabaseAdmin is used
+         // Timer remains paused, handled by handleNextQuestion
+    }, [currentAttempt, showFeedback, isTestComplete, isSaving, isTimerRunning, timeUpModal, questions, currentQuestionIndex, isDummyModeActive]);
 
 
-    // --- Navigation Logic (Restoring context's version + dummy logic) ---
+    // --- Navigation Logic (Refactored to use Server Action) ---
     const handleNextQuestion = useCallback(async (isSkip: boolean = false) => {
-        // Standard checks from context
-        if (!currentAttempt || isSaving || isTestComplete || timeUpModal || !questions.length) return;
+        if (!currentAttempt || isSaving || isTestComplete || timeUpModal || !questions.length) {
+            debugLogger.warn("handleNextQuestion prevented: UI/State checks failed.");
+            return;
+        }
 
         const currentQIndex = currentQuestionIndex;
         const nextIndex = currentQIndex + 1;
-        const isFinishing = nextIndex >= questions.length;
-        debugLogger.log(`Handling next question. From: ${currentQIndex}, To: ${nextIndex}, Finishing: ${isFinishing}, Skip: ${isSkip}, DummyActive: ${isDummyModeActive}`);
+        const totalQ = questions.length; // Use current questions length
+        const isFinishing = nextIndex >= totalQ;
 
+        debugLogger.log(`Handling next question UI. From: ${currentQIndex}, To: ${nextIndex}, Finishing: ${isFinishing}, Skip: ${isSkip}`);
         setIsSaving(true);
-        // Reset feedback/selection states
         setShowFeedback(false); setSelectedAnswerId(null); setIsCorrect(false); setFeedbackExplanation(null);
-        // Keep dummy mode state as it is unless explicitly changed
+        setError(null);
 
-        let nextIsNonAnswerable = false;
-        if (!isFinishing) {
-            const nextQ = questions[nextIndex]; const nextAnswers = nextQ?.vpr_answers || [];
-            nextIsNonAnswerable = nextAnswers.length > 0 && nextAnswers.every(a => /^\[(Рисунок|Ввод текста|Диаграмма|Изображение|Площадь)\].*/.test(a.text));
-            debugLogger.log(`Next question (${nextIndex}) non-answerable? ${nextIsNonAnswerable}`);
-        }
+        // Call Server Action to update progress/completion
+        const result = await updateVprAttemptProgress(currentAttempt.id, nextIndex, totalQ);
 
-        // Use supabaseAdmin for updates as per original context
-        try {
-            const updates: Partial<VprTestAttempt> = isFinishing
-                ? { last_question_index: questions.length, completed_at: new Date().toISOString() }
-                : { last_question_index: nextIndex };
-            debugLogger.log(`Updating attempt progress/completion in DB to index: ${updates.last_question_index} using supabaseAdmin`);
+        setIsSaving(false);
 
-            const { data: updatedAttempt, error: updateError } = await supabaseAdmin.from('vpr_test_attempts').update(updates).eq('id', currentAttempt.id).select().single();
-            if (updateError) throw new Error(`Ошибка обновления прогресса: ${updateError.message}`);
-            if (!updatedAttempt) throw new Error("Attempt not found after update.");
-
-            setCurrentAttempt(updatedAttempt); // Update with DB data *first*
+        if (!result.success || !result.updatedAttempt) {
+            debugLogger.error("Failed to update progress via action:", result.error);
+            setError(result.error || "Не удалось сохранить прогресс.");
+            toast.error(result.error || "Не удалось сохранить прогресс.");
+            // Stop timer if navigation failed
+            setIsTimerRunning(false);
+        } else {
+            debugLogger.log("Progress update successful via action. Updating local state.");
+            // Sync local state with the confirmed state from the server
+            setCurrentAttempt(result.updatedAttempt);
 
             if (!isFinishing) {
                 setCurrentQuestionIndex(nextIndex);
+                // Check if next question is non-answerable
+                const nextQ = questions[nextIndex];
+                const nextAnswers = nextQ?.vpr_answers || [];
+                const nextIsNonAnswerable = nextAnswers.length > 0 && nextAnswers.every(a => /^\[(Рисунок|Ввод текста|Диаграмма|Изображение|Площадь)\].*/.test(a.text));
                 setIsCurrentQuestionNonAnswerable(nextIsNonAnswerable);
-                // Timer logic: Run only if not finishing AND dummy mode is OFF
-                if (!isDummyModeActive) { // Check global disable too
-                    setIsTimerRunning(true);
-                    debugLogger.log(`Moved to question index: ${nextIndex}. Timer restarted.`);
-                } else {
-                    setIsTimerRunning(false); // Ensure timer is paused if dummy mode is ON or globally disabled
-                    const reason = isDummyModeActive ? "Dummy Mode Active" : "Globally Disabled";
-                    debugLogger.log(`Moved to question index: ${nextIndex}. Timer remains paused (${reason}).`);
-                }
+
+                // Timer logic: Run only if NOT finishing AND dummy mode is OFF (and not globally disabled)
+                const shouldTimerRun = !isDummyModeActive && !isDummyModeGloballyDisabled;
+                setIsTimerRunning(shouldTimerRun);
+                debugLogger.log(`Moved to question index: ${nextIndex}. Timer running: ${shouldTimerRun}.`);
             } else {
-                // Test completion logic (restored from context)
+                // Finishing the test
                 setIsCurrentQuestionNonAnswerable(false);
-                setIsTimerRunning(false); // Ensure timer stops on completion
+                setIsTimerRunning(false); // Ensure timer stops
                 setIsTestComplete(true);
-                setFinalScore(updatedAttempt.score ?? 0);
-                debugLogger.log("Test marked as complete. Final Score from DB:", updatedAttempt.score);
+                setFinalScore(result.updatedAttempt.score ?? 0); // Use score from the final updated attempt
+                debugLogger.log("Test marked as complete locally. Final Score:", result.updatedAttempt.score);
                 toast.success("Тест завершен!", { duration: 4000 });
-
-                // --- Notify Admin (Normal Completion) - Using `user` from context ---
-                if (user && subject && updatedAttempt) {
-                    const message = `✅ Тест ВПР завершен!
-Пользователь: ${user.username || user.id} (${user.id})
-Предмет: ${subject.name}
-Вариант: ${updatedAttempt.variant_number}
-Результат: ${updatedAttempt.score ?? 0} из ${updatedAttempt.total_questions}`;
-                    try {
-                        await notifyAdmin(message); // Use imported notifyAdmin
-                        debugLogger.log("Admin notified of normal test completion.");
-                    } catch (notifyError) {
-                        debugLogger.error("Failed to notify admin about normal completion:", notifyError);
-                    }
-                } else {
-                    debugLogger.warn("Could not notify admin (normal completion): missing user, subject, or attempt data.");
-                }
-                // --- End Notify Admin ---
+                // Admin notification handled by server action
             }
-        } catch(err: any) {
-            debugLogger.error("Error updating attempt on navigation:", err);
-            setError(`Не удалось сохранить прогресс (${err.message}). Попробуйте обновить страницу.`);
-            toast.error("Ошибка сохранения прогресса.");
-            // Stop timer if navigation failed before completion
-            if (!isFinishing) setIsTimerRunning(false);
-        } finally {
-            setIsSaving(false);
         }
-    }, [currentAttempt, isSaving, isTestComplete, timeUpModal, questions, currentQuestionIndex, user, subject, isDummyModeActive]); 
+    }, [currentAttempt, isSaving, isTestComplete, timeUpModal, questions, currentQuestionIndex, isDummyModeActive, isDummyModeGloballyDisabled]);
 
 
-    // --- Reset Logic (Restoring context's version + dummy reset) ---
+    // --- Reset Logic (Refactored to use Server Action) ---
      const resetTest = useCallback(async () => {
          if (isSaving) {
              toast.warning("Подождите, идет сохранение...");
              return;
          }
          debugLogger.log("Reset button clicked.");
-         setIsLoading(true);
+         setIsSaving(true); // Indicate saving during reset process
+         setError(null);
 
          try {
+             // Stop timer visually
              setIsTimerRunning(false);
-             setIsDummyModeActive(false); // Ensure dummy mode is off on reset
+             setIsDummyModeActive(false);
 
-             // Using user.id and supabaseAdmin for delete as per context
+             // Call server action to delete attempts
              if (user?.id && subjectId) {
-                 debugLogger.log(`Attempting to delete ANY active attempt for subject ${subjectId} and user ${user.id} before reset using supabaseAdmin.`);
-                 const { error: deleteError } = await supabaseAdmin
-                     .from('vpr_test_attempts')
-                     .delete()
-                     .eq('user_id', user.id) // Use user.id
-                     .eq('subject_id', subjectId)
-                     .is('completed_at', null);
-
-                 if (deleteError) {
-                      debugLogger.error("Error deleting active attempt(s) during reset:", deleteError);
-                      toast.warning(`Не удалось удалить предыдущую попытку: ${deleteError.message}`);
+                 const result = await resetVprTest(user.id, subjectId);
+                 if (!result.success) {
+                     // Log the error but proceed with UI reset and re-initialization
+                     debugLogger.error("Error deleting active attempt(s) during reset:", result.error);
+                     toast.warning(result.error || "Не удалось удалить предыдущую попытку.");
                  } else {
-                      debugLogger.log("Any active attempts for this subject/user deleted successfully.");
+                     debugLogger.log("Active attempts deleted successfully via action.");
                  }
              } else {
-                  debugLogger.warn("Cannot delete active attempt during reset: missing user ID or subject ID.");
+                 debugLogger.warn("Cannot delete active attempt during reset: missing user ID or subject ID.");
              }
 
-             // Reset frontend state fully
+             // Reset UI state immediately after action call (success or fail)
              setCurrentAttempt(null); setQuestions([]); setCurrentQuestionIndex(0);
-             setError(null); setSelectedVariant(null); setSubject(null);
+             setSelectedVariant(null); setSubject(null);
              setFinalScore(0); setIsTestComplete(false); setShowFeedback(false);
              setSelectedAnswerId(null); setTimeUpModal(false);
+             setShowDescription(false); setFeedbackExplanation(null); setIsCorrect(false);
+             setIsCurrentQuestionNonAnswerable(false);
 
              toast.info("Сброс теста...", { duration: 1500});
-             // Increment counter to trigger useEffect reload
+             // Increment counter to trigger the main useEffect to re-fetch and re-initialize
              setResetCounter(prev => prev + 1);
-             debugLogger.log("Reset counter incremented, useEffect will re-run.");
+             debugLogger.log("Reset counter incremented, useEffect will re-run initialization.");
 
-         } catch (err: any) {
-              debugLogger.error("Error during reset process:", err);
+         } catch (err: any) { // Catch errors from the action call itself
+              debugLogger.error("Error calling resetVprTest action:", err);
               setError(`Ошибка сброса теста: ${err.message}`);
-              setIsLoading(false); // Stop loading on error
+         } finally {
+             setIsSaving(false); // Stop saving indicator
+             // Loading state is handled by the main useEffect triggered by resetCounter
          }
-         // Let useEffect handle setting isLoading to false after re-fetch
-     }, [isSaving, user?.id, subjectId]); // Dependency on user.id
+     }, [isSaving, user?.id, subjectId]);
 
 
-    // --- NEW: Purchase Disabling of Dummy Mode ---
-    const handlePurchaseDisableDummy = async () => {
-        if (!user?.id) { // Use user.id
+    // --- Purchase/Toggle Dummy Mode (Logic remains client-side, calls server action) ---
+    const handlePurchaseDisableDummy = useCallback(async () => {
+        // Requires both target (dbUser.id) and requester (user.id?)
+        // Adjust based on who should receive the invoice
+        if (!user?.id || !dbUser?.id) {
             toast.error("Не удалось определить пользователя для покупки.");
             return;
         }
-        if (isPurchasingDisable) return;
+         // Use dbUser.id as the target for disabling
+        const targetUserId = dbUser.id;
+        // Assuming the currently logged-in user (user.id) is the requester
+        const requesterUserId = user.id;
 
-        debugLogger.log("Attempting to purchase DISABLE Dummy Mode feature...");
+        if (isPurchasingDisable || isDummyModeGloballyDisabled) {
+             if (isDummyModeGloballyDisabled) {
+                 toast.info("Режим подсказок уже отключен родителем.", { duration: 3000 });
+             }
+             return;
+        }
+
+        debugLogger.log(`Attempting to purchase DISABLE Dummy Mode for target user ID: ${targetUserId} by requester ${requesterUserId}`);
         setIsPurchasingDisable(true);
         toast.loading("Отправка запроса на покупку...", { id: "purchase-disable-dummy" });
+        setError(null);
 
         try {
-            // Use user.id
-            const result = await purchaseDisableDummyMode(user.id);
+            // Call the server action, passing both IDs
+            const result = await purchaseDisableDummyMode(targetUserId, requesterUserId);
+
             if (result.success) {
+                toast.dismiss("purchase-disable-dummy"); // Dismiss loading
                 if (result.alreadyDisabled) {
-                    toast.success("Режим подсказок уже отключен для этого пользователя.", { id: "purchase-disable-dummy" });
-                    // AppContext should update user eventually, maybe force refresh context?
-                    // Consider a manual refresh/refetch of user data here if needed immediately
+                    toast.success(result.message || "Режим подсказок уже отключен.", { duration: 3000 });
+                    // Potentially refresh dbUser context here if needed immediately
                 } else {
-                    toast.success("Счет на отключение отправлен в Telegram! Пожалуйста, оплатите его там.", { id: "purchase-disable-dummy", duration: 5000 });
+                    toast.success(result.message || "Счет на отключение режима подсказок отправлен вам в Telegram!", { duration: 6000 });
                 }
             } else {
-                throw new Error(result.error || "Неизвестная ошибка при покупке отключения.");
+                throw new Error(result.error || "Неизвестная ошибка при запросе покупки.");
             }
         } catch (error: any) {
             debugLogger.error("Failed to initiate disable dummy mode purchase:", error);
-            toast.error(`Ошибка покупки: ${error.message}`, { id: "purchase-disable-dummy" });
+            const errorMsg = `Ошибка покупки: ${error.message}`;
+            setError(errorMsg);
+            toast.error(errorMsg, { id: "purchase-disable-dummy" });
         } finally {
             setIsPurchasingDisable(false);
         }
-    };
-    // --- End Purchase Disable ---
+    }, [user, dbUser, isPurchasingDisable, isDummyModeGloballyDisabled]);
 
-    // --- Toggle Dummy Mode ---
-    const toggleDummyMode = () => {
+    const toggleDummyMode = useCallback(() => {
         if (isDummyModeGloballyDisabled) {
-             toast.info("Режим подсказок отключен родителем.", { duration: 3000 });
+             toast.info("Режим подсказок отключен родителем и не может быть включен.", { duration: 3000 });
              return;
         }
-        if (isTestComplete || timeUpModal) return; // Don't allow toggle if test finished
+        if (isTestComplete || timeUpModal || isSaving) {
+            debugLogger.log("Dummy mode toggle prevented: Test complete, time up, or saving.");
+            return;
+        }
 
         setIsDummyModeActive(prev => {
             const newState = !prev;
             debugLogger.log(`Dummy Mode Toggled: ${newState}`);
             if (newState) {
-                // Turning ON Dummy Mode
-                setIsTimerRunning(false); // Pause timer
-                setShowFeedback(false); // Hide normal feedback if it was shown
-                setSelectedAnswerId(null); // Clear selection
+                setIsTimerRunning(false);
+                setShowFeedback(false);
+                setSelectedAnswerId(null);
                 toast.info("🧠 Режим Подсказок ВКЛ", { duration: 1500 });
             } else {
-                // Turning OFF Dummy Mode
-                // Restart timer only if the test is ongoing and not showing feedback
-                if (!isTestComplete && !showFeedback) {
+                if (!isTestComplete && !showFeedback && !timeUpModal) {
                      setIsTimerRunning(true);
                 }
                 toast.info("💪 Режим Подсказок ВЫКЛ", { duration: 1500 });
             }
             return newState;
         });
-    };
-    // --- End Toggle Dummy Mode ---
+    }, [isDummyModeGloballyDisabled, isTestComplete, timeUpModal, isSaving, showFeedback]);
 
-    // --- Rendering Logic (Restoring structure from context + merging new UI) ---
-    // Loading state handling user loading and test loading
-    if (isUserLoading || (isLoading && !currentAttempt)) {
-        return <VprLoadingIndicator text={isUserLoading ? "Загрузка пользователя..." : undefined} />;
+
+    // --- Rendering Logic ---
+
+    // Primary loading state
+    if (isUserLoading || isLoading || (subjectId === null && !error)) {
+        return <VprLoadingIndicator />;
     }
-    // Error state from context
-    if (error && !currentAttempt) return <VprErrorDisplay error={error} onRetry={resetTest} />; // Adjusted condition
-    // Completion screen from context
+
+    // Error state
+    if (error) {
+        const allowRetry = subjectId !== null && !error.includes("ID предмета в URL") && !error.includes("данные пользователя");
+        return <VprErrorDisplay error={error} onRetry={allowRetry ? resetTest : undefined} />;
+    }
+
+    // Completion screen
     if (isTestComplete) {
+        if (!currentAttempt) {
+             return <VprErrorDisplay error="Ошибка: Не удалось загрузить данные завершенной попытки." onRetry={resetTest} />;
+        }
         return ( <VprCompletionScreen
-                    subjectName={subject?.name}
-                    variantNumber={currentAttempt?.variant_number}
+                    subjectName={subject?.name ?? "Тест"}
+                    variantNumber={currentAttempt.variant_number}
                     finalScore={finalScore}
-                    // Use attempt's total questions if available, fallback to question length
-                    totalQuestions={currentAttempt?.total_questions ?? questions.length}
+                    totalQuestions={currentAttempt.total_questions ?? questions.length}
                     onReset={resetTest}
                     onGoToList={() => router.push('/vpr-tests')} /> );
     }
-    // Safeguard check from context
-    if (!isLoading && (!currentAttempt || questions.length === 0 || !selectedVariant || !subject)) {
-         return <VprErrorDisplay error={error || "Критические данные теста (предмет, вариант или вопросы) не загружены. Попробуйте сбросить."} onRetry={resetTest} />;
+
+    // Critical Data Check - needs attempt, subject, questions, variant *after* loading/error checks passed
+    if (!currentAttempt || !subject || questions.length === 0 || selectedVariant === null) {
+         debugLogger.error("Critical data missing before rendering main test UI (after load/error checks passed):", {
+             hasAttempt: !!currentAttempt, hasSubject: !!subject, qCount: questions.length, hasVariant: selectedVariant !== null,
+         });
+         // This indicates an issue with the initialization logic or server action response
+         return <VprErrorDisplay error={"Критическая ошибка: Неполные данные теста после загрузки. Попробуйте сбросить."} onRetry={resetTest} />;
     }
 
-    const currentQuestionData = questions?.[currentQuestionIndex];
-    // Add check for currentQuestionData validity
+    // Get current question data (safe now)
+    const currentQuestionData = questions[currentQuestionIndex];
     if (!currentQuestionData) {
-        debugLogger.warn("currentQuestionData is undefined for index:", currentQuestionIndex);
-        // Avoid rendering components that rely on it if it's missing
-        // Return Loading or Error based on whether we expect it eventually
-        if (isLoading) {
-            return <VprLoadingIndicator text="Загрузка вопроса..." />;
-        } else {
-            return <VprErrorDisplay error={`Не удалось загрузить данные вопроса #${currentQuestionIndex + 1}. Попробуйте сбросить тест.`} onRetry={resetTest} />;
-        }
+        // This should ideally not happen if index is managed correctly
+        debugLogger.error("currentQuestionData is null unexpectedly for index:", currentQuestionIndex);
+        return <VprErrorDisplay error={`Ошибка: Не найдены данные для вопроса #${currentQuestionIndex + 1}.`} onRetry={resetTest} />;
     }
 
+    // Prepare render variables
     const answersForCurrent = currentQuestionData.vpr_answers || [];
     const showSavingOverlay = isSaving;
-
-    // Determine if explanation should be shown (dummy mode OR normal feedback)
-    const shouldShowExplanation = isDummyModeActive || showFeedback;
-    const correctAnswer = isDummyModeActive ? answersForCurrent.find(a => a.is_correct) : null;
-    const explanationToShow = isDummyModeActive
-                                ? (currentQuestionData?.explanation || "Объяснение отсутствует.") // Show general explanation in dummy mode
-                                : feedbackExplanation; // Normal feedback explanation
+    const shouldShowExplanation = (isDummyModeActive && !isCurrentQuestionNonAnswerable) || showFeedback;
+    const explanationToShow = isDummyModeActive ? (currentQuestionData.explanation || "Объяснение отсутствует.") : feedbackExplanation;
     const explanationIsCorrectState = isDummyModeActive ? true : isCorrect;
 
-
+    // --- Render Main Test UI ---
     return (
         <TooltipProvider>
-            {/* Using motion.div key from context */}
             <motion.div
-                key={currentAttempt?.id || 'loading'} // Use attempt ID or fallback key
+                key={currentAttempt.id}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
+                transition={{ duration: 0.5 }}
                 className="min-h-screen bg-page-gradient text-light-text flex flex-col items-center pt-6 pb-10 px-4"
             >
                 <VprTimeUpModal show={timeUpModal} onConfirm={completeTestDueToTime} />
 
-                {/* Using layout structure from context */}
-                <div className="max-w-3xl w-full bg-dark-card shadow-xl rounded-2xl p-5 md:p-8 flex-grow flex flex-col border border-brand-blue/20 relative">
+                <div className="max-w-3xl w-full bg-dark-card shadow-xl rounded-2xl p-5 md:p-8 flex-grow flex flex-col border border-brand-blue/20 relative overflow-hidden">
                      {showSavingOverlay && (
                         <div className="absolute inset-0 bg-dark-card/80 backdrop-blur-sm flex items-center justify-center z-40 rounded-2xl">
                             <Loader2 className="h-8 w-8 animate-spin text-brand-blue" />
@@ -721,65 +604,55 @@ export default function VprTestPage() {
                         </div>
                      )}
 
-                    {/* --- HEADER AREA (Merging VprHeader and Dummy Toggle) --- */}
-                    <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-y-3">
-                        {/* VprHeader component as in context */}
+                    <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-y-3 flex-wrap">
                         <VprHeader
-                            subjectName={subject?.name}
-                            variantNumber={selectedVariant} // Pass variant number
-                            showDescriptionButton={!!subject?.description}
+                            subjectName={subject.name}
+                            variantNumber={selectedVariant}
+                            showDescriptionButton={!!subject.description}
                             isDescriptionShown={showDescription}
                             onToggleDescription={() => setShowDescription(!showDescription)}
                             timerKey={timerKey}
                             timeLimit={timeLimit}
                             onTimeUp={handleTimeUp}
-                            // Adjust timer running condition based on merged logic
-                            isTimerRunning={isTimerRunning && !isSaving && !isTestComplete && !timeUpModal && !isDummyModeActive}
+                            isTimerRunning={isTimerRunning && !showSavingOverlay && !isTestComplete && !timeUpModal && !isDummyModeActive && !isDummyModeGloballyDisabled}
                         />
-                        {/* --- Dummy Mode Toggle & Purchase Button --- */}
-                        <div className="flex items-center space-x-3 self-center sm:self-auto">
-                             {/* === Show Toggle ONLY if NOT globally disabled === */}
-                             {!isDummyModeGloballyDisabled && (
+                         <div className="flex items-center space-x-3 self-center sm:self-auto">
+                             {!isDummyModeGloballyDisabled ? (
                                  <Tooltip>
                                      <TooltipTrigger asChild>
                                          <div className="flex items-center space-x-2">
-                                             <Sparkles className={`h-5 w-5 transition-colors ${isDummyModeActive ? 'text-yellow-400' : 'text-gray-500'}`} />
+                                             <Sparkles className={`h-5 w-5 transition-colors ${isDummyModeActive ? 'text-yellow-400 animate-pulse' : 'text-gray-500'}`} />
                                              <Switch
                                                  id="dummy-mode-toggle"
                                                  checked={isDummyModeActive}
                                                  onCheckedChange={toggleDummyMode}
-                                                 // Removed isDummyModeGloballyDisabled check here
                                                  disabled={isTestComplete || timeUpModal || isSaving}
                                                  aria-label="Режим Подсказок"
                                                  className="data-[state=checked]:bg-yellow-500 data-[state=unchecked]:bg-gray-600"
                                              />
-                                             <label htmlFor="dummy-mode-toggle" className={`text-sm font-medium transition-colors ${isDummyModeActive ? 'text-yellow-400' : 'text-gray-400'} cursor-pointer`}>
+                                             <label htmlFor="dummy-mode-toggle" className={`text-sm font-medium transition-colors ${isDummyModeActive ? 'text-yellow-400' : 'text-gray-400'} cursor-pointer select-none`}>
                                                  Подсказки
                                              </label>
                                          </div>
                                      </TooltipTrigger>
                                      <TooltipContent>
-                                         <p>{isDummyModeActive ? 'Выключить' : 'Включить'} режим подсказок (показать правильный ответ)</p>
+                                         <p>{isDummyModeActive ? 'Выключить' : 'Включить'} режим подсказок (покажет правильный ответ и объяснение)</p>
                                      </TooltipContent>
                                  </Tooltip>
-                             )}
-
-                            {/* === Show Lock Icon/Text if globally disabled === */}
-                            {isDummyModeGloballyDisabled && (
+                             ) : (
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <div className="flex items-center space-x-2 text-yellow-500 opacity-70 cursor-not-allowed">
+                                        <div className="flex items-center space-x-2 text-yellow-600 opacity-80 cursor-not-allowed">
                                             <Lock className="h-5 w-5" />
-                                            <span className="text-sm font-medium">Подсказки</span>
+                                            <span className="text-sm font-medium select-none">Подсказки</span>
                                         </div>
                                     </TooltipTrigger>
                                     <TooltipContent>
                                         <p>Режим подсказок отключен родителем.</p>
                                     </TooltipContent>
                                 </Tooltip>
-                            )}
+                             )}
 
-                            {/* Show button to disable IF NOT already globally disabled */}
                             {!isDummyModeGloballyDisabled && (
                                 <Tooltip>
                                     <TooltipTrigger asChild>
@@ -787,76 +660,73 @@ export default function VprTestPage() {
                                             variant="outline"
                                             size="sm"
                                             onClick={handlePurchaseDisableDummy}
-                                            disabled={isPurchasingDisable || !user?.id}
+                                            disabled={isPurchasingDisable || !user?.id || !dbUser?.id}
                                             className="border-red-500/50 text-red-400 hover:bg-red-900/30 hover:text-red-300 px-2 py-1 h-auto"
+                                            title="Отключить подсказки навсегда (опция для родителя)"
                                         >
                                             {isPurchasingDisable ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4"/>}
                                             <span className="ml-1 text-xs hidden sm:inline">Отключить</span>
                                         </Button>
                                     </TooltipTrigger>
                                     <TooltipContent side="bottom">
-                                        <p>Купить опцию для родителя: <br/> навсегда отключить режим подсказок.</p>
+                                        <p className="text-xs max-w-[200px]">Запросить у родителя <br/> навсегда отключить режим <br/> подсказок для этого <br/> пользователя (через оплату).</p>
                                     </TooltipContent>
                                 </Tooltip>
                              )}
                         </div>
                     </div>
-                    {/* --- END HEADER AREA --- */}
 
-                    <VprDescription description={subject?.description} show={showDescription} />
+                    <VprDescription description={subject.description} show={showDescription} />
                     <VprProgressIndicator current={currentQuestionIndex} total={questions.length} />
 
-                    {/* Question and Answer area with animation */}
                      <motion.div
-                        key={currentQuestionIndex} // Animate when question changes
-                        initial={{ opacity: 0, y: 10 }}
+                        key={currentQuestionIndex}
+                        initial={{ opacity: 0, y: 15 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3 }}
+                        transition={{ duration: 0.3, ease: "easeOut" }}
+                        className="mb-auto"
                     >
                          <VprQuestionContent
-                             questionData={currentQuestionData} // Pass the whole data object
+                             questionData={currentQuestionData}
                              questionNumber={currentQuestionIndex + 1}
                              totalQuestions={questions.length}
                          />
                          <VprAnswerList
                             answers={answersForCurrent}
                             selectedAnswerId={selectedAnswerId}
-                            showFeedback={showFeedback} // For normal feedback
+                            showFeedback={showFeedback}
                             timeUpModal={timeUpModal}
                             handleAnswer={handleAnswer}
-                            isDummyModeActive={isDummyModeActive} // Pass dummy state
+                            isDummyModeActive={isDummyModeActive}
                         />
                      </motion.div>
 
-                     {/* Non-answerable question skip button (restored from context) */}
-                     {isCurrentQuestionNonAnswerable && !showFeedback && !isTestComplete && !timeUpModal && !isDummyModeActive && (
+                     {isCurrentQuestionNonAnswerable && !shouldShowExplanation && !isTestComplete && !timeUpModal && (
                          <div className="mt-4 text-center">
                              <button
-                                onClick={() => handleNextQuestion(true)} // Skip non-answerable question
+                                onClick={() => handleNextQuestion(true)}
                                 disabled={isSaving}
                                 className="bg-brand-purple text-white px-6 py-2 rounded-lg font-semibold hover:bg-brand-purple/80 transition-colors disabled:opacity-50 disabled:cursor-wait"
                              >
                                  Пропустить / Далее
                              </button>
-                             <p className="text-xs text-gray-400 mt-2">Этот вопрос требует рисунка, ввода текста или анализа изображения.</p>
+                             <p className="text-xs text-gray-400 mt-2">Этот вопрос требует рисунка, ввода текста или анализа изображения (нет выбора варианта).</p>
                          </div>
                      )}
 
-                     {/* Explanation Display (Animated, shown in dummy mode or normal feedback) */}
                      <AnimatePresence>
                         {shouldShowExplanation && (
                             <ExplanationDisplay
-                                key={`exp-${currentQuestionIndex}`} // Ensure re-render on question change
+                                key={`exp-${currentQuestionIndex}-${isDummyModeActive}`}
                                 explanation={explanationToShow}
-                                isCorrect={explanationIsCorrectState} // Contextual correctness
-                                onNext={() => handleNextQuestion(false)} // Normal next action
+                                isCorrect={explanationIsCorrectState}
+                                onNext={() => handleNextQuestion(false)}
                                 isLastQuestion={currentQuestionIndex >= questions.length - 1}
-                                isDummyModeExplanation={isDummyModeActive} // Indicate if shown due to dummy mode
+                                isDummyModeExplanation={isDummyModeActive}
                             />
                         )}
                      </AnimatePresence>
 
-                    {/* Reset button (restored from context) */}
                     <div className="mt-auto pt-6 text-center">
                         <button
                             onClick={resetTest}
@@ -864,7 +734,7 @@ export default function VprTestPage() {
                             className="text-xs text-gray-500 hover:text-brand-pink underline transition-colors flex items-center justify-center gap-1 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
                          >
                              <RotateCcw className="h-3 w-3"/>
-                             Сбросить и начать заново
+                             Сбросить и начать другой вариант
                         </button>
                     </div>
                 </div>

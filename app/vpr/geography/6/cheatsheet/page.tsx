@@ -1,212 +1,289 @@
-"use client";
+"use client"; // Ensure this is at the top
 
 import React from 'react';
+import { NextPage } from 'next';
+import Head from 'next/head';
+import Link from 'next/link';
+import Image from 'next/image';
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
-// Corrected: Separated fa imports
-import { FaGlobeAmericas, FaAtlas } from "react-icons/fa";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-    FaMapLocationDot,
-    FaCompass,
-    FaRulerCombined,
-    FaMountain,
-    FaRoute,
-    FaUserSecret,
-    FaWater,
-    FaThermometerHalf,
-    FaCloudSunRain,
-    FaWind,
-    FaTree,
-    FaPaw,
-    FaGlobe,
-    FaTable,
-    FaChartBar,
-    FaRegCompass,
-    FaImage,
-    FaPercent,
-    FaMap,
-    FaUsers
-} from "react-icons/fa6"; // Removed FaGlobeAmericas and FaAtlas from here
-import Link from "next/link";
-import Image from "next/image";
+    FaGlobeAmericas, // Keep for World Map section title
+    FaWater, FaCompass, FaRulerCombined, FaMountain, FaUserSecret,
+    FaThermometerHalf, FaCloudSunRain, FaWind, FaTree, FaPaw, FaGlobeEurope, // Use GlobeEurope for оболочки
+    FaTable, FaRegCompass, FaImage, FaMapLocationDot,
+    FaBookOpen, FaMap, FaUsers, FaBookAtlas // Replaced FaAtlas with FaBookAtlas
+} from "react-icons/fa6";
 
-// --- Component ---
-const VprGeographyCheatsheet: React.FC = () => {
-
-  // Tooltip descriptions for image placeholders
-  const tooltipDescriptions: Record<string, string> = {
-      'geo-continents.png': "Карта мира с выделенными и подписанными материками (Евразия, Африка, Сев. Америка, Юж. Америка, Австралия, Антарктида) и океанами (Тихий, Атлантический, Индийский, Северный Ледовитый).",
-      'geo-coordinates.png': "Изображение Земли с сеткой координат (параллели и меридианы). Показано, как определять широту (от экватора к полюсам) и долготу (от Гринвича на восток и запад).",
-      'geo-explorers.png': "Коллаж из портретов известных путешественников 6 класса (например, Магеллан, Колумб, Васко да Гама, Кук, Беллинсгаузен и Лазарев, Миклухо-Маклай, Тасман) с краткими подписями об их главных открытиях.",
-      // 'geo-topo-map.png': "Фрагмент типичной топографической карты для ВПР с условными знаками (лес, река, луг, родник, строения, горизонтали, шоссе) и масштабом.", // (Not used directly, but kept for reference)
-      // 'geo-scale.png': "Иллюстрация использования линейки для измерения расстояния на карте и его пересчета в реальное расстояние с помощью именованного или численного масштаба.", // (Not used directly, but kept for reference)
-      // 'geo-azimuth.png': "Изображение компаса, показывающего основные и промежуточные стороны горизонта и принцип определения азимута (угол от северного направления по часовой стрелке).", // (Not used directly, but kept for reference)
-      // 'geo-relief.png': "Схематическое изображение холма с горизонталями. Показано, как по сгущению/разрежению горизонталей определить крутизну склона и направление понижения/повышения рельефа.", // (Not used directly, but kept for reference)
-      'geo-natural-zones.png': "Коллаж из фотографий типичных ландшафтов разных природных зон (тундра, тайга, степь, пустыня, саванна, влажные экваториальные леса) с характерными растениями и животными.",
-      'geo-weather-symbols.png': "Таблица с основными условными знаками погоды, используемыми в ВПР (ясно, облачно, пасмурно, дождь, снег, роса, туман, направление и сила ветра).",
-      'geo-wind-rose.png': "Пример розы ветров с объяснением, как определить преобладающее направление ветра и штиль.",
-      'geo-atmosphere.png': "Изображение грозового облака с молнией или торнадо как пример явления в атмосфере.",
-      'geo-biosphere.png': "Фотография разнообразных живых организмов (растения, животные, грибы) во взаимодействии, символизирующая биосферу.",
-      // NEW Tooltips - these are now linked to the actual image components below
-      'IMG_20250420_010735.jpg': "Пояснение: Численный масштаб (1:10000) показывает, во сколько раз уменьшено изображение. Именованный (в 1 см 100 м) говорит, сколько метров на местности соответствует 1 см на карте. Для расчета расстояния измеряем отрезок линейкой и умножаем на величину именованного масштаба.", // Updated key for scale
-      'IMG_20250420_010521.jpg': "Пояснение: Стороны горизонта (С, Ю, З, В и промежуточные) помогают определить общее направление. Азимут - точный угол (0°-360°) от направления на Север по часовой стрелке до направления на объект.", // Updated key for azimuth
-      '3topo.png': "Основные элементы топокарты: Горизонтали показывают высоту и форму рельефа (близко = круто). Стрелка на реке указывает течение (правый/левый берег определяются по течению). Условные знаки обозначают объекты (лес, дом, родник и т.д.).", // Updated key for topo elements
-  };
-
-
-  return (
-    <div className="relative min-h-screen overflow-hidden pt-20 pb-10 bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200">
-       <div
-        className="absolute inset-0 bg-repeat opacity-5 z-0"
-        style={{
-          backgroundImage: `linear-gradient(to right, rgba(0, 255, 157, 0.2) 1px, transparent 1px),
-                            linear-gradient(to bottom, rgba(0, 255, 157, 0.2) 1px, transparent 1px)`,
-          backgroundSize: '50px 50px',
-        }}
-      ></div>
-
-      <TooltipProvider delayDuration={200}>
-          <div className="relative z-10 container mx-auto px-4">
-            <Card className="max-w-5xl mx-auto bg-black/80 backdrop-blur-md text-white rounded-2xl border border-brand-green/30 shadow-[0_0_25px_rgba(0,255,157,0.4)]">
-              <CardHeader className="text-center border-b border-brand-green/20 pb-4">
-                <CardTitle className="text-3xl md:text-5xl font-bold text-brand-green cyber-text glitch" data-text="ВПР География 6 класс: Шпаргалка">
-                 ВПР География 6 класс: Шпаргалка
-                </CardTitle>
-                <p className="text-md md:text-lg text-gray-300 mt-3 font-mono">
-                  Все карты в твоих руках! 🌍🧭
-                </p>
-              </CardHeader>
-
-              <CardContent className="space-y-12 p-4 md:p-8">
-
-                {/* Section: Карта Мира */}
-                <section className="space-y-4">
-                  {/* Corrected icon usage */}
-                  <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-cyan-400 mb-4">
-                    <FaGlobeAmericas className="mr-3 text-cyan-400/80" /> 🗺️ Карта Мира: Основы
-                  </h2>
-                   {/* Subsection: Материки и Океаны */}
-                   <h3 className="flex items-center text-xl font-semibold text-cyan-300 mt-6 mb-2"> <FaWater className="mr-2 text-cyan-300/80" /> Материки и Океаны </h3> <p className="text-gray-300 text-base md:text-lg">Умей находить и называть 6 материков и 4 океана.</p> <div className="my-6 p-2 border border-cyan-500/30 rounded-lg bg-black/30"> <Tooltip>
-                    {/* --- FIX: Removed extra span --- */}
-                    <TooltipTrigger asChild>
-                       <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about//continents-99913414-d4cb-4624-9779-6a7498cbf67a.png" alt="Карта мира с подписанными материками и океанами" width={600} height={338} className="w-full h-full object-cover" loading="lazy"/> </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-cyan-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['geo-continents.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Знаешь, где какой?</p> </div>
-                   {/* Subsection: Координаты и Направления */}
-                   <h3 className="flex items-center text-xl font-semibold text-cyan-300 mt-6 mb-2"> <FaCompass className="mr-2 text-cyan-300/80" /> Координаты и Направления </h3> <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg"> <li><strong>Координаты:</strong> Широта (ю.ш., с.ш.) + Долгота (з.д., в.д.). Умей находить точку по координатам.</li> <li><strong>Направления:</strong> Определяй направление от одной точки к другой (север, юг, запад, восток и промежуточные).</li> </ul> <div className="my-6 p-2 border border-cyan-500/30 rounded-lg bg-black/30 max-w-sm mx-auto"> <Tooltip>
-                    {/* --- FIX: Removed extra span --- */}
-                    <TooltipTrigger asChild>
-                       <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about//latitude-d685bb88-e694-408c-b01d-d285edc6ff29.png" alt="Земля с сеткой координат: параллели (широта) и меридианы (долгота)" width={400} height={400} className="w-full h-full object-cover" loading="lazy"/> </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-cyan-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['geo-coordinates.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Широта, долгота - легко!</p> </div>
-                   {/* Subsection: Путешественники */}
-                   <h3 className="flex items-center text-xl font-semibold text-cyan-300 mt-6 mb-2"> <FaUserSecret className="mr-2 text-cyan-300/80" /> Великие Путешественники </h3> <p className="text-gray-300 text-base md:text-lg">Знай портреты и основные открытия (особенно связанные с материками А и Б из задания 1). Пример: Тасман, Миклухо-Маклай - часто связаны с Австралией.</p> <div className="my-6 p-2 border border-cyan-500/30 rounded-lg bg-black/30"> <Tooltip>
-                    {/* --- FIX: Removed extra span --- */}
-                    <TooltipTrigger asChild>
-                      <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/explorers-673a4b3e-1fdb-42e3-bc14-990493afe92d.png" alt="Коллаж: портреты Магеллана, Колумба, Миклухо-Маклая, Тасмана" width={400} height={400} className="w-full h-full object-cover" loading="lazy"/> </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-cyan-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['geo-explorers.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Узнаешь их в лицо?</p> </div>
-                   {/* Subsection: Географические Объекты */}
-                   <h3 className="flex items-center text-xl font-semibold text-cyan-300 mt-6 mb-2"> <FaImage className="mr-2 text-cyan-300/80" /> Узнаем по Описанию </h3> <p className="text-gray-300 text-base md:text-lg">Умей определять крупные объекты (острова, горы, равнины) по описанию и космическому снимку (Пример: Мадагаскар).</p>
-                </section>
-
-                {/* Section: Топографическая Карта */}
-                <section className="space-y-4 border-t border-orange-500/20 pt-8">
-                  <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-orange-400 mb-4">
-                    <FaMapLocationDot className="mr-3 text-orange-400/80" /> 🗺️ Топографическая Карта: Читаем Местность
-                  </h2>
-                   {/* Subsection: Масштаб и Расстояния */}
-                   <h3 className="flex items-center text-xl font-semibold text-orange-300 mt-6 mb-2"> <FaRulerCombined className="mr-2 text-orange-300/80" /> Масштаб и Расстояния </h3> <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg"> <li><strong>Масштаб:</strong> Численный (1:10000) и Именованный (в 1 см 100 м). Понимай, что он значит.</li> <li><strong>Измерение:</strong> Линейкой измерь расстояние на карте (в см).</li> <li><strong>Расчет:</strong> Расстояние (см) * Величина масштаба (м/см) = Расстояние на местности (м).</li> </ul>
-                   {/* UPDATED Image: Scale Explained */}
-                   <div className="my-6 p-2 border border-orange-500/30 rounded-lg bg-black/30"> <Tooltip>
-                     {/* --- FIX: Removed extra span --- */}
-                     <TooltipTrigger asChild>
-                        <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about//IMG_20250420_010735.jpg" alt="Инфографика, объясняющая численный и именованный масштаб и расчет расстояния по карте." width={600} height={338} className="w-full h-full object-cover" loading="lazy"/> </div>
-                     </TooltipTrigger>
-                     <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-orange-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['IMG_20250420_010735.jpg']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Как работает масштаб?</p> </div>
-
-                   {/* Subsection: Направления и Азимут */}
-                   <h3 className="flex items-center text-xl font-semibold text-orange-300 mt-6 mb-2"> <FaRegCompass className="mr-2 text-orange-300/80" /> Направления и Азимут </h3> <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg"> <li><strong>Стороны горизонта:</strong> С, Ю, З, В, СЗ, СВ, ЮЗ, ЮВ.</li> <li><strong>Направление на карте:</strong> Определяй по расположению объектов (от церкви на СВ).</li> <li><strong>Азимут (редко в 6 кл, но полезно):</strong> Угол между направлением на север и направлением на объект (по часовой стрелке).</li> </ul>
-                   {/* UPDATED Image: Azimuth Explained */}
-                   <div className="my-6 p-2 border border-orange-500/30 rounded-lg bg-black/30 max-w-sm mx-auto"> <Tooltip>
-                    {/* --- FIX: Removed extra span --- */}
-                    <TooltipTrigger asChild>
-                       <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about//IMG_20250420_010521.jpg" alt="Схема компаса, объясняющая стороны горизонта и определение азимута." width={400} height={400} className="w-full h-full object-cover" loading="lazy"/> </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-orange-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['IMG_20250420_010521.jpg']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Определяем курс!</p> </div>
-
-                  {/* Subsection: Рельеф и Условные Знаки */}
-                  <h3 className="flex items-center text-xl font-semibold text-orange-300 mt-6 mb-2"> <FaMountain className="mr-2 text-orange-300/80" /> Рельеф и Условные Знаки </h3> <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg"> <li><strong>Горизонтали:</strong> Линии равных высот. Чем ближе - тем круче склон. Бергштрих показывает направление понижения.</li> <li><strong>Условные знаки:</strong> Знай основные (река, лес, луг, шоссе, церковь, родник, обрыв, болото).</li> <li><strong>Характеристики участка (для выбора):</strong> Ровная поверхность (горизонтали далеко), склон (горизонтали близко), близость к реке/дороге, лес/луг.</li> </ul>
-                  {/* UPDATED Image: Topo Elements */}
-                  <div className="my-6 p-2 border border-orange-500/30 rounded-lg bg-black/30"> <Tooltip>
-                    {/* --- FIX: Removed extra span --- */}
-                    <TooltipTrigger asChild>
-                       <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about//3topo.png" alt="Инфографика с ключевыми элементами топокарты: горизонтали, река, условные знаки." width={600} height={338} className="w-full h-full object-cover" loading="lazy"/> </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-orange-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['3topo.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Читаем карту как книгу!</p> </div>
-                </section>
-
-                {/* Section: Природа Земли */}
-                <section className="space-y-4 border-t border-green-500/20 pt-8">
-                  <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-green-400 mb-4">
-                    <FaTree className="mr-3 text-green-400/80" /> 🌳 Природа Земли
-                  </h2>
-                  {/* Subsection: Природные Зоны */} <h3 className="flex items-center text-xl font-semibold text-green-300 mt-6 mb-2"> <FaPaw className="mr-2 text-green-300/80" /> Природные Зоны </h3> <p className="text-gray-300 text-base md:text-lg">Умей сопоставлять ПЗ (тайга, саванна, пустыня и т.д.) с их географическими особенностями (климат, растительность, животные). Узнавай ПЗ по фото.</p> <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg"> <li><strong>Тайга:</strong> Хвойные леса, умеренный пояс, снежная зима.</li> <li><strong>Саванны и редколесья:</strong> Травы, редкие деревья, жаркий климат с сухим и влажным сезонами, зебры, жирафы (Африка).</li> </ul> <div className="my-6 p-2 border border-green-500/30 rounded-lg bg-black/30"> <Tooltip>
-                    {/* --- FIX: Removed extra span --- */}
-                    <TooltipTrigger asChild>
-                      <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/geo-natural-zones.png" alt="Коллаж: Фотографии тайги, саванны, пустыни, тундры" width={600} height={338} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-green-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['geo-natural-zones.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Где кто живет?</p> </div>
-                  {/* Subsection: Погода и Климат */} <h3 className="flex items-center text-xl font-semibold text-green-300 mt-6 mb-2"> <FaCloudSunRain className="mr-2 text-green-300/80" /> Погода и Климат </h3> <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg"> <li><strong>Погода:</strong> Состояние атмосферы СЕЙЧАС (температура, осадки, ветер, облачность).</li> <li><strong>Условные знаки погоды:</strong> Знай основные значки.</li> <li><strong>Ветер:</strong> Определяй направление по розе ветров (дует ОТТУДА, куда показывает самый длинный луч).</li> <li><strong>Причина смены дня/ночи и времен года:</strong> Осевое вращение Земли (день/ночь, разница во времени), движение Земли вокруг Солнца + наклон оси (времена года).</li> </ul> <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6"> <div className="p-2 border border-green-500/30 rounded-lg bg-black/30"> <Tooltip>
-                    {/* --- FIX: Removed extra span --- */}
-                    <TooltipTrigger asChild>
-                      <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/geo-weather-symbols.png" alt="Таблица с условными знаками погоды" width={400} height={400} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-green-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['geo-weather-symbols.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Что значит этот значок?</p> </div> <div className="p-2 border border-green-500/30 rounded-lg bg-black/30"> <Tooltip>
-                    {/* --- FIX: Removed extra span --- */}
-                    <TooltipTrigger asChild>
-                      <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/geo-wind-rose.png" alt="Пример розы ветров с объяснением" width={400} height={400} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-green-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['geo-wind-rose.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Откуда ветер дует?</p> </div> </div>
-                  {/* Subsection: Географическая Оболочка */} <h3 className="flex items-center text-xl font-semibold text-green-300 mt-6 mb-2"> <FaGlobe className="mr-2 text-green-300/80" /> Географическая Оболочка </h3> <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-base md:text-lg"> <li><strong>Состав:</strong> Литосфера (земная кора), Гидросфера (вода), Атмосфера (воздух), Биосфера (жизнь).</li> <li><strong>Явления:</strong> Умей относить явления (землетрясение, дождь, торнадо, рост растений) к соответствующей оболочке.</li> <li><strong>Влияние человека:</strong> Понимай негативные последствия (загрязнение, вырубка лесов) на биосферу.</li> </ul> <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6"> <div className="p-2 border border-green-500/30 rounded-lg bg-black/30"> <Tooltip>
-                    {/* --- FIX: Removed extra span --- */}
-                    <TooltipTrigger asChild>
-                      <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="/placeholders/geo-atmosphere.png" alt="Изображение торнадо или грозы" width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/> </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-green-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['geo-atmosphere.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Явления в атмосфере.</p> </div> <div className="p-2 border border-green-500/30 rounded-lg bg-black/30"> <Tooltip>
-                    {/* --- FIX: Removed extra span --- */}
-                    <TooltipTrigger asChild>
-                      <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help"> <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/life-77b646d5-16f4-45e1-ab80-a810340f6c40.png" alt="Изображение разнообразных живых организмов" width={400} height={225} className="w-full h-full object-cover" loading="lazy"/> </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-green-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['geo-biosphere.png']}</p></TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">Всё живое - Биосфера.</p> </div> </div>
-                </section>
-
-                {/* Section: Человек на Земле */}
-                <section className="space-y-4 border-t border-yellow-500/20 pt-8">
-                  <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-yellow-400 mb-4">
-                    <FaUsers className="mr-3 text-yellow-400/80" /> 🧍 Человек на Земле
-                  </h2>
-                   <ul className="list-disc list-inside space-y-2 text-gray-300 pl-4 text-base md:text-lg"> <li><strong>Работа с таблицами:</strong> Умей находить нужные данные (численность населения, % городского/сельского), сравнивать, ранжировать страны.</li> <li><strong>Городское/Сельское население:</strong> Понимай, где больше (%).</li> <li><strong>Фото и страна:</strong> Соотноси фотографии (часто с узнаваемыми объектами/животными) со страной из таблицы.</li> <li><strong>Уникальные объекты:</strong> Знай несколько всемирно известных объектов и их примерное расположение (Большой Барьерный риф - Австралия).</li> </ul>
-                   {/* Example: Table icon */} <div className="text-center my-4"><FaTable className="text-6xl text-yellow-400/60 mx-auto"/></div>
-                </section>
-
-                {/* Final Tip */}
-                <section className="border-t border-brand-green/20 pt-8 mt-10 text-center">
-                  <h2 className="flex items-center justify-center text-2xl md:text-3xl font-semibold text-brand-green mb-4">
-                    {/* Corrected icon usage */}
-                    <FaAtlas className="mr-3 text-brand-green/80" /> Главное - Практика!
-                  </h2>
-                   <p className="text-gray-300 text-base md:text-lg leading-relaxed"> Эта шпаргалка - твой компас. Но лучший способ подготовиться - решать <strong className="text-brand-green font-semibold">демоверсии</strong> и <strong className="text-brand-green font-semibold">задания прошлых лет</strong>. Обращай внимание на работу с <strong className="text-brand-green font-semibold">картами</strong> и <strong className="text-brand-green font-semibold">условными знаками</strong>. Ты справишься! </p>
-                </section>
-
-              </CardContent>
-            </Card>
-          </div>
-      </TooltipProvider>
-    </div>
-  );
+// --- Tooltip Descriptions ---
+const tooltipDescriptions: Record<string, string> = {
+    'continents-*.png': "Карта мира с выделенными и подписанными 6 материками (Евразия, Африка, Сев. Америка, Юж. Америка, Австралия, Антарктида) и 4 основными океанами (Тихий, Атлантический, Индийский, Северный Ледовитый). Важно помнить их взаимное расположение и примерные очертания.",
+    'latitude-*.png': "Земной шар с градусной сеткой. Параллели (горизонтальные линии) показывают широту (от 0° на экваторе до 90° на полюсах, северная или южная). Меридианы (вертикальные линии) показывают долготу (от 0° на Гринвиче до 180°, западная или восточная). Координаты точки - это пересечение ее параллели и меридиана.",
+    'explorers-*.png': "Коллаж портретов: Магеллан (первое кругосветное плавание), Колумб (открытие Америки для европейцев), Васко да Гама (морской путь в Индию), Кук (исследование Тихого океана, Австралии), Беллинсгаузен и Лазарев (открытие Антарктиды), Миклухо-Маклай и Тасман (исследование Океании и Австралии). Важно знать их вклад в изучение Земли.",
+    'IMG_20250420_010735.jpg': "Численный масштаб (1:10000) показывает, во сколько раз уменьшено изображение. Именованный (в 1 см 100 м) говорит, сколько метров/км на местности соответствует 1 см на карте. Для расчета расстояния измеряем отрезок линейкой (см) и умножаем на величину именованного масштаба (например, на 100 м/см). Не забывай переводить метры в километры при необходимости (1 км = 1000 м).",
+    'IMG_20250420_010521.jpg': "Стороны горизонта (Север, Юг, Запад, Восток и промежуточные СЗ, СВ, ЮЗ, ЮВ) помогают определить общее направление движения или расположения объектов. Азимут - точный угол (от 0° до 360°) от направления на Север по часовой стрелке до направления на объект. Определяется компасом или транспортиром на карте.",
+    '3topo.png': "Топографическая карта: Горизонтали (линии равных высот) показывают рельеф (близко = круто, далеко = полого). Бергштрих - короткая черточка на горизонтали, показывающая направление понижения склона (куда стекает вода). Стрелка на реке указывает направление течения (правый/левый берег определяются стоя по течению). Условные знаки обозначают объекты (лес, дом, родник, болото, дорога, мост, школа и т.д.).",
+    'geo-natural-zones-*.png': "Коллаж ландшафтов: Арктическая пустыня/Тундра (снег, лед, мхи, лишайники, мало тепла), Тайга (хвойный лес, умеренный климат, четкие сезоны), Степь (травы, плодородные почвы, засушливое лето), Пустыня (жарко/холодно, очень сухо, песок/камни, редкая растительность), Саванна (травы, редкие деревья, жаркий климат с сухим и влажным сезонами, Африка), Влажный экваториальный лес (джунгли, жарко и влажно круглый год, буйная растительность).",
+    'geo-weather-symbols-*.png': "Основные условные знаки погоды: Солнце (ясно), Солнце за тучей (переменная облачность), Туча (облачно), Туча с каплями (дождь), Туча со снежинками (снег), Стрелка ветра (показывает направление ОТКУДА дует, скорость по числу 'перьев' на хвосте), Три горизонтальные линии (туман), Капля на поверхности (роса).",
+    'geo-wind-rose-*.png': "Роза ветров: График повторяемости ветров разных направлений. Лучи показывают частоту ветра С указанного направления (самый длинный луч = преобладающий ветер). Длина луча пропорциональна числу дней или %. Цифра в центре круга - процент штиля (безветрия). Разные цвета/отрезки на лучах могут показывать разную скорость ветра.",
+    'geo-atmosphere-*.png': "Примеры атмосферных явлений: Гроза (мощные кучево-дождевые облака, молнии, гром, сильный ливень, иногда град, шквалистый ветер) и Торнадо/Смерч (сильный вращающийся вихрь воздуха, связанный с грозовым облаком, опускающийся к земле). Оба явления происходят в нижнем слое атмосферы - Тропосфере.",
+    'life-*.png': "Биосфера - это 'оболочка жизни', охватывающая все живые организмы (растения, животные, грибы, микроорганизмы) и ту часть Земли, где они обитают (нижняя атмосфера, вся гидросфера, верхняя литосфера). Организмы тесно взаимодействуют друг с другом и с неживой природой.",
 };
 
-export default VprGeographyCheatsheet;
+
+// --- Component ---
+const VprGeographyCheatsheet6: NextPage = () => {
+    // Helper function to get tooltip text
+    const getTooltip = (keyPart: string) => {
+        const key = Object.keys(tooltipDescriptions).find(k => k.includes(keyPart));
+        return key ? tooltipDescriptions[key] : `Описание для ${keyPart}`;
+    };
+
+    // Helper component for images with tooltips
+    const ImageWithTooltip = ({ src, alt, width, height, className = '', tooltipKeyPart, aspect = 'video', bgColor = 'bg-gray-700/30' }: { src: string, alt: string, width: number, height: number, className?: string, tooltipKeyPart: string, aspect?: 'video' | 'square' | 'auto', bgColor?: string }) => (
+        <div className={`p-2 border border-gray-500/30 rounded-lg ${bgColor} hover:shadow-lg hover:shadow-purple-500/20 transition-shadow duration-300`}>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <div className={`${aspect === 'video' ? 'aspect-video' : aspect === 'square' ? 'aspect-square' : ''} w-full h-auto overflow-hidden rounded ${bgColor} cursor-help`}>
+                        <Image
+                            src={src.startsWith('/placeholders/') ? src : src.replace('about//', 'about/')} // Fix double slash if needed
+                            alt={alt}
+                            width={width}
+                            height={height}
+                            className={`w-full h-full object-cover ${src.startsWith('/placeholders/') ? 'opacity-50' : ''} ${className}`}
+                            loading="lazy"
+                        />
+                    </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[300px] bg-gray-950 border border-purple-500/60 text-white p-3 shadow-lg z-50">
+                    <p className="text-sm">{getTooltip(tooltipKeyPart)}</p>
+                </TooltipContent>
+            </Tooltip>
+            <p className="text-xs text-center text-gray-400 mt-1 italic">{alt.split(':')[0]}</p> {/* Shorten alt for caption */}
+        </div>
+    );
+
+
+    return (
+        <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200">
+            <Head>
+                <title>ВПР География 6 класс: Шпаргалка</title>
+                <meta name="description" content="Подробная шпаргалка по географии для подготовки к ВПР в 6 классе: карты, оболочки Земли, погода, климат, топография, страны." />
+                <link rel="icon" href="/favicon.ico" />
+            </Head>
+
+            <TooltipProvider delayDuration={150}>
+                <main className="flex-grow container mx-auto px-4 py-12 md:py-16">
+                    <h1 className="text-3xl md:text-5xl font-bold mb-8 text-center text-brand-green cyber-text glitch" data-text="ВПР География 6 класс: Шпаргалка">
+                        <FontAwesomeIcon icon={FaBookOpen} className="mr-3 text-brand-green/80" />
+                        ВПР География 6 класс: Шпаргалка
+                    </h1>
+
+                    <Card className="max-w-6xl mx-auto bg-black/85 backdrop-blur-lg text-white rounded-2xl border border-brand-purple/40 shadow-[0_0_30px_rgba(157,0,255,0.3)]">
+                         <CardHeader className="text-center border-b border-brand-purple/20 pb-4 pt-6">
+                            <p className="text-md md:text-lg text-gray-300 mt-2 font-mono">
+                              Ключевые темы для успешной сдачи ВПР! 🌍🧭📊
+                            </p>
+                         </CardHeader>
+
+                        <CardContent className="space-y-16 p-4 md:p-8"> {/* Increased space between sections */}
+
+                            {/* Section: Карта Мира */}
+                            <section className="space-y-6">
+                                <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-cyan-400 mb-4 border-b-2 border-cyan-500/40 pb-3">
+                                    <FontAwesomeIcon icon={FaGlobeAmericas} className="mr-3 text-cyan-400/80 fa-fw" /> Карта Мира: Основы
+                                </h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                    {/* Subsection: Материки и Океаны */}
+                                    <div className="border-l-4 border-cyan-700 pl-4">
+                                        <h3 className="flex items-center text-xl font-semibold text-cyan-300 mb-3"> <FontAwesomeIcon icon={FaWater} className="mr-2 text-cyan-300/80 fa-fw" /> Материки и Океаны </h3>
+                                        <p className="text-gray-300 text-base md:text-lg mb-4">Необходимо уверенно находить на карте 6 материков (Евразия, Африка, Северная Америка, Южная Америка, Австралия, Антарктида) и 4-5 океанов (Тихий, Атлантический, Индийский, Северный Ледовитый; Южный). Обращай внимание на их относительные размеры и расположение друг относительно друга (кто соседи?).</p>
+                                        <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/continents-99913414-d4cb-4624-9779-6a7498cbf67a.png" alt="Материки и океаны: Где какой?" width={600} height={338} tooltipKeyPart="continents-*.png" aspect="square" />
+                                    </div>
+                                    {/* Subsection: Координаты и Направления */}
+                                    <div className="border-l-4 border-cyan-700 pl-4">
+                                        <h3 className="flex items-center text-xl font-semibold text-cyan-300 mb-3"> <FontAwesomeIcon icon={FaCompass} className="mr-2 text-cyan-300/80 fa-fw" /> Координаты и Направления </h3>
+                                        <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg mb-4">
+                                            <li><strong>Географические координаты:</strong> Широта (градусы к северу или югу от экватора, 0-90°, с.ш./ю.ш.) + Долгота (градусы к западу или востоку от Гринвича, 0-180°, з.д./в.д.). Практикуйся находить точку по координатам и определять координаты заданного объекта.</li>
+                                            <li><strong>Стороны горизонта:</strong> Определяй направление от одного объекта к другому (например, Африка находится к югу от Евразии, Тихий океан к востоку от Азии). Используй основные (С, Ю, З, В) и промежуточные (СЗ, СВ, ЮЗ, ЮВ) направления.</li>
+                                        </ul>
+                                        <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/latitude-d685bb88-e694-408c-b01d-d285edc6ff29.png" alt="Координаты: Широта и долгота?" width={400} height={400} tooltipKeyPart="latitude-*.png" aspect="square" />
+                                    </div>
+                                    {/* Subsection: Путешественники */}
+                                    <div className="border-l-4 border-cyan-700 pl-4 lg:col-span-1 md:col-span-2"> {/* Span 2 on md if needed */}
+                                        <h3 className="flex items-center text-xl font-semibold text-cyan-300 mb-3"> <FontAwesomeIcon icon={FaUserSecret} className="mr-2 text-cyan-300/80 fa-fw" /> Великие Путешественники </h3>
+                                        <p className="text-gray-300 text-base md:text-lg mb-4">Узнавай по портретам и кратко опиши главные открытия/маршруты (особенно тех, кто связан с материками А и Б из задания 1 ВПР). Например: Магеллан (доказал шарообразность Земли), Колумб (путь в Америку), Васко да Гама (морской путь в Индию), Джеймс Кук (Тихий океан), Беллинсгаузен и Лазарев (Антарктида), Тасман и Миклухо-Маклай (Австралия, Океания).</p>
+                                        <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/explorers-673a4b3e-1fdb-42e3-bc14-990493afe92d.png" alt="Путешественники: Узнаешь их?" width={600} height={338} tooltipKeyPart="explorers-*.png" aspect="video" />
+                                    </div>
+                                    {/* Subsection: Географические Объекты по описанию */}
+                                     <div className="border-l-4 border-cyan-700 pl-4 md:col-span-2 lg:col-span-3"> {/* Span full width on lg */}
+                                        <h3 className="flex items-center text-xl font-semibold text-cyan-300 mb-3"> <FontAwesomeIcon icon={FaImage} className="mr-2 text-cyan-300/80 fa-fw" /> Узнаем по Описанию / Фото / Снимку </h3>
+                                        <p className="text-gray-300 text-base md:text-lg">Часто нужно определить крупный географический объект (остров, полуостров, горы, равнину, реку, озеро, море, залив, пролив) по его характерным чертам, краткому описанию или космическому снимку. Обращай внимание на форму, размеры, положение относительно других объектов, климатические особенности. Пример: Мадагаскар (крупный остров у Африки), Амазонка (самая полноводная река в Южной Америке), Анды (длинные горы на западе Южной Америки), Гималаи (высочайшие горы в Азии), Аравийский п-ов (крупнейший полуостров).</p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Section: Топографическая Карта */}
+                            <section className="space-y-6 border-t-2 border-orange-500/30 pt-8">
+                                <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-orange-400 mb-4 border-b-2 border-orange-500/40 pb-3">
+                                    <FontAwesomeIcon icon={FaMapLocationDot} className="mr-3 text-orange-400/80 fa-fw" /> Топографическая Карта: Читаем Местность
+                                </h2>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                    {/* Subsection: Масштаб и Расстояния */}
+                                    <div className="border-l-4 border-orange-700 pl-4">
+                                        <h3 className="flex items-center text-xl font-semibold text-orange-300 mb-3"> <FontAwesomeIcon icon={FaRulerCombined} className="mr-2 text-orange-300/80 fa-fw" /> Масштаб и Расстояния </h3>
+                                        <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg mb-4">
+                                            <li><strong>Виды масштаба:</strong> Численный (дробь, 1:10000) показывает степень уменьшения. Именованный (текстом, в 1 см - 100 м) удобен для расчетов. Линейный (график) для измерения циркулем.</li>
+                                            <li><strong>Измерение:</strong> Приложи линейку к карте, измерь расстояние между точками в сантиметрах.</li>
+                                            <li><strong>Расчет:</strong> Умножь измеренное расстояние (см) на величину именованного масштаба (число метров или км в 1 см). Пример: на карте 3 см, масштаб в 1 см 100 м. Расстояние = 3 * 100 = 300 м.</li>
+                                            <li><strong>Точность:</strong> Старайся измерять как можно точнее, особенно если линия изогнутая (используй нитку или курвиметр, если разрешено).</li>
+                                        </ul>
+                                        <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250420_010735.jpg" alt="Масштаб: Как рассчитать расстояние?" width={600} height={338} tooltipKeyPart="IMG_20250420_010735.jpg" aspect="video" />
+                                    </div>
+
+                                    {/* Subsection: Направления и Азимут */}
+                                    <div className="border-l-4 border-orange-700 pl-4">
+                                        <h3 className="flex items-center text-xl font-semibold text-orange-300 mb-3"> <FontAwesomeIcon icon={FaRegCompass} className="mr-2 text-orange-300/80 fa-fw" /> Направления и Азимут </h3>
+                                        <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg mb-4">
+                                            <li><strong>Стороны горизонта:</strong> Основные (Север, Юг, Запад, Восток) и промежуточные (Северо-Запад, Северо-Восток, Юго-Запад, Юго-Восток). Умей определять их на карте (обычно север сверху).</li>
+                                            <li><strong>Определение направления:</strong> Мысленно встань в начальную точку, посмотри на конечную и определи, в каком секторе она находится (например, школа находится от моста на юго-восток).</li>
+                                            <li><strong>Азимут (важно!):</strong> Угол от 0° до 360° между направлением на СЕВЕР и направлением на объект, измеряемый ПО ЧАСОВОЙ СТРЕЛКЕ. Используй транспортир: центр в начальной точке, 0° на север, измерь угол до линии на объект.</li>
+                                        </ul>
+                                         <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/IMG_20250420_010521.jpg" alt="Направления и азимут: Определяем курс?" width={400} height={400} tooltipKeyPart="IMG_20250420_010521.jpg" aspect="square" />
+                                    </div>
+
+                                    {/* Subsection: Рельеф и Условные Знаки */}
+                                    <div className="border-l-4 border-orange-700 pl-4">
+                                        <h3 className="flex items-center text-xl font-semibold text-orange-300 mb-3"> <FontAwesomeIcon icon={FaMountain} className="mr-2 text-orange-300/80 fa-fw" /> Рельеф и Условные Знаки </h3>
+                                        <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg mb-4">
+                                            <li><strong>Горизонтали (Изогипсы):</strong> Линии, соединяющие точки с одинаковой абсолютной высотой. Их значения подписаны. Сближение = крутой склон, расхождение = пологий.</li>
+                                            <li><strong>Бергштрих:</strong> Короткая черточка на горизонтали, направленная в сторону понижения склона. Помогает определить холм или впадину.</li>
+                                            <li><strong>Условные знаки:</strong> Выучи НАИЗУСТЬ основные знаки ВПР: лес (хвойный, лиственный, смешанный), луг, кустарник, река (со стрелкой течения), озеро, болото, родник, колодец, мост (деревянный, металлический), дом (жилой, нежилой), школа, церковь, пашня, сад, обрыв, яма, шоссе, улучшенная грунтовая дорога, тропа, ЛЭП.</li>
+                                            <li><strong>Профиль рельефа:</strong> График, показывающий вид местности в разрезе по заданной линии. Строится по высотам точек пересечения линии с горизонталями.</li>
+                                            <li><strong>Выбор участка:</strong> Анализируй карту для выбора места под разные цели (ровная площадка для футбола - горизонтали далеко; крутой склон для санок - горизонтали близко; ферма - у воды, у дороги, на ровном месте).</li>
+                                        </ul>
+                                        <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/3topo.png" alt="Топокарта: Читаем рельеф и знаки?" width={600} height={338} tooltipKeyPart="3topo.png" aspect="square" />
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Section: Географические Оболочки и Природа Земли */}
+                            <section className="space-y-6 border-t-2 border-green-500/30 pt-8">
+                                <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-green-400 mb-4 border-b-2 border-green-500/40 pb-3">
+                                    <FontAwesomeIcon icon={FaGlobeEurope} className="mr-3 text-green-400/80 fa-fw" /> Оболочки Земли и Природа
+                                </h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                    {/* Subsection: Оболочки */}
+                                    <div className="border-l-4 border-green-700 pl-4">
+                                        <h3 className="flex items-center text-xl font-semibold text-green-300 mb-3"> <FontAwesomeIcon icon={FaGlobeEurope} className="mr-2 text-green-300/80 fa-fw" /> Оболочки Земли </h3>
+                                        <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg mb-4">
+                                            <li><strong>Литосфера:</strong> Твердая оболочка (земная кора, верхняя мантия). Включает рельеф (горы, равнины). Процессы: землетрясения, вулканизм, выветривание, движение литосферных плит.</li>
+                                            <li><strong>Гидросфера:</strong> Водная оболочка (океаны, моря, реки, озера, ледники, подземные воды, вода в атмосфере). Процессы: круговорот воды, течения, волны, приливы/отливы, замерзание/таяние.</li>
+                                            <li><strong>Атмосфера:</strong> Воздушная оболочка. Слои: тропосфера (где погода), стратосфера (озоновый слой), и т.д. Состав: азот, кислород и др. Процессы: ветер, осадки, облака, грозы, изменение давления и температуры.</li>
+                                            <li><strong>Биосфера:</strong> Оболочка жизни (все живые организмы). Процессы: фотосинтез, дыхание, питание, размножение, взаимодействие организмов, образование почвы.</li>
+                                        </ul>
+                                         <p className="text-gray-300 text-base md:text-lg mb-4">Умей относить природные явления (дождь, землетрясение, цветение, извержение вулкана, таяние ледника) к соответствующей оболочке.</p>
+                                         <div className="space-y-4">
+                                            <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/geo-atmosphere-collage-eff574ec-a074-4dea-be8c-4746a9175e86.png" alt="Атмосфера: Гроза и торнадо?" width={400} height={225} tooltipKeyPart="geo-atmosphere-*.png" aspect="square" />
+                                            <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/life-77b646d5-16f4-45e1-ab80-a810340f6c40.png" alt="Биосфера: Разнообразие жизни?" width={400} height={225} tooltipKeyPart="life-*.png" aspect="square" />
+                                         </div>
+                                    </div>
+                                    {/* Subsection: Природные Зоны */}
+                                    <div className="border-l-4 border-green-700 pl-4">
+                                        <h3 className="flex items-center text-xl font-semibold text-green-300 mb-3"> <FontAwesomeIcon icon={FaPaw} className="mr-2 text-green-300/80 fa-fw" /> Природные Зоны (ПЗ) </h3>
+                                        <p className="text-gray-300 text-base md:text-lg mb-4">Крупные участки суши с закономерно повторяющимися сочетаниями климата, почв, растительности и животного мира. Их смена зависит в первую очередь от географической широты (количества тепла и влаги).</p>
+                                        <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-sm md:text-base mb-4">
+                                             <li><strong>Аркт. пустыни/Тундра:</strong> Очень холодно, мало осадков, вечная мерзлота, мхи, лишайники, карликовые ивы/березы, сев. олень, песец, лемминг.</li>
+                                             <li><strong>Тайга:</strong> Умеренный пояс (холодная зима, теплое лето), хвойные леса (ель, пихта, сосна, лиственница), подзолистые почвы, бурый медведь, лось, волк, белка.</li>
+                                             <li><strong>Смешанные/Широколиств. леса:</strong> Умеренный пояс (теплее тайги), смешанные или лиственные деревья (дуб, клен, береза), более плодородные почвы, олень, кабан, лиса.</li>
+                                             <li><strong>Степи/Лесостепи:</strong> Умеренный пояс (теплое, засушливое лето), преобладание трав, плодородные черноземы, грызуны (суслики, хомяки), степные орлы, сайгаки.</li>
+                                             <li><strong>Пустыни/Полупустыни:</strong> Разные пояса, очень сухо, большие перепады температур, песок/камни, скудная растительность (саксаул, верблюжья колючка, кактусы), верблюды, змеи, ящерицы.</li>
+                                             <li><strong>Саванны:</strong> Субэкваториальный пояс, жарко, четкий сухой и влажный сезоны, высокие травы, редкие деревья (акация, баобаб), красно-бурые почвы, слоны, жирафы, зебры, львы (особенно в Африке).</li>
+                                             <li><strong>Влажные экваториальные леса (Гилея):</strong> Экваториальный пояс, жарко и влажно круглый год, многоярусный вечнозеленый лес, лианы, красно-желтые ферраллитные почвы, обезьяны, попугаи, змеи, огромное разнообразие насекомых.</li>
+                                        </ul>
+                                         <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/geo-natural-zones-3f1c6f06-3cdd-49e4-91ee-b551ed244290.png" alt="Природные зоны: Где кто живет?" width={600} height={338} tooltipKeyPart="geo-natural-zones-*.png" aspect="square" />
+                                    </div>
+                                     {/* Subsection: Погода и Климат */}
+                                    <div className="border-l-4 border-green-700 pl-4">
+                                        <h3 className="flex items-center text-xl font-semibold text-green-300 mb-3"> <FontAwesomeIcon icon={FaCloudSunRain} className="mr-2 text-green-300/80 fa-fw" /> Погода и Климат </h3>
+                                        <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg mb-4">
+                                            <li><strong>Погода:</strong> Состояние тропосферы в данном месте в данный момент (или за короткий период). Характеристики: температура воздуха (t°), атм. давление, ветер (направление, скорость), влажность, облачность, осадки. Погода изменчива.</li>
+                                            <li><strong>Климат:</strong> Многолетний (десятки лет) режим погоды, типичный для данной местности. Определяется климатообразующими факторами (геогр. широта, близость океана, рельеф и др.). Климат определяет ПЗ.</li>
+                                            <li><strong>Условные знаки погоды:</strong> Необходимо знать для чтения синоптических карт и дневников наблюдений.</li>
+                                            <li><strong>Ветер:</strong> Горизонтальное движение воздуха из области высокого давления в область низкого. Роза ветров показывает преобладающие направления (откуда дует чаще всего). Скорость измеряется анемометром (м/с).</li>
+                                            <li><strong>Температура воздуха:</strong> Измеряется термометром (°C). Среднесуточная t° = сумма всех измерений за сутки / число измерений. Амплитуда t° = max t° - min t°.</li>
+                                            <li><strong>Смена дня и ночи:</strong> Результат вращения Земли вокруг своей оси (период ~24 часа).</li>
+                                            <li><strong>Смена времен года:</strong> Результат вращения Земли вокруг Солнца и наклона земной оси к плоскости орбиты (период ~365 дней).</li>
+                                        </ul>
+                                        <div className="grid grid-cols-2 gap-4">
+                                          <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/geo-weather-symbols-9deca9a2-1000-47f7-a13b-cf3c2e4980dd.png" alt="Знаки погоды: Расшифровываем?" width={400} height={400} tooltipKeyPart="geo-weather-symbols-*.png" aspect="square" bgColor="bg-white/90" />
+                                          <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/geo-wind-rose.png-bc50103a-016a-4d39-a1a6-595d018ec926.jpg" alt="Роза ветров: Какой ветер главный?" width={400} height={400} tooltipKeyPart="geo-wind-rose-*.png" aspect="square" />
+                                        </div>
+                                    </div>
+                                </div>
+                             </section>
+
+                            {/* Section: Человек на Земле */}
+                            <section className="space-y-6 border-t-2 border-yellow-500/30 pt-8">
+                                <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-yellow-400 mb-4 border-b-2 border-yellow-500/40 pb-3">
+                                    <FontAwesomeIcon icon={FaUsers} className="mr-3 text-yellow-400/80 fa-fw" /> Человек на Земле: Страны и Статистика
+                                </h2>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="border-l-4 border-yellow-700 pl-4">
+                                        <h3 className="flex items-center text-xl font-semibold text-yellow-300 mb-3"> <FontAwesomeIcon icon={FaTable} className="mr-2 text-yellow-300/80 fa-fw" /> Работа с Таблицами и Диаграммами </h3>
+                                        <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg">
+                                            <li><strong>Извлечение данных:</strong> Внимательно читай заголовки строк и столбцов. Находи конкретные значения (например, численность населения Китая, площадь России).</li>
+                                            <li><strong>Сравнение:</strong> Сравнивай показатели разных стран (У какой страны ВВП на душу населения выше? Какая страна имеет большую площадь?).</li>
+                                            <li><strong>Ранжирование:</strong> Располагай страны/регионы в порядке возрастания или убывания по заданному показателю (например, по численности населения).</li>
+                                            <li><strong>Расчет доли:</strong> Вычисляй долю городского/сельского населения (например, (число горожан / общая численность) * 100%).</li>
+                                            <li><strong>Анализ диаграмм:</strong> Определяй наибольшие/наименьшие значения по столбчатым или круговым диаграммам (например, какая отрасль экономики преобладает в стране?).</li>
+                                        </ul>
+                                        <div className="text-center my-6"><FontAwesomeIcon icon={FaTable} className="text-6xl text-yellow-400/60 mx-auto hover:text-yellow-300 transition-colors"/> <p className="text-sm text-gray-400 mt-2">Таблицы и диаграммы - ключ к успеху в заданиях 7-8!</p></div>
+                                    </div>
+                                    <div className="border-l-4 border-yellow-700 pl-4">
+                                        <h3 className="flex items-center text-xl font-semibold text-yellow-300 mb-3"> <FontAwesomeIcon icon={FaMap} className="mr-2 text-yellow-300/80 fa-fw" /> Страны, Народы, Объекты </h3>
+                                        <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg">
+                                            <li><strong>Фото и страна/регион:</strong> Умей соотносить фотографии типичных ландшафтов, известных достопримечательностей, национальных костюмов или животных с определенной страной или регионом России (например, самурай - Япония, тундра с оленями - Север России).</li>
+                                            <li><strong>Столицы:</strong> Знай столицы крупнейших стран мира и стран-соседей России (Пекин, Вашингтон, Дели, Астана, Минск, Киев и др.).</li>
+                                            <li><strong>Народы России:</strong> Имей представление о народах, населяющих разные регионы России (татары, башкиры, якуты, народы Кавказа и др.) и их традициях.</li>
+                                            <li><strong>Всемирное наследие:</strong> Знай несколько объектов Всемирного природного и культурного наследия ЮНЕСКО в России (Байкал, вулканы Камчатки, Кремль и Красная площадь) и в мире (Пирамиды Египта, Великая Китайская стена, Тадж-Махал).</li>
+                                            <li><strong>Влияние человека на природу:</strong> Понимай основные экологические проблемы (загрязнение воздуха/воды, мусор, вырубка лесов, истощение ресурсов) и пути их решения (заповедники, переработка отходов, 'зеленая' энергетика).</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </section>
+
+                            {/* Final Tip */}
+                            <section className="border-t-2 border-brand-green/30 pt-8 mt-12 text-center">
+                                <h2 className="flex items-center justify-center text-2xl md:text-3xl font-semibold text-brand-green mb-4">
+                                    <FontAwesomeIcon icon={FaBookAtlas} className="mr-3 text-brand-green/80 fa-fw" /> Главное - Практика и Атлас!
+                                </h2>
+                                <p className="text-gray-300 text-base md:text-lg leading-relaxed max-w-3xl mx-auto">
+                                    Эта шпаргалка поможет вспомнить ключевые моменты. Но самый эффективный способ подготовки - это <strong className="text-brand-green font-semibold">решение демоверсий ВПР</strong> и заданий прошлых лет с использованием <strong className="text-brand-green font-semibold">школьного атласа за 6 класс</strong>. Учись быстро находить нужную информацию на картах, понимать условные знаки и анализировать таблицы.
+                                    <br /> <br />
+                                    Не бойся заданий, внимательно читай условия и используй все свои знания! Удачи!
+                                </p>
+                                <div className="mt-10">
+                                    <Link href="/vpr-tests" legacyBehavior>
+                                      <a className="inline-block bg-gradient-to-r from-green-500 to-cyan-500 hover:from-green-400 hover:to-cyan-400 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5">
+                                         &larr; К другим тестам и шпаргалкам ВПР
+                                      </a>
+                                    </Link>
+                                </div>
+                            </section>
+
+                        </CardContent>
+                    </Card>
+                </main>
+            </TooltipProvider>
+
+            {/* Optional Footer could be added here */}
+        </div>
+    );
+};
+
+export default VprGeographyCheatsheet6;

@@ -1,8 +1,14 @@
 /* /app/globals.css */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
+@import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&display=swap');
+.font-comic {
+  font-family: 'Comic Neue', cursive;
+}
+/* Orbitron Font Import - Correctly placed at the end */
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap");
 :root {
   --background: 0 0% 0%;
   --foreground: 0 0% 100%;
@@ -283,12 +289,7 @@ input[type="search"]::-ms-clear {
     background-position: 200px 200px;
   }
 }
-@import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&display=swap');
-.font-comic {
-  font-family: 'Comic Neue', cursive;
-}
-/* Orbitron Font Import - Correctly placed at the end */
-@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap");
+
 @font-face {
   font-family: 'Orbitron';
   src: url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
