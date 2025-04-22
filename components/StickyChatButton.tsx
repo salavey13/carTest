@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
     FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard,
-    FaPaperPlane, FaLightbulb, FaImages, FaSquareArrowUpRight // Corrected icon import
+    FaPaperPlane, FaLightbulb, FaImages, FaSquareArrowUpRight
 } from "react-icons/fa6";
 
 // Import Subcomponents
@@ -14,13 +14,12 @@ import { FloatingActionButton } from "@/components/stickyChat_components/Floatin
 import { SpeechBubble } from "@/components/stickyChat_components/SpeechBubble";
 import { CharacterDisplay } from "@/components/stickyChat_components/CharacterDisplay";
 import { SuggestionList } from "@/components/stickyChat_components/SuggestionList";
-import { ImageReplaceTool } from "@/components/stickyChat_components/ImageReplaceTool"; // IMPORT the new component
+import { ImageReplaceTool } from "@/components/stickyChat_components/ImageReplaceTool";
 import { toast } from "sonner";
 
 // Import Context & Actions
 import { useAppContext } from "@/contexts/AppContext";
 import { getGitHubUserProfile } from "@/app/actions_github/actions";
-// NO LONGER NEED uploadImage here
 
 // --- Constants & Types ---
 const AUTO_OPEN_DELAY_MS = 13000;
@@ -55,18 +54,65 @@ const childVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y:
 const fabVariants = { hidden: { scale: 0, opacity: 0 }, visible: { scale: 1, opacity: 1, rotate: [0, 10, -10, 5, -5, 0], transition: { scale: { duration: 0.4, ease: "easeOut" }, opacity: { duration: 0.4, ease: "easeOut" }, rotate: { repeat: Infinity, duration: 3, ease: "easeInOut", delay: 1 } } }, exit: { scale: 0, opacity: 0, transition: { duration: 0.3 } } };
 
 // --- Helper Functions ---
-const isImageUrl = (url: string): boolean => {
+const isValidUrl = (url: string): boolean => {
   if (!url) return false;
   try {
+    const parsed = new URL(url);
+    return ['http:', 'https:'].includes(parsed.protocol);
+  } catch (_) {
+    return false;
+  }
+};
+
+// --- UPDATED isImageUrl Function ---
+const isImageUrl = (url: string): boolean => {
+  if (!url || !isValidUrl(url)) { // Ensure it's a valid URL first
+    return false;
+  }
+
+  const knownImageServiceHosts = ['placehold.co', 'via.placeholder.com', 'picsum.photos', 'dummyimage.com', 'source.unsplash.com']; // Add more known hosts
+  const imageFormatSegmentsOrExt = /\.(png|jpg|jpeg|gif|webp|svg)$|\/(png|jpg|jpeg|gif|webp|svg)([\/?#]|$)/i; // Checks extension OR format as a path segment
+
+  try {
     const parsedUrl = new URL(url);
-    return /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(parsedUrl.pathname);
-  } catch (e) { return false; }
+    const pathnameLower = parsedUrl.pathname.toLowerCase();
+    const hostnameLower = parsedUrl.hostname.toLowerCase();
+
+    // 1. Check standard extensions OR format segments in the pathname
+    if (imageFormatSegmentsOrExt.test(pathnameLower)) {
+      return true;
+    }
+
+    // 2. Check known image service hostnames
+    if (knownImageServiceHosts.some(host => hostnameLower.endsWith(host))) {
+         // Assume URLs from these hosts are images, especially if path isn't just "/"
+         return parsedUrl.pathname !== '/';
+    }
+
+    // 3. Optional: Check specific query parameters (if needed, more complex)
+    // const searchParams = parsedUrl.searchParams;
+    // if (searchParams.get('format')?.match(/^(png|jpg|jpeg|gif|webp|svg)$/i)) {
+    //   return true;
+    // }
+
+    // 4. Check if Content-Type might be implied (e.g., GitHub avatars often lack extensions)
+    // This is heuristic and might give false positives/negatives
+    if (hostnameLower.includes('githubusercontent.com') && pathnameLower.includes('/u/')) {
+        return true; // Likely a GitHub user avatar
+    }
+     if (hostnameLower.includes('googleusercontent.com') && pathnameLower.includes('/a/')) {
+         return true; // Likely a Google Workspace profile image or similar
+     }
+
+
+    return false; // Default to false
+
+  } catch (e) {
+    console.error("Error parsing URL in isImageUrl:", e);
+    return false;
+  }
 };
-const isValidUrl = (url: string): boolean => { // Keep this helper here or move to utils
-  if (!url) return false;
-  try { new URL(url); return url.startsWith('http://') || url.startsWith('https://'); }
-  catch (_) { return false; }
-};
+// --- End UPDATED isImageUrl Function ---
 
 // --- Main Component (Orchestrator) ---
 const StickyChatButton: React.FC = () => {
@@ -92,7 +138,7 @@ const StickyChatButton: React.FC = () => {
     }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading]);
 
 
-    // --- Suggestion Logic (Modified) ---
+    // --- Suggestion Logic (Uses updated isImageUrl) ---
     const suggestions = useMemo((): Suggestion[] => {
         const baseSuggestions: Suggestion[] = [];
         const isToolPage = currentPath === '/repo-xml';
@@ -119,12 +165,12 @@ const StickyChatButton: React.FC = () => {
             tooltip: "Узнать о SelfDev пути и заказать консультацию"
         });
 
-        // Add Image Replace Trigger IF an image URL is detected in customIdea
+        // Add Image Replace Trigger IF an image URL is detected
         if (potentialOldImageUrl && !isToolPage && !showReplaceTool) {
-            baseSuggestions.unshift({ // Add to the beginning
+            baseSuggestions.unshift({
                 id: REPLACE_IMAGE_ID,
                 text: "Заменить Картинку? 🖼️",
-                action: () => setShowReplaceTool(true), // Action to show the tool
+                action: () => setShowReplaceTool(true),
                 icon: <FaImages className="mr-1.5 text-blue-400" />,
                 tooltip: `Начать процесс замены картинки: ${potentialOldImageUrl.substring(0, 30)}...`
             });
@@ -167,14 +213,15 @@ const StickyChatButton: React.FC = () => {
     // Reset state on path change
     useEffect(() => { setCustomIdea(""); setPotentialOldImageUrl(null); setShowReplaceTool(false); setIsOpen(false); setHasAutoOpened(false); }, [currentPath]);
 
-    // Detect Image URL in Custom Input
+    // Detect Image URL in Custom Input (using updated isImageUrl)
     useEffect(() => {
         const trimmedIdea = customIdea.trim();
-        if (trimmedIdea && isImageUrl(trimmedIdea)) {
+        if (trimmedIdea && isImageUrl(trimmedIdea)) { // Use the smarter detector
             setPotentialOldImageUrl(trimmedIdea);
+            console.log("Detected image URL:", trimmedIdea); // Debug log
         } else {
             setPotentialOldImageUrl(null);
-            if (showReplaceTool) { setShowReplaceTool(false); } // Hide tool if user types something else
+            if (showReplaceTool) { setShowReplaceTool(false); }
         }
     }, [customIdea, showReplaceTool]);
 
@@ -188,14 +235,11 @@ const StickyChatButton: React.FC = () => {
             suggestion.action();
         } else if (suggestion.link) {
             let finalLink = suggestion.link;
-            // If custom idea exists AND this isn't the image replace trigger AND link is to repo-xml, format it
+            // Format link if custom idea exists (and not image replace trigger)
             if (customIdea.trim() && suggestion.id !== REPLACE_IMAGE_ID && suggestion.link === '/repo-xml') {
                  const cleanPath = currentPath.split('?')[0];
-                 // Determine target path (you might need more robust logic here)
                  let targetPath = cleanPath === "/" ? "app/page.tsx" : `app${cleanPath}`;
-                 if (!targetPath.match(/\.[^/.]+$/)) {
-                     targetPath = targetPath.endsWith('/') ? targetPath + 'page.tsx' : targetPath + '/page.tsx';
-                 }
+                 if (!targetPath.match(/\.[^/.]+$/)) { targetPath = targetPath.endsWith('/') ? targetPath + 'page.tsx' : targetPath + '/page.tsx'; }
                  const encodedTargetPath = encodeURIComponent(targetPath);
                  const encodedIdea = encodeURIComponent(customIdea.trim());
                  finalLink = `/repo-xml?path=${encodedTargetPath}&idea=${encodedIdea}`;
@@ -204,20 +248,15 @@ const StickyChatButton: React.FC = () => {
                  toast.info("🚀 Перехожу...");
             }
             router.push(finalLink);
-            setIsOpen(false); // Close after navigation
+            setIsOpen(false);
         }
 
-        // Close the popup UNLESS it's the action to OPEN the replace tool
-        if (suggestion.id !== REPLACE_IMAGE_ID) {
-             setIsOpen(false);
-        }
+        if (suggestion.id !== REPLACE_IMAGE_ID) { setIsOpen(false); }
     };
 
     const handleReplaceConfirmed = (newImageUrl: string) => {
         if (!potentialOldImageUrl) { toast.error("Ошибка: Старый URL картинки не найден."); return; }
-        // Format the special idea string
         const structuredIdea = `ImageReplace|OldURL=${encodeURIComponent(potentialOldImageUrl)}|NewURL=${encodeURIComponent(newImageUrl)}`;
-        // Get target path
         const cleanPath = currentPath.split('?')[0];
         let targetPath = cleanPath === "/" ? "app/page.tsx" : `app${cleanPath}`;
         if (!targetPath.match(/\.[^/.]+$/)) { targetPath = targetPath.endsWith('/') ? targetPath + 'page.tsx' : targetPath + '/page.tsx'; }
@@ -227,32 +266,31 @@ const StickyChatButton: React.FC = () => {
 
         toast.info("🚀 Перехожу в Студию для замены картинки...");
         router.push(redirectUrl);
-        setIsOpen(false); // Close the main dialog
-        setShowReplaceTool(false); // Close the tool
+        setIsOpen(false); setShowReplaceTool(false);
     };
 
     const handleCancelReplace = () => {
         setShowReplaceTool(false);
-        // setPotentialOldImageUrl(null); // Keep potential URL for suggestion logic
-        // setCustomIdea(""); // Keep custom idea for potential other actions
+        // Keep potentialOldImageUrl so the suggestion might reappear if user clears input
+        // setCustomIdea(""); // Maybe clear the input? Or let user edit?
     };
 
     const handleOverlayClick = () => { setIsOpen(false); setShowReplaceTool(false); };
     const handleDialogClick = (e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
     const handleFabClick = () => {
-        setIsOpen(!isOpen);
-        if (!isOpen) { // Opening
+        const willOpen = !isOpen;
+        setIsOpen(willOpen);
+        if (willOpen) {
             setHasAutoOpened(true);
-            setShowReplaceTool(false);
-            // setCustomIdea(""); // Clear idea only when opening? Or maybe keep it? Decide based on desired UX
-            // setPotentialOldImageUrl(null);
-        } else { // Closing
-            setShowReplaceTool(false);
+            setShowReplaceTool(false); // Ensure tool closed on open
+            setCustomIdea(""); // Clear idea on open
+            setPotentialOldImageUrl(null);
+        } else {
+            setShowReplaceTool(false); // Ensure tool closed on close
         }
     };
 
     // --- Render Logic ---
-    // Determine if the custom input area should be shown
     const showInputArea = isOpen && !showReplaceTool && currentPath !== '/repo-xml';
 
     return (
