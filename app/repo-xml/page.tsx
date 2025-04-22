@@ -1,10 +1,13 @@
 "use client";
     import React, { Suspense, useRef, useState, useEffect } from "react";
+
     import { useSearchParams } from 'next/navigation'; // Import useSearchParams
     import RepoTxtFetcher from "@/components/RepoTxtFetcher";
     import AICodeAssistant from "@/components/AICodeAssistant";
     import AutomationBuddy from "@/components/AutomationBuddy";
-    import { RepoXmlPageProvider, RepoTxtFetcherRef, AICodeAssistantRef, ImageReplaceTask } from '@/contexts/RepoXmlPageContext'; // Import ImageReplaceTask
+    import { 
+useRepoXmlPageContext,
+RepoXmlPageProvider, RepoTxtFetcherRef, AICodeAssistantRef, ImageReplaceTask } from '@/contexts/RepoXmlPageContext'; // Import ImageReplaceTask
     import { useAppContext } from "@/contexts/AppContext";
     import { debugLogger } from "@/lib/debugLogger";
     import { Button } from "@/components/ui/button"; // Import Button
