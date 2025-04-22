@@ -1,8 +1,8 @@
-// /app/actions_github/actions.ts
 "use server";
 import { Octokit } from "@octokit/rest";
 // Keep both imports, but use notifyAdmin for errors
 import { notifyAdmins, notifyAdmin } from "@/app/actions";
+import { logger } from "@/lib/logger"; // Import logger for potential use
 
 // Interfaces
 interface FileNode {
@@ -57,8 +57,12 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
     if (!token) throw new Error("GitHub token is missing");
     const repoInfo = parseRepoUrl(repoUrl); owner = repoInfo.owner; repo = repoInfo.repo;
     const octokit = new Octokit({ auth: token });
-    const allowedExtensions = [".ts", ".tsx", ".css", ".sql"]; // excluded as per original comment
-    const excludedPrefixes = ["supabase/", "components/ui/", "node_modules/", ".next/", "dist/", "build/", "Configame/"];
+    // Allowed extensions (Updated to match original request - only these pass)
+    const allowedExtensions = [".ts", ".tsx", ".js", ".jsx", ".css", ".sql", ".json", ".md", ".py", ".html", ".php", ".rb", ".go", ".java", ".cs", ".sh", ".yml", ".yaml", ".env", ".txt"];
+    // Excluded prefixes remain the same
+    const excludedPrefixes = ["node_modules/", ".next/", "dist/", "build/", "supabase/", "public/"]; // Added public as per original logic inference
+    // Ensure components/ui IS excluded, other components are NOT
+    const specificallyExcluded = ["components/ui/"];
 
     let latestCommitSha: string;
 
@@ -94,12 +98,9 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
     try {
         const response = await octokit.git.getTree({ owner, repo, tree_sha: treeSha, recursive: '1' });
         treeData = response.data as GitTreeResponseData;
-        // .. VITAL DEBUG LOGGING (Uncomment if needed)
-        // .. console.log("Raw treeData received:", JSON.stringify(treeData, null, 2).substring(0, 500) + '...');
         if (treeData?.truncated) {
             console.warn("WARNING: GitHub API reported the tree data was truncated. File list may be incomplete.");
-            // .. Decide if you want to notify admin about truncation
-            // .. await notifyAdmin(`⚠️ Tree data truncated for ${owner}/${repo} on branch ${targetBranch}. File list might be incomplete.`);
+            // await notifyAdmin(`⚠️ Tree data truncated for ${owner}/${repo} on branch ${targetBranch}. File list might be incomplete.`);
         }
         if (!treeData || !Array.isArray(treeData.tree)) {
             console.error("Invalid tree structure received. Expected an object with a 'tree' array property, but got:", treeData);
@@ -111,18 +112,27 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
         throw new Error(`Failed during getTree API call${status}: ${treeError.message || treeError}`);
     }
 
+    // Adjusted filtering logic
     const filesToFetch: GitTreeFile[] = treeData.tree.filter((item): item is GitTreeFile => {
-        if (item.type !== 'blob' || typeof item.path !== 'string' || !item.path || typeof item.sha !== 'string' || !item.sha) {
-            return false;
-        }
-        if (excludedPrefixes.some(prefix => item.path!.startsWith(prefix))) {
-            return false;
-        }
-        if (!allowedExtensions.some(ext => item.path!.endsWith(ext))) {
-            return false;
-        }
-        return true;
+         if (item.type !== 'blob' || typeof item.path !== 'string' || !item.path || typeof item.sha !== 'string' || !item.sha) {
+             return false;
+         }
+         // Skip specifically excluded prefixes
+         if (specificallyExcluded.some(prefix => item.path!.startsWith(prefix))) {
+             return false;
+         }
+          // Skip general excluded prefixes ONLY IF it's not allowed
+         if (excludedPrefixes.some(prefix => item.path!.startsWith(prefix)) && !allowedExtensions.some(ext => item.path!.endsWith(ext))) {
+             return false;
+         }
+         // Allow if extension matches OR if no specific exclusion applies (keeps components/, etc.)
+         if (allowedExtensions.some(ext => item.path!.endsWith(ext)) || !excludedPrefixes.some(prefix => item.path!.startsWith(prefix)) ) {
+            return true;
+         }
+
+         return false; // Default deny
     });
+
     console.log(`Found ${filesToFetch.length} files matching criteria.`);
 
     const allFiles: FileNode[] = [];
@@ -146,26 +156,33 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
                      content = Buffer.from(blobData.content, 'base64').toString('utf-8');
                  } else if (blobData.encoding === 'utf-8') {
                      content = blobData.content;
-                     // .. console.warn(`Received non-base64 encoding ('${blobData.encoding}') for blob ${fileInfo.path}. Using content directly.`);
                  } else {
                      console.error(`Unsupported blob encoding for ${fileInfo.path}: ${blobData.encoding}. Cannot decode.`);
                      throw new Error(`Unsupported encoding '${blobData.encoding}' for file ${fileInfo.path}`);
                  }
-                 const contentLines = content.split("\n");
-                 let pathComment: string;
-                 if (fileInfo.path.endsWith(".ts") || fileInfo.path.endsWith(".tsx")) { pathComment = `// /${fileInfo.path}`; }
-                 else if (fileInfo.path.endsWith(".css")) { pathComment = `/* /${fileInfo.path} */`; }
-                 else if (fileInfo.path.endsWith(".sql")) { pathComment = `-- /${fileInfo.path}`; }
-                 else { pathComment = `# /${fileInfo.path}`; } // Default
-
-                 const firstLineTrimmed = contentLines[0]?.trimStart();
-                 // .. Only replace if the first line LOOKS like a comment already
-                 if (firstLineTrimmed?.match(/^(--|\/\/|\/\*|#)/)) {
-                    contentLines[0] = pathComment;
-                 } else { // .. Otherwise, prepend
-                    contentLines.unshift(pathComment);
+                // Path comment logic remains the same
+                // ...
+                let pathComment: string;
+                 const fileExt = fileInfo.path.split('.').pop()?.toLowerCase() || '';
+                 switch(fileExt) {
+                      case 'ts': case 'tsx': case 'js': case 'jsx': pathComment = `// /${fileInfo.path}`; break;
+                      case 'css': case 'scss': pathComment = `/* /${fileInfo.path} */`; break;
+                      case 'sql': pathComment = `-- /${fileInfo.path}`; break;
+                      case 'py': case 'rb': case 'sh': case 'yml': case 'yaml': case 'env': pathComment = `# /${fileInfo.path}`; break;
+                      case 'html': case 'xml': pathComment = `<!-- /${fileInfo.path} -->`; break;
+                      case 'md': pathComment = `<!-- /${fileInfo.path} -->`; break; // Markdown comment
+                      default: pathComment = `// /${fileInfo.path}`; // Default fallback
                  }
-                 return { path: fileInfo.path, content: contentLines.join("\n") };
+
+                 // Avoid adding comment if content is empty or starts with it
+                 if (content.trim() && !content.trimStart().startsWith(pathComment)) {
+                      content = `${pathComment}\n${content}`;
+                 } else if (!content.trim()) {
+                     content = pathComment; // Add comment even if file is empty
+                 }
+
+                 return { path: fileInfo.path, content: content };
+
              } catch (fetchError: any) {
                   console.error(`Error fetching blob content for ${fileInfo.path} (SHA: ${fileInfo.sha}):`, fetchError.status ? `${fetchError.message} (Status: ${fetchError.status})` : fetchError);
                   throw new Error(`Failed to fetch blob ${fileInfo.path}: ${fetchError.message || fetchError}`);
@@ -173,11 +190,8 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
         });
         try {
             const batchResults = await Promise.all(batchPromises); allFiles.push(...batchResults);
-            // .. console.log(`Batch ${batchNumber}/${totalBatches} completed.`);
         } catch (batchError) {
              console.error(`Error processing content batch ${batchNumber}/${totalBatches}:`, batchError);
-             // .. Throw to indicate the overall fetch failed if any batch fails.
-             // .. It already includes the specific file error message from the inner catch
              throw new Error(`Failed to fetch files in batch ${batchNumber}. Error: ${batchError instanceof Error ? batchError.message : batchError}`);
         }
         if (i + BATCH_SIZE < totalFiles) {
@@ -193,10 +207,8 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
   } catch (error: any) {
         const endTime = Date.now();
         const repoIdentifier = owner && repo ? `${owner}/${repo}` : repoUrl;
-        // Use targetBranch (which might be the fetched default) in error messages
         const branchInfo = targetBranch ? ` on branch '${targetBranch}'` : ' (default branch)';
         console.error(`Error fetching repo contents for ${repoIdentifier}${branchInfo} after ${(endTime - startTime) / 1000} seconds:`, error);
-         // Use notifyAdmin for error notifications
          if (error.status === 403 && error.message?.includes('rate limit exceeded')) {
             console.error("GitHub API rate limit exceeded.");
             await notifyAdmin(`❌ Ошибка (Rate Limit) при извлечении файлов из репозитория ${repoIdentifier}${branchInfo}. Попробуйте позже.`);
@@ -212,7 +224,6 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
              await notifyAdmin(`❌ Ошибка (Auth ${error.status}) при извлечении файлов из репозитория ${repoIdentifier}${branchInfo}. Проверьте токен и его права доступа.`);
             return { success: false, error: `GitHub API Authentication/Authorization error (Status: ${error.status}). Check token and permissions.` };
          }
-        // Generic error
         await notifyAdmin(`❌ Ошибка при извлечении файлов из репозитория ${repoIdentifier}${branchInfo}:\n${error instanceof Error ? error.message : String(error)}`);
         return { success: false, error: `Failed to fetch contents${branchInfo}: ${error instanceof Error ? error.message : "Unknown error occurred"}` };
   }
@@ -274,7 +285,7 @@ export async function createGitHubPullRequest(
     // --- Notify (Success) ---
     const adminMessage = `🔔 Созданы новые изменения в проекте!\nЧто меняем: ${prTitle}\nПодробности: ${finalPrDescription}\nФайлы: ${changedFiles}\n\n[Посмотреть и одобрить на GitHub](https://github.com/${owner}/${repo}/pull/${pr.number})`;
     await notifyAdmins(adminMessage); // Use notifyAdmins for success broadcasts
-    return { success: true, prUrl: pr.html_url, branch: newBranch };
+    return { success: true, prUrl: pr.html_url, branch: newBranch, prNumber: pr.number }; // Return PR number
 
   } catch (error: any) {
         console.error("Error creating pull request:", error);
@@ -299,23 +310,24 @@ export async function createGitHubPullRequest(
 }
 
 
-// --- NEW: updateBranch (Uses notifyAdmin for errors) ---
-// This function commits changes to an EXISTING branch.
+// --- MODIFIED: updateBranch (Accepts optional PR info for comments) ---
 export async function updateBranch(
   repoUrl: string,
   files: FileNode[],
   commitMessage: string,
-  branchName: string // Branch MUST exist
+  branchName: string, // Branch MUST exist
+  prNumberToComment?: number | null, // Optional: PR number to add comment to
+  commentBody?: string | null      // Optional: Body of the comment
 ) {
   let owner: string | undefined, repo: string | undefined;
+  const repoIdentifier = parseRepoUrl(repoUrl); // Parse once
+  owner = repoIdentifier.owner; repo = repoIdentifier.repo;
+
   try {
     const token = process.env.GITHUB_TOKEN;
     if (!token) throw new Error("GitHub token missing");
     if (!branchName) throw new Error("Branch name is required for update");
 
-    const repoInfo = parseRepoUrl(repoUrl);
-    owner = repoInfo.owner;
-    repo = repoInfo.repo;
     const octokit = new Octokit({ auth: token });
 
     // 1. Get the SHA of the branch's current HEAD
@@ -387,7 +399,33 @@ export async function updateBranch(
     });
     console.log(`Ref heads/${branchName} updated successfully.`);
 
-    // Notify Admins (Success)
+    // <<< --- NEW: Add comment if PR number provided --- >>>
+    if (prNumberToComment && commentBody) {
+        try {
+            console.log(`Adding comment to existing PR #${prNumberToComment}...`);
+            // Truncate comment body if necessary
+            let finalCommentBody = commentBody;
+            if (encoder.encode(finalCommentBody).length > MAX_SIZE_BYTES) {
+                finalCommentBody = finalCommentBody.substring(0, 60000) + "\n\n... (comment truncated)";
+                console.warn(`Comment body for PR #${prNumberToComment} too long, truncating.`);
+            }
+
+            await octokit.issues.createComment({
+                owner: owner!,
+                repo: repo!,
+                issue_number: prNumberToComment,
+                body: finalCommentBody
+            });
+            console.log(`Comment added successfully to PR #${prNumberToComment}.`);
+        } catch (commentError: any) {
+            console.error(`Failed to add comment to PR #${prNumberToComment}:`, commentError);
+            // Don't fail the whole update, but notify admin about the comment failure
+            await notifyAdmin(`⚠️ Не удалось добавить коммент к PR #${prNumberToComment} в ${owner}/${repo} после обновления ветки:\n${commentError.message}`);
+        }
+    }
+    // <<< --- End New Comment Logic --- >>>
+
+    // Notify Admins (Success) - Keep this notification
     const changedFiles = files.map((file) => file.path).join(", ");
     const branchUrl = `https://github.com/${owner}/${repo}/tree/${branchName}`;
     const adminMessage = `🔄 Ветка '${branchName}' обновлена!\nCommit: ${finalCommitMessage.split('\n')[0]}\nFiles: ${changedFiles}\n\n[Посмотреть ветку](${branchUrl})`;
@@ -397,12 +435,12 @@ export async function updateBranch(
 
   } catch (error: any) {
     console.error(`Error updating branch ${branchName}:`, error);
-    const repoIdentifier = owner && repo ? `${owner}/${repo}` : repoUrl;
+    const repoIdStr = owner && repo ? `${owner}/${repo}` : repoUrl; // Use parsed owner/repo for message
     let errorMessage = error instanceof Error ? error.message : `Unknown error occurred updating branch ${branchName}`;
      if (error.status === 404) {
-        errorMessage = `Repository ${repoIdentifier} or branch ${branchName} not found (404).`;
+        errorMessage = `Repository ${repoIdStr} or branch ${branchName} not found (404).`;
     } else if (error.status === 403) {
-         errorMessage = `Permission denied (403) updating branch ${branchName} in ${repoIdentifier}.`;
+         errorMessage = `Permission denied (403) updating branch ${branchName} in ${repoIdStr}.`;
     } else if (error.status === 409) { // Conflict, e.g., non-fast-forward update if force: false
         errorMessage = `Conflict updating branch ${branchName} (409). Might require force push or rebase.`;
     } else if (error.status === 422) { // Unprocessable Entity, e.g. bad commit data
@@ -410,7 +448,7 @@ export async function updateBranch(
     }
 
     // Notify Admin on Error
-    await notifyAdmin(`❌ Ошибка при обновлении ветки '${branchName}' в ${repoIdentifier}:\n${errorMessage}`);
+    await notifyAdmin(`❌ Ошибка при обновлении ветки '${branchName}' в ${repoIdStr}:\n${errorMessage}`);
     return { success: false, error: errorMessage };
   }
 }
@@ -550,7 +588,7 @@ export async function getOpenPullRequests(repoUrl: string) {
     const { data } = await octokit.pulls.list({ owner, repo, state: "open" });
     // console.log(`Found ${data.length} open PRs.`);
     // Ensure essential data is present
-    const cleanData = data.map(pr => ({
+    const cleanData: SimplePullRequest[] = data.map(pr => ({ // Added type annotation
         id: pr.id,
         number: pr.number,
         title: pr.title || 'Untitled PR',
