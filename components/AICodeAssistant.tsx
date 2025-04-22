@@ -28,15 +28,12 @@ import clsx from "clsx";
 import { saveAs } from "file-saver";
 import { logger } from "@/lib/logger";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { selectFunctionDefinition, extractFunctionName } from "@/lib/codeUtils"; // <<<--- IMPORT HELPERS HERE
+import { selectFunctionDefinition, extractFunctionName } from "@/lib/codeUtils"; // <<<--- CORRECT: Helpers Imported
 
 // Interfaces
 interface FileEntry extends ValidationFileEntry {}
 interface AICodeAssistantProps {}
 interface OriginalFile { path: string; content: string; }
-
-
-
 
 // --- Main Component ---
 const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((props, ref) => {
@@ -307,6 +304,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const submitButtonDisabled = !canSubmitRegularPR || isProcessingPR || !!imageReplaceTask;
     const showStandardAssistantUI = isMounted && !imageReplaceTask;
     const showImageReplaceUI = isMounted && !!imageReplaceTask;
+
 
     return (
         <div id="executor" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
