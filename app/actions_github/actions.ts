@@ -126,7 +126,7 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
              return false;
          }
          // Allow if extension matches OR if no specific exclusion applies (keeps components/, etc.)
-         if (allowedExtensions.some(ext => item.path!.endsWith(ext)) || !excludedPrefixes.some(prefix => item.path!.startsWith(prefix)) ) {
+         if (allowedExtensions.some(ext => item.path!.endsWith(ext)) && !excludedPrefixes.some(prefix => item.path!.startsWith(prefix)) ) {
             return true;
          }
 
