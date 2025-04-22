@@ -309,7 +309,6 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
         if (fetchStatus === 'failed_retries') return 'fetch_failed';
         if (aiActionLoading && currentAiRequestId) return 'generating_ai_response';
         if (isParsing) return 'parsing_response';
-        // *** MODIFIED: Check assistantLoading condition ***
         // Assistant is loading EITHER for parsing/regular PR OR for image replace PR
         if (assistantLoading) return 'pr_ready';
 
@@ -317,8 +316,8 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
         if (!repoUrlEntered) return 'need_repo_url';
         if (!filesFetched) return 'ready_to_fetch';
 
-        // *** NEW: Specific state for image replace after fetch, before PR is triggered ***
-        if (imageReplaceTask && filesFetched) return 'files_fetched_image_replace';
+        // Specific state for image replace after fetch, before PR is triggered
+        if (imageReplaceTask && filesFetched) return 'files_fetched_image_replace'; // <<< --- THIS STEP LOGIC --- >>>
 
         // Regular AI flow states
         if (aiResponseHasContent) {
@@ -359,13 +358,15 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
 
         if (fetched) {
             // Trigger Image Replace *immediately* after files are available
-            if (imageReplaceTaskState && assistantRef.current) { // Use imageReplaceTaskState getter
-                console.log("[Context:setFilesFetched] Files fetched, triggering direct image replacement for:", imageReplaceTaskState);
+            // --- FIX: Use imageReplaceTask directly ---
+            if (imageReplaceTask && assistantRef.current) {
+                console.log("[Context:setFilesFetched] Files fetched, triggering direct image replacement for:", imageReplaceTask);
                 setAssistantLoadingState(true); // Set loading *before* calling
                 // Use setTimeout to allow state update and component re-render before calling ref method
                 setTimeout(() => {
                     if (assistantRef.current) {
-                        assistantRef.current.handleDirectImageReplace(imageReplaceTaskState) // Pass the task
+                        // --- FIX: Pass imageReplaceTask ---
+                        assistantRef.current.handleDirectImageReplace(imageReplaceTask)
                             .then(() => {
                                 console.log("[Context:setFilesFetched] Direct image replacement process finished/triggered.");
                                 // Let handleDirectImageReplace handle clearing task and loading state
@@ -403,7 +404,7 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
             setFetchStatusState('idle'); // Reset status
             if (assistantRef.current) assistantRef.current.setResponseValue("");
         }
-    }, [assistantRef, imageReplaceTaskState]); // Dependency on the state getter
+    }, [assistantRef, imageReplaceTask]); // --- FIX: Use imageReplaceTask dependency ---
 
     const setAllFetchedFilesCallback = useCallback((files: FileNode[]) => setAllFetchedFilesState(files), []); // NEW Setter
     const setSelectedFetcherFilesCallback = useCallback((files: Set<string>) => setSelectedFetcherFilesState(files), []);
@@ -507,14 +508,16 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
 
     // MODIFIED: This now strictly points to the AICodeAssistant's combined handler
     const triggerCreateOrUpdatePR = useCallback(async () => {
-        if (imageReplaceTaskState) {
+        // --- FIX: Check imageReplaceTask directly ---
+        if (imageReplaceTask) {
             toast.warn("Действие недоступно во время замены картинки.");
             console.warn("triggerCreateOrUpdatePR called while imageReplaceTask is active. Aborting.");
             return;
         }
         if (assistantRef.current) await assistantRef.current.handleCreatePR(); // Points to the combined function in Assistant
         else console.warn("triggerCreateOrUpdatePR: assistantRef not ready.");
-    }, [assistantRef, imageReplaceTaskState]); // Added imageReplaceTaskState dependency
+        // --- FIX: Use imageReplaceTask dependency ---
+    }, [assistantRef, imageReplaceTask]);
 
     // This remains for potential direct use but is generally wrapped by triggerCreateOrUpdatePR now
     const triggerUpdateBranch = useCallback(async (repoUrl: string, files: { path: string; content: string }[], commitMessage: string, branchName: string): Promise<ReturnType<typeof updateBranch>> => {
@@ -526,18 +529,23 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
     // --- Realtime Subscription Logic (No changes needed here for this fix) ---
     useEffect(() => {
         let isMounted = true;
+        // --- FIX: Use currentAiRequestId directly ---
         if (!currentAiRequestId || !supabaseAnon) { if (realtimeChannelRef.current) { console.log(`[RT Cleanup] No request ID or Supabase client. Removing channel: ${realtimeChannelRef.current.topic}`); supabaseAnon?.removeChannel(realtimeChannelRef.current).catch(e => console.error("[RT Cleanup] Error removing channel:", e)); realtimeChannelRef.current = null; } return () => { isMounted = false }; }
         const channelId = `ai-request-${currentAiRequestId}`; if (realtimeChannelRef.current?.topic === channelId) return () => { isMounted = false };
         if (realtimeChannelRef.current) { console.log(`[RT Switch] Removing old channel: ${realtimeChannelRef.current.topic}`); supabaseAnon.removeChannel(realtimeChannelRef.current).catch(e => console.error("[RT Switch] Error removing old channel:", e)); }
         console.log(`[RT Setup] Attempting to subscribe to ${channelId}`);
-        const channel = supabaseAnon.channel(channelId).on<AiRequestRecord>('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'ai_requests', filter: `id=eq.${currentAiRequestId}` }, (payload) => { if (!isMounted) return; console.log('[RT Received] AI Request Updated:', payload.new); const updatedRecord = payload.new; if (updatedRecord.id !== currentAiRequestIdState) { console.log(`[RT Mismatch] Update for ${updatedRecord.id}, but monitoring ${currentAiRequestIdState}. Ignoring.`); return; } // Use state getter here
+        const channel = supabaseAnon.channel(channelId).on<AiRequestRecord>('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'ai_requests', filter: `id=eq.${currentAiRequestId}` }, (payload) => { if (!isMounted) return; console.log('[RT Received] AI Request Updated:', payload.new); const updatedRecord = payload.new;
+             // --- FIX: Use currentAiRequestId directly ---
+             if (updatedRecord.id !== currentAiRequestId) { console.log(`[RT Mismatch] Update for ${updatedRecord.id}, but monitoring ${currentAiRequestId}. Ignoring.`); return; }
             if (updatedRecord.status === 'completed') { toast.success("🤖✨ Ответ от AI получен!"); if (assistantRef.current) { assistantRef.current.setResponseValue(updatedRecord.response || ""); } setAiResponseHasContentState(true); setAiActionLoadingState(false); setCurrentAiRequestIdState(null); setTimeout(() => { if (isMounted) { triggerParseResponse().catch(err => console.error("Error during auto-parsing:", err)); } }, 300); }
             else if (updatedRecord.status === 'failed') { const errorMsg = updatedRecord.error_message || 'Неизвестная ошибка AI'; toast.error(`❌ Ошибка AI: ${errorMsg}`); setAiActionLoadingState(false); setCurrentAiRequestIdState(null); }
-            else if (updatedRecord.status === 'processing') { toast.info("⏳ AI всё ещё думает...", { id: `ai-processing-${currentAiRequestIdState}`, duration: 5000 }); } // Use state getter here
+            // --- FIX: Use currentAiRequestId directly ---
+            else if (updatedRecord.status === 'processing') { toast.info("⏳ AI всё ещё думает...", { id: `ai-processing-${currentAiRequestId}`, duration: 5000 }); }
          }).subscribe((status, err) => { if (!isMounted) return; if (status === 'SUBSCRIBED') { console.log(`[RT Status] Successfully subscribed to ${channelId}`); } else if (['CHANNEL_ERROR', 'TIMED_OUT'].includes(status)) { console.error(`[RT Status] Subscription error for ${channelId}: ${status}`, err); toast.error("Ошибка Realtime подписки."); if (aiActionLoading) { setAiActionLoadingState(false); setCurrentAiRequestIdState(null); } } else if (status === 'CLOSED') { console.log(`[RT Status] Channel explicitly closed for ${channelId}`); if (aiActionLoading) { setAiActionLoadingState(false); setCurrentAiRequestIdState(null); } } });
         realtimeChannelRef.current = channel;
         return () => { isMounted = false; if (realtimeChannelRef.current && realtimeChannelRef.current.topic === channelId) { console.log(`[RT Cleanup] Removing channel: ${realtimeChannelRef.current.topic}`); supabaseAnon.removeChannel(realtimeChannelRef.current).catch(e => console.error("[RT Cleanup] Error removing channel:", e)); realtimeChannelRef.current = null; } };
-    }, [currentAiRequestIdState, assistantRef, triggerParseResponse, aiActionLoading]); // Use state getter dependency
+        // --- FIX: Use currentAiRequestId dependency ---
+    }, [currentAiRequestId, assistantRef, triggerParseResponse, aiActionLoading]);
 
 
     // --- Xuinity Message Logic (MODIFIED for Image Replace) ---
@@ -566,7 +574,8 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
             case 'pr_ready': return assistantLoading ? (effectiveBranch ? `Обновляю ветку '${effectiveBranch}'...` : "Создаю Pull Request...") : (effectiveBranch ? `Готов обновить ветку '${effectiveBranch}'? 🚀` : "Готов создать Pull Request? ✨");
             default: return "Что будем вайбить дальше?";
         }
-    }, [currentStep, repoUrlEntered, fetchStatus, assistantLoading, aiActionLoading, targetBranchName, isParsing, currentAiRequestId, imageReplaceTask]); // Added imageReplaceTask dependency
+        // --- FIX: Use imageReplaceTask dependency ---
+    }, [currentStep, repoUrlEntered, fetchStatus, assistantLoading, aiActionLoading, targetBranchName, isParsing, currentAiRequestId, imageReplaceTask]);
 
 
     // --- Callback for Repo URL update in Assistant ---
