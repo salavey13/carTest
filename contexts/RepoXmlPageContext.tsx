@@ -578,7 +578,7 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
         setImageReplaceTask: setImageReplaceTaskCallback, // Added setter
         triggerFetch, triggerGetOpenPRs, triggerSelectHighlighted, triggerAddSelectedToKwork,
         triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed,
-        triggerCreateOrUpdatePR: triggerCreatePR, // Keep alias for clarity
+        triggerCreateOrUpdatePR,
         triggerUpdateBranch, triggerToggleSettingsModal, scrollToSection,
         getXuinityMessage, updateRepoUrlInAssistant,
     };
