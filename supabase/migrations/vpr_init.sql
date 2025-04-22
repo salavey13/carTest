@@ -83,6 +83,12 @@ CREATE TABLE public.vpr_test_attempts (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now(),       -- Tracks the last modification time (e.g., answering a question)
 
+    -- *** ADDED STATUS COLUMN ***
+    status TEXT NULL,                           -- Tracks the state (e.g., 'in_progress', 'completed', 'time_up')
+
+    -- *** ADDED METADATA COLUMN (as used in interface) ***
+    metadata JSONB NULL,                        -- Optional metadata field
+
     -- Foreign key to users table (adjust type of user_id if needed)
     CONSTRAINT fk_user
         FOREIGN KEY(user_id)
@@ -98,15 +104,20 @@ CREATE TABLE public.vpr_test_attempts (
     -- Note: The unique constraint for active attempts is handled by a partial unique index below.
 );
 
--- Index for faster lookup of attempts by user/subject/variant
+-- Add an index for the status column if you plan to query by it often
+CREATE INDEX IF NOT EXISTS idx_vpr_test_attempts_status ON public.vpr_test_attempts (status);
+
+-- Index for faster lookup of attempts by user/subject/variant (existing)
 CREATE INDEX IF NOT EXISTS idx_vpr_test_attempts_user_subject_variant
 ON public.vpr_test_attempts (user_id, subject_id, variant_number);
 
 -- Ensures a user can only have *one* active (not completed) attempt
--- for a specific subject and variant at any given time.
+-- for a specific subject and variant at any given time. (existing)
 CREATE UNIQUE INDEX IF NOT EXISTS unique_active_attempt_per_user_subject_variant
 ON public.vpr_test_attempts (user_id, subject_id, variant_number)
 WHERE (completed_at IS NULL);
+
+-- (Keep the rest of your SQL file: vpr_attempt_answers, triggers, functions etc.)
 
 
 -- 5. Create Attempt Answers Table

@@ -8,11 +8,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
+// .. Импортируем новые иконки
 import {
   FaCar, FaCircleUser, FaWandMagicSparkles, FaRocket, FaRoad, FaBookOpen,
   FaBrain, FaRobot, FaMagnifyingGlass, FaGift, FaUserShield, FaCarOn,
   FaYoutube, FaFileInvoiceDollar, FaCreditCard, FaHeart, FaPalette,
-  FaCircleInfo, FaListCheck, FaNetworkWired, FaRegLightbulb, FaUpload
+  FaCircleInfo, FaListCheck, FaNetworkWired, FaRegLightbulb, FaUpload,
+  FaUserNinja, FaGlobeEurope, FaLandmarkDome // <-- Добавлены иконки для шпаргалок и ВПР
 } from "react-icons/fa6";
 
 // --- Page Definitions ---
@@ -22,28 +24,30 @@ interface PageInfo {
   icon?: React.ComponentType<{ className?: string }>;
   isImportant?: boolean;
   isAdminOnly?: boolean;
+  isHot?: boolean; // <-- Флаг для новинок
   color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red';
 }
 
-// .. Updated allPages array with English names as keys and new pages, fixed advice-upload path
+// .. Добавляем новые страницы
 const allPages: PageInfo[] = [
+  // --- Важные ссылки ---
   { path: "/", name: "Cyber Garage", icon: FaCar, isImportant: true, color: "cyan" },
   { path: "/about", name: "About Me", icon: FaCircleUser, isImportant: true, color: "blue" },
   { path: "/repo-xml", name: "SUPERVIBE Studio", icon: FaWandMagicSparkles, isImportant: true, color: "yellow" },
   { path: "/jumpstart", name: "Jumpstart Kit", icon: FaRocket, isImportant: true, color: "lime" },
   { path: "/selfdev", name: "SelfDev Path", icon: FaRoad, isImportant: true, color: "green" },
+  { path: "/p-plan", name: "VIBE Plan", icon: FaUserNinja, isImportant: true, isHot: true, color: "yellow" },
+  { path: "/ai-work-future", name: "AI & Future of Work", icon: FaNetworkWired, color: "cyan", isImportant: true },
   { path: "/advice", name: "Advice", icon: FaRegLightbulb, isImportant: true, color: "purple" },
+  // --- Новая большая плитка ВПР Тесты ---
+  { path: "/vpr-tests", name: "VPR Tests", icon: FaListCheck, isImportant: true, color: 'pink' },
+  // --------------------------------------
+  // --- Обычные ссылки ---
   { path: "/purpose-profit", name: "Purpose & Profit", icon: FaBookOpen, color: "purple" },
   { path: "/expmind", name: "Experimental Mindset", icon: FaBrain, color: "pink" },
-  { path: "/ai-work-future", name: "AI & Future of Work", icon: FaNetworkWired, color: "cyan", isImportant: true },
   { path: "/botbusters", name: "Bot Busters", icon: FaRobot },
   { path: "/bullshitdetector", name: "BS Detector", icon: FaMagnifyingGlass },
   { path: "/wheel-of-fortune", name: "Wheel of Fortune", icon: FaGift },
-  // .. Fixed path for 'Upload Advice' and marked as admin only:
-  { path: "/advice-upload", name: "Upload Advice", icon: FaUpload, isAdminOnly: true, isImportant: true, color: "red" },
-  { path: "/admin", name: "Admin Panel", icon: FaUserShield, isAdminOnly: true, color: "red" },
-  { path: "/shadow-fleet-admin", name: "Fleet Admin", icon: FaCarOn, isAdminOnly: true, color: "red" },
-  { path: "/youtubeAdmin", name: "YT Admin", icon: FaYoutube, isAdminOnly: true, color: "red" },
   { path: "/invoices", name: "My Invoices", icon: FaFileInvoiceDollar },
   { path: "/buy-subscription", name: "Subscribe", icon: FaCreditCard },
   { path: "/donate", name: "Donate", icon: FaHeart, color: "red" },
@@ -51,6 +55,15 @@ const allPages: PageInfo[] = [
   { path: "/onesitepls", name: "oneSitePls Info", icon: FaCircleInfo },
   { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: FaListCheck },
   { path: "/rent-car", name: "Rent a Car", icon: FaCar },
+  // --- Новые маленькие плитки-шпаргалки ---
+  { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: FaGlobeEurope, color: 'green' },
+  { path: "/vpr/history/6/cheatsheet", name: "History Cheatsheet 6", icon: FaLandmarkDome, color: 'yellow' },
+  // -----------------------------------------
+  // --- Админские ссылки ---
+  { path: "/advice-upload", name: "Upload Advice", icon: FaUpload, isAdminOnly: true, isImportant: true, color: "red" },
+  { path: "/admin", name: "Admin Panel", icon: FaUserShield, isAdminOnly: true, color: "red" },
+  { path: "/shadow-fleet-admin", name: "Fleet Admin", icon: FaCarOn, isAdminOnly: true, color: "red" },
+  { path: "/youtubeAdmin", name: "YT Admin", icon: FaYoutube, isAdminOnly: true, color: "red" },
 ];
 
 // --- Translations ---
@@ -61,10 +74,12 @@ const translations: Record<string, Record<string, string>> = {
     "SUPERVIBE Studio": "SUPERVIBE Studio",
     "Jumpstart Kit": "Jumpstart Kit",
     "SelfDev Path": "SelfDev Path",
+    "VIBE Plan": "VIBE Plan",
     "Advice": "Advice",
+    "AI & Future of Work": "AI & Future of Work",
+    "VPR Tests": "VPR Tests", // <-- Добавлен перевод EN
     "Purpose & Profit": "Purpose & Profit",
     "Experimental Mindset": "Experimental Mindset",
-    "AI & Future of Work": "AI & Future of Work",
     "Bot Busters": "Bot Busters",
     "BS Detector": "BS Detector",
     "Wheel of Fortune": "Wheel of Fortune",
@@ -79,12 +94,15 @@ const translations: Record<string, Record<string, string>> = {
     "oneSitePls Info": "oneSitePls Info",
     "oneSitePls How-To": "oneSitePls How-To",
     "Rent a Car": "Rent a Car",
+    "Geo Cheatsheet 6": "Geo Cheatsheet 6", // <-- Добавлен перевод EN
+    "History Cheatsheet 6": "History Cheatsheet 6", // <-- Добавлен перевод EN
     "Search pages...": "Search pages...",
     "No pages found matching": "No pages found matching",
     "Admin Only": "Admin Only",
     "Toggle Language": "Toggle Language",
     "Open navigation": "Open navigation",
     "Close navigation": "Close navigation",
+    "Hot": "Hot",
   },
   ru: {
     "Cyber Garage": "Кибер Гараж",
@@ -92,10 +110,12 @@ const translations: Record<string, Record<string, string>> = {
     "SUPERVIBE Studio": "SUPERVIBE Studio",
     "Jumpstart Kit": "Набор Jumpstart",
     "SelfDev Path": "Путь Саморазвития",
+    "VIBE Plan": "VIBE План",
     "Advice": "Советы",
+    "AI & Future of Work": "ИИ и Будущее Работы",
+    "VPR Tests": "ВПР Тесты", // <-- Добавлен перевод RU
     "Purpose & Profit": "Цель и Прибыль",
     "Experimental Mindset": "Эксперим. Мышление",
-    "AI & Future of Work": "ИИ и Будущее Работы",
     "Bot Busters": "Охотники за Ботами",
     "BS Detector": "Детектор Чуши",
     "Wheel of Fortune": "Колесо Фортуны",
@@ -110,12 +130,15 @@ const translations: Record<string, Record<string, string>> = {
     "oneSitePls Info": "Инфо oneSitePls",
     "oneSitePls How-To": "Как юзать oneSitePls",
     "Rent a Car": "Аренда Авто",
+    "Geo Cheatsheet 6": "Шпаргалка Гео 6", // <-- Добавлен перевод RU
+    "History Cheatsheet 6": "Шпаргалка Ист 6", // <-- Добавлен перевод RU
     "Search pages...": "Поиск страниц...",
     "No pages found matching": "Страницы не найдены по запросу",
     "Admin Only": "Только для админа",
     "Toggle Language": "Переключить язык",
     "Open navigation": "Открыть навигацию",
     "Close navigation": "Закрыть навигацию",
+    "Hot": "Новинка",
   }
 };
 
@@ -129,65 +152,54 @@ export default function Header() {
   const [searchTerm, setSearchTerm] = useState("");
   const pathname = usePathname();
 
-  // .. Determine initial language based on user preference or default to 'en'
   const initialLang = useMemo(() => {
     const userLang = user?.language_code;
     return userLang === 'ru' ? 'ru' : 'en';
   }, [user?.language_code]);
   const [currentLang, setCurrentLang] = useState<'en' | 'ru'>(initialLang);
 
-  // .. Effect to update language state ONLY if user language code changes from context
-  // .. Removed currentLang dependency to prevent overriding manual toggle
   useEffect(() => {
       const userLang = user?.language_code;
       const newLangBasedOnUser = userLang === 'ru' ? 'ru' : 'en';
-      // .. Only update if the language derived from user context is different
-      // .. from the current state (prevents loop and unnecessary updates)
       if (newLangBasedOnUser !== currentLang) {
-           console.log(`Header: User language changed to ${userLang}, updating state to ${newLangBasedOnUser}`);
+           // console.log(`Header: User language changed to ${userLang}, updating state to ${newLangBasedOnUser}`); // Commented out for cleaner logs
            setCurrentLang(newLangBasedOnUser);
       }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.language_code]); // ONLY depends on user language code now
+  }, [user?.language_code]);
 
 
-  // .. Function to get translated text
   const t = useCallback((key: string): string => {
-    return translations[currentLang]?.[key] || translations['en']?.[key] || key; // Fallback chain: current -> en -> key
+    return translations[currentLang]?.[key] || translations['en']?.[key] || key;
   }, [currentLang]);
 
-  // .. Function to toggle language MANUALLY
   const toggleLang = useCallback(() => {
     setCurrentLang(prevLang => prevLang === 'en' ? 'ru' : 'en');
-    console.log(`Header: Language manually toggled to ${currentLang === 'en' ? 'ru' : 'en'}`);
-  }, [currentLang]); // Depend on currentLang to correctly toggle
+    // console.log(`Header: Language manually toggled to ${currentLang === 'en' ? 'ru' : 'en'}`); // Commented out for cleaner logs
+  }, [currentLang]);
 
-  // .. Memoize current logo text based on pathname and language
   const currentLogoText = useMemo(() => {
     const currentPage = allPages.find(p => p.path === pathname);
+    // .. Специальное правило для шпаргалок и тестов ВПР, чтобы в лого было VPR
+    if (pathname?.startsWith('/vpr')) {
+        return "VPR";
+    }
     const baseName = currentPage?.name || "VIBE";
     const translatedFirstName = t(baseName)?.split(' ')[0];
     return translatedFirstName || baseName.split(' ')[0] || "VIBE";
-  }, [pathname, t]); // Depends on t (and thus currentLang)
+  }, [pathname, t]);
 
-  // .. Memoize filtered pages based on search term, admin status, and language
   const filteredPages = useMemo(() => {
     const lowerSearchTerm = searchTerm.toLowerCase();
     return allPages
-      .filter(page => {
-        const isAdminPage = page.isAdminOnly === true;
-        return !(isAdminPage && !isAdmin);
-      })
+      .filter(page => !(page.isAdminOnly && !isAdmin)) // Filter admin pages if not admin
       .map(page => ({
         ...page,
-        translatedName: t(page.name) // Use translated name
+        translatedName: t(page.name) // Translate name
       }))
-      .filter(page => {
-        return page.translatedName.toLowerCase().includes(lowerSearchTerm); // Search in translated name
-      });
-  }, [searchTerm, isAdmin, t]); // Depends on t (and thus currentLang)
+      .filter(page => page.translatedName.toLowerCase().includes(lowerSearchTerm)); // Search in translated name
+  }, [searchTerm, isAdmin, t]);
 
-  // .. Callback to handle scroll events for showing/hiding the header
   const handleScroll = useCallback(() => {
     const currentScrollY = window.scrollY;
     if (isNavOpen) {
@@ -203,7 +215,6 @@ export default function Header() {
     setLastScrollY(currentScrollY);
   }, [lastScrollY, isNavOpen]);
 
-  // .. Effect to add/remove scroll listener
   useEffect(() => {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
@@ -211,13 +222,11 @@ export default function Header() {
     };
   }, [handleScroll]);
 
-  // .. Effect to close nav and clear search when route changes
   useEffect(() => {
     setIsNavOpen(false);
     setSearchTerm("");
   }, [pathname]);
 
-   // .. Effect to prevent body scroll when nav overlay is open
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
     if (isNavOpen) {
@@ -230,7 +239,6 @@ export default function Header() {
     };
   }, [isNavOpen]);
 
-  // .. Tile color classes
   const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> = {
     purple: "border-brand-purple/50 hover:border-brand-purple hover:shadow-[0_0_15px_rgba(157,0,255,0.5)] text-brand-purple",
     blue: "border-brand-blue/50 hover:border-brand-blue hover:shadow-[0_0_15px_rgba(0,194,255,0.5)] text-brand-blue",
@@ -342,6 +350,17 @@ export default function Header() {
                           isCurrentPage ? 'ring-1 ring-offset-1 ring-offset-black ring-brand-green' : ''
                         )}
                       >
+                        {/* --- Иконка Новинки (Hot) --- */}
+                        {page.isHot && (
+                          <span
+                             title={t("Hot")} // Используем перевод для title
+                             className="absolute top-0.5 left-0.5 text-[0.5rem] bg-red-500/80 text-white rounded-full px-1 py-0 leading-none animate-pulse"
+                             aria-label={t("Hot")} // aria-label для доступности
+                          >
+                            🔥
+                          </span>
+                        )}
+                        {/* ---------------------------- */}
                         {PageIcon && (
                             <PageIcon className={cn(
                                 "h-4 w-4 sm:h-5 sm:w-5 md:h-4 md:w-4 mb-0.5 transition-transform duration-300 group-hover:scale-110",
@@ -355,6 +374,7 @@ export default function Header() {
                         )}>
                           {page.translatedName}
                         </span>
+                        {/* Иконка Админа (сдвинута немного правее, чтобы не перекрывать новинку) */}
                         {page.isAdminOnly && (
                            <span title={t("Admin Only")} className="absolute top-0.5 right-0.5 text-[0.5rem] text-red-400 bg-black/60 rounded-full px-1 py-0 leading-none">🛡️</span>
                         )}
