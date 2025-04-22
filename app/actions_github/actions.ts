@@ -58,9 +58,9 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
     const repoInfo = parseRepoUrl(repoUrl); owner = repoInfo.owner; repo = repoInfo.repo;
     const octokit = new Octokit({ auth: token });
     // Allowed extensions (Updated to match original request - only these pass)
-    const allowedExtensions = [".ts", ".tsx", ".js", ".jsx", ".css", ".sql", ".json", ".md", ".py", ".html", ".php", ".rb", ".go", ".java", ".cs", ".sh", ".yml", ".yaml", ".env", ".txt"];
+    const allowedExtensions = [".ts", ".tsx", ".css", ".sql"];
     // Excluded prefixes remain the same
-    const excludedPrefixes = ["node_modules/", ".next/", "dist/", "build/", "supabase/", "public/"]; // Added public as per original logic inference
+    const excludedPrefixes = ["node_modules/", ".next/", "dist/", "build/", "supabase/migrations/", "public/", "Configame/"]; // Added public as per original logic inference
     // Ensure components/ui IS excluded, other components are NOT
     const specificallyExcluded = ["components/ui/"];
 
