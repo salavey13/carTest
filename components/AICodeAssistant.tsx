@@ -1,6 +1,8 @@
 // ... (imports and other code remain the same) ...
 
 // --- Main Component ---
+"use client";
+
 const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((props, ref) => {
     // ... (hooks, context, state remain the same) ...
 
