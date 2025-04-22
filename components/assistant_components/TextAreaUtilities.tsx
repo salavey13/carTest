@@ -1,10 +1,10 @@
 "use client";
 
 "use client"
+
 import React from "react";
 import { motion } from "framer-motion";
 import { FaCopy, FaPoo, FaRightLeft, FaArrowRight, FaRotate, FaMagnifyingGlass, FaCode } from "react-icons/fa6"; // Added FaCode
-import { Tooltip } from '@/components/ui/Tooltip'; // <<<--- CORRECTED IMPORT PATH
 
 interface TextAreaUtilitiesProps {
     response: string;
@@ -34,7 +34,7 @@ export const TextAreaUtilities: React.FC<TextAreaUtilitiesProps> = ({
         <>
             {/* Right-Side Buttons (Parse) */}
             <div className="absolute top-2 right-2 flex flex-col gap-1.5 z-10">
-                <Tooltip text="Разобрать и Проверить Ответ AI" position="left">
+                
                      <motion.button
                         className="p-1.5 rounded-full bg-gradient-to-r from-purple-600 to-cyan-500 text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_8px_rgba(0,255,157,0.3)] hover:shadow-[0_0_12px_rgba(0,255,157,0.5)]"
                         onClick={onParse}
@@ -44,7 +44,7 @@ export const TextAreaUtilities: React.FC<TextAreaUtilitiesProps> = ({
                     >
                         {isLoading ? <FaRotate size={14} className="animate-spin" /> : <FaArrowRight size={14} />}
                     </motion.button>
-                </Tooltip>
+                
             </div>
 
             {/* Left-Side Buttons (Appear on Hover/Focus) */}
