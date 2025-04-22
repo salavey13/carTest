@@ -23,16 +23,17 @@ import { CodeRestorer } from './assistant_components/CodeRestorer';
 // UI & Utils
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
-import { FaCircleInfo, FaCodeBranch, FaGithub, FaWandMagicSparkles, FaArrowsRotate, FaImage, FaImages } from "react-icons/fa6"; // Added FaImages
+import { FaCircleInfo, FaCodeBranch, FaGithub, FaWandMagicSparkles, FaArrowsRotate, FaImage, FaImages, FaSpinner } from "react-icons/fa6"; // Added FaImages, FaSpinner
 import clsx from "clsx";
 import { saveAs } from "file-saver";
 import { logger } from "@/lib/logger"; // Import logger
-import { Tooltip } from "@/components/ui/Tooltip"; // <<<--- CORRECT: Import Tooltip from its own file
+import { Tooltip } from "@/components/ui/Tooltip"; // Correct import
 
 // Interfaces
-interface FileEntry extends ValidationFileEntry {} // Keep local alias if needed
+interface FileEntry extends ValidationFileEntry {}
 interface AICodeAssistantProps {}
 interface OriginalFile { path: string; content: string; }
+
 
 // Helper: Robust Function Selection Logic
 const selectFunctionDefinition = (text: string, startIndex: number): [number, number] => {
@@ -139,45 +140,23 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     // --- Hooks ---
     const { user } = useAppContext();
     const {
-        parsedFiles: hookParsedFiles, // Use alias for hook state
-        rawDescription,
-        validationStatus,
-        validationIssues,
-        isParsing: hookIsParsing, // Alias hook state
-        parseAndValidateResponse,
-        autoFixIssues,
-        setParsedFiles: setHookParsedFiles, // Alias hook setter
-        setValidationStatus,
-        setValidationIssues,
+        parsedFiles: hookParsedFiles, rawDescription, validationStatus, validationIssues,
+        isParsing: hookIsParsing, parseAndValidateResponse, autoFixIssues,
+        setParsedFiles: setHookParsedFiles, setValidationStatus, setValidationIssues,
     } = useCodeParsingAndValidation();
 
     // --- Context Access ---
     const {
-        aiResponseInputRef,
-        setAiResponseHasContent,
-        setFilesParsed,
-        filesParsed,
-        setSelectedAssistantFiles,
-        setAssistantLoading,
-        assistantLoading,
-        aiActionLoading,
-        currentAiRequestId,
-        openPrs: contextOpenPrs, // Get existing PRs from context
-        triggerGetOpenPRs, // Get function to refresh PRs
-        targetBranchName, // Use targetBranchName (effective branch)
-        triggerToggleSettingsModal,
-        triggerUpdateBranch, // Keep triggerUpdateBranch for direct calls if needed
-        triggerCreateOrUpdatePR, // Get the context trigger for normal PRs
-        updateRepoUrlInAssistant,
-        loadingPrs,
-        setIsParsing: setContextIsParsing, // Use context setter alias
-        isParsing: contextIsParsing, // Use context state alias
-        allFetchedFiles, // Get raw fetched files from context
-        imageReplaceTask, // Get image replace task from context
-        setImageReplaceTask, // Get setter to clear the task
+        aiResponseInputRef, setAiResponseHasContent, setFilesParsed, filesParsed,
+        setSelectedAssistantFiles, setAssistantLoading, assistantLoading, aiActionLoading,
+        currentAiRequestId, openPrs: contextOpenPrs, triggerGetOpenPRs, targetBranchName,
+        triggerToggleSettingsModal, triggerUpdateBranch, triggerCreateOrUpdatePR,
+        updateRepoUrlInAssistant, loadingPrs, setIsParsing: setContextIsParsing,
+        isParsing: contextIsParsing, allFetchedFiles, imageReplaceTask, setImageReplaceTask,
     } = useRepoXmlPageContext();
 
     // --- State ---
+    const [isMounted, setIsMounted] = useState(false); // <<<--- ADD isMounted STATE
     const [response, setResponse] = useState<string>("");
     const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
     const [repoUrl, setRepoUrlState] = useState<string>("https://github.com/salavey13/cartest");
@@ -185,7 +164,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const [customLinks, setCustomLinks] = useState<{ name: string; url: string }[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [modalMode, setModalMode] = useState<'replace' | 'search'>('replace');
-    const [isProcessingPR, setIsProcessingPR] = useState(false); // Specific state for PR/Update actions
+    const [isProcessingPR, setIsProcessingPR] = useState(false);
     const [originalRepoFiles, setOriginalRepoFiles] = useState<OriginalFile[]>([]);
     const [isFetchingOriginals, setIsFetchingOriginals] = useState(false);
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -206,16 +185,18 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     // --- Effects ---
     useEffect(() => {
+        setIsMounted(true); // Set mounted on client
+    }, []);
+
+    useEffect(() => {
         const hasContent = response.trim().length > 0;
         setAiResponseHasContent(hasContent);
-        // Reset logic if response cleared and not loading/image task active
-        if (!hasContent && !currentAiRequestId && !aiActionLoading && !imageReplaceTask) {
+        if (isMounted && !hasContent && !currentAiRequestId && !aiActionLoading && !imageReplaceTask) {
             setFilesParsed(false); setSelectedAssistantFiles(new Set()); setValidationStatus('idle'); setValidationIssues([]); setOriginalRepoFiles([]); setComponentParsedFiles([]); setHookParsedFiles([]);
-        } else if (hasContent && componentParsedFiles.length === 0 && validationStatus !== 'idle' && !isParsing && !assistantLoading && !imageReplaceTask) {
-             // If response exists but no parsed files (and not loading/image task), reset validation
+        } else if (isMounted && hasContent && componentParsedFiles.length === 0 && validationStatus !== 'idle' && !isParsing && !assistantLoading && !imageReplaceTask) {
             setValidationStatus('idle'); setValidationIssues([]);
         }
-    }, [ response, currentAiRequestId, aiActionLoading, componentParsedFiles.length, isParsing, assistantLoading, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setHookParsedFiles, imageReplaceTask ]); // Added imageReplaceTask
+    }, [ response, currentAiRequestId, aiActionLoading, componentParsedFiles.length, isParsing, assistantLoading, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setHookParsedFiles, imageReplaceTask, isMounted ]); // Added isMounted
 
     useEffect(() => {
         const loadLinks = async () => { if (!user) { setCustomLinks([]); return; } try { const { data: d, error: e } = await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id).single(); if (!e && d?.metadata?.customLinks) setCustomLinks(d.metadata.customLinks); else setCustomLinks([]); } catch (e) { console.error("Error loading custom links:", e); setCustomLinks([]); } }; loadLinks();
@@ -271,7 +252,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         const selectedFilesContent = componentParsedFiles.filter(f => selectedFileIds.has(f.id));
         if (!repoUrl || selectedFilesContent.length === 0 || !prTitle) { toast.error("Укажите URL репо, Заголовок PR/Commit и выберите файлы (после разбора ➡️)."); return; }
 
-        // Construct description (this IS the comment body)
         let finalDescription = rawDescription.substring(0, 60000) + (rawDescription.length > 60000 ? "\n\n...(описание усечено)" : "");
         finalDescription += `\n\n**Файлы (${selectedFilesContent.length}):**\n` + selectedFilesContent.map(f => `- \`${f.path}\``).join('\n');
         const relevantIssues = validationIssues.filter(i => i.type !== 'skippedCodeBlock' && i.type !== 'skippedComment');
@@ -286,9 +266,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
         try {
             let prToUpdate: SimplePullRequest | null = null;
-            // Check for existing relevant PRs
             if (contextOpenPrs && contextOpenPrs.length > 0) {
-                // More lenient matching: Find any PR whose title suggests AI changes
                  prToUpdate = contextOpenPrs.find(pr =>
                      pr.title.toLowerCase().includes("ai changes") ||
                      pr.title.toLowerCase().includes("supervibe studio") ||
@@ -299,29 +277,22 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                     toast.info(`Найден существующий PR #${prToUpdate.number}. Обновляю его...`);
                 }
             }
-
             const branchToUpdate = prToUpdate?.head.ref || targetBranchName;
 
             if (branchToUpdate) {
                 toast.info(`Обновление ветки '${branchToUpdate}'...`);
-                // Pass prToUpdate?.number and finalDescription to trigger
                 const updateResult = await triggerUpdateBranch(
-                    repoUrl,
-                    filesToCommit,
-                    fullCommitMessage,
-                    branchToUpdate,
-                    prToUpdate?.number, // Pass PR number
-                    finalDescription    // Pass description as comment body
+                    repoUrl, filesToCommit, fullCommitMessage, branchToUpdate,
+                    prToUpdate?.number, finalDescription
                 );
-                 if (updateResult.success) { await triggerGetOpenPRs(repoUrl); } // Refresh PR list on success
+                 if (updateResult.success) { await triggerGetOpenPRs(repoUrl); }
             } else {
-                // Create New Pull Request
                 toast.info(`Создание нового PR...`);
                 const result = await createGitHubPullRequest(repoUrl, filesToCommit, prTitle, finalDescription, fullCommitMessage);
                 if (result.success && result.prUrl) {
                     toast.success(`PR создан: ${result.prUrl}`);
                     await notifyAdmin(`🤖 PR с AI изменениями создан ${user?.username || user?.id}: ${result.prUrl}`);
-                    await triggerGetOpenPRs(repoUrl); // Refresh PR list on success
+                    await triggerGetOpenPRs(repoUrl);
                 } else {
                     toast.error("Ошибка создания PR: " + (result.error || "Неизвестная ошибка")); logger.error("PR Creation Failed (Regular):", result.error);
                 }
@@ -371,24 +342,18 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
             if (branchToUpdate) {
                 toast.info(`Обновление ветки '${branchToUpdate}' (замена картинки)...`);
-                // Pass existingPrNumber and prDescription to trigger
                 const result = await triggerUpdateBranch( // Use context trigger for consistency
-                    repoUrl,
-                    filesToCommit,
-                    fullCommitMessage,
-                    branchToUpdate,
-                    existingPrNumber, // Pass PR number if found
-                    prDescription     // Pass description as comment body
+                    repoUrl, filesToCommit, fullCommitMessage, branchToUpdate,
+                    existingPrNumber, prDescription
                 );
-                 if (result.success) { await triggerGetOpenPRs(repoUrl); } // Refresh on success
+                 if (result.success) { await triggerGetOpenPRs(repoUrl); }
             } else {
-                // Create New Pull Request
                 toast.info(`Создание нового PR (замена картинки)...`);
                  const result = await createGitHubPullRequest(repoUrl, filesToCommit, prTitle, prDescription, fullCommitMessage);
                  if (result.success && result.prUrl) {
                      toast.success(`PR для замены картинки создан: ${result.prUrl}`);
                      await notifyAdmin(`🖼️ PR для замены картинки в ${task.targetPath} создан ${user?.username || user?.id}: ${result.prUrl}`);
-                     await triggerGetOpenPRs(repoUrl); // Refresh on success
+                     await triggerGetOpenPRs(repoUrl);
                  }
                  else { toast.error("Ошибка создания PR: " + (result.error || "Неизвестная ошибка")); logger.error("PR Creation Failed (Image Replace):", result.error); }
             }
@@ -400,7 +365,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             setImageReplaceTask(null); // Clear the task upon completion/failure
         }
 
-    }, [ allFetchedFiles, contextOpenPrs, targetBranchName, repoUrl, notifyAdmin, user, setAssistantLoading, setImageReplaceTask, triggerGetOpenPRs, triggerUpdateBranch ]); // Added triggerUpdateBranch to deps
+    }, [ allFetchedFiles, contextOpenPrs, targetBranchName, repoUrl, notifyAdmin, user, setAssistantLoading, setImageReplaceTask, triggerGetOpenPRs, triggerUpdateBranch ]);
 
 
     // --- Response Setting and URL Update Callbacks ---
@@ -432,8 +397,9 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const parseButtonDisabled = commonDisabled || isWaitingForAiResponse || !response.trim();
     const fixButtonDisabled = commonDisabled || isWaitingForAiResponse;
     const submitButtonDisabled = !canSubmitRegularPR || isProcessingPR || !!imageReplaceTask;
-    const showStandardAssistantUI = !imageReplaceTask;
-
+    // <<<--- MODIFIED: Use isMounted to control initial render state --- >>>
+    const showStandardAssistantUI = isMounted && !imageReplaceTask;
+    const showImageReplaceUI = isMounted && !!imageReplaceTask;
 
     return (
         <div id="executor" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
@@ -441,6 +407,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
              <header className="flex justify-between items-center gap-2">
                  <div className="flex items-center gap-2">
                      <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse">AI Code Assistant</h1>
+                     {/* Only show tooltip if standard UI is visible AND mounted */}
                      {showStandardAssistantUI && (
                          <Tooltip text={assistantTooltipText} position="left">
                              <FaCircleInfo className="text-blue-400 cursor-help hover:text-blue-300 transition" />
@@ -452,8 +419,15 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                  </Tooltip>
              </header>
 
-            {/* Conditionally render standard UI vs Image Replace message */}
-            {showStandardAssistantUI ? (
+            {/* Conditionally render standard UI vs Image Replace message based on mount status */}
+            {!isMounted && (
+                <div className="flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed border-gray-600 min-h-[200px]">
+                    <FaSpinner className="text-gray-400 text-3xl mb-4 animate-spin" />
+                    <p className="text-sm text-gray-400">Инициализация ассистента...</p>
+                </div>
+            )}
+
+            {isMounted && showStandardAssistantUI && (
                  <>
                      {/* AI Response Input Area */}
                       <div>
@@ -552,7 +526,9 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                     </div>
 
                  </>
-            ) : (
+            )}
+
+            {isMounted && showImageReplaceUI && (
                  // Message shown during image replacement processing
                  <div className="flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed border-blue-400 min-h-[200px]">
                      {assistantLoading ? (
