@@ -4,7 +4,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaCodeBranch, FaList, FaCheck, FaSquareArrowUpRight, FaArrowsRotate } from 'react-icons/fa6'; // Updated icons
 import { SimplePullRequest } from '@/contexts/RepoXmlPageContext'; // Import type
-import { Tooltip } from '../AICodeAssistant'; // Assuming Tooltip is accessible
+import { Tooltip } from '@/components/ui/Tooltip';
 
 interface SettingsModalProps {
     isOpen: boolean;
