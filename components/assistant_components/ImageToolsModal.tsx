@@ -4,29 +4,29 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FaImages, FaXmark, FaUpload, FaCopy, FaCheck, FaSpinner, FaTriangleExclamation,
-    FaGoogle, FaImage, FaSync, FaLink, FaPaste, FaPaperPlane // Added ExternalLink, Paste, PaperPlane
+    FaGoogle, FaImage, FaSync, FaLink, FaPaste, FaPaperPlane
 } from 'react-icons/fa6';
 import { listPublicBuckets, uploadBatchImages } from '@/app/actions';
 import { searchAndGetFirstImageUrl } from '@/app/repo-xml/google_actions';
 import { Bucket } from '@supabase/storage-js';
 import { toast } from 'sonner';
-// Removed import from AICodeAssistant as it's now in its own file
-// import { Tooltip } from '../AICodeAssistant';
-import { Tooltip } from '@/components/ui/Tooltip'; // Correct import
+import { Tooltip } from '@/components/ui/Tooltip';
 import { FileEntry as ParsedFileEntry } from "@/hooks/useCodeParsingAndValidation";
-import { logger } from '@/lib/logger';
-import { useAppContext } from '@/contexts/AppContext'; // Import AppContext hook
-import { Input } from '@/components/ui/input'; // Import Input component
+// --- SWITCHED IMPORT ---
+import { debugLogger as logger } from '@/lib/debugLogger'; // Import and rename debugLogger
+// --- Keep other imports ---
+import { useAppContext } from '@/contexts/AppContext';
+import { Input } from '@/components/ui/input';
 
 // --- Helper Type ---
 interface ImagePrompt {
-    id: string; // Unique ID for React key
+    id: string;
     placeholder: string;
     prompt: string;
     status: 'pending' | 'searching' | 'uploading' | 'swapping' | 'swapped_google' | 'swapped_upload' | 'error_search' | 'error_upload' | 'error_swap';
-    currentUrl?: string | null; // Store the found/uploaded URL
+    currentUrl?: string | null;
     errorMessage?: string;
-    manualUrlInput: string; // NEW: State for manual URL input
+    manualUrlInput: string;
 }
 
 // --- Props ---
@@ -51,10 +51,10 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
     onUpdateParsedFiles
 }) => {
     // --- Context ---
-    const { openLink } = useAppContext(); // Get openLink function
+    const { openLink } = useAppContext();
 
     // --- State ---
-    const [isMounted, setIsMounted] = useState(false); // <<<--- ADD isMounted STATE
+    const [isMounted, setIsMounted] = useState(false);
     const [buckets, setBuckets] = useState<Bucket[]>([]);
     const [selectedBucket, setSelectedBucket] = useState<string>('');
     const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
@@ -68,22 +68,19 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
     const specificUploadInputRef = useRef<HTMLInputElement>(null);
     const [imagePrompts, setImagePrompts] = useState<ImagePrompt[]>([]);
     const [isSwappingAll, setIsSwappingAll] = useState(false);
-    const [activeManualInput, setActiveManualInput] = useState<string | null>(null); // Track which manual input is active
+    const [activeManualInput, setActiveManualInput] = useState<string | null>(null);
 
 
     // --- Effects ---
-
-    // Set mounted state
     useEffect(() => {
         setIsMounted(true);
-        return () => { setIsMounted(false); }; // Optional cleanup
+        return () => { setIsMounted(false); };
     }, []);
 
-    // Parse prompts_imgs.txt (runs only client-side after mount)
+    // Parse prompts_imgs.txt
     useEffect(() => {
-        // Only run if mounted and modal is open
         if (isMounted && isOpen && parsedFiles.length > 0) {
-            logger.log("ImageToolsModal: Checking for /prompts_imgs.txt");
+            logger.log("ImageToolsModal: Checking for /prompts_imgs.txt"); // Now uses debugLogger
             const promptsFile = parsedFiles.find(f => f.path === '/prompts_imgs.txt');
             if (promptsFile) {
                 const lines = promptsFile.content.split('\n');
@@ -93,16 +90,15 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
                         if (match) {
                             const placeholder = match[1].trim();
                             const prompt = match[2].trim();
-                            // Client-side check for existence
                             const existsInCode = parsedFiles.some(f =>
                                 f.path !== '/prompts_imgs.txt' && f.content?.includes(placeholder)
                             );
                             return {
-                                id: `${placeholder}-${index}-${Math.random().toString(36).substring(7)}`, // More robust ID
+                                id: `${placeholder}-${index}-${Math.random().toString(36).substring(7)}`,
                                 placeholder, prompt,
                                 status: existsInCode ? 'pending' : 'error_swap',
                                 errorMessage: existsInCode ? undefined : 'Placeholder не найден в коде',
-                                manualUrlInput: '', // Initialize manual input
+                                manualUrlInput: '',
                             } as ImagePrompt;
                         }
                         return null;
@@ -110,41 +106,38 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
                     .filter((p): p is ImagePrompt => p !== null);
 
                 if (prompts.length > 0) {
-                    // Avoid immediate toast if parsing happens instantly
-                    // toast.success(`🤖 Обнаружен /prompts_imgs.txt (${prompts.length} промптов)`);
                     setImagePrompts(prompts);
-                    logger.log("Parsed image prompts:", prompts);
-                } else { setImagePrompts([]); logger.log("/prompts_imgs.txt found but no valid prompts parsed."); }
-            } else { setImagePrompts([]); logger.log("/prompts_imgs.txt not found."); }
+                    logger.log("Parsed image prompts:", prompts); // Now uses debugLogger
+                } else { setImagePrompts([]); logger.log("/prompts_imgs.txt found but no valid prompts parsed."); } // Now uses debugLogger
+            } else { setImagePrompts([]); logger.log("/prompts_imgs.txt not found."); } // Now uses debugLogger
         } else if (!isOpen) {
-            // Reset prompts when modal closes
             setImagePrompts([]);
         }
-    }, [isOpen, parsedFiles, isMounted]); // Add isMounted dependency
+    }, [isOpen, parsedFiles, isMounted]);
 
 
-    // Fetch buckets (runs only client-side after mount)
+    // Fetch buckets
     const fetchBuckets = useCallback(async () => {
-         if (!isMounted) return; // Don't fetch if not mounted
+         if (!isMounted) return;
          setIsLoadingBuckets(true); setFetchError(null); setBuckets([]); setSelectedBucket('');
          try {
              const result = await listPublicBuckets();
-             if (!isMounted) return; // Check again after await
+             if (!isMounted) return;
              if (result.success && result.data) {
                  setBuckets(result.data);
                  if (result.data.length > 0) setSelectedBucket(result.data[0].name);
                  else { setFetchError("Не найдено публичных бакетов."); toast.warn("Публичные бакеты не найдены."); }
              } else { const e = result.error || "Не удалось загрузить бакеты."; setFetchError(e); toast.error(e); }
-         } catch (error) { const e = "Ошибка при загрузке бакетов."; setFetchError(e); toast.error(e); logger.error("Fetch buckets error:", error); }
+         } catch (error) { const e = "Ошибка при загрузке бакетов."; setFetchError(e); toast.error(e); logger.error("Fetch buckets error:", error); } // Now uses debugLogger
          finally { if (isMounted) setIsLoadingBuckets(false); }
-    }, [isMounted]); // Add isMounted dependency
+    }, [isMounted]);
 
     useEffect(() => {
-        if (isOpen && isMounted) { // Ensure mounted before fetching
+        if (isOpen && isMounted) {
             fetchBuckets(); setSelectedFiles(null); setUploadResults([]); setUploadError(null); setCopiedUrlIndex(null);
             if (fileInputRef.current) fileInputRef.current.value = "";
         }
-    }, [isOpen, fetchBuckets, isMounted]); // Add isMounted dependency
+    }, [isOpen, fetchBuckets, isMounted]);
 
 
     // --- Core Logic ---
@@ -157,46 +150,44 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
 
         let swapOccurred = false;
         const updatedParsedFiles = parsedFiles.map(file => {
-            // Ensure content exists before trying to replace
             if (file.path === '/prompts_imgs.txt' || !file.content || !file.content.includes(placeholder)) return file;
 
-            logger.log(`Attempting swap for "${placeholder}" in ${file.path} with URL from ${source}`);
+            logger.log(`Attempting swap for "${placeholder}" in ${file.path} with URL from ${source}`); // Now uses debugLogger
             swapOccurred = true;
             try {
                 const newContent = file.content.replaceAll(placeholder, newUrl);
                 if (newContent !== file.content) {
-                    logger.log(`Successfully swapped "${placeholder}" -> "${newUrl}" in ${file.path}`);
+                    logger.log(`Successfully swapped "${placeholder}" -> "${newUrl}" in ${file.path}`); // Now uses debugLogger
                     return { ...file, content: newContent };
                 } else {
-                    logger.warn(`Placeholder "${placeholder}" found via includes(), but replaceAll had no effect in ${file.path}`);
+                    logger.warn(`Placeholder "${placeholder}" found via includes(), but replaceAll had no effect in ${file.path}`); // Now uses debugLogger
                     return file;
                 }
-            } catch (e) { logger.error(`Error during string replaceAll in ${file.path}:`, e); return file; }
+            } catch (e) { logger.error(`Error during string replaceAll in ${file.path}:`, e); return file; } // Now uses debugLogger
         });
 
         if (swapOccurred) {
-            onUpdateParsedFiles(updatedParsedFiles); // Update parent state
+            onUpdateParsedFiles(updatedParsedFiles);
             setImagePrompts(prev => prev.map(p =>
                 p.placeholder === placeholder
-                ? { ...p, status: source === 'google' ? 'swapped_google' : (source === 'upload' ? 'swapped_upload' : 'swapped_upload'), currentUrl: newUrl, errorMessage: undefined } // Treat manual like upload for status
+                ? { ...p, status: source === 'google' ? 'swapped_google' : (source === 'upload' ? 'swapped_upload' : 'swapped_upload'), currentUrl: newUrl, errorMessage: undefined }
                 : p
             ));
-            logger.log(`Swap successful for "${placeholder}", updated parent state.`);
+            logger.log(`Swap successful for "${placeholder}", updated parent state.`); // Now uses debugLogger
             return true;
         } else {
-            logger.warn(`performSwap: Placeholder "${placeholder}" not found via includes() in any file content during mapping.`);
-            // Only set error if not already swapped
+            logger.warn(`performSwap: Placeholder "${placeholder}" not found via includes() in any file content during mapping.`); // Now uses debugLogger
             setImagePrompts(prev => prev.map(p =>
                 p.placeholder === placeholder && !p.status.startsWith('swapped_')
                  ? { ...p, status: 'error_swap', errorMessage: 'Placeholder не найден при замене' } : p
              ));
              return false;
         }
-    }, [parsedFiles, onUpdateParsedFiles]); // Keep dependencies
+    }, [parsedFiles, onUpdateParsedFiles]);
 
-    // --- Handlers (remain largely the same, wrapped in useCallback) ---
+    // --- Handlers ---
     const handleGoogleSwap = useCallback(async (placeholder: string, prompt: string) => {
-        logger.log(`Google Swap triggered for: ${placeholder}`);
+        logger.log(`Google Swap triggered for: ${placeholder}`); // Now uses debugLogger
         setImagePrompts(prev => prev.map(p => p.placeholder === placeholder ? { ...p, status: 'searching' } : p));
         try {
             const result = await searchAndGetFirstImageUrl(prompt);
@@ -208,38 +199,35 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
                 toast.error(`Google Поиск не дал результатов для: "${prompt.substring(0, 30)}..."`);
                 setImagePrompts(prev => prev.map(p => p.placeholder === placeholder ? { ...p, status: 'error_search', errorMessage: result.error || 'Google не нашел' } : p));
             }
-        } catch (error) { toast.error("Ошибка при поиске в Google."); logger.error("Google Swap Error:", error); setImagePrompts(prev => prev.map(p => p.placeholder === placeholder ? { ...p, status: 'error_search', errorMessage: 'Ошибка сети' } : p)); }
+        } catch (error) { toast.error("Ошибка при поиске в Google."); logger.error("Google Swap Error:", error); setImagePrompts(prev => prev.map(p => p.placeholder === placeholder ? { ...p, status: 'error_search', errorMessage: 'Ошибка сети' } : p)); } // Now uses debugLogger
     }, [performSwap]);
 
     const handleOpenGoogleSearch = useCallback((prompt: string) => {
         const searchUrl = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(prompt)}`;
-        logger.log(`Opening Google Image search tab: ${searchUrl}`);
-        openLink(searchUrl); // Use context function
+        logger.log(`Opening Google Image search tab: ${searchUrl}`); // Now uses debugLogger
+        openLink(searchUrl);
     }, [openLink]);
 
     const handleManualUrlInputChange = useCallback((id: string, value: string) => {
         setImagePrompts(prev => prev.map(p => p.id === id ? { ...p, manualUrlInput: value } : p));
-        setActiveManualInput(id); // Track active input
+        setActiveManualInput(id);
     }, []);
 
     const handleManualUrlSwap = useCallback((placeholder: string, manualUrl: string) => {
          if (!manualUrl || !manualUrl.trim() || !manualUrl.startsWith('http')) {
-             toast.error("Введите валидный URL (https://...)");
+             toast.error("Введите валидный URL (https://..)");
              return;
          }
-         logger.log(`Manual Swap triggered for: ${placeholder} with URL: ${manualUrl}`);
-         setImagePrompts(prev => prev.map(p => p.placeholder === placeholder ? { ...p, status: 'swapping' } : p)); // Indicate swapping
+         logger.log(`Manual Swap triggered for: ${placeholder} with URL: ${manualUrl}`); // Now uses debugLogger
+         setImagePrompts(prev => prev.map(p => p.placeholder === placeholder ? { ...p, status: 'swapping' } : p));
          const swapped = performSwap(placeholder, manualUrl.trim(), 'manual');
          if (swapped) {
             toast.success(`"${placeholder.substring(0, 20)}..." заменен вручную!`);
-            // Optionally clear the input after successful swap
              setImagePrompts(prev => prev.map(p => p.placeholder === placeholder ? { ...p, manualUrlInput: '' } : p));
              setActiveManualInput(null);
          } else {
              toast.error(`Не удалось найти placeholder "${placeholder}" для ручной замены.`);
-             // Status already set to error_swap by performSwap
          }
-
     }, [performSwap]);
 
 
@@ -256,7 +244,7 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
         const file = event.target.files?.[0];
         const inputElement = event.target;
         if (!placeholder || !file || !selectedBucket) { toast.error("Ошибка: не выбран файл, плейсхолдер или бакет."); if (inputElement) inputElement.value = ""; return; }
-        logger.log(`Upload & Swap for: ${placeholder} with file ${file.name}`);
+        logger.log(`Upload & Swap for: ${placeholder} with file ${file.name}`); // Now uses debugLogger
         setImagePrompts(prev => prev.map(p => p.placeholder === placeholder ? { ...p, status: 'uploading' } : p));
         setIsUploading(true);
         const formData = new FormData(); formData.append("bucketName", selectedBucket); formData.append("files", file);
@@ -268,7 +256,7 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
                  if (!swapped) toast.error(`Не найден placeholder "${placeholder}" для замены.`);
                  else toast.success(`"${placeholder.substring(0, 20)}..." заменен загруженной картинкой!`);
             } else { const errorMsg = result.error || result.failed?.[0]?.error || "Ошибка загрузки"; toast.error(`Ошибка загрузки для "${placeholder}": ${errorMsg}`); setImagePrompts(prev => prev.map(p => p.placeholder === placeholder ? { ...p, status: 'error_upload', errorMessage: errorMsg } : p)); }
-        } catch (error) { toast.error(`Крит. ошибка загрузки для "${placeholder}".`); logger.error("Specific Upload Error:", error); setImagePrompts(prev => prev.map(p => p.placeholder === placeholder ? { ...p, status: 'error_upload', errorMessage: 'Ошибка сети' } : p)); }
+        } catch (error) { toast.error(`Крит. ошибка загрузки для "${placeholder}".`); logger.error("Specific Upload Error:", error); setImagePrompts(prev => prev.map(p => p.placeholder === placeholder ? { ...p, status: 'error_upload', errorMessage: 'Ошибка сети' } : p)); } // Now uses debugLogger
         finally { setIsUploading(false); if (inputElement) inputElement.value = ""; }
     }, [selectedBucket, performSwap]);
 
@@ -286,7 +274,7 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
                     if (swapped) successCount++; else errorCount++;
                 } else { setImagePrompts(prev => prev.map(p => p.id === promptItem.id ? { ...p, status: 'error_search', errorMessage: result.error || 'Google не нашел' } : p)); errorCount++; }
             } catch (error) { setImagePrompts(prev => prev.map(p => p.id === promptItem.id ? { ...p, status: 'error_search', errorMessage: 'Ошибка сети' } : p)); errorCount++; }
-            await new Promise(resolve => setTimeout(resolve, 200)); // Small delay
+            await new Promise(resolve => setTimeout(resolve, 200));
         }
         if (successCount > 0) toast.success(`Авто-замена Google: ${successCount} успешно!`);
         if (errorCount > 0) toast.error(`Авто-замена Google: ${errorCount} ошибок.`);
@@ -316,27 +304,27 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
                   const errorCount = finalResults.filter(r => r.error).length;
                   if (successCount > 0) toast.success(`${successCount} из ${originalFiles.length} файлов успешно загружено!`);
                   if (errorCount > 0) { const generalErrorMsg = result.error || `${errorCount} файлов не удалось загрузить.`; setUploadError(generalErrorMsg); toast.error(generalErrorMsg); }
-                  // Ensure all original files have a result entry
                    const resultSet = new Set(finalResults.map(r => r.name));
                    originalFiles.forEach(file => { if (!resultSet.has(file.name)) { finalResults.push({ name: file.name, error: "No result returned" }); } });
 
-             } else { // Overall failure
+             } else {
                  const errorMsg = result.error || "Не удалось загрузить файлы."; setUploadError(errorMsg); toast.error(errorMsg); finalResults = originalFiles.map(file => ({ name: file.name, error: errorMsg }));
              }
              setUploadResults(finalResults);
-         } catch (error) { const errorMsg = "Критическая ошибка при загрузке."; setUploadError(errorMsg); toast.error(errorMsg); logger.error("Upload error:", error); setUploadResults(originalFiles.map(file => ({ name: file.name, error: "Critical error" }))); }
+         } catch (error) { const errorMsg = "Критическая ошибка при загрузке."; setUploadError(errorMsg); toast.error(errorMsg); logger.error("Upload error:", error); setUploadResults(originalFiles.map(file => ({ name: file.name, error: "Critical error" }))); } // Now uses debugLogger
          finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""; setSelectedFiles(null); }
     }, [selectedBucket, selectedFiles]);
 
     const copyUrl = useCallback((url: string | undefined, index: number) => {
          if (!url || typeof url !== 'string') { toast.error("Неверный URL"); return; }
-         navigator.clipboard.writeText(url).then(() => { setCopiedUrlIndex(index); toast.success("URL скопирован!"); setTimeout(() => setCopiedUrlIndex(null), 1500); }).catch((err) => { toast.error("Не удалось скопировать URL"); logger.error("Copy URL error:", err); });
+         navigator.clipboard.writeText(url).then(() => { setCopiedUrlIndex(index); toast.success("URL скопирован!"); setTimeout(() => setCopiedUrlIndex(null), 1500); }).catch((err) => { toast.error("Не удалось скопировать URL"); logger.error("Copy URL error:", err); }); // Now uses debugLogger
     }, []);
 
 
     // --- Render ---
     const anyLoading = isUploading || isSwappingAll || imagePrompts.some(p => ['searching', 'uploading', 'swapping'].includes(p.status));
 
+    // Render logic remains the same...
     return (
         <AnimatePresence>
             {isOpen && (

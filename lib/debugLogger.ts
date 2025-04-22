@@ -1,52 +1,70 @@
-// /lib/debugLogger.ts
+// Intended for more verbose client-side debugging, keeps a limited history.
+
 class DebugLogger {
-  private logs: string[] = []
-  private maxLogs = 100
+  private logs: string[] = [];
+  private maxLogs = 100; // Keep the last 100 logs
 
   log(...args: any[]) {
-    const logMessage = args.map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : arg)).join(" ")
+    const logMessage = args
+      .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : arg))
+      .join(" ");
 
-    this.logs.push(`${new Date().toISOString()}: ${logMessage}`)
+    this.logs.push(`${new Date().toISOString()} [LOG]: ${logMessage}`);
 
     if (this.logs.length > this.maxLogs) {
-      this.logs.shift()
+      this.logs.shift(); // Remove the oldest log
     }
 
-    console.log(...args)
+    // Standard console logging
+    console.log(...args);
   }
 
   error(...args: any[]) {
-    const errorMessage = args.map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : arg)).join(" ")
+    const errorMessage = args
+      .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : arg))
+      .join(" ");
 
-    this.logs.push(`ERROR ${new Date().toISOString()}: ${errorMessage}`)
+    this.logs.push(`ERROR ${new Date().toISOString()}: ${errorMessage}`);
 
     if (this.logs.length > this.maxLogs) {
-      this.logs.shift()
+      this.logs.shift();
     }
 
-    console.error(...args)
+    console.error(...args);
   }
 
   warn(...args: any[]) {
-    const errorMessage = args.map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : arg)).join(" ")
+    const warnMessage = args // Renamed variable for clarity
+      .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : arg))
+      .join(" ");
 
-    this.logs.push(`WARN ${new Date().toISOString()}: ${errorMessage}`)
+    this.logs.push(`WARN ${new Date().toISOString()}: ${warnMessage}`); // Use warnMessage
 
     if (this.logs.length > this.maxLogs) {
-      this.logs.shift()
+      this.logs.shift();
     }
 
-    console.error(...args)
+    // --- CORRECTED LINE ---
+    console.warn(...args); // Use console.warn for warnings
   }
 
   getLogs() {
-    return this.logs.join("\n")
+    // Returns all stored logs as a single string, newest last
+    return this.logs.join("\n");
   }
 
   clear() {
-    this.logs = []
+    this.logs = [];
+    console.log("Debug logs cleared.");
   }
 }
 
-export const debugLogger = new DebugLogger()
+// Export a single instance
+export const debugLogger = new DebugLogger();
 
+// Optional: Add a simple function to display logs in the console easily
+export const showDebugLogs = () => {
+    console.log("--- Debug Logs History ---");
+    console.log(debugLogger.getLogs() || "No logs recorded.");
+    console.log("--------------------------");
+};
