@@ -2,7 +2,7 @@
 
 import React, { MutableRefObject, ChangeEventHandler } from 'react';
 import { motion } from 'framer-motion';
-import { FaClipboard, FaBroom, FaRobot, FaPlus, FaFileLines, FaArrowsRotate, FaSpinner } from 'react-icons/fa6'; // Added FaSpinner
+import { FaClipboard, FaBroom, FaRobot, FaPlus, FaFileLines, FaArrowsRotate, FaSpinner } from 'react-icons/fa6'; // Use Spinner
 import { toast } from 'sonner';
 // --- Import the prompt ---
 import { ULTIMATE_VIBE_MASTER_PROMPT } from './prompt';
