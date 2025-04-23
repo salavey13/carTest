@@ -1,4 +1,5 @@
-// /components/repo/SelectedFilesPreview.tsx
+"use client";
+
 import React from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -7,45 +8,51 @@ import { FileNode } from '../RepoTxtFetcher'; // Import FileNode interface
 interface SelectedFilesPreviewProps {
     selectedFiles: Set<string>;
     allFiles: FileNode[];
-    getLanguage: (path: string) => string; // Receive helper function as prop
+    getLanguage: (path: string) => string;
 }
 
-const SelectedFilesPreview: React.FC<SelectedFilesPreviewProps> = ({
+// Memoize the component to prevent re-renders if props haven't changed by reference
+const SelectedFilesPreview: React.FC<SelectedFilesPreviewProps> = React.memo(({
     selectedFiles,
     allFiles,
     getLanguage,
 }) => {
-    // Create a sorted array from the Set for stable rendering order
-    const sortedSelectedPaths = Array.from(selectedFiles).sort();
+    // Create a sorted array from the Set inside the component
+    const sortedSelectedPaths = React.useMemo(() => Array.from(selectedFiles).sort(), [selectedFiles]);
 
     if (selectedFiles.size === 0) {
-        return null; // Don't render if no files selected
+        return null;
     }
 
     return (
-         // *** UPDATED: Removed 'open' prop to make it collapsed by default ***
-         <details className="mb-6 bg-gray-800/50 border border-gray-700 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.2)]">
-            <summary className="text-lg font-bold text-cyan-400 cursor-pointer hover:text-cyan-300 transition-colors">Предпросмотр выбранных файлов ({selectedFiles.size})</summary>
-            <div className="mt-3 max-h-96 overflow-y-auto space-y-4 custom-scrollbar">
+         <details className="mb-4 bg-gray-800/50 border border-gray-700 p-3 rounded-lg shadow-inner"> {/* Adjusted styles */}
+            <summary className="text-base font-semibold text-cyan-300 cursor-pointer hover:text-cyan-200 transition-colors"> {/* Adjusted styles */}
+                Предпросмотр выбранных файлов ({selectedFiles.size})
+            </summary>
+            <div className="mt-3 max-h-80 overflow-y-auto space-y-3 custom-scrollbar pr-1"> {/* Adjusted max-height, padding */}
                 {sortedSelectedPaths.map((path) => {
                     const file = allFiles.find((f) => f.path === path);
                     if (!file) return null;
                     const lang = getLanguage(file.path);
-                    const isTruncated = file.content.length > 1000;
-                    const displayContent = isTruncated ? file.content.substring(0, 1000) + '\n... (содержимое усечено)' : file.content;
+                    // More aggressive truncation for preview
+                    const MAX_PREVIEW_LENGTH = 500;
+                    const isTruncated = file.content.length > MAX_PREVIEW_LENGTH;
+                    const displayContent = isTruncated
+                        ? file.content.substring(0, MAX_PREVIEW_LENGTH) + '\n\n... (содержимое усечено для предпросмотра)'
+                        : file.content;
 
                     return (
-                        <div key={file.path} className="bg-gray-900 rounded-lg overflow-hidden border border-gray-700/50 shadow-md">
-                            <h4 className="text-xs font-bold text-purple-300 px-3 py-1 bg-gray-700/80 truncate" title={file.path}>{file.path}</h4>
-                             {/* Use pre/code for better semantics and potential copy/paste */}
-                             <pre className="!m-0 !p-0">
+                        <div key={file.path} className="bg-gray-900/80 rounded-md overflow-hidden border border-gray-700/40 shadow-sm">
+                            <h4 className="text-[11px] font-medium text-purple-300 px-2 py-0.5 bg-gray-700/60 truncate" title={file.path}>{file.path}</h4>
+                             <pre className="!m-0 !p-0 text-[10px]"> {/* Smaller base font for preview */}
                                 <SyntaxHighlighter
                                     language={lang}
                                     style={oneDark}
-                                    customStyle={{ background: "#111827", padding: "0.75rem", margin: 0, fontSize: "0.75rem", maxHeight: '20rem', overflowY: 'auto' }}
+                                    // Further optimize styles for preview
+                                    customStyle={{ background: "transparent", padding: "0.5rem 0.75rem", margin: 0, maxHeight: '15rem', overflowY: 'auto' }}
                                     showLineNumbers={true}
                                     wrapLines={true}
-                                    lineNumberStyle={{ color: '#5c6370', fontSize: '0.7rem' }} // Style line numbers
+                                    lineNumberStyle={{ color: '#5c6370', fontSize: '0.6rem', minWidth: '2.0em', paddingRight: '0.5em' }} // Adjusted line number style
                                 >
                                     {displayContent}
                                 </SyntaxHighlighter>
@@ -56,6 +63,7 @@ const SelectedFilesPreview: React.FC<SelectedFilesPreviewProps> = ({
             </div>
         </details>
     );
-};
+});
+SelectedFilesPreview.displayName = 'SelectedFilesPreview'; // Add display name
 
 export default SelectedFilesPreview;
