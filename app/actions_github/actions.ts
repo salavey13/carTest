@@ -1,7 +1,8 @@
+// /app/actions_github/actions.ts
 "use server";
 import { Octokit } from "@octokit/rest";
 import { notifyAdmins, notifyAdmin } from "@/app/actions";
-// Use standard console logging in server actions
+// Use standard console logging
 
 // Interfaces
 interface FileNode { path: string; content: string; }
@@ -9,31 +10,21 @@ interface GitTreeFile { path: string; sha: string; type: string; mode?: string; 
 interface GitTreeResponseData { sha: string; url: string; tree: GitTreeFile[]; truncated: boolean; }
 interface SimplePullRequest { id: number; number: number; title: string; html_url: string; user?: { login?: string }; head: { ref: string }; updated_at: string; }
 
-// --- Constants for Batching ---
+// Constants
 const BATCH_SIZE = 40;
 const DELAY_BETWEEN_BATCHES_MS = 600;
-
-// Utility: Delay Function
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+function parseRepoUrl(repoUrl: string) { const m=repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/); if(!m) throw new Error("Invalid GitHub URL"); return { owner: m[1], repo: m[2].replace(/\.git$/, '') }; }
 
-// --- parseRepoUrl ---
-function parseRepoUrl(repoUrl: string) {
-  const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/);
-  if (!match) throw new Error("Invalid GitHub repo URL");
-  return { owner: match[1], repo: match[2].replace(/\.git$/, '') };
-}
-
-// --- REVISED fetchRepoContents FUNCTION (Default Branch Fix + Standard Console) ---
 export async function fetchRepoContents(repoUrl: string, customToken?: string, branchName?: string | null) {
-  console.log(`[Action] Fetching repo contents for: ${repoUrl}${branchName ? ` on branch ${branchName}` : ' (default branch attempt)'}`);
+  console.log(`[Action] Fetching: ${repoUrl}${branchName ? ` @ ${branchName}` : ' (default)'}`);
   const startTime = Date.now();
   let owner: string | undefined, repo: string | undefined;
   let targetBranch = branchName;
-  let isDefaultFetched = false; // Flag
+  let isDefaultFetched = false;
 
   try {
-    const token = customToken || process.env.GITHUB_TOKEN;
-    if (!token) throw new Error("GitHub token is missing");
+    const token = customToken || process.env.GITHUB_TOKEN; if (!token) throw new Error("GH token missing");
     const repoInfo = parseRepoUrl(repoUrl); owner = repoInfo.owner; repo = repoInfo.repo;
     const octokit = new Octokit({ auth: token });
 
@@ -45,84 +36,72 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
     const excludedExtensions = ['.pl','.json','.png','.jpg','.jpeg','.gif','.svg','.ico','.webp','.avif','.mp4','.webm','.mov','.mp3','.wav','.ogg','.pdf','.woff','.woff2','.ttf','.otf','.eot','.zip','.gz','.tar','.rar','.env','.lock','.log','.DS_Store','.md','.csv','.xlsx','.xls','.yaml','.yml','.bak','.tmp','.swp','.map','.dll','.exe','.so','.dylib'];
     // --- END Filtering ---
 
-    // --- Branch and Commit Logic (Improved Default Branch Handling) ---
+    // --- Branch Logic (More Robust Default Handling) ---
     let repoDefaultBranch: string | undefined = undefined;
     if (!targetBranch || targetBranch === 'default') {
-        console.log("[Action] No specific branch or 'default' requested, fetching repository info...");
+        console.log("[Action] Fetching repo info for default branch...");
         try {
             const { data: repoData } = await octokit.repos.get({ owner, repo });
             repoDefaultBranch = repoData.default_branch;
-            targetBranch = repoDefaultBranch; // Set targetBranch
-            isDefaultFetched = true;
-            console.log(`[Action] Default branch determined via repos.get: ${targetBranch}`);
+            targetBranch = repoDefaultBranch; isDefaultFetched = true;
+            console.log(`[Action] Default branch via repos.get: ${targetBranch}`);
         } catch (repoGetError: any) {
-            console.error(`[Action] Failed to fetch default branch via repos.get:`, repoGetError);
-             if (!branchName) { throw new Error(`Failed to determine default branch: ${repoGetError.message}`); }
-             targetBranch = 'default'; // Keep 'default' if explicitly passed
-             console.warn("[Action] Could not fetch default branch info, proceeding with potentially explicit 'default' name.");
+            console.error(`[Action] Failed repos.get default branch`, repoGetError);
+             // *** Specific Rate Limit Handling for initial check ***
+             if (repoGetError.status === 403 && repoGetError.message?.includes('rate limit exceeded')) {
+                 await notifyAdmin(`⏳ Rate Limit hit getting default branch for ${owner}/${repo}. Retrying may succeed later.`);
+                 throw new Error("API rate limit hit checking default branch. Please try again shortly."); // Throw specific error
+             }
+             if (!branchName) { throw new Error(`Failed determine default branch: ${repoGetError.message}`); }
+             targetBranch = 'default'; // Keep explicit 'default' if passed
+             console.warn("[Action] Default branch fetch failed, using explicit 'default'.");
         }
-    } else {
-        console.log(`[Action] Using specified branch: ${targetBranch}`);
-    }
+    } else { console.log(`[Action] Using specified branch: ${targetBranch}`); }
     if (!targetBranch) { throw new Error("Target branch could not be determined."); }
 
-    let latestCommitSha: string;
-    console.log(`[Action] Fetching ref/commit for effective target branch: ${targetBranch}...`);
+    let latestCommitSha: string; console.log(`[Action] Fetching ref/commit for: ${targetBranch}...`);
     try {
         const { data: refData } = await octokit.git.getRef({ owner, repo, ref: `heads/${targetBranch}` });
-        latestCommitSha = refData.object.sha;
-        console.log(`[Action] Found latest commit SHA via getRef: ${latestCommitSha}`);
+        latestCommitSha = refData.object.sha; console.log(`[Action] Commit SHA via getRef: ${latestCommitSha}`);
     } catch (refError: any) {
          if (refError.status === 404) {
-             console.warn(`[Action] getRef failed for 'heads/${targetBranch}' (404). Trying getCommit...`);
-             try {
-                 const { data: commitDataFallback } = await octokit.repos.getCommit({ owner, repo, ref: targetBranch });
-                 latestCommitSha = commitDataFallback.sha;
-                 console.log(`[Action] Found commit SHA via getCommit fallback: ${latestCommitSha}`);
-             } catch (commitError: any) {
-                 console.error(`[Action] Both getRef and getCommit failed for branch '${targetBranch}'. Final error:`, commitError);
-                 const branchType = isDefaultFetched ? "default branch" : "branch";
-                 throw new Error(`Could not find ${branchType} '${targetBranch}' (404). Check name/access. Final attempt error: ${commitError.message}`);
-             }
-         } else {
-            console.error(`[Action] Failed get ref for ${targetBranch}:`, refError); throw new Error(`Failed get git ref for ${targetBranch}: ${refError.message}`);
-         }
+             console.warn(`[Action] getRef 404 for 'heads/${targetBranch}'. Trying getCommit...`);
+             try { const { data: commitDataFallback } = await octokit.repos.getCommit({ owner, repo, ref: targetBranch }); latestCommitSha = commitDataFallback.sha; console.log(`[Action] Commit SHA via getCommit fallback: ${latestCommitSha}`); }
+             catch (commitError: any) { console.error(`[Action] All attempts failed for branch '${targetBranch}'.`, commitError); const bType = isDefaultFetched ? "default branch" : "branch"; throw new Error(`Cannot find ${bType} '${targetBranch}' (404). Check name/access.`); }
+         } else if (refError.status === 403 && refError.message?.includes('rate limit exceeded')) {
+             // Rate limit specifically on getRef (might happen after initial success)
+             await notifyAdmin(`⏳ Rate Limit hit getting ref for ${owner}/${repo} branch ${targetBranch}.`);
+             throw new Error("API rate limit hit fetching branch details.");
+         } else { console.error(`[Action] Failed getRef ${targetBranch}:`, refError); throw new Error(`Failed get git ref ${targetBranch}: ${refError.message}`); }
     }
+
     // --- Tree Fetching ---
-    const { data: commitData } = await octokit.git.getCommit({ owner, repo, commit_sha: latestCommitSha });
-    const treeSha = commitData.tree.sha; console.log(`[Action] Tree SHA for commit ${latestCommitSha}: ${treeSha}`);
-    console.log(`[Action] Fetching recursive tree for tree SHA ${treeSha}...`); let treeData: GitTreeResponseData;
-    try {
-        const response = await octokit.git.getTree({ owner, repo, tree_sha: treeSha, recursive: '1' });
-        treeData = response.data as GitTreeResponseData;
-        if (treeData?.truncated) { console.warn("[Action] WARNING: Tree data truncated."); await notifyAdmin(`⚠️ Tree truncated ${owner}/${repo} ${targetBranch}.`); }
-        if (!treeData || !Array.isArray(treeData.tree)) { console.error("[Action] Invalid tree structure:", treeData); throw new Error(`Invalid tree structure. Truncated: ${treeData?.truncated ?? 'N/A'}`); }
-        console.log(`[Action] Tree received: ${treeData.tree.length} items. Filtering...`);
+    const { data: commitData } = await octokit.git.getCommit({ owner, repo, commit_sha: latestCommitSha }); const treeSha = commitData.tree.sha; console.log(`[Action] Tree SHA: ${treeSha}. Fetching tree...`); let treeData: GitTreeResponseData;
+    try { const res = await octokit.git.getTree({ owner, repo, tree_sha: treeSha, recursive: '1' }); treeData = res.data as GitTreeResponseData; if (treeData?.truncated) { console.warn("[Action] Tree truncated."); await notifyAdmin(`⚠️ Tree truncated ${owner}/${repo} ${targetBranch}.`); } if (!treeData || !Array.isArray(treeData.tree)) { console.error("[Action] Invalid tree structure:", treeData); throw new Error(`Invalid tree structure.`); } console.log(`[Action] Tree items: ${treeData.tree.length}. Filtering...`);
     } catch (treeError: any) { console.error(`[Action] getTree failed`, treeError); throw new Error(`Failed getTree: ${treeError.message || treeError}`); }
 
     // --- Apply Filtering ---
     let filesToFetch = treeData.tree.filter((item): item is GitTreeFile => { if(item.type!=='blob'||!item.path||!item.sha) return false; const pL=item.path.toLowerCase(); if(excludedExactPaths.has(item.path)) return false; if(excludedPrefixes.some(p=>pL.startsWith(p))) return false; if(excludedExtensions.some(e=>pL.endsWith(e))) return item.path==='README.md'||allowedRootFiles.has(item.path); if(allowedRootFiles.has(item.path)) return true; if(allowedPrefixes.some(p=>pL.startsWith(p))) return true; return false; });
-    console.log(`[Action] Filtered down to ${filesToFetch.length} relevant files.`);
+    console.log(`[Action] Filtered to ${filesToFetch.length} files.`);
 
     // --- File Limit Check (Warn & Truncate) ---
-    const MAX_FILES_TO_FETCH = 500;
-    if (filesToFetch.length > MAX_FILES_TO_FETCH) { console.warn(`[Action] Warning: Count (${filesToFetch.length}) > limit (${MAX_FILES_TO_FETCH}). Truncating.`); await notifyAdmin(`⚠️ High file count (${filesToFetch.length}) ${owner}/${repo} ${targetBranch}. Truncated.`); filesToFetch = filesToFetch.slice(0, MAX_FILES_TO_FETCH); }
+    const MAX_FILES_TO_FETCH = 500; if (filesToFetch.length > MAX_FILES_TO_FETCH) { console.warn(`[Action] Count (${filesToFetch.length}) > limit (${MAX_FILES_TO_FETCH}). Truncating.`); await notifyAdmin(`⚠️ High file count (${filesToFetch.length}) ${owner}/${repo} ${targetBranch}. Truncated.`); filesToFetch = filesToFetch.slice(0, MAX_FILES_TO_FETCH); }
 
     // --- Content Fetching Loop (Resilient) ---
-    const allFiles: FileNode[] = []; const totalFiles = filesToFetch.length; if (totalFiles === 0) { console.warn("[Action] No relevant files found."); return { success: true, files: [] }; }
-    console.log(`[Action] Starting content fetch for ${totalFiles} files...`);
-    for (let i = 0; i < totalFiles; i += BATCH_SIZE) { const batchFiles = filesToFetch.slice(i, i + BATCH_SIZE); const batchNumber = Math.floor(i / BATCH_SIZE) + 1; const totalBatches = Math.ceil(totalFiles / BATCH_SIZE); console.log(`[Action] Fetching batch ${batchNumber}/${totalBatches}...`); const batchPromises = batchFiles.map(async (fI) => { try { const { data: bD } = await octokit.git.getBlob({ owner: owner!, repo: repo!, file_sha: fI.sha }); if (typeof bD.content !== 'string' || typeof bD.encoding !== 'string') { console.warn(`[Action] Invalid blob ${fI.path}. Skip.`); return null; } let cnt: string; if (bD.encoding === 'base64') { cnt = Buffer.from(bD.content, 'base64').toString('utf-8'); } else if (bD.encoding === 'utf-8') { cnt = bD.content; } else { console.warn(`[Action] Unsup. encoding '${bD.encoding}' for ${fI.path}. Skip.`); return null; } const MAX_F_BYTES = 750 * 1024; if (Buffer.byteLength(cnt, 'utf8') > MAX_F_BYTES) { console.warn(`[Action] Skipping large file (${(Buffer.byteLength(cnt, 'utf8') / 1024).toFixed(0)} KB): ${fI.path}`); return null; } let pC: string; const fE = fI.path.split('.').pop()?.toLowerCase()||''; switch(fE){ /* cases */ case 'ts': case 'tsx': case 'js': case 'jsx': pC=`// /${fI.path}`; break; case 'css': case 'scss': pC=`/* /${fI.path} */`; break; case 'sql': pC=`-- /${fI.path}`; break; case 'py': case 'rb': case 'sh': case 'yml': case 'yaml': case 'env': pC=`# /${fI.path}`; break; case 'html': case 'xml': case 'vue': case 'svelte': pC=`<!-- /${fI.path} -->`; break; case 'md': pC=`<!-- /${fI.path} -->`; break; default: pC=`// /${fI.path}`; } if(cnt.trim()&&!cnt.trimStart().startsWith(pC)){cnt=`${pC}\n${cnt}`;} else if(!cnt.trim()){cnt=pC;} return { path: fI.path, content: cnt }; } catch (fE: any) { console.error(`[Action] Error fetch blob ${fI.path}:`, fE.status?`${fE.message} (${fE.status})`:fE); return null; } }); const bR = await Promise.all(batchPromises); const vR = bR.filter((r): r is FileNode => r !== null); allFiles.push(...vR); if (vR.length < bR.length) { console.warn(`[Action] ${bR.length - vR.length} files in batch ${batchNumber} failed/skipped.`); } if (i + BATCH_SIZE < totalFiles) { console.log(`[Action] Wait ${DELAY_BETWEEN_BATCHES_MS}ms...`); await delay(DELAY_BETWEEN_BATCHES_MS); } }
+    const allFiles: FileNode[] = []; const totalFiles = filesToFetch.length; if (totalFiles === 0) { console.warn("[Action] No relevant files."); return { success: true, files: [] }; }
+    console.log(`[Action] Fetching content for ${totalFiles} files...`);
+    for (let i = 0; i < totalFiles; i += BATCH_SIZE) { /* Batch loop kept */ const bF = filesToFetch.slice(i, i + BATCH_SIZE); const bN = Math.floor(i / BATCH_SIZE) + 1; const tB = Math.ceil(totalFiles / BATCH_SIZE); console.log(`[Action] Batch ${bN}/${tB}...`); const bP = bF.map(async (fI) => { try { const { data: bD } = await octokit.git.getBlob({ owner: owner!, repo: repo!, file_sha: fI.sha }); if (typeof bD.content !== 'string' || typeof bD.encoding !== 'string') { console.warn(`[Action] Invalid blob ${fI.path}. Skip.`); return null; } let cnt: string; if (bD.encoding === 'base64') { cnt = Buffer.from(bD.content, 'base64').toString('utf-8'); } else if (bD.encoding === 'utf-8') { cnt = bD.content; } else { console.warn(`[Action] Unsup. encoding '${bD.encoding}' ${fI.path}. Skip.`); return null; } const MAX_BYTES = 750*1024; if (Buffer.byteLength(cnt, 'utf8') > MAX_BYTES) { console.warn(`[Action] Skip large file (${(Buffer.byteLength(cnt, 'utf8')/1024).toFixed(0)} KB): ${fI.path}`); return null; } let pC: string; const fE = fI.path.split('.').pop()?.toLowerCase()||''; switch(fE){ case 'ts': case 'tsx': case 'js': case 'jsx': pC=`// /${fI.path}`; break; case 'css': case 'scss': pC=`/* /${fI.path} */`; break; case 'sql': pC=`-- /${fI.path}`; break; case 'py': case 'rb': case 'sh': case 'yml': case 'yaml': case 'env': pC=`# /${fI.path}`; break; case 'html': case 'xml': case 'vue': case 'svelte': pC=`<!-- /${fI.path} -->`; break; case 'md': pC=`<!-- /${fI.path} -->`; break; default: pC=`// /${fI.path}`; } if(cnt.trim()&&!cnt.trimStart().startsWith(pC)){cnt=`${pC}\n${cnt}`;} else if(!cnt.trim()){cnt=pC;} return { path: fI.path, content: cnt }; } catch (fE: any) { console.error(`[Action] Err fetch blob ${fI.path}:`, fE.status?`${fE.message} (${fE.status})`:fE); return null; } }); const bR = await Promise.all(bP); const vR = bR.filter((r): r is FileNode => r !== null); allFiles.push(...vR); if (vR.length < bR.length) { console.warn(`[Action] ${bR.length - vR.length} files batch ${bN} failed/skipped.`); } if (i + BATCH_SIZE < totalFiles) { console.log(`[Action] Wait ${DELAY_BETWEEN_BATCHES_MS}ms...`); await delay(DELAY_BETWEEN_BATCHES_MS); } }
 
     // --- Success Return ---
-    const endTime = Date.now(); console.log(`[Action] Success: Processed ${allFiles.length} files from branch '${targetBranch}' in ${(endTime - startTime) / 1000}s.`); return { success: true, files: allFiles };
+    const endTime = Date.now(); console.log(`[Action] Success: Processed ${allFiles.length} files from '${targetBranch}' (${((endTime-startTime)/1000).toFixed(1)}s).`); return { success: true, files: allFiles };
   } catch (error: any) {
         // --- Error Handling ---
-        const endTime = Date.now(); const repoId = owner && repo ? `${owner}/${repo}` : repoUrl; const branchInfo = targetBranch ? ` on branch '${targetBranch}'` : ''; console.error(`[Action] CRITICAL Error fetch ${repoId}${branchInfo}:`, error);
-         if (error.status === 403 && error.message?.includes('rate limit')) { await notifyAdmin(`❌ Rate Limit ${repoId}${branchInfo}.`); return { success: false, error: "GitHub API rate limit exceeded." }; }
-         if (error.status === 404 || error.message?.includes('not found')) { await notifyAdmin(`❌ 404 Not Found ${repoId}${branchInfo}.`); return { success: false, error: `Repo, branch ('${targetBranch}'), or resource not found.` }; }
-         if (error.status === 401 || error.status === 403) { await notifyAdmin(`❌ Auth Error (${error.status}) ${repoId}${branchInfo}.`); return { success: false, error: `GitHub Auth error (${error.status}).` }; }
-         if (error.message?.startsWith('Too many files')) { await notifyAdmin(`❌ Too many files ${repoId}${branchInfo}.`); return { success: false, error: error.message }; }
-        await notifyAdmin(`❌ Ошибка извлечения ${repoId}${branchInfo}:\n${error.message}`); return { success: false, error: `Failed fetch: ${error.message}` };
+        const endTime = Date.now(); const repoId = owner&&repo?`${owner}/${repo}`:repoUrl; const bInfo=targetBranch?` on ${targetBranch}`:''; console.error(`[Action] CRITICAL Error fetch ${repoId}${bInfo}:`, error);
+         if (error.status === 403 && error.message?.includes('rate limit')) { await notifyAdmin(`❌ Rate Limit ${repoId}${bInfo}.`); return { success: false, error: "GitHub API rate limit exceeded." }; }
+         if (error.status === 404 || error.message?.includes('not found')) { await notifyAdmin(`❌ 404 Not Found ${repoId}${bInfo}.`); return { success: false, error: `Repo, branch ('${targetBranch}'), or resource not found.` }; }
+         if (error.status === 401 || error.status === 403) { await notifyAdmin(`❌ Auth Error (${error.status}) ${repoId}${bInfo}.`); return { success: false, error: `GitHub Auth error (${error.status}).` }; }
+         if (error.message?.startsWith('Too many files')) { await notifyAdmin(`❌ Too many files ${repoId}${bInfo}.`); return { success: false, error: error.message }; }
+        await notifyAdmin(`❌ Ошибка извлечения ${repoId}${bInfo}:\n${error.message}`); return { success: false, error: `Fetch failed: ${error.message}` };
   }
 }
 
@@ -130,100 +109,39 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
 export async function createGitHubPullRequest( repoUrl: string, files: FileNode[], prTitle: string, prDescription: string, commitMessage: string, branchName?: string ) {
   console.log("[Action] createGitHubPullRequest called..."); let owner: string | undefined, repo: string | undefined, baseBranch: string | undefined;
   try {
-    const token = process.env.GITHUB_TOKEN; if (!token) throw new Error("GitHub token missing");
+    const token = process.env.GITHUB_TOKEN; if (!token) throw new Error("GH token missing");
     const repoInfo = parseRepoUrl(repoUrl); owner = repoInfo.owner; repo = repoInfo.repo;
     const octokit = new Octokit({ auth: token }); const { data: repoData } = await octokit.repos.get({ owner, repo }); baseBranch = repoData.default_branch;
     const { data: refData } = await octokit.git.getRef({ owner, repo, ref: `heads/${baseBranch}` }); const baseSha = refData.object.sha;
-    const MAX_SIZE_BYTES = 65000; let finalCommitMessage = commitMessage, finalPrDescription = prDescription; const encoder = new TextEncoder();
-    if (encoder.encode(finalCommitMessage).length > MAX_SIZE_BYTES) { finalCommitMessage = finalCommitMessage.substring(0, 60000) + "...(truncated)"; console.warn(`[Action] Commit msg truncated.`); }
-    if (encoder.encode(finalPrDescription).length > MAX_SIZE_BYTES) { finalPrDescription = finalPrDescription.substring(0, 60000) + "\n\n...(truncated)"; console.warn(`[Action] PR desc truncated.`); }
-    const newBranch = branchName || `ai-patch-${Date.now()}`; // Shorter default branch name
-
-    // *** CHECK IF BRANCH EXISTS ***
-    let branchExists = false; let existingHeadSha: string | null = null;
-    try {
-        const { data: existingRef } = await octokit.git.getRef({ owner, repo, ref: `heads/${newBranch}` });
-        branchExists = true;
-        existingHeadSha = existingRef.object.sha; // Get SHA of existing branch head
-        console.warn(`[Action] Branch '${newBranch}' already exists (SHA: ${existingHeadSha}). Will update instead of creating.`);
-    } catch (error: any) { if (error.status === 404) { console.log(`[Action] Branch '${newBranch}' not found. Creating...`); branchExists = false; } else { throw error; } }
-
-    if (!branchExists) {
-        console.log(`[Action] Creating NEW branch '${newBranch}' from ${baseBranch} (SHA: ${baseSha})`);
-        await octokit.git.createRef({ owner, repo, ref: `refs/heads/${newBranch}`, sha: baseSha });
-        console.log(`[Action] Branch '${newBranch}' created successfully.`);
-    }
-    // *** END CHECK ***
-
-    // --- Create blobs, tree, commit, update ref ---
-    const baseTreeSha = branchExists && existingHeadSha // If branch exists, get its commit's tree
-        ? (await octokit.git.getCommit({ owner, repo, commit_sha: existingHeadSha })).data.tree.sha
-        : (await octokit.git.getCommit({ owner, repo, commit_sha: baseSha })).data.tree.sha; // Otherwise use base branch tree
-    console.log(`[Action] Base tree SHA for changes: ${baseTreeSha}`);
-    console.log(`[Action] Creating ${files.length} blobs...`);
-    const tree = await Promise.all( files.map(async (file) => { try { const { data } = await octokit.git.createBlob({ owner: owner!, repo: repo!, content: file.content, encoding: "utf-8" }); return { path: file.path, mode: "100644" as const, type: "blob" as const, sha: data.sha }; } catch (e: any) { throw new Error(`Failed blob ${file.path}: ${e.message || e}`); } }) );
-    console.log("[Action] Blobs created.");
-    console.log(`[Action] Creating new tree with base ${baseTreeSha}...`);
-    const { data: newTree } = await octokit.git.createTree({ owner, repo, base_tree: baseTreeSha, tree }); // Use correct base tree
-    console.log(`[Action] New tree created: ${newTree.sha}`);
-    console.log(`[Action] Creating commit with tree ${newTree.sha}...`);
-    const parentSha = branchExists ? existingHeadSha! : baseSha; // Parent is existing branch head or base branch head
-    const { data: newCommit } = await octokit.git.createCommit({ owner, repo, message: finalCommitMessage, tree: newTree.sha, parents: [parentSha] });
-    console.log(`[Action] New commit created: ${newCommit.sha}`);
-    console.log(`[Action] Updating ref heads/${newBranch} to commit ${newCommit.sha}...`);
-    await octokit.git.updateRef({ owner, repo, ref: `heads/${newBranch}`, sha: newCommit.sha, force: false }); // updateRef works for new/existing branches
-    console.log(`[Action] Ref heads/${newBranch} updated.`);
-
-    // --- PR Creation/Update/Find ---
-    let prNumber: number | undefined; let prUrl: string | undefined; let existingPr: SimplePullRequest | undefined = undefined;
-    // Try to find an existing open PR for this branch
-    const { data: existingPrs } = await octokit.pulls.list({ owner, repo, head: `${owner}:${newBranch}`, state: 'open' });
-    if (existingPrs.length > 0) {
-        existingPr = existingPrs[0]; // Assume first one is the relevant one
-        prNumber = existingPr.number;
-        prUrl = existingPr.html_url;
-        console.log(`[Action] Found existing open PR #${prNumber} for branch ${newBranch}.`);
-        // Optionally update PR title/description if needed (usually just updating the branch is sufficient)
-        // await octokit.pulls.update({ owner, repo, pull_number: prNumber, title: prTitle, body: finalPrDescription });
-        // console.log(`[Action] Updated existing PR #${prNumber}.`);
-        const adminMessage = `🔄 PR #${prNumber} в ${owner}/${repo} обновлен.\nCommit: ${finalCommitMessage.split('\n')[0]}\n\n[Посмотреть](${prUrl})`;
-        await notifyAdmins(adminMessage);
-    } else if (!branchExists) {
-        // Only create PR if the branch was newly created
-        console.log(`[Action] Creating pull request: '${prTitle}' from ${newBranch} to ${baseBranch}...`);
-        const { data: pr } = await octokit.pulls.create({ owner, repo, title: prTitle, body: finalPrDescription, head: newBranch, base: baseBranch });
-        prNumber = pr.number;
-        prUrl = pr.html_url;
-        console.log(`[Action] Pull request created: ${prUrl}`);
-        const changedFiles = files.map((file) => file.path).join(", ");
-        const adminMessage = `🔔 Создан PR #${prNumber} в ${owner}/${repo}\nЧто меняем: ${prTitle}\nПодробности: ${finalPrDescription}\nФайлы: ${changedFiles}\n\n[Посмотреть](${prUrl})`;
-        await notifyAdmins(adminMessage);
-    } else {
-        // Branch existed, but no open PR found - user might need to create one manually
-        console.warn(`[Action] Branch '${newBranch}' updated, but no open PR found. Manual PR creation might be needed.`);
-        const changedFiles = files.map((file) => file.path).join(", ");
-        const branchUrl = `https://github.com/${owner}/${repo}/tree/${newBranch}`;
-        const adminMessage = `🔄 Существующая ветка '${newBranch}' в ${owner}/${repo} обновлена (PR не найден).\nCommit: ${finalCommitMessage.split('\n')[0]}\nFiles: ${changedFiles}\n\n[Ветка](${branchUrl})`;
-        await notifyAdmins(adminMessage);
-    }
-
+    const MAX_BYTES = 65000; let finalCommitMsg = commitMessage, finalPrDesc = prDescription; const enc = new TextEncoder();
+    if (enc.encode(finalCommitMsg).length > MAX_BYTES) { finalCommitMsg = finalCommitMsg.substring(0, 60000) + "...(trunc)"; console.warn(`[Action] Commit msg trunc.`); }
+    if (enc.encode(finalPrDesc).length > MAX_BYTES) { finalPrDesc = finalPrDesc.substring(0, 60000) + "\n\n...(trunc)"; console.warn(`[Action] PR desc trunc.`); }
+    const newBranch = branchName || `ai-patch-${Date.now()}`; let branchExists = false; let existingHeadSha: string | null = null;
+    try { const { data: eRef } = await octokit.git.getRef({ owner, repo, ref: `heads/${newBranch}` }); branchExists = true; existingHeadSha = eRef.object.sha; console.warn(`[Action] Branch '${newBranch}' exists (SHA: ${existingHeadSha}). Updating.`); }
+    catch (error: any) { if (error.status === 404) { console.log(`[Action] Branch '${newBranch}' not found. Creating...`); branchExists = false; } else { throw error; } }
+    if (!branchExists) { console.log(`[Action] Creating NEW branch '${newBranch}' from ${baseBranch} (SHA: ${baseSha})`); await octokit.git.createRef({ owner, repo, ref: `refs/heads/${newBranch}`, sha: baseSha }); console.log(`[Action] Branch '${newBranch}' created.`); }
+    const baseTreeSha = branchExists && existingHeadSha ? (await octokit.git.getCommit({ owner, repo, commit_sha: existingHeadSha })).data.tree.sha : (await octokit.git.getCommit({ owner, repo, commit_sha: baseSha })).data.tree.sha;
+    console.log(`[Action] Base tree SHA: ${baseTreeSha}. Creating ${files.length} blobs...`);
+    const tree = await Promise.all( files.map(async (f) => { try { const { data } = await octokit.git.createBlob({ owner: owner!, repo: repo!, content: f.content, encoding: "utf-8" }); return { path: f.path, mode: "100644" as const, type: "blob" as const, sha: data.sha }; } catch (e: any) { throw new Error(`Fail blob ${f.path}: ${e.message||e}`); } }) );
+    console.log("[Action] Blobs created. Creating tree..."); const { data: newTree } = await octokit.git.createTree({ owner, repo, base_tree: baseTreeSha, tree }); console.log(`[Action] New tree: ${newTree.sha}. Creating commit...`);
+    const parentSha = branchExists ? existingHeadSha! : baseSha; const { data: newCommit } = await octokit.git.createCommit({ owner, repo, message: finalCommitMsg, tree: newTree.sha, parents: [parentSha] }); console.log(`[Action] New commit: ${newCommit.sha}. Updating ref...`);
+    await octokit.git.updateRef({ owner, repo, ref: `heads/${newBranch}`, sha: newCommit.sha, force: false }); console.log(`[Action] Ref heads/${newBranch} updated.`);
+    let prNumber: number|undefined; let prUrl: string|undefined; const { data: existingPrs } = await octokit.pulls.list({ owner, repo, head: `${owner}:${newBranch}`, state: 'open' });
+    if (existingPrs.length > 0) { prNumber = existingPrs[0].number; prUrl = existingPrs[0].html_url; console.log(`[Action] Found existing PR #${prNumber}.`); const adminMsg = `🔄 PR #${prNumber} в ${owner}/${repo} обновлен.\nCommit: ${finalCommitMsg.split('\n')[0]}\n\n[Посмотреть](${prUrl})`; await notifyAdmins(adminMsg); }
+    else if (!branchExists) { console.log(`[Action] Creating PR: '${prTitle}'...`); const { data: pr } = await octokit.pulls.create({ owner, repo, title: prTitle, body: finalPrDesc, head: newBranch, base: baseBranch }); prNumber = pr.number; prUrl = pr.html_url; console.log(`[Action] PR created: ${prUrl}`); const chFiles = files.map((f) => f.path).join(", "); const adminMsg = `🔔 Создан PR #${prNumber} в ${owner}/${repo}\n${prTitle}\n${chFiles}\n\n[GitHub](${prUrl})`; await notifyAdmins(adminMsg); }
+    else { console.warn(`[Action] Branch '${newBranch}' updated, no open PR found.`); const chFiles = files.map((f) => f.path).join(", "); const bUrl = `https://github.com/${owner}/${repo}/tree/${newBranch}`; const adminMsg = `🔄 Ветка '${newBranch}' обновлена (PR не найден).\n${finalCommitMsg.split('\n')[0]}\n${chFiles}\n\n[Ветка](${bUrl})`; await notifyAdmins(adminMsg); }
     return { success: true, prUrl, branch: newBranch, prNumber };
-  } catch (error: any) {
-    console.error("[Action] Error in create/update PR flow:", error); const repoId=`${owner}/${repo}`; const attemptedBranch=branchName||`ai-patch-...`; let eM=error instanceof Error?error.message:"Unknown error"; if(error.status===422&&error.message?.includes("No commit found")){eM=`Base branch '${baseBranch||'?'}' empty/invalid?`;} else if(error.status===404){eM=`Repo ${repoId} or base '${baseBranch||'?'}' not found.`;} else if(error.status===403){eM=`Permission denied ${repoId}. Check token.`;} else if(error.status===409&&error.message?.includes('conflict')){eM=`Update conflict on branch '${attemptedBranch}'.`;} await notifyAdmin(`❌ Ошибка PR ${repoId}:\n${eM}`); return {success:false, error:eM};
-  }
+  } catch (error: any) { console.error("[Action] Error create/update PR:", error); const repoId=`${owner}/${repo}`; const aB=branchName||`ai-patch-...`; let eM=error instanceof Error?error.message:"Unknown error"; if(error.status===422&&error.message?.includes("No commit")){eM=`Base branch '${baseBranch||'?'}' empty?`;} else if(error.status===404){eM=`Repo ${repoId} or base '${baseBranch||'?'}' not found.`;} else if(error.status===403){eM=`Permission denied ${repoId}.`;} else if(error.status===409&&error.message?.includes('conflict')){eM=`Update conflict branch '${aB}'.`;} await notifyAdmin(`❌ Ошибка PR ${repoId}:\n${eM}`); return {success:false, error:eM}; }
 }
-
 
 // --- updateBranch (Keep Revised with Comment Debugging) ---
 export async function updateBranch( repoUrl: string, files: FileNode[], commitMessage: string, branchName: string, prNumberToComment?: number | null, commentBody?: string | null ) {
-  // Paste the REVISED updateBranch function from the previous response here
-  let owner: string | undefined, repo: string | undefined; const rIP = parseRepoUrl(repoUrl); owner = rIP.owner; repo = rIP.repo; const rId = `${owner}/${repo}`; console.log(`[Action] updateBranch branch '${branchName}' in ${rId}. PR#: ${prNumberToComment ?? 'N/A'}`);
+  let owner: string | undefined, repo: string | undefined; const rIP = parseRepoUrl(repoUrl); owner = rIP.owner; repo = rIP.repo; const rId = `${owner}/${repo}`; console.log(`[Action] updateBranch '${branchName}' in ${rId}. PR#: ${prNumberToComment ?? 'N/A'}`);
   try { const token = process.env.GITHUB_TOKEN; if (!token) throw new Error("Token missing"); if (!branchName) throw new Error("Branch name required"); const octokit = new Octokit({ auth: token }); console.log(`[Action] Get HEAD ${branchName}...`); let baseSha: string; try { const { data: refData } = await octokit.git.getRef({ owner, repo, ref: `heads/${branchName}` }); baseSha = refData.object.sha; console.log(`[Action] HEAD ${branchName}: ${baseSha}`); } catch (refError: any) { if (refError.status === 404) { console.error(`[Action] Branch '${branchName}' not found.`); throw new Error(`Branch '${branchName}' not found.`); } console.error(`[Action] Failed get ref ${branchName}:`, refError); throw new Error(`Failed get ref ${branchName}: ${refError.message}`); } const { data: baseCommitData } = await octokit.git.getCommit({ owner, repo, commit_sha: baseSha }); const baseTree = baseCommitData.tree.sha; console.log(`[Action] Base tree ${baseSha}: ${baseTree}`); const MAX_BYTES=65000; let finalMsg=commitMessage; const enc=new TextEncoder(); if(enc.encode(finalMsg).length>MAX_BYTES){finalMsg=finalMsg.substring(0,60000)+"..."; console.warn(`[Action] Commit msg trunc.`);} console.log(`[Action] Creating ${files.length} blobs...`); const tree = await Promise.all( files.map(async (f) => { try { const { data } = await octokit.git.createBlob({ owner: owner!, repo: repo!, content: f.content, encoding: "utf-8" }); return { path: f.path, mode: "100644" as const, type: "blob" as const, sha: data.sha }; } catch (bE: any) { console.error(`[Action] Err blob ${f.path}:`, bE); throw new Error(`Failed blob ${f.path}: ${bE.message || bE}`); } }) ); console.log("[Action] Blobs done."); console.log(`[Action] Creating tree base ${baseTree}...`); const { data: newTree } = await octokit.git.createTree({ owner, repo, base_tree: baseTree, tree }); console.log(`[Action] New tree: ${newTree.sha}`); console.log(`[Action] Creating commit tree ${newTree.sha}...`); const { data: newCommit } = await octokit.git.createCommit({ owner, repo, message: finalMsg, tree: newTree.sha, parents: [baseSha] }); console.log(`[Action] New commit: ${newCommit.sha}`); console.log(`[Action] Updating ref heads/${branchName} to ${newCommit.sha}...`); await octokit.git.updateRef({ owner, repo, ref: `heads/${branchName}`, sha: newCommit.sha, force: false }); console.log(`[Action] Ref heads/${branchName} updated.`);
     if (prNumberToComment && commentBody) { console.log(`[Action] Attempt comment PR #${prNumberToComment}. Len: ${commentBody.length}. Starts: "${commentBody.substring(0, 50)}..."`); try { let finalComment = commentBody; if(enc.encode(finalComment).length > MAX_BYTES){ finalComment = finalComment.substring(0, 60000) + "\n\n...(truncated)"; console.warn(`[Action] Comment PR #${prNumberToComment} truncated.`); } await octokit.issues.createComment({ owner: owner!, repo: repo!, issue_number: prNumberToComment, body: finalComment }); console.log(`[Action] Comment added PR #${prNumberToComment}.`); } catch (cE: any) { console.error(`[Action] FAILED comment PR #${prNumberToComment}:`, cE); const status = cE.status ? ` (${cE.status})` : ''; let specificError = cE.message || 'Unknown error'; if(cE.status===403){specificError+=' Check Token (issues:write)!';} else if(cE.status===404){specificError+=` PR #${prNumberToComment} not found.`;} else if(cE.status===422){specificError+=` Unprocessable Entity.`;} await notifyAdmin(`⚠️ Не удалось добавить коммент к PR #${prNumberToComment}${status}:\n${specificError}`); } } else { if(!prNumberToComment) console.log(`[Action] Skip comment: no PR #.`); if(!commentBody) console.log(`[Action] Skip comment: no body.`); }
     const chFiles = files.map((f) => f.path).join(", "); const bUrl = `https://github.com/${owner}/${repo}/tree/${branchName}`; const adminMsg = `🔄 Ветка '${branchName}' обновлена!\nCommit: ${finalMsg.split('\n')[0]}\nFiles: ${chFiles}\n\n[Ветка](${bUrl})`; await notifyAdmins(adminMsg); return { success: true, commitSha: newCommit.sha, branch: branchName };
   } catch (error: any) { console.error(`[Action] Error update branch ${branchName}:`, error); let eM=error instanceof Error?error.message:`Unknown error update ${branchName}`; if(error.status===404)eM=`Repo/branch ${branchName} not found (404).`; else if(error.status===403)eM=`Permission denied (403) update ${branchName}.`; else if(error.status===409)eM=`Conflict update ${branchName} (409).`; else if(error.status===422)eM=`Unprocessable (422) update ${branchName}: ${error.message}`; await notifyAdmin(`❌ Ошибка обновления '${branchName}':\n${eM}`); return { success: false, error: eM }; }
 }
-
 
 // --- deleteGitHubBranch (Keep Original) ---
 export async function deleteGitHubBranch(repoUrl: string, branchName: string) { /* Keep original */ console.log("[Action] deleteGitHubBranch called..."); let owner: string|undefined; let repo: string|undefined; const rIP=parseRepoUrl(repoUrl); owner=rIP.owner; repo=rIP.repo; const rId=`${owner}/${repo}`; try { const token = process.env.GITHUB_TOKEN; if (!token) throw new Error("GH token missing"); const octokit = new Octokit({ auth: token }); console.log(`[Action] Attempting delete branch 'refs/heads/${branchName}' in ${rId}...`); await octokit.git.deleteRef({ owner, repo, ref: `heads/${branchName}` }); console.log(`[Action] Delete request sent for ${branchName}. Verifying...`); await delay(2000); try { await octokit.git.getRef({ owner, repo, ref: `heads/${branchName}` }); console.error(`[Action] Verification failed: ${branchName} still exists.`); await notifyAdmin(`⚠️ Не удалось подтвердить удаление ${branchName}.`); return { success: false, error: "Branch delete verification failed." }; } catch (err: any) { if (err.status === 404) { console.log(`[Action] Verification ok: ${branchName} deleted.`); return { success: true }; } console.error(`[Action] Error during delete verification ${branchName}:`, err); await notifyAdmin(`⚠️ Ошибка проверки удаления ${branchName} (${err.status}): ${err.message}.`); return { success: true, warning: "Delete OK, check failed." }; } } catch (error: any) { console.error(`[Action] Error deleting branch ${branchName}:`, error); let eM = error instanceof Error ? error.message : "Failed delete"; if (error.status === 404 || error.status === 422) { eM = `Branch '${branchName}' not found/unprocessable (${error.status}).`; console.warn(`[Action] ${eM}`); } else if (error.status === 403) { eM = `Permission denied (403) deleting ${branchName}.`; console.error(`[Action] ${eM}`); } await notifyAdmin(`❌ Ошибка удаления ${branchName}:\n${eM}`); return { success: false, error: eM }; } }
