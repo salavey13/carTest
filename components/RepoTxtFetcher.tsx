@@ -209,7 +209,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
    // Full resolveImportPath implementation (using original supportedExtensions)
    const resolveImportPath = useCallback((importPath: string, currentFilePath: string, allFileNodes: FileNode[]): string | null => {
         const allPaths = allFileNodes.map(f => f.path);
-        const supportedExtensions = ['.ts', '.tsx", '.css', '.sql', '.md'];
+        const supportedExtensions = ['.ts', '.tsx', '.css', '.sql', '.md'];
 
         const tryPaths = (basePath: string): string | null => {
             const pathsToTry: string[] = [];
