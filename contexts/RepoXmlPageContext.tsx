@@ -152,7 +152,7 @@ const RepoXmlPageContext = createContext<RepoXmlPageContextType | undefined>(und
 export const useRepoXmlPageContext = () => {
     const context = useContext(RepoXmlPageContext);
     if (context === undefined) {
-        // ... (stub implementation remains the same) ...
+        // Return a stub implementation if context is not found
         logger.error('useRepoXmlPageContext must be used within a RepoXmlPageProvider. Returning stub.');
         const warn = (name: string): any => () => { logger.warn(`Context stub: ${name} called.`); return Promise.resolve({ success: false, error: 'Context unavailable' }); };
         const warnSync = (name: string): any => () => { logger.warn(`Context stub: ${name} called.`); };
@@ -244,7 +244,6 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
 
      // Effect: Load Initial AI Request State
     useEffect(() => {
-        // ... (Initial AI state loading logic remains the same) ...
         let isMounted = true;
         if (!user?.id) {
             setCurrentAiRequestIdState(null);
@@ -309,29 +308,36 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
 
     // Derive current workflow step based on state
     const getCurrentStep = useCallback((): WorkflowStep => {
-        // ... (getCurrentStep logic remains the same, prioritizing image task) ...
         if (fetchStatus === 'loading' || fetchStatus === 'retrying') return 'fetching';
         if (fetchStatus === 'failed_retries') return 'fetch_failed';
         if (aiActionLoading && currentAiRequestId) return 'generating_ai_response';
         if (isParsing) return 'parsing_response';
-        if (assistantLoading) return 'pr_ready';
+        // Consider assistantLoading (PR/Update process) as a final step state
+        if (assistantLoading) return 'pr_ready'; // Keep PR/Update state sticky
 
         if (!repoUrlEntered) return 'need_repo_url';
         if (!filesFetched) return 'ready_to_fetch';
 
-        if (imageReplaceTask && filesFetched && !assistantLoading) {
+        // Image Replace Task Flow takes priority AFTER fetch completes
+        if (imageReplaceTask && filesFetched) {
+            // If assistant isn't busy (e.g., creating PR), it's in the state after fetching
             return 'files_fetched_image_replace';
         }
 
+        // Standard Flow
         if (aiResponseHasContent) {
             if (!filesParsed) return 'response_pasted';
+            // If files are parsed, even if 0 selected, it's parsed. Ready if >0 selected.
             if (selectedAssistantFiles.size > 0) return 'pr_ready';
-            return 'response_parsed';
+            return 'response_parsed'; // Files parsed, but none selected yet or 0 files found
         }
         if (requestCopied) return 'request_copied';
         if (kworkInputHasContent) return 'request_written';
         if (selectedFetcherFiles.size > 0) return 'files_selected';
+        // Highlights are only relevant if no files are selected yet
         if (primaryHighlightedPath || secondaryHighlightedPaths.length > 0) return 'files_fetched_highlights';
+
+        // Base state after successful fetch, no specific actions taken yet
         return 'files_fetched';
     }, [
         fetchStatus, repoUrlEntered, filesFetched, aiActionLoading, assistantLoading, isParsing,
@@ -352,10 +358,9 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
         primaryPath: string | null = null,
         secondaryPaths: string[] = []
     ) => {
-        // ... (setFilesFetchedCallback logic remains the same) ...
         logger.log(`[Context:setFilesFetched] Called with fetched: ${fetched}, files: ${allFilesData.length}`);
         setFilesFetchedState(fetched);
-        setAllFetchedFilesState(allFilesData);
+        setAllFetchedFilesState(allFilesData); // Store all fetched files regardless of selection
         setPrimaryHighlightedPathState(primaryPath);
         setSecondaryHighlightedPathsState(secondaryPaths);
 
@@ -363,47 +368,56 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
             const currentTask = imageReplaceTask; // Capture state at call time
             if (currentTask && assistantRef.current) {
                 logger.log("[Context:setFilesFetched] Files fetched, triggering direct image replacement for:", currentTask);
-                setAssistantLoadingState(true);
+                setAssistantLoadingState(true); // Indicate assistant is busy
 
+                // Use setTimeout to allow React state updates to settle before calling the ref method
                 setTimeout(() => {
                     if (assistantRef.current) {
                         assistantRef.current.handleDirectImageReplace(currentTask)
                             .catch(err => {
                                 logger.error("[Context:setFilesFetched] Error triggering/running direct image replacement:", err);
                                 toast.error("Ошибка авто-замены картинки.");
-                                // Use direct setters inside async catch
-                                setImageReplaceTaskState(null);
-                                setAssistantLoadingState(false);
+                                // Reset state on error WITHIN the async catch
+                                setImageReplaceTaskState(null); // Use direct setter
+                                setAssistantLoadingState(false); // Use direct setter
                             });
                     } else {
                         logger.warn("[Context:setFilesFetched] Assistant ref not ready when trying to trigger replacement within timeout.");
                         toast.error("Ошибка: Компонент ассистента не готов для авто-замены.");
-                        setImageReplaceTaskState(null);
-                        setAssistantLoadingState(false);
+                        setImageReplaceTaskState(null); // Use direct setter
+                        setAssistantLoadingState(false); // Use direct setter
                     }
-                }, 50);
+                }, 50); // Small delay (50ms)
+
             } else if (currentTask && !assistantRef.current) {
+                 // THIS IS THE ERROR CASE WE FIXED
                  logger.error("[Context:setFilesFetched] Image task exists, but Assistant ref is missing!");
                  toast.error("Критическая ошибка: Ассистент не найден для замены картинки.");
-                 setImageReplaceTaskState(null);
+                 setImageReplaceTaskState(null); // Clear the task if it can't be handled
             } else {
+                 // Standard fetch success (no image task, or ref already handled it)
+                 // Set status to success ONLY if not handled by image replace logic
                  setFetchStatusState('success');
-                 logger.log("[Context:setFilesFetched] Standard file fetch successful.");
+                 logger.log("[Context:setFilesFetched] Standard file fetch successful or image task initiated.");
             }
         } else {
+            // Resetting state when 'fetched' is false
             logger.log("[Context:setFilesFetched] Resetting fetcher state.");
             setAllFetchedFilesState([]);
             setSelectedFetcherFilesState(new Set());
+            setPrimaryHighlightedPathState(null);
+            setSecondaryHighlightedPathsState([]);
             setKworkInputHasContentState(false);
             setRequestCopiedState(false);
             setAiResponseHasContentState(false);
             setFilesParsedState(false);
             setSelectedAssistantFilesState(new Set());
             setAssistantLoadingState(false);
+            setAiActionLoadingState(false);
             setIsParsingState(false);
             setCurrentAiRequestIdState(null);
-            setImageReplaceTaskState(null);
-            setFetchStatusState('idle');
+            setImageReplaceTaskState(null); // Ensure task is cleared on reset
+            setFetchStatusState('idle'); // Reset fetch status
             if (assistantRef.current) assistantRef.current.setResponseValue("");
             if (kworkInputRef.current) kworkInputRef.current.value = "";
         }
@@ -415,12 +429,20 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
     const setRequestCopiedCallback = useCallback((copied: boolean) => setRequestCopiedState(copied), []);
     const setAiResponseHasContentCallback = useCallback((hasContent: boolean) => {
         setAiResponseHasContentState(hasContent);
+        // Clear downstream state only if response cleared AND not loading new one
         if (!hasContent && !aiActionLoading) { // Use state variable for read
-            setFilesParsedState(false); setSelectedAssistantFilesState(new Set()); setCurrentAiRequestIdState(null);
+            setFilesParsedState(false);
+            setSelectedAssistantFilesState(new Set());
+            // Don't clear currentAiRequestId here, Realtime effect manages it
         }
     }, [aiActionLoading]); // Dependency is correct
     const setFilesParsedCallback = useCallback((parsed: boolean) => {
-        setFilesParsedState(parsed); if (!parsed) setSelectedAssistantFilesState(new Set()); setIsParsingState(false);
+        setFilesParsedState(parsed);
+        if (!parsed) {
+            setSelectedAssistantFilesState(new Set()); // Clear selection if parsing fails or is reset
+        }
+        setIsParsingState(false); // Ensure parsing flag is reset
+        setAssistantLoadingState(false); // Ensure general loading is reset after parse attempt
     }, []);
     const setSelectedAssistantFilesCallback = useCallback((files: Set<string>) => setSelectedAssistantFilesState(files), []);
     const setAssistantLoadingCallback = useCallback((loading: boolean) => setAssistantLoadingState(loading), []);
@@ -435,7 +457,6 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
     const setImageReplaceTaskCallback = useCallback((task: ImageReplaceTask | null) => setImageReplaceTaskState(task), []);
 
     // --- Action Triggers (Memoized) ---
-    // ... (Action triggers remain the same, like triggerFetch, triggerAskAi, etc.) ...
     const triggerFetch = useCallback(async (isManualRetry = false, branchNameToFetch?: string | null) => {
         if (fetcherRef.current) await fetcherRef.current.handleFetch(isManualRetry, branchNameToFetch);
         else logger.warn("triggerFetch: fetcherRef not ready.");
@@ -447,38 +468,45 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
         try {
             const result = await getOpenPullRequests(repoUrl);
             if (result.success && result.pullRequests) { setOpenPrsState(result.pullRequests); toast.success(`Загружено ${result.pullRequests.length} открытых PR.`); }
-            else { toast.error(`Ошибка загрузки PR: ${result.error || 'Неизвестная ошибка'}`); }
-        } catch (error) { toast.error("Критическая ошибка при загрузке PR."); logger.error("triggerGetOpenPRs error:", error); }
+            else { setOpenPrsState([]); toast.error(`Ошибка загрузки PR: ${result.error || 'Неизвестная ошибка'}`); } // Clear PRs on error
+        } catch (error) { setOpenPrsState([]); toast.error("Критическая ошибка при загрузке PR."); logger.error("triggerGetOpenPRs error:", error); }
         finally { setLoadingPrsState(false); }
     }, [setTargetBranchNameFromPr]);
 
     const scrollToSection = useCallback((id: 'kworkInput' | 'aiResponseInput' | 'prSection' | 'fetcher' | 'assistant' | 'executor' | 'settingsModalTrigger' | 'settings-modal-trigger-assistant') => {
-        // ... (Scroll logic remains the same) ...
         let element: HTMLElement | null = null;
+        // Map logical IDs to actual DOM IDs if they differ
         const targetId = (id === 'assistant' || id === 'executor') ? 'executor' : (id === 'fetcher' ? 'extractor' : (id === 'settingsModalTrigger' ? 'settings-modal-trigger-assistant' : id));
+
         switch (targetId) {
             case 'kworkInput': element = kworkInputRef.current; break;
             case 'aiResponseInput': element = aiResponseInputRef.current; break;
             case 'prSection': element = prSectionRef.current; break;
+            // Use getElementById for components potentially rendered later or outside direct ref scope
             case 'extractor': element = document.getElementById('extractor'); break;
             case 'executor': element = document.getElementById('executor'); break;
             case 'settings-modal-trigger-assistant': element = document.getElementById('settings-modal-trigger-assistant'); break;
         }
+
         if (element) {
             const behavior = 'smooth';
             if (['kworkInput', 'aiResponseInput'].includes(targetId)) {
                  element.scrollIntoView({ behavior, block: 'center' });
+                 // Focus after scrolling animation settles
                  setTimeout(() => (element as HTMLTextAreaElement)?.focus(), 350);
             } else if (targetId === 'prSection') {
-                 element.scrollIntoView({ behavior, block: 'nearest' });
+                 element.scrollIntoView({ behavior, block: 'nearest' }); // Scroll just enough to bring it into view
             } else {
-                 const headerOffset = 80;
+                 // Standard scroll with offset for fixed headers
+                 const headerOffset = 80; // Adjust as needed
                  const elementRect = element.getBoundingClientRect();
                  const elementTop = elementRect.top + window.scrollY;
                  window.scrollTo({ top: elementTop - headerOffset, behavior });
             }
-        } else { logger.warn(`scrollToSection: Element with target ID "${targetId}" (mapped from "${id}") not found.`); }
-    }, [kworkInputRef, aiResponseInputRef, prSectionRef]);
+        } else {
+            logger.warn(`scrollToSection: Element with target ID "${targetId}" (mapped from "${id}") not found.`);
+        }
+    }, [kworkInputRef, aiResponseInputRef, prSectionRef]); // Refs are stable, no need to include them? Check React docs.
 
     const triggerSelectHighlighted = useCallback(() => {
         if (fetcherRef.current) fetcherRef.current.selectHighlightedFiles();
@@ -495,9 +523,10 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
             const copied = fetcherRef.current.handleCopyToClipboard(undefined, true);
             if (copied) {
                  setRequestCopiedState(true);
+                 // Clear AI response only if user explicitly copies
                  setAiResponseHasContentState(false);
                  if (assistantRef.current) assistantRef.current.setResponseValue("");
-                 scrollToSection('aiResponseInput');
+                 scrollToSection('aiResponseInput'); // Scroll to where AI response will go
             }
         } else { logger.warn("triggerCopyKwork: fetcherRef not ready."); }
     }, [fetcherRef, assistantRef, scrollToSection]);
@@ -505,31 +534,75 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
     const triggerAskAi = useCallback(async (): Promise<{ success: boolean; requestId?: string; error?: string }> => {
         if (!fetcherRef.current || !user?.id ) { const m = !user?.id ? "Пользователь не аутентифицирован." : "Компоненты не готовы."; toast.error(m); return { success: false, error: m }; }
         const kworkValue = fetcherRef.current.getKworkInputValue(); if (!kworkValue.trim()) { toast.error("Запрос для AI пуст. Напишите что-нибудь!"); return { success: false, error: "Prompt empty." }; }
-        setAiActionLoadingState(true); setAiResponseHasContentState(false); setCurrentAiRequestIdState(null); if (assistantRef.current) assistantRef.current.setResponseValue(""); toast.info("Отправка запроса AI в очередь..."); scrollToSection('executor');
+
+        // Set loading states IMMEDIATELY
+        setAiActionLoadingState(true);
+        setAiResponseHasContentState(false); // Clear previous response display
+        setCurrentAiRequestIdState(null); // Clear previous request ID
+        if (assistantRef.current) assistantRef.current.setResponseValue(""); // Clear assistant's textarea
+        toast.info("Отправка запроса AI в очередь...");
+        scrollToSection('executor'); // Scroll to assistant area
+
         try {
             const requestData: AiRequestInsert = { prompt: kworkValue, user_id: String(user.id), status: 'pending' };
             const { data, error: insertError } = await supabaseAnon.from('ai_requests').insert(requestData).select('id').single();
-            if (insertError) { throw new Error(`DB Insert Error: ${insertError.message}`); } if (!data?.id) { throw new Error("No Request ID returned after insert."); }
-            const newRequestId = data.id; logger.log("AI Request submitted to DB. Monitoring ID:", newRequestId);
-            const userNameOrId = user.username || user.first_name || String(user.id); const promptExcerpt = kworkValue.substring(0, 300) + (kworkValue.length > 300 ? '...' : ''); const notificationMessage = `🤖 Новый AI Запрос (#${newRequestId.substring(0, 6)}...)\nОт: ${userNameOrId} (${user.id})\nПромпт:\n\`\`\`\n${promptExcerpt}\n\`\`\``;
+
+            if (insertError) { throw new Error(`DB Insert Error: ${insertError.message}`); }
+            if (!data?.id) { throw new Error("No Request ID returned after insert."); }
+
+            const newRequestId = data.id;
+            logger.log("AI Request submitted to DB. Monitoring ID:", newRequestId);
+
+            // --- Update user metadata ---
+             const { error: updateMetaError } = await supabaseAnon
+                 .from('users')
+                 .update({ metadata: { last_ai_request_id: newRequestId } })
+                 .eq('user_id', user.id);
+             if (updateMetaError) {
+                 logger.warn("Failed to update user metadata with last_ai_request_id:", updateMetaError);
+                 // Non-critical, continue...
+             }
+            // --- End update metadata ---
+
+
+            const userNameOrId = user.username || user.first_name || String(user.id);
+            const promptExcerpt = kworkValue.substring(0, 300) + (kworkValue.length > 300 ? '...' : '');
+            const notificationMessage = `🤖 Новый AI Запрос (#${newRequestId.substring(0, 6)}...)\nОт: ${userNameOrId} (${user.id})\nПромпт:\n\`\`\`\n${promptExcerpt}\n\`\`\``;
+
             notifyAdmin(notificationMessage).catch(err => logger.error("Failed to notify admin:", err));
-            toast.success("Запрос поставлен в очередь! Ожидаем ответ AI... 🤖💭"); setCurrentAiRequestIdState(newRequestId);
+
+            toast.success("Запрос поставлен в очередь! Ожидаем ответ AI... 🤖💭");
+            // Set the request ID AFTER successful submission and DB operations
+            setCurrentAiRequestIdState(newRequestId); // This triggers the Realtime listener setup
             return { success: true, requestId: newRequestId };
-        } catch (error: any) { toast.error("Критическая ошибка при отправке запроса AI."); logger.error("triggerAskAi error:", error); setAiActionLoadingState(false); setCurrentAiRequestIdState(null); return { success: false, error: error.message ?? "Unknown submit error." }; }
+
+        } catch (error: any) {
+            toast.error("Критическая ошибка при отправке запроса AI.");
+            logger.error("triggerAskAi error:", error);
+            // Reset loading states on error
+            setAiActionLoadingState(false);
+            setCurrentAiRequestIdState(null);
+            return { success: false, error: error.message ?? "Unknown submit error." };
+        }
     }, [fetcherRef, user, assistantRef, scrollToSection]);
 
     const triggerParseResponse = useCallback(async () => {
         if (assistantRef.current) {
-             setIsParsingState(true);
-             setAssistantLoadingState(true);
+             setIsParsingState(true); // Set parsing state specifically
+             // setAssistantLoadingState(true); // Optional: Set general loading too if needed
              try {
-                 await assistantRef.current.handleParse();
+                 await assistantRef.current.handleParse(); // This will update parsed files and validation
+                 // Success/error handled within AICodeAssistant or its hook
              } catch (err) {
-                 logger.error("Error during parsing:", err);
+                 logger.error("Error during parsing trigger:", err);
                  toast.error("Ошибка при разборе ответа AI.");
-                 setFilesParsedCallback(false);
+                 // Reset states on direct error here
+                 setFilesParsedCallback(false); // Updates state and clears selection
                  setIsParsingState(false);
-                 setAssistantLoadingState(false);
+                 setAssistantLoadingState(false); // Reset general loading if set
+             } finally {
+                 // setIsParsingState(false); // Parsing state is reset within setFilesParsedCallback or AICodeAssistant hook
+                 // setAssistantLoadingState(false); // Reset general loading here if it was set
              }
         } else {
              logger.warn("triggerParseResponse: assistantRef not ready.");
@@ -548,12 +621,14 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
             return;
         }
         if (assistantRef.current) {
+             // Assistant's internal handler will set loading states
              await assistantRef.current.handleCreatePR();
         } else {
              logger.warn("triggerCreateOrUpdatePR: assistantRef not ready.");
         }
     }, [assistantRef, imageReplaceTask]);
 
+    // Trigger for updating a branch (used by Assistant for PR updates/image updates)
     const triggerUpdateBranch = useCallback(async (
         repoUrl: string,
         files: { path: string; content: string }[],
@@ -562,12 +637,14 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
         prNumber?: number,
         prBody?: string
     ): Promise<ReturnType<typeof updateBranch>> => {
-        setAssistantLoadingState(true);
+        setAssistantLoadingState(true); // Set loading specifically for this async operation
         try {
             logger.log(`Context triggerUpdateBranch: Calling action for branch '${branchName}'`, { prNumber });
             const result = await updateBranch(repoUrl, files, commitMessage, branchName, prNumber, prBody);
             if (result.success) {
                 toast.success(`Ветка '${branchName}'${prNumber ? ` (и PR #${prNumber})` : ''} успешно обновлена!`);
+                // Refresh PR list after successful update
+                await triggerGetOpenPRs(repoUrl);
             } else {
                 toast.error(`Ошибка обновления ветки '${branchName}': ${result.error}`);
             }
@@ -577,9 +654,9 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
             logger.error("triggerUpdateBranch error:", error);
             return { success: false, error: error instanceof Error ? error.message : "Client-side error." };
         } finally {
-            setAssistantLoadingState(false);
+            setAssistantLoadingState(false); // Clear loading state
         }
-    }, []);
+    }, [triggerGetOpenPRs]); // Added triggerGetOpenPRs dependency
 
     const triggerToggleSettingsModal = useCallback(() => setIsSettingsModalOpenState(prev => !prev), []);
 
@@ -587,26 +664,31 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
     // --- Realtime Subscription Logic ---
     useEffect(() => {
         let isMounted = true;
-        const currentReqId = currentAiRequestId;
+        const currentReqId = currentAiRequestId; // Capture the ID at the start of the effect
 
         if (!currentReqId || !supabaseAnon) {
-            // ... (cleanup logic) ...
+            // Cleanup if no request ID or client gone
             if (realtimeChannelRef.current) {
-                logger.log(`[RT Cleanup] No request ID or Supabase client. Removing channel: ${realtimeChannelRef.current.topic}`);
+                logger.log(`[RT Cleanup] No active request ID (${currentReqId}) or Supabase client. Removing channel: ${realtimeChannelRef.current.topic}`);
                 supabaseAnon.removeChannel(realtimeChannelRef.current).catch(e => logger.error("[RT Cleanup] Error removing channel:", e));
                 realtimeChannelRef.current = null;
             }
-            return () => { isMounted = false };
+            return () => { isMounted = false; }; // Standard cleanup pattern
         }
 
         const channelId = `ai-request-${currentReqId}`;
+
+        // Avoid re-subscribing if already on the correct channel
         if (realtimeChannelRef.current?.topic === channelId) {
-             return () => { isMounted = false };
+            logger.log(`[RT Check] Already subscribed to ${channelId}. No change.`);
+             return () => { isMounted = false; };
         }
 
+        // Clean up the previous channel if switching
         if (realtimeChannelRef.current) {
-            logger.log(`[RT Switch] Removing old channel: ${realtimeChannelRef.current.topic}`);
+            logger.log(`[RT Switch] Switching from ${realtimeChannelRef.current.topic} to ${channelId}. Removing old channel.`);
             supabaseAnon.removeChannel(realtimeChannelRef.current).catch(e => logger.error("[RT Switch] Error removing old channel:", e));
+            realtimeChannelRef.current = null; // Ensure ref is cleared before creating new one
         }
 
         logger.log(`[RT Setup] Attempting to subscribe to ${channelId}`);
@@ -615,12 +697,14 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
                 'postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'ai_requests', filter: `id=eq.${currentReqId}` },
                 (payload) => {
-                    if (!isMounted) return;
+                    if (!isMounted) { logger.log("[RT Received] Component unmounted. Ignoring update."); return; }
+
                     logger.log('[RT Received] AI Request Updated:', payload.new);
                     const updatedRecord = payload.new;
 
-                    if (updatedRecord.id !== currentReqId) {
-                        logger.log(`[RT Mismatch] Update for ${updatedRecord.id}, but monitoring ${currentReqId}. Ignoring.`);
+                    // Crucial: Ensure update is for the request we are currently tracking
+                    if (updatedRecord.id !== currentAiRequestId) { // Check against the LATEST state value
+                        logger.log(`[RT Mismatch] Update for ${updatedRecord.id}, but monitoring ${currentAiRequestId}. Ignoring.`);
                         return;
                     }
 
@@ -629,78 +713,100 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
                         if (assistantRef.current) {
                             assistantRef.current.setResponseValue(updatedRecord.response || "");
                         }
-                        setAiResponseHasContentState(true);
-                        setAiActionLoadingState(false);
-                        setCurrentAiRequestIdState(null);
-
+                        setAiResponseHasContentState(!!updatedRecord.response); // Update based on actual content
+                        setAiActionLoadingState(false); // Stop loading indicator
+                        setCurrentAiRequestIdState(null); // Clear the tracked ID
+                        // --- Auto Parse ---
                         setTimeout(() => {
-                            if (isMounted) {
+                            // Check mount status and if assistant is ready AGAIN before parsing
+                            if (isMounted && assistantRef.current) {
                                 logger.log("[RT AutoParse] Triggering parse after response received.");
+                                // Trigger parse, error handling within triggerParseResponse
                                 triggerParseResponse().catch(err => logger.error("Error during auto-parsing:", err));
+                            } else if (isMounted) {
+                                logger.warn("[RT AutoParse] Assistant ref not ready for auto-parse.");
+                                toast.warn("Ответ получен, но ассистент не готов к авто-разбору.");
                             }
-                        }, 300);
+                        }, 300); // Small delay for state updates
 
                     } else if (updatedRecord.status === 'failed') {
                         const errorMsg = updatedRecord.error_message || 'Неизвестная ошибка AI';
                         toast.error(`❌ Ошибка AI: ${errorMsg}`);
-                        setAiActionLoadingState(false);
-                        setCurrentAiRequestIdState(null);
+                        setAiActionLoadingState(false); // Stop loading
+                        setCurrentAiRequestIdState(null); // Clear tracked ID
 
                     } else if (updatedRecord.status === 'processing') {
+                        // Provide ongoing feedback that AI is working
                         toast.info("⏳ AI обрабатывает запрос...", { id: `ai-processing-${currentReqId}`, duration: 5000 });
+                    } else if (updatedRecord.status === 'pending') {
+                        // Might receive this if DB trigger is slow, just log
+                        logger.log(`[RT Received] Request ${currentReqId} still pending.`);
                     }
                 }
             )
             .subscribe((status, err) => {
-                if (!isMounted) return;
+                if (!isMounted) return; // Don't log or change state if unmounted
+
                 if (status === 'SUBSCRIBED') {
                     logger.log(`[RT Status] Successfully subscribed to ${channelId}`);
                 } else if (['CHANNEL_ERROR', 'TIMED_OUT'].includes(status)) {
                     logger.error(`[RT Status] Subscription error for ${channelId}: ${status}`, err);
-                    toast.error("Ошибка Realtime подписки.");
-                    // *** CORRECTED READ ***
-                    if (aiActionLoading && currentAiRequestId === currentReqId) { // Use state variable aiActionLoading
+                    toast.error("Ошибка Realtime подписки. Ответ AI может не прийти автоматически.");
+                    // If subscription fails, stop showing the loading state for this request
+                    // *** Corrected Read and Check ***
+                    if (aiActionLoading && currentAiRequestId === currentReqId) { // Use state value & check if it matches the failed channel's ID
                         setAiActionLoadingState(false);
                         setCurrentAiRequestIdState(null);
                     }
                 } else if (status === 'CLOSED') {
                     logger.log(`[RT Status] Channel explicitly closed for ${channelId}`);
-                     // *** CORRECTED READ ***
-                     if (aiActionLoading && currentAiRequestId === currentReqId) { // Use state variable aiActionLoading
+                     // If channel closes unexpectedly while we thought we were loading
+                     // *** Corrected Read and Check ***
+                     if (aiActionLoading && currentAiRequestId === currentReqId) { // Use state value & check ID
                          setAiActionLoadingState(false);
                          setCurrentAiRequestIdState(null);
+                         logger.warn("[RT Status] Channel closed unexpectedly while AI action was loading.");
                     }
                 }
             });
 
         realtimeChannelRef.current = channel;
 
+        // Cleanup function for the effect
         return () => {
             isMounted = false;
+            // Check if the channel we are cleaning up is the one stored in the ref
             if (realtimeChannelRef.current && realtimeChannelRef.current.topic === channelId) {
-                logger.log(`[RT Cleanup] Removing channel: ${realtimeChannelRef.current.topic}`);
-                supabaseAnon.removeChannel(realtimeChannelRef.current).catch(e => logger.error("[RT Cleanup] Error removing channel:", e));
-                realtimeChannelRef.current = null;
+                logger.log(`[RT Cleanup Effect] Removing channel: ${realtimeChannelRef.current.topic}`);
+                supabaseAnon.removeChannel(realtimeChannelRef.current).catch(e => logger.error("[RT Cleanup Effect] Error removing channel:", e));
+                realtimeChannelRef.current = null; // Clear the ref after removal
+            } else {
+                logger.log(`[RT Cleanup Effect] No channel or different channel found for ${channelId}. Skipping removal.`);
             }
         };
-    }, [currentAiRequestId, assistantRef, triggerParseResponse, aiActionLoading]); // Dependency aiActionLoading is correct
+    // Dependencies: Re-run ONLY when the currentAiRequestId changes.
+    }, [currentAiRequestId, assistantRef, triggerParseResponse, aiActionLoading]); // aiActionLoading included to potentially reset state on error
 
 
     // --- Xuinity Message Logic ---
      const getXuinityMessage = useCallback((): string => {
-        // ... (getXuinityMessage logic remains the same) ...
-         const effectiveBranch = targetBranchName;
-         const branchInfo = effectiveBranch ? ` (ветка: ${effectiveBranch})` : ' (ветка по умолчанию)';
+         const effectiveBranch = targetBranchName; // Uses combined state (manual or selected PR)
+         const branchInfo = effectiveBranch ? ` (ветка: ${effectiveBranch.substring(0, 20)}${effectiveBranch.length > 20 ? '...' : ''})` : ' (ветка по умолчанию)';
          const settingsMention = "настройках";
 
+         // --- Image Replace Task Flow ---
          if (imageReplaceTask) {
              if (fetchStatus === 'loading' || fetchStatus === 'retrying') return `Извлекаю файл для замены картинки${branchInfo}... ⏳`;
              if (fetchStatus === 'failed_retries') return `Ошибка извлечения файла для замены картинки${branchInfo}. 😭 Попробовать еще раз?`;
-             if (assistantLoading) return `Заменяю картинку и создаю PR${branchInfo}... 🤖🖼️⚙️`;
-             if (filesFetched) return `Файл извлечен${branchInfo}! ✅ Инициирую замену картинки и PR...`;
-             return `Подготовка к замене картинки в файле ${imageReplaceTask.targetPath}...`;
+             // assistantLoading here means PR/update process for the image is running
+             if (assistantLoading) return `Заменяю картинку и создаю/обновляю PR${branchInfo}... 🤖🖼️⚙️`;
+             // If files fetched for image task, but assistant isn't loading yet (brief moment)
+             if (filesFetched && currentStep === 'files_fetched_image_replace') return `Файл ${imageReplaceTask.targetPath.split('/').pop()} извлечен${branchInfo}! ✅ Готовлюсь к замене и PR...`;
+             // Default message if task exists but fetch hasn't started/finished
+             return `Подготовка к замене картинки в ${imageReplaceTask.targetPath.split('/').pop()}...`;
          }
 
+         // --- Standard Workflow ---
          switch (currentStep) {
              case 'idle': return "Инициализация студии...";
              case 'need_repo_url': return `👈 Укажи URL GitHub репозитория в ${settingsMention}.`;
@@ -708,34 +814,40 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
              case 'fetching': return `Извлекаю файлы${branchInfo}... ${fetchStatus === 'retrying' ? '(Повтор...)' : ''} ⏳`;
              case 'fetch_failed': return `Ошибка извлечения${branchInfo}. 😭 Попробовать еще раз?`;
              case 'files_fetched': return `Файлы извлечены${branchInfo}! ✅ Выбери нужные ИЛИ опиши задачу ниже. 👇 Или смени ветку в ${settingsMention}.`;
-             case 'files_fetched_highlights': return `Файлы извлечены${branchInfo}. Есть связанные. 🤔 Выбери или опиши задачу. Ветку можно сменить в ${settingsMention}.`;
+             case 'files_fetched_highlights': return `Файлы извлечены${branchInfo}. Есть связанные/важные. 🤔 Выбери или опиши задачу. Ветку можно сменить в ${settingsMention}.`;
              case 'files_selected': return `Файлы выбраны${branchInfo}! 👍 Добавь в 'Твой Запрос' (+) ИЛИ сразу жми '🤖 Спросить AI'!`;
-             case 'request_written': return aiActionLoading && !currentAiRequestId ? "Отправка запроса AI в очередь..." : "Запрос готов! 🔥 Жми '🤖 Спросить AI' ИЛИ скопируй для Grok.";
+             case 'request_written': return aiActionLoading && !currentAiRequestId ? "Отправка запроса AI в очередь..." : "Запрос готов! 🔥 Жми '🤖 Спросить AI' ИЛИ скопируй для внешнего AI.";
              case 'generating_ai_response': return `Запрос #${currentAiRequestId?.substring(0, 6)}... улетел к AI. 🚀 Ожидаем магию... (Админ в курсе!) ✨`;
              case 'request_copied': return "Скопировано! 📋 Жду ответ от внешнего AI. Вставляй результат сюда. 👇";
-             case 'response_pasted': return "Ответ AI получен! ✅ Нажми '➡️ Разобрать Ответ' для анализа.";
+             case 'response_pasted': return aiResponseHasContent ? "Ответ AI получен! ✅ Нажми '➡️ Разобрать Ответ' для анализа." : "Ожидание ответа AI...";
              case 'parsing_response': return "Разбираю ответ AI... 🧠";
-             case 'response_parsed': return "Разобрал! 👀 Проверь изменения, выбери файлы для коммита.";
-             case 'pr_ready': return assistantLoading ? (effectiveBranch ? `Обновляю ветку '${effectiveBranch}'...` : "Создаю Pull Request...") : (effectiveBranch ? `Готов обновить ветку '${effectiveBranch}'? 🚀` : "Готов создать Pull Request? ✨");
-             case 'files_fetched_image_replace': return `Неожиданное состояние: files_fetched_image_replace`;
+             case 'response_parsed': return filesParsed ? "Разобрал! 👀 Проверь изменения, выбери файлы для коммита." : "Разбор завершен, но файлы не найдены/невалидны. Проверь ответ AI.";
+             case 'pr_ready': return assistantLoading ? (effectiveBranch ? `Обновляю ветку '${effectiveBranch}'...` : "Создаю Pull Request...") : (selectedAssistantFiles.size > 0 ? (effectiveBranch ? `Готов обновить ветку '${effectiveBranch}'? 🚀` : "Готов создать Pull Request? ✨") : "Выбери файлы для коммита после разбора.");
+             case 'files_fetched_image_replace': return `Неожиданное состояние: files_fetched_image_replace`; // Should be handled earlier
              default: logger.warn(`Unknown step in getXuinityMessage: ${currentStep}`); return "Что будем вайбить дальше?";
          }
-    }, [currentStep, repoUrlEntered, fetchStatus, assistantLoading, aiActionLoading, targetBranchName, isParsing, currentAiRequestId, imageReplaceTask, filesFetched]);
+    }, [currentStep, repoUrlEntered, fetchStatus, assistantLoading, aiActionLoading, targetBranchName, isParsing, currentAiRequestId, imageReplaceTask, filesFetched, filesParsed, selectedAssistantFiles, aiResponseHasContent]);
 
 
     // --- Callback for Repo URL update in Assistant ---
     const updateRepoUrlInAssistant = useCallback((url: string) => {
         if (assistantRef.current) assistantRef.current.updateRepoUrl(url);
+        else logger.warn("updateRepoUrlInAssistant: assistantRef not ready.");
     }, [assistantRef]);
 
     // --- Context Value ---
     const value: RepoXmlPageContextType = {
+        // State Flags
         currentStep, fetchStatus, repoUrlEntered, filesFetched, allFetchedFiles,
         primaryHighlightedPath, secondaryHighlightedPaths, selectedFetcherFiles, kworkInputHasContent, requestCopied,
         aiResponseHasContent, filesParsed, selectedAssistantFiles, assistantLoading, aiActionLoading, // State variable is correct here
         loadingPrs, openPrs, targetBranchName, manualBranchName, isSettingsModalOpen, currentAiRequestId, isParsing,
         imageReplaceTask,
+
+        // Refs (Passed from Layout)
         fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef, prSectionRef,
+
+        // Updaters
         setFetchStatus: setFetchStatusCallback, setRepoUrlEntered: setRepoUrlEnteredCallback,
         setFilesFetched: setFilesFetchedCallback,
         setAllFetchedFiles: setAllFetchedFilesCallback,
@@ -751,10 +863,14 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
         setCurrentAiRequestId: setCurrentAiRequestIdCallback,
         setIsParsing: setIsParsingCallback,
         setImageReplaceTask: setImageReplaceTaskCallback,
+
+        // Action Triggers
         triggerFetch, triggerGetOpenPRs, triggerSelectHighlighted, triggerAddSelectedToKwork,
         triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed,
         triggerCreateOrUpdatePR,
         triggerUpdateBranch, triggerToggleSettingsModal, scrollToSection,
+
+        // Messages & Callbacks
         getXuinityMessage, updateRepoUrlInAssistant,
     };
 
