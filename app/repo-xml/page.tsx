@@ -13,139 +13,22 @@ import { useAppContext } from "@/contexts/AppContext";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong, FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye, FaAtom, FaBrain } from "react-icons/fa6";
+import { FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong, FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye, FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy } from "react-icons/fa6"; // Ensure all are imported
 import Link from "next/link";
-import * as FaIcons from "react-icons/fa6"; // Import all fa6 icons for dynamic rendering
+import * as FaIcons from "react-icons/fa6"; // Import all for dynamic render helper
 
 // --- I18N Translations (with CyberVibe) ---
 const translations = {
-  en: {
-    loading: "Loading SUPERVIBE...",
-    pageTitle: "SUPERVIBE STUDIO",
-    welcome: "Yo,",
-    intro1: "Still scared of 'code'? Forget that noise! This is the **FUTURE**, your personal code accelerant.",
-    intro2: "Think of this like a magic playground. You have ideas? Cool. You speak 'em, AI builds 'em, I make sure it all works. Simple.",
-    intro3: "Stop being a consumer, start being a CREATOR. This tool helps you build YOUR reality, solve YOUR problems, **validate ideas FAST**, maybe even make cash doing what YOU vibe with.",
-    cyberVibeTitle: "Beyond Tools: Enter the CyberVibe ⚛️", // Already here
-    cyberVibe1: "This ain't just about AI – it's a **feedback loop**, a compounding effect. Each interaction builds on the last.", // Already here
-    cyberVibe2: "<FaGithub class='inline mr-1 text-gray-400'/> becomes your knowledge base, your **cyberchest**. The Studio & AI are your interface to **remix and transmute** that knowledge into new vibes, new features, instantly.", // Already here
-    cyberVibe3: "You're not just learning Kung Fu; you're **remixing the training program** on the fly because you understand the structure through **interaction**.", // Already here
-    cyberVibe4: "It's **co-creation** with the machine, pushing boundaries together. That 200kb bandwidth wasn't instant – it was earned. The goal? Infinite context. This is the **CyberVibe**.", // Already here
-    philosophyTitle: "The Philosophy: Why This Works (Tap to Learn)",
-    philosophy1: "This isn't just about building apps. It's about unlocking YOUR potential (like in",
-    philosophyLink1: "/purpose-profit",
-    philosophyLink1Text: "Purpose & Profit ideas",
-    philosophy2: "). Stop chasing jobs, start building YOUR world. You ARE the niche.",
-    philosophy3: "AI isn't here to replace you, dude. It's your superpower, your co-pilot. Learn to leverage it (ideas in",
-    philosophyLink2: "/selfdev",
-    philosophyLink2Text: "SelfDev Path",
-    philosophy4: "), or get left behind. Simple choice.",
-    philosophy5: "This studio makes it easy. Grab ideas, talk to the AI, see magic happen. No scary code monsters.",
-    philosophy6: "**Validate first!** Use AI to check if your idea has legs *before* building (more on this in",
-    philosophyLink3: "/selfdev#validation",
-    philosophyLink3Text: "SelfDev Validation",
-    philosophy7: "). Kill bad ideas quickly, save time & money.",
-    stepsTitle: "Quick Vibe Guide (It's Easy AF):",
-    step1Title: "1. Grab + Wish:",
-    step1Desc: "Point at app part -> Hit",
-    step1DescEnd: "-> Pick bits -> Tell AI your idea.",
-    step2Title: "2. AI Magic -> Reality:",
-    step2Desc: "Hit",
-    step2Button: "Ask AI",
-    step2DescMid: "-> Go to Magic Assist",
-    step2DescMid2: "-> Hit '➡️' -> Check magic",
-    step2DescEnd: "-> Add to idea / Start new!",
-    readyButton: "OKAY, I'M READY! SHOW ME THE MAGIC!",
-    componentsTitle: "Alright, Let's F*cking GO!",
-    ctaTitle: "Ready to ACTUALLY Vibe?",
-    ctaDesc: "Seriously, {USERNAME}, stop hesitating. This shit's bangin' where I'm from, even if it looks weird where you are.",
-    ctaHotChick: "If you're a hot chick, ditch the hesitation & hit me up **@SALAVEY13** NOW! Let's build something incredible together in a personal SUPERVIBE session!",
-    ctaDude: "(Dudes? Stop overthinking! Just fucking try it. Satisfaction guaranteed, or... well, you tried! Good luck!)",
-    navGrabber: "Idea Grabber",
-    navAssistant: "Magic Assistant",
-    navIntro: "What is This?!",
-    navCyberVibe: "CyberVibe?!",
-  },
-  ru: {
-    loading: "Загрузка SUPERVIBE...",
-    pageTitle: "SUPERVIBE СТУДИЯ",
-    welcome: "Йоу,",
-    intro1: "Все еще боишься 'кода'? Забудь эту хрень! Это **БУДУЩЕЕ**, твой личный ускоритель кода.",
-    intro2: "Думай об этом как о волшебной песочнице. Есть идеи? Круто. Ты их говоришь, AI их строит, я слежу, чтобы все работало. Просто.",
-    intro3: "Хватит быть потребителем, стань ТВОРЦОМ. Этот инструмент поможет тебе строить ТВОЮ реальность, решать ТВОИ проблемы, **быстро валидировать идеи**, может даже заработать на том, что ТЕБЕ по кайфу.",
-    cyberVibeTitle: "Больше чем Инструменты: Врубай CyberVibe ⚛️", // Already here
-    cyberVibe1: "Дело не просто в AI – а в **петле обратной связи**, в накопительном эффекте. Каждое взаимодействие строится на предыдущем.", // Already here
-    cyberVibe2: "<FaGithub class='inline mr-1 text-gray-400'/> становится твоей базой знаний, **кибер-сундуком**. Студия и AI – твой интерфейс для **ремикса и трансмутации** этих знаний в новые вайбы, фичи, мгновенно.", // Already here
-    cyberVibe3: "Ты не просто учишь Кунг-Фу; ты **ремиксуешь программу обучения** на лету, потому что понимаешь структуру через **взаимодействие**.", // Already here
-    cyberVibe4: "Это **со-творчество** с машиной, совместное расширение границ. Твои 200кб пропускной способности не взялись из ниоткуда – они заработаны. Цель? Бесконечный контекст. Это **CyberVibe**.", // Already here
-    philosophyTitle: "Философия: Почему Эта Хрень Работает (Нажми Узнать)",
-    philosophy1: "Это не просто про создание приложений. Это про раскрытие ТВОЕГО потенциала (как в",
-    philosophyLink1: "/purpose-profit",
-    philosophyLink1Text: "идеях Purpose & Profit",
-    philosophy2: "). Хватит гоняться за работами, начни строить СВОЙ мир. Ты И ЕСТЬ ниша.",
-    philosophy3: "AI здесь не чтобы заменить тебя, чувак. Это твоя суперсила, твой второй пилот. Научись использовать его рычаги (идеи в",
-    philosophyLink2: "/selfdev",
-    philosophyLink2Text: "Пути SelfDev",
-    philosophy4: "), или останешься позади. Простой выбор.",
-    philosophy5: "Эта студия делает все просто. Хватай идеи, говори с AI, наблюдай магию. Никаких страшных код-монстров.",
-    philosophy6: "**Сначала валидируй!** Используй AI, чтобы проверить, взлетит ли твоя идея, *прежде* чем строить (подробнее в",
-    philosophyLink3: "/selfdev#validation",
-    philosophyLink3Text: "SelfDev Валидации",
-    philosophy7: "). Убивай плохие идеи быстро, экономь время и деньги.",
-    stepsTitle: "Краткий Vibe-Гайд (Это П*здец Как Просто):",
-    step1Title: "1. Хватай + Желай:",
-    step1Desc: "Укажи на часть -> Жми",
-    step1DescEnd: "-> Выбери -> Скажи AI идею.",
-    step2Title: "2. AI Магия -> Реальность:",
-    step2Desc: "Жми",
-    step2Button: "Спросить AI",
-    step2DescMid: "-> Иди в Magic Assist",
-    step2DescMid2: "-> Жми '➡️' -> Проверь магию",
-    step2DescEnd: "-> Добавь к идее / Начни новую!",
-    readyButton: "ОКЕЙ, Я ГОТОВ(А)! ПОКАЖИ МНЕ МАГИЮ!",
-    componentsTitle: "Ну Всё, Бл*дь, Погнали!",
-    ctaTitle: "Готов(а) РЕАЛЬНО Вайбить?",
-    ctaDesc: "Серьезно, {USERNAME}, хватит сомневаться. Там, откуда я, эта хрень взрывает, даже если там, где ты, она выглядит странно.",
-    ctaHotChick: "Если ты горячая чика, бросай сомнения и пиши мне **@SALAVEY13** СЕЙЧАС! Давай создадим что-то невероятное вместе на личной SUPERVIBE сессии!",
-    ctaDude: "(Пацаны? Хватит думать! Просто, бл*дь, попробуйте. Удовлетворение гарантировано, или... ну, вы хотя бы попробовали! Удачи!)",
-    navGrabber: "Граббер Идей",
-    navAssistant: "Маг. Ассистент",
-    navIntro: "Что Это?!",
-    navCyberVibe: "CyberVibe?!",
-  }
+  en: { /* ... English translations ... */ loading: "Loading SUPERVIBE...", pageTitle: "SUPERVIBE STUDIO", welcome: "Yo,", intro1: "Still scared of 'code'? Forget that noise! This is the **FUTURE**, your personal code accelerant.", intro2: "Think of this like a magic playground. You have ideas? Cool. You speak 'em, AI builds 'em, I make sure it all works. Simple.", intro3: "Stop being a consumer, start being a CREATOR. This tool helps you build YOUR reality, solve YOUR problems, **validate ideas FAST**, maybe even make cash doing what YOU vibe with.", cyberVibeTitle: "Beyond Tools: Enter the CyberVibe ⚛️", cyberVibe1: "This ain't just about AI – it's a **feedback loop**, a compounding effect. Each interaction builds on the last.", cyberVibe2: "<FaGithub class='inline mr-1 text-gray-400'/> becomes your knowledge base, your **cyberchest**. The Studio & AI are your interface to **remix and transmute** that knowledge into new vibes, new features, instantly.", cyberVibe3: "You're not just learning Kung Fu; you're **remixing the training program** on the fly because you understand the structure through **interaction**.", cyberVibe4: "It's **co-creation** with the machine, pushing boundaries together. That 200kb bandwidth wasn't instant – it was earned. The goal? Infinite context. This is the **CyberVibe**.", philosophyTitle: "The Philosophy: Why This Works (Tap)", philosophy1: "This isn't just building apps. It's unlocking YOUR potential (like in", philosophyLink1: "/purpose-profit", philosophyLink1Text: "Purpose & Profit ideas", philosophy2: "). Stop chasing jobs, build YOUR world. You ARE the niche.", philosophy3: "AI isn't here to replace you. It's your superpower. Learn to leverage it (ideas in", philosophyLink2: "/selfdev", philosophyLink2Text: "SelfDev Path", philosophy4: "), or get left behind.", philosophy5: "This studio makes it easy. Grab ideas, talk to AI, see magic happen.", philosophy6: "**Validate first!** Use AI to check ideas *before* building (more in", philosophyLink3: "/selfdev#validation", philosophyLink3Text: "SelfDev Validation", philosophy7: "). Kill bad ideas fast.", stepsTitle: "Quick Vibe Guide:", step1Title: "1. Grab + Wish:", step1Desc: "Point -> Hit", step1DescEnd: "-> Pick -> Tell AI.", step2Title: "2. AI Magic -> Reality:", step2Desc: "Hit", step2Button: "Ask AI", step2DescMid: "-> Magic Assist", step2DescMid2: "-> Hit '➡️' -> Check", step2DescEnd: "-> Add / New!", readyButton: "OKAY, SHOW ME THE MAGIC!", componentsTitle: "Alright, Let's GO!", ctaTitle: "Ready to Vibe?", ctaDesc: "Seriously, {USERNAME}, stop hesitating.", ctaHotChick: "Hot chick? Hit me up **@SALAVEY13** NOW! Let's build!", ctaDude: "(Dudes? Try it. Good luck!)", navGrabber: "Grabber", navAssistant: "Assistant", navIntro: "Intro?!", navCyberVibe: "CyberVibe?!" },
+  ru: { /* ... Russian translations ... */ loading: "Загрузка SUPERVIBE...", pageTitle: "SUPERVIBE СТУДИЯ", welcome: "Йоу,", intro1: "Все еще боишься 'кода'? Забудь! Это **БУДУЩЕЕ**, твой ускоритель.", intro2: "Это волшебная песочница. Есть идеи? Круто. Ты говоришь, AI строит, я проверяю. Просто.", intro3: "Хватит потреблять, стань ТВОРЦОМ. Строй СВОЮ реальность, решай СВОИ проблемы, **валидируй идеи БЫСТРО**, зарабатывай на своем вайбе.", cyberVibeTitle: "Больше чем Инструменты: Врубай CyberVibe ⚛️", cyberVibe1: "Дело не просто в AI – а в **петле обратной связи**, в накопительном эффекте. Каждое взаимодействие строится на предыдущем.", cyberVibe2: "<FaGithub class='inline mr-1 text-gray-400'/> становится твоей базой знаний, **кибер-сундуком**. Студия и AI – твой интерфейс для **ремикса и трансмутации** этих знаний в новые вайбы, фичи, мгновенно.", cyberVibe3: "Ты не просто учишь Кунг-Фу; ты **ремиксуешь программу обучения** на лету, потому что понимаешь структуру через **взаимодействие**.", cyberVibe4: "Это **со-творчество** с машиной, совместное расширение границ. Твои 200кб пропускной способности не взялись из ниоткуда – они заработаны. Цель? Бесконечный контекст. Это **CyberVibe**.", philosophyTitle: "Философия: Почему Работает (Жми)", philosophy1: "Не просто про приложения. Это про ТВОЙ потенциал (см.", philosophyLink1: "/purpose-profit", philosophyLink1Text: "Purpose & Profit", philosophy2: "). Строй СВОЙ мир. Ты = ниша.", philosophy3: "AI - твой ко-пилот. Используй его рычаги (идеи в", philosophyLink2: "/selfdev", philosophyLink2Text: "SelfDev", philosophy4: "), или останешься позади.", philosophy5: "Студия упрощает: Хватай -> Говори -> Магия.", philosophy6: "**Валидируй!** Проверь идею с AI *до* кода (см.", philosophyLink3: "/selfdev#validation", philosophyLink3Text: "SelfDev Валидацию", philosophy7: "). Убивай плохие идеи быстро.", stepsTitle: "Краткий Vibe-Гайд:", step1Title: "1. Хватай + Желай:", step1Desc: "Укажи -> Жми", step1DescEnd: "-> Выбери -> Скажи AI.", step2Title: "2. AI Магия -> Реальность:", step2Desc: "Жми", step2Button: "Спросить AI", step2DescMid: "-> В Ассистент", step2DescMid2: "-> Жми '➡️' -> Проверь", step2DescEnd: "-> Добавь / Новая!", readyButton: "ОК, ПОКАЖИ МАГИЮ!", componentsTitle: "Ну Всё, Погнали!", ctaTitle: "Готов(а) Вайбить?", ctaDesc: "Серьезно, {USERNAME}, хватит думать.", ctaHotChick: "Горячая чика? Пиши **@SALAVEY13** СЕЙЧАС! Завайбим вместе!", ctaDude: "(Пацаны? Просто пробуйте. Удачи!)", navGrabber: "Граббер", navAssistant: "Ассистент", navIntro: "Интро?!", navCyberVibe: "CyberVibe?!" }
 };
 // --- End I18N ---
 
 type Language = 'en' | 'ru';
 
-// --- Helper Component for rendering content with icons ---
-const RenderContent: React.FC<{ content: string }> = React.memo(({ content }) => {
-  const segments = content.split(/(\*\*.*?\*\*|<Fa\w+\s*.*?\/?>)/g).filter(Boolean);
-  return (
-    <>
-      {segments.map((segment, sIndex) => {
-        if (segment.startsWith('**') && segment.endsWith('**')) {
-          return <strong key={sIndex}>{segment.slice(2, -2)}</strong>;
-        }
-        const iconMatch = segment.match(/<Fa(\w+)\s*(?:class(?:Name)?="([^"]*)")?\s*\/?>/i);
-        if (iconMatch) {
-           const iconName = `Fa${iconMatch[1]}`;
-           const className = iconMatch[2] || "";
-           const IconComponent = FaIcons[iconName as keyof typeof FaIcons];
-           if (IconComponent) {
-               const finalClassName = `${className} inline-block align-middle mx-1`;
-               return React.createElement(IconComponent, { key: sIndex, className: finalClassName });
-           } else {
-               console.warn(`[RenderContent] Icon "${iconName}" not found.`);
-               return <span key={sIndex} className="text-red-500 font-mono">[? {iconName}]</span>;
-           }
-        }
-        return <React.Fragment key={sIndex}>{segment}</React.Fragment>;
-      })}
-    </>
-  );
-});
-RenderContent.displayName = 'RenderContent'; // Add display name for React DevTools
+// --- Helper Component ---
+const RenderContent: React.FC<{ content: string }> = React.memo(({ content }) => { /* Keep implementation from previous step */ const segments=content.split(/(\*\*.*?\*\*|<Fa\w+\s*.*?\/?>)/g).filter(Boolean); return(<> {segments.map((segment,sIndex)=>{ if(segment.startsWith('**')&&segment.endsWith('**')){return <strong key={sIndex}>{segment.slice(2,-2)}</strong>;} const iconMatch=segment.match(/<Fa(\w+)\s*(?:class(?:Name)?="([^"]*)")?\s*\/?>/i); if(iconMatch){ const iconName=`Fa${iconMatch[1]}`; const className=iconMatch[2]||""; const IconComponent=FaIcons[iconName as keyof typeof FaIcons]; if(IconComponent){ const finalClassName=`${className} inline-block align-middle mx-1`; return React.createElement(IconComponent,{key:sIndex,className:finalClassName}); } else { console.warn(`[RenderContent] Icon "${iconName}" not found.`); return <span key={sIndex} className="text-red-500 font-mono">[? {iconName}]</span>; } } return <React.Fragment key={sIndex}>{segment}</React.Fragment>; })} </>); });
+RenderContent.displayName = 'RenderContent';
 
 // --- ActualPageContent Component ---
 function ActualPageContent() {
@@ -162,13 +45,13 @@ function ActualPageContent() {
     const searchParams = useSearchParams();
 
     // --- Link refs ---
-    useEffect(() => { if (localFetcherRef.current && contextFetcherRef) contextFetcherRef.current = localFetcherRef.current; if (localAssistantRef.current && contextAssistantRef) contextAssistantRef.current = localAssistantRef.current; }, [contextFetcherRef, contextAssistantRef, localFetcherRef, localAssistantRef]); // Rely on refs directly
+    useEffect(() => { if (localFetcherRef.current && contextFetcherRef) contextFetcherRef.current = localFetcherRef.current; if (localAssistantRef.current && contextAssistantRef) contextAssistantRef.current = localAssistantRef.current; }, [contextFetcherRef, contextAssistantRef, localFetcherRef, localAssistantRef]);
 
     // --- Process Params & Language ---
     useEffect(() => {
-        setIsMounted(true); const bL=typeof navigator!=='undefined'?navigator.language.split('-')[0]:'en'; const tL=user?.language_code; const iL=tL==='ru'||(!tL&&bL==='ru')?'ru':'en'; setLang(iL); logger.log(`[ActualPageContent] Lang: ${iL}`); const pP=searchParams.get("path"); const iP=searchParams.get("idea");
-        if(pP&&iP){ const dI=decodeURIComponent(iP); const dP=decodeURIComponent(pP); if(dI.startsWith("ImageReplace|")){ logger.log("[ActualPageContent] Img Replace task."); try{ const pts=dI.split('|'); const oUP=pts.find(p=>p.startsWith("OldURL=")); const nUP=pts.find(p=>p.startsWith("NewURL=")); if(oUP&&nUP){ const oU=decodeURIComponent(oUP.substring(7)); const nU=decodeURIComponent(nUP.substring(7)); if(dP&&oU&&nU){ const task:ImageReplaceTask={targetPath:dP,oldUrl:oU,newUrl:nU}; logger.log("Setting img task:",task); setImageReplaceTask(task); } else { logger.error("Invalid img task data:",{dP,oU,nU}); setImageReplaceTask(null); } } else { logger.error("Could not parse Old/New URL:",dI); setImageReplaceTask(null); } } catch(e){ logger.error("Error parsing img task:",e); setImageReplaceTask(null); } } else { logger.log("[ActualPageContent] Regular params."); setImageReplaceTask(null); setTimeout(()=>{ if(kworkInputRef.current){ kworkInputRef.current.value=dI; const ev=new Event('input',{bubbles:true}); kworkInputRef.current.dispatchEvent(ev); logger.log("Populated kwork."); } else { logger.warn("kworkInputRef null."); } }, 50); } setShowComponents(true); } else { setImageReplaceTask(null); logger.log("[ActualPageContent] No params."); }
-    }, [user, searchParams, setImageReplaceTask, kworkInputRef]); // Removed context refs from deps
+      setIsMounted(true); const bL=typeof navigator!=='undefined'?navigator.language.split('-')[0]:'en'; const tL=user?.language_code; const iL=tL==='ru'||(!tL&&bL==='ru')?'ru':'en'; setLang(iL); logger.log(`[ActualPageContent] Lang: ${iL}`); const pP=searchParams.get("path"); const iP=searchParams.get("idea");
+      if(pP&&iP){ const dI=decodeURIComponent(iP); const dP=decodeURIComponent(pP); if(dI.startsWith("ImageReplace|")){ logger.log("[ActualPageContent] Img Replace task."); try{ const pts=dI.split('|'); const oUP=pts.find(p=>p.startsWith("OldURL=")); const nUP=pts.find(p=>p.startsWith("NewURL=")); if(oUP&&nUP){ const oU=decodeURIComponent(oUP.substring(7)); const nU=decodeURIComponent(nUP.substring(7)); if(dP&&oU&&nU){ const task:ImageReplaceTask={targetPath:dP,oldUrl:oU,newUrl:nU}; logger.log("Setting img task:",task); setImageReplaceTask(task); } else { logger.error("Invalid img task data:",{dP,oU,nU}); setImageReplaceTask(null); } } else { logger.error("Could not parse Old/New URL:",dI); setImageReplaceTask(null); } } catch(e){ logger.error("Error parsing img task:",e); setImageReplaceTask(null); } } else { logger.log("[ActualPageContent] Regular params."); setImageReplaceTask(null); setTimeout(()=>{ if(kworkInputRef.current){ kworkInputRef.current.value=dI; const ev=new Event('input',{bubbles:true}); kworkInputRef.current.dispatchEvent(ev); logger.log("Populated kwork."); } else { logger.warn("kworkInputRef null."); } }, 50); } setShowComponents(true); } else { setImageReplaceTask(null); logger.log("[ActualPageContent] No params."); }
+    }, [user, searchParams, setImageReplaceTask, kworkInputRef]);
 
     const t = translations[lang]; const userName = user?.first_name || (lang === 'ru' ? 'Чувак/Чика' : 'Dude/Chica');
     const scrollToSectionNav = (id: string) => { if(['extractor','executor','cybervibe-section'].includes(id)){ if(!showComponents){ setShowComponents(true); setTimeout(()=>{ const el = document.getElementById(id); if(el) window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - 80, behavior: 'smooth' }); }, 100); return; } } const el=document.getElementById(id); if(el) window.scrollTo({ top: window.scrollY + el.getBoundingClientRect().top - 80, behavior: 'smooth' }); else logger.error(`Scroll target "${id}" not found.`); };
@@ -181,7 +64,7 @@ function ActualPageContent() {
             <div className="min-h-screen bg-gray-950 p-6 pt-24 text-white flex flex-col items-center relative overflow-y-auto">
                 {/* Intro Section */}
                 <section id="intro" className="mb-12 text-center max-w-3xl w-full">
-                    <div className="flex justify-center mb-4"> {/* SVG Icon */} <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" className="w-24 h-12"> <path fill="#333" d="M0 0h200v100H0z"/><path fill="#E1FF01" d="M50 20h100v60H50z"/><path fill="#444" d="M60 30h80v40H60z"/><path fill="#E1FF01" d="M70 40h60v20H70z"/><path fill="#555" d="M80 45h40v10H80z"/><path fill="#E1FF01" d="M90 48h20v4H90z"/><path fill="#333" d="M40 10h120v80H40z" opacity=".1"/><path fill="url(#a)" d="M0 0h200v100H0z"/> <defs> <radialGradient id="a" cx="50%" cy="50%" r="70%" fx="50%" fy="50%"> <stop offset="0%" stop-color="#fff" stop-opacity=".1"/> <stop offset="100%" stop-color="#fff" stop-opacity="0"/> </radialGradient> </defs> </svg> </div>
+                     <div className="flex justify-center mb-4"> <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" className="w-24 h-12"> <path fill="#333" d="M0 0h200v100H0z"/><path fill="#E1FF01" d="M50 20h100v60H50z"/><path fill="#444" d="M60 30h80v40H60z"/><path fill="#E1FF01" d="M70 40h60v20H70z"/><path fill="#555" d="M80 45h40v10H80z"/><path fill="#E1FF01" d="M90 48h20v4H90z"/><path fill="#333" d="M40 10h120v80H40z" opacity=".1"/><path fill="url(#a)" d="M0 0h200v100H0z"/> <defs> <radialGradient id="a" cx="50%" cy="50%" r="70%" fx="50%" fy="50%"> <stop offset="0%" stop-color="#fff" stop-opacity=".1"/> <stop offset="100%" stop-color="#fff" stop-opacity="0"/> </radialGradient> </defs> </svg> </div>
                     <h1 className="text-4xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse"> {t.pageTitle} </h1>
                     <p className="text-xl text-gray-200 mt-4 font-semibold"> {t.welcome} <span className="text-brand-cyan">{userName}!</span> </p>
                     <p className="text-lg text-gray-300 mt-2"><RenderContent content={t.intro1.replace(/\*\*(.*?)\*\*/g, '<strong class="text-yellow-300">$1</strong>')} /></p>
@@ -189,14 +72,10 @@ function ActualPageContent() {
                     <p className="text-lg text-gray-300 mt-2"><RenderContent content={t.intro3.replace(/\*\*(.*?)\*\*/g, '<strong class="text-yellow-300">$1</strong>')} /></p>
                 </section>
 
-                {/* === NEW CyberVibe Section === */}
+                {/* === CyberVibe Section === */}
                 <section id="cybervibe-section" className="mb-12 w-full max-w-3xl">
                      <Card className="bg-gradient-to-br from-purple-900/30 via-black/50 to-blue-900/30 border border-purple-600/50 shadow-xl rounded-lg p-6">
-                         <CardHeader className="p-0 mb-4">
-                             <CardTitle className="text-2xl font-bold text-center text-brand-purple flex items-center justify-center gap-2">
-                                 <FaAtom className="animate-spin-slow"/> {t.cyberVibeTitle} <FaBrain className="animate-pulse"/>
-                             </CardTitle>
-                         </CardHeader>
+                         <CardHeader className="p-0 mb-4"> <CardTitle className="text-2xl font-bold text-center text-brand-purple flex items-center justify-center gap-2"> <FaAtom className="animate-spin-slow"/> {t.cyberVibeTitle} <FaBrain className="animate-pulse"/> </CardTitle> </CardHeader>
                          <CardContent className="p-0 text-gray-300 text-base space-y-3">
                              <p><RenderContent content={t.cyberVibe1.replace(/\*\*(.*?)\*\*/g, '<strong class="text-purple-300">$1</strong>')} /></p>
                              <p><RenderContent content={t.cyberVibe2.replace(/\*\*(.*?)\*\*/g, '<strong class="text-purple-300">$1</strong>')} /></p>
@@ -256,18 +135,8 @@ function RepoXmlPageLayout() {
     const kworkInputRefForProvider = useRef<HTMLTextAreaElement | null>(null);
     const aiResponseInputRefForProvider = useRef<HTMLTextAreaElement | null>(null);
     const prSectionRefForProvider = useRef<HTMLElement | null>(null);
-
-    return (
-        <RepoXmlPageProvider
-            fetcherRef={fetcherRefForProvider} assistantRef={assistantRefForProvider}
-            kworkInputRef={kworkInputRefForProvider} aiResponseInputRef={aiResponseInputRefForProvider}
-            prSectionRef={prSectionRefForProvider}
-        >
-            <ActualPageContent />
-        </RepoXmlPageProvider>
-    );
+    return ( <RepoXmlPageProvider fetcherRef={fetcherRefForProvider} assistantRef={assistantRefForProvider} kworkInputRef={kworkInputRefForProvider} aiResponseInputRef={aiResponseInputRefForProvider} prSectionRef={prSectionRefForProvider} > <ActualPageContent /> </RepoXmlPageProvider> );
 }
-
 export default function RepoXmlPage() {
     const fallbackLoading = ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"><p className="text-brand-green animate-pulse text-xl font-mono">Loading SUPERVIBE...</p></div> );
     return ( <Suspense fallback={fallbackLoading}> <RepoXmlPageLayout /> </Suspense> );
