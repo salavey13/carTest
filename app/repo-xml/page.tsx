@@ -1,5 +1,5 @@
 "use client";
-import React, { Suspense, useRef, useState, useEffect, ReactNode } from "react"; // Added ReactNode
+import React, { Suspense, useRef, useState, useEffect, ReactNode, useCallback } from "react"; // Added ReactNode, useCallback
 
 import { useSearchParams } from 'next/navigation';
 import RepoTxtFetcher from "@/components/RepoTxtFetcher";
@@ -11,7 +11,7 @@ import {
     RepoTxtFetcherRef, AICodeAssistantRef, ImageReplaceTask
 } from '@/contexts/RepoXmlPageContext';
 import { useAppContext } from "@/contexts/AppContext";
-import { debugLogger } from "@/lib/debugLogger";
+import { debugLogger as logger } from "@/lib/debugLogger"; // Use debugLogger
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong, FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye } from "react-icons/fa6";
@@ -108,17 +108,21 @@ type Language = 'en' | 'ru';
 
 // --- NEW: Component containing the actual page logic and consuming context ---
 function ActualPageContent() {
-    // Refs created here are used by the components rendered WITHIN this component
-    const fetcherRef = useRef<RepoTxtFetcherRef | null>(null);
-    const assistantRef = useRef<AICodeAssistantRef | null>(null);
-    const kworkInputRef = useRef<HTMLTextAreaElement | null>(null); // Ref needed for direct manipulation
+    // Refs for direct interaction within this component/passing down
+    const localFetcherRef = useRef<RepoTxtFetcherRef | null>(null); // Renamed for clarity
+    const localAssistantRef = useRef<AICodeAssistantRef | null>(null); // Renamed for clarity
+    const kworkInputRef = useRef<HTMLTextAreaElement | null>(null);
     const aiResponseInputRef = useRef<HTMLTextAreaElement | null>(null);
     const prSectionRef = useRef<HTMLElement | null>(null); // Ref needed for scrolling target
 
     // State
     const { user } = useAppContext(); // Consumes AppContext
-    // !!! CONTEXT HOOK MOVED HERE !!! - Consumes RepoXmlPageContext
-    const { setImageReplaceTask } = useRepoXmlPageContext();
+    // Get context refs AND the setter for the image task
+    const {
+        setImageReplaceTask,
+        fetcherRef: contextFetcherRef, // Get the ref object held by context
+        assistantRef: contextAssistantRef // Get the ref object held by context
+    } = useRepoXmlPageContext();
     const [isMounted, setIsMounted] = useState(false);
     const [lang, setLang] = useState<Language>('en');
     const [showComponents, setShowComponents] = useState(false);
@@ -126,13 +130,37 @@ function ActualPageContent() {
     // Hooks
     const searchParams = useSearchParams(); // Needs Suspense boundary higher up
 
+    // --- NEW EFFECT: Link local refs to context refs ---
+    useEffect(() => {
+        // Assign the component instance refs obtained locally
+        // to the refs managed by the context provider.
+        if (localFetcherRef.current && contextFetcherRef) {
+            contextFetcherRef.current = localFetcherRef.current;
+            logger.log("[ActualPageContent] Fetcher ref linked to context.");
+        }
+        if (localAssistantRef.current && contextAssistantRef) {
+            contextAssistantRef.current = localAssistantRef.current;
+            logger.log("[ActualPageContent] Assistant ref linked to context.");
+            // Optional: Trigger pending task if needed (context logic might handle this)
+            // const task = useRepoXmlPageContext.getState().imageReplaceTask; // Example hypothetical access
+            // if (task && localAssistantRef.current) {
+            //     logger.log("[ActualPageContent Effect] Assistant ready, attempting to trigger pending task.");
+            //     localAssistantRef.current.handleDirectImageReplace(task)
+            //        .catch(e => logger.error("Error re-triggering task from effect:", e));
+            // }
+        }
+        // Dependencies: Run when local refs change or context refs become available.
+        // Using .current directly isn't ideal, but we rely on mount/context availability.
+    }, [contextFetcherRef, contextAssistantRef, localFetcherRef.current, localAssistantRef.current]); // Include local refs' .current
+
+    // --- Existing useEffect for Params ---
     useEffect(() => {
       setIsMounted(true);
       const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
       const telegramLang = user?.language_code;
       const initialLang = telegramLang === 'ru' || (!telegramLang && browserLang === 'ru') ? 'ru' : 'en';
       setLang(initialLang);
-      debugLogger.log(`[ActualPageContent] Mounted. Browser lang: ${browserLang}, TG lang: ${telegramLang}, Initial selected: ${initialLang}`);
+      logger.log(`[ActualPageContent] Mounted. Browser lang: ${browserLang}, TG lang: ${telegramLang}, Initial selected: ${initialLang}`);
 
       const pathParam = searchParams.get("path");
       const ideaParam = searchParams.get("idea");
@@ -142,7 +170,7 @@ function ActualPageContent() {
             const decodedPath = decodeURIComponent(pathParam);
 
             if (decodedIdea.startsWith("ImageReplace|")) {
-                debugLogger.log("[ActualPageContent] Image Replace task detected in URL params.");
+                logger.log("[ActualPageContent] Image Replace task detected in URL params.");
                 try {
                     const parts = decodedIdea.split('|');
                     const oldUrlPart = parts.find(p => p.startsWith("OldURL="));
@@ -154,24 +182,24 @@ function ActualPageContent() {
 
                         if (decodedPath && oldUrl && newUrl) {
                             const task: ImageReplaceTask = { targetPath: decodedPath, oldUrl, newUrl };
-                            console.log("[ActualPageContent] Setting image replace task in context:", task);
+                            logger.log("[ActualPageContent] Setting image replace task in context:", task);
                             // Use the setter obtained from context
                             setImageReplaceTask(task);
                         } else {
-                             console.error("[ActualPageContent] Invalid image replace task data:", { decodedPath, oldUrl, newUrl });
+                             logger.error("[ActualPageContent] Invalid image replace task data:", { decodedPath, oldUrl, newUrl });
                              setImageReplaceTask(null);
                         }
                     } else {
-                         console.error("[ActualPageContent] Could not parse OldURL/NewURL from image replace idea:", decodedIdea);
+                         logger.error("[ActualPageContent] Could not parse OldURL/NewURL from image replace idea:", decodedIdea);
                          setImageReplaceTask(null);
                     }
                 } catch (e) {
-                    console.error("[ActualPageContent] Error parsing image replace task:", e);
+                    logger.error("[ActualPageContent] Error parsing image replace task:", e);
                     setImageReplaceTask(null);
                 }
             } else {
                  // --- It's a regular idea ---
-                 debugLogger.log("[ActualPageContent] Regular 'path' and 'idea' params found.");
+                 logger.log("[ActualPageContent] Regular 'path' and 'idea' params found.");
                  setImageReplaceTask(null); // Ensure image task is cleared via context setter
                  // Populate kwork input using the ref created within this component
                  if (kworkInputRef.current) {
@@ -179,10 +207,10 @@ function ActualPageContent() {
                       // Optionally trigger input event if needed by AICodeAssistant
                       const event = new Event('input', { bubbles: true });
                       kworkInputRef.current.dispatchEvent(event);
-                      console.log("[ActualPageContent] Populated kwork input with idea from URL.");
+                      logger.log("[ActualPageContent] Populated kwork input with idea from URL.");
                  } else {
                      // This might happen briefly on initial render before refs are assigned
-                     console.warn("[ActualPageContent] kworkInputRef is null when trying to populate idea from URL.");
+                     logger.warn("[ActualPageContent] kworkInputRef is null when trying to populate idea from URL.");
                      // Retry slightly later? Or rely on component rendering cycle.
                      // For now, just warn. If it persists, it's an issue.
                  }
@@ -190,15 +218,15 @@ function ActualPageContent() {
 
             // Auto-show components if path and idea/task are present
             setShowComponents(true);
-            console.log("[ActualPageContent] Auto-showing components due to URL params.");
+            logger.log("[ActualPageContent] Auto-showing components due to URL params.");
 
       } else {
            // No path/idea params, clear any potential image task via context
            setImageReplaceTask(null);
-           console.log("[ActualPageContent] No path/idea params found in URL.");
+           logger.log("[ActualPageContent] No path/idea params found in URL.");
       }
-      // Added kworkInputRef to dependencies as it's used for populating the idea
-    }, [user, searchParams, setImageReplaceTask, kworkInputRef]);
+      // Added context refs to ensure effect runs after context is potentially available
+    }, [user, searchParams, setImageReplaceTask, kworkInputRef, contextFetcherRef, contextAssistantRef]);
 
     const t = translations[lang];
     const userName = user?.first_name || (lang === 'ru' ? 'Чувак/Чика' : 'Dude/Chica');
@@ -215,7 +243,7 @@ function ActualPageContent() {
                 const rect = element.getBoundingClientRect();
                 // Adjust scroll position slightly (-80px) to account for fixed headers/nav
                 window.scrollTo({ top: window.scrollY + rect.top - 80, behavior: 'smooth' });
-            } else { console.error(`Element with id "${id}" not found post-reveal.`); }
+            } else { logger.error(`Element with id "${id}" not found post-reveal.`); }
           }, 100); // Small delay
           return; // Exit early as scrolling is handled in setTimeout
         }
@@ -225,7 +253,7 @@ function ActualPageContent() {
       if (element) {
           const rect = element.getBoundingClientRect();
           window.scrollTo({ top: window.scrollY + rect.top - 80, behavior: 'smooth' });
-      } else { console.error(`Element with id "${id}" not found.`); }
+      } else { logger.error(`Element with id "${id}" not found.`); }
     };
 
     // Loading state based on mount status (basic client-side loading indicator)
@@ -348,8 +376,8 @@ function ActualPageContent() {
                           <section id="extractor" className="mb-12 w-full max-w-4xl">
                               <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg">
                                 <CardContent className="p-4">
-                                  {/* Pass the ref created in this component down */}
-                                  <RepoTxtFetcher ref={fetcherRef} />
+                                  {/* Pass the LOCAL ref */}
+                                  <RepoTxtFetcher ref={localFetcherRef} />
                                 </CardContent>
                               </Card>
                           </section>
@@ -360,9 +388,8 @@ function ActualPageContent() {
                        <section id="executor" ref={prSectionRef} className="mb-12 w-full max-w-4xl pb-16">
                            <Card className="bg-gray-900/80 border border-purple-700/50 shadow-lg">
                              <CardContent className="p-4">
-                               {/* Pass the refs created in this component down */}
-                               {/* Note: AICodeAssistant internally uses kworkInputRef and aiResponseInputRef via context, but we pass the assistantRef itself */}
-                               <AICodeAssistant ref={assistantRef} kworkInputRefPassed={kworkInputRef} aiResponseInputRefPassed={aiResponseInputRef} />
+                               {/* Pass the LOCAL ref */}
+                               <AICodeAssistant ref={localAssistantRef} kworkInputRefPassed={kworkInputRef} aiResponseInputRefPassed={aiResponseInputRef} />
                              </CardContent>
                            </Card>
                        </section>

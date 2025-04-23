@@ -84,7 +84,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     // Local state for parsed files, synced with the hook's state
     const [componentParsedFiles, setComponentParsedFiles] = useState<ValidationFileEntry[]>([]);
     useEffect(() => {
-        logger.log("[AICodeAssistant] Syncing parsed files from hook:", hookParsedFiles);
+        // logger.log("[AICodeAssistant] Syncing parsed files from hook:", hookParsedFiles);
         setComponentParsedFiles(hookParsedFiles);
         setFilesParsed(hookParsedFiles.length > 0); // Update context based on hook's files
     }, [hookParsedFiles, setFilesParsed]);
@@ -102,7 +102,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
         // Clear assistant state if response is empty, no AI action, and no image task
         if (isMounted && !hasContent && !currentAiRequestId && !aiActionLoading && !imageReplaceTask) {
-            logger.log("[AICodeAssistant Effect] Clearing state: No response/AI action/image task.");
+            // logger.log("[AICodeAssistant Effect] Clearing state: No response/AI action/image task.");
             setFilesParsed(false); // Context
             setSelectedAssistantFiles(new Set()); // Context
             setValidationStatus('idle');
@@ -114,7 +114,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         }
         // Reset validation if response exists but no files parsed (e.g., after manual edit)
         else if (isMounted && hasContent && componentParsedFiles.length === 0 && validationStatus !== 'idle' && !isParsing && !assistantLoading && !imageReplaceTask) {
-             logger.log("[AICodeAssistant Effect] Resetting validation status: Response has content, but no files parsed.");
+             // logger.log("[AICodeAssistant Effect] Resetting validation status: Response has content, but no files parsed.");
              setValidationStatus('idle');
              setValidationIssues([]);
         }
@@ -122,13 +122,11 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     // Load custom links
     useEffect(() => {
-        // ... (Load custom links logic - no changes needed) ...
         const loadLinks = async () => { if (!user) { setCustomLinks([]); return; } try { const { data: d, error: e } = await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id).single(); if (!e && d?.metadata?.customLinks) setCustomLinks(d.metadata.customLinks); else setCustomLinks([]); } catch (e) { logger.error("Error loading custom links:", e); setCustomLinks([]); } }; loadLinks();
     }, [user]);
 
     // Fetch original files if needed for restoration
     useEffect(() => {
-        // ... (Fetch originals logic - no changes needed) ...
         const skippedCodeBlockIssues = validationIssues.filter(i => i.type === 'skippedCodeBlock');
         if (skippedCodeBlockIssues.length > 0 && originalRepoFiles.length === 0 && !isFetchingOriginals && repoUrl) { const fetchOriginals = async () => { setIsFetchingOriginals(true); const branch = targetBranchName ?? undefined; const branchDisplay = targetBranchName ?? 'default'; toast.info(`Загрузка оригиналов из ветки ${branchDisplay}...`); try { const result = await fetchRepoContents(repoUrl, undefined, branch); if (result.success && Array.isArray(result.files)) { setOriginalRepoFiles(result.files); toast.success("Оригиналы загружены."); } else { toast.error("Ошибка загрузки оригиналов: " + (result.error ?? '?')); setOriginalRepoFiles([]); } } catch (e) { toast.error("Крит. ошибка при загрузке оригиналов."); logger.error("Fetch originals critical error:", e); setOriginalRepoFiles([]); } finally { setIsFetchingOriginals(false); } }; fetchOriginals(); }
     }, [validationIssues, originalRepoFiles.length, isFetchingOriginals, repoUrl, targetBranchName]);
@@ -172,19 +170,16 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const handleCopyResponse = useCallback(() => { if (!response) return; navigator.clipboard.writeText(response).then(() => toast.success("Скопировано!")).catch(() => {toast.error("Ошибка копирования")}); }, [response]);
     const handleOpenModal = useCallback((mode: 'replace' | 'search') => { setModalMode(mode); setShowModal(true); }, []);
     const handleSwap = useCallback((find: string, replace: string) => {
-        // ... (Swap logic - no changes needed) ...
         if (!find || !aiResponseInputRefPassed.current) return; try { const textArea = aiResponseInputRefPassed.current; const currentValue = textArea.value; const escapedFind = find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); const regex = new RegExp(escapedFind, 'g'); const newValue = currentValue.replace(regex, replace); if (newValue !== currentValue) { setResponse(newValue); requestAnimationFrame(() => { if (aiResponseInputRefPassed.current) aiResponseInputRefPassed.current.value = newValue; }); setHookParsedFiles([]); setFilesParsed(false); setSelectedFileIds(new Set()); setSelectedAssistantFiles(new Set()); setValidationStatus('idle'); setValidationIssues([]); toast.success(`"${find}" -> "${replace}". Жми '➡️'.`); } else { toast.info(`"${find}" не найден.`); } } catch (e: any) { toast.error(`Ошибка замены: ${e.message}`); }
     }, [aiResponseInputRefPassed, setHookParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues]);
 
     const handleSearch = useCallback((searchText: string, isMultiline: boolean) => {
-         // ... (Search/Replace Function logic - no changes needed) ...
         if (!searchText || !aiResponseInputRefPassed.current) return; const textArea = aiResponseInputRefPassed.current; const textContent = textArea.value;
         if (isMultiline) { const cleanedSearchText = searchText.split('\n').map(l => l.trim()).filter(l => l.length > 0).join('\n'); if (!cleanedSearchText) { toast.error("Текст для мультилайн поиска пуст."); return; } const firstLine = cleanedSearchText.split('\n')[0]; const funcName = extractFunctionName(firstLine ?? ''); if (!funcName) { toast.error("Не удалось извлечь имя функции из первой строки для поиска."); return; } const funcRegex = new RegExp(`(^|\\n|\\s)(?:export\\s+|async\\s+)*?(?:function\\s+|class\\s+|const\\s+|let\\s+|var\\s+)${funcName}\\s*(?:\\(|[:=]|<)`, 'm'); let match = funcRegex.exec(textContent); if (!match) { const methodRegex = new RegExp(`(^|\\n|\\s)(?:async\\s+|get\\s+|set\\s+)*?${funcName}\\s*\\(`, 'm'); match = methodRegex.exec(textContent); } if (!match || match.index === undefined) { toast.info(`Функция "${funcName}" не найдена.`); return; } const matchStartIndex = match.index + (match[1]?.length || 0); const [startPos, endPos] = selectFunctionDefinition(textContent, matchStartIndex); if (startPos === -1 || endPos === -1) { toast.error("Не удалось выделить тело найденной функции."); return; } const newValue = textContent.substring(0, startPos) + cleanedSearchText + textContent.substring(endPos); setResponse(newValue); requestAnimationFrame(() => { if (aiResponseInputRefPassed.current) { aiResponseInputRefPassed.current.value = newValue; aiResponseInputRefPassed.current.focus(); aiResponseInputRefPassed.current.setSelectionRange(startPos, startPos + cleanedSearchText.length); } }); setHookParsedFiles([]); setFilesParsed(false); setSelectedFileIds(new Set()); setSelectedAssistantFiles(new Set()); setValidationStatus('idle'); setValidationIssues([]); toast.success(`Функция "${funcName}" заменена! ✨ Жми '➡️'.`);
         } else { const searchTextLower = searchText.toLowerCase(); const textContentLower = textContent.toLowerCase(); const currentPosition = textArea.selectionStart || 0; let foundIndex = textContentLower.indexOf(searchTextLower, currentPosition); if (foundIndex === -1) { foundIndex = textContentLower.indexOf(searchTextLower, 0); if (foundIndex === -1 || foundIndex >= currentPosition) { toast.info(`"${searchText}" не найден.`); textArea.focus(); return; } toast.info("Поиск с начала документа."); } textArea.focus(); textArea.setSelectionRange(foundIndex, foundIndex + searchText.length); toast(`Найдено: "${searchText}"`, { style: { background: "rgba(30, 64, 175, 0.9)", color: "#fff", border: "1px solid rgba(37, 99, 235, 0.3)", backdropFilter: "blur(3px)" }, duration: 2000 }); }
     }, [aiResponseInputRefPassed, setHookParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues]);
 
     const handleSelectFunction = useCallback(() => {
-        // ... (Select Function logic - no changes needed) ...
         const textArea = aiResponseInputRefPassed.current; if (!textArea) return; const textContent = textArea.value; const cursorPos = textArea.selectionStart || 0; const lineStartIndex = textContent.lastIndexOf('\n', cursorPos - 1) + 1; const [startPos, endPos] = selectFunctionDefinition(textContent, lineStartIndex); if (startPos !== -1 && endPos !== -1) { textArea.focus(); textArea.setSelectionRange(startPos, endPos); toast.success("Функция выделена!"); } else { let searchUpIndex = textContent.lastIndexOf('{', lineStartIndex); if (searchUpIndex > 0) { const [upStartPos, upEndPos] = selectFunctionDefinition(textContent, searchUpIndex); if (upStartPos !== -1 && upEndPos !== -1) { textArea.focus(); textArea.setSelectionRange(upStartPos, upEndPos); toast.success("Функция найдена выше!"); return; } } toast.info("Не удалось выделить функцию."); textArea.focus(); }
     }, [aiResponseInputRefPassed]);
 
@@ -209,10 +204,10 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         toast.info("Выделение снято.");
     }, [setSelectedAssistantFiles]);
 
-    const handleSaveFiles = useCallback(async () => { /* ... (Save files logic - no changes needed) ... */ if (!user) return; const filesToSave = componentParsedFiles.filter(f => selectedFileIds.has(f.id)); if (filesToSave.length === 0) return; setIsProcessingPR(true); try { const fileData = filesToSave.map(f => ({ p: f.path, c: f.content, e: f.extension })); const { data: existingData, error: fetchError } = await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id).single(); if (fetchError && fetchError.code !== 'PGRST116') throw fetchError; const existingFiles = existingData?.metadata?.generated_files || []; const newPaths = new Set(fileData.map(f => f.p)); const mergedFiles = [ ...existingFiles.filter((f: any) => !newPaths.has(f.path)), ...fileData.map(f => ({ path: f.p, code: f.c, extension: f.e })) ]; const { error: upsertError } = await supabaseAdmin.from("users").upsert({ user_id: user.id, metadata: { ...(existingData?.metadata || {}), generated_files: mergedFiles } }, { onConflict: 'user_id' }); if (upsertError) throw upsertError; toast.success(`${filesToSave.length} файлов сохранено в вашем профиле!`); } catch (err) { toast.error("Ошибка сохранения файлов."); logger.error("Save files error:", err); } finally { setIsProcessingPR(false); } }, [user, componentParsedFiles, selectedFileIds]);
-    const handleDownloadZip = useCallback(async () => { /* ... (Download Zip logic - no changes needed) ... */ const filesToZip = componentParsedFiles.filter(f => selectedFileIds.has(f.id)); if (filesToZip.length === 0) return; setIsProcessingPR(true); try { const JSZip = (await import("jszip")).default; const zip = new JSZip(); filesToZip.forEach((f) => zip.file(f.path.startsWith('/') ? f.path.substring(1) : f.path, f.content)); const blob = await zip.generateAsync({ type: "blob" }); saveAs(blob, `ai_files_${Date.now()}.zip`); toast.success("Архив скачан."); } catch (error) { toast.error("Ошибка создания ZIP."); logger.error("ZIP download error:", error); } finally { setIsProcessingPR(false); } }, [componentParsedFiles, selectedFileIds]);
-    const handleSendToTelegram = useCallback(async (file: FileEntry) => { /* ... (Send to TG logic - no changes needed) ... */ if (!user?.id) return; setIsProcessingPR(true); try { const result = await sendTelegramDocument(String(user.id), file.content, file.path.split("/").pop() || "file.txt"); if (!result.success) throw new Error(result.error ?? "TG Send Error"); toast.success(`"${file.path}" отправлен в ваш Telegram.`); } catch (err: any) { toast.error(`Ошибка отправки TG: ${err.message}`); logger.error("Send to TG error:", err); } finally { setIsProcessingPR(false); } }, [user]);
-    const handleAddCustomLink = useCallback(async () => { /* ... (Add custom link logic - no changes needed) ... */ const name = prompt("Название ссылки:"); if (!name) return; const url = prompt("URL (начиная с https://):"); if (!url || !url.startsWith('http')) { toast.error("Некорректный URL."); return; } const newLink = { name: name, url: url }; const updatedLinks = [...customLinks, newLink]; setCustomLinks(updatedLinks); if (user) { try { const { data: existingData } = await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id).single(); await supabaseAdmin.from("users").upsert({ user_id: user.id, metadata: { ...(existingData?.metadata || {}), customLinks: updatedLinks } }, { onConflict: 'user_id' }); toast.success(`Ссылка "${name}" добавлена.`); } catch (e) { toast.error("Ошибка сохранения ссылки."); logger.error("Save custom link error:", e); setCustomLinks(customLinks); } } }, [customLinks, user]);
+    const handleSaveFiles = useCallback(async () => { if (!user) return; const filesToSave = componentParsedFiles.filter(f => selectedFileIds.has(f.id)); if (filesToSave.length === 0) return; setIsProcessingPR(true); try { const fileData = filesToSave.map(f => ({ p: f.path, c: f.content, e: f.extension })); const { data: existingData, error: fetchError } = await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id).single(); if (fetchError && fetchError.code !== 'PGRST116') throw fetchError; const existingFiles = existingData?.metadata?.generated_files || []; const newPaths = new Set(fileData.map(f => f.p)); const mergedFiles = [ ...existingFiles.filter((f: any) => !newPaths.has(f.path)), ...fileData.map(f => ({ path: f.p, code: f.c, extension: f.e })) ]; const { error: upsertError } = await supabaseAdmin.from("users").upsert({ user_id: user.id, metadata: { ...(existingData?.metadata || {}), generated_files: mergedFiles } }, { onConflict: 'user_id' }); if (upsertError) throw upsertError; toast.success(`${filesToSave.length} файлов сохранено в вашем профиле!`); } catch (err) { toast.error("Ошибка сохранения файлов."); logger.error("Save files error:", err); } finally { setIsProcessingPR(false); } }, [user, componentParsedFiles, selectedFileIds]);
+    const handleDownloadZip = useCallback(async () => { const filesToZip = componentParsedFiles.filter(f => selectedFileIds.has(f.id)); if (filesToZip.length === 0) return; setIsProcessingPR(true); try { const JSZip = (await import("jszip")).default; const zip = new JSZip(); filesToZip.forEach((f) => zip.file(f.path.startsWith('/') ? f.path.substring(1) : f.path, f.content)); const blob = await zip.generateAsync({ type: "blob" }); saveAs(blob, `ai_files_${Date.now()}.zip`); toast.success("Архив скачан."); } catch (error) { toast.error("Ошибка создания ZIP."); logger.error("ZIP download error:", error); } finally { setIsProcessingPR(false); } }, [componentParsedFiles, selectedFileIds]);
+    const handleSendToTelegram = useCallback(async (file: FileEntry) => { if (!user?.id) return; setIsProcessingPR(true); try { const result = await sendTelegramDocument(String(user.id), file.content, file.path.split("/").pop() || "file.txt"); if (!result.success) throw new Error(result.error ?? "TG Send Error"); toast.success(`"${file.path}" отправлен в ваш Telegram.`); } catch (err: any) { toast.error(`Ошибка отправки TG: ${err.message}`); logger.error("Send to TG error:", err); } finally { setIsProcessingPR(false); } }, [user]);
+    const handleAddCustomLink = useCallback(async () => { const name = prompt("Название ссылки:"); if (!name) return; const url = prompt("URL (начиная с https://):"); if (!url || !url.startsWith('http')) { toast.error("Некорректный URL."); return; } const newLink = { name: name, url: url }; const updatedLinks = [...customLinks, newLink]; setCustomLinks(updatedLinks); if (user) { try { const { data: existingData } = await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id).single(); await supabaseAdmin.from("users").upsert({ user_id: user.id, metadata: { ...(existingData?.metadata || {}), customLinks: updatedLinks } }, { onConflict: 'user_id' }); toast.success(`Ссылка "${name}" добавлена.`); } catch (e) { toast.error("Ошибка сохранения ссылки."); logger.error("Save custom link error:", e); setCustomLinks(customLinks); } } }, [customLinks, user]);
 
 
     // --- Combined PR/Update Handler (For Regular AI Flow) ---
@@ -267,7 +262,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                     prToUpdate?.number, finalDescription // Pass PR number and body
                 );
                  if (updateResult.success) {
-                     await triggerGetOpenPRs(repoUrl); // Refresh PR list on success
+                     // Refresh handled by triggerUpdateBranch internally now
+                     // await triggerGetOpenPRs(repoUrl);
                  } // Errors handled within triggerUpdateBranch
             } else {
                 toast.info(`Создание нового PR...`);
@@ -299,27 +295,30 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         setIsProcessingPR(true); // Indicate local PR activity
 
         try {
+            // Use allFetchedFiles from context, which should be populated by setFilesFetched
             const targetFile = allFetchedFiles.find(f => f.path === task.targetPath);
             if (!targetFile) {
                 throw new Error(`Целевой файл "${task.targetPath}" не найден среди загруженных.`);
             }
 
             let currentContent = targetFile.content;
+            // Use case-insensitive replace for URLs if needed, but usually exact match is safer
             if (!currentContent.includes(task.oldUrl)) {
                 toast.warn(`Старый URL картинки (${task.oldUrl.substring(0,30)}...) не найден в файле ${task.targetPath}. Изменений не будет.`);
                 // Clear task and reset loading as the operation is effectively finished/aborted
-                setImageReplaceTask(null);
-                setAssistantLoading(false);
-                setIsProcessingPR(false);
+                setImageReplaceTask(null); // Use context setter
+                setAssistantLoading(false); // Use context setter
+                setIsProcessingPR(false); // Reset local state
                 return;
             }
+            // Use replaceAll for safety, although URLs are usually unique
             const modifiedContent = currentContent.replaceAll(task.oldUrl, task.newUrl);
             if (modifiedContent === currentContent) {
                 toast.info(`Контент файла ${task.targetPath} не изменился после замены (возможно, URL уже обновлен).`);
                  // Clear task and reset loading
-                 setImageReplaceTask(null);
-                 setAssistantLoading(false);
-                 setIsProcessingPR(false);
+                 setImageReplaceTask(null); // Use context setter
+                 setAssistantLoading(false); // Use context setter
+                 setIsProcessingPR(false); // Reset local state
                  return;
             }
 
@@ -357,7 +356,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                     existingPrNumber, prDescription // Pass PR number and body
                 );
                  if (result.success) {
-                     await triggerGetOpenPRs(repoUrl); // Refresh PR list
+                    // Refresh handled internally by triggerUpdateBranch now
+                    // await triggerGetOpenPRs(repoUrl);
                  } // Errors handled within triggerUpdateBranch
             } else {
                 logger.log(`Creating new PR for image replace.`);
@@ -389,7 +389,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     // --- Response Setting and URL Update Callbacks ---
     const setResponseValue = useCallback((value: string) => {
-        logger.log("AICodeAssistant: setResponseValue called.");
+        // logger.log("AICodeAssistant: setResponseValue called.");
         setResponse(value);
         if (aiResponseInputRefPassed.current) {
             aiResponseInputRefPassed.current.value = value;
@@ -416,7 +416,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         handleCreatePR: handleCreateOrUpdatePR, // Expose the combined handler
         setResponseValue,
         updateRepoUrl,
-        handleDirectImageReplace,
+        handleDirectImageReplace, // Expose the image replacement handler
     }), [handleParse, handleSelectAllFiles, handleCreateOrUpdatePR, setResponseValue, updateRepoUrl, handleDirectImageReplace]);
 
     // --- RENDER ---
@@ -427,7 +427,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     // Determine button text/icon based on target branch
     const prButtonText = targetBranchName ? `Обновить Ветку (${targetBranchName.substring(0, 15)}...)` : "Создать PR";
     const prButtonIcon = targetBranchName ? <FaCodeBranch /> : <FaGithub />;
-    const prButtonLoadingIcon = isProcessingPR || assistantLoading ? <FaArrowsRotate className="animate-spin"/> : prButtonIcon; // Show loading if EITHER local PR or general assistant loading is true
+    // Show loading if EITHER local PR processing OR general assistant loading is true
+    const prButtonLoadingIcon = isProcessingPR || assistantLoading ? <FaArrowsRotate className="animate-spin"/> : prButtonIcon;
     const assistantTooltipText = `Вставьте ответ AI ИЛИ используйте кнопку 'Спросить AI'. Затем '➡️' → Проверьте/Исправьте → Выберите файлы → ${prButtonText}`;
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
 
@@ -589,23 +590,25 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             {/* IMAGE REPLACE UI */}
             {isMounted && showImageReplaceUI && (
                  <div className="flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed border-blue-400 min-h-[200px]">
-                     {assistantLoading || isProcessingPR ? (
+                     {/* Show spinner if assistant is creating/updating PR OR if AI action loading (less likely here) */}
+                     {assistantLoading || isProcessingPR || aiActionLoading ? (
                         <FaArrowsRotate className="text-blue-400 text-4xl mb-4 animate-spin" />
                      ) : (
-                         <FaImages className="text-blue-400 text-4xl mb-4" /> // Or maybe FaCheck if done?
+                         <FaImages className="text-blue-400 text-4xl mb-4" /> // Or maybe FaCheck if needed based on a final success state?
                      )}
                      <p className="text-lg font-semibold text-blue-300">
-                         {assistantLoading || isProcessingPR ? "Заменяю картинку и обновляю ветку/PR..." : "Задача Замены Картинки"}
+                         {assistantLoading || isProcessingPR || aiActionLoading ? "Заменяю картинку и обновляю ветку/PR..." : "Задача Замены Картинки"}
                      </p>
                      <p className="text-sm text-gray-400 mt-2">
-                          {assistantLoading || isProcessingPR ? "Идет процесс..." : "Процесс завершен или ожидает запуска."}
+                          {assistantLoading || isProcessingPR || aiActionLoading ? "Идет процесс..." : "Процесс завершен или ожидает запуска."}
                      </p>
+                     {/* Display task details */}
                      {imageReplaceTask && (
-                         <p className="text-xs text-gray-500 mt-3 break-all">
-                             Файл: {imageReplaceTask.targetPath}<br/>
-                             Старый URL: {imageReplaceTask.oldUrl.substring(0,50)}...<br/>
-                             Новый URL: {imageReplaceTask.newUrl.substring(0,50)}...
-                         </p>
+                         <div className="mt-3 text-xs text-gray-500 break-all text-left bg-gray-900/50 p-2 rounded max-w-full overflow-x-auto">
+                             <p><span className="font-semibold text-gray-400">Файл:</span> {imageReplaceTask.targetPath}</p>
+                             <p><span className="font-semibold text-gray-400">Старый URL:</span> {imageReplaceTask.oldUrl}</p>
+                             <p><span className="font-semibold text-gray-400">Новый URL:</span> {imageReplaceTask.newUrl}</p>
+                         </div>
                      )}
                  </div>
             )}
