@@ -61,136 +61,126 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
 
   // === Параметры URL и производное состояние ===
    const searchParams = useSearchParams(); // Хук для доступа к параметрам URL
-   // Путь, подсвечиваемый из URL (?path=...)
    const highlightedPathFromUrl = useMemo(() => searchParams.get("path") || "", [searchParams]);
-   // Идея, передаваемая из URL (?idea=...)
    const ideaFromUrl = useMemo(() => searchParams.get("idea") ? decodeURIComponent(searchParams.get("idea")!) : "", [searchParams]);
-   // Флаг для автоматического запуска извлечения при наличии параметров URL или задачи замены картинки
    const autoFetch = useMemo(() => !!highlightedPathFromUrl || !!imageReplaceTask, [highlightedPathFromUrl, imageReplaceTask]);
-   // Идея по умолчанию для поля запроса
    const DEFAULT_TASK_IDEA = "Проанализируй код. Опиши функции, предложи улучшения.";
-   // Список важных файлов для автоматического выбора
    const importantFiles = useMemo(() => [ "contexts/AppContext.tsx", "hooks/useTelegram.ts", "app/layout.tsx", "hooks/supabase.ts", "app/actions.ts", "app/ai_actions/actions.ts", "app/webhook-handlers/proxy.ts", "package.json", "tailwind.config.ts" ], []);
 
   // === Рефы (Ссылки на DOM-элементы и значения) ===
-  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null); // Ref для интервала симуляции прогресса
-  const localKworkInputRef = useRef<HTMLTextAreaElement | null>(null); // Ref для поля ввода запроса
-  const selectionUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref для таймаута обновления выбора файлов (оптимизация)
-  const prevSelectedFilesRef = useRef<Set<string>>(new Set()); // Ref для хранения предыдущего набора выбранных файлов (для авто-добавления зависимостей)
-  const isImageTaskFetchInitiated = useRef(false); // Флаг: инициирована ли загрузка для задачи замены картинки
-  const isAutoFetchingRef = useRef(false); // <<<--- ДОБАВЛЕН Ref-страж для предотвращения многократного авто-запуска
-  const fetchStatusRef = useRef(fetchStatus); // Ref для чтения актуального fetchStatus внутри setInterval симуляции прогресса
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const localKworkInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const selectionUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const prevSelectedFilesRef = useRef<Set<string>>(new Set());
+  const isImageTaskFetchInitiated = useRef(false);
+  const isAutoFetchingRef = useRef(false); // Ref-страж для предотвращения многократного авто-запуска
+  const fetchStatusRef = useRef(fetchStatus); // Ref для чтения актуального fetchStatus внутри setInterval
 
   // Связываем локальный ref поля ввода с ref из контекста
   useEffect(() => { if (kworkInputRef) kworkInputRef.current = localKworkInputRef.current; }, [kworkInputRef]);
 
-  // === Утилиты ===
+  // === Утилиты и Колбэки (определяем ДО их использования в других колбэках) ===
+
   // Показ уведомлений (toast)
   const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => { let s={background:"rgba(50,50,50,0.9)",color:"#E1FF01",border:"1px solid rgba(225,255,1,0.2)",backdropFilter:"blur(3px)"}; if(type==='success')s={background:"rgba(22,163,74,0.9)",color:"#fff",border:"1px solid rgba(34,197,94,0.3)",backdropFilter:"blur(3px)"}; else if(type==='error')s={background:"rgba(220,38,38,0.9)",color:"#fff",border:"1px solid rgba(239,68,68,0.3)",backdropFilter:"blur(3px)"}; else if(type==='warning')s={background:"rgba(217,119,6,0.9)",color:"#fff",border:"1px solid rgba(245,158,11,0.3)",backdropFilter:"blur(3px)"}; toast(message,{style:s,duration:type==='error'?5000:(type==='warning'?4000:3000)}); }, []);
-  // Получение пути к файлу страницы Next.js по относительному пути из URL
-  const getPageFilePath = useCallback((rP:string, aP:string[]):string|null=>{const cP=rP.startsWith('/')?rP.substring(1):rP; if(!cP||cP==='app'||cP==='/'){ const rPs=['app/page.tsx','app/page.js','src/app/page.tsx','src/app/page.js']; for(const rp of rPs) if(aP.includes(rp)) return rp; return null; } const pwa=cP.startsWith('app/')?cP:cP.startsWith('src/app/')?cP:`app/${cP}`; if(aP.includes(pwa)) return pwa; const pDP=[`${pwa}/page.tsx`,`${pwa}/page.js`,`${pwa}/index.tsx`,`${pwa}/index.js`]; for(const p of pDP) if(aP.includes(p)) return p; const iS=pwa.split('/'); const nIS=iS.length; const pF=aP.filter(p=>(p.startsWith('app/')||p.startsWith('src/app/'))&&(p.endsWith('/page.tsx')||p.endsWith('/page.js')||p.endsWith('/index.tsx')||p.endsWith('/index.js'))); for(const acP of pF){ const sfx=['/page.tsx','/page.js','/index.tsx','/index.js'].find(s=>acP.endsWith(s)); if(!sfx) continue; const aPB=acP.substring(0,acP.length-sfx.length); const aS=aPB.split('/'); if(aS.length!==nIS) continue; let iDM=true; for(let i=0;i<nIS;i++){ const iSeg=iS[i]; const aSeg=aS[i]; if(iSeg===aSeg) continue; else if(aSeg.startsWith('[')&&aSeg.endsWith(']')) continue; else { iDM=false; break; }} if(iDM) return acP; } return null; }, []);
-  // Извлечение путей импортов из содержимого файла
-  const extractImports = useCallback((c:string):string[]=>{const r1=/import(?:["'\s]*(?:[\w*{}\n\r\t, ]+)from\s*)?["']((?:@[/\w.-]+)|(?:[./]+[\w./-]+))["']/g; const r2=/require\s*\(\s*["']((?:@[/\w.-]+)|(?:[./]+[\w./-]+))["']\s*\)/g; const i=new Set<string>(); let m; while((m=r1.exec(c))!==null)if(m[1]&&m[1]!=='.')i.add(m[1]); while((m=r2.exec(c))!==null)if(m[1]&&m[1]!=='.')i.add(m[1]); return Array.from(i);}, []);
-  // Разрешение абсолютного пути импорта относительно текущего файла
-  const resolveImportPath = useCallback((iP:string, cFP:string, aFN:FileNode[]):string|null=>{const aP=aFN.map(f=>f.path); const sE=['.ts','.tsx','.js','.jsx','.css','.scss','.sql','.md']; const tryP=(bP:string):string|null=>{const pTT:string[]=[]; const hEE=/\.\w+$/.test(bP); if(hEE)pTT.push(bP); else{sE.forEach(e=>pTT.push(bP+e)); sE.forEach(e=>pTT.push(`${bP}/index${e}`));} for(const p of pTT)if(aP.includes(p))return p; return null;}; if(iP.startsWith('@/')){const pSB=['src/','app/','']; const pS=iP.substring(2); for(const b of pSB){const r=tryP(b+pS); if(r)return r;} const cAR=['components/','lib/','utils/','hooks/','contexts/','styles/']; for(const rt of cAR)if(pS.startsWith(rt)){const r=tryP(pS); if(r)return r;}}else if(iP.startsWith('.')){const cD=cFP.includes('/')?cFP.substring(0,cFP.lastIndexOf('/')):''; const pP=(cD?cD+'/'+iP:iP).split('/'); const rP:string[]=[]; for(const pt of pP){if(pt==='.'||pt==='')continue; if(pt==='..'){if(rP.length>0)rP.pop();}else rP.push(pt);} const rRB=rP.join('/'); const r=tryP(rRB); if(r)return r;}else{const sB=['lib/','utils/','components/','hooks/','contexts/','styles/','src/lib/','src/utils/','src/components/','src/hooks/','src/contexts/','src/styles/']; for(const b of sB){const r=tryP(b+iP); if(r)return r;}} return null;}, []);
+  // Обновление значения поля ввода запроса
+  const updateKworkInput = useCallback((value: string) => { if (localKworkInputRef.current) { localKworkInputRef.current.value = value; const event = new Event('input', { bubbles: true }); localKworkInputRef.current.dispatchEvent(event); setKworkInputHasContent(value.trim().length > 0); } else { console.warn("localKworkInputRef is null"); } }, [setKworkInputHasContent]);
+  // Получение текущего значения поля ввода запроса
+  const getKworkInputValue = useCallback((): string => localKworkInputRef.current?.value || "", []);
+  // Прокрутка к элементу
+  const scrollToSection = useCallback((id: 'kworkInput' | 'aiResponseInput' | 'prSection' | 'fetcher' | 'assistant' | 'executor' | 'settingsModalTrigger' | 'settings-modal-trigger-assistant') => {
+      // Реализация scrollToSection из контекста RepoXmlPageContext
+      let element: HTMLElement | null = null;
+      const targetId = (id === 'assistant' || id === 'executor') ? 'executor' : (id === 'fetcher' ? 'extractor' : (id === 'settingsModalTrigger' ? 'settings-modal-trigger-assistant' : id));
+      switch (targetId) {
+          case 'kworkInput': element = localKworkInputRef.current; break; // Используем локальный ref
+          case 'aiResponseInput': /* Допустим, aiResponseInputRef есть в контексте */ break;
+          case 'prSection': /* Допустим, prSectionRef есть в контексте */ break;
+          case 'extractor': element = document.getElementById('extractor'); break;
+          case 'executor': element = document.getElementById('executor'); break;
+          case 'settings-modal-trigger-assistant': element = document.getElementById('settings-modal-trigger-assistant'); break;
+      }
+      if (element) {
+          const behavior = 'smooth';
+          if (['kworkInput', 'aiResponseInput'].includes(targetId)) {
+               element.scrollIntoView({ behavior, block: 'center' });
+               setTimeout(() => (element as HTMLTextAreaElement)?.focus(), 350);
+          } else if (targetId === 'prSection') {
+               element.scrollIntoView({ behavior, block: 'nearest' });
+          } else {
+               const headerOffset = 80;
+               const elementRect = element.getBoundingClientRect();
+               const elementTop = elementRect.top + window.scrollY;
+               window.scrollTo({ top: elementTop - headerOffset, behavior });
+          }
+      } else { console.warn(`scrollToSection: Элемент с ID "${targetId}" (из "${id}") не найден.`); }
+  }, []); // Убираем зависимости от рефов контекста, если они не используются напрямую здесь
 
-  // --- Симуляция прогресс-бара ---
-  // Остановка симуляции
+  // Добавление выбранных файлов в поле запроса
+  const handleAddSelected = useCallback(async (filesToAddParam?: Set<string>, allFilesParam?: FileNode[]) => { const fTP=allFilesParam||files; const fTA=filesToAddParam||selectedFiles; if(fTP.length===0&&fTA.size>0){addToast("Файлы не загружены.",'error');return;} if(fTA.size===0){addToast("Выберите файлы.",'warning');return;} const pfx="Контекст кода для анализа:\n"; const mdTxt=fTP.filter(f=>fTA.has(f.path)).sort((a,b)=>a.path.localeCompare(b.path)).map(f=>{const pC=`// /${f.path}`; const cAHC=f.content.trimStart().startsWith(pC); const cTA=cAHC?f.content:`${pC}\n${f.content}`; return `\`\`\`${getLanguage(f.path)}\n${cTA}\n\`\`\``}).join("\n\n"); const cKV=getKworkInputValue(); const ctxRgx=/Контекст кода для анализа:[\s\S]*/; const tT=cKV.replace(ctxRgx,'').trim(); const nC=`${tT?tT+'\n\n':''}${pfx}${mdTxt}`; updateKworkInput(nC); addToast(`${fTA.size} файлов добавлено`, 'success'); scrollToSection('kworkInput'); }, [files, selectedFiles, addToast, getKworkInputValue, updateKworkInput, scrollToSection]); // Зависимости: files, selectedFiles и другие колбэки
+
+  // Остановка симуляции прогресса
   const stopProgressSimulation = useCallback(() => {
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
       progressIntervalRef.current = null;
   }, []);
 
-  // Запуск симуляции прогресс-бара (линейно за 13 секунд)
+  // Запуск симуляции прогресс-бара
   const startProgressSimulation = useCallback((estimatedDurationSeconds = 13) => {
-      stopProgressSimulation(); // Остановить предыдущую симуляцию, если была
-      setProgress(0); // Сбросить прогресс
-      setError(null); // Сбросить ошибку при новом запуске
-
+      stopProgressSimulation();
+      setProgress(0);
+      setError(null);
       const startTime = Date.now();
       const totalDurationMs = estimatedDurationSeconds * 1000;
-      const intervalTime = 100; // Интервал обновления (10 раз в секунду)
-
+      const intervalTime = 100;
       console.log(`[ProgressSim] Запуск симуляции на ${estimatedDurationSeconds} сек.`);
-
       progressIntervalRef.current = setInterval(() => {
           const elapsedTime = Date.now() - startTime;
           const calculatedProgress = Math.min((elapsedTime / totalDurationMs) * 100, 100);
-
-          setProgress(calculatedProgress); // Обновляем состояние прогресса
-
-          // Проверяем статус через ref, чтобы не добавлять fetchStatus в зависимости интервала
+          setProgress(calculatedProgress);
           const currentFetchStatus = fetchStatusRef.current;
-          // Останавливаем интервал, если загрузка завершилась (успех/ошибка) ИЛИ время вышло
           if (currentFetchStatus === 'success' || currentFetchStatus === 'error' || currentFetchStatus === 'failed_retries') {
               console.log(`[ProgressSim] Статус (${currentFetchStatus}) изменился, остановка симуляции.`);
               stopProgressSimulation();
-              setProgress(currentFetchStatus === 'success' ? 100 : 0); // Установить финальный прогресс
+              setProgress(currentFetchStatus === 'success' ? 100 : 0);
           } else if (elapsedTime >= totalDurationMs) {
               console.log(`[ProgressSim] Время симуляции (${estimatedDurationSeconds} сек) истекло.`);
               stopProgressSimulation();
-               // Если загрузка все еще идет по истечении времени, ставим почти 100%
               if (currentFetchStatus === 'loading' || currentFetchStatus === 'retrying') {
-                  setProgress(98); // Показываем, что почти готово, но время вышло
+                  setProgress(98);
                   console.warn("[ProgressSim] Симуляция завершилась по таймауту во время загрузки.");
-              } else {
-                 // Этого не должно произойти, если статус обновляется корректно, но на всякий случай
-                 setProgress(100);
-              }
+              } else { setProgress(100); }
           }
       }, intervalTime);
-
-  }, [stopProgressSimulation]); // Зависимость только от stopProgressSimulation
+  }, [stopProgressSimulation]); // Зависит только от stopProgressSimulation
 
   // Обновляем fetchStatusRef при изменении fetchStatus из контекста
-  useEffect(() => {
-      fetchStatusRef.current = fetchStatus;
-  }, [fetchStatus]);
-  // --- Конец логики симуляции прогресс-бара ---
+  useEffect(() => { fetchStatusRef.current = fetchStatus; }, [fetchStatus]);
 
-  // === Основные колбэки ===
-  // Обработка изменения URL репозитория
-  const handleRepoUrlChange = useCallback((url: string) => { setRepoUrlState(url); setRepoUrlEntered(url.trim().length > 0); updateRepoUrlInAssistant(url); setOpenPrs([]); setTargetBranchName(null); setManualBranchName(""); }, [setRepoUrlEntered, updateRepoUrlInAssistant, setOpenPrs, setTargetBranchName, setManualBranchName]);
-  // Обновление значения поля ввода запроса
-  const updateKworkInput = useCallback((value: string) => { if (localKworkInputRef.current) { localKworkInputRef.current.value = value; const event = new Event('input', { bubbles: true }); localKworkInputRef.current.dispatchEvent(event); setKworkInputHasContent(value.trim().length > 0); } else { console.warn("localKworkInputRef is null"); } }, [setKworkInputHasContent]);
-  // Получение текущего значения поля ввода запроса
-  const getKworkInputValue = useCallback((): string => localKworkInputRef.current?.value || "", []);
-  // Добавление выбранных файлов в поле запроса
-  const handleAddSelected = useCallback(async (filesToAddParam?: Set<string>, allFilesParam?: FileNode[]) => { const fTP=allFilesParam||files; const fTA=filesToAddParam||selectedFiles; if(fTP.length===0&&fTA.size>0){addToast("Файлы не загружены.",'error');return;} if(fTA.size===0){addToast("Выберите файлы.",'warning');return;} const pfx="Контекст кода для анализа:\n"; const mdTxt=fTP.filter(f=>fTA.has(f.path)).sort((a,b)=>a.path.localeCompare(b.path)).map(f=>{const pC=`// /${f.path}`; const cAHC=f.content.trimStart().startsWith(pC); const cTA=cAHC?f.content:`${pC}\n${f.content}`; return `\`\`\`${getLanguage(f.path)}\n${cTA}\n\`\`\``}).join("\n\n"); const cKV=getKworkInputValue(); const ctxRgx=/Контекст кода для анализа:[\s\S]*/; const tT=cKV.replace(ctxRgx,'').trim(); const nC=`${tT?tT+'\n\n':''}${pfx}${mdTxt}`; updateKworkInput(nC); addToast(`${fTA.size} файлов добавлено`, 'success'); scrollToSection('kworkInput'); }, [files, selectedFiles, addToast, getKworkInputValue, updateKworkInput, scrollToSection]);
-  // Копирование текста в буфер обмена
-  const handleCopyToClipboard = useCallback((textToCopy?: string, shouldScroll = true): boolean => { const c=textToCopy??getKworkInputValue(); if(!c.trim()){addToast("Нет текста",'warning');return false;} try{navigator.clipboard.writeText(c); addToast("Скопировано!",'success');setRequestCopied(true); if(shouldScroll)scrollToSection('executor');return true;}catch(e){console.error("Ошибка копирования:",e);addToast("Ошибка копирования",'error');return false;} }, [getKworkInputValue, scrollToSection, addToast, setRequestCopied]);
-  // Очистка состояния компонента
-  const handleClearAll = useCallback(() => { console.log("Очистка состояния Fetcher."); setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set()); updateKworkInput(""); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set()); setRequestCopied(false); addToast("Очищено ✨", 'success'); if (localKworkInputRef.current) localKworkInputRef.current.focus(); }, [ setSelectedFetcherFiles, updateKworkInput, addToast, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setRequestCopied ]);
-
-  // --- Основная функция извлечения файлов ---
+  // === Основная функция извлечения файлов (handleFetch) ===
+  // Определяем ее ПОСЛЕ всех колбэков, от которых она зависит
   const handleFetch = useCallback(async (isManualRetry = false, branchNameToFetch?: string | null) => {
       const effectiveBranch = branchNameToFetch || targetBranchName || manualBranchName || 'default';
       console.log(`Fetcher: Старт извлечения. Повтор: ${isManualRetry}, Ветка: ${effectiveBranch}, Статус: ${fetchStatusRef.current}, Задача: ${!!imageReplaceTask}, ИнициацияЗадачи: ${isImageTaskFetchInitiated.current}`);
 
-      // Предотвращение повторного запуска для задачи замены картинки
-      if (imageReplaceTask && isImageTaskFetchInitiated.current && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying')) {
-          console.warn("Fetcher: Загрузка для задачи картинки уже идет. Отмена дубликата."); return;
-      }
-      // Проверки перед запуском
+      if (imageReplaceTask && isImageTaskFetchInitiated.current && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying')) { console.warn("Fetcher: Загрузка для задачи картинки уже идет. Отмена дубликата."); return; }
       if (!repoUrl.trim()) { console.error("Fetcher: URL пуст."); addToast("Введите URL", 'error'); setError("URL пуст."); triggerToggleSettingsModal(); return; }
       if ((fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying') && !isManualRetry) { console.warn("Fetcher: Уже идет загрузка."); addToast("Уже идет...", "info"); return; }
       if (assistantLoading || isParsing || aiActionLoading) { console.warn(`Fetcher: Заблокировано состоянием (assistantLoading: ${assistantLoading}, isParsing: ${isParsing}, aiActionLoading: ${aiActionLoading}).`); addToast("Подождите.", "warning"); return; }
 
       console.log("Fetcher: Запускаем процесс.");
-      setFetchStatus('loading'); // Устанавливаем статус СНАЧАЛА
-      // Сброс предыдущих результатов и ошибок
+      setFetchStatus('loading');
       setError(null); setFiles([]); setSelectedFilesState(new Set()); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setAllFetchedFiles([]); setSelectedFetcherFiles(new Set()); setFilesFetched(false, [], null, []); setRequestCopied(false); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set());
-      // Специальная логика для задачи картинки и инициализации поля запроса
       if (imageReplaceTask) { isImageTaskFetchInitiated.current = true; updateKworkInput(""); }
       else if (!highlightedPathFromUrl && localKworkInputRef.current) { updateKworkInput(ideaFromUrl || DEFAULT_TASK_IDEA); }
 
       addToast(`Запрос (${effectiveBranch})...`, 'info');
-      startProgressSimulation(13); // <<<--- ЗАПУСК СИМУЛЯЦИИ ПРОГРЕССА
+      startProgressSimulation(13); // <<<--- ЗАПУСК СИМУЛЯЦИИ
       console.log("Fetcher: Симуляция запущена.");
 
       let result: Awaited<ReturnType<typeof fetchRepoContents>> | null = null;
       let success = false;
-      let finalStatus: FetchStatus = 'error'; // По умолчанию - ошибка
+      let finalStatus: FetchStatus = 'error';
 
       try {
           console.log(`Fetcher: Вызов server action для ветки: ${effectiveBranch}`);
@@ -201,83 +191,38 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                success = true; const fetchedFiles = result.files;
                finalStatus = 'success'; // Предварительный успех
 
-               // Логика после успешного извлечения (обработка файлов, подсветка, проверка задачи картинки)
                const allPaths=fetchedFiles.map(f=>f.path); let primaryHPath:string|null=null; const catSecPaths:Record<ImportCategory,Set<string>>={component:new Set(),context:new Set(),hook:new Set(),lib:new Set(),other:new Set()}; let filesToSel=new Set<string>();
-               if(imageReplaceTask){ // Проверка для задачи замены картинки
+               if(imageReplaceTask){
                    primaryHPath=imageReplaceTask.targetPath;
-                   if(!allPaths.includes(primaryHPath)){ // Если нужный файл не найден
-                       const imgErr=`Файл (${primaryHPath}) не найден в '${effectiveBranch}'.`;
-                       console.error(`Fetcher: ${imgErr}`); setError(imgErr); addToast(imgErr,'error');
-                       setFilesFetched(true,fetchedFiles,null,[]); // Сообщаем контексту, что файлы загружены (но с ошибкой)
-                       finalStatus='error'; success=false; // Переопределяем статус на ошибку
-                   } else { filesToSel.add(primaryHPath); console.log(`Fetcher: Авто-выбор цели для замены картинки: ${primaryHPath}`); }
+                   if(!allPaths.includes(primaryHPath)){ const imgErr=`Файл (${primaryHPath}) не найден в '${effectiveBranch}'.`; console.error(`Fetcher: ${imgErr}`); setError(imgErr); addToast(imgErr,'error'); setFilesFetched(true,fetchedFiles,null,[]); finalStatus='error'; success=false; }
+                   else { filesToSel.add(primaryHPath); console.log(`Fetcher: Авто-выбор цели для замены картинки: ${primaryHPath}`); }
                }
-               else if(highlightedPathFromUrl){ // Обработка подсветки из URL
-                   primaryHPath=getPageFilePath(highlightedPathFromUrl,allPaths);
-                   if(primaryHPath){
-                       const pF=fetchedFiles.find(f=>f.path===primaryHPath);
-                       if(pF){
-                           filesToSel.add(primaryHPath);
-                           const imps=extractImports(pF.content);
-                           for(const imp of imps){
-                               const rP=resolveImportPath(imp,pF.path,fetchedFiles);
-                               if(rP&&rP!==primaryHPath){
-                                   const cat=categorizeResolvedPath(rP);
-                                   catSecPaths[cat].add(rP);
-                                   if(cat!=='other')filesToSel.add(rP); // Добавляем в авто-выбор только не 'other' категории
-                               }
-                           }
-                       } else { primaryHPath=null; addToast(`Ошибка: Путь (${primaryHPath}) не найден.`, 'error'); }
-                   } else { addToast(`Файл страницы для URL (${highlightedPathFromUrl}) не найден.`, 'warning'); }
-               }
-               // Авто-выбор важных файлов (только если не задача замены картинки)
+               else if(highlightedPathFromUrl){ primaryHPath=getPageFilePath(highlightedPathFromUrl,allPaths); if(primaryHPath){ const pF=fetchedFiles.find(f=>f.path===primaryHPath); if(pF){ filesToSel.add(primaryHPath); const imps=extractImports(pF.content); for(const imp of imps){ const rP=resolveImportPath(imp,pF.path,fetchedFiles); if(rP&&rP!==primaryHPath){ const cat=categorizeResolvedPath(rP); catSecPaths[cat].add(rP); if(cat!=='other')filesToSel.add(rP); } } } else { primaryHPath=null; addToast(`Ошибка: Путь (${primaryHPath}) не найден.`, 'error'); } } else { addToast(`Файл страницы для URL (${highlightedPathFromUrl}) не найден.`, 'warning'); } }
                if(!imageReplaceTask){ importantFiles.forEach(p=>{if(allPaths.includes(p)&&!filesToSel.has(p)){filesToSel.add(p); console.log(`Fetcher: Авто-выбор важного файла: ${p}`);}}); }
 
-               // --- Продолжаем только если все еще успешно (особенно после проверки задачи картинки) ---
-               if(success){
-                   setPrimaryHighlightedPathState(primaryHPath);
-                   const finalSecPaths={component:Array.from(catSecPaths.component),context:Array.from(catSecPaths.context),hook:Array.from(catSecPaths.hook),lib:Array.from(catSecPaths.lib),other:Array.from(catSecPaths.other)};
-                   setSecondaryHighlightedPathsState(finalSecPaths);
-
-                   // Обновляем локальное состояние выбора и состояние в контексте, ЕСЛИ это не задача картинки
-                   if(!imageReplaceTask){
-                       setSelectedFilesState(filesToSel);
-                       setSelectedFetcherFiles(filesToSel);
-                   }
-                   // Обновляем состояние в контексте (это ТРИГГЕР для замены картинки, если она есть)
+               if(success){ // Продолжаем только если все еще успешно
+                   setPrimaryHighlightedPathState(primaryHPath); const finalSecPaths={component:Array.from(catSecPaths.component),context:Array.from(catSecPaths.context),hook:Array.from(catSecPaths.hook),lib:Array.from(catSecPaths.lib),other:Array.from(catSecPaths.other)}; setSecondaryHighlightedPathsState(finalSecPaths);
+                   if(!imageReplaceTask){ setSelectedFilesState(filesToSel); setSelectedFetcherFiles(filesToSel); }
                    setFilesFetched(true,fetchedFiles,primaryHPath,Object.values(finalSecPaths).flat());
                    console.log("[Fetcher] Вызван setFilesFetched.");
 
-                   // Обновления UI (тосты, скролл) - только если успех и НЕ задача картинки (у нее своя логика в контексте)
                    if (!imageReplaceTask) { addToast(`Извлечено ${fetchedFiles.length} файлов!`, 'success'); }
-                   setFiles(fetchedFiles); // Обновляем локальный стейт для отображения списка
-                   setAllFetchedFiles(fetchedFiles); // Обновляем стейт в контексте со всеми файлами
-                   if(isSettingsModalOpen) triggerToggleSettingsModal(); // Закрыть модалку настроек, если была открыта
+                   setFiles(fetchedFiles); setAllFetchedFiles(fetchedFiles); if(isSettingsModalOpen) triggerToggleSettingsModal();
 
-                   // Тосты и авто-действия для РАЗНЫХ сценариев (не для картинки)
                    if(imageReplaceTask && primaryHPath){ addToast(`Авто-выбран для замены: ${primaryHPath}`,'info'); }
-                   else if(highlightedPathFromUrl && ideaFromUrl && filesToSel.size > 0 && !imageReplaceTask){ /* Авто-добавление при переходе по URL с идеей */ const nS=catSecPaths.component.size+catSecPaths.context.size+catSecPaths.hook.size+catSecPaths.lib.size; const nI=filesToSel.size-(primaryHPath?1:0)-nS; let msg=`✅ Авто-выбор: `; const pts=[]; if(primaryHPath)pts.push(`1 стр`); if(nS>0)pts.push(`${nS} связ`); if(nI>0)pts.push(`${nI} важн`); msg+=pts.join(', ')+` (${filesToSel.size} всего). Идея добавлена.`; addToast(msg,'success'); updateKworkInput(ideaFromUrl||DEFAULT_TASK_IDEA); await handleAddSelected(filesToSel,fetchedFiles); setTimeout(()=>{addToast("💡 Добавь инструкции!", "info");}, 500); }
-                   else if(!imageReplaceTask){ /* Стандартный успех: тост об авто-выборе и скролл */ if(filesToSel.size>0){const nH=catSecPaths.component.size+catSecPaths.context.size+catSecPaths.hook.size+catSecPaths.lib.size; const nI=filesToSel.size-(primaryHPath?1:0)-nH; let msg=`Авто-выбраны: `; const pts=[]; if(primaryHPath)pts.push(`1 осн`); if(nH>0)pts.push(`${nH} связ`); if(nI>0)pts.push(`${nI} важн`); msg+=pts.join(', ')+'.'; addToast(msg,'info');} if(primaryHPath){setTimeout(()=>{const eId=`file-${primaryHPath}`; const el=document.getElementById(eId); if(el){el.scrollIntoView({behavior:"smooth",block:"center"}); el.classList.add('ring-2','ring-offset-1','ring-offset-gray-900','ring-cyan-400','rounded-md'); setTimeout(()=>el.classList.remove('ring-2','ring-offset-1','ring-offset-gray-900','ring-cyan-400','rounded-md'),2500);}},400);}else if(fetchedFiles.length>0){const el=document.getElementById('file-list-container'); el?.scrollIntoView({behavior:"smooth",block:"nearest"});} }
+                   else if(highlightedPathFromUrl && ideaFromUrl && filesToSel.size > 0 && !imageReplaceTask){ const nS=catSecPaths.component.size+catSecPaths.context.size+catSecPaths.hook.size+catSecPaths.lib.size; const nI=filesToSel.size-(primaryHPath?1:0)-nS; let msg=`✅ Авто-выбор: `; const pts=[]; if(primaryHPath)pts.push(`1 стр`); if(nS>0)pts.push(`${nS} связ`); if(nI>0)pts.push(`${nI} важн`); msg+=pts.join(', ')+` (${filesToSel.size} всего). Идея добавлена.`; addToast(msg,'success'); updateKworkInput(ideaFromUrl||DEFAULT_TASK_IDEA); await handleAddSelected(filesToSel,fetchedFiles); setTimeout(()=>{addToast("💡 Добавь инструкции!", "info");}, 500); }
+                   else if(!imageReplaceTask){ if(filesToSel.size>0){const nH=catSecPaths.component.size+catSecPaths.context.size+catSecPaths.hook.size+catSecPaths.lib.size; const nI=filesToSel.size-(primaryHPath?1:0)-nH; let msg=`Авто-выбраны: `; const pts=[]; if(primaryHPath)pts.push(`1 осн`); if(nH>0)pts.push(`${nH} связ`); if(nI>0)pts.push(`${nI} важн`); msg+=pts.join(', ')+'.'; addToast(msg,'info');} if(primaryHPath){setTimeout(()=>{const eId=`file-${primaryHPath}`; const el=document.getElementById(eId); if(el){el.scrollIntoView({behavior:"smooth",block:"center"}); el.classList.add('ring-2','ring-offset-1','ring-offset-gray-900','ring-cyan-400','rounded-md'); setTimeout(()=>el.classList.remove('ring-2','ring-offset-1','ring-offset-gray-900','ring-cyan-400','rounded-md'),2500);}},400);}else if(fetchedFiles.length>0){const el=document.getElementById('file-list-container'); el?.scrollIntoView({behavior:"smooth",block:"nearest"});}}
                } // Конец блока if(success)
-          } else { // Если result.success === false
-              console.error(`Fetcher: Server action НЕ УДАЛСЯ. Ошибка: ${result?.error}`);
-              throw new Error(result?.error || `Не удалось получить файлы из ${effectiveBranch}.`);
-          }
-      } catch (err: any) { // Обработка ошибок (из action или других)
-          console.error(`Fetcher: Ошибка в блоке catch handleFetch: ${err.message}`);
-          const displayError = err?.message || "Неизвестная ошибка";
-          setError(displayError); addToast(`Ошибка извлечения: ${displayError}`, 'error');
-          setFilesFetched(false, [], null, []); // Сигнал контексту о неудаче
-          success = false; finalStatus = 'error'; // Убеждаемся, что флаги установлены
-      } finally {
-           // --- КРИТИЧЕСКИ ВАЖНО: Остановить симуляцию и установить финальный статус/прогресс ---
+          } else { console.error(`Fetcher: Server action НЕ УДАЛСЯ. Ошибка: ${result?.error}`); throw new Error(result?.error || `Не удалось получить файлы из ${effectiveBranch}.`); }
+      } catch (err: any) { console.error(`Fetcher: Ошибка в блоке catch handleFetch: ${err.message}`); const displayError = err?.message || "Неизвестная ошибка"; setError(displayError); addToast(`Ошибка извлечения: ${displayError}`, 'error'); setFilesFetched(false, [], null, []); success = false; finalStatus = 'error'; }
+      finally {
            stopProgressSimulation(); // <<<--- ОСТАНОВКА СИМУЛЯЦИИ
            setProgress(success ? 100 : 0);
            setFetchStatus(finalStatus); // <<<--- УСТАНОВКА ФИНАЛЬНОГО СТАТУСА
-           if (imageReplaceTask) { isImageTaskFetchInitiated.current = false; } // Сброс флага задачи картинки
+           if (imageReplaceTask) { isImageTaskFetchInitiated.current = false; }
            console.log(`Fetcher: Завершено. Успех: ${success}, Финальный статус установлен: ${fetchStatusRef.current}`);
       }
-  }, [ // Зависимости useCallback для handleFetch
+  }, [ // Зависимости useCallback для handleFetch (все используемые переменные и функции)
         // Состояния и сеттеры
         repoUrl, token, imageReplaceTask, assistantLoading, isParsing, aiActionLoading, repoUrlEntered,
         setFetchStatus, setFiles, setSelectedFilesState, setProgress, setError, setAllFetchedFiles,
@@ -285,14 +230,23 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
         setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles,
         // Производные состояния и константы
         highlightedPathFromUrl, ideaFromUrl, importantFiles, DEFAULT_TASK_IDEA, manualBranchName, targetBranchName,
-        // Функции и рефы
-        addToast, startProgressSimulation, stopProgressSimulation, getLanguage, getPageFilePath, extractImports, resolveImportPath, categorizeResolvedPath, handleAddSelected,
-        getKworkInputValue, scrollToSection, setKworkInputHasContent, isSettingsModalOpen, triggerToggleSettingsModal,
-        updateKworkInput, triggerAskAi, localKworkInputRef
+        // Функции и рефы, определенные ВЫШЕ
+        addToast, startProgressSimulation, stopProgressSimulation, getKworkInputValue, updateKworkInput, scrollToSection, handleAddSelected,
+        // Функции из контекста и внешние
+        triggerToggleSettingsModal, triggerAskAi,
+        // Рефы
+        localKworkInputRef
     ]);
 
-  // --- Другие колбэки (обработчики UI) ---
-  // Выбрать подсвеченные файлы (основной + вторичные)
+
+  // --- Другие колбэки (определяем ДО handleFetch, если handleFetch от них зависит) ---
+  // Обработка изменения URL репозитория
+  const handleRepoUrlChange = useCallback((url: string) => { setRepoUrlState(url); setRepoUrlEntered(url.trim().length > 0); updateRepoUrlInAssistant(url); setOpenPrs([]); setTargetBranchName(null); setManualBranchName(""); }, [setRepoUrlEntered, updateRepoUrlInAssistant, setOpenPrs, setTargetBranchName, setManualBranchName]);
+  // Копирование текста в буфер обмена
+  const handleCopyToClipboard = useCallback((textToCopy?: string, shouldScroll = true): boolean => { const c=textToCopy??getKworkInputValue(); if(!c.trim()){addToast("Нет текста",'warning');return false;} try{navigator.clipboard.writeText(c); addToast("Скопировано!",'success');setRequestCopied(true); if(shouldScroll)scrollToSection('executor');return true;}catch(e){console.error("Ошибка копирования:",e);addToast("Ошибка копирования",'error');return false;} }, [getKworkInputValue, scrollToSection, addToast, setRequestCopied]); // Зависит от getKworkInputValue, scrollToSection, addToast
+  // Очистка состояния компонента
+  const handleClearAll = useCallback(() => { console.log("Очистка состояния Fetcher."); setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set()); updateKworkInput(""); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set()); setRequestCopied(false); addToast("Очищено ✨", 'success'); if (localKworkInputRef.current) localKworkInputRef.current.focus(); }, [ setSelectedFetcherFiles, updateKworkInput, addToast, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setRequestCopied ]); // Зависит от updateKworkInput, addToast и сеттеров контекста
+  // Выбрать подсвеченные файлы
   const selectHighlightedFiles = useCallback(() => { const fTS=new Set<string>(selectedFiles); let nSC=0; const aHLS=[ ...secondaryHighlightedPaths.component, ...secondaryHighlightedPaths.context, ...secondaryHighlightedPaths.hook, ...secondaryHighlightedPaths.lib ]; if(primaryHighlightedPath&&files.some(f=>f.path===primaryHighlightedPath)&&!fTS.has(primaryHighlightedPath)){fTS.add(primaryHighlightedPath); nSC++;} aHLS.forEach(p=>{if(files.some(f=>f.path===p)&&!fTS.has(p)){fTS.add(p); nSC++;}}); if(nSC>0){setSelectedFilesState(fTS); setSelectedFetcherFiles(fTS); addToast(`${nSC} связанных добавлено`, 'info');} else {addToast("Все связанные уже выбраны", 'info');} }, [ primaryHighlightedPath, secondaryHighlightedPaths, files, selectedFiles, setSelectedFetcherFiles, addToast ]);
   // Переключить выбор файла
   const toggleFileSelection = useCallback((path: string) => { setSelectedFilesState(prevSet => { const newSet = new Set(prevSet); if(newSet.has(path)){ newSet.delete(path); }else{ newSet.add(path); } if (selectionUpdateTimeoutRef.current) clearTimeout(selectionUpdateTimeoutRef.current); selectionUpdateTimeoutRef.current = setTimeout(() => { setSelectedFetcherFiles(new Set(newSet)); selectionUpdateTimeoutRef.current = null; }, 150); return newSet; }); }, [setSelectedFetcherFiles]);
@@ -305,134 +259,62 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   // Обработка ручного ввода имени ветки
   const handleManualBranchChange = useCallback((name: string) => { setManualBranchName(name); }, [setManualBranchName]);
   // Загрузить список открытых PR
-  const handleLoadPrs = useCallback(() => { triggerGetOpenPRs(repoUrl); }, [triggerGetOpenPRs, repoUrl]);
+  const handleLoadPrs = useCallback(() => { triggerGetOpenPRs(repoUrl); }, [triggerGetOpenPRs, repoUrl]); // Зависит от repoUrl (state)
   // Выбрать все файлы
-  const handleSelectAll = useCallback(() => { if(files.length===0)return; const allP=new Set(files.map(f=>f.path)); setSelectedFilesState(allP); setSelectedFetcherFiles(allP); addToast(`Выбрано ${allP.size} файлов`,'info'); }, [files, setSelectedFetcherFiles]);
+  const handleSelectAll = useCallback(() => { if(files.length===0)return; const allP=new Set(files.map(f=>f.path)); setSelectedFilesState(allP); setSelectedFetcherFiles(allP); addToast(`Выбрано ${allP.size} файлов`,'info'); }, [files, setSelectedFetcherFiles, addToast]);
   // Снять выбор со всех файлов
-  const handleDeselectAll = useCallback(() => { setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set()); addToast("Выбор снят",'info'); }, [setSelectedFetcherFiles]);
+  const handleDeselectAll = useCallback(() => { setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set()); addToast("Выбор снят",'info'); }, [setSelectedFetcherFiles, addToast]);
 
   // --- Эффекты ---
   // Обновление флага repoUrlEntered и URL в ассистенте при изменении repoUrl
   useEffect(() => { setRepoUrlEntered(repoUrl.trim().length > 0); updateRepoUrlInAssistant(repoUrl); }, [repoUrl, setRepoUrlEntered, updateRepoUrlInAssistant]);
 
-  // Эффект для автоматического запуска извлечения при наличии URL параметров или задачи картинки
+  // Эффект для автоматического запуска извлечения (с использованием стража)
   useEffect(() => {
     const branch = targetBranchName || manualBranchName || null;
     const canTriggerFetch = autoFetch && repoUrl &&
                            (fetchStatusRef.current === 'idle' || fetchStatusRef.current === 'failed_retries' || fetchStatusRef.current === 'error');
-
     const isImageFetchReady = !imageReplaceTask || !isImageTaskFetchInitiated.current;
 
-    // Запускаем только если условия выполнены И ref-страж не активен
     if (canTriggerFetch && isImageFetchReady && !isAutoFetchingRef.current) {
         console.log(`[AutoFetch Effect] Запуск извлечения. Страж активен. ЗадачаКартинки: ${!!imageReplaceTask}, Инициация: ${isImageTaskFetchInitiated.current}`);
         isAutoFetchingRef.current = true; // Устанавливаем страж
+        handleFetch(false, branch) // Вызов handleFetch (определен выше)
+            .catch(err => { console.error("[AutoFetch Effect] handleFetch выбросил ошибку:", err); })
+            .finally(() => { setTimeout(() => { console.log("[AutoFetch Effect] Сброс стража извлечения."); isAutoFetchingRef.current = false; }, 300); });
+    } else if (autoFetch && imageReplaceTask && isImageTaskFetchInitiated.current) { console.log("[AutoFetch Effect] Пропуск: Загрузка для задачи картинки уже инициирована."); }
+    else if (canTriggerFetch && isAutoFetchingRef.current) { console.log("[AutoFetch Effect] Пропуск: Страж уже активен."); }
+  }, [repoUrl, autoFetch, fetchStatus, targetBranchName, manualBranchName, imageReplaceTask, handleFetch]); // handleFetch теперь стабилен (если его зависимости определены выше)
 
-        handleFetch(false, branch) // Вызов основной функции извлечения
-            .catch(err => {
-                // Сброс стража даже если handleFetch выбросил ошибку
-                console.error("[AutoFetch Effect] handleFetch выбросил ошибку:", err);
-            })
-            .finally(() => {
-                // Сбрасываем страж с небольшой задержкой после завершения
-                setTimeout(() => {
-                    console.log("[AutoFetch Effect] Сброс стража извлечения.");
-                    isAutoFetchingRef.current = false;
-                }, 300); // Задержка 300мс
-            });
-
-    } else if (autoFetch && imageReplaceTask && isImageTaskFetchInitiated.current) {
-        console.log("[AutoFetch Effect] Пропуск: Загрузка для задачи картинки уже инициирована.");
-    } else if (canTriggerFetch && isAutoFetchingRef.current) {
-        console.log("[AutoFetch Effect] Пропуск: Страж уже активен.");
-    }
-
-  // Зависимости эффекта - используем handleFetch, который сам зависит от всего необходимого
-  }, [repoUrl, autoFetch, fetchStatus, targetBranchName, manualBranchName, imageReplaceTask, handleFetch]);
-  // --- Конец эффекта AutoFetch ---
-
-  // Эффект для авто-добавления зависимостей при выборе файлов (кроме задачи картинки)
+  // Эффект для авто-добавления зависимостей при выборе файлов
   useEffect(() => {
-      if(files.length===0 || imageReplaceTask || fetchStatusRef.current !== 'success'){
-          prevSelectedFilesRef.current = new Set(selectedFiles); // Обновляем предыдущие даже если выходим
-          return;
+      if(files.length===0 || imageReplaceTask || fetchStatusRef.current !== 'success'){ prevSelectedFilesRef.current = new Set(selectedFiles); return; }
+      const newSelPaths=new Set<string>(); selectedFiles.forEach(p => { if(!prevSelectedFilesRef.current.has(p)) { newSelPaths.add(p); } });
+      if(primaryHighlightedPath && selectedFiles.has(primaryHighlightedPath) && !prevSelectedFilesRef.current.has(primaryHighlightedPath) && !newSelPaths.has(primaryHighlightedPath)){ newSelPaths.add(primaryHighlightedPath); }
+      if(newSelPaths.size === 0){ prevSelectedFilesRef.current = new Set(selectedFiles); return; }
+      const pgSuffixes=['/page.tsx','/page.js','/index.tsx','/index.js']; const filesToCheck=Array.from(newSelPaths).filter(p => pgSuffixes.some(s=>p.endsWith(s)) || p===primaryHighlightedPath);
+      if(filesToCheck.length > 0){ const relatedToSel = new Set<string>(); let foundCount = 0; filesToCheck.forEach(fp => { const fNode = files.find(f => f.path === fp); if(fNode){ const imps = extractImports(fNode.content); imps.forEach(imp => { const rP = resolveImportPath(imp, fNode.path, files); if(rP && rP !== fp){ const cat = categorizeResolvedPath(rP); if(cat !== 'other'){ if(!selectedFiles.has(rP)){ relatedToSel.add(rP); foundCount++; } } } }); } });
+          if(relatedToSel.size > 0){ const finalSel = new Set([...selectedFiles, ...relatedToSel]); setSelectedFilesState(finalSel); setSelectedFetcherFiles(finalSel); addToast(`🔗 Авто-добавлено ${foundCount} связанных`, 'info'); prevSelectedFilesRef.current = finalSel; return; }
       }
-      // Находим только что добавленные файлы
-      const newSelPaths=new Set<string>();
-      selectedFiles.forEach(p => { if(!prevSelectedFilesRef.current.has(p)) { newSelPaths.add(p); } });
-      // Если основной подсвеченный файл был только что выбран, добавляем его тоже
-      if(primaryHighlightedPath && selectedFiles.has(primaryHighlightedPath) && !prevSelectedFilesRef.current.has(primaryHighlightedPath) && !newSelPaths.has(primaryHighlightedPath)){
-          newSelPaths.add(primaryHighlightedPath);
-      }
-      if(newSelPaths.size === 0){ // Если ничего нового не выбрано
-          prevSelectedFilesRef.current = new Set(selectedFiles); // Обновляем и выходим
-          return;
-      }
-
-      // Ищем импорты только для файлов страниц или основного подсвеченного файла
-      const pgSuffixes=['/page.tsx','/page.js','/index.tsx','/index.js'];
-      const filesToCheck=Array.from(newSelPaths).filter(p => pgSuffixes.some(s=>p.endsWith(s)) || p===primaryHighlightedPath);
-
-      if(filesToCheck.length > 0){
-          const relatedToSel = new Set<string>();
-          let foundCount = 0;
-          filesToCheck.forEach(fp => {
-              const fNode = files.find(f => f.path === fp);
-              if(fNode){
-                  const imps = extractImports(fNode.content);
-                  imps.forEach(imp => {
-                      const rP = resolveImportPath(imp, fNode.path, files);
-                      if(rP && rP !== fp){ // Нашли разрешенный путь, и это не сам файл
-                          const cat = categorizeResolvedPath(rP);
-                          if(cat !== 'other'){ // Добавляем только если категория не 'other'
-                              if(!selectedFiles.has(rP)){ // И если еще не выбран
-                                  relatedToSel.add(rP);
-                                  foundCount++;
-                              }
-                          }
-                      }
-                  });
-              }
-          });
-
-          if(relatedToSel.size > 0){ // Если нашли новые связанные файлы
-              const finalSel = new Set([...selectedFiles, ...relatedToSel]); // Объединяем с текущим выбором
-              setSelectedFilesState(finalSel); // Обновляем локальное состояние
-              setSelectedFetcherFiles(finalSel); // Обновляем состояние в контексте
-              addToast(`🔗 Авто-добавлено ${foundCount} связанных`, 'info');
-              prevSelectedFilesRef.current = finalSel; // Обновляем предыдущие для следующего раза
-              return; // Выходим, чтобы не обновить prevSelectedFilesRef еще раз ниже
-          }
-      }
-      // Если не нашли новых связанных или не было файлов для проверки, просто обновляем prevSelectedFilesRef
       prevSelectedFilesRef.current = new Set(selectedFiles);
+  }, [selectedFiles, files, fetchStatus, primaryHighlightedPath, extractImports, resolveImportPath, categorizeResolvedPath, setSelectedFetcherFiles, addToast, imageReplaceTask]);
 
-  }, [selectedFiles, files, fetchStatus, primaryHighlightedPath, extractImports, resolveImportPath, categorizeResolvedPath, setSelectedFetcherFiles, addToast, imageReplaceTask]); // fetchStatus добавлен для re-run после загрузки
-
-  // Очистка интервала симуляции при размонтировании компонента
+  // Очистка интервала симуляции при размонтировании
   useEffect(() => { return () => stopProgressSimulation(); }, [stopProgressSimulation]);
 
-  // === Imperative Handle (для вызова методов извне через ref) ===
+  // === Imperative Handle (методы, доступные через ref) ===
   useImperativeHandle(ref, () => ({ handleFetch, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, clearAll: handleClearAll, getKworkInputValue }), [handleFetch, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll, getKworkInputValue]);
 
   // --- Логика рендеринга ---
   const isLoading = fetchStatus === 'loading' || fetchStatus === 'retrying';
-  const showProgressBar = fetchStatus !== 'idle'; // Показываем прогресс-бар, если статус не 'idle'
-  // Состояния, при которых кнопка "Извлечь" должна быть неактивна
+  const showProgressBar = fetchStatus !== 'idle';
   const isFetchDisabled = isLoading || loadingPrs || !repoUrlEntered || assistantLoading || isParsing || aiActionLoading;
-  // Состояния, при которых кнопки действий (кроме "Извлечь") должны быть неактивны
   const isActionDisabled = isLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing || !!imageReplaceTask;
-  // Неактивность кнопки "Спросить AI" - *ВРЕМЕННО ОТКЛЮЧЕНО*
-  const isAskAiDisabled = true; // <<<--- TEMPORARILY DISABLED (было: !kworkInputHasContent || isActionDisabled || !!imageReplaceTask || isWaitingForAi)
-  // Неактивность кнопки "Копировать"
+  const isAskAiDisabled = true; // <<<--- ВРЕМЕННО ОТКЛЮЧЕНО
   const isCopyDisabled = !kworkInputHasContent || isActionDisabled || !!imageReplaceTask;
-  // Неактивность кнопки "Очистить все"
   const isClearDisabled = (!kworkInputHasContent && selectedFiles.size === 0) || isActionDisabled || !!imageReplaceTask;
-  // Неактивность кнопки "Добавить выбранные"
   const isAddSelectedDisabled = selectedFiles.size === 0 || isActionDisabled || !!imageReplaceTask;
-  // Отображаемое имя текущей ветки
   const effectiveBranchDisplay = targetBranchName || manualBranchName || "default";
-  // Флаг ожидания ответа от AI (для UI)
   const isWaitingForAi = aiActionLoading && !!currentAiRequestId;
 
   return (
@@ -451,9 +333,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       {/* Прогресс-бар и область статуса */}
        {showProgressBar && (
             <div className="mb-4 min-h-[40px]">
-                {/* Передаем статус и текущий прогресс в компонент ProgressBar */}
                 <ProgressBar status={fetchStatus === 'failed_retries' ? 'error' : fetchStatus} progress={progress} />
-                 {/* Отображение текстового статуса под прогресс-баром */}
                  {isLoading && <p className="text-cyan-300 text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? '(Повтор)' : ''}</p>}
                  {isParsing && <p className="text-yellow-400 text-xs font-mono mt-1 text-center animate-pulse">Разбор ответа...</p>}
                  {fetchStatus === 'success' && files.length > 0 && !imageReplaceTask && ( <div className="text-center text-xs font-mono mt-1 text-green-400 flex items-center justify-center gap-1"> <FaCircleCheck /> {`Успешно ${files.length} файлов из '${effectiveBranchDisplay}'.`} </div> )}
@@ -462,52 +342,11 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                  {(fetchStatus === 'error' || fetchStatus === 'failed_retries') && error && ( <div className="text-center text-xs font-mono mt-1 text-red-400 flex items-center justify-center gap-1"> <FaXmark /> {error} </div> )}
             </div>
         )}
-      {/* Основная область контента (Список файлов и Поле запроса) */}
+      {/* Основная область контента */}
        <div className={`grid grid-cols-1 ${ (files.length > 0 || (kworkInputHasContent && !imageReplaceTask)) ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-4 md:gap-6`}>
-         {/* Левая колонка: Превью и Список файлов (показывается при загрузке или если есть файлы) */}
-         {(isLoading || files.length > 0) && (
-             <div className="flex flex-col gap-4">
-                  {/* Компонент превью выбранных файлов */}
-                 <SelectedFilesPreview selectedFiles={selectedFiles} allFiles={files} getLanguage={getLanguage} />
-                 {/* Компонент списка файлов */}
-                 <FileList
-                    id="file-list-container" files={files} selectedFiles={selectedFiles}
-                    primaryHighlightedPath={primaryHighlightedPath} secondaryHighlightedPaths={secondaryHighlightedPaths}
-                    importantFiles={importantFiles} isLoading={isLoading} isActionDisabled={isActionDisabled}
-                    toggleFileSelection={toggleFileSelection} onAddSelected={() => handleAddSelected()}
-                    onAddImportant={handleAddImportantFiles} onAddTree={handleAddFullTree}
-                    onSelectHighlighted={selectHighlightedFiles} onSelectAll={handleSelectAll} onDeselectAll={handleDeselectAll}
-                 />
-             </div>
-         )}
-         {/* Правая колонка: Поле запроса (показывается если есть файлы ИЛИ текст в поле, И НЕ задача картинки) */}
-         {(files.length > 0 || (kworkInputHasContent && !imageReplaceTask)) ? (
-             <div id="kwork-input-section" className="flex flex-col gap-3">
-                 {/* Компонент поля ввода запроса */}
-                 <RequestInput
-                     kworkInputRef={localKworkInputRef}
-                     onCopyToClipboard={() => handleCopyToClipboard(undefined, true)}
-                     onClearAll={handleClearAll}
-                     isCopyDisabled={isCopyDisabled}
-                     isClearDisabled={isClearDisabled}
-                     onInputChange={(value) => setKworkInputHasContent(value.trim().length > 0)}
-                     onAskAi={triggerAskAi}
-                     isAskAiDisabled={isAskAiDisabled} // Передаем флаг неактивности
-                     aiActionLoading={aiActionLoading}
-                     onAddSelected={() => handleAddSelected()}
-                     isAddSelectedDisabled={isAddSelectedDisabled}
-                     selectedFetcherFilesCount={selectedFiles.size}
-                 />
-             </div>
-         ) : null }
-         {/* Заглушка во время обработки задачи замены картинки (показывается если есть задача, fetch успешен, файлы есть) */}
-         {imageReplaceTask && fetchStatus === 'success' && files.length > 0 && (
-             <div className={`md:col-span-1 flex flex-col items-center justify-center text-center p-4 bg-gray-700/30 rounded-lg border border-dashed border-blue-400 min-h-[200px]`}>
-                 {(assistantLoading || aiActionLoading) ? ( <FaSpinner className="text-blue-400 text-3xl mb-3 animate-spin" /> ) : ( <FaCircleCheck className="text-green-400 text-3xl mb-3" /> )}
-                 <p className="text-sm text-blue-300"> {(assistantLoading || aiActionLoading) ? "Обработка замены..." : `Файл ${imageReplaceTask.targetPath.split('/').pop()} готов.`} </p>
-                 <p className="text-xs text-gray-400 mt-1"> {(assistantLoading || aiActionLoading) ? "Создание/обновление PR..." : "Перехожу к созданию PR..."} </p>
-             </div>
-         )}
+         {(isLoading || files.length > 0) && ( <div className="flex flex-col gap-4"> <SelectedFilesPreview selectedFiles={selectedFiles} allFiles={files} getLanguage={getLanguage} /> <FileList id="file-list-container" files={files} selectedFiles={selectedFiles} primaryHighlightedPath={primaryHighlightedPath} secondaryHighlightedPaths={secondaryHighlightedPaths} importantFiles={importantFiles} isLoading={isLoading} isActionDisabled={isActionDisabled} toggleFileSelection={toggleFileSelection} onAddSelected={() => handleAddSelected()} onAddImportant={handleAddImportantFiles} onAddTree={handleAddFullTree} onSelectHighlighted={selectHighlightedFiles} onSelectAll={handleSelectAll} onDeselectAll={handleDeselectAll} /> </div> )}
+         {(files.length > 0 || (kworkInputHasContent && !imageReplaceTask)) ? ( <div id="kwork-input-section" className="flex flex-col gap-3"> <RequestInput kworkInputRef={localKworkInputRef} onCopyToClipboard={() => handleCopyToClipboard(undefined, true)} onClearAll={handleClearAll} isCopyDisabled={isCopyDisabled} isClearDisabled={isClearDisabled} onInputChange={(value) => setKworkInputHasContent(value.trim().length > 0)} onAskAi={triggerAskAi} isAskAiDisabled={isAskAiDisabled} aiActionLoading={aiActionLoading} onAddSelected={() => handleAddSelected()} isAddSelectedDisabled={isAddSelectedDisabled} selectedFetcherFilesCount={selectedFiles.size} /> </div> ) : null }
+         {imageReplaceTask && fetchStatus === 'success' && files.length > 0 && ( <div className={`md:col-span-1 flex flex-col items-center justify-center text-center p-4 bg-gray-700/30 rounded-lg border border-dashed border-blue-400 min-h-[200px]`}> {(assistantLoading || aiActionLoading) ? ( <FaSpinner className="text-blue-400 text-3xl mb-3 animate-spin" /> ) : ( <FaCircleCheck className="text-green-400 text-3xl mb-3" /> )} <p className="text-sm text-blue-300"> {(assistantLoading || aiActionLoading) ? "Обработка замены..." : `Файл ${imageReplaceTask.targetPath.split('/').pop()} готов.`} </p> <p className="text-xs text-gray-400 mt-1"> {(assistantLoading || aiActionLoading) ? "Создание/обновление PR..." : "Перехожу к созданию PR..."} </p> </div> )}
       </div>
     </div>
   );
