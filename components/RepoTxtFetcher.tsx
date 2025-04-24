@@ -112,12 +112,11 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   const handleAddSelected = useCallback(async (filesToAddParam?: Set<string>, allFilesParam?: FileNode[]) => { const fTP=allFilesParam||files; const fTA=filesToAddParam||selectedFiles; if(fTP.length===0&&fTA.size>0){addToast("Файлы не загружены.",'error');return;} if(fTA.size===0){addToast("Выберите файлы.",'warning');return;} const pfx="Контекст кода для анализа:\n"; const mdTxt=fTP.filter(f=>fTA.has(f.path)).sort((a,b)=>a.path.localeCompare(b.path)).map(f=>{const pC=`// /${f.path}`; const cAHC=f.content.trimStart().startsWith(pC); const cTA=cAHC?f.content:`${pC}\n${f.content}`; return `\`\`\`${getLanguage(f.path)}\n${cTA}\n\`\`\``}).join("\n\n"); const cKV=getKworkInputValue(); const ctxRgx=/Контекст кода для анализа:[\s\S]*/; const tT=cKV.replace(ctxRgx,'').trim(); const nC=`${tT?tT+'\n\n':''}${pfx}${mdTxt}`; updateKworkInput(nC); addToast(`${fTA.size} файлов добавлено`, 'success'); scrollToSection('kworkInput'); }, [files, selectedFiles, addToast, getKworkInputValue, updateKworkInput, scrollToSection]);
 
   // 4. Основная функция извлечения (handleFetchManual) - Для ручного вызова
-  // Переименована, чтобы не конфликтовать с внутренней функцией эффекта
+  // Определена ПОСЛЕДНЕЙ, т.к. зависит от многих колбэков выше
   const handleFetchManual = useCallback(async (isManualRetry = false, branchNameToFetch?: string | null) => {
       const effectiveBranch = branchNameToFetch || targetBranchName || manualBranchName || 'default';
       console.log(`Fetcher(Manual): Старт извлечения. Повтор: ${isManualRetry}, Ветка: ${effectiveBranch}`);
 
-      // --- Повторяем логику из handleFetch, но используем доступные колбэки и состояния ---
        if (imageReplaceTask && isImageTaskFetchInitiated.current && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying')) { console.warn("Fetcher(Manual): Загрузка для задачи картинки уже идет. Отмена дубликата."); return; }
        if (!repoUrl.trim()) { console.error("Fetcher(Manual): URL пуст."); addToast("Введите URL", 'error'); setError("URL пуст."); triggerToggleSettingsModal(); return; }
        if ((fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying') && !isManualRetry) { console.warn("Fetcher(Manual): Уже идет загрузка."); addToast("Уже идет...", "info"); return; }
@@ -154,90 +153,38 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
        finally { stopProgressSimulation(); setProgress(success ? 100 : 0); setFetchStatus(finalStatus); if (imageReplaceTask) { isImageTaskFetchInitiated.current = false; } console.log(`Fetcher(Manual): Завершено. Успех: ${success}, Финальный статус: ${finalStatus}`); }
    }, [ // Зависимости handleFetchManual
        repoUrl, token, imageReplaceTask, targetBranchName, manualBranchName,
-       assistantLoading, isParsing, aiActionLoading,
+       assistantLoading, isParsing, aiActionLoading, repoUrlEntered, // Добавлено repoUrlEntered
        setFetchStatus, setError, setFiles, setSelectedFilesState, setPrimaryHighlightedPathState,
        setSecondaryHighlightedPathsState, setAllFetchedFiles, setSelectedFetcherFiles, setFilesFetched,
        setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles,
        addToast, startProgressSimulation, stopProgressSimulation, triggerToggleSettingsModal, updateKworkInput,
        importantFiles, highlightedPathFromUrl, ideaFromUrl, DEFAULT_TASK_IDEA,
-       isSettingsModalOpen, handleAddSelected, // handleAddSelected использует другие колбэки, которые тоже должны быть стабильны
-       getKworkInputValue // Используется в handleCopyToClipboard/handleClearAll/handleAddSelected, которые вызываются внутри handleFetch->try->if(success)
+       isSettingsModalOpen, handleAddSelected,
+       getKworkInputValue, // Добавлено как зависимость
+       // triggerAskAi, // Не используется напрямую в handleFetchManual
+       // scrollToSection // Используется через handleAddSelected и handleCopyToClipboard, которые должны быть стабильны
    ]);
 
 
   // --- Эффекты ---
   useEffect(() => { setRepoUrlEntered(repoUrl.trim().length > 0); updateRepoUrlInAssistant(repoUrl); }, [repoUrl, setRepoUrlEntered, updateRepoUrlInAssistant]);
 
-  // Эффект для авто-запуска (Использует внутреннюю triggerAutoFetch, а не useCallback handleFetch)
+  // Эффект для авто-запуска (Вызывает handleFetchManual)
   useEffect(() => {
-    // Определяем функцию triggerAutoFetch прямо здесь
-    const triggerAutoFetch = async (isManualRetry = false, branchNameToFetch?: string | null) => {
-        const effectiveBranch = branchNameToFetch || targetBranchName || manualBranchName || 'default';
-        console.log(`Fetcher(Effect): Старт извлечения. Повтор: ${isManualRetry}, Ветка: ${effectiveBranch}, Статус: ${fetchStatusRef.current}, Задача: ${!!imageReplaceTask}, ИнициацияЗадачи: ${isImageTaskFetchInitiated.current}`);
-
-        if (imageReplaceTask && isImageTaskFetchInitiated.current && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying')) { console.warn("Fetcher(Effect): Загрузка для задачи картинки уже идет. Отмена дубликата."); return; }
-        if (!repoUrl.trim()) { console.error("Fetcher(Effect): URL пуст."); setError("URL пуст."); triggerToggleSettingsModal(); return; }
-        if ((fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying') && !isManualRetry) { console.warn("Fetcher(Effect): Уже идет загрузка."); return; }
-        if (assistantLoading || isParsing || aiActionLoading) { console.warn(`Fetcher(Effect): Заблокировано состоянием.`); return; }
-
-        console.log("Fetcher(Effect): Запускаем процесс.");
-        setFetchStatus('loading');
-        setError(null); setFiles([]); setSelectedFilesState(new Set()); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setAllFetchedFiles([]); setSelectedFetcherFiles(new Set()); setFilesFetched(false, [], null, []); setRequestCopied(false); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set());
-        if (imageReplaceTask) { isImageTaskFetchInitiated.current = true; updateKworkInput(""); }
-        else if (!highlightedPathFromUrl && localKworkInputRef.current) { updateKworkInput(ideaFromUrl || DEFAULT_TASK_IDEA); }
-
-        console.log(`Fetcher(Effect): Запрос (${effectiveBranch})...`);
-        startProgressSimulation(13);
-        console.log("Fetcher(Effect): Симуляция запущена.");
-
-        let result: Awaited<ReturnType<typeof fetchRepoContents>> | null = null; let success = false; let finalStatus: FetchStatus = 'error';
-        try {
-            result = await fetchRepoContents(repoUrl, token || undefined, effectiveBranch);
-            if (result?.success && Array.isArray(result.files)) {
-                 success = true; finalStatus = 'success'; const fetchedFiles = result.files;
-                 const allPaths=fetchedFiles.map(f=>f.path); let primaryHPath:string|null=null; const catSecPaths:Record<ImportCategory,Set<string>>={component:new Set(),context:new Set(),hook:new Set(),lib:new Set(),other:new Set()}; let filesToSel=new Set<string>();
-                 if(imageReplaceTask){ /* ... проверка файла картинки ... */ primaryHPath=imageReplaceTask.targetPath; if(!allPaths.includes(primaryHPath)){ const imgErr=`Файл (${primaryHPath}) не найден в '${effectiveBranch}'.`; setError(imgErr); /* addToast(imgErr,'error'); */ setFilesFetched(true,fetchedFiles,null,[]); finalStatus='error'; success=false; } else { filesToSel.add(primaryHPath); } }
-                 else if(highlightedPathFromUrl){ /* ... подсветка/зависимости ... */ primaryHPath=getPageFilePath(highlightedPathFromUrl,allPaths); if(primaryHPath){ const pF=fetchedFiles.find(f=>f.path===primaryHPath); if(pF){ filesToSel.add(primaryHPath); const imps=extractImports(pF.content); for(const imp of imps){ const rP=resolveImportPath(imp,pF.path,fetchedFiles); if(rP&&rP!==primaryHPath){ const cat=categorizeResolvedPath(rP); catSecPaths[cat].add(rP); if(cat!=='other')filesToSel.add(rP); } } } else { primaryHPath=null; /* addToast(...) */ } } else { /* addToast(...) */ } }
-                 if(!imageReplaceTask){ /* ... важные файлы ... */ importantFiles.forEach(p=>{ if(allPaths.includes(p)&&!filesToSel.has(p)){ filesToSel.add(p); } }); }
-                 if(success){
-                     setPrimaryHighlightedPathState(primaryHPath); const finalSecPaths={component:Array.from(catSecPaths.component),context:Array.from(catSecPaths.context),hook:Array.from(catSecPaths.hook),lib:Array.from(catSecPaths.lib),other:Array.from(catSecPaths.other)}; setSecondaryHighlightedPathsState(finalSecPaths);
-                     if(!imageReplaceTask){ setSelectedFilesState(filesToSel); setSelectedFetcherFiles(filesToSel); }
-                     setFilesFetched(true,fetchedFiles,primaryHPath,Object.values(finalSecPaths).flat());
-                     if (!imageReplaceTask) { /* addToast(...) */ }
-                     setFiles(fetchedFiles); setAllFetchedFiles(fetchedFiles); if(isSettingsModalOpen) triggerToggleSettingsModal();
-                     if(imageReplaceTask && primaryHPath){ /* addToast(...) */ }
-                     else if(highlightedPathFromUrl && ideaFromUrl && filesToSel.size > 0 && !imageReplaceTask){ const nS=catSecPaths.component.size+catSecPaths.context.size+catSecPaths.hook.size+catSecPaths.lib.size; const nI=filesToSel.size-(primaryHPath?1:0)-nS; let msg=`✅ Авто-выбор: `; const pts=[]; if(primaryHPath)pts.push(`1 стр`); if(nS>0)pts.push(`${nS} связ`); if(nI>0)pts.push(`${nI} важн`); msg+=pts.join(', ')+` (${filesToSel.size} всего). Идея добавлена.`; /* addToast(msg,'success'); */ updateKworkInput(ideaFromUrl||DEFAULT_TASK_IDEA); await handleAddSelected(filesToSel,fetchedFiles); setTimeout(()=>{/*addToast("💡 Добавь инструкции!", "info"); */}, 500); }
-                     else if(!imageReplaceTask){ if(filesToSel.size>0){const nH=catSecPaths.component.size+catSecPaths.context.size+catSecPaths.hook.size+catSecPaths.lib.size; const nI=filesToSel.size-(primaryHPath?1:0)-nH; let msg=`Авто-выбраны: `; const pts=[]; if(primaryHPath)pts.push(`1 осн`); if(nH>0)pts.push(`${nH} связ`); if(nI>0)pts.push(`${nI} важн`); msg+=pts.join(', ')+'.'; /* addToast(msg,'info'); */} if(primaryHPath){setTimeout(()=>{const eId=`file-${primaryHPath}`; const el=document.getElementById(eId); if(el){el.scrollIntoView({behavior:"smooth",block:"center"}); el.classList.add('ring-2','ring-offset-1','ring-offset-gray-900','ring-cyan-400','rounded-md'); setTimeout(()=>el.classList.remove('ring-2','ring-offset-1','ring-offset-gray-900','ring-cyan-400','rounded-md'),2500);}},400);}else if(fetchedFiles.length>0){const el=document.getElementById('file-list-container'); el?.scrollIntoView({behavior:"smooth",block:"nearest"});}}
-                 }
-            } else { throw new Error(result?.error || `Не удалось получить файлы из ${effectiveBranch}.`); }
-        } catch (err: any) { const displayError = err?.message || "Неизвестная ошибка"; setError(displayError); /* addToast(...) */ setFilesFetched(false, [], null, []); success = false; finalStatus = 'error'; }
-        finally { stopProgressSimulation(); setProgress(success ? 100 : 0); setFetchStatus(finalStatus); if (imageReplaceTask) { isImageTaskFetchInitiated.current = false; } console.log(`Fetcher(Effect): Завершено. Успех: ${success}, Финальный статус: ${finalStatus}`); }
-    }; // Конец определения triggerAutoFetch
-
-    // Триггер эффекта
     const branch = targetBranchName || manualBranchName || null;
-    const canTriggerFetch = autoFetch && repoUrl && (fetchStatusRef.current === 'idle' || fetchStatusRef.current === 'failed_retries' || fetchStatusRef.current === 'error');
+    const canTriggerFetch = autoFetch && repoUrl &&
+                           (fetchStatusRef.current === 'idle' || fetchStatusRef.current === 'failed_retries' || fetchStatusRef.current === 'error');
     const isImageFetchReady = !imageReplaceTask || !isImageTaskFetchInitiated.current;
+
     if (canTriggerFetch && isImageFetchReady && !isAutoFetchingRef.current) {
-        console.log(`[AutoFetch Effect] Запуск извлечения. Страж активен. ЗадачаКартинки: ${!!imageReplaceTask}, Инициация: ${isImageTaskFetchInitiated.current}`);
+        console.log(`[AutoFetch Effect] Запуск извлечения через handleFetchManual. Страж активен. ЗадачаКартинки: ${!!imageReplaceTask}, Инициация: ${isImageTaskFetchInitiated.current}`);
         isAutoFetchingRef.current = true;
-        triggerAutoFetch(false, branch)
-            .catch(err => { console.error("[AutoFetch Effect] triggerAutoFetch выбросил ошибку:", err); })
+        handleFetchManual(false, branch) // Используем handleFetchManual
+            .catch(err => { console.error("[AutoFetch Effect] handleFetchManual выбросил ошибку:", err); })
             .finally(() => { setTimeout(() => { console.log("[AutoFetch Effect] Сброс стража извлечения."); isAutoFetchingRef.current = false; }, 300); });
     } else if (autoFetch && imageReplaceTask && isImageTaskFetchInitiated.current) { console.log("[AutoFetch Effect] Пропуск: Загрузка для задачи картинки уже инициирована."); }
     else if (canTriggerFetch && isAutoFetchingRef.current) { console.log("[AutoFetch Effect] Пропуск: Страж уже активен."); }
-
-  }, [ // Зависимости useEffect (все внешние переменные/функции, используемые ВНУТРИ, включая triggerAutoFetch)
-      repoUrl, autoFetch, fetchStatus, targetBranchName, manualBranchName, imageReplaceTask, token,
-      assistantLoading, isParsing, aiActionLoading,
-      setFetchStatus, setError, setFiles, setSelectedFilesState, setPrimaryHighlightedPathState,
-      setSecondaryHighlightedPathsState, setAllFetchedFiles, setSelectedFetcherFiles, setFilesFetched,
-      setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles,
-      updateKworkInput, startProgressSimulation, stopProgressSimulation, handleAddSelected,
-      triggerToggleSettingsModal,
-      ideaFromUrl, DEFAULT_TASK_IDEA, importantFiles, isSettingsModalOpen
-      // НЕ включаем handleFetchManual, т.к. он не используется в этом useEffect
-  ]);
+  }, [repoUrl, autoFetch, fetchStatus, targetBranchName, manualBranchName, imageReplaceTask, handleFetchManual]); // Теперь зависим от handleFetchManual
 
   // Эффект для авто-добавления зависимостей
   useEffect(() => {
@@ -277,6 +224,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   const effectiveBranchDisplay = targetBranchName || manualBranchName || "default";
   const isWaitingForAi = aiActionLoading && !!currentAiRequestId;
 
+  // --- JSX Возврат ---
   return (
     <div id="extractor" className="w-full p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm text-gray-200 font-mono rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] border border-gray-700/50 relative overflow-hidden">
       {/* Заголовок и инструкции */}
