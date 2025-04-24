@@ -87,9 +87,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   const updateKworkInput = useCallback((value: string) => { if (localKworkInputRef.current) { localKworkInputRef.current.value = value; const event = new Event('input', { bubbles: true }); localKworkInputRef.current.dispatchEvent(event); setKworkInputHasContent(value.trim().length > 0); } else { console.warn("localKworkInputRef is null"); } }, [setKworkInputHasContent]);
   // Получение текущего значения поля ввода запроса
   const getKworkInputValue = useCallback((): string => localKworkInputRef.current?.value || "", []);
-  // Прокрутка к элементу
-  const scrollToSection = useCallback((id: 'kworkInput' | 'aiResponseInput' | 'prSection' | 'fetcher' | 'assistant' | 'executor' | 'settingsModalTrigger' | 'settings-modal-trigger-assistant') => {
-      // Реализация scrollToSection из контекста RepoXmlPageContext
+  
       let element: HTMLElement | null = null;
       const targetId = (id === 'assistant' || id === 'executor') ? 'executor' : (id === 'fetcher' ? 'extractor' : (id === 'settingsModalTrigger' ? 'settings-modal-trigger-assistant' : id));
       switch (targetId) {
