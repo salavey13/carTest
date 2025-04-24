@@ -1,5 +1,3 @@
-// Intended for more verbose client-side debugging, keeps a limited history.
-
 class DebugLogger {
   private logs: string[] = [];
   private maxLogs = 100; // Keep the last 100 logs
