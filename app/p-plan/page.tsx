@@ -227,7 +227,7 @@ const getPlanSections = (dbUser: DbUser) => {
     },
      { // Section 9: Glitchy / Warning Style
       id: "risks",
-      title: "9. Глюки в Матрице (Риски и План "Омега")",
+      title: "9. Глюки в Матрице (Риски и План Омега)",
       icon: FaCarCrash,
       color: "text-red-500", // Error Red
       content: `**Матрица Обновилась (Free Tier):** Юзаем "Щит Веры" (::FaTriangleExclamation::), ищем **эксплойты** (опенсорс), **быстро учимся делать золото**, чтобы платить "десятину" Матрице.
