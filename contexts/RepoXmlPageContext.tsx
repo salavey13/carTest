@@ -15,7 +15,7 @@ import { debugLogger as logger } from '@/lib/debugLogger'; // Use debugLogger
 export interface RepoTxtFetcherRef {
     handleFetch: (isManualRetry?: boolean, branchName?: string | null) => Promise<void>;
     selectHighlightedFiles: () => void;
-    handleAddSelected: (autoAskAi?: boolean, filesToAddParam?: Set<string>, allFilesParam?: FileNode[]) => Promise<void>;
+    handleAddSelected: (filesToAddParam?: Set<string>, allFilesParam?: FileNode[]) => Promise<void>; // Removed autoAskAi param here
     handleCopyToClipboard: (textToCopy?: string, shouldScroll?: boolean) => boolean;
     clearAll: () => void;
     getKworkInputValue: () => string;
@@ -130,7 +130,7 @@ interface RepoXmlPageContextType {
     triggerFetch: (isManualRetry?: boolean, branchNameToFetch?: string | null) => Promise<void>;
     triggerGetOpenPRs: (repoUrl: string) => Promise<void>;
     triggerSelectHighlighted: () => void;
-    triggerAddSelectedToKwork: (autoAskAi?: boolean, filesToAddParam?: Set<string>) => Promise<void>;
+    triggerAddSelectedToKwork: (filesToAddParam?: Set<string>) => Promise<void>; // Removed autoAskAi param here
     triggerCopyKwork: () => void;
     triggerAskAi: () => Promise<{ success: boolean; requestId?: string; error?: string }>;
     triggerParseResponse: () => Promise<void>;
@@ -390,15 +390,19 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
                 }, 50); // Small delay (50ms)
 
             } else if (currentTask && !assistantRef.current) {
-                 // THIS IS THE ERROR CASE WE FIXED
                  logger.error("[Context:setFilesFetched] Image task exists, but Assistant ref is missing!");
                  toast.error("Критическая ошибка: Ассистент не найден для замены картинки.");
                  setImageReplaceTaskState(null); // Clear the task if it can't be handled
+                 setAssistantLoadingState(false); // Reset loading too
             } else {
-                 // Standard fetch success (no image task, or ref already handled it)
+                 // Standard fetch success (no image task, or image task already handled)
                  // Set status to success ONLY if not handled by image replace logic
-                 setFetchStatusState('success');
-                 logger.log("[Context:setFilesFetched] Standard file fetch successful or image task initiated.");
+                 // And only if it wasn't already set to 'error' by handleFetch itself
+                 // Use ref read here as fetchStatus state update might be batched
+                 if (fetchStatusRef.current !== 'error') {
+                     setFetchStatusState('success');
+                 }
+                 logger.log("[Context:setFilesFetched] Standard file fetch successful or image task handled.");
             }
         } else {
             // Resetting state when 'fetched' is false
@@ -421,7 +425,14 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
             if (assistantRef.current) assistantRef.current.setResponseValue("");
             if (kworkInputRef.current) kworkInputRef.current.value = "";
         }
-    }, [assistantRef, imageReplaceTask, kworkInputRef]); // Include dependencies
+    // Added fetchStatusRef to read current status without causing infinite loop
+    }, [assistantRef, imageReplaceTask, kworkInputRef, fetchStatusRef]);
+
+    // Ref for fetchStatus read within setFilesFetchedCallback
+    const fetchStatusRef = useRef(fetchStatus);
+    useEffect(() => {
+        fetchStatusRef.current = fetchStatus;
+    }, [fetchStatus]);
 
     const setAllFetchedFilesCallback = useCallback((files: FileNode[]) => setAllFetchedFilesState(files), []);
     const setSelectedFetcherFilesCallback = useCallback((files: Set<string>) => setSelectedFetcherFilesState(files), []);
@@ -513,8 +524,8 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
         else logger.warn("triggerSelectHighlighted: fetcherRef not ready.");
     }, [fetcherRef]);
 
-    const triggerAddSelectedToKwork = useCallback(async (autoAskAi = false, filesToAddParam?: Set<string>) => {
-        if (fetcherRef.current) await fetcherRef.current.handleAddSelected(autoAskAi, filesToAddParam, allFetchedFiles);
+    const triggerAddSelectedToKwork = useCallback(async (filesToAddParam?: Set<string>) => { // Removed autoAskAi param
+        if (fetcherRef.current) await fetcherRef.current.handleAddSelected(filesToAddParam, allFetchedFiles);
         else logger.warn("triggerAddSelectedToKwork: fetcherRef not ready.");
     }, [fetcherRef, allFetchedFiles]);
 
@@ -797,7 +808,7 @@ export const RepoXmlPageProvider: React.FC<RepoXmlPageProviderProps> = ({
          // --- Image Replace Task Flow ---
          if (imageReplaceTask) {
              if (fetchStatus === 'loading' || fetchStatus === 'retrying') return `Извлекаю файл для замены картинки${branchInfo}... ⏳`;
-             if (fetchStatus === 'failed_retries') return `Ошибка извлечения файла для замены картинки${branchInfo}. 😭 Попробовать еще раз?`;
+             if (fetchStatus === 'failed_retries' || fetchStatus === 'error') return `Ошибка извлечения файла для замены картинки${branchInfo}. 😭 Попробовать еще раз?`;
              // assistantLoading here means PR/update process for the image is running
              if (assistantLoading) return `Заменяю картинку и создаю/обновляю PR${branchInfo}... 🤖🖼️⚙️`;
              // If files fetched for image task, but assistant isn't loading yet (brief moment)

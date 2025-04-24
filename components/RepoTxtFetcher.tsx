@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useImperativeHandle, forwardRef, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useImperativeHandle, forwardRef, useRef, useCallback, useMemo } from "react"; // Ensure useRef is imported
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -60,11 +60,14 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
 
   // === Refs ===
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Removed - handled by interval end logic
   const localKworkInputRef = useRef<HTMLTextAreaElement | null>(null);
   const selectionUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const prevSelectedFilesRef = useRef<Set<string>>(new Set());
   const isImageTaskFetchInitiated = useRef(false);
+  const isAutoFetchingRef = useRef(false); // <<<--- ADDED THIS REF GUARD
+  const fetchStatusRef = useRef(fetchStatus); // Ref to read status in interval
+
   useEffect(() => { if (kworkInputRef) kworkInputRef.current = localKworkInputRef.current; }, [kworkInputRef]);
 
   // === Utils ===
@@ -74,8 +77,56 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   const resolveImportPath = useCallback((iP:string, cFP:string, aFN:FileNode[]):string|null=>{const aP=aFN.map(f=>f.path); const sE=['.ts','.tsx','.js','.jsx','.css','.scss','.sql','.md']; const tryP=(bP:string):string|null=>{const pTT:string[]=[]; const hEE=/\.\w+$/.test(bP); if(hEE)pTT.push(bP); else{sE.forEach(e=>pTT.push(bP+e)); sE.forEach(e=>pTT.push(`${bP}/index${e}`));} for(const p of pTT)if(aP.includes(p))return p; return null;}; if(iP.startsWith('@/')){const pSB=['src/','app/','']; const pS=iP.substring(2); for(const b of pSB){const r=tryP(b+pS); if(r)return r;} const cAR=['components/','lib/','utils/','hooks/','contexts/','styles/']; for(const rt of cAR)if(pS.startsWith(rt)){const r=tryP(pS); if(r)return r;}}else if(iP.startsWith('.')){const cD=cFP.includes('/')?cFP.substring(0,cFP.lastIndexOf('/')):''; const pP=(cD?cD+'/'+iP:iP).split('/'); const rP:string[]=[]; for(const pt of pP){if(pt==='.'||pt==='')continue; if(pt==='..'){if(rP.length>0)rP.pop();}else rP.push(pt);} const rRB=rP.join('/'); const r=tryP(rRB); if(r)return r;}else{const sB=['lib/','utils/','components/','hooks/','contexts/','styles/','src/lib/','src/utils/','src/components/','src/hooks/','src/contexts/','src/styles/']; for(const b of sB){const r=tryP(b+iP); if(r)return r;}} return null;}, []);
 
   // --- Enhanced Progress Simulation ---
-  const stopProgressSimulation = useCallback(() => { if (progressIntervalRef.current) clearInterval(progressIntervalRef.current); if (fetchTimeoutRef.current) clearTimeout(fetchTimeoutRef.current); progressIntervalRef.current = null; fetchTimeoutRef.current = null; }, []);
-  const startProgressSimulation = useCallback((estimatedDurationSeconds = 20) => { stopProgressSimulation(); setProgress(0); setError(null); const intervalTime = 150; const steps = (estimatedDurationSeconds * 1000) / intervalTime; let currentStepSim = 0; progressIntervalRef.current = setInterval(() => { setProgress((prev) => { currentStepSim++; const pR = currentStepSim / steps; let eF = 0.5 * (1 - Math.cos(pR * Math.PI)); const j = (Math.random() - 0.5) * 0.05; let tP = Math.min(eF + j, 1) * 100; let cP = prev; let inc = (tP - prev) * (Math.random() * 0.4 + 0.6); if (prev > 85 && (fetchStatus === 'loading' || fetchStatus === 'retrying')) inc *= 0.2; else if (prev > 70) inc *= 0.5; cP += inc; if (fetchStatus === 'loading' || fetchStatus === 'retrying') cP = Math.min(cP, 95); else cP = Math.min(cP, 99.9); return Math.max(0, cP); }); }, intervalTime); fetchTimeoutRef.current = setTimeout(() => { if (progressIntervalRef.current) { clearInterval(progressIntervalRef.current); progressIntervalRef.current = null; if (fetchStatus === 'loading' || fetchStatus === 'retrying') { console.warn("Progress simulation timed out."); setProgress(96); } } fetchTimeoutRef.current = null; }, estimatedDurationSeconds * 1000 + 10000); }, [stopProgressSimulation, fetchStatus]);
+  const stopProgressSimulation = useCallback(() => {
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+  }, []);
+
+  // --- MODIFIED Progress Simulation ---
+  const startProgressSimulation = useCallback((estimatedDurationSeconds = 13) => { // Default to 13s
+      stopProgressSimulation();
+      setProgress(0);
+      setError(null); // Reset error on new simulation start
+
+      const startTime = Date.now();
+      const totalDurationMs = estimatedDurationSeconds * 1000;
+      const intervalTime = 100; // Update interval (e.g., 10 times per second)
+
+      console.log(`[ProgressSim] Starting simulation for ${estimatedDurationSeconds}s.`);
+
+      progressIntervalRef.current = setInterval(() => {
+          const elapsedTime = Date.now() - startTime;
+          const calculatedProgress = Math.min((elapsedTime / totalDurationMs) * 100, 100);
+
+          setProgress(calculatedProgress);
+
+          // Stop the interval if fetch completes early OR simulation time is up
+          const currentFetchStatus = fetchStatusRef.current; // Use a ref to read latest status without causing dependency issues
+          if (currentFetchStatus === 'success' || currentFetchStatus === 'error' || currentFetchStatus === 'failed_retries') {
+              console.log(`[ProgressSim] Fetch status (${currentFetchStatus}) changed, stopping simulation.`);
+              stopProgressSimulation();
+              setProgress(currentFetchStatus === 'success' ? 100 : 0); // Final progress based on status
+          } else if (elapsedTime >= totalDurationMs) {
+              console.log(`[ProgressSim] Simulation duration reached.`);
+              stopProgressSimulation();
+               // If still loading after duration, maybe cap it slightly below 100%
+              if (currentFetchStatus === 'loading' || currentFetchStatus === 'retrying') {
+                  setProgress(98); // Indicate it's *almost* done but timed out
+                  console.warn("[ProgressSim] Simulation timed out while still loading.");
+              } else {
+                 // Should have been caught by status change, but as fallback:
+                 setProgress(100);
+              }
+          }
+      }, intervalTime);
+
+  }, [stopProgressSimulation]); // Keep only stopProgressSimulation as dep
+
+  // --- Update fetchStatusRef whenever fetchStatus changes ---
+  useEffect(() => {
+      fetchStatusRef.current = fetchStatus;
+  }, [fetchStatus]);
+  // --- End Helper Ref Effect ---
 
   // === Core Logic Callbacks ===
   const handleRepoUrlChange = useCallback((url: string) => { setRepoUrlState(url); setRepoUrlEntered(url.trim().length > 0); updateRepoUrlInAssistant(url); setOpenPrs([]); setTargetBranchName(null); setManualBranchName(""); }, [setRepoUrlEntered, updateRepoUrlInAssistant, setOpenPrs, setTargetBranchName, setManualBranchName]);
@@ -85,30 +136,34 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   const handleCopyToClipboard = useCallback((textToCopy?: string, shouldScroll = true): boolean => { const c=textToCopy??getKworkInputValue(); if(!c.trim()){addToast("Нет текста",'warning');return false;} try{navigator.clipboard.writeText(c); addToast("Скопировано!",'success');setRequestCopied(true); if(shouldScroll)scrollToSection('executor');return true;}catch(e){console.error("Copy fail:",e);addToast("Ошибка копирования",'error');return false;} }, [getKworkInputValue, scrollToSection, addToast, setRequestCopied]);
   const handleClearAll = useCallback(() => { console.log("Clearing Fetcher state."); setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set()); updateKworkInput(""); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set()); setRequestCopied(false); addToast("Очищено ✨", 'success'); if (localKworkInputRef.current) localKworkInputRef.current.focus(); }, [ setSelectedFetcherFiles, updateKworkInput, addToast, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setRequestCopied ]);
 
-  // --- Fetch Handler (Final - Simplified Logging, Better State/Image Handling) ---
+  // --- Fetch Handler (Final - Incorporating Simulation and Guard) ---
   const handleFetch = useCallback(async (isManualRetry = false, branchNameToFetch?: string | null) => {
       const effectiveBranch = branchNameToFetch || targetBranchName || manualBranchName || 'default';
       console.log(`Fetcher: Start fetch. Retry: ${isManualRetry}, Branch: ${effectiveBranch}, Status: ${fetchStatus}, Task: ${!!imageReplaceTask}, TaskFetchInit: ${isImageTaskFetchInitiated.current}`);
 
-      // --- Prevent re-fetch loop for image task ---
+      // Prevent re-fetch for image task if already initiated (check remains)
       if (imageReplaceTask && isImageTaskFetchInitiated.current && (fetchStatus === 'loading' || fetchStatus === 'retrying')) {
-          console.warn("Fetcher: Image task fetch already running. Aborting duplicate.");
-          return;
+          console.warn("Fetcher: Image task fetch already running. Aborting duplicate."); return;
       }
+      // Standard checks (URL, existing loading, other busy states)
       if (!repoUrl.trim()) { console.error("Fetcher: URL empty."); addToast("Введите URL", 'error'); setError("URL пуст."); triggerToggleSettingsModal(); return; }
       if ((fetchStatus === 'loading' || fetchStatus === 'retrying') && !isManualRetry) { console.warn("Fetcher: Already fetching."); addToast("Уже идет...", "info"); return; }
       if (assistantLoading || isParsing || aiActionLoading) { console.warn(`Fetcher: Blocked by state.`); addToast("Подождите.", "warning"); return; }
 
       console.log("Fetcher: Proceeding.");
-      setFetchStatus('loading'); // ** SET STATUS FIRST **
+      setFetchStatus('loading'); // Set status FIRST
+      // Reset states
       setError(null); setFiles([]); setSelectedFilesState(new Set()); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setAllFetchedFiles([]); setSelectedFetcherFiles(new Set()); setFilesFetched(false, [], null, []); setRequestCopied(false); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set());
-      if (imageReplaceTask) { isImageTaskFetchInitiated.current = true; updateKworkInput(""); } // Mark started, clear input
+      if (imageReplaceTask) { isImageTaskFetchInitiated.current = true; updateKworkInput(""); }
       else if (!highlightedPathFromUrl && localKworkInputRef.current) { updateKworkInput(ideaFromUrl || DEFAULT_TASK_IDEA); }
-      addToast(`Запрос (${effectiveBranch})...`, 'info'); startProgressSimulation(30); console.log("Fetcher: Sim started.");
+
+      addToast(`Запрос (${effectiveBranch})...`, 'info');
+      startProgressSimulation(13); // <<<--- START SIMULATION
+      console.log("Fetcher: Sim started.");
 
       let result: Awaited<ReturnType<typeof fetchRepoContents>> | null = null;
       let success = false;
-      let finalStatus: FetchStatus = 'error'; // Default to error, explicitly set success
+      let finalStatus: FetchStatus = 'error'; // Default to error
 
       try {
           console.log(`Fetcher: Calling action for branch: ${effectiveBranch}`);
@@ -116,24 +171,40 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
           console.log(`Fetcher: Result: Success=${result?.success}, Files=${result?.files?.length ?? 'N/A'}, Error=${result?.error ?? 'None'}`);
 
           if (result?.success && Array.isArray(result.files)) {
-               success = true; const fetchedFiles = result.files; finalStatus = 'success'; // Assume success unless image task fails below
+               success = true; const fetchedFiles = result.files;
+               finalStatus = 'success'; // Tentative success
 
-               // --- Post-Fetch Logic ---
+               // Post-Fetch Logic (Highlights, Image Check etc.)
                const allPaths=fetchedFiles.map(f=>f.path); let primaryHPath:string|null=null; const catSecPaths:Record<ImportCategory,Set<string>>={component:new Set(),context:new Set(),hook:new Set(),lib:new Set(),other:new Set()}; let filesToSel=new Set<string>();
-               if(imageReplaceTask){primaryHPath=imageReplaceTask.targetPath; if(!allPaths.includes(primaryHPath)){const imgErr=`File (${primaryHPath}) not found in '${effectiveBranch}'.`; console.error(`Fetcher: ${imgErr}`); setError(imgErr); addToast(imgErr,'error'); setFilesFetched(true,fetchedFiles,null,[]); /* Don't set success status yet */ finalStatus='error'; success=false;} else {filesToSel.add(primaryHPath); console.log(`Fetcher: Auto-select image target: ${primaryHPath}`); setSelectedFetcherFiles(filesToSel);}}
+               if(imageReplaceTask){
+                   primaryHPath=imageReplaceTask.targetPath;
+                   if(!allPaths.includes(primaryHPath)){
+                       const imgErr=`File (${primaryHPath}) not found in '${effectiveBranch}'.`;
+                       console.error(`Fetcher: ${imgErr}`); setError(imgErr); addToast(imgErr,'error');
+                       setFilesFetched(true,fetchedFiles,null,[]); // Signal fetch happened, but it's an error state
+                       finalStatus='error'; success=false;
+                   } else { filesToSel.add(primaryHPath); console.log(`Fetcher: Auto-select image target: ${primaryHPath}`); }
+               }
                else if(highlightedPathFromUrl){primaryHPath=getPageFilePath(highlightedPathFromUrl,allPaths); if(primaryHPath){const pF=fetchedFiles.find(f=>f.path===primaryHPath); if(pF){filesToSel.add(primaryHPath); const imps=extractImports(pF.content); for(const imp of imps){const rP=resolveImportPath(imp,pF.path,fetchedFiles); if(rP&&rP!==primaryHPath){const cat=categorizeResolvedPath(rP); catSecPaths[cat].add(rP); if(cat!=='other')filesToSel.add(rP);}}}else{primaryHPath=null; addToast(`Error: Path (${primaryHPath}) not found.`,'error');}} else {addToast(`Page file for URL (${highlightedPathFromUrl}) not found.`,'warning');}}
                if(!imageReplaceTask){importantFiles.forEach(p=>{if(allPaths.includes(p)&&!filesToSel.has(p)){filesToSel.add(p); console.log(`Fetcher: Auto-select important: ${p}`);}}); }
 
-               if(success){ // Only proceed if still considered successful
+               // --- Proceed only if fetch is still considered successful ---
+               if(success){
                    setPrimaryHighlightedPathState(primaryHPath); const finalSecPaths={component:Array.from(catSecPaths.component),context:Array.from(catSecPaths.context),hook:Array.from(catSecPaths.hook),lib:Array.from(catSecPaths.lib),other:Array.from(catSecPaths.other)}; setSecondaryHighlightedPathsState(finalSecPaths);
-                   if(!imageReplaceTask){setSelectedFilesState(filesToSel); setSelectedFetcherFiles(filesToSel);}
-                   setFilesFetched(true,fetchedFiles,primaryHPath,Object.values(finalSecPaths).flat()); // Call context setter
+                   if(!imageReplaceTask){
+                       setSelectedFilesState(filesToSel); // Update local visual selection
+                       setSelectedFetcherFiles(filesToSel); // Update context selection
+                   }
+                   setFilesFetched(true,fetchedFiles,primaryHPath,Object.values(finalSecPaths).flat()); // Call context setter (triggers image replacement if needed)
                    console.log("[Fetcher] setFilesFetched called successfully.");
-                   // --- UI Updates (only if success is still true) ---
-                   addToast(`Fetched ${fetchedFiles.length} files!`, 'success');
+
+                   // UI Updates (only if success and not handled by image task yet)
+                   if (!imageReplaceTask) { addToast(`Fetched ${fetchedFiles.length} files!`, 'success'); }
                    setFiles(fetchedFiles); setAllFetchedFiles(fetchedFiles); if(isSettingsModalOpen) triggerToggleSettingsModal();
-                   if(imageReplaceTask&&primaryHPath){addToast(`Auto-selected for replace: ${primaryHPath}`,'info');}
-                   else if(highlightedPathFromUrl&&ideaFromUrl&&filesToSel.size>0){ /* ... URL param toast ... */ const nS=catSecPaths.component.size+catSecPaths.context.size+catSecPaths.hook.size+catSecPaths.lib.size; const nI=filesToSel.size-(primaryHPath?1:0)-nS; let msg=`✅ Auto-select: `; const pts=[]; if(primaryHPath)pts.push(`1 стр`); if(nS>0)pts.push(`${nS} связ`); if(nI>0)pts.push(`${nI} важн`); msg+=pts.join(', ')+` (${filesToSel.size} total). Idea added.`; addToast(msg,'success'); updateKworkInput(ideaFromUrl||DEFAULT_TASK_IDEA); await handleAddSelected(filesToSel,fetchedFiles); setTimeout(()=>{addToast("💡 Add instructions!", "info");}, 500);}
+
+                   // Toasts and auto-actions for DIFFERENT flows
+                   if(imageReplaceTask && primaryHPath){ addToast(`Auto-selected for replace: ${primaryHPath}`,'info'); }
+                   else if(highlightedPathFromUrl && ideaFromUrl && filesToSel.size > 0 && !imageReplaceTask){ /* ... URL param toast and actions ... */ const nS=catSecPaths.component.size+catSecPaths.context.size+catSecPaths.hook.size+catSecPaths.lib.size; const nI=filesToSel.size-(primaryHPath?1:0)-nS; let msg=`✅ Auto-select: `; const pts=[]; if(primaryHPath)pts.push(`1 стр`); if(nS>0)pts.push(`${nS} связ`); if(nI>0)pts.push(`${nI} важн`); msg+=pts.join(', ')+` (${filesToSel.size} total). Idea added.`; addToast(msg,'success'); updateKworkInput(ideaFromUrl||DEFAULT_TASK_IDEA); await handleAddSelected(filesToSel,fetchedFiles); setTimeout(()=>{addToast("💡 Add instructions!", "info");}, 500); }
                    else if(!imageReplaceTask){ /* ... Standard toast & scroll ... */ if(filesToSel.size>0){const nH=catSecPaths.component.size+catSecPaths.context.size+catSecPaths.hook.size+catSecPaths.lib.size; const nI=filesToSel.size-(primaryHPath?1:0)-nH; let msg=`Auto-selected: `; const pts=[]; if(primaryHPath)pts.push(`1 осн`); if(nH>0)pts.push(`${nH} связ`); if(nI>0)pts.push(`${nI} важн`); msg+=pts.join(', ')+'.'; addToast(msg,'info');} if(primaryHPath){setTimeout(()=>{const eId=`file-${primaryHPath}`; const el=document.getElementById(eId); if(el){el.scrollIntoView({behavior:"smooth",block:"center"}); el.classList.add('ring-2','ring-offset-1','ring-offset-gray-900','ring-cyan-400','rounded-md'); setTimeout(()=>el.classList.remove('ring-2','ring-offset-1','ring-offset-gray-900','ring-cyan-400','rounded-md'),2500);}},400);}else if(fetchedFiles.length>0){const el=document.getElementById('file-list-container'); el?.scrollIntoView({behavior:"smooth",block:"nearest"});}}}
                 // End success block
           } else {
@@ -147,14 +218,23 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
           setFilesFetched(false, [], null, []); // Signal failure
           success = false; finalStatus = 'error'; // Ensure flags are set
       } finally {
-           // --- CRUCIAL: Reset loading states and set final status ---
-           stopProgressSimulation();
+           // --- CRUCIAL: Stop simulation and set final status/progress ---
+           stopProgressSimulation(); // <<<--- STOP SIMULATION
            setProgress(success ? 100 : 0);
-           setFetchStatus(finalStatus); // ** SET FINAL STATUS HERE **
+           setFetchStatus(finalStatus); // <<<--- SET FINAL STATUS
            if (imageReplaceTask) { isImageTaskFetchInitiated.current = false; } // Reset image task flag
-           console.log(`Fetcher: Finished. Success: ${success}, Final Status Set: ${finalStatus}`);
+           console.log(`Fetcher: Finished. Success: ${success}, Final Status Set: ${fetchStatusRef.current}`); // Log the status just set
       }
- }, [ /* Keep ALL dependencies */ repoUrl, token, fetchStatus, imageReplaceTask, assistantLoading, isParsing, aiActionLoading, repoUrlEntered, setFetchStatus, setFiles, setSelectedFilesState, setProgress, setError, setAllFetchedFiles, setPrimaryHighlightedPathState, setSecondaryHighlightedPathsState, setSelectedFetcherFiles, setFilesFetched, setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, highlightedPathFromUrl, ideaFromUrl, importantFiles, DEFAULT_TASK_IDEA, addToast, startProgressSimulation, stopProgressSimulation, getLanguage, getPageFilePath, extractImports, resolveImportPath, categorizeResolvedPath, handleAddSelected, getKworkInputValue, scrollToSection, setKworkInputHasContent, isSettingsModalOpen, triggerToggleSettingsModal, updateKworkInput, triggerAskAi, localKworkInputRef, manualBranchName, targetBranchName ]);
+  }, [ /* Added start/stop simulation, removed local fetchStatus read */
+        repoUrl, token, imageReplaceTask, assistantLoading, isParsing, aiActionLoading, repoUrlEntered,
+        setFetchStatus, setFiles, setSelectedFilesState, setProgress, setError, setAllFetchedFiles,
+        setPrimaryHighlightedPathState, setSecondaryHighlightedPathsState, setSelectedFetcherFiles, setFilesFetched,
+        setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles,
+        highlightedPathFromUrl, ideaFromUrl, importantFiles, DEFAULT_TASK_IDEA, addToast,
+        startProgressSimulation, stopProgressSimulation, // Added dependencies
+        getLanguage, getPageFilePath, extractImports, resolveImportPath, categorizeResolvedPath, handleAddSelected,
+        getKworkInputValue, scrollToSection, setKworkInputHasContent, isSettingsModalOpen, triggerToggleSettingsModal,
+        updateKworkInput, triggerAskAi, localKworkInputRef, manualBranchName, targetBranchName ]);
 
 
   // --- Other Callbacks ---
@@ -170,8 +250,46 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
 
   // --- Effects ---
   useEffect(() => { setRepoUrlEntered(repoUrl.trim().length > 0); updateRepoUrlInAssistant(repoUrl); }, [repoUrl, setRepoUrlEntered, updateRepoUrlInAssistant]);
-  useEffect(() => { const branch = targetBranchName || manualBranchName || null; if (autoFetch && repoUrl && (fetchStatus === 'idle' || fetchStatus === 'failed_retries' || fetchStatus === 'error') && (!imageReplaceTask || !isImageTaskFetchInitiated.current)) { console.log(`[AutoFetch Effect] Triggering fetch. ImageTask: ${!!imageReplaceTask}, Initiated: ${isImageTaskFetchInitiated.current}`); handleFetch(false, branch); } else if (autoFetch && imageReplaceTask && isImageTaskFetchInitiated.current) { console.log("[AutoFetch Effect] Skipping: Image task fetch already initiated."); } }, [repoUrl, autoFetch, fetchStatus, targetBranchName, manualBranchName, imageReplaceTask, handleFetch]);
+
+  // --- MODIFIED AutoFetch Effect (Using Guard) ---
+  useEffect(() => {
+    const branch = targetBranchName || manualBranchName || null;
+    const canTriggerFetch = autoFetch && repoUrl &&
+                           (fetchStatus === 'idle' || fetchStatus === 'failed_retries' || fetchStatus === 'error');
+
+    const isImageFetchReady = !imageReplaceTask || !isImageTaskFetchInitiated.current;
+
+    // Only trigger if conditions met AND not already auto-fetching
+    if (canTriggerFetch && isImageFetchReady && !isAutoFetchingRef.current) {
+        console.log(`[AutoFetch Effect] Triggering fetch. Guard Active. ImageTask: ${!!imageReplaceTask}, Initiated: ${isImageTaskFetchInitiated.current}`);
+        isAutoFetchingRef.current = true; // Set the guard
+
+        handleFetch(false, branch)
+            .catch(err => {
+                // Ensure guard is reset even if handleFetch itself throws an unexpected error
+                console.error("[AutoFetch Effect] handleFetch threw an error:", err);
+            })
+            .finally(() => {
+                // Reset the guard slightly after completion to allow state to settle
+                setTimeout(() => {
+                    console.log("[AutoFetch Effect] Resetting fetch guard.");
+                    isAutoFetchingRef.current = false;
+                }, 300); // Small delay (e.g., 300ms)
+            });
+
+    } else if (autoFetch && imageReplaceTask && isImageTaskFetchInitiated.current) {
+        console.log("[AutoFetch Effect] Skipping: Image task fetch already initiated.");
+    } else if (canTriggerFetch && isAutoFetchingRef.current) {
+        console.log("[AutoFetch Effect] Skipping: Guard is already active.");
+    }
+
+  // Keep dependencies the same, the guard logic controls the execution
+  }, [repoUrl, autoFetch, fetchStatus, targetBranchName, manualBranchName, imageReplaceTask, handleFetch]);
+  // --- End MODIFIED AutoFetch Effect ---
+
   useEffect(() => { if(files.length===0||imageReplaceTask||fetchStatus!=='success'){prevSelectedFilesRef.current=new Set(selectedFiles); return;} const newSelPaths=new Set<string>(); selectedFiles.forEach(p=>{if(!prevSelectedFilesRef.current.has(p)){newSelPaths.add(p);}}); if(primaryHighlightedPath&&selectedFiles.has(primaryHighlightedPath)&&!prevSelectedFilesRef.current.has(primaryHighlightedPath)&&!newSelPaths.has(primaryHighlightedPath)){newSelPaths.add(primaryHighlightedPath);} if(newSelPaths.size===0){prevSelectedFilesRef.current=new Set(selectedFiles); return;} const pgSuffixes=['/page.tsx','/page.js','/index.tsx','/index.js']; const filesToCheck=Array.from(newSelPaths).filter(p=>pgSuffixes.some(s=>p.endsWith(s))||p===primaryHighlightedPath); if(filesToCheck.length>0){const relatedToSel=new Set<string>(); let foundCount=0; filesToCheck.forEach(fp=>{const fNode=files.find(f=>f.path===fp); if(fNode){const imps=extractImports(fNode.content); imps.forEach(imp=>{const rP=resolveImportPath(imp,fNode.path,files); if(rP&&rP!==fp){const cat=categorizeResolvedPath(rP); if(cat!=='other'){if(!selectedFiles.has(rP)){relatedToSel.add(rP); foundCount++;}}}});}}); if(relatedToSel.size>0){const finalSel=new Set([...selectedFiles,...relatedToSel]); setSelectedFilesState(finalSel); setSelectedFetcherFiles(finalSel); addToast(`🔗 Авто-добавлено ${foundCount} связанных`,'info'); prevSelectedFilesRef.current=finalSel; return;}} prevSelectedFilesRef.current=new Set(selectedFiles); }, [selectedFiles, files, fetchStatus, primaryHighlightedPath, extractImports, resolveImportPath, categorizeResolvedPath, setSelectedFetcherFiles, addToast, imageReplaceTask]);
+
+  // --- Cleanup Simulation on Unmount ---
   useEffect(() => { return () => stopProgressSimulation(); }, [stopProgressSimulation]);
 
   // === Imperative Handle ===
@@ -193,7 +311,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
     <div id="extractor" className="w-full p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm text-gray-200 font-mono rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] border border-gray-700/50 relative overflow-hidden">
       {/* Header */}
        <div className="flex justify-between items-start mb-4 gap-4 flex-wrap">
-            <div> <h2 className="text-xl md:text-2xl font-bold tracking-tight text-emerald-400 mb-2 flex items-center gap-2"> <FaDownload className="text-purple-400" /> Кибер-Экстрактор Кода </h2> {!imageReplaceTask && ( <> <p className="text-yellow-300/80 text-xs md:text-sm mb-1">1. Настрой URL/токен/ветку (<FaCodeBranch className="inline text-cyan-400 cursor-pointer hover:underline" onClick={triggerToggleSettingsModal}/>).</p> <p className="text-yellow-300/80 text-xs md:text-sm mb-1">2. Жми <span className="font-bold text-purple-400 mx-1">"Извлечь файлы"</span>.</p> <p className="text-yellow-300/80 text-xs md:text-sm mb-1">3. Выбери файлы для контекста.</p> <p className="text-yellow-300/80 text-xs md:text-sm mb-2">4. Опиши задачу ИЛИ добавь файлы (<FaPlus className="inline text-sm"/>).</p> <p className="text-yellow-300/80 text-xs md:text-sm mb-2">5. Жми <span className="font-bold text-blue-400 mx-1">"Спросить AI"</span> или скопируй <FaCopy className="inline text-sm mx-px"/>.</p> </> )} {imageReplaceTask && ( <p className="text-blue-300/80 text-xs md:text-sm mb-2">Загрузка файла для замены картинки...</p> )} </div>
+            <div> <h2 className="text-xl md:text-2xl font-bold tracking-tight text-emerald-400 mb-2 flex items-center gap-2"> <FaDownload className="text-purple-400" /> Кибер-Экстрактор Кода </h2> {!imageReplaceTask && ( <> <p className="text-yellow-300/80 text-xs md:text-sm mb-1">1. Настрой URL/токен/ветку (<FaCodeBranch className="inline text-cyan-400 cursor-pointer hover:underline" onClick={triggerToggleSettingsModal}/>).</p> <p className="text-yellow-300/80 text-xs md:text-sm mb-1">2. Жми <span className="font-bold text-purple-400 mx-1">"Извлечь файлы"</span>.</p> <p className="text-yellow-300/80 text-xs md:text-sm mb-1">3. Выбери файлы для контекста.</p> <p className="text-yellow-300/80 text-xs md:text-sm mb-1">4. Опиши задачу ИЛИ добавь файлы (<FaPlus className="inline text-sm"/>).</p> <p className="text-yellow-300/80 text-xs md:text-sm mb-2">5. Жми <span className="font-bold text-blue-400 mx-1">"Спросить AI"</span> или скопируй <FaCopy className="inline text-sm mx-px"/>.</p> </> )} {imageReplaceTask && ( <p className="text-blue-300/80 text-xs md:text-sm mb-2">Загрузка файла для замены картинки...</p> )} </div>
             <motion.button onClick={triggerToggleSettingsModal} disabled={isFetchDisabled} whileHover={{ scale: isFetchDisabled ? 1 : 1.1, rotate: isSettingsModalOpen ? 10 : -10 }} whileTap={{ scale: isFetchDisabled ? 1 : 0.95 }} title={isSettingsModalOpen ? "Скрыть" : "Настройки"} aria-label={isSettingsModalOpen ? "Скрыть настройки" : "Показать настройки"} aria-expanded={isSettingsModalOpen} className="p-2 bg-gray-700/50 rounded-full hover:bg-gray-600/70 transition-colors flex-shrink-0 disabled:opacity-50"> {isSettingsModalOpen ? <FaAngleUp className="text-cyan-400 text-xl" /> : <FaAngleDown className="text-cyan-400 text-xl" />} </motion.button>
         </div>
       {/* Settings Modal */}
@@ -205,11 +323,11 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       {/* Progress Bar & Status Area */}
        {showProgressBar && ( /* Use flag */
             <div className="mb-4 min-h-[40px]">
-                <ProgressBar status={fetchStatus === 'failed_retries' ? 'error' : fetchStatus} progress={fetchStatus === 'success' ? 100 : (fetchStatus === 'error' || fetchStatus === 'failed_retries' ? 0 : progress)} />
+                <ProgressBar status={fetchStatus === 'failed_retries' ? 'error' : fetchStatus} progress={progress} />
                  {isLoading && <p className="text-cyan-300 text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? '(Повтор)' : ''}</p>}
                  {isParsing && <p className="text-yellow-400 text-xs font-mono mt-1 text-center animate-pulse">Разбор ответа...</p>}
-                 {fetchStatus === 'success' && files.length > 0 && ( <div className="text-center text-xs font-mono mt-1 text-green-400 flex items-center justify-center gap-1"> <FaCircleCheck /> {`Успешно ${files.length} файлов из '${effectiveBranchDisplay}'.`} </div> )}
-                 {fetchStatus === 'success' && files.length === 0 && ( <div className="text-center text-xs font-mono mt-1 text-yellow-400 flex items-center justify-center gap-1"> <FaCircleCheck /> {`Успешно, 0 файлов в '${effectiveBranchDisplay}'.`} </div> )}
+                 {fetchStatus === 'success' && files.length > 0 && !imageReplaceTask && ( <div className="text-center text-xs font-mono mt-1 text-green-400 flex items-center justify-center gap-1"> <FaCircleCheck /> {`Успешно ${files.length} файлов из '${effectiveBranchDisplay}'.`} </div> )}
+                 {fetchStatus === 'success' && files.length === 0 && !imageReplaceTask && ( <div className="text-center text-xs font-mono mt-1 text-yellow-400 flex items-center justify-center gap-1"> <FaCircleCheck /> {`Успешно, 0 файлов в '${effectiveBranchDisplay}'.`} </div> )}
                  {fetchStatus === 'success' && imageReplaceTask && files.length > 0 && ( <div className="text-center text-xs font-mono mt-1 text-green-400 flex items-center justify-center gap-1"> <FaCircleCheck /> {`Файл ${imageReplaceTask.targetPath.split('/').pop()} загружен.`} </div> )}
                  {(fetchStatus === 'error' || fetchStatus === 'failed_retries') && error && ( <div className="text-center text-xs font-mono mt-1 text-red-400 flex items-center justify-center gap-1"> <FaXmark /> {error} </div> )}
             </div>
