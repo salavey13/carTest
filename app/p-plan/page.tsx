@@ -9,8 +9,8 @@ import { useAppContext } from "@/contexts/AppContext";
 
 
 import {
-  FaFileAlt, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom,
-  FaMobileAlt, FaComments, FaPaintBrush, FaBrain, FaRocket, FaUserNinja,
+  FaFileLines, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom,
+  FaMobileAlt, FaComments, FaPaintbrush, FaBrain, FaRocket, FaUserNinja,
   FaMoneyBillWave, FaTriangleExclamation, FaUserAstronaut, FaSignature,
   FaRecycle, FaCode, FaVideo, FaNewspaper, FaGithub, FaTelegram, FaCarBurst,
   FaRobot, FaGift, FaHandshake, FaBomb, FaFlaskVial, FaInfinity, FaDumbbell,
@@ -27,8 +27,8 @@ type DbUser = Database["public"]["Tables"]["users"]["Row"] | null;
 // --- Карта Компонентов Иконок (Для RenderContent) ---
 // Убедимся, что ВСЕ иконки, используемые в маркерах, здесь есть
 const iconComponents: { [key: string]: React.ElementType } = {
-  FaFileAlt, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom, FaFlaskVial,
-  FaMobileAlt, FaComments, FaPaintBrush, FaBrain, FaRocket, FaUserNinja, FaInfinity, FaDumbbell,
+  FaFileLines, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom, FaFlaskVial,
+  FaMobileAlt, FaComments, FaPaintbrush, FaBrain, FaRocket, FaUserNinja, FaInfinity, FaDumbbell,
   FaMoneyBillWave, FaTriangleExclamation, FaUserAstronaut, FaSignature, FaEye,
   FaRecycle, FaCode, FaVideo, FaNewspaper, FaGithub, FaTelegram, FaCarBurst,
   FaRobot, FaGift, FaHandshake, FaBomb, FaHatWizard, FaPoo, FaKey, FaBolt, FaScroll,
@@ -218,7 +218,7 @@ const getPlanSections = (dbUser: DbUser) => {
       title: "5. Неоновые Сигналы: Призыв Пробужденных",
       icon: FaBullseye,
       color: "text-neon-lime",
-      content: `- ::FaPaintBrush className="inline text-neon-lime":: **Контент - Твой Сигнал:** Делай то, что **вибрирует**! Делись процессом. AI (::FaAtom className="inline text-purple-400"::) – твоя **нейро-фабрика** (текст, видео, арт). **ПРАВДА. ПОЛЬЗА. VIBE.** (TG, VK, YouTube?).
+      content: `- ::FaPaintbrush className="inline text-neon-lime":: **Контент - Твой Сигнал:** Делай то, что **вибрирует**! Делись процессом. AI (::FaAtom className="inline text-purple-400"::) – твоя **нейро-фабрика** (текст, видео, арт). **ПРАВДА. ПОЛЬЗА. VIBE.** (TG, VK, YouTube?).
       - ::FaComments className="inline text-neon-lime":: **Создай Свой "Зион" (::FaTelegram className="inline text-blue-400"::):** Твой чат – **последний оплот свободы**. **Общайся! Помогай! Вдохновляй!** Лояльность > охватов.
       - ::FaGithub className="inline text-neon-lime":: **GitHub - Голодек для Гиков:** Код как искусство.
       - **Альянсы (::FaHandshake::):** Объединяйся с другими **хакерами реальности**.
@@ -253,7 +253,7 @@ const getPlanSections = (dbUser: DbUser) => {
       icon: FaMoneyBillWave,
       color: "text-brand-yellow",
       content: `Стартовый капитал – это **искра**, чтобы зажечь твой **внутренний огонь**. Приоритеты:
-      - **::FaUserAstronaut className="inline text-yellow-400":: 1. ТВОЕ ВРЕМЯ НА ТРАНСМУТАЦИЮ (Приоритет #1):** Чтобы ты (${userName}) **вырвался из Матрицы** и мог **творить**: контент ::FaPaintBrush::, VIBE/AI ::FaBrain::, Орден ::FaUsers::. Это **инвестиция в твой ЛИЧНЫЙ Философский Камень**!
+      - **::FaUserAstronaut className="inline text-yellow-400":: 1. ТВОЕ ВРЕМЯ НА ТРАНСМУТАЦИЮ (Приоритет #1):** Чтобы ты (${userName}) **вырвался из Матрицы** и мог **творить**: контент ::FaPaintbrush::, VIBE/AI ::FaBrain::, Орден ::FaUsers::. Это **инвестиция в твой ЛИЧНЫЙ Философский Камень**!
       - **::FaBullseye className="inline text-yellow-400":: 2. ОХОТА НА "ЗОЛОТЫЕ ДУШИ" (Приоритет #2):** Найти **первых**, кто **заплатит за твою магию**. **Быстрые деньги = топливо для веры**.
       - **::FaBrain className="inline text-yellow-400":: 3. АПГРЕЙД ТВОЕЙ СИЛЫ (Приоритет #3):** Доступ к **мощнейшим AI-гримуарам** ::FaScroll::, секреты "нейро-маркетинга". Стань **Верховным Магом VIBE**.
       - **::FaTriangleExclamation className="inline text-yellow-400":: 4. "ЩИТ ВЕРЫ" (Резерв):** На случай **критического сбоя** ::FaBomb:: или если AI потребует дань.
