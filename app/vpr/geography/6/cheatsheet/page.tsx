@@ -7,19 +7,20 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+// CORRECTED Tooltip import casing
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+} from "@/components/ui/Tooltip";
+// Standardized ALL icon imports from react-icons/fa6
 import {
-    FaGlobeAmericas, // Keep for World Map section title
-    FaWater, FaCompass, FaRulerCombined, FaMountain, FaUserSecret,
-    FaThermometerHalf, FaCloudSunRain, FaWind, FaTree, FaPaw, FaGlobeEurope, // Use GlobeEurope for оболочки
-    FaTable, FaRegCompass, FaImage, FaMapLocationDot,
-    FaBookOpen, FaMap, FaUsers, FaBookAtlas // Replaced FaAtlas with FaBookAtlas
+    FaGlobeAmericas, FaWater, FaCompass, FaRulerCombined, FaMountainSun, // Replaced FaMountain
+    FaUserSecret, FaTemperatureHalf, // Replaced FaThermometerHalf
+    FaCloudSunRain, FaWind, FaTree, FaPaw, FaGlobeEurope, FaTable, FaRegCompass,
+    FaImage, FaMapLocationDot, // Replaced FaMapMarkedAlt
+    FaBookOpen, FaMap, FaUsers, FaBookAtlas, FaSmog, FaSatelliteDish // Added missing + Replaced FaAtlas
 } from "react-icons/fa6";
 
-// --- Tooltip Descriptions ---
+// --- Tooltip Descriptions (Keep as is) ---
 const tooltipDescriptions: Record<string, string> = {
     'continents-*.png': "Карта мира с выделенными и подписанными 6 материками (Евразия, Африка, Сев. Америка, Юж. Америка, Австралия, Антарктида) и 4 основными океанами (Тихий, Атлантический, Индийский, Северный Ледовитый). Важно помнить их взаимное расположение и примерные очертания.",
     'latitude-*.png': "Земной шар с градусной сеткой. Параллели (горизонтальные линии) показывают широту (от 0° на экваторе до 90° на полюсах, северная или южная). Меридианы (вертикальные линии) показывают долготу (от 0° на Гринвиче до 180°, западная или восточная). Координаты точки - это пересечение ее параллели и меридиана.",
@@ -79,7 +80,8 @@ const VprGeographyCheatsheet6: NextPage = () => {
             <TooltipProvider delayDuration={150}>
                 <main className="flex-grow container mx-auto px-4 py-12 md:py-16">
                     <h1 className="text-3xl md:text-5xl font-bold mb-8 text-center text-brand-green cyber-text glitch" data-text="ВПР География 6 класс: Шпаргалка">
-                        <FontAwesomeIcon icon={FaBookOpen} className="mr-3 text-brand-green/80" />
+                        {/* Use Fa6 icon */}
+                        <FaBookOpen className="mr-3 text-brand-green/80 inline-block" />
                         ВПР География 6 класс: Шпаргалка
                     </h1>
 
@@ -90,23 +92,26 @@ const VprGeographyCheatsheet6: NextPage = () => {
                             </p>
                          </CardHeader>
 
-                        <CardContent className="space-y-16 p-4 md:p-8"> {/* Increased space between sections */}
+                        <CardContent className="space-y-16 p-4 md:p-8">
 
                             {/* Section: Карта Мира */}
                             <section className="space-y-6">
                                 <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-cyan-400 mb-4 border-b-2 border-cyan-500/40 pb-3">
-                                    <FontAwesomeIcon icon={FaGlobeAmericas} className="mr-3 text-cyan-400/80 fa-fw" /> Карта Мира: Основы
+                                    {/* Use Fa6 icon */}
+                                    <FaGlobeAmericas className="mr-3 text-cyan-400/80 fa-fw" /> Карта Мира: Основы
                                 </h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                                     {/* Subsection: Материки и Океаны */}
                                     <div className="border-l-4 border-cyan-700 pl-4">
-                                        <h3 className="flex items-center text-xl font-semibold text-cyan-300 mb-3"> <FontAwesomeIcon icon={FaWater} className="mr-2 text-cyan-300/80 fa-fw" /> Материки и Океаны </h3>
+                                         {/* Use Fa6 icon */}
+                                        <h3 className="flex items-center text-xl font-semibold text-cyan-300 mb-3"> <FaWater className="mr-2 text-cyan-300/80 fa-fw" /> Материки и Океаны </h3>
                                         <p className="text-gray-300 text-base md:text-lg mb-4">Необходимо уверенно находить на карте 6 материков (Евразия, Африка, Северная Америка, Южная Америка, Австралия, Антарктида) и 4-5 океанов (Тихий, Атлантический, Индийский, Северный Ледовитый; Южный). Обращай внимание на их относительные размеры и расположение друг относительно друга (кто соседи?).</p>
                                         <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/continents-99913414-d4cb-4624-9779-6a7498cbf67a.png" alt="Материки и океаны: Где какой?" width={600} height={338} tooltipKeyPart="continents-*.png" aspect="square" />
                                     </div>
                                     {/* Subsection: Координаты и Направления */}
                                     <div className="border-l-4 border-cyan-700 pl-4">
-                                        <h3 className="flex items-center text-xl font-semibold text-cyan-300 mb-3"> <FontAwesomeIcon icon={FaCompass} className="mr-2 text-cyan-300/80 fa-fw" /> Координаты и Направления </h3>
+                                         {/* Use Fa6 icon */}
+                                        <h3 className="flex items-center text-xl font-semibold text-cyan-300 mb-3"> <FaCompass className="mr-2 text-cyan-300/80 fa-fw" /> Координаты и Направления </h3>
                                         <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg mb-4">
                                             <li><strong>Географические координаты:</strong> Широта (градусы к северу или югу от экватора, 0-90°, с.ш./ю.ш.) + Долгота (градусы к западу или востоку от Гринвича, 0-180°, з.д./в.д.). Практикуйся находить точку по координатам и определять координаты заданного объекта.</li>
                                             <li><strong>Стороны горизонта:</strong> Определяй направление от одного объекта к другому (например, Африка находится к югу от Евразии, Тихий океан к востоку от Азии). Используй основные (С, Ю, З, В) и промежуточные (СЗ, СВ, ЮЗ, ЮВ) направления.</li>
@@ -114,14 +119,16 @@ const VprGeographyCheatsheet6: NextPage = () => {
                                         <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/latitude-d685bb88-e694-408c-b01d-d285edc6ff29.png" alt="Координаты: Широта и долгота?" width={400} height={400} tooltipKeyPart="latitude-*.png" aspect="square" />
                                     </div>
                                     {/* Subsection: Путешественники */}
-                                    <div className="border-l-4 border-cyan-700 pl-4 lg:col-span-1 md:col-span-2"> {/* Span 2 on md if needed */}
-                                        <h3 className="flex items-center text-xl font-semibold text-cyan-300 mb-3"> <FontAwesomeIcon icon={FaUserSecret} className="mr-2 text-cyan-300/80 fa-fw" /> Великие Путешественники </h3>
+                                    <div className="border-l-4 border-cyan-700 pl-4 lg:col-span-1 md:col-span-2">
+                                         {/* Use Fa6 icon */}
+                                        <h3 className="flex items-center text-xl font-semibold text-cyan-300 mb-3"> <FaUserSecret className="mr-2 text-cyan-300/80 fa-fw" /> Великие Путешественники </h3>
                                         <p className="text-gray-300 text-base md:text-lg mb-4">Узнавай по портретам и кратко опиши главные открытия/маршруты (особенно тех, кто связан с материками А и Б из задания 1 ВПР). Например: Магеллан (доказал шарообразность Земли), Колумб (путь в Америку), Васко да Гама (морской путь в Индию), Джеймс Кук (Тихий океан), Беллинсгаузен и Лазарев (Антарктида), Тасман и Миклухо-Маклай (Австралия, Океания).</p>
                                         <ImageWithTooltip src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/explorers-673a4b3e-1fdb-42e3-bc14-990493afe92d.png" alt="Путешественники: Узнаешь их?" width={600} height={338} tooltipKeyPart="explorers-*.png" aspect="video" />
                                     </div>
                                     {/* Subsection: Географические Объекты по описанию */}
-                                     <div className="border-l-4 border-cyan-700 pl-4 md:col-span-2 lg:col-span-3"> {/* Span full width on lg */}
-                                        <h3 className="flex items-center text-xl font-semibold text-cyan-300 mb-3"> <FontAwesomeIcon icon={FaImage} className="mr-2 text-cyan-300/80 fa-fw" /> Узнаем по Описанию / Фото / Снимку </h3>
+                                     <div className="border-l-4 border-cyan-700 pl-4 md:col-span-2 lg:col-span-3">
+                                         {/* Use Fa6 icon */}
+                                        <h3 className="flex items-center text-xl font-semibold text-cyan-300 mb-3"> <FaImage className="mr-2 text-cyan-300/80 fa-fw" /> Узнаем по Описанию / Фото / Снимку </h3>
                                         <p className="text-gray-300 text-base md:text-lg">Часто нужно определить крупный географический объект (остров, полуостров, горы, равнину, реку, озеро, море, залив, пролив) по его характерным чертам, краткому описанию или космическому снимку. Обращай внимание на форму, размеры, положение относительно других объектов, климатические особенности. Пример: Мадагаскар (крупный остров у Африки), Амазонка (самая полноводная река в Южной Америке), Анды (длинные горы на западе Южной Америки), Гималаи (высочайшие горы в Азии), Аравийский п-ов (крупнейший полуостров).</p>
                                     </div>
                                 </div>
@@ -130,12 +137,14 @@ const VprGeographyCheatsheet6: NextPage = () => {
                             {/* Section: Топографическая Карта */}
                             <section className="space-y-6 border-t-2 border-orange-500/30 pt-8">
                                 <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-orange-400 mb-4 border-b-2 border-orange-500/40 pb-3">
-                                    <FontAwesomeIcon icon={FaMapLocationDot} className="mr-3 text-orange-400/80 fa-fw" /> Топографическая Карта: Читаем Местность
+                                     {/* Use Fa6 icon */}
+                                    <FaMapLocationDot className="mr-3 text-orange-400/80 fa-fw" /> Топографическая Карта: Читаем Местность
                                 </h2>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                     {/* Subsection: Масштаб и Расстояния */}
                                     <div className="border-l-4 border-orange-700 pl-4">
-                                        <h3 className="flex items-center text-xl font-semibold text-orange-300 mb-3"> <FontAwesomeIcon icon={FaRulerCombined} className="mr-2 text-orange-300/80 fa-fw" /> Масштаб и Расстояния </h3>
+                                         {/* Use Fa6 icon */}
+                                        <h3 className="flex items-center text-xl font-semibold text-orange-300 mb-3"> <FaRulerCombined className="mr-2 text-orange-300/80 fa-fw" /> Масштаб и Расстояния </h3>
                                         <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg mb-4">
                                             <li><strong>Виды масштаба:</strong> Численный (дробь, 1:10000) показывает степень уменьшения. Именованный (текстом, в 1 см - 100 м) удобен для расчетов. Линейный (график) для измерения циркулем.</li>
                                             <li><strong>Измерение:</strong> Приложи линейку к карте, измерь расстояние между точками в сантиметрах.</li>
@@ -147,7 +156,8 @@ const VprGeographyCheatsheet6: NextPage = () => {
 
                                     {/* Subsection: Направления и Азимут */}
                                     <div className="border-l-4 border-orange-700 pl-4">
-                                        <h3 className="flex items-center text-xl font-semibold text-orange-300 mb-3"> <FontAwesomeIcon icon={FaRegCompass} className="mr-2 text-orange-300/80 fa-fw" /> Направления и Азимут </h3>
+                                        {/* Use Fa6 icon */}
+                                        <h3 className="flex items-center text-xl font-semibold text-orange-300 mb-3"> <FaRegCompass className="mr-2 text-orange-300/80 fa-fw" /> Направления и Азимут </h3>
                                         <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg mb-4">
                                             <li><strong>Стороны горизонта:</strong> Основные (Север, Юг, Запад, Восток) и промежуточные (Северо-Запад, Северо-Восток, Юго-Запад, Юго-Восток). Умей определять их на карте (обычно север сверху).</li>
                                             <li><strong>Определение направления:</strong> Мысленно встань в начальную точку, посмотри на конечную и определи, в каком секторе она находится (например, школа находится от моста на юго-восток).</li>
@@ -158,7 +168,8 @@ const VprGeographyCheatsheet6: NextPage = () => {
 
                                     {/* Subsection: Рельеф и Условные Знаки */}
                                     <div className="border-l-4 border-orange-700 pl-4">
-                                        <h3 className="flex items-center text-xl font-semibold text-orange-300 mb-3"> <FontAwesomeIcon icon={FaMountain} className="mr-2 text-orange-300/80 fa-fw" /> Рельеф и Условные Знаки </h3>
+                                        {/* Use Fa6 icon */}
+                                        <h3 className="flex items-center text-xl font-semibold text-orange-300 mb-3"> <FaMountainSun className="mr-2 text-orange-300/80 fa-fw" /> Рельеф и Условные Знаки </h3>
                                         <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg mb-4">
                                             <li><strong>Горизонтали (Изогипсы):</strong> Линии, соединяющие точки с одинаковой абсолютной высотой. Их значения подписаны. Сближение = крутой склон, расхождение = пологий.</li>
                                             <li><strong>Бергштрих:</strong> Короткая черточка на горизонтали, направленная в сторону понижения склона. Помогает определить холм или впадину.</li>
@@ -174,12 +185,14 @@ const VprGeographyCheatsheet6: NextPage = () => {
                             {/* Section: Географические Оболочки и Природа Земли */}
                             <section className="space-y-6 border-t-2 border-green-500/30 pt-8">
                                 <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-green-400 mb-4 border-b-2 border-green-500/40 pb-3">
-                                    <FontAwesomeIcon icon={FaGlobeEurope} className="mr-3 text-green-400/80 fa-fw" /> Оболочки Земли и Природа
+                                    {/* Use Fa6 icon */}
+                                    <FaGlobeEurope className="mr-3 text-green-400/80 fa-fw" /> Оболочки Земли и Природа
                                 </h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                                     {/* Subsection: Оболочки */}
                                     <div className="border-l-4 border-green-700 pl-4">
-                                        <h3 className="flex items-center text-xl font-semibold text-green-300 mb-3"> <FontAwesomeIcon icon={FaGlobeEurope} className="mr-2 text-green-300/80 fa-fw" /> Оболочки Земли </h3>
+                                         {/* Use Fa6 icon */}
+                                        <h3 className="flex items-center text-xl font-semibold text-green-300 mb-3"> <FaGlobeEurope className="mr-2 text-green-300/80 fa-fw" /> Оболочки Земли </h3>
                                         <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg mb-4">
                                             <li><strong>Литосфера:</strong> Твердая оболочка (земная кора, верхняя мантия). Включает рельеф (горы, равнины). Процессы: землетрясения, вулканизм, выветривание, движение литосферных плит.</li>
                                             <li><strong>Гидросфера:</strong> Водная оболочка (океаны, моря, реки, озера, ледники, подземные воды, вода в атмосфере). Процессы: круговорот воды, течения, волны, приливы/отливы, замерзание/таяние.</li>
@@ -194,7 +207,8 @@ const VprGeographyCheatsheet6: NextPage = () => {
                                     </div>
                                     {/* Subsection: Природные Зоны */}
                                     <div className="border-l-4 border-green-700 pl-4">
-                                        <h3 className="flex items-center text-xl font-semibold text-green-300 mb-3"> <FontAwesomeIcon icon={FaPaw} className="mr-2 text-green-300/80 fa-fw" /> Природные Зоны (ПЗ) </h3>
+                                        {/* Use Fa6 icon */}
+                                        <h3 className="flex items-center text-xl font-semibold text-green-300 mb-3"> <FaPaw className="mr-2 text-green-300/80 fa-fw" /> Природные Зоны (ПЗ) </h3>
                                         <p className="text-gray-300 text-base md:text-lg mb-4">Крупные участки суши с закономерно повторяющимися сочетаниями климата, почв, растительности и животного мира. Их смена зависит в первую очередь от географической широты (количества тепла и влаги).</p>
                                         <ul className="list-disc list-inside space-y-1 text-gray-300 pl-4 text-sm md:text-base mb-4">
                                              <li><strong>Аркт. пустыни/Тундра:</strong> Очень холодно, мало осадков, вечная мерзлота, мхи, лишайники, карликовые ивы/березы, сев. олень, песец, лемминг.</li>
@@ -209,7 +223,8 @@ const VprGeographyCheatsheet6: NextPage = () => {
                                     </div>
                                      {/* Subsection: Погода и Климат */}
                                     <div className="border-l-4 border-green-700 pl-4">
-                                        <h3 className="flex items-center text-xl font-semibold text-green-300 mb-3"> <FontAwesomeIcon icon={FaCloudSunRain} className="mr-2 text-green-300/80 fa-fw" /> Погода и Климат </h3>
+                                         {/* Use Fa6 icon */}
+                                        <h3 className="flex items-center text-xl font-semibold text-green-300 mb-3"> <FaCloudSunRain className="mr-2 text-green-300/80 fa-fw" /> Погода и Климат </h3>
                                         <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg mb-4">
                                             <li><strong>Погода:</strong> Состояние тропосферы в данном месте в данный момент (или за короткий период). Характеристики: температура воздуха (t°), атм. давление, ветер (направление, скорость), влажность, облачность, осадки. Погода изменчива.</li>
                                             <li><strong>Климат:</strong> Многолетний (десятки лет) режим погоды, типичный для данной местности. Определяется климатообразующими факторами (геогр. широта, близость океана, рельеф и др.). Климат определяет ПЗ.</li>
@@ -230,11 +245,13 @@ const VprGeographyCheatsheet6: NextPage = () => {
                             {/* Section: Человек на Земле */}
                             <section className="space-y-6 border-t-2 border-yellow-500/30 pt-8">
                                 <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-yellow-400 mb-4 border-b-2 border-yellow-500/40 pb-3">
-                                    <FontAwesomeIcon icon={FaUsers} className="mr-3 text-yellow-400/80 fa-fw" /> Человек на Земле: Страны и Статистика
+                                    {/* Use Fa6 icon */}
+                                    <FaUsers className="mr-3 text-yellow-400/80 fa-fw" /> Человек на Земле: Страны и Статистика
                                 </h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="border-l-4 border-yellow-700 pl-4">
-                                        <h3 className="flex items-center text-xl font-semibold text-yellow-300 mb-3"> <FontAwesomeIcon icon={FaTable} className="mr-2 text-yellow-300/80 fa-fw" /> Работа с Таблицами и Диаграммами </h3>
+                                         {/* Use Fa6 icon */}
+                                        <h3 className="flex items-center text-xl font-semibold text-yellow-300 mb-3"> <FaTable className="mr-2 text-yellow-300/80 fa-fw" /> Работа с Таблицами и Диаграммами </h3>
                                         <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg">
                                             <li><strong>Извлечение данных:</strong> Внимательно читай заголовки строк и столбцов. Находи конкретные значения (например, численность населения Китая, площадь России).</li>
                                             <li><strong>Сравнение:</strong> Сравнивай показатели разных стран (У какой страны ВВП на душу населения выше? Какая страна имеет большую площадь?).</li>
@@ -242,10 +259,12 @@ const VprGeographyCheatsheet6: NextPage = () => {
                                             <li><strong>Расчет доли:</strong> Вычисляй долю городского/сельского населения (например, (число горожан / общая численность) * 100%).</li>
                                             <li><strong>Анализ диаграмм:</strong> Определяй наибольшие/наименьшие значения по столбчатым или круговым диаграммам (например, какая отрасль экономики преобладает в стране?).</li>
                                         </ul>
-                                        <div className="text-center my-6"><FontAwesomeIcon icon={FaTable} className="text-6xl text-yellow-400/60 mx-auto hover:text-yellow-300 transition-colors"/> <p className="text-sm text-gray-400 mt-2">Таблицы и диаграммы - ключ к успеху в заданиях 7-8!</p></div>
+                                        {/* Use Fa6 icon */}
+                                        <div className="text-center my-6"><FaTable className="text-6xl text-yellow-400/60 mx-auto hover:text-yellow-300 transition-colors"/> <p className="text-sm text-gray-400 mt-2">Таблицы и диаграммы - ключ к успеху в заданиях 7-8!</p></div>
                                     </div>
                                     <div className="border-l-4 border-yellow-700 pl-4">
-                                        <h3 className="flex items-center text-xl font-semibold text-yellow-300 mb-3"> <FontAwesomeIcon icon={FaMap} className="mr-2 text-yellow-300/80 fa-fw" /> Страны, Народы, Объекты </h3>
+                                         {/* Use Fa6 icon */}
+                                        <h3 className="flex items-center text-xl font-semibold text-yellow-300 mb-3"> <FaMap className="mr-2 text-yellow-300/80 fa-fw" /> Страны, Народы, Объекты </h3>
                                         <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg">
                                             <li><strong>Фото и страна/регион:</strong> Умей соотносить фотографии типичных ландшафтов, известных достопримечательностей, национальных костюмов или животных с определенной страной или регионом России (например, самурай - Япония, тундра с оленями - Север России).</li>
                                             <li><strong>Столицы:</strong> Знай столицы крупнейших стран мира и стран-соседей России (Пекин, Вашингтон, Дели, Астана, Минск, Киев и др.).</li>
@@ -260,7 +279,8 @@ const VprGeographyCheatsheet6: NextPage = () => {
                             {/* Final Tip */}
                             <section className="border-t-2 border-brand-green/30 pt-8 mt-12 text-center">
                                 <h2 className="flex items-center justify-center text-2xl md:text-3xl font-semibold text-brand-green mb-4">
-                                    <FontAwesomeIcon icon={FaBookAtlas} className="mr-3 text-brand-green/80 fa-fw" /> Главное - Практика и Атлас!
+                                     {/* Use Fa6 icon */}
+                                    <FaBookAtlas className="mr-3 text-brand-green/80 fa-fw" /> Главное - Практика и Атлас!
                                 </h2>
                                 <p className="text-gray-300 text-base md:text-lg leading-relaxed max-w-3xl mx-auto">
                                     Эта шпаргалка поможет вспомнить ключевые моменты. Но самый эффективный способ подготовки - это <strong className="text-brand-green font-semibold">решение демоверсий ВПР</strong> и заданий прошлых лет с использованием <strong className="text-brand-green font-semibold">школьного атласа за 6 класс</strong>. Учись быстро находить нужную информацию на картах, понимать условные знаки и анализировать таблицы.
