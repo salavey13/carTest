@@ -1,4 +1,4 @@
-"use server"// Explicitly mark the route as dynamic because it uses headers
+// Explicitly mark the route as dynamic because it uses headers
 export const dynamic = 'force-dynamic';
 import { type NextRequest, NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
