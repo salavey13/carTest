@@ -4,7 +4,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { FaPaperPlane } from 'react-icons/fa6';
-import { Tooltip } from '@/components/ui/Tooltip';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface Suggestion {
     id: string;
@@ -65,7 +65,7 @@ export const SuggestionList: React.FC<SuggestionListProps> = ({
                     >
                         {/* Wrap button content in Tooltip if tooltip text exists */}
                         {suggestion.tooltip ? (
-                            <Tooltip text={suggestion.tooltip} position="right">
+                            <Tooltip text={suggestion.tooltip} >
                                 <div className="flex items-center w-full">
                                     {suggestion.icon || <FaPaperPlane className="mr-1.5" />}
                                     <span className="flex-grow">{suggestion.text}</span>
