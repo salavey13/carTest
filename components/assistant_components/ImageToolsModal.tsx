@@ -10,7 +10,7 @@ import { listPublicBuckets, uploadBatchImages } from '@/app/actions';
 import { searchAndGetFirstImageUrl } from '@/app/repo-xml/google_actions';
 import { Bucket } from '@supabase/storage-js';
 import { toast } from 'sonner';
-import { Tooltip } from '@/components/ui/Tooltip';
+import { Tooltip } from '@/components/ui/tooltip';
 import { FileEntry as ParsedFileEntry } from "@/hooks/useCodeParsingAndValidation";
 import { debugLogger as logger } from '@/lib/debugLogger'; // Use debugLogger
 import { useAppContext } from '@/contexts/AppContext';

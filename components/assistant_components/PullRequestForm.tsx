@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Tooltip } from '@/components/ui/Tooltip'; // <<<--- CORRECT PATH
+import { Tooltip } from '@/components/ui/tooltip'; // <<<--- CORRECT PATH
 import { FaRotate, FaCodeBranch, FaGithub } from 'react-icons/fa6'; // Added FaCodeBranch, FaGithub
 
 interface PullRequestFormProps {
