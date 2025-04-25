@@ -1,4 +1,5 @@
-"use client"; // Ensure this is at the top
+"use client";
+ // Ensure this is at the top
 
 import React from 'react';
 import { NextPage } from 'next';
@@ -48,7 +49,7 @@ const VprGeographyCheatsheet6: NextPage = () => {
     const ImageWithTooltip = ({ src, alt, width, height, className = '', tooltipKeyPart, aspect = 'video', bgColor = 'bg-gray-700/30' }: { src: string, alt: string, width: number, height: number, className?: string, tooltipKeyPart: string, aspect?: 'video' | 'square' | 'auto', bgColor?: string }) => (
         <div className={`p-2 border border-gray-500/30 rounded-lg ${bgColor} hover:shadow-lg hover:shadow-purple-500/20 transition-shadow duration-300`}>
             <Tooltip>
-                <TooltipTrigger asChild>
+                
                     <div className={`${aspect === 'video' ? 'aspect-video' : aspect === 'square' ? 'aspect-square' : ''} w-full h-auto overflow-hidden rounded ${bgColor} cursor-help`}>
                         <Image
                             src={src.startsWith('/placeholders/') ? src : src.replace('about//', 'about/')} // Fix double slash if needed
@@ -59,10 +60,8 @@ const VprGeographyCheatsheet6: NextPage = () => {
                             loading="lazy"
                         />
                     </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-[300px] bg-gray-950 border border-purple-500/60 text-white p-3 shadow-lg z-50">
-                    <p className="text-sm">{getTooltip(tooltipKeyPart)}</p>
-                </TooltipContent>
+                
+                
             </Tooltip>
             <p className="text-xs text-center text-gray-400 mt-1 italic">{alt.split(':')[0]}</p> {/* Shorten alt for caption */}
         </div>
@@ -77,7 +76,7 @@ const VprGeographyCheatsheet6: NextPage = () => {
                 <link rel="icon" href="/favicon.ico" />
             </Head>
 
-            <TooltipProvider delayDuration={150}>
+            
                 <main className="flex-grow container mx-auto px-4 py-12 md:py-16">
                     <h1 className="text-3xl md:text-5xl font-bold mb-8 text-center text-brand-green cyber-text glitch" data-text="ВПР География 6 класс: Шпаргалка">
                         {/* Use Fa6 icon */}
@@ -299,7 +298,7 @@ const VprGeographyCheatsheet6: NextPage = () => {
                         </CardContent>
                     </Card>
                 </main>
-            </TooltipProvider>
+            
 
             {/* Optional Footer could be added here */}
         </div>
