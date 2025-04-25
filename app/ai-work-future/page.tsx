@@ -9,7 +9,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@/components/ui/Tooltip";
 // .. Corrected Icons Import
 import {
   FaBrain, FaTriangleExclamation, FaChartLine, FaScaleBalanced, FaBriefcase,
