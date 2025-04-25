@@ -1,72 +1,70 @@
-// /app/layout.tsx
 import type React from "react";
 import Script from "next/script";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import StickyChatButton from "@/components/StickyChatButton"; // Import the button
+import StickyChatButton from "@/components/StickyChatButton";
 import { AppProvider } from "@/contexts/AppContext";
-import { Toaster } from "sonner"; // Assuming sonner is used for toasts
+import { Toaster } from "sonner";
 import "./globals.css";
-import { cn } from "@/lib/utils"; // Utility for class names
+import { cn } from "@/lib/utils";
+import type { Metadata, Viewport } from 'next'; // Import Viewport type
 
-export const metadata = {
-  title: "V0 Car Test App", // Add a default title
-  description: "Find your perfect V0 car.", // Add a default description
-  // Add viewport settings for responsiveness and disabling zoom
-  viewport: "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no",
+// Define Metadata (WITHOUT viewport)
+export const metadata: Metadata = {
+  title: "V0 Car Test App",
+  description: "Find your perfect V0 car.",
+  // Viewport removed from here
+  // Add other metadata like icons, openGraph, etc. if needed
+  // icons: { icon: '/favicon.ico' },
+};
+
+// Define Viewport separately
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1, // Disable zoom
+  userScalable: false, // Disable zoom
+  // themeColor: '#000000', // Optional: Set theme color
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full"> {/* Ensure html takes full height */}
+    <html lang="en" className="h-full">
       <head>
-        {/* Prevent iOS auto-detection of phone numbers */}
+        {/* format-detection and mobile-web-app-capable are good */}
         <meta name="format-detection" content="telephone=no" />
-        {/* Hint for Android to treat as a web app */}
         <meta name="mobile-web-app-capable" content="yes" />
-        {/* Telegram WebApp script, loaded early */}
+        {/* Telegram Script */}
         <Script
-          id="telegram-webapp-script" // Renamed ID for clarity
+          id="telegram-webapp-script"
           src="https://telegram.org/js/telegram-web-app.js"
-          strategy="beforeInteractive" // Load before Next.js hydrates
-          // Optional: Add error handling if script fails to load
-          // onError={(e) => console.error("Failed to load Telegram WebApp script:", e)}
+          strategy="beforeInteractive"
         />
       </head>
-      {/* Apply base styling to body, ensure flex column layout and min height */}
       <body className={cn(
           "flex min-h-screen flex-col bg-gray-900 text-white antialiased",
-          // Add font definitions if needed, e.g., using next/font
+          // Add font class if needed
           // inter.className
       )}>
         <AppProvider>
-          {/* Header: Sticky or fixed positioning might be handled within the Header component itself */}
           <Header />
-
-          {/* Main content area that grows to fill available space */}
           <main className="flex-1">
             {children}
           </main>
-
-          {/* Sticky Chat Button - Placed outside main, might need specific positioning CSS */}
           <StickyChatButton />
-
-          {/* Footer */}
           <Footer />
-
-          {/* Toast notifications configuration */}
           <Toaster
-            position="bottom-right" // Common position
-            richColors // Use predefined color schemes if available
+            position="bottom-right"
+            richColors
             toastOptions={{
-              style: { // Custom styling for toasts
-                background: "rgba(34, 34, 34, 0.9)", // Slightly transparent dark background
-                color: "#00FF9D", // Neon green text
-                border: "1px solid rgba(0, 255, 157, 0.4)", // Subtle neon border
-                boxShadow: "0 2px 10px rgba(0, 255, 157, 0.2)", // Softer glow effect
-                fontFamily: "monospace", // Monospace font for consistency
+              style: {
+                background: "rgba(34, 34, 34, 0.9)",
+                color: "#00FF9D",
+                border: "1px solid rgba(0, 255, 157, 0.4)",
+                boxShadow: "0 2px 10px rgba(0, 255, 157, 0.2)",
+                fontFamily: "monospace",
               },
-              className: 'text-sm', // Adjust font size
+              className: 'text-sm',
             }}
           />
         </AppProvider>
