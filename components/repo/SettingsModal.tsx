@@ -4,7 +4,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaCodeBranch, FaList, FaCheck, FaSquareArrowUpRight, FaArrowsRotate } from 'react-icons/fa6'; // Updated icons
 import { SimplePullRequest } from '@/contexts/RepoXmlPageContext'; // Import type
-import { Tooltip } from '@/components/ui/Tooltip';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -99,7 +99,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                     Выберите PR для извлечения/обновления ветки:
                                 </h4>
                                 <div className="flex items-center gap-2">
-                                    <Tooltip text="Использовать ветку по умолчанию" position='left'>
+                                    <Tooltip text="Использовать ветку по умолчанию" >
                                         <button
                                            onClick={() => { setManualBranchName(''); onSelectPrBranch(null); }} // Clear manual input when selecting default
                                            disabled={loading || loadingPrs}
@@ -111,7 +111,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                            Default
                                         </button>
                                      </Tooltip>
-                                     <Tooltip text="Обновить список PR" position='left'>
+                                     <Tooltip text="Обновить список PR" >
                                           <button onClick={onLoadPrs} disabled={loading || loadingPrs || !repoUrl.includes('github.com')} className="p-1 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition">
                                               {loadingPrs ? <FaArrowsRotate className="animate-spin"/> : <FaList />}
                                           </button>
