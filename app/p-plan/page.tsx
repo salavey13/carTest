@@ -10,7 +10,7 @@ import { useAppContext } from "@/contexts/AppContext";
 
 import {
   FaFileLines, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom,
-  FaMobileAlt, FaComments, FaPaintbrush, FaBrain, FaRocket, FaUserNinja,
+  FaMobile, FaComments, FaPaintbrush, FaBrain, FaRocket, FaUserNinja,
   FaMoneyBillWave, FaTriangleExclamation, FaUserAstronaut, FaSignature,
   FaRecycle, FaCode, FaVideo, FaNewspaper, FaGithub, FaTelegram, FaCarBurst,
   FaRobot, FaGift, FaHandshake, FaBomb, FaFlaskVial, FaInfinity, FaDumbbell,
@@ -28,7 +28,7 @@ type DbUser = Database["public"]["Tables"]["users"]["Row"] | null;
 // Убедимся, что ВСЕ иконки, используемые в маркерах, здесь есть
 const iconComponents: { [key: string]: React.ElementType } = {
   FaFileLines, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom, FaFlaskVial,
-  FaMobileAlt, FaComments, FaPaintbrush, FaBrain, FaRocket, FaUserNinja, FaInfinity, FaDumbbell,
+  FaMobile, FaComments, FaPaintbrush, FaBrain, FaRocket, FaUserNinja, FaInfinity, FaDumbbell,
   FaMoneyBillWave, FaTriangleExclamation, FaUserAstronaut, FaSignature, FaEye,
   FaRecycle, FaCode, FaVideo, FaNewspaper, FaGithub, FaTelegram, FaCarBurst,
   FaRobot, FaGift, FaHandshake, FaBomb, FaHatWizard, FaPoo, FaKey, FaBolt, FaScroll,
@@ -160,7 +160,7 @@ const getPlanSections = (dbUser: DbUser) => {
       title: `1. Протокол "Исход": ${userName}, Взламываем Матрицу!`,
       icon: FaBomb,
       color: "text-blue-400",
-      content: `Проект **"Кибер-Волк ${userName}"** – это не сраный PDF. Это **чит-код** ::FaKey className="inline text-blue-400":: к твоей новой жизни! Твой JUMPSTART ::FaRocket className="inline text-blue-400"::, чтобы ты (${userHandle}) **выбил дверь с ноги** из ${userOriginStory} и начал **писать СВОЙ код реальности**. Управлять? **Телефоном, сука!** ::FaMobileAlt className="inline text-blue-400"::!
+      content: `Проект **"Кибер-Волк ${userName}"** – это не сраный PDF. Это **чит-код** ::FaKey className="inline text-blue-400":: к твоей новой жизни! Твой JUMPSTART ::FaRocket className="inline text-blue-400"::, чтобы ты (${userHandle}) **выбил дверь с ноги** из ${userOriginStory} и начал **писать СВОЙ код реальности**. Управлять? **Телефоном, сука!** ::FaMobile className="inline text-blue-400"::!
       **VIBE – Твой Новый BIOS:** Скорость (::FaRocket::) + **AI как Нейроусилитель** (::FaAtom className="inline text-purple-400"::>, Gemini 2.5 Pro – халявный IQ-буст!) + Кибер-Броня (::FaUserNinja className="inline text-gray-500"::>). И **SelfDev** – ты **перепрошиваешь себя**, как киборга.
       **Ресурсы:** Юзаем **халяву** – Vercel, GitHub (::FaGithub::), Telegram (::FaTelegram className="inline text-blue-400"::>). **Платные фичи – для Агентов Смитов**.
       **Стартовый Буст – Твой Первый "Прыжок Веры":** Это не подачка. Это **топливо для твоего "Навуходоносора"**. На что (приоритеты):
@@ -175,7 +175,7 @@ const getPlanSections = (dbUser: DbUser) => {
       title: "2. Твой Кибер-Арсенал: Интерфейс к Силе",
       icon: FaUserAstronaut,
       color: "text-brand-cyan",
-      content: `**Командный Мостик:** Телефон ::FaMobileAlt className="inline text-cyan-400":: + Ноут (опц).
+      content: `**Командный Мостик:** Телефон ::FaMobile className="inline text-cyan-400":: + Ноут (опц).
       **1. Личный Голодек (Сайт/Блог, 0 руб):** Твоя легенда. Путь из ${userOriginStory}. VIBE-мануалы, кейсы "искривления реальности". **Обновляется сам** (GitHub ::FaGithub:: + TG-бот ::FaTelegram::).
       **2. Твой Зион (TG-Канал/Чат ::FaTelegram className="inline text-blue-400"::):** Собирай **экипаж "Навуходоносора"** ::FaUsers::. Делись альфа-инфой, руби правду-матку, создавай **сопротивление**.
       **3. Библиотека Заклинаний (GitHub ::FaGithub::):** Твой "Кибер-Сундук". Готовые артефакты (Jumpstart Kit ::FaBoxOpen::!), VIBE-автоматизация. **Тут ты - Архимаг**.
@@ -232,9 +232,9 @@ const getPlanSections = (dbUser: DbUser) => {
      { // Section 6: Deeper Cyberpunk, Blur
       id: "operations",
       title: "6. Твоя Кибер-Лаборатория: Телефон и Сила Мысли",
-      icon: FaMobileAlt,
+      icon: FaMobile,
       color: "text-brand-cyan",
-      content: `**Пульт Управления (::FaMobileAlt className="inline text-cyan-400":: + ::FaAtom::):** ТЕЛЕФОН! Снял → смонтировал → AI (::FaAtom::) всё остальное. Сказал → AI сделал. **Автоматизируй Матрицу!**
+      content: `**Пульт Управления (::FaMobile className="inline text-cyan-400":: + ::FaAtom::):** ТЕЛЕФОН! Снял → смонтировал → AI (::FaAtom::) всё остальное. Сказал → AI сделал. **Автоматизируй Матрицу!**
       **Твой Сервер (0 руб):** Сайт на Next.js/Vercel. Управление – GitHub/TG-бот (::FaGithub::). База знаний? Supabase (0 руб).
       **Нейролинк:** Telegram/VK (::FaTelegram className="inline text-blue-400"::) для всего!
       **Мантра Морфеуса:** **"Ты думаешь, это воздух?!"** ::FaEye className="inline text-cyan-400":: Скорость ограничена лишь твоей **верой и скиллом управления AI**. Ты **пишешь правила**, а не следуешь им.`
