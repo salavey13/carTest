@@ -12,7 +12,7 @@ import {
   FaFileAlt, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom,
   FaMobileAlt, FaComments, FaPaintBrush, FaBrain, FaRocket, FaUserNinja,
   FaMoneyBillWave, FaTriangleExclamation, FaUserAstronaut, FaSignature,
-  FaRecycle, FaCode, FaVideo, FaNewspaper, FaGithub, FaTelegram, FaCarCrash,
+  FaRecycle, FaCode, FaVideo, FaNewspaper, FaGithub, FaTelegram, FaCarBurst,
   FaRobot, FaGift, FaHandshake, FaBomb, FaFlaskVial, FaInfinity, FaDumbbell,
   FaEye, FaHatWizard, FaPoo, FaKey, FaBolt, FaScroll, FaHandPointer, FaUserSecret
 } from "react-icons/fa6";
@@ -30,7 +30,7 @@ const iconComponents: { [key: string]: React.ElementType } = {
   FaFileAlt, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom, FaFlaskVial,
   FaMobileAlt, FaComments, FaPaintBrush, FaBrain, FaRocket, FaUserNinja, FaInfinity, FaDumbbell,
   FaMoneyBillWave, FaTriangleExclamation, FaUserAstronaut, FaSignature, FaEye,
-  FaRecycle, FaCode, FaVideo, FaNewspaper, FaGithub, FaTelegram, FaCarCrash,
+  FaRecycle, FaCode, FaVideo, FaNewspaper, FaGithub, FaTelegram, FaCarBurst,
   FaRobot, FaGift, FaHandshake, FaBomb, FaHatWizard, FaPoo, FaKey, FaBolt, FaScroll,
   FaHandPointer, FaUserSecret
 };
@@ -150,7 +150,7 @@ const getPlanSections = (dbUser: DbUser) => {
   const isSanek = dbUser?.user_id?.toString() === '1260304309' || dbUser?.username === 'Pihman';
   const userHandle = isSanek ? '@Pihman_Reborn69' : (dbUser?.username ? `@${dbUser.username}` : 'Твой_Кибер_Сигил');
   const userOriginStory = isSanek
-     ? "в гравитационном колодце разбитых карданов ::FaCarCrash className='inline text-red-500'::"
+     ? "в гравитационном колодце разбитых карданов ::FaCarBurst className='inline text-red-500'::"
      : "в поисках апгрейда серой реальности";
   const myExperience = "13+ лет в трансмутации реальности";
 
@@ -167,7 +167,7 @@ const getPlanSections = (dbUser: DbUser) => {
       - **ТВОЕ ВРЕМЯ для "Прокачки в Додзе"** (Основная часть): **Забей на галеры**. Погружайся в VIBE, генери контент с AI, **учись видеть Матрицу**. Это твоя **"качалка" для мозга** ::FaDumbbell::. Я – твой **Морфеус/тренер** ::FaHandPointer className="inline text-blue-400"::, ловлю глюки AI, пока ты **уклоняешься от пуль**.
       - **Охота на "Донни"** (Значительная часть): Найти первых **клиентов-последователей** ::FaUserSecret className="inline text-pink-400"::, кто **заплатит за твою "ручку"** (методологию VIBE). Помогать им **умножать кэш** с AI – это наш **"почти легальный" бизнес**! ::FaMoneyBillWave className="inline text-pink-400"::.
       - **Апгрейд Твоей "Нейросети"** (Меньшая часть): Доступ к **продвинутым AI-заклинаниям**, курсы по "взлому" маркетинга. Стань **магистром VIBE**.
-      - **"Аварийный Выход"** (Резерв): На случай ::FaCarCrash:: или если AI взбунтуется.
+      - **"Аварийный Выход"** (Резерв): На случай ::FaCarBurst:: или если AI взбунтуется.
       **Цель:** Построить **не сайт, а ЛИЧНЫЙ ГЕНЕРАТОР СВОБОДЫ И БАБОК**, работающий на **VIBE и дерзости**.`
     },
      { // Section 2: Win98/XP - Чуть сложнее, появляются иконки
@@ -264,12 +264,12 @@ const getPlanSections = (dbUser: DbUser) => {
      { // Section 9: Glitchy / Warning Style
       id: "risks",
       title: "9. Глюки в Матрице (Риски и План \"Омега\")",
-      icon: FaCarCrash,
+      icon: FaCarBurst,
       color: "text-red-500",
       content: `**Матрица Обновилась (Free Tier):** Юзаем "Щит Веры" (::FaTriangleExclamation::), ищем **эксплойты** (опенсорс), **быстро учимся делать золото**, чтобы платить "десятину" Матрице.
       **Перегрев Процессора (${userName}):** AI (::FaAtom::) – твой **аватар**. "Орден" (::FaComments::) – твой **круг силы**. Делай то, что **прет** (SelfDev!). Помни: **"Нет ложки!"** ::FaEye:: Сила в **балансе**!
       **Красная Таблетка Оказалась Витаминкой (Идея – Г):** **AI-Оракул** (::FaBullseye::) **ПРЕДСКАЖЕТ ДО СТАРТА!** Мочим дохлых гиппогрифов быстро. VIBE = **Мгновенная Телепортация** на новую идею.
-      **System Failure (<::FaCarCrash className="inline text-red-500"::>):** Жизнь – багованная игра. Твои **нейро-апгрейды** VIBE/AI/SelfDev – твой **"сейв"**. Сможешь **загрузиться** в новом мире.`
+      **System Failure (<::FaCarBurst className="inline text-red-500"::>):** Жизнь – багованная игра. Твои **нейро-апгрейды** VIBE/AI/SelfDev – твой **"сейв"**. Сможешь **загрузиться** в новом мире.`
     },
     { // Section 10: Epic Finale Style
       id: "conclusion",
@@ -373,7 +373,7 @@ export default function PPlanPage() {
               </CardTitle>
               {/* Подзаголовок */}
               <div className="text-md md:text-lg text-gray-300 mt-4 font-mono max-w-2xl mx-auto">
-                 <RenderContent content={`Твой Рецепт: От **${greetingName === 'Pihman' ? 'Свинцового Кардана' : 'Нуля'}** ::FaCarCrash className="inline text-red-500":: к **Золотому VIBE** ::FaMoneyBillWave className="inline text-yellow-400"::. Стартовый Буст ${initialBoostStr} Энергии. (Личный Гримуар для ${greetingName})`} />
+                 <RenderContent content={`Твой Рецепт: От **${greetingName === 'Pihman' ? 'Свинцового Кардана' : 'Нуля'}** ::FaCarBurst className="inline text-red-500":: к **Золотому VIBE** ::FaMoneyBillWave className="inline text-yellow-400"::. Стартовый Буст ${initialBoostStr} Энергии. (Личный Гримуар для ${greetingName})`} />
               </div>
             </CardHeader>
             {/* Секции Плана */}
