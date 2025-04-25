@@ -153,7 +153,7 @@ const initialMinimalContextValue: Omit<RepoXmlPageContextType, 'getXuinityMessag
     imageReplaceTask: null,
     allFetchedFiles: [],
     // Derived State
-    currentStep: 'idle',
+    currentStep: 'idle', // Provide default step for minimal context
     // Setters / Triggers (provide stubs)
     setFetchStatus: () => {},
     setRepoUrlEntered: () => {},
@@ -228,6 +228,9 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
     const [imageReplaceTaskState, setImageReplaceTaskState] = useState<ImageReplaceTask | null>(null);
     const [allFetchedFilesState, setAllFetchedFilesState] = useState<FileNode[]>([]);
 
+    // === <<< Change currentStep to useState >>> ===
+    const [currentStep, setCurrentStep] = useState<WorkflowStep>('idle'); // Initial default
+
     // === Refs ===
     const kworkInputRef = useRef<HTMLTextAreaElement | null>(null);
     const aiResponseInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -277,35 +280,55 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
 
     }, [imageReplaceTaskState]); // Dependency on the task state
 
-    // === Derived State: Workflow Step ===
-    const currentStep = useMemo((): WorkflowStep => {
-        // Prioritize image replace task flow
-        if (imageReplaceTaskState && filesFetchedState) return 'files_fetched_image_replace';
-        if (imageReplaceTaskState && fetchStatusState === 'loading') return 'fetching'; // Show fetching during image task load
-
-        // Standard Flow
-        if (fetchStatusState === 'loading' || fetchStatusState === 'retrying') return 'fetching';
-        if (fetchStatusState === 'error' || fetchStatusState === 'failed_retries') return 'fetch_failed';
-        if (isParsingState) return 'parsing_response';
-        if (aiActionLoadingState) return 'generating_ai_response'; // Use specific AI loading state
-
-        if (!filesFetchedState) return 'ready_to_fetch';
-        if (!kworkInputHasContentState) {
-            if (primaryHighlightPathState || secondaryHighlightPathsState.length > 0) return 'files_fetched_highlights';
-            if (selectedFetcherFilesState.size > 0) return 'files_selected'; // If user selected manually before highlights processed
-            return 'files_fetched';
+    // === <<< Calculate currentStep in useEffect >>> ===
+    useEffect(() => {
+        // Only calculate after mount
+        if (!isMounted) {
+            setCurrentStep('idle'); // Ensure default before mount
+            return;
         }
-        if (kworkInputHasContentState && !aiResponseHasContentState && !requestCopiedState) return 'request_written';
-        if (requestCopiedState && !aiResponseHasContentState) return 'request_copied';
-        if (aiResponseHasContentState && !filesParsedState) return 'response_pasted';
-        if (filesParsedState) return 'pr_ready'; // Simplified: if files are parsed, assume ready for PR
 
-        return 'idle'; // Fallback
-    }, [
+        // The logic previously inside useMemo goes here
+        let calculatedStep: WorkflowStep = 'idle'; // Start with default
+
+        // Prioritize image replace task flow
+        if (imageReplaceTaskState && filesFetchedState) {
+             calculatedStep = 'files_fetched_image_replace';
+        } else if (imageReplaceTaskState && fetchStatusState === 'loading') {
+            calculatedStep = 'fetching'; // Show fetching during image task load
+        }
+        // Only proceed to standard flow if not in image replace task
+        else if (!imageReplaceTaskState) {
+            // Standard Flow Logic (copy from your existing useMemo)
+            if (fetchStatusState === 'loading' || fetchStatusState === 'retrying') calculatedStep = 'fetching';
+            else if (fetchStatusState === 'error' || fetchStatusState === 'failed_retries') calculatedStep = 'fetch_failed';
+            else if (isParsingState) calculatedStep = 'parsing_response';
+            else if (aiActionLoadingState) calculatedStep = 'generating_ai_response';
+            else if (!filesFetchedState) calculatedStep = 'ready_to_fetch';
+            else if (!kworkInputHasContentState) {
+                // Check highlights only if files are fetched
+                if (filesFetchedState && (primaryHighlightPathState || secondaryHighlightPathsState.length > 0)) calculatedStep = 'files_fetched_highlights';
+                else if (selectedFetcherFilesState.size > 0) calculatedStep = 'files_selected';
+                else calculatedStep = 'files_fetched';
+            }
+            else if (kworkInputHasContentState && !aiResponseHasContentState && !requestCopiedState) calculatedStep = 'request_written';
+            else if (requestCopiedState && !aiResponseHasContentState) calculatedStep = 'request_copied';
+            else if (aiResponseHasContentState && !filesParsedState) calculatedStep = 'response_pasted';
+            else if (filesParsedState) calculatedStep = 'pr_ready';
+            else calculatedStep = 'idle'; // Fallback for standard flow
+        }
+
+        // Update the state
+        setCurrentStep(calculatedStep);
+
+    }, [ // <<< Add ALL dependencies the calculation uses >>>
+        isMounted, // Crucial dependency
         fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState,
         filesParsedState, requestCopiedState, primaryHighlightPathState, secondaryHighlightPathsState,
-        selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState // Include image task state
+        selectedFetcherFilesState.size, // Use .size if only size matters, or the set itself if content matters
+        aiActionLoadingState, isParsingState, imageReplaceTaskState
     ]);
+
 
     // === Action Triggers ===
     const triggerFetch = useCallback(async (isRetry = false, branch?: string | null) => {
@@ -406,35 +429,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
         }
     }, []);
 
-    const triggerUpdateBranch = useCallback(async (
-        repoUrl: string,
-        filesToCommit: { path: string; content: string }[],
-        commitMessage: string,
-        branch: string,
-        prNumber?: number | null,
-        prDescription?: string
-    ): Promise<{ success: boolean; error?: string }> => {
-        try {
-            setAssistantLoadingState(true);
-            const result = await updateBranch(repoUrl, filesToCommit, commitMessage, branch, prNumber ?? undefined, prDescription);
-            if (result.success) {
-                toast.success(`Ветка ${branch} обновлена!`);
-                // Refresh PR list after update
-                await triggerGetOpenPRs(repoUrl);
-                return { success: true };
-            } else {
-                toast.error(`Ошибка обновления ветки: ${result.error}`);
-                return { success: false, error: result.error };
-            }
-        } catch (error: any) {
-            logger.error("triggerUpdateBranch Error:", error);
-            toast.error(`Критическая ошибка обновления ветки: ${error.message}`);
-            return { success: false, error: error.message };
-        } finally {
-            setAssistantLoadingState(false);
-        }
-    }, [triggerGetOpenPRs]); // Include triggerGetOpenPRs
-
     const triggerGetOpenPRs = useCallback(async (url: string) => {
         if (!url || !url.includes('github.com')) {
             // logger.warn("triggerGetOpenPRs: Invalid GitHub URL.");
@@ -467,6 +461,37 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
         }
     }, []); // Removed manualBranchNameState, setTargetBranchNameState dependencies to avoid loop
 
+
+    const triggerUpdateBranch = useCallback(async (
+        repoUrl: string,
+        filesToCommit: { path: string; content: string }[],
+        commitMessage: string,
+        branch: string,
+        prNumber?: number | null,
+        prDescription?: string
+    ): Promise<{ success: boolean; error?: string }> => {
+        try {
+            setAssistantLoadingState(true);
+            const result = await updateBranch(repoUrl, filesToCommit, commitMessage, branch, prNumber ?? undefined, prDescription);
+            if (result.success) {
+                toast.success(`Ветка ${branch} обновлена!`);
+                // Refresh PR list after update
+                await triggerGetOpenPRs(repoUrl); // Use the already defined trigger
+                return { success: true };
+            } else {
+                toast.error(`Ошибка обновления ветки: ${result.error}`);
+                return { success: false, error: result.error };
+            }
+        } catch (error: any) {
+            logger.error("triggerUpdateBranch Error:", error);
+            toast.error(`Критическая ошибка обновления ветки: ${error.message}`);
+            return { success: false, error: error.message };
+        } finally {
+            setAssistantLoadingState(false);
+        }
+    }, [triggerGetOpenPRs]); // Include triggerGetOpenPRs
+
+
     const updateRepoUrlInAssistant = useCallback((url: string) => {
         assistantRef.current?.updateRepoUrl(url);
     }, []); // No dependencies needed
@@ -478,7 +503,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
     const scrollToSection = useCallback((sectionId: string) => {
         const element = document.getElementById(sectionId);
         if (element) {
-             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+             // Adjusted scroll options for better centering
+             element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
              // Optional: Add highlight effect
              element.classList.add('highlight-scroll');
              setTimeout(() => element.classList.remove('highlight-scroll'), 1500);
@@ -486,11 +512,19 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
         } else {
              logger.warn(`Scroll target not found: ${sectionId}`);
         }
+         // Add CSS for highlight effect globally or in a relevant CSS file:
+         /*
+         .highlight-scroll {
+             transition: box-shadow 0.3s ease-in-out;
+             box-shadow: 0 0 15px 5px rgba(0, 255, 157, 0.6); // Example highlight
+         }
+         */
     }, []);
 
 
     // === Buddy Message Logic ===
     const getXuinityMessage = useCallback((): string => {
+         // Use the 'currentStep' state variable directly
         if (imageReplaceTaskState) { return assistantLoadingState ? "Меняю картинку, секунду..." : "Ок, сейчас заменю картинку и сделаю PR!"; }
         switch (currentStep) {
             case 'idle': return "Готов к работе! Введи URL репо.";
@@ -511,18 +545,19 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
             default: return "Давай что-нибудь замутим!";
         }
     }, [
-        currentStep, repoUrlEnteredState, manualBranchNameState, targetBranchNameState,
+        currentStep, // Now depends on the state variable
+        repoUrlEnteredState, manualBranchNameState, targetBranchNameState,
         primaryHighlightPathState, secondaryHighlightPathsState, selectedFetcherFilesState.size,
-        aiActionLoadingState, currentAiRequestIdState, imageReplaceTaskState, assistantLoadingState // Added loading states
+        currentAiRequestIdState, imageReplaceTaskState, assistantLoadingState // Kept loading states
     ]);
 
 
-    // === Build Context Value (Only full value when mounted) ===
+    // === Build Context Value ===
     const contextValue = useMemo(() => {
         // If not mounted, return the minimal value to prevent errors during build
         if (!isMounted) {
-            logger.log("RepoXmlPageContext: Providing MINIMAL context value (SSR/Build)");
-            return initialMinimalContextValue;
+             logger.log("RepoXmlPageContext: Providing MINIMAL context value (SSR/Build)");
+             return initialMinimalContextValue; // Minimal value already includes currentStep: 'idle'
         }
 
         // If mounted, provide the full context value
@@ -534,7 +569,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
             assistantLoading: assistantLoadingState, aiActionLoading: aiActionLoadingState, loadingPrs: loadingPrsState,
             targetBranchName: targetBranchNameState, manualBranchName: manualBranchNameState, openPrs: openPrsState,
             isSettingsModalOpen: isSettingsModalOpenState, isParsing: isParsingState, currentAiRequestId: currentAiRequestIdState,
-            imageReplaceTask: imageReplaceTaskState, allFetchedFiles: allFetchedFilesState, currentStep,
+            imageReplaceTask: imageReplaceTaskState, allFetchedFiles: allFetchedFilesState,
+            currentStep, // <<< Use the state variable here >>>
             setFetchStatus: setFetchStatusState, setRepoUrlEntered: setRepoUrlEnteredState, setFilesFetched: setFilesFetchedCombined,
             setSelectedFetcherFiles: setSelectedFetcherFilesState, setKworkInputHasContent: setKworkInputHasContentState, setRequestCopied: setRequestCopiedState,
             setAiResponseHasContent: setAiResponseHasContentState, setFilesParsed: setFilesParsedState, setSelectedAssistantFiles: setSelectedAssistantFilesState,
@@ -548,13 +584,15 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
             triggerUpdateBranch, triggerGetOpenPRs, updateRepoUrlInAssistant, getXuinityMessage, scrollToSection,
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ // Ensure all state and stable callbacks are dependencies
+    }, [ // <<< Update dependencies for contextValue useMemo >>>
         isMounted, // Include mount state
+        // Include ALL state variables that are returned in the context object
         fetchStatusState, repoUrlEnteredState, filesFetchedState, selectedFetcherFilesState, kworkInputHasContentState, requestCopiedState,
         aiResponseHasContentState, filesParsedState, selectedAssistantFilesState, assistantLoadingState, aiActionLoadingState, loadingPrsState,
         targetBranchNameState, manualBranchNameState, openPrsState, isSettingsModalOpenState, isParsingState, currentAiRequestIdState,
-        imageReplaceTaskState, allFetchedFilesState, currentStep,
-        // Stable callbacks:
+        imageReplaceTaskState, allFetchedFilesState,
+        currentStep, // <<< Add the currentStep state variable as a dependency >>>
+        // Stable callbacks (assuming they are correctly memoized with useCallback and have stable dependencies themselves)
         setFilesFetchedCombined, triggerToggleSettingsModal, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork,
         triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR,
         triggerUpdateBranch, triggerGetOpenPRs, updateRepoUrlInAssistant, getXuinityMessage, scrollToSection
