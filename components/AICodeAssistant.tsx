@@ -31,7 +31,7 @@ import {
 import clsx from "clsx";
 import { saveAs } from "file-saver";
 import { logger } from "@/lib/logger"; // Use standard logger
-import { Tooltip } from "@/components/ui/Tooltip";
+import { Tooltip } from "@/components/ui/tooltip";
 import { selectFunctionDefinition, extractFunctionName } from "@/lib/codeUtils";
 
 // Interfaces
@@ -207,9 +207,9 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
              <header className="flex justify-between items-center gap-2 flex-wrap">
                  <div className="flex items-center gap-2">
                      <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse"> {showImageReplaceUI ? "Статус Замены" : "AI Code Assistant"} </h1>
-                     {showStandardAssistantUI && ( <Tooltip text={assistantTooltipText} position="bottom"> <FaCircleInfo className="text-blue-400 cursor-help hover:text-blue-300 transition" /> </Tooltip> )}
+                     {showStandardAssistantUI && ( <Tooltip text={assistantTooltipText} > <FaCircleInfo className="text-blue-400 cursor-help hover:text-blue-300 transition" /> </Tooltip> )}
                  </div>
-                 <Tooltip text="Настройки URL/Token/Ветки/PR" position="left">
+                 <Tooltip text="Настройки URL/Token/Ветки/PR" >
                       <button id="settings-modal-trigger-assistant" onClick={triggerToggleSettingsModal} className="p-2 text-gray-400 hover:text-cyan-400 transition rounded-full hover:bg-gray-700/50 disabled:opacity-50" disabled={isProcessingPR || assistantLoading} > <FaCodeBranch className="text-xl" /> </button>
                  </Tooltip>
              </header>
@@ -235,7 +235,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                      <OpenPrList openPRs={contextOpenPrs} />
                     <div className="flex items-center gap-3 mt-2 flex-wrap">
                         <ToolsMenu customLinks={customLinks} onAddCustomLink={handleAddCustomLink} />
-                         <Tooltip text="Загрузить/Связать Картинки" position="top">
+                         <Tooltip text="Загрузить/Связать Картинки" >
                              <button onClick={() => setIsImageModalOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50 relative" disabled={commonDisabled} >
                                 <FaImage className="text-gray-400" /> <span className="text-sm text-white">Картинки</span>
                                 {componentParsedFiles.some(f => f.path === '/prompts_imgs.txt') && !isImageModalOpen && ( <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-gray-800 animate-pulse"></span> )}
