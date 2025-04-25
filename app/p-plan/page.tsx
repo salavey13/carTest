@@ -3,9 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppContext } from "@/contexts/AppContext";
-import {
-  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
-} from "@/components/ui/tooltip";
+
 // Иконки из fa6, проверенные по списку и использованию
 import {
   FaFileAlt, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom,
@@ -259,7 +257,7 @@ export default function PPlanPage() {
          // }}
        ></div>
 
-      <TooltipProvider delayDuration={150}>
+      
         <div className="relative z-10 container mx-auto px-4">
           {/* Карточка */}
           <Card className="max-w-4xl mx-auto bg-dark-card/85 backdrop-blur-lg text-light-text rounded-2xl border-2 border-brand-purple/40 shadow-[0_0_30px_rgba(157,0,255,0.3)]">
@@ -325,7 +323,7 @@ export default function PPlanPage() {
             </CardContent>
           </Card>
         </div>
-      </TooltipProvider>
+      
       {/* Локальные стили удалены */}
     </div>
   );
