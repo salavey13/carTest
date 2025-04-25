@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Tooltip } from '@/components/ui/Tooltip'; // <<<--- CORRECT PATH
+import { Tooltip } from '@/components/ui/tooltip'; // <<<--- CORRECT PATH
 import { ValidationStatus, ValidationIssue } from '../../hooks/useCodeParsingAndValidation'; // Adjust path
 import { FaRotate, FaCircleCheck, FaCircleExclamation, FaBroom, FaClipboardQuestion } from 'react-icons/fa6';
 
@@ -56,7 +56,7 @@ export const ValidationStatusIndicator: React.FC<ValidationStatusProps> = ({
         <div className="flex flex-col items-end gap-1 mt-1">
              {/* Indicator Icon */}
              <div className="h-4 flex items-center justify-center">
-                <Tooltip text={getIndicatorTooltip()} position="left">
+                <Tooltip text={getIndicatorTooltip()} >
                     <div>{getIndicatorIcon()}</div>
                 </Tooltip>
              </div>
@@ -71,7 +71,7 @@ export const ValidationStatusIndicator: React.FC<ValidationStatusProps> = ({
                      )}
                      {skippedCommentIssues.length > 0 && (
                           <button onClick={onCopyPrompt} className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-orange-600 hover:bg-orange-500 text-white transition shadow text-nowrap">
-                              <FaClipboardQuestion size={12}/> Prompt Fix '//...' ({skippedCommentIssues.length})
+                              <FaClipboardQuestion size={12}/> Prompt Fix '//..''.' ({skippedCommentIssues.length})
                           </button>
                      )}
                  </div>
