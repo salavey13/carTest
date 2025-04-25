@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import {
     FaAngleDown, FaAngleUp,
     FaDownload, FaArrowsRotate, FaCircleCheck, FaXmark, FaCopy,
-    FaBroom, FaRobot, FaCodeBranch, FaPlus, FaFileLines, FaSpinner, FaListCheck, FaSquareXmark
+    FaBroom, FaRobot, FaCodeBranch, FaPlus, FaFileLines, FaSpinner, FaListCheck, FaSquareXmark,
+    FaHighlighter, FaKey, FaTree // Added missing icons from FileList usage
 } from "react-icons/fa6";
 import { motion } from "framer-motion";
 
@@ -57,8 +58,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       setLoadingPrs, isSettingsModalOpen, triggerToggleSettingsModal, kworkInputRef, triggerAskAi,
       triggerGetOpenPRs, updateRepoUrlInAssistant, scrollToSection,
       setFilesParsed, setAiResponseHasContent, setSelectedAssistantFiles, imageReplaceTask,
-      setAllFetchedFiles, // <<< Make sure this is passed and used
-      allFetchedFiles // <<< Make sure this is read if needed
+      setAllFetchedFiles,
+      allFetchedFiles
    } = useRepoXmlPageContext();
 
   // === Параметры URL и производное состояние ===
@@ -85,7 +86,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
         "tailwind.config.ts",
     ], []);
 
-
   // === Рефы ===
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const localKworkInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -95,23 +95,24 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   const isAutoFetchingRef = useRef(false);
   const fetchStatusRef = useRef(fetchStatus);
 
-  // Связываем локальный ref поля ввода с ref из контекста
-  useEffect(() => { if (kworkInputRef) kworkInputRef.current = localKworkInputRef.current; }, [kworkInputRef]);
-  // Обновляем fetchStatusRef при изменении fetchStatus из контекста
-  useEffect(() => { fetchStatusRef.current = fetchStatus; }, [fetchStatus]);
-  // Устанавливаем isMounted после первого рендера на клиенте
-  useEffect(() => { setIsMounted(true); }, []); // <<< Устанавливает isMounted в true ПОСЛЕ первого рендера
+  // === Эффекты ===
+  useEffect(() => { setIsMounted(true); }, []); // Устанавливаем isMounted после первого рендера на клиенте
+  useEffect(() => { if (kworkInputRef) kworkInputRef.current = localKworkInputRef.current; }, [kworkInputRef]); // Связываем рефы
+  useEffect(() => { fetchStatusRef.current = fetchStatus; }, [fetchStatus]); // Обновляем fetchStatusRef
+  useEffect(() => { setRepoUrlEntered(repoUrl.trim().length > 0); updateRepoUrlInAssistant(repoUrl); }, [repoUrl, setRepoUrlEntered, updateRepoUrlInAssistant]); // Обновляем URL в ассистенте
+  useEffect(() => { return () => stopProgressSimulation(); }, []); // Очистка интервала симуляции при размонтировании
 
-  // === Утилиты и Колбэки (в правильном порядке инициализации!) ===
+  // === Утилиты и Колбэки (Определены ДО их использования в зависимостях!) ===
 
-  // 1. Базовые утилиты
+  // 1. Базовые утилиты (низкоуровневые, без внешних зависимостей-колбэков)
   const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
     let s={background:"rgba(50,50,50,0.9)",color:"#E1FF01",border:"1px solid rgba(225,255,1,0.2)",backdropFilter:"blur(3px)"};
     if(type==='success')s={background:"rgba(22,163,74,0.9)",color:"#fff",border:"1px solid rgba(34,197,94,0.3)",backdropFilter:"blur(3px)"};
     else if(type==='error')s={background:"rgba(220,38,38,0.9)",color:"#fff",border:"1px solid rgba(239,68,68,0.3)",backdropFilter:"blur(3px)"};
     else if(type==='warning')s={background:"rgba(217,119,6,0.9)",color:"#fff",border:"1px solid rgba(245,158,11,0.3)",backdropFilter:"blur(3px)"};
     toast(message,{style:s,duration:type==='error'?5000:(type==='warning'?4000:3000)});
-  }, []);
+  }, []); // Зависит только от toast, стабильно
+
   const updateKworkInput = useCallback((value: string) => {
       if (localKworkInputRef.current) {
           localKworkInputRef.current.value = value;
@@ -119,14 +120,16 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
           localKworkInputRef.current.dispatchEvent(event);
           setKworkInputHasContent(value.trim().length > 0);
       } else { console.warn("localKworkInputRef is null"); }
-  }, [setKworkInputHasContent]); // Dependency is correct
-  const getKworkInputValue = useCallback((): string => localKworkInputRef.current?.value || "", []);
+  }, [setKworkInputHasContent]); // Зависит от setKworkInputHasContent из контекста
 
-  // 2. Симуляция прогресса
+  const getKworkInputValue = useCallback((): string => localKworkInputRef.current?.value || "", []); // Без зависимостей
+
+  // 2. Симуляция прогресса (зависит от stopProgressSimulation, который без зависимостей)
   const stopProgressSimulation = useCallback(() => {
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
       progressIntervalRef.current = null;
-  }, []);
+  }, []); // Без зависимостей
+
   const startProgressSimulation = useCallback((estimatedDurationSeconds = 13) => {
       stopProgressSimulation(); setProgress(0); setError(null); const startTime = Date.now(); const totalDurationMs = estimatedDurationSeconds * 1000; const intervalTime = 100;
       console.log(`[ProgressSim] Запуск симуляции на ${estimatedDurationSeconds} сек.`);
@@ -134,7 +137,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
           const elapsedTime = Date.now() - startTime;
           const calculatedProgress = Math.min((elapsedTime / totalDurationMs) * 100, 100);
           setProgress(calculatedProgress);
-          const currentFetchStatus = fetchStatusRef.current; // Read from ref
+          const currentFetchStatus = fetchStatusRef.current;
           if (currentFetchStatus === 'success' || currentFetchStatus === 'error' || currentFetchStatus === 'failed_retries') {
               console.log(`[ProgressSim] Статус (${currentFetchStatus}) изменился, остановка симуляции.`);
               stopProgressSimulation();
@@ -147,24 +150,37 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
               } else { setProgress(100); }
           }
       }, intervalTime);
-  }, [stopProgressSimulation]); // Dependencies seem correct
+  }, [stopProgressSimulation]); // Зависит от stopProgressSimulation
 
-  // 3. Обработчики UI и взаимодействий
-  const handleRepoUrlChange = useCallback((url: string) => { setRepoUrlState(url); setRepoUrlEntered(url.trim().length > 0); updateRepoUrlInAssistant(url); setOpenPrs([]); setTargetBranchName(null); setManualBranchName(""); }, [setRepoUrlEntered, updateRepoUrlInAssistant, setOpenPrs, setTargetBranchName, setManualBranchName]); // Dependencies correct
-  const handleCopyToClipboard = useCallback((textToCopy?: string, shouldScroll = true): boolean => { const c=textToCopy??getKworkInputValue(); if(!c.trim()){addToast("Нет текста",'warning');return false;} try{navigator.clipboard.writeText(c); addToast("Скопировано!",'success');setRequestCopied(true); if(shouldScroll)scrollToSection('executor');return true;}catch(e){console.error("Ошибка копирования:",e);addToast("Ошибка копирования",'error');return false;} }, [getKworkInputValue, scrollToSection, addToast, setRequestCopied]); // Dependencies correct
-  const handleClearAll = useCallback(() => { console.log("Очистка состояния Fetcher."); setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set()); updateKworkInput(""); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set()); setRequestCopied(false); addToast("Очищено ✨", 'success'); if (localKworkInputRef.current) localKworkInputRef.current.focus(); }, [ setSelectedFetcherFiles, updateKworkInput, addToast, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setRequestCopied ]); // Dependencies correct
-  const selectHighlightedFiles = useCallback(() => { const fTS=new Set<string>(selectedFiles); let nSC=0; const aHLS=[ ...secondaryHighlightedPaths.component, ...secondaryHighlightedPaths.context, ...secondaryHighlightedPaths.hook, ...secondaryHighlightedPaths.lib ]; if(primaryHighlightedPath&&files.some(f=>f.path===primaryHighlightedPath)&&!fTS.has(primaryHighlightedPath)){fTS.add(primaryHighlightedPath); nSC++;} aHLS.forEach(p=>{if(files.some(f=>f.path===p)&&!fTS.has(p)){fTS.add(p); nSC++;}}); if(nSC>0){setSelectedFilesState(fTS); setSelectedFetcherFiles(fTS); addToast(`${nSC} связанных добавлено`, 'info');} else {addToast("Все связанные уже выбраны", 'info');} }, [ primaryHighlightedPath, secondaryHighlightedPaths, files, selectedFiles, setSelectedFetcherFiles, addToast ]); // Dependencies correct
-  const toggleFileSelection = useCallback((path: string) => { setSelectedFilesState(prevSet => { const newSet = new Set(prevSet); if(newSet.has(path)){ newSet.delete(path); }else{ newSet.add(path); } if (selectionUpdateTimeoutRef.current) clearTimeout(selectionUpdateTimeoutRef.current); selectionUpdateTimeoutRef.current = setTimeout(() => { setSelectedFetcherFiles(new Set(newSet)); selectionUpdateTimeoutRef.current = null; }, 150); return newSet; }); }, [setSelectedFetcherFiles]); // Dependency correct
-  const handleAddImportantFiles = useCallback(() => { let aC=0; const fTA=new Set(selectedFiles); importantFiles.forEach(p=>{if(files.some(f=>f.path===p)&&!selectedFiles.has(p)){fTA.add(p); aC++;}}); if(aC===0){addToast("Важные уже выбраны", 'info'); return;} setSelectedFilesState(fTA); setSelectedFetcherFiles(fTA); addToast(`Добавлено ${aC} важных`, 'success'); }, [selectedFiles, importantFiles, files, setSelectedFetcherFiles, addToast]); // Dependencies correct
-  const handleAddFullTree = useCallback(() => { if(files.length===0){addToast("Нет файлов",'warning'); return;} const tO=files.map((f)=>`- /${f.path}`).sort().join("\n"); const tC=`Структура:\n\`\`\`\n${tO}\n\`\`\``; let added=false; const cV=getKworkInputValue(); const tV=cV.trim(); const hT=/Структура:\s*```/im.test(tV); if(!hT){const nC=tV?`${tV}\n\n${tC}`:tC; updateKworkInput(nC); added=true;} if(added){addToast("Дерево добавлено",'success'); scrollToSection('kworkInput');} else {addToast("Дерево уже добавлено", 'info');} }, [files, getKworkInputValue, updateKworkInput, scrollToSection, addToast]); // Dependencies correct
-  const handleSelectPrBranch = useCallback((branch: string | null) => { setTargetBranchName(branch); if(branch) addToast(`Ветка PR: ${branch}`, 'success'); else addToast(`Выбор ветки PR снят.`, 'info'); }, [setTargetBranchName, addToast]); // Dependencies correct
-  const handleManualBranchChange = useCallback((name: string) => { setManualBranchName(name); }, [setManualBranchName]); // Dependency correct
-  const handleLoadPrs = useCallback(() => { triggerGetOpenPRs(repoUrl); }, [triggerGetOpenPRs, repoUrl]); // Dependencies correct
-  const handleSelectAll = useCallback(() => { if(files.length===0)return; const allP=new Set(files.map(f=>f.path)); setSelectedFilesState(allP); setSelectedFetcherFiles(allP); addToast(`Выбрано ${allP.size} файлов`,'info'); }, [files, setSelectedFetcherFiles, addToast]); // Dependencies correct
-  const handleDeselectAll = useCallback(() => { setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set()); addToast("Выбор снят",'info'); }, [setSelectedFetcherFiles, addToast]); // Dependency correct
-  const handleAddSelected = useCallback(async (filesToAddParam?: Set<string>, allFilesParam?: FileNode[]) => { const fTP=allFilesParam||files; const fTA=filesToAddParam||selectedFiles; if(fTP.length===0&&fTA.size>0){addToast("Файлы не загружены.",'error');return;} if(fTA.size===0){addToast("Выберите файлы.",'warning');return;} const pfx="Контекст кода для анализа:\n"; const mdTxt=fTP.filter(f=>fTA.has(f.path)).sort((a,b)=>a.path.localeCompare(b.path)).map(f=>{const pC=`// /${f.path}`; const cAHC=f.content.trimStart().startsWith(pC); const cTA=cAHC?f.content:`${pC}\n${f.content}`; return `\`\`\`${getLanguage(f.path)}\n${cTA}\n\`\`\``}).join("\n\n"); const cKV=getKworkInputValue(); const ctxRgx=/Контекст кода для анализа:[\s\S]*/; const tT=cKV.replace(ctxRgx,'').trim(); const nC=`${tT?tT+'\n\n':''}${pfx}${mdTxt}`; updateKworkInput(nC); addToast(`${fTA.size} файлов добавлено`, 'success'); scrollToSection('kworkInput'); }, [files, selectedFiles, addToast, getKworkInputValue, updateKworkInput, scrollToSection]); // Dependencies correct
+  // 3. Обработчики UI и взаимодействий (зависят от базовых утилит)
+  const handleRepoUrlChange = useCallback((url: string) => { setRepoUrlState(url); setRepoUrlEntered(url.trim().length > 0); updateRepoUrlInAssistant(url); setOpenPrs([]); setTargetBranchName(null); setManualBranchName(""); }, [setRepoUrlEntered, updateRepoUrlInAssistant, setOpenPrs, setTargetBranchName, setManualBranchName]);
 
-  // 4. Основная функция извлечения (handleFetchManual) - Defined last among callbacks
+  const handleCopyToClipboard = useCallback((textToCopy?: string, shouldScroll = true): boolean => { const c=textToCopy??getKworkInputValue(); if(!c.trim()){addToast("Нет текста",'warning');return false;} try{navigator.clipboard.writeText(c); addToast("Скопировано!",'success');setRequestCopied(true); if(shouldScroll)scrollToSection('executor');return true;}catch(e){console.error("Ошибка копирования:",e);addToast("Ошибка копирования",'error');return false;} }, [getKworkInputValue, scrollToSection, addToast, setRequestCopied]);
+
+  const handleClearAll = useCallback(() => { console.log("Очистка состояния Fetcher."); setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set()); updateKworkInput(""); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set()); setRequestCopied(false); addToast("Очищено ✨", 'success'); if (localKworkInputRef.current) localKworkInputRef.current.focus(); }, [ setSelectedFetcherFiles, updateKworkInput, addToast, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setRequestCopied ]);
+
+  const selectHighlightedFiles = useCallback(() => { const fTS=new Set<string>(selectedFiles); let nSC=0; const aHLS=[ ...secondaryHighlightedPaths.component, ...secondaryHighlightedPaths.context, ...secondaryHighlightedPaths.hook, ...secondaryHighlightedPaths.lib ]; if(primaryHighlightedPath&&files.some(f=>f.path===primaryHighlightedPath)&&!fTS.has(primaryHighlightedPath)){fTS.add(primaryHighlightedPath); nSC++;} aHLS.forEach(p=>{if(files.some(f=>f.path===p)&&!fTS.has(p)){fTS.add(p); nSC++;}}); if(nSC>0){setSelectedFilesState(fTS); setSelectedFetcherFiles(fTS); addToast(`${nSC} связанных добавлено`, 'info');} else {addToast("Все связанные уже выбраны", 'info');} }, [ primaryHighlightedPath, secondaryHighlightedPaths, files, selectedFiles, setSelectedFetcherFiles, addToast ]);
+
+  const toggleFileSelection = useCallback((path: string) => { setSelectedFilesState(prevSet => { const newSet = new Set(prevSet); if(newSet.has(path)){ newSet.delete(path); }else{ newSet.add(path); } if (selectionUpdateTimeoutRef.current) clearTimeout(selectionUpdateTimeoutRef.current); selectionUpdateTimeoutRef.current = setTimeout(() => { setSelectedFetcherFiles(new Set(newSet)); selectionUpdateTimeoutRef.current = null; }, 150); return newSet; }); }, [setSelectedFetcherFiles]);
+
+  const handleAddImportantFiles = useCallback(() => { let aC=0; const fTA=new Set(selectedFiles); importantFiles.forEach(p=>{if(files.some(f=>f.path===p)&&!selectedFiles.has(p)){fTA.add(p); aC++;}}); if(aC===0){addToast("Важные уже выбраны", 'info'); return;} setSelectedFilesState(fTA); setSelectedFetcherFiles(fTA); addToast(`Добавлено ${aC} важных`, 'success'); }, [selectedFiles, importantFiles, files, setSelectedFetcherFiles, addToast]);
+
+  const handleAddFullTree = useCallback(() => { if(files.length===0){addToast("Нет файлов",'warning'); return;} const tO=files.map((f)=>`- /${f.path}`).sort().join("\n"); const tC=`Структура:\n\`\`\`\n${tO}\n\`\`\``; let added=false; const cV=getKworkInputValue(); const tV=cV.trim(); const hT=/Структура:\s*```/im.test(tV); if(!hT){const nC=tV?`${tV}\n\n${tC}`:tC; updateKworkInput(nC); added=true;} if(added){addToast("Дерево добавлено",'success'); scrollToSection('kworkInput');} else {addToast("Дерево уже добавлено", 'info');} }, [files, getKworkInputValue, updateKworkInput, scrollToSection, addToast]);
+
+  const handleSelectPrBranch = useCallback((branch: string | null) => { setTargetBranchName(branch); if(branch) addToast(`Ветка PR: ${branch}`, 'success'); else addToast(`Выбор ветки PR снят.`, 'info'); }, [setTargetBranchName, addToast]);
+
+  const handleManualBranchChange = useCallback((name: string) => { setManualBranchName(name); }, [setManualBranchName]);
+
+  const handleLoadPrs = useCallback(() => { triggerGetOpenPRs(repoUrl); }, [triggerGetOpenPRs, repoUrl]);
+
+  const handleSelectAll = useCallback(() => { if(files.length===0)return; const allP=new Set(files.map(f=>f.path)); setSelectedFilesState(allP); setSelectedFetcherFiles(allP); addToast(`Выбрано ${allP.size} файлов`,'info'); }, [files, setSelectedFetcherFiles, addToast]);
+
+  const handleDeselectAll = useCallback(() => { setSelectedFilesState(new Set()); setSelectedFetcherFiles(new Set()); addToast("Выбор снят",'info'); }, [setSelectedFetcherFiles, addToast]);
+
+  // 4. Основная функция добавления выбранных (зависит от getKworkInputValue, updateKworkInput, scrollToSection, addToast)
+  const handleAddSelected = useCallback(async (filesToAddParam?: Set<string>, allFilesParam?: FileNode[]) => { const fTP=allFilesParam||files; const fTA=filesToAddParam||selectedFiles; if(fTP.length===0&&fTA.size>0){addToast("Файлы не загружены.",'error');return;} if(fTA.size===0){addToast("Выберите файлы.",'warning');return;} const pfx="Контекст кода для анализа:\n"; const mdTxt=fTP.filter(f=>fTA.has(f.path)).sort((a,b)=>a.path.localeCompare(b.path)).map(f=>{const pC=`// /${f.path}`; const cAHC=f.content.trimStart().startsWith(pC); const cTA=cAHC?f.content:`${pC}\n${f.content}`; return `\`\`\`${getLanguage(f.path)}\n${cTA}\n\`\`\``}).join("\n\n"); const cKV=getKworkInputValue(); const ctxRgx=/Контекст кода для анализа:[\s\S]*/; const tT=cKV.replace(ctxRgx,'').trim(); const nC=`${tT?tT+'\n\n':''}${pfx}${mdTxt}`; updateKworkInput(nC); addToast(`${fTA.size} файлов добавлено`, 'success'); scrollToSection('kworkInput'); }, [files, selectedFiles, addToast, getKworkInputValue, updateKworkInput, scrollToSection]);
+
+  // 5. Основная функция извлечения (handleFetchManual) - Зависит от многих колбэков и состояний
   const handleFetchManual = useCallback(async (isManualRetry = false, branchNameToFetch?: string | null) => {
       const effectiveBranch = branchNameToFetch || targetBranchName || manualBranchName || 'default';
       console.log(`Fetcher(Manual): Старт извлечения. Повтор: ${isManualRetry}, Ветка: ${effectiveBranch}`);
@@ -172,7 +188,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
        if (imageReplaceTask && isImageTaskFetchInitiated.current && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying')) { console.warn("Fetcher(Manual): Загрузка для задачи картинки уже идет. Отмена дубликата."); return; }
        if (!repoUrl.trim()) { console.error("Fetcher(Manual): URL пуст."); addToast("Введите URL", 'error'); setError("URL пуст."); triggerToggleSettingsModal(); return; }
        if ((fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying') && !isManualRetry) { console.warn("Fetcher(Manual): Уже идет загрузка."); addToast("Уже идет...", "info"); return; }
-       if (assistantLoading || isParsing || aiActionLoading) { console.warn(`Fetcher(Manual): Заблокировано состоянием.`); addToast("Подождите.", "warning"); return; }
+       if (assistantLoading || isParsing || aiActionLoading) { console.warn(`Fetcher(Manual): Заблокировано состоянием (${assistantLoading}, ${isParsing}, ${aiActionLoading}).`); addToast("Подождите.", "warning"); return; }
        console.log("Fetcher(Manual): Запускаем процесс.");
        setFetchStatus('loading');
        setError(null); setFiles([]); setSelectedFilesState(new Set()); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setAllFetchedFiles([]); setSelectedFetcherFiles(new Set()); setFilesFetched(false, [], null, []); setRequestCopied(false); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set());
@@ -188,7 +204,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                success = true; finalStatus = 'success'; const fetchedFiles = result.files;
                const allPaths=fetchedFiles.map(f=>f.path); let primaryHPath:string|null=null; const catSecPaths:Record<ImportCategory,Set<string>>={component:new Set(),context:new Set(),hook:new Set(),lib:new Set(),other:new Set()}; let filesToSel=new Set<string>();
                if(imageReplaceTask){ primaryHPath=imageReplaceTask.targetPath; if(!allPaths.includes(primaryHPath)){ const imgErr=`Файл (${primaryHPath}) не найден в '${effectiveBranch}'.`; setError(imgErr); addToast(imgErr,'error'); setFilesFetched(true,fetchedFiles,null,[]); finalStatus='error'; success=false; } else { filesToSel.add(primaryHPath); } }
-               else if(highlightedPathFromUrl){ primaryHPath=getPageFilePath(highlightedPathFromUrl,allPaths); if(primaryHPath){ const pF=fetchedFiles.find(f=>f.path===primaryHPath); if(pF){ filesToSel.add(primaryHPath); const imps=extractImports(pF.content); for(const imp of imps){ const rP=resolveImportPath(imp,pF.path,fetchedFiles); if(rP&&rP!==primaryHPath){ const cat=categorizeResolvedPath(rP); catSecPaths[cat].add(rP); if(cat!=='other')filesToSel.add(rP); } } } else { primaryHPath=null; addToast(`Ошибка: Путь (${primaryHPath}) не найден.`, 'error'); } } else { addToast(`Файл страницы для URL (${highlightedPathFromUrl}) не найден.`, 'warning'); } }
+               else if(highlightedPathFromUrl){ primaryHPath=getPageFilePath(highlightedPathFromUrl,allPaths); if(primaryHPath){ const pF=fetchedFiles.find(f=>f.path===primaryHPath); if(pF){ filesToSel.add(primaryHPath); const imps=extractImports(pF.content); for(const imp of imps){ const rP=resolveImportPath(imp,pF.path,fetchedFiles); if(rP&&rP!==primaryHPath){ const cat=categorizeResolvedPath(rP); catSecPaths[cat].add(rP); if(cat!=='other')filesToSel.add(rP); } } } else { primaryHPath=null; addToast(`Ошибка: Путь (${highlightedPathFromUrl}) не найден.`, 'error'); } } else { addToast(`Файл страницы для URL (${highlightedPathFromUrl}) не найден.`, 'warning'); } }
                if(!imageReplaceTask){ importantFiles.forEach(p=>{ if(allPaths.includes(p)&&!filesToSel.has(p)){ filesToSel.add(p); } }); }
                if(success){
                    setPrimaryHighlightedPathState(primaryHPath); const finalSecPaths={component:Array.from(catSecPaths.component),context:Array.from(catSecPaths.context),hook:Array.from(catSecPaths.hook),lib:Array.from(catSecPaths.lib),other:Array.from(catSecPaths.other)}; setSecondaryHighlightedPathsState(finalSecPaths);
@@ -203,40 +219,36 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
            } else { throw new Error(result?.error || `Не удалось получить файлы из ${effectiveBranch}.`); }
        } catch (err: any) { const displayError = err?.message || "Неизвестная ошибка"; setError(displayError); addToast(`Ошибка извлечения: ${displayError}`, 'error'); setFilesFetched(false, [], null, []); success = false; finalStatus = 'error'; }
        finally { stopProgressSimulation(); setProgress(success ? 100 : 0); setFetchStatus(finalStatus); if (imageReplaceTask) { isImageTaskFetchInitiated.current = false; } console.log(`Fetcher(Manual): Завершено. Успех: ${success}, Финальный статус: ${finalStatus}`); }
-   }, [ // Dependencies checked and seem correct based on previous definitions
+   }, [ // Dependencies проверены и включают все необходимые колбэки и состояния
        repoUrl, token, imageReplaceTask, targetBranchName, manualBranchName, assistantLoading, isParsing,
-       aiActionLoading, repoUrlEntered, setFetchStatus, setError, setFiles, setSelectedFilesState,
-       setPrimaryHighlightedPathState, setSecondaryHighlightedPathsState, setAllFetchedFiles,
-       setSelectedFetcherFiles, setFilesFetched, setRequestCopied, setAiResponseHasContent,
-       setFilesParsed, setSelectedAssistantFiles, addToast, startProgressSimulation,
-       stopProgressSimulation, triggerToggleSettingsModal, updateKworkInput, importantFiles,
-       highlightedPathFromUrl, ideaFromUrl, DEFAULT_TASK_IDEA, isSettingsModalOpen, handleAddSelected,
-       getKworkInputValue // Assuming getKworkInputValue is stable (depends only on ref)
+       aiActionLoading, setFetchStatus, setError, setFiles, setSelectedFilesState, setPrimaryHighlightedPathState,
+       setSecondaryHighlightedPathsState, setAllFetchedFiles, setSelectedFetcherFiles, setFilesFetched,
+       setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, addToast,
+       startProgressSimulation, stopProgressSimulation, triggerToggleSettingsModal, updateKworkInput,
+       highlightedPathFromUrl, ideaFromUrl, DEFAULT_TASK_IDEA, importantFiles, isSettingsModalOpen, handleAddSelected,
+       token // Добавлен токен в зависимости, так как он используется
    ]);
 
-
-  // --- Эффекты ---
-  useEffect(() => { setRepoUrlEntered(repoUrl.trim().length > 0); updateRepoUrlInAssistant(repoUrl); }, [repoUrl, setRepoUrlEntered, updateRepoUrlInAssistant]);
-
-  // Эффект для авто-запуска (Использует handleFetchManual)
+  // --- Эффекты (Теперь используют колбэки, определенные выше) ---
+  // Эффект для авто-запуска
   useEffect(() => {
-    if (!isMounted) return; // <<< ГЛАВНЫЙ ФИКС: Не запускать эффект до монтирования
+    if (!isMounted) return; // Не запускать до монтирования
 
     const branch = targetBranchName || manualBranchName || null;
-    const canTriggerFetch = autoFetch && repoUrl &&
+    const canTriggerFetch = autoFetch && repoUrlEntered &&
                            (fetchStatusRef.current === 'idle' || fetchStatusRef.current === 'failed_retries' || fetchStatusRef.current === 'error');
     const isImageFetchReady = !imageReplaceTask || !isImageTaskFetchInitiated.current;
 
     if (canTriggerFetch && isImageFetchReady && !isAutoFetchingRef.current) {
-        console.log(`[AutoFetch Effect] Запуск извлечения через handleFetchManual. Страж активен. ЗадачаКартинки: ${!!imageReplaceTask}, Инициация: ${isImageTaskFetchInitiated.current}`);
+        console.log(`[AutoFetch Effect] Запуск извлечения через handleFetchManual. Страж активен.`);
         isAutoFetchingRef.current = true;
-        handleFetchManual(false, branch) // Используем handleFetchManual
+        handleFetchManual(false, branch)
             .catch(err => { console.error("[AutoFetch Effect] handleFetchManual выбросил ошибку:", err); })
             .finally(() => { setTimeout(() => { console.log("[AutoFetch Effect] Сброс стража извлечения."); isAutoFetchingRef.current = false; }, 300); });
     } else if (autoFetch && imageReplaceTask && isImageTaskFetchInitiated.current) { console.log("[AutoFetch Effect] Пропуск: Загрузка для задачи картинки уже инициирована."); }
     else if (canTriggerFetch && isAutoFetchingRef.current) { console.log("[AutoFetch Effect] Пропуск: Страж уже активен."); }
-    // Dependencies now include handleFetchManual
-  }, [ isMounted, repoUrl, autoFetch, fetchStatus, targetBranchName, manualBranchName, imageReplaceTask, handleFetchManual ]);
+  }, [ isMounted, repoUrlEntered, autoFetch, targetBranchName, manualBranchName, imageReplaceTask, handleFetchManual ]); // Зависимости: isMounted, флаги, ветки, таска картинки, и сам обработчик
+
 
   // Эффект для авто-добавления зависимостей
   useEffect(() => {
@@ -252,10 +264,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
           if(relatedToSel.size > 0){ const finalSel = new Set([...selectedFiles, ...relatedToSel]); setSelectedFilesState(finalSel); setSelectedFetcherFiles(finalSel); addToast(`🔗 Авто-добавлено ${foundCount} связанных`, 'info'); prevSelectedFilesRef.current = finalSel; return; }
       }
       prevSelectedFilesRef.current = new Set(selectedFiles);
-  }, [selectedFiles, files, fetchStatus, primaryHighlightedPath, imageReplaceTask, setSelectedFetcherFiles, addToast, isMounted]); // Dependencies correct
-
-  // Очистка интервала симуляции
-  useEffect(() => { return () => stopProgressSimulation(); }, [stopProgressSimulation]);
+  }, [selectedFiles, files, fetchStatus, primaryHighlightedPath, imageReplaceTask, setSelectedFetcherFiles, addToast, isMounted]); // Добавил isMounted
 
   // === Imperative Handle ===
   useImperativeHandle(ref, () => ({
@@ -265,38 +274,31 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       handleCopyToClipboard,
       clearAll: handleClearAll,
       getKworkInputValue
-  }), [handleFetchManual, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll, getKworkInputValue]); // Dependencies correct
+  }), [handleFetchManual, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll, getKworkInputValue]); // Зависимости корректны
 
-  // --- Логика рендеринга ---
-
-  // <<< --- ГЛАВНЫЙ ФИКС --- >>>
-  // Отложить рендеринг основного контента до монтирования на клиенте
+  // === Логика рендеринга ===
   if (!isMounted) {
-      // Возвращаем простой лоадер или null во время SSR/сборки
-      // Это предотвращает выполнение сложной логики и доступ к состоянию/контексту до гидратации
+      // Возвращаем лоадер или null во время SSR/сборки для предотвращения ошибок
       return (
-          <div className="w-full p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm text-gray-200 font-mono rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] border border-gray-700/50 relative overflow-hidden min-h-[300px] flex items-center justify-center">
-              <p className="text-gray-400 text-lg animate-pulse">Инициализация Экстрактора...</p>
+          <div id="extractor-loading" className="w-full p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm text-gray-200 font-mono rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] border border-gray-700/50 relative overflow-hidden min-h-[300px] flex items-center justify-center">
+              <p className="text-gray-400 text-lg animate-pulse flex items-center gap-2"><FaSpinner className="animate-spin"/> Инициализация Экстрактора...</p>
           </div>
       );
   }
-  // <<< --- КОНЕЦ ФИКСА --- >>>
 
-
-  // --- Вычисляемые переменные для JSX (теперь выполняются только после isMounted) ---
+  // Вычисляемые переменные для JSX (теперь выполняются только после isMounted)
   const isLoading = fetchStatus === 'loading' || fetchStatus === 'retrying';
   const showProgressBar = fetchStatus !== 'idle';
-  // Use state values directly here, as they are now guaranteed to be from the client-side state after isMounted check
   const isFetchDisabled = isLoading || loadingPrs || !repoUrlEntered || assistantLoading || isParsing || aiActionLoading;
   const isActionDisabled = isLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing || !!imageReplaceTask;
-  const isAskAiDisabled = true; // <<<--- ВРЕМЕННО ОТКЛЮЧЕНО
+  const isAskAiDisabled = true; // ВРЕМЕННО ОТКЛЮЧЕНО
   const isCopyDisabled = !kworkInputHasContent || isActionDisabled || !!imageReplaceTask;
   const isClearDisabled = (!kworkInputHasContent && selectedFiles.size === 0) || isActionDisabled || !!imageReplaceTask;
   const isAddSelectedDisabled = selectedFiles.size === 0 || isActionDisabled || !!imageReplaceTask;
   const effectiveBranchDisplay = targetBranchName || manualBranchName || "default";
   const isWaitingForAi = aiActionLoading && !!currentAiRequestId;
 
-  // --- JSX Возврат (теперь безопасно рендерится только на клиенте) ---
+  // JSX Возврат (теперь безопасно рендерится только на клиенте)
   return (
     <div id="extractor" className="w-full p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm text-gray-200 font-mono rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] border border-gray-700/50 relative overflow-hidden">
       {/* Заголовок и инструкции */}
@@ -308,7 +310,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
        <SettingsModal isOpen={isSettingsModalOpen} repoUrl={repoUrl} setRepoUrl={handleRepoUrlChange} token={token} setToken={setToken} manualBranchName={manualBranchName} setManualBranchName={handleManualBranchChange} currentTargetBranch={targetBranchName} openPrs={openPrs} loadingPrs={loadingPrs} onSelectPrBranch={handleSelectPrBranch} onLoadPrs={handleLoadPrs} loading={isLoading || loadingPrs || assistantLoading || aiActionLoading} />
       {/* Кнопка "Извлечь файлы" */}
        <div className="mb-4 flex justify-center">
-            {/* Кнопка вызывает handleFetchManual */}
             <motion.button onClick={() => { handleFetchManual(fetchStatus === 'failed_retries' || fetchStatus === 'error'); }} disabled={isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')} className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-white bg-gradient-to-r ${fetchStatus === 'failed_retries' || fetchStatus === 'error' ? 'from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600' : 'from-purple-600 to-cyan-500'} transition-all shadow-lg shadow-purple-500/30 hover:shadow-cyan-500/40 ${(isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')) ? "opacity-60 cursor-not-allowed" : "hover:brightness-110 active:scale-[0.98]"}`} whileHover={{ scale: (isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')) ? 1 : 1.03 }} whileTap={{ scale: (isFetchDisabled && !(fetchStatus === 'failed_retries' || fetchStatus === 'error')) ? 1 : 0.97 }} title={`Извлечь файлы из ветки: ${effectiveBranchDisplay}`}> {isLoading ? <FaSpinner className="animate-spin" /> : (fetchStatus === 'failed_retries' || fetchStatus === 'error' ? <FaArrowsRotate /> : <FaDownload />)} {fetchStatus === 'retrying' ? "Повтор..." : isLoading ? "Загрузка..." : (fetchStatus === 'failed_retries' || fetchStatus === 'error' ? "Попробовать снова" : "Извлечь файлы")} <span className="text-xs opacity-80 hidden sm:inline">({effectiveBranchDisplay})</span> </motion.button>
         </div>
       {/* Прогресс-бар и область статуса */}
