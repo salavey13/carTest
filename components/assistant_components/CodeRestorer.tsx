@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { ValidationIssue, FileEntry } from '@/hooks/useCodeParsingAndValidation'; // Adjust path
 import { FaCodeMerge, FaWandMagicSparkles, FaRotate, FaPoo, FaXmark } from 'react-icons/fa6'; // Added FaTimes
-import { Tooltip } from '@/components/ui/Tooltip'; // <<<--- CORRECT PATH
+import { Tooltip } from '@/components/ui/tooltip'; // <<<--- CORRECT PATH
 
 // --- Restore Modal Component ---
 interface RestoreSkippedModalProps {

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Tooltip } from '@/components/ui/Tooltip'; // <<<--- CORRECTED IMPORT PATH
+import { Tooltip } from '@/components/ui/tooltip'; // <<<--- CORRECTED IMPORT PATH
 import { FileEntry, ValidationIssue } from '../../hooks/useCodeParsingAndValidation'; // Adjust path if necessary
 import { FaEllipsisVertical, FaSquareCheck, FaPaperPlane, FaCircleExclamation, FaFileZipper, FaFloppyDisk } from 'react-icons/fa6';
 import clsx from 'clsx';
