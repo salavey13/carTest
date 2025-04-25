@@ -8,6 +8,7 @@ import { Toaster } from "sonner";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import type { Metadata, Viewport } from 'next'; // Import Viewport type
+import { TooltipProvider } from "@/components/ui/tooltip"; // <--- IMPORT TooltipProvider
 
 // Define Metadata (WITHOUT viewport)
 export const metadata: Metadata = {
@@ -46,28 +47,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           // Add font class if needed
           // inter.className
       )}>
-        <AppProvider>
-          <Header />
-          <main className="flex-1">
-            {children}
-          </main>
-          <StickyChatButton />
-          <Footer />
-          <Toaster
-            position="bottom-right"
-            richColors
-            toastOptions={{
-              style: {
-                background: "rgba(34, 34, 34, 0.9)",
-                color: "#00FF9D",
-                border: "1px solid rgba(0, 255, 157, 0.4)",
-                boxShadow: "0 2px 10px rgba(0, 255, 157, 0.2)",
-                fontFamily: "monospace",
-              },
-              className: 'text-sm',
-            }}
-          />
-        </AppProvider>
+        {/* Wrap with TooltipProvider, often inside other global providers */}
+        <TooltipProvider>
+          <AppProvider>
+            <Header />
+            <main className="flex-1">
+              {children}
+            </main>
+            <StickyChatButton />
+            <Footer />
+            <Toaster
+              position="bottom-right"
+              richColors
+              toastOptions={{
+                style: {
+                  background: "rgba(34, 34, 34, 0.9)",
+                  color: "#00FF9D",
+                  border: "1px solid rgba(0, 255, 157, 0.4)",
+                  boxShadow: "0 2px 10px rgba(0, 255, 157, 0.2)",
+                  fontFamily: "monospace",
+                },
+                className: 'text-sm',
+              }}
+            />
+          </AppProvider>
+        </TooltipProvider> {/* <--- CLOSE TooltipProvider */}
       </body>
     </html>
   );
