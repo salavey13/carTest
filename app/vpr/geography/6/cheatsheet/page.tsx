@@ -8,10 +8,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-// CORRECTED Tooltip import casing
-import {
-  Tooltip
-} from "@/components/ui/Tooltip";
+
 // Standardized ALL icon imports from react-icons/fa6
 import {
  FaWater, FaCompass, FaRulerCombined, FaMountainSun, // Replaced FaMountain
@@ -20,8 +17,7 @@ import {
     FaImage, FaMapLocationDot, // Replaced FaMapMarkedAlt
     FaBookOpen, FaMap, FaUsers, FaBookAtlas, FaSmog, FaSatelliteDish // Added missing + Replaced FaAtlas
 } from "react-icons/fa6";
-
-// --- Tooltip Descriptions (Keep as is) ---
+ Descriptions (Keep as is) ---
 const tooltipDescriptions: Record<string, string> = {
     'continents-*.png': "Карта мира с выделенными и подписанными 6 материками (Евразия, Африка, Сев. Америка, Юж. Америка, Австралия, Антарктида) и 4 основными океанами (Тихий, Атлантический, Индийский, Северный Ледовитый). Важно помнить их взаимное расположение и примерные очертания.",
     'latitude-*.png': "Земной шар с градусной сеткой. Параллели (горизонтальные линии) показывают широту (от 0° на экваторе до 90° на полюсах, северная или южная). Меридианы (вертикальные линии) показывают долготу (от 0° на Гринвиче до 180°, западная или восточная). Координаты точки - это пересечение ее параллели и меридиана.",
@@ -48,21 +44,7 @@ const VprGeographyCheatsheet6: NextPage = () => {
     // Helper component for images with tooltips
     const ImageWithTooltip = ({ src, alt, width, height, className = '', tooltipKeyPart, aspect = 'video', bgColor = 'bg-gray-700/30' }: { src: string, alt: string, width: number, height: number, className?: string, tooltipKeyPart: string, aspect?: 'video' | 'square' | 'auto', bgColor?: string }) => (
         <div className={`p-2 border border-gray-500/30 rounded-lg ${bgColor} hover:shadow-lg hover:shadow-purple-500/20 transition-shadow duration-300`}>
-            <Tooltip>
-                
-                    <div className={`${aspect === 'video' ? 'aspect-video' : aspect === 'square' ? 'aspect-square' : ''} w-full h-auto overflow-hidden rounded ${bgColor} cursor-help`}>
-                        <Image
-                            src={src.startsWith('/placeholders/') ? src : src.replace('about//', 'about/')} // Fix double slash if needed
-                            alt={alt}
-                            width={width}
-                            height={height}
-                            className={`w-full h-full object-cover ${src.startsWith('/placeholders/') ? 'opacity-50' : ''} ${className}`}
-                            loading="lazy"
-                        />
-                    </div>
-                
-                
-            </Tooltip>
+
             <p className="text-xs text-center text-gray-400 mt-1 italic">{alt.split(':')[0]}</p> {/* Shorten alt for caption */}
         </div>
     );
