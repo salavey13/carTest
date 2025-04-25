@@ -3,7 +3,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+  Tooltip
 } from "@/components/ui/tooltip";
 import {
     FaLandmark, FaBookOpen, FaScroll, FaCalendarDays, FaUserShield, FaShieldHalved,
@@ -98,7 +98,7 @@ const VprHistoryCheatsheet: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
                     <div className="p-2 border border-blue-500/30 rounded-lg bg-black/30">
                         <Tooltip>
-                          <TooltipTrigger asChild>
+                          
                            {/* Container forces 16:9 aspect ratio */}
                            <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
                              {/* === IMAGE USES UPDATED URL === */}
@@ -112,14 +112,14 @@ const VprHistoryCheatsheet: React.FC = () => {
                                unoptimized // Use if external host doesn't support optimization
                               />
                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-blue-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-varangians.png']}</p></TooltipContent>
+                          
+                          
                         </Tooltip>
                         <p className="text-xs text-center text-gray-400 mt-1 italic">Призвание варягов (862)</p>
                     </div>
                     <div className="p-2 border border-blue-500/30 rounded-lg bg-black/30">
                         <Tooltip>
-                          <TooltipTrigger asChild>
+                          
                              {/* Container forces 16:9 aspect ratio */}
                              <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
                                {/* === IMAGE USES UPDATED URL === */}
@@ -133,8 +133,8 @@ const VprHistoryCheatsheet: React.FC = () => {
                                  unoptimized
                                />
                               </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-blue-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-baptism.png']}</p></TooltipContent>
+                          
+                          
                         </Tooltip>
                          <p className="text-xs text-center text-gray-400 mt-1 italic">Крещение Руси (988)</p>
                     </div>
@@ -154,7 +154,7 @@ const VprHistoryCheatsheet: React.FC = () => {
                    {/* Image Placeholder: Ярослав Мудрый */}
                    <div className="my-6 p-2 border border-blue-500/30 rounded-lg bg-black/30 max-w-sm mx-auto">
                      <Tooltip>
-                       <TooltipTrigger asChild>
+                       
                           {/* Container forces 1:1 aspect ratio */}
                           <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
                             {/* === IMAGE USES UPDATED URL === */}
@@ -168,9 +168,8 @@ const VprHistoryCheatsheet: React.FC = () => {
                               unoptimized
                              />
                           </div>
-                       </TooltipTrigger>
-                       <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-blue-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-yaroslav.png']}</p></TooltipContent>
-                     </Tooltip>
+                       
+                          </Tooltip>
                      <p className="text-xs text-center text-gray-400 mt-1 italic">Ярослав Мудрый - расцвет Руси.</p>
                    </div>
 
@@ -203,7 +202,7 @@ const VprHistoryCheatsheet: React.FC = () => {
                   {/* Image Placeholder: Монгольское нашествие */}
                   <div className="my-6 p-2 border border-red-600/30 rounded-lg bg-black/30">
                     <Tooltip>
-                      <TooltipTrigger asChild>
+                      
                           {/* Container forces 16:9 aspect ratio */}
                           <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
                              {/* === IMAGE USES UPDATED URL === */}
@@ -217,8 +216,8 @@ const VprHistoryCheatsheet: React.FC = () => {
                                unoptimized
                               />
                            </div>
-                       </TooltipTrigger>
-                       <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-mongols.png']}</p></TooltipContent>
+                       
+                       
                     </Tooltip>
                     <p className="text-xs text-center text-gray-400 mt-1 italic">Нашествие Батыя (1237-1241)</p>
                   </div>
@@ -234,7 +233,7 @@ const VprHistoryCheatsheet: React.FC = () => {
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
                      <div className="p-2 border border-cyan-500/30 rounded-lg bg-black/30">
                        <Tooltip>
-                         <TooltipTrigger asChild>
+                         
                              {/* Container forces 16:9 aspect ratio */}
                              <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
                                {/* === IMAGE USES UPDATED URL === */}
@@ -248,14 +247,14 @@ const VprHistoryCheatsheet: React.FC = () => {
                                  unoptimized
                                />
                               </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-cyan-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-nevsky.png']}</p></TooltipContent>
+                          
+                          
                          </Tooltip>
                          <p className="text-xs text-center text-gray-400 mt-1 italic">Ледовое побоище (1242)</p>
                       </div>
                      <div className="p-2 border border-orange-500/30 rounded-lg bg-black/30">
                        <Tooltip>
-                         <TooltipTrigger asChild>
+                         
                              {/* Container forces 16:9 aspect ratio */}
                              <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
                                 {/* === IMAGE USES UPDATED URL === */}
@@ -269,8 +268,8 @@ const VprHistoryCheatsheet: React.FC = () => {
                                   unoptimized
                                 />
                               </div>
-                           </TooltipTrigger>
-                           <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-orange-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-kulikovo.png']}</p></TooltipContent>
+                           
+                           
                          </Tooltip>
                          <p className="text-xs text-center text-gray-400 mt-1 italic">Куликовская битва (1380)</p>
                        </div>
@@ -287,7 +286,7 @@ const VprHistoryCheatsheet: React.FC = () => {
                    {/* Image Placeholder: Стояние на Угре */}
                    <div className="my-6 p-2 border border-green-500/30 rounded-lg bg-black/30 max-w-md mx-auto">
                      <Tooltip>
-                       <TooltipTrigger asChild>
+                       
                            {/* Container forces 16:9 aspect ratio */}
                            <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
                               {/* === IMAGE USES UPDATED URL === */}
@@ -301,8 +300,8 @@ const VprHistoryCheatsheet: React.FC = () => {
                                 unoptimized
                                />
                             </div>
-                         </TooltipTrigger>
-                         <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-green-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ivan3.png']}</p></TooltipContent>
+                         
+                         
                        </Tooltip>
                        <p className="text-xs text-center text-gray-400 mt-1 italic">Стояние на Угре (1480) - конец ига.</p>
                     </div>
@@ -326,7 +325,7 @@ const VprHistoryCheatsheet: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
                      <div className="p-2 border border-purple-500/30 rounded-lg bg-black/30">
                        <Tooltip>
-                         <TooltipTrigger asChild>
+                         
                              {/* Container forces 1:1 aspect ratio */}
                              <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
                                {/* === IMAGE USES UPDATED URL === */}
@@ -340,14 +339,14 @@ const VprHistoryCheatsheet: React.FC = () => {
                                  unoptimized
                                />
                               </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-purple-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-feudalism.png']}</p></TooltipContent>
+                          
+                          
                         </Tooltip>
                         <p className="text-xs text-center text-gray-400 mt-1 italic">Феодальная система.</p>
                      </div>
                      <div className="p-2 border border-purple-500/30 rounded-lg bg-black/30">
                        <Tooltip>
-                         <TooltipTrigger asChild>
+                         
                              {/* Container forces 1:1 aspect ratio */}
                              <div className="aspect-square w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
                                {/* === IMAGE USES UPDATED URL === */}
@@ -361,9 +360,8 @@ const VprHistoryCheatsheet: React.FC = () => {
                                  unoptimized
                                />
                               </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-purple-500/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-crusades.png']}</p></TooltipContent>
-                        </Tooltip>
+                          
+                          </Tooltip>
                         <p className="text-xs text-center text-gray-400 mt-1 italic">Крестовые походы.</p>
                      </div>
                    </div>
@@ -384,7 +382,7 @@ const VprHistoryCheatsheet: React.FC = () => {
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
                      <div className="p-2 border border-red-600/30 rounded-lg bg-black/30">
                        <Tooltip>
-                         <TooltipTrigger asChild>
+                         
                              {/* Container forces 16:9 aspect ratio */}
                              <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
                                 {/* === IMAGE USES UPDATED URL === */}
@@ -398,14 +396,14 @@ const VprHistoryCheatsheet: React.FC = () => {
                                   unoptimized
                                  />
                               </div>
-                           </TooltipTrigger>
-                           <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ww2-victory.png']}</p></TooltipContent>
+                           
+                           
                           </Tooltip>
                           <p className="text-xs text-center text-gray-400 mt-1 italic">Знамя Победы над Рейхстагом.</p>
                      </div>
                      <div className="p-2 border border-red-600/30 rounded-lg bg-black/30">
                        <Tooltip>
-                         <TooltipTrigger asChild>
+                         
                              {/* Container forces 16:9 aspect ratio */}
                              <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
                                {/* === IMAGE USES UPDATED URL === */}
@@ -419,9 +417,8 @@ const VprHistoryCheatsheet: React.FC = () => {
                                   unoptimized
                                 />
                               </div>
-                           </TooltipTrigger>
-                           <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-red-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['history-ww2-monument.png']}</p></TooltipContent>
-                          </Tooltip>
+                           
+                              </Tooltip>
                           <p className="text-xs text-center text-gray-400 mt-1 italic">"Родина-мать зовет!".</p>
                      </div>
                    </div>
@@ -440,7 +437,7 @@ const VprHistoryCheatsheet: React.FC = () => {
               </CardContent>
             </Card>
           </div>
-      </TooltipProvider>
+      
     </div>
   );
 };
