@@ -4,13 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/Tooltip";
-// .. Corrected Icons Import
+
 import {
   FaBrain, FaTriangleExclamation, FaChartLine, FaScaleBalanced, FaBriefcase,
   FaToolbox, FaUsers, FaUserGear, FaCubes, FaUserGraduate, FaBullseye, // FaTools -> FaToolbox, FaBalanceScale -> FaScaleBalanced, FaExclamationTriangle -> FaTriangleExclamation, FaUserCog -> FaUserGear
@@ -438,7 +432,7 @@ export default function AiWorkFuturePage() {
         }}
       ></div>
 
-      <TooltipProvider delayDuration={200}>
+      
         <div className="relative z-10 container mx-auto px-4">
           <Card className={cn(
               "max-w-4xl mx-auto bg-black/85 backdrop-blur-lg text-white rounded-2xl border",
@@ -553,7 +547,7 @@ export default function AiWorkFuturePage() {
             </CardContent>
           </Card>
         </div>
-      </TooltipProvider>
+      
     </div>
   );
 }
