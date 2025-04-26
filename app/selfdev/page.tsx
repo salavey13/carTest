@@ -13,7 +13,7 @@ import {
     FaFileCode, FaRobot, FaWandMagicSparkles, FaBullseye, FaEnvelopeOpenText,
     FaMagnifyingGlass, FaChartLine, FaRegLightbulb, FaListCheck, FaArrowUpRightFromSquare,
     FaSkullCrossbones, // Icon for negative framing
-    FaShieldAlt      // Icon for protection/validation
+    FaShieldCat      // Icon for protection/validation
 } from "react-icons/fa6";
 import { debugLogger } from "@/lib/debugLogger";
 import Link from "next/link";
@@ -166,7 +166,7 @@ export default function SelfDevLandingPage() {
                  {/* Section: AI Validation (Framed as Protection/Control) */}
                 <section id="validation" className="space-y-5 border-t border-yellow-500/40 pt-10 mt-12">
                   <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-yellow mb-5">
-                    <FaShieldAlt className="mr-3 text-brand-yellow/80" /> AI-Валидация: Убей Провальные Идеи ДО Старта
+                    <FaShieldCat className="mr-3 text-brand-yellow/80" /> AI-Валидация: Убей Провальные Идеи ДО Старта
                   </h2>
                   <p className="text-gray-300 text-base md:text-lg leading-relaxed">
                      <strong className="text-brand-yellow">9 из 10 бизнесов проваливаются.</strong> Почему? Строят то, что <strong className="text-brand-yellow font-semibold">никому не нужно</strong>. Это слив времени и денег. <strong className="text-brand-yellow font-semibold">AI — твой щит от этого.</strong> Вместо месяцев слепой разработки — 72 часа на жесткую проверку реальности. <strong className="text-brand-yellow">Хватит гадать — пора знать.</strong>
