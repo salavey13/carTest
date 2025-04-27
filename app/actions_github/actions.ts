@@ -7,7 +7,7 @@ import { notifyAdmins, notifyAdmin } from "@/app/actions";
 interface FileNode { path: string; content: string; }
 interface GitTreeFile { path: string; sha: string; type: string; mode?: string; size?: number; url?: string; }
 interface GitTreeResponseData { sha: string; url: string; tree: GitTreeFile[]; truncated: boolean; }
-interface SimplePullRequest { id: number; number: number; title: string; html_url: string; user?: { login?: string }; head: { ref: string }; updated_at: string; }
+interface SimplePullRequest { id: number; number: number; title: string; html_url: string; user?: { login?: string }; head: { ref: string }; base: { ref: string }; updated_at: string; } // Added base ref
 
 // --- Константы ---
 const BATCH_SIZE = 40;
@@ -91,7 +91,8 @@ export async function createGitHubPullRequest( repoUrl: string, files: FileNode[
   } catch (error: any) { console.error("[Action] Error create/update PR:", error); const repoId=`${owner}/${repo}`; const aB=branchName||`ai-patch-...`; let eM=error instanceof Error?error.message:"Unknown error"; if(error.status===422&&error.message?.includes("No commit")){eM=`Base branch '${baseBranch||'?'}' empty?`;} else if(error.status===404){eM=`Repo ${repoId} or base '${baseBranch||'?'}' not found.`;} else if(error.status===403){eM=`Permission denied ${repoId}.`;} else if(error.status===409&&error.message?.includes('conflict')){eM=`Update conflict branch '${aB}'.`;} await notifyAdmin(`❌ Ошибка PR ${repoId}:\n${eM}`); return {success:false, error:eM}; }
 }
 
-// --- updateBranch (Добавлено больше логов для отладки комментария) ---
+// --- updateBranch ---
+// ... (код updateBranch без изменений, но с улучшенным логом комментария) ...
 export async function updateBranch(
     repoUrl: string,
     files: FileNode[],
@@ -201,7 +202,9 @@ export async function updateBranch(
     }
 }
 
-// --- revertLastCommitOnBranch (НОВАЯ ФУНКЦИЯ) ---
+
+// --- revertLastCommitOnBranch ---
+// ... (код revertLastCommitOnBranch без изменений) ...
 export async function revertLastCommitOnBranch(repoUrl: string, branchName: string): Promise<{ success: boolean; revertedToSha?: string; error?: string }> {
     console.log(`[Action] Reverting last commit on branch '${branchName}'...`);
     let owner: string | undefined, repo: string | undefined;
@@ -281,8 +284,59 @@ export async function deleteGitHubBranch(repoUrl: string, branchName: string) { 
 export async function mergePullRequest(repoUrl: string, pullNumber: number) { console.log("[Action] mergePullRequest called..."); let owner: string|undefined; let repo: string|undefined; const rIP=parseRepoUrl(repoUrl); owner=rIP.owner; repo=rIP.repo; const rId=`${owner}/${repo}`; try { const token=process.env.GITHUB_TOKEN; if(!token) throw new Error("GH token missing"); const octokit = new Octokit({ auth: token }); console.log(`[Action] Merging PR #${pullNumber} in ${rId}...`); const { data: prData } = await octokit.pulls.get({ owner, repo, pull_number: pullNumber }); if (prData.state !== 'open') { console.warn(`[Action] PR #${pullNumber} not open (${prData.state}).`); throw new Error(`PR #${pullNumber} not open (${prData.state}).`); } if (prData.merged) { console.warn(`[Action] PR #${pullNumber} already merged.`); return { success: true, message: "PR already merged." }; } if (!prData.mergeable) { console.warn(`[Action] PR #${pullNumber} not mergeable (${prData.mergeable_state}). Check delay...`); await delay(2000); const { data: prUpd } = await octokit.pulls.get({ owner, repo, pull_number: pullNumber }); if (!prUpd.mergeable) { console.error(`[Action] PR #${pullNumber} still not mergeable (${prUpd.mergeable_state}).`); throw new Error(`PR #${pullNumber} not mergeable (${prUpd.mergeable_state}).`); } console.log(`[Action] PR #${pullNumber} became mergeable.`); } await octokit.pulls.merge({ owner, repo, pull_number: pullNumber, merge_method: "squash" }); console.log(`[Action] PR #${pullNumber} merged in ${rId}.`); const adminMsg = `🚀 Изменения #${pullNumber} в ${rId} смержены!\n\n[GitHub](https://github.com/${owner}/${repo}/pull/${pullNumber})`; await notifyAdmins(adminMsg); return { success: true }; } catch (error: any) { console.error(`[Action] Merge fail PR #${pullNumber} in ${rId}:`, error); let eM = error instanceof Error ? error.message : "Merge failed"; if (error.status === 405) { eM = `PR #${pullNumber} not mergeable (405).`; console.error(`[Action] ${eM}`, error.response?.data); } else if (error.status === 404) { eM = `PR #${pullNumber} not found (404).`; console.error(`[Action] ${eM}`); } else if (error.status === 403) { eM = `Permission denied (403) merge PR #${pullNumber}.`; console.error(`[Action] ${eM}`); } else if (error.status === 409) { eM = `Merge conflict PR #${pullNumber} (409).`; console.error(`[Action] ${eM}`); } await notifyAdmin(`❌ Ошибка мержа PR #${pullNumber} в ${rId}:\n${eM}`); return { success: false, error: eM }; } }
 
 // --- getOpenPullRequests ---
-// ... (код getOpenPullRequests без изменений) ...
-export async function getOpenPullRequests(repoUrl: string): Promise<{ success: boolean; pullRequests?: SimplePullRequest[]; error?: string }> { let owner: string|undefined, repo: string|undefined; const rIP=parseRepoUrl(repoUrl); owner=rIP.owner; repo=rIP.repo; const rId=`${owner}/${repo}`; try { const token=process.env.GITHUB_TOKEN; if(!token) throw new Error("GH token missing"); const octokit=new Octokit({ auth: token }); const { data } = await octokit.pulls.list({ owner, repo, state: "open" }); const cleanData: SimplePullRequest[] = data.map(pr => ({ id: pr.id, number: pr.number, title: pr.title||'Untitled', html_url: pr.html_url||'#', user: pr.user?{login:pr.user.login}:undefined, head: { ref: pr.head?.ref||'unknown' }, updated_at: pr.updated_at||new Date().toISOString(), })); return { success: true, pullRequests: cleanData }; } catch (error: any) { console.error(`[Action] Error fetch PRs ${rId}:`, error); let eM=error instanceof Error?error.message:"Failed fetch PRs"; if (error.status===404){eM=`Repo ${rId} not found (404).`; await notifyAdmin(`❌ Ошибка 404 при получении PR ${rId}.`);} else if (error.status===403||error.status===401){eM=`Permission denied (${error.status}) fetch PRs ${rId}.`; await notifyAdmin(`❌ Ошибка ${error.status} при получении PR ${rId}.`);} else {console.error(`[Action] Non-critical error fetch PRs ${rId}: ${eM}`);} return { success: false, error: eM }; } }
+// (Updated with more detailed error handling)
+export async function getOpenPullRequests(repoUrl: string): Promise<{ success: boolean; pullRequests?: SimplePullRequest[]; error?: string }> {
+    let owner: string | undefined, repo: string | undefined;
+    const rIP = parseRepoUrl(repoUrl);
+    owner = rIP.owner;
+    repo = rIP.repo;
+    const rId = `${owner}/${repo}`;
+    try {
+        const token = process.env.GITHUB_TOKEN;
+        if (!token) throw new Error("GH token missing");
+        const octokit = new Octokit({ auth: token });
+        console.log(`[Action] Fetching open PRs for ${rId}...`); // Added log
+        const { data } = await octokit.pulls.list({ owner, repo, state: "open" });
+        const cleanData: SimplePullRequest[] = data.map(pr => ({
+            id: pr.id,
+            number: pr.number,
+            title: pr.title || 'Untitled',
+            html_url: pr.html_url || '#',
+            user: pr.user ? { login: pr.user.login } : undefined,
+            head: { ref: pr.head?.ref || 'unknown' },
+            base: { ref: pr.base?.ref || 'unknown' }, // Added base branch
+            updated_at: pr.updated_at || new Date().toISOString(),
+        }));
+        console.log(`[Action] Found ${cleanData.length} open PRs for ${rId}.`); // Added log
+        return { success: true, pullRequests: cleanData };
+    } catch (error: any) {
+        // Enhanced Error Logging and Reporting
+        console.error(`[Action] CRITICAL Error fetch PRs ${rId}:`, error); // Log the full error object
+        let eM = error instanceof Error ? error.message : "Failed fetch PRs";
+        const status = error.status ? ` (${error.status})` : '';
+
+        if (error.status === 404) {
+            eM = `Repo ${rId} not found${status}.`;
+            await notifyAdmin(`❌ Ошибка 404 при получении PR ${rId}. Проверь URL/доступ.`);
+        } else if (error.status === 403) {
+            eM = `Permission denied${status} fetch PRs ${rId}. Проверь права токена.`;
+            await notifyAdmin(`❌ Ошибка 403 при получении PR ${rId}. Проверь права токена.`);
+        } else if (error.status === 401) {
+             eM = `Bad credentials${status} fetch PRs ${rId}. Токен невалиден?`;
+             await notifyAdmin(`❌ Ошибка 401 при получении PR ${rId}. Токен невалиден?`);
+        } else if (error.message?.includes('rate limit')) { // Explicit check for rate limit
+             eM = `GitHub API rate limit exceeded${status} fetch PRs ${rId}.`;
+             await notifyAdmin(`⏳ Rate Limit при получении PR ${rId}.`);
+        } else {
+            // Notify for other unexpected errors
+            await notifyAdmin(`❌ Неизвестная ошибка (${status || 'N/A'}) при получении PR ${rId}:\n${eM}`);
+            console.error(`[Action] Non-critical/Unknown error fetch PRs ${rId}: Status=${status}`, error);
+        }
+        // Return the specific error message
+        return { success: false, error: eM };
+    }
+}
+
 
 // --- getGitHubUserProfile ---
 // ... (код getGitHubUserProfile без изменений) ...

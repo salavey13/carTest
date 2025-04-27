@@ -29,7 +29,12 @@ export type WorkflowStep =
   | 'response_parsed'         // Assistant parsed files successfully
   | 'pr_ready';               // Files ready, PR details filled
 
-export interface SimplePullRequest extends Pick<GitHubPullRequest, 'id' | 'number' | 'title' | 'html_url' | 'user' | 'head' | 'base'> {}
+export interface SimplePullRequest extends Pick<GitHubPullRequest, 'id' | 'number' | 'title' | 'html_url' | 'user' | 'head' | 'base'> {
+    // Ensure types match action return
+    head: { ref: string };
+    base: { ref: string };
+    updated_at: string; // Ensure this is present if used
+}
 
 export interface ImageReplaceTask {
     targetPath: string;
@@ -201,7 +206,7 @@ const RepoXmlPageContext = createContext<RepoXmlPageContextType>(initialMinimalC
 
 
 // --- Context Provider Component ---
-export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const RepoXmlPageProvider: React.FC<{ children: ReactNode; fetcherRef: MutableRefObject<RepoTxtFetcherRef | null>; assistantRef: MutableRefObject<AICodeAssistantRef | null>; kworkInputRef: MutableRefObject<HTMLTextAreaElement | null>; aiResponseInputRef: MutableRefObject<HTMLTextAreaElement | null>; prSectionRef: MutableRefObject<HTMLElement | null>; }> = ({ children, fetcherRef: passedFetcherRef, assistantRef: passedAssistantRef, kworkInputRef: passedKworkRef, aiResponseInputRef: passedAiResponseRef }) => {
     const [isMounted, setIsMounted] = useState(false); // Track client mount
 
     // === State Definitions ===
@@ -228,14 +233,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
     const [imageReplaceTaskState, setImageReplaceTaskState] = useState<ImageReplaceTask | null>(null);
     const [allFetchedFilesState, setAllFetchedFilesState] = useState<FileNode[]>([]);
 
-    // === <<< Change currentStep to useState >>> ===
-    const [currentStep, setCurrentStep] = useState<WorkflowStep>('idle'); // Initial default
-
-    // === Refs ===
-    const kworkInputRef = useRef<HTMLTextAreaElement | null>(null);
-    const aiResponseInputRef = useRef<HTMLTextAreaElement | null>(null);
-    const fetcherRef = useRef<RepoTxtFetcherRef | null>(null);
-    const assistantRef = useRef<AICodeAssistantRef | null>(null);
+    // === Use passed refs ===
+    const fetcherRef = passedFetcherRef;
+    const assistantRef = passedAssistantRef;
+    const kworkInputRef = passedKworkRef;
+    const aiResponseInputRef = passedAiResponseRef;
 
     // === useEffect to signal mount ===
     useEffect(() => {
@@ -243,7 +245,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
         logger.log("RepoXmlPageContext Mounted");
     }, []);
 
-    // === Combined State Setter ===
+    // === Combined State Setter with Logging ===
     const setFilesFetchedCombined = useCallback((
         fetched: boolean,
         allFiles: FileNode[],
@@ -260,53 +262,51 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
         if (fetched && imageReplaceTaskState && assistantRef.current) {
             const targetFileExists = allFiles.some(f => f.path === imageReplaceTaskState.targetPath);
             if (targetFileExists) {
-                logger.log("Image Replace Task: Target file found, triggering direct replace.");
+                // Add log here
+                logger.log("[Context] Image Replace Task: Target file found, preparing to trigger direct replace.", imageReplaceTaskState);
                 // Use setTimeout to ensure state updates propagate before calling ref method
                 setTimeout(() => {
                     if (assistantRef.current) {
+                        // Add log here
+                        logger.log("[Context] Calling handleDirectImageReplace now.");
                         assistantRef.current.handleDirectImageReplace(imageReplaceTaskState)
                             .catch(err => logger.error("Error calling handleDirectImageReplace:", err));
+                    } else {
+                        logger.warn("[Context] Assistant ref became null before handleDirectImageReplace call inside setTimeout.");
                     }
-                }, 0);
+                }, 50); // Small delay might be safer than 0
             } else {
                  logger.error(`Image Replace Task: Target file ${imageReplaceTaskState.targetPath} not found in fetched files!`);
                  toast.error(`Ошибка: Файл ${imageReplaceTaskState.targetPath} для замены не найден.`);
                  setImageReplaceTaskState(null); // Clear the task if the target file is missing
+                 setFetchStatusState('error'); // Set fetch status to error
             }
         } else if (fetched && imageReplaceTaskState && !assistantRef.current) {
              logger.warn("Image Replace Task: Assistant ref not ready when files were fetched.");
              // Optionally retry after a short delay, or rely on subsequent renders
         }
 
-    }, [imageReplaceTaskState]); // Dependency on the task state
+    }, [imageReplaceTaskState, assistantRef]); // Added assistantRef as dependency
 
-    // === <<< Calculate currentStep in useEffect >>> ===
+    // === Calculate currentStep using useState and useEffect ===
+    const [currentStep, setCurrentStep] = useState<WorkflowStep>('idle');
+
     useEffect(() => {
-        // Only calculate after mount
         if (!isMounted) {
-            setCurrentStep('idle'); // Ensure default before mount
+            setCurrentStep('idle');
             return;
         }
 
-        // The logic previously inside useMemo goes here
-        let calculatedStep: WorkflowStep = 'idle'; // Start with default
-
-        // Prioritize image replace task flow
-        if (imageReplaceTaskState && filesFetchedState) {
-             calculatedStep = 'files_fetched_image_replace';
-        } else if (imageReplaceTaskState && fetchStatusState === 'loading') {
-            calculatedStep = 'fetching'; // Show fetching during image task load
-        }
-        // Only proceed to standard flow if not in image replace task
-        else if (!imageReplaceTaskState) {
-            // Standard Flow Logic (copy from your existing useMemo)
+        let calculatedStep: WorkflowStep = 'idle';
+        if (imageReplaceTaskState && filesFetchedState) calculatedStep = 'files_fetched_image_replace';
+        else if (imageReplaceTaskState && fetchStatusState === 'loading') calculatedStep = 'fetching';
+        else if (!imageReplaceTaskState) { // Standard flow only if no image task
             if (fetchStatusState === 'loading' || fetchStatusState === 'retrying') calculatedStep = 'fetching';
             else if (fetchStatusState === 'error' || fetchStatusState === 'failed_retries') calculatedStep = 'fetch_failed';
             else if (isParsingState) calculatedStep = 'parsing_response';
             else if (aiActionLoadingState) calculatedStep = 'generating_ai_response';
             else if (!filesFetchedState) calculatedStep = 'ready_to_fetch';
             else if (!kworkInputHasContentState) {
-                // Check highlights only if files are fetched
                 if (filesFetchedState && (primaryHighlightPathState || secondaryHighlightPathsState.length > 0)) calculatedStep = 'files_fetched_highlights';
                 else if (selectedFetcherFilesState.size > 0) calculatedStep = 'files_selected';
                 else calculatedStep = 'files_fetched';
@@ -315,18 +315,15 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
             else if (requestCopiedState && !aiResponseHasContentState) calculatedStep = 'request_copied';
             else if (aiResponseHasContentState && !filesParsedState) calculatedStep = 'response_pasted';
             else if (filesParsedState) calculatedStep = 'pr_ready';
-            else calculatedStep = 'idle'; // Fallback for standard flow
+            else calculatedStep = 'idle';
         }
-
-        // Update the state
         setCurrentStep(calculatedStep);
+        logger.log(`Context Step Updated: ${calculatedStep}`);
 
-    }, [ // <<< Add ALL dependencies the calculation uses >>>
-        isMounted, // Crucial dependency
-        fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState,
+    }, [
+        isMounted, fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState,
         filesParsedState, requestCopiedState, primaryHighlightPathState, secondaryHighlightPathsState,
-        selectedFetcherFilesState.size, // Use .size if only size matters, or the set itself if content matters
-        aiActionLoadingState, isParsingState, imageReplaceTaskState
+        selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState
     ]);
 
 
@@ -338,7 +335,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
             logger.error("triggerFetch: fetcherRef is not set.");
             toast.error("Ошибка: Не удалось запустить извлечение.");
         }
-    }, []); // No dependencies needed if fetcherRef is stable
+    }, [fetcherRef]);
 
     const triggerSelectHighlighted = useCallback(() => {
         if (fetcherRef.current?.selectHighlightedFiles) {
@@ -346,20 +343,18 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
         } else {
             logger.error("triggerSelectHighlighted: fetcherRef is not set.");
         }
-    }, []);
+    }, [fetcherRef]);
 
     const triggerAddSelectedToKwork = useCallback(async (clearSelection = false) => {
         if (fetcherRef.current?.handleAddSelected) {
             await fetcherRef.current.handleAddSelected();
             if (clearSelection) {
-                // Logic to clear selection if needed - might need method on fetcherRef
-                // fetcherRef.current.clearSelection?.();
-                setSelectedFetcherFilesState(new Set()); // Or manage selection state here
+                setSelectedFetcherFilesState(new Set()); // Manage selection state here
             }
         } else {
             logger.error("triggerAddSelectedToKwork: fetcherRef is not set.");
         }
-    }, []);
+    }, [fetcherRef]);
 
     const triggerCopyKwork = useCallback((): boolean => {
         if (fetcherRef.current?.handleCopyToClipboard) {
@@ -368,41 +363,15 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
             logger.error("triggerCopyKwork: fetcherRef is not set.");
             return false;
         }
-    }, []);
+    }, [fetcherRef]);
 
     const triggerAskAi = useCallback(async (): Promise<{ success: boolean; requestId?: string; error?: string }> => {
         logger.warn("AI Ask Triggered (Currently Disabled)");
-        setAiActionLoadingState(false); // Ensure loading is false
+        setAiActionLoadingState(false);
         setCurrentAiRequestIdState(null);
         // TODO: Re-enable AI Call Logic when ready
-        // setAiActionLoadingState(true);
-        // setCurrentAiRequestIdState(`temp_${Date.now()}`); // Placeholder ID
-        // toast.info("Отправка запроса AI...");
-        // try {
-        //     // Simulate AI call
-        //     await new Promise(resolve => setTimeout(resolve, 2000));
-        //     const fakeResponse = "// AI Response Placeholder\nconsole.log('AI generated this');";
-        //     if (assistantRef.current) {
-        //         assistantRef.current.setResponseValue(fakeResponse);
-        //         setAiResponseHasContentState(true);
-        //         setRequestCopiedState(false); // Reset copied state
-        //         toast.success("Ответ AI получен (симуляция).");
-        //         setAiActionLoadingState(false);
-        //         setCurrentAiRequestIdState(null); // Clear placeholder ID
-        //         scrollToSection('aiResponseInput');
-        //         return { success: true, requestId: `temp_${Date.now()}` };
-        //     } else {
-        //         throw new Error("Assistant ref not available.");
-        //     }
-        // } catch (error: any) {
-        //     logger.error("AI Ask Error:", error);
-        //     toast.error(`Ошибка AI: ${error.message}`);
-        //     setAiActionLoadingState(false);
-        //     setCurrentAiRequestIdState(null);
-        //     return { success: false, error: error.message };
-        // }
-        return { success: false, error: "AI временно отключен" }; // Return disabled state
-    }, []); // Removed assistantRef dependency temporarily
+        return { success: false, error: "AI временно отключен" };
+    }, []);
 
 
     const triggerParseResponse = useCallback(async () => {
@@ -411,7 +380,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
         } else {
             logger.error("triggerParseResponse: assistantRef is not set.");
         }
-    }, []);
+    }, [assistantRef]);
 
     const triggerSelectAllParsed = useCallback(() => {
         if (assistantRef.current?.selectAllParsedFiles) {
@@ -419,7 +388,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
         } else {
             logger.error("triggerSelectAllParsed: assistantRef is not set.");
         }
-    }, []);
+    }, [assistantRef]);
 
     const triggerCreateOrUpdatePR = useCallback(async () => {
         if (assistantRef.current?.handleCreatePR) {
@@ -427,40 +396,47 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
         } else {
             logger.error("triggerCreateOrUpdatePR: assistantRef is not set.");
         }
-    }, []);
+    }, [assistantRef]);
 
+    // Updated triggerGetOpenPRs with better error reporting
     const triggerGetOpenPRs = useCallback(async (url: string) => {
         if (!url || !url.includes('github.com')) {
-            // logger.warn("triggerGetOpenPRs: Invalid GitHub URL.");
-             setOpenPrsState([]); // Clear PRs if URL is invalid/empty
-             return;
+            logger.log("triggerGetOpenPRs: Invalid or empty GitHub URL, clearing PRs.");
+            setOpenPrsState([]);
+            return;
         }
         logger.log("triggerGetOpenPRs: Fetching for", url);
         setLoadingPrsState(true);
+        let resultError = 'Неизвестная ошибка'; // Default error message
         try {
             const result = await getOpenPullRequests(url);
-            if (result.success && result.prs) {
-                setOpenPrsState(result.prs);
-                // Auto-select branch if only one AI PR exists
-                // const aiPrs = result.prs.filter(pr => pr.title.toLowerCase().includes('ai changes') || pr.title.toLowerCase().includes('supervibe'));
-                // if (aiPrs.length === 1 && !manualBranchNameState) {
-                //     setTargetBranchNameState(aiPrs[0].head.ref);
-                //     toast.info(`Авто-выбрана ветка PR #${aiPrs[0].number}: ${aiPrs[0].head.ref}`);
-                // }
-                 logger.log(`Fetched ${result.prs.length} open PRs.`);
+            if (result.success && result.pullRequests) {
+                // Explicitly cast to SimplePullRequest[] to satisfy state type
+                setOpenPrsState(result.pullRequests as SimplePullRequest[]);
+                logger.log(`Fetched ${result.pullRequests.length} open PRs.`);
             } else {
-                toast.error(`Не удалось загрузить PR: ${result.error || 'Неизвестная ошибка'}`);
+                resultError = result.error || 'Не удалось загрузить PR'; // Use error from result
+                // Use toast description for more details
+                toast.error("Ошибка загрузки PR", {
+                     description: resultError,
+                     duration: 5000, // Show error longer
+                     style: { background: "rgba(220,38,38,0.9)", color: "#fff", border: "1px solid rgba(239,68,68,0.3)", backdropFilter: "blur(3px)"}
+                });
                 setOpenPrsState([]);
             }
-        } catch (error: any) {
-            logger.error("triggerGetOpenPRs Error:", error);
-            toast.error(`Ошибка загрузки PR: ${error.message}`);
+        } catch (error: any) { // Catch errors during the action call itself
+            logger.error("triggerGetOpenPRs Action Call Error:", error);
+            resultError = error.message || 'Ошибка сети или сервера';
+            toast.error("Крит. ошибка загрузки PR", {
+                description: resultError,
+                duration: 5000,
+                style: { background: "rgba(220,38,38,0.9)", color: "#fff", border: "1px solid rgba(239,68,68,0.3)", backdropFilter: "blur(3px)"}
+            });
             setOpenPrsState([]);
         } finally {
             setLoadingPrsState(false);
         }
-    }, []); // Removed manualBranchNameState, setTargetBranchNameState dependencies to avoid loop
-
+    }, []); // Dependencies checked, should be stable
 
     const triggerUpdateBranch = useCallback(async (
         repoUrl: string,
@@ -475,8 +451,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
             const result = await updateBranch(repoUrl, filesToCommit, commitMessage, branch, prNumber ?? undefined, prDescription);
             if (result.success) {
                 toast.success(`Ветка ${branch} обновлена!`);
-                // Refresh PR list after update
-                await triggerGetOpenPRs(repoUrl); // Use the already defined trigger
+                await triggerGetOpenPRs(repoUrl); // Refresh PR list
                 return { success: true };
             } else {
                 toast.error(`Ошибка обновления ветки: ${result.error}`);
@@ -494,7 +469,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
 
     const updateRepoUrlInAssistant = useCallback((url: string) => {
         assistantRef.current?.updateRepoUrl(url);
-    }, []); // No dependencies needed
+    }, [assistantRef]); // Added assistantRef
 
     const triggerToggleSettingsModal = useCallback(() => {
         setIsSettingsModalOpenState(prev => !prev);
@@ -503,28 +478,27 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
     const scrollToSection = useCallback((sectionId: string) => {
         const element = document.getElementById(sectionId);
         if (element) {
-             // Adjusted scroll options for better centering
-             element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-             // Optional: Add highlight effect
-             element.classList.add('highlight-scroll');
+            element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            element.classList.add('highlight-scroll');
              setTimeout(() => element.classList.remove('highlight-scroll'), 1500);
              logger.log(`Scrolled to section: ${sectionId}`);
         } else {
-             logger.warn(`Scroll target not found: ${sectionId}`);
+            logger.warn(`Scroll target not found: ${sectionId}`);
+            // Try scrolling to common parent if specific ID fails
+            const parentExecutor = document.getElementById('executor');
+            const parentExtractor = document.getElementById('extractor');
+            if (sectionId.includes('kworkInput') || sectionId.includes('aiResponseInput') || sectionId.includes('prSection')) {
+                 parentExecutor?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            } else if (parentExtractor) {
+                 parentExtractor?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            }
         }
-         // Add CSS for highlight effect globally or in a relevant CSS file:
-         /*
-         .highlight-scroll {
-             transition: box-shadow 0.3s ease-in-out;
-             box-shadow: 0 0 15px 5px rgba(0, 255, 157, 0.6); // Example highlight
-         }
-         */
     }, []);
 
 
     // === Buddy Message Logic ===
     const getXuinityMessage = useCallback((): string => {
-         // Use the 'currentStep' state variable directly
+        if (!isMounted) return "Инициализация..."; // Message before mount
         if (imageReplaceTaskState) { return assistantLoadingState ? "Меняю картинку, секунду..." : "Ок, сейчас заменю картинку и сделаю PR!"; }
         switch (currentStep) {
             case 'idle': return "Готов к работе! Введи URL репо.";
@@ -545,22 +519,20 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
             default: return "Давай что-нибудь замутим!";
         }
     }, [
-        currentStep, // Now depends on the state variable
+        isMounted, currentStep, // Depend on the calculated step state
         repoUrlEnteredState, manualBranchNameState, targetBranchNameState,
-        primaryHighlightPathState, secondaryHighlightPathsState, selectedFetcherFilesState.size,
-        currentAiRequestIdState, imageReplaceTaskState, assistantLoadingState // Kept loading states
+        primaryHighlightPathState, secondaryHighlightPathsState, selectedFetcherFilesState,
+        currentAiRequestIdState, imageReplaceTaskState, assistantLoadingState
     ]);
 
 
     // === Build Context Value ===
     const contextValue = useMemo(() => {
-        // If not mounted, return the minimal value to prevent errors during build
         if (!isMounted) {
              logger.log("RepoXmlPageContext: Providing MINIMAL context value (SSR/Build)");
-             return initialMinimalContextValue; // Minimal value already includes currentStep: 'idle'
+             return initialMinimalContextValue;
         }
 
-        // If mounted, provide the full context value
         logger.log("RepoXmlPageContext: Providing FULL context value (Client)");
         return {
             fetchStatus: fetchStatusState, repoUrlEntered: repoUrlEnteredState, filesFetched: filesFetchedState,
@@ -570,7 +542,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
             targetBranchName: targetBranchNameState, manualBranchName: manualBranchNameState, openPrs: openPrsState,
             isSettingsModalOpen: isSettingsModalOpenState, isParsing: isParsingState, currentAiRequestId: currentAiRequestIdState,
             imageReplaceTask: imageReplaceTaskState, allFetchedFiles: allFetchedFilesState,
-            currentStep, // <<< Use the state variable here >>>
+            currentStep,
             setFetchStatus: setFetchStatusState, setRepoUrlEntered: setRepoUrlEnteredState, setFilesFetched: setFilesFetchedCombined,
             setSelectedFetcherFiles: setSelectedFetcherFilesState, setKworkInputHasContent: setKworkInputHasContentState, setRequestCopied: setRequestCopiedState,
             setAiResponseHasContent: setAiResponseHasContentState, setFilesParsed: setFilesParsedState, setSelectedAssistantFiles: setSelectedAssistantFilesState,
@@ -584,16 +556,18 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
             triggerUpdateBranch, triggerGetOpenPRs, updateRepoUrlInAssistant, getXuinityMessage, scrollToSection,
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ // <<< Update dependencies for contextValue useMemo >>>
-        isMounted, // Include mount state
-        // Include ALL state variables that are returned in the context object
+    }, [ // Dependencies updated
+        isMounted,
         fetchStatusState, repoUrlEnteredState, filesFetchedState, selectedFetcherFilesState, kworkInputHasContentState, requestCopiedState,
         aiResponseHasContentState, filesParsedState, selectedAssistantFilesState, assistantLoadingState, aiActionLoadingState, loadingPrsState,
         targetBranchNameState, manualBranchNameState, openPrsState, isSettingsModalOpenState, isParsingState, currentAiRequestIdState,
         imageReplaceTaskState, allFetchedFilesState,
-        currentStep, // <<< Add the currentStep state variable as a dependency >>>
-        // Stable callbacks (assuming they are correctly memoized with useCallback and have stable dependencies themselves)
-        setFilesFetchedCombined, triggerToggleSettingsModal, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork,
+        currentStep, // Include currentStep state
+        setFilesFetchedCombined, // Include the combined setter callback
+        // Stable refs
+        kworkInputRef, aiResponseInputRef, fetcherRef, assistantRef,
+        // Stable callbacks (ensure they are correctly memoized)
+        triggerToggleSettingsModal, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork,
         triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR,
         triggerUpdateBranch, triggerGetOpenPRs, updateRepoUrlInAssistant, getXuinityMessage, scrollToSection
     ]);
@@ -610,8 +584,5 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode }> = ({ childre
 export const useRepoXmlPageContext = (): RepoXmlPageContextType => {
     const context = useContext(RepoXmlPageContext);
     // No need to check for undefined here anymore if initial value is always provided
-    // if (context === undefined) {
-    //     throw new Error("useRepoXmlPageContext must be used within a RepoXmlPageProvider");
-    // }
     return context;
 };
