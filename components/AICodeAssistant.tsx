@@ -667,13 +667,16 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     // Show spinner only for standard PR processing, not during image replace
     const prButtonLoadingIcon = (isProcessingPR || assistantLoading) && !imageReplaceTask ? <FaSpinner className="animate-spin"/> : prButtonIcon;
     const assistantTooltipText = `Вставь ответ AI -> '➡️' -> Проверь/Исправь -> Выбери файлы -> ${prButtonText}`;
+    // FIX: Replace isWaitingForAi with aiActionLoading & currentAiRequestId check
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
     const showStandardAssistantUI = !imageReplaceTask;
     const showImageReplaceUI = !!imageReplaceTask;
 
     // Determine disabled states based on combined loading and task type
     const commonDisabled = isProcessingAny; // Base disabled state
+    // FIX: Replace isWaitingForAi check with isWaitingForAiResponse
     const parseButtonDisabled = commonDisabled || isWaitingForAiResponse || !response.trim() || !!imageReplaceTask; // Disable parse during image task
+    // FIX: Replace isWaitingForAi check with isWaitingForAiResponse
     const fixButtonDisabled = commonDisabled || isWaitingForAiResponse || !!imageReplaceTask; // Disable fix during image task
     const submitButtonDisabled = !canSubmitRegularPR || isProcessingPR || assistantLoading; // Disable PR button if not ready or processing
 
@@ -720,6 +723,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                      <>
                          {/* Response Text Area */}
                          <div>
+                             {/* FIX: Use isWaitingForAiResponse */}
                               <p className="text-yellow-400 mb-2 text-xs md:text-sm min-h-[18px]">
                                  {isWaitingForAiResponse ? `⏳ Жду AI... (ID: ${currentAiRequestId?.substring(0,6)}...)` :
                                   commonDisabled ? "⏳ Обработка..." :
@@ -732,6 +736,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                                     className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm min-h-[180px] resize-y simple-scrollbar" // Added simple-scrollbar
                                     defaultValue={response}
                                     onChange={(e) => setResponseValue(e.target.value)}
+                                    // FIX: Use isWaitingForAiResponse
                                     placeholder={isWaitingForAiResponse ? "AI думает..." : commonDisabled ? "Ожидание..." : "Ответ AI здесь..."}
                                     disabled={commonDisabled}
                                     spellCheck="false"

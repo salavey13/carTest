@@ -100,7 +100,17 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   useEffect(() => { setIsMounted(true); }, []); // Устанавливаем isMounted после первого рендера на клиенте
   useEffect(() => { if (kworkInputRef) kworkInputRef.current = localKworkInputRef.current; }, [kworkInputRef]); // Связываем рефы
   useEffect(() => { fetchStatusRef.current = fetchStatus; }, [fetchStatus]); // Обновляем fetchStatusRef
-  useEffect(() => { setRepoUrlEntered(repoUrl.trim().length > 0); updateRepoUrlInAssistant(repoUrl); }, [repoUrl, setRepoUrlEntered, updateRepoUrlInAssistant]); // Обновляем URL в ассистенте
+  // FIX: Added isMounted guard here to potentially help with initial state propagation timing
+  useEffect(() => {
+      if (isMounted) { // Check if mounted before updating context
+          setRepoUrlEntered(repoUrl.trim().length > 0);
+          updateRepoUrlInAssistant(repoUrl);
+          // Keep original logic for resetting state on URL change, but ensure it only runs client-side
+          setOpenPrs([]);
+          setTargetBranchName(null);
+          setManualBranchName("");
+      }
+  }, [isMounted, repoUrl, setRepoUrlEntered, updateRepoUrlInAssistant, setOpenPrs, setTargetBranchName, setManualBranchName]); // Обновляем URL в ассистенте
   useEffect(() => { return () => stopProgressSimulation(); }, []); // Очистка интервала симуляции при размонтировании
 
   // === Утилиты и Колбэки (Определены ДО их использования в зависимостях!) ===
@@ -156,12 +166,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   // 3. Обработчики UI и взаимодействий (зависят от базовых утилит)
   const handleRepoUrlChange = useCallback((url: string) => {
         setRepoUrlState(url);
-        setRepoUrlEntered(url.trim().length > 0);
-        updateRepoUrlInAssistant(url);
-        setOpenPrs([]); // Clear PRs when URL changes
-        setTargetBranchName(null); // Reset target branch
-        setManualBranchName(""); // Reset manual branch
-    }, [setRepoUrlEntered, updateRepoUrlInAssistant, setOpenPrs, setTargetBranchName, setManualBranchName]);
+        // Context update is now handled by the useEffect watching repoUrl and isMounted
+    }, []); // Removed context setters, they are handled by useEffect
 
   const handleCopyToClipboard = useCallback((textToCopy?: string, shouldScroll = true): boolean => {
         const c=textToCopy??getKworkInputValue();
@@ -364,7 +370,11 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       if (imageReplaceTask && isImageTaskFetchInitiated.current && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying')) { logger.warn("Fetcher(Manual): Загрузка для задачи картинки уже идет. Отмена дубликата."); return; }
       if (!imageReplaceTask && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying') && !isManualRetry) { logger.warn("Fetcher(Manual): Уже идет загрузка (стандартный режим)."); addToast("Уже идет загрузка...", "info"); return; }
       if (!repoUrl.trim()) { logger.error("Fetcher(Manual): URL пуст."); addToast("Введите URL репозитория", 'error'); setError("URL репозитория не указан."); triggerToggleSettingsModal(); return; }
-      if (assistantLoading || isParsing || aiActionLoading) { logger.warn(`Fetcher(Manual): Заблокировано состоянием (${assistantLoading}, ${isParsing}, ${aiActionLoading}).`); addToast("Подождите завершения предыдущей операции.", "warning"); return; }
+      // FIX: Replace isWaitingForAi with aiActionLoading
+      if (assistantLoading || isParsing || aiActionLoading) {
+          logger.warn(`Fetcher(Manual): Заблокировано состоянием (${assistantLoading}, ${isParsing}, ${aiActionLoading}).`);
+          addToast("Подождите завершения предыдущей операции.", "warning"); return;
+      }
 
       // --- Start Fetch Process ---
       logger.log("Fetcher(Manual): Запускаем процесс.");
@@ -705,7 +715,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   const isClearDisabled = (!kworkInputHasContent && selectedFiles.size === 0 && !filesFetched) || isActionDisabled;
   const isAddSelectedDisabled = selectedFiles.size === 0 || isActionDisabled;
   const effectiveBranchDisplay = targetBranchName || manualBranchName || "default";
-  const isWaitingForAi = aiActionLoading && !!currentAiRequestId;
+  // FIX: Replace isWaitingForAi with aiActionLoading & currentAiRequestId check
+  const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
   // Check if the target file for image replacement exists AND fetch attempt completed successfully
   const imageTaskTargetFileReady = imageReplaceTask && fetchStatus === 'success' && allFetchedFiles.some(f => f.path === imageReplaceTask.targetPath);
 
@@ -765,6 +776,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
             onSelectPrBranch={handleSelectPrBranch}
             onLoadPrs={handleLoadPrs}
             // Disable settings interaction if anything is loading/processing
+            // FIX: Replace isWaitingForAi check with aiActionLoading
             loading={isLoading || loadingPrs || assistantLoading || aiActionLoading || isParsing}
         />
 
@@ -801,6 +813,12 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                  )}
                  {/* Fetch Error Message */}
                  {(fetchStatus === 'error' || fetchStatus === 'failed_retries') && error && ( <div className="text-center text-xs font-mono mt-1 text-red-400 flex items-center justify-center gap-1"> <FaXmark /> {error} </div> )}
+                 {/* FIX: Display waiting for AI message using aiActionLoading & currentAiRequestId */}
+                 {isWaitingForAiResponse && !imageReplaceTask && (
+                    <p className="text-blue-400 text-xs font-mono mt-1 text-center animate-pulse">
+                        ⏳ Жду ответ AI... (ID: {currentAiRequestId?.substring(0, 6)}...)
+                    </p>
+                 )}
             </div>
         )}
 
