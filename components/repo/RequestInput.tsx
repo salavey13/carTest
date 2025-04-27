@@ -41,14 +41,15 @@ const RequestInput: React.FC<RequestInputProps> = ({
     selectedFetcherFilesCount,
 }) => {
 
+    // --- UPDATED: Removed auto-resizing logic ---
     const handleChange: ChangeEventHandler<HTMLTextAreaElement> = (e) => {
         if (onInputChange) {
             onInputChange(e.target.value);
         }
-        // Авто-ресайз высоты (опционально, но полезно)
-        const textarea = e.target;
-        textarea.style.height = 'auto'; // Сбросить высоту
-        textarea.style.height = `${textarea.scrollHeight}px`; // Установить по контенту
+        // Auto-resize logic is removed
+        // const textarea = e.target;
+        // textarea.style.height = 'auto';
+        // textarea.style.height = `${textarea.scrollHeight}px`;
     };
 
     // Обработчик копирования инструкций
@@ -70,17 +71,17 @@ const RequestInput: React.FC<RequestInputProps> = ({
                  <p className="text-yellow-300/90 mb-2 text-xs md:text-sm">
                      4. Опиши задачу И/ИЛИ добавь файлы (<FaPlus className="inline text-sm mx-px"/>). Затем <FaRobot className="inline text-sm mx-px"/> или <FaClipboard className="inline text-sm mx-px"/>.
                  </p>
-                 {/* Textarea */}
+                 {/* Textarea - UPDATED for scrolling */}
                  <textarea
                     id="kwork-input"
                     ref={kworkInputRef}
                     onChange={handleChange}
-                    // ИЗМЕНЕНО: overflow-hidden -> overflow-y-auto
-                    className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition shadow-inner resize-y min-h-[150px] text-sm placeholder-gray-500 overflow-y-auto" // <<< ИЗМЕНЕНИЕ ЗДЕСЬ
+                    // UPDATED: Removed resize-y, adjusted height classes for fixed height + scroll
+                    className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition shadow-inner text-sm placeholder-gray-500 overflow-y-auto h-40" // Set fixed height (h-40 ~ 10rem/160px) and ensure overflow-y-auto
                     placeholder="Опиши здесь вашу задачу... Затем добавь контекст кнопками ИЛИ нажми 'Спросить AI'."
                     disabled={isAskAiDisabled && isCopyDisabled && isClearDisabled}
                     aria-label="Поле ввода запроса для AI"
-                    rows={5} // Начальное количество строк, помогает с min-h
+                    // rows={5} // Removed rows, using fixed height class instead
                 />
                 {/* Контейнер кнопок-иконок */}
                 <div className="absolute top-8 right-2 flex flex-col gap-2.5">
