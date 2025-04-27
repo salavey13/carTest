@@ -509,17 +509,21 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                         updateKworkInput(DEFAULT_TASK_IDEA);
                    }
 
-                   // Scroll to primary highlighted file or list
-                   if (primaryHighlightPath) {
-                        setTimeout(()=>{
-                            const elementId=`file-${primaryHighlightPath}`; const element=document.getElementById(elementId);
-                            if(element){element.scrollIntoView({behavior:"smooth",block:"center"}); element.classList.add('highlight-scroll'); setTimeout(()=>element.classList.remove('highlight-scroll'),2500);}
-                            else { logger.warn(`Scroll target ${elementId} not found for primary highlight.`); }
-                        },400);
-                    } else if (fetchedFilesData.length > 0) {
-                        scrollToSection('file-list-container');
-                    }
-                    if(isSettingsModalOpen) triggerToggleSettingsModal(); // Close settings modal
+                   // --- SCROLL FIX: Only scroll here if ideaFromUrl was NOT present ---
+                   if (!ideaFromUrl) {
+                       if (primaryHighlightPath) {
+                            setTimeout(()=>{
+                                const elementId=`file-${primaryHighlightPath}`; const element=document.getElementById(elementId);
+                                if(element){element.scrollIntoView({behavior:"smooth",block:"center"}); element.classList.add('highlight-scroll'); setTimeout(()=>element.classList.remove('highlight-scroll'),2500);}
+                                else { logger.warn(`Scroll target ${elementId} not found for primary highlight.`); }
+                            },400);
+                        } else if (fetchedFilesData.length > 0) {
+                            scrollToSection('file-list-container'); // Scroll to file list if no primary highlight
+                        }
+                   }
+                   // --- END SCROLL FIX ---
+
+                   if(isSettingsModalOpen) triggerToggleSettingsModal(); // Close settings modal
                }
                // === Fallback: Standard Fetch without URL params ===
                else {
@@ -585,7 +589,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
        setSecondaryHighlightedPathsState, setSelectedFetcherFiles, setFilesFetchedCombined, // Using combined context setter
        setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, addToast,
        startProgressSimulation, stopProgressSimulation, triggerToggleSettingsModal, updateKworkInput,
-       highlightedPathFromUrl, ideaFromUrl, DEFAULT_TASK_IDEA, importantFiles, isSettingsModalOpen, handleAddSelected,
+       highlightedPathFromUrl, ideaFromUrl, // Added ideaFromUrl dependency for scroll fix
+       DEFAULT_TASK_IDEA, importantFiles, isSettingsModalOpen, handleAddSelected,
        logger, scrollToSection // Added logger & scrollToSection
    ]);
 
