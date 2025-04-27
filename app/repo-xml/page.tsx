@@ -77,11 +77,19 @@ RenderContent.displayName = 'RenderContent';
 function ActualPageContent() {
     const localFetcherRef = useRef<RepoTxtFetcherRef | null>(null);
     const localAssistantRef = useRef<AICodeAssistantRef | null>(null);
-    const kworkInputRef = useRef<HTMLTextAreaElement | null>(null);
-    const aiResponseInputRef = useRef<HTMLTextAreaElement | null>(null);
+    // --- REMOVED Local kworkInputRef, use context one ---
+    // const kworkInputRef = useRef<HTMLTextAreaElement | null>(null);
+    const aiResponseInputRef = useRef<HTMLTextAreaElement | null>(null); // Keep this local ref if AICodeAssistant needs it directly THIS way
     const prSectionRef = useRef<HTMLElement | null>(null); // Ref remains, even if not used for scrolling here
     const { user } = useAppContext();
-    const { setImageReplaceTask, fetcherRef: contextFetcherRef, assistantRef: contextAssistantRef } = useRepoXmlPageContext();
+    const {
+        setImageReplaceTask,
+        fetcherRef: contextFetcherRef,
+        assistantRef: contextAssistantRef,
+        kworkInputRef: contextKworkInputRef, // <<< Get kworkInputRef from context
+        setKworkInputHasContent, // <<< Get setter for kwork input state
+        // aiResponseInputRef is also in context, use it if needed: contextAiResponseRef
+    } = useRepoXmlPageContext();
     const [isMounted, setIsMounted] = useState(false);
     const [lang, setLang] = useState<Language>('en');
     const [showComponents, setShowComponents] = useState(false);
@@ -91,6 +99,7 @@ function ActualPageContent() {
     useEffect(() => {
         if (localFetcherRef.current && contextFetcherRef) contextFetcherRef.current = localFetcherRef.current;
         if (localAssistantRef.current && contextAssistantRef) contextAssistantRef.current = localAssistantRef.current;
+        // No need to link kworkInputRef here, ActualPageContent uses the context one directly now
     }, [contextFetcherRef, contextAssistantRef, localFetcherRef, localAssistantRef]);
 
     // --- Process Params & Language ---
@@ -125,16 +134,26 @@ function ActualPageContent() {
                   } else { logger.error("Could not parse Old/New URL:", dI); setImageReplaceTask(null); }
               } catch (e) { logger.error("Error parsing img task:", e); setImageReplaceTask(null); }
           } else {
-              logger.log("[ActualPageContent] Regular params.");
+              // --- FIX: Use contextKworkInputRef and setKworkInputHasContent ---
+              logger.log("[ActualPageContent] Regular idea param found:", dI);
               setImageReplaceTask(null);
               setTimeout(() => {
-                  if (kworkInputRef.current) {
-                      kworkInputRef.current.value = dI;
+                  if (contextKworkInputRef.current) {
+                      contextKworkInputRef.current.value = dI;
                       const ev = new Event('input', { bubbles: true });
-                      kworkInputRef.current.dispatchEvent(ev);
-                      logger.log("Populated kwork.");
-                  } else { logger.warn("kworkInputRef null."); }
-              }, 50);
+                      contextKworkInputRef.current.dispatchEvent(ev); // Trigger internal handlers in RepoTxtFetcher
+                      setKworkInputHasContent(dI.trim().length > 0); // <<< Update context state
+                      logger.log("Populated kwork input via context ref and updated context state.");
+                      // Optional: Scroll to the kwork input after populating
+                      const kworkElement = document.getElementById('kwork-input-section'); // Ensure this ID exists on the container
+                      if (kworkElement) {
+                          kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }
+                  } else {
+                      logger.warn("Context kworkInputRef is null when trying to populate idea from URL params.");
+                  }
+              }, 100); // Increased timeout slightly just in case
+              // --- END FIX ---
           }
           setShowComponents(true); // Show components if any params are present
       } else {
@@ -142,7 +161,8 @@ function ActualPageContent() {
           logger.log("[ActualPageContent] No params.");
           // Don't setShowComponents(true) here automatically if no params
       }
-    }, [user, searchParams, setImageReplaceTask]); // Removed kworkInputRef - let the effect run once
+    // Dependencies updated: contextKworkInputRef, setKworkInputHasContent
+    }, [user, searchParams, setImageReplaceTask, contextKworkInputRef, setKworkInputHasContent]);
 
     const t = translations[lang];
     const userName = user?.first_name || (lang === 'ru' ? 'Чувак/Чика' : 'Dude/Chica');
@@ -265,7 +285,7 @@ function ActualPageContent() {
                          <section id="extractor" className="mb-12 w-full max-w-4xl">
                              <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg">
                                  <CardContent className="p-4">
-                                     {/* Pass kworkInputRef only to AICodeAssistant */}
+                                     {/* Pass kworkInputRef from context via provider to RepoTxtFetcher */}
                                      <RepoTxtFetcher ref={localFetcherRef} />
                                  </CardContent>
                              </Card>
@@ -274,8 +294,12 @@ function ActualPageContent() {
                         <section id="executor" ref={prSectionRef} className="mb-12 w-full max-w-4xl pb-16">
                             <Card className="bg-gray-900/80 border border-purple-700/50 shadow-lg">
                                 <CardContent className="p-4">
-                                    {/* Pass both refs here */}
-                                    <AICodeAssistant ref={localAssistantRef} kworkInputRefPassed={kworkInputRef} aiResponseInputRefPassed={aiResponseInputRef} />
+                                    {/* Pass context kworkInputRef and local aiResponseInputRef */}
+                                    <AICodeAssistant
+                                        ref={localAssistantRef}
+                                        kworkInputRefPassed={contextKworkInputRef} // <<< Pass context ref
+                                        aiResponseInputRefPassed={aiResponseInputRef} // Pass local ref (or context one if preferred)
+                                    />
                                 </CardContent>
                             </Card>
                         </section>
@@ -322,16 +346,16 @@ function RepoXmlPageLayout() {
     // Refs for the provider must be defined here, at the parent level
     const fetcherRefForProvider = useRef<RepoTxtFetcherRef | null>(null);
     const assistantRefForProvider = useRef<AICodeAssistantRef | null>(null);
-    const kworkInputRefForProvider = useRef<HTMLTextAreaElement | null>(null);
+    const kworkInputRefForProvider = useRef<HTMLTextAreaElement | null>(null); // <<< This is the SHARED ref <<<
     const aiResponseInputRefForProvider = useRef<HTMLTextAreaElement | null>(null);
-    const prSectionRefForProvider = useRef<HTMLElement | null>(null); // Ref remains, even if not used for scrolling here
+    const prSectionRefForProvider = useRef<HTMLElement | null>(null);
 
     return (
         <RepoXmlPageProvider
             fetcherRef={fetcherRefForProvider}
             assistantRef={assistantRefForProvider}
-            kworkInputRef={kworkInputRefForProvider} // Pass down kwork ref
-            aiResponseInputRef={aiResponseInputRefForProvider} // Pass down AI response ref
+            kworkInputRef={kworkInputRefForProvider} // <<< Pass SHARED kwork ref to provider
+            aiResponseInputRef={aiResponseInputRefForProvider}
             prSectionRef={prSectionRefForProvider}
         >
             {/* ActualPageContent uses useSearchParams internally */}
