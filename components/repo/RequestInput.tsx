@@ -1,162 +1,112 @@
-"use client";
-
-import React, { MutableRefObject, ChangeEventHandler } from 'react';
-import { motion } from 'framer-motion';
-import { FaClipboard, FaBroom, FaRobot, FaPlus, FaFileLines, FaArrowsRotate, FaSpinner } from 'react-icons/fa6';
-import { toast } from 'sonner';
-// --- Импорт промпта ---
-import { ULTIMATE_VIBE_MASTER_PROMPT } from './prompt';
+import React from "react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { FaCopy, FaBroom, FaRobot, FaPlus, FaSpinner } from "react-icons/fa6";
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface RequestInputProps {
-    kworkInputRef: MutableRefObject<HTMLTextAreaElement | null>;
+    kworkInputRef: React.RefObject<HTMLTextAreaElement>;
     onCopyToClipboard: () => void;
     onClearAll: () => void;
+    onAskAi: () => Promise<any>; // Assuming returns promise
+    onAddSelected: () => void;
     isCopyDisabled: boolean;
     isClearDisabled: boolean;
-    onInputChange?: (value: string) => void;
-    // Props для AI
-    onAskAi: () => Promise<{ success: boolean; requestId?: string; error?: string }>;
     isAskAiDisabled: boolean;
-    aiActionLoading: boolean;
-    // Props для добавления файлов
-    onAddSelected: () => Promise<void>;
+    aiActionLoading: boolean; // Loading state for AI call
     isAddSelectedDisabled: boolean;
-    selectedFetcherFilesCount: number;
+    selectedFetcherFilesCount: number; // Changed prop name for clarity
+    onInputChange: (value: string) => void; // Added prop to notify parent of change
 }
 
 const RequestInput: React.FC<RequestInputProps> = ({
     kworkInputRef,
     onCopyToClipboard,
     onClearAll,
+    onAskAi,
+    onAddSelected,
     isCopyDisabled,
     isClearDisabled,
-    onInputChange,
-    // AI Props
-    onAskAi,
     isAskAiDisabled,
     aiActionLoading,
-    // Add Selected Props
-    onAddSelected,
     isAddSelectedDisabled,
     selectedFetcherFilesCount,
+    onInputChange
 }) => {
-
-    // --- UPDATED: Removed auto-resizing logic ---
-    const handleChange: ChangeEventHandler<HTMLTextAreaElement> = (e) => {
-        if (onInputChange) {
-            onInputChange(e.target.value);
-        }
-        // Auto-resize logic is removed
-        // const textarea = e.target;
-        // textarea.style.height = 'auto';
-        // textarea.style.height = `${textarea.scrollHeight}px`;
-    };
-
-    // Обработчик копирования инструкций
-    const handleCopyInstructions = () => {
-        navigator.clipboard.writeText(ULTIMATE_VIBE_MASTER_PROMPT)
-            .then(() => {
-                toast.success("Инструкции для AI скопированы!");
-            })
-            .catch(err => {
-                console.error("Не удалось скопировать инструкции: ", err);
-                toast.error("Ошибка копирования инструкций");
-            });
-    };
-
     return (
-        <div className="flex flex-col gap-3">
-            <div className="relative">
-                 {/* Строка с инструкциями */}
-                 <p className="text-yellow-300/90 mb-2 text-xs md:text-sm">
-                     4. Опиши задачу И/ИЛИ добавь файлы (<FaPlus className="inline text-sm mx-px"/>). Затем <FaRobot className="inline text-sm mx-px"/> или <FaClipboard className="inline text-sm mx-px"/>.
-                 </p>
-                 {/* Textarea - UPDATED for scrolling */}
-                 <textarea
-                    id="kwork-input"
-                    ref={kworkInputRef}
-                    onChange={handleChange}
-                    // UPDATED: Removed resize-y, adjusted height classes for fixed height + scroll
-                    className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition shadow-inner text-sm placeholder-gray-500 overflow-y-auto h-40" // Set fixed height (h-40 ~ 10rem/160px) and ensure overflow-y-auto
-                    placeholder="Опиши здесь вашу задачу... Затем добавь контекст кнопками ИЛИ нажми 'Спросить AI'."
-                    disabled={isAskAiDisabled && isCopyDisabled && isClearDisabled}
-                    aria-label="Поле ввода запроса для AI"
-                    // rows={5} // Removed rows, using fixed height class instead
-                />
-                {/* Контейнер кнопок-иконок */}
-                <div className="absolute top-8 right-2 flex flex-col gap-2.5">
-                     {/* Кнопка "Копировать инструкции" */}
-                     <motion.button
-                        onClick={handleCopyInstructions}
-                        className="p-1.5 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full shadow-md shadow-purple-500/30 transition-all hover:shadow-lg hover:shadow-purple-500/50"
-                        whileHover={{ scale: 1.1, rotate: -5 }}
-                        whileTap={{ scale: 0.9 }}
-                        title="Скопировать инструкции для AI (role prompt)"
-                    >
-                        <FaFileLines className="text-white text-sm" />
-                    </motion.button>
-                    {/* Кнопка "Копировать" */}
-                    <motion.button
-                        onClick={onCopyToClipboard}
-                        disabled={isCopyDisabled}
-                        className={`p-1.5 bg-gradient-to-br from-cyan-600 to-teal-600 rounded-full shadow-md shadow-cyan-500/30 transition-all ${isCopyDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-teal-500/50'}`}
-                        whileHover={{ scale: !isCopyDisabled ? 1.1 : 1, rotate: 5 }}
-                        whileTap={{ scale: !isCopyDisabled ? 0.9 : 1 }}
-                        title="Скопировать запрос в буфер"
-                    >
-                        <FaClipboard className="text-white text-sm" />
-                    </motion.button>
-                    {/* Кнопка "Очистить" */}
-                    <motion.button
-                        onClick={onClearAll}
-                        disabled={isClearDisabled}
-                        className={`p-1.5 bg-gradient-to-br from-red-600 to-orange-600 rounded-full shadow-md shadow-orange-500/30 transition-all ${isClearDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-red-500/50'}`}
-                        whileHover={{ scale: !isClearDisabled ? 1.1 : 1, rotate: -5 }}
-                        whileTap={{ scale: !isClearDisabled ? 0.9 : 1 }}
-                        title="Очистить поле ввода и выбор файлов"
-                    >
-                        <FaBroom className="text-white text-sm" />
-                    </motion.button>
+        <TooltipProvider>
+            <div className="flex flex-col gap-3">
+                <div className="relative group">
+                    <Textarea
+                        ref={kworkInputRef}
+                        id="kworkInput"
+                        className="w-full p-3 pr-10 bg-gray-800 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none transition shadow-[0_0_8px_rgba(168,85,247,0.3)] text-sm min-h-[150px] resize-y simple-scrollbar"
+                        placeholder="4. Напиши свой запрос к AI здесь ИЛИ добавь выбранные файлы как контекст ->"
+                        onChange={(e) => onInputChange(e.target.value)} // Notify parent on change
+                        spellCheck="false"
+                    />
+                    <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+                        <Tooltip delayDuration={100}>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={onCopyToClipboard} disabled={isCopyDisabled} className="h-7 w-7 text-gray-400 hover:text-cyan-400 hover:bg-gray-700 disabled:opacity-50">
+                                    <FaCopy />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="left" className="bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-1.5 rounded">Скопировать</TooltipContent>
+                        </Tooltip>
+                        <Tooltip delayDuration={100}>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" onClick={onClearAll} disabled={isClearDisabled} className="h-7 w-7 text-gray-400 hover:text-red-500 hover:bg-gray-700 disabled:opacity-50">
+                                    <FaBroom />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="left" className="bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-1.5 rounded">Очистить все</TooltipContent>
+                        </Tooltip>
+                    </div>
                 </div>
+                 <div className="flex flex-wrap justify-end gap-3">
+                     <Tooltip delayDuration={100}>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={onAddSelected}
+                                disabled={isAddSelectedDisabled}
+                                className="border-purple-500/50 text-purple-300 hover:bg-purple-900/30 hover:text-purple-200 disabled:opacity-50"
+                            >
+                                <FaPlus className="mr-2 h-4 w-4" />
+                                Добавить Выбранное ({selectedFetcherFilesCount})
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-1.5 rounded">
+                            Добавить выбранные файлы в запрос
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip delayDuration={100}>
+                        <TooltipTrigger asChild>
+                            <Button
+                                size="sm"
+                                onClick={onAskAi}
+                                disabled={isAskAiDisabled || aiActionLoading} // Disable if loading
+                                className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:brightness-110 disabled:opacity-60"
+                            >
+                                {aiActionLoading ? (
+                                    <FaSpinner className="animate-spin mr-2 h-4 w-4" />
+                                ) : (
+                                    <FaRobot className="mr-2 h-4 w-4" />
+                                )}
+                                {aiActionLoading ? "Думаю..." : "Спросить AI"}
+                            </Button>
+                         </TooltipTrigger>
+                         <TooltipContent side="bottom" className="bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-1.5 rounded">
+                            Отправить запрос и контекст AI
+                        </TooltipContent>
+                    </Tooltip>
+                 </div>
             </div>
-            {/* Кнопки действий под Textarea */}
-            <div className="flex flex-col sm:flex-row gap-3">
-                 {/* Кнопка "Добавить выбранные" */}
-                 <motion.button
-                      onClick={onAddSelected}
-                      disabled={isAddSelectedDisabled}
-                      className={`flex items-center justify-center gap-2 flex-grow px-4 py-2 rounded-full font-semibold text-sm text-white ${
-                        isAddSelectedDisabled
-                          ? 'bg-gray-600 opacity-60 cursor-not-allowed'
-                          : 'bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 shadow-md shadow-cyan-500/30 hover:shadow-lg hover:shadow-teal-500/40'
-                      } transition-all`}
-                      whileHover={{ scale: isAddSelectedDisabled ? 1 : 1.03 }}
-                      whileTap={{ scale: isAddSelectedDisabled ? 1 : 0.97 }}
-                      title={`Добавить ${selectedFetcherFilesCount} выбранных файлов в поле ввода выше`}
-                  >
-                      <FaPlus />
-                      Добавить файлы ({selectedFetcherFilesCount})
-                  </motion.button>
-
-                 {/* Кнопка "Спросить AI" */}
-                 <motion.button
-                    onClick={onAskAi}
-                    disabled={isAskAiDisabled} // Кнопка теперь всегда неактивна
-                    className={`flex items-center justify-center gap-2 w-full sm:w-auto flex-grow px-4 py-2 rounded-full font-semibold text-sm text-white ${
-                        isAskAiDisabled
-                        ? 'bg-gray-600 opacity-60 cursor-not-allowed' // Стиль неактивной кнопки
-                        : 'bg-gradient-to-r from-blue-600 to-indigo-500 hover:from-blue-700 hover:to-indigo-600 shadow-md shadow-blue-500/30 hover:shadow-lg hover:shadow-indigo-500/40'
-                    } transition-all`}
-                    whileHover={{ scale: isAskAiDisabled ? 1 : 1.03 }}
-                    whileTap={{ scale: isAskAiDisabled ? 1 : 0.97 }}
-                    aria-label="Отправить запрос AI (временно отключено)"
-                 >
-                    {aiActionLoading ? <FaSpinner className="animate-spin" /> : <FaRobot />}
-                    {aiActionLoading ? "Ждем AI..." : "🤖 Спросить AI"}
-                 </motion.button>
-            </div>
-        </div>
+        </TooltipProvider>
     );
 };
 
+RequestInput.displayName = 'RequestInput';
 export default RequestInput;
