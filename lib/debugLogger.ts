@@ -1,68 +1,93 @@
+// Make the warn method more resilient
+
 class DebugLogger {
   private logs: string[] = [];
-  private maxLogs = 100; // Keep the last 100 logs
+  private maxLogs = 100;
 
   log(...args: any[]) {
-    const logMessage = args
-      .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : arg))
-      .join(" ");
-
-    this.logs.push(`${new Date().toISOString()} [LOG]: ${logMessage}`);
-
-    if (this.logs.length > this.maxLogs) {
-      this.logs.shift(); // Remove the oldest log
+    // Basic check for console availability
+    if (typeof console !== 'undefined' && typeof console.log === 'function') {
+        console.log(...args);
     }
 
-    // Standard console logging
-    console.log(...args);
+    try {
+        const logMessage = args.map((arg) => (typeof arg === "object" ? JSON.stringify(arg, null, 2) : String(arg))).join(" "); // Use String() for safety
+        this.logs.push(`${new Date().toISOString()}: ${logMessage}`);
+        if (this.logs.length > this.maxLogs) {
+            this.logs.shift();
+        }
+    } catch (e) {
+        // Fallback if stringify fails
+        if (typeof console !== 'undefined' && typeof console.error === 'function') {
+            console.error("Error adding log entry:", e);
+        }
+        this.logs.push(`${new Date().toISOString()}: [Logging Error]`);
+         if (this.logs.length > this.maxLogs) {
+             this.logs.shift();
+         }
+    }
   }
 
   error(...args: any[]) {
-    const errorMessage = args
-      .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : arg))
-      .join(" ");
+     // Basic check for console availability
+     if (typeof console !== 'undefined' && typeof console.error === 'function') {
+        console.error(...args);
+     }
 
-    this.logs.push(`ERROR ${new Date().toISOString()}: ${errorMessage}`);
-
-    if (this.logs.length > this.maxLogs) {
-      this.logs.shift();
-    }
-
-    console.error(...args);
+     try {
+        const errorMessage = args.map((arg) => (typeof arg === "object" ? JSON.stringify(arg, null, 2) : String(arg))).join(" "); // Use String() for safety
+        this.logs.push(`ERROR ${new Date().toISOString()}: ${errorMessage}`);
+        if (this.logs.length > this.maxLogs) {
+            this.logs.shift();
+        }
+     } catch (e) {
+         // Fallback if stringify fails
+        if (typeof console !== 'undefined' && typeof console.error === 'function') {
+            console.error("Error adding error log entry:", e);
+        }
+        this.logs.push(`ERROR ${new Date().toISOString()}: [Logging Error]`);
+         if (this.logs.length > this.maxLogs) {
+             this.logs.shift();
+         }
+     }
   }
 
   warn(...args: any[]) {
-    const warnMessage = args // Renamed variable for clarity
-      .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : arg))
-      .join(" ");
-
-    this.logs.push(`WARN ${new Date().toISOString()}: ${warnMessage}`); // Use warnMessage
-
-    if (this.logs.length > this.maxLogs) {
-      this.logs.shift();
+    // *** Add defensive check here ***
+    if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+        // Use console.warn for warnings
+        console.warn(...args);
+    } else if (typeof console !== 'undefined' && typeof console.error === 'function') {
+        // Fallback to console.error if console.warn is missing
+        console.error("WARN (via console.error):", ...args);
     }
+    // *********************************
 
-    // --- CORRECTED LINE ---
-    console.warn(...args); // Use console.warn for warnings
+    try {
+        const warnMessage = args.map((arg) => (typeof arg === "object" ? JSON.stringify(arg, null, 2) : String(arg))).join(" "); // Use String() for safety
+        this.logs.push(`WARN ${new Date().toISOString()}: ${warnMessage}`);
+        if (this.logs.length > this.maxLogs) {
+            this.logs.shift();
+        }
+    } catch (e) {
+         // Fallback if stringify fails
+        if (typeof console !== 'undefined' && typeof console.error === 'function') {
+            console.error("Error adding warn log entry:", e);
+        }
+        this.logs.push(`WARN ${new Date().toISOString()}: [Logging Error]`);
+         if (this.logs.length > this.maxLogs) {
+             this.logs.shift();
+         }
+    }
   }
 
   getLogs() {
-    // Returns all stored logs as a single string, newest last
     return this.logs.join("\n");
   }
 
   clear() {
     this.logs = [];
-    console.log("Debug logs cleared.");
   }
 }
 
-// Export a single instance
 export const debugLogger = new DebugLogger();
-
-// Optional: Add a simple function to display logs in the console easily
-export const showDebugLogs = () => {
-    console.log("--- Debug Logs History ---");
-    console.log(debugLogger.getLogs() || "No logs recorded.");
-    console.log("--------------------------");
-};
