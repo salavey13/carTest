@@ -53,7 +53,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   // === Контекст ===
    const {
       fetchStatus, setFetchStatus, repoUrlEntered, setRepoUrlEntered, filesFetched, setFilesFetched: setFilesFetchedCombined, // Use context setter
-      setSelectedFetcherFiles, // Context's selection state
+      selectedFetcherFiles, // <<< CONTEXT selection state >>>
+      setSelectedFetcherFiles, // Context's selection state setter
       kworkInputHasContent, setKworkInputHasContent, setRequestCopied,
       aiActionLoading, currentStep, loadingPrs, assistantLoading, isParsing, currentAiRequestId,
       targetBranchName, setTargetBranchName, manualBranchName, setManualBranchName, openPrs, setOpenPrs,
@@ -90,7 +91,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   // === Рефы ===
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const localKworkInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const selectionUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // const selectionUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null); // REMOVED Debounce ref
   const prevSelectedFilesRef = useRef<Set<string>>(new Set());
   const isImageTaskFetchInitiated = useRef(false); // Tracks if fetch for image task has started
   const isAutoFetchingRef = useRef(false); // Guard for auto-fetch effect
@@ -226,12 +227,12 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       });
       if(nSC > 0){
           setSelectedFilesState(fTS); // Update local state
-          setSelectedFetcherFiles(fTS); // Update context state
+          setSelectedFetcherFiles(fTS); // Update context state IMMEDIATELY
           addToast(`${nSC} связанных файлов добавлено в выборку`, 'info');
       } else {
           addToast("Все связанные файлы уже выбраны", 'info');
       }
-  }, [ primaryHighlightedPath, secondaryHighlightedPaths, files, selectedFiles, setSelectedFetcherFiles, addToast, imageReplaceTask ]); // Added imageReplaceTask
+  }, [ primaryHighlightedPath, secondaryHighlightedPaths, files, selectedFiles, setSelectedFetcherFiles, addToast, imageReplaceTask ]); // Added imageReplaceTask, removed debounce
 
   const toggleFileSelection = useCallback((path: string) => {
       if (imageReplaceTask) return; // Prevent selection changes during image task
@@ -239,12 +240,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
             const newSet = new Set(prevSet);
             if(newSet.has(path)){ newSet.delete(path); }
             else{ newSet.add(path); }
-            // Debounce context update slightly for better performance with rapid clicks
-            if (selectionUpdateTimeoutRef.current) clearTimeout(selectionUpdateTimeoutRef.current);
-            selectionUpdateTimeoutRef.current = setTimeout(() => {
-                setSelectedFetcherFiles(new Set(newSet)); // Update context after debounce
-                selectionUpdateTimeoutRef.current = null;
-            }, 150);
+            // --- FIX 2.1: Update context state immediately ---
+            setSelectedFetcherFiles(new Set(newSet));
+            // --- END FIX 2.1 ---
             return newSet; // Update local state immediately for UI responsiveness
         });
   }, [setSelectedFetcherFiles, imageReplaceTask]); // Added imageReplaceTask
@@ -262,7 +260,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
           addToast("Все важные файлы уже выбраны", 'info'); return;
       }
       setSelectedFilesState(filesToAdd); // Update local state
-      setSelectedFetcherFiles(filesToAdd); // Update context state
+      setSelectedFetcherFiles(filesToAdd); // Update context state IMMEDIATELY
       addToast(`Добавлено ${addedCount} важных файлов`, 'success');
   }, [selectedFiles, importantFiles, files, setSelectedFetcherFiles, addToast, imageReplaceTask]); // Added imageReplaceTask
 
@@ -310,29 +308,39 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       if(files.length===0) return;
       const allPaths=new Set(files.map(f=>f.path));
       setSelectedFilesState(allPaths); // Update local state
-      setSelectedFetcherFiles(allPaths); // Update context state
+      setSelectedFetcherFiles(allPaths); // Update context state IMMEDIATELY
       addToast(`Выбрано ${allPaths.size} файлов`,'info');
   }, [files, setSelectedFetcherFiles, addToast, imageReplaceTask]); // Added imageReplaceTask
 
   const handleDeselectAll = useCallback(() => {
       if (imageReplaceTask) return; // Skip if image task active
       setSelectedFilesState(new Set()); // Update local state
-      setSelectedFetcherFiles(new Set()); // Update context state
+      setSelectedFetcherFiles(new Set()); // Update context state IMMEDIATELY
       addToast("Выбор снят со всех файлов",'info');
   }, [setSelectedFetcherFiles, addToast, imageReplaceTask]); // Added imageReplaceTask
 
   // 4. Основная функция добавления выбранных (зависит от getKworkInputValue, updateKworkInput, scrollToSection, addToast)
   const handleAddSelected = useCallback(async (filesToAddParam?: Set<string>, allFilesParam?: FileNode[]) => {
       if (imageReplaceTask) return; // Skip if image task active
-      const filesToProcess = allFilesParam || files; // Use passed files or local state
-      const filesToAdd = filesToAddParam || selectedFiles; // Use passed selection or local state
+
+      // --- FIX 2.2: Prioritize context state if no explicit param is passed ---
+      // Use passed files or local state for processing
+      const filesToProcess = allFilesParam || files;
+      // Use passed selection, OR context selection (for Buddy), OR local selection (fallback for internal button?)
+      const filesToAdd = filesToAddParam || selectedFetcherFiles || selectedFiles;
+      // --- END FIX 2.2 ---
 
       if(filesToProcess.length===0 && filesToAdd.size > 0){
           addToast("Файлы еще не загружены.",'error'); return;
       }
       if(filesToAdd.size === 0){
-          addToast("Сначала выберите файлы для добавления.",'warning'); return;
+          // More specific log for debugging Buddy issue
+          logger.warn("handleAddSelected called with 0 files to add. filesToAddParam:", filesToAddParam, "contextSelected:", selectedFetcherFiles, "localSelected:", selectedFiles);
+          addToast("Сначала выберите файлы для добавления.",'warning');
+          return;
       }
+
+      logger.log(`handleAddSelected: Adding ${filesToAdd.size} files. Using source: ${filesToAddParam ? 'param' : selectedFetcherFiles ? 'context' : 'local'}`);
 
       const prefix="Контекст кода для анализа:\n";
       // Create markdown code blocks for selected files
@@ -359,12 +367,13 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       updateKworkInput(newContent); // Update the textarea
       addToast(`${filesToAdd.size} файлов добавлено в запрос`, 'success');
       scrollToSection('kworkInput'); // Scroll to the input field
-  }, [files, selectedFiles, addToast, getKworkInputValue, updateKworkInput, scrollToSection, imageReplaceTask]); // Added imageReplaceTask
+  }, [files, selectedFiles, selectedFetcherFiles, addToast, getKworkInputValue, updateKworkInput, scrollToSection, imageReplaceTask, logger]); // Added selectedFetcherFiles and logger
 
-  // 5. Основная функция извлечения (handleFetchManual) - Modified for Image Task
+
+  // 5. Основная функция извлечения (handleFetchManual) - Modified for Image Task & Idea Overwrite
   const handleFetchManual = useCallback(async (isManualRetry = false, branchNameToFetch?: string | null) => {
       const effectiveBranch = branchNameToFetch || targetBranchName || manualBranchName || 'default';
-      logger.log(`Fetcher(Manual): Старт извлечения. Повтор: ${isManualRetry}, Ветка: ${effectiveBranch}, ImageTask: ${!!imageReplaceTask}`);
+      logger.log(`Fetcher(Manual): Старт извлечения. Повтор: ${isManualRetry}, Ветка: ${effectiveBranch}, ImageTask: ${!!imageReplaceTask}, IdeaFromUrl: ${ideaFromUrl}`);
 
       // --- Initiation Guards ---
       if (imageReplaceTask && isImageTaskFetchInitiated.current && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying')) { logger.warn("Fetcher(Manual): Загрузка для задачи картинки уже идет. Отмена дубликата."); return; }
@@ -382,12 +391,19 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       setError(null); setFiles([]); setSelectedFilesState(new Set()); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] });
       setSelectedFetcherFiles(new Set()); // Clear context selection too
 
+      // --- FIX 1.1: Preserve initial idea text if set by ActualPageContent ---
+      const initialKworkValue = getKworkInputValue(); // Get value potentially set by ActualPageContent
+      const wasKworkInitiallyPopulated = !!initialKworkValue && !initialKworkValue.startsWith("Контекст кода"); // Check if it has user idea, not just context block
+      logger.log(`Fetcher(Manual): Initial kwork check. Value: "${initialKworkValue.substring(0, 30)}...", WasPopulated: ${wasKworkInitiallyPopulated}`);
+      // --- END FIX 1.1 ---
+
       // Clear downstream state ONLY if NOT an image task
       if (!imageReplaceTask) {
             setRequestCopied(false); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set());
-            // Prefill kwork only for standard flow, if not highlighted from URL
-            if (!highlightedPathFromUrl && localKworkInputRef.current) {
-                updateKworkInput(ideaFromUrl || DEFAULT_TASK_IDEA);
+            // Only set default idea if kwork wasn't already populated with a specific idea from URL
+            if (!wasKworkInitiallyPopulated && localKworkInputRef.current) {
+                logger.log("Fetcher(Manual): Setting DEFAULT idea because kwork was not initially populated.");
+                updateKworkInput(DEFAULT_TASK_IDEA);
             }
        } else {
            logger.log("Fetcher(Manual): Режим Замены Картинки - очистка Kwork, установка флага.");
@@ -435,110 +451,125 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                    if(isSettingsModalOpen) triggerToggleSettingsModal(); // Close settings modal if open
                    secondaryHighlightPaths = { component: [], context: [], hook: [], lib: [], other: [] }; // No secondary for image task
                }
-               // === Standard Fetch Path (with URL params) ===
-               else if (highlightedPathFromUrl){
-                   logger.log(`Fetcher(Manual): Standard Task - Поиск основного файла для URL ${highlightedPathFromUrl}`);
-                   primaryHighlightPath = getPageFilePath(highlightedPathFromUrl, allPaths);
-                   const tempSecPathsSet: Record<ImportCategory, Set<string>> = {component:new Set(), context:new Set(), hook:new Set(), lib:new Set(), other:new Set()};
-                   const filesToAutoSelect = new Set<string>();
+               // === Standard Fetch Path (with URL params or manual) ===
+               else {
+                   // Only process highlights if path was provided in URL
+                   if (highlightedPathFromUrl) {
+                        logger.log(`Fetcher(Manual): Standard Task - Поиск основного файла для URL ${highlightedPathFromUrl}`);
+                        primaryHighlightPath = getPageFilePath(highlightedPathFromUrl, allPaths);
+                        const tempSecPathsSet: Record<ImportCategory, Set<string>> = {component:new Set(), context:new Set(), hook:new Set(), lib:new Set(), other:new Set()};
+                        const filesToAutoSelect = new Set<string>();
 
-                   if(primaryHighlightPath){
-                       const primaryFileNode = fetchedFilesData.find(f=>f.path===primaryHighlightPath);
-                       if(primaryFileNode){
-                           logger.log(`Fetcher(Manual): Standard Task - Основной файл ${primaryHighlightPath} найден.`);
-                           filesToAutoSelect.add(primaryHighlightPath);
-                           const imports = extractImports(primaryFileNode.content);
-                           logger.log(`Fetcher(Manual): Standard Task - Найдено ${imports.length} импортов в ${primaryHighlightPath}.`);
-                           for(const imp of imports){
-                               const resolvedPath = resolveImportPath(imp, primaryFileNode.path, fetchedFilesData);
-                               if(resolvedPath && resolvedPath !== primaryHighlightPath){
-                                   const category = categorizeResolvedPath(resolvedPath);
-                                   tempSecPathsSet[category].add(resolvedPath);
-                                   if(category !== 'other') filesToAutoSelect.add(resolvedPath); // Auto-select non-other imports
-                               }
-                           }
-                       } else {
-                            primaryHighlightPath = null; // Reset if find fails
-                            const findErr = `Ошибка: Путь страницы для URL (${highlightedPathFromUrl}) не найден среди файлов.`;
-                            logger.error(`Fetcher(Manual): Standard Task - ${findErr}`);
-                            addToast(findErr, 'error');
-                       }
-                   } else {
-                       const warnMsg = `Файл страницы для URL (${highlightedPathFromUrl}) не найден. Выберите файлы вручную.`;
-                       logger.warn(`Fetcher(Manual): Standard Task - ${warnMsg}`);
-                       addToast(warnMsg, 'warning');
-                   }
-
-                   // Add important files (only for standard flow)
-                   logger.log(`Fetcher(Manual): Standard Task - Добавление ${importantFiles.length} важных файлов.`);
-                   importantFiles.forEach(p => { if(allPaths.includes(p) && !filesToAutoSelect.has(p)) { filesToAutoSelect.add(p); } });
-
-                   // Finalize paths and selections for standard flow
-                   setPrimaryHighlightedPathState(primaryHighlightPath);
-                   secondaryHighlightPaths = {
-                       component:Array.from(tempSecPathsSet.component),
-                       context:Array.from(tempSecPathsSet.context),
-                       hook:Array.from(tempSecPathsSet.hook),
-                       lib:Array.from(tempSecPathsSet.lib),
-                       other:Array.from(tempSecPathsSet.other)
-                   };
-                   setSecondaryHighlightedPathsState(secondaryHighlightPaths);
-                   setSelectedFilesState(filesToAutoSelect); // Set local selection for UI
-                   setSelectedFetcherFiles(filesToAutoSelect); // Set context selection for standard flow
-
-                   // Post-fetch actions for standard flow with URL params
-                   if(ideaFromUrl && filesToAutoSelect.size > 0){
-                       const numSecondary = tempSecPathsSet.component.size + tempSecPathsSet.context.size + tempSecPathsSet.hook.size + tempSecPathsSet.lib.size;
-                       const numImportant = filesToAutoSelect.size - (primaryHighlightPath ? 1 : 0) - numSecondary;
-                       let msg=`✅ Авто-выбор: `; const parts=[];
-                       if(primaryHighlightPath)parts.push(`1 стр.`); if(numSecondary>0)parts.push(`${numSecondary} связ.`); if(numImportant>0)parts.push(`${numImportant} важн.`);
-                       msg+=parts.join(', ') + ` (${filesToAutoSelect.size} всего). Идея добавлена.`;
-                       addToast(msg,'success');
-                       updateKworkInput(ideaFromUrl || DEFAULT_TASK_IDEA); // Use prefilled idea
-                       await handleAddSelected(filesToAutoSelect, fetchedFilesData); // Add selection to kwork
-                       setTimeout(()=>{addToast("💡 Добавь инструкции или уточни запрос!", "info");}, 500);
-                   } else if (filesToAutoSelect.size > 0) { // Auto-selection without URL idea
-                       const numSecondary=tempSecPathsSet.component.size+tempSecPathsSet.context.size+tempSecPathsSet.hook.size+tempSecPathsSet.lib.size;
-                       const numImportant=filesToAutoSelect.size-(primaryHighlightPath?1:0)-numSecondary;
-                       let msg=`Авто-выбраны: `; const parts=[];
-                       if(primaryHighlightPath)parts.push(`1 осн.`); if(numSecondary>0)parts.push(`${numSecondary} связ.`); if(numImportant>0)parts.push(`${numImportant} важн.`);
-                       msg+=parts.join(', ')+'.'; addToast(msg,'info');
-                       updateKworkInput(DEFAULT_TASK_IDEA); // Set default idea
-                   } else {
-                        // No files auto-selected, set default idea
-                        updateKworkInput(DEFAULT_TASK_IDEA);
-                   }
-
-                   // --- SCROLL FIX: Only scroll here if ideaFromUrl was NOT present ---
-                   if (!ideaFromUrl) {
-                       if (primaryHighlightPath) {
-                            setTimeout(()=>{
-                                const elementId=`file-${primaryHighlightPath}`; const element=document.getElementById(elementId);
-                                if(element){element.scrollIntoView({behavior:"smooth",block:"center"}); element.classList.add('highlight-scroll'); setTimeout(()=>element.classList.remove('highlight-scroll'),2500);}
-                                else { logger.warn(`Scroll target ${elementId} not found for primary highlight.`); }
-                            },400);
-                        } else if (fetchedFilesData.length > 0) {
-                            scrollToSection('file-list-container'); // Scroll to file list if no primary highlight
+                        if(primaryHighlightPath){
+                            const primaryFileNode = fetchedFilesData.find(f=>f.path===primaryHighlightPath);
+                            if(primaryFileNode){
+                                logger.log(`Fetcher(Manual): Standard Task - Основной файл ${primaryHighlightPath} найден.`);
+                                filesToAutoSelect.add(primaryHighlightPath);
+                                const imports = extractImports(primaryFileNode.content);
+                                logger.log(`Fetcher(Manual): Standard Task - Найдено ${imports.length} импортов в ${primaryHighlightPath}.`);
+                                for(const imp of imports){
+                                    const resolvedPath = resolveImportPath(imp, primaryFileNode.path, fetchedFilesData);
+                                    if(resolvedPath && resolvedPath !== primaryHighlightPath){
+                                        const category = categorizeResolvedPath(resolvedPath);
+                                        tempSecPathsSet[category].add(resolvedPath);
+                                        if(category !== 'other') filesToAutoSelect.add(resolvedPath); // Auto-select non-other imports
+                                    }
+                                }
+                            } else {
+                                 primaryHighlightPath = null; // Reset if find fails
+                                 const findErr = `Ошибка: Путь страницы для URL (${highlightedPathFromUrl}) не найден среди файлов.`;
+                                 logger.error(`Fetcher(Manual): Standard Task - ${findErr}`);
+                                 addToast(findErr, 'error');
+                            }
+                        } else {
+                            const warnMsg = `Файл страницы для URL (${highlightedPathFromUrl}) не найден. Выберите файлы вручную.`;
+                            logger.warn(`Fetcher(Manual): Standard Task - ${warnMsg}`);
+                            addToast(warnMsg, 'warning');
                         }
+
+                        // Add important files (only for standard flow)
+                        logger.log(`Fetcher(Manual): Standard Task - Добавление ${importantFiles.length} важных файлов.`);
+                        importantFiles.forEach(p => { if(allPaths.includes(p) && !filesToAutoSelect.has(p)) { filesToAutoSelect.add(p); } });
+
+                        // Finalize paths and selections for standard flow
+                        setPrimaryHighlightedPathState(primaryHighlightPath);
+                        secondaryHighlightPaths = {
+                            component:Array.from(tempSecPathsSet.component),
+                            context:Array.from(tempSecPathsSet.context),
+                            hook:Array.from(tempSecPathsSet.hook),
+                            lib:Array.from(tempSecPathsSet.lib),
+                            other:Array.from(tempSecPathsSet.other)
+                        };
+                        setSecondaryHighlightedPathsState(secondaryHighlightPaths);
+                        setSelectedFilesState(filesToAutoSelect); // Set local selection for UI
+                        setSelectedFetcherFiles(filesToAutoSelect); // Set context selection for standard flow
+
+                        // Post-fetch actions for standard flow with URL params
+                        if(ideaFromUrl && filesToAutoSelect.size > 0){
+                            const numSecondary = tempSecPathsSet.component.size + tempSecPathsSet.context.size + tempSecPathsSet.hook.size + tempSecPathsSet.lib.size;
+                            const numImportant = filesToAutoSelect.size - (primaryHighlightPath ? 1 : 0) - numSecondary;
+                            let msg=`✅ Авто-выбор: `; const parts=[];
+                            if(primaryHighlightPath)parts.push(`1 стр.`); if(numSecondary>0)parts.push(`${numSecondary} связ.`); if(numImportant>0)parts.push(`${numImportant} важн.`);
+                            msg+=parts.join(', ') + ` (${filesToAutoSelect.size} всего). Идея уже в поле запроса.`;
+                            addToast(msg,'success');
+                            // ** DON'T updateKworkInput here if wasKworkInitiallyPopulated **
+                            if (!wasKworkInitiallyPopulated) {
+                                logger.log("Fetcher(Manual): Setting kwork input because it wasn't initially populated.");
+                                updateKworkInput(ideaFromUrl || DEFAULT_TASK_IDEA); // Use prefilled idea
+                            } else {
+                                logger.log("Fetcher(Manual): Skipping kwork input update, was already populated.");
+                            }
+                            // Add selected files to the *existing* kwork content
+                            await handleAddSelected(filesToAutoSelect, fetchedFilesData);
+                            setTimeout(()=>{addToast("💡 Уточни запрос или добавь еще файлы!", "info");}, 500);
+                        } else if (filesToAutoSelect.size > 0) { // Auto-selection without URL idea
+                            const numSecondary=tempSecPathsSet.component.size+tempSecPathsSet.context.size+tempSecPathsSet.hook.size+tempSecPathsSet.lib.size;
+                            const numImportant=filesToAutoSelect.size-(primaryHighlightPath?1:0)-numSecondary;
+                            let msg=`Авто-выбраны: `; const parts=[];
+                            if(primaryHighlightPath)parts.push(`1 осн.`); if(numSecondary>0)parts.push(`${numSecondary} связ.`); if(numImportant>0)parts.push(`${numImportant} важн.`);
+                            msg+=parts.join(', ')+'.'; addToast(msg,'info');
+                            // ** DON'T updateKworkInput here if wasKworkInitiallyPopulated **
+                            if (!wasKworkInitiallyPopulated) {
+                                updateKworkInput(DEFAULT_TASK_IDEA); // Set default idea only if not populated
+                            }
+                        } else {
+                             // No files auto-selected, set default idea only if not populated
+                             if (!wasKworkInitiallyPopulated) {
+                                updateKworkInput(DEFAULT_TASK_IDEA);
+                            }
+                        }
+
+                         // --- SCROLL FIX: Only scroll here if ideaFromUrl was NOT present ---
+                         if (!ideaFromUrl) {
+                            if (primaryHighlightPath) {
+                                 setTimeout(()=>{
+                                     const elementId=`file-${primaryHighlightPath}`; const element=document.getElementById(elementId);
+                                     if(element){element.scrollIntoView({behavior:"smooth",block:"center"}); element.classList.add('highlight-scroll'); setTimeout(()=>element.classList.remove('highlight-scroll'),2500);}
+                                     else { logger.warn(`Scroll target ${elementId} not found for primary highlight.`); }
+                                 },400);
+                             } else if (fetchedFilesData.length > 0) {
+                                 scrollToSection('file-list-container'); // Scroll to file list if no primary highlight
+                             }
+                        }
+                        // --- END SCROLL FIX ---
+
+                   } else {
+                       // Fallback: Standard Fetch without URL params (manual click)
+                       logger.log("Fetcher(Manual): Standard Task - Нет URL параметров, просто загрузка всех файлов.");
+                       addToast(`Извлечено ${fetchedFilesData.length} файлов! Выберите нужные.`, 'success');
+                       // ** DON'T updateKworkInput here if wasKworkInitiallyPopulated **
+                       if (!wasKworkInitiallyPopulated) {
+                            updateKworkInput(DEFAULT_TASK_IDEA); // Set default task idea only if not populated
+                       }
+                       if (fetchedFilesData.length > 0) { // Scroll to file list container
+                           scrollToSection('file-list-container');
+                       }
+                       primaryHighlightPath = null;
+                       secondaryHighlightPaths = { component: [], context: [], hook: [], lib: [], other: [] };
                    }
-                   // --- END SCROLL FIX ---
 
                    if(isSettingsModalOpen) triggerToggleSettingsModal(); // Close settings modal
-               }
-               // === Fallback: Standard Fetch without URL params ===
-               else {
-                   logger.log("Fetcher(Manual): Standard Task - Нет URL параметров, просто загрузка всех файлов.");
-                   // setFiles is called in finally
-                   addToast(`Извлечено ${fetchedFilesData.length} файлов! Выберите нужные.`, 'success');
-                   updateKworkInput(DEFAULT_TASK_IDEA); // Set default task idea
-                   if(isSettingsModalOpen) triggerToggleSettingsModal();
-                   if (fetchedFilesData.length > 0) { // Scroll to file list container
-                        scrollToSection('file-list-container');
-                   }
-                   // No automatic selection or highlight paths for this case
-                   primaryHighlightPath = null;
-                   secondaryHighlightPaths = { component: [], context: [], hook: [], lib: [], other: [] };
-               }
+               } // End Standard Flow
            } else { // Handle failure from fetchRepoContents directly
                fetchAttemptSucceeded = false;
                throw new Error(result?.error || `Не удалось получить файлы из ${effectiveBranch}. Проверьте URL, токен и имя ветки.`);
@@ -591,7 +622,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
        startProgressSimulation, stopProgressSimulation, triggerToggleSettingsModal, updateKworkInput,
        highlightedPathFromUrl, ideaFromUrl, // Added ideaFromUrl dependency for scroll fix
        DEFAULT_TASK_IDEA, importantFiles, isSettingsModalOpen, handleAddSelected,
-       logger, scrollToSection // Added logger & scrollToSection
+       logger, scrollToSection, getKworkInputValue // Added getKworkInputValue
    ]);
 
 
@@ -678,7 +709,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
           if(relatedPathsToSelect.size > 0){
               const finalSelection = new Set([...selectedFiles, ...relatedPathsToSelect]);
               setSelectedFilesState(finalSelection); // Update local state
-              setSelectedFetcherFiles(finalSelection); // Update context state
+              setSelectedFetcherFiles(finalSelection); // Update context state IMMEDIATELY
               addToast(`🔗 Авто-добавлено ${foundCount} связанных файлов`, 'info');
               prevSelectedFilesRef.current = finalSelection; // Update ref for next render
               return; // Exit after updating
@@ -718,7 +749,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   const isAskAiDisabled = isActionDisabled || !kworkInputHasContent; // Disable AI if actions disabled or no kwork input (already covered by isActionDisabled for image task)
   const isCopyDisabled = !kworkInputHasContent || isActionDisabled;
   const isClearDisabled = (!kworkInputHasContent && selectedFiles.size === 0 && !filesFetched) || isActionDisabled;
-  const isAddSelectedDisabled = selectedFiles.size === 0 || isActionDisabled;
+  // --- FIX 2.2 Check: Use context state for AddSelected button disable check ---
+  const isAddSelectedDisabled = selectedFetcherFiles.size === 0 || isActionDisabled;
+  // --- END FIX 2.2 Check ---
   const effectiveBranchDisplay = targetBranchName || manualBranchName || "default";
   // FIX: Replace isWaitingForAi with aiActionLoading & currentAiRequestId check
   const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
@@ -873,7 +906,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                      aiActionLoading={aiActionLoading}
                      onAddSelected={() => handleAddSelected()}
                      isAddSelectedDisabled={isAddSelectedDisabled}
-                     selectedFetcherFilesCount={selectedFiles.size}
+                     selectedFetcherFilesCount={selectedFetcherFiles.size} // <<< Use context state for button check
                  />
              </div>
          ) : null }
