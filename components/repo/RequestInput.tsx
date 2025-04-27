@@ -1,34 +1,28 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { FaCopy, FaBroom, FaRobot, FaPlus, FaSpinner } from "react-icons/fa6";
+import { FaCopy, FaBroom, FaPlus } from "react-icons/fa6";
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface RequestInputProps {
     kworkInputRef: React.RefObject<HTMLTextAreaElement>;
     onCopyToClipboard: () => void;
     onClearAll: () => void;
-    onAskAi: () => Promise<any>; // Assuming returns promise
-    onAddSelected: () => void;
+    onAddSelected: () => void; // Keep Add Selected handler
     isCopyDisabled: boolean;
     isClearDisabled: boolean;
-    isAskAiDisabled: boolean;
-    aiActionLoading: boolean; // Loading state for AI call
     isAddSelectedDisabled: boolean;
-    selectedFetcherFilesCount: number; // Changed prop name for clarity
-    onInputChange: (value: string) => void; // Added prop to notify parent of change
+    selectedFetcherFilesCount: number;
+    onInputChange: (value: string) => void;
 }
 
 const RequestInput: React.FC<RequestInputProps> = ({
     kworkInputRef,
     onCopyToClipboard,
     onClearAll,
-    onAskAi,
-    onAddSelected,
+    onAddSelected, // Keep Add Selected handler
     isCopyDisabled,
     isClearDisabled,
-    isAskAiDisabled,
-    aiActionLoading,
     isAddSelectedDisabled,
     selectedFetcherFilesCount,
     onInputChange
@@ -42,7 +36,7 @@ const RequestInput: React.FC<RequestInputProps> = ({
                         id="kworkInput"
                         className="w-full p-3 pr-10 bg-gray-800 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none transition shadow-[0_0_8px_rgba(168,85,247,0.3)] text-sm min-h-[150px] resize-y simple-scrollbar"
                         placeholder="4. Напиши свой запрос к AI здесь ИЛИ добавь выбранные файлы как контекст ->"
-                        onChange={(e) => onInputChange(e.target.value)} // Notify parent on change
+                        onChange={(e) => onInputChange(e.target.value)}
                         spellCheck="false"
                     />
                     <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
@@ -67,41 +61,24 @@ const RequestInput: React.FC<RequestInputProps> = ({
                  <div className="flex flex-wrap justify-end gap-3">
                      <Tooltip delayDuration={100}>
                         <TooltipTrigger asChild>
+                            {/* --- STYLED Add Files Button --- */}
                             <Button
-                                variant="outline"
+                                variant="default" // More prominent variant
                                 size="sm"
                                 onClick={onAddSelected}
                                 disabled={isAddSelectedDisabled}
-                                className="border-purple-500/50 text-purple-300 hover:bg-purple-900/30 hover:text-purple-200 disabled:opacity-50"
+                                className="rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition-all disabled:opacity-50 px-4" // rounded-full, gradient, shadow
                             >
                                 <FaPlus className="mr-2 h-4 w-4" />
                                 Добавить Выбранное ({selectedFetcherFilesCount})
                             </Button>
+                            {/* --- END STYLED Add Files Button --- */}
                         </TooltipTrigger>
                         <TooltipContent side="bottom" className="bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-1.5 rounded">
                             Добавить выбранные файлы в запрос
                         </TooltipContent>
                     </Tooltip>
-                    <Tooltip delayDuration={100}>
-                        <TooltipTrigger asChild>
-                            <Button
-                                size="sm"
-                                onClick={onAskAi}
-                                disabled={isAskAiDisabled || aiActionLoading} // Disable if loading
-                                className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:brightness-110 disabled:opacity-60"
-                            >
-                                {aiActionLoading ? (
-                                    <FaSpinner className="animate-spin mr-2 h-4 w-4" />
-                                ) : (
-                                    <FaRobot className="mr-2 h-4 w-4" />
-                                )}
-                                {aiActionLoading ? "Думаю..." : "Спросить AI"}
-                            </Button>
-                         </TooltipTrigger>
-                         <TooltipContent side="bottom" className="bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-1.5 rounded">
-                            Отправить запрос и контекст AI
-                        </TooltipContent>
-                    </Tooltip>
+                     {/* Ask AI button completely removed */}
                  </div>
             </div>
         </TooltipProvider>
