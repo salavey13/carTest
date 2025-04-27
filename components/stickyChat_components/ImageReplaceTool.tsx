@@ -1,3 +1,4 @@
+// No changes needed.
 "use client";
 
 import React, { useState } from 'react';
@@ -97,7 +98,7 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
     return (
         <motion.div
             variants={childVariants}
-            className="w-full mt-2 p-3 bg-gray-700/80 backdrop-blur-sm border border-blue-500/50 rounded-lg shadow-lg flex flex-col gap-3"
+            className="w-full mt-2 p-3 pb-16 bg-gray-700/80 backdrop-blur-sm border border-blue-500/50 rounded-lg shadow-lg flex flex-col gap-3"
         >
             <p className="text-xs text-gray-300">Заменить эту картинку:</p>
             <input

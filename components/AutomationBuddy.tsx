@@ -1,3 +1,8 @@
+// MODIFICATIONS:
+// - Added check for `imageReplaceTask` at the beginning of suggestion calculation.
+// - If `imageReplaceTask` exists, generate specific suggestions for image replacement flow.
+// - Return *only* image-related suggestions when the task is active.
+// - Ensured loading states correctly disable suggestions in both standard and image flows.
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -110,7 +115,7 @@ const AutomationBuddy: React.FC = () => {
         const calculateSuggestions = (): Suggestion[] => {
             const suggestionsList: Suggestion[] = [];
             const isFetcherLoading = fetchStatus === 'loading' || fetchStatus === 'retrying';
-            // Consolidated loading check
+            // Consolidated loading check (includes assistant loading for PRs/parsing/image replace)
             const isAnyLoading = isFetcherLoading || assistantLoading || aiActionLoading || loadingPrs || isParsing;
             const effectiveBranch = manualBranchName.trim() || targetBranchName;
             const branchInfo = effectiveBranch ? ` (${effectiveBranch})` : ' (default)';
@@ -121,92 +126,126 @@ const AutomationBuddy: React.FC = () => {
             // Helper to add suggestions, including the unified loading check
             const addSuggestion = (id: string, text: string, action: () => any, icon: React.ReactNode, condition = true, disabled = false, tooltip = '') => {
                 if (condition) {
-                    // Disable most actions if any loading is happening, with specific exceptions
-                    let isDisabled = isAnyLoading && !['retry-fetch', 'toggle-settings-close', 'goto-', 'clear-all'].some(prefix => id.startsWith(prefix));
-                     // Explicitly allow settings toggle even when loading (useful for changing URL/branch)
-                     if (id === 'toggle-settings-open' || id === 'toggle-settings-close') isDisabled = false; // Allow toggling settings always
-                     // Explicitly disable image status action if assistant is busy elsewhere
-                     if (id === 'img-replace-status' && assistantLoading) isDisabled = true;
-                     // Apply the passed disabled prop if true
-                     if (disabled) isDisabled = true;
+                     // Disable most actions if any general loading is happening
+                     let isDisabled = isAnyLoading;
+
+                     // --- SPECIFIC EXCEPTIONS ---
+                     // Allow retrying fetch even if loading stuck (but not if other things are loading)
+                     if (id === 'retry-fetch') isDisabled = assistantLoading || aiActionLoading || loadingPrs || isParsing; // Only disable if OTHER things are loading
+                     // Always allow toggling settings
+                     if (id === 'toggle-settings-close' || id === 'toggle-settings-open') isDisabled = false;
+                     // Always allow scrolling
+                     if (id.startsWith('goto-')) isDisabled = false;
+                     // Allow clearing ONLY if the fetcher/assistant isn't actively doing something critical
+                     if (id === 'clear-all') isDisabled = isFetcherLoading || assistantLoading || aiActionLoading || isParsing;
+                     // Allow image status view unless something critical is happening
+                     if (id === 'img-replace-status') isDisabled = isFetcherLoading || aiActionLoading || isParsing || loadingPrs; // Allow if only assistantLoading (PR creation) is true
+
+                    // Apply the passed disabled prop if true (overrides exceptions if needed)
+                    if (disabled) isDisabled = true;
 
                      suggestionsList.push({ id, text, action, icon, disabled: isDisabled, tooltip });
                 }
             };
 
-             // --- Image Replace Task Flow ---
+             // --- MODIFICATION: Image Replace Task Flow ---
              if (imageReplaceTask) {
                  logger.log("AutomationBuddy: Image Replace Task active, generating specific suggestions.");
-                 addSuggestion( "img-replace-status", assistantLoading ? "Замена Картинки..." : "Задача Замены Активна", () => {}, assistantLoading ? <FaSpinner className="animate-spin text-blue-400"/> : <FaImages className="text-blue-400"/>, true, assistantLoading );
-                 addSuggestion( "goto-pr-form-img", "К Статусу Задачи", () => scrollToSection('executor'), <FaRocket />, true, assistantLoading ); // Go to assistant section for status
                  const settingsButtonId = isSettingsModalOpen ? 'toggle-settings-close' : 'toggle-settings-open';
-                 addSuggestion( settingsButtonId, isSettingsModalOpen ? "Закрыть Настройки" : "Настройки (URL/Ветка/PR)", triggerToggleSettingsModal, <FaCodeBranch />, true ); // Allow settings toggle
+                 addSuggestion( settingsButtonId, isSettingsModalOpen ? "Закрыть Настройки" : "Настройки (URL/Ветка/PR)", triggerToggleSettingsModal, <FaCodeBranch />, true, false ); // Settings always allowed
+
+                 // Status suggestion based on fetch/assistant state
+                 let statusText = "Задача Замены Активна";
+                 let statusIcon: React.ReactNode = <FaImages className="text-blue-400"/>;
+                 let statusDisabled = false; // Disable interaction with status itself
+
+                 if (fetchStatus === 'loading' || fetchStatus === 'retrying') {
+                     statusText = "Загрузка Файла...";
+                     statusIcon = <FaSpinner className="animate-spin text-blue-400"/>;
+                 } else if (fetchStatus === 'success' && assistantLoading) {
+                     statusText = "Замена и PR...";
+                     statusIcon = <FaSpinner className="animate-spin text-purple-400"/>;
+                 } else if (fetchStatus === 'error' || fetchStatus === 'failed_retries') {
+                     statusText = "Ошибка Загрузки Файла!";
+                     statusIcon = <FaExclamation className="text-red-500"/>;
+                 } else if (fetchStatus === 'success' && !assistantLoading) {
+                     // This state might be brief before PR creation starts
+                     statusText = "Файл Загружен, Готовлю PR";
+                     statusIcon = <FaCheck className="text-green-400"/>;
+                 }
+
+                 addSuggestion( "img-replace-status", statusText, () => scrollToSection('executor'), statusIcon, true, statusDisabled ); // Link to assistant section for details
+                // Add retry fetch button only on failure
+                 if (fetchStatus === 'error' || fetchStatus === 'failed_retries') {
+                    addSuggestion("retry-fetch-img", `Попробовать Снова Загрузить?`, () => triggerFetch(true, effectiveBranch || null), <FaArrowRotateRight />, true);
+                 }
+
                  return suggestionsList; // Return only image-related suggestions
              }
+             // --- END IMAGE REPLACE MODIFICATION ---
 
-             // --- Standard Workflow ---
-             // logger.log(`AutomationBuddy: Standard flow, currentStep: ${currentStep}`); // Can be verbose
+             // --- Standard Workflow (Only runs if imageReplaceTask is null) ---
              const settingsButtonId = isSettingsModalOpen ? 'toggle-settings-close' : 'toggle-settings-open';
-             addSuggestion( settingsButtonId, isSettingsModalOpen ? "Закрыть Настройки" : "Настройки (URL/Ветка/PR)", triggerToggleSettingsModal, <FaCodeBranch />, true ); // Allow settings toggle
+             addSuggestion( settingsButtonId, isSettingsModalOpen ? "Закрыть Настройки" : "Настройки (URL/Ветка/PR)", triggerToggleSettingsModal, <FaCodeBranch />, true, false ); // Settings always allowed
 
              switch (currentStep) {
                  case 'ready_to_fetch':
                      addSuggestion("fetch", `Извлечь Файлы${branchInfo}`, () => triggerFetch(false, effectiveBranch || null), <FaDownload />, true, !repoUrlEntered, !repoUrlEntered ? "Сначала укажи URL" : "");
                      break;
                  case 'fetching':
-                     addSuggestion("loading-indicator", `Загрузка Файлов${branchInfo}...`, () => {}, <FaArrowsRotate className="animate-spin"/>, true, true );
+                     addSuggestion("loading-indicator", `Загрузка Файлов${branchInfo}...`, () => {}, <FaArrowsRotate className="animate-spin"/>, true, true ); // Disabled interaction
                      break;
                  case 'fetch_failed':
-                     addSuggestion("retry-fetch", `Попробовать Снова${branchInfo}?`, () => triggerFetch(true, effectiveBranch || null), <FaArrowRotateRight />, true);
+                     addSuggestion("retry-fetch", `Попробовать Снова${branchInfo}?`, () => triggerFetch(true, effectiveBranch || null), <FaArrowRotateRight />, true); // Allow retry unless other things loading
                      break;
                  case 'files_fetched':
-                     addSuggestion("goto-files", "К Списку Файлов", () => scrollToSection('fetcher'), <FaEye />);
-                     addSuggestion("ask-ai-empty", "🤖 Спросить AI", triggerAskAi, <FaRobot />);
+                     addSuggestion("goto-files", "К Списку Файлов", () => scrollToSection('file-list-container'), <FaEye />, true); // Changed target ID
+                     addSuggestion("ask-ai-empty", "🤖 Спросить AI", triggerAskAi, <FaRobot />, true, isWaitingForAi, isWaitingForAi ? "Запрос уже отправлен" : "");
                      break;
                  case 'files_fetched_highlights':
-                     addSuggestion("select-highlighted", "Выбрать Связанные", triggerSelectHighlighted, <FaHighlighter />);
-                     addSuggestion("goto-files", "К Списку Файлов", () => scrollToSection('fetcher'), <FaEye />);
+                     addSuggestion("select-highlighted", "Выбрать Связанные", triggerSelectHighlighted, <FaHighlighter />, true);
+                     addSuggestion("goto-files", "К Списку Файлов", () => scrollToSection('file-list-container'), <FaEye />, true); // Changed target ID
                      addSuggestion("add-selected", "Добавить (+) => Запрос", () => triggerAddSelectedToKwork(false), <FaPlus />, selectedFetcherFiles.size > 0, false, "Добавить выбранные файлы в поле запроса");
-                     addSuggestion("ask-ai-highlights", "🤖 Спросить AI (с Добавл.)", async () => { await triggerAddSelectedToKwork(false); await triggerAskAi(); }, <FaRobot />, selectedFetcherFiles.size > 0, false, "Добавить выбранные и сразу спросить AI");
+                     addSuggestion("ask-ai-highlights", "🤖 Спросить AI (с Добавл.)", async () => { await triggerAddSelectedToKwork(false); await triggerAskAi(); }, <FaRobot />, selectedFetcherFiles.size > 0, isWaitingForAi, isWaitingForAi ? "Запрос уже отправлен" : "Добавить выбранные и сразу спросить AI");
                     break;
                  case 'files_selected':
                     addSuggestion("add-selected", "Добавить (+) => Запрос", () => triggerAddSelectedToKwork(false), <FaPlus />, true, false, "Добавить выбранные файлы в поле запроса");
-                    addSuggestion("ask-ai-selected", "🤖 Спросить AI (с Добавл.)", async () => { await triggerAddSelectedToKwork(false); await triggerAskAi(); }, <FaRobot />, true, false, "Добавить выбранные и сразу спросить AI");
-                    addSuggestion("goto-kwork", "К Полю Запроса", () => scrollToSection('kworkInput'), <FaKeyboard />);
+                    addSuggestion("ask-ai-selected", "🤖 Спросить AI (с Добавл.)", async () => { await triggerAddSelectedToKwork(false); await triggerAskAi(); }, <FaRobot />, true, isWaitingForAi, isWaitingForAi ? "Запрос уже отправлен" : "Добавить выбранные и сразу спросить AI");
+                    addSuggestion("goto-kwork", "К Полю Запроса", () => scrollToSection('kwork-input-section'), <FaKeyboard />, true); // Changed target ID
                     break;
                  case 'request_written':
                      addSuggestion("ask-ai-written", "🤖 Спросить AI", triggerAskAi, <FaRobot />, true, isWaitingForAi, isWaitingForAi ? "Запрос уже отправлен" : "");
                      addSuggestion("copy-kwork", "Скопировать Запрос", triggerCopyKwork, <FaCopy />, true, !kworkInputHasContent, !kworkInputHasContent ? "Запрос пуст" : "");
-                     addSuggestion("goto-kwork", "К Полю Запроса", () => scrollToSection('kworkInput'), <FaKeyboard />);
+                     addSuggestion("goto-kwork", "К Полю Запроса", () => scrollToSection('kwork-input-section'), <FaKeyboard />, true); // Changed target ID
                      break;
                  case 'generating_ai_response':
-                     addSuggestion("loading-indicator", `⏳ Жду AI (${currentAiRequestId?.substring(0,6)}...)`, () => {}, <FaBrain className="animate-pulse"/>, true, true );
-                     addSuggestion("goto-ai-response-wait", "К Полю Ответа AI", () => scrollToSection('aiResponseInput'), <FaKeyboard />);
+                     addSuggestion("loading-indicator", `⏳ Жду AI (${currentAiRequestId?.substring(0,6)}...)`, () => {}, <FaBrain className="animate-pulse"/>, true, true ); // Disabled interaction
+                     addSuggestion("goto-ai-response-wait", "К Полю Ответа AI", () => scrollToSection('response-input'), <FaKeyboard />, true); // Changed target ID
                      break;
                  case 'request_copied':
-                    addSuggestion("goto-ai-response", "К Полю Ответа AI", () => scrollToSection('aiResponseInput'), <FaArrowRight />);
-                    addSuggestion("parse-response", "➡️ Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, aiResponseHasContent, !aiResponseHasContent, !aiResponseHasContent ? "Вставь ответ AI" : "");
+                    addSuggestion("goto-ai-response", "К Полю Ответа AI", () => scrollToSection('response-input'), <FaArrowRight />, true); // Changed target ID
+                    addSuggestion("parse-response", "➡️ Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, aiResponseHasContent, !aiResponseHasContent || isParsing, !aiResponseHasContent ? "Вставь ответ AI" : (isParsing ? "Уже разбираю..." : ""));
                     break;
                  case 'response_pasted':
-                     addSuggestion("parse-response", "➡️ Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, true, !aiResponseHasContent, !aiResponseHasContent ? "Нет ответа" : "");
-                     addSuggestion("goto-ai-response", "К Полю Ответа", () => scrollToSection('aiResponseInput'), <FaKeyboard />);
+                     addSuggestion("parse-response", "➡️ Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, true, !aiResponseHasContent || isParsing, !aiResponseHasContent ? "Нет ответа" : (isParsing ? "Уже разбираю..." : ""));
+                     addSuggestion("goto-ai-response", "К Полю Ответа", () => scrollToSection('response-input'), <FaKeyboard />, true); // Changed target ID
                     break;
                  case 'parsing_response':
-                     addSuggestion("loading-indicator", "Разбор Ответа...", () => {}, <FaBrain className="animate-pulse"/>, true, true );
+                     addSuggestion("loading-indicator", "Разбор Ответа...", () => {}, <FaBrain className="animate-pulse"/>, true, true ); // Disabled interaction
                      break;
                  case 'response_parsed': // Fallthrough intended
                  case 'pr_ready':
                      addSuggestion("select-all-parsed", "Выбрать Все Файлы", triggerSelectAllParsed, <FaListCheck />, filesParsed);
-                     addSuggestion("goto-assistant-files", "К Файлам Ниже", () => scrollToSection('executor'), <FaEye />);
-                     addSuggestion( effectiveBranch ? "update-branch" : "create-pr", createOrUpdateActionText, triggerCreateOrUpdatePR, createOrUpdateIcon, selectedAssistantFiles.size > 0, selectedAssistantFiles.size === 0, selectedAssistantFiles.size === 0 ? "Выбери файлы для коммита" : "" );
-                     addSuggestion("goto-pr-form", "К Форме PR/Ветки", () => scrollToSection('prSection'), <FaRocket />);
+                     addSuggestion("goto-assistant-files", "К Файлам Ниже", () => scrollToSection('executor'), <FaEye />, true); // Changed target ID (executor contains assistant)
+                     addSuggestion( effectiveBranch ? "update-branch" : "create-pr", createOrUpdateActionText, triggerCreateOrUpdatePR, createOrUpdateIcon, selectedAssistantFiles.size > 0, selectedAssistantFiles.size === 0 || assistantLoading, selectedAssistantFiles.size === 0 ? "Выбери файлы для коммита" : (assistantLoading ? "Обработка..." : "") );
+                     addSuggestion("goto-pr-form", "К Форме PR/Ветки", () => scrollToSection('pr-form-container'), <FaRocket />, true); // Changed target ID
                      break;
                  default: break;
              }
 
-             // Clear All button available in most steps if there's something to clear
+             // Clear All button available in most standard steps
              if (fetcherRef?.current?.clearAll && !imageReplaceTask && (selectedFetcherFiles.size > 0 || kworkInputHasContent || aiResponseHasContent)) {
-                 addSuggestion("clear-all", "Очистить Все?", fetcherRef.current.clearAll, <FaBroom/>, true);
+                 addSuggestion("clear-all", "Очистить Все?", fetcherRef.current.clearAll, <FaBroom/>, true); // Disabled state handled by helper now
              }
 
             return suggestionsList;
@@ -223,11 +262,11 @@ const AutomationBuddy: React.FC = () => {
         selectedFetcherFiles, kworkInputHasContent, aiResponseHasContent, filesParsed,
         selectedAssistantFiles, assistantLoading, aiActionLoading, loadingPrs,
         targetBranchName, manualBranchName, isSettingsModalOpen, isParsing,
-        currentAiRequestId, imageReplaceTask,
+        currentAiRequestId, imageReplaceTask, // Added imageReplaceTask
         // Context triggers are generally stable, but include if they might change identity
         triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork,
         triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR,
-        triggerToggleSettingsModal, scrollToSection, fetcherRef
+        triggerToggleSettingsModal, scrollToSection, fetcherRef, getBaseMessage // Added getBaseMessage
     ]);
 
     // --- Suggestion Change Detection for Notification (No change needed) ---
@@ -244,12 +283,12 @@ const AutomationBuddy: React.FC = () => {
             let changed = currentIds.size !== prevIds.size;
             if (!changed) { // If size is same, check content
                 for (const id of currentIds) { if (!prevIds.has(id)) { changed = true; break; } }
-                // Optionally check if any were removed (less common to cause notification)
-                // if (!changed) { for (const id of prevIds) { if (!currentIds.has(id)) { changed = true; break; } } }
             }
 
-            // Only set notification if there was a change AND it's meaningful (not just loading indicator toggle)
-            const meaningfulChange = Array.from(currentIds).some(id => !id.includes('loading-indicator') && id !== 'img-replace-status') || Array.from(prevIds).some(id => !id.includes('loading-indicator') && id !== 'img-replace-status');
+            // Only set notification if there was a change AND it's meaningful
+            // (exclude loading indicators and potentially the image status which might flicker)
+            const meaningfulChange = Array.from(currentIds).some(id => !id.includes('loading-indicator') && !id.includes('img-replace-status'))
+                                || Array.from(prevIds).some(id => !id.includes('loading-indicator') && !id.includes('img-replace-status'));
 
             if (changed && meaningfulChange && !hasNewSuggestions) {
                 setHasNewSuggestions(true);
@@ -270,7 +309,7 @@ const AutomationBuddy: React.FC = () => {
 
     // --- Event Handlers (No change needed) ---
     const handleSuggestionClick = (suggestion: Suggestion) => {
-        if(suggestion.disabled)return; logger.log("Buddy Click:",suggestion.id); if(suggestion.action){ const r=suggestion.action(); if(!suggestion.id.startsWith('goto-')&&suggestion.id!=='loading-indicator'&&suggestion.id!=='toggle-settings-close'&& suggestion.id!=='toggle-settings-open' && suggestion.id !== 'img-replace-status'){setIsOpen(false);} else if(suggestion.id.startsWith('goto-')){setTimeout(()=>setIsOpen(false),300);} if(r instanceof Promise){r.catch(err=>{logger.error(`Buddy action (${suggestion.id}) error:`, err); toast.error(`Действие "${suggestion.text}" не удалось.`);});} } else {setIsOpen(false);}
+        if(suggestion.disabled)return; logger.log("Buddy Click:",suggestion.id); if(suggestion.action){ const r=suggestion.action(); if(!suggestion.id.startsWith('goto-')&&suggestion.id!=='loading-indicator'&&suggestion.id!=='toggle-settings-close'&& suggestion.id!=='toggle-settings-open' && suggestion.id !== 'img-replace-status' && !suggestion.id.startsWith('retry-fetch')){setIsOpen(false);} else if(suggestion.id.startsWith('goto-')){setTimeout(()=>setIsOpen(false),300);} if(r instanceof Promise){r.catch(err=>{logger.error(`Buddy action (${suggestion.id}) error:`, err); toast.error(`Действие "${suggestion.text}" не удалось.`);});} } else {setIsOpen(false);}
     };
     const handleOverlayClick = () => setIsOpen(false);
     const handleDialogClick = (e:React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
