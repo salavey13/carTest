@@ -1,18 +1,8 @@
 // MODIFICATIONS:
-// - Added `allFetchedFiles` state to hold all files fetched from the repo.
-// - Modified `setFilesFetched` to be `setFilesFetchedCombined` which now accepts and sets `allFetchedFiles`.
-// - In `setFilesFetchedCombined`:
-//     - Added logic to check for `imageReplaceTask` *after* files are fetched.
-//     - If task is active and target file exists in `allFiles`, trigger `assistantRef.current.handleDirectImageReplace` using `setTimeout` for safety.
-//     - If task is active but target file is *not* found, log error, show toast, clear task, set fetch status to error.
-//     - Included `assistantRef` in the dependency array.
-// - Added a new `WorkflowStep`: `files_fetched_image_replace`.
-// - Updated `currentStep` calculation logic to include the new step and prioritize image task flow.
-// - Updated `getXuinityMessage` to provide appropriate messages for the image replacement flow.
-// - Passed `allFetchedFiles` down in the context value.
-// - Updated initial context value to include `allFetchedFiles`.
-// - Updated dependencies for `useMemo` on `contextValue`.
-// - Added logging for the image replace trigger logic.
+// - Ensured `allFetchedFilesState` is included in the dependency array for `useMemo` that creates `contextValue`.
+// - Ensured `assistantRef` is included in the dependency array for `setFilesFetchedCombined`.
+// - Ensured `allFetchedFilesState` is included in the dependency array for the `useEffect` hook that calculates `currentStep`.
+// - Added more specific IDs to `scrollToSection` type.
 "use client";
 
 import React, {
@@ -136,7 +126,7 @@ interface RepoXmlPageContextType {
     setIsParsing: React.Dispatch<React.SetStateAction<boolean>>;
     setCurrentAiRequestId: React.Dispatch<React.SetStateAction<string | null>>;
     setImageReplaceTask: React.Dispatch<React.SetStateAction<ImageReplaceTask | null>>;
-    setAllFetchedFiles: React.Dispatch<React.SetStateAction<FileNode[]>>; // Keep direct setter? Maybe not needed if combined setter works. Let's remove for now.
+    // setAllFetchedFiles: React.Dispatch<React.SetStateAction<FileNode[]>>; // Keep direct setter? Maybe not needed if combined setter works. Let's remove for now.
 
     // Refs passed down (mutable, be careful)
     kworkInputRef: MutableRefObject<HTMLTextAreaElement | null>;
@@ -157,7 +147,8 @@ interface RepoXmlPageContextType {
     triggerGetOpenPRs: (repoUrl: string) => Promise<void>;
     updateRepoUrlInAssistant: (url: string) => void;
     getXuinityMessage: () => string; // Gets dynamic message for buddy
-    scrollToSection: (sectionId: 'fetcher' | 'kworkInput' | 'aiResponseInput' | 'executor' | 'prSection' | 'file-list-container' | 'response-input' | 'pr-form-container' | string) => void; // Added more specific IDs
+    // --- Added more specific IDs ---
+    scrollToSection: (sectionId: 'fetcher' | 'kworkInput' | 'aiResponseInput' | 'executor' | 'prSection' | 'file-list-container' | 'response-input' | 'pr-form-container' | string) => void;
 }
 
 
@@ -320,7 +311,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; fetcherRef: Mu
         }
         // --- End Image Task Trigger Logic ---
 
-    }, [imageReplaceTaskState, assistantRef]); // Added assistantRef as dependency
+    // --- Ensure assistantRef is dependency ---
+    }, [imageReplaceTaskState, assistantRef]);
 
 
     // === Calculate currentStep using useState and useEffect ===
@@ -381,6 +373,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; fetcherRef: Mu
             return prevStep;
         });
 
+    // --- Ensure allFetchedFilesState is dependency ---
     }, [
         isMounted, fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState,
         filesParsedState, requestCopiedState, primaryHighlightPathState, secondaryHighlightPathsState,
@@ -624,7 +617,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; fetcherRef: Mu
              return initialMinimalContextValue;
         }
 
-        logger.log("RepoXmlPageContext: Providing FULL context value (Client)");
+        // logger.log("RepoXmlPageContext: Providing FULL context value (Client)"); // Reduce verbosity
         return {
             fetchStatus: fetchStatusState, repoUrlEntered: repoUrlEnteredState, filesFetched: filesFetchedState,
             selectedFetcherFiles: selectedFetcherFilesState, kworkInputHasContent: kworkInputHasContentState, requestCopied: requestCopiedState,
@@ -648,8 +641,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; fetcherRef: Mu
             triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR,
             triggerUpdateBranch, triggerGetOpenPRs, updateRepoUrlInAssistant, getXuinityMessage, scrollToSection,
         };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ // Dependencies updated
+    // --- Ensure all state values are dependencies ---
+    }, [
         isMounted,
         fetchStatusState, repoUrlEnteredState, filesFetchedState, selectedFetcherFilesState, kworkInputHasContentState, requestCopiedState,
         aiResponseHasContentState, filesParsedState, selectedAssistantFilesState, assistantLoadingState, aiActionLoadingState, loadingPrsState,
@@ -678,9 +671,9 @@ export const useRepoXmlPageContext = (): RepoXmlPageContextType => {
     const context = useContext(RepoXmlPageContext);
     // No need to check for undefined here anymore if initial value is always provided
     // However, during development, a check might still be useful
-    if (context === initialMinimalContextValue) {
+    if (context === initialMinimalContextValue && typeof window !== 'undefined') { // Check only on client
         // This might happen briefly on initial client render before full context is ready
-        // console.warn("useRepoXmlPageContext: Consuming initial minimal context value. Wait for mount?");
+        console.warn("useRepoXmlPageContext: Consuming initial minimal context value. Wait for mount?");
     }
     return context;
 };

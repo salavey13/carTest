@@ -1,15 +1,8 @@
 // MODIFICATIONS:
-// - Separated logic for image replace task within `handleFetchManual`.
-// - Bypassed standard highlighting/selection when `imageReplaceTask` is active.
-// - Explicitly selected ONLY the target file in `selectedFilesState` and context (`setSelectedFetcherFiles`) during image task fetch.
-// - Checked if the target file exists *after* fetching and before proceeding. Handled error if not found.
-// - Prevented automatic call to `handleAddSelected` during image task fetch.
-// - Disabled irrelevant UI elements (Add Selected, Ask AI, Kwork Input, etc.) during image task flow.
-// - Added specific UI status display for image task fetch success.
-// - Updated auto-fetch and auto-dependency effects to ignore image task.
-// - Added logging for image task flow.
-// - Used `debugLogger` consistently.
-// - Ensured `setFilesFetched` (now `setFilesFetchedCombined` in context) is called even on target file not found error, but with success=false.
+// - Simplified logic in `handleFetchManual` for image task: Fetch files, check if target exists, call context's `setFilesFetched`. The context now handles triggering the assistant.
+// - Removed explicit setting of `selectedFilesState` / `setSelectedFetcherFiles` within `handleFetchManual` for the image task path, as the context trigger is sufficient. Local state is only for UI feedback if needed.
+// - Ensured `setPrimaryHighlightedPathState` is still set for UI feedback (like highlighting the row).
+// - Confirmed `setFilesFetched` (the context function) is called correctly in the `finally` block, passing the necessary info.
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useRef, useCallback, useMemo } from "react";
@@ -56,23 +49,23 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   const [repoUrl, setRepoUrlState] = useState<string>("https://github.com/salavey13/cartest");
   const [token, setToken] = useState<string>("");
   const [files, setFiles] = useState<FileNode[]>([]);
-  const [selectedFiles, setSelectedFilesState] = useState<Set<string>>(new Set());
+  const [selectedFiles, setSelectedFilesState] = useState<Set<string>>(new Set()); // Local state mainly for UI feedback
   const [progress, setProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
-  const [primaryHighlightedPath, setPrimaryHighlightedPathState] = useState<string | null>(null);
-  const [secondaryHighlightedPaths, setSecondaryHighlightedPathsState] = useState<Record<ImportCategory, string[]>>({ component: [], context: [], hook: [], lib: [], other: [] });
+  const [primaryHighlightedPath, setPrimaryHighlightedPathState] = useState<string | null>(null); // For UI highlight
+  const [secondaryHighlightedPaths, setSecondaryHighlightedPathsState] = useState<Record<ImportCategory, string[]>>({ component: [], context: [], hook: [], lib: [], other: [] }); // For UI highlight
 
   // === Контекст ===
    const {
       fetchStatus, setFetchStatus, repoUrlEntered, setRepoUrlEntered, filesFetched, setFilesFetched, // Using combined setFilesFetched from context
-      setSelectedFetcherFiles, kworkInputHasContent, setKworkInputHasContent, setRequestCopied,
+      setSelectedFetcherFiles, // Context's selection state (might not be needed for image task)
+      kworkInputHasContent, setKworkInputHasContent, setRequestCopied,
       aiActionLoading, currentStep, loadingPrs, assistantLoading, isParsing, currentAiRequestId,
       targetBranchName, setTargetBranchName, manualBranchName, setManualBranchName, openPrs, setOpenPrs,
       setLoadingPrs, isSettingsModalOpen, triggerToggleSettingsModal, kworkInputRef, triggerAskAi,
       triggerGetOpenPRs, updateRepoUrlInAssistant, scrollToSection,
       setFilesParsed, setAiResponseHasContent, setSelectedAssistantFiles, imageReplaceTask,
-      setAllFetchedFiles, // This setter is now handled by the combined setFilesFetched in context
-      allFetchedFiles // Read allFetchedFiles if needed, but context manages setting it
+      // allFetchedFiles is now managed and read via context
    } = useRepoXmlPageContext();
 
   // === Параметры URL и производное состояние ===
@@ -244,9 +237,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
        logger.log("Fetcher(Manual): Запускаем процесс.");
        setFetchStatus('loading');
        setError(null); setFiles([]); setSelectedFilesState(new Set()); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] });
-       // setAllFetchedFiles([]); // Context now handles this via setFilesFetched
-       setSelectedFetcherFiles(new Set());
-       // setFilesFetched(false, [], null, []); // Context now handles this
+       setSelectedFetcherFiles(new Set()); // Clear context selection too
        setRequestCopied(false); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set());
 
        // --- Specific Handling for Image Task ---
@@ -254,8 +245,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
            logger.log("Fetcher(Manual): Режим Замены Картинки - очистка Kwork, установка флага.");
            isImageTaskFetchInitiated.current = true; // Set flag HERE
            updateKworkInput(""); // Clear kwork for image task
-           setSelectedFilesState(new Set()); // Ensure selection is cleared for image task
-           setSelectedFetcherFiles(new Set());
        } else if (!highlightedPathFromUrl && localKworkInputRef.current) { // Standard flow prefill
            updateKworkInput(ideaFromUrl || DEFAULT_TASK_IDEA);
        }
@@ -265,7 +254,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
        logger.log("Fetcher(Manual): Симуляция запущена.");
 
        let result: Awaited<ReturnType<typeof fetchRepoContents>> | null = null;
-       let success = false;
+       let success = false; // Overall success of the fetch *and* finding the target file if needed
+       let fetchSucceeded = false; // Tracks if the API call itself was successful
        let finalStatus: FetchStatus = 'error'; // Default to error
        let fetchedFiles: FileNode[] = []; // Keep track of fetched files even on error
        let primaryHPath: string | null = null; // Keep track of primary path
@@ -275,36 +265,40 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
            result = await fetchRepoContents(repoUrl, token || undefined, effectiveBranch);
 
            if (result?.success && Array.isArray(result.files)) {
+               fetchSucceeded = true; // API call was good
                fetchedFiles = result.files; // Store fetched files immediately
                const allPaths = fetchedFiles.map(f => f.path);
                logger.log(`Fetcher(Manual): Успешно извлечено ${fetchedFiles.length} файлов из '${effectiveBranch}'.`);
-               success = true; // Assume success initially after fetch
-               finalStatus = 'success';
+               finalStatus = 'success'; // Assume success unless target missing etc.
+               success = true; // Assume overall success initially
 
                // === Image Replace Task Path ===
                if(imageReplaceTask){
                    logger.log(`Fetcher(Manual): Image Task - Проверка целевого файла ${imageReplaceTask.targetPath}`);
                    primaryHPath = imageReplaceTask.targetPath; // This IS the primary path for the image task
+                   setPrimaryHighlightedPathState(primaryHPath); // Set for UI highlight
+
                    if(!allPaths.includes(primaryHPath)){
                        const imgErr=`Файл (${primaryHPath}) не найден в '${effectiveBranch}'. Замена невозможна.`;
                        logger.error(`Fetcher(Manual): Image Task - ${imgErr}`);
                        setError(imgErr); addToast(imgErr,'error');
-                       finalStatus='error'; // Set status to error
-                       success = false; // Mark as overall failure for this specific flow
-                       // We still call setFilesFetched later to update allFiles in context
+                       finalStatus = 'error'; // Set fetch status to error
+                       success = false; // Mark overall operation as failed
+                       // No selection needed
+                       setSelectedFilesState(new Set());
+                       setSelectedFetcherFiles(new Set());
                    } else {
-                       logger.log(`Fetcher(Manual): Image Task - Целевой файл ${primaryHPath} найден. Выделяем его.`);
-                       const imageTaskSelection = new Set([primaryHPath]);
-                       setSelectedFilesState(imageTaskSelection); // Update local selection state
-                       setSelectedFetcherFiles(imageTaskSelection); // Update context selection state
-                       setPrimaryHighlightedPathState(primaryHPath); // Set primary highlight for UI feedback
-                       // No secondary highlights or important files for image task
-                       finalSecPaths = { component: [], context: [], hook: [], lib: [], other: [] };
+                       logger.log(`Fetcher(Manual): Image Task - Целевой файл ${primaryHPath} найден.`);
+                       // Explicitly DO NOT set selectedFetcherFiles here. Context trigger relies on file existing in allFetchedFiles.
+                       // We only set local state for UI feedback if needed (e.g., visual highlight).
+                       setSelectedFilesState(new Set([primaryHPath])); // Local selection for UI highlight only
                        addToast(`Файл для замены (${primaryHPath.split('/').pop()}) загружен.`, 'success');
                        if(isSettingsModalOpen) triggerToggleSettingsModal();
+                       // No secondary paths needed
+                       finalSecPaths = { component: [], context: [], hook: [], lib: [], other: [] };
                    }
                }
-               // === Standard Fetch Path ===
+               // === Standard Fetch Path (with URL params) ===
                else if (highlightedPathFromUrl){
                    logger.log(`Fetcher(Manual): Standard Task - Поиск основного файла для URL ${highlightedPathFromUrl}`);
                    primaryHPath = getPageFilePath(highlightedPathFromUrl, allPaths);
@@ -327,7 +321,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                                }
                            }
                        } else {
-                            primaryHPath = null;
+                            primaryHPath = null; // Reset if find fails (shouldn't happen if getPageFilePath worked)
                             const findErr = `Ошибка: Путь страницы для URL (${highlightedPathFromUrl}) не найден среди файлов.`;
                             logger.error(`Fetcher(Manual): Standard Task - ${findErr}`);
                             addToast(findErr, 'error');
@@ -346,8 +340,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                    setPrimaryHighlightedPathState(primaryHPath);
                    finalSecPaths = {component:Array.from(tempSecPaths.component), context:Array.from(tempSecPaths.context), hook:Array.from(tempSecPaths.hook), lib:Array.from(tempSecPaths.lib), other:Array.from(tempSecPaths.other)};
                    setSecondaryHighlightedPathsState(finalSecPaths);
-                   setSelectedFilesState(filesToSel); // Set selection based on logic above
-                   setSelectedFetcherFiles(filesToSel);
+                   setSelectedFilesState(filesToSel); // Set local selection for UI
+                   setSelectedFetcherFiles(filesToSel); // Set context selection
 
                    // Post-fetch actions for standard flow with URL params
                    if(ideaFromUrl && filesToSel.size > 0){
@@ -382,8 +376,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                // === Fallback: Standard Fetch without URL params ===
                else {
                    logger.log("Fetcher(Manual): Standard Task - Нет URL параметров, просто загрузка всех файлов.");
-                   setFiles(fetchedFiles);
-                   // setAllFetchedFiles(fetchedFiles); // Context handles this
+                   setFiles(fetchedFiles); // Set local files for display
                    // No automatic selection or kwork update
                    addToast(`Извлечено ${fetchedFiles.length} файлов!`, 'success');
                    if(isSettingsModalOpen) triggerToggleSettingsModal();
@@ -392,6 +385,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                    }
                }
            } else { // Handle failure from fetchRepoContents directly
+               fetchSucceeded = false;
+               success = false;
                throw new Error(result?.error || `Не удалось получить файлы из ${effectiveBranch}.`);
            }
        } catch (err: any) { // Catch errors from fetchRepoContents or logic above
@@ -399,22 +394,23 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
            logger.error(`Fetcher(Manual): Ошибка в процессе извлечения - ${displayError}`, err);
            setError(displayError);
            addToast(`Ошибка извлечения: ${displayError}`, 'error');
-           success = false; // Ensure success is false
+           success = false; // Ensure overall success is false
            finalStatus = 'error';
            // Ensure state is reset visually, context update happens in finally
            setFiles([]);
            setSelectedFilesState(new Set());
            setPrimaryHighlightedPathState(null);
            setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] });
-           // setFilesFetched(false, [], null, []); // Context update in finally
        }
        finally {
            stopProgressSimulation();
-           setProgress(success ? 100 : 0);
-           setFetchStatus(finalStatus); // Update context status
-           // CRITICAL: Update context with fetched files (even if error occurred finding target), highlights, and fetch success status
-           setFilesFetched(success, fetchedFiles, primaryHPath, Object.values(finalSecPaths).flat());
-           setFiles(fetchedFiles); // Update local files state for UI rendering
+           setProgress(success ? 100 : 0); // Progress reflects overall success (including finding target file if image task)
+           setFetchStatus(finalStatus); // Update context status reflects fetch outcome / target find outcome
+           // CRITICAL: Update context with fetched files, highlights, and fetch completion status
+           // The 'fetched' flag passed here indicates the fetch attempt completed.
+           // The success/failure of the *image replace* task is determined later in the context setter based on whether the target file exists in `fetchedFiles`.
+           setFilesFetched(fetchSucceeded, fetchedFiles, primaryHPath, Object.values(finalSecPaths).flat());
+           setFiles(fetchedFiles); // Update local files state for UI rendering LAST
 
            if (imageReplaceTask) {
                // Reset initiation flag ONLY if the fetch itself failed, or if the overall flow failed (success is false)
@@ -423,12 +419,12 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                     isImageTaskFetchInitiated.current = false;
                }
            }
-           logger.log(`Fetcher(Manual): Завершено. Успех (общий): ${success}, Финальный статус: ${finalStatus}`);
+           logger.log(`Fetcher(Manual): Завершено. Успех API: ${fetchSucceeded}, Успех Общий: ${success}, Финальный статус: ${finalStatus}`);
        }
    }, [ // Dependencies updated
        repoUrl, token, imageReplaceTask, targetBranchName, manualBranchName, assistantLoading, isParsing,
        aiActionLoading, setFetchStatus, setError, setFiles, setSelectedFilesState, setPrimaryHighlightedPathState,
-       setSecondaryHighlightedPathsState, /*setAllFetchedFiles,*/ setSelectedFetcherFiles, setFilesFetched, // Using combined context setter
+       setSecondaryHighlightedPathsState, setSelectedFetcherFiles, setFilesFetched, // Using combined context setter
        setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, addToast,
        startProgressSimulation, stopProgressSimulation, triggerToggleSettingsModal, updateKworkInput,
        highlightedPathFromUrl, ideaFromUrl, DEFAULT_TASK_IDEA, importantFiles, isSettingsModalOpen, handleAddSelected,
@@ -616,7 +612,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                     id="file-list-container"
                     files={files}
                     selectedFiles={selectedFiles}
-                    primaryHighlightedPath={primaryHighlightedPath}
+                    primaryHighlightedPath={primaryHighlightedPath} // Used for UI highlight
                     secondaryHighlightedPaths={secondaryHighlightedPaths}
                     importantFiles={importantFiles}
                     isLoading={isLoading}
