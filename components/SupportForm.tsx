@@ -8,13 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { logger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
-import { FaPaperPlane } from "react-icons/fa6"; // Add an icon
+import { FaPaperPlane, FaArrowsSpin } from "react-icons/fa6"; // Import FaArrowsSpin
 
 export default function SupportForm() {
   const contextValue = useAppContext();
   const [level, setLevel] = useState("1");
   const [message, setMessage] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false); // Add loading state for button
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   if (!contextValue) {
@@ -40,17 +40,16 @@ export default function SupportForm() {
       return;
     }
 
-    setIsSubmitting(true); // Start loading state
+    setIsSubmitting(true);
 
-    const amount = parseInt(level) * 1000; // 1 звезда = 1000 XTR
-    // Refined descriptions for clarity and value perception
+    const amount = parseInt(level) * 1000;
     const descriptions: Record<string, string> = {
         "1": "Базовая консультация/поддержка",
         "2": "Углубленная консультация/приоритетная поддержка",
         "3": "Стратегическая сессия/VIP поддержка",
     };
     const description = `${descriptions[level]}: ${message || 'Обсудить детали задачи'}`;
-    const payload = `support_${user.id}_${Date.now()}_lvl${level}`; // Added level to payload
+    const payload = `support_${user.id}_${Date.now()}_lvl${level}`;
     const title = `Заявка на Поддержку VIBE (${level} ★)`;
 
     try {
@@ -71,7 +70,7 @@ export default function SupportForm() {
       toast({
         title: "Заявка Отправлена!",
         description: "Счет на оплату поддержки отправлен вам в Telegram. Проверьте сообщения.",
-        variant: "success", // Use success variant
+        variant: "success",
       });
       setMessage("");
       setLevel("1");
@@ -83,18 +82,17 @@ export default function SupportForm() {
         variant: "destructive",
       });
     } finally {
-       setIsSubmitting(false); // End loading state
+       setIsSubmitting(false);
     }
   };
 
   return (
-    // Form with clearer instruction priming the user for action
     <form onSubmit={handleSubmit} className="space-y-5">
        <p className="text-sm text-gray-400 text-center font-mono">
          Опиши задачу, выбери приоритет. Получи помощь на пути SelfDev. <br/> (Оплата через Telegram Stars - XTR)
        </p>
       <Input
-        placeholder="Какую проблему ты хочешь решить сейчас?" // More direct question
+        placeholder="Какую проблему ты хочешь решить сейчас?"
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         required
@@ -106,7 +104,6 @@ export default function SupportForm() {
           <SelectValue placeholder="Уровень поддержки/приоритет" />
         </SelectTrigger>
         <SelectContent className="bg-gray-950 text-white border border-brand-green/50">
-          {/* Slightly refined labels */}
           <SelectItem value="1">★ Базовая Консультация (1000 XTR)</SelectItem>
           <SelectItem value="2">★★ Приоритетная Помощь (2000 XTR)</SelectItem>
           <SelectItem value="3">★★★ Стратегическая Сессия (3000 XTR)</SelectItem>
@@ -114,17 +111,18 @@ export default function SupportForm() {
       </Select>
       <Button
         type="submit"
-        disabled={!user || isSubmitting} // Disable if not logged in OR submitting
+        disabled={!user || isSubmitting}
         className={cn(
-            "w-full text-black rounded-lg font-semibold transition-all duration-300 ease-in-out flex items-center justify-center space-x-2 text-base py-3", // Increased padding/size
+            "w-full text-black rounded-full font-semibold transition-all duration-300 ease-in-out flex items-center justify-center space-x-2 text-base py-3", // Changed rounded-lg to rounded-full
             "bg-brand-green hover:bg-brand-green/80 shadow-[0_0_12px_rgba(0,255,157,0.6)] hover:shadow-[0_0_18px_rgba(0,255,157,0.8)]",
-            "disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed disabled:shadow-none disabled:opacity-60" // Clearer disabled state
+            "disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed disabled:shadow-none disabled:opacity-60"
             )}
        >
         {isSubmitting ? (
             <> <FaArrowsSpin className="animate-spin mr-2" /> Обработка... </>
         ) : user ? (
-            <> <FaPaperPlane className="mr-2" /> Отправить Запрос на Поддержку </>
+            // Shortened Russian text
+            <> <FaPaperPlane className="mr-2" /> Запросить Поддержку </>
         ) : (
             "Войдите через Telegram для Отправки"
         )}
