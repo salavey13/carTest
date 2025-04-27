@@ -1,20 +1,33 @@
 import type React from "react";
 import Script from "next/script";
+import { Suspense } from 'react'; // <-- Import Suspense
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import StickyChatButton from "@/components/StickyChatButton";
+import StickyChatButton from "@/components/StickyChatButton"; // <-- Component to wrap
 import { AppProvider } from "@/contexts/AppContext";
 import { Toaster } from "sonner";
 import "./globals.css";
 import { cn } from "@/lib/utils";
-import type { Metadata, Viewport } from 'next'; // Import Viewport type
-import { TooltipProvider } from "@/components/ui/tooltip"; // <--- IMPORT TooltipProvider
+import type { Metadata, Viewport } from 'next';
+import { TooltipProvider } from "@/components/ui/tooltip";
+
+// --- Fallback component for StickyChatButton ---
+// Displayed while the client-side hook useSearchParams resolves
+function LoadingChatButtonFallback() {
+  // Basic visual placeholder matching the FAB's likely position and size
+  return (
+    <div
+        className="fixed bottom-4 left-4 z-40 w-12 h-12 rounded-full bg-gray-700 animate-pulse"
+        aria-hidden="true"
+    ></div>
+  );
+}
+// ------------------------------------------
 
 // Define Metadata (WITHOUT viewport)
 export const metadata: Metadata = {
   title: "V0 Car Test App",
   description: "Find your perfect V0 car.",
-  // Viewport removed from here
   // Add other metadata like icons, openGraph, etc. if needed
   // icons: { icon: '/favicon.ico' },
 };
@@ -54,7 +67,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <main className="flex-1">
               {children}
             </main>
-            <StickyChatButton />
+            {/* Wrap StickyChatButton in Suspense */}
+            <Suspense fallback={<LoadingChatButtonFallback />}>
+              <StickyChatButton />
+            </Suspense>
             <Footer />
             <Toaster
               position="bottom-right"
@@ -71,7 +87,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               }}
             />
           </AppProvider>
-        </TooltipProvider> {/* <--- CLOSE TooltipProvider */}
+        </TooltipProvider>
       </body>
     </html>
   );
