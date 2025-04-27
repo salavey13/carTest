@@ -155,8 +155,8 @@ const RepoXmlPageContext = createContext<RepoXmlPageContextType>(initialMinimalC
 export const RepoXmlPageProvider: React.FC<{ children: ReactNode; fetcherRef: MutableRefObject<RepoTxtFetcherRef | null>; assistantRef: MutableRefObject<AICodeAssistantRef | null>; kworkInputRef: MutableRefObject<HTMLTextAreaElement | null>; aiResponseInputRef: MutableRefObject<HTMLTextAreaElement | null>; prSectionRef: MutableRefObject<HTMLElement | null>; }> = ({ children, fetcherRef: passedFetcherRef, assistantRef: passedAssistantRef, kworkInputRef: passedKworkRef, aiResponseInputRef: passedAiResponseRef }) => {
     const [isMounted, setIsMounted] = useState(false); // Track client mount
     const [fetchStatusState, setFetchStatusState] = useState<FetchStatus>('idle');
-    const [repoUrlEnteredState, setRepoUrlEnteredState] = useState<boolean>(false);
-    const [filesFetchedState, setFilesFetchedState] = useState<boolean>(false); // True if fetch completed (success or error)
+    const [repoUrlEnteredState, setRepoUrlEnteredState] = useState<boolean>(false); // FIX: Initialize based on known default? No, let Fetcher handle it via useEffect.
+    const [filesFetchedState, setFilesFetchedState] = useState<boolean>(false); // True if fetch attempt completed (success or error)
     const [primaryHighlightPathState, setPrimaryHighlightPathState] = useState<string | null>(null);
     const [secondaryHighlightPathsState, setSecondaryHighlightPathsState] = useState<string[]>([]);
     const [selectedFetcherFilesState, setSelectedFetcherFilesState] = useState<Set<string>>(new Set());
@@ -280,7 +280,10 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; fetcherRef: Mu
             else if (isParsingState) calculatedStep = 'parsing_response';
             else if (aiActionLoadingState) calculatedStep = 'generating_ai_response'; // Only AI gen
             else if (assistantLoadingState) calculatedStep = 'generating_ai_response'; // Assistant processing PR/update
-            else if (!filesFetchedState) calculatedStep = 'ready_to_fetch';
+            else if (!filesFetchedState) {
+                // FIX: Check repoUrlEntered here to ensure Buddy doesn't skip to asking for URL if default is set but fetcher hasn't run yet
+                calculatedStep = repoUrlEnteredState ? 'ready_to_fetch' : 'idle'; // If URL is entered (even default), it's ready to fetch
+            }
             else if (!kworkInputHasContentState) {
                 if (primaryHighlightPathState || secondaryHighlightPathsState.length > 0) calculatedStep = 'files_fetched_highlights';
                 else if (selectedFetcherFilesState.size > 0) calculatedStep = 'files_selected';
@@ -296,8 +299,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; fetcherRef: Mu
             else calculatedStep = 'idle'; // Fallback
         }
         setCurrentStep(prevStep => { if (prevStep !== calculatedStep) { logger.log(`Context Step Updated: ${prevStep} -> ${calculatedStep}`); return calculatedStep; } return prevStep; });
-    // Added assistantLoadingState to dependencies for more accurate step updates
-    }, [ isMounted, fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState, filesParsedState, requestCopiedState, primaryHighlightPathState, secondaryHighlightPathsState, selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, allFetchedFilesState, assistantLoadingState ]);
+    // Added repoUrlEnteredState to dependencies for ready_to_fetch calculation
+    }, [ isMounted, fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState, filesParsedState, requestCopiedState, primaryHighlightPathState, secondaryHighlightPathsState, selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, allFetchedFilesState, assistantLoadingState, repoUrlEnteredState ]);
 
 
     // --- Triggers (wrapped in useCallback for stability) ---
@@ -434,7 +437,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; fetcherRef: Mu
          // Standard Workflow Messages
          switch (currentStep) {
              case 'idle': return "Готов к работе! Введи URL репо.";
-             case 'ready_to_fetch': return repoUrlEnteredState ? `URL вижу! Жми "Извлечь файлы" для ветки '${manualBranchNameState || targetBranchNameState || 'default'}'.` : "Жду URL репозитория в настройках...";
+             // FIX: Display "Fetch Files" message correctly even if repoUrlEntered is momentarily false due to timing
+             case 'ready_to_fetch': return repoUrlEnteredState ? `URL вижу! Жми "Извлечь файлы" для ветки '${manualBranchNameState || targetBranchNameState || 'default'}'.` : "Жду URL репозитория в настройках (или использую дефолтный)..."; // Adjusted message
              case 'fetching': return `Тяну файлы из ветки '${manualBranchNameState || targetBranchNameState || 'default'}'. Минутку...`;
              case 'fetch_failed': return "Упс! Не смог загрузить файлы. Попробуй еще раз или проверь URL/токен/ветку.";
              case 'files_fetched': return "Файлы загружены! Что будем делать? Можешь выбрать файлы или сразу спросить AI.";
@@ -443,6 +447,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; fetcherRef: Mu
              case 'request_written': return "Отличный запрос! Теперь жми 'Спросить AI' или скопируй текст.";
              case 'request_copied': return "Запрос скопирован! Жду твоего ответа от AI в поле ниже.";
              case 'generating_ai_response': // Handles both AI generation and PR processing
+                 // FIX: Replace isWaitingForAi with aiActionLoading check
                  return aiActionLoadingState ? `Думаю... AI генерирует ответ (ID: ${currentAiRequestIdState?.substring(0, 6)}...).` : assistantLoadingState ? "⚙️ Обработка PR/Ветки..." : "⏳ Обработка...";
              case 'response_pasted': return "Вижу ответ AI! Жми 'Разобрать Ответ' (➡️), чтобы я проверил код.";
              case 'parsing_response': return "Анализирую код из ответа AI...";
@@ -453,7 +458,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; fetcherRef: Mu
                  return assistantLoadingState ? "⚙️ Обработка PR/Ветки..." : `Код готов! Жми '${actionText}' ${fileCountText}.`;
              default: return "Давай что-нибудь замутим!";
          }
-     // Added assistantLoadingState, aiActionLoadingState to dependencies
+     // Added assistantLoadingState, aiActionLoadingState, repoUrlEnteredState to dependencies
      }, [ isMounted, currentStep, repoUrlEnteredState, manualBranchNameState, targetBranchNameState, primaryHighlightPathState, secondaryHighlightPathsState.length, selectedFetcherFilesState.size, selectedAssistantFilesState.size, currentAiRequestIdState, imageReplaceTaskState, assistantLoadingState, aiActionLoadingState ]);
 
 

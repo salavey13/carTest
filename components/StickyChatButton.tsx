@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation"; // Import useSearchParams
 import { motion, AnimatePresence } from "framer-motion";
 import {
     FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
@@ -23,6 +23,7 @@ import { getGitHubUserProfile } from "@/app/actions_github/actions";
 
 // --- Constants & Types ---
 const AUTO_OPEN_DELAY_MS = 13000;
+const AUTO_OPEN_DELAY_MS_SIMPLE_CASE = 42000; // <-- NEW: Delay for simple case
 const CHARACTER_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/character-images/public/x13.png";
 const CHARACTER_ALT_TEXT = "Xuinity Assistant";
 const HIRE_ME_TEXT = "Найми меня! ✨";
@@ -34,6 +35,7 @@ interface Suggestion {
     id: string;
     text: string;
     link?: string;
+    action?: () => void; // <-- Action added for image replace trigger
     icon?: React.ReactNode;
     isHireMe?: boolean;
     isFixAction?: boolean;
@@ -130,6 +132,7 @@ const StickyChatButton: React.FC = () => {
     // --- Hooks ---
     const currentPath = usePathname();
     const router = useRouter();
+    const searchParams = useSearchParams(); // <-- Get search params
     const { user: appContextUser, isLoading: isAppLoading } = useAppContext();
 
     // --- Fetch GitHub Profile ---
@@ -167,10 +170,10 @@ const StickyChatButton: React.FC = () => {
 
         // Add Image Replace Trigger IF an image URL is detected
         if (potentialOldImageUrl && !isToolPage && !showReplaceTool) {
-            baseSuggestions.unshift({
+            baseSuggestions.unshift({ // Add to the beginning
                 id: REPLACE_IMAGE_ID,
                 text: "Заменить Картинку? 🖼️",
-                action: () => setShowReplaceTool(true),
+                action: () => setShowReplaceTool(true), // Use action instead of link
                 icon: <FaImages className="mr-1.5 text-blue-400" />,
                 tooltip: `Начать процесс замены картинки: ${potentialOldImageUrl.substring(0, 30)}...`
             });
@@ -203,8 +206,22 @@ const StickyChatButton: React.FC = () => {
     }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading, prevGithubLoading, currentPath, potentialOldImageUrl, showReplaceTool]);
 
 
-    // --- Auto-open Timer ---
-    useEffect(() => { if (!hasAutoOpened && !isOpen) { const timer = setTimeout(() => { setIsOpen(true); setHasAutoOpened(true); }, AUTO_OPEN_DELAY_MS); return () => clearTimeout(timer); } }, [hasAutoOpened, isOpen]);
+    // --- Auto-open Timer (Modified for simple case) ---
+    useEffect(() => {
+        let t: NodeJS.Timeout | null = null;
+        if (!hasAutoOpened && !isOpen) {
+            // Determine delay based on search params
+            const hasParams = searchParams.has("path") || searchParams.has("idea");
+            const delayMs = hasParams ? AUTO_OPEN_DELAY_MS : AUTO_OPEN_DELAY_MS_SIMPLE_CASE;
+            console.log(`StickyChat: Setting auto-open timer for ${delayMs}ms (hasParams: ${hasParams})`);
+            t = setTimeout(() => {
+                 setIsOpen(true);
+                 setHasAutoOpened(true);
+                 console.log(`StickyChat: Auto-opened after ${delayMs}ms`);
+             }, delayMs);
+             return () => { if (t) clearTimeout(t); };
+        }
+    }, [hasAutoOpened, isOpen, searchParams]); // Added searchParams dependency
 
     // --- Handle Escape Key ---
     const handleEscKey = useCallback((event: KeyboardEvent) => { if (event.key === 'Escape' && isOpen) { setIsOpen(false); setShowReplaceTool(false); } }, [isOpen]);
@@ -232,7 +249,7 @@ const StickyChatButton: React.FC = () => {
         console.log("(StickyChat) Suggestion Clicked:", suggestion.id, suggestion.action);
 
         if (suggestion.action) {
-            suggestion.action();
+            suggestion.action(); // Execute the action (e.g., setShowReplaceTool(true))
         } else if (suggestion.link) {
             let finalLink = suggestion.link;
             // Format link if custom idea exists (and not image replace trigger)
@@ -248,10 +265,13 @@ const StickyChatButton: React.FC = () => {
                  toast.info("🚀 Перехожу...");
             }
             router.push(finalLink);
-            setIsOpen(false);
+            setIsOpen(false); // Close after navigation
         }
 
-        if (suggestion.id !== REPLACE_IMAGE_ID) { setIsOpen(false); }
+        // Close only if it wasn't the trigger to show the replace tool
+        if (suggestion.id !== REPLACE_IMAGE_ID) {
+            setIsOpen(false);
+        }
     };
 
     const handleReplaceConfirmed = (newImageUrl: string) => {
@@ -275,20 +295,27 @@ const StickyChatButton: React.FC = () => {
         // setCustomIdea(""); // Maybe clear the input? Or let user edit?
     };
 
-    const handleOverlayClick = () => { setIsOpen(false); setShowReplaceTool(false); };
+    const handleOverlayClick = () => {
+        setIsOpen(false);
+        setShowReplaceTool(false);
+        // FIX: Try to return focus to the body
+        requestAnimationFrame(() => document.body.focus());
+    };
     const handleDialogClick = (e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
     const handleFabClick = () => {
-        const willOpen = !isOpen;
-        setIsOpen(willOpen);
-        if (willOpen) {
-            setHasAutoOpened(true);
-            setShowReplaceTool(false); // Ensure tool closed on open
-            setCustomIdea(""); // Clear idea on open
-            setPotentialOldImageUrl(null);
-        } else {
-            setShowReplaceTool(false); // Ensure tool closed on close
-        }
-    };
+         const willOpen = !isOpen;
+         setIsOpen(willOpen);
+         if (willOpen) {
+             setHasAutoOpened(true);
+             setShowReplaceTool(false); // Ensure tool closed on open
+             setCustomIdea(""); // Clear idea on open
+             setPotentialOldImageUrl(null);
+         } else {
+             setShowReplaceTool(false); // Ensure tool closed on close
+             // FIX: Try to return focus to the body when closing via FAB
+             requestAnimationFrame(() => document.body.focus());
+         }
+     };
 
     // --- Render Logic ---
     const showInputArea = isOpen && !showReplaceTool && currentPath !== '/repo-xml';

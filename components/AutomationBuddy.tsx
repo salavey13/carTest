@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { useSearchParams } from "next/navigation"; // Import useSearchParams
 import {
     FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
     FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard,
@@ -23,6 +24,7 @@ import { debugLogger as logger } from '@/lib/debugLogger'; // Use debugLogger
 
 // --- Constants & Types ---
 const AUTO_OPEN_DELAY_MS_BUDDY = 4000;
+const AUTO_OPEN_DELAY_MS_BUDDY_SIMPLE_CASE = 42000; // <-- NEW: Delay for simple case
 const BUDDY_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/character-images/public/x13.png";
 const BUDDY_ALT_TEXT = "Automation Buddy";
 
@@ -54,6 +56,9 @@ const AutomationBuddy: React.FC = () => {
     const previousSuggestionIds = useRef<Set<string>>(new Set());
     // Use useState for suggestions for reliability with useEffect updates
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+
+    // --- Hooks ---
+    const searchParams = useSearchParams(); // <-- Get search params
 
     // --- Context ---
     const {
@@ -215,7 +220,8 @@ const AutomationBuddy: React.FC = () => {
 
              switch (currentStep) {
                  case 'ready_to_fetch':
-                     addSuggestion("fetch", `Извлечь Файлы${branchInfo}`, () => triggerFetch(false, effectiveBranch || null), <FaDownload />, true, !repoUrlEntered, !repoUrlEntered ? "Сначала укажи URL" : "");
+                     // FIX: Display "Fetch Files" even if repoUrlEntered is momentarily false, as long as there's a URL (which there is by default)
+                     addSuggestion("fetch", `Извлечь Файлы${branchInfo}`, () => triggerFetch(false, effectiveBranch || null), <FaDownload />, true, false, ""); // Always enable if not loading, as there's a default URL
                      break;
                  case 'fetching':
                      addSuggestion("loading-indicator", `Загрузка Файлов${branchInfo}...`, () => {}, <FaArrowsRotate className="animate-spin"/>, true, true );
@@ -225,21 +231,25 @@ const AutomationBuddy: React.FC = () => {
                      break;
                  case 'files_fetched':
                      addSuggestion("goto-files", "К Списку Файлов", () => scrollToSection('file-list-container'), <FaEye />, true);
-                     addSuggestion("ask-ai-empty", "🤖 Спросить AI", triggerAskAi, <FaRobot />, true, false, isWaitingForAi ? "Запрос уже отправлен" : "");
+                     // FIX: Replace isWaitingForAi with isAiGenerating
+                     addSuggestion("ask-ai-empty", "🤖 Спросить AI", triggerAskAi, <FaRobot />, true, false, isAiGenerating ? "Запрос уже отправлен" : "");
                      break;
                  case 'files_fetched_highlights':
                      addSuggestion("select-highlighted", "Выбрать Связанные", triggerSelectHighlighted, <FaHighlighter />, true);
                      addSuggestion("goto-files", "К Списку Файлов", () => scrollToSection('file-list-container'), <FaEye />, true);
                      addSuggestion("add-selected", "Добавить (+) => Запрос", () => triggerAddSelectedToKwork(false), <FaPlus />, selectedFetcherFiles.size > 0, false, "Добавить выбранные файлы в поле запроса");
-                     addSuggestion("ask-ai-highlights", "🤖 Спросить AI (с Добавл.)", async () => { await triggerAddSelectedToKwork(false); await triggerAskAi(); }, <FaRobot />, selectedFetcherFiles.size > 0, false, isWaitingForAi ? "Запрос уже отправлен" : "Добавить выбранные и сразу спросить AI");
+                     // FIX: Replace isWaitingForAi with isAiGenerating
+                     addSuggestion("ask-ai-highlights", "🤖 Спросить AI (с Добавл.)", async () => { await triggerAddSelectedToKwork(false); await triggerAskAi(); }, <FaRobot />, selectedFetcherFiles.size > 0, false, isAiGenerating ? "Запрос уже отправлен" : "Добавить выбранные и сразу спросить AI");
                     break;
                  case 'files_selected':
                     addSuggestion("add-selected", "Добавить (+) => Запрос", () => triggerAddSelectedToKwork(false), <FaPlus />, true, false, "Добавить выбранные файлы в поле запроса");
-                    addSuggestion("ask-ai-selected", "🤖 Спросить AI (с Добавл.)", async () => { await triggerAddSelectedToKwork(false); await triggerAskAi(); }, <FaRobot />, true, false, isWaitingForAi ? "Запрос уже отправлен" : "Добавить выбранные и сразу спросить AI");
+                    // FIX: Replace isWaitingForAi with isAiGenerating
+                    addSuggestion("ask-ai-selected", "🤖 Спросить AI (с Добавл.)", async () => { await triggerAddSelectedToKwork(false); await triggerAskAi(); }, <FaRobot />, true, false, isAiGenerating ? "Запрос уже отправлен" : "Добавить выбранные и сразу спросить AI");
                     addSuggestion("goto-kwork", "К Полю Запроса", () => scrollToSection('kwork-input-section'), <FaKeyboard />, true);
                     break;
                  case 'request_written':
-                     addSuggestion("ask-ai-written", "🤖 Спросить AI", triggerAskAi, <FaRobot />, true, false, isWaitingForAi ? "Запрос уже отправлен" : "");
+                     // FIX: Replace isWaitingForAi with isAiGenerating
+                     addSuggestion("ask-ai-written", "🤖 Спросить AI", triggerAskAi, <FaRobot />, true, false, isAiGenerating ? "Запрос уже отправлен" : "");
                      addSuggestion("copy-kwork", "Скопировать Запрос", triggerCopyKwork, <FaCopy />, true, !kworkInputHasContent, !kworkInputHasContent ? "Запрос пуст" : "");
                      addSuggestion("goto-kwork", "К Полю Запроса", () => scrollToSection('kwork-input-section'), <FaKeyboard />, true);
                      break;
@@ -306,6 +316,7 @@ const AutomationBuddy: React.FC = () => {
             previousSuggestionIds.current = currentIds;
         } else {
             let changed = currentIds.size !== prevIds.size || ![...currentIds].every(id => prevIds.has(id));
+            // Check if change is "meaningful" (not just loading indicator changes)
             const meaningfulChange = [...currentIds].some(id => !id.includes('loading-indicator') && !id.includes('img-replace-status')) ||
                                    [...prevIds].some(id => !id.includes('loading-indicator') && !id.includes('img-replace-status'));
 
@@ -313,14 +324,29 @@ const AutomationBuddy: React.FC = () => {
                 setHasNewSuggestions(true);
                 logger.log("Buddy: New suggestions available!");
             }
+             // Update previous IDs only if there was *any* change, meaningful or not
              if(changed) {
                  previousSuggestionIds.current = currentIds;
              }
         }
     }, [isMounted, suggestions, isOpen, hasNewSuggestions]);
 
-    // --- Auto-open Timer ---
-    useEffect(() => { let t:NodeJS.Timeout|null=null; if(isMounted && !hasAutoOpened&&!isOpen){t=setTimeout(()=>{setIsOpen(true);setHasAutoOpened(true);},AUTO_OPEN_DELAY_MS_BUDDY);} return()=>{if(t)clearTimeout(t);}; }, [isMounted, hasAutoOpened, isOpen]);
+    // --- Auto-open Timer (Modified for simple case) ---
+    useEffect(() => {
+        let t: NodeJS.Timeout | null = null;
+        if (isMounted && !hasAutoOpened && !isOpen) {
+            // Determine delay based on search params
+            const hasParams = searchParams.has("path") || searchParams.has("idea");
+            const delayMs = hasParams ? AUTO_OPEN_DELAY_MS_BUDDY : AUTO_OPEN_DELAY_MS_BUDDY_SIMPLE_CASE;
+            logger.log(`Buddy: Setting auto-open timer for ${delayMs}ms (hasParams: ${hasParams})`);
+            t = setTimeout(() => {
+                setIsOpen(true);
+                setHasAutoOpened(true);
+                logger.log(`Buddy: Auto-opened after ${delayMs}ms`);
+            }, delayMs);
+        }
+        return () => { if (t) clearTimeout(t); };
+    }, [isMounted, hasAutoOpened, isOpen, searchParams]); // Added searchParams dependency
 
     // --- Handle Escape Key ---
     const handleEscKey = useCallback((e:KeyboardEvent) => { if(e.key==='Escape'&&isOpen)setIsOpen(false);}, [isOpen]);
@@ -336,9 +362,23 @@ const AutomationBuddy: React.FC = () => {
                  setTimeout(() => setIsOpen(false), 300);
              } if(r instanceof Promise){r.catch(err=>{logger.error(`Buddy action (${suggestion.id}) error:`, err); toast.error(`Действие "${suggestion.text}" не удалось.`);});} } else {setIsOpen(false);} // Close if no action defined
     };
-    const handleOverlayClick = () => setIsOpen(false);
+    const handleOverlayClick = () => {
+        setIsOpen(false);
+        // FIX: Try to return focus to the body
+        requestAnimationFrame(() => document.body.focus());
+    };
     const handleDialogClick = (e:React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
-    const handleFabClick = () => { setIsOpen(!isOpen); if(!isOpen){setHasAutoOpened(true);setHasNewSuggestions(false);} };
+    const handleFabClick = () => {
+        setIsOpen(prev => {
+             const nextOpen = !prev;
+             if (!nextOpen) {
+                 // FIX: Try to return focus to the body when closing via FAB
+                 requestAnimationFrame(() => document.body.focus());
+             }
+             return nextOpen;
+        });
+        if(!isOpen){setHasAutoOpened(true);setHasNewSuggestions(false);}
+    };
 
     // --- Render Logic ---
     if (!isMounted) {
