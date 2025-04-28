@@ -5,14 +5,16 @@ import { NextPage } from 'next';
 import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Card, CardContent, CardHeader } from "@/components/ui/card"; // Removed CardTitle as it wasn't used
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
   FaLeaf, FaDna, FaMicroscope, FaTree, FaPaw, FaBug,
   FaSeedling, FaWater, FaSun, FaFish,
-  FaBookOpen, FaFlask, FaGlobe, FaBacteria, FaQuestionCircle, FaRecycle, FaBalanceScale // Added Recycle, BalanceScale
+  FaBookOpen, FaFlask, FaGlobe, FaBacteria, FaQuestionCircle, FaRecycle, FaBalanceScale,
+  FaBrain, // Icon for Easter Egg
+  FaGrinStars // Icon for Easter Egg
 } from "react-icons/fa";
 
 // --- Tooltip Descriptions (Kept the original Russian text) ---
@@ -28,52 +30,67 @@ const tooltipDescriptions: Record<string, string> = {
 
 // --- Updated Image URLs ---
 const imageUrls: Record<string, string> = {
-  'bio-cell-*.png': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/bio6/bio61.png',
-  'bio-photosynthesis-*.png': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/bio6/bio62.png',
-  'bio-plant-organs-*.png': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/bio6/bio63.png',
-  'bio-classification-*.png': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/bio6/bio64.png',
-  'bio-food-chain-*.png': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/bio6/bio65.png',
-  'bio-ecosystem-*.png': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/bio6/bio66.png',
-  'bio-human-impact-*.png': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/bio6/bio67.png',
+  'bio-cell-*.png': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/bio6/bio61.png', // This is likely portrait
+  'bio-photosynthesis-*.png': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/bio6/bio62.png', // Landscape
+  'bio-plant-organs-*.png': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/bio6/bio63.png', // This is likely portrait
+  'bio-classification-*.png': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/bio6/bio64.png', // Square-ish
+  'bio-food-chain-*.png': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/bio6/bio65.png', // Landscape
+  'bio-ecosystem-*.png': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/bio6/bio66.png', // Square-ish
+  'bio-human-impact-*.png': 'https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/vprtests/bio6/bio67.png', // Landscape
 };
 
 // --- Component ---
 const VprBiologyCheatsheet6: NextPage = () => {
-  // Helper function to get tooltip text
   const getTooltip = (keyPart: string) => {
     const key = Object.keys(tooltipDescriptions).find(k => k.includes(keyPart));
     return key ? tooltipDescriptions[key] : `Подробное описание для ${keyPart}`;
   };
 
-  // Helper component for images with tooltips - Adjusted for object-contain and flexible height
+  // Image Component: Container is aspect-square, Image uses object-contain
   const ImageWithTooltip = ({ src, alt, width, height, className = '', tooltipKeyPart, bgColor = 'bg-slate-100' }: {
     src: string, alt: string, width: number, height: number, className?: string, tooltipKeyPart: string, bgColor?: string
   }) => (
     <div className={`p-1.5 border border-emerald-200/80 rounded-lg ${bgColor} hover:shadow-md hover:shadow-emerald-200/70 transition-shadow duration-300 flex flex-col items-center`}>
       <Tooltip>
         <TooltipTrigger asChild>
-          {/* Container controls max height, image uses object-contain */}
-          <div className={`w-full max-h-72 overflow-hidden rounded ${bgColor} cursor-help border border-slate-200 flex justify-center items-center`}>
+          {/* This container enforces aspect ratio in the grid */}
+          <div className={`w-full aspect-square overflow-hidden rounded ${bgColor} cursor-help border border-slate-200 flex justify-center items-center`}>
+            {/* Image fits within the container, keeping its ratio */}
             <Image
               src={src}
               alt={alt}
-              width={width} // Still useful for Next.js optimization, layout shifts
-              height={height} // Still useful for Next.js optimization, layout shifts
-              className={`w-auto h-auto max-w-full max-h-full object-contain ${className}`} // object-contain is key here
+              width={width} // Important for Next.js optimization & initial layout
+              height={height}// Important for Next.js optimization & initial layout
+              className={`w-auto h-auto max-w-full max-h-full object-contain ${className}`} // object-contain ensures full visibility
               loading="lazy"
-              // Optionally add unoptimized prop if aspect ratio issues persist with Next Image optimization
-              // unoptimized={true} 
+              // Consider unoptimized if you still face issues with specific images and Next/Image optimization
+              // unoptimized={true}
             />
           </div>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="max-w-[350px] bg-emerald-50 border border-emerald-300 text-slate-700 p-3 shadow-lg z-50 rounded-md text-xs">
-          {/* Tooltip font size slightly reduced */}
           <p>{getTooltip(tooltipKeyPart)}</p>
         </TooltipContent>
       </Tooltip>
-      <p className="text-xs text-center text-slate-500 mt-1.5 italic px-1">{alt}</p> {/* Smaller alt text */}
+      <p className="text-xs text-center text-slate-500 mt-1.5 italic px-1">{alt}</p>
     </div>
   );
+
+  // Easter Egg Component
+  const EasterEgg = () => (
+      <div className="my-8 flex justify-center items-center space-x-2 text-sm text-amber-700/80 opacity-80 hover:opacity-100 transition-opacity duration-300">
+          <FaBrain className="animate-pulse" />
+          <Tooltip>
+              <TooltipTrigger asChild>
+                  <span className="cursor-help italic">Маленький секрет для самых упорных...</span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="bg-amber-100 border border-amber-300 text-amber-800 p-2 rounded-md shadow-md text-xs">
+                  <p className="flex items-center"><FaGrinStars className="mr-1.5 text-lg text-amber-600"/>Ты молодец, что дошел до сюда! Продолжай в том же духе!</p>
+              </TooltipContent>
+          </Tooltip>
+      </div>
+  );
+
 
   return (
     // Light Theme Background
@@ -108,25 +125,23 @@ const VprBiologyCheatsheet6: NextPage = () => {
                   <FaMicroscope className="mr-2 md:mr-3 text-emerald-600/90 fa-fw" /> Основы Жизни: Клетки и Процессы
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
-                  {/* Subsection: Cell Structure */}
-                  <div className="border-l-4 border-emerald-500 pl-3 md:pl-4">
+                   {/* Cell Structure */}
+                   <div className="border-l-4 border-emerald-500 pl-3 md:pl-4">
                     <h3 className="flex items-center text-lg md:text-xl font-semibold text-emerald-700 mb-2">
                       <FaQuestionCircle className="mr-2 text-emerald-600/80 fa-fw" /> Строение Клетки
                     </h3>
-                    {/* More detailed description, smaller font */}
                     <p className="text-slate-700 mb-3 text-sm leading-relaxed">
                       Клетка – наименьшая живая система. <strong className="font-semibold">Растительная:</strong> есть <strong className="font-semibold">клеточная стенка</strong> (форма), <strong className="font-semibold">мембрана</strong> (контроль), <strong className="font-semibold">ядро</strong> (ДНК, управление), <strong className="font-semibold">цитоплазма</strong>, <strong className="font-semibold">хлоропласты</strong> (фотосинтез, зеленые), <strong className="font-semibold">вакуоль</strong> (большая, с соком), <strong className="font-semibold">митохондрии</strong> (энергия). <strong className="font-semibold">Животная:</strong> нет стенки, хлоропластов, крупной вакуоли.
                     </p>
                     <ImageWithTooltip
                       src={imageUrls['bio-cell-*.png']}
                       alt="Детали строения растительной клетки"
-                      width={500} // Provide reasonable guess for optimization
-                      height={500}
+                      width={500} height={889} // Approximate 9:16 ratio if known
                       tooltipKeyPart="bio-cell-*.png"
                     />
                   </div>
-                  {/* Subsection: Photosynthesis */}
-                  <div className="border-l-4 border-emerald-500 pl-3 md:pl-4">
+                  {/* Photosynthesis */}
+                   <div className="border-l-4 border-emerald-500 pl-3 md:pl-4">
                     <h3 className="flex items-center text-lg md:text-xl font-semibold text-emerald-700 mb-2">
                       <FaSun className="mr-2 text-yellow-500 fa-fw" /> Фотосинтез: Рецепт Растений
                     </h3>
@@ -136,13 +151,12 @@ const VprBiologyCheatsheet6: NextPage = () => {
                     <ImageWithTooltip
                       src={imageUrls['bio-photosynthesis-*.png']}
                       alt="Схема процесса фотосинтеза"
-                      width={600} // Provide reasonable guess
-                      height={338}
+                      width={600} height={338} // Landscape
                       tooltipKeyPart="bio-photosynthesis-*.png"
                     />
                   </div>
-                  {/* Subsection: Classification */}
-                  <div className="border-l-4 border-emerald-500 pl-3 md:pl-4">
+                  {/* Classification */}
+                   <div className="border-l-4 border-emerald-500 pl-3 md:pl-4">
                     <h3 className="flex items-center text-lg md:text-xl font-semibold text-emerald-700 mb-2">
                       <FaGlobe className="mr-2 text-sky-600 fa-fw" /> Царства Живой Природы
                     </h3>
@@ -152,8 +166,7 @@ const VprBiologyCheatsheet6: NextPage = () => {
                     <ImageWithTooltip
                       src={imageUrls['bio-classification-*.png']}
                       alt="Основные царства живых организмов"
-                      width={500} // Provide reasonable guess
-                      height={500}
+                      width={500} height={500} // Square-ish
                       tooltipKeyPart="bio-classification-*.png"
                     />
                   </div>
@@ -166,12 +179,11 @@ const VprBiologyCheatsheet6: NextPage = () => {
                   <FaLeaf className="mr-2 md:mr-3 text-lime-600/90 fa-fw" /> Мир Растений: Строение и Жизнь
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
-                  {/* Subsection: Plant Organs */}
-                  <div className="border-l-4 border-lime-500 pl-3 md:pl-4">
+                   {/* Plant Organs */}
+                   <div className="border-l-4 border-lime-500 pl-3 md:pl-4">
                     <h3 className="flex items-center text-lg md:text-xl font-semibold text-lime-700 mb-2">
                       <FaSeedling className="mr-2 text-lime-600/80 fa-fw" /> Органы Растений
                     </h3>
-                    {/* Detailed list, smaller font */}
                     <ul className="space-y-1 text-slate-700 pl-1 text-sm leading-relaxed">
                       <li><strong className="font-semibold">Вегетативные</strong> (рост, питание):</li>
                       <li className="ml-4">- <strong className="font-semibold">Корень:</strong> Всасывание H₂O и мин. солей, якорь, запас веществ.</li>
@@ -185,19 +197,18 @@ const VprBiologyCheatsheet6: NextPage = () => {
                     <ImageWithTooltip
                       src={imageUrls['bio-plant-organs-*.png']}
                       alt="Вегетативные и генеративные органы"
-                      width={600} // Provide reasonable guess
-                      height={338}
+                      width={500} height={889} // Approximate 9:16 ratio
                       tooltipKeyPart="bio-plant-organs-*.png"
                       className="mt-3"
                     />
                   </div>
-                  {/* Subsection: Life Processes */}
-                  <div className="border-l-4 border-lime-500 pl-3 md:pl-4">
+                  {/* Life Processes */}
+                   <div className="border-l-4 border-lime-500 pl-3 md:pl-4">
                     <h3 className="flex items-center text-lg md:text-xl font-semibold text-lime-700 mb-2">
                       <FaFlask className="mr-2 text-lime-600/80 fa-fw" /> Жизнедеятельность Растений
                     </h3>
                     <ul className="space-y-1 text-slate-700 pl-1 text-sm leading-relaxed">
-                      <li><strong className="font-semibold">Питание:</strong> <strong className="font-semibold">Фотосинтез</strong> (воздушное питание - CO₂) + <strong className="font-semibold">Минеральное</strong> (корневое - H₂O и соли).</li>
+                       <li><strong className="font-semibold">Питание:</strong> <strong className="font-semibold">Фотосинтез</strong> (воздушное питание - CO₂) + <strong className="font-semibold">Минеральное</strong> (корневое - H₂O и соли).</li>
                       <li><strong className="font-semibold">Дыхание:</strong> Поглощают O₂, выделяют CO₂ (круглосуточно!). Энергия для жизни.</li>
                       <li><strong className="font-semibold">Транспорт веществ:</strong> Вода и соли – вверх по <strong className="font-semibold">сосудам</strong> (древесина). Органические в-ва – вниз по <strong className="font-semibold">ситовидным трубкам</strong> (луб).</li>
                       <li><strong className="font-semibold">Рост:</strong> Увеличение размеров за счет деления и роста клеток (особенно в <strong className="font-semibold">верхушках</strong> корня и побега).</li>
@@ -212,14 +223,17 @@ const VprBiologyCheatsheet6: NextPage = () => {
                 </div>
               </section>
 
+               {/* <<< EASTER EGG PLACEMENT >>> */}
+               <EasterEgg />
+
               {/* Section 3: Ecosystems */}
               <section className="space-y-5 border-t-2 border-teal-300/80 pt-6">
                 <h2 className="flex items-center text-xl md:text-2xl font-semibold text-teal-800 mb-3 border-b-2 border-teal-300 pb-2">
                   <FaTree className="mr-2 md:mr-3 text-teal-600/90 fa-fw" /> Экосистемы и Взаимосвязи
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
-                  {/* Subsection: Food Chains */}
-                  <div className="border-l-4 border-teal-500 pl-3 md:pl-4">
+                  {/* Food Chains */}
+                   <div className="border-l-4 border-teal-500 pl-3 md:pl-4">
                     <h3 className="flex items-center text-lg md:text-xl font-semibold text-teal-700 mb-2">
                       <FaPaw className="mr-2 text-orange-600 fa-fw" /> Пищевые Цепи и Сети
                     </h3>
@@ -229,13 +243,12 @@ const VprBiologyCheatsheet6: NextPage = () => {
                     <ImageWithTooltip
                       src={imageUrls['bio-food-chain-*.png']}
                       alt="Пищевая цепь: продуценты, консументы, редуценты"
-                      width={600} // Provide reasonable guess
-                      height={338}
+                      width={600} height={338} // Landscape
                       tooltipKeyPart="bio-food-chain-*.png"
                     />
                   </div>
-                  {/* Subsection: Ecosystems */}
-                  <div className="border-l-4 border-teal-500 pl-3 md:pl-4">
+                  {/* Ecosystems */}
+                   <div className="border-l-4 border-teal-500 pl-3 md:pl-4">
                     <h3 className="flex items-center text-lg md:text-xl font-semibold text-teal-700 mb-2">
                       <FaFish className="mr-2 text-blue-600 fa-fw" /> Экосистемы: Живое + Неживое
                     </h3>
@@ -245,13 +258,12 @@ const VprBiologyCheatsheet6: NextPage = () => {
                     <ImageWithTooltip
                       src={imageUrls['bio-ecosystem-*.png']}
                       alt="Компоненты лесной экосистемы"
-                      width={500} // Provide reasonable guess
-                      height={500}
+                      width={500} height={500} // Square-ish
                       tooltipKeyPart="bio-ecosystem-*.png"
                     />
                   </div>
-                  {/* Subsection: Human Impact */}
-                  <div className="border-l-4 border-teal-500 pl-3 md:pl-4">
+                  {/* Human Impact */}
+                   <div className="border-l-4 border-teal-500 pl-3 md:pl-4">
                     <h3 className="flex items-center text-lg md:text-xl font-semibold text-teal-700 mb-2">
                       <FaBalanceScale className="mr-2 text-gray-600 fa-fw" /> Человек и Природа
                     </h3>
@@ -261,8 +273,7 @@ const VprBiologyCheatsheet6: NextPage = () => {
                     <ImageWithTooltip
                       src={imageUrls['bio-human-impact-*.png']}
                       alt="Положительное и отрицательное влияние человека"
-                      width={600} // Provide reasonable guess
-                      height={338}
+                      width={600} height={338} // Landscape
                       tooltipKeyPart="bio-human-impact-*.png"
                     />
                   </div>
