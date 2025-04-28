@@ -106,7 +106,7 @@ const translations: Record<string, Record<string, string>> = {
     "About Me": "Обо мне",
     "SUPERVIBE Studio": "SUPERVIBE Studio",
     "Jumpstart Kit": "Набор Jumpstart",
-    "SelfDev Path": "Путь Саморазвития",
+    "SelfDev Path": "Путь Самораз ++++++++++++++++
     "VIBE Plan": "VIBE План",
     "Advice": "Советы",
     "AI & Future of Work": "ИИ и Будущее Работы",
@@ -156,11 +156,11 @@ export default function Header() {
   const [currentLang, setCurrentLang] = useState<'en' | 'ru'>(initialLang);
 
   useEffect(() => {
-      const userLang = user?.language_code;
-      const newLangBasedOnUser = userLang === 'ru' ? 'ru' : 'en';
-      if (newLangBasedOnUser !== currentLang) {
-           setCurrentLang(newLangBasedOnUser);
-      }
+    const userLang = user?.language_code;
+    const newLangBasedOnUser = userLang === 'ru' ? 'ru' : 'en';
+    if (newLangBasedOnUser !== currentLang) {
+      setCurrentLang(newLangBasedOnUser);
+    }
   }, [user?.language_code, currentLang]);
 
   const t = useCallback((key: string): string => {
@@ -174,7 +174,7 @@ export default function Header() {
   const currentLogoText = useMemo(() => {
     const currentPage = allPages.find(p => p.path === pathname);
     if (pathname?.startsWith('/vpr')) {
-        return "VPR";
+      return "VPR";
     }
     const baseName = currentPage?.name || "VIBE";
     const translatedFirstName = t(baseName)?.split(' ')[0];
@@ -260,10 +260,10 @@ export default function Header() {
             <div className="flex items-center gap-3 md:gap-4">
               {/* Language Toggle Button */}
               <button
-                 onClick={toggleLang}
-                 className="p-1 sm:p-2 text-xs sm:text-sm font-semibold text-brand-cyan hover:text-brand-cyan/80 transition-colors focus:outline-none focus:ring-1 focus:ring-brand-cyan focus:ring-offset-2 focus:ring-offset-black rounded-md"
-                 aria-label={t("Toggle Language")}
-                 title={t("Toggle Language")}
+                onClick={toggleLang}
+                className="p-1 sm:p-2 text-xs sm:text-sm font-semibold text-brand-cyan hover:text-brand-cyan/80 transition-colors focus:outline-none focus:ring-1 focus:ring-brand-cyan focus:ring-offset-2 focus:ring-offset-black rounded-md"
+                aria-label={t("Toggle Language")}
+                title={t("Toggle Language")}
               >
                 {currentLang === 'en' ? 'RU' : 'EN'}
               </button>
@@ -336,4 +336,52 @@ export default function Header() {
                         className={cn(
                           "group relative flex flex-col items-center justify-center rounded-md border transition-all duration-300 aspect-square text-center hover:scale-[1.03]",
                           "p-1.5 sm:p-2 md:p-1.5",
-                          page.isImportant ? "bg-gradient-to-br from-purple-900/30 via-black/50 to-blue-900/30 col-span-2" : "bg-gray-800/70 hover:bg-gray-7
+                          page.isImportant ? "bg-gradient-to-br from-purple-900/30 via-black/50 to-blue-900/30 col-span-2" : "bg-gray-800/70 hover:bg-gray-700/90 col-span-1",
+                          tileColorClass,
+                          isCurrentPage ? 'ring-1 ring-offset-1 ring-offset-black ring-brand-green' : ''
+                        )}
+                      >
+                        {/* --- Иконка Новинки (Hot) --- */}
+                        {page.isHot && (
+                          <span
+                            title={t("Hot")}
+                            className="absolute top-0.5 left-0.5 text-[0.5rem] bg-red-500/80 text-white rounded-full px-1 py-0 leading-none animate-pulse"
+                            aria-label={t("Hot")}
+                          >
+                            🔥
+                          </span>
+                        )}
+                        {/* ---------------------------- */}
+                        {PageIcon && (
+                          <PageIcon className={cn(
+                            "h-4 w-4 sm:h-5 sm:w-5 md:h-4 md:w-4 mb-0.5 transition-transform duration-300 group-hover:scale-110",
+                            page.isImportant ? "text-brand-yellow h-5 w-5 sm:h-6 sm:w-6 md:h-5 md:w-5" : "inherit"
+                          )} />
+                        )}
+                        <span className={cn(
+                          "font-semibold transition-colors leading-tight",
+                          "text-[0.6rem] sm:text-xs md:text-[0.6rem] md:leading-none",
+                          page.isImportant ? "text-white text-[0.7rem] sm:text-sm md:text-xs" : "text-gray-300 group-hover:text-white"
+                        )}>
+                          {page.translatedName}
+                        </span>
+                        {/* Иконка Админа */}
+                        {page.isAdminOnly && (
+                          <span title={t("Admin Only")} className="absolute top-0.5 right-0.5 text-[0.5rem] text-red-400 bg-black/60 rounded-full px-1 py-0 leading-none">🛡️</span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-center text-gray-500 text-sm md:text-base mt-6 md:mt-8">
+                  {t("No pages found matching")} "{searchTerm}"
+                </p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
