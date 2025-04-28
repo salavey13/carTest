@@ -106,7 +106,7 @@ const translations: Record<string, Record<string, string>> = {
     "About Me": "Обо мне",
     "SUPERVIBE Studio": "SUPERVIBE Studio",
     "Jumpstart Kit": "Набор Jumpstart",
-    "SelfDev Path": "Путь Самораз ++++++++++++++++
+    "SelfDev Path": "Путь Саморазвития",
     "VIBE Plan": "VIBE План",
     "Advice": "Советы",
     "AI & Future of Work": "ИИ и Будущее Работы",
