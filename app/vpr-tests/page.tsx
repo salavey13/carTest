@@ -203,7 +203,7 @@ export default function VprTestsListPage() {
                          <p className="text-center text-gray-300 mb-5 text-sm md:text-base">
                             Нужна быстрая помощь? Загляни в наши шпаргалки с самым важным!
                          </p>
-                         <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+                         <div className="flex flex-col sm:flex-row flex-wrap justify-center items-center gap-4"> {/* Added flex-wrap */}
                              <Link href="/vpr/history/6/cheatsheet" passHref legacyBehavior>
                                  <motion.a
                                      className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 border border-blue-500 shadow-md hover:shadow-lg w-full sm:w-auto justify-center"
@@ -222,6 +222,17 @@ export default function VprTestsListPage() {
                                      География (Шпаргалка)
                                  </motion.a>
                              </Link>
+                             {/* ----- START: ADDED BIOLOGY LINK ----- */}
+                             <Link href="/vpr/biology/6/cheatsheet" passHref legacyBehavior>
+                                 <motion.a
+                                     className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors duration-200 border border-emerald-500 shadow-md hover:shadow-lg w-full sm:w-auto justify-center"
+                                     whileHover={{ scale: 1.05 }}
+                                 >
+                                     <FaBookOpenFa className="w-4 h-4"/> {/* Using same icon for consistency */}
+                                     Биология (Шпаргалка)
+                                 </motion.a>
+                             </Link>
+                             {/* ----- END: ADDED BIOLOGY LINK ----- */}
                          </div>
                     </motion.div>
                  )}
