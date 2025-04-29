@@ -6,21 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppContext } from "@/contexts/AppContext";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@/components/ui/tooltip"; // Kept from V1
 
-// --- Иконки из fa6, ПРОВЕРЕННЫЕ И ИСПРАВЛЕННЫЕ ---
-// Используем FaFileLines, FaMobile, FaPaintbrush, FaCarBurst
-// Добавляем FaChartLine, FaPoo (были в тексте прошлой версии, но не в импорте "good example")
-// Убираем FaVideo, т.к. не используется в p-plan (можно оставить, если нужна где-то еще, но для чистоты уберем)
+// --- Иконки из fa6: Используем проверенный и исправленный список из V1 ---
+// Включая FaChartLine, FaPoo для экспоненциальной темы, убирая FaVideo
 import {
-  FaFileLines, // <-- ИСПРАВЛЕНО
-  FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom,
-  FaMobile, // <-- ИСПРАВЛЕНО
-  FaComments, FaPaintbrush, // <-- ИСПРАВЛЕНО (регистр)
-  FaBrain, FaRocket, FaUserNinja,
+  FaFileLines, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom,
+  FaMobile, FaComments, FaPaintbrush, FaBrain, FaRocket, FaUserNinja,
   FaMoneyBillWave, FaTriangleExclamation, FaUserAstronaut, FaSignature,
-  FaRecycle, FaCode, FaNewspaper, FaGithub, FaTelegram,
-  FaCarBurst, // <-- ИСПРАВЛЕНО
+  FaRecycle, FaCode, FaNewspaper, FaGithub, FaTelegram, FaCarBurst, // Corrected icons
   FaRobot, FaGift, FaHandshake, FaBomb, FaFlaskVial, FaInfinity, FaDumbbell,
   FaEye, FaHatWizard, FaPoo, FaKey, FaBolt, FaScroll, FaHandPointer, FaUserSecret
 } from "react-icons/fa6";
@@ -33,8 +27,7 @@ import type { Database } from "@/types/database.types";
 // --- Типы ---
 type DbUser = Database["public"]["Tables"]["users"]["Row"] | null;
 
-// --- Карта Компонентов Иконок (Для RenderContent) ---
-// Убедимся, что КЛЮЧИ и ЗНАЧЕНИЯ совпадают с ИСПРАВЛЕННЫМИ импортами
+// --- Карта Компонентов Иконок (Соответствует импортам V1) ---
 const iconComponents: { [key: string]: React.ElementType } = {
   FaFileLines, FaBullseye, FaUsers, FaBoxOpen, FaChartLine, FaAtom, FaFlaskVial,
   FaMobile, FaComments, FaPaintbrush, FaBrain, FaRocket, FaUserNinja, FaInfinity, FaDumbbell,
@@ -44,14 +37,14 @@ const iconComponents: { [key: string]: React.ElementType } = {
   FaHandPointer, FaUserSecret
 };
 
-// *** RenderContent v5: Используем iterative exec ***
-// (RenderContent остается без изменений, т.к. он берет имя из маркера и ищет в iconComponents)
+// *** RenderContent v5: Используем iterative exec из V1 (стабильный) ***
 const RenderContent: React.FC<{ content: string }> = React.memo(({ content }) => {
     // Split by paragraphs first
     return content.split('\n').map((paragraph, pIndex) => {
         if (!paragraph.trim()) return null; // Skip empty lines
 
         const elements: React.ReactNode[] = [];
+        // Regex from V1/V2 (iterative exec part)
         const regex = /(\*\*(.*?)\*\*)|(::Fa(\w+)(?:\s+className="([^"]*)")?\s*::)/g;
         let lastIndex = 0;
         let keyCounter = 0; // Use simple counter for keys within a paragraph
@@ -78,7 +71,8 @@ const RenderContent: React.FC<{ content: string }> = React.memo(({ content }) =>
                     const finalClassName = cn("inline-block align-middle mx-1", className || "w-4 h-4"); // Default size if no class
                     elements.push(<IconComp key={`${pIndex}-icon-${keyCounter++}`} className={finalClassName} />);
                 } else {
-                    console.warn(`[RenderContent] Icon "Fa${iconName}" not found in iconComponents map.`); // Уточнили варнинг
+                    // Refined warning from V1
+                    console.warn(`[RenderContent] Icon "Fa${iconName}" not found in iconComponents map.`);
                     elements.push(<span key={`${pIndex}-icon-error-${keyCounter++}`} className="text-red-500 font-mono" title={`Icon Fa${iconName} not found`}>[?]</span>);
                 }
             }
@@ -105,102 +99,103 @@ const RenderContent: React.FC<{ content: string }> = React.memo(({ content }) =>
 RenderContent.displayName = 'RenderContent';
 
 
-// --- Функция генерации секций (getPlanSections) с ИСПРАВЛЕННЫМИ ИКОНКАМИ В ТЕКСТЕ ---
+// --- Функция генерации секций (getPlanSections) - ИСПОЛЬЗУЕМ ВЕРСИЮ ИЗ V1 С ЭКСПОНЕНЦИАЛЬНЫМ РОСТОМ ---
 const getPlanSections = (dbUser: DbUser) => {
   const userName = dbUser?.first_name || 'Неофит';
   const isSanek = dbUser?.user_id?.toString() === '1260304309' || dbUser?.username === 'Pihman';
   const userHandle = isSanek ? '@Pihman_Reborn69' : (dbUser?.username ? `@${dbUser.username}` : 'Твой_Кибер_Сигил');
   const userOriginStory = isSanek
-     ? "в гравитационном колодце разбитых карданов ::FaCarBurst className='inline text-red-500'::" // <-- ИСПРАВЛЕНО
+     ? "в гравитационном колодце разбитых карданов ::FaCarBurst className='inline text-red-500'::" // Correct icon usage
      : "в поисках апгрейда серой реальности";
-  const myExperience = "13+ лет в трансмутации реальности";
+  const myExperience = "13+ лет в трансмутации реальности"; // Not used directly in content, but defined
 
+  // --- Текст секций из V1, включающий ЭКСПОНЕНЦИАЛЬНЫЙ РОСТ ---
   return [
-     { // Section 1: Win95 - Простой и понятный, как Paint
+     { // Section 1: Включает идею "Один Клик -> Экспонента"
       id: "resume",
       title: `1. Протокол "Исход": ${userName}, Взламываем Матрицу!`,
       icon: FaBomb,
       color: "text-blue-400",
-      content: `Проект **"Кибер-Волк ${userName}"** – это не сраный PDF. Это **чит-код** ::FaKey className="inline text-blue-400":: к твоей новой жизни! Твой JUMPSTART ::FaRocket className="inline text-blue-400"::, чтобы ты (${userHandle}) **выбил дверь с ноги** из ${userOriginStory} и начал **писать СВОЙ код реальности**. Управлять? **Телефоном, сука!** ::FaMobile className="inline text-blue-400"::! // <-- ИСПРАВЛЕНО
+      content: `Проект **"Кибер-Волк ${userName}"** – это не сраный PDF. Это **чит-код** ::FaKey className="inline text-blue-400":: к твоей новой жизни! Твой JUMPSTART ::FaRocket className="inline text-blue-400"::, чтобы ты (${userHandle}) **выбил дверь с ноги** из ${userOriginStory} и начал **писать СВОЙ код реальности**. Управлять? **Телефоном, сука!** ::FaMobile className="inline text-blue-400"::! // Correct icon usage
       **VIBE – Твой Новый BIOS:** Скорость (::FaRocket::) + **AI как Нейроусилитель** (::FaAtom className="inline text-purple-400"::>, Gemini 2.5 Pro – халявный IQ-буст!) + Кибер-Броня (::FaUserNinja className="inline text-gray-500"::>). И **SelfDev** – ты **перепрошиваешь себя**, как киборга. **Ключевое Открытие:** Мы тут не +1 раба в год нанимаем. Это **"Один Клик → Экспонента!"** ::FaChartLine className="inline text-yellow-500 animate-pulse"::. Маленькое изменение в первом апгрейде L1→L2 (обучить **двух** вместо одного) запускает **ВЗРЫВНОЙ РОСТ** ::FaBolt::, удваивая команду почти каждый цикл! Это не линейный набор, это **самовоспроизводящийся VIBE-вирус**!
       **Ресурсы:** Юзаем **халяву** – Vercel, GitHub (::FaGithub::), Telegram (::FaTelegram className="inline text-blue-400"::>). **Платные фичи – для Агентов Смитов**.
       **Стартовый Буст – Твой Первый "Прыжок Веры":** Это не подачка. Это **топливо для твоего "Навуходоносора"**. На что (приоритеты):
       - **ТВОЕ ВРЕМЯ для "Прокачки в Додзе"** (Основная часть): **Забей на галеры**. Погружайся в VIBE, генери контент с AI, **учись видеть Матрицу**. Это твоя **"качалка" для мозга** ::FaDumbbell::. Я – твой **Морфеус/тренер** ::FaHandPointer className="inline text-blue-400"::, ловлю глюки AI, пока ты **уклоняешься от пуль**.
       - **Охота на "Донни"** (Значительная часть): Найти первых **клиентов-последователей** ::FaUserSecret className="inline text-pink-400"::, кто **заплатит за твою "ручку"** (методологию VIBE). Помогать им **умножать кэш** с AI – это наш **"почти легальный" бизнес**! ::FaMoneyBillWave className="inline text-pink-400"::.
       - **Апгрейд Твоей "Нейросети"** (Меньшая часть): Доступ к **продвинутым AI-заклинаниям**, курсы по "взлому" маркетинга. Стань **магистром VIBE**.
-      - **"Аварийный Выход"** (Резерв): На случай ::FaCarBurst:: или если AI взбунтуется. // <-- ИСПРАВЛЕНО
-      **Цель:** Построить **не сайт, а ЛИЧНЫЙ ГЕНЕРАТОР СВОБОДЫ И БАБОК**, работающий на **VIBE, дерзости и экспоненциальном росте**.`
+      - **"Аварийный Выход"** (Резерв): На случай ::FaCarBurst:: или если AI взбунтуется. // Correct icon usage
+      **Цель:** Построить **не сайт, а ЛИЧНЫЙ ГЕНЕРАТОР СВОБОДЫ И БАБОК**, работающий на **VIBE, дерзости и экспоненциальном росте**.` // Добавлено про экспоненциальный рост
     },
-    { // Section 2: Win98/XP - Чуть сложнее, появляются иконки
+    { // Section 2: Арсенал
       id: "description",
       title: "2. Твой Кибер-Арсенал: Интерфейс к Силе",
       icon: FaUserAstronaut,
       color: "text-brand-cyan",
-      content: `**Командный Мостик:** Телефон ::FaMobile className="inline text-cyan-400":: + Ноут (опц). // <-- ИСПРАВЛЕНО
-      **1. Личный Голодек (Сайт/Блог, 0 руб):** Твоя легенда. Путь из ${userOriginStory}. VIBE-мануалы, кейсы "искривления реальности". **Обновляется сам** (GitHub ::FaGithub:: + TG-бот ::FaTelegram::). Здесь ты **сеешь зерна экспоненты**.
-      **2. Твой Зион (TG-Канал/Чат ::FaTelegram className="inline text-blue-400"::):** Собирай **экипаж "Навуходоносора"** ::FaUsers::. Делись альфа-инфой, руби правду-матку, создавай **сопротивление**. Координируй **лавину новичков**.
-      **3. Библиотека Заклинаний (GitHub ::FaGithub::):** Твой "Кибер-Сундук". Готовые артефакты (Jumpstart Kit ::FaBoxOpen::!), VIBE-автоматизация. **Тут ты - Архимаг**. Ключ к **масштабированию магии**.
-      **4. AI-Репликатор (::FaAtom className="inline text-purple-400":: + ::FaRecycle className="inline text-yellow-400"::):** Твой **личный Джарвис**. Мысль → текст, видео, арт, код. **Идея → Воплощение.** Экономит 99% энергии ::FaBolt::. Движок, **питающий твой рост**.
-      **УТП (Твой Уникальный "Глюк в Матрице"):** Ты – **${userName} (${userHandle})**, **выбравшийся** из ${userOriginStory}. Ты юзаешь **подпольный AI** ::FaRobot:: и **взламываешь законы роста**. Ты **не Агент Смит**. Ты **даешь красную таблетку, а не синюю**.`
+      content: `**Командный Мостик:** Телефон ::FaMobile className="inline text-cyan-400":: + Ноут (опц). // Correct icon usage
+      **1. Личный Голодек (Сайт/Блог, 0 руб):** Твоя легенда. Путь из ${userOriginStory}. VIBE-мануалы, кейсы "искривления реальности". **Обновляется сам** (GitHub ::FaGithub:: + TG-бот ::FaTelegram::). Здесь ты **сеешь зерна экспоненты**. // Подчеркиваем связь с ростом
+      **2. Твой Зион (TG-Канал/Чат ::FaTelegram className="inline text-blue-400"::):** Собирай **экипаж "Навуходоносора"** ::FaUsers::. Делись альфа-инфой, руби правду-матку, создавай **сопротивление**. Координируй **лавину новичков**. // Важно для управления ростом
+      **3. Библиотека Заклинаний (GitHub ::FaGithub::):** Твой "Кибер-Сундук". Готовые артефакты (Jumpstart Kit ::FaBoxOpen::!), VIBE-автоматизация. **Тут ты - Архимаг**. Ключ к **масштабированию магии**. // Подчеркиваем масштабирование
+      **4. AI-Репликатор (::FaAtom className="inline text-purple-400":: + ::FaRecycle className="inline text-yellow-400"::):** Твой **личный Джарвис**. Мысль → текст, видео, арт, код. **Идея → Воплощение.** Экономит 99% энергии ::FaBolt::. Движок, **питающий твой рост**. // Рост как ключевой элемент
+      **УТП (Твой Уникальный "Глюк в Матрице"):** Ты – **${userName} (${userHandle})**, **выбравшийся** из ${userOriginStory}. Ты юзаешь **подпольный AI** ::FaRobot:: и **взламываешь законы роста**. Ты **не Агент Смит**. Ты **даешь красную таблетку, а не синюю**.` // Рост как УТП
     },
-    { // Section 3: Early Cyberpunk - Неон, тени
+    { // Section 3: Рынок
       id: "market",
       title: "3. Охотничьи Угодья: Ищем Тех, Кто Готов Проснуться",
       icon: FaUsers,
       color: "text-brand-pink",
       content: `Рынок РФ? Дикий кибер-запад! Старые правила **сломаны**. AI – это **универсальный отмычка** ::FaKey className="inline text-pink-400"::.
-      **Твоя Цель (ЦА):** Застрявшие в Матрице. Как ты вчера, ${userName}. Разрабы со **старым софтом в голове**. Фрилансеры, **гриндившие репутацию**. Малый бизнес, кто **хочет AI-апгрейд за еду**. Все, кто ищет **Ctrl+Alt+Del** для ${userOriginStory}.
-      **Агенты Смиты (Конкуренты):** Продавцы воздуха, теоретики без практики, инфоцыгане.
+      **Твоя Цель (ЦА):** Застрявшие в Матрице. Как ты вчера, ${userName}. Разрабы со **старым софтом в голове**. Фрилансеры, **гриндившие репутацию**. Малый бизнес, кто **хочет AI-апгрейд за еду**. Все, кто ищет **Ctrl+Alt+Del** для ${userOriginStory}. **И особенно те, кто чувствует, что линейный рост - это тупик.** // Добавляем акцент
+      **Агенты Смиты (Конкуренты):** Продавцы воздуха, теоретики без практики, инфоцыгане. **Те, кто продает старые карты.**
       **Твой Код Неуязвимости (Отстройка):**
       - **Ты (${userName}):** Твоя история ::FaSignature:: – **неотразимый сигнал**.
       - **VIBE:** Скорость Нео (::FaRocket::) + Магия AI (::FaAtom::) + Броня Старка (::FaUserNinja::). Мы **пишем будущее**.
       - **SelfDev:** Качаем **мозг** ::FaBrain:: и **волю** ::FaUserNinja::. Помогаем **стать Избранным**.
       - **AI-Алхимия (::FaAtom::):** Наш **вечный двигатель** контента ::FaInfinity::.
-      - **"Красная Таблетка для Всех":** Просто, доступно, **без пафоса**.`
+      - **"Красная Таблетка для Всех":** Просто, доступно, **без пафоса**. **И с перспективой экспоненты.**` // Добавляем акцент
     },
-     { // Section 4: More Cyberpunk
+     { // Section 4: Продукты
       id: "product",
       title: "4. Твои Артефакты: Прошивки для Мозга",
       icon: FaGift,
       color: "text-brand-orange",
       content: `Принцип "Сначала Демо-Версия": Дай пощупать силу ::FaGift className="inline text-orange-400"::, потом продавай лицензию на "Кунг-Фу".
-      **Бесплатные Чипы (Вербовка в Сопротивление):**
+      **Бесплатные Чипы (Вербовка в Сопротивление и Запуск Роста L1):** // Уточняем цель
       - **Контент (::FaNewspaper::):** "Дневник Нео" – твой путь, VIBE-инсайты. AI (::FaAtom::) – твой **Оракул**.
-      - **Код (::FaCode::):** Jumpstart Kit (::FaBoxOpen::) – **установка "Кунг-Фу"**. AI-боты на GitHub (::FaGithub::).
+      - **Код (::FaCode::):** Jumpstart Kit (::FaBoxOpen::) – **установка "Кунг-Фу"**. AI-боты на GitHub (::FaGithub::). **Покажи, как легко начать.**
       - **Концентрат Мудрости (::FaBrain::):** Саммари "запретных текстов" (Purpose&Profit) – **для своих**.
-      **Платные Прошивки (Когда ты – Архитектор ::FaHatWizard::):**
+      **Платные Прошивки (Когда ты – Архитектор ::FaHatWizard:: и Мастер Экспоненты):** // Уточняем статус
       - **"Дефрагментация Разума" с ${userName}:** Личный VIBE-тюнинг + AI-интеграция (Цену определяешь сам!).
       - **Тренинг "Анти-Матрица с AI":** Учим **уклоняться от пуль** (проблем) с AI (Формат и цену решаешь сам!).
       - **Jumpstart Kit "Избранный":** Заряженные кибер-шаблоны (Цену ставишь сам!).
-      - **(VIP) Внутренний Круг Зиона:** Закрытый чат, тайные техники (По подписке?).`
+      - **(VIP) Внутренний Круг Зиона:** Закрытый чат, тайные техники **управления экспонентой** (По подписке?).` // Уточняем фокус
     },
-    { // Section 5: Neon Glow
+    { // Section 5: Маркетинг
       id: "marketing",
       title: "5. Неоновые Сигналы: Призыв Пробужденных",
       icon: FaBullseye,
       color: "text-neon-lime",
-      content: `- ::FaPaintbrush className="inline text-neon-lime":: **Контент - Твой Сигнал:** Делай то, что **вибрирует**! Делись процессом. AI (::FaAtom className="inline text-purple-400"::) – твоя **нейро-фабрика** (текст, видео, арт). **ПРАВДА. ПОЛЬЗА. VIBE.** (TG, VK, YouTube?). // <-- ИСПРАВЛЕНО (регистр)
-      - ::FaComments className="inline text-neon-lime":: **Создай Свой "Зион" (::FaTelegram className="inline text-blue-400"::):** Твой чат – **последний оплот свободы**. **Общайся! Помогай! Вдохновляй!** Лояльность > охватов.
-      - ::FaGithub className="inline text-neon-lime":: **GitHub - Голодек для Гиков:** Код как искусство.
-      - **Альянсы (::FaHandshake::):** Объединяйся с другими **хакерами реальности**.
+      content: `- ::FaPaintbrush className="inline text-neon-lime":: **Контент - Твой Сигнал:** Делай то, что **вибрирует**! Делись процессом. AI (::FaAtom className="inline text-purple-400"::) – твоя **нейро-фабрика** (текст, видео, арт). **ПРАВДА. ПОЛЬЗА. VIBE.** (TG, VK, YouTube?). // Correct icon usage (case)
+      - ::FaComments className="inline text-neon-lime":: **Создай Свой "Зион" (::FaTelegram className="inline text-blue-400"::):** Твой чат – **последний оплот свободы**. **Общайся! Помогай! Вдохновляй!** Лояльность > охватов. **Готовь инфраструктуру к росту.**
+      - ::FaGithub className="inline text-neon-lime":: **GitHub - Голодек для Гиков:** Код как искусство. **Инструменты для экспоненты.**
+      - **Альянсы (::FaHandshake::):** Объединяйся с другими **хакерами реальности**. **Вместе рост еще быстрее.**
       **Топливо для Сигнала (Стартовый Буст ~X% бюджета):**
-      - **Таргет:** Найти тех, кто **уже ищет красную таблетку**.
-      - **Посевы:** Распространяй **VIBE-вирус** по сети.
+      - **Таргет:** Найти тех, кто **уже ищет красную таблетку и готов к нелинейному пути**.
+      - **Посевы:** Распространяй **VIBE-вирус экспоненциального роста** по сети.
       - **Эксперименты:** Пробуй **новые частоты** (форматы)!
 
-      [Воронка Пробуждения: Сигнал (Контент/AI) → Зов (Таргет) → Зион (TG) → Просветление (Продажа)]`
+      [Кибер-Воронка: Сигнал (Контент/AI) → Зов (Таргет) → Зион (TG) → Просветление L1 (Jumpstart) → Трансмутация L2 (Запуск +2 L1) → Экспонента (Продажи/Масштаб)]` // Обновленная воронка
     },
-     { // Section 6: Deeper Cyberpunk, Blur
+     { // Section 6: Операционка
       id: "operations",
       title: "6. Твоя Кибер-Лаборатория: Телефон и Сила Мысли",
-      icon: FaMobile, // <-- ИСПОЛЬЗУЕМ ИСПРАВЛЕННУЮ
+      icon: FaMobile, // Correct icon usage
       color: "text-brand-cyan",
-      content: `**Пульт Управления (::FaMobile className="inline text-cyan-400":: + ::FaAtom::):** ТЕЛЕФОН! Снял → смонтировал → AI (::FaAtom::) всё остальное. Сказал → AI сделал. **Автоматизируй Матрицу!** // <-- ИСПРАВЛЕНО
-      **Твой Сервер (0 руб):** Сайт на Next.js/Vercel. Управление – GitHub/TG-бот (::FaGithub::). База знаний? Supabase (0 руб).
-      **Нейролинк:** Telegram/VK (::FaTelegram className="inline text-blue-400"::) для всего!
-      **Мантра Морфеуса:** **"Ты думаешь, это воздух?!"** ::FaEye className="inline text-cyan-400":: Скорость ограничена лишь твоей **верой и скиллом управления AI**. Ты **пишешь правила**, а не следуешь им.`
+      content: `**Пульт Управления (::FaMobile className="inline text-cyan-400":: + ::FaAtom::):** ТЕЛЕФОН! Снял → смонтировал → AI (::FaAtom::) всё остальное. Сказал → AI сделал. **Автоматизируй Матрицу!** // Correct icon usage
+      **Твой Сервер (0 руб):** Сайт на Next.js/Vercel. Управление – GitHub/TG-бот (::FaGithub::). База знаний? Supabase (0 руб). **Инфраструктура готова к взрывному росту.**
+      **Нейролинк:** Telegram/VK (::FaTelegram className="inline text-blue-400"::) для всего! **Канал управления лавиной.**
+      **Мантра Морфеуса:** **"Ты думаешь, это воздух?!"** ::FaEye className="inline text-cyan-400":: Скорость ограничена лишь твоей **верой и скиллом управления AI**. Ты **пишешь правила**, а не следуешь им. **Правила экспоненциального роста.**` // Акцент на росте
     },
-    { // Section 7: Advanced Cyberpunk / Stark Tech
+    { // Section 7: Структура - КЛЮЧЕВАЯ секция про ЭКСПОНЕНТУ из V1
       id: "org",
       title: "7. Структура Силы: Ты – Ядро Экспоненты",
       icon: FaUserNinja,
@@ -210,88 +205,86 @@ const getPlanSections = (dbUser: DbUser) => {
       **Заметка для Нулевых (L1):** Каждый раз, когда один из вас апается на L2, вы **удваиваете армию таких же как вы** на старте (L1)! Это значит, что общее число "picture updaters" (и всей команды) растет не +1, +1, +1, а как **2 в степени (время+1) минус 1** (по формуле \`2**(t+1) - 1\`). Грубо говоря, **почти удваивается каждый цикл**! ::FaChartLine className="inline text-yellow-400"::. Готовьтесь к лавине новичков!
       Твоя задача – **качать "бицуху" мозга** ::FaDumbbell::, быть **дирижером AI-оркестра** и **нажимать ту самую "кнопку" L1→L2**, запуская **экспоненциальный каскад**. CyberVibe – твоя **персональная "качалка" и центр управления ростом**. Я – твой **тренер/спарринг-партнер**, ловлю баги AI и слежу, чтобы **экспонента не схлопнулась**. `
     },
-    { // Section 8: High Tech Finance / Alchemy Complete
+    { // Section 8: Финансы - Топливо для ЭКСПОНЕНТЫ из V1
       id: "finance",
       title: `8. Философский Камень: Топливо для Экспоненты`,
       icon: FaMoneyBillWave,
       color: "text-brand-yellow",
       content: `Стартовый капитал – это **искра**, чтобы зажечь твой **внутренний огонь** и **запустить первый цикл экспоненциального роста**. Приоритеты:
-      - **::FaUserAstronaut className="inline text-yellow-400":: 1. ТВОЕ ВРЕМЯ НА ТРАНСМУТАЦИЮ (Приоритет #1):** Чтобы ты (${userName}) **вырвался из Матрицы** и мог **творить**: контент ::FaPaintbrush::, VIBE/AI ::FaBrain::, Орден ::FaUsers::. Это **инвестиция в твой ЛИЧНЫЙ Философский Камень** и **первый шаг к удвоению**! // <-- ИСПРАВЛЕНО (регистр)
-      - **::FaBullseye className="inline text-yellow-400":: 2. ОХОТА НА "ЗОЛОТЫЕ ДУШИ" (Приоритет #2):** Найти **первых**, кто **заплатит за твою магию**. **Быстрые деньги = топливо для веры и следующего цикла роста**.
-      - **::FaBrain className="inline text-yellow-400":: 3. АПГРЕЙД ТВОЕЙ СИЛЫ (Приоритет #3):** Доступ к **мощнейшим AI-гримуарам** ::FaScroll::, секреты "нейро-маркетинга". Стань **Верховным Магом VIBE**, способным **управлять лавиной**.
-      - **::FaTriangleExclamation className="inline text-yellow-400":: 4. "ЩИТ ВЕРЫ" (Резерв):** На случай **критического сбоя** ::FaBomb:: или если AI потребует дань. **Экспонента требует страховки**.
+      - **::FaUserAstronaut className="inline text-yellow-400":: 1. ТВОЕ ВРЕМЯ НА ТРАНСМУТАЦИЮ (Приоритет #1):** Чтобы ты (${userName}) **вырвался из Матрицы** и мог **творить**: контент ::FaPaintbrush::, VIBE/AI ::FaBrain::, Орден ::FaUsers::. Это **инвестиция в твой ЛИЧНЫЙ Философский Камень** и **первый шаг к удвоению**! // Correct icon usage (case), Акцент на удвоении
+      - **::FaBullseye className="inline text-yellow-400":: 2. ОХОТА НА "ЗОЛОТЫЕ ДУШИ" (Приоритет #2):** Найти **первых**, кто **заплатит за твою магию**. **Быстрые деньги = топливо для веры и следующего цикла роста**. // Топливо для роста
+      - **::FaBrain className="inline text-yellow-400":: 3. АПГРЕЙД ТВОЕЙ СИЛЫ (Приоритет #3):** Доступ к **мощнейшим AI-гримуарам** ::FaScroll::, секреты "нейро-маркетинга". Стань **Верховным Магом VIBE**, способным **управлять лавиной**. // Управление ростом
+      - **::FaTriangleExclamation className="inline text-yellow-400":: 4. "ЩИТ ВЕРЫ" (Резерв):** На случай **критического сбоя** ::FaBomb:: или если AI потребует дань. **Экспонента требует страховки**. // Риски роста
       **Цель по Золоту:** Стабильный **денежный поток**, достаточный для **свободы и поддержания роста**. Буст **снимает страх** и **дает первый импульс**.
 
-      [Диаграмма Потоков Энергии: ТЫ (Искра) → Запуск L1→L2 (+2) → Охота/Апгрейд (Подпитка Роста) → Щит]`
+      [Диаграмма Потоков Энергии: ТЫ (Искра) → Запуск L1→L2 (+2) → Охота/Апгрейд (Подпитка Роста) → Щит]` // Диаграмма из V1
     },
-     { // Section 9: Glitchy / Warning Style
+     { // Section 9: Риски - Управление ЭКСПОНЕНТОЙ из V1
       id: "risks",
       title: "9. Глюки в Матрице (Риски и План \"Омега\")",
-      icon: FaCarBurst, // <-- ИСПОЛЬЗУЕМ ИСПРАВЛЕННУЮ
+      icon: FaCarBurst, // Correct icon usage
       color: "text-red-500",
-      content: `**Матрица Обновилась (Free Tier):** Юзаем "Щит Веры" (::FaTriangleExclamation::), ищем **эксплойты** (опенсорс), **быстро учимся делать золото**, чтобы платить "десятину" Матрице. **Экспоненциальный рост может потребовать платных ресурсов быстрее**.
-      **Перегрев Процессора (${userName}):** AI (::FaAtom::) – твой **аватар**. "Орден" (::FaComments::) – твой **круг силы**. **Управлять экспонентой сложнее, чем линейным ростом**. Делай то, что **прет** (SelfDev!). Помни: **"Нет ложки!"** ::FaEye:: Сила в **балансе и делегировании AI**!
-      **Красная Таблетка Оказалась Витаминкой (Идея – Г):** **AI-Оракул** (::FaBullseye::) **ПРЕДСКАЖЕТ ДО СТАРТА!** Мочим дохлых гиппогрифов быстро. VIBE = **Мгновенная Телепортация** на новую идею. **Неудачная экспонента = быстрый провал, быстрый рестарт**.
-      **System Failure (<::FaCarBurst className="inline text-red-500"::>):** Жизнь – багованная игра. Твои **нейро-апгрейды** VIBE/AI/SelfDev – твой **"сейв"**. Сможешь **загрузиться** в новом мире. **Опыт управления быстрым ростом бесценен**. ` // <-- ИСПРАВЛЕНО
+      content: `**Матрица Обновилась (Free Tier):** Юзаем "Щит Веры" (::FaTriangleExclamation::), ищем **эксплойты** (опенсорс), **быстро учимся делать золото**, чтобы платить "десятину" Матрице. **Экспоненциальный рост может потребовать платных ресурсов быстрее**. // Риск роста
+      **Перегрев Процессора (${userName}):** AI (::FaAtom::) – твой **аватар**. "Орден" (::FaComments::) – твой **круг силы**. **Управлять экспонентой сложнее, чем линейным ростом**. Делай то, что **прет** (SelfDev!). Помни: **"Нет ложки!"** ::FaEye:: Сила в **балансе и делегировании AI**! // Сложность управления ростом
+      **Красная Таблетка Оказалась Витаминкой (Идея – Г):** **AI-Оракул** (::FaBullseye::) **ПРЕДСКАЖЕТ ДО СТАРТА!** Мочим дохлых гиппогрифов быстро. VIBE = **Мгновенная Телепортация** на новую идею. **Неудачная экспонента = быстрый провал, быстрый рестарт**. // Скорость VIBE важна
+      **System Failure (<::FaCarBurst className="inline text-red-500"::>):** Жизнь – багованная игра. Твои **нейро-апгрейды** VIBE/AI/SelfDev – твой **"сейв"**. Сможешь **загрузиться** в новом мире. **Опыт управления быстрым ростом бесценен**. ` // Ценность опыта роста
     },
-    { // Section 10: Epic Finale Style
+    { // Section 10: Заключение - Призыв к ЭКСПОНЕНТЕ из V1
       id: "conclusion",
-      title: `10. ${userName}, Ты Избранный! Жми на Газ Экспоненты!`,
+      title: `10. ${userName}, Ты Избранный! Жми на Газ Экспоненты!`, // Название из V1
       icon: FaBrain,
       color: "text-brand-purple",
-      content: `**"Кибер-Волк ${userName}"** – это **твой манифест**. **ТВОЙ ВЫБОР**. Шанс **стать Архитектором своей реальности... и её экспоненциального расширения**. Используй **мозг** (::FaBrain::), **шрамы** (::FaSignature::), **братство** (::FaUsers::) и **космическую силу AI** (::FaAtom::). Стартовый буст – **лишь первый разряд** ::FaBolt className="inline text-yellow-400"::, **искра для детонации цепной реакции**. Дальше – твой **VIBE**, твоя **воля**, твой **прыжок в неизвестность**, где **один становится легионом** ::FaUsers className="inline text-purple-400 animate-ping"::!
-      **ХВАТИТ БЫТЬ ПЕШКОЙ В ЛИНЕЙНОЙ ИГРЕ. ВРЕМЯ ЗАПУСКАТЬ СВОЮ ЭКСПОНЕНТУ!** ::FaRocket className="inline text-brand-green"::`
+      content: `**"Кибер-Волк ${userName}"** – это **твой манифест**. **ТВОЙ ВЫБОР**. Шанс **стать Архитектором своей реальности... и её экспоненциального расширения**. Используй **мозг** (::FaBrain::), **шрамы** (::FaSignature::), **братство** (::FaUsers::) и **космическую силу AI** (::FaAtom::). Стартовый буст – **лишь первый разряд** ::FaBolt className="inline text-yellow-400"::, **искра для детонации цепной реакции**. Дальше – твой **VIBE**, твоя **воля**, твой **прыжок в неизвестность**, где **один становится легионом** ::FaUsers className="inline text-purple-400 animate-ping"::! // Текст V1
+      **ХВАТИТ БЫТЬ ПЕШКОЙ В ЛИНЕЙНОЙ ИГРЕ. ВРЕМЯ ЗАПУСКАТЬ СВОЮ ЭКСПОНЕНТУ!** ::FaRocket className="inline text-brand-green"::` // Текст V1
     },
   ];
 };
 
-// --- Функция для стилей секций (УСИЛЕННАЯ ГРАДАЦИЯ) ---
+// --- Функция для стилей секций (УСИЛЕННАЯ ГРАДАЦИЯ из V1/V2) ---
 const getSectionStyles = (index: number): string => {
     const totalSections = 10;
     const progress = (index + 1) / totalSections;
-    // Base styles + Increased contrast and effects for later stages
-    const base = "group border-l-8 pl-4 py-4 rounded-r-lg transition-all duration-700 ease-out open:shadow-xl "; // Толще граница, медленнее переход, больше тень
+    const base = "group border-l-8 pl-4 py-4 rounded-r-lg transition-all duration-700 ease-out open:shadow-xl ";
 
-    // Определяем цвета для градиентов и свечения по прогрессу
     let bgColor = "bg-gray-800/50 open:bg-gray-700/60";
-    let borderColor = "border-blue-500/70"; // Начальный цвет границы
-    let shadowColor = "open:shadow-blue-500/20"; // Тень при открытии
+    let borderColor = "border-blue-500/70";
+    let shadowColor = "open:shadow-blue-500/20";
     let hoverBorderColor = "hover:border-blue-400";
     let openBorderColor = "open:border-blue-400";
 
-    if (progress <= 0.2) { // Sections 1-2: Win95/DOS - Чуть живее
-        bgColor = "bg-gray-700/40 open:bg-gray-600/50"; // Светлее
+    if (progress <= 0.2) {
+        bgColor = "bg-gray-700/40 open:bg-gray-600/50";
         borderColor = "border-blue-500/60";
         shadowColor = "open:shadow-md open:shadow-blue-500/20";
         hoverBorderColor = "hover:border-blue-400";
         openBorderColor = "open:border-blue-400";
-        return cn(base, bgColor, borderColor, shadowColor, hoverBorderColor, openBorderColor, "rounded-md"); // Меньше скругление
-    } else if (progress <= 0.5) { // Sections 3-5: Early Cyber - Темнее, неон, заметнее
-        bgColor = "bg-dark-card/70 open:bg-dark-card/90"; // Темнее
-        borderColor = "border-brand-pink/70"; // Ярче
-        shadowColor = "open:shadow-lg open:shadow-brand-pink/40"; // Заметнее тень
+        return cn(base, bgColor, borderColor, shadowColor, hoverBorderColor, openBorderColor, "rounded-md");
+    } else if (progress <= 0.5) {
+        bgColor = "bg-dark-card/70 open:bg-dark-card/90";
+        borderColor = "border-brand-pink/70";
+        shadowColor = "open:shadow-lg open:shadow-brand-pink/40";
         hoverBorderColor = "hover:border-brand-pink";
         openBorderColor = "open:border-brand-pink";
-        return cn(base, bgColor, borderColor, shadowColor, hoverBorderColor, openBorderColor, "rounded-lg"); // Среднее скругление
-    } else if (progress <= 0.8) { // Sections 6-8: Mid-Cyberpunk - Блюр, фиолет, сильное свечение
-        bgColor = "bg-black/75 backdrop-blur-sm open:bg-black/90"; // Черный с блюром
-        borderColor = "border-brand-purple/80"; // Насыщеннее
-        shadowColor = "open:shadow-[0_0_25px_rgba(157,0,255,0.6)]"; // Сильное свечение
+        return cn(base, bgColor, borderColor, shadowColor, hoverBorderColor, openBorderColor, "rounded-lg");
+    } else if (progress <= 0.8) {
+        bgColor = "bg-black/75 backdrop-blur-sm open:bg-black/90";
+        borderColor = "border-brand-purple/80";
+        shadowColor = "open:shadow-[0_0_25px_rgba(157,0,255,0.6)]";
         hoverBorderColor = "hover:border-brand-purple/100";
         openBorderColor = "open:border-brand-purple/100";
-        return cn(base, bgColor, borderColor, shadowColor, hoverBorderColor, openBorderColor, "rounded-xl"); // Больше скругление
-    } else { // Sections 9-10: Peak VIBE - Макс киберпанк
-        bgColor = "bg-black/90 backdrop-blur-lg open:bg-black/95"; // Глубокий черный, сильный блюр
-        borderColor = "border-neon-lime"; // Ярчайший неон
-        shadowColor = "open:shadow-[0_0_45px_rgba(174,255,0,0.9)]"; // Макс свечение
-        hoverBorderColor = "hover:border-neon-lime/80"; // Может чуть приглушить при ховере для контраста
+        return cn(base, bgColor, borderColor, shadowColor, hoverBorderColor, openBorderColor, "rounded-xl");
+    } else {
+        bgColor = "bg-black/90 backdrop-blur-lg open:bg-black/95";
+        borderColor = "border-neon-lime";
+        shadowColor = "open:shadow-[0_0_45px_rgba(174,255,0,0.9)]";
+        hoverBorderColor = "hover:border-neon-lime/80";
         openBorderColor = "open:border-neon-lime";
-        return cn(base, bgColor, borderColor, shadowColor, hoverBorderColor, openBorderColor, "rounded-2xl"); // Макс скругление
+        return cn(base, bgColor, borderColor, shadowColor, hoverBorderColor, openBorderColor, "rounded-2xl");
     }
 };
 
 
-// --- Компонент Страницы ---
+// --- Компонент Страницы (Структура из V1) ---
 export default function PPlanPage() {
   const { dbUser, isLoading, error } = useAppContext();
   const [isMounted, setIsMounted] = useState(false);
@@ -300,73 +293,81 @@ export default function PPlanPage() {
 
   const planSections = useMemo(() => getPlanSections(dbUser), [dbUser]);
   const pageTitleName = useMemo(() => dbUser?.first_name || "Кибер-Волк", [dbUser]);
+  // Greeting name adjusted for Pihman/Neophyte distinction
   const greetingName = useMemo(() => (dbUser?.user_id?.toString() === '1260304309' || dbUser?.username === 'Pihman') ? 'Pihman' : 'Неофит', [dbUser]);
 
-  // Определяем initialBoostStr ЗДЕСЬ, чтобы она была доступна для подзаголовка
-  const initialBoost = 0;
+  // Initial boost amount (can be dynamic later)
+  const initialBoost = 0; // Keep as 0 as in both versions for now
   const initialBoostStr = useMemo(() => `${initialBoost.toLocaleString('ru-RU')} руб.`, [initialBoost]);
 
-  // Лоадер и ошибка
+  // Лоадер и ошибка (из V1)
   if (!isMounted || isLoading) { return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gradient-to-br from-gray-900 via-black to-gray-800"> <p className="text-brand-cyan animate-pulse text-xl font-mono">Загрузка Гримуара Кибер-Алхимика...</p> </div> ); }
+  // Error display from V1 (more detailed)
   if (error) { return ( <div className="flex flex-col justify-center items-center min-h-screen pt-20 bg-gradient-to-br from-gray-900 via-black to-red-900/50"> <FaTriangleExclamation className="text-6xl text-red-500 mb-4"/> <p className="text-red-400 text-xl font-mono">Ошибка загрузки плана</p> <p className="text-red-500 mt-2 text-sm max-w-md text-center">{error ? error.message : 'Unknown error'}</p> <p className="text-gray-400 mt-4 text-xs">Матрица глючит. Перезагрузись.</p> </div> ); }
 
   return (
+    // Layout and background from V1
     <div className="relative min-h-screen overflow-hidden pt-20 pb-10 bg-gradient-to-br from-dark-bg via-black to-purple-900/30 text-light-text">
+       {/* Grid pattern div from V1 */}
        <div className="absolute inset-0 bg-repeat opacity-[0.04] z-0 bg-grid-pattern"></div>
-      <TooltipProvider delayDuration={150}>
+       {/* TooltipProvider from V1 */}
+       <TooltipProvider delayDuration={150}>
         <div className="relative z-10 container mx-auto px-4">
-          {/* --- Карточка теперь использует стили пикового киберпанка --- */}
+          {/* Card styling from V1 */}
           <Card className="max-w-4xl mx-auto bg-black/85 backdrop-blur-md text-light-text rounded-2xl border-2 border-neon-lime/70 shadow-[0_0_40px_rgba(174,255,0,0.7)]">
-            {/* Заголовок */}
-            <CardHeader className="text-center border-b border-brand-purple/30 pb-5 pt-8"> {/* Фиолетовая граница для контраста */}
+            {/* Header structure and styling from V1 */}
+            <CardHeader className="text-center border-b border-brand-purple/30 pb-5 pt-8">
               <FaFlaskVial className="text-6xl text-brand-purple mx-auto mb-4 animate-pulse" />
               <CardTitle className="text-3xl md:text-5xl font-bold text-brand-purple cyber-text glitch uppercase tracking-wider" data-text={`КИБЕР-АЛХИМИЯ ${pageTitleName.toUpperCase()}`}>
                  КИБЕР-АЛХИМИЯ {pageTitleName.toUpperCase()}
               </CardTitle>
-              {/* Подзаголовок */}
+              {/* Sub-header using RenderContent from V1 */}
               <div className="text-md md:text-lg text-gray-300 mt-4 font-mono max-w-2xl mx-auto">
+                 {/* Text content for sub-header focuses on the core transformation and boost */}
                  <RenderContent content={`Твой Рецепт: От **${greetingName === 'Pihman' ? 'Свинцового Кардана' : 'Нуля'}** ::FaCarBurst className="inline text-red-500":: к **Золотому VIBE** ::FaMoneyBillWave className="inline text-yellow-400"::. Стартовый Буст ${initialBoostStr} Энергии. (Личный Гримуар для ${greetingName})`} />
               </div>
             </CardHeader>
-            {/* Секции Плана */}
-            <CardContent className="space-y-4 p-4 md:p-6"> {/* Уменьшил еще немного space-y */}
+            {/* Card content and section mapping from V1 */}
+            <CardContent className="space-y-4 p-4 md:p-6">
               {planSections.map((section, index) => {
-                 const sectionStyles = getSectionStyles(index); // Получаем стили для секции
+                 const sectionStyles = getSectionStyles(index); // Get styles
 
                  return (
-                   // --- Обертка для Details с градиентным фоном для поздних стадий ---
+                   // Wrapper div with gradient/padding logic from V1
                     <div key={section.id} className={cn(
-                        sectionStyles, // Основные стили секции
-                        index >= 8 && "bg-gradient-to-r from-gray-900 via-purple-900/30 to-neon-lime/10", // Градиент для последних секций
-                        index >= 6 && "p-1" // Небольшой внутренний отступ для градиента на средних/поздних
+                        sectionStyles,
+                        index >= 8 && "bg-gradient-to-r from-gray-900 via-purple-900/30 to-neon-lime/10", // Late stage gradient
+                        index >= 6 && "p-1" // Late stage padding adjustment
                     )}>
+                       {/* Details/Summary structure from V1 */}
                        <details className={cn(
-                           // Убрали фон и скругление отсюда, они теперь на обертке
-                           "open:bg-transparent" // Убираем фон при открытии, т.к. он на обертке
-                        )} open={index < 2 || section.id === 'finance'}> {/* Первые 2 и финансы */}
+                           "open:bg-transparent" // Background is on wrapper
+                        )} open={index < 2 || section.id === 'finance'}> {/* Default open state */}
                          <summary className={cn(
                              "text-xl md:text-2xl font-semibold cursor-pointer list-none flex items-center hover:opacity-80 transition-opacity py-2",
                              section.color,
-                             index >= 6 && "px-3 py-3 bg-black/30 rounded-t-lg" // Доп стиль для summary на поздних стадиях
+                             index >= 6 && "px-3 py-3 bg-black/30 rounded-t-lg" // Late stage summary style
                          )}>
-                           {/* Используем исправленное имя иконки для секции */}
+                           {/* Icon rendering from V1 */}
                            {section.icon && <section.icon className="mr-3 flex-shrink-0 w-6 h-6 group-open:animate-pulse" />}
                            {section.title}
                          </summary>
                          <div className={cn(
                              "mt-3 text-gray-300 text-base leading-relaxed space-y-3 pb-2",
-                             index >= 6 ? "px-3" : "pl-6 pr-2" // Разные отступы
+                             index >= 6 ? "px-3" : "pl-6 pr-2" // Padding logic from V1
                           )}>
+                           {/* Render section content */}
                            <RenderContent content={section.content} />
-                           {/* Визуализации */}
+                           {/* Visual placeholders from V1 */}
                            {section.id === 'finance' && ( <div className="mt-4 p-3 border border-dashed border-gray-600 rounded-md bg-gray-800/40"> <p className="text-sm text-gray-400 italic text-center">[Диаграмма Потоков Энергии: ТЫ (Искра) → Запуск L1→L2 (+2) → Охота/Апгрейд (Подпитка Роста) → Щит]</p> </div> )}
-                           {section.id === 'marketing' && ( <div className="mt-4 p-3 border border-dashed border-gray-600 rounded-md bg-gray-800/40"> <p className="text-sm text-gray-400 italic text-center">[Кибер-Воронка: Сигнал → Зов → Стая → Золото]</p> </div> )}
+                           {/* Updated marketing funnel viz */}
+                           {section.id === 'marketing' && ( <div className="mt-4 p-3 border border-dashed border-gray-600 rounded-md bg-gray-800/40"> <p className="text-sm text-gray-400 italic text-center">[Кибер-Воронка: Сигнал → Зов → Зион L1 → Трансмутация L2 (+2 L1) → Экспонента]</p> </div> )}
                          </div>
                        </details>
                     </div>
                 );
               })}
-              {/* Заключение */}
+              {/* Conclusion section from V1 */}
               <section className="text-center pt-10 border-t border-brand-purple/20 mt-12">
                  <p className="text-lg text-gray-400 italic">
                    Это **карта**, {greetingName}, а не территория. **Путь осилит идущий**. Начинай **трансмутацию**! VIBE!
