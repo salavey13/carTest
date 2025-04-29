@@ -13,7 +13,7 @@ import {
   FaBrain, FaRobot, FaMagnifyingGlass, FaGift, FaUserShield, FaCarOn,
   FaYoutube, FaFileInvoiceDollar, FaCreditCard, FaHeart, FaPalette,
   FaCircleInfo, FaListCheck, FaNetworkWired, FaRegLightbulb, FaUpload,
-  FaUserNinja, FaGlobeEurope, FaLandmarkDome, FaLeaf
+  FaUserNinja, FaGlobe, FaLandmarkDome, FaLeaf
 } from "react-icons/fa6";
 
 // --- Page Definitions ---
@@ -52,7 +52,7 @@ const allPages: PageInfo[] = [
   { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: FaListCheck },
   { path: "/rent-car", name: "Rent a Car", icon: FaCar },
   // --- Шпаргалки ---
-  { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: FaGlobeEurope, color: 'green' },
+  { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: FaGlobe, color: 'green' },
   { path: "/vpr/history/6/cheatsheet", name: "History Cheatsheet 6", icon: FaLandmarkDome, color: 'yellow' },
   { path: "/vpr/biology/6/cheatsheet", name: "Biology Cheatsheet 6", icon: FaLeaf, color: 'lime' },
   // --- Админские ссылки ---
