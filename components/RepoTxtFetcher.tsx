@@ -57,9 +57,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       selectedFetcherFiles, // CONTEXT selection state
       setSelectedFetcherFiles, // Context setter
       kworkInputHasContent, setKworkInputHasContent, setRequestCopied,
-      aiActionLoading, currentStep, loadingPrs, assistantLoading, isParsing, currentAiRequestId,
+      aiActionLoading, currentStep, loadingPrs, assistantLoading, isParsing, currentAiRequestId, // <<< Ensure these are destructured
       targetBranchName, setTargetBranchName, manualBranchName, setManualBranchName, openPrs, setOpenPrs,
-      setLoadingPrs, isSettingsModalOpen, triggerToggleSettingsModal, kworkInputRef, triggerAskAi,
+      setLoadingPrs, isSettingsModalOpen, triggerToggleSettingsModal, kworkInputRef, triggerAskAi, // <<< Ensure triggerToggleSettingsModal is destructured
       triggerGetOpenPRs, updateRepoUrlInAssistant, scrollToSection,
       setFilesParsed, setAiResponseHasContent, setSelectedAssistantFiles, imageReplaceTask, // Keep imageReplaceTask from context
       allFetchedFiles, // Keep allFetchedFiles from context
@@ -145,7 +145,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   }, [allFetchedFiles, selectedFetcherFiles, addToast, getKworkInputValue, updateKworkInput, scrollToSection, imageReplaceTask, logger]);
 
 
-  // --- MODIFIED handleFetchManual with EARLY PR CHECK for Image Task ---
+  // --- MODIFIED handleFetchManual with EARLY PR CHECK for Image Task & Refined Dependencies ---
   const handleFetchManual = useCallback(async (
         isManualRetry = false,
         branchNameToFetchOverride?: string | null,
@@ -161,7 +161,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       if (currentTask && isImageTaskFetchInitiated.current && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying')) { logger.warn("Fetcher(Manual): Image task fetch already running."); return; }
       if (!currentTask && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying') && !isManualRetry) { logger.warn("Fetcher(Manual): Standard fetch already running."); addToast("Уже идет загрузка...", "info"); return; }
       if (!repoUrl.trim()) { logger.error("Fetcher(Manual): Repo URL empty."); addToast("Введите URL репозитория", 'error'); setError("URL репозитория не указан."); triggerToggleSettingsModal(); return; }
-      if (assistantLoading || isParsing || aiActionLoading) { logger.warn(`Fetcher(Manual): Blocked by processing state.`); addToast("Подождите завершения.", "warning"); return; }
+      // Check context loading states directly
+      if (assistantLoading || isParsing || aiActionLoading) { logger.warn(`Fetcher(Manual): Blocked by processing state (Assistant: ${assistantLoading}, Parsing: ${isParsing}, AI Action: ${aiActionLoading}).`); addToast("Подождите завершения.", "warning"); return; }
+
 
       logger.log("Fetcher(Manual): Starting process.");
       setFetchStatus('loading'); setError(null); setFiles([]); setSelectedFilesState(new Set()); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setSelectedFetcherFiles(new Set()); // Clear context state
@@ -300,14 +302,19 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
            }
            logger.log(`Fetcher(Manual): Finished. Fetch Success: ${overallSuccess}, Branch Fetched: ${branchForContentFetch}`);
        }
-   }, [ // Dependencies List (ensure comprehensive)
-       repoUrl, token, imageReplaceTask, targetBranchName, manualBranchName, assistantLoading, isParsing, aiActionLoading, autoFetch, ideaFromUrl, importantFiles, isSettingsModalOpen,
+   }, [ // --- UPDATED DEPENDENCIES ---
+       repoUrl, token, imageReplaceTask, targetBranchName, manualBranchName,
+       // Context state values read directly OR used in conditions:
+       assistantLoading, isParsing, aiActionLoading, autoFetch, ideaFromUrl, isSettingsModalOpen,
+       // Context setters/triggers called:
        setFetchStatus, setError, setFiles, setSelectedFilesState, setPrimaryHighlightedPathState, setSecondaryHighlightedPathsState, setSelectedFetcherFiles, setFilesFetchedCombined,
-       setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setLoadingPrs, setOpenPrs, setTargetBranchName, // Added setters for PR check
-       addToast, startProgressSimulation, stopProgressSimulation, triggerToggleSettingsModal, updateKworkInput, getKworkInputValue,
+       setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setLoadingPrs, setOpenPrs, setTargetBranchName,
+       triggerToggleSettingsModal, // Add the trigger function
+       // Local helpers/state/refs:
+       importantFiles, addToast, startProgressSimulation, stopProgressSimulation, updateKworkInput, getKworkInputValue,
        logger, scrollToSection,
-       // Removed getOpenPullRequests from here, it's imported and called directly
-   ]);
+       // getOpenPullRequests and fetchRepoContents are stable imports, no need to list typically
+   ]); // --- END UPDATED DEPENDENCIES ---
 
 
   // --- Effect: Auto-Fetch (Add isMounted check inside) ---
