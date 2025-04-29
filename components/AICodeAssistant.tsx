@@ -24,7 +24,7 @@ import { CodeRestorer } from './assistant_components/CodeRestorer';
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-    FaCircleInfo, FaCodeBranch, FaGithub, FaWandMagicSparkles, FaArrowsRotate,
+    FaCircleInfo, FaCodebranch, FaGithub, FaWandMagicSparkles, FaArrowsRotate,
     FaImage, FaImages, FaSpinner, FaPlus, FaKeyboard, FaFileLines, FaCode,
     FaCheck, FaCircleXmark
 } from "react-icons/fa6";
@@ -412,7 +412,7 @@ await triggerGetOpenPRs(repoUrl); logger.log(`New PR created: ${result.prUrl}`);
 
     const isProcessingAny = assistantLoading || aiActionLoading || contextIsParsing || isProcessingPR || isFetchingOriginals || loadingPrs;
     const canSubmitRegularPR = !isProcessingAny && filesParsed && selectedAssistantFiles.size > 0 && !!prTitle.trim() && !!repoUrl && !imageReplaceTask; // Use context selection size
-    const prButtonText = targetBranchName ? `Обновить Ветку` : "Создать PR"; const prButtonIcon = targetBranchName ? <FaCodeBranch /> : <FaGithub />; const prButtonLoadingIcon = (isProcessingPR || assistantLoading) && !imageReplaceTask ? <FaSpinner className="animate-spin"/> : prButtonIcon;
+    const prButtonText = targetBranchName ? `Обновить Ветку` : "Создать PR"; const prButtonIcon = targetBranchName ? <FaCodebranch /> : <FaGithub />; const prButtonLoadingIcon = (isProcessingPR || assistantLoading) && !imageReplaceTask ? <FaSpinner className="animate-spin"/> : prButtonIcon;
     const assistantTooltipText = `Вставь ответ AI -> '➡️' -> Проверь/Исправь -> Выбери файлы -> ${prButtonText}`;
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId; const showStandardAssistantUI = !imageReplaceTask; const showImageReplaceUI = !!imageReplaceTask;
     const commonDisabled = isProcessingAny; const parseButtonDisabled = commonDisabled || isWaitingForAiResponse || !response.trim() || !!imageReplaceTask; const fixButtonDisabled = commonDisabled || isWaitingForAiResponse || !!imageReplaceTask; const submitButtonDisabled = !canSubmitRegularPR || isProcessingPR || assistantLoading;
@@ -422,7 +422,7 @@ await triggerGetOpenPRs(repoUrl); logger.log(`New PR created: ${result.prUrl}`);
             <div id="executor" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
                 <header className="flex justify-between items-center gap-2 flex-wrap">
                      <div className="flex items-center gap-2"> <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse"> {showImageReplaceUI ? "🖼️ Статус Замены Картинки" : "🤖 AI Code Assistant"} </h1> {showStandardAssistantUI && ( <Tooltip delayDuration={200}> <TooltipTrigger asChild> <button className="cursor-help p-1"><FaCircleInfo className="text-blue-400 hover:text-blue-300 transition" /></button> </TooltipTrigger> <TooltipContent side="right" className="max-w-xs bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-2 rounded"> {assistantTooltipText} </TooltipContent> </Tooltip> )} </div>
-                     <Tooltip delayDuration={200}> <TooltipTrigger asChild> <button id="settings-modal-trigger-assistant" onClick={triggerToggleSettingsModal} className="p-2 text-gray-400 hover:text-cyan-400 transition rounded-full hover:bg-gray-700/50 disabled:opacity-50" disabled={isProcessingPR || assistantLoading} > <FaCodeBranch className="text-xl" /> </button> </TooltipTrigger> <TooltipContent side="left" className="bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-2 rounded"> Настройки URL / Token / Ветки / PRs </TooltipContent> </Tooltip>
+                     <Tooltip delayDuration={200}> <TooltipTrigger asChild> <button id="settings-modal-trigger-assistant" onClick={triggerToggleSettingsModal} className="p-2 text-gray-400 hover:text-cyan-400 transition rounded-full hover:bg-gray-700/50 disabled:opacity-50" disabled={isProcessingPR || assistantLoading} > <FaCodebranch className="text-xl" /> </button> </TooltipTrigger> <TooltipContent side="left" className="bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-2 rounded"> Настройки URL / Token / Ветки / PRs </TooltipContent> </Tooltip>
                  </header>
 
                 {showStandardAssistantUI && (
