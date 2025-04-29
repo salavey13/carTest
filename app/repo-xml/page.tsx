@@ -138,7 +138,7 @@ function ActualPageContent() {
     }, [user, searchParams, setImageReplaceTask]);
 
 
-    // --- Effect 2: Populate Kwork Input AFTER Initial Fetch Attempt (no changes to logic, but uses context fetcherRef) ---
+    // --- Effect 2: Populate Kwork Input AFTER Initial Fetch Attempt (Added defensive check for fetcherRef.current) ---
     useEffect(() => {
       const fetchAttemptFinished = isMounted && (fetchStatus === 'success' || fetchStatus === 'error' || fetchStatus === 'failed_retries');
 
@@ -153,19 +153,25 @@ function ActualPageContent() {
               logger.log("[ActualPageContent Effect 2] Populated kwork input via context ref.");
 
               // Now, trigger adding the selected files to this idea text
-              if (fetcherRef.current?.handleAddSelected) { // Use context ref
-                    if (selectedFetcherFiles.size > 0) {
-                        logger.log("[ActualPageContent Effect 2] Calling fetcherRef.handleAddSelected to append auto-selected files to the idea.");
-                        // Pass context state directly
-                        fetcherRef.current.handleAddSelected(selectedFetcherFiles, allFetchedFiles)
-                            .then(() => logger.log("[ActualPageContent Effect 2] handleAddSelected call finished."))
-                            .catch(err => logger.error("[ActualPageContent Effect 2] Error calling handleAddSelected:", err));
-                    } else {
-                        logger.log("[ActualPageContent Effect 2] Skipping handleAddSelected as context selection is empty.");
-                    }
+              // --- ADDED DEFENSIVE CHECK ---
+              if (fetcherRef.current) { // Check if the ref itself is populated
+                   if (fetcherRef.current.handleAddSelected) { // Check if the method exists on the current value
+                        if (selectedFetcherFiles.size > 0) {
+                            logger.log("[ActualPageContent Effect 2] Calling fetcherRef.handleAddSelected to append auto-selected files to the idea.");
+                            // Pass context state directly
+                            fetcherRef.current.handleAddSelected(selectedFetcherFiles, allFetchedFiles)
+                                .then(() => logger.log("[ActualPageContent Effect 2] handleAddSelected call finished."))
+                                .catch(err => logger.error("[ActualPageContent Effect 2] Error calling handleAddSelected:", err));
+                        } else {
+                            logger.log("[ActualPageContent Effect 2] Skipping handleAddSelected as context selection is empty.");
+                        }
+                  } else {
+                       logger.warn("[ActualPageContent Effect 2] fetcherRef.current.handleAddSelected method not available on ref.");
+                  }
               } else {
-                   logger.warn("[ActualPageContent Effect 2] fetcherRef.current.handleAddSelected not available.");
+                   logger.warn("[ActualPageContent Effect 2] fetcherRef.current is null when trying to call handleAddSelected.");
               }
+              // --- END DEFENSIVE CHECK ---
 
               // Scroll to kwork input
                const kworkElement = document.getElementById('kwork-input-section');
