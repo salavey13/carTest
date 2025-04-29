@@ -343,9 +343,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
        triggerToggleSettingsModal,
        importantFiles, addToast, startProgressSimulation, stopProgressSimulation, updateKworkInput, getKworkInputValue,
        logger, scrollToSection, highlightedPathFromUrl
-       // NOTE: Removed `files` from dependencies as it's set *within* the callback, preventing infinite loops.
-       // Other state setters are stable.
-    ]); // <--- This closing parenthesis was missing
+    ]); // <--- REMOVED extra parenthesis here
 
 
   // --- Effect: Auto-Fetch (Adjust finally block) ---
