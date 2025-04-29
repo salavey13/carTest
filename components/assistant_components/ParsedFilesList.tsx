@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'; // Corrected path
+// REMOVED Tooltip Imports
 import { FileEntry, ValidationIssue } from '../../hooks/useCodeParsingAndValidation'; // Adjust path if necessary
 import { FaEllipsisVertical, FaSquareCheck, FaRegSquare, FaPaperPlane, FaCircleExclamation, FaFileZipper, FaFloppyDisk } from 'react-icons/fa6'; // Corrected FaRegSquare, FaPaperPlane
 import clsx from 'clsx';
@@ -41,18 +41,13 @@ export const ParsedFilesList: React.FC<ParsedFilesListProps> = ({
     }
 
     return (
-        <TooltipProvider> {/* Ensure TooltipProvider wraps the component */}
         <div className="mb-4 bg-gray-800 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.3)]">
             <div className="flex justify-between items-center mb-3">
                 <h2 className="text-lg font-semibold text-cyan-400">Разобранные файлы ({parsedFiles.length})</h2>
                 <div className="relative">
-                    <Tooltip text="Опции для файлов" position="left">
-                         <TooltipTrigger asChild>
-                        <button className="p-1 text-gray-400 hover:text-white" onClick={() => setShowFileMenu(!showFileMenu)}>
-                            <FaEllipsisVertical />
-                        </button>
-                         </TooltipTrigger>
-                    </Tooltip>
+                    <button className="p-1 text-gray-400 hover:text-white" onClick={() => setShowFileMenu(!showFileMenu)} title="Опции для файлов">
+                        <FaEllipsisVertical />
+                    </button>
                     {showFileMenu && (
                         <motion.div
                             initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
@@ -69,7 +64,6 @@ export const ParsedFilesList: React.FC<ParsedFilesListProps> = ({
                                 <FaSquareCheck size={14}/> Выбрать все
                             </button>
                             <button className="flex items-center gap-2 w-full text-left px-4 py-2 hover:bg-gray-600 text-sm transition text-white disabled:opacity-50" onClick={() => { onDeselectAll(); setShowFileMenu(false); }} disabled={isLoading || selectedFileIds.size === 0}>
-                                {/* Icon for deselect? Maybe just text is fine */}
                                  Снять выделение
                             </button>
                         </motion.div>
@@ -107,25 +101,21 @@ export const ParsedFilesList: React.FC<ParsedFilesListProps> = ({
                                 {file.path}
                             </span>
                             {hasError && (
-                                <FaCircleExclamation className="text-red-500 flex-shrink-0" size={12} />
+                                <FaCircleExclamation className="text-red-500 flex-shrink-0" size={12} title={tooltipText} /> // Add title here too
                             )}
-                            <Tooltip text={`Отправить ${file.path.split('/').pop()} в Telegram`} position="left">
-                                <TooltipTrigger asChild>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onSendToTelegram(file); }}
-                                    disabled={isLoading || !isUserLoggedIn}
-                                    className="ml-auto text-purple-500 hover:text-purple-400 disabled:opacity-50 disabled:cursor-not-allowed transition p-0.5"
-                                >
-                                    <FaPaperPlane size={14}/>
-                                </button>
-                                 </TooltipTrigger>
-                            </Tooltip>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onSendToTelegram(file); }}
+                                disabled={isLoading || !isUserLoggedIn}
+                                className="ml-auto text-purple-500 hover:text-purple-400 disabled:opacity-50 disabled:cursor-not-allowed transition p-0.5"
+                                title={`Отправить ${file.path.split('/').pop()} в Telegram`}
+                            >
+                                <FaPaperPlane size={14}/>
+                            </button>
                         </div>
                     )
                 })}
             </div>
         </div>
-        </TooltipProvider>
     );
 };
 ParsedFilesList.displayName = 'ParsedFilesList';

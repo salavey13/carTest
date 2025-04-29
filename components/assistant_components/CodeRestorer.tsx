@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { ValidationIssue, FileEntry } from '@/hooks/useCodeParsingAndValidation'; // Adjust path
 import { FaCodeMerge, FaWandMagicSparkles, FaRotate, FaPoo, FaXmark, FaCheck } from 'react-icons/fa6'; // Added FaCheck, FaXmark
-import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger} from "@/components/ui/tooltip"; // Corrected import path
+// REMOVED Tooltip Imports
 
 // --- Restore Modal Component ---
 interface RestoreSkippedModalProps {
@@ -311,18 +311,15 @@ export const CodeRestorer: React.FC<CodeRestorerProps> = ({
     if (skippedIssues.length === 0) return null;
 
     return (
-        <TooltipProvider> {/* Wrap with TooltipProvider */}
-             <Tooltip text="Восстановить код, отмеченный маркерами пропуска /* ... */" position="left">
-                <TooltipTrigger asChild> {/* Trigger for the tooltip */}
-                    <button
-                        onClick={() => { setIsModalOpen(true); setAllowManualRestore(false); setRestoreStatus({}); }}
-                        disabled={disabled}
-                        className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white transition shadow disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <FaCodeMerge size={12} /> Восстановить ({skippedIssues.length})...
-                    </button>
-                 </TooltipTrigger>
-             </Tooltip>
+        <>
+            <button
+                onClick={() => { setIsModalOpen(true); setAllowManualRestore(false); setRestoreStatus({}); }}
+                disabled={disabled}
+                className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white transition shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Восстановить код, отмеченный маркерами пропуска /* ... */"
+            >
+                <FaCodeMerge size={12} /> Восстановить ({skippedIssues.length})...
+            </button>
 
             <AnimatePresence>
                 {isModalOpen && (
@@ -338,7 +335,7 @@ export const CodeRestorer: React.FC<CodeRestorerProps> = ({
                     />
                 )}
             </AnimatePresence>
-        </TooltipProvider>
+        </>
     );
 };
 CodeRestorer.displayName = 'CodeRestorer';

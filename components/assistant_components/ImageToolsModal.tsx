@@ -10,7 +10,7 @@ import { listPublicBuckets, uploadBatchImages } from '@/app/actions';
 import { searchAndGetFirstImageUrl } from '@/app/repo-xml/google_actions';
 import { Bucket } from '@supabase/storage-js';
 import { toast } from 'sonner';
-import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"; // Corrected import path
+// REMOVED Tooltip Imports
 import { FileEntry as ParsedFileEntry } from "@/hooks/useCodeParsingAndValidation";
 import { debugLogger as logger } from '@/lib/debugLogger'; // Use debugLogger
 import { useAppContext } from '@/contexts/AppContext';
@@ -423,15 +423,9 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
                             <div className="border border-indigo-600/50 rounded-lg p-4 bg-indigo-900/10 flex flex-col">
                                 <div className="flex justify-between items-center mb-3 flex-shrink-0">
                                      <h3 className="text-lg font-medium text-indigo-300">Авто-замена Плейсхолдеров <span className='text-xs opacity-70'>({imagePrompts.length})</span></h3>
-                                     <TooltipProvider> {/* Wrap button in provider */}
-                                     <Tooltip text="Авто-поиск Google и замена для всех ожидающих" position="left">
-                                          <TooltipTrigger asChild>
-                                          <button onClick={handleSwapAll} disabled={anyLoading || imagePrompts.every(p => p.status !== 'pending')} className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full bg-indigo-600 hover:bg-indigo-500 text-white transition shadow disabled:opacity-50 disabled:cursor-not-allowed">
-                                             {isSwappingAll ? <FaSpinner className="animate-spin" /> : <FaGoogle />} Заменить все
-                                         </button>
-                                         </TooltipTrigger>
-                                     </Tooltip>
-                                     </TooltipProvider>
+                                     <button onClick={handleSwapAll} disabled={anyLoading || imagePrompts.every(p => p.status !== 'pending')} className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-full bg-indigo-600 hover:bg-indigo-500 text-white transition shadow disabled:opacity-50 disabled:cursor-not-allowed" title="Авто-поиск Google и замена для всех ожидающих">
+                                         {isSwappingAll ? <FaSpinner className="animate-spin" /> : <FaGoogle />} Заменить все
+                                     </button>
                                 </div>
 
                                 {isMounted ? (
@@ -440,7 +434,6 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
                                             <p className="text-center text-gray-500 text-sm mt-4 flex-grow flex items-center justify-center">Файл <code className="text-xs bg-gray-700 px-1 rounded mx-1">/prompts_imgs.txt</code> не найден или пуст/невалиден.</p>
                                         ) : (
                                             <div className="space-y-2 flex-grow overflow-y-auto simple-scrollbar pr-1">
-                                                <TooltipProvider> {/* Wrap list in provider */}
                                                 {imagePrompts.map((item) => (
                                                     <div key={item.id} className="flex items-start gap-2 p-2 rounded-md bg-gray-700/50 border border-gray-600/50 text-xs">
                                                         {/* Status Indicator */}
@@ -448,7 +441,7 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
                                                              {item.status === 'pending' && <FaImage className="text-gray-500" title="Ожидание" />}
                                                              {(item.status === 'searching' || item.status === 'uploading' || item.status === 'swapping') && <FaSpinner className="animate-spin text-blue-400" title="В процессе..." />}
                                                              {(item.status === 'swapped_google' || item.status === 'swapped_upload') && <FaCheck className="text-green-500" title={`Заменено!\nURL: ${item.currentUrl}`} />}
-                                                             {(item.status === 'error_search' || item.status === 'error_upload' || item.status === 'error_swap') && <Tooltip text={item.errorMessage || 'Ошибка'} position="top"><TooltipTrigger asChild><button className='cursor-help'><FaTriangleExclamation className="text-red-500" title="Ошибка" /></button></TooltipTrigger></Tooltip>}
+                                                             {(item.status === 'error_search' || item.status === 'error_upload' || item.status === 'error_swap') && <button className='cursor-help text-red-500' title={item.errorMessage || 'Ошибка'}><FaTriangleExclamation /></button>}
                                                         </div>
                                                         {/* Placeholder, Prompt, Manual Input */}
                                                         <div className="flex-grow overflow-hidden space-y-1">
@@ -466,38 +459,22 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
                                                                     disabled={anyLoading || item.status.startsWith('swapped_')}
                                                                     className={`h-6 px-1.5 text-xs bg-gray-600 border-gray-500 placeholder-gray-400 focus:ring-indigo-500 focus:border-indigo-500 flex-grow ${activeManualInput === item.id ? 'ring-1 ring-indigo-500' : ''} ${item.status.startsWith('swapped_') ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                                 />
-                                                                 <Tooltip text="Заменить на URL из поля" position="top">
-                                                                     <TooltipTrigger asChild>
-                                                                         <button
-                                                                             onClick={() => handleManualUrlSwap(item.placeholder, item.manualUrlInput)}
-                                                                             disabled={anyLoading || !item.manualUrlInput.trim() || !item.manualUrlInput.startsWith('http') || item.status.startsWith('swapped_')}
-                                                                             className="p-1 rounded text-gray-400 hover:text-white hover:bg-purple-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                                                                         > <FaPaperPlane size={11}/> </button>
-                                                                      </TooltipTrigger>
-                                                                 </Tooltip>
+                                                                 <button
+                                                                     onClick={() => handleManualUrlSwap(item.placeholder, item.manualUrlInput)}
+                                                                     disabled={anyLoading || !item.manualUrlInput.trim() || !item.manualUrlInput.startsWith('http') || item.status.startsWith('swapped_')}
+                                                                     className="p-1 rounded text-gray-400 hover:text-white hover:bg-purple-600/50 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                                                                     title="Заменить на URL из поля"
+                                                                 > <FaPaperPlane size={11}/> </button>
                                                             </div>
                                                         </div>
                                                         {/* Action Buttons */}
                                                         <div className="flex-shrink-0 flex flex-col gap-1 ml-2">
-                                                            <Tooltip text="Авто-поиск в Google и Замена" position="left">
-                                                                 <TooltipTrigger asChild>
-                                                                      <button onClick={() => handleGoogleSwap(item.placeholder, item.prompt)} disabled={anyLoading || item.status.startsWith('swapped_')} className="p-1 rounded text-gray-400 hover:text-white hover:bg-blue-600/50 disabled:opacity-50 disabled:cursor-not-allowed"> <FaGoogle size={12}/> </button>
-                                                                 </TooltipTrigger>
-                                                             </Tooltip>
-                                                            <Tooltip text="Открыть Google Картинки в новой вкладке" position="left">
-                                                                 <TooltipTrigger asChild>
-                                                                     <button onClick={() => handleOpenGoogleSearch(item.prompt)} disabled={anyLoading} className="p-1 rounded text-gray-400 hover:text-white hover:bg-red-600/50 disabled:opacity-50"> <FaLink size={12}/> </button>
-                                                                 </TooltipTrigger>
-                                                            </Tooltip>
-                                                             <Tooltip text="Загрузить свой файл и Заменить" position="left">
-                                                                  <TooltipTrigger asChild>
-                                                                     <button onClick={() => handleSpecificUploadAndSwap(item.placeholder)} disabled={anyLoading || !selectedBucket || item.status.startsWith('swapped_')} className="p-1 rounded text-gray-400 hover:text-white hover:bg-green-600/50 disabled:opacity-50 disabled:cursor-not-allowed"> <FaUpload size={12}/> </button>
-                                                                  </TooltipTrigger>
-                                                             </Tooltip>
+                                                           <button onClick={() => handleGoogleSwap(item.placeholder, item.prompt)} disabled={anyLoading || item.status.startsWith('swapped_')} className="p-1 rounded text-gray-400 hover:text-white hover:bg-blue-600/50 disabled:opacity-50 disabled:cursor-not-allowed" title="Авто-поиск в Google и Замена"> <FaGoogle size={12}/> </button>
+                                                           <button onClick={() => handleOpenGoogleSearch(item.prompt)} disabled={anyLoading} className="p-1 rounded text-gray-400 hover:text-white hover:bg-red-600/50 disabled:opacity-50" title="Открыть Google Картинки в новой вкладке"> <FaLink size={12}/> </button>
+                                                           <button onClick={() => handleSpecificUploadAndSwap(item.placeholder)} disabled={anyLoading || !selectedBucket || item.status.startsWith('swapped_')} className="p-1 rounded text-gray-400 hover:text-white hover:bg-green-600/50 disabled:opacity-50 disabled:cursor-not-allowed" title="Загрузить свой файл и Заменить"> <FaUpload size={12}/> </button>
                                                         </div>
                                                     </div>
                                                 ))}
-                                                </TooltipProvider>
                                             </div>
                                         )}
                                     </>
@@ -537,9 +514,7 @@ export const ImageToolsModal: React.FC<ImageToolsModalProps> = ({
                                         <div className="border-t border-gray-700 pt-4 mt-4">
                                             <h3 className="text-base font-medium text-gray-300 mb-2">Результаты ручной загрузки:</h3>
                                             <ul className="space-y-2 max-h-40 overflow-y-auto simple-scrollbar pr-1">
-                                                 <TooltipProvider> {/* Wrap list in provider */}
-                                                {uploadResults.map((result, index) => ( <li key={`${result.name}-manual-${index}`} className={`flex items-center justify-between p-2 rounded-md text-sm ${result.url ? 'bg-green-900/30 border-green-700/50' : 'bg-red-900/30 border-red-700/50'} border`}> <span className={`truncate font-mono text-xs mr-2 flex-1 ${result.url ? 'text-gray-300' : 'text-red-300'}`} title={result.name}>{result.name}</span> {result.url ? (<Tooltip text="Копировать URL" position="left"><TooltipTrigger asChild><button onClick={() => copyUrl(result.url, index)} className={`p-1 rounded transition ${copiedUrlIndex === index ? 'text-green-400 scale-110' : 'text-gray-400 hover:text-cyan-300'}`}>{copiedUrlIndex === index ? <FaCheck /> : <FaCopy />}</button></TooltipTrigger></Tooltip>) : (<Tooltip text={result.error || "Ошибка"} position="left"><TooltipTrigger asChild><button className='cursor-help'><FaTriangleExclamation className="text-red-400 flex-shrink-0" /></button></TooltipTrigger></Tooltip>)} </li> ))}
-                                                 </TooltipProvider>
+                                                {uploadResults.map((result, index) => ( <li key={`${result.name}-manual-${index}`} className={`flex items-center justify-between p-2 rounded-md text-sm ${result.url ? 'bg-green-900/30 border-green-700/50' : 'bg-red-900/30 border-red-700/50'} border`}> <span className={`truncate font-mono text-xs mr-2 flex-1 ${result.url ? 'text-gray-300' : 'text-red-300'}`} title={result.name}>{result.name}</span> {result.url ? (<button onClick={() => copyUrl(result.url, index)} className={`p-1 rounded transition ${copiedUrlIndex === index ? 'text-green-400 scale-110' : 'text-gray-400 hover:text-cyan-300'}`} title="Копировать URL">{copiedUrlIndex === index ? <FaCheck /> : <FaCopy />}</button>) : (<button className='cursor-help text-red-400' title={result.error || "Ошибка"}><FaTriangleExclamation className="flex-shrink-0" /></button>)} </li> ))}
                                             </ul>
                                         </div>
                                     )}

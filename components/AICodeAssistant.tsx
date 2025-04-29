@@ -31,7 +31,7 @@ import {
 import clsx from "clsx";
 import { saveAs } from "file-saver";
 import { logger } from "@/lib/logger";
-import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"; // Correct import path
+// REMOVED Tooltip Imports
 import { selectFunctionDefinition, extractFunctionName } from "@/lib/codeUtils";
 
 // Interfaces
@@ -418,62 +418,71 @@ await triggerGetOpenPRs(repoUrl); logger.log(`New PR created: ${result.prUrl}`);
     const commonDisabled = isProcessingAny; const parseButtonDisabled = commonDisabled || isWaitingForAiResponse || !response.trim() || !!imageReplaceTask; const fixButtonDisabled = commonDisabled || isWaitingForAiResponse || !!imageReplaceTask; const submitButtonDisabled = !canSubmitRegularPR || isProcessingPR || assistantLoading;
 
     return (
-        <TooltipProvider>
-            <div id="executor" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
-                <header className="flex justify-between items-center gap-2 flex-wrap">
-                     <div className="flex items-center gap-2"> <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse"> {showImageReplaceUI ? "🖼️ Статус Замены Картинки" : "🤖 AI Code Assistant"} </h1> {showStandardAssistantUI && ( <Tooltip delayDuration={200}> <TooltipTrigger asChild> <button className="cursor-help p-1"><FaCircleInfo className="text-blue-400 hover:text-blue-300 transition" /></button> </TooltipTrigger> <TooltipContent side="right" className="max-w-xs bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-2 rounded"> {assistantTooltipText} </TooltipContent> </Tooltip> )} </div>
-                     <Tooltip delayDuration={200}> <TooltipTrigger asChild> <button id="settings-modal-trigger-assistant" onClick={triggerToggleSettingsModal} className="p-2 text-gray-400 hover:text-cyan-400 transition rounded-full hover:bg-gray-700/50 disabled:opacity-50" disabled={isProcessingPR || assistantLoading} > <FaCodeBranch className="text-xl" /> </button> </TooltipTrigger> <TooltipContent side="left" className="bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-2 rounded"> Настройки URL / Token / Ветки / PRs </TooltipContent> </Tooltip>
-                 </header>
+        <div id="executor" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
+            <header className="flex justify-between items-center gap-2 flex-wrap">
+                 <div className="flex items-center gap-2">
+                     <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse">
+                         {showImageReplaceUI ? "🖼️ Статус Замены Картинки" : "🤖 AI Code Assistant"}
+                     </h1>
+                     {showStandardAssistantUI && (
+                         <button className="cursor-help p-1" title={assistantTooltipText}>
+                            <FaCircleInfo className="text-blue-400 hover:text-blue-300 transition" />
+                         </button>
+                     )}
+                 </div>
+                 <button
+                    id="settings-modal-trigger-assistant"
+                    onClick={triggerToggleSettingsModal}
+                    className="p-2 text-gray-400 hover:text-cyan-400 transition rounded-full hover:bg-gray-700/50 disabled:opacity-50"
+                    disabled={isProcessingPR || assistantLoading}
+                    title="Настройки URL / Token / Ветки / PRs"
+                 >
+                     <FaCodeBranch className="text-xl" />
+                 </button>
+             </header>
 
-                {showStandardAssistantUI && (
-                     <>
-                         <div>
-                              <p className="text-yellow-400 mb-2 text-xs md:text-sm min-h-[18px]"> {isWaitingForAiResponse ? `⏳ Жду AI... (ID: ${currentAiRequestId?.substring(0,6)}...)` : commonDisabled ? "⏳ Обработка..." : "2️⃣ Вставь ответ AI или жди. Затем '➡️'."} </p>
-                              <div className="relative group">
-                                  <textarea id="response-input" ref={aiResponseInputRefPassed} className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm min-h-[180px] resize-y simple-scrollbar" defaultValue={response} onChange={(e) => setResponseValue(e.target.value)} placeholder={isWaitingForAiResponse ? "AI думает..." : commonDisabled ? "Ожидание..." : "Ответ AI здесь..."} disabled={commonDisabled} spellCheck="false" />
-                                  <TextAreaUtilities response={response} isLoading={commonDisabled} onParse={handleParse} onOpenModal={handleOpenModal} onCopy={handleCopyResponse} onClear={handleClearResponse} onSelectFunction={handleSelectFunction} isParseDisabled={parseButtonDisabled} isProcessingPR={isProcessingPR || assistantLoading} />
-                              </div>
-                               <div className="flex justify-end items-start mt-1 gap-2 min-h-[30px]">
-                                   <CodeRestorer parsedFiles={componentParsedFiles} originalFiles={originalRepoFiles} skippedIssues={validationIssues.filter(i => i.type === 'skippedCodeBlock')} onRestorationComplete={handleRestorationComplete} disabled={commonDisabled || validationStatus === 'validating' || isFetchingOriginals} />
-                                   <ValidationStatusIndicator status={validationStatus} issues={validationIssues} onAutoFix={handleAutoFix} onCopyPrompt={handleCopyFixPrompt} isFixDisabled={fixButtonDisabled} />
-                              </div>
+            {showStandardAssistantUI && (
+                 <>
+                     <div>
+                          <p className="text-yellow-400 mb-2 text-xs md:text-sm min-h-[18px]"> {isWaitingForAiResponse ? `⏳ Жду AI... (ID: ${currentAiRequestId?.substring(0,6)}...)` : commonDisabled ? "⏳ Обработка..." : "2️⃣ Вставь ответ AI или жди. Затем '➡️'."} </p>
+                          <div className="relative group">
+                              <textarea id="response-input" ref={aiResponseInputRefPassed} className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm min-h-[180px] resize-y simple-scrollbar" defaultValue={response} onChange={(e) => setResponseValue(e.target.value)} placeholder={isWaitingForAiResponse ? "AI думает..." : commonDisabled ? "Ожидание..." : "Ответ AI здесь..."} disabled={commonDisabled} spellCheck="false" />
+                              <TextAreaUtilities response={response} isLoading={commonDisabled} onParse={handleParse} onOpenModal={handleOpenModal} onCopy={handleCopyResponse} onClear={handleClearResponse} onSelectFunction={handleSelectFunction} isParseDisabled={parseButtonDisabled} isProcessingPR={isProcessingPR || assistantLoading} />
                           </div>
-                         <ParsedFilesList parsedFiles={componentParsedFiles} selectedFileIds={selectedFileIds} validationIssues={validationIssues} onToggleSelection={handleToggleFileSelection} onSelectAll={handleSelectAllFiles} onDeselectAll={handleDeselectAllFiles} onSaveFiles={handleSaveFiles} onDownloadZip={handleDownloadZip} onSendToTelegram={handleSendToTelegram} isUserLoggedIn={!!user} isLoading={commonDisabled} />
-                         <PullRequestForm id="pr-form-container" repoUrl={repoUrl} // Use combined repoUrl state
-                          prTitle={prTitle} selectedFileCount={selectedAssistantFiles.size} isLoading={isProcessingPR || assistantLoading} isLoadingPrList={loadingPrs} onRepoUrlChange={(url) => { setRepoUrlStateLocal(url); /* Context update happens via effect */ }} onPrTitleChange={setPrTitle} onCreatePR={handleCreateOrUpdatePR} buttonText={prButtonText} buttonIcon={prButtonLoadingIcon} isSubmitDisabled={submitButtonDisabled} />
-                         <OpenPrList openPRs={contextOpenPrs} />
-                        <div className="flex items-center gap-3 mt-2 flex-wrap">
-                            <ToolsMenu customLinks={customLinks} onAddCustomLink={handleAddCustomLink} disabled={commonDisabled}/>
-                             {/* --- FIXED TOOLTIP STRUCTURE --- */}
-                             <Tooltip delayDuration={200}>
-                                 <TooltipTrigger asChild>
-                                     <button
-                                         onClick={() => setIsImageModalOpen(true)}
-                                         className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50 relative"
-                                         disabled={commonDisabled}
-                                     >
-                                         <FaImage className="text-gray-400" />
-                                         <span className="text-sm text-white">Картинки</span>
-                                         {/* Notification dot logic */}
-                                         {componentParsedFiles.some(f => f.path === '/prompts_imgs.txt') && !isImageModalOpen && (
-                                             <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-gray-800 animate-pulse"></span>
-                                         )}
-                                     </button>
-                                 </TooltipTrigger>
-                                 <TooltipContent side="top" className="bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-2 rounded">
-                                     Загрузить/Связать Картинки (prompts_imgs.txt)
-                                 </TooltipContent>
-                             </Tooltip>
-                            {/* --- END FIXED TOOLTIP --- */}
-                        </div>
-                     </>
-                )}
+                           <div className="flex justify-end items-start mt-1 gap-2 min-h-[30px]">
+                               <CodeRestorer parsedFiles={componentParsedFiles} originalFiles={originalRepoFiles} skippedIssues={validationIssues.filter(i => i.type === 'skippedCodeBlock')} onRestorationComplete={handleRestorationComplete} disabled={commonDisabled || validationStatus === 'validating' || isFetchingOriginals} />
+                               <ValidationStatusIndicator status={validationStatus} issues={validationIssues} onAutoFix={handleAutoFix} onCopyPrompt={handleCopyFixPrompt} isFixDisabled={fixButtonDisabled} />
+                          </div>
+                      </div>
+                     <ParsedFilesList parsedFiles={componentParsedFiles} selectedFileIds={selectedFileIds} validationIssues={validationIssues} onToggleSelection={handleToggleFileSelection} onSelectAll={handleSelectAllFiles} onDeselectAll={handleDeselectAllFiles} onSaveFiles={handleSaveFiles} onDownloadZip={handleDownloadZip} onSendToTelegram={handleSendToTelegram} isUserLoggedIn={!!user} isLoading={commonDisabled} />
+                     <PullRequestForm id="pr-form-container" repoUrl={repoUrl} // Use combined repoUrl state
+                      prTitle={prTitle} selectedFileCount={selectedAssistantFiles.size} isLoading={isProcessingPR || assistantLoading} isLoadingPrList={loadingPrs} onRepoUrlChange={(url) => { setRepoUrlStateLocal(url); /* Context update happens via effect */ }} onPrTitleChange={setPrTitle} onCreatePR={handleCreateOrUpdatePR} buttonText={prButtonText} buttonIcon={prButtonLoadingIcon} isSubmitDisabled={submitButtonDisabled} />
+                     <OpenPrList openPRs={contextOpenPrs} />
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                        <ToolsMenu customLinks={customLinks} onAddCustomLink={handleAddCustomLink} disabled={commonDisabled}/>
+                         {/* --- BUTTON WITHOUT TOOLTIP --- */}
+                         <button
+                             onClick={() => setIsImageModalOpen(true)}
+                             className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50 relative"
+                             disabled={commonDisabled}
+                             title="Загрузить/Связать Картинки (prompts_imgs.txt)" // Keep basic title
+                         >
+                             <FaImage className="text-gray-400" />
+                             <span className="text-sm text-white">Картинки</span>
+                             {/* Notification dot logic */}
+                             {componentParsedFiles.some(f => f.path === '/prompts_imgs.txt') && !isImageModalOpen && (
+                                 <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-gray-800 animate-pulse"></span>
+                             )}
+                         </button>
+                         {/* --- END BUTTON WITHOUT TOOLTIP --- */}
+                    </div>
+                 </>
+            )}
 
-                {showImageReplaceUI && ( <div className="flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed border-blue-400 min-h-[200px]"> {(assistantLoading || isProcessingPR) ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> ) : ( fetchStatus === 'loading' || fetchStatus === 'retrying') ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> ) : ( imageReplaceTask ? <FaImages className="text-blue-400 text-4xl mb-4" /> : <FaCheck className="text-green-400 text-4xl mb-4" /> )} <p className="text-lg font-semibold text-blue-300"> {(assistantLoading || isProcessingPR) ? "Заменяю картинку и обновляю ветку/PR..." : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Загрузка файла для замены..." : imageReplaceTask ? "Задача Замены Картинки Активна" : "Замена Завершена"} </p> <p className="text-sm text-gray-400 mt-2"> {(assistantLoading || isProcessingPR) ? "Идет процесс..." : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Ожидание..." : imageReplaceTask ? "Файл загружен, ожидание обработки..." : "Процесс завершен."} </p> {imageReplaceTask && ( <div className="mt-3 text-xs text-gray-500 break-all text-left bg-gray-900/50 p-2 rounded max-w-full overflow-x-auto simple-scrollbar"> <p><span className="font-semibold text-gray-400">Файл:</span> {imageReplaceTask.targetPath}</p> <p><span className="font-semibold text-gray-400">Старый URL:</span> {imageReplaceTask.oldUrl}</p> <p><span className="font-semibold text-gray-400">Новый URL:</span> {imageReplaceTask.newUrl}</p> </div> )} </div> )}
+            {showImageReplaceUI && ( <div className="flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed border-blue-400 min-h-[200px]"> {(assistantLoading || isProcessingPR) ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> ) : ( fetchStatus === 'loading' || fetchStatus === 'retrying') ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> ) : ( imageReplaceTask ? <FaImages className="text-blue-400 text-4xl mb-4" /> : <FaCheck className="text-green-400 text-4xl mb-4" /> )} <p className="text-lg font-semibold text-blue-300"> {(assistantLoading || isProcessingPR) ? "Заменяю картинку и обновляю ветку/PR..." : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Загрузка файла для замены..." : imageReplaceTask ? "Задача Замены Картинки Активна" : "Замена Завершена"} </p> <p className="text-sm text-gray-400 mt-2"> {(assistantLoading || isProcessingPR) ? "Идет процесс..." : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Ожидание..." : imageReplaceTask ? "Файл загружен, ожидание обработки..." : "Процесс завершен."} </p> {imageReplaceTask && ( <div className="mt-3 text-xs text-gray-500 break-all text-left bg-gray-900/50 p-2 rounded max-w-full overflow-x-auto simple-scrollbar"> <p><span className="font-semibold text-gray-400">Файл:</span> {imageReplaceTask.targetPath}</p> <p><span className="font-semibold text-gray-400">Старый URL:</span> {imageReplaceTask.oldUrl}</p> <p><span className="font-semibold text-gray-400">Новый URL:</span> {imageReplaceTask.newUrl}</p> </div> )} </div> )}
 
-                 <AnimatePresence> {showStandardAssistantUI && showModal && (<SwapModal isOpen={showModal} onClose={() => setShowModal(false)} onSwap={handleSwap} onSearch={handleSearch} initialMode={modalMode} /> )} {showStandardAssistantUI && isImageModalOpen && (<ImageToolsModal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} parsedFiles={componentParsedFiles} onUpdateParsedFiles={handleUpdateParsedFiles}/> )} </AnimatePresence>
-            </div>
-        </TooltipProvider>
+             <AnimatePresence> {showStandardAssistantUI && showModal && (<SwapModal isOpen={showModal} onClose={() => setShowModal(false)} onSwap={handleSwap} onSearch={handleSearch} initialMode={modalMode} /> )} {showStandardAssistantUI && isImageModalOpen && (<ImageToolsModal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} parsedFiles={componentParsedFiles} onUpdateParsedFiles={handleUpdateParsedFiles}/> )} </AnimatePresence>
+        </div>
       );
 });
 AICodeAssistant.displayName = 'AICodeAssistant';

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"; // Corrected path
+// REMOVED Tooltip Imports
 import { FaRotate, FaCodeBranch, FaGithub } from 'react-icons/fa6'; // Added FaCodeBranch, FaGithub
 
 interface PullRequestFormProps {
@@ -39,7 +39,6 @@ export const PullRequestForm: React.FC<PullRequestFormProps> = ({
     const [showPRDetails, setShowPRDetails] = useState(false);
 
     return (
-        <TooltipProvider> {/* Wrap component in provider */}
         <section id={id || "pr-section"} className="mb-4"> {/* Use id prop or default */}
             <div className="flex flex-col sm:flex-row justify-between items-center mb-3 gap-2">
                 <h2 className="text-lg font-semibold text-cyan-400">
@@ -64,13 +63,9 @@ export const PullRequestForm: React.FC<PullRequestFormProps> = ({
                         {buttonText}
                     </motion.button>
                     {/* Details Toggle Button */}
-                    <Tooltip text="Показать/скрыть детали" position="top">
-                         <TooltipTrigger asChild>
-                       <button className="text-blue-400 hover:text-blue-300 transition text-sm p-1" onClick={() => setShowPRDetails(!showPRDetails)}>
+                       <button className="text-blue-400 hover:text-blue-300 transition text-sm p-1" onClick={() => setShowPRDetails(!showPRDetails)} title="Показать/скрыть детали">
                            {showPRDetails ? "Скрыть детали" : "Детали"}
                        </button>
-                        </TooltipTrigger>
-                   </Tooltip>
                 </div>
             </div>
 
@@ -106,7 +101,6 @@ export const PullRequestForm: React.FC<PullRequestFormProps> = ({
                 )}
             </AnimatePresence>
         </section>
-        </TooltipProvider>
     );
 };
 PullRequestForm.displayName = 'PullRequestForm';
