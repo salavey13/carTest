@@ -31,7 +31,7 @@ import {
 import clsx from "clsx";
 import { saveAs } from "file-saver";
 import { logger } from "@/lib/logger";
-import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"; // Correct import path
 import { selectFunctionDefinition, extractFunctionName } from "@/lib/codeUtils";
 
 // Interfaces
@@ -393,7 +393,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
              let prToUpdate: SimplePullRequest | null = null; if (contextOpenPrs && contextOpenPrs.length > 0) { prToUpdate = contextOpenPrs.find(pr => pr.title.toLowerCase().includes("ai changes") || pr.title.toLowerCase().includes("supervibe") || pr.title.toLowerCase().includes("ai assistant") || pr.title.toLowerCase().includes(commitSubj.toLowerCase().substring(0, 20))) ?? null; if (prToUpdate) { logger.log(`Found existing PR #${prToUpdate.number}.`); toast.info(`Обновляю существующий PR #${prToUpdate.number}...`); } else { logger.log("No suitable existing PR found."); } }
              const branchToUpdate = prToUpdate?.head.ref || targetBranchName;
              if (branchToUpdate) { logger.log(`Updating branch '${branchToUpdate}'. PR#: ${prToUpdate?.number}`); toast.info(`Обновление ветки '${branchToUpdate}'...`); const updateResult = await triggerUpdateBranch( repoUrl, filesToCommit, fullCommitMsg, branchToUpdate, prToUpdate?.number, finalDesc ); if (!updateResult.success) { logger.error(`Failed to update branch '${branchToUpdate}': ${updateResult.error}`); } }
-             else { logger.log(`Creating new PR.`); toast.info(`Создание нового PR...`); const result = await createGitHubPullRequest(repoUrl, filesToCommit, prTitle.trim(), finalDesc, fullCommitMsg); if (result.success && result.prUrl) { toast.success(`PR создан: ${result.prUrl}`); // Admin notified inside action 
+             else { logger.log(`Creating new PR.`); toast.info(`Создание нового PR...`); const result = await createGitHubPullRequest(repoUrl, filesToCommit, prTitle.trim(), finalDesc, fullCommitMsg); if (result.success && result.prUrl) { toast.success(`PR создан: ${result.prUrl}`); // Admin notified inside action
 await triggerGetOpenPRs(repoUrl); logger.log(`New PR created: ${result.prUrl}`); } else { toast.error("Ошибка создания PR: " + (result.error || "?")); logger.error("PR Creation Failed:", result.error); } }
         } catch (err) { toast.error(`Крит. ошибка ${targetBranchName ? 'обновления ветки' : 'создания PR'}.`); logger.error("PR/Update error:", err); }
         finally { setIsProcessingPR(false); setAssistantLoading(false); logger.log("[handleCreateOrUpdatePR] Finished."); }
@@ -444,7 +444,27 @@ await triggerGetOpenPRs(repoUrl); logger.log(`New PR created: ${result.prUrl}`);
                          <OpenPrList openPRs={contextOpenPrs} />
                         <div className="flex items-center gap-3 mt-2 flex-wrap">
                             <ToolsMenu customLinks={customLinks} onAddCustomLink={handleAddCustomLink} disabled={commonDisabled}/>
-                             <Tooltip delayDuration={200}> <TooltipTrigger asChild> <button onClick={() => setIsImageModalOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50 relative" disabled={commonDisabled} > <FaImage className="text-gray-400" /> <span className="text-sm text-white">Картинки</span> {componentParsedFiles.some(f => f.path === '/prompts_imgs.txt') && !isImageModalOpen && ( <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-gray-800 animate-pulse"></span> )} </button> </TooltipTrigger> <TooltipContent side="top" className="bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-2 rounded"> Загрузить/Связать Картинки (prompts_imgs.txt) </TooltipContent> </Tooltip>
+                             {/* --- FIXED TOOLTIP STRUCTURE --- */}
+                             <Tooltip delayDuration={200}>
+                                 <TooltipTrigger asChild>
+                                     <button
+                                         onClick={() => setIsImageModalOpen(true)}
+                                         className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50 relative"
+                                         disabled={commonDisabled}
+                                     >
+                                         <FaImage className="text-gray-400" />
+                                         <span className="text-sm text-white">Картинки</span>
+                                         {/* Notification dot logic */}
+                                         {componentParsedFiles.some(f => f.path === '/prompts_imgs.txt') && !isImageModalOpen && (
+                                             <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-gray-800 animate-pulse"></span>
+                                         )}
+                                     </button>
+                                 </TooltipTrigger>
+                                 <TooltipContent side="top" className="bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-2 rounded">
+                                     Загрузить/Связать Картинки (prompts_imgs.txt)
+                                 </TooltipContent>
+                             </Tooltip>
+                            {/* --- END FIXED TOOLTIP --- */}
                         </div>
                      </>
                 )}
