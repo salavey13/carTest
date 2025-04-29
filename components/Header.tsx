@@ -8,27 +8,25 @@ import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
-// .. Импортируем новые иконки
 import {
   FaCar, FaCircleUser, FaWandMagicSparkles, FaRocket, FaRoad, FaBookOpen,
   FaBrain, FaRobot, FaMagnifyingGlass, FaGift, FaUserShield, FaCarOn,
   FaYoutube, FaFileInvoiceDollar, FaCreditCard, FaHeart, FaPalette,
   FaCircleInfo, FaListCheck, FaNetworkWired, FaRegLightbulb, FaUpload,
-  FaUserNinja, FaGlobe, FaLandmarkDome // <-- Добавлены иконки для шпаргалок и ВПР
+  FaUserNinja, FaGlobeEurope, FaLandmarkDome, FaLeaf
 } from "react-icons/fa6";
 
 // --- Page Definitions ---
 interface PageInfo {
   path: string;
-  name: string; // English name acts as the key for translations
+  name: string;
   icon?: React.ComponentType<{ className?: string }>;
   isImportant?: boolean;
   isAdminOnly?: boolean;
-  isHot?: boolean; // <-- Флаг для новинок
+  isHot?: boolean;
   color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red';
 }
 
-// .. Добавляем новые страницы
 const allPages: PageInfo[] = [
   // --- Важные ссылки ---
   { path: "/", name: "Cyber Garage", icon: FaCar, isImportant: true, color: "cyan" },
@@ -39,9 +37,7 @@ const allPages: PageInfo[] = [
   { path: "/p-plan", name: "VIBE Plan", icon: FaUserNinja, isImportant: true, isHot: true, color: "yellow" },
   { path: "/ai-work-future", name: "AI & Future of Work", icon: FaNetworkWired, color: "cyan", isImportant: true },
   { path: "/advice", name: "Advice", icon: FaRegLightbulb, isImportant: true, color: "purple" },
-  // --- Новая большая плитка ВПР Тесты ---
   { path: "/vpr-tests", name: "VPR Tests", icon: FaListCheck, isImportant: true, color: 'pink' },
-  // --------------------------------------
   // --- Обычные ссылки ---
   { path: "/purpose-profit", name: "Purpose & Profit", icon: FaBookOpen, color: "purple" },
   { path: "/expmind", name: "Experimental Mindset", icon: FaBrain, color: "pink" },
@@ -55,10 +51,10 @@ const allPages: PageInfo[] = [
   { path: "/onesitepls", name: "oneSitePls Info", icon: FaCircleInfo },
   { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: FaListCheck },
   { path: "/rent-car", name: "Rent a Car", icon: FaCar },
-  // --- Новые маленькие плитки-шпаргалки ---
-  { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: FaGlobe, color: 'green' },
+  // --- Шпаргалки ---
+  { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: FaGlobeEurope, color: 'green' },
   { path: "/vpr/history/6/cheatsheet", name: "History Cheatsheet 6", icon: FaLandmarkDome, color: 'yellow' },
-  // -----------------------------------------
+  { path: "/vpr/biology/6/cheatsheet", name: "Biology Cheatsheet 6", icon: FaLeaf, color: 'lime' },
   // --- Админские ссылки ---
   { path: "/advice-upload", name: "Upload Advice", icon: FaUpload, isAdminOnly: true, isImportant: true, color: "red" },
   { path: "/admin", name: "Admin Panel", icon: FaUserShield, isAdminOnly: true, color: "red" },
@@ -77,7 +73,7 @@ const translations: Record<string, Record<string, string>> = {
     "VIBE Plan": "VIBE Plan",
     "Advice": "Advice",
     "AI & Future of Work": "AI & Future of Work",
-    "VPR Tests": "VPR Tests", // <-- Добавлен перевод EN
+    "VPR Tests": "VPR Tests",
     "Purpose & Profit": "Purpose & Profit",
     "Experimental Mindset": "Experimental Mindset",
     "Bot Busters": "Bot Busters",
@@ -94,8 +90,9 @@ const translations: Record<string, Record<string, string>> = {
     "oneSitePls Info": "oneSitePls Info",
     "oneSitePls How-To": "oneSitePls How-To",
     "Rent a Car": "Rent a Car",
-    "Geo Cheatsheet 6": "Geo Cheatsheet 6", // <-- Добавлен перевод EN
-    "History Cheatsheet 6": "History Cheatsheet 6", // <-- Добавлен перевод EN
+    "Geo Cheatsheet 6": "Geo Cheatsheet 6",
+    "History Cheatsheet 6": "History Cheatsheet 6",
+    "Biology Cheatsheet 6": "Biology Cheatsheet 6",
     "Search pages...": "Search pages...",
     "No pages found matching": "No pages found matching",
     "Admin Only": "Admin Only",
@@ -113,7 +110,7 @@ const translations: Record<string, Record<string, string>> = {
     "VIBE Plan": "VIBE План",
     "Advice": "Советы",
     "AI & Future of Work": "ИИ и Будущее Работы",
-    "VPR Tests": "ВПР Тесты", // <-- Добавлен перевод RU
+    "VPR Tests": "ВПР Тесты",
     "Purpose & Profit": "Цель и Прибыль",
     "Experimental Mindset": "Эксперим. Мышление",
     "Bot Busters": "Охотники за Ботами",
@@ -130,8 +127,9 @@ const translations: Record<string, Record<string, string>> = {
     "oneSitePls Info": "Инфо oneSitePls",
     "oneSitePls How-To": "Как юзать oneSitePls",
     "Rent a Car": "Аренда Авто",
-    "Geo Cheatsheet 6": "Шпаргалка Гео 6", // <-- Добавлен перевод RU
-    "History Cheatsheet 6": "Шпаргалка Ист 6", // <-- Добавлен перевод RU
+    "Geo Cheatsheet 6": "Шпаргалка Гео 6",
+    "History Cheatsheet 6": "Шпаргалка Ист 6",
+    "Biology Cheatsheet 6": "Шпаргалка Био 6",
     "Search pages...": "Поиск страниц...",
     "No pages found matching": "Страницы не найдены по запросу",
     "Admin Only": "Только для админа",
@@ -141,7 +139,6 @@ const translations: Record<string, Record<string, string>> = {
     "Hot": "Новинка",
   }
 };
-
 
 // --- Header Component ---
 export default function Header() {
@@ -159,15 +156,12 @@ export default function Header() {
   const [currentLang, setCurrentLang] = useState<'en' | 'ru'>(initialLang);
 
   useEffect(() => {
-      const userLang = user?.language_code;
-      const newLangBasedOnUser = userLang === 'ru' ? 'ru' : 'en';
-      if (newLangBasedOnUser !== currentLang) {
-           // console.log(`Header: User language changed to ${userLang}, updating state to ${newLangBasedOnUser}`); // Commented out for cleaner logs
-           setCurrentLang(newLangBasedOnUser);
-      }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.language_code]);
-
+    const userLang = user?.language_code;
+    const newLangBasedOnUser = userLang === 'ru' ? 'ru' : 'en';
+    if (newLangBasedOnUser !== currentLang) {
+      setCurrentLang(newLangBasedOnUser);
+    }
+  }, [user?.language_code, currentLang]);
 
   const t = useCallback((key: string): string => {
     return translations[currentLang]?.[key] || translations['en']?.[key] || key;
@@ -175,14 +169,12 @@ export default function Header() {
 
   const toggleLang = useCallback(() => {
     setCurrentLang(prevLang => prevLang === 'en' ? 'ru' : 'en');
-    // console.log(`Header: Language manually toggled to ${currentLang === 'en' ? 'ru' : 'en'}`); // Commented out for cleaner logs
-  }, [currentLang]);
+  }, []);
 
   const currentLogoText = useMemo(() => {
     const currentPage = allPages.find(p => p.path === pathname);
-    // .. Специальное правило для шпаргалок и тестов ВПР, чтобы в лого было VPR
     if (pathname?.startsWith('/vpr')) {
-        return "VPR";
+      return "VPR";
     }
     const baseName = currentPage?.name || "VIBE";
     const translatedFirstName = t(baseName)?.split(' ')[0];
@@ -192,12 +184,12 @@ export default function Header() {
   const filteredPages = useMemo(() => {
     const lowerSearchTerm = searchTerm.toLowerCase();
     return allPages
-      .filter(page => !(page.isAdminOnly && !isAdmin)) // Filter admin pages if not admin
+      .filter(page => !(page.isAdminOnly && !isAdmin))
       .map(page => ({
         ...page,
-        translatedName: t(page.name) // Translate name
+        translatedName: t(page.name)
       }))
-      .filter(page => page.translatedName.toLowerCase().includes(lowerSearchTerm)); // Search in translated name
+      .filter(page => page.translatedName.toLowerCase().includes(lowerSearchTerm));
   }, [searchTerm, isAdmin, t]);
 
   const handleScroll = useCallback(() => {
@@ -251,7 +243,6 @@ export default function Header() {
     default: "border-gray-700/80 hover:border-brand-green/70 text-gray-400 hover:text-brand-green"
   };
 
-
   return (
     <>
       {/* Header Bar */}
@@ -269,10 +260,10 @@ export default function Header() {
             <div className="flex items-center gap-3 md:gap-4">
               {/* Language Toggle Button */}
               <button
-                 onClick={toggleLang}
-                 className="p-1 sm:p-2 text-xs sm:text-sm font-semibold text-brand-cyan hover:text-brand-cyan/80 transition-colors focus:outline-none focus:ring-1 focus:ring-brand-cyan focus:ring-offset-2 focus:ring-offset-black rounded-md"
-                 aria-label={t("Toggle Language")}
-                 title={t("Toggle Language")}
+                onClick={toggleLang}
+                className="p-1 sm:p-2 text-xs sm:text-sm font-semibold text-brand-cyan hover:text-brand-cyan/80 transition-colors focus:outline-none focus:ring-1 focus:ring-brand-cyan focus:ring-offset-2 focus:ring-offset-black rounded-md"
+                aria-label={t("Toggle Language")}
+                title={t("Toggle Language")}
               >
                 {currentLang === 'en' ? 'RU' : 'EN'}
               </button>
@@ -353,39 +344,39 @@ export default function Header() {
                         {/* --- Иконка Новинки (Hot) --- */}
                         {page.isHot && (
                           <span
-                             title={t("Hot")} // Используем перевод для title
-                             className="absolute top-0.5 left-0.5 text-[0.5rem] bg-red-500/80 text-white rounded-full px-1 py-0 leading-none animate-pulse"
-                             aria-label={t("Hot")} // aria-label для доступности
+                            title={t("Hot")}
+                            className="absolute top-0.5 left-0.5 text-[0.5rem] bg-red-500/80 text-white rounded-full px-1 py-0 leading-none animate-pulse"
+                            aria-label={t("Hot")}
                           >
                             🔥
                           </span>
                         )}
                         {/* ---------------------------- */}
                         {PageIcon && (
-                            <PageIcon className={cn(
-                                "h-4 w-4 sm:h-5 sm:w-5 md:h-4 md:w-4 mb-0.5 transition-transform duration-300 group-hover:scale-110",
-                                page.isImportant ? "text-brand-yellow h-5 w-5 sm:h-6 sm:w-6 md:h-5 md:w-5" : "inherit"
-                            )} />
+                          <PageIcon className={cn(
+                            "h-4 w-4 sm:h-5 sm:w-5 md:h-4 md:w-4 mb-0.5 transition-transform duration-300 group-hover:scale-110",
+                            page.isImportant ? "text-brand-yellow h-5 w-5 sm:h-6 sm:w-6 md:h-5 md:w-5" : "inherit"
+                          )} />
                         )}
                         <span className={cn(
-                            "font-semibold transition-colors leading-tight",
-                            "text-[0.6rem] sm:text-xs md:text-[0.6rem] md:leading-none",
-                            page.isImportant ? "text-white text-[0.7rem] sm:text-sm md:text-xs" : "text-gray-300 group-hover:text-white"
+                          "font-semibold transition-colors leading-tight",
+                          "text-[0.6rem] sm:text-xs md:text-[0.6rem] md:leading-none",
+                          page.isImportant ? "text-white text-[0.7rem] sm:text-sm md:text-xs" : "text-gray-300 group-hover:text-white"
                         )}>
                           {page.translatedName}
                         </span>
-                        {/* Иконка Админа (сдвинута немного правее, чтобы не перекрывать новинку) */}
+                        {/* Иконка Админа */}
                         {page.isAdminOnly && (
-                           <span title={t("Admin Only")} className="absolute top-0.5 right-0.5 text-[0.5rem] text-red-400 bg-black/60 rounded-full px-1 py-0 leading-none">🛡️</span>
+                          <span title={t("Admin Only")} className="absolute top-0.5 right-0.5 text-[0.5rem] text-red-400 bg-black/60 rounded-full px-1 py-0 leading-none">🛡️</span>
                         )}
                       </Link>
                     );
                   })}
                 </div>
               ) : (
-                 <p className="text-center text-gray-500 text-sm md:text-base mt-6 md:mt-8">
-                    {t("No pages found matching")} "{searchTerm}"
-                 </p>
+                <p className="text-center text-gray-500 text-sm md:text-base mt-6 md:mt-8">
+                  {t("No pages found matching")} "{searchTerm}"
+                </p>
               )}
             </div>
           </motion.div>
