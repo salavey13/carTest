@@ -42,11 +42,9 @@ const getPageFilePath = (rP:string, aP:string[]):string|null=>{ const cP=rP.star
 const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   // === Состояние компонента ===
   const [isMounted, setIsMounted] = useState(false);
-  // Use context repoUrl state for consistency, local only if editing needed separate from context
-  // const [repoUrl, setRepoUrlState] = useState<string>("https://github.com/salavey13/cartest"); // Keep local if needed for SettingsModal direct editing
   const [token, setToken] = useState<string>(""); // Keep local for SettingsModal
-  const [files, setFiles] = useState<FileNode[]>([]);
-  // REMOVED: const [selectedFiles, setSelectedFilesState] = useState<Set<string>>(new Set()); // Local UI state removed
+  const [files, setFiles] = useState<FileNode[]>([]); // Local state for fetched file list
+  // REMOVED: const [selectedFiles, setSelectedFilesState] = useState<Set<string>>(new Set()); // Use context selection directly
   const [progress, setProgress] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [primaryHighlightedPath, setPrimaryHighlightedPathState] = useState<string | null>(null);
@@ -55,7 +53,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
   // === Контекст ===
    const {
       fetchStatus, setFetchStatus, repoUrlEntered, setRepoUrlEntered, filesFetched, setFilesFetched: setFilesFetchedCombined,
-      selectedFetcherFiles, setSelectedFetcherFiles, // Use context selection directly
+      selectedFetcherFiles, setSelectedFetcherFiles, // Use context selection state and setter
       kworkInputHasContent, setKworkInputHasContent, setRequestCopied,
       aiActionLoading, currentStep, loadingPrs, assistantLoading, isParsing, currentAiRequestId,
       targetBranchName, setTargetBranchName, manualBranchName, setManualBranchName, openPrs, setOpenPrs,
@@ -90,7 +88,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
 
   // === Рефы ===
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  // REMOVED: const localKworkInputRef = useRef<HTMLTextAreaElement | null>(null);
   const prevSelectedFilesRef = useRef<Set<string>>(new Set());
   const isImageTaskFetchInitiated = useRef(false);
   const isAutoFetchingRef = useRef(false);
@@ -98,7 +95,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
 
   // === Эффекты ===
   useEffect(() => { setIsMounted(true); }, []);
-  // REMOVED: Effect linking localKworkInputRef to context kworkInputRef
   useEffect(() => { fetchStatusRef.current = fetchStatus; }, [fetchStatus]);
   useEffect(() => {
       // Sync assistant's repo URL state if context URL changes
@@ -107,23 +103,20 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       } else if (isMounted) {
            logger.warn("[RepoTxtFetcher URL Effect] assistantRef not ready when URL changed.");
       }
-      // Keep resetting PRs/branch on URL change? Maybe only if it *actually* changed?
-      // Could add a prevRepoUrl state to compare if needed.
+      // Reset PRs/branch on URL change
       setOpenPrs([]);
       setTargetBranchName(null);
       setManualBranchName("");
     }, [isMounted, repoUrl, updateRepoUrlInAssistant, setOpenPrs, setTargetBranchName, setManualBranchName, assistantRef, logger]); // Depend on context repoUrl
   useEffect(() => { return () => stopProgressSimulation(); }, []);
-  // REMOVED: useEffect(() => { setSelectedFilesState(selectedFetcherFiles); }, [selectedFetcherFiles]); // REMOVED: No longer need to sync local state
+  // REMOVED: useEffect(() => { setSelectedFilesState(selectedFetcherFiles); }, [selectedFetcherFiles]); // No longer need to sync local state
 
   // === Утилиты и Колбэки ===
   const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => { toast[type](message, { duration: 3000 }); }, []);
-  // Now reads kworkInputRef directly from context where needed
   const updateKworkInput = useCallback((value: string) => { if (kworkInputRef.current) { kworkInputRef.current.value = value; const event = new Event('input', { bubbles: true }); kworkInputRef.current.dispatchEvent(event); setKworkInputHasContent(value.trim().length > 0); } else { logger.warn("Context kworkInputRef is null in updateKworkInput"); } }, [kworkInputRef, setKworkInputHasContent, logger]);
   const getKworkInputValue = useCallback((): string => kworkInputRef.current?.value || "", [kworkInputRef]);
   const stopProgressSimulation = useCallback(() => { if (progressIntervalRef.current) { clearInterval(progressIntervalRef.current); progressIntervalRef.current = null; } }, []);
   const startProgressSimulation = useCallback((estimatedDurationSeconds = 13) => { stopProgressSimulation(); setProgress(0); const ticks = estimatedDurationSeconds * 5; const increment = 100 / ticks; let currentProgress = 0; progressIntervalRef.current = setInterval(() => { currentProgress += increment; setProgress(prev => Math.min(prev + increment, 95)); // Cap at 95% if (currentProgress >= 100 || fetchStatusRef.current !== 'loading') { stopProgressSimulation(); } }, 200); }, [stopProgressSimulation, logger, fetchStatusRef]);
-  // handleRepoUrlChange is now the context setter
   const handleCopyToClipboard = useCallback((textToCopy?: string, shouldScroll = true): boolean => { const c=textToCopy??getKworkInputValue(); if(!c.trim()){addToast("Нет текста для копирования",'warning');return false;} try{ navigator.clipboard.writeText(c); addToast("Скопировано!",'success'); setRequestCopied(true); if(shouldScroll)scrollToSection('executor'); return true; }catch(e){ logger.error("Copy error:",e); addToast("Ошибка копирования",'error'); return false; } }, [getKworkInputValue, scrollToSection, addToast, setRequestCopied, logger]);
   const handleClearAll = useCallback(() => { if (imageReplaceTask) { addToast("Очистка недоступна во время замены картинки.", "warning"); return; } logger.log("Fetcher: Clearing state."); /* setSelectedFilesState(new Set()); REMOVED */ setSelectedFetcherFiles(new Set()); updateKworkInput(""); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set()); setRequestCopied(false); addToast("Очищено ✨", 'success'); if (kworkInputRef.current) kworkInputRef.current.focus(); }, [ imageReplaceTask, setSelectedFetcherFiles, updateKworkInput, addToast, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setRequestCopied, logger, kworkInputRef ]); // Added kworkInputRef
 
@@ -302,13 +295,12 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       let filesToAutoSelect = new Set<string>();
 
       try {
-           // --- Add logging right before the call ---
-           logger.log(`Fetcher(Manual): FINAL CHECK - Calling fetchRepoContents for URL: ${repoUrl}, Branch: "${branchForContentFetch}"`);
+           logger.log(`Fetcher(Manual): FINAL CHECK - Calling fetchRepoContents for URL: ${repoUrl}, Branch: "${branchForContentFetch}"`); // Added log
            fetchResult = await fetchRepoContents(repoUrl, token || undefined, branchForContentFetch);
            if (fetchResult?.success && Array.isArray(fetchResult.files)) {
                fetchAttemptSucceeded = true; fetchedFilesData = fetchResult.files; const allPaths = fetchedFilesData.map(f => f.path);
                logger.log(`Fetcher(Manual): Fetched ${fetchedFilesData.length} files from '${branchForContentFetch}'.`);
-               setFiles(fetchedFilesData); // Update local `files` state for FileList rendering
+               setFiles(fetchedFilesData);
 
                if(currentTask){
                    primaryHighlightPath = currentTask.targetPath; setPrimaryHighlightedPathState(primaryHighlightPath);
@@ -333,7 +325,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                    if(isSettingsModalOpen) triggerToggleSettingsModal();
                }
            } else { fetchAttemptSucceeded = false; throw new Error(fetchResult?.error || `Не удалось получить файлы из ${branchForContentFetch}.`); }
-       } catch (err: any) { const displayError = err?.message || "Неизвестная ошибка."; logger.error(`Fetcher(Manual): Fetch Error - ${displayError}`, err); setError(displayError); addToast(`Ошибка: ${displayError}`, 'error'); fetchAttemptSucceeded = false; setFiles([]); /* setSelectedFilesState(new Set()); REMOVED */ setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setSelectedFetcherFiles(new Set()); }
+       } catch (err: any) { const displayError = err?.message || "Неизвестная ошибка."; logger.error(`Fetcher(Manual): Fetch Error - ${displayError}`, err); setError(displayError); addToast(`Ошибка: ${displayError}`, 'error'); fetchAttemptSucceeded = false; setFiles([]); /*setSelectedFilesState(new Set()); REMOVED*/ setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setSelectedFetcherFiles(new Set()); }
        finally {
            stopProgressSimulation();
            const overallSuccess = fetchAttemptSucceeded;
@@ -342,15 +334,17 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
            if (currentTask && !overallSuccess) { isImageTaskFetchInitiated.current = false; }
            logger.log(`Fetcher(Manual): Finished. Fetch Success: ${overallSuccess}, Branch Fetched: ${branchForContentFetch}`);
        }
-   }, [
+    }, [
        repoUrl, token, imageReplaceTask, targetBranchName, manualBranchName,
        assistantLoading, isParsing, aiActionLoading, autoFetch, ideaFromUrl, isSettingsModalOpen,
-       setFetchStatus, setError, setFiles, /*setSelectedFilesState, REMOVED*/ setPrimaryHighlightedPathState, setSecondaryHighlightedPathsState, setSelectedFetcherFiles, setFilesFetchedCombined,
+       setFetchStatus, setError, setFiles, /* setSelectedFilesState, REMOVED */ setPrimaryHighlightedPathState, setSecondaryHighlightedPathsState, setSelectedFetcherFiles, setFilesFetchedCombined,
        setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setLoadingPrs, setOpenPrs, setTargetBranchName,
        triggerToggleSettingsModal,
        importantFiles, addToast, startProgressSimulation, stopProgressSimulation, updateKworkInput, getKworkInputValue,
        logger, scrollToSection, highlightedPathFromUrl // Added highlightedPathFromUrl
-   ]);
+       // NOTE: Removed `files` from dependencies as it's set *within* the callback, preventing infinite loops.
+       // Other state setters are stable.
+    ]);
 
 
   // --- Effect: Auto-Fetch (Adjust finally block) ---
@@ -374,7 +368,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                 logger.log("[AutoFetch Effect] Resetting fetch guard.");
                 isAutoFetchingRef.current = false;
                 // Reset image task flag if fetch didn't succeed or resulted in error
-                const currentStatus = fetchStatusRef.current; // Read the latest status via ref
+                // Read the status *after* handleFetchManual has potentially updated it
+                const currentStatus = fetchStatusRef.current;
                 if (currentTask && (currentStatus === 'error' || currentStatus === 'failed_retries')) {
                      isImageTaskFetchInitiated.current = false;
                      logger.log(`[AutoFetch Effect] Resetting image task initiated flag due to status: ${currentStatus}.`);
@@ -392,7 +387,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       targetBranchName,
       manualBranchName,
       imageReplaceTask,
-      fetchStatus, // Keep depending on context status to re-evaluate trigger conditions
+      fetchStatus,
       handleFetchManual,
       logger
    ]);
