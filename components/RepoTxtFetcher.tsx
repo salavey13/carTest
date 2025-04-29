@@ -334,6 +334,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
            if (currentTask && !overallSuccess) { isImageTaskFetchInitiated.current = false; }
            logger.log(`Fetcher(Manual): Finished. Fetch Success: ${overallSuccess}, Branch Fetched: ${branchForContentFetch}`);
        }
+    // --- FIX: Corrected dependency array closing parenthesis ---
     }, [
        repoUrl, token, imageReplaceTask, targetBranchName, manualBranchName,
        assistantLoading, isParsing, aiActionLoading, autoFetch, ideaFromUrl, isSettingsModalOpen,
@@ -341,10 +342,10 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
        setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setLoadingPrs, setOpenPrs, setTargetBranchName,
        triggerToggleSettingsModal,
        importantFiles, addToast, startProgressSimulation, stopProgressSimulation, updateKworkInput, getKworkInputValue,
-       logger, scrollToSection, highlightedPathFromUrl // Added highlightedPathFromUrl
+       logger, scrollToSection, highlightedPathFromUrl
        // NOTE: Removed `files` from dependencies as it's set *within* the callback, preventing infinite loops.
        // Other state setters are stable.
-    ]);
+    ]); // <--- This closing parenthesis was missing
 
 
   // --- Effect: Auto-Fetch (Adjust finally block) ---
