@@ -8,6 +8,7 @@ import AutomationBuddy from "@/components/AutomationBuddy";
 import {
     useRepoXmlPageContext, RepoXmlPageProvider,
     RepoTxtFetcherRef, AICodeAssistantRef, ImageReplaceTask
+    // Provider no longer needed here for refs
 } from '@/contexts/RepoXmlPageContext';
 import { useAppContext } from "@/contexts/AppContext";
 import { debugLogger as logger } from "@/lib/debugLogger";
@@ -58,24 +59,25 @@ const RenderContent: React.FC<{ content: string }> = React.memo(({ content }) =>
 });
 RenderContent.displayName = 'RenderContent';
 
-// --- ActualPageContent Component (Needs to read params, so it uses useSearchParams) ---
+// --- ActualPageContent Component (Ref handling removed) ---
 function ActualPageContent() {
-    const localFetcherRef = useRef<RepoTxtFetcherRef | null>(null);
-    const localAssistantRef = useRef<AICodeAssistantRef | null>(null);
-    const aiResponseInputRef = useRef<HTMLTextAreaElement | null>(null);
-    const prSectionRef = useRef<HTMLElement | null>(null);
+    // REMOVED: localFetcherRef, localAssistantRef, aiResponseInputRef, prSectionRef
     const { user } = useAppContext();
     const {
+        // Get refs DIRECTLY from context
+        fetcherRef,
+        assistantRef,
+        kworkInputRef,
+        aiResponseInputRef,
+        // Other context values...
         setImageReplaceTask,
-        fetcherRef: contextFetcherRef,
-        assistantRef: contextAssistantRef,
-        kworkInputRef: contextKworkInputRef,
         setKworkInputHasContent,
         fetchStatus,
         imageReplaceTask,
         allFetchedFiles,
-        selectedFetcherFiles, // Get context selection state
+        selectedFetcherFiles,
     } = useRepoXmlPageContext();
+
     const [isMounted, setIsMounted] = useState(false);
     const [lang, setLang] = useState<Language>('en');
     const [showComponents, setShowComponents] = useState(false);
@@ -85,13 +87,9 @@ function ActualPageContent() {
     const [initialIdea, setInitialIdea] = useState<string | null>(null);
     const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(false);
 
-    // --- Link refs to context ---
-    useEffect(() => {
-        if (localFetcherRef.current && contextFetcherRef) contextFetcherRef.current = localFetcherRef.current;
-        if (localAssistantRef.current && contextAssistantRef) contextAssistantRef.current = localAssistantRef.current;
-    }, [contextFetcherRef, contextAssistantRef, localFetcherRef, localAssistantRef]);
+    // REMOVED: useEffect that linked local refs to context refs
 
-    // --- Effect 1: Process URL Params and Set Initial State ---
+    // --- Effect 1: Process URL Params and Set Initial State (no changes) ---
     useEffect(() => {
       setIsMounted(true);
       const bL = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
@@ -140,28 +138,26 @@ function ActualPageContent() {
     }, [user, searchParams, setImageReplaceTask]);
 
 
-    // --- Effect 2: Populate Kwork Input AFTER Initial Fetch Attempt ---
+    // --- Effect 2: Populate Kwork Input AFTER Initial Fetch Attempt (no changes to logic, but uses context fetcherRef) ---
     useEffect(() => {
       const fetchAttemptFinished = isMounted && (fetchStatus === 'success' || fetchStatus === 'error' || fetchStatus === 'failed_retries');
 
       if (fetchAttemptFinished && initialIdea && !initialIdeaProcessed && !imageReplaceTask) {
           logger.log(`[ActualPageContent Effect 2] Fetch finished (${fetchStatus}). Populating kwork with stored idea:`, initialIdea.substring(0,50) + "...");
-          if (contextKworkInputRef.current) {
+          if (kworkInputRef.current) { // Use context ref
               // Set the idea text first
-              contextKworkInputRef.current.value = initialIdea;
+              kworkInputRef.current.value = initialIdea;
               const inputEvent = new Event('input', { bubbles: true });
-              contextKworkInputRef.current.dispatchEvent(inputEvent);
+              kworkInputRef.current.dispatchEvent(inputEvent);
               setKworkInputHasContent(initialIdea.trim().length > 0);
               logger.log("[ActualPageContent Effect 2] Populated kwork input via context ref.");
 
               // Now, trigger adding the selected files to this idea text
-              if (contextFetcherRef.current?.handleAddSelected) {
-                    // Ensure files have been potentially auto-selected by Fetcher before calling this
-                    // Check if selection state has files (it should have been updated by Fetcher)
+              if (fetcherRef.current?.handleAddSelected) { // Use context ref
                     if (selectedFetcherFiles.size > 0) {
                         logger.log("[ActualPageContent Effect 2] Calling fetcherRef.handleAddSelected to append auto-selected files to the idea.");
-                        // Pass undefined to use the context's selection state
-                        contextFetcherRef.current.handleAddSelected(undefined, allFetchedFiles)
+                        // Pass context state directly
+                        fetcherRef.current.handleAddSelected(selectedFetcherFiles, allFetchedFiles)
                             .then(() => logger.log("[ActualPageContent Effect 2] handleAddSelected call finished."))
                             .catch(err => logger.error("[ActualPageContent Effect 2] Error calling handleAddSelected:", err));
                     } else {
@@ -188,13 +184,14 @@ function ActualPageContent() {
           setInitialIdeaProcessed(true);
            logger.log(`[ActualPageContent Effect 2] Fetch finished (${fetchStatus}), no pending idea to process.`);
       }
-    // Added selectedFetcherFiles dependency to ensure handleAddSelected uses updated selection
-    }, [isMounted, fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, contextKworkInputRef, setKworkInputHasContent, contextFetcherRef, allFetchedFiles, selectedFetcherFiles]);
+    // Dependencies updated
+    }, [isMounted, fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles]);
 
     const t = translations[lang];
     const userName = user?.first_name || (lang === 'ru' ? 'Чувак/Чика' : 'Dude/Chica');
 
     const scrollToSectionNav = (id: string) => {
+        // ... (no changes needed in this function)
         if (['extractor', 'executor', 'cybervibe-section'].includes(id)) {
             if (!showComponents) {
                 setShowComponents(true);
@@ -214,7 +211,7 @@ function ActualPageContent() {
         }
     };
 
-    // Render loading state based on isMounted
+    // Render loading state (no changes)
     if (!isMounted) {
          const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
          const loadingText = translations[loadingLang].loading;
@@ -265,12 +262,30 @@ function ActualPageContent() {
                 {/* Reveal Button */}
                 {!showComponents && ( <section id="reveal-trigger" className="mb-12 w-full max-w-3xl text-center"> <Button onClick={() => setShowComponents(true)} className="bg-gradient-to-r from-green-500 to-cyan-500 text-gray-900 font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:scale-105 transform transition duration-300 animate-bounce" size="lg"> <FaHandSparkles className="mr-2"/> {t.readyButton} </Button> </section> )}
 
-                {/* WORKHORSE Components */}
+                {/* WORKHORSE Components (Pass context refs directly) */}
                 {showComponents && (
                      <>
                         <h2 className="text-3xl font-bold text-center text-brand-green mb-8 animate-pulse">{t.componentsTitle}</h2>
-                         <section id="extractor" className="mb-12 w-full max-w-4xl"> <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg"> <CardContent className="p-4"> <RepoTxtFetcher ref={localFetcherRef} /> </CardContent> </Card> </section>
-                        <section id="executor" ref={prSectionRef} className="mb-12 w-full max-w-4xl pb-16"> <Card className="bg-gray-900/80 border border-purple-700/50 shadow-lg"> <CardContent className="p-4"> <AICodeAssistant ref={localAssistantRef} kworkInputRefPassed={contextKworkInputRef} aiResponseInputRefPassed={aiResponseInputRef} /> </CardContent> </Card> </section>
+                         <section id="extractor" className="mb-12 w-full max-w-4xl">
+                             <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg">
+                                 <CardContent className="p-4">
+                                     {/* Pass CONTEXT ref directly */}
+                                     <RepoTxtFetcher ref={fetcherRef} />
+                                 </CardContent>
+                             </Card>
+                         </section>
+                        <section id="executor" /* ref={prSectionRef} - Removed if not used elsewhere */ className="mb-12 w-full max-w-4xl pb-16">
+                             <Card className="bg-gray-900/80 border border-purple-700/50 shadow-lg">
+                                 <CardContent className="p-4">
+                                     {/* Pass CONTEXT refs directly */}
+                                     <AICodeAssistant
+                                         ref={assistantRef}
+                                         kworkInputRefPassed={kworkInputRef}
+                                         aiResponseInputRefPassed={aiResponseInputRef}
+                                     />
+                                 </CardContent>
+                             </Card>
+                         </section>
                      </>
                  )}
 
@@ -287,10 +302,15 @@ function ActualPageContent() {
     );
 }
 
-// --- Layout Component & Suspense ---
+// --- Layout Component (Ref creation REMOVED) ---
 function RepoXmlPageLayout() {
-    const fetcherRefForProvider = useRef<RepoTxtFetcherRef | null>(null); const assistantRefForProvider = useRef<AICodeAssistantRef | null>(null); const kworkInputRefForProvider = useRef<HTMLTextAreaElement | null>(null); const aiResponseInputRefForProvider = useRef<HTMLTextAreaElement | null>(null); const prSectionRefForProvider = useRef<HTMLElement | null>(null);
-    return ( <RepoXmlPageProvider fetcherRef={fetcherRefForProvider} assistantRef={assistantRefForProvider} kworkInputRef={kworkInputRefForProvider} aiResponseInputRef={aiResponseInputRefForProvider} prSectionRef={prSectionRefForProvider} > <ActualPageContent /> </RepoXmlPageProvider> );
+    // REMOVED: fetcherRefForProvider, assistantRefForProvider, etc.
+    return (
+        // REMOVED: Passing refs as props to Provider
+        <RepoXmlPageProvider>
+            <ActualPageContent />
+        </RepoXmlPageProvider>
+    );
 }
 
 // --- Exported Page Component ---
