@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Tooltip } from '@/components/ui/tooltip'; // <<<--- CORRECTED IMPORT PATH
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'; // Corrected path
 import { FileEntry, ValidationIssue } from '../../hooks/useCodeParsingAndValidation'; // Adjust path if necessary
-import { FaEllipsisVertical, FaSquareCheck, FaPaperPlane, FaCircleExclamation, FaFileZipper, FaFloppyDisk } from 'react-icons/fa6';
+import { FaEllipsisVertical, FaSquareCheck, FaRegSquare, FaPaperPlane, FaCircleExclamation, FaFileZipper, FaFloppyDisk } from 'react-icons/fa6'; // Corrected FaRegSquare, FaPaperPlane
 import clsx from 'clsx';
 
 interface ParsedFilesListProps {
@@ -41,14 +41,17 @@ export const ParsedFilesList: React.FC<ParsedFilesListProps> = ({
     }
 
     return (
+        <TooltipProvider> {/* Ensure TooltipProvider wraps the component */}
         <div className="mb-4 bg-gray-800 p-4 rounded-xl shadow-[0_0_12px_rgba(0,255,157,0.3)]">
             <div className="flex justify-between items-center mb-3">
                 <h2 className="text-lg font-semibold text-cyan-400">Разобранные файлы ({parsedFiles.length})</h2>
                 <div className="relative">
                     <Tooltip text="Опции для файлов" position="left">
+                         <TooltipTrigger asChild>
                         <button className="p-1 text-gray-400 hover:text-white" onClick={() => setShowFileMenu(!showFileMenu)}>
                             <FaEllipsisVertical />
                         </button>
+                         </TooltipTrigger>
                     </Tooltip>
                     {showFileMenu && (
                         <motion.div
@@ -107,6 +110,7 @@ export const ParsedFilesList: React.FC<ParsedFilesListProps> = ({
                                 <FaCircleExclamation className="text-red-500 flex-shrink-0" size={12} />
                             )}
                             <Tooltip text={`Отправить ${file.path.split('/').pop()} в Telegram`} position="left">
+                                <TooltipTrigger asChild>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onSendToTelegram(file); }}
                                     disabled={isLoading || !isUserLoggedIn}
@@ -114,12 +118,14 @@ export const ParsedFilesList: React.FC<ParsedFilesListProps> = ({
                                 >
                                     <FaPaperPlane size={14}/>
                                 </button>
+                                 </TooltipTrigger>
                             </Tooltip>
                         </div>
                     )
                 })}
             </div>
         </div>
+        </TooltipProvider>
     );
 };
 ParsedFilesList.displayName = 'ParsedFilesList';

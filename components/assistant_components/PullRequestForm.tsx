@@ -2,14 +2,16 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Tooltip } from '@/components/ui/tooltip'; // <<<--- CORRECT PATH
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"; // Corrected path
 import { FaRotate, FaCodeBranch, FaGithub } from 'react-icons/fa6'; // Added FaCodeBranch, FaGithub
 
 interface PullRequestFormProps {
+    id?: string; // Make ID optional
     repoUrl: string;
     prTitle: string;
     selectedFileCount: number;
     isLoading: boolean;
+    isLoadingPrList?: boolean; // Make optional if not always needed
     onRepoUrlChange: (value: string) => void;
     onPrTitleChange: (value: string) => void;
     onCreatePR: () => void;
@@ -17,14 +19,15 @@ interface PullRequestFormProps {
     buttonText: string;
     buttonIcon: React.ReactNode;
     isSubmitDisabled: boolean;
-    isLoadingPrList: boolean;
 }
 
 export const PullRequestForm: React.FC<PullRequestFormProps> = ({
+    id, // Receive optional ID
     repoUrl,
     prTitle,
     selectedFileCount,
     isLoading,
+    isLoadingPrList, // Receive optional prop
     onRepoUrlChange,
     onPrTitleChange,
     onCreatePR,
@@ -36,7 +39,8 @@ export const PullRequestForm: React.FC<PullRequestFormProps> = ({
     const [showPRDetails, setShowPRDetails] = useState(false);
 
     return (
-        <section id="pr-section" className="mb-4">
+        <TooltipProvider> {/* Wrap component in provider */}
+        <section id={id || "pr-section"} className="mb-4"> {/* Use id prop or default */}
             <div className="flex flex-col sm:flex-row justify-between items-center mb-3 gap-2">
                 <h2 className="text-lg font-semibold text-cyan-400">
                     {/* Update title based on action */}
@@ -61,9 +65,11 @@ export const PullRequestForm: React.FC<PullRequestFormProps> = ({
                     </motion.button>
                     {/* Details Toggle Button */}
                     <Tooltip text="Показать/скрыть детали" position="top">
+                         <TooltipTrigger asChild>
                        <button className="text-blue-400 hover:text-blue-300 transition text-sm p-1" onClick={() => setShowPRDetails(!showPRDetails)}>
                            {showPRDetails ? "Скрыть детали" : "Детали"}
                        </button>
+                        </TooltipTrigger>
                    </Tooltip>
                 </div>
             </div>
@@ -100,6 +106,7 @@ export const PullRequestForm: React.FC<PullRequestFormProps> = ({
                 )}
             </AnimatePresence>
         </section>
+        </TooltipProvider>
     );
 };
 PullRequestForm.displayName = 'PullRequestForm';

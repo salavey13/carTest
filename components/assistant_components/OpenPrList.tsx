@@ -1,4 +1,3 @@
-// /components/assistant_components/OpenPrList.tsx
 import React from 'react';
 import { SimplePullRequest } from '@/contexts/RepoXmlPageContext'; // Import type
 
