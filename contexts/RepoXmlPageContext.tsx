@@ -219,8 +219,18 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
     }, [ isMounted, fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState, filesParsedState, requestCopiedState, primaryHighlightPathState, secondaryHighlightPathsState, selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, allFetchedFilesState, assistantLoadingState, repoUrlEnteredState /* Use derived state */ ]);
 
 
-    // --- Triggers (mostly unchanged, but use context repoUrlState) ---
-    const triggerFetch = useCallback(async (isRetry = false, branch?: string | null) => { if (fetcherRef.current?.handleFetch) { await fetcherRef.current.handleFetch(isRetry, branch); } else { logger.error("triggerFetch: fetcherRef is not set."); toast.error("Ошибка: Не удалось запустить извлечение."); } }, [fetcherRef]); // Depends on fetcherRef
+    // --- Triggers (Make triggerFetch safer) ---
+    const triggerFetch = useCallback(async (isRetry = false, branch?: string | null) => {
+        // Check ref right before calling the method
+        if (fetcherRef.current?.handleFetch) {
+            // Pass the imageReplaceTaskState explicitly for the early check in handleFetch
+            await fetcherRef.current.handleFetch(isRetry, branch, imageReplaceTaskState);
+        } else {
+            logger.error("triggerFetch: fetcherRef or fetcherRef.current.handleFetch is not set.");
+            toast.error("Ошибка: Не удалось запустить извлечение."); // This matches the error you saw
+        }
+    }, [fetcherRef, imageReplaceTaskState]); // Add imageReplaceTaskState dependency
+
     const triggerSelectHighlighted = useCallback(() => { if (fetcherRef.current?.selectHighlightedFiles) { fetcherRef.current.selectHighlightedFiles(); } else { logger.error("triggerSelectHighlighted: fetcherRef is not set."); } }, [fetcherRef]); // Depends on fetcherRef
     const triggerAddSelectedToKwork = useCallback(async (clearSelection = false) => {
         if (fetcherRef.current?.handleAddSelected) {
@@ -320,7 +330,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             assistantRef,
             // Triggers
             triggerToggleSettingsModal,
-            triggerFetch,
+            triggerFetch, // Use the safer triggerFetch from useCallback
             triggerSelectHighlighted,
             triggerAddSelectedToKwork,
             triggerCopyKwork,
@@ -335,8 +345,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             scrollToSection,
         };
     }, [ // Add ALL state values and stable functions/refs
-        isMounted, fetchStatusState, repoUrlEnteredState, filesFetchedState, selectedFetcherFilesState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, selectedAssistantFilesState, assistantLoadingState, aiActionLoadingState, loadingPrsState, targetBranchNameState, manualBranchNameState, openPrsState, isSettingsModalOpenState, isParsingState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, setFilesFetchedCombined, kworkInputRef, aiResponseInputRef, fetcherRef, assistantRef, triggerToggleSettingsModal, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR, triggerUpdateBranch, triggerGetOpenPRs, updateRepoUrlInAssistant, getXuinityMessage, scrollToSection
-    ]);
+        isMounted, fetchStatusState, repoUrlEnteredState, filesFetchedState, selectedFetcherFilesState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, selectedAssistantFilesState, assistantLoadingState, aiActionLoadingState, loadingPrsState, targetBranchNameState, manualBranchNameState, openPrsState, isSettingsModalOpenState, isParsingState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, setFilesFetchedCombined, kworkInputRef, aiResponseInputRef, fetcherRef, assistantRef, triggerToggleSettingsModal, triggerFetch, /* Add the trigger */ triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR, triggerUpdateBranch, triggerGetOpenPRs, updateRepoUrlInAssistant, getXuinityMessage, scrollToSection
+    ]); // Added triggerFetch to dependency array
 
     return ( <RepoXmlPageContext.Provider value={contextValue}> {children} </RepoXmlPageContext.Provider> );
 };
