@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect, useImperativeHandle, forwardRef, MutableRefObject, useCallback } from "react";
+import React, { useMemo, useState, useEffect, useImperativeHandle, forwardRef, MutableRefObject, useCallback, useRef } from "react"; // Added useRef
 // Context & Actions
 import {
     useRepoXmlPageContext, AICodeAssistantRef, SimplePullRequest, ImageReplaceTask, FileNode
@@ -11,7 +11,7 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
 // Hooks & Components
 import { useCodeParsingAndValidation, ValidationIssue, FileEntry as ValidationFileEntry, ValidationStatus } from "@/hooks/useCodeParsingAndValidation";
-import { TextAreaUtilities } from './assistant_components/TextAreaUtilities'; // <<< Import is correct
+import { TextAreaUtilities } from './assistant_components/TextAreaUtilities';
 import { ValidationStatusIndicator } from './assistant_components/ValidationStatus';
 import { ParsedFilesList } from './assistant_components/ParsedFilesList';
 import { PullRequestForm } from './assistant_components/PullRequestForm';
@@ -51,7 +51,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const [isMounted, setIsMounted] = useState(false);
     const [response, setResponse] = useState<string>("");
     const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
-    const [repoUrl, setRepoUrlState] = useState<string>("https://github.com/salavey13/cartest");
+    const [repoUrlStateLocal, setRepoUrlStateLocal] = useState<string>("https://github.com/salavey13/cartest"); // Local state for PR form URL
     const [prTitle, setPrTitle] = useState<string>("");
     const [customLinks, setCustomLinks] = useState<{ name: string; url: string }[]>([]);
     const [showModal, setShowModal] = useState(false);
@@ -67,16 +67,38 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const { parsedFiles: hookParsedFiles, rawDescription, validationStatus, validationIssues, isParsing: hookIsParsing, parseAndValidateResponse, autoFixIssues, setParsedFiles: setHookParsedFiles, setValidationStatus, setValidationIssues, } = useCodeParsingAndValidation();
 
     // --- Context Access ---
-    const { setAiResponseHasContent, setFilesParsed, filesParsed, selectedAssistantFiles, setSelectedAssistantFiles, setAssistantLoading, assistantLoading, aiActionLoading, currentAiRequestId, openPrs: contextOpenPrs, triggerGetOpenPRs, targetBranchName, triggerToggleSettingsModal, triggerUpdateBranch, updateRepoUrlInAssistant, loadingPrs, setIsParsing: setContextIsParsing, isParsing: contextIsParsing,
+    const {
+        setAiResponseHasContent, setFilesParsed, filesParsed,
+        selectedAssistantFiles, setSelectedAssistantFiles,
+        setAssistantLoading, assistantLoading,
+        aiActionLoading, currentAiRequestId,
+        openPrs: contextOpenPrs, triggerGetOpenPRs,
+        targetBranchName, triggerToggleSettingsModal,
+        triggerUpdateBranch, updateRepoUrlInAssistant,
+        loadingPrs, setIsParsing: setContextIsParsing, isParsing: contextIsParsing,
         imageReplaceTask, setImageReplaceTask,
+        fetchStatus, allFetchedFiles, repoUrlEntered, // Added fetchStatus, allFetchedFiles
+        // Added repoUrl from context
     } = useRepoXmlPageContext();
+    const { repoUrl: repoUrlFromContext } = useRepoXmlPageContext(); // Get repoUrl separately for clarity
 
     // --- Derived State ---
     const isParsing = contextIsParsing ?? hookIsParsing;
+    const repoUrl = repoUrlStateLocal || repoUrlFromContext || ""; // Prioritize local form state, then context
+
+    // --- Ref for Image Processing Guard ---
+    const processingImageReplace = useRef(false); // Guard against re-entry
 
     // --- Effects ---
     useEffect(() => { setIsMounted(true); }, []);
     useEffect(() => { setComponentParsedFiles(hookParsedFiles); setFilesParsed(hookParsedFiles.length > 0); }, [hookParsedFiles, setFilesParsed]);
+    useEffect(() => {
+        // Update local repo URL state when context URL changes (e.g., from settings)
+        if (repoUrlFromContext !== repoUrlStateLocal) {
+            setRepoUrlStateLocal(repoUrlFromContext);
+        }
+    }, [repoUrlFromContext]);
+
     useEffect(() => {
         if (!isMounted) return;
         const hasContent = response.trim().length > 0;
@@ -108,6 +130,184 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     // --- Helper Functions ---
     const extractPRTitleHint = (text: string): string => { const lines = text.split('\n'); const firstLine = lines.find(l => l.trim() !== '') || "AI Assistant Update"; return firstLine.trim().substring(0, 70); };
+
+
+     // --- Direct Image Replacement Handler (Modified with Defensive Checks) ---
+     const handleDirectImageReplace = useCallback(async (task: ImageReplaceTask, files: FileNode[]): Promise<void> => {
+         logger.log("[AICodeAssistant] handleDirectImageReplace called with task:", task, `and ${files?.length ?? 0} files passed.`);
+         setIsProcessingPR(true); // Consider using setAssistantLoading instead/as well
+         setAssistantLoading(true);
+
+         try {
+             // Ensure task is still valid (might have been cleared elsewhere)
+             if (!task || !task.targetPath || !task.oldUrl || !task.newUrl) {
+                  logger.warn("[AICodeAssistant] handleDirectImageReplace: Invalid task received.", task);
+                  setImageReplaceTask(null); // Clear potentially invalid task
+                  return;
+             }
+
+             logger.log(`[AICodeAssistant] Checking for ${task.targetPath} in PASSED files (${files?.length ?? 0}).`);
+             const targetFile = files?.find(f => f.path === task.targetPath);
+
+             // --- Defensive Check: Target File ---
+             if (!targetFile || typeof targetFile.content !== 'string') {
+                 throw new Error(`Целевой файл "${task.targetPath}" не найден или его контент невалиден.`);
+             }
+             // --- End Check ---
+
+             let currentContent = targetFile.content;
+
+             if (!currentContent.includes(task.oldUrl)) {
+                 logger.warn(`Old URL not found in ${task.targetPath}. Content may be stale or URL incorrect. Aborting.`);
+                 toast.warn(`Старый URL "${task.oldUrl.substring(0, 30)}..." не найден в ${task.targetPath}. Замена отменена.`);
+                 setImageReplaceTask(null); // Clear task as it's not applicable
+                 return; // Exit cleanly
+             }
+
+             const modifiedContent = currentContent.replaceAll(task.oldUrl, task.newUrl);
+
+             if (modifiedContent === currentContent) {
+                 logger.info(`Content of ${task.targetPath} did not change after replaceAll. Aborting.`);
+                 toast.info(`Контент ${task.targetPath} не изменился. Замена отменена.`);
+                 setImageReplaceTask(null); // Clear task
+                 return; // Exit cleanly
+             }
+
+             logger.log(`Replacing in ${task.targetPath}. Content changed.`);
+             toast.info(`Заменяю ${task.oldUrl.substring(0, 30)}... в ${task.targetPath}`);
+
+             const filesToCommit: { path: string; content: string }[] = [{ path: task.targetPath, content: modifiedContent }];
+             const newImageFilename = task.newUrl.split('/').pop()?.split('?')[0] || 'image';
+             const commitTitle = `chore: Update image ${newImageFilename} in ${task.targetPath}`;
+             // Truncate commit title safely
+             const safeCommitTitle = commitTitle.length > 72 ? commitTitle.substring(0, 69) + '...' : commitTitle;
+             const prDesc = `Replaced image via SuperVibe Studio.\n\nFile: \`${task.targetPath}\`\nOld: \`${task.oldUrl}\`\nNew: \`${task.newUrl}\``;
+             const fullCommitMsg = `${safeCommitTitle}\n\n${prDesc}`;
+             const prTitleNew = safeCommitTitle;
+
+             let existingPrBranch: string | null = null;
+             let existingPrNum: number | null = null;
+             const expectedPrTitlePrefix = `chore: Update image`; // Keep prefix matching
+             const expectedPrFile = task.targetPath;
+
+             logger.log(`[AICodeAssistant] Searching for existing PRs. Context has ${contextOpenPrs?.length ?? 0} PRs.`);
+             if (contextOpenPrs && contextOpenPrs.length > 0) {
+                 const matchPr = contextOpenPrs.find(pr =>
+                     pr.title?.startsWith(expectedPrTitlePrefix) && // Optional chaining
+                     pr.title?.includes(expectedPrFile) &&          // Optional chaining
+                     pr.head?.ref // Ensure head ref exists
+                 );
+
+                 if (matchPr) {
+                     // --- Defensive Check: Matched PR Properties ---
+                     if (matchPr.head.ref && typeof matchPr.number === 'number') {
+                          existingPrBranch = matchPr.head.ref;
+                          existingPrNum = matchPr.number;
+                          logger.log(`Found existing image PR #${existingPrNum} on branch '${existingPrBranch}'`);
+                          toast.info(`Обновляю PR #${existingPrNum} для картинки...`);
+                     } else {
+                          logger.warn("Found matching PR, but head.ref or number is missing:", matchPr);
+                          // Decide how to handle: Treat as not found? Log error?
+                          // Let's treat as not found for now to avoid errors downstreams
+                     }
+                     // --- End Check ---
+                 } else {
+                     logger.log(`No specific existing PR found matching title prefix and file.`);
+                 }
+             } else {
+                  logger.log("No open PRs in context or context PRs is empty.");
+             }
+
+             // Use targetBranchName from context ONLY if NO existing PR branch was found
+             const branchToUpd = existingPrBranch || (existingPrNum === null ? targetBranchName : null); // Only use targetBranchName if truly creating new
+             logger.log(`Decision: ${existingPrBranch ? 'Update existing PR branch' : (branchToUpd ? `Update target branch ${branchToUpd}` : 'Create new PR/branch')}`);
+
+
+             if (branchToUpd && existingPrNum !== null) { // Ensure we are updating a KNOWN PR branch
+                 logger.log(`Updating branch '${branchToUpd}' for img replace. PR#: ${existingPrNum}`);
+                 const res = await triggerUpdateBranch( repoUrl, filesToCommit, fullCommitMsg, branchToUpd, existingPrNum, prDesc );
+                 if (!res.success) { throw new Error(res.error || "Failed to update branch"); }
+                 logger.log(`[AICodeAssistant] Branch ${branchToUpd} update successful.`);
+
+             } else { // Create new PR
+                 logger.log(`Creating new PR for img replace.`);
+                  // Create PR action will handle branch creation internally
+                 const res = await createGitHubPullRequest(repoUrl, filesToCommit, prTitleNew, prDesc, fullCommitMsg);
+                 if (res.success && res.prUrl) {
+                     toast.success(`PR для картинки создан: ${res.prUrl}`);
+                     // Admin is notified inside createGitHubPullRequest action
+                     await triggerGetOpenPRs(repoUrl); // Refresh PRs after creation
+                     logger.log(`New image PR created: ${res.prUrl}`);
+                 } else {
+                     logger.error("PR Img Create Failed:", res.error);
+                     throw new Error(res.error || "Failed to create PR");
+                 }
+             }
+
+             logger.log("[AICodeAssistant] handleDirectImageReplace: Successfully completed operation.");
+             setImageReplaceTask(null); // Clear task on success
+
+         } catch (err: any) {
+             toast.error(`Ошибка замены картинки: ${err.message}`);
+             logger.error("[AICodeAssistant] handleDirectImageReplace error caught:", err);
+             setImageReplaceTask(null); // Clear task on error too
+             // Rethrow or handle as needed, maybe return a status?
+             // For now, just logging and clearing task.
+         } finally {
+             logger.log("[AICodeAssistant] handleDirectImageReplace: Finalizing.");
+             setIsProcessingPR(false);
+             setAssistantLoading(false);
+         }
+     }, [
+         // Explicitly list ALL dependencies read from context or props:
+         contextOpenPrs, targetBranchName, repoUrl, user, // Context state reads
+         setAssistantLoading, setImageReplaceTask, triggerGetOpenPRs, triggerUpdateBranch, // Context functions
+         setIsProcessingPR, // Local state setter
+         logger // Assuming logger is stable or imported globally/via module
+         // createGitHubPullRequest is imported directly, no need to list if not passed as prop/context
+         // notifyAdmin removed as notification is handled inside createGitHubPullRequest now
+     ]);
+
+
+    // --- Effect to handle image replacement AFTER fetch completes (New) ---
+    useEffect(() => {
+        const canProcess = imageReplaceTask &&
+                           fetchStatus === 'success' && // Check fetch status from context
+                           allFetchedFiles.length > 0 &&
+                           allFetchedFiles.some(f => f.path === imageReplaceTask.targetPath) &&
+                           !assistantLoading && // Ensure not already processing something else from context
+                           !processingImageReplace.current; // Use the local guard
+
+        if (canProcess) {
+            logger.log("[AICodeAssistant Effect] Conditions met for image replacement. Starting process.");
+            processingImageReplace.current = true; // Set guard
+
+            // Call the handler logic
+            handleDirectImageReplace(imageReplaceTask, allFetchedFiles)
+                .catch(err => {
+                    logger.error("[AICodeAssistant Effect] Error during handleDirectImageReplace:", err);
+                    // Toast is handled inside the function now
+                    // Reset task state on error if needed (already done inside handler)
+                })
+                .finally(() => {
+                    logger.log("[AICodeAssistant Effect] Image replacement process finished. Releasing guard.");
+                    processingImageReplace.current = false; // Release guard
+                    // Task state is cleared inside the handler on success/failure
+                });
+        } else if (imageReplaceTask && fetchStatus === 'error') {
+             logger.warn("[AICodeAssistant Effect] Image replace task active, but fetch status is error. Doing nothing.");
+             // Optionally clear the task if fetch fails definitively
+             // setImageReplaceTask(null); // Handled inside handler now if fetch fails
+        }
+
+    }, [
+        imageReplaceTask,
+        fetchStatus, // Add fetchStatus from context
+        allFetchedFiles, // Add allFetchedFiles from context
+        assistantLoading, // Add assistantLoading from context
+        handleDirectImageReplace // Add the handler itself as dependency
+    ]);
+
 
     // --- Handlers (wrapped in useCallback) ---
     const handleParse = useCallback(async () => {
@@ -193,26 +393,15 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
              let prToUpdate: SimplePullRequest | null = null; if (contextOpenPrs && contextOpenPrs.length > 0) { prToUpdate = contextOpenPrs.find(pr => pr.title.toLowerCase().includes("ai changes") || pr.title.toLowerCase().includes("supervibe") || pr.title.toLowerCase().includes("ai assistant") || pr.title.toLowerCase().includes(commitSubj.toLowerCase().substring(0, 20))) ?? null; if (prToUpdate) { logger.log(`Found existing PR #${prToUpdate.number}.`); toast.info(`Обновляю существующий PR #${prToUpdate.number}...`); } else { logger.log("No suitable existing PR found."); } }
              const branchToUpdate = prToUpdate?.head.ref || targetBranchName;
              if (branchToUpdate) { logger.log(`Updating branch '${branchToUpdate}'. PR#: ${prToUpdate?.number}`); toast.info(`Обновление ветки '${branchToUpdate}'...`); const updateResult = await triggerUpdateBranch( repoUrl, filesToCommit, fullCommitMsg, branchToUpdate, prToUpdate?.number, finalDesc ); if (!updateResult.success) { logger.error(`Failed to update branch '${branchToUpdate}': ${updateResult.error}`); } }
-             else { logger.log(`Creating new PR.`); toast.info(`Создание нового PR...`); const result = await createGitHubPullRequest(repoUrl, filesToCommit, prTitle.trim(), finalDesc, fullCommitMsg); if (result.success && result.prUrl) { toast.success(`PR создан: ${result.prUrl}`); await notifyAdmin(`🤖 PR с AI создан ${user?.username || user?.id}: ${result.prUrl}`); await triggerGetOpenPRs(repoUrl); logger.log(`New PR created: ${result.prUrl}`); } else { toast.error("Ошибка создания PR: " + (result.error || "?")); logger.error("PR Creation Failed:", result.error); } }
+             else { logger.log(`Creating new PR.`); toast.info(`Создание нового PR...`); const result = await createGitHubPullRequest(repoUrl, filesToCommit, prTitle.trim(), finalDesc, fullCommitMsg); if (result.success && result.prUrl) { toast.success(`PR создан: ${result.prUrl}`); // Admin notified inside action await triggerGetOpenPRs(repoUrl); logger.log(`New PR created: ${result.prUrl}`); } else { toast.error("Ошибка создания PR: " + (result.error || "?")); logger.error("PR Creation Failed:", result.error); } }
         } catch (err) { toast.error(`Крит. ошибка ${targetBranchName ? 'обновления ветки' : 'создания PR'}.`); logger.error("PR/Update error:", err); }
         finally { setIsProcessingPR(false); setAssistantLoading(false); logger.log("[handleCreateOrUpdatePR] Finished."); }
-    }, [ componentParsedFiles, selectedAssistantFiles, repoUrl, prTitle, rawDescription, response, validationIssues, targetBranchName, contextOpenPrs, triggerUpdateBranch, setAssistantLoading, user, triggerGetOpenPRs, notifyAdmin, imageReplaceTask ]);
+    }, [ componentParsedFiles, selectedAssistantFiles, repoUrl, prTitle, rawDescription, response, validationIssues, targetBranchName, contextOpenPrs, triggerUpdateBranch, setAssistantLoading, user, triggerGetOpenPRs, imageReplaceTask ]); // Added notifyAdmin dependency? No, it's inside the action.
 
-    // --- Direct Image Replacement Handler ---
-    const handleDirectImageReplace = useCallback(async (task: ImageReplaceTask, files: FileNode[]): Promise<void> => {
-        logger.log("[AICodeAssistant] handleDirectImageReplace called with task:", task, `and ${files?.length ?? 0} files passed.`); setIsProcessingPR(true); setAssistantLoading(true);
-        try { logger.log(`[AICodeAssistant] Checking for ${task.targetPath} in PASSED files (${files?.length ?? 0}).`); const targetFile = files?.find(f => f.path === task.targetPath); if (!targetFile) { throw new Error(`Целевой файл "${task.targetPath}" не найден (${files?.length ?? 0} шт).`); } let currentContent = targetFile.content; if (!currentContent.includes(task.oldUrl)) { logger.warn(`Old URL not found in ${task.targetPath}.`); toast.warn(`Старый URL не найден в ${task.targetPath}. Замена отменена.`); setImageReplaceTask(null); return; } const modifiedContent = currentContent.replaceAll(task.oldUrl, task.newUrl); if (modifiedContent === currentContent) { logger.info(`Content of ${task.targetPath} did not change.`); toast.info(`Контент ${task.targetPath} не изменился. Замена отменена.`); setImageReplaceTask(null); return; } logger.log(`Replacing in ${task.targetPath}.`); toast.info(`Заменяю ${task.oldUrl.substring(0, 30)}... в ${task.targetPath}`); const filesToCommit: { path: string; content: string }[] = [{ path: task.targetPath, content: modifiedContent }]; const newImageFilename = task.newUrl.split('/').pop()?.split('?')[0] || 'image'; const commitTitle = `chore: Update image ${newImageFilename} in ${task.targetPath}`; const prDesc = `Replaced image via SuperVibe Studio.\n\nFile: \`${task.targetPath}\`\nOld: \`${task.oldUrl}\`\nNew: \`${task.newUrl}\``; const fullCommitMsg = `${commitTitle}\n\n${prDesc}`; const prTitleNew = commitTitle; let existingPrBranch: string | null = null; let existingPrNum: number | null = null; const expectedPrTitlePrefix = `chore: Update image`; const expectedPrFile = task.targetPath;
-            if (contextOpenPrs && contextOpenPrs.length > 0) { const matchPr = contextOpenPrs.find(pr => pr.title.startsWith(expectedPrTitlePrefix) && pr.title.includes(expectedPrFile)); if (matchPr) { existingPrBranch = matchPr.head.ref; existingPrNum = matchPr.number; logger.log(`Found existing image PR #${existingPrNum}`); toast.info(`Обновляю PR #${existingPrNum} для картинки...`); } else { logger.log(`No specific existing PR found for image.`); } } const branchToUpd = existingPrBranch || targetBranchName;
-            if (branchToUpd) { logger.log(`Updating branch '${branchToUpd}' for img replace. PR#: ${existingPrNum ?? 'N/A'}`); const res = await triggerUpdateBranch( repoUrl, filesToCommit, fullCommitMsg, branchToUpd, existingPrNum, prDesc ); if (!res.success) { throw new Error(res.error || "Failed to update branch"); } }
-            else { logger.log(`Creating new PR for img replace.`); const res = await createGitHubPullRequest(repoUrl, filesToCommit, prTitleNew, prDesc, fullCommitMsg); if (res.success && res.prUrl) { toast.success(`PR для картинки создан: ${res.prUrl}`); await notifyAdmin(`🖼️ PR картинки ${task.targetPath} (${newImageFilename}) создан ${user?.username || user?.id}: ${res.prUrl}`); await triggerGetOpenPRs(repoUrl); logger.log(`New image PR created: ${res.prUrl}`); } else { toast.error("Ошибка создания PR: " + (res.error || "?")); logger.error("PR Img Create Failed:", res.error); throw new Error(res.error || "Failed to create PR"); } }
-            logger.log("[AICodeAssistant] handleDirectImageReplace: Successfully completed."); setImageReplaceTask(null);
-        } catch (err: any) { toast.error(`Ошибка замены картинки: ${err.message}`); logger.error("[AICodeAssistant] handleDirectImageReplace error caught:", err); setImageReplaceTask(null); }
-        finally { logger.log("[AICodeAssistant] handleDirectImageReplace: Finalizing."); setIsProcessingPR(false); setAssistantLoading(false); }
-    }, [ contextOpenPrs, targetBranchName, repoUrl, notifyAdmin, user, setAssistantLoading, setImageReplaceTask, triggerGetOpenPRs, triggerUpdateBranch, logger ]);
 
     // --- Response Setting and URL Update Callbacks ---
     const setResponseValue = useCallback((value: string) => { setResponse(value); if (aiResponseInputRefPassed.current) aiResponseInputRefPassed.current.value = value; setHookParsedFiles([]); setFilesParsed(false); setSelectedFileIds(new Set()); setSelectedAssistantFiles(new Set()); setValidationStatus('idle'); setValidationIssues([]); logger.log("Response value set manually, resetting parsed state."); }, [aiResponseInputRefPassed, setHookParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues]);
-    const updateRepoUrl = useCallback((url: string) => { setRepoUrlState(url); triggerGetOpenPRs(url); }, [triggerGetOpenPRs]);
+    const updateRepoUrl = useCallback((url: string) => { setRepoUrlStateLocal(url); triggerGetOpenPRs(url); }, [triggerGetOpenPRs]);
 
     // --- Imperative Handle ---
     useImperativeHandle(ref, () => ({ handleParse, selectAllParsedFiles: handleSelectAllFiles, handleCreatePR: handleCreateOrUpdatePR, setResponseValue, updateRepoUrl, handleDirectImageReplace, }), [handleParse, handleSelectAllFiles, handleCreateOrUpdatePR, setResponseValue, updateRepoUrl, handleDirectImageReplace]);
@@ -241,7 +430,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                               <p className="text-yellow-400 mb-2 text-xs md:text-sm min-h-[18px]"> {isWaitingForAiResponse ? `⏳ Жду AI... (ID: ${currentAiRequestId?.substring(0,6)}...)` : commonDisabled ? "⏳ Обработка..." : "2️⃣ Вставь ответ AI или жди. Затем '➡️'."} </p>
                               <div className="relative group">
                                   <textarea id="response-input" ref={aiResponseInputRefPassed} className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm min-h-[180px] resize-y simple-scrollbar" defaultValue={response} onChange={(e) => setResponseValue(e.target.value)} placeholder={isWaitingForAiResponse ? "AI думает..." : commonDisabled ? "Ожидание..." : "Ответ AI здесь..."} disabled={commonDisabled} spellCheck="false" />
-                                  {/* <<< Restored TextAreaUtilities Call >>> */}
                                   <TextAreaUtilities response={response} isLoading={commonDisabled} onParse={handleParse} onOpenModal={handleOpenModal} onCopy={handleCopyResponse} onClear={handleClearResponse} onSelectFunction={handleSelectFunction} isParseDisabled={parseButtonDisabled} isProcessingPR={isProcessingPR || assistantLoading} />
                               </div>
                                <div className="flex justify-end items-start mt-1 gap-2 min-h-[30px]">
@@ -250,7 +438,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                               </div>
                           </div>
                          <ParsedFilesList parsedFiles={componentParsedFiles} selectedFileIds={selectedFileIds} validationIssues={validationIssues} onToggleSelection={handleToggleFileSelection} onSelectAll={handleSelectAllFiles} onDeselectAll={handleDeselectAllFiles} onSaveFiles={handleSaveFiles} onDownloadZip={handleDownloadZip} onSendToTelegram={handleSendToTelegram} isUserLoggedIn={!!user} isLoading={commonDisabled} />
-                         <PullRequestForm id="pr-form-container" repoUrl={repoUrl} prTitle={prTitle} selectedFileCount={selectedAssistantFiles.size} isLoading={isProcessingPR || assistantLoading} isLoadingPrList={loadingPrs} onRepoUrlChange={(url) => { setRepoUrlState(url); updateRepoUrlInAssistant(url); }} onPrTitleChange={setPrTitle} onCreatePR={handleCreateOrUpdatePR} buttonText={prButtonText} buttonIcon={prButtonLoadingIcon} isSubmitDisabled={submitButtonDisabled} />
+                         <PullRequestForm id="pr-form-container" repoUrl={repoUrl} // Use combined repoUrl state
+                          prTitle={prTitle} selectedFileCount={selectedAssistantFiles.size} isLoading={isProcessingPR || assistantLoading} isLoadingPrList={loadingPrs} onRepoUrlChange={(url) => { setRepoUrlStateLocal(url); /* Context update happens via effect */ }} onPrTitleChange={setPrTitle} onCreatePR={handleCreateOrUpdatePR} buttonText={prButtonText} buttonIcon={prButtonLoadingIcon} isSubmitDisabled={submitButtonDisabled} />
                          <OpenPrList openPRs={contextOpenPrs} />
                         <div className="flex items-center gap-3 mt-2 flex-wrap">
                             <ToolsMenu customLinks={customLinks} onAddCustomLink={handleAddCustomLink} disabled={commonDisabled}/>
@@ -259,7 +448,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                      </>
                 )}
 
-                {showImageReplaceUI && ( <div className="flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed border-blue-400 min-h-[200px]"> {assistantLoading ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> ) : ( imageReplaceTask ? <FaImages className="text-blue-400 text-4xl mb-4" /> : <FaCheck className="text-green-400 text-4xl mb-4" /> )} <p className="text-lg font-semibold text-blue-300"> {assistantLoading ? "Заменяю картинку и обновляю ветку/PR..." : imageReplaceTask ? "Задача Замены Картинки Активна" : "Замена Завершена"} </p> <p className="text-sm text-gray-400 mt-2"> {assistantLoading ? "Идет процесс..." : imageReplaceTask ? "Файл загружен, ожидание обработки..." : "Процесс завершен."} </p> {imageReplaceTask && ( <div className="mt-3 text-xs text-gray-500 break-all text-left bg-gray-900/50 p-2 rounded max-w-full overflow-x-auto simple-scrollbar"> <p><span className="font-semibold text-gray-400">Файл:</span> {imageReplaceTask.targetPath}</p> <p><span className="font-semibold text-gray-400">Старый URL:</span> {imageReplaceTask.oldUrl}</p> <p><span className="font-semibold text-gray-400">Новый URL:</span> {imageReplaceTask.newUrl}</p> </div> )} </div> )}
+                {showImageReplaceUI && ( <div className="flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed border-blue-400 min-h-[200px]"> {(assistantLoading || isProcessingPR) ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> ) : ( fetchStatus === 'loading' || fetchStatus === 'retrying') ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> ) : ( imageReplaceTask ? <FaImages className="text-blue-400 text-4xl mb-4" /> : <FaCheck className="text-green-400 text-4xl mb-4" /> )} <p className="text-lg font-semibold text-blue-300"> {(assistantLoading || isProcessingPR) ? "Заменяю картинку и обновляю ветку/PR..." : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Загрузка файла для замены..." : imageReplaceTask ? "Задача Замены Картинки Активна" : "Замена Завершена"} </p> <p className="text-sm text-gray-400 mt-2"> {(assistantLoading || isProcessingPR) ? "Идет процесс..." : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Ожидание..." : imageReplaceTask ? "Файл загружен, ожидание обработки..." : "Процесс завершен."} </p> {imageReplaceTask && ( <div className="mt-3 text-xs text-gray-500 break-all text-left bg-gray-900/50 p-2 rounded max-w-full overflow-x-auto simple-scrollbar"> <p><span className="font-semibold text-gray-400">Файл:</span> {imageReplaceTask.targetPath}</p> <p><span className="font-semibold text-gray-400">Старый URL:</span> {imageReplaceTask.oldUrl}</p> <p><span className="font-semibold text-gray-400">Новый URL:</span> {imageReplaceTask.newUrl}</p> </div> )} </div> )}
 
                  <AnimatePresence> {showStandardAssistantUI && showModal && (<SwapModal isOpen={showModal} onClose={() => setShowModal(false)} onSwap={handleSwap} onSearch={handleSearch} initialMode={modalMode} /> )} {showStandardAssistantUI && isImageModalOpen && (<ImageToolsModal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} parsedFiles={componentParsedFiles} onUpdateParsedFiles={handleUpdateParsedFiles}/> )} </AnimatePresence>
             </div>

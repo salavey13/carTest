@@ -57,23 +57,45 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; fetcherRef: Mu
 
     useEffect(() => { setIsMounted(true); logger.log("RepoXmlPageContext Mounted"); }, []);
 
-    // === Combined State Setter ===
+    // === Combined State Setter (Modified Logic) ===
     const setFilesFetchedCombined = useCallback(( fetchAttemptSucceeded: boolean, allFiles: FileNode[], primaryHighlight: string | null, secondaryHighlights: string[] ) => {
         logger.log("[Context] setFilesFetchedCombined called:", { fetchAttemptSucceeded, primaryHighlight, secondaryCount: secondaryHighlights.length, allFilesCount: allFiles.length, taskActive: !!imageReplaceTaskState });
-        setFilesFetchedState(true); setAllFetchedFilesState(allFiles); setPrimaryHighlightPathState(primaryHighlight); setSecondaryHighlightPathsState(secondaryHighlights);
-        let finalFetchStatus: FetchStatus = fetchAttemptSucceeded ? 'success' : 'error';
+        setFilesFetchedState(true); // Mark files as fetched (or attempted)
+        setAllFetchedFilesState(allFiles); // Store the files
+        setPrimaryHighlightPathState(primaryHighlight);
+        setSecondaryHighlightPathsState(secondaryHighlights);
+
+        let finalFetchStatus: FetchStatus = 'idle'; // Determine final status based on success and task
+
         if (imageReplaceTaskState) {
-             if (fetchAttemptSucceeded) {
+            if (fetchAttemptSucceeded) {
                 const targetFileExists = allFiles.some(f => f.path === imageReplaceTaskState.targetPath);
                 if (targetFileExists) {
-                     finalFetchStatus = 'success';
-                     if (assistantRef.current) { logger.log("[Context] Image Replace Task: Triggering replace."); setTimeout(() => { if (assistantRef.current && imageReplaceTaskState) { assistantRef.current.handleDirectImageReplace(imageReplaceTaskState, allFiles).catch(err => logger.error("[Context] Error calling handleDirectImageReplace:", err)); } }, 50); }
-                     else { logger.warn("[Context] Image Replace Task: Assistant ref not ready."); }
-                } else { logger.error(`[Context] Image Replace Task Error: Target file ${imageReplaceTaskState.targetPath} not found!`); toast.error(`Ошибка: Файл ${imageReplaceTaskState.targetPath} для замены не найден.`); setImageReplaceTaskState(null); finalFetchStatus = 'error'; }
-            } else { logger.error("[Context] Image Replace Task Error: Fetch attempt failed."); finalFetchStatus = 'error'; }
+                    logger.log(`[Context] Image Task: Target file ${imageReplaceTaskState.targetPath} found. Fetch status set to success. Assistant will handle replacement.`);
+                    finalFetchStatus = 'success';
+                    // DO NOT CALL handleDirectImageReplace here anymore.
+                    // AICodeAssistant's useEffect will now handle this based on the 'success' status and task presence.
+                } else {
+                    logger.error(`[Context] Image Task Error: Target file ${imageReplaceTaskState.targetPath} not found!`);
+                    toast.error(`Ошибка: Файл ${imageReplaceTaskState.targetPath} для замены не найден.`);
+                    setImageReplaceTaskState(null); // Clear the task if target is missing
+                    finalFetchStatus = 'error';
+                }
+            } else {
+                logger.error("[Context] Image Task Error: Fetch attempt failed.");
+                finalFetchStatus = 'error';
+                // Optional: Clear the task on fetch failure? Or allow retry? Let's keep it for retry.
+                // setImageReplaceTaskState(null);
+            }
+        } else {
+            // Standard flow: set status based on fetch attempt
+            finalFetchStatus = fetchAttemptSucceeded ? 'success' : 'error';
         }
-        setFetchStatusState(finalFetchStatus); logger.log(`[Context] setFilesFetchedCombined finished. Final Status: ${finalFetchStatus}`);
-    }, [imageReplaceTaskState, assistantRef]);
+
+        setFetchStatusState(finalFetchStatus); // Set the final calculated status
+        logger.log(`[Context] setFilesFetchedCombined finished. Final Status: ${finalFetchStatus}`);
+        // NO assistantRef call here
+    }, [imageReplaceTaskState]); // Removed assistantRef dependency
 
     // --- Workflow Step Calculation ---
     const [currentStep, setCurrentStep] = useState<WorkflowStep>('idle');
@@ -82,19 +104,27 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; fetcherRef: Mu
         let calculatedStep: WorkflowStep = 'idle';
         if (imageReplaceTaskState) {
             if (fetchStatusState === 'loading' || fetchStatusState === 'retrying') { calculatedStep = 'fetching'; }
-            else if (fetchStatusState === 'success' && filesFetchedState && allFetchedFilesState.some(f => f.path === imageReplaceTaskState.targetPath)) { calculatedStep = assistantLoadingState ? 'generating_ai_response' : 'files_fetched_image_replace'; }
-            else if (fetchStatusState === 'error' || fetchStatusState === 'failed_retries' || (filesFetchedState && !allFetchedFilesState.some(f => f.path === imageReplaceTaskState?.targetPath))) { calculatedStep = 'fetch_failed'; }
-            else { calculatedStep = 'ready_to_fetch'; }
+            // Check if fetch is successful and the specific target file exists
+            else if (fetchStatusState === 'success' && filesFetchedState && allFetchedFilesState.some(f => f.path === imageReplaceTaskState.targetPath)) {
+                 // If successful and file exists, check if the assistant is *currently* processing the PR/update
+                 calculatedStep = assistantLoadingState ? 'generating_ai_response' : 'files_fetched_image_replace';
+            }
+            else if (fetchStatusState === 'error' || fetchStatusState === 'failed_retries' || (filesFetchedState && !allFetchedFilesState.some(f => f.path === imageReplaceTaskState?.targetPath))) {
+                // Covers fetch error OR success but missing file
+                calculatedStep = 'fetch_failed';
+            }
+            else { calculatedStep = 'ready_to_fetch'; } // Initial state before fetch starts
         } else {
+            // Standard workflow logic (remains the same)
             if (fetchStatusState === 'loading' || fetchStatusState === 'retrying') calculatedStep = 'fetching';
             else if (fetchStatusState === 'error' || fetchStatusState === 'failed_retries') calculatedStep = 'fetch_failed';
             else if (isParsingState) calculatedStep = 'parsing_response';
             else if (aiActionLoadingState) calculatedStep = 'generating_ai_response';
-            else if (assistantLoadingState) calculatedStep = 'generating_ai_response';
+            else if (assistantLoadingState) calculatedStep = 'generating_ai_response'; // Covers PR/Update loading
             else if (!filesFetchedState) { calculatedStep = repoUrlEnteredState ? 'ready_to_fetch' : 'idle'; }
             else if (!kworkInputHasContentState) {
                  if (primaryHighlightPathState || secondaryHighlightPathsState.length > 0) calculatedStep = 'files_fetched_highlights';
-                 else if (selectedFetcherFilesState.size > 0) calculatedStep = 'files_selected'; // <<< This state should now be reached correctly
+                 else if (selectedFetcherFilesState.size > 0) calculatedStep = 'files_selected';
                  else calculatedStep = 'files_fetched';
             }
             else if (kworkInputHasContentState && !aiResponseHasContentState && !requestCopiedState) calculatedStep = 'request_written';
@@ -106,11 +136,10 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; fetcherRef: Mu
         setCurrentStep(prevStep => { if (prevStep !== calculatedStep) { logger.log(`Context Step Updated: ${prevStep} -> ${calculatedStep}`); return calculatedStep; } return prevStep; });
     }, [ isMounted, fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState, filesParsedState, requestCopiedState, primaryHighlightPathState, secondaryHighlightPathsState, selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, allFetchedFilesState, assistantLoadingState, repoUrlEnteredState ]);
 
+
     // --- Triggers ---
     const triggerFetch = useCallback(async (isRetry = false, branch?: string | null) => { if (fetcherRef.current?.handleFetch) { await fetcherRef.current.handleFetch(isRetry, branch); } else { logger.error("triggerFetch: fetcherRef is not set."); toast.error("Ошибка: Не удалось запустить извлечение."); } }, [fetcherRef]);
     const triggerSelectHighlighted = useCallback(() => { if (fetcherRef.current?.selectHighlightedFiles) { fetcherRef.current.selectHighlightedFiles(); } else { logger.error("triggerSelectHighlighted: fetcherRef is not set."); } }, [fetcherRef]);
-
-    // --- MODIFIED triggerAddSelectedToKwork ---
     const triggerAddSelectedToKwork = useCallback(async (clearSelection = false) => {
         if (fetcherRef.current?.handleAddSelected) {
             logger.log("[Context] triggerAddSelectedToKwork called. Passing current context selection and files:", { selectionSize: selectedFetcherFilesState.size, filesCount: allFetchedFilesState.length });
@@ -120,12 +149,12 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; fetcherRef: Mu
                  return; // Abort if no files selected in context
             }
             try {
+                 // Pass the current context state values to the ref function
                  await fetcherRef.current.handleAddSelected(selectedFetcherFilesState, allFetchedFilesState);
                  if (clearSelection) { logger.log("[Context] Clearing fetcher selection after add."); setSelectedFetcherFilesState(new Set()); }
             } catch (error) { logger.error("[Context] Error during fetcherRef.current.handleAddSelected:", error); toast.error("Ошибка добавления файлов в запрос."); }
         } else { logger.error("triggerAddSelectedToKwork: fetcherRef is not set."); toast.error("Ошибка: Компонент Экстрактора недоступен."); }
     }, [fetcherRef, selectedFetcherFilesState, allFetchedFilesState]); // Depend on the states being passed
-    // --- END MODIFICATION ---
 
     const triggerCopyKwork = useCallback((): boolean => { if (fetcherRef.current?.handleCopyToClipboard) { return fetcherRef.current.handleCopyToClipboard(); } else { logger.error("triggerCopyKwork: fetcherRef is not set."); return false; } }, [fetcherRef]);
     const triggerAskAi = useCallback(async (): Promise<{ success: boolean; requestId?: string; error?: string }> => { logger.warn("AI Ask Triggered (No Longer Active)"); toast.info("Кнопка 'Спросить AI' временно отключена."); return { success: false, error: "Ask AI button disabled" }; }, []);
