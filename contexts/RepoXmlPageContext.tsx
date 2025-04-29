@@ -144,16 +144,15 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
      }, [repoUrlState]);
 
 
-    // === Combined State Setter (no change needed here) ===
+    // === Combined State Setter (FIXED dependencies) ===
     const setFilesFetchedCombined = useCallback(( fetchAttemptSucceeded: boolean, allFiles: FileNode[], primaryHighlight: string | null, secondaryHighlights: string[] ) => {
-       // ... logic remains the same, uses imageReplaceTaskState ...
        logger.log("[Context] setFilesFetchedCombined called:", { fetchAttemptSucceeded, primaryHighlight, secondaryCount: secondaryHighlights.length, allFilesCount: allFiles.length, taskActive: !!imageReplaceTaskState });
        setFilesFetchedState(true); // Mark files as fetched (or attempted)
        setAllFetchedFilesState(allFiles); // Store the files
        setPrimaryHighlightPathState(primaryHighlight);
        setSecondaryHighlightPathsState(secondaryHighlights);
 
-       let finalFetchStatus: FetchStatus = 'idle'; // Determine final status based on success and task
+       let finalFetchStatus: FetchStatus = 'idle'; // Defaulting to idle might be wrong if it fails? Let's revisit
 
        if (imageReplaceTaskState) {
            if (fetchAttemptSucceeded) {
@@ -176,7 +175,15 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
        }
        setFetchStatusState(finalFetchStatus);
        logger.log(`[Context] setFilesFetchedCombined finished. Final Status: ${finalFetchStatus}`);
-    }, [imageReplaceTaskState]);
+    }, [ // ADDED missing dependencies
+        imageReplaceTaskState,
+        setFilesFetchedState,
+        setAllFetchedFilesState,
+        setPrimaryHighlightPathState,
+        setSecondaryHighlightPathsState,
+        setImageReplaceTaskState, // Needed if task cleared on error
+        setFetchStatusState
+    ]);
 
     // --- Workflow Step Calculation (depends on repoUrlEnteredState now) ---
     const [currentStep, setCurrentStep] = useState<WorkflowStep>('idle');
