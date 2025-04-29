@@ -1,38 +1,27 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { cn } from '@/lib/utils';
-
-interface ErrorInfo {
-  message: string;
-  source?: string;
-  lineno?: number;
-  colno?: number;
-  error?: Error | string;
-  type: 'error' | 'rejection';
-}
-
-const showOverlay = process.env.NEXT_PUBLIC_ENABLE_DEV_OVERLAY === 'true';
+import { useErrorOverlay, type ErrorInfo } from '@/contexts/ErrorOverlayContext'; // Import hook and type
 
 export default function DevErrorOverlay() {
-  const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
+  // Get state and setter from context
+  const { errorInfo, setErrorInfo, showOverlay } = useErrorOverlay();
 
+  // Effect for catching GLOBAL errors (outside React tree)
   useEffect(() => {
+    // Only run if overlay is enabled
     if (!showOverlay) {
       return;
     }
 
     const handleError = (event: ErrorEvent) => {
-      // --- FILTER ---
-      // Ignore generic "Script error." as it provides no useful details
-      // and often comes from cross-origin scripts like analytics or SDKs.
       if (event.message === 'Script error.') {
-          console.warn("Ignoring generic 'Script error.' potentially from external script.");
-          return;
+        console.warn("Ignoring generic 'Script error.' potentially from external script.");
+        return;
       }
-      // --- END FILTER ---
-
-      console.error("Caught global error by DevErrorOverlay:", event);
+      console.error("Caught global error by window.onerror:", event);
+      // Use context setter
       setErrorInfo({
         message: event.message,
         source: event.filename,
@@ -41,11 +30,10 @@ export default function DevErrorOverlay() {
         error: event.error,
         type: 'error',
       });
-      // event.preventDefault(); // Usually don't prevent default for better console logging
     };
 
     const handleRejection = (event: PromiseRejectionEvent) => {
-      console.error("Caught unhandled rejection by DevErrorOverlay:", event);
+      console.error("Caught unhandled rejection by window.onunhandledrejection:", event);
       let message = 'Unhandled Promise Rejection';
       let errorObj: Error | string | undefined;
 
@@ -53,26 +41,22 @@ export default function DevErrorOverlay() {
         message = event.reason.message;
         errorObj = event.reason;
       } else if (typeof event.reason === 'string') {
-        // --- FILTER ---
-        // Also ignore "Script error." if it somehow ends up as a rejection reason string
-        if (event.reason === 'Script error.') {
-             console.warn("Ignoring generic 'Script error.' potentially from external script (rejection).");
-             return;
-        }
-        // --- END FILTER ---
+         if (event.reason === 'Script error.') {
+            console.warn("Ignoring generic 'Script error.' (rejection).");
+            return;
+         }
         message = event.reason;
         errorObj = event.reason;
       } else {
         try { message = JSON.stringify(event.reason); } catch { message = 'Non-serializable rejection reason'; }
         errorObj = message;
       }
-
+      // Use context setter
       setErrorInfo({
         message: message,
         error: errorObj,
         type: 'rejection',
       });
-      // event.preventDefault();
     };
 
     window.addEventListener('error', handleError);
@@ -82,14 +66,16 @@ export default function DevErrorOverlay() {
       window.removeEventListener('error', handleError);
       window.removeEventListener('unhandledrejection', handleRejection);
     };
-  }, []);
+    // Depend on showOverlay so listeners are added/removed if the flag changes
+    // Also depend on setErrorInfo to ensure stability if context changes unexpectedly
+  }, [showOverlay, setErrorInfo]);
 
-  // Don't render if no error or not enabled
+  // Render based on context state and flag
   if (!errorInfo || !showOverlay) {
     return null;
   }
 
-  // Render the overlay (JSX remains the same)
+  // --- Overlay Rendering Logic (Same as before) ---
   return (
     <div
         className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
@@ -98,13 +84,13 @@ export default function DevErrorOverlay() {
         aria-modal="true"
     >
        <div className="bg-red-900/90 border-2 border-red-500 rounded-lg shadow-2xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto text-white font-mono">
-         {/* ... (rest of the overlay JSX is unchanged) ... */}
          <div className="flex justify-between items-center mb-4">
-           <h2 className="text-2xl font-bold text-red-300">
-             {errorInfo.type === 'error' ? 'Runtime Error' : 'Unhandled Rejection'}
+           <h2 className="text-2xl font-bold text-red-300 capitalize">
+             {/* Display type: 'react', 'error', or 'rejection' */}
+             {errorInfo.type} Error
            </h2>
            <button
-             onClick={() => setErrorInfo(null)}
+             onClick={() => setErrorInfo(null)} // Use context setter to clear
              className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-white text-sm transition-colors"
              aria-label="Close error overlay"
            >
@@ -114,6 +100,7 @@ export default function DevErrorOverlay() {
 
          <div className="bg-black/50 p-4 rounded mb-4">
            <p className="text-red-300 text-lg break-words">{errorInfo.message}</p>
+           {/* Show source only for global errors, less useful for React errors */}
            {errorInfo.type === 'error' && errorInfo.source && (
              <p className="text-xs text-red-400 mt-1">
                Source: {errorInfo.source}:{errorInfo.lineno}:{errorInfo.colno}
@@ -123,16 +110,16 @@ export default function DevErrorOverlay() {
 
          {errorInfo.error && (
            <div>
-             <h3 className="text-lg text-red-400 mb-2">Stack Trace:</h3>
+             <h3 className="text-lg text-red-400 mb-2">Stack Trace / Details:</h3>
              <pre className="bg-black/60 p-4 rounded text-xs text-red-300 overflow-x-auto whitespace-pre-wrap break-all">
+               {/* Try to get stack, fallback to string */}
                {errorInfo.error instanceof Error ? errorInfo.error.stack : String(errorInfo.error)}
              </pre>
            </div>
          )}
 
-         {/* Add a note about potential minification and Next.js overlay */}
          <p className="text-xs text-yellow-400 mt-4 pt-2 border-t border-yellow-400/30">
-             Note: Errors in Preview/Prod builds will be minified. Errors within the React tree might trigger the default Next.js overlay instead.
+             Note: Errors in Preview/Prod builds will be minified. Closing the overlay may require a page refresh to reset the UI state.
          </p>
        </div>
     </div>
