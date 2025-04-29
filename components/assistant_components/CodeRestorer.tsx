@@ -4,8 +4,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { ValidationIssue, FileEntry } from '@/hooks/useCodeParsingAndValidation'; // Adjust path
-import { FaCodeMerge, FaWandMagicSparkles, FaRotate, FaPoo, FaXmark } from 'react-icons/fa6'; // Added FaTimes
-import { Tooltip } from '@/components/ui/tooltip'; // <<<--- CORRECT PATH
+import { FaCodeMerge, FaWandMagicSparkles, FaRotate, FaPoo, FaXmark, FaCheck } from 'react-icons/fa6'; // Added FaCheck, FaXmark
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger} from "@/components/ui/tooltip"; // Corrected import path
 
 // --- Restore Modal Component ---
 interface RestoreSkippedModalProps {
@@ -82,7 +82,7 @@ export const CodeRestorer: React.FC<CodeRestorerProps> = ({
         let successCount = 0; let errorCount = 0; let notFoundCount = 0;
         const filesContentMap = new Map(parsedFiles.map(f => [f.id, f.content]));
         let searchStartIndex = 0; // Keep track for non-manual search
-        const initialStatus = skippedIssues.reduce((acc, issue) => { acc[issue.id] = 'pending'; return acc; }, {});
+        const initialStatus = skippedIssues.reduce((acc, issue) => { acc[issue.id] = 'pending'; return acc; }, {} as Record<string, 'pending' | 'success' | 'not_found' | 'failed_verification'>); // Explicit type
         setRestoreStatus(initialStatus); // Reset status on new attempt
 
         // --- Helper Functions ---
@@ -311,16 +311,18 @@ export const CodeRestorer: React.FC<CodeRestorerProps> = ({
     if (skippedIssues.length === 0) return null;
 
     return (
-        <>
-            <Tooltip text="Восстановить код, отмеченный маркерами пропуска /* ... */" position="left">
-                <button
-                    onClick={() => { setIsModalOpen(true); setAllowManualRestore(false); setRestoreStatus({}); }}
-                    disabled={disabled}
-                    className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white transition shadow disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    <FaCodeMerge size={12} /> Восстановить ({skippedIssues.length})...
-                </button>
-            </Tooltip>
+        <TooltipProvider> {/* Wrap with TooltipProvider */}
+             <Tooltip text="Восстановить код, отмеченный маркерами пропуска /* ... */" position="left">
+                <TooltipTrigger asChild> {/* Trigger for the tooltip */}
+                    <button
+                        onClick={() => { setIsModalOpen(true); setAllowManualRestore(false); setRestoreStatus({}); }}
+                        disabled={disabled}
+                        className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white transition shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <FaCodeMerge size={12} /> Восстановить ({skippedIssues.length})...
+                    </button>
+                 </TooltipTrigger>
+             </Tooltip>
 
             <AnimatePresence>
                 {isModalOpen && (
@@ -336,7 +338,7 @@ export const CodeRestorer: React.FC<CodeRestorerProps> = ({
                     />
                 )}
             </AnimatePresence>
-        </>
+        </TooltipProvider>
     );
 };
 CodeRestorer.displayName = 'CodeRestorer';

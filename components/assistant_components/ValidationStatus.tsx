@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Tooltip } from '@/components/ui/tooltip'; // <<<--- CORRECT PATH
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger} from '@/components/ui/tooltip'; // Corrected path
 import { ValidationStatus, ValidationIssue } from '../../hooks/useCodeParsingAndValidation'; // Adjust path
 import { FaRotate, FaCircleCheck, FaCircleExclamation, FaBroom, FaClipboardQuestion } from 'react-icons/fa6';
 
@@ -18,6 +18,7 @@ export const ValidationStatusIndicator: React.FC<ValidationStatusProps> = ({
     issues,
     onAutoFix,
     onCopyPrompt,
+    isFixDisabled // Receive this prop
 }) => {
 
     // Issues fixable by the autoFix function (icon, useClient, import)
@@ -53,11 +54,14 @@ export const ValidationStatusIndicator: React.FC<ValidationStatusProps> = ({
     }
 
     return (
+        <TooltipProvider> {/* Ensure TooltipProvider wraps the component */}
         <div className="flex flex-col items-end gap-1 mt-1">
              {/* Indicator Icon */}
              <div className="h-4 flex items-center justify-center">
                 <Tooltip text={getIndicatorTooltip()} >
-                    <div>{getIndicatorIcon()}</div>
+                     <TooltipTrigger asChild>
+                         <div>{getIndicatorIcon()}</div>
+                     </TooltipTrigger>
                 </Tooltip>
              </div>
 
@@ -65,18 +69,35 @@ export const ValidationStatusIndicator: React.FC<ValidationStatusProps> = ({
             {(status === 'warning' || status === 'error') && (fixableIssues.length > 0 || skippedCommentIssues.length > 0) ? (
                  <div className="flex gap-2 items-center flex-wrap justify-end">
                      {fixableIssues.length > 0 && (
-                         <button onClick={onAutoFix} className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-green-600 hover:bg-green-500 text-white transition shadow text-nowrap">
-                             <FaBroom size={12} /> Исправить ({fixableIssues.length})
-                         </button>
+                          <Tooltip text="Автоматически исправить (use client, import React)" >
+                             <TooltipTrigger asChild>
+                                 <button
+                                     onClick={onAutoFix}
+                                     disabled={isFixDisabled} // Use the disabled prop
+                                     className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-green-600 hover:bg-green-500 text-white transition shadow text-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                                 >
+                                     <FaBroom size={12} /> Исправить ({fixableIssues.length})
+                                 </button>
+                              </TooltipTrigger>
+                          </Tooltip>
                      )}
                      {skippedCommentIssues.length > 0 && (
-                          <button onClick={onCopyPrompt} className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-orange-600 hover:bg-orange-500 text-white transition shadow text-nowrap">
-                              <FaClipboardQuestion size={12}/> Prompt Fix '//..''.' ({skippedCommentIssues.length})
-                          </button>
+                           <Tooltip text="Скопировать prompt для восстановления '// ...'" >
+                             <TooltipTrigger asChild>
+                                <button
+                                    onClick={onCopyPrompt}
+                                    disabled={isFixDisabled} // Use the disabled prop
+                                    className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-orange-600 hover:bg-orange-500 text-white transition shadow text-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <FaClipboardQuestion size={12}/> Prompt Fix '//..''.' ({skippedCommentIssues.length})
+                                </button>
+                                </TooltipTrigger>
+                           </Tooltip>
                      )}
                  </div>
             ) : null}
         </div>
+        </TooltipProvider>
     );
 };
 ValidationStatusIndicator.displayName = 'ValidationStatusIndicator';
