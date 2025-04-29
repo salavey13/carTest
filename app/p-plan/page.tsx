@@ -35,101 +35,52 @@ const iconComponents: { [key: string]: React.ElementType } = {
   FaHandPointer, FaUserSecret
 };
 
-// *** RenderContent v5: Используем split с аккуратной обработкой ***
+// *** RenderContent v5: Используем iterative exec ***
 const RenderContent: React.FC<{ content: string }> = React.memo(({ content }) => {
     // Split by paragraphs first
     return content.split('\n').map((paragraph, pIndex) => {
         if (!paragraph.trim()) return null; // Skip empty lines
 
         const elements: React.ReactNode[] = [];
-        // Regex to capture delimiters (**bold** or ::FaIcon::) including their content
         const regex = /(\*\*(.*?)\*\*)|(::Fa(\w+)(?:\s+className="([^"]*)")?\s*::)/g;
         let lastIndex = 0;
-        let keyCounter = 0;
+        let keyCounter = 0; // Use simple counter for keys within a paragraph
+        let match;
 
-        // Split the paragraph using the regex. This separates text from markers/bold parts.
-        const parts = paragraph.split(regex);
-
-        // Process the resulting array parts
-        for (let i = 0; i < parts.length; i++) {
-            const part = parts[i];
-            if (part === undefined) continue; // Skip undefined capture groups
-
-            // Check if the part corresponds to a **bold** match's content (group 2)
-            // The part before it (at i-1) would be the full **bold** match (group 1)
-            if (i > 0 && parts[i - 1] === `**${part}**`) {
-                elements.push(<strong key={`${pIndex}-bold-${keyCounter++}`}>{part}</strong>);
-                continue; // Skip the plain text part that was inside **
+        while ((match = regex.exec(paragraph)) !== null) {
+            const matchStartIndex = match.index;
+            // Add text before match
+            if (matchStartIndex > lastIndex) {
+                elements.push(
+                    <React.Fragment key={`${pIndex}-txt-${keyCounter++}`}>
+                        {paragraph.substring(lastIndex, matchStartIndex).replace(/->/g, '→')}
+                    </React.Fragment>
+                );
             }
-
-            // Check if the part corresponds to an ::FaIcon:: match's content
-            // Look ahead to see if the next parts match the icon structure
-            const iconMarkerMatch = part.match(/^::Fa(\w+)(?:\s+className="([^"]*)")?\s*::$/);
-            if (iconMarkerMatch) {
-                const [, iconName, className = ""] = iconMarkerMatch;
+            // Handle match
+            if (match[1]) { // Bold (**bold**) -> match[2] is the content
+                elements.push(<strong key={`${pIndex}-bold-${keyCounter++}`}>{match[2]}</strong>);
+            } else if (match[3]) { // Icon (::FaIcon:: or ::FaIcon className="..." ::)
+                const iconName = match[4]; // Icon name like 'Rocket'
+                const className = match[5] || ""; // Optional className
                 const IconComp = iconComponents[`Fa${iconName}`];
                 if (IconComp) {
-                    const finalClassName = cn("inline-block align-middle mx-1", className || "w-4 h-4");
+                    const finalClassName = cn("inline-block align-middle mx-1", className || "w-4 h-4"); // Default size if no class
                     elements.push(<IconComp key={`${pIndex}-icon-${keyCounter++}`} className={finalClassName} />);
                 } else {
                     console.warn(`[RenderContent] Icon "Fa${iconName}" not found.`);
                     elements.push(<span key={`${pIndex}-icon-error-${keyCounter++}`} className="text-red-500 font-mono" title={`Icon Fa${iconName} not found`}>[?]</span>);
                 }
-                // Need to potentially skip ahead in the `parts` array if the regex captured internal groups separately
-                // This logic depends heavily on how `split` handles capture groups, which can be tricky.
-                // A safer approach might be iterative `exec` as used before, let's revert to that polished version.
-
-                // -- Reverting to iterative exec logic from previous attempt --
-                // Reset elements for this paragraph and use exec
-                elements.length = 0; // Clear previous attempt for this paragraph
-                lastIndex = 0;
-                let match;
-                while ((match = regex.exec(paragraph)) !== null) {
-                     const matchStartIndex = match.index;
-                     // Add text before match
-                     if (matchStartIndex > lastIndex) {
-                         elements.push(
-                             <React.Fragment key={`${pIndex}-txt-${lastIndex}`}>
-                                 {paragraph.substring(lastIndex, matchStartIndex).replace(/->/g, '→')}
-                             </React.Fragment>
-                         );
-                     }
-                    // Handle match
-                    if (match[1]) { // Bold
-                         elements.push(<strong key={`${pIndex}-bold-${matchStartIndex}`}>{match[2]}</strong>);
-                     } else if (match[3]) { // Icon
-                         const iconName = match[4];
-                         const className = match[5] || "";
-                         const IconComp = iconComponents[`Fa${iconName}`];
-                         if (IconComp) {
-                             const finalClassName = cn("inline-block align-middle mx-1", className || "w-4 h-4");
-                             elements.push(<IconComp key={`${pIndex}-icon-${matchStartIndex}`} className={finalClassName} />);
-                         } else {
-                             console.warn(`[RenderContent] Icon "Fa${iconName}" not found.`);
-                            elements.push(<span key={`${pIndex}-icon-error-${matchStartIndex}`} className="text-red-500 font-mono" title={`Icon Fa${iconName} not found`}>[?]</span>);
-                         }
-                     }
-                     lastIndex = regex.lastIndex;
-                 }
-                 // Add remaining text
-                 if (lastIndex < paragraph.length) {
-                    elements.push(
-                         <React.Fragment key={`${pIndex}-txt-${lastIndex}`}>
-                             {paragraph.substring(lastIndex).replace(/->/g, '→')}
-                         </React.Fragment>
-                     );
-                 }
-                 // Break the outer loop for this paragraph as we handled it with exec
-                 break;
-
-            } else if (!part.startsWith('**') && !part.startsWith('::Fa')) {
-                 // It's likely a plain text segment that wasn't captured correctly by split logic.
-                 // Render it as text.
-                 const processedText = part.replace(/->/g, '→');
-                 if(processedText.trim()) { // Avoid rendering empty strings
-                     elements.push(<React.Fragment key={`${pIndex}-text-${i}`}>{processedText}</React.Fragment>);
-                 }
             }
+            lastIndex = regex.lastIndex;
+        }
+        // Add remaining text after the last match
+        if (lastIndex < paragraph.length) {
+           elements.push(
+                <React.Fragment key={`${pIndex}-txt-${keyCounter++}`}>
+                    {paragraph.substring(lastIndex).replace(/->/g, '→')}
+                </React.Fragment>
+            );
         }
 
         // Final check to render the paragraph
@@ -139,12 +90,12 @@ const RenderContent: React.FC<{ content: string }> = React.memo(({ content }) =>
             </p>
         ) : null;
 
-    }).filter(Boolean);
+    }).filter(Boolean); // Filter out nulls from empty lines
 });
 RenderContent.displayName = 'RenderContent';
 
 
-// --- Функция генерации секций (getPlanSections) с ФИНАЛЬНЫМ ТЕКСТОМ БЕЗ СУММ ---
+// --- Функция генерации секций (getPlanSections) с ФИНАЛЬНЫМ ТЕКСТОМ И ЭКСПОНЕНТОЙ ---
 const getPlanSections = (dbUser: DbUser) => {
   const userName = dbUser?.first_name || 'Неофит';
   const isSanek = dbUser?.user_id?.toString() === '1260304309' || dbUser?.username === 'Pihman';
@@ -160,27 +111,28 @@ const getPlanSections = (dbUser: DbUser) => {
       title: `1. Протокол "Исход": ${userName}, Взламываем Матрицу!`,
       icon: FaBomb,
       color: "text-blue-400",
+      // *** UPDATED Section 1 Content ***
       content: `Проект **"Кибер-Волк ${userName}"** – это не сраный PDF. Это **чит-код** ::FaKey className="inline text-blue-400":: к твоей новой жизни! Твой JUMPSTART ::FaRocket className="inline text-blue-400"::, чтобы ты (${userHandle}) **выбил дверь с ноги** из ${userOriginStory} и начал **писать СВОЙ код реальности**. Управлять? **Телефоном, сука!** ::FaMobileAlt className="inline text-blue-400"::!
-      **VIBE – Твой Новый BIOS:** Скорость (::FaRocket::) + **AI как Нейроусилитель** (::FaAtom className="inline text-purple-400"::>, Gemini 2.5 Pro – халявный IQ-буст!) + Кибер-Броня (::FaUserNinja className="inline text-gray-500"::>). И **SelfDev** – ты **перепрошиваешь себя**, как киборга.
+      **VIBE – Твой Новый BIOS:** Скорость (::FaRocket::) + **AI как Нейроусилитель** (::FaAtom className="inline text-purple-400"::>, Gemini 2.5 Pro – халявный IQ-буст!) + Кибер-Броня (::FaUserNinja className="inline text-gray-500"::>). И **SelfDev** – ты **перепрошиваешь себя**, как киборга. **Ключевое Открытие:** Мы тут не +1 раба в год нанимаем. Это **"Один Клик → Экспонента!"** ::FaChartLine className="inline text-yellow-500 animate-pulse"::. Маленькое изменение в первом апгрейде L1→L2 (обучить **двух** вместо одного) запускает **ВЗРЫВНОЙ РОСТ** ::FaBolt::, удваивая команду почти каждый цикл! Это не линейный набор, это **самовоспроизводящийся VIBE-вирус**!
       **Ресурсы:** Юзаем **халяву** – Vercel, GitHub (::FaGithub::), Telegram (::FaTelegram className="inline text-blue-400"::>). **Платные фичи – для Агентов Смитов**.
       **Стартовый Буст – Твой Первый "Прыжок Веры":** Это не подачка. Это **топливо для твоего "Навуходоносора"**. На что (приоритеты):
       - **ТВОЕ ВРЕМЯ для "Прокачки в Додзе"** (Основная часть): **Забей на галеры**. Погружайся в VIBE, генери контент с AI, **учись видеть Матрицу**. Это твоя **"качалка" для мозга** ::FaDumbbell::. Я – твой **Морфеус/тренер** ::FaHandPointer className="inline text-blue-400"::, ловлю глюки AI, пока ты **уклоняешься от пуль**.
       - **Охота на "Донни"** (Значительная часть): Найти первых **клиентов-последователей** ::FaUserSecret className="inline text-pink-400"::, кто **заплатит за твою "ручку"** (методологию VIBE). Помогать им **умножать кэш** с AI – это наш **"почти легальный" бизнес**! ::FaMoneyBillWave className="inline text-pink-400"::.
       - **Апгрейд Твоей "Нейросети"** (Меньшая часть): Доступ к **продвинутым AI-заклинаниям**, курсы по "взлому" маркетинга. Стань **магистром VIBE**.
       - **"Аварийный Выход"** (Резерв): На случай ::FaCarCrash:: или если AI взбунтуется.
-      **Цель:** Построить **не сайт, а ЛИЧНЫЙ ГЕНЕРАТОР СВОБОДЫ И БАБОК**, работающий на **VIBE и дерзости**.`
+      **Цель:** Построить **не сайт, а ЛИЧНЫЙ ГЕНЕРАТОР СВОБОДЫ И БАБОК**, работающий на **VIBE, дерзости и экспоненциальном росте**.`
     },
-     { // Section 2: Win98/XP - Чуть сложнее, появляются иконки
+    { // Section 2: Win98/XP - Чуть сложнее, появляются иконки
       id: "description",
       title: "2. Твой Кибер-Арсенал: Интерфейс к Силе",
       icon: FaUserAstronaut,
       color: "text-brand-cyan",
       content: `**Командный Мостик:** Телефон ::FaMobileAlt className="inline text-cyan-400":: + Ноут (опц).
-      **1. Личный Голодек (Сайт/Блог, 0 руб):** Твоя легенда. Путь из ${userOriginStory}. VIBE-мануалы, кейсы "искривления реальности". **Обновляется сам** (GitHub ::FaGithub:: + TG-бот ::FaTelegram::).
-      **2. Твой Зион (TG-Канал/Чат ::FaTelegram className="inline text-blue-400"::):** Собирай **экипаж "Навуходоносора"** ::FaUsers::. Делись альфа-инфой, руби правду-матку, создавай **сопротивление**.
-      **3. Библиотека Заклинаний (GitHub ::FaGithub::):** Твой "Кибер-Сундук". Готовые артефакты (Jumpstart Kit ::FaBoxOpen::!), VIBE-автоматизация. **Тут ты - Архимаг**.
-      **4. AI-Репликатор (::FaAtom className="inline text-purple-400":: + ::FaRecycle className="inline text-yellow-400"::):** Твой **личный Джарвис**. Мысль → текст, видео, арт, код. **Идея → Воплощение.** Экономит 99% энергии ::FaBolt::.
-      **УТП (Твой Уникальный "Глюк в Матрице"):** Ты – **${userName} (${userHandle})**, **выбравшийся** из ${userOriginStory}. Ты юзаешь **подпольный AI** ::FaRobot::. Ты **не Агент Смит**. Ты **даешь красную таблетку, а не синюю**.`
+      **1. Личный Голодек (Сайт/Блог, 0 руб):** Твоя легенда. Путь из ${userOriginStory}. VIBE-мануалы, кейсы "искривления реальности". **Обновляется сам** (GitHub ::FaGithub:: + TG-бот ::FaTelegram::). Здесь ты **сеешь зерна экспоненты**.
+      **2. Твой Зион (TG-Канал/Чат ::FaTelegram className="inline text-blue-400"::):** Собирай **экипаж "Навуходоносора"** ::FaUsers::. Делись альфа-инфой, руби правду-матку, создавай **сопротивление**. Координируй **лавину новичков**.
+      **3. Библиотека Заклинаний (GitHub ::FaGithub::):** Твой "Кибер-Сундук". Готовые артефакты (Jumpstart Kit ::FaBoxOpen::!), VIBE-автоматизация. **Тут ты - Архимаг**. Ключ к **масштабированию магии**.
+      **4. AI-Репликатор (::FaAtom className="inline text-purple-400":: + ::FaRecycle className="inline text-yellow-400"::):** Твой **личный Джарвис**. Мысль → текст, видео, арт, код. **Идея → Воплощение.** Экономит 99% энергии ::FaBolt::. Движок, **питающий твой рост**.
+      **УТП (Твой Уникальный "Глюк в Матрице"):** Ты – **${userName} (${userHandle})**, **выбравшийся** из ${userOriginStory}. Ты юзаешь **подпольный AI** ::FaRobot:: и **взламываешь законы роста**. Ты **не Агент Смит**. Ты **даешь красную таблетку, а не синюю**.`
     },
     { // Section 3: Early Cyberpunk - Неон, тени
       id: "market",
@@ -241,43 +193,48 @@ const getPlanSections = (dbUser: DbUser) => {
     },
     { // Section 7: Advanced Cyberpunk / Stark Tech
       id: "org",
-      title: "7. Структура Силы: Ты – Ядро Реактора",
+      title: "7. Структура Силы: Ты – Ядро Экспоненты", // Updated title
       icon: FaUserNinja,
       color: "text-gray-400",
+      // *** UPDATED Section 7 Content + NOTE FOR LEVEL 0 DUDES ***
       content: `**Статус:** Самозанятый Кибер-Алхимик (НПД).
-      **Ты (${userName}, ${userHandle}):** ::FaUserAstronaut className="inline text-gray-300":: Ты – **Альфа и Омега**. **ЗАБУДЬ ПРО ОФИСНЫЙ ПЛАНКТОН!** Твоя команда – **ТЫ, УСИЛЕННЫЙ AI-ЛЕГИОНОМ ::FaRobot::**. Твоя задача – **качать "бицуху" мозга** ::FaDumbbell:: и **быть дирижером AI-оркестра**. CyberVibe – твоя **персональная "качалка"**. Я – твой **тренер/спарринг-партнер**, ловлю баги AI, пока ты **побиваешь рекорды**.`
+      **Ты (${userName}, ${userHandle}):** ::FaUserAstronaut className="inline text-gray-300":: Ты – **Альфа и Омега**. **ЗАБУДЬ ПРО ОФИСНЫЙ ПЛАНКТОН И ЛИНЕЙНЫЙ НАБОР!** ::FaPoo className="inline text-red-600":: Твоя команда – **ТЫ, УСИЛЕННЫЙ AI-ЛЕГИОНОМ ::FaRobot::**. Но главный трюк – в **механике роста**. Помнишь **"Один Клик → Экспонента"** ::FaChartLine::? Обычный рост: +1 сотрудник = +1 единица работы. VIBE-рост: +1 "пробужденный" L1, докачавшийся до L2, **ЗАПУСКАЕТ ВОЛНУ ИЗ ДВУХ НОВЫХ L1** ::FaUsers className="inline text-gray-300"::! Это **цепная реакция** ::FaBolt::, а не сложение.
+      **Заметка для Нулевых (L1):** Каждый раз, когда один из вас апается на L2, вы **удваиваете армию таких же как вы** на старте (L1)! Это значит, что общее число "picture updaters" (и всей команды) растет не +1, +1, +1, а как **2 в степени (время+1) минус 1** (`2^(t+1) - 1`). Грубо говоря, **почти удваивается каждый цикл**! ::FaChartLine className="inline text-yellow-400"::. Готовьтесь к лавине новичков!
+      Твоя задача – **качать "бицуху" мозга** ::FaDumbbell::, быть **дирижером AI-оркестра** и **нажимать ту самую "кнопку" L1→L2**, запуская **экспоненциальный каскад**. CyberVibe – твоя **персональная "качалка" и центр управления ростом**. Я – твой **тренер/спарринг-партнер**, ловлю баги AI и слежу, чтобы **экспонента не схлопнулась**. `
     },
     { // Section 8: High Tech Finance / Alchemy Complete
       id: "finance",
-      title: `8. Философский Камень: Стартовый Буст Энергии`, // Убрали сумму
+      title: `8. Философский Камень: Топливо для Экспоненты`, // Updated title
       icon: FaMoneyBillWave,
       color: "text-brand-yellow",
-      content: `Стартовый капитал – это **искра**, чтобы зажечь твой **внутренний огонь**. Приоритеты:
-      - **::FaUserAstronaut className="inline text-yellow-400":: 1. ТВОЕ ВРЕМЯ НА ТРАНСМУТАЦИЮ (Приоритет #1):** Чтобы ты (${userName}) **вырвался из Матрицы** и мог **творить**: контент ::FaPaintBrush::, VIBE/AI ::FaBrain::, Орден ::FaUsers::. Это **инвестиция в твой ЛИЧНЫЙ Философский Камень**!
-      - **::FaBullseye className="inline text-yellow-400":: 2. ОХОТА НА "ЗОЛОТЫЕ ДУШИ" (Приоритет #2):** Найти **первых**, кто **заплатит за твою магию**. **Быстрые деньги = топливо для веры**.
-      - **::FaBrain className="inline text-yellow-400":: 3. АПГРЕЙД ТВОЕЙ СИЛЫ (Приоритет #3):** Доступ к **мощнейшим AI-гримуарам** ::FaScroll::, секреты "нейро-маркетинга". Стань **Верховным Магом VIBE**.
-      - **::FaTriangleExclamation className="inline text-yellow-400":: 4. "ЩИТ ВЕРЫ" (Резерв):** На случай **критического сбоя** ::FaBomb:: или если AI потребует дань.
-      **Цель по Золоту:** Стабильный **денежный поток**, достаточный для **свободы**. Буст **снимает страх**.
+      content: `Стартовый капитал – это **искра**, чтобы зажечь твой **внутренний огонь** и **запустить первый цикл экспоненциального роста**. Приоритеты:
+      - **::FaUserAstronaut className="inline text-yellow-400":: 1. ТВОЕ ВРЕМЯ НА ТРАНСМУТАЦИЮ (Приоритет #1):** Чтобы ты (${userName}) **вырвался из Матрицы** и мог **творить**: контент ::FaPaintBrush::, VIBE/AI ::FaBrain::, Орден ::FaUsers::. Это **инвестиция в твой ЛИЧНЫЙ Философский Камень** и **первый шаг к удвоению**!
+      - **::FaBullseye className="inline text-yellow-400":: 2. ОХОТА НА "ЗОЛОТЫЕ ДУШИ" (Приоритет #2):** Найти **первых**, кто **заплатит за твою магию**. **Быстрые деньги = топливо для веры и следующего цикла роста**.
+      - **::FaBrain className="inline text-yellow-400":: 3. АПГРЕЙД ТВОЕЙ СИЛЫ (Приоритет #3):** Доступ к **мощнейшим AI-гримуарам** ::FaScroll::, секреты "нейро-маркетинга". Стань **Верховным Магом VIBE**, способным **управлять лавиной**.
+      - **::FaTriangleExclamation className="inline text-yellow-400":: 4. "ЩИТ ВЕРЫ" (Резерв):** На случай **критического сбоя** ::FaBomb:: или если AI потребует дань. **Экспонента требует страховки**.
+      **Цель по Золоту:** Стабильный **денежный поток**, достаточный для **свободы и поддержания роста**. Буст **снимает страх** и **дает первый импульс**.
 
-      [Диаграмма Потоков Энергии: ТЫ – Ядро → Охота → Апгрейд → Щит]` // Упростил
+      [Диаграмма Потоков Энергии: ТЫ (Искра) → Запуск L1→L2 (+2) → Охота/Апгрейд (Подпитка Роста) → Щит]` // Updated diagram text
     },
      { // Section 9: Glitchy / Warning Style
       id: "risks",
       title: "9. Глюки в Матрице (Риски и План \"Омега\")",
       icon: FaCarCrash,
       color: "text-red-500",
-      content: `**Матрица Обновилась (Free Tier):** Юзаем "Щит Веры" (::FaTriangleExclamation::), ищем **эксплойты** (опенсорс), **быстро учимся делать золото**, чтобы платить "десятину" Матрице.
-      **Перегрев Процессора (${userName}):** AI (::FaAtom::) – твой **аватар**. "Орден" (::FaComments::) – твой **круг силы**. Делай то, что **прет** (SelfDev!). Помни: **"Нет ложки!"** ::FaEye:: Сила в **балансе**!
-      **Красная Таблетка Оказалась Витаминкой (Идея – Г):** **AI-Оракул** (::FaBullseye::) **ПРЕДСКАЖЕТ ДО СТАРТА!** Мочим дохлых гиппогрифов быстро. VIBE = **Мгновенная Телепортация** на новую идею.
-      **System Failure (<::FaCarCrash className="inline text-red-500"::>):** Жизнь – багованная игра. Твои **нейро-апгрейды** VIBE/AI/SelfDev – твой **"сейв"**. Сможешь **загрузиться** в новом мире.`
+      // *** UPDATED Section 9 Content ***
+      content: `**Матрица Обновилась (Free Tier):** Юзаем "Щит Веры" (::FaTriangleExclamation::), ищем **эксплойты** (опенсорс), **быстро учимся делать золото**, чтобы платить "десятину" Матрице. **Экспоненциальный рост может потребовать платных ресурсов быстрее**.
+      **Перегрев Процессора (${userName}):** AI (::FaAtom::) – твой **аватар**. "Орден" (::FaComments::) – твой **круг силы**. **Управлять экспонентой сложнее, чем линейным ростом**. Делай то, что **прет** (SelfDev!). Помни: **"Нет ложки!"** ::FaEye:: Сила в **балансе и делегировании AI**!
+      **Красная Таблетка Оказалась Витаминкой (Идея – Г):** **AI-Оракул** (::FaBullseye::) **ПРЕДСКАЖЕТ ДО СТАРТА!** Мочим дохлых гиппогрифов быстро. VIBE = **Мгновенная Телепортация** на новую идею. **Неудачная экспонента = быстрый провал, быстрый рестарт**.
+      **System Failure (<::FaCarCrash className="inline text-red-500"::>):** Жизнь – багованная игра. Твои **нейро-апгрейды** VIBE/AI/SelfDev – твой **"сейв"**. Сможешь **загрузиться** в новом мире. **Опыт управления быстрым ростом бесценен**. `
     },
     { // Section 10: Epic Finale Style
       id: "conclusion",
-      title: `10. ${userName}, Ты Избранный! Взломай Код!`,
+      title: `10. ${userName}, Ты Избранный! Жми на Газ Экспоненты!`, // Updated title
       icon: FaBrain,
       color: "text-brand-purple",
-      content: `**"Кибер-Волк ${userName}"** – это **твой манифест**. **ТВОЙ ВЫБОР**. Шанс **стать Архитектором**. Используй **мозг** (::FaBrain::), **шрамы** (::FaSignature::), **братство** (::FaUsers::) и **космическую силу AI** (::FaAtom::). Стартовый буст – **лишь первый разряд** ::FaBolt className="inline text-yellow-400"::. Дальше – твой **VIBE**, твоя **воля**, твой **прыжок в неизвестность**.
-      **ХВАТИТ БЫТЬ ПЕШКОЙ. ВРЕМЯ СТАНОВИТЬСЯ КОРОЛЕМ!** ::FaRocket className="inline text-brand-green"::`
+      // *** UPDATED Section 10 Content ***
+      content: `**"Кибер-Волк ${userName}"** – это **твой манифест**. **ТВОЙ ВЫБОР**. Шанс **стать Архитектором своей реальности... и её экспоненциального расширения**. Используй **мозг** (::FaBrain::), **шрамы** (::FaSignature::), **братство** (::FaUsers::) и **космическую силу AI** (::FaAtom::). Стартовый буст – **лишь первый разряд** ::FaBolt className="inline text-yellow-400"::, **искра для детонации цепной реакции**. Дальше – твой **VIBE**, твоя **воля**, твой **прыжок в неизвестность**, где **один становится легионом** ::FaUsers className="inline text-purple-400 animate-ping"::!
+      **ХВАТИТ БЫТЬ ПЕШКОЙ В ЛИНЕЙНОЙ ИГРЕ. ВРЕМЯ ЗАПУСКАТЬ СВОЮ ЭКСПОНЕНТУ!** ::FaRocket className="inline text-brand-green"::`
     },
   ];
 };
@@ -395,7 +352,7 @@ export default function PPlanPage() {
                           )}>
                            <RenderContent content={section.content} />
                            {/* Визуализации */}
-                           {section.id === 'finance' && ( <div className="mt-4 p-3 border border-dashed border-gray-600 rounded-md bg-gray-800/40"> <p className="text-sm text-gray-400 italic text-center">[Диаграмма Потоков Энергии: ТЫ – Ядро → Охота → Апгрейд → Щит]</p> </div> )}
+                           {section.id === 'finance' && ( <div className="mt-4 p-3 border border-dashed border-gray-600 rounded-md bg-gray-800/40"> <p className="text-sm text-gray-400 italic text-center">[Диаграмма Потоков Энергии: ТЫ (Искра) → Запуск L1→L2 (+2) → Охота/Апгрейд (Подпитка Роста) → Щит]</p> </div> )}
                            {section.id === 'marketing' && ( <div className="mt-4 p-3 border border-dashed border-gray-600 rounded-md bg-gray-800/40"> <p className="text-sm text-gray-400 italic text-center">[Кибер-Воронка: Сигнал → Зов → Стая → Золото]</p> </div> )}
                          </div>
                        </details>
