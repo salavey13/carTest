@@ -104,7 +104,7 @@ const AutomationBuddy: React.FC = () => {
         return getXuinityMessage();
     }, [isMounted, getXuinityMessage]);
 
-    // --- Calculate Suggestions in useEffect ---
+    // --- Calculate Suggestions in useEffect (with added check for fetcherRef.current.clearAll) ---
     useEffect(() => {
         // Only calculate after mount
         if (!isMounted) {
@@ -220,8 +220,7 @@ const AutomationBuddy: React.FC = () => {
 
              switch (currentStep) {
                  case 'ready_to_fetch':
-                     // FIX: Display "Fetch Files" even if repoUrlEntered is momentarily false, as long as there's a URL (which there is by default)
-                     addSuggestion("fetch", `Извлечь Файлы${branchInfo}`, () => triggerFetch(false, effectiveBranch || null), <FaDownload />, true, false, ""); // Always enable if not loading, as there's a default URL
+                     addSuggestion("fetch", `Извлечь Файлы${branchInfo}`, () => triggerFetch(false, effectiveBranch || null), <FaDownload />, true, false, "");
                      break;
                  case 'fetching':
                      addSuggestion("loading-indicator", `Загрузка Файлов${branchInfo}...`, () => {}, <FaArrowsRotate className="animate-spin"/>, true, true );
@@ -231,24 +230,20 @@ const AutomationBuddy: React.FC = () => {
                      break;
                  case 'files_fetched':
                      addSuggestion("goto-files", "К Списку Файлов", () => scrollToSection('file-list-container'), <FaEye />, true);
-                     // FIX: Replace isWaitingForAi with isAiGenerating
                      addSuggestion("ask-ai-empty", "🤖 Спросить AI", triggerAskAi, <FaRobot />, true, false, isAiGenerating ? "Запрос уже отправлен" : "");
                      break;
                  case 'files_fetched_highlights':
                      addSuggestion("select-highlighted", "Выбрать Связанные", triggerSelectHighlighted, <FaHighlighter />, true);
                      addSuggestion("goto-files", "К Списку Файлов", () => scrollToSection('file-list-container'), <FaEye />, true);
                      addSuggestion("add-selected", "Добавить (+) => Запрос", () => triggerAddSelectedToKwork(false), <FaPlus />, selectedFetcherFiles.size > 0, false, "Добавить выбранные файлы в поле запроса");
-                     // FIX: Replace isWaitingForAi with isAiGenerating
                      addSuggestion("ask-ai-highlights", "🤖 Спросить AI (с Добавл.)", async () => { await triggerAddSelectedToKwork(false); await triggerAskAi(); }, <FaRobot />, selectedFetcherFiles.size > 0, false, isAiGenerating ? "Запрос уже отправлен" : "Добавить выбранные и сразу спросить AI");
                     break;
                  case 'files_selected':
                     addSuggestion("add-selected", "Добавить (+) => Запрос", () => triggerAddSelectedToKwork(false), <FaPlus />, true, false, "Добавить выбранные файлы в поле запроса");
-                    // FIX: Replace isWaitingForAi with isAiGenerating
                     addSuggestion("ask-ai-selected", "🤖 Спросить AI (с Добавл.)", async () => { await triggerAddSelectedToKwork(false); await triggerAskAi(); }, <FaRobot />, true, false, isAiGenerating ? "Запрос уже отправлен" : "Добавить выбранные и сразу спросить AI");
                     addSuggestion("goto-kwork", "К Полю Запроса", () => scrollToSection('kwork-input-section'), <FaKeyboard />, true);
                     break;
                  case 'request_written':
-                     // FIX: Replace isWaitingForAi with isAiGenerating
                      addSuggestion("ask-ai-written", "🤖 Спросить AI", triggerAskAi, <FaRobot />, true, false, isAiGenerating ? "Запрос уже отправлен" : "");
                      addSuggestion("copy-kwork", "Скопировать Запрос", triggerCopyKwork, <FaCopy />, true, !kworkInputHasContent, !kworkInputHasContent ? "Запрос пуст" : "");
                      addSuggestion("goto-kwork", "К Полю Запроса", () => scrollToSection('kwork-input-section'), <FaKeyboard />, true);
@@ -279,10 +274,27 @@ const AutomationBuddy: React.FC = () => {
                  default: break;
              }
 
-             // Clear All button available in most standard steps
-             if (fetcherRef?.current?.clearAll && !imageReplaceTask && (selectedFetcherFiles.size > 0 || kworkInputHasContent || aiResponseHasContent || filesParsed)) {
-                 addSuggestion("clear-all", "Очистить Все?", fetcherRef.current.clearAll, <FaBroom/>, true);
-             }
+            // Clear All button available in most standard steps
+            // --- ADDED DEFENSIVE CHECK ---
+            if (fetcherRef?.current?.clearAll && // Check if ref.current and method exist
+                !imageReplaceTask &&
+                (selectedFetcherFiles.size > 0 || kworkInputHasContent || aiResponseHasContent || filesParsed)
+            ) {
+                // Use a function wrapper to call the ref method
+                const clearAction = () => {
+                    if (fetcherRef.current?.clearAll) {
+                        fetcherRef.current.clearAll();
+                    } else {
+                        logger.error("[AutomationBuddy] clearAll action called but fetcherRef.current.clearAll is missing!");
+                    }
+                };
+                addSuggestion("clear-all", "Очистить Все?", clearAction, <FaBroom/>, true);
+            } else if (!imageReplaceTask && (selectedFetcherFiles.size > 0 || kworkInputHasContent || aiResponseHasContent || filesParsed)) {
+                // Log if clearAll is expected but not available
+                 logger.warn("[AutomationBuddy] ClearAll suggestion not added. fetcherRef.current:", fetcherRef?.current);
+            }
+            // --- END DEFENSIVE CHECK ---
+
 
             return suggestionsList;
         };
@@ -291,7 +303,7 @@ const AutomationBuddy: React.FC = () => {
         const newSuggestions = calculateSuggestions();
         setSuggestions(newSuggestions);
 
-    // Dependencies updated for image task logic
+    // Dependencies updated for image task logic AND DEFENSIVE CHECK
     }, [
         isMounted, currentStep, fetchStatus, repoUrlEntered, filesFetched,
         selectedFetcherFiles, kworkInputHasContent, aiResponseHasContent, filesParsed,
@@ -302,7 +314,8 @@ const AutomationBuddy: React.FC = () => {
         // Context triggers
         triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork,
         triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR,
-        triggerToggleSettingsModal, scrollToSection, fetcherRef, getXuinityMessage
+        triggerToggleSettingsModal, scrollToSection, getXuinityMessage,
+        fetcherRef // Added fetcherRef dependency for the clearAll check
     ]);
 
     // --- Suggestion Change Detection for Notification ---

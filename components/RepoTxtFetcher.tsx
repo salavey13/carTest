@@ -63,7 +63,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       triggerGetOpenPRs, updateRepoUrlInAssistant, scrollToSection,
       setFilesParsed, setAiResponseHasContent, setSelectedAssistantFiles, imageReplaceTask, // Keep imageReplaceTask from context
       allFetchedFiles, // Keep allFetchedFiles from context
-      // Removed repoUrl and setRepoUrl from context destructuring, use local state + effect
+      assistantRef // Get assistant ref for the effect
    } = useRepoXmlPageContext();
 
   // === Параметры URL и производное состояние ===
@@ -99,16 +99,21 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
       // Update context state when local URL changes
       if (isMounted) {
            setRepoUrlEntered(repoUrl.trim().length > 0);
-           updateRepoUrlInAssistant(repoUrl); // Keep Assistant's URL in sync
-           // Reset PRs and target branch when URL changes manually
-           // Check if the change wasn't just initialization?
-           // Maybe add a check: if (prevRepoUrl !== repoUrl) { ... }
-           // For simplicity, let's keep the reset for now.
+           // --- Safer call to updateRepoUrlInAssistant ---
+           if (assistantRef.current?.updateRepoUrl) {
+               updateRepoUrlInAssistant(repoUrl);
+           } else {
+               // Log if the ref isn't ready yet (might happen on initial mount)
+               logger.warn("[RepoTxtFetcher URL Effect] assistantRef not ready when URL changed.");
+               // Consider delaying or retrying if this is critical path, but for now, just log.
+           }
+           // --- End safer call ---
            setOpenPrs([]);
            setTargetBranchName(null);
            setManualBranchName("");
       }
-  }, [isMounted, repoUrl, setRepoUrlEntered, updateRepoUrlInAssistant, setOpenPrs, setTargetBranchName, setManualBranchName]); // Depend on local repoUrl
+     // Add assistantRef and updateRepoUrlInAssistant to dependency array
+    }, [isMounted, repoUrl, setRepoUrlEntered, updateRepoUrlInAssistant, setOpenPrs, setTargetBranchName, setManualBranchName, assistantRef, logger]); // <-- Added assistantRef, logger
   useEffect(() => { return () => stopProgressSimulation(); }, []);
   useEffect(() => { setSelectedFilesState(selectedFetcherFiles); }, [selectedFetcherFiles]); // Sync local UI state from context
 
@@ -368,7 +373,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
     // --- Effect: Track previous selection (for debugging/advanced logic if needed) ---
     useEffect(() => { if(!isMounted){ return; } prevSelectedFilesRef.current = selectedFetcherFiles; }, [selectedFetcherFiles, isMounted]);
 
-    // === Imperative Handle (ensure handleFetch has correct signature) ---
+    // === Imperative Handle (ensure handleFetch has correct signature) ===
     useImperativeHandle(ref, () => ({
         // Update signature to accept the optional task
         handleFetch: (isManualRetry?: boolean, branchNameToFetchOverride?: string | null, taskForEarlyCheck?: ImageReplaceTask | null) => handleFetchManual(isManualRetry, branchNameToFetchOverride, taskForEarlyCheck || imageReplaceTask), // Use context task as fallback
