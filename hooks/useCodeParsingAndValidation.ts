@@ -234,8 +234,12 @@ const validFa6Icons = new Set([
 const importChecks = [
     { name: 'motion', usageRegex: /<motion\./, importRegex: /import .* from ['"]framer-motion['"]/, importStatement: `import { motion } from "framer-motion";` },
     { name: 'clsx', usageRegex: /clsx\(/, importRegex: /import clsx from ['"]clsx['"]/, importStatement: `import clsx from "clsx";` },
+    // Added React import check
+    { name: 'React', usageRegex: /React\.(useState|useEffect|useRef|useContext|useCallback|useMemo|Fragment|createElement)/, importRegex: /import\s+(\*\s+as\s+React|React(?:,\s*\{[^}]*\})?)\s+from\s+['"]react['"]/, importStatement: `import React from "react";` }
 ];
-const skippedCodeBlockMarkerRegex = /(\/\*\s*\.{2,3}\s*\*\/)|({\s*\/\*\s*\.{2,3}\s*\*\/\s*})|(\[\s*\/\*\s*\.{2,3}\s*\*\/\s*\])/;
+const clientHookPatterns = /(useState|useEffect|useRef|useContext|useReducer|useCallback|useMemo|useLayoutEffect|useImperativeHandle|useDebugValue)\s*\(/;
+
+const skippedCodeBlockMarkerRegex = /(\/\*\s*\.{3}\s*\*\/)|({\s*\/\*\s*\.{3}\s*\*\/\s*})|(\[\s*\/\*\s*\.{3}\s*\*\/\s*\])/;
 const skippedCommentKeepRegex = /\/\/\s*\.{3}\s*\(keep\s/;
 const skippedCommentRealRegex = /\/\/\s*\.{3}(?!\s*\()/;
 const codeBlockStartRegex = /^\s*```(\w*)\s*$/;
@@ -303,7 +307,6 @@ export function useCodeParsingAndValidation() {
     const validateParsedFiles = useCallback(async (filesToValidate: FileEntry[]): Promise<ValidationIssue[]> => {
         setValidationStatus('validating');
         const issues: ValidationIssue[] = [];
-        const clientHookPatterns = /(useState|useEffect|useRef|useContext|useReducer|useCallback|useMemo|useLayoutEffect|useImperativeHandle|useDebugValue)\s*\(/;
 
         for (const file of filesToValidate) {
             if (file.path.startsWith('unnamed-') || file.path.startsWith('parse-error-')) continue;
