@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { FaScrewdriverWrench, FaLink, FaPlus, FaRobot, FaImage, FaBook, FaDatabase, FaRocket, FaCode } from 'react-icons/fa6';
-import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"; // Corrected path
+// REMOVED Tooltip Imports
 
 interface LinkItem {
     name: string;
@@ -35,7 +35,6 @@ export const ToolsMenu: React.FC<ToolsMenuProps> = ({ customLinks, onAddCustomLi
     const [showToolsMenu, setShowToolsMenu] = useState(false);
 
     return (
-        <TooltipProvider> {/* Wrap with provider */}
         <div className="relative inline-block">
             <button
                 className={clsx(
@@ -58,16 +57,12 @@ export const ToolsMenu: React.FC<ToolsMenuProps> = ({ customLinks, onAddCustomLi
                     {/* Predefined Links Section */}
                     <div className="py-1">
                         {predefinedLinks.map((link) => (
-                             <Tooltip key={link.name} text={link.url} position="right">
-                                 <TooltipTrigger asChild>
-                                      <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-4 py-2 hover:bg-gray-600 text-sm transition text-white group">
-                                          <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                                               {link.icon ?? <FaLink className="text-gray-400 group-hover:text-white" />}
-                                          </span>
-                                          <span className="flex-grow truncate">{link.name}</span>
-                                      </a>
-                                 </TooltipTrigger>
-                             </Tooltip>
+                             <a href={link.url} target="_blank" rel="noopener noreferrer" key={link.name} title={link.url} className="flex items-center gap-2.5 px-4 py-2 hover:bg-gray-600 text-sm transition text-white group">
+                                  <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                                       {link.icon ?? <FaLink className="text-gray-400 group-hover:text-white" />}
+                                  </span>
+                                  <span className="flex-grow truncate">{link.name}</span>
+                              </a>
                         ))}
                     </div>
                     {/* Custom Links Section (if any) */}
@@ -75,16 +70,12 @@ export const ToolsMenu: React.FC<ToolsMenuProps> = ({ customLinks, onAddCustomLi
                     {customLinks.length > 0 && (
                          <div className="py-1">
                             {customLinks.map((link) => (
-                                 <Tooltip key={link.name} text={link.url} position="right">
-                                      <TooltipTrigger asChild>
-                                          <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-4 py-2 hover:bg-gray-600 text-sm transition text-white group">
-                                               <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                                                   <FaLink className="text-gray-400 group-hover:text-white" />
-                                               </span>
-                                               <span className="flex-grow truncate">{link.name}</span>
-                                          </a>
-                                      </TooltipTrigger>
-                                 </Tooltip>
+                                 <a href={link.url} target="_blank" rel="noopener noreferrer" key={link.name} title={link.url} className="flex items-center gap-2.5 px-4 py-2 hover:bg-gray-600 text-sm transition text-white group">
+                                       <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                                           <FaLink className="text-gray-400 group-hover:text-white" />
+                                       </span>
+                                       <span className="flex-grow truncate">{link.name}</span>
+                                  </a>
                             ))}
                          </div>
                     )}
@@ -99,7 +90,6 @@ export const ToolsMenu: React.FC<ToolsMenuProps> = ({ customLinks, onAddCustomLi
                 </motion.div>
             )}
         </div>
-         </TooltipProvider>
     );
 };
 ToolsMenu.displayName = 'ToolsMenu';
