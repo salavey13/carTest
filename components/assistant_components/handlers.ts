@@ -73,15 +73,17 @@ interface UseAICodeAssistantHandlersProps {
     setIsImageModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     setComponentParsedFiles: React.Dispatch<React.SetStateAction<ValidationFileEntry[]>>;
     setImageReplaceError: React.Dispatch<React.SetStateAction<string | null>>;
-    setRepoUrlStateLocal: React.Dispatch<React.SetStateAction<string>>; // Added setter
+    // --- FIX: Add setImageReplaceTask type ---
+    setImageReplaceTask: React.Dispatch<React.SetStateAction<ImageReplaceTask | null>>;
+    setRepoUrlStateLocal: React.Dispatch<React.SetStateAction<string>>;
     // Props from useCodeParsingAndValidation hook
     codeParserHook: UseCodeParsingAndValidationReturn;
     // Context values/methods
-    appContext: ReturnType<typeof useAppContext>; // Pass the whole context object
-    pageContext: ReturnType<typeof useRepoXmlPageContext>; // Pass the whole context object
-    // Refs (passed from parent)
+    appContext: ReturnType<typeof useAppContext>;
+    pageContext: ReturnType<typeof useRepoXmlPageContext>;
+    // Refs
     aiResponseInputRefPassed: React.MutableRefObject<HTMLTextAreaElement | null>;
-    kworkInputRefPassed: React.MutableRefObject<HTMLTextAreaElement | null>; // Keep if needed
+    kworkInputRefPassed: React.MutableRefObject<HTMLTextAreaElement | null>;
 }
 
 // --- Custom Hook ---
@@ -89,9 +91,11 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
     const {
         // Destructure all props
         response, componentParsedFiles, selectedFileIds, repoUrlStateLocal, prTitle, customLinks, originalRepoFiles, isFetchingOriginals, imageReplaceTask,
-        setResponse, setSelectedFileIds, setPrTitle, setCustomLinks, setShowModal, setModalMode, setIsProcessingPR, setOriginalRepoFiles, setIsFetchingOriginals, setIsImageModalOpen, setComponentParsedFiles, setImageReplaceError, setRepoUrlStateLocal, // Added setter
+        setResponse, setSelectedFileIds, setPrTitle, setCustomLinks, setShowModal, setModalMode, setIsProcessingPR, setOriginalRepoFiles, setIsFetchingOriginals, setIsImageModalOpen, setComponentParsedFiles, setImageReplaceError, setRepoUrlStateLocal,
+        // --- FIX: Destructure setImageReplaceTask ---
+        setImageReplaceTask,
         codeParserHook, appContext, pageContext,
-        aiResponseInputRefPassed, kworkInputRefPassed // Keep kworkInputRefPassed
+        aiResponseInputRefPassed, kworkInputRefPassed
     } = props;
 
     // Destructure needed parts from hooks and contexts
@@ -133,9 +137,6 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             setPrTitle(extractPRTitleHint(textForTitle));
             setFilesParsed(newlyParsedFiles.length > 0);
 
-            // Use the issues returned by parseAndValidateResponse directly
-            // Validation status is set within parseAndValidateResponse now
-
             toast.success(`Разбор завершен. Найдено ${newlyParsedFiles.length} файлов. Проблем: ${parseValidationIssues.length}.`);
         } catch (error) {
             logger.error("Parse error in handleParse:", error); toast.error("Ошибка разбора ответа AI.");
@@ -145,14 +146,13 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             setContextIsParsing(false); setAssistantLoading(false);
         }
      }, [
-        response, imageReplaceTask, parseAndValidateResponse, setFilesParsed, setSelectedAssistantFiles, setContextIsParsing, setAssistantLoading, setValidationStatus, setValidationIssues, setHookParsedFiles, logger, extractPRTitleHint, setPrTitle, setOriginalRepoFiles, setSelectedFileIds, setComponentParsedFiles // Added parseAndValidateResponse
+        response, imageReplaceTask, parseAndValidateResponse, setFilesParsed, setSelectedAssistantFiles, setContextIsParsing, setAssistantLoading, setValidationStatus, setValidationIssues, setHookParsedFiles, logger, extractPRTitleHint, setPrTitle, setOriginalRepoFiles, setSelectedFileIds, setComponentParsedFiles
      ]);
 
     const handleAutoFix = useCallback(() => {
         if (imageReplaceTask) return;
         const updated = autoFixIssues(componentParsedFiles, validationIssues);
         setComponentParsedFiles(updated);
-        // Validation status is updated within autoFixIssues now
      }, [autoFixIssues, componentParsedFiles, validationIssues, imageReplaceTask, setComponentParsedFiles]);
 
     const handleCopyFixPrompt = useCallback(() => {
@@ -490,7 +490,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         finally { setIsProcessingPR(false); setAssistantLoading(false); logger.log("[handleCreateOrUpdatePR] Finished."); }
      }, [ componentParsedFiles, selectedAssistantFiles, repoUrlForForm, prTitle, rawDescription, response, validationIssues, targetBranchName, contextOpenPrs, triggerUpdateBranch, setAssistantLoading, user, triggerGetOpenPRs, imageReplaceTask, logger, setIsProcessingPR, createGitHubPullRequest ]); // Added dependencies
 
-    // --- Direct Image Replace Handler (moved here) ---
+    // --- Direct Image Replace Handler ---
     const handleDirectImageReplace = useCallback(async (task: ImageReplaceTask, allFiles: FileNode[]): Promise<void> => {
       if (!task) { logger.warn("[handleDirectImageReplace] No task provided."); return; }
       logger.log("[handleDirectImageReplace] Starting direct image replace process for task:", task);
@@ -504,8 +504,6 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
           const oldUrlRegex = new RegExp(task.oldUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
           if (!oldUrlRegex.test(targetFile.content)) {
               logger.warn(`[handleDirectImageReplace] Old URL "${task.oldUrl}" not found in file ${task.targetPath}. Proceeding anyway.`);
-              // Consider throwing an error or just warning, depending on desired behavior
-              // throw new Error(`Старый URL (${task.oldUrl}) не найден в файле ${task.targetPath}.`);
           }
 
           const updatedContent = targetFile.content.replace(oldUrlRegex, task.newUrl);
@@ -540,8 +538,8 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
            }
 
           logger.log("[handleDirectImageReplace] Image replacement and PR/Update process finished successfully.");
+          // --- FIX: Use the destructured setter ---
           setImageReplaceTask(null); // Clear the task on success
-          // setResponseValue(""); // Clear response area after successful image replace
 
       } catch (err: any) {
           logger.error("[handleDirectImageReplace] Error during process:", err);
@@ -554,8 +552,10 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
       }
     }, [
         repoUrlForForm, setAssistantLoading, setIsProcessingPR, setImageReplaceError,
-        triggerUpdateBranch, createGitHubPullRequest, triggerGetOpenPRs, setImageReplaceTask,
-        logger // Added dependencies
+        triggerUpdateBranch, createGitHubPullRequest, triggerGetOpenPRs,
+        // --- FIX: Add setImageReplaceTask to dependency array ---
+        setImageReplaceTask,
+        logger
     ]);
 
 
@@ -581,6 +581,6 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         handleSendToTelegram,
         handleAddCustomLink,
         handleCreateOrUpdatePR,
-        handleDirectImageReplace // Expose the new handler
+        handleDirectImageReplace // Expose the handler
     };
 };
