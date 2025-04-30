@@ -338,7 +338,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
     }, [
        repoUrl, token, imageReplaceTask, targetBranchName, manualBranchName,
        assistantLoading, isParsing, aiActionLoading, autoFetch, ideaFromUrl, isSettingsModalOpen,
-       setFetchStatus, setError, setFiles, /* setSelectedFilesState, REMOVED */ setPrimaryHighlightedPathState, setSecondaryHighlightedPathsState, setSelectedFetcherFiles, setFilesFetchedCombined,
+       setFetchStatus, setError, setFiles, setPrimaryHighlightedPathState, setSecondaryHighlightedPathsState, setSelectedFetcherFiles, setFilesFetchedCombined,
        setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setLoadingPrs, setOpenPrs, setTargetBranchName,
        triggerToggleSettingsModal,
        importantFiles, addToast, startProgressSimulation, stopProgressSimulation, updateKworkInput, getKworkInputValue,
