@@ -21,12 +21,10 @@ import {
 import Link from "next/link";
 import * as FaIcons from "react-icons/fa6";
 import { motion } from 'framer-motion';
-// --- FIX: Import html-react-parser ---
-import parse, { domToReact, HTMLReactParserOptions, Element, attributesToProps } from 'html-react-parser'; // Import Element and attributesToProps
+import parse, { domToReact, HTMLReactParserOptions, Element, attributesToProps } from 'html-react-parser';
 
 
 // --- I18N Translations (Keep Vibe 2.0 Philosophy from previous step) ---
-// Use standard HTML tags (<a> for links, <strong> for bold) and <FaIconName/> for icons
 const translations = {
   en: {
     loading: "Booting SUPERVIBE ENGINE...",
@@ -125,66 +123,46 @@ function LoadingBuddyFallback() {
 // --- REVISED: Configuration for html-react-parser ---
 const parserOptions: HTMLReactParserOptions = {
   replace: (domNode) => {
-    // Ensure it's an element with attributes before proceeding
     if (domNode instanceof Element && domNode.attribs) {
       const { name, attribs, children } = domNode;
       const lowerCaseName = name?.toLowerCase();
 
-      // --- Handle Font Awesome Icons ---
-      // Check if the tag name exactly matches a valid FaIcon key
+      // Handle Font Awesome Icons: Check if the tag name is a valid key in FaIcons
       if (name && FaIcons[name as keyof typeof FaIcons]) {
         const IconComponent = FaIcons[name as keyof typeof FaIcons];
-        const props = attributesToProps(attribs); // Convert HTML attributes to React props
-        // Combine existing classes with default styling
-        const className = `${props.className || ''} inline-block align-middle mx-1`;
-        // logger.log(`Rendering icon: ${name} with className: ${className}`); // Optional Debug log
-        return <IconComponent {...props} className={className} />;
+        const props = attributesToProps(attribs);
+        const baseClassName = "inline-block align-middle mx-1";
+        const specificClassName = props.className || '';
+        props.className = `${baseClassName} ${specificClassName}`.trim();
+        return React.createElement(IconComponent, props);
       }
 
-      // --- Handle Links (<a> tags) -> Next.js <Link> ---
+      // Handle Links: Convert internal links to Next.js <Link>
       if (lowerCaseName === 'a') {
         const props = attributesToProps(attribs);
-        const isInternalLink = props.href && (props.href.startsWith('/') || props.href.startsWith('#'));
-         // Use Next <Link> for internal navigation without target="_blank"
-        if (isInternalLink && !props.target) {
-          // logger.log(`Rendering internal Link: ${props.href}`); // Optional Debug log
-          return (
-            <Link href={props.href} {...props}>
-              {domToReact(children, parserOptions)}
-            </Link>
-          );
+        const isInternal = props.href && (props.href.startsWith('/') || props.href.startsWith('#'));
+        if (isInternal && !props.target) {
+          // Prevent passing invalid props like 'class' to NextLink
+          const { class: _, ...validProps } = props;
+          return <Link href={props.href} {...validProps} className={props.className}>{domToReact(children, parserOptions)}</Link>;
         }
-         // Standard <a> tag for external links or those with target
-         // logger.log(`Rendering standard <a> tag: ${props.href}`); // Optional Debug log
-         return (
-           <a {...props}>
-             {domToReact(children, parserOptions)}
-           </a>
-         );
+        return <a {...props}>{domToReact(children, parserOptions)}</a>;
       }
-
-      // --- Handle standard HTML tags like <strong>, <em>, <span> ---
-      // html-react-parser handles these by default if not replaced, no explicit action needed
     }
-    // Return undefined to let the parser handle other elements or text nodes
     return undefined;
   },
 };
 
+
 // --- REVISED: RenderContent Component ---
 const RenderContent: React.FC<{ content: string }> = React.memo(({ content }) => {
   const safeContent = typeof content === 'string' ? content : '';
-  // Replace **bold** with <strong>bold</strong> *before* parsing
-  // Make the regex non-greedy to handle multiple instances correctly
   const contentWithStrong = safeContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   try {
-    // logger.log("Parsing content:", contentWithStrong); // Optional Debug log
-    const parsed = parse(contentWithStrong, parserOptions);
-    // logger.log("Parsed result:", parsed); // Optional Debug log
-    return <>{parsed}</>;
+    return <>{parse(contentWithStrong, parserOptions)}</>;
   } catch (error) {
     logger.error("Error parsing content in RenderContent:", error, "Original Content:", safeContent);
-    return <>{safeContent}</>; // Fallback
+    return <span dangerouslySetInnerHTML={{ __html: contentWithStrong }} />; // Fallback
   }
 });
 RenderContent.displayName = 'RenderContent';
@@ -210,14 +188,12 @@ function ActualPageContent() {
     // Effect 1: Process URL Params & Easter Egg
     useEffect(() => {
       setIsMounted(true);
-      // --- Easter Egg ---
       console.log(
         "%c🚀 CyberVibe Studio 2.0 Initialized! 🚀\n%cCo-created with the Vibe Community & AI. Let's build!\n%cEaster Egg added by request. 😉",
         "color: #E1FF01; font-size: 1.2em; font-weight: bold; text-shadow: 0 0 5px #E1FF01;",
         "color: #00FF9D; font-size: 0.9em;",
         "color: #888; font-size: 0.8em;"
       );
-      // --- End Easter Egg ---
 
       const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
       const userLang = user?.language_code;
@@ -226,7 +202,7 @@ function ActualPageContent() {
       logger.log(`[ActualPageContent Effect 1] Lang set to: ${initialLang}`);
 
       const pathParam = searchParams.get("path");
-      const ideaParam = searchParams.get("idea"); // Can be null, "", or a string
+      const ideaParam = searchParams.get("idea");
       const repoParam = searchParams.get("repo");
 
       if (repoParam) {
@@ -299,7 +275,7 @@ function ActualPageContent() {
             logger.log(`[ActualPageContent Effect 1] No valid path/idea params found (path: ${!!pathParam}, idea type: ${typeof ideaParam}).`);
         }
 
-    }, [user, searchParams, setImageReplaceTask, setRepoUrl]); // Dependencies
+    }, [user, searchParams, setImageReplaceTask, setRepoUrl]);
 
 
     // Effect 2: Populate Kwork Input
@@ -316,7 +292,6 @@ function ActualPageContent() {
                 if (fetcherRef.current?.handleAddSelected) {
                     if (selectedFetcherFiles.size > 0) {
                         logger.log("[ActualPageContent Effect 2] Calling fetcherRef.handleAddSelected.");
-                        // Pass empty arrays if context data isn't ready, handleAddSelected should handle this
                         const filesToAdd = selectedFetcherFiles ?? new Set<string>();
                         const allFilesData = allFetchedFiles ?? [];
                         fetcherRef.current.handleAddSelected(filesToAdd, allFilesData)
@@ -338,20 +313,20 @@ function ActualPageContent() {
     const t = translations[lang];
     const userName = user?.first_name || (lang === 'ru' ? 'Нео' : 'Neo');
 
-    // REVISED: Helper to strip HTML/Icon tags for plain text title attribute
-    const getPlainText = (htmlString: string): string => {
-        if (!htmlString) return '';
-        try {
-            // Replace FaIcon tags specifically
-            const withoutIcons = htmlString.replace(/<Fa\w+\s*.*?\/?>/g, '');
-            // Replace any other HTML tags
-            const plainText = withoutIcons.replace(/<[^>]*>/g, '');
-            return plainText.trim();
-        } catch (e) {
-             logger.warn("Error stripping HTML for title:", e);
-            return htmlString; // fallback to original string on error
-        }
-    };
+    // REVISED: getPlainText helper with added safety check
+    const getPlainText = useCallback((htmlString: string | null | undefined): string => {
+       if (typeof htmlString !== 'string' || !htmlString) {
+           return ''; // Return empty string for non-string or empty input
+       }
+       try {
+           const withoutIcons = htmlString.replace(/<Fa\w+\s*.*?\/?>/g, '');
+           const plainText = withoutIcons.replace(/<[^>]*>/g, '');
+           return plainText.trim();
+       } catch (e) {
+           logger.error("Error stripping HTML for title:", e, "Input:", htmlString);
+           return htmlString; // fallback
+       }
+    }, []);
 
     const scrollToSectionNav = (id: string) => {
         const sectionsRequiringReveal = ['extractor', 'executor', 'cybervibe-section', 'philosophy-steps'];
@@ -376,6 +351,12 @@ function ActualPageContent() {
          return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
      }
 
+    // --- Pre-calculate nav titles (Ensures getPlainText gets a string) ---
+    const navTitleIntro = getPlainText(t.navIntro);
+    const navTitleVibeLoop = getPlainText(t.navCyberVibe);
+    const navTitleGrabber = getPlainText(t.navGrabber);
+    const navTitleAssistant = getPlainText(t.navAssistant);
+
     return (
         <>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
@@ -386,7 +367,6 @@ function ActualPageContent() {
                      <div className="flex justify-center mb-4"> <FaBolt className="w-16 h-16 text-[#E1FF01] text-shadow-[0_0_15px_#E1FF01] animate-pulse" /> </div>
                     <h1 className="text-4xl md:text-5xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-4"> <RenderContent content={t.pageTitle} /> </h1>
                     <p className="text-xl md:text-2xl text-gray-200 mt-4 font-semibold"> <RenderContent content={t.welcome} /> <span className="text-brand-cyan">{userName}!</span> </p>
-                    {/* Apply prose for better default text styling */}
                     <div className="text-lg md:text-xl text-gray-300 mt-3 space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-yellow-300 prose-em:text-purple-300 max-w-none">
                         <RenderContent content={t.intro1} />
                         <RenderContent content={t.intro2} />
@@ -402,7 +382,6 @@ function ActualPageContent() {
                                 <FaAtom className="animate-spin-slow"/> <RenderContent content={t.cyberVibeTitle}/> <FaBrain className="animate-pulse"/>
                             </CardTitle>
                          </CardHeader>
-                         {/* Apply prose for better default text styling */}
                          <CardContent className="p-0 text-gray-300 text-base md:text-lg space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-purple-300 prose-em:text-cyan-300 max-w-none">
                             <RenderContent content={t.cyberVibe1} />
                             <RenderContent content={t.cyberVibe2} />
@@ -419,9 +398,8 @@ function ActualPageContent() {
                             <span className="flex items-center gap-2"><FaCodeBranch /> <RenderContent content={t.philosophyTitle} /></span>
                             <span className="text-xs text-gray-500 group-open:rotate-180 transition-transform duration-300">▼</span>
                         </summary>
-                         {/* Apply prose for better default text/list/link styling */}
                         <div className="px-6 pt-2 text-gray-300 space-y-4 text-base prose prose-invert prose-p:my-2 prose-li:my-1 prose-strong:text-yellow-300 prose-em:text-cyan-300 prose-a:text-brand-blue max-w-none">
-                             <div className="my-4 not-prose"> {/* Exclude video section from prose */}
+                             <div className="my-4 not-prose">
                                  <h4 className="text-lg font-semibold text-cyan-400 mb-2"><RenderContent content={t.philosophyVideoTitle}/></h4>
                                  <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
                                      <iframe
@@ -500,7 +478,6 @@ function ActualPageContent() {
                 {/* Final CTA */}
                  {showComponents && (
                      <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
-                         {/* Apply prose for better default text styling */}
                          <div className="bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 p-6 rounded-lg shadow-lg animate-pulse border-2 border-white/50 prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 max-w-none">
                              <h3 className="text-2xl font-bold text-white mb-3"><RenderContent content={t.ctaTitle.replace('{USERNAME}', userName)} /></h3>
                              <p className="text-white text-lg mb-4"> <RenderContent content={t.ctaDesc} /> </p>
@@ -516,12 +493,12 @@ function ActualPageContent() {
                     animate={{ scale: [1, 1.03, 1] }}
                     transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}
                  >
-                    {/* REVISED: Use plain text for titles */}
-                     <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700/80 backdrop-blur-sm rounded-full hover:bg-gray-600 transition shadow-md" title={getPlainText(t.navIntro)} aria-label="Scroll to Intro" > <FaCircleInfo className="text-lg text-gray-200" /> </button>
-                     <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-purple-700/80 backdrop-blur-sm rounded-full hover:bg-purple-600 transition shadow-md" title={getPlainText(t.navCyberVibe)} aria-label="Scroll to Vibe Loop" > <FaUpLong className="text-lg text-white" /> </button>
+                    {/* REVISED: Use pre-calculated plain text titles */}
+                     <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700/80 backdrop-blur-sm rounded-full hover:bg-gray-600 transition shadow-md" title={navTitleIntro} aria-label="Scroll to Intro" > <FaCircleInfo className="text-lg text-gray-200" /> </button>
+                     <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-purple-700/80 backdrop-blur-sm rounded-full hover:bg-purple-600 transition shadow-md" title={navTitleVibeLoop} aria-label="Scroll to Vibe Loop" > <FaUpLong className="text-lg text-white" /> </button>
                      {showComponents && ( <>
-                            <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-blue-700/80 backdrop-blur-sm rounded-full hover:bg-blue-600 transition shadow-md" title={getPlainText(t.navGrabber)} aria-label="Scroll to Grabber" > <FaDownload className="text-lg text-white" /> </button>
-                            <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-indigo-700/80 backdrop-blur-sm rounded-full hover:bg-indigo-600 transition shadow-md" title={getPlainText(t.navAssistant)} aria-label="Scroll to Assistant" > <FaRobot className="text-lg text-white" /> </button>
+                            <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-blue-700/80 backdrop-blur-sm rounded-full hover:bg-blue-600 transition shadow-md" title={navTitleGrabber} aria-label="Scroll to Grabber" > <FaDownload className="text-lg text-white" /> </button>
+                            <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-indigo-700/80 backdrop-blur-sm rounded-full hover:bg-indigo-600 transition shadow-md" title={navTitleAssistant} aria-label="Scroll to Assistant" > <FaRobot className="text-lg text-white" /> </button>
                      </> )}
                 </motion.nav>
 
