@@ -5,13 +5,11 @@ import { useSearchParams } from "next/navigation";
 import {
     FaAngleDown, FaAngleUp,
     FaDownload, FaArrowsRotate, FaCircleCheck, FaXmark, FaCopy,
-    FaBroom, /* FaRobot, */ FaCodeBranch, FaPlus, /* FaFileLines, */ FaSpinner, /* FaListCheck, */ /* FaSquareXmark, */
-    /* FaHighlighter, */ /* FaKey, */ FaTree, FaImages
+    FaBroom, FaCodeBranch, FaPlus, FaSpinner, FaTree, FaImages
 } from "react-icons/fa6"; // Keep only used icons
 import { motion } from "framer-motion";
 
 // --- Core & Context ---
-// import { useAppContext } from "@/contexts/AppContext"; // Only if directly used
 import {
     useRepoXmlPageContext,
     RepoTxtFetcherRef, // Exported type for the ref
@@ -37,11 +35,6 @@ import SelectedFilesPreview from "./repo/SelectedFilesPreview";
 import RequestInput from "./repo/RequestInput";
 import ProgressBar from "./repo/ProgressBar";
 
-// --- Type Definitions ---
-// Keep these here temporarily, but ideally move to RepoXmlPageContext or a shared types file.
-// export interface FileNode { path: string; content: string; } // Now imported from context
-// export type ImportCategory = 'component' | 'context' | 'hook' | 'lib' | 'other'; // Now imported from context
-
 
 // --- Component Definition ---
 const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
@@ -51,7 +44,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
     const [token, setToken] = useState<string>("");
 
     // === Context ===
-    // Destructure only what's needed directly by RepoTxtFetcher UI logic or passed to hooks/components
+    // Destructure all needed values from context
     const {
         // Fetch Status/Control (used for UI display)
         fetchStatus, filesFetched, // boolean flag indicating fetch attempt completed
@@ -62,7 +55,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
         // Kwork Input State/Ref (used for UI display & disabling logic)
         kworkInputHasContent, setKworkInputHasContent, kworkInputRef,
         // Loading/Blocking States (used for disabling UI elements)
-        loadingPrs, assistantLoading, isParsing, aiActionLoading,
+        loadingPrs, // Destructure here
+        assistantLoading, isParsing, aiActionLoading,
         // Branch/PR Management (passed to SettingsModal, used for display)
         targetBranchName, setTargetBranchName, manualBranchName, setManualBranchName, openPrs,
         setLoadingPrs, triggerGetOpenPRs, // Actions passed to SettingsModal
@@ -80,7 +74,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
         addToast, getKworkInputValue, updateKworkInput
     } = useRepoXmlPageContext();
 
-    // Use context URL as the source of truth, allow local editing via SettingsModal
     const repoUrl = repoUrlFromContext;
     const handleRepoUrlChange = setRepoUrlInContext; // Use context setter directly
 
@@ -118,6 +111,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
         repoUrl, token, targetBranchName, manualBranchName, imageReplaceTask,
         highlightedPathFromUrl, importantFiles, autoFetch, ideaFromUrl, isSettingsModalOpen,
         repoUrlEntered, assistantLoading, isParsing, aiActionLoading,
+        // Pass loadingPrs from context to the hook:
+        loadingPrs, // Pass it here
     });
 
     // --- File Selection Hook ---
@@ -159,64 +154,71 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
              logger.log("[RepoTxtFetcher URL Effect] Syncing assistant URL:", repoUrl);
              updateRepoUrlInAssistant(repoUrl);
         } else if (isMounted) {
-            // This might happen briefly on initial load
+            // This might happen briefly on initial load, usually not an issue
             // logger.warn("[RepoTxtFetcher URL Effect] assistantRef not ready when URL changed.");
         }
-        // Resetting PRs/branch on URL change is implicitly handled by:
-        // 1. SettingsModal interactions clearing manual/target branches.
-        // 2. Fetcher hook re-checking PRs when needed (e.g., for image task).
-        // Avoid resetting targetBranchName here as it might be set by PR checks in fetcher hook.
-    }, [isMounted, repoUrl, updateRepoUrlInAssistant, assistantRef /* logger */]); // Simplified dependencies
+    }, [isMounted, repoUrl, updateRepoUrlInAssistant, assistantRef]); // Simplified dependencies
 
     // Effect to scroll to highlighted file after successful fetch
     useEffect(() => {
+        // Conditions to execute scroll: mounted, fetch succeeded, not image task, not auto-fetch
         if (!isMounted || fetchStatus !== 'success' || !!imageReplaceTask || autoFetch) {
-             return; // Only scroll on manual fetch success for standard tasks
+             return;
         }
 
+        // Helper function for scrolling and highlighting
         const scrollToFile = (path: string, block: ScrollLogicalPosition = "center") => {
              const el = document.getElementById(`file-${path}`);
              if (el) {
                  logger.log(`Scrolling to file: ${path}`);
                  el.scrollIntoView({ behavior: "smooth", block: block });
                  el.classList.add('highlight-scroll'); // Add highlight class
-                 const removeClassTimer = setTimeout(() => el.classList.remove('highlight-scroll'), 2500);
-                 return () => clearTimeout(removeClassTimer); // Return cleanup for the timer
+                 // Set timeout to remove the class after animation
+                 const removeClassTimer = setTimeout(() => {
+                     el.classList.remove('highlight-scroll');
+                 }, 2500); // Match duration of highlight effect
+                 // Return cleanup function for the timer
+                 return () => clearTimeout(removeClassTimer);
              }
              return () => {}; // Return no-op cleanup if element not found
         };
 
-        let cleanupScroll = () => {};
+        let cleanupScroll = () => {}; // To store the cleanup function from scrollToFile
 
         if (primaryHighlightedPath) {
-             // Delay slightly to ensure DOM update after fetch
-             const timer = setTimeout(() => { cleanupScroll = scrollToFile(primaryHighlightedPath); }, 300);
-             return () => { clearTimeout(timer); cleanupScroll(); }; // Cleanup timeout and scroll effect
+             // Delay slightly to ensure DOM update after fetch and state change
+             const timer = setTimeout(() => {
+                 cleanupScroll = scrollToFile(primaryHighlightedPath);
+             }, 300); // Adjust delay if needed
+             // Return cleanup for the main timeout and the scroll effect timer
+             return () => {
+                 clearTimeout(timer);
+                 cleanupScroll();
+             };
         } else if (fetchedFiles.length > 0) {
             // If fetch succeeded but no specific file to highlight, scroll to the list container
              logger.log("Scrolling to file list container");
-             // No timeout needed usually for scrolling to the container itself
              scrollToSection('file-list-container');
+             // No specific cleanup needed for scrollToSection itself
         }
-        // No return needed here as scrollToSection doesn't need cleanup like the highlight class
-    }, [isMounted, fetchStatus, primaryHighlightedPath, imageReplaceTask, autoFetch, fetchedFiles, scrollToSection, logger]);
+    }, [isMounted, fetchStatus, primaryHighlightedPath, imageReplaceTask, autoFetch, fetchedFiles, scrollToSection, logger]); // Dependencies for scroll effect
 
 
     // === Imperative Handle ===
     // Expose functions for parent components or external calls via the ref
     useImperativeHandle(ref, () => ({
-        // Use functions returned by the hooks
+        // Use functions returned by the hooks or context
         handleFetch: (isManualRetry?: boolean, branchNameToFetchOverride?: string | null, taskForEarlyCheck?: ImageReplaceTask | null) =>
             handleFetchManual(isManualRetry, branchNameToFetchOverride, taskForEarlyCheck || imageReplaceTask),
         selectHighlightedFiles,
-        handleAddSelected: handleAddSelected, // Directly use the function from useKworkInput
+        handleAddSelected: handleAddSelected,
         handleCopyToClipboard,
         clearAll: handleClearAll,
-        // Use the getter directly from context (or pass it from useKworkInput if preferred)
         getKworkInputValue: getKworkInputValue
     }), [
+        // Include all functions/values used in the returned object as dependencies
         handleFetchManual, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll,
-        getKworkInputValue, imageReplaceTask // Include dependencies used in the exposed methods
+        getKworkInputValue, imageReplaceTask
     ]);
 
     // === Render Logic ===
@@ -234,7 +236,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
     // --- Derived States for Rendering ---
     const currentImageTask = imageReplaceTask; // Use context value directly
     const showProgressBar = fetchStatus !== 'idle';
-    // Combined loading state for disabling various actions (excluding the main fetch button, which uses isFetchDisabled)
+    // Combined loading state for disabling various actions (uses loadingPrs from context)
     const isActionDisabled = isFetchLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing || !!currentImageTask;
     const isCopyDisabled = !kworkInputHasContent || isActionDisabled; // Can't copy if input empty or actions blocked
     const isClearDisabled = (!kworkInputHasContent && selectedFetcherFiles.size === 0 && !filesFetched) || isActionDisabled; // Can't clear if nothing to clear or actions blocked
@@ -260,9 +262,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
               setManualBranchName(""); // Clear manual input if PR branch is selected
           }
           // Optional: Trigger fetch immediately after selecting PR branch?
-          // Consider if this is desired UX. If so:
           // handleFetchManual(false, branch, currentImageTask);
-      }, [setTargetBranchName, setManualBranchName/*, handleFetchManual, currentImageTask */]); // Include fetch if auto-fetching on select
+      }, [setTargetBranchName, setManualBranchName/*, handleFetchManual, currentImageTask */]); // Include fetch deps if auto-fetching on select
 
       const handleLoadPrs = useCallback(() => {
           if (repoUrl) {
@@ -304,7 +305,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
               {/* Settings Toggle Button */}
               <motion.button
                   onClick={triggerToggleSettingsModal}
-                  // Disable button if fetching, assistant working, or parsing
+                  // Disable button if fetching, assistant working, or parsing (uses states from context)
                   disabled={isFetchLoading || assistantLoading || isParsing}
                   whileHover={{ scale: (isFetchLoading || assistantLoading || isParsing) ? 1 : 1.1, rotate: isSettingsModalOpen ? 10 : -10 }}
                   whileTap={{ scale: (isFetchLoading || assistantLoading || isParsing) ? 1 : 0.95 }}
@@ -328,10 +329,10 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
               setManualBranchName={handleManualBranchChange} // Local handler
               currentTargetBranch={targetBranchName} // Context state
               openPrs={openPrs} // Context state
-              loadingPrs={loadingPrs} // Context state
+              loadingPrs={loadingPrs} // Context state passed as prop
               onSelectPrBranch={handleSelectPrBranch} // Local handler
               onLoadPrs={handleLoadPrs} // Local handler
-              // Combined loading state for disabling inputs in modal
+              // Combined loading state for disabling inputs in modal (uses loadingPrs from context)
               loading={isFetchLoading || loadingPrs || assistantLoading || aiActionLoading || isParsing}
           />
 

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
-import { fetchRepoContents, getOpenPullRequests } from "@/app/actions_github/actions";
-import { useRepoXmlPageContext, FetchStatus, SimplePullRequest, ImageReplaceTask, FileNode, ImportCategory } from "@/contexts/RepoXmlPageContext"; // Assuming types are here
+import { fetchRepoContents, getOpenPullRequests } from "@/app/actions_github/actions"; // Adjust if actions are elsewhere
+import { useRepoXmlPageContext, FetchStatus, SimplePullRequest, ImageReplaceTask, FileNode, ImportCategory } from "@/contexts/RepoXmlPageContext";
 import { debugLogger as logger } from "@/lib/debugLogger";
-import * as repoUtils from "@/lib/repoUtils"; // Import all utils
+import * as repoUtils from "@/lib/repoUtils";
 
 interface UseRepoFetcherProps {
     repoUrl: string;
@@ -14,29 +14,29 @@ interface UseRepoFetcherProps {
     highlightedPathFromUrl: string;
     importantFiles: string[];
     autoFetch: boolean;
-    ideaFromUrl: string; // Provided by component, used for auto-fetch logic
+    ideaFromUrl: string;
     isSettingsModalOpen: boolean;
     repoUrlEntered: boolean;
     // States from context needed for guards/logic
     assistantLoading: boolean;
     isParsing: boolean;
     aiActionLoading: boolean;
+    loadingPrs: boolean; // Prop needed for guards and disabled state calculation
 }
 
 interface UseRepoFetcherReturn {
-    files: FileNode[]; // Locally fetched files state for this hook
+    files: FileNode[];
     progress: number;
     error: string | null;
-    // fetchStatus is read directly from context in the component
-    primaryHighlightedPath: string | null; // Determined primary file path
-    secondaryHighlightedPaths: Record<ImportCategory, string[]>; // Determined related files
+    primaryHighlightedPath: string | null;
+    secondaryHighlightedPaths: Record<ImportCategory, string[]>;
     handleFetchManual: (
         isManualRetry?: boolean,
         branchNameToFetchOverride?: string | null,
         taskForEarlyCheck?: ImageReplaceTask | null
-    ) => Promise<void>; // The main fetch function
-    isLoading: boolean; // Derived loading state (fetchStatus === 'loading' || 'retrying')
-    isFetchDisabled: boolean; // Derived disabled state for the fetch button
+    ) => Promise<void>;
+    isLoading: boolean;
+    isFetchDisabled: boolean;
 }
 
 export const useRepoFetcher = ({
@@ -48,40 +48,40 @@ export const useRepoFetcher = ({
     highlightedPathFromUrl,
     importantFiles,
     autoFetch,
-    ideaFromUrl, // used in handleFetchManual logic
+    ideaFromUrl,
     isSettingsModalOpen,
     repoUrlEntered,
+    // Destructure loadingPrs from props
+    loadingPrs,
     assistantLoading,
     isParsing,
     aiActionLoading,
 }: UseRepoFetcherProps): UseRepoFetcherReturn => {
 
-    // Context access within the hook
+    // Context access within the hook (for setters mostly)
     const {
       fetchStatus, setFetchStatus, setFilesFetched: setFilesFetchedCombined,
       setSelectedFetcherFiles,
       setRequestCopied,
       setLoadingPrs, setOpenPrs, setTargetBranchName: setContextTargetBranch,
       triggerToggleSettingsModal,
-      updateKworkInput, // Needed to clear input for image task
+      updateKworkInput,
       addToast,
-      // Context states needed to reset on clear/fetch:
       setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles
-      // Note: allFetchedFiles from context is NOT used here, hook manages its own 'files' state
     } = useRepoXmlPageContext();
 
-    // Internal state managed by this hook
-    const [files, setFiles] = useState<FileNode[]>([]); // Holds the fetched file data
+    // Internal state
+    const [files, setFiles] = useState<FileNode[]>([]);
     const [progress, setProgress] = useState<number>(0);
     const [error, setError] = useState<string | null>(null);
     const [primaryHighlightedPath, setPrimaryHighlightedPathState] = useState<string | null>(null);
     const [secondaryHighlightedPaths, setSecondaryHighlightedPathsState] = useState<Record<ImportCategory, string[]>>({ component: [], context: [], hook: [], lib: [], other: [] });
 
-    // Refs managed by this hook
+    // Refs
     const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-    const isImageTaskFetchInitiated = useRef(false); // Flag specific to image task auto-fetch
-    const isAutoFetchingRef = useRef(false); // General auto-fetch guard
-    const fetchStatusRef = useRef(fetchStatus); // To track status reliably in intervals/guards
+    const isImageTaskFetchInitiated = useRef(false);
+    const isAutoFetchingRef = useRef(false);
+    const fetchStatusRef = useRef(fetchStatus);
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => { setIsMounted(true); }, []);
@@ -103,6 +103,7 @@ export const useRepoFetcher = ({
         progressIntervalRef.current = setInterval(() => {
             setProgress(prev => {
                 const nextProgress = prev + increment;
+                // Check fetch status via ref to avoid stale closure issues
                 if (nextProgress >= 95 || fetchStatusRef.current !== 'loading') {
                     stopProgressSimulation(); // Stop if near 100 or status changes
                     return Math.min(nextProgress, 95); // Cap at 95
@@ -110,7 +111,7 @@ export const useRepoFetcher = ({
                 return nextProgress;
             });
         }, 200); // 200ms interval
-    }, [stopProgressSimulation]); // Removed fetchStatusRef dependency - interval checks it directly
+    }, [stopProgressSimulation]);
 
     // --- Core Fetch Logic ---
     const handleFetchManual = useCallback(async (
@@ -135,9 +136,9 @@ export const useRepoFetcher = ({
         if (!repoUrl.trim()) {
             logger.error("Fetcher Hook: Repo URL empty."); addToast("Введите URL репозитория", 'error'); setError("URL репозитория не указан."); triggerToggleSettingsModal(); return;
         }
-        // Check other blocking states from context
-        if (assistantLoading || isParsing || aiActionLoading) {
-            logger.warn(`Fetcher Hook: Blocked by processing state (Assistant: ${assistantLoading}, Parsing: ${isParsing}, AI Action: ${aiActionLoading}).`); addToast("Подождите завершения.", "warning"); return;
+        // Use loadingPrs prop in guard
+        if (loadingPrs || assistantLoading || isParsing || aiActionLoading) {
+            logger.warn(`Fetcher Hook: Blocked by processing state (PRs: ${loadingPrs}, Assistant: ${assistantLoading}, Parsing: ${isParsing}, AI Action: ${aiActionLoading}).`); addToast("Подождите завершения.", "warning"); return;
         }
 
         // --- Reset State ---
@@ -170,7 +171,7 @@ export const useRepoFetcher = ({
 
         if (currentTask && !isManualRetry) { // Only check for PRs on the *initial* fetch of an image task
             logger.log(`[Fetcher Hook] Image task (${currentTask.targetPath}). Checking PRs...`);
-            setLoadingPrs(true);
+            setLoadingPrs(true); // Use context setter
             try {
                 const prResult = await getOpenPullRequests(repoUrl); // Assumes token is handled within action if needed
                 if (prResult.success && prResult.pullRequests) {
@@ -204,7 +205,7 @@ export const useRepoFetcher = ({
                 toast.error("Крит. ошибка проверки PR. Загружаю...", { description: prError.message });
                 setOpenPrs([]); // Clear PRs on error
             } finally {
-                setLoadingPrs(false);
+                setLoadingPrs(false); // Use context setter
             }
         }
 
@@ -373,8 +374,8 @@ export const useRepoFetcher = ({
                 logger.log("Fetcher Hook: Resetting image task initiated flag due to fetch failure.");
                 isImageTaskFetchInitiated.current = false;
             }
-            // Close settings modal if it was open during fetch
-            if(isSettingsModalOpen && overallSuccess) { // Only close on success? Or always? Let's say always.
+            // Close settings modal if it was open during fetch (always close after attempt)
+            if(isSettingsModalOpen) {
                  triggerToggleSettingsModal();
             }
             logger.log(`Fetcher Hook: Finished. Success: ${overallSuccess}, Branch Fetched: ${branchForContentFetch}`);
@@ -385,6 +386,7 @@ export const useRepoFetcher = ({
         repoUrl, token, targetBranchName, manualBranchName, imageReplaceTask,
         highlightedPathFromUrl, importantFiles, autoFetch, ideaFromUrl, isSettingsModalOpen,
         // Context states/setters/actions used directly:
+        loadingPrs, // Include prop in dependency array as it's used in guards
         assistantLoading, isParsing, aiActionLoading, // Guards
         setFetchStatus, setFilesFetchedCombined, setSelectedFetcherFiles, setRequestCopied,
         setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setLoadingPrs,
@@ -438,16 +440,18 @@ export const useRepoFetcher = ({
                     // Do NOT reset the flag on success, as the task flow should proceed.
                 });
         } else {
-             // Log why auto-fetch might be skipped
+             // Log why auto-fetch might be skipped (optional, can be noisy)
+             /*
              if (canTriggerFetch && isAutoFetchingRef.current) {
-                 // logger.log("[AutoFetch Effect Hook] Skipping: Guard is active.");
+                 logger.log("[AutoFetch Effect Hook] Skipping: Guard is active.");
              } else if (currentTask && isImageTaskFetchInitiated.current) {
-                 // logger.log("[AutoFetch Effect Hook] Skipping: Image task fetch already initiated/running.");
+                 logger.log("[AutoFetch Effect Hook] Skipping: Image task fetch already initiated/running.");
              } else if (!canTriggerFetch) {
-                 // logger.log(`[AutoFetch Effect Hook] Skipping: Conditions not met (AutoFetch: ${autoFetch}, Status: ${fetchStatus}, RepoEntered: ${repoUrlEntered})`);
-             } else if (isImageFetchReady || isStandardFetchReady) {
-                 // logger.log(`[AutoFetch Effect Hook] Skipping: Check flags (isImageFetchReady: ${isImageFetchReady}, isStandardFetchReady: ${isStandardFetchReady})`);
+                 logger.log(`[AutoFetch Effect Hook] Skipping: Conditions not met (AutoFetch: ${autoFetch}, Status: ${fetchStatus}, RepoEntered: ${repoUrlEntered})`);
+             } else if (!(isImageFetchReady || isStandardFetchReady)) {
+                 logger.log(`[AutoFetch Effect Hook] Skipping: Flags check (isImageFetchReady: ${isImageFetchReady}, isStandardFetchReady: ${isStandardFetchReady})`);
              }
+             */
         }
 
     // --- useEffect Dependency Array ---
@@ -470,6 +474,7 @@ export const useRepoFetcher = ({
     // --- Derived State ---
     // Provide loading/disabled states for the component UI based on context/hook state
     const isLoading = fetchStatus === 'loading' || fetchStatus === 'retrying';
+    // Use loadingPrs prop here for accurate disabling
     const isFetchDisabled = isLoading || loadingPrs || !repoUrlEntered || assistantLoading || isParsing || aiActionLoading || (!!imageReplaceTask && isImageTaskFetchInitiated.current && isLoading);
 
     // --- Return values ---
