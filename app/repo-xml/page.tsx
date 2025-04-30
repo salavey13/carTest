@@ -1,30 +1,29 @@
 "use client";
 import React, { Suspense, useRef, useState, useEffect, ReactNode, useCallback } from "react";
 
-import { useSearchParams } from 'next/navigation'; // Keep this import if used within ActualPageContent
+import { useSearchParams } from 'next/navigation';
 import RepoTxtFetcher from "@/components/RepoTxtFetcher";
 import AICodeAssistant from "@/components/AICodeAssistant";
 import AutomationBuddy from "@/components/AutomationBuddy";
 import {
     useRepoXmlPageContext, RepoXmlPageProvider,
     RepoTxtFetcherRef, AICodeAssistantRef, ImageReplaceTask
-    // Provider no longer needed here for refs
 } from '@/contexts/RepoXmlPageContext';
 import { useAppContext } from "@/contexts/AppContext";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-// Updated Icons for CYBERVIBE 2.0
 import {
     FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong,
     FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye,
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaLevelUpAlt, FaBolt,
-    FaTools, FaCode, FaVideo // Added FaVideo for the embed
+    FaTools, FaCode, FaVideo // Added FaVideo
 } from "react-icons/fa6";
 import Link from "next/link";
-import * as FaIcons from "react-icons/fa6"; // Import all for dynamic render helper
+import * as FaIcons from "react-icons/fa6";
+import { motion } from 'framer-motion'; // Import motion
 
-// --- I18N Translations (CYBERVIBE 2.0 Overhaul) ---
+// --- I18N Translations (CYBERVIBE 2.0) ---
 const translations = {
   en: {
     loading: "Booting SUPERVIBE ENGINE...",
@@ -78,7 +77,7 @@ const translations = {
     cyberVibe3: "Ты не просто *учишь* код; ты **ремиксуешь саму матрицу** на лету. Ты видишь структуру, взаимодействуешь, **эволюционируешь**.",
     cyberVibe4: "Это **со-творчество** с машинным разумом. Двигай границы. Зарабатывай свой 'bandwidth'. Цель? Бесконечный контекст. Бесконечная мощь. Это **CYBERVIBE 2.0**.",
     philosophyTitle: "Твой Путь Вайба: Гайд по Левелам (Жми)",
-    philosophyVideoTitle: "Смотри Быстрый Старт / Левелы <FaVideo/>:", // Title for the video section
+    philosophyVideoTitle: "Смотри Быстрый Старт / Левелы <FaVideo/>:",
     philosophy1: "Это про раскрытие **ТВОЕГО** потенциала. Строй **СВОЙ** мир. Хватит гоняться, начни **создавать**. Ты = ниша.",
     philosophy2: "AI не замена, это твой **ультимативный рычаг**. Твой силовой множитель. Юзай его (идеи в <Link href='/selfdev' class='text-brand-blue hover:underline font-semibold'>SelfDev Пути <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-1'/></Link>) или останешься позади.",
     philosophy3: "**УРОВЕНЬ 1: МГНОВЕННАЯ ПОБЕДА! <FaBolt/>** Битый URL картинки? Скопируй URL, вставь в Инпут/Бадди, загрузи новую. **ГОТОВО.** Полностью Авто-PR. **Ты можешь это ПРЯМО СЕЙЧАС.**",
@@ -113,7 +112,6 @@ type Language = 'en' | 'ru';
 function LoadingBuddyFallback() {
     return ( <div className="fixed bottom-4 right-4 z-50 w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 animate-pulse" aria-hidden="true" ></div> );
 }
-// ------------------------------------------
 
 // --- Helper Component to render content with icons and bold ---
 const RenderContent: React.FC<{ content: string }> = React.memo(({ content }) => {
@@ -121,39 +119,35 @@ const RenderContent: React.FC<{ content: string }> = React.memo(({ content }) =>
     return (
         <>
             {segments.map((segment, sIndex) => {
-                // Handle Bold
                 if (segment.startsWith('**') && segment.endsWith('**')) {
                     return <strong key={sIndex}>{segment.slice(2, -2)}</strong>;
                 }
-                // Handle Icons (<FaIconName class="..."/>)
                 const iconMatch = segment.match(/<Fa(\w+)\s*(?:class(?:Name)?="([^"]*)")?\s*\/?>/i);
                 if (iconMatch) {
                     const iconName = `Fa${iconMatch[1]}` as keyof typeof FaIcons;
                     const className = iconMatch[2] || "";
-                    const IconComponent = FaIcons[iconName]; // Dynamically get the component
-
-                    // *** FIX: Explicitly handle the case where IconComponent is undefined ***
+                    const IconComponent = FaIcons[iconName];
                     if (IconComponent) {
-                        const finalClassName = `${className} inline-block align-middle mx-1`; // Adjust styling as needed
+                        const finalClassName = `${className} inline-block align-middle mx-1`;
                         return React.createElement(IconComponent, { key: sIndex, className: finalClassName });
                     } else {
-                        // Fallback for unknown icons - THIS IS CRUCIAL
                         logger.warn(`[RenderContent] Icon "${iconName}" not found.`);
                         return <span key={sIndex} className="text-red-500 font-mono">[? {iconName}]</span>;
                     }
-                    // *** END FIX ***
-
                 }
-                // Handle simple HTML tags (like <Link> or <a> from translations)
                 const htmlTagMatch = segment.match(/^<\/?\w+(?:\s+[^>]*)*>$/);
-                if (segment.startsWith('<Link') || segment.startsWith('<a')) {
-                     // WARNING: Only use if you trust the source (your translations)
+                 if (segment.startsWith('<Link') || segment.startsWith('<a')) {
                     return <span key={sIndex} dangerouslySetInnerHTML={{ __html: segment }} />;
-                } else if (htmlTagMatch) {
-                    // Avoid rendering arbitrary tags
-                    return <React.Fragment key={sIndex}>{segment}</React.Fragment>; // Render as text
-                }
-                // Handle regular text
+                 } else if (htmlTagMatch) {
+                     // Render simple formatting tags or skip others
+                     const allowedTags = ['strong', 'em', 'b', 'i', 'span']; // Add safe tags if needed
+                     const tagNameMatch = segment.match(/^<\/?(\w+)/);
+                     if(tagNameMatch && allowedTags.includes(tagNameMatch[1])) {
+                         return <span key={sIndex} dangerouslySetInnerHTML={{ __html: segment }} />;
+                     }
+                     // Skip other tags or render as text
+                     return <React.Fragment key={sIndex}>{segment}</React.Fragment>;
+                 }
                 return <React.Fragment key={sIndex}>{segment}</React.Fragment>;
             })}
         </>
@@ -178,85 +172,84 @@ function ActualPageContent() {
     const [initialIdea, setInitialIdea] = useState<string | null>(null);
     const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(false);
 
-    // Effect 1: Process URL Params and Set Initial State
+    // Effect 1: Process URL Params
     useEffect(() => {
-      setIsMounted(true);
-      const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
-      const userLang = user?.language_code;
-      const initialLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
-      setLang(initialLang);
-      logger.log(`[ActualPageContent Effect 1] Lang set to: ${initialLang}`);
+        setIsMounted(true);
+        const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
+        const userLang = user?.language_code;
+        const initialLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
+        setLang(initialLang);
+        logger.log(`[ActualPageContent Effect 1] Lang set to: ${initialLang}`);
 
-      const pathParam = searchParams.get("path");
-      const ideaParam = searchParams.get("idea");
-      const repoParam = searchParams.get("repo");
+        const pathParam = searchParams.get("path");
+        const ideaParam = searchParams.get("idea");
+        const repoParam = searchParams.get("repo");
 
-      if (repoParam) {
-           try {
-               const decodedRepoUrl = decodeURIComponent(repoParam);
-               if (decodedRepoUrl.includes("github.com")) {
-                   setRepoUrl(decodedRepoUrl);
-                   logger.log(`[ActualPageContent Effect 1] Repo URL set from param: ${decodedRepoUrl}`);
-               } else { logger.warn(`[ActualPageContent Effect 1] Invalid repo URL from param: ${decodedRepoUrl}`); }
-           } catch (e) { logger.error("[ActualPageContent Effect 1] Error decoding repo URL param:", e); }
-       }
+        if (repoParam) {
+            try {
+                const decodedRepoUrl = decodeURIComponent(repoParam);
+                if (decodedRepoUrl.includes("github.com")) {
+                    setRepoUrl(decodedRepoUrl);
+                    logger.log(`[ActualPageContent Effect 1] Repo URL set from param: ${decodedRepoUrl}`);
+                } else { logger.warn(`[ActualPageContent Effect 1] Invalid repo URL from param: ${decodedRepoUrl}`); }
+            } catch (e) { logger.error("[ActualPageContent Effect 1] Error decoding repo URL param:", e); }
+        }
 
-      if (pathParam && ideaParam) {
-          const decodedIdea = decodeURIComponent(ideaParam);
-          const decodedPath = decodeURIComponent(pathParam);
-          if (decodedIdea.startsWith("ImageReplace|")) {
-              logger.log("[ActualPageContent Effect 1] Processing Image Replace task from URL.");
-              try {
-                  const parts = decodedIdea.split('|');
-                  const oldUrlParam = parts.find(p => p.startsWith("OldURL="));
-                  const newUrlParam = parts.find(p => p.startsWith("NewURL="));
-                  if (oldUrlParam && newUrlParam) {
-                      const oldUrl = decodeURIComponent(oldUrlParam.substring(7));
-                      const newUrl = decodeURIComponent(newUrlParam.substring(7));
-                      if (decodedPath && oldUrl && newUrl) {
-                          const task: ImageReplaceTask = { targetPath: decodedPath, oldUrl: oldUrl, newUrl: newUrl };
-                          logger.log("[ActualPageContent Effect 1] Setting image task:", task);
-                          setImageReplaceTask(task);
-                          setInitialIdea(null);
-                          setInitialIdeaProcessed(true);
-                      } else { logger.error("[ActualPageContent Effect 1] Invalid image task data parsed:", { decodedPath, oldUrl, newUrl }); setImageReplaceTask(null); }
-                  } else { logger.error("[ActualPageContent Effect 1] Could not parse Old/New URL from image task string:", decodedIdea); setImageReplaceTask(null); }
-              } catch (e) { logger.error("[ActualPageContent Effect 1] Error parsing image task from URL:", e); setImageReplaceTask(null); }
-          } else {
-              logger.log("[ActualPageContent Effect 1] Regular idea param found, storing:", decodedIdea.substring(0, 50) + "...");
-              setInitialIdea(decodedIdea);
-              setImageReplaceTask(null);
-              setInitialIdeaProcessed(false);
-          }
-          setShowComponents(true);
-      } else {
-          setImageReplaceTask(null);
-          setInitialIdea(null);
-          setInitialIdeaProcessed(true);
-          logger.log("[ActualPageContent Effect 1] No path/idea params found.");
-      }
-    }, [user, searchParams, setImageReplaceTask, setRepoUrl]); // Ensure setRepoUrl is stable or memoized in context
+        if (pathParam && ideaParam) {
+            const decodedIdea = decodeURIComponent(ideaParam);
+            const decodedPath = decodeURIComponent(pathParam);
+            if (decodedIdea.startsWith("ImageReplace|")) {
+                logger.log("[ActualPageContent Effect 1] Processing Image Replace task from URL.");
+                try {
+                    const parts = decodedIdea.split('|');
+                    const oldUrlParam = parts.find(p => p.startsWith("OldURL="));
+                    const newUrlParam = parts.find(p => p.startsWith("NewURL="));
+                    if (oldUrlParam && newUrlParam) {
+                        const oldUrl = decodeURIComponent(oldUrlParam.substring(7));
+                        const newUrl = decodeURIComponent(newUrlParam.substring(7));
+                        if (decodedPath && oldUrl && newUrl) {
+                            const task: ImageReplaceTask = { targetPath: decodedPath, oldUrl: oldUrl, newUrl: newUrl };
+                            logger.log("[ActualPageContent Effect 1] Setting image task:", task);
+                            setImageReplaceTask(task);
+                            setInitialIdea(null);
+                            setInitialIdeaProcessed(true);
+                        } else { logger.error("[ActualPageContent Effect 1] Invalid image task data parsed:", { decodedPath, oldUrl, newUrl }); setImageReplaceTask(null); }
+                    } else { logger.error("[ActualPageContent Effect 1] Could not parse Old/New URL from image task string:", decodedIdea); setImageReplaceTask(null); }
+                } catch (e) { logger.error("[ActualPageContent Effect 1] Error parsing image task from URL:", e); setImageReplaceTask(null); }
+            } else {
+                logger.log("[ActualPageContent Effect 1] Regular idea param found, storing:", decodedIdea.substring(0, 50) + "...");
+                setInitialIdea(decodedIdea);
+                setImageReplaceTask(null);
+                setInitialIdeaProcessed(false);
+            }
+            setShowComponents(true);
+        } else {
+            setImageReplaceTask(null);
+            setInitialIdea(null);
+            setInitialIdeaProcessed(true);
+            logger.log("[ActualPageContent Effect 1] No path/idea params found.");
+        }
+    }, [user, searchParams, setImageReplaceTask, setRepoUrl]);
 
     // Effect 2: Populate Kwork Input
-    useEffect(() => {
-      const fetchAttemptFinished = isMounted && (fetchStatus === 'success' || fetchStatus === 'error' || fetchStatus === 'failed_retries');
+     useEffect(() => {
+        const fetchAttemptFinished = isMounted && (fetchStatus === 'success' || fetchStatus === 'error' || fetchStatus === 'failed_retries');
 
-      if (fetchAttemptFinished && initialIdea && !initialIdeaProcessed && !imageReplaceTask) {
-          logger.log(`[ActualPageContent Effect 2] Fetch finished (${fetchStatus}). Populating kwork...`);
-          if (kworkInputRef.current) {
-              kworkInputRef.current.value = initialIdea;
-              const inputEvent = new Event('input', { bubbles: true });
-              kworkInputRef.current.dispatchEvent(inputEvent);
-              setKworkInputHasContent(initialIdea.trim().length > 0);
-              logger.log("[ActualPageContent Effect 2] Populated kwork input.");
+        if (fetchAttemptFinished && initialIdea && !initialIdeaProcessed && !imageReplaceTask) {
+            logger.log(`[ActualPageContent Effect 2] Fetch finished (${fetchStatus}). Populating kwork...`);
+            if (kworkInputRef.current) {
+                kworkInputRef.current.value = initialIdea;
+                const inputEvent = new Event('input', { bubbles: true });
+                kworkInputRef.current.dispatchEvent(inputEvent);
+                setKworkInputHasContent(initialIdea.trim().length > 0);
+                logger.log("[ActualPageContent Effect 2] Populated kwork input.");
 
-              // --- Add selected files (with checks) ---
-              if (fetcherRef.current) {
-                   if (fetcherRef.current.handleAddSelected) {
+                // --- Add selected files (with checks) ---
+                if (fetcherRef.current) {
+                    if (fetcherRef.current.handleAddSelected) {
                         if (selectedFetcherFiles.size > 0) {
                             logger.log("[ActualPageContent Effect 2] Calling fetcherRef.handleAddSelected.");
                             const promise = fetcherRef.current.handleAddSelected(selectedFetcherFiles, allFetchedFiles);
-                            // Check if it returned a promise (it should)
                             if (promise && typeof promise.then === 'function') {
                                 promise
                                     .then(() => logger.log("[ActualPageContent Effect 2] handleAddSelected .then() executed successfully."))
@@ -265,22 +258,23 @@ function ActualPageContent() {
                                 logger.warn("[ActualPageContent Effect 2] handleAddSelected did NOT return a valid promise!");
                             }
                         } else { logger.log("[ActualPageContent Effect 2] Skipping handleAddSelected (empty selection)."); }
-                  } else { logger.warn("[ActualPageContent Effect 2] handleAddSelected method not found on fetcherRef."); }
-              } else { logger.warn("[ActualPageContent Effect 2] fetcherRef.current is null."); }
-              // --- End Add selected files ---
+                    } else { logger.warn("[ActualPageContent Effect 2] handleAddSelected method not found on fetcherRef."); }
+                } else { logger.warn("[ActualPageContent Effect 2] fetcherRef.current is null."); }
+                // --- End Add selected files ---
 
-               const kworkElement = document.getElementById('kwork-input-section');
-               if (kworkElement) {
-                    setTimeout(() => { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); logger.log("[ActualPageContent Effect 2] Scrolled to kwork."); }, 250);
-               }
+                 const kworkElement = document.getElementById('kwork-input-section');
+                 if (kworkElement) {
+                      setTimeout(() => { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); logger.log("[ActualPageContent Effect 2] Scrolled to kwork."); }, 250);
+                 }
 
-          } else { logger.warn("[ActualPageContent Effect 2] kworkInputRef is null."); }
-          setInitialIdeaProcessed(true);
-      } else if (fetchAttemptFinished && !initialIdeaProcessed) {
-          setInitialIdeaProcessed(true);
-           logger.log(`[ActualPageContent Effect 2] Fetch finished (${fetchStatus}), no pending idea.`);
-      }
+            } else { logger.warn("[ActualPageContent Effect 2] kworkInputRef is null."); }
+            setInitialIdeaProcessed(true);
+        } else if (fetchAttemptFinished && !initialIdeaProcessed) {
+            setInitialIdeaProcessed(true);
+            logger.log(`[ActualPageContent Effect 2] Fetch finished (${fetchStatus}), no pending idea.`);
+        }
     }, [isMounted, fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles]); // Dependencies seem correct
+
 
     const t = translations[lang];
     const userName = user?.first_name || (lang === 'ru' ? 'Нео' : 'Neo');
@@ -350,20 +344,18 @@ function ActualPageContent() {
                             <span className="text-xs text-gray-500 group-open:rotate-180 transition-transform duration-300">▼</span>
                         </summary>
                         <div className="px-6 pt-2 text-gray-300 space-y-4 text-base">
-                            {/* --- Video Embed --- */}
                              <div className="my-4">
                                  <h4 className="text-lg font-semibold text-cyan-400 mb-2"><RenderContent content={t.philosophyVideoTitle}/></h4>
                                  <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
                                      <iframe
                                          className="w-full h-full"
-                                         src="https://www.youtube.com/embed/imxzYWYKCyQ" // Use /embed/ URL
+                                         src="https://www.youtube.com/embed/imxzYWYKCyQ"
                                          title="YouTube video player - Vibe Level Explanation"
                                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                                          allowFullScreen>
                                     </iframe>
                                  </div>
                              </div>
-                             {/* --- End Video Embed --- */}
                             <hr className="border-gray-700 my-3"/>
                             <p><RenderContent content={t.philosophy1} /></p>
                             <p><RenderContent content={t.philosophy2} /></p>
@@ -440,15 +432,20 @@ function ActualPageContent() {
                      </section>
                  )}
 
-                {/* Navigation Icons */}
-                 <nav className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40">
+                {/* Navigation Icons - Added Animation */}
+                 <motion.nav
+                    className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40"
+                    // Subtle pulsing animation
+                    animate={{ scale: [1, 1.03, 1] }}
+                    transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}
+                 >
                      <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700/80 backdrop-blur-sm rounded-full hover:bg-gray-600 transition shadow-md" title={t.navIntro}> <FaCircleInfo className="text-lg text-gray-200" /> </button>
                      <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-purple-700/80 backdrop-blur-sm rounded-full hover:bg-purple-600 transition shadow-md" title={t.navCyberVibe}> <FaLevelUpAlt className="text-lg text-white" /> </button>
                      {showComponents && ( <>
                             <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-blue-700/80 backdrop-blur-sm rounded-full hover:bg-blue-600 transition shadow-md" title={t.navGrabber}> <FaDownload className="text-lg text-white" /> </button>
                             <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-indigo-700/80 backdrop-blur-sm rounded-full hover:bg-indigo-600 transition shadow-md" title={t.navAssistant}> <FaRobot className="text-lg text-white" /> </button>
                      </> )}
-                </nav>
+                </motion.nav>
 
                 {/* Automation Buddy */}
                 <Suspense fallback={<LoadingBuddyFallback />}> <AutomationBuddy /> </Suspense>
