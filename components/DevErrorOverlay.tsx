@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useErrorOverlay, ErrorInfo } from '@/contexts/ErrorOverlayContext';
-import { FaCopy, FaTriangleExclamation, FaGithub } from 'react-icons/fa6'; // Added FaGithub
+import { FaCopy, FaTriangleExclamation, FaGithub } from 'react-icons/fa6'; // Corrected icon
 import { toast } from 'sonner';
 import { debugLogger as logger } from '@/lib/debugLogger';
 
@@ -85,16 +85,29 @@ const DevErrorOverlay: React.FC = () => {
          }
       };
 
-      const handleCopyVibeRequest = () => {
-         try {
-             const safeErrorInfo = errorInfo ?? { message: 'Unknown error', type: 'unknown' }; // Fallback
+      // --- Safely prepare GitHub issue link & copy text ---
+      const prepareIssueAndCopyData = () => {
+          try {
+             const safeErrorInfo = errorInfo ?? { message: 'Unknown error', type: 'unknown' };
              const errorType = safeErrorInfo.type?.toUpperCase() || 'UNKNOWN';
              const message = safeErrorInfo.message || 'Нет сообщения';
-             const shortStack = getShortStackTrace(safeErrorInfo.error); // Execute safely
+             const shortStack = getShortStackTrace(safeErrorInfo.error);
              const source = safeErrorInfo.source ? ` (${safeErrorInfo.source}:${safeErrorInfo.lineno ?? '?'})` : '';
-             const gitHubIssueUrl = `https://github.com/salavey13/oneSitePls/issues/new?title=Bug%20Report:%20${encodeURIComponent(message.substring(0,50))}&body=${encodeURIComponent(`**Type:** ${errorType}\n**Message:** ${message}\n**Source:** ${source}\n\n**Stack (start):**\n\`\`\`\n${shortStack}\n\`\`\`\n\n**Context/Steps:**\n[Please describe what you were doing]\n`)}`;
+             const repoName = 'carTest'; // <<< UPDATED REPO NAME
 
-             const prompt = `Йоу! Поймал ошибку в CyberVibe Studio, помоги разгрести!
+             // Creative Russian Title
+             const issueTitleOptions = [
+                 `Сбой в Матрице: ${message.substring(0, 40)}...`,
+                 `Баг в Коде: ${errorType} ${message.substring(0, 35)}...`,
+                 `Аномалия: ${message.substring(0, 45)}...`,
+                 `Нужна Помощь: ${errorType} (${source || 'N/A'})`,
+             ];
+             const issueTitle = encodeURIComponent(issueTitleOptions[Math.floor(Math.random() * issueTitleOptions.length)]);
+
+             const issueBody = encodeURIComponent(`**Тип Ошибки:** ${errorType}\n**Сообщение:** ${message}\n**Источник:** ${source || 'N/A'}\n\n**Стек (начало):**\n\`\`\`\n${shortStack}\n\`\`\`\n\n**Контекст/Шаги:**\n[Опиши, что ты делал(а), когда это случилось]\n`);
+             const gitHubIssueUrl = `https://github.com/salavey13/${repoName}/issues/new?title=${issueTitle}&body=${issueBody}`;
+
+             const copyPrompt = `Йоу! Поймал ошибку в CyberVibe Studio, помоги разгрести!
 
 Ошибка (${errorType})${source}:
 ${message}
@@ -104,15 +117,20 @@ ${message}
 ${shortStack}
 \`\`\`
 
-Задача: Проанализируй ошибку и стек. Предложи исправления кода или объясни причину.
+Задача: Проанализируй ошибку и стек. Предложи исправления кода или объясни причину.`;
+             return { gitHubIssueUrl, copyPrompt };
+         } catch (e: any) {
+             logger.error("Error preparing issue/copy data:", e);
+             toast.error(`Не удалось подготовить данные: ${e?.message ?? 'Неизвестно'}`);
+             return { gitHubIssueUrl: `https://github.com/salavey13/carTest/issues/new`, copyPrompt: `Error generating copy data: ${e?.message}` };
+         }
+      };
 
-*   **Скопируй этот текст** и вставь в CyberVibe Studio (<a href="/repo-xml" class="text-cyan-400 underline">/repo-xml</a>).
-*   **ИЛИ** [**Создай Issue на GitHub**](${gitHubIssueUrl}) (откроется в новой вкладке).
+      const { gitHubIssueUrl, copyPrompt } = prepareIssueAndCopyData();
 
-Детали для Issue уже частично заполнены.`;
-
-
-             navigator.clipboard.writeText(prompt)
+      const handleCopyVibeRequest = () => {
+         try {
+             navigator.clipboard.writeText(copyPrompt)
                .then(() => {
                  toast.success("Vibe Запрос для фикса скопирован!");
                })
@@ -121,13 +139,12 @@ ${shortStack}
                  toast.error("Не удалось скопировать запрос.");
                });
          } catch (e: any) {
-             logger.error("Error preparing vibe request:", e);
-             toast.error(`Не удалось подготовить запрос: ${e?.message ?? 'Неизвестно'}`);
+             logger.error("Error during copy action:", e);
+             toast.error(`Ошибка копирования: ${e?.message ?? 'Неизвестно'}`);
          }
       };
 
       // --- Safely render parts ---
-      // Each section wrapped in its own try-catch for maximum resilience
       const RenderSection: React.FC<{ title: string; children: () => React.ReactNode }> = ({ title, children }) => {
           try {
               return <>{children()}</>;
@@ -139,21 +156,21 @@ ${shortStack}
 
       return (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-80 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" // Slightly more blur
           role="alertdialog"
           aria-modal="true"
           aria-labelledby="error-overlay-title"
           aria-describedby="error-overlay-description"
         >
-          <div className="bg-gradient-to-br from-red-900 via-red-950 to-black border border-red-600/50 rounded-lg shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] flex flex-col text-red-100">
+          <div className="bg-gradient-to-br from-gray-900 via-indigo-950 to-black border border-cyan-500/30 rounded-lg shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] flex flex-col text-gray-200 glitch-border-animate"> {/* Cyberpunk style */}
 
             {/* Header */}
              <RenderSection title="Header">
                  {() => (
                      <div className="flex items-center justify-between mb-4">
-                       <h2 id="error-overlay-title" className="text-2xl font-bold text-red-300 flex items-center gap-2">
-                          <FaTriangleExclamation className="text-red-400" />
-                          Ошибочка вышла!
+                       <h2 id="error-overlay-title" className="text-2xl font-bold text-cyan-300 flex items-center gap-2 glitch-text-shadow"> {/* Glitchy text */}
+                          <FaTriangleExclamation className="text-yellow-400" /> {/* Changed icon */}
+                          Сбой системы...
                        </h2>
                      </div>
                  )}
@@ -163,25 +180,25 @@ ${shortStack}
             <div id="error-overlay-description" className="flex-grow overflow-y-auto simple-scrollbar pr-2 space-y-4 mb-4">
                  <RenderSection title="Message">
                       {() => (
-                          <p className="text-lg text-red-200 font-semibold">
+                          <p className="text-lg text-gray-100 font-semibold">
                              {(errorInfo?.message || "Неизвестная ошибка").toString()} {/* Ensure message is string */}
                           </p>
                       )}
                  </RenderSection>
                  <RenderSection title="Source">
                       {() => errorInfo?.source ? (
-                         <p className="text-sm text-red-300 font-mono">
+                         <p className="text-sm text-purple-300 font-mono">
                            Источник: {errorInfo.source} (строка: {errorInfo.lineno ?? '?'}, столбец: {errorInfo.colno ?? '?'})
                          </p>
                       ) : null}
                  </RenderSection>
                  <RenderSection title="StackTrace">
                       {() => (
-                          <details className="bg-red-950/50 p-3 rounded border border-red-700/50">
-                            <summary className="cursor-pointer text-sm font-medium text-red-300 hover:text-red-200">
-                              Технические детали (Stack Trace - начало)
+                          <details className="bg-black/30 p-3 rounded border border-gray-700/50">
+                            <summary className="cursor-pointer text-sm font-medium text-gray-400 hover:text-gray-200">
+                              Технические артефакты (Stack Trace - начало)
                             </summary>
-                            <pre className="mt-2 text-xs text-red-200/80 whitespace-pre-wrap break-words font-mono">
+                            <pre className="mt-2 text-xs text-gray-300/80 whitespace-pre-wrap break-words font-mono">
                               {getShortStackTrace(errorInfo?.error)}
                             </pre>
                           </details>
@@ -190,21 +207,21 @@ ${shortStack}
                  <RenderSection title="Advice">
                       {() => (
                          <div className="mt-4 p-3 bg-yellow-900/30 border border-yellow-600/50 rounded text-yellow-200 text-sm space-y-2">
-                           <p className="font-semibold">🧘 Не паникуй, лови вайб!</p>
-                           <p>Ошибки - это часть пути к просветлению кода. Помоги нам стать лучше:</p>
+                           <p className="font-semibold">🤖 Матрица сбоит... но это не конец!</p>
+                           <p>Помоги нам отладить реальность:</p>
                            <ul className='list-disc list-inside space-y-1'>
                                <li>
-                                  Скопируй <button onClick={handleCopyVibeRequest} className="text-cyan-400 underline hover:text-cyan-300 px-1">Vibe Запрос</button> и вставь в CyberVibe Studio (<a href="/repo-xml" className="text-cyan-400 underline hover:text-cyan-300">/repo-xml</a>).
+                                  Скопируй <button onClick={handleCopyVibeRequest} className="text-cyan-400 underline hover:text-cyan-300 px-1">Vibe Запрос</button> и закинь в CyberVibe Studio (<a href="/repo-xml" className="text-cyan-400 underline hover:text-cyan-300">/repo-xml</a>).
                                </li>
                                <li>
                                    Или <a
-                                       href={`https://github.com/salavey13/oneSitePls/issues/new?title=Bug%20Report:%20${encodeURIComponent((errorInfo?.message || 'Unknown Error').substring(0,50))}&body=${encodeURIComponent(`**Type:** ${errorInfo?.type?.toUpperCase() || 'UNKNOWN'}\n**Message:** ${errorInfo?.message || 'N/A'}\n**Source:** ${errorInfo?.source || 'N/A'} (Line: ${errorInfo?.lineno ?? '?'})\n\n**Stack (start):**\n\`\`\`\n${getShortStackTrace(errorInfo?.error)}\n\`\`\`\n\n**Context/Steps:**\n[Please describe what you were doing]\n`)}`}
+                                       href={gitHubIssueUrl} // Use prepared URL
                                        target="_blank"
                                        rel="noopener noreferrer"
                                        className="text-cyan-400 underline hover:text-cyan-300"
                                     >
                                        создай Issue на GitHub <FaGithub className="inline ml-1 h-3 w-3" />
-                                    </a> (детали частично заполнены).
+                                    </a> (данные подготовлены).
                                </li>
                            </ul>
                          </div>
@@ -215,11 +232,11 @@ ${shortStack}
             {/* Footer with Buttons */}
             <RenderSection title="Footer">
                  {() => (
-                     <div className="flex flex-col sm:flex-row justify-end items-center pt-4 border-t border-red-700/50 mt-auto gap-3">
+                     <div className="flex flex-col sm:flex-row justify-end items-center pt-4 border-t border-cyan-700/50 mt-auto gap-3">
                         {/* Removed Copy button here as it's integrated into advice */}
                        <button
                          onClick={handleClose}
-                         className="px-4 py-2 bg-red-700 hover:bg-red-600 text-red-100 rounded-md text-sm font-semibold transition shadow hover:shadow-lg w-full sm:w-auto"
+                         className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-indigo-100 rounded-md text-sm font-semibold transition shadow hover:shadow-lg w-full sm:w-auto" // Changed color
                          aria-label="Закрыть оверлей ошибки"
                        >
                          Закрыть

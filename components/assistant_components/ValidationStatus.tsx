@@ -3,7 +3,7 @@
 import React from 'react';
 // REMOVED Tooltip Imports
 import { ValidationStatus, ValidationIssue } from '../../hooks/useCodeParsingAndValidation'; // Adjust path
-import { FaRotate, FaCircleCheck, FaCircleExclamation, FaBroom, FaClipboardQuestion } from 'react-icons/fa6';
+import { FaRotate, FaCircleCheck, FaCircleExclamation, FaBroom, FaClipboardQuestion, FaTriangleExclamation } from 'react-icons/fa6'; // Added FaTriangleExclamation explicitly
 
 interface ValidationStatusProps {
     status: ValidationStatus;
@@ -47,8 +47,8 @@ export const ValidationStatusIndicator: React.FC<ValidationStatusProps> = ({
          switch (status) {
             case 'validating': return <FaRotate size={16} className="text-blue-400 animate-spin" />;
             case 'success': return <FaCircleCheck size={16} className="text-green-500" />;
-            case 'warning': return <FaCircleExclamation size={16} className="text-yellow-500" />;
-            case 'error': return <FaCircleExclamation size={16} className="text-red-500" />;
+            case 'warning': return <FaTriangleExclamation size={16} className="text-yellow-500" />; // Changed to correct icon
+            case 'error': return <FaTriangleExclamation size={16} className="text-red-500" />; // Changed to correct icon
             default: return null;
         }
     }
@@ -68,7 +68,7 @@ export const ValidationStatusIndicator: React.FC<ValidationStatusProps> = ({
                              onClick={onAutoFix}
                              disabled={isFixDisabled} // Use the disabled prop
                              className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-green-600 hover:bg-green-500 text-white transition shadow text-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                             title="Автоматически исправить (use client, import React)"
+                             title="Автоматически исправить (use client, import React, icon names)" // Updated tooltip
                          >
                              <FaBroom size={12} /> Исправить ({fixableIssues.length})
                          </button>

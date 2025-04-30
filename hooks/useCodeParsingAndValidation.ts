@@ -491,21 +491,28 @@ export function useCodeParsingAndValidation() {
                 try {
                     // .. 1. NEW: Fix incorrect Fa6 icon names
                     if (issue.type === 'incorrectFa6IconName' && issue.details?.incorrectName && issue.details?.correctName && issue.details?.importStatement) {
+                         const incorrectName = issue.details.incorrectName;
+                         const correctName = issue.details.correctName;
+                         const importLine = issue.details.importStatement;
                          const lines = currentContent.split('\n');
-                         const importLineIndex = lines.findIndex(line => line.includes(issue.details.importStatement));
+                         const importLineIndex = lines.findIndex(line => line.includes(importLine)); // Find the exact import line
+
                          if (importLineIndex !== -1) {
-                             const nameRegex = new RegExp(`\\b${issue.details.incorrectName}\\b`);
-                             // Ensure we replace only within the specific import line found
-                             if (nameRegex.test(lines[importLineIndex])) {
-                                lines[importLineIndex] = lines[importLineIndex].replace(nameRegex, issue.details.correctName);
-                                currentContent = lines.join('\n');
-                                fileChanged = true;
-                                fixedMessages.push(`✅ Fa6 Иконка: ${issue.details.incorrectName} -> ${issue.details.correctName} в ${file.path}`);
+                             // Replace within the specific line only
+                             const nameRegex = new RegExp(`\\b${incorrectName}\\b`, 'g'); // Use word boundary
+                             const originalLine = lines[importLineIndex];
+                             const modifiedLine = originalLine.replace(nameRegex, correctName);
+
+                             if (modifiedLine !== originalLine) { // Check if replacement actually happened
+                                 lines[importLineIndex] = modifiedLine;
+                                 currentContent = lines.join('\n');
+                                 fileChanged = true;
+                                 fixedMessages.push(`✅ Fa6 Иконка: ${incorrectName} -> ${correctName} в ${file.path}`);
                              } else {
-                                console.warn(`Incorrect icon name ${issue.details.incorrectName} not found in specific import line: ${file.path}`);
+                                 console.warn(`AutoFix: Incorrect icon name ${incorrectName} regex did not match in specific import line: "${originalLine}" in ${file.path}`);
                              }
                          } else {
-                             console.warn(`Could not find import line for Fa6 icon fix: ${file.path}`);
+                             console.warn(`AutoFix: Could not find import line "${importLine}" for Fa6 icon fix in ${file.path}`);
                          }
 
                     // .. 2. Fix legacy icons (keep existing logic, update type check)
@@ -545,7 +552,10 @@ export function useCodeParsingAndValidation() {
         });
 
         if (changesMadeCount > 0) {
-            setParsedFiles(updatedFiles);
+            // --- CRITICAL FIX: Update the state with the modified files ---
+            setParsedFiles(updatedFiles); // <<< THIS LINE WAS MISSING!
+            // --- END CRITICAL FIX ---
+
             fixedMessages.forEach(msg => toast.success(msg, { duration: 4000 }));
             console.log("Re-validating files after auto-fix...");
             validateParsedFiles(updatedFiles); // Re-validate AFTER fixing
@@ -560,7 +570,7 @@ export function useCodeParsingAndValidation() {
                 setValidationStatus('success');
             }
         }
-        return updatedFiles;
+        return updatedFiles; // Return the potentially modified files
     }, [validationIssues, validationStatus, validateParsedFiles]);
 
 
