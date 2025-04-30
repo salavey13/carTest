@@ -152,7 +152,7 @@ ${shortStack}
                  {() => (
                      <div className="flex items-center justify-between mb-4">
                        <h2 id="error-overlay-title" className="text-2xl font-bold text-red-300 flex items-center gap-2">
-                          <FaExclamationTriangle className="text-red-400" />
+                          <FaTriangleExclamation className="text-red-400" />
                           Ошибочка вышла!
                        </h2>
                      </div>
