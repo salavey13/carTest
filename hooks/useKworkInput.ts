@@ -4,8 +4,7 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 
 interface UseKworkInputProps {
     selectedFetcherFiles: Set<string>; // Current selection from context
-    allFetchedFiles: FileNode[]; // All files ever fetched (from context - potentially stale if fetch failed?)
-                                  // Consider passing `fetchedFiles` from `useRepoFetcher` instead if needed for accuracy.
+    allFetchedFiles: FileNode[]; // All files ever fetched (from context) - used for getting content of selected files
     imageReplaceTaskActive: boolean; // Is an image task currently active?
     files: FileNode[]; // Current files list from useRepoFetcher (needed for AddFullTree)
 }
@@ -56,13 +55,13 @@ export const useKworkInput = ({
 
         const currentKworkValue = getKworkInputValue();
         // Regex to find an existing context block (non-greedy match for content)
-        const contextRegex = /(Контекст кода для анализа[\s\S]*?)\n?```/;
+        // Looking for ``` optionally followed by language, then content, then ```
+        const contextRegex = /(Контекст кода для анализа:\s*```(?:\w+\n)?)([\s\S]*?)(\n?```)/;
         const fileSeparator = "\n\n// ---- FILE SEPARATOR ----\n\n";
         let newContextContent = "";
 
         // Generate the content block for selected files
-        // Use allFetchedFiles from context to find content, assuming it's up-to-date enough
-        // If accuracy tied to the *last successful fetch* is critical, pass `fetchedFiles` from useRepoFetcher instead
+        // Use allFetchedFiles from context to find content.
         newContextContent = Array.from(selectedFetcherFiles).map(path => {
             const file = allFetchedFiles.find(f => f.path === path);
             const pathComment = `// /${path}`;
@@ -71,13 +70,14 @@ export const useKworkInput = ({
             return fileContent.trimStart().startsWith(pathComment) ? fileContent : `${pathComment}\n${fileContent}`;
         }).join(fileSeparator);
 
+        // Construct the new block with plaintext hint
         const fullContextBlock = `Контекст кода для анализа:\n\`\`\`plaintext\n${newContextContent}\n\`\`\``;
         let finalKworkValue = "";
 
         // Replace existing block or append/prepend new one
         if (contextRegex.test(currentKworkValue)) {
              logger.log("Existing context block found, replacing.");
-             // Replace the existing block entirely
+             // Replace the existing block entirely using the regex
              finalKworkValue = currentKworkValue.replace(contextRegex, fullContextBlock);
         } else {
              logger.log("No existing context block found, adding new.");
@@ -136,7 +136,6 @@ export const useKworkInput = ({
         imageReplaceTaskActive, setSelectedFetcherFiles, updateKworkInput,
         setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setRequestCopied,
         addToast, logger, kworkInputRef // Include kworkInputRef for focus
-        // Removed setKworkInputHasContent as updateKworkInput should trigger listener in component
     ]);
 
     /** Adds the content of *all* currently listed files (from useRepoFetcher) to the Kwork input. */
@@ -163,7 +162,8 @@ export const useKworkInput = ({
          const prefix = "Контекст кода для анализа (ВСЕ ФАЙЛЫ):\n```plaintext\n";
          const suffix = "\n```";
          const currentKworkValue = getKworkInputValue();
-         const contextRegex = /(Контекст кода для анализа[\s\S]*?)\n?```/; // Non-greedy match
+         // Use the same regex as handleAddSelected to replace existing context if present
+         const contextRegex = /(Контекст кода для анализа:\s*```(?:\w+\n)?)([\s\S]*?)(\n?```)/;
          const textWithoutContext = currentKworkValue.replace(contextRegex, '').trim();
          const separator = textWithoutContext ? '\n\n' : '';
 

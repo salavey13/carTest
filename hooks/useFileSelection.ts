@@ -1,7 +1,6 @@
 import { useCallback } from "react";
 import { useRepoXmlPageContext, FileNode, ImportCategory } from "@/contexts/RepoXmlPageContext"; // Assuming types are here
 import { debugLogger as logger } from "@/lib/debugLogger";
-// No need to import repoUtils here if ImportCategory comes from context/types
 
 interface UseFileSelectionProps {
     files: FileNode[]; // Current list of fetched files (from useRepoFetcher hook)
@@ -57,11 +56,13 @@ export const useFileSelection = ({
              return;
         }
         const filesToSelect = new Set<string>();
-        if (primaryHighlightedPath && files.some(f => f.path === primaryHighlightedPath)) { // Ensure primary exists
+        // Ensure primary file exists in the current fetched list before adding
+        if (primaryHighlightedPath && files.some(f => f.path === primaryHighlightedPath)) {
              filesToSelect.add(primaryHighlightedPath);
         }
+        // Ensure secondary files exist in the current fetched list before adding
         Object.values(secondaryHighlightedPaths).flat().forEach(p => {
-             if (files.some(f => f.path === p)) { // Ensure secondary exists
+             if (files.some(f => f.path === p)) {
                  filesToSelect.add(p);
              }
         });

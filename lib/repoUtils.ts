@@ -133,14 +133,15 @@ export const resolveImportPath = (
     // --- 1. Resolve Alias Paths (e.g., @/...) ---
     if (importPath.startsWith('@/')) {
         // Define possible base directories for aliases (adjust based on your tsconfig/jsconfig)
-        const aliasBasePaths = ['src/', 'app/', './', '']; // Common locations, '' handles root-level alias
+        // No 'src/' prefix assumed
+        const aliasBasePaths = ['app/', './', '']; // Common locations, '' handles root-level alias
         const pathSegment = importPath.substring(2); // Remove '@/'
 
         for (const base of aliasBasePaths) {
             const resolved = tryPath(base + pathSegment);
             if (resolved) return resolved;
         }
-        // Fallback check for specific common root directories if not found directly under src/ or app/
+        // Fallback check for specific common root directories if not found directly under app/ or root
         const commonRootDirs = ['components/', 'lib/', 'utils/', 'hooks/', 'contexts/', 'styles/', 'services/'];
          for (const rootDir of commonRootDirs) {
              if (pathSegment.startsWith(rootDir)) {
@@ -178,8 +179,8 @@ export const resolveImportPath = (
     // This is a heuristic approach, as we don't have full node_modules resolution.
     // We prioritize common source directories within the project structure.
     else {
-        // Check common source roots relative to the project root
-        const commonSourceRoots = ['src/lib/', 'src/utils/', 'src/components/', 'src/hooks/', 'src/contexts/', 'src/styles/', 'src/services/', 'lib/', 'utils/', 'components/', 'hooks/', 'contexts/', 'styles/', 'services/'];
+        // Check common source roots relative to the project root (no 'src/' assumed)
+        const commonSourceRoots = ['lib/', 'utils/', 'components/', 'hooks/', 'contexts/', 'styles/', 'services/'];
         for (const base of commonSourceRoots) {
             const resolved = tryPath(base + importPath);
             if (resolved) return resolved;
@@ -217,12 +218,10 @@ export const getPageFilePath = (
 
     // --- Handle Root Path ---
     if (!cleanRoute) {
+        // Only check 'app/' since no 'src/'
         const rootPageFiles = [
             'app/page.tsx', 'app/page.js',
-            'src/app/page.tsx', 'src/app/page.js', // Check src/app too
-             // Less common but possible: index files at root level
-             'app/index.tsx', 'app/index.js',
-             'src/app/index.tsx', 'src/app/index.js'
+             'app/index.tsx', 'app/index.js'
         ];
         for (const rp of rootPageFiles) {
             if (allPaths.includes(rp)) return rp;
@@ -237,69 +236,65 @@ export const getPageFilePath = (
 
     const routeSegments = cleanRoute.split('/');
 
-    // Prioritize 'app/' directory, then 'src/app/'
-    const basePrefixes = ['app/', 'src/app/'];
+    // Only search within 'app/' directory
+    const prefix = 'app/';
+    const basePath = prefix + cleanRoute; // e.g., "app/dashboard/settings"
 
-    for (const prefix of basePrefixes) {
-        const basePath = prefix + cleanRoute; // e.g., "app/dashboard/settings"
+    // --- Check 1 & 2: Static routes (page.* and index.*) ---
+    const possibleStaticFiles = [
+        `${basePath}/page.tsx`, `${basePath}/page.js`,
+        `${basePath}/index.tsx`, `${basePath}/index.js`,
+         // Check if the route itself points to a file directly (e.g., /about.tsx if routes are structured differently)
+         `${prefix}${cleanRoute}.tsx`, `${prefix}${cleanRoute}.js`,
+    ];
+    for (const p of possibleStaticFiles) {
+        if (allPaths.includes(p)) {
+            return p;
+        }
+    }
 
-        // --- Check 1 & 2: Static routes (page.* and index.*) ---
-        const possibleStaticFiles = [
-            `${basePath}/page.tsx`, `${basePath}/page.js`,
-            `${basePath}/index.tsx`, `${basePath}/index.js`,
-             // Check if the route itself points to a file directly (e.g., /about.tsx if routes are structured differently)
-             `${prefix}${cleanRoute}.tsx`, `${prefix}${cleanRoute}.js`,
-        ];
-        for (const p of possibleStaticFiles) {
-            if (allPaths.includes(p)) {
-                return p;
+    // --- Check 3: Dynamic routes ---
+    const potentialDynamicPages = allPaths.filter(p =>
+        p.startsWith(prefix) && // Must be in app/
+        p.includes('[') && // Must contain dynamic segment markers
+        (p.endsWith('/page.tsx') || p.endsWith('/page.js') || p.endsWith('/index.tsx') || p.endsWith('/index.js'))
+    );
+
+    for (const pagePath of potentialDynamicPages) {
+        const suffix = ['/page.tsx', '/page.js', '/index.tsx', '/index.js'].find(s => pagePath.endsWith(s));
+        if (!suffix) continue; // Should not happen based on filter
+
+        // Extract the directory structure part of the potential page file path
+        // e.g., "users/[id]/settings" from "app/users/[id]/settings/page.tsx"
+        const pageDir = pagePath.substring(prefix.length, pagePath.length - suffix.length);
+        const pageSegments = pageDir.split('/');
+
+        // Compare segments count
+        if (pageSegments.length !== routeSegments.length) continue;
+
+        // Compare segments one by one
+        let match = true;
+        for (let i = 0; i < routeSegments.length; i++) {
+            const routeSeg = routeSegments[i];
+            const pageSeg = pageSegments[i];
+
+            // Allow mismatch only if the page segment is a dynamic placeholder
+            if (routeSeg !== pageSeg && !(pageSeg.startsWith('[') && pageSeg.endsWith(']'))) {
+                match = false;
+                break;
             }
         }
 
-         // --- Check 3: Dynamic routes ---
-         const potentialDynamicPages = allPaths.filter(p =>
-             p.startsWith(prefix) && // Must be in the current search prefix (app/ or src/app/)
-             p.includes('[') && // Must contain dynamic segment markers
-             (p.endsWith('/page.tsx') || p.endsWith('/page.js') || p.endsWith('/index.tsx') || p.endsWith('/index.js'))
-         );
-
-         for (const pagePath of potentialDynamicPages) {
-             const suffix = ['/page.tsx', '/page.js', '/index.tsx', '/index.js'].find(s => pagePath.endsWith(s));
-             if (!suffix) continue; // Should not happen based on filter
-
-             // Extract the directory structure part of the potential page file path
-             // e.g., "app/users/[id]/settings" from "app/users/[id]/settings/page.tsx"
-             const pageDir = pagePath.substring(prefix.length, pagePath.length - suffix.length);
-             const pageSegments = pageDir.split('/');
-
-             // Compare segments count
-             if (pageSegments.length !== routeSegments.length) continue;
-
-             // Compare segments one by one
-             let match = true;
-             for (let i = 0; i < routeSegments.length; i++) {
-                 const routeSeg = routeSegments[i];
-                 const pageSeg = pageSegments[i];
-
-                 // Allow mismatch only if the page segment is a dynamic placeholder
-                 if (routeSeg !== pageSeg && !(pageSeg.startsWith('[') && pageSeg.endsWith(']'))) {
-                     match = false;
-                     break;
-                 }
-             }
-
-             if (match) {
-                 return pagePath; // Found a matching dynamic route page file
-             }
-         }
-
-    } // End loop through prefixes (app/, src/app/)
+        if (match) {
+            return pagePath; // Found a matching dynamic route page file
+        }
+    }
 
 
     // --- Final Fallback (less likely for standard Next.js routing) ---
     // Check if the routePath directly matches a file path (e.g., if routePath was "app/some/file.tsx")
     if (allPaths.includes(routePath)) return routePath;
-    if (allPaths.includes(`src/${routePath}`)) return `src/${routePath}`;
+    // No src/ check needed
 
 
     return null; // No matching page file found
