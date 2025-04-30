@@ -243,6 +243,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
     const scrollToSection = useCallback((sectionId: string) => { const element = document.getElementById(sectionId); if (element) { element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); setTimeout(() => { element.classList.add('highlight-scroll'); setTimeout(() => element.classList.remove('highlight-scroll'), 1500); }, 300); } else { logger.warn(`Scroll target not found: ${sectionId}`); } }, []);
 
     // --- Buddy Message Logic (Updated Vibe) ---
+    // REMOVED usage of validationIssues from here
     const getXuinityMessage = useCallback((): string => {
           if (!isMounted) return "Инициализация...";
           const effectiveBranch = manualBranchNameState.trim() || targetBranchNameState || 'default';
@@ -280,12 +281,9 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
               case 'pr_ready':
                   const actionText = targetBranchNameState ? 'обновления ветки' : 'создания PR';
                   if (selectedAssistantFilesState.size === 0) return "Код разобран и проверен! Теперь выбери файлы, которые пойдут в коммит.";
-                  // Check for errors that require user action
-                  const hasErrors = validationIssues.some(i => !i.fixable && !i.restorable);
-                  if (hasErrors) return `🚨 Есть ошибки (например, неизвестные иконки)! Исправь их в поле ответа или удали файл из выбора перед отправкой PR/Update. (+1 Debug Perk!)`;
-                  const hasWarnings = validationIssues.some(i => i.fixable || i.restorable);
-                  if (hasWarnings) return `⚠️ Есть варнинги (пропуски/импорты)! Можешь нажать 'Исправить' или отправить так. Файлов для ${actionText}: ${selectedAssistantFilesState.size}.`;
-                  return `Код чист! Выбрано ${selectedAssistantFilesState.size} файлов для ${actionText}. Жми кнопку!`;
+                  // Simplified message: doesn't check validationIssues directly here.
+                  // Rely on Assistant UI/Buddy suggestions for validation feedback if needed.
+                  return `Код разобран! Выбрано ${selectedAssistantFilesState.size} файлов для ${actionText}. Проверь код в ассистенте (ошибки/варнинги?). Жми кнопку PR/Update!`;
               default: return "Вайб неопределен... Что будем делать?";
           }
      }, [
@@ -293,7 +291,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
          fetchStatusState, filesFetchedState, selectedFetcherFilesState.size, kworkInputHasContentState,
          aiResponseHasContentState, filesParsedState, selectedAssistantFilesState.size, requestCopiedState,
          assistantLoadingState, aiActionLoadingState, currentAiRequestIdState, imageReplaceTaskState,
-         allFetchedFilesState, isParsingState, validationIssues // Added validationIssues
+         allFetchedFilesState, isParsingState // Removed validationIssues dependency
      ]);
 
 

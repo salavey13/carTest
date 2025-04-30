@@ -277,7 +277,7 @@ function ActualPageContent() {
     }, [user, searchParams, setImageReplaceTask, setRepoUrl]); // Dependencies
 
 
-    // Effect 2: Populate Kwork Input (No changes needed here, fix was in Effect 1)
+    // Effect 2: Populate Kwork Input
      useEffect(() => {
         const fetchAttemptFinished = isMounted && (fetchStatus === 'success' || fetchStatus === 'error' || fetchStatus === 'failed_retries');
         if (fetchAttemptFinished && initialIdea && !initialIdeaProcessed && !imageReplaceTask) {
@@ -306,6 +306,8 @@ function ActualPageContent() {
         }
     }, [isMounted, fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles]);
 
+    // REMOVED: The useEffect hook that was causing the error by using `validationIssues`.
+    // REMOVED: The dependency on `validationIssues` from the other useEffect.
 
     const t = translations[lang];
     const userName = user?.first_name || (lang === 'ru' ? 'Нео' : 'Neo');
@@ -402,7 +404,7 @@ function ActualPageContent() {
                                 <li><RenderContent content={t.philosophyLvl8_10} /></li>
                             </ul>
                             <hr className="border-gray-700 my-3"/>
-                             <p className="font-semibold text-yellow-400 flex items-start gap-2"> <FaBullseye className="inline-block h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0"/> <span><RenderContent content={t.philosophy6} /></span> </p>
+                             {/* Removed philosophy6 as it was not defined */}
                              <p className="font-bold text-brand-green"><RenderContent content={t.philosophyEnd} /></p>
                             <hr className="border-gray-700 my-4"/>
                             <h4 className="text-lg font-semibold text-cyan-400 pt-2">{t.stepsTitle}</h4>
