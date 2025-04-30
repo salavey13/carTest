@@ -23,8 +23,9 @@ import {
 import {
     createGitHubPullRequest,
     updateBranch,
-    fetchRepoContents
-} from '@/app/actions_github/actions';
+    fetchRepoContents,
+    getOpenPullRequests // Need this for image replace check
+} from '@/app/actions_github/actions'; // Added getOpenPullRequests
 import { sendTelegramDocument, notifyAdmin } from '@/app/actions';
 import { supabaseAdmin } from '@/hooks/supabase'; // Keep if used for Supabase Admin client
 import { selectFunctionDefinition, extractFunctionName } from '@/lib/codeUtils';
@@ -62,7 +63,6 @@ interface UseAICodeAssistantHandlersProps {
     // State setters from AICodeAssistant
     setResponse: React.Dispatch<React.SetStateAction<string>>;
     setSelectedFileIds: React.Dispatch<React.SetStateAction<Set<string>>>;
-    // setRepoUrlStateLocal: React.Dispatch<React.SetStateAction<string>>; // Handled via updateRepoUrl
     setPrTitle: React.Dispatch<React.SetStateAction<string>>;
     setCustomLinks: React.Dispatch<React.SetStateAction<{ name: string; url: string }[]>>;
     setShowModal: React.Dispatch<React.SetStateAction<boolean>>;
@@ -104,7 +104,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         setHookParsedFiles, setValidationStatus, setValidationIssues, parseAndValidateResponse, autoFixIssues, validationIssues, validationStatus, rawDescription, setRawDescription
     } = codeParserHook;
     const {
-        contextOpenPrs, targetBranchName, repoUrlFromContext, setAssistantLoading, triggerGetOpenPRs, triggerUpdateBranch, setFilesParsed, setSelectedAssistantFiles, setContextIsParsing, setRequestCopied, selectedAssistantFiles, setAiResponseHasContent
+        contextOpenPrs, targetBranchName, repoUrlFromContext, setAssistantLoading, triggerGetOpenPRs, triggerUpdateBranch, setFilesParsed, setSelectedAssistantFiles, setContextIsParsing, setRequestCopied, selectedAssistantFiles, setAiResponseHasContent, allFetchedFiles // Need allFetchedFiles for image replace
     } = pageContext;
 
     const repoUrlForForm = repoUrlStateLocal || repoUrlFromContext || "";
@@ -371,7 +371,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             logger.log("Successfully saved/updated files.");
         } catch (err) { logger.error("Save files error:", err); toast.error("Ошибка сохранения файлов.", { id: toastId }); }
         finally { setIsProcessingPR(false); }
-     }, [user, componentParsedFiles, selectedFileIds, imageReplaceTask, logger, setIsProcessingPR]); // Added supabaseAdmin dependency
+     }, [user, componentParsedFiles, selectedFileIds, imageReplaceTask, logger, setIsProcessingPR]);
 
 
     const handleDownloadZip = useCallback(async () => {
@@ -404,7 +404,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             logger.log(`Sent file ${file.path} to TG.`);
         } catch (err: any) { logger.error("Send TG error:", err); toast.error(`Ошибка отправки в TG: ${err.message}`, { id: toastId }); }
         finally { setIsProcessingPR(false); }
-     }, [user, imageReplaceTask, logger, setIsProcessingPR]); // Added sendTelegramDocument dependency
+     }, [user, imageReplaceTask, logger, setIsProcessingPR]);
 
 
     const handleAddCustomLink = useCallback(async () => {
@@ -424,7 +424,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             toast.success(`Ссылка "${name}" добавлена.`, { id: toastId });
             logger.log("Saved custom link.");
         } catch (e) { logger.error("Save link error:", e); toast.error("Ошибка сохранения ссылки.", { id: toastId }); setCustomLinks(customLinks); /* Revert optimistic update */ }
-     }, [customLinks, user, imageReplaceTask, logger, setCustomLinks]); // Added supabaseAdmin dependency
+     }, [customLinks, user, imageReplaceTask, logger, setCustomLinks]);
 
 
     const handleCreateOrUpdatePR = useCallback(async (): Promise<void> => {
@@ -435,8 +435,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             return;
         }
 
-        // Validation Check before PR
-        const errors = validationIssues.filter(i => i.severity === 'error' || (!i.fixable && !i.restorable && i.type !== 'skippedComment')); // Treat unknown icons, parse errors etc as errors
+        const errors = validationIssues.filter(i => i.severity === 'error' || (!i.fixable && !i.restorable && i.type !== 'skippedComment'));
         if (errors.length > 0) {
              toast.error(`Найдены ошибки (${errors.length}), которые нужно исправить перед созданием PR!`, {
                 description: errors.map(e => `- ${e.filePath}: ${e.message}`).join('\n'),
@@ -488,17 +487,19 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
              }
         } catch (err) { logger.error("PR/Update critical error:", err); toast.error(`Крит. ошибка ${actionType}.`, { id: toastId }); }
         finally { setIsProcessingPR(false); setAssistantLoading(false); logger.log("[handleCreateOrUpdatePR] Finished."); }
-     }, [ componentParsedFiles, selectedAssistantFiles, repoUrlForForm, prTitle, rawDescription, response, validationIssues, targetBranchName, contextOpenPrs, triggerUpdateBranch, setAssistantLoading, user, triggerGetOpenPRs, imageReplaceTask, logger, setIsProcessingPR, createGitHubPullRequest ]); // Added dependencies
+     }, [ componentParsedFiles, selectedAssistantFiles, repoUrlForForm, prTitle, rawDescription, response, validationIssues, targetBranchName, contextOpenPrs, triggerUpdateBranch, setAssistantLoading, user, triggerGetOpenPRs, imageReplaceTask, logger, setIsProcessingPR, createGitHubPullRequest ]);
 
     // --- Direct Image Replace Handler ---
-    const handleDirectImageReplace = useCallback(async (task: ImageReplaceTask, allFiles: FileNode[]): Promise<void> => {
+    const handleDirectImageReplace = useCallback(async (task: ImageReplaceTask, currentAllFiles: FileNode[]): Promise<void> => {
       if (!task) { logger.warn("[handleDirectImageReplace] No task provided."); return; }
+      // Use the passed 'currentAllFiles' instead of context one, as context might not be updated yet
+      const allFilesForReplace = currentAllFiles;
       logger.log("[handleDirectImageReplace] Starting direct image replace process for task:", task);
       setAssistantLoading(true); setIsProcessingPR(true); setImageReplaceError(null);
       const toastId = toast.loading(`Замена картинки в ${task.targetPath.split('/').pop()}...`);
 
       try {
-          const targetFile = allFiles.find(f => f.path === task.targetPath);
+          const targetFile = allFilesForReplace.find(f => f.path === task.targetPath);
           if (!targetFile) { throw new Error(`Целевой файл ${task.targetPath} не найден среди загруженных.`); }
 
           const oldUrlRegex = new RegExp(task.oldUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
@@ -538,7 +539,6 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
            }
 
           logger.log("[handleDirectImageReplace] Image replacement and PR/Update process finished successfully.");
-          // --- FIX: Use the destructured setter ---
           setImageReplaceTask(null); // Clear the task on success
 
       } catch (err: any) {
@@ -553,9 +553,8 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
     }, [
         repoUrlForForm, setAssistantLoading, setIsProcessingPR, setImageReplaceError,
         triggerUpdateBranch, createGitHubPullRequest, triggerGetOpenPRs,
-        // --- FIX: Add setImageReplaceTask to dependency array ---
-        setImageReplaceTask,
-        logger
+        setImageReplaceTask, // Now included
+        logger, getOpenPullRequests // Added getOpenPullRequests dependency
     ]);
 
 

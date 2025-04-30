@@ -1,127 +1,139 @@
 "use client";
 
-import React, { useEffect } from 'react';
-import { cn } from '@/lib/utils';
-import { useErrorOverlay, type ErrorInfo } from '@/contexts/ErrorOverlayContext'; // Import hook and type
+import React from 'react';
+import { useErrorOverlay, ErrorInfo } from '@/contexts/ErrorOverlayContext';
+import { FaCopy, FaBug, FaExclamationTriangle } from 'react-icons/fa6'; // Using FaExclamationTriangle as standard warning/error icon
+import { toast } from 'sonner';
+import { debugLogger as logger } from '@/lib/debugLogger'; // Import logger
 
-export default function DevErrorOverlay() {
-  // Get state and setter from context
+const DevErrorOverlay: React.FC = () => {
   const { errorInfo, setErrorInfo, showOverlay } = useErrorOverlay();
 
-  // Effect for catching GLOBAL errors (outside React tree)
-  useEffect(() => {
-    // Only run if overlay is enabled
-    if (!showOverlay) {
-      return;
+  // --- NEW: Effect to log error when it appears ---
+  React.useEffect(() => {
+    if (errorInfo) {
+      logger.error("DevErrorOverlay displayed:", errorInfo);
     }
+  }, [errorInfo]);
 
-    const handleError = (event: ErrorEvent) => {
-      if (event.message === 'Script error.') {
-        console.warn("Ignoring generic 'Script error.' potentially from external script.");
-        return;
-      }
-      console.error("Caught global error by window.onerror:", event);
-      // Use context setter
-      setErrorInfo({
-        message: event.message,
-        source: event.filename,
-        lineno: event.lineno,
-        colno: event.colno,
-        error: event.error,
-        type: 'error',
-      });
-    };
-
-    const handleRejection = (event: PromiseRejectionEvent) => {
-      console.error("Caught unhandled rejection by window.onunhandledrejection:", event);
-      let message = 'Unhandled Promise Rejection';
-      let errorObj: Error | string | undefined;
-
-      if (event.reason instanceof Error) {
-        message = event.reason.message;
-        errorObj = event.reason;
-      } else if (typeof event.reason === 'string') {
-         if (event.reason === 'Script error.') {
-            console.warn("Ignoring generic 'Script error.' (rejection).");
-            return;
-         }
-        message = event.reason;
-        errorObj = event.reason;
-      } else {
-        try { message = JSON.stringify(event.reason); } catch { message = 'Non-serializable rejection reason'; }
-        errorObj = message;
-      }
-      // Use context setter
-      setErrorInfo({
-        message: message,
-        error: errorObj,
-        type: 'rejection',
-      });
-    };
-
-    window.addEventListener('error', handleError);
-    window.addEventListener('unhandledrejection', handleRejection);
-
-    return () => {
-      window.removeEventListener('error', handleError);
-      window.removeEventListener('unhandledrejection', handleRejection);
-    };
-    // Depend on showOverlay so listeners are added/removed if the flag changes
-    // Also depend on setErrorInfo to ensure stability if context changes unexpectedly
-  }, [showOverlay, setErrorInfo]);
-
-  // Render based on context state and flag
   if (!errorInfo || !showOverlay) {
     return null;
   }
 
-  // --- Overlay Rendering Logic (Same as before) ---
+  const handleClose = () => {
+    setErrorInfo(null);
+  };
+
+  const getShortStackTrace = (error?: Error | string): string => {
+    if (!error) return 'Нет стека вызовов.';
+    let stack = '';
+    if (error instanceof Error && error.stack) {
+        stack = error.stack;
+    } else if (typeof error === 'string') {
+        stack = error; // If error is just a string (e.g., from rejection)
+    }
+    // Take first 5 lines or fewer if stack is shorter
+    return stack.split('\n').slice(0, 5).join('\n') || 'Стек вызовов пуст или недоступен.';
+  };
+
+  const handleCopyVibeRequest = () => {
+    const errorType = errorInfo.type?.toUpperCase() || 'UNKNOWN';
+    const message = errorInfo.message || 'Нет сообщения';
+    const shortStack = getShortStackTrace(errorInfo.error);
+    const source = errorInfo.source ? ` (${errorInfo.source}:${errorInfo.lineno ?? '?'})` : '';
+
+    const prompt = `Йоу! Поймал ошибку в CyberVibe Studio, помоги разгрести!
+
+Ошибка (${errorType})${source}:
+${message}
+
+Стек (начало):
+\`\`\`
+${shortStack}
+\`\`\`
+
+Задача: Проанализируй ошибку и стек. Предложи исправления кода или объясни причину.
+
+Ссылка на студию для контекста: /repo-xml
+`;
+
+    navigator.clipboard.writeText(prompt)
+      .then(() => {
+        toast.success("Vibe Запрос для фикса скопирован!");
+      })
+      .catch(err => {
+        logger.error("Failed to copy vibe request:", err);
+        toast.error("Не удалось скопировать запрос.");
+      });
+  };
+
+
   return (
     <div
-        className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-        aria-live="assertive"
-        role="alertdialog"
-        aria-modal="true"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black bg-opacity-80 backdrop-blur-sm p-4"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="error-overlay-title"
+      aria-describedby="error-overlay-description"
     >
-       <div className="bg-red-900/90 border-2 border-red-500 rounded-lg shadow-2xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto text-white font-mono">
-         <div className="flex justify-between items-center mb-4">
-           <h2 className="text-2xl font-bold text-red-300 capitalize">
-             {/* Display type: 'react', 'error', or 'rejection' */}
-             {errorInfo.type} Error
-           </h2>
+      <div className="bg-gradient-to-br from-red-900 via-red-950 to-black border border-red-600/50 rounded-lg shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] flex flex-col text-red-100">
+
+        <div className="flex items-center justify-between mb-4">
+          <h2 id="error-overlay-title" className="text-2xl font-bold text-red-300 flex items-center gap-2">
+             <FaExclamationTriangle className="text-red-400" />
+             Ошибочка вышла!
+          </h2>
+          {/* Close button moved to bottom */}
+        </div>
+
+        <div id="error-overlay-description" className="flex-grow overflow-y-auto simple-scrollbar pr-2 space-y-4 mb-4">
+          <p className="text-lg text-red-200 font-semibold">
+            {errorInfo.message || "Неизвестная ошибка"}
+          </p>
+
+          {errorInfo.source && (
+            <p className="text-sm text-red-300 font-mono">
+              Источник: {errorInfo.source} (строка: {errorInfo.lineno ?? '?'}, столбец: {errorInfo.colno ?? '?'})
+            </p>
+          )}
+
+          <details className="bg-red-950/50 p-3 rounded border border-red-700/50">
+            <summary className="cursor-pointer text-sm font-medium text-red-300 hover:text-red-200">
+              Технические детали (Stack Trace - начало)
+            </summary>
+            <pre className="mt-2 text-xs text-red-200/80 whitespace-pre-wrap break-words font-mono">
+              {getShortStackTrace(errorInfo.error)}
+            </pre>
+          </details>
+
+          <div className="mt-4 p-3 bg-yellow-900/30 border border-yellow-600/50 rounded text-yellow-200 text-sm">
+            <p className="font-semibold mb-1">🧘 Не паникуй, лови вайб!</p>
+            <p>Ошибки - это часть пути к просветлению кода. Скопируй инфу и кидай боту (или мне) в <a href="/repo-xml" className="underline hover:text-yellow-100">CyberVibe Studio</a> – разберемся!</p>
+          </div>
+        </div>
+
+        {/* Buttons at the bottom */}
+        <div className="flex flex-col sm:flex-row justify-between items-center pt-4 border-t border-red-700/50 mt-auto gap-3">
            <button
-             onClick={() => setErrorInfo(null)} // Use context setter to clear
-             className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-white text-sm transition-colors"
-             aria-label="Close error overlay"
+              onClick={handleCopyVibeRequest}
+              className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-yellow-950 rounded-md text-sm font-semibold transition shadow hover:shadow-lg w-full sm:w-auto"
+              aria-label="Скопировать запрос на исправление ошибки"
            >
-             Close
+               <FaCopy />
+               Скопировать Vibe Запрос
            </button>
-         </div>
+           <button
+             onClick={handleClose}
+             className="px-4 py-2 bg-red-700 hover:bg-red-600 text-red-100 rounded-md text-sm font-semibold transition shadow hover:shadow-lg w-full sm:w-auto"
+             aria-label="Закрыть оверлей ошибки"
+           >
+             Закрыть
+           </button>
+        </div>
 
-         <div className="bg-black/50 p-4 rounded mb-4">
-           <p className="text-red-300 text-lg break-words">{errorInfo.message}</p>
-           {/* Show source only for global errors, less useful for React errors */}
-           {errorInfo.type === 'error' && errorInfo.source && (
-             <p className="text-xs text-red-400 mt-1">
-               Source: {errorInfo.source}:{errorInfo.lineno}:{errorInfo.colno}
-             </p>
-           )}
-         </div>
-
-         {errorInfo.error && (
-           <div>
-             <h3 className="text-lg text-red-400 mb-2">Stack Trace / Details:</h3>
-             <pre className="bg-black/60 p-4 rounded text-xs text-red-300 overflow-x-auto whitespace-pre-wrap break-all">
-               {/* Try to get stack, fallback to string */}
-               {errorInfo.error instanceof Error ? errorInfo.error.stack : String(errorInfo.error)}
-             </pre>
-           </div>
-         )}
-
-         <p className="text-xs text-yellow-400 mt-4 pt-2 border-t border-yellow-400/30">
-             Note: Errors in Preview/Prod builds will be minified. Closing the overlay may require a page refresh to reset the UI state.
-         </p>
-       </div>
+      </div>
     </div>
   );
-}
+};
+
+export default DevErrorOverlay;

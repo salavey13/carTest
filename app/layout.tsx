@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import StickyChatButton from "@/components/StickyChatButton";
 import { AppProvider } from "@/contexts/AppContext";
-import { Toaster } from "sonner"; // Ensure this path is correct for your setup
+import { Toaster as SonnerToaster } from "sonner"; // Renamed import to avoid naming conflict
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import type { Metadata, Viewport } from 'next';
@@ -14,13 +14,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 // --- NEW IMPORTS for Error Handling ---
 import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext";
 import ErrorBoundaryForOverlay from "@/components/ErrorBoundaryForOverlay";
-import DevErrorOverlay from "@/components/DevErrorOverlay";
+import DevErrorOverlay from "@/components/DevErrorOverlay"; // Import the new overlay component
 // ------------------------------------
 
 // --- Fallback component for StickyChatButton ---
-// Displayed while the client-side hook useSearchParams resolves
 function LoadingChatButtonFallback() {
-  // Basic visual placeholder matching the FAB's likely position and size
   return (
     <div
         className="fixed bottom-4 left-4 z-40 w-12 h-12 rounded-full bg-gray-700 animate-pulse"
@@ -30,73 +28,56 @@ function LoadingChatButtonFallback() {
 }
 // ------------------------------------------
 
-// Define Metadata (WITHOUT viewport)
 export const metadata: Metadata = {
-  title: "V0 Car Test App", // Update if necessary
-  description: "Find your perfect V0 car.", // Update if necessary
-  // Add other metadata like icons, openGraph, etc. if needed
-  // icons: { icon: '/favicon.ico' },
+  title: "V0 Car Test App",
+  description: "Find your perfect V0 car.",
 };
 
-// Define Viewport separately
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1, // Disable zoom
-  userScalable: false, // Disable zoom
-  // themeColor: '#000000', // Optional: Set theme color
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="h-full">
       <head>
-        {/* Basic meta tags */}
         <meta charSet="utf-8" />
-        {/* Viewport is handled by the export above, but can keep for older browsers */}
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-        {/* PWA / Mobile specific tags */}
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
-        {/* Add more head tags if needed: favicons, theme-color, etc. */}
-
-        {/* Telegram Script */}
         <Script
           id="telegram-webapp-script"
           src="https://telegram.org/js/telegram-web-app.js"
-          strategy="beforeInteractive" // Load early
+          strategy="beforeInteractive"
         />
       </head>
       <body className={cn(
           "flex min-h-screen flex-col bg-gray-900 text-white antialiased",
-          // Add font class here if you have one, e.g., inter.className
       )}>
-        {/* --- WRAP WITH ERROR OVERLAY PROVIDER (OUTSIDE EVERYTHING) --- */}
+        {/* --- Wrap everything with ErrorOverlayProvider --- */}
         <ErrorOverlayProvider>
-          {/* Wrap with TooltipProvider */}
           <TooltipProvider>
-            {/* Wrap with AppProvider */}
             <AppProvider>
 
-              {/* --- WRAP MAIN APP CONTENT WITH ERROR BOUNDARY --- */}
-              {/* This catches errors within Header, children, Footer etc. */}
+              {/* --- ErrorBoundaryForOverlay Wraps main app content --- */}
+              {/* It catches errors and sends them to the ErrorOverlayContext */}
               <ErrorBoundaryForOverlay>
                 <Header />
                 <main className="flex-1">
-                  {children} {/* Your page content goes here */}
+                  {children}
                 </main>
-                {/* Wrap StickyChatButton in Suspense */}
                 <Suspense fallback={<LoadingChatButtonFallback />}>
                   <StickyChatButton />
                 </Suspense>
                 <Footer />
               </ErrorBoundaryForOverlay>
-              {/* ---------------------------------------------------- */}
+              {/* --- End of ErrorBoundaryForOverlay Wrap --- */}
 
-              {/* Toaster remains outside the main ErrorBoundaryForOverlay */}
-              {/* but inside AppProvider if it needs context (it doesn't usually) */}
-              <Toaster
+              {/* Sonner Toaster remains outside the boundary */}
+              <SonnerToaster
                 position="bottom-right"
                 richColors
                 toastOptions={{
@@ -111,15 +92,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 }}
               />
 
-              {/* DevErrorOverlay Component */}
-              {/* Renders based on context state from ErrorOverlayProvider */}
-              {/* MUST be outside ErrorBoundaryForOverlay to render when boundary catches */}
-              {/* but INSIDE ErrorOverlayProvider to access the context */}
+              {/* --- DevErrorOverlay is placed here --- */}
+              {/* It's INSIDE ErrorOverlayProvider to get context */}
+              {/* It's OUTSIDE ErrorBoundaryForOverlay so it renders even if the boundary caught an error */}
               <DevErrorOverlay />
 
             </AppProvider>
           </TooltipProvider>
-        </ErrorOverlayProvider> {/* --- CLOSE ERROR OVERLAY PROVIDER --- */}
+        </ErrorOverlayProvider> {/* --- Close ErrorOverlayProvider --- */}
       </body>
     </html>
   );
