@@ -15,33 +15,32 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 // CORRECTED/UPDATED Icons for CYBERVIBE 2.0
 import {
-    FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong, // <-- FIXED: Replaced FaLevelUpAlt
+    FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong,
     FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye,
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
-    FaTools, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer // Added more relevant icons
+    FaTools, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket // Added FaRocket
 } from "react-icons/fa6";
 import Link from "next/link";
 import * as FaIcons from "react-icons/fa6";
 import { motion } from 'framer-motion';
 
-// --- I18N Translations (CYBERVIBE 2.0 - PHILOSOPHY OVERHAUL) ---
+// --- I18N Translations (CYBERVIBE 2.0 - Final Version) ---
 const translations = {
   en: {
     loading: "Booting SUPERVIBE ENGINE...",
     pageTitle: "SUPERVIBE STUDIO 2.0",
     welcome: "Yo,",
     intro1: "Code scary? Forget that noise! This is the **NOW**. Your personal **dev accelerator**. Instant Level UP!",
-    intro2: "Think: Magic Playground. Got ideas? Speak 'em. AI builds, system checks, PR ships. **Boom.**",
+    intro2: "Think: Magic Playground. Got ideas? Speak 'em. AI builds, system checks, PR ships. **Boom.** You guide the process.",
     intro3: "Stop consuming, start **CREATING**. Build YOUR reality, crush YOUR problems, **validate ideas INSTANTLY**. This is how you vibe.",
-    cyberVibeTitle: "The Vibe Loop: Your Level Up Engine <FaUpLong/>", // FIXED ICON
+    cyberVibeTitle: "The Vibe Loop: Your Level Up Engine <FaUpLong/>",
     cyberVibe1: "This ain't just tools – it's a **compounding feedback loop**. Every action levels you up, makes the next step easier. You evolve.",
     cyberVibe2: "<FaGithub class='inline mr-1 text-gray-400'/> is your **cyberchest**. This Studio + AI? Your interface to **remix and transmute** that knowledge into new vibes, features, fixes... **instantly**.",
     cyberVibe3: "You're not *learning* code; you're **remixing the matrix**. You interact, you understand structure, you **command the AI**. You're the Vibe Master.",
     cyberVibe4: "It's **co-creation** with the machine. Push boundaries. Earn bandwidth. Infinite context. Infinite power. This is **CYBERVIBE 2.0**.",
 
-    philosophyTitle: "Your Vibe Path: The Inevitable Level Up (Tap)", // UPDATED TITLE
+    philosophyTitle: "Your Vibe Path: The Inevitable Level Up (Tap)",
     philosophyVideoTitle: "Watch: The Level System Explained <FaVideo/>:",
-    // --- NEW Level Philosophy ---
     philosophyCore: "The secret? **You're not asking the bot for help, YOU are helping the BOT**. Each level adds **+1 Vibe Perk**, one more click, one more skill to guide the AI. It's not a grind, it's evolution. You get lazy doing the old stuff, so you *automatically* level up. And there's **NO GOING BACK!**",
     philosophyLvl0_1: "**Lv.0 -> 1 <FaBolt/> (Instant Win):** Fix a broken image. Copy URL -> Paste -> Upload new -> **DONE**. System auto-PRs. **ANYONE** can do this *NOW*. This is your entry point.",
     philosophyLvl1_2: "**Lv.1 -> 2 <FaTools/> (+1 File/AI):** Simple idea? Change text/button? Give AI the idea + 1 file context -> PR. **DONE.**",
@@ -52,7 +51,6 @@ const translations = {
     philosophyLvl6_7: "**Lv.6 -> 7 <FaDatabase/> (+SQL/DB):** Discover new file types! AI generates SQL -> Paste into Supabase (1 click) -> **DONE.** Same flow, different context. +1 Perk: Data Handling.",
     philosophyLvl8_10: "**Lv.8-10+ <FaServer/>/<FaRocket/> (+Independence):** Deploy your OWN CyberVibe! Use/steal my Supabase! Set your own Bot Token! Build your own XTRs! **UNLIMITED POWER!**",
     philosophyEnd: "Step-by-step, level-up is **inevitable**. You're too lazy for the old shit. One extra click, one new skill, and you're automatically stronger. Welcome, **Neo**.",
-    // --- End NEW Level Philosophy ---
     stepsTitle: "Quick Start Guide:",
     step1Title: "1. Grab Repo / Point Wish:",
     step1Desc: "Enter GitHub URL -> Hit <FaDownload class='inline mx-1 text-purple-400'/> OR Spot bug/idea -> Activate Buddy <FaRobot class='inline mx-1 text-indigo-400'/> -> Describe.",
@@ -69,14 +67,14 @@ const translations = {
     navGrabber: "Grabber <FaDownload/>",
     navAssistant: "Assistant <FaRobot/>",
     navIntro: "Intro <FaCircleInfo/>",
-    navCyberVibe: "Vibe Loop <FaUpLong/>", // FIXED ICON
+    navCyberVibe: "Vibe Loop <FaUpLong/>",
   },
   ru: { // --- RUSSIAN TRANSLATIONS UPDATED ---
     loading: "Запуск SUPERVIBE ДВИЖКА...",
     pageTitle: "SUPERVIBE СТУДИЯ 2.0",
     welcome: "Йоу,",
     intro1: "Код пугает? Забудь! Это **СЕЙЧАС**. Твой личный **dev-ускоритель**. Мгновенный Level UP!",
-    intro2: "Думай: Волшебная Песочница. Есть идеи? Говори. AI строит, система чекает, PR улетает. **Бум.**",
+    intro2: "Думай: Волшебная Песочница. Есть идеи? Говори. AI строит, система чекает, PR улетает. **Бум.** Ты рулишь процессом.",
     intro3: "Хватит потреблять, стань **ТВОРЦОМ**. Строй СВОЮ реальность, решай СВОИ проблемы, **валидируй идеи МГНОВЕННО**. Вот это вайб.",
     cyberVibeTitle: "Петля Вайба: Твой Движок Прокачки <FaUpLong/>", // FIXED ICON
     cyberVibe1: "Это не просто тулзы – это **накопительная петля обратной связи**. Каждое действие качает тебя, делает следующий шаг легче. Ты эволюционируешь.",
@@ -84,11 +82,10 @@ const translations = {
     cyberVibe3: "Ты не *учишь* код; ты **ремиксуешь матрицу**. Взаимодействуешь, понимаешь структуру, **командуешь AI**. Ты - Вайб Мастер.",
     cyberVibe4: "Это **со-творчество** с машиной. Двигай границы. Зарабатывай bandwidth. Бесконечный контекст. Бесконечная мощь. Это **CYBERVIBE 2.0**.",
 
-    philosophyTitle: "Твой Путь Вайба: Неизбежный Level Up (Жми)", // UPDATED TITLE
+    philosophyTitle: "Твой Путь Вайба: Неизбежный Level Up (Жми)",
     philosophyVideoTitle: "Смотри: Объяснение Системы Уровней <FaVideo/>:",
-    // --- NEW Level Philosophy (RU) ---
     philosophyCore: "Секрет? **Не ты просишь бота помочь, а ТЫ помогаешь БОТУ**. Каждый левел дает **+1 Вайб Перк**, +1 клик, +1 скилл, чтобы направлять AI. Это не гринд, это эволюция. Тебе становится лень делать старое, и ты *автоматически* апаешь левел. И **НАЗАД ДОРОГИ НЕТ!**",
-    philosophyLvl0_1: "**Лв.0 -> 1 <FaBolt/> (Мгновенный Вин):** Починить битую картинку. Скопируй URL -> Вставь -> Загрузи новую -> **ГОТОВО**. Система сама сделает PR. **ЛЮБОЙ** может это *ПРЯМО СЕЙЧАС*. Это твой вход.",
+    philosophyLvl0_1: "**Лв.0 -> 1 <FaBolt/> (Мгновенный Вин):** Починить битую картинку. Скопируй URL -> Вставь -> Загрузи новую -> **ГОТОВО**. Система авто-PR. **ЛЮБОЙ** может это *ПРЯМО СЕЙЧАС*. Это твой вход.",
     philosophyLvl1_2: "**Лв.1 -> 2 <FaTools/> (+1 Файл/AI):** Простая идея? Текст/кнопку поменять? Дай AI идею + 1 файл контекста -> PR. **ГОТОВО.**",
     philosophyLvl2_3: "**Лв.2 -> 3 <FaCode/> (+Мульти-Файл):** Чуть сложнее? 2-5 файлов? Дай AI идею + контекст -> Проверь -> PR. **ГОТОВО.**",
     philosophyLvl3_4: "**Лв.3 -> 4 <FaBug/> (+Чек Логов):** Упала сборка? Ошибка в рантайме? 99% - еб*ная иконка! Открой логи Vercel (ссылка в комменте PR!) -> Скопируй красные строки -> Скорми ошибку AI -> **ПОЧИНЕНО.** +1 Вайб Перк: Дебаггинг.",
@@ -97,7 +94,6 @@ const translations = {
     philosophyLvl6_7: "**Лв.6 -> 7 <FaDatabase/> (+SQL/БД):** Открой новые типы файлов! AI генерит SQL -> Вставь в Supabase (1 клик) -> **ГОТОВО.** Тот же флоу, другой контекст. +1 Перк: Работа с Данными.",
     philosophyLvl8_10: "**Лв.8-10+ <FaServer/>/<FaRocket/> (+Независимость):** Разверни свой CyberVibe! Юзай/спи*ди мою Supabase! Поставь свой Токен Бота! Строй свои XTR-ы! **БЕЗГРАНИЧНАЯ МОЩЬ!**",
     philosophyEnd: "Шаг за шагом, левел-ап **неизбежен**. Тебе слишком лень для старой х*йни. Один лишний клик, один новый скилл - и ты автоматом сильнее. Добро пожаловать, **Нео**.",
-    // --- End NEW Level Philosophy (RU) ---
     stepsTitle: "Краткий Гайд:",
     step1Title: "1. Хватай Репу / Укажи Желание:",
     step1Desc: "Введи GitHub URL -> Жми <FaDownload class='inline mx-1 text-purple-400'/> ИЛИ Видишь баг/идею -> Вызови Бадди <FaRobot class='inline mx-1 text-indigo-400'/> -> Опиши.",
@@ -183,9 +179,18 @@ function ActualPageContent() {
     const [initialIdea, setInitialIdea] = useState<string | null>(null);
     const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(false);
 
-    // --- Effects (Same as previous version, no changes needed here) ---
-    useEffect(() => { setIsMounted(true); }, []);
+    // Effect 1: Process URL Params & Easter Egg
     useEffect(() => {
+      setIsMounted(true);
+      // --- Easter Egg ---
+      console.log(
+        "%c🚀 CyberVibe Studio 2.0 Initialized! 🚀\n%cCo-created with the Vibe Community & AI. Let's build!\n%cEaster Egg added by request. 😉",
+        "color: #E1FF01; font-size: 1.2em; font-weight: bold; text-shadow: 0 0 5px #E1FF01;",
+        "color: #00FF9D; font-size: 0.9em;",
+        "color: #888; font-size: 0.8em;"
+      );
+      // --- End Easter Egg ---
+
       const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
       const userLang = user?.language_code;
       const initialLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
@@ -240,8 +245,9 @@ function ActualPageContent() {
           setInitialIdeaProcessed(true);
           logger.log("[ActualPageContent Effect 1] No path/idea params found.");
       }
-    }, [user, searchParams, setImageReplaceTask, setRepoUrl]);
+    }, [user, searchParams, setImageReplaceTask, setRepoUrl]); // Mount effect
 
+    // Effect 2: Populate Kwork Input
      useEffect(() => {
         const fetchAttemptFinished = isMounted && (fetchStatus === 'success' || fetchStatus === 'error' || fetchStatus === 'failed_retries');
         if (fetchAttemptFinished && initialIdea && !initialIdeaProcessed && !imageReplaceTask) {
@@ -339,7 +345,6 @@ function ActualPageContent() {
                             <span className="text-xs text-gray-500 group-open:rotate-180 transition-transform duration-300">▼</span>
                         </summary>
                         <div className="px-6 pt-2 text-gray-300 space-y-4 text-base">
-                             {/* Video Embed */}
                              <div className="my-4">
                                  <h4 className="text-lg font-semibold text-cyan-400 mb-2"><RenderContent content={t.philosophyVideoTitle}/></h4>
                                  <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
@@ -353,10 +358,8 @@ function ActualPageContent() {
                                  </div>
                              </div>
                             <hr className="border-gray-700 my-3"/>
-                             {/* Core Philosophy Text */}
                              <p className="text-purple-300 italic"><RenderContent content={t.philosophyCore} /></p>
                              <hr className="border-gray-700 my-3"/>
-                            {/* Level Progression */}
                             <h4 className="text-lg font-semibold text-cyan-400 pt-1">Level Progression (+1 Vibe Perk):</h4>
                             <ul className="list-none space-y-2 pl-2 text-sm md:text-base">
                                 <li><RenderContent content={t.philosophyLvl0_1} /></li>
@@ -372,7 +375,6 @@ function ActualPageContent() {
                              <p className="font-semibold text-yellow-400 flex items-start gap-2"> <FaBullseye className="inline-block h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0"/> <span><RenderContent content={t.philosophy6} /></span> </p>
                              <p className="font-bold text-brand-green"><RenderContent content={t.philosophyEnd} /></p>
                             <hr className="border-gray-700 my-4"/>
-                            {/* Quick Start Guide */}
                             <h4 className="text-lg font-semibold text-cyan-400 pt-2">{t.stepsTitle}</h4>
                             <div className="text-sm space-y-2">
                                  <p><RenderContent content={`<strong class="text-cyan-500">${t.step1Title}</strong> ${t.step1Desc} ${t.step1DescEnd}`} /></p>
@@ -439,7 +441,7 @@ function ActualPageContent() {
                     transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}
                  >
                      <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700/80 backdrop-blur-sm rounded-full hover:bg-gray-600 transition shadow-md" title={t.navIntro}> <FaCircleInfo className="text-lg text-gray-200" /> </button>
-                     <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-purple-700/80 backdrop-blur-sm rounded-full hover:bg-purple-600 transition shadow-md" title={t.navCyberVibe}> <FaUpLong className="text-lg text-white" /> </button> {/* FIXED ICON */}
+                     <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-purple-700/80 backdrop-blur-sm rounded-full hover:bg-purple-600 transition shadow-md" title={t.navCyberVibe}> <FaUpLong className="text-lg text-white" /> </button>
                      {showComponents && ( <>
                             <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-blue-700/80 backdrop-blur-sm rounded-full hover:bg-blue-600 transition shadow-md" title={t.navGrabber}> <FaDownload className="text-lg text-white" /> </button>
                             <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-indigo-700/80 backdrop-blur-sm rounded-full hover:bg-indigo-600 transition shadow-md" title={t.navAssistant}> <FaRobot className="text-lg text-white" /> </button>

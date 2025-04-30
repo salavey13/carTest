@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-// --- FIX: Add necessary icon imports ---
+// --- FIX: Add necessary icon imports used by buttonIcon prop ---
 import { FaRotate, FaCodeBranch, FaGithub, FaSpinner } from 'react-icons/fa6';
 
 interface PullRequestFormProps {
@@ -25,7 +25,7 @@ export const PullRequestForm: React.FC<PullRequestFormProps> = ({
     repoUrl,
     prTitle,
     selectedFileCount,
-    isLoading, // Use the general PR/Update loading state
+    isLoading,
     isLoadingPrList,
     onRepoUrlChange,
     onPrTitleChange,
