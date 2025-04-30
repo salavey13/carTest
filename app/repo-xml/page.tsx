@@ -1,6 +1,5 @@
 "use client";
 import React, { Suspense, useRef, useState, useEffect, ReactNode, useCallback } from "react";
-
 import { useSearchParams } from 'next/navigation';
 import RepoTxtFetcher from "@/components/RepoTxtFetcher";
 import AICodeAssistant from "@/components/AICodeAssistant";
@@ -22,45 +21,49 @@ import {
 import Link from "next/link";
 import * as FaIcons from "react-icons/fa6";
 import { motion } from 'framer-motion';
+// --- FIX: Import html-react-parser ---
+import parse, { domToReact, HTMLReactParserOptions, Element } from 'html-react-parser';
+
 
 // --- I18N Translations (Keep Vibe 2.0 Philosophy from previous step) ---
+// Use standard HTML tags (<a> for links, <strong> for bold) and <FaIconName/> for icons
 const translations = {
   en: {
     loading: "Booting SUPERVIBE ENGINE...",
     pageTitle: "SUPERVIBE STUDIO 2.0",
     welcome: "Yo,",
-    intro1: "Code scary? Forget that noise! This is the **NOW**. Your personal **dev accelerator**. Instant Level UP!",
-    intro2: "Think: Magic Playground. Got ideas? Speak 'em. AI builds, system checks, PR ships. **Boom.** You guide the process.",
-    intro3: "Stop consuming, start **CREATING**. Build YOUR reality, crush YOUR problems, **validate ideas INSTANTLY**. This is how you vibe.",
+    intro1: "Code scary? Forget that noise! This is the <strong>NOW</strong>. Your personal <strong>dev accelerator</strong>. Instant Level UP!",
+    intro2: "Think: Magic Playground. Got ideas? Speak 'em. AI builds, system checks, PR ships. <strong>Boom.</strong> You guide the process.",
+    intro3: "Stop consuming, start <strong>CREATING</strong>. Build YOUR reality, crush YOUR problems, <strong>validate ideas INSTANTLY</strong>. This is how you vibe.",
     cyberVibeTitle: "The Vibe Loop: Your Level Up Engine <FaUpLong/>",
-    cyberVibe1: "This ain't just tools – it's a **compounding feedback loop**. Every action levels you up, makes the next step easier. You evolve.",
-    cyberVibe2: "<FaGithub class='inline mr-1 text-gray-400'/> is your **cyberchest**. This Studio + AI? Your interface to **remix and transmute** that knowledge into new vibes, features, fixes... **instantly**.",
-    cyberVibe3: "You're not *learning* code; you're **remixing the matrix**. You interact, you understand structure, you **command the AI**. You're the Vibe Master.",
-    cyberVibe4: "It's **co-creation** with the machine. Push boundaries. Earn bandwidth. Infinite context. Infinite power. This is **CYBERVIBE 2.0**.",
+    cyberVibe1: "This ain't just tools – it's a <strong>compounding feedback loop</strong>. Every action levels you up, makes the next step easier. You evolve.",
+    cyberVibe2: "<FaGithub class='inline mr-1 text-gray-400'/> is your <strong>cyberchest</strong>. This Studio + AI? Your interface to <strong>remix and transmute</strong> that knowledge into new vibes, features, fixes... <strong>instantly</strong>.",
+    cyberVibe3: "You're not <em>learning</em> code; you're <strong>remixing the matrix</strong>. You interact, you understand structure, you <strong>command the AI</strong>. You're the Vibe Master.",
+    cyberVibe4: "It's <strong>co-creation</strong> with the machine. Push boundaries. Earn bandwidth. Infinite context. Infinite power. This is <strong>CYBERVIBE 2.0</strong>.",
     philosophyTitle: "Your Vibe Path: The Inevitable Level Up (Tap)",
     philosophyVideoTitle: "Watch: The Level System Explained <FaVideo/>:",
-    philosophyCore: "The secret? **You're not asking the bot for help, YOU are helping the BOT**. Each level adds **+1 Vibe Perk**, one more click, one more skill to guide the AI. It's not a grind, it's evolution. You get lazy doing the old stuff, so you *automatically* level up. And there's **NO GOING BACK!**",
-    philosophyLvl0_1: "**Lv.0 -> 1 <FaBolt/> (Instant Win):** Fix a broken image. Copy URL -> Paste -> Upload new -> **DONE**. System auto-PRs. **ANYONE** can do this *NOW*. This is your entry point.",
-    philosophyLvl1_2: "**Lv.1 -> 2 <FaTools/> (+1 File/AI):** Simple idea? Change text/button? Give AI the idea + 1 file context -> PR. **DONE.**",
-    philosophyLvl2_3: "**Lv.2 -> 3 <FaCode/> (+Multi-File):** Slightly complex? 2-5 files? Give AI idea + context -> Check -> PR. **DONE.**",
-    philosophyLvl3_4: "**Lv.3 -> 4 <FaBug/> (+Log Check):** Build failed? Runtime error? 99% it's a bad icon! Check Vercel logs (link in PR comment!) -> Copy red lines -> Feed error to AI -> **FIXED.** +1 Vibe Perk: Debugging.",
-    philosophyLvl4_5: "**Lv.4 -> 5 <FaLink/> (+Icon Hunt):** Tired of icon errors? Find the *perfect* Fa6 icon yourself! Use <Link href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-blue hover:underline font-semibold'>FontAwesome Search <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-1'/></Link> -> Add link to Assistant Quick Links -> Fix icons proactively. +1 Perk: Resourcefulness.",
-    philosophyLvl5_6: "**Lv.5 -> 6 <FaMicrophone/>/<FaVideo/> (+Multimedia):** Use audio commands! Attach videos! Watch them turn into page content automatically. +1 Perk: Multi-modal Input.",
-    philosophyLvl6_7: "**Lv.6 -> 7 <FaDatabase/> (+SQL/DB):** Discover new file types! AI generates SQL -> Paste into Supabase (1 click) -> **DONE.** Same flow, different context. +1 Perk: Data Handling.",
-    philosophyLvl8_10: "**Lv.8-10+ <FaServer/>/<FaRocket/> (+Independence):** Deploy your OWN CyberVibe! Use/steal my Supabase! Set your own Bot Token! Build your own XTRs! **UNLIMITED POWER!**",
-    philosophyEnd: "Step-by-step, level-up is **inevitable**. You're too lazy for the old shit. One extra click, one new skill, and you're automatically stronger. Welcome, **Neo**.",
+    philosophyCore: "The secret? <strong>You're not asking the bot for help, YOU are helping the BOT</strong>. Each level adds <strong>+1 Vibe Perk</strong>, one more click, one more skill to guide the AI. It's not a grind, it's evolution. You get lazy doing the old stuff, so you <em>automatically</em> level up. And there's <strong>NO GOING BACK!</strong>",
+    philosophyLvl0_1: "<strong>Lv.0 -> 1 <FaBolt/> (Instant Win):</strong> Fix a broken image. Copy URL -> Paste -> Upload new -> <strong>DONE</strong>. System auto-PRs. <strong>ANYONE</strong> can do this <em>NOW</em>. This is your entry point.",
+    philosophyLvl1_2: "<strong>Lv.1 -> 2 <FaTools/> (+1 File/AI):</strong> Simple idea? Change text/button? Give AI the idea + 1 file context -> PR. <strong>DONE.</strong>",
+    philosophyLvl2_3: "<strong>Lv.2 -> 3 <FaCode/> (+Multi-File):</strong> Slightly complex? 2-5 files? Give AI idea + context -> Check -> PR. <strong>DONE.</strong>",
+    philosophyLvl3_4: "<strong>Lv.3 -> 4 <FaBug/> (+Log Check):</strong> Build failed? Runtime error? 99% it's a bad icon! Check Vercel logs (link in PR comment!) -> Copy red lines -> Feed error to AI -> <strong>FIXED.</strong> +1 Vibe Perk: Debugging.",
+    philosophyLvl4_5: "<strong>Lv.4 -> 5 <FaLink/> (+Icon Hunt):</strong> Tired of icon errors? Find the <em>perfect</em> Fa6 icon yourself! Use <a href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-blue hover:underline font-semibold'>FontAwesome Search <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-1'/></a> -> Add link to Assistant Quick Links -> Fix icons proactively. +1 Perk: Resourcefulness.",
+    philosophyLvl5_6: "<strong>Lv.5 -> 6 <FaMicrophone/>/<FaVideo/> (+Multimedia):</strong> Use audio commands! Attach videos! Watch them turn into page content automatically. +1 Perk: Multi-modal Input.",
+    philosophyLvl6_7: "<strong>Lv.6 -> 7 <FaDatabase/> (+SQL/DB):</strong> Discover new file types! AI generates SQL -> Paste into Supabase (1 click) -> <strong>DONE.</strong> Same flow, different context. +1 Perk: Data Handling.",
+    philosophyLvl8_10: "<strong>Lv.8-10+ <FaServer/>/<FaRocket/> (+Independence):</strong> Deploy your OWN CyberVibe! Use/steal my Supabase! Set your own Bot Token! Build your own XTRs! <strong>UNLIMITED POWER!</strong>",
+    philosophyEnd: "Step-by-step, level-up is <strong>inevitable</strong>. You're too lazy for the old shit. One extra click, one new skill, and you're automatically stronger. Welcome, <strong>Neo</strong>.",
     stepsTitle: "Quick Start Guide:",
     step1Title: "1. Grab Repo / Point Wish:",
     step1Desc: "Enter GitHub URL -> Hit <FaDownload class='inline mx-1 text-purple-400'/> OR Spot bug/idea -> Activate Buddy <FaRobot class='inline mx-1 text-indigo-400'/> -> Describe.",
     step1DescEnd: "For images (Lv.1): Copy broken URL, paste in Buddy/Input.",
     step2Title: "2. AI Magic & Ship:",
     step2Desc: "If needed (Lv.2+), use <span class='text-blue-400 font-semibold'>\"🤖 Ask AI\"</span> -> Check Assistant <FaWandMagicSparkles class='inline mx-1 text-yellow-400'/> -> Hit <FaGithub class='inline mx-1 text-green-400'/> PR Button.",
-    step2DescEnd: "**DONE.** Site updates automagically.",
+    step2DescEnd: "<strong>DONE.</strong> Site updates automagically.",
     readyButton: "LET'S F*CKING GO!",
     componentsTitle: "Engage Vibe Engines!",
     ctaTitle: "Ready to Ascend, {USERNAME}?",
-    ctaDesc: "Seriously. Stop doubting. Start **DOING**. That first level is calling. Level up NOW!",
-    ctaHotChick: "Got the fire? Let's build something epic. Hit me up **@SALAVEY13** NOW!",
+    ctaDesc: "Seriously. Stop doubting. Start <strong>DOING</strong>. That first level is calling. Level up NOW!",
+    ctaHotChick: "Got the fire? Let's build something epic. Hit me up <strong>@SALAVEY13</strong> NOW!",
     ctaDude: "(Everyone else? Just f*cking try it. Level 1 is a button click away. You got this!)",
     navGrabber: "Grabber <FaDownload/>",
     navAssistant: "Assistant <FaRobot/>",
@@ -71,38 +74,38 @@ const translations = {
     loading: "Запуск SUPERVIBE ДВИЖКА...",
     pageTitle: "SUPERVIBE СТУДИЯ 2.0",
     welcome: "Йоу,",
-    intro1: "Код пугает? Забудь! Это **СЕЙЧАС**. Твой личный **dev-ускоритель**. Мгновенный Level UP!",
-    intro2: "Думай: Волшебная Песочница. Есть идеи? Говори. AI строит, система чекает, PR улетает. **Бум.** Ты рулишь процессом.",
-    intro3: "Хватит потреблять, стань **ТВОРЦОМ**. Строй СВОЮ реальность, решай СВОИ проблемы, **валидируй идеи МГНОВЕННО**. Вот это вайб.",
+    intro1: "Код пугает? Забудь! Это <strong>СЕЙЧАС</strong>. Твой личный <strong>dev-ускоритель</strong>. Мгновенный Level UP!",
+    intro2: "Думай: Волшебная Песочница. Есть идеи? Говори. AI строит, система чекает, PR улетает. <strong>Бум.</strong> Ты рулишь процессом.",
+    intro3: "Хватит потреблять, стань <strong>ТВОРЦОМ</strong>. Строй СВОЮ реальность, решай СВОИ проблемы, <strong>валидируй идеи МГНОВЕННО</strong>. Вот это вайб.",
     cyberVibeTitle: "Петля Вайба: Твой Движок Прокачки <FaUpLong/>", // FIXED ICON
-    cyberVibe1: "Это не просто тулзы – это **накопительная петля обратной связи**. Каждое действие качает тебя, делает следующий шаг легче. Ты эволюционируешь.",
-    cyberVibe2: "<FaGithub class='inline mr-1 text-gray-400'/> - твой **кибер-сундук**. Эта Студия + AI? Твой интерфейс для **ремикса и трансмутации** этих знаний в новые вайбы, фичи, фиксы... **мгновенно**.",
-    cyberVibe3: "Ты не *учишь* код; ты **ремиксуешь матрицу**. Взаимодействуешь, понимаешь структуру, **командуешь AI**. Ты - Вайб Мастер.",
-    cyberVibe4: "Это **со-творчество** с машиной. Двигай границы. Зарабатывай bandwidth. Бесконечный контекст. Бесконечная мощь. Это **CYBERVIBE 2.0**.",
+    cyberVibe1: "Это не просто тулзы – это <strong>накопительная петля обратной связи</strong>. Каждое действие качает тебя, делает следующий шаг легче. Ты эволюционируешь.",
+    cyberVibe2: "<FaGithub class='inline mr-1 text-gray-400'/> - твой <strong>кибер-сундук</strong>. Эта Студия + AI? Твой интерфейс для <strong>ремикса и трансмутации</strong> этих знаний в новые вайбы, фичи, фиксы... <strong>мгновенно</strong>.",
+    cyberVibe3: "Ты не <em>учишь</em> код; ты <strong>ремиксуешь матрицу</strong>. Взаимодействуешь, понимаешь структуру, <strong>командуешь AI</strong>. Ты - Вайб Мастер.",
+    cyberVibe4: "Это <strong>со-творчество</strong> с машиной. Двигай границы. Зарабатывай bandwidth. Бесконечный контекст. Бесконечная мощь. Это <strong>CYBERVIBE 2.0</strong>.",
     philosophyTitle: "Твой Путь Вайба: Неизбежный Level Up (Жми)",
     philosophyVideoTitle: "Смотри: Объяснение Системы Уровней <FaVideo/>:",
-    philosophyCore: "Секрет? **Не ты просишь бота помочь, а ТЫ помогаешь БОТУ**. Каждый левел дает **+1 Вайб Перк**, +1 клик, +1 скилл, чтобы направлять AI. Это не гринд, это эволюция. Тебе становится лень делать старое, и ты *автоматически* апаешь левел. И **НАЗАД ДОРОГИ НЕТ!**",
-    philosophyLvl0_1: "**Лв.0 -> 1 <FaBolt/> (Мгновенный Вин):** Починить битую картинку. Скопируй URL -> Вставь -> Загрузи новую -> **ГОТОВО**. Система авто-PR. **ЛЮБОЙ** может это *ПРЯМО СЕЙЧАС*. Это твой вход.",
-    philosophyLvl1_2: "**Лв.1 -> 2 <FaTools/> (+1 Файл/AI):** Простая идея? Текст/кнопку поменять? Дай AI идею + 1 файл контекста -> PR. **ГОТОВО.**",
-    philosophyLvl2_3: "**Лв.2 -> 3 <FaCode/> (+Мульти-Файл):** Чуть сложнее? 2-5 файлов? Дай AI идею + контекст -> Проверь -> PR. **ГОТОВО.**",
-    philosophyLvl3_4: "**Лв.3 -> 4 <FaBug/> (+Чек Логов):** Упала сборка? Ошибка в рантайме? 99% - еб*ная иконка! Открой логи Vercel (ссылка в комменте PR!) -> Скопируй красные строки -> Скорми ошибку AI -> **ПОЧИНЕНО.** +1 Вайб Перк: Дебаггинг.",
-    philosophyLvl4_5: "**Лв.4 -> 5 <FaLink/> (+Охота за Иконками):** Зае*али ошибки иконок? Найди *идеальную* Fa6 иконку сам! Юзай <Link href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-blue hover:underline font-semibold'>Поиск FontAwesome <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-1'/></Link> -> Добавь в Быстрые Ссылки Ассистента -> Фикси иконки проактивно. +1 Перк: Находчивость.",
-    philosophyLvl5_6: "**Лв.5 -> 6 <FaMicrophone/>/<FaVideo/> (+Мультимедиа):** Используй аудио-команды! Прикрепляй видосы! Смотри, как они автоматом становятся контентом страницы. +1 Перк: Мультимодальный Ввод.",
-    philosophyLvl6_7: "**Лв.6 -> 7 <FaDatabase/> (+SQL/БД):** Открой новые типы файлов! AI генерит SQL -> Вставь в Supabase (1 клик) -> **ГОТОВО.** Тот же флоу, другой контекст. +1 Перк: Работа с Данными.",
-    philosophyLvl8_10: "**Лв.8-10+ <FaServer/>/<FaRocket/> (+Независимость):** Разверни свой CyberVibe! Юзай/спи*ди мою Supabase! Поставь свой Токен Бота! Строй свои XTR-ы! **БЕЗГРАНИЧНАЯ МОЩЬ!**",
-    philosophyEnd: "Шаг за шагом, левел-ап **неизбежен**. Тебе слишком лень для старой х*йни. Один лишний клик, один новый скилл - и ты автоматом сильнее. Добро пожаловать, **Нео**.",
+    philosophyCore: "Секрет? <strong>Не ты просишь бота помочь, а ТЫ помогаешь БОТУ</strong>. Каждый левел дает <strong>+1 Вайб Перк</strong>, +1 клик, +1 скилл, чтобы направлять AI. Это не гринд, это эволюция. Тебе становится лень делать старое, и ты <em>автоматически</em> апаешь левел. И <strong>НАЗАД ДОРОГИ НЕТ!</strong>",
+    philosophyLvl0_1: "<strong>Лв.0 -> 1 <FaBolt/> (Мгновенный Вин):</strong> Починить битую картинку. Скопируй URL -> Вставь -> Загрузи новую -> <strong>ГОТОВО</strong>. Система авто-PR. <strong>ЛЮБОЙ</strong> может это <em>ПРЯМО СЕЙЧАС</em>. Это твой вход.",
+    philosophyLvl1_2: "<strong>Лв.1 -> 2 <FaTools/> (+1 Файл/AI):</strong> Простая идея? Текст/кнопку поменять? Дай AI идею + 1 файл контекста -> PR. <strong>ГОТОВО.</strong>",
+    philosophyLvl2_3: "<strong>Лв.2 -> 3 <FaCode/> (+Мульти-Файл):</strong> Чуть сложнее? 2-5 файлов? Дай AI идею + контекст -> Проверь -> PR. <strong>ГОТОВО.</strong>",
+    philosophyLvl3_4: "<strong>Лв.3 -> 4 <FaBug/> (+Чек Логов):</strong> Упала сборка? Ошибка в рантайме? 99% - еб*ная иконка! Открой логи Vercel (ссылка в комменте PR!) -> Скопируй красные строки -> Скорми ошибку AI -> <strong>ПОЧИНЕНО.</strong> +1 Вайб Перк: Дебаггинг.",
+    philosophyLvl4_5: "<strong>Лв.4 -> 5 <FaLink/> (+Охота за Иконками):</strong> Зае*али ошибки иконок? Найди <em>идеальную</em> Fa6 иконку сам! Юзай <a href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-blue hover:underline font-semibold'>Поиск FontAwesome <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-1'/></a> -> Добавь в Быстрые Ссылки Ассистента -> Фикси иконки проактивно. +1 Перк: Находчивость.",
+    philosophyLvl5_6: "<strong>Лв.5 -> 6 <FaMicrophone/>/<FaVideo/> (+Мультимедиа):</strong> Используй аудио-команды! Прикрепляй видосы! Смотри, как они автоматом становятся контентом страницы. +1 Перк: Мультимодальный Ввод.",
+    philosophyLvl6_7: "<strong>Лв.6 -> 7 <FaDatabase/> (+SQL/БД):</strong> Открой новые типы файлов! AI генерит SQL -> Вставь в Supabase (1 клик) -> <strong>ГОТОВО.</strong> Тот же флоу, другой контекст. +1 Перк: Работа с Данными.",
+    philosophyLvl8_10: "<strong>Лв.8-10+ <FaServer/>/<FaRocket/> (+Независимость):</strong> Разверни свой CyberVibe! Юзай/спи*ди мою Supabase! Поставь свой Токен Бота! Строй свои XTR-ы! <strong>БЕЗГРАНИЧНАЯ МОЩЬ!</strong>",
+    philosophyEnd: "Шаг за шагом, левел-ап <strong>неизбежен</strong>. Тебе слишком лень для старой х*йни. Один лишний клик, один новый скилл - и ты автоматом сильнее. Добро пожаловать, <strong>Нео</strong>.",
     stepsTitle: "Краткий Гайд:",
     step1Title: "1. Хватай Репу / Укажи Желание:",
     step1Desc: "Введи GitHub URL -> Жми <FaDownload class='inline mx-1 text-purple-400'/> ИЛИ Видишь баг/идею -> Вызови Бадди <FaRobot class='inline mx-1 text-indigo-400'/> -> Опиши.",
     step1DescEnd: "Для картинок (Лв.1): Скопируй битый URL, вставь Бадди/в Инпут.",
     step2Title: "2. AI Магия & Отправка:",
     step2Desc: "Если нужно (Лв.2+), юзай <span class='text-blue-400 font-semibold'>\"🤖 Спросить AI\"</span> -> Проверь Ассистента <FaWandMagicSparkles class='inline mx-1 text-yellow-400'/> -> Жми <FaGithub class='inline mx-1 text-green-400'/> Кнопку PR.",
-    step2DescEnd: "**ГОТОВО.** Сайт обновляется авто-магически.",
+    step2DescEnd: "<strong>ГОТОВО.</strong> Сайт обновляется авто-магически.",
     readyButton: "ПОГНАЛИ, БЛ*ТЬ!",
     componentsTitle: "Врубай Движки Вайба!",
     ctaTitle: "Готов(а) к Вознесению, {USERNAME}?",
-    ctaDesc: "Серьезно. Хватит сомневаться. Начни **ДЕЛАТЬ**. Первый левел зовет. Качайся СЕЙЧАС!",
-    ctaHotChick: "Есть искра? Давай замутим что-то эпичное. Пиши **@SALAVEY13** СЕЙЧАС!",
+    ctaDesc: "Серьезно. Хватит сомневаться. Начни <strong>ДЕЛАТЬ</strong>. Первый левел зовет. Качайся СЕЙЧАС!",
+    ctaHotChick: "Есть искра? Давай замутим что-то эпичное. Пиши <strong>@SALAVEY13</strong> СЕЙЧАС!",
     ctaDude: "(Все остальные? Просто, бл*ть, попробуйте. Левел 1 - это клик мышки. У вас получится!)",
     navGrabber: "Граббер <FaDownload/>",
     navAssistant: "Ассистент <FaRobot/>",
@@ -119,47 +122,67 @@ function LoadingBuddyFallback() {
     return ( <div className="fixed bottom-4 right-4 z-50 w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 animate-pulse" aria-hidden="true" ></div> );
 }
 
-// --- Helper Component to render content with icons and bold ---
+// --- NEW: Configuration for html-react-parser ---
+const parserOptions: HTMLReactParserOptions = {
+  replace: (domNode) => {
+    if (domNode instanceof Element && domNode.attribs) {
+      const { name, attribs, children } = domNode;
+
+      // --- Handle Font Awesome Icons ---
+      if (name && name.toLowerCase().startsWith('fa') && name.length > 2 && FaIcons[name as keyof typeof FaIcons]) {
+        const IconComponent = FaIcons[name as keyof typeof FaIcons];
+        // Combine existing classes with default styling
+        const className = `${attribs.class || ''} inline-block align-middle mx-1`;
+        // Remove class attribute before spreading to avoid conflicts
+        const { class: _, ...restAttribs } = attribs;
+        return <IconComponent className={className} {...restAttribs} />;
+      }
+
+      // --- Handle Links (<a> tags) -> Next.js <Link> ---
+      // Check for internal links (relative paths) or specific hosts if needed
+      const isInternalLink = attribs.href && (attribs.href.startsWith('/') || attribs.href.startsWith('#'));
+      if (name === 'a' && isInternalLink && !attribs.target) {
+        return (
+          <Link href={attribs.href} {...attribs}>
+            {domToReact(children, parserOptions)}
+          </Link>
+        );
+      }
+      // External links or links with target="_blank" remain as standard <a> tags
+      if (name === 'a') {
+        return (
+          <a {...attribs}>
+            {domToReact(children, parserOptions)}
+          </a>
+        );
+      }
+
+      // --- Handle standard HTML tags like <strong>, <em>, <span> ---
+      // html-react-parser handles these by default if not replaced
+    }
+    // Let html-react-parser handle default replacements for other tags
+    return undefined;
+  },
+};
+
+// --- Updated RenderContent Component ---
 const RenderContent: React.FC<{ content: string }> = React.memo(({ content }) => {
-    const segments = content.split(/(\*\*.*?\*\*|<Fa\w+\s*.*?\/?>|<\/?\w+(?:\s+[^>]*)*>)/g).filter(Boolean);
-    return (
-        <>
-            {segments.map((segment, sIndex) => {
-                if (segment.startsWith('**') && segment.endsWith('**')) {
-                    return <strong key={sIndex}>{segment.slice(2, -2)}</strong>;
-                }
-                const iconMatch = segment.match(/<Fa(\w+)\s*(?:class(?:Name)?="([^"]*)")?\s*\/?>/i);
-                if (iconMatch) {
-                    const iconName = `Fa${iconMatch[1]}` as keyof typeof FaIcons;
-                    const className = iconMatch[2] || "";
-                    const IconComponent = FaIcons[iconName];
-                    if (IconComponent) {
-                        const finalClassName = `${className} inline-block align-middle mx-1`;
-                        return React.createElement(IconComponent, { key: sIndex, className: finalClassName });
-                    } else {
-                        logger.warn(`[RenderContent] Icon "${iconName}" not found.`);
-                        return <span key={sIndex} className="text-red-500 font-mono">[? {iconName}]</span>;
-                    }
-                }
-                const htmlTagMatch = segment.match(/^<\/?\w+(?:\s+[^>]*)*>$/);
-                 if (segment.startsWith('<Link') || segment.startsWith('<a')) {
-                    return <span key={sIndex} dangerouslySetInnerHTML={{ __html: segment }} />;
-                 } else if (htmlTagMatch) {
-                     const allowedTags = ['strong', 'em', 'b', 'i', 'span'];
-                     const tagNameMatch = segment.match(/^<\/?(\w+)/);
-                     if(tagNameMatch && allowedTags.includes(tagNameMatch[1])) {
-                         return <span key={sIndex} dangerouslySetInnerHTML={{ __html: segment }} />;
-                     }
-                     return <React.Fragment key={sIndex}>{segment}</React.Fragment>;
-                 }
-                return <React.Fragment key={sIndex}>{segment}</React.Fragment>;
-            })}
-        </>
-    );
+  // Ensure content is a string before parsing
+  const safeContent = typeof content === 'string' ? content : '';
+  // Replace **bold** with <strong>bold</strong> before parsing
+  const contentWithStrong = safeContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  try {
+    return <>{parse(contentWithStrong, parserOptions)}</>;
+  } catch (error) {
+    logger.error("Error parsing content in RenderContent:", error, "Original Content:", safeContent);
+    // Fallback to rendering the raw string if parsing fails
+    return <>{safeContent}</>;
+  }
 });
 RenderContent.displayName = 'RenderContent';
 
-// --- ActualPageContent Component ---
+
+// --- ActualPageContent Component (No other changes needed here for icons) ---
 function ActualPageContent() {
     const { user } = useAppContext();
     const {
@@ -208,20 +231,18 @@ function ActualPageContent() {
            } catch (e) { logger.error("[ActualPageContent Effect 1] Error decoding repo URL param:", e); }
        }
 
-        // *** SPLIT FIX: Add more robust checks before decode/split ***
-        if (pathParam && typeof ideaParam === 'string') { // Ensure ideaParam is a string
+        if (pathParam && typeof ideaParam === 'string') {
             let decodedIdea: string | null = null;
             let decodedPath: string | null = null;
 
             try {
                 decodedPath = decodeURIComponent(pathParam);
-                decodedIdea = decodeURIComponent(ideaParam); // Decode only if it's a string
+                decodedIdea = decodeURIComponent(ideaParam);
 
-                // Now process based on decodedIdea
                 if (decodedIdea && decodedIdea.startsWith("ImageReplace|")) {
                     logger.log("[ActualPageContent Effect 1] Processing Image Replace task from URL.");
                     try {
-                        const parts = decodedIdea.split('|'); // Split is safer now
+                        const parts = decodedIdea.split('|');
                         const oldUrlParam = parts.find(p => p.startsWith("OldURL="));
                         const newUrlParam = parts.find(p => p.startsWith("NewURL="));
 
@@ -247,13 +268,12 @@ function ActualPageContent() {
                         logger.error("[ActualPageContent Effect 1] Error splitting ImageReplace task string:", splitError);
                         setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
                     }
-                } else if (decodedIdea) { // Handle regular idea
+                } else if (decodedIdea) {
                     logger.log("[ActualPageContent Effect 1] Regular idea param found, storing:", decodedIdea.substring(0, 50) + "...");
                     setInitialIdea(decodedIdea);
                     setImageReplaceTask(null);
-                    setInitialIdeaProcessed(false); // Process after fetch
+                    setInitialIdeaProcessed(false);
                 } else {
-                    // Handle case where decodedIdea is empty string after decoding
                     logger.warn("[ActualPageContent Effect 1] Decoded idea is empty, skipping idea processing.");
                     setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
                 }
@@ -262,17 +282,14 @@ function ActualPageContent() {
                 logger.error("[ActualPageContent Effect 1] Error decoding path or idea params:", decodeError);
                 setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
             }
-            // Show components if params were present (even if processing had issues)
             setShowComponents(true);
 
         } else {
-            // No path/idea params found or ideaParam wasn't a string
             setImageReplaceTask(null);
             setInitialIdea(null);
             setInitialIdeaProcessed(true);
             logger.log(`[ActualPageContent Effect 1] No valid path/idea params found (path: ${!!pathParam}, idea type: ${typeof ideaParam}).`);
         }
-        // *** END SPLIT FIX ***
 
     }, [user, searchParams, setImageReplaceTask, setRepoUrl]); // Dependencies
 
@@ -306,8 +323,6 @@ function ActualPageContent() {
         }
     }, [isMounted, fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles]);
 
-    // REMOVED: The useEffect hook that was causing the error by using `validationIssues`.
-    // REMOVED: The dependency on `validationIssues` from the other useEffect.
 
     const t = translations[lang];
     const userName = user?.first_name || (lang === 'ru' ? 'Нео' : 'Neo');
@@ -343,11 +358,11 @@ function ActualPageContent() {
                 {/* Intro Section */}
                 <section id="intro" className="mb-12 text-center max-w-3xl w-full">
                      <div className="flex justify-center mb-4"> <FaBolt className="w-16 h-16 text-[#E1FF01] text-shadow-[0_0_15px_#E1FF01] animate-pulse" /> </div>
-                    <h1 className="text-4xl md:text-5xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-4"> {t.pageTitle} </h1>
-                    <p className="text-xl md:text-2xl text-gray-200 mt-4 font-semibold"> {t.welcome} <span className="text-brand-cyan">{userName}!</span> </p>
-                    <div className="text-lg md:text-xl text-gray-300 mt-3 space-y-3">
-                        <p><RenderContent content={t.intro1} /></p>
-                        <p><RenderContent content={t.intro2} /></p>
+                    <h1 className="text-4xl md:text-5xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-4"> <RenderContent content={t.pageTitle} /> </h1>
+                    <p className="text-xl md:text-2xl text-gray-200 mt-4 font-semibold"> <RenderContent content={t.welcome} /> <span className="text-brand-cyan">{userName}!</span> </p>
+                    <div className="text-lg md:text-xl text-gray-300 mt-3 space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-yellow-300 prose-em:text-purple-300 max-w-none">
+                        <RenderContent content={t.intro1} />
+                        <RenderContent content={t.intro2} />
                         <p className="font-semibold text-brand-green"><RenderContent content={t.intro3} /></p>
                     </div>
                 </section>
@@ -360,10 +375,10 @@ function ActualPageContent() {
                                 <FaAtom className="animate-spin-slow"/> <RenderContent content={t.cyberVibeTitle}/> <FaBrain className="animate-pulse"/>
                             </CardTitle>
                          </CardHeader>
-                         <CardContent className="p-0 text-gray-300 text-base md:text-lg space-y-3">
-                            <p><RenderContent content={t.cyberVibe1} /></p>
-                            <p><RenderContent content={t.cyberVibe2} /></p>
-                            <p><RenderContent content={t.cyberVibe3} /></p>
+                         <CardContent className="p-0 text-gray-300 text-base md:text-lg space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-purple-300 prose-em:text-cyan-300 max-w-none">
+                            <RenderContent content={t.cyberVibe1} />
+                            <RenderContent content={t.cyberVibe2} />
+                            <RenderContent content={t.cyberVibe3} />
                             <p className="text-purple-300 font-semibold"><RenderContent content={t.cyberVibe4} /></p>
                          </CardContent>
                      </Card>
@@ -373,10 +388,10 @@ function ActualPageContent() {
                 <section id="philosophy-steps" className="mb-12 w-full max-w-3xl">
                     <details className="bg-gray-900/80 border border-gray-700 rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50">
                         <summary className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-gray-800/50 rounded-t-lg transition-colors">
-                            <span className="flex items-center gap-2"><FaCodeBranch /> {t.philosophyTitle}</span>
+                            <span className="flex items-center gap-2"><FaCodeBranch /> <RenderContent content={t.philosophyTitle} /></span>
                             <span className="text-xs text-gray-500 group-open:rotate-180 transition-transform duration-300">▼</span>
                         </summary>
-                        <div className="px-6 pt-2 text-gray-300 space-y-4 text-base">
+                        <div className="px-6 pt-2 text-gray-300 space-y-4 text-base prose prose-invert prose-p:my-2 prose-li:my-1 prose-strong:text-yellow-300 prose-em:text-cyan-300 prose-a:text-brand-blue max-w-none">
                              <div className="my-4">
                                  <h4 className="text-lg font-semibold text-cyan-400 mb-2"><RenderContent content={t.philosophyVideoTitle}/></h4>
                                  <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
@@ -404,13 +419,12 @@ function ActualPageContent() {
                                 <li><RenderContent content={t.philosophyLvl8_10} /></li>
                             </ul>
                             <hr className="border-gray-700 my-3"/>
-                             {/* Removed philosophy6 as it was not defined */}
-                             <p className="font-bold text-brand-green"><RenderContent content={t.philosophyEnd} /></p>
+                            <p className="font-bold text-brand-green"><RenderContent content={t.philosophyEnd} /></p>
                             <hr className="border-gray-700 my-4"/>
-                            <h4 className="text-lg font-semibold text-cyan-400 pt-2">{t.stepsTitle}</h4>
+                            <h4 className="text-lg font-semibold text-cyan-400 pt-2"><RenderContent content={t.stepsTitle} /></h4>
                             <div className="text-sm space-y-2">
-                                 <p><RenderContent content={`<strong class="text-cyan-500">${t.step1Title}</strong> ${t.step1Desc} ${t.step1DescEnd}`} /></p>
-                                 <p><RenderContent content={`<strong class="text-cyan-500">${t.step2Title}</strong> ${t.step2Desc} ${t.step2DescEnd}`} /></p>
+                                 <p><RenderContent content={`<strong>${t.step1Title}</strong> ${t.step1Desc} ${t.step1DescEnd}`} /></p>
+                                 <p><RenderContent content={`<strong>${t.step2Title}</strong> ${t.step2Desc} ${t.step2DescEnd}`} /></p>
                             </div>
                         </div>
                     </details>
@@ -424,7 +438,7 @@ function ActualPageContent() {
                             className="bg-gradient-to-r from-green-500 via-cyan-500 to-purple-600 text-gray-900 font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:scale-105 transform transition duration-300 animate-bounce hover:animate-none ring-2 ring-offset-2 ring-offset-gray-950 ring-transparent hover:ring-cyan-300"
                             size="lg"
                         >
-                            <FaHandSparkles className="mr-2"/> {t.readyButton}
+                            <FaHandSparkles className="mr-2"/> <RenderContent content={t.readyButton} />
                         </Button>
                     </section>
                 )}
@@ -432,7 +446,7 @@ function ActualPageContent() {
                 {/* WORKHORSE Components */}
                 {showComponents && (
                      <>
-                        <h2 className="text-3xl font-bold text-center text-brand-green mb-8 animate-pulse">{t.componentsTitle}</h2>
+                        <h2 className="text-3xl font-bold text-center text-brand-green mb-8 animate-pulse"><RenderContent content={t.componentsTitle} /></h2>
                          <section id="extractor" className="mb-12 w-full max-w-4xl">
                              <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg backdrop-blur-sm">
                                  <CardContent className="p-4">
@@ -457,8 +471,8 @@ function ActualPageContent() {
                 {/* Final CTA */}
                  {showComponents && (
                      <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
-                         <div className="bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 p-6 rounded-lg shadow-lg animate-pulse border-2 border-white/50">
-                             <h3 className="text-2xl font-bold text-white mb-3">{t.ctaTitle.replace('{USERNAME}', userName)}</h3>
+                         <div className="bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 p-6 rounded-lg shadow-lg animate-pulse border-2 border-white/50 prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 max-w-none">
+                             <h3 className="text-2xl font-bold text-white mb-3"><RenderContent content={t.ctaTitle.replace('{USERNAME}', userName)} /></h3>
                              <p className="text-white text-lg mb-4"> <RenderContent content={t.ctaDesc} /> </p>
                              <p className="text-white text-xl font-semibold mb-4 bg-black/30 p-3 rounded"> <FaHeart className="inline mr-2 text-red-400 animate-ping"/> <RenderContent content={t.ctaHotChick} /> <FaUserAstronaut className="inline ml-2 text-pink-300"/> </p>
                              <p className="text-gray-300 text-base"> <RenderContent content={t.ctaDude} /> </p>
@@ -472,11 +486,12 @@ function ActualPageContent() {
                     animate={{ scale: [1, 1.03, 1] }}
                     transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}
                  >
-                     <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700/80 backdrop-blur-sm rounded-full hover:bg-gray-600 transition shadow-md" title={t.navIntro}> <FaCircleInfo className="text-lg text-gray-200" /> </button>
-                     <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-purple-700/80 backdrop-blur-sm rounded-full hover:bg-purple-600 transition shadow-md" title={t.navCyberVibe}> <FaUpLong className="text-lg text-white" /> </button>
+                    {/* FIX: Use RenderContent for titles for potential future icons */}
+                     <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700/80 backdrop-blur-sm rounded-full hover:bg-gray-600 transition shadow-md" title={t.navIntro ? parse(t.navIntro, {replace: (node) => { if (node instanceof Element && node.attribs) return <></>}}).toString() : "Intro"} > <FaCircleInfo className="text-lg text-gray-200" /> </button>
+                     <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-purple-700/80 backdrop-blur-sm rounded-full hover:bg-purple-600 transition shadow-md" title={t.navCyberVibe ? parse(t.navCyberVibe, {replace: (node) => { if (node instanceof Element && node.attribs) return <></>}}).toString() : "Vibe Loop"}> <FaUpLong className="text-lg text-white" /> </button>
                      {showComponents && ( <>
-                            <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-blue-700/80 backdrop-blur-sm rounded-full hover:bg-blue-600 transition shadow-md" title={t.navGrabber}> <FaDownload className="text-lg text-white" /> </button>
-                            <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-indigo-700/80 backdrop-blur-sm rounded-full hover:bg-indigo-600 transition shadow-md" title={t.navAssistant}> <FaRobot className="text-lg text-white" /> </button>
+                            <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-blue-700/80 backdrop-blur-sm rounded-full hover:bg-blue-600 transition shadow-md" title={t.navGrabber ? parse(t.navGrabber, {replace: (node) => { if (node instanceof Element && node.attribs) return <></>}}).toString() : "Grabber"} > <FaDownload className="text-lg text-white" /> </button>
+                            <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-indigo-700/80 backdrop-blur-sm rounded-full hover:bg-indigo-600 transition shadow-md" title={t.navAssistant ? parse(t.navAssistant, {replace: (node) => { if (node instanceof Element && node.attribs) return <></>}}).toString() : "Assistant"} > <FaRobot className="text-lg text-white" /> </button>
                      </> )}
                 </motion.nav>
 

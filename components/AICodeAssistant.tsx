@@ -8,7 +8,7 @@ import {
 // Removed direct action imports if handled solely by context triggers passed to hook
 // import { createGitHubPullRequest, updateBranch, fetchRepoContents } from "@/app/actions_github/actions";
 // import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
-// import { supabaseAdmin } from "@/hooks/supabase";
+import { supabaseAdmin } from "@/hooks/supabase"; // Keep if used for Supabase Admin client
 import { useAppContext } from "@/contexts/AppContext";
 // Hooks & Components
 import { useCodeParsingAndValidation, ValidationIssue, FileEntry as ValidationFileEntry, ValidationStatus } from "@/hooks/useCodeParsingAndValidation";
@@ -33,11 +33,7 @@ import {
 import clsx from "clsx";
 // import { saveAs } from "file-saver"; // Moved to handlers.ts
 // import { selectFunctionDefinition, extractFunctionName } from "@/lib/codeUtils"; // Moved to handlers.ts
-import { debugLogger as logger } from "@/lib/debugLogger"; // Keep logger if used directly here
-
-
-// --- Logger Replacement for Toasts (Keep if used directly, otherwise remove) ---
-const toastLogger = { /* ... keep if needed ... */ };
+import { debugLogger as logger } from "@/lib/debugLogger"; // Keep logger
 
 // Interfaces (Keep if needed)
 interface FileEntry extends ValidationFileEntry {}
@@ -106,7 +102,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         pageContext,
         // Pass refs
         aiResponseInputRefPassed,
-        kworkInputRefPassed, // Pass if needed by any handler logic indirectly
+        kworkInputRefPassed: kworkInputRefPassed, // Pass if needed by any handler logic indirectly
     });
 
     // --- Destructure the handlers for use ---
@@ -128,7 +124,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         setValidationStatus('idle'); setValidationIssues([]); setPrTitle(''); codeParserHook.setRawDescription(''); // Use hook's setter
         setRequestCopied(false); setAiResponseHasContent(value.trim().length > 0);
         logger.log("Response value set manually, resetting parsed state.");
-     }, [aiResponseInputRefPassed, setHookParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, codeParserHook.setRawDescription, setRequestCopied, setAiResponseHasContent]); // Added dependency
+     }, [aiResponseInputRefPassed, setHookParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, codeParserHook, setRequestCopied, setAiResponseHasContent]); // Added codeParserHook dependency
 
     // Handler for updating local repo URL state (and triggering PR fetch)
     const updateRepoUrl = useCallback((url: string) => {
@@ -166,29 +162,46 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     // Fetch custom links effect
     useEffect(() => {
         if (!isMounted || !user) { setCustomLinks([]); return; }
-        const loadLinks = async () => { try { const { data: d, error: e } = await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id).single(); if (!e && d?.metadata?.customLinks) { setCustomLinks(d.metadata.customLinks); } else { setCustomLinks([]); if (e && e.code !== 'PGRST116') { toastLogger.error("Error loading custom links (supabase):", e); } } } catch (e) { toastLogger.error("Error loading custom links (catch):", e); setCustomLinks([]); } }; loadLinks();
-    }, [isMounted, user]);
+        const loadLinks = async () => {
+            try {
+                const { data: d, error: e } = await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id).single();
+                if (!e && d?.metadata?.customLinks) {
+                    setCustomLinks(d.metadata.customLinks);
+                } else {
+                    setCustomLinks([]);
+                    if (e && e.code !== 'PGRST116') {
+                        // --- FIX: Use logger or toast directly ---
+                        logger.error("Error loading custom links (supabase):", e);
+                        toast.error("Error loading custom links: " + e.message);
+                    }
+                }
+            } catch (e: any) {
+                // --- FIX: Use logger or toast directly ---
+                logger.error("Error loading custom links (catch):", e);
+                toast.error("Error loading custom links: " + e.message);
+                setCustomLinks([]);
+            }
+        };
+        loadLinks();
+    }, [isMounted, user]); // Removed supabaseAdmin from deps if it's stable
 
      // Fetch original files effect
     useEffect(() => {
         if (!isMounted || imageReplaceTask) return; const skipped = validationIssues.filter(i => i.type === 'skippedCodeBlock');
         if (skipped.length > 0 && originalRepoFiles.length === 0 && !isFetchingOriginals && repoUrlForForm) {
-            const fetchOrig = async () => { setIsFetchingOriginals(true); const branch = targetBranchName ?? undefined; const branchDisp = targetBranchName ?? 'default'; toast.info(`Загрузка оригиналов из ${branchDisp}...`); try { const res = await fetchRepoContents(repoUrlForForm, undefined, branch); if (res.success && Array.isArray(res.files)) { const originalFilesData = res.files.map(f => ({ path: f.path, content: f.content })); setOriginalRepoFiles(originalFilesData); toast.success("Оригиналы загружены."); } else { toast.error("Ошибка загрузки оригиналов: " + (res.error ?? '?')); setOriginalRepoFiles([]); } } catch (e) { toast.error("Крит. ошибка загрузки оригиналов."); toastLogger.error("Fetch originals error:", e); setOriginalRepoFiles([]); } finally { setIsFetchingOriginals(false); } }; fetchOrig();
+            const fetchOrig = async () => { setIsFetchingOriginals(true); const branch = targetBranchName ?? undefined; const branchDisp = targetBranchName ?? 'default'; toast.info(`Загрузка оригиналов из ${branchDisp}...`); try { const res = await fetchRepoContents(repoUrlForForm, undefined, branch); if (res.success && Array.isArray(res.files)) { const originalFilesData = res.files.map(f => ({ path: f.path, content: f.content })); setOriginalRepoFiles(originalFilesData); toast.success("Оригиналы загружены."); } else { toast.error("Ошибка загрузки оригиналов: " + (res.error ?? '?')); setOriginalRepoFiles([]); } } catch (e) { toast.error("Крит. ошибка загрузки оригиналов."); logger.error("Fetch originals error:", e); setOriginalRepoFiles([]); } finally { setIsFetchingOriginals(false); } }; fetchOrig();
         }
-    }, [isMounted, validationIssues, originalRepoFiles.length, isFetchingOriginals, repoUrlForForm, targetBranchName, imageReplaceTask]);
+    }, [isMounted, validationIssues, originalRepoFiles.length, isFetchingOriginals, repoUrlForForm, targetBranchName, imageReplaceTask]); // Added fetchRepoContents to deps if it's not stable
 
-    // Direct image replace effect remains here as it uses local state/refs
+    // Direct image replace effect
      useEffect(() => {
-        if (imageReplaceTask) {
-             toastLogger.effectCheck({ /* ... */ });
-        }
+        // --- FIX: Removed toastLogger.effectCheck ---
         const canProcess = imageReplaceTask && fetchStatus === 'success' && allFetchedFiles.length > 0 && allFetchedFiles.some(f => f.path === imageReplaceTask.targetPath) && !assistantLoading && !processingImageReplace.current;
 
         if (canProcess) {
             logger.log("[Effect] Conditions met. Starting image replace process...");
             processingImageReplace.current = true;
             setImageReplaceError(null);
-            // Call the handler obtained from the hook
             handlers.handleDirectImageReplace(imageReplaceTask, allFetchedFiles)
                 .then(() => {
                      if (imageReplaceTaskRef.current) {
@@ -198,7 +211,9 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                 })
                 .catch(err => {
                     const errorMsg = err?.message || "Unknown error";
-                    toastLogger.error("[Effect] handleDirectImageReplace Promise REJECTED:", errorMsg);
+                    // --- FIX: Use logger or toast directly ---
+                    logger.error("[Effect] handleDirectImageReplace Promise REJECTED:", errorMsg);
+                    toast.error("Image replace failed: " + errorMsg);
                     setImageReplaceError(`Promise rejected: ${errorMsg}`);
                 })
                 .finally(() => {
