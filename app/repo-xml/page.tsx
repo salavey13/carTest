@@ -13,18 +13,17 @@ import { useAppContext } from "@/contexts/AppContext";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-// CORRECTED/UPDATED Icons for CYBERVIBE 2.0
 import {
     FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong,
     FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye,
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
-    FaTools, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket // Added FaRocket
+    FaTools, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket
 } from "react-icons/fa6";
 import Link from "next/link";
 import * as FaIcons from "react-icons/fa6";
 import { motion } from 'framer-motion';
 
-// --- I18N Translations (CYBERVIBE 2.0 - Final Version) ---
+// --- I18N Translations (Keep Vibe 2.0 Philosophy from previous step) ---
 const translations = {
   en: {
     loading: "Booting SUPERVIBE ENGINE...",
@@ -38,7 +37,6 @@ const translations = {
     cyberVibe2: "<FaGithub class='inline mr-1 text-gray-400'/> is your **cyberchest**. This Studio + AI? Your interface to **remix and transmute** that knowledge into new vibes, features, fixes... **instantly**.",
     cyberVibe3: "You're not *learning* code; you're **remixing the matrix**. You interact, you understand structure, you **command the AI**. You're the Vibe Master.",
     cyberVibe4: "It's **co-creation** with the machine. Push boundaries. Earn bandwidth. Infinite context. Infinite power. This is **CYBERVIBE 2.0**.",
-
     philosophyTitle: "Your Vibe Path: The Inevitable Level Up (Tap)",
     philosophyVideoTitle: "Watch: The Level System Explained <FaVideo/>:",
     philosophyCore: "The secret? **You're not asking the bot for help, YOU are helping the BOT**. Each level adds **+1 Vibe Perk**, one more click, one more skill to guide the AI. It's not a grind, it's evolution. You get lazy doing the old stuff, so you *automatically* level up. And there's **NO GOING BACK!**",
@@ -69,7 +67,7 @@ const translations = {
     navIntro: "Intro <FaCircleInfo/>",
     navCyberVibe: "Vibe Loop <FaUpLong/>",
   },
-  ru: { // --- RUSSIAN TRANSLATIONS UPDATED ---
+  ru: { // --- RUSSIAN TRANSLATIONS (KEEP Vibe 2.0 Philosophy) ---
     loading: "Запуск SUPERVIBE ДВИЖКА...",
     pageTitle: "SUPERVIBE СТУДИЯ 2.0",
     welcome: "Йоу,",
@@ -81,7 +79,6 @@ const translations = {
     cyberVibe2: "<FaGithub class='inline mr-1 text-gray-400'/> - твой **кибер-сундук**. Эта Студия + AI? Твой интерфейс для **ремикса и трансмутации** этих знаний в новые вайбы, фичи, фиксы... **мгновенно**.",
     cyberVibe3: "Ты не *учишь* код; ты **ремиксуешь матрицу**. Взаимодействуешь, понимаешь структуру, **командуешь AI**. Ты - Вайб Мастер.",
     cyberVibe4: "Это **со-творчество** с машиной. Двигай границы. Зарабатывай bandwidth. Бесконечный контекст. Бесконечная мощь. Это **CYBERVIBE 2.0**.",
-
     philosophyTitle: "Твой Путь Вайба: Неизбежный Level Up (Жми)",
     philosophyVideoTitle: "Смотри: Объяснение Системы Уровней <FaVideo/>:",
     philosophyCore: "Секрет? **Не ты просишь бота помочь, а ТЫ помогаешь БОТУ**. Каждый левел дает **+1 Вайб Перк**, +1 клик, +1 скилл, чтобы направлять AI. Это не гринд, это эволюция. Тебе становится лень делать старое, и ты *автоматически* апаешь левел. И **НАЗАД ДОРОГИ НЕТ!**",
@@ -198,7 +195,7 @@ function ActualPageContent() {
       logger.log(`[ActualPageContent Effect 1] Lang set to: ${initialLang}`);
 
       const pathParam = searchParams.get("path");
-      const ideaParam = searchParams.get("idea");
+      const ideaParam = searchParams.get("idea"); // Can be null, "", or a string
       const repoParam = searchParams.get("repo");
 
       if (repoParam) {
@@ -211,43 +208,76 @@ function ActualPageContent() {
            } catch (e) { logger.error("[ActualPageContent Effect 1] Error decoding repo URL param:", e); }
        }
 
-      if (pathParam && ideaParam) {
-          const decodedIdea = decodeURIComponent(ideaParam);
-          const decodedPath = decodeURIComponent(pathParam);
-          if (decodedIdea.startsWith("ImageReplace|")) {
-              logger.log("[ActualPageContent Effect 1] Processing Image Replace task from URL.");
-              try {
-                  const parts = decodedIdea.split('|');
-                  const oldUrlParam = parts.find(p => p.startsWith("OldURL="));
-                  const newUrlParam = parts.find(p => p.startsWith("NewURL="));
-                  if (oldUrlParam && newUrlParam) {
-                      const oldUrl = decodeURIComponent(oldUrlParam.substring(7));
-                      const newUrl = decodeURIComponent(newUrlParam.substring(7));
-                      if (decodedPath && oldUrl && newUrl) {
-                          const task: ImageReplaceTask = { targetPath: decodedPath, oldUrl: oldUrl, newUrl: newUrl };
-                          logger.log("[ActualPageContent Effect 1] Setting image task:", task);
-                          setImageReplaceTask(task);
-                          setInitialIdea(null);
-                          setInitialIdeaProcessed(true);
-                      } else { logger.error("[ActualPageContent Effect 1] Invalid image task data parsed:", { decodedPath, oldUrl, newUrl }); setImageReplaceTask(null); }
-                  } else { logger.error("[ActualPageContent Effect 1] Could not parse Old/New URL from image task string:", decodedIdea); setImageReplaceTask(null); }
-              } catch (e) { logger.error("[ActualPageContent Effect 1] Error parsing image task from URL:", e); setImageReplaceTask(null); }
-          } else {
-              logger.log("[ActualPageContent Effect 1] Regular idea param found, storing:", decodedIdea.substring(0, 50) + "...");
-              setInitialIdea(decodedIdea);
-              setImageReplaceTask(null);
-              setInitialIdeaProcessed(false);
-          }
-          setShowComponents(true);
-      } else {
-          setImageReplaceTask(null);
-          setInitialIdea(null);
-          setInitialIdeaProcessed(true);
-          logger.log("[ActualPageContent Effect 1] No path/idea params found.");
-      }
-    }, [user, searchParams, setImageReplaceTask, setRepoUrl]); // Mount effect
+        // *** SPLIT FIX: Add more robust checks before decode/split ***
+        if (pathParam && typeof ideaParam === 'string') { // Ensure ideaParam is a string
+            let decodedIdea: string | null = null;
+            let decodedPath: string | null = null;
 
-    // Effect 2: Populate Kwork Input
+            try {
+                decodedPath = decodeURIComponent(pathParam);
+                decodedIdea = decodeURIComponent(ideaParam); // Decode only if it's a string
+
+                // Now process based on decodedIdea
+                if (decodedIdea && decodedIdea.startsWith("ImageReplace|")) {
+                    logger.log("[ActualPageContent Effect 1] Processing Image Replace task from URL.");
+                    try {
+                        const parts = decodedIdea.split('|'); // Split is safer now
+                        const oldUrlParam = parts.find(p => p.startsWith("OldURL="));
+                        const newUrlParam = parts.find(p => p.startsWith("NewURL="));
+
+                        if (oldUrlParam && newUrlParam) {
+                            const oldUrl = decodeURIComponent(oldUrlParam.substring(7));
+                            const newUrl = decodeURIComponent(newUrlParam.substring(7));
+
+                            if (decodedPath && oldUrl && newUrl) {
+                                const task: ImageReplaceTask = { targetPath: decodedPath, oldUrl: oldUrl, newUrl: newUrl };
+                                logger.log("[ActualPageContent Effect 1] Setting image task:", task);
+                                setImageReplaceTask(task);
+                                setInitialIdea(null);
+                                setInitialIdeaProcessed(true);
+                            } else {
+                                logger.error("[ActualPageContent Effect 1] Invalid image task data after parsing parts:", { decodedPath, oldUrl, newUrl });
+                                setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
+                            }
+                        } else {
+                            logger.error("[ActualPageContent Effect 1] Could not parse Old/New URL from image task parts:", decodedIdea);
+                            setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
+                        }
+                    } catch (splitError) {
+                        logger.error("[ActualPageContent Effect 1] Error splitting ImageReplace task string:", splitError);
+                        setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
+                    }
+                } else if (decodedIdea) { // Handle regular idea
+                    logger.log("[ActualPageContent Effect 1] Regular idea param found, storing:", decodedIdea.substring(0, 50) + "...");
+                    setInitialIdea(decodedIdea);
+                    setImageReplaceTask(null);
+                    setInitialIdeaProcessed(false); // Process after fetch
+                } else {
+                    // Handle case where decodedIdea is empty string after decoding
+                    logger.warn("[ActualPageContent Effect 1] Decoded idea is empty, skipping idea processing.");
+                    setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
+                }
+
+            } catch (decodeError) {
+                logger.error("[ActualPageContent Effect 1] Error decoding path or idea params:", decodeError);
+                setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
+            }
+            // Show components if params were present (even if processing had issues)
+            setShowComponents(true);
+
+        } else {
+            // No path/idea params found or ideaParam wasn't a string
+            setImageReplaceTask(null);
+            setInitialIdea(null);
+            setInitialIdeaProcessed(true);
+            logger.log(`[ActualPageContent Effect 1] No valid path/idea params found (path: ${!!pathParam}, idea type: ${typeof ideaParam}).`);
+        }
+        // *** END SPLIT FIX ***
+
+    }, [user, searchParams, setImageReplaceTask, setRepoUrl]); // Dependencies
+
+
+    // Effect 2: Populate Kwork Input (No changes needed here, fix was in Effect 1)
      useEffect(() => {
         const fetchAttemptFinished = isMounted && (fetchStatus === 'success' || fetchStatus === 'error' || fetchStatus === 'failed_retries');
         if (fetchAttemptFinished && initialIdea && !initialIdeaProcessed && !imageReplaceTask) {
