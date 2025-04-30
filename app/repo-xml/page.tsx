@@ -13,6 +13,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+// Updated Icons for CYBERVIBE 2.0
 import {
     FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong,
     FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye,
@@ -139,13 +140,11 @@ const RenderContent: React.FC<{ content: string }> = React.memo(({ content }) =>
                  if (segment.startsWith('<Link') || segment.startsWith('<a')) {
                     return <span key={sIndex} dangerouslySetInnerHTML={{ __html: segment }} />;
                  } else if (htmlTagMatch) {
-                     // Render simple formatting tags or skip others
-                     const allowedTags = ['strong', 'em', 'b', 'i', 'span']; // Add safe tags if needed
+                     const allowedTags = ['strong', 'em', 'b', 'i', 'span'];
                      const tagNameMatch = segment.match(/^<\/?(\w+)/);
                      if(tagNameMatch && allowedTags.includes(tagNameMatch[1])) {
                          return <span key={sIndex} dangerouslySetInnerHTML={{ __html: segment }} />;
                      }
-                     // Skip other tags or render as text
                      return <React.Fragment key={sIndex}>{segment}</React.Fragment>;
                  }
                 return <React.Fragment key={sIndex}>{segment}</React.Fragment>;
@@ -174,61 +173,61 @@ function ActualPageContent() {
 
     // Effect 1: Process URL Params
     useEffect(() => {
-        setIsMounted(true);
-        const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
-        const userLang = user?.language_code;
-        const initialLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
-        setLang(initialLang);
-        logger.log(`[ActualPageContent Effect 1] Lang set to: ${initialLang}`);
+      setIsMounted(true);
+      const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
+      const userLang = user?.language_code;
+      const initialLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
+      setLang(initialLang);
+      logger.log(`[ActualPageContent Effect 1] Lang set to: ${initialLang}`);
 
-        const pathParam = searchParams.get("path");
-        const ideaParam = searchParams.get("idea");
-        const repoParam = searchParams.get("repo");
+      const pathParam = searchParams.get("path");
+      const ideaParam = searchParams.get("idea");
+      const repoParam = searchParams.get("repo");
 
-        if (repoParam) {
-            try {
-                const decodedRepoUrl = decodeURIComponent(repoParam);
-                if (decodedRepoUrl.includes("github.com")) {
-                    setRepoUrl(decodedRepoUrl);
-                    logger.log(`[ActualPageContent Effect 1] Repo URL set from param: ${decodedRepoUrl}`);
-                } else { logger.warn(`[ActualPageContent Effect 1] Invalid repo URL from param: ${decodedRepoUrl}`); }
-            } catch (e) { logger.error("[ActualPageContent Effect 1] Error decoding repo URL param:", e); }
-        }
+      if (repoParam) {
+           try {
+               const decodedRepoUrl = decodeURIComponent(repoParam);
+               if (decodedRepoUrl.includes("github.com")) {
+                   setRepoUrl(decodedRepoUrl);
+                   logger.log(`[ActualPageContent Effect 1] Repo URL set from param: ${decodedRepoUrl}`);
+               } else { logger.warn(`[ActualPageContent Effect 1] Invalid repo URL from param: ${decodedRepoUrl}`); }
+           } catch (e) { logger.error("[ActualPageContent Effect 1] Error decoding repo URL param:", e); }
+       }
 
-        if (pathParam && ideaParam) {
-            const decodedIdea = decodeURIComponent(ideaParam);
-            const decodedPath = decodeURIComponent(pathParam);
-            if (decodedIdea.startsWith("ImageReplace|")) {
-                logger.log("[ActualPageContent Effect 1] Processing Image Replace task from URL.");
-                try {
-                    const parts = decodedIdea.split('|');
-                    const oldUrlParam = parts.find(p => p.startsWith("OldURL="));
-                    const newUrlParam = parts.find(p => p.startsWith("NewURL="));
-                    if (oldUrlParam && newUrlParam) {
-                        const oldUrl = decodeURIComponent(oldUrlParam.substring(7));
-                        const newUrl = decodeURIComponent(newUrlParam.substring(7));
-                        if (decodedPath && oldUrl && newUrl) {
-                            const task: ImageReplaceTask = { targetPath: decodedPath, oldUrl: oldUrl, newUrl: newUrl };
-                            logger.log("[ActualPageContent Effect 1] Setting image task:", task);
-                            setImageReplaceTask(task);
-                            setInitialIdea(null);
-                            setInitialIdeaProcessed(true);
-                        } else { logger.error("[ActualPageContent Effect 1] Invalid image task data parsed:", { decodedPath, oldUrl, newUrl }); setImageReplaceTask(null); }
-                    } else { logger.error("[ActualPageContent Effect 1] Could not parse Old/New URL from image task string:", decodedIdea); setImageReplaceTask(null); }
-                } catch (e) { logger.error("[ActualPageContent Effect 1] Error parsing image task from URL:", e); setImageReplaceTask(null); }
-            } else {
-                logger.log("[ActualPageContent Effect 1] Regular idea param found, storing:", decodedIdea.substring(0, 50) + "...");
-                setInitialIdea(decodedIdea);
-                setImageReplaceTask(null);
-                setInitialIdeaProcessed(false);
-            }
-            setShowComponents(true);
-        } else {
-            setImageReplaceTask(null);
-            setInitialIdea(null);
-            setInitialIdeaProcessed(true);
-            logger.log("[ActualPageContent Effect 1] No path/idea params found.");
-        }
+      if (pathParam && ideaParam) {
+          const decodedIdea = decodeURIComponent(ideaParam);
+          const decodedPath = decodeURIComponent(pathParam);
+          if (decodedIdea.startsWith("ImageReplace|")) {
+              logger.log("[ActualPageContent Effect 1] Processing Image Replace task from URL.");
+              try {
+                  const parts = decodedIdea.split('|');
+                  const oldUrlParam = parts.find(p => p.startsWith("OldURL="));
+                  const newUrlParam = parts.find(p => p.startsWith("NewURL="));
+                  if (oldUrlParam && newUrlParam) {
+                      const oldUrl = decodeURIComponent(oldUrlParam.substring(7));
+                      const newUrl = decodeURIComponent(newUrlParam.substring(7));
+                      if (decodedPath && oldUrl && newUrl) {
+                          const task: ImageReplaceTask = { targetPath: decodedPath, oldUrl: oldUrl, newUrl: newUrl };
+                          logger.log("[ActualPageContent Effect 1] Setting image task:", task);
+                          setImageReplaceTask(task);
+                          setInitialIdea(null);
+                          setInitialIdeaProcessed(true);
+                      } else { logger.error("[ActualPageContent Effect 1] Invalid image task data parsed:", { decodedPath, oldUrl, newUrl }); setImageReplaceTask(null); }
+                  } else { logger.error("[ActualPageContent Effect 1] Could not parse Old/New URL from image task string:", decodedIdea); setImageReplaceTask(null); }
+              } catch (e) { logger.error("[ActualPageContent Effect 1] Error parsing image task from URL:", e); setImageReplaceTask(null); }
+          } else {
+              logger.log("[ActualPageContent Effect 1] Regular idea param found, storing:", decodedIdea.substring(0, 50) + "...");
+              setInitialIdea(decodedIdea);
+              setImageReplaceTask(null);
+              setInitialIdeaProcessed(false);
+          }
+          setShowComponents(true);
+      } else {
+          setImageReplaceTask(null);
+          setInitialIdea(null);
+          setInitialIdeaProcessed(true);
+          logger.log("[ActualPageContent Effect 1] No path/idea params found.");
+      }
     }, [user, searchParams, setImageReplaceTask, setRepoUrl]);
 
     // Effect 2: Populate Kwork Input
@@ -244,7 +243,6 @@ function ActualPageContent() {
                 setKworkInputHasContent(initialIdea.trim().length > 0);
                 logger.log("[ActualPageContent Effect 2] Populated kwork input.");
 
-                // --- Add selected files (with checks) ---
                 if (fetcherRef.current) {
                     if (fetcherRef.current.handleAddSelected) {
                         if (selectedFetcherFiles.size > 0) {
@@ -260,7 +258,6 @@ function ActualPageContent() {
                         } else { logger.log("[ActualPageContent Effect 2] Skipping handleAddSelected (empty selection)."); }
                     } else { logger.warn("[ActualPageContent Effect 2] handleAddSelected method not found on fetcherRef."); }
                 } else { logger.warn("[ActualPageContent Effect 2] fetcherRef.current is null."); }
-                // --- End Add selected files ---
 
                  const kworkElement = document.getElementById('kwork-input-section');
                  if (kworkElement) {
@@ -273,7 +270,7 @@ function ActualPageContent() {
             setInitialIdeaProcessed(true);
             logger.log(`[ActualPageContent Effect 2] Fetch finished (${fetchStatus}), no pending idea.`);
         }
-    }, [isMounted, fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles]); // Dependencies seem correct
+    }, [isMounted, fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles]);
 
 
     const t = translations[lang];
@@ -344,6 +341,7 @@ function ActualPageContent() {
                             <span className="text-xs text-gray-500 group-open:rotate-180 transition-transform duration-300">▼</span>
                         </summary>
                         <div className="px-6 pt-2 text-gray-300 space-y-4 text-base">
+                             {/* Video Embed */}
                              <div className="my-4">
                                  <h4 className="text-lg font-semibold text-cyan-400 mb-2"><RenderContent content={t.philosophyVideoTitle}/></h4>
                                  <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
@@ -432,7 +430,7 @@ function ActualPageContent() {
                      </section>
                  )}
 
-                {/* Navigation Icons - Added Animation */}
+                {/* Navigation Icons - ADDED ANIMATION */}
                  <motion.nav
                     className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40"
                     // Subtle pulsing animation
