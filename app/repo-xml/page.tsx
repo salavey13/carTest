@@ -14,7 +14,13 @@ import { useAppContext } from "@/contexts/AppContext";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong, FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye, FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaLevelUpAlt, FaBolt, FaTools, FaCode } from "react-icons/fa"; // Added FaLevelUpAlt, FaBolt, FaTools, FaCode etc. Import all Fa6 below
+// Updated Icons for CYBERVIBE 2.0
+import {
+    FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong,
+    FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye,
+    FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaLevelUpAlt, FaBolt,
+    FaTools, FaCode, FaVideo // Added FaVideo for the embed
+} from "react-icons/fa6";
 import Link from "next/link";
 import * as FaIcons from "react-icons/fa6"; // Import all for dynamic render helper
 
@@ -33,30 +39,31 @@ const translations = {
     cyberVibe3: "You're not just *learning* code; you're **remixing the damn matrix** on the fly. You see the structure, you interact, you **evolve**.",
     cyberVibe4: "It's **co-creation** with the machine mind. Push boundaries. Earn your bandwidth. The goal? Infinite context. Infinite power. This is **CYBERVIBE 2.0**.",
     philosophyTitle: "Your Vibe Path: Level Up Guide (Tap)",
+    philosophyVideoTitle: "Watch the Quick Level-Up Intro <FaVideo/>:", // Title for the video section
     philosophy1: "This is about unlocking **YOUR** potential. Build **YOUR** world. Stop chasing, start **creating**. You ARE the niche.",
     philosophy2: "AI isn't replacement, it's your **ultimate leverage**. Your force multiplier. Use it (ideas in <Link href='/selfdev' class='text-brand-blue hover:underline font-semibold'>SelfDev Path <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-1'/></Link>) or get left behind.",
-    philosophy3: "**LEVEL 1: INSTANT WIN!** Got a broken image link? Copy, paste, upload new one. **DONE.** Auto-magic fixes it. **You can do this NOW.**",
-    philosophy4: "**LEVEL 2: Simple Fix:** Need to change text? Button style? Tell the AI Helper. **DONE.** System guides you.",
-    philosophy5: "**LEVEL 3+: Multi-File Magic:** More complex? Change logic? AI helps, you guide. Step-by-step, you'll handle 5, 10, 20+ files like a pro.",
+    philosophy3: "**LEVEL 1: INSTANT WIN!** Got a broken image link? Copy URL, paste in Input/Buddy, upload new. **DONE.** Full Auto PR. **You can do this NOW.**",
+    philosophy4: "**LEVEL 2: Simple Idea:** Need to change text? Button style? Tell the AI Helper + Context. -> PR. **DONE.**",
+    philosophy5: "**LEVEL 3+: Multi-File Magic:** Complex logic? Multiple components? AI helps, you guide. Step-by-step, handle 5, 10, 28+ files. **You WILL reach this.**",
     philosophy6: "**Validate FAST!** Use AI to check ideas *before* code (<Link href='/selfdev#validation' class='text-brand-yellow hover:underline font-semibold'>SelfDev Validation <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-1'/></Link>). Kill bad vibes quick.",
-    philosophy7: "This Studio makes it easy. **Grab code -> Point -> Wish -> AI Magic -> Ship it!**",
+    philosophy7: "This Studio makes it easy. **Grab code -> Point -> Wish -> AI Magic -> Ship it!** The previous level always feels too simple once you evolve.",
     stepsTitle: "Quick Start Guide:",
     step1Title: "1. Grab Repo / Point Wish:",
-    step1Desc: "Enter GitHub URL -> Hit <FaDownload class='inline mx-1 text-purple-400'/> OR Just spot a bug/idea on a page -> Activate Buddy <FaRobot class='inline mx-1 text-indigo-400'/> -> Describe.",
-    step1DescEnd: "For images: Copy broken URL, paste in Buddy/Input.", // Simplified image step hint
+    step1Desc: "Enter GitHub URL -> Hit <FaDownload class='inline mx-1 text-purple-400'/> OR Spot bug/idea -> Activate Buddy <FaRobot class='inline mx-1 text-indigo-400'/> -> Describe.",
+    step1DescEnd: "For images (Lv.1): Copy broken URL, paste in Buddy/Input.", // Level 1 explicitly mentioned
     step2Title: "2. AI Magic & Ship:",
-    step2Desc: "If needed, use <span class='text-blue-400 font-semibold'>\"🤖 Ask AI\"</span> -> Check result in Assistant <FaWandMagicSparkles class='inline mx-1 text-yellow-400'/> -> Hit <FaGithub class='inline mx-1 text-green-400'/> to create/update PR.",
-    step2DescEnd: "**DONE.** Site updates automagically.", // Emphasize automation
-    readyButton: "LET'S F*CKING GO!", // More energy
-    componentsTitle: "Engage Vibe Engines!", // New title
-    ctaTitle: "Ready to Ascend, {USERNAME}?", // Updated CTA
-    ctaDesc: "Seriously. Stop doubting. Start **DOING**. That first level is calling.",
-    ctaHotChick: "Got the fire? Let's build something epic. Hit me up **@SALAVEY13** NOW!", // Kept original contact info
-    ctaDude: "(Everyone else? Just f*cking try it. You got this!)", // More encouraging
-    navGrabber: "Grabber <FaDownload/>", // Added icon
-    navAssistant: "Assistant <FaRobot/>", // Added icon
+    step2Desc: "If needed (Lv.2+), use <span class='text-blue-400 font-semibold'>\"🤖 Ask AI\"</span> -> Check Assistant <FaWandMagicSparkles class='inline mx-1 text-yellow-400'/> -> Hit <FaGithub class='inline mx-1 text-green-400'/> PR Button.",
+    step2DescEnd: "**DONE.** Site updates automagically.",
+    readyButton: "LET'S F*CKING GO!",
+    componentsTitle: "Engage Vibe Engines!",
+    ctaTitle: "Ready to Ascend, {USERNAME}?",
+    ctaDesc: "Seriously. Stop doubting. Start **DOING**. That first level is calling. Level up NOW!",
+    ctaHotChick: "Got the fire? Let's build something epic. Hit me up **@SALAVEY13** NOW!",
+    ctaDude: "(Everyone else? Just f*cking try it. Level 1 is a button click away. You got this!)",
+    navGrabber: "Grabber <FaDownload/>",
+    navAssistant: "Assistant <FaRobot/>",
     navIntro: "Intro <FaCircleInfo/>",
-    navCyberVibe: "Vibe Loop <FaLevelUpAlt/>", // Updated name
+    navCyberVibe: "Vibe Loop <FaLevelUpAlt/>",
   },
   ru: {
     loading: "Запуск SUPERVIBE ДВИЖКА...",
@@ -71,30 +78,31 @@ const translations = {
     cyberVibe3: "Ты не просто *учишь* код; ты **ремиксуешь саму матрицу** на лету. Ты видишь структуру, взаимодействуешь, **эволюционируешь**.",
     cyberVibe4: "Это **со-творчество** с машинным разумом. Двигай границы. Зарабатывай свой 'bandwidth'. Цель? Бесконечный контекст. Бесконечная мощь. Это **CYBERVIBE 2.0**.",
     philosophyTitle: "Твой Путь Вайба: Гайд по Левелам (Жми)",
+    philosophyVideoTitle: "Смотри Быстрый Старт / Левелы <FaVideo/>:", // Title for the video section
     philosophy1: "Это про раскрытие **ТВОЕГО** потенциала. Строй **СВОЙ** мир. Хватит гоняться, начни **создавать**. Ты = ниша.",
     philosophy2: "AI не замена, это твой **ультимативный рычаг**. Твой силовой множитель. Юзай его (идеи в <Link href='/selfdev' class='text-brand-blue hover:underline font-semibold'>SelfDev Пути <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-1'/></Link>) или останешься позади.",
-    philosophy3: "**УРОВЕНЬ 1: МГНОВЕННАЯ ПОБЕДА!** Битый линк картинки? Скопируй, вставь, загрузи новую. **ГОТОВО.** Авто-магия все пофиксит. **Ты можешь это ПРЯМО СЕЙЧАС.**",
-    philosophy4: "**УРОВЕНЬ 2: Простой Фикс:** Текст поменять? Стиль кнопки? Скажи AI Помощнику. **ГОТОВО.** Система направит.",
-    philosophy5: "**УРОВЕНЬ 3+: Мульти-Файл Магия:** Сложно? Логика? AI помогает, ты рулишь. Шаг за шагом, будешь ворочать 5, 10, 20+ файлами как профи.",
-    philosophy6: "**Валидируй БЫСТРО!** Чекай идеи с AI *до* кода (<Link href='/selfdev#validation' class='text-brand-yellow hover:underline font-semibold'>SelfDev Валидация <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-1'/></Link>). Убивай мертвые вайбы сразу.",
-    philosophy7: "Студия упрощает. **Хватай код -> Укажи -> Желай -> AI Магия -> Отправляй!**",
+    philosophy3: "**УРОВЕНЬ 1: МГНОВЕННАЯ ПОБЕДА! <FaBolt/>** Битый URL картинки? Скопируй URL, вставь в Инпут/Бадди, загрузи новую. **ГОТОВО.** Полностью Авто-PR. **Ты можешь это ПРЯМО СЕЙЧАС.**",
+    philosophy4: "**УРОВЕНЬ 2: Простая Идея <FaTools/>:** Текст поменять? Стиль? Скажи AI + Контекст. -> PR. **ГОТОВО.**",
+    philosophy5: "**УРОВЕНЬ 3+: Мульти-Файл Магия <FaCode/>:** Логика? Компоненты? AI помогает, ты рулишь. Шаг за шагом, будешь ворочать 5, 10, 28+ файлами. **Ты ДОРАСТЕШЬ до этого.**",
+    philosophy6: "**Валидируй БЫСТРО! <FaBullseye/>** Чекай идеи с AI *до* кода (<Link href='/selfdev#validation' class='text-brand-yellow hover:underline font-semibold'>SelfDev Валидация <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-1'/></Link>). Убивай мертвые вайбы сразу.",
+    philosophy7: "Студия упрощает. **Хватай код -> Укажи -> Желай -> AI Магия -> Отправляй!** Предыдущий левел всегда кажется для дебилов, когда ты эволюционируешь.",
     stepsTitle: "Краткий Гайд:",
     step1Title: "1. Хватай Репу / Укажи Желание:",
-    step1Desc: "Введи GitHub URL -> Жми <FaDownload class='inline mx-1 text-purple-400'/> ИЛИ Просто видишь баг/идею на странице -> Вызови Бадди <FaRobot class='inline mx-1 text-indigo-400'/> -> Опиши.",
-    step1DescEnd: "Для картинок: Скопируй битый URL, вставь Бадди/в Инпут.", // Упрощенный хинт
+    step1Desc: "Введи GitHub URL -> Жми <FaDownload class='inline mx-1 text-purple-400'/> ИЛИ Видишь баг/идею -> Вызови Бадди <FaRobot class='inline mx-1 text-indigo-400'/> -> Опиши.",
+    step1DescEnd: "Для картинок (Лв.1): Скопируй битый URL, вставь Бадди/в Инпут.",
     step2Title: "2. AI Магия & Отправка:",
-    step2Desc: "Если нужно, юзай <span class='text-blue-400 font-semibold'>\"🤖 Спросить AI\"</span> -> Проверь результат в Ассистенте <FaWandMagicSparkles class='inline mx-1 text-yellow-400'/> -> Жми <FaGithub class='inline mx-1 text-green-400'/> для создания/обновления PR.",
-    step2DescEnd: "**ГОТОВО.** Сайт обновляется авто-магически.", // Акцент на автоматизации
-    readyButton: "ПОГНАЛИ, БЛ*ТЬ!", // Больше энергии
-    componentsTitle: "Врубай Движки Вайба!", // Новый заголовок
-    ctaTitle: "Готов(а) к Вознесению, {USERNAME}?", // Обновленный CTA
-    ctaDesc: "Серьезно. Хватит сомневаться. Начни **ДЕЛАТЬ**. Первый левел зовет.",
-    ctaHotChick: "Есть искра? Давай замутим что-то эпичное. Пиши **@SALAVEY13** СЕЙЧАС!", // Контакт остался
-    ctaDude: "(Все остальные? Просто, бл*ть, попробуйте. У вас получится!)", // Более ободряюще
-    navGrabber: "Граббер <FaDownload/>", // Иконка
-    navAssistant: "Ассистент <FaRobot/>", // Иконка
+    step2Desc: "Если нужно (Лв.2+), юзай <span class='text-blue-400 font-semibold'>\"🤖 Спросить AI\"</span> -> Проверь Ассистента <FaWandMagicSparkles class='inline mx-1 text-yellow-400'/> -> Жми <FaGithub class='inline mx-1 text-green-400'/> Кнопку PR.",
+    step2DescEnd: "**ГОТОВО.** Сайт обновляется авто-магически.",
+    readyButton: "ПОГНАЛИ, БЛ*ТЬ!",
+    componentsTitle: "Врубай Движки Вайба!",
+    ctaTitle: "Готов(а) к Вознесению, {USERNAME}?",
+    ctaDesc: "Серьезно. Хватит сомневаться. Начни **ДЕЛАТЬ**. Первый левел зовет. Качайся СЕЙЧАС!",
+    ctaHotChick: "Есть искра? Давай замутим что-то эпичное. Пиши **@SALAVEY13** СЕЙЧАС!",
+    ctaDude: "(Все остальные? Просто, бл*ть, попробуйте. Левел 1 - это клик мышки. У вас получится!)",
+    navGrabber: "Граббер <FaDownload/>",
+    navAssistant: "Ассистент <FaRobot/>",
     navIntro: "Интро <FaCircleInfo/>",
-    navCyberVibe: "Петля Вайба <FaLevelUpAlt/>", // Обновленное имя
+    navCyberVibe: "Петля Вайба <FaLevelUpAlt/>",
   }
 };
 // --- End I18N ---
@@ -108,120 +116,80 @@ function LoadingBuddyFallback() {
 // ------------------------------------------
 
 // --- Helper Component to render content with icons and bold ---
-// Use React.memo for performance if content updates frequently but is often the same
 const RenderContent: React.FC<{ content: string }> = React.memo(({ content }) => {
-    // Split by bold tags, icon tags, or general HTML tags
     const segments = content.split(/(\*\*.*?\*\*|<Fa\w+\s*.*?\/?>|<\/?\w+(?:\s+[^>]*)*>)/g).filter(Boolean);
     return (
         <>
             {segments.map((segment, sIndex) => {
-                // Handle Bold
-                if (segment.startsWith('**') && segment.endsWith('**')) {
-                    return <strong key={sIndex}>{segment.slice(2, -2)}</strong>;
-                }
-                // Handle Icons (<FaIconName class="..."/>)
+                if (segment.startsWith('**') && segment.endsWith('**')) { return <strong key={sIndex}>{segment.slice(2, -2)}</strong>; }
                 const iconMatch = segment.match(/<Fa(\w+)\s*(?:class(?:Name)?="([^"]*)")?\s*\/?>/i);
                 if (iconMatch) {
                     const iconName = `Fa${iconMatch[1]}` as keyof typeof FaIcons;
                     const className = iconMatch[2] || "";
-                    const IconComponent = FaIcons[iconName]; // Dynamically get the component
+                    const IconComponent = FaIcons[iconName];
                     if (IconComponent) {
-                        // Apply default styling + any provided class
-                        const finalClassName = `${className} inline-block align-middle mx-1`; // Adjust styling as needed
+                        const finalClassName = `${className} inline-block align-middle mx-1`;
                         return React.createElement(IconComponent, { key: sIndex, className: finalClassName });
-                    } else {
-                        // Fallback for unknown icons
-                        logger.warn(`[RenderContent] Icon "${iconName}" not found.`);
-                        return <span key={sIndex} className="text-red-500 font-mono">[? {iconName}]</span>;
-                    }
+                    } else { logger.warn(`[RenderContent] Icon "${iconName}" not found.`); return <span key={sIndex} className="text-red-500 font-mono">[? {iconName}]</span>; }
                 }
-                // Handle simple HTML tags (like <Link> or <a> from translations)
-                // Use dangerouslySetInnerHTML ONLY if you trust the source (your translations)
                 const htmlTagMatch = segment.match(/^<\/?\w+(?:\s+[^>]*)*>$/);
-                if (htmlTagMatch || segment.startsWith('<Link') || segment.startsWith('<a')) {
-                    // WARNING: Ensure your translation strings don't contain user-generated content
-                    // if using dangerouslySetInnerHTML. For simple links/formatting, it's okay.
-                    return <span key={sIndex} dangerouslySetInnerHTML={{ __html: segment }} />;
+                // IMPORTANT: Only allow specific trusted tags like Link if necessary, otherwise stick to RenderContent's capabilities
+                if (segment.startsWith('<Link') || segment.startsWith('<a')) {
+                     return <span key={sIndex} dangerouslySetInnerHTML={{ __html: segment }} />;
+                } else if (htmlTagMatch) {
+                     // Avoid rendering arbitrary HTML tags unless explicitly safe
+                     return <React.Fragment key={sIndex}>{segment}</React.Fragment>; // Render as text or handle specific safe tags
                 }
-                // Handle regular text
                 return <React.Fragment key={sIndex}>{segment}</React.Fragment>;
             })}
         </>
     );
 });
-RenderContent.displayName = 'RenderContent'; // Helps in React DevTools
+RenderContent.displayName = 'RenderContent';
 
-// --- ActualPageContent Component (Ref handling removed) ---
+// --- ActualPageContent Component ---
 function ActualPageContent() {
-    // REMOVED: localFetcherRef, localAssistantRef, aiResponseInputRef, prSectionRef
     const { user } = useAppContext();
     const {
-        // Get refs DIRECTLY from context
-        fetcherRef,
-        assistantRef,
-        kworkInputRef,
-        aiResponseInputRef,
-        // Other context values...
-        setImageReplaceTask,
-        setKworkInputHasContent,
-        fetchStatus,
-        imageReplaceTask,
-        allFetchedFiles,
-        selectedFetcherFiles,
-        repoUrl, // Get repoUrl from context
-        setRepoUrl, // Get repoUrl setter from context
+        fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef,
+        setImageReplaceTask, setKworkInputHasContent, fetchStatus,
+        imageReplaceTask, allFetchedFiles, selectedFetcherFiles,
+        repoUrl, setRepoUrl, // Use context state for repoUrl
     } = useRepoXmlPageContext();
 
     const [isMounted, setIsMounted] = useState(false);
     const [lang, setLang] = useState<Language>('en');
     const [showComponents, setShowComponents] = useState(false);
     const searchParams = useSearchParams();
-
-    // --- State to hold the idea from URL ---
     const [initialIdea, setInitialIdea] = useState<string | null>(null);
     const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(false);
 
-    // REMOVED: useEffect that linked local refs to context refs
-
-    // --- Effect 1: Process URL Params and Set Initial State (no changes) ---
+    // Effect 1: Process URL Params (including repo) and Set Initial State
     useEffect(() => {
       setIsMounted(true);
-      // Determine language based on user profile or browser default
       const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
       const userLang = user?.language_code;
       const initialLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
       setLang(initialLang);
       logger.log(`[ActualPageContent Effect 1] Lang set to: ${initialLang}`);
 
-      // Get URL parameters
       const pathParam = searchParams.get("path");
       const ideaParam = searchParams.get("idea");
-      const repoParam = searchParams.get("repo"); // Check for repo URL param
+      const repoParam = searchParams.get("repo");
 
-       // --- NEW: Handle Repo URL Param ---
-       if (repoParam) {
+      if (repoParam) {
            try {
                const decodedRepoUrl = decodeURIComponent(repoParam);
-               // Basic validation
                if (decodedRepoUrl.includes("github.com")) {
                    setRepoUrl(decodedRepoUrl); // Update context state
                    logger.log(`[ActualPageContent Effect 1] Repo URL set from param: ${decodedRepoUrl}`);
-                   // Optionally trigger fetch or PR list update here if needed immediately
-                   // triggerGetOpenPRs(decodedRepoUrl);
-               } else {
-                   logger.warn(`[ActualPageContent Effect 1] Invalid repo URL from param: ${decodedRepoUrl}`);
-               }
-           } catch (e) {
-               logger.error("[ActualPageContent Effect 1] Error decoding repo URL param:", e);
-           }
+               } else { logger.warn(`[ActualPageContent Effect 1] Invalid repo URL from param: ${decodedRepoUrl}`); }
+           } catch (e) { logger.error("[ActualPageContent Effect 1] Error decoding repo URL param:", e); }
        }
-       // --- END NEW ---
-
 
       if (pathParam && ideaParam) {
           const decodedIdea = decodeURIComponent(ideaParam);
           const decodedPath = decodeURIComponent(pathParam);
-          // Check if it's an image replacement task
           if (decodedIdea.startsWith("ImageReplace|")) {
               logger.log("[ActualPageContent Effect 1] Processing Image Replace task from URL.");
               try {
@@ -234,176 +202,107 @@ function ActualPageContent() {
                       if (decodedPath && oldUrl && newUrl) {
                           const task: ImageReplaceTask = { targetPath: decodedPath, oldUrl: oldUrl, newUrl: newUrl };
                           logger.log("[ActualPageContent Effect 1] Setting image task:", task);
-                          setImageReplaceTask(task); // Set task in context
-                          setInitialIdea(null); // No regular idea needed
-                          setInitialIdeaProcessed(true); // Mark as processed
-                      } else {
-                          logger.error("[ActualPageContent Effect 1] Invalid image task data parsed:", { decodedPath, oldUrl, newUrl });
-                          setImageReplaceTask(null);
-                      }
-                  } else {
-                      logger.error("[ActualPageContent Effect 1] Could not parse Old/New URL from image task string:", decodedIdea);
-                      setImageReplaceTask(null);
-                  }
-              } catch (e) {
-                  logger.error("[ActualPageContent Effect 1] Error parsing image task from URL:", e);
-                  setImageReplaceTask(null);
-              }
+                          setImageReplaceTask(task);
+                          setInitialIdea(null);
+                          setInitialIdeaProcessed(true);
+                      } else { logger.error("[ActualPageContent Effect 1] Invalid image task data parsed:", { decodedPath, oldUrl, newUrl }); setImageReplaceTask(null); }
+                  } else { logger.error("[ActualPageContent Effect 1] Could not parse Old/New URL from image task string:", decodedIdea); setImageReplaceTask(null); }
+              } catch (e) { logger.error("[ActualPageContent Effect 1] Error parsing image task from URL:", e); setImageReplaceTask(null); }
           } else {
-              // Regular idea parameter
               logger.log("[ActualPageContent Effect 1] Regular idea param found, storing:", decodedIdea.substring(0, 50) + "...");
               setInitialIdea(decodedIdea);
-              setImageReplaceTask(null); // Ensure no image task
-              setInitialIdeaProcessed(false); // Mark as NOT processed yet (wait for fetch)
+              setImageReplaceTask(null);
+              setInitialIdeaProcessed(false);
           }
-          // Show components immediately if params are present
           setShowComponents(true);
       } else {
-          // No path/idea params
           setImageReplaceTask(null);
           setInitialIdea(null);
-          setInitialIdeaProcessed(true); // Nothing to process
+          setInitialIdeaProcessed(true);
           logger.log("[ActualPageContent Effect 1] No path/idea params found.");
       }
-    // Dependencies include user (for lang), searchParams, context setters
     }, [user, searchParams, setImageReplaceTask, setRepoUrl]);
 
-
-    // --- Effect 2: Populate Kwork Input AFTER Initial Fetch Attempt (Includes defensive checks) ---
+    // Effect 2: Populate Kwork Input (Includes defensive checks)
     useEffect(() => {
-      // Check if fetch attempt (auto or manual) has finished
       const fetchAttemptFinished = isMounted && (fetchStatus === 'success' || fetchStatus === 'error' || fetchStatus === 'failed_retries');
 
-      // Conditions to populate: fetch finished, there's a stored initial idea, it hasn't been processed yet, and it's not an image task
       if (fetchAttemptFinished && initialIdea && !initialIdeaProcessed && !imageReplaceTask) {
-          logger.log(`[ActualPageContent Effect 2] Fetch finished (${fetchStatus}). Populating kwork with stored idea:`, initialIdea.substring(0,50) + "...");
-
-          // Ensure the kwork input ref is available
-          if (kworkInputRef.current) { // Use context ref directly
-              // Set the idea text first
+          logger.log(`[ActualPageContent Effect 2] Fetch finished (${fetchStatus}). Populating kwork...`);
+          if (kworkInputRef.current) {
               kworkInputRef.current.value = initialIdea;
-              // Dispatch an 'input' event to simulate user typing, which triggers internal state updates if needed
               const inputEvent = new Event('input', { bubbles: true });
               kworkInputRef.current.dispatchEvent(inputEvent);
-              setKworkInputHasContent(initialIdea.trim().length > 0); // Update context state
-              logger.log("[ActualPageContent Effect 2] Populated kwork input via context ref.");
+              setKworkInputHasContent(initialIdea.trim().length > 0);
+              logger.log("[ActualPageContent Effect 2] Populated kwork input.");
 
-              // Now, trigger adding the auto-selected files (if any) to this idea text
-              // --- DEFENSIVE CHECK ---
-              if (fetcherRef.current) { // Check if the fetcher ref itself is populated
-                   if (fetcherRef.current.handleAddSelected) { // Check if the method exists
-                        // Check if there are actually selected files in the context state
+              if (fetcherRef.current) {
+                   if (fetcherRef.current.handleAddSelected) {
                         if (selectedFetcherFiles.size > 0) {
-                            logger.log("[ActualPageContent Effect 2] Calling fetcherRef.handleAddSelected to append auto-selected files.");
-                            // Call the method using files from context state
-                            fetcherRef.current.handleAddSelected(selectedFetcherFiles, allFetchedFiles)
-                                .then(() => logger.log("[ActualPageContent Effect 2] handleAddSelected call finished."))
-                                .catch(err => logger.error("[ActualPageContent Effect 2] Error calling handleAddSelected:", err));
-                        } else {
-                            logger.log("[ActualPageContent Effect 2] Skipping handleAddSelected as no files were auto-selected.");
-                        }
-                  } else {
-                       logger.warn("[ActualPageContent Effect 2] fetcherRef.current.handleAddSelected method not available on ref.");
-                  }
-              } else {
-                   logger.warn("[ActualPageContent Effect 2] fetcherRef.current is null when trying to call handleAddSelected.");
-              }
-              // --- END DEFENSIVE CHECK ---
+                            logger.log("[ActualPageContent Effect 2] Calling fetcherRef.handleAddSelected.");
+                            // --- Added Extra Logging ---
+                            const promise = fetcherRef.current.handleAddSelected(selectedFetcherFiles, allFetchedFiles);
+                            if (promise && typeof promise.then === 'function') {
+                                promise
+                                    .then(() => logger.log("[ActualPageContent Effect 2] handleAddSelected .then() executed successfully."))
+                                    .catch(err => logger.error("[ActualPageContent Effect 2] Error INSIDE handleAddSelected .catch():", err));
+                            } else {
+                                logger.warn("[ActualPageContent Effect 2] handleAddSelected did NOT return a valid promise!");
+                            }
+                            // --- End Extra Logging ---
+                        } else { logger.log("[ActualPageContent Effect 2] Skipping handleAddSelected (empty selection)."); }
+                  } else { logger.warn("[ActualPageContent Effect 2] handleAddSelected method not found on fetcherRef."); }
+              } else { logger.warn("[ActualPageContent Effect 2] fetcherRef.current is null."); }
 
-              // Scroll to the kwork input section to make it visible
                const kworkElement = document.getElementById('kwork-input-section');
                if (kworkElement) {
-                    // Use a timeout to ensure rendering is complete before scrolling
-                    setTimeout(() => {
-                        kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        logger.log("[ActualPageContent Effect 2] Scrolled to kwork input.");
-                    }, 250); // Slightly increased delay
+                    setTimeout(() => { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); logger.log("[ActualPageContent Effect 2] Scrolled to kwork."); }, 250);
                }
 
-          } else {
-              logger.warn("[ActualPageContent Effect 2] Context kworkInputRef is null when trying to populate idea.");
-          }
-          setInitialIdeaProcessed(true); // Mark the initial idea as processed
-      } else if (fetchAttemptFinished && !initialIdeaProcessed) {
-          // If fetch finished but there was no idea or it was already processed, mark as processed
+          } else { logger.warn("[ActualPageContent Effect 2] kworkInputRef is null."); }
           setInitialIdeaProcessed(true);
-           logger.log(`[ActualPageContent Effect 2] Fetch finished (${fetchStatus}), no pending idea to process or already processed.`);
+      } else if (fetchAttemptFinished && !initialIdeaProcessed) {
+          setInitialIdeaProcessed(true);
+           logger.log(`[ActualPageContent Effect 2] Fetch finished (${fetchStatus}), no pending idea.`);
       }
-    // Dependencies ensure this runs when fetch status changes, idea/task states change, or refs become available
     }, [isMounted, fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles]);
 
-    const t = translations[lang]; // Get translations for the current language
-    const userName = user?.first_name || (lang === 'ru' ? 'Нео' : 'Neo'); // Use user's name or a default
+    const t = translations[lang];
+    const userName = user?.first_name || (lang === 'ru' ? 'Нео' : 'Neo');
 
-    // --- Scroll Helper ---
     const scrollToSectionNav = (id: string) => {
-        // Target sections that require revealing the components first
-        const sectionsRequiringReveal = ['extractor', 'executor', 'cybervibe-section', 'philosophy-steps']; // Added CyberVibe & Philosophy
-
+        const sectionsRequiringReveal = ['extractor', 'executor', 'cybervibe-section', 'philosophy-steps'];
         if (sectionsRequiringReveal.includes(id) && !showComponents) {
-            logger.log(`[Scroll] Revealing components to scroll to "${id}"`);
+            logger.log(`[Scroll] Revealing components for "${id}"`);
             setShowComponents(true);
-            // Wait for components to render before scrolling
             setTimeout(() => {
                 const el = document.getElementById(id);
-                if (el) {
-                    // Calculate offset scroll position (adjust 80px as needed for fixed header)
-                    const offsetTop = window.scrollY + el.getBoundingClientRect().top - 80;
-                    window.scrollTo({ top: offsetTop, behavior: 'smooth' });
-                     logger.log(`[Scroll] Scrolled to revealed "${id}" at offset ${offsetTop}`);
-                } else {
-                    logger.error(`[Scroll] Target "${id}" not found after revealing components.`);
-                }
-            }, 150); // Adjust delay if needed
+                if (el) { const offsetTop = window.scrollY + el.getBoundingClientRect().top - 80; window.scrollTo({ top: offsetTop, behavior: 'smooth' }); logger.log(`[Scroll] Scrolled to revealed "${id}"`); }
+                else { logger.error(`[Scroll] Target "${id}" not found after reveal.`); }
+            }, 150);
             return;
         }
-
-        // If components are already shown or the section doesn't require reveal
         const el = document.getElementById(id);
-        if (el) {
-             const offsetTop = window.scrollY + el.getBoundingClientRect().top - 80;
-            window.scrollTo({ top: offsetTop, behavior: 'smooth' });
-             logger.log(`[Scroll] Scrolled to "${id}" at offset ${offsetTop}`);
-        } else {
-            logger.error(`[Scroll] Target "${id}" not found.`);
-        }
+        if (el) { const offsetTop = window.scrollY + el.getBoundingClientRect().top - 80; window.scrollTo({ top: offsetTop, behavior: 'smooth' }); logger.log(`[Scroll] Scrolled to "${id}"`); }
+        else { logger.error(`[Scroll] Target "${id}" not found.`); }
     };
 
-
-    // Render loading state if component hasn't mounted yet
     if (!isMounted) {
          const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
          const loadingText = translations[loadingLang].loading;
-         return (
-             <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950">
-                 <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" />
-                 <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p>
-             </div>
-         );
+         return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
      }
 
     return (
         <>
-            {/* Ensure viewport settings are applied */}
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
-            {/* Main container */}
             <div className="min-h-screen bg-gray-950 p-4 sm:p-6 pt-24 text-white flex flex-col items-center relative overflow-y-auto">
 
-                {/* Intro Section - CYBERVIBE Overhaul */}
+                {/* Intro Section - CYBERVIBE 2.0 */}
                 <section id="intro" className="mb-12 text-center max-w-3xl w-full">
-                     {/* Logo/Icon */}
-                     <div className="flex justify-center mb-4">
-                        <FaBolt className="w-16 h-16 text-[#E1FF01] text-shadow-[0_0_15px_#E1FF01] animate-pulse" />
-                    </div>
-                    {/* Title */}
-                    <h1 className="text-4xl md:text-5xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-4">
-                        {t.pageTitle}
-                    </h1>
-                    {/* Welcome Message */}
-                    <p className="text-xl md:text-2xl text-gray-200 mt-4 font-semibold">
-                        {t.welcome} <span className="text-brand-cyan">{userName}!</span>
-                    </p>
-                    {/* Intro Text */}
+                     <div className="flex justify-center mb-4"> <FaBolt className="w-16 h-16 text-[#E1FF01] text-shadow-[0_0_15px_#E1FF01] animate-pulse" /> </div>
+                    <h1 className="text-4xl md:text-5xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-4"> {t.pageTitle} </h1>
+                    <p className="text-xl md:text-2xl text-gray-200 mt-4 font-semibold"> {t.welcome} <span className="text-brand-cyan">{userName}!</span> </p>
                     <div className="text-lg md:text-xl text-gray-300 mt-3 space-y-3">
                         <p><RenderContent content={t.intro1} /></p>
                         <p><RenderContent content={t.intro2} /></p>
@@ -411,7 +310,7 @@ function ActualPageContent() {
                     </div>
                 </section>
 
-                {/* === The Vibe Loop Section (CyberVibe Renamed) === */}
+                {/* === The Vibe Loop Section === */}
                 <section id="cybervibe-section" className="mb-12 w-full max-w-3xl">
                      <Card className="bg-gradient-to-br from-purple-900/40 via-black/60 to-indigo-900/40 border border-purple-600/60 shadow-xl rounded-lg p-6 backdrop-blur-sm">
                          <CardHeader className="p-0 mb-4">
@@ -430,25 +329,36 @@ function ActualPageContent() {
 
                 {/* Your Vibe Path Section (Philosophy & Steps Renamed) */}
                 <section id="philosophy-steps" className="mb-12 w-full max-w-3xl">
-                    {/* Use <details> for collapsibility, styled */}
                     <details className="bg-gray-900/80 border border-gray-700 rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50">
-                        {/* Summary acts as the clickable header */}
                         <summary className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-gray-800/50 rounded-t-lg transition-colors">
                             <span className="flex items-center gap-2"><FaCodeBranch /> {t.philosophyTitle}</span>
-                            <span className="text-xs text-gray-500 group-open:rotate-180 transition-transform duration-300">▼</span> {/* Simple indicator */}
+                            <span className="text-xs text-gray-500 group-open:rotate-180 transition-transform duration-300">▼</span>
                         </summary>
-                        {/* Content inside the details */}
                         <div className="px-6 pt-2 text-gray-300 space-y-4 text-base">
-                            {/* Core Philosophy */}
                             <p><RenderContent content={t.philosophy1} /></p>
                             <p><RenderContent content={t.philosophy2} /></p>
+                            <hr className="border-gray-700 my-3"/>
+                            {/* Video Embed Section */}
+                            <div className="my-4">
+                                 <h4 className="text-lg font-semibold text-cyan-400 mb-2"><RenderContent content={t.philosophyVideoTitle}/></h4>
+                                 {/* Responsive YouTube Embed */}
+                                 <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
+                                     <iframe
+                                         className="w-full h-full"
+                                         src="https://www.youtube.com/embed/imxzYWYKCyQ" // Use /embed/ URL
+                                         title="YouTube video player - Vibe Level Explanation"
+                                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                         allowFullScreen>
+                                    </iframe>
+                                 </div>
+                             </div>
                             <hr className="border-gray-700 my-3"/>
                             {/* Level Progression */}
                             <h4 className="text-lg font-semibold text-cyan-400 pt-1">Level Progression:</h4>
                             <ul className="list-none space-y-2 pl-2">
-                                <li><span className="font-bold text-yellow-400 mr-2">Lv.1 <FaBolt/>:</span> <RenderContent content={t.philosophy3} /></li>
-                                <li><span className="font-bold text-yellow-400 mr-2">Lv.2 <FaTools/>:</span> <RenderContent content={t.philosophy4} /></li>
-                                <li><span className="font-bold text-yellow-400 mr-2">Lv.3+ <FaCode/>:</span> <RenderContent content={t.philosophy5} /></li>
+                                <li><span className="font-bold text-yellow-400 mr-2">Lv.1:</span> <RenderContent content={t.philosophy3} /></li>
+                                <li><span className="font-bold text-yellow-400 mr-2">Lv.2:</span> <RenderContent content={t.philosophy4} /></li>
+                                <li><span className="font-bold text-yellow-400 mr-2">Lv.3+:</span> <RenderContent content={t.philosophy5} /></li>
                             </ul>
                             <hr className="border-gray-700 my-3"/>
                             {/* Validation Emphasis */}
@@ -481,27 +391,20 @@ function ActualPageContent() {
                     </section>
                 )}
 
-                {/* WORKHORSE Components (Render when showComponents is true) */}
+                {/* WORKHORSE Components */}
                 {showComponents && (
                      <>
-                        {/* Title for the main components */}
                         <h2 className="text-3xl font-bold text-center text-brand-green mb-8 animate-pulse">{t.componentsTitle}</h2>
-
-                         {/* Extractor Section */}
                          <section id="extractor" className="mb-12 w-full max-w-4xl">
                              <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg backdrop-blur-sm">
                                  <CardContent className="p-4">
-                                     {/* Pass CONTEXT ref directly */}
                                      <RepoTxtFetcher ref={fetcherRef} />
                                  </CardContent>
                              </Card>
                          </section>
-
-                         {/* Executor Section */}
-                        <section id="executor" /* ref={prSectionRef} - Removed if not used elsewhere */ className="mb-12 w-full max-w-4xl pb-16">
+                        <section id="executor" className="mb-12 w-full max-w-4xl pb-16">
                              <Card className="bg-gray-900/80 border border-purple-700/50 shadow-lg backdrop-blur-sm">
                                  <CardContent className="p-4">
-                                     {/* Pass CONTEXT refs directly */}
                                      <AICodeAssistant
                                          ref={assistantRef}
                                          kworkInputRefPassed={kworkInputRef}
@@ -513,92 +416,44 @@ function ActualPageContent() {
                      </>
                  )}
 
-                {/* Final CTA (Render when showComponents is true) */}
+                {/* Final CTA */}
                  {showComponents && (
                      <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
                          <div className="bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 p-6 rounded-lg shadow-lg animate-pulse border-2 border-white/50">
                              <h3 className="text-2xl font-bold text-white mb-3">{t.ctaTitle.replace('{USERNAME}', userName)}</h3>
-                             <p className="text-white text-lg mb-4">
-                                <RenderContent content={t.ctaDesc} />
-                             </p>
-                             {/* Specific CTA for "Hot Chicks" / Contact */}
-                             <p className="text-white text-xl font-semibold mb-4 bg-black/30 p-3 rounded">
-                                 <FaHeart className="inline mr-2 text-red-400 animate-ping"/> <RenderContent content={t.ctaHotChick} /> <FaUserAstronaut className="inline ml-2 text-pink-300"/>
-                             </p>
-                             {/* General CTA for "Dudes" */}
-                             <p className="text-gray-300 text-base">
-                                <RenderContent content={t.ctaDude} />
-                             </p>
+                             <p className="text-white text-lg mb-4"> <RenderContent content={t.ctaDesc} /> </p>
+                             <p className="text-white text-xl font-semibold mb-4 bg-black/30 p-3 rounded"> <FaHeart className="inline mr-2 text-red-400 animate-ping"/> <RenderContent content={t.ctaHotChick} /> <FaUserAstronaut className="inline ml-2 text-pink-300"/> </p>
+                             <p className="text-gray-300 text-base"> <RenderContent content={t.ctaDude} /> </p>
                          </div>
                      </section>
                  )}
 
-                {/* Floating Navigation Icons */}
+                {/* Navigation Icons */}
                  <nav className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40">
-                     {/* Intro Button */}
-                     <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700/80 backdrop-blur-sm rounded-full hover:bg-gray-600 transition shadow-md" title={t.navIntro}>
-                         <FaCircleInfo className="text-lg text-gray-200" />
-                     </button>
-                     {/* Vibe Loop Button */}
-                     <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-purple-700/80 backdrop-blur-sm rounded-full hover:bg-purple-600 transition shadow-md" title={t.navCyberVibe}>
-                         <FaLevelUpAlt className="text-lg text-white" />
-                     </button>
-                     {/* Buttons shown only when components are visible */}
-                     {showComponents && (
-                         <>
-                             {/* Grabber Button */}
-                             <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-blue-700/80 backdrop-blur-sm rounded-full hover:bg-blue-600 transition shadow-md" title={t.navGrabber}>
-                                 <FaDownload className="text-lg text-white" />
-                             </button>
-                             {/* Assistant Button */}
-                             <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-indigo-700/80 backdrop-blur-sm rounded-full hover:bg-indigo-600 transition shadow-md" title={t.navAssistant}>
-                                 <FaRobot className="text-lg text-white" />
-                             </button>
-                         </>
-                     )}
+                     <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700/80 backdrop-blur-sm rounded-full hover:bg-gray-600 transition shadow-md" title={t.navIntro}> <FaCircleInfo className="text-lg text-gray-200" /> </button>
+                     <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-purple-700/80 backdrop-blur-sm rounded-full hover:bg-purple-600 transition shadow-md" title={t.navCyberVibe}> <FaLevelUpAlt className="text-lg text-white" /> </button>
+                     {showComponents && ( <>
+                            <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-blue-700/80 backdrop-blur-sm rounded-full hover:bg-blue-600 transition shadow-md" title={t.navGrabber}> <FaDownload className="text-lg text-white" /> </button>
+                            <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-indigo-700/80 backdrop-blur-sm rounded-full hover:bg-indigo-600 transition shadow-md" title={t.navAssistant}> <FaRobot className="text-lg text-white" /> </button>
+                     </> )}
                 </nav>
 
-                {/* Automation Buddy (Wrapped in Suspense for client-side hooks) */}
-                <Suspense fallback={<LoadingBuddyFallback />}>
-                    <AutomationBuddy />
-                </Suspense>
+                {/* Automation Buddy */}
+                <Suspense fallback={<LoadingBuddyFallback />}> <AutomationBuddy /> </Suspense>
             </div>
         </>
     );
 }
 
-// --- Layout Component (Ref creation REMOVED) ---
-// This component sets up the Context Provider
+// --- Layout Component ---
 function RepoXmlPageLayout() {
-    // REMOVED: fetcherRefForProvider, assistantRefForProvider, etc.
-    return (
-        // The Provider initializes the context and manages the state
-        // REMOVED: Passing refs as props to Provider
-        <RepoXmlPageProvider>
-            {/* The actual page content component consumes the context */}
-            <ActualPageContent />
-        </RepoXmlPageProvider>
-    );
+    return ( <RepoXmlPageProvider> <ActualPageContent /> </RepoXmlPageProvider> );
 }
 
 // --- Exported Page Component ---
-// This is the component Next.js renders for the page route
 export default function RepoXmlPage() {
-    // Determine fallback language based on browser before full mount
     const fallbackLoadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
     const fallbackLoadingText = translations[fallbackLoadingLang].loading;
-    // Define a fallback UI for Suspense
-    const fallbackLoading = (
-        <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950">
-            <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" />
-            <p className="text-brand-green animate-pulse text-xl font-mono">{fallbackLoadingText}</p>
-        </div>
-    );
-    // Wrap the Layout (which includes the Provider and Page Content) in Suspense
-    // This handles loading states for hooks like useSearchParams within ActualPageContent
-    return (
-        <Suspense fallback={fallbackLoading}>
-            <RepoXmlPageLayout />
-        </Suspense>
-    );
+    const fallbackLoading = ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{fallbackLoadingText}</p> </div> );
+    return ( <Suspense fallback={fallbackLoading}> <RepoXmlPageLayout /> </Suspense> );
 }
