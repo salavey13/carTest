@@ -131,7 +131,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     // --- Helper Functions ---
     const extractPRTitleHint = (text: string): string => { const lines = text.split('\n'); const firstLine = lines.find(l => l.trim() !== '') || "AI Assistant Update"; return firstLine.trim().substring(0, 70); };
 
-     // --- Direct Image Replacement Handler (Updated error handling) ---
+     // --- Direct Image Replacement Handler (Updated PR Title/Search Logic) ---
     const handleDirectImageReplace = useCallback(async (task: ImageReplaceTask, files: FileNode[]): Promise<void> => {
         toast.info("[ImgReplace] START");
         setIsProcessingPR(true);
@@ -192,28 +192,44 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
              toast.info("[ImgReplace] Content changed.");
 
 
-            // PR/Commit Logic (This part can throw errors)
+            // PR/Commit Logic
             toast.info(`[ImgReplace] Preparing commit/PR...`);
             const filesToCommit: { path: string; content: string }[] = [{ path: task.targetPath, content: modifiedContent }];
-            const newImageFilename = task.newUrl.split('/').pop()?.split('?')[0] || 'image';
-            const commitTitle = `chore: Update image ${newImageFilename} in ${task.targetPath}`;
-            const safeCommitTitle = commitTitle.length > 72 ? commitTitle.substring(0, 69) + '...' : commitTitle;
+
+            // --- *** MODIFIED TITLE LOGIC START *** ---
+            // Commit message still includes specific image for history clarity
+            const newImageFilenameForCommit = task.newUrl.split('/').pop()?.split('?')[0] || 'image';
+            const specificCommitMsg = `chore: Update image ${newImageFilenameForCommit} in ${task.targetPath}`;
+            // PR Title is now generic to the PAGE being updated
+            const genericPrTitle = `chore: Update images in ${task.targetPath}`;
+            const safePrTitle = genericPrTitle.length > 72 ? genericPrTitle.substring(0, 69) + '...' : genericPrTitle;
+            // --- *** MODIFIED TITLE LOGIC END *** ---
+
+            // PR Description remains specific
             const prDesc = `Replaced image via SuperVibe Studio.\n\nFile: \`${task.targetPath}\`\nOld: \`${task.oldUrl}\`\nNew: \`${task.newUrl}\``;
-            const fullCommitMsg = `${safeCommitTitle}\n\n${prDesc}`;
-            const prTitleNew = safeCommitTitle;
+            // Full commit message for git commit
+            const fullCommitMsg = `${specificCommitMsg}\n\n${prDesc}`; // Use specific commit message here
 
             let existingPrBranch: string | null = null; let existingPrNum: number | null = null;
-            const expectedPrTitlePrefix = `chore: Update image`; const expectedPrFile = task.targetPath;
-            toast.info(`[ImgReplace] Searching for existing PRs...`);
+            // --- *** UPDATED PR SEARCH LOGIC *** ---
+            const expectedPrTitlePrefix = `chore: Update images in`; // Use the new generic prefix
+            const expectedPrFile = task.targetPath; // Still use the file path
+            toast.info(`[ImgReplace] Searching for existing PRs (Prefix: '${expectedPrTitlePrefix}', File: ${expectedPrFile})...`);
              if (contextOpenPrs && contextOpenPrs.length > 0) {
-                 const matchPr = contextOpenPrs.find(pr => pr.title?.startsWith(expectedPrTitlePrefix) && pr.title?.includes(expectedPrFile) && pr.head?.ref);
+                 // Search using the new prefix and the file path
+                 const matchPr = contextOpenPrs.find(pr =>
+                     pr.title?.startsWith(expectedPrTitlePrefix) &&
+                     pr.title?.includes(expectedPrFile) && // Make sure it's for the correct file
+                     pr.head?.ref);
+            // --- *** END UPDATED PR SEARCH LOGIC *** ---
+
                  if (matchPr) {
                       if (matchPr.head.ref && typeof matchPr.number === 'number') {
                           existingPrBranch = matchPr.head.ref; existingPrNum = matchPr.number;
-                          toast.info(`[ImgReplace] Found existing PR #${existingPrNum} on branch '${existingPrBranch}'`);
-                          toast.info(`Обновляю PR #${existingPrNum} для картинки...`);
+                          toast.info(`[ImgReplace] Found existing PR #${existingPrNum} ('${matchPr.title}') on branch '${existingPrBranch}'`);
+                          toast.info(`Обновляю PR #${existingPrNum} для картинок на странице...`);
                       } else { toastLogger.error("[ImgReplace] Found PR, but ref/num missing:", matchPr); }
-                 } else { toast.info(`[ImgReplace] No specific existing PR found.`); }
+                 } else { toast.info(`[ImgReplace] No specific existing PR found matching prefix and file.`); }
              } else { toast.info("[ImgReplace] No open PRs in context."); }
              const branchToUpd = existingPrBranch || (existingPrNum === null ? targetBranchName : null);
              toast.info(`[ImgReplace] Action: ${existingPrBranch ? 'Update existing PR branch' : (branchToUpd ? `Update target branch ${branchToUpd}` : 'Create new PR/branch')}`);
@@ -221,14 +237,17 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
              // Execute Action (Update or Create)
              if (branchToUpd && existingPrNum !== null) {
                  toast.info(`[ImgReplace] Calling triggerUpdateBranch...`);
+                 // Use specific commit message, generic PR title isn't needed for update function directly
+                 // The PR description (prDesc) will be added as a comment
                  const res = await triggerUpdateBranch( repoUrlForForm, filesToCommit, fullCommitMsg, branchToUpd, existingPrNum, prDesc );
                  if (!res.success) { throw new Error(res.error || "Failed to update branch"); } // Throws on failure
-                 toast.success(`[ImgReplace] Branch ${branchToUpd} updated.`);
+                 toast.success(`[ImgReplace] Branch ${branchToUpd} updated for PR #${existingPrNum}.`);
              } else {
                  toast.info(`[ImgReplace] Calling createGitHubPullRequest...`);
-                 const res = await createGitHubPullRequest(repoUrlForForm, filesToCommit, prTitleNew, prDesc, fullCommitMsg);
+                 // Use the new GENERIC PR title when creating a NEW PR
+                 const res = await createGitHubPullRequest(repoUrlForForm, filesToCommit, safePrTitle, prDesc, fullCommitMsg);
                  if (res.success && res.prUrl) {
-                     toast.success(`PR для картинки создан: ${res.prUrl}`);
+                     toast.success(`PR для картинок создан: ${res.prUrl}`);
                      await triggerGetOpenPRs(repoUrlForForm);
                      toast.success(`[ImgReplace] New PR created: ${res.prUrl}`);
                  } else {
