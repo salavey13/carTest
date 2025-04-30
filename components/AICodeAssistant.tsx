@@ -84,7 +84,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         targetBranchName, triggerToggleSettingsModal,
         triggerUpdateBranch, updateRepoUrlInAssistant,
         loadingPrs, setIsParsing: setContextIsParsing, isParsing: contextIsParsing,
-        imageReplaceTask, setImageReplaceTask,
+        imageReplaceTask, setImageReplaceTask, // <<< Make sure setImageReplaceTask is destructured here
         fetchStatus, allFetchedFiles, repoUrlEntered,
         repoUrl: repoUrlFromContext,
         setRequestCopied // Needed for handlers hook
@@ -94,7 +94,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const handlers = useAICodeAssistantHandlers({
         // Pass all required state and setters
         response, componentParsedFiles, selectedFileIds, repoUrlStateLocal, prTitle, customLinks, originalRepoFiles, isFetchingOriginals, imageReplaceTask,
-        setResponse, setSelectedFileIds, setPrTitle, setCustomLinks, setShowModal, setModalMode, setIsProcessingPR, setOriginalRepoFiles, setIsFetchingOriginals, setIsImageModalOpen, setComponentParsedFiles, setImageReplaceError, setRepoUrlStateLocal, // Pass local URL setter too
+        setResponse, setSelectedFileIds, setPrTitle, setCustomLinks, setShowModal, setModalMode, setIsProcessingPR, setOriginalRepoFiles, setIsFetchingOriginals, setIsImageModalOpen, setComponentParsedFiles, setImageReplaceError, setRepoUrlStateLocal,
         // Pass hook results/setters
         codeParserHook,
         // Pass contexts
@@ -102,7 +102,9 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         pageContext,
         // Pass refs
         aiResponseInputRefPassed,
-        kworkInputRefPassed: kworkInputRefPassed, // Pass if needed by any handler logic indirectly
+        kworkInputRefPassed,
+        // --- FIX: Pass setImageReplaceTask ---
+        setImageReplaceTask, // Add this line
     });
 
     // --- Destructure the handlers for use ---
@@ -170,13 +172,11 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                 } else {
                     setCustomLinks([]);
                     if (e && e.code !== 'PGRST116') {
-                        // --- FIX: Use logger or toast directly ---
                         logger.error("Error loading custom links (supabase):", e);
                         toast.error("Error loading custom links: " + e.message);
                     }
                 }
             } catch (e: any) {
-                // --- FIX: Use logger or toast directly ---
                 logger.error("Error loading custom links (catch):", e);
                 toast.error("Error loading custom links: " + e.message);
                 setCustomLinks([]);
@@ -195,36 +195,41 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     // Direct image replace effect
      useEffect(() => {
-        // --- FIX: Removed toastLogger.effectCheck ---
         const canProcess = imageReplaceTask && fetchStatus === 'success' && allFetchedFiles.length > 0 && allFetchedFiles.some(f => f.path === imageReplaceTask.targetPath) && !assistantLoading && !processingImageReplace.current;
 
         if (canProcess) {
             logger.log("[Effect] Conditions met. Starting image replace process...");
             processingImageReplace.current = true;
             setImageReplaceError(null);
-            handlers.handleDirectImageReplace(imageReplaceTask, allFetchedFiles)
-                .then(() => {
-                     if (imageReplaceTaskRef.current) {
-                        if(imageReplaceError) { logger.warn(`[Effect] Replace finished, but with issue: ${imageReplaceError}`); }
-                        else { logger.info("[Effect] Replace process resolved, but task still active? (Check logic)"); }
-                     } else { logger.log("[Effect] Replace process resolved successfully."); }
-                })
-                .catch(err => {
-                    const errorMsg = err?.message || "Unknown error";
-                    // --- FIX: Use logger or toast directly ---
-                    logger.error("[Effect] handleDirectImageReplace Promise REJECTED:", errorMsg);
-                    toast.error("Image replace failed: " + errorMsg);
-                    setImageReplaceError(`Promise rejected: ${errorMsg}`);
-                })
-                .finally(() => {
-                    logger.log("[Effect] Process finished (finally block).");
-                    processingImageReplace.current = false;
-                });
+            // Ensure handlers and the specific handler exist before calling
+            if (handlers?.handleDirectImageReplace) {
+                handlers.handleDirectImageReplace(imageReplaceTask, allFetchedFiles)
+                    .then(() => {
+                         if (imageReplaceTaskRef.current) {
+                            if(imageReplaceError) { logger.warn(`[Effect] Replace finished, but with issue: ${imageReplaceError}`); }
+                            else { logger.info("[Effect] Replace process resolved, but task still active? (Check logic)"); }
+                         } else { logger.log("[Effect] Replace process resolved successfully."); }
+                    })
+                    .catch(err => {
+                        const errorMsg = err?.message || "Unknown error";
+                        logger.error("[Effect] handleDirectImageReplace Promise REJECTED:", errorMsg);
+                        toast.error("Image replace failed: " + errorMsg);
+                        setImageReplaceError(`Promise rejected: ${errorMsg}`);
+                    })
+                    .finally(() => {
+                        logger.log("[Effect] Process finished (finally block).");
+                        processingImageReplace.current = false;
+                    });
+            } else {
+                 logger.error("[Effect] handleDirectImageReplace handler is not available!");
+                 setImageReplaceError("Internal error: Image replace handler missing.");
+                 processingImageReplace.current = false; // Ensure flag is reset
+            }
         } else if (imageReplaceTask && fetchStatus === 'error') {
             logger.warn("[Effect] Image task active, but fetch status is error.");
              setImageReplaceError("Failed to fetch target file.");
         }
-     }, [ imageReplaceTask, fetchStatus, allFetchedFiles, assistantLoading, handlers.handleDirectImageReplace, setImageReplaceError, imageReplaceError, logger ]); // Use handler from hook
+     }, [ imageReplaceTask, fetchStatus, allFetchedFiles, assistantLoading, handlers, setImageReplaceError, imageReplaceError, logger ]); // Added handlers to dependency array
 
 
     // --- Imperative Handle (Expose handlers from the hook) ---
@@ -275,23 +280,23 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                           <div className="relative group">
                               <textarea id="response-input" ref={aiResponseInputRefPassed} className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm min-h-[180px] resize-y simple-scrollbar" defaultValue={response} onChange={(e) => setResponseValue(e.target.value)} placeholder={isWaitingForAiResponse ? "AI думает..." : commonDisabled ? "Ожидание..." : "Ответ AI здесь..."} disabled={commonDisabled} spellCheck="false" />
                               {/* Pass handlers from the hook */}
-                              <TextAreaUtilities response={response} isLoading={commonDisabled} onParse={handleParse} onOpenModal={handleOpenModal} onCopy={handleCopyResponse} onClear={handleClearResponse} onSelectFunction={handleSelectFunction} isParseDisabled={parseButtonDisabled} isProcessingPR={isProcessingPR || assistantLoading} />
+                              <TextAreaUtilities response={response} isLoading={commonDisabled} onParse={handlers.handleParse} onOpenModal={handlers.handleOpenModal} onCopy={handlers.handleCopyResponse} onClear={handlers.handleClearResponse} onSelectFunction={handlers.handleSelectFunction} isParseDisabled={parseButtonDisabled} isProcessingPR={isProcessingPR || assistantLoading} />
                           </div>
                            <div className="flex justify-end items-start mt-1 gap-2 min-h-[30px]">
                                {/* Pass handlers from the hook */}
-                               <CodeRestorer parsedFiles={componentParsedFiles} originalFiles={originalRepoFiles} skippedIssues={validationIssues.filter(i => i.type === 'skippedCodeBlock')} onRestorationComplete={handleRestorationComplete} disabled={commonDisabled || validationStatus === 'validating' || isFetchingOriginals} />
-                               <ValidationStatusIndicator status={validationStatus} issues={validationIssues} onAutoFix={handleAutoFix} onCopyPrompt={handleCopyFixPrompt} isFixDisabled={fixButtonDisabled} />
+                               <CodeRestorer parsedFiles={componentParsedFiles} originalFiles={originalRepoFiles} skippedIssues={validationIssues.filter(i => i.type === 'skippedCodeBlock')} onRestorationComplete={handlers.handleRestorationComplete} disabled={commonDisabled || validationStatus === 'validating' || isFetchingOriginals} />
+                               <ValidationStatusIndicator status={validationStatus} issues={validationIssues} onAutoFix={handlers.handleAutoFix} onCopyPrompt={handlers.handleCopyFixPrompt} isFixDisabled={fixButtonDisabled} />
                           </div>
                       </div>
                       {/* Pass handlers from the hook */}
-                     <ParsedFilesList parsedFiles={componentParsedFiles} selectedFileIds={selectedFileIds} validationIssues={validationIssues} onToggleSelection={handleToggleFileSelection} onSelectAll={handleSelectAllFiles} onDeselectAll={handleDeselectAllFiles} onSaveFiles={handleSaveFiles} onDownloadZip={handleDownloadZip} onSendToTelegram={handleSendToTelegram} isUserLoggedIn={!!user} isLoading={commonDisabled} />
+                     <ParsedFilesList parsedFiles={componentParsedFiles} selectedFileIds={selectedFileIds} validationIssues={validationIssues} onToggleSelection={handlers.handleToggleFileSelection} onSelectAll={handlers.handleSelectAllFiles} onDeselectAll={handlers.handleDeselectAllFiles} onSaveFiles={handlers.handleSaveFiles} onDownloadZip={handlers.handleDownloadZip} onSendToTelegram={handlers.handleSendToTelegram} isUserLoggedIn={!!user} isLoading={commonDisabled} />
                      {/* Pass handlers from the hook */}
                      <PullRequestForm id="pr-form-container" repoUrl={repoUrlForForm}
-                      prTitle={prTitle} selectedFileCount={selectedAssistantFiles.size} isLoading={isProcessingPR || assistantLoading} isLoadingPrList={loadingPrs} onRepoUrlChange={updateRepoUrl} onPrTitleChange={setPrTitle} onCreatePR={handleCreateOrUpdatePR} buttonText={prButtonText} buttonIcon={prButtonLoadingIconNode} isSubmitDisabled={submitButtonDisabled} />
+                      prTitle={prTitle} selectedFileCount={selectedAssistantFiles.size} isLoading={isProcessingPR || assistantLoading} isLoadingPrList={loadingPrs} onRepoUrlChange={updateRepoUrl} onPrTitleChange={setPrTitle} onCreatePR={handlers.handleCreateOrUpdatePR} buttonText={prButtonText} buttonIcon={prButtonLoadingIconNode} isSubmitDisabled={submitButtonDisabled} />
                      <OpenPrList openPRs={contextOpenPrs} />
                     <div className="flex items-center gap-3 mt-2 flex-wrap">
                         {/* Pass handlers from the hook */}
-                        <ToolsMenu customLinks={customLinks} onAddCustomLink={handleAddCustomLink} disabled={commonDisabled}/>
+                        <ToolsMenu customLinks={customLinks} onAddCustomLink={handlers.handleAddCustomLink} disabled={commonDisabled}/>
                          <button onClick={() => setIsImageModalOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50 relative" disabled={commonDisabled} title="Загрузить/Связать Картинки (prompts_imgs.txt)" >
                              <FaImage className="text-gray-400" /> <span className="text-sm text-white">Картинки</span>
                              {componentParsedFiles.some(f => f.path === '/prompts_imgs.txt') && !isImageModalOpen && ( <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-gray-800 animate-pulse"></span> )}
@@ -341,10 +346,10 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             {/* --- Modals (Use handlers from the hook) --- */}
             <AnimatePresence>
                 {showStandardAssistantUI && showModal && (
-                    <SwapModal isOpen={showModal} onClose={() => setShowModal(false)} onSwap={handleSwap} onSearch={handleSearch} initialMode={modalMode} />
+                    <SwapModal isOpen={showModal} onClose={() => setShowModal(false)} onSwap={handlers.handleSwap} onSearch={handlers.handleSearch} initialMode={modalMode} />
                 )}
                 {showStandardAssistantUI && isImageModalOpen && (
-                    <ImageToolsModal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} parsedFiles={componentParsedFiles} onUpdateParsedFiles={handleUpdateParsedFiles}/>
+                    <ImageToolsModal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} parsedFiles={componentParsedFiles} onUpdateParsedFiles={handlers.handleUpdateParsedFiles}/>
                 )}
              </AnimatePresence>
         </div>
