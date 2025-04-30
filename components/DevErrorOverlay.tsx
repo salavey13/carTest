@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useErrorOverlay, ErrorInfo } from '@/contexts/ErrorOverlayContext';
-import { FaCopy, FaTriangleExclamation } from 'react-icons/fa6';
+import { FaCopy, FaTriangleExclamation, FaGithub } from 'react-icons/fa6'; // Added FaGithub
 import { toast } from 'sonner';
 import { debugLogger as logger } from '@/lib/debugLogger';
 
@@ -24,7 +24,21 @@ const ErrorOverlayFallback: React.FC<{ message: string, renderErrorMessage?: str
 
 
 const DevErrorOverlay: React.FC = () => {
-  const { errorInfo, setErrorInfo, showOverlay } = useErrorOverlay();
+  // --- Safely access context ---
+  let errorInfo: ErrorInfo | null = null;
+  let setErrorInfo: React.Dispatch<React.SetStateAction<ErrorInfo | null>> = () => {};
+  let showOverlay = false;
+  try {
+       const context = useErrorOverlay();
+       errorInfo = context.errorInfo;
+       setErrorInfo = context.setErrorInfo;
+       showOverlay = context.showOverlay;
+  } catch(contextError: any) {
+       logger.fatal("FATAL: Failed to get ErrorOverlayContext!", contextError);
+       // Cannot render fallback here as we are outside the main try-catch
+       return <div className="fixed inset-0 z-[100] bg-black text-red-500 p-4">FATAL: ErrorOverlayContext failed. Check console.</div>;
+  }
+
 
   React.useEffect(() => {
     if (errorInfo) {
@@ -38,16 +52,16 @@ const DevErrorOverlay: React.FC = () => {
         return null;
       }
 
+      // --- Safe event handlers ---
       const handleClose = () => {
          try {
              setErrorInfo(null);
          } catch (e) {
-             logger.error("Error closing DevErrorOverlay:", e);
+             logger.error("Error in setErrorInfo during handleClose:", e);
          }
       };
 
-      // --- Safely get stack trace ---
-      const getShortStackTrace = (error?: Error | string): string => {
+      const getShortStackTrace = (error?: Error | string | any): string => {
          try {
              if (!error) return 'Нет стека вызовов.';
              let stack = '';
@@ -56,22 +70,29 @@ const DevErrorOverlay: React.FC = () => {
              } else if (typeof error === 'string') {
                  stack = error.split('\\n').join('\n');
              } else {
-                 stack = String(error);
+                 // Attempt to stringify other types safely
+                  try { stack = JSON.stringify(error, null, 2); }
+                  catch { stack = String(error); }
+             }
+             // Basic check for 'Script error.' and return something more informative if no stack
+             if (stack.trim() === '' && errorInfo?.message === 'Script error.') {
+                 return 'Стек недоступен (вероятно, ошибка CORS или в стороннем скрипте).';
              }
              return stack.split('\n').slice(0, 5).join('\n') || 'Стек вызовов пуст или недоступен.';
          } catch (e: any) {
-              logger.error("Error getting stack trace in DevErrorOverlay:", e);
+              logger.error("Error getting/formatting stack trace in DevErrorOverlay:", e);
               return `Ошибка получения стека: ${e?.message ?? 'Неизвестно'}`;
          }
       };
 
-      // --- Safely prepare copy text ---
       const handleCopyVibeRequest = () => {
          try {
-             const errorType = errorInfo.type?.toUpperCase() || 'UNKNOWN';
-             const message = errorInfo.message || 'Нет сообщения';
-             const shortStack = getShortStackTrace(errorInfo.error); // Execute safely
-             const source = errorInfo.source ? ` (${errorInfo.source}:${errorInfo.lineno ?? '?'})` : '';
+             const safeErrorInfo = errorInfo ?? { message: 'Unknown error', type: 'unknown' }; // Fallback
+             const errorType = safeErrorInfo.type?.toUpperCase() || 'UNKNOWN';
+             const message = safeErrorInfo.message || 'Нет сообщения';
+             const shortStack = getShortStackTrace(safeErrorInfo.error); // Execute safely
+             const source = safeErrorInfo.source ? ` (${safeErrorInfo.source}:${safeErrorInfo.lineno ?? '?'})` : '';
+             const gitHubIssueUrl = `https://github.com/salavey13/oneSitePls/issues/new?title=Bug%20Report:%20${encodeURIComponent(message.substring(0,50))}&body=${encodeURIComponent(`**Type:** ${errorType}\n**Message:** ${message}\n**Source:** ${source}\n\n**Stack (start):**\n\`\`\`\n${shortStack}\n\`\`\`\n\n**Context/Steps:**\n[Please describe what you were doing]\n`)}`;
 
              const prompt = `Йоу! Поймал ошибку в CyberVibe Studio, помоги разгрести!
 
@@ -85,8 +106,11 @@ ${shortStack}
 
 Задача: Проанализируй ошибку и стек. Предложи исправления кода или объясни причину.
 
-Ссылка на студию для контекста: /repo-xml
-`;
+*   **Скопируй этот текст** и вставь в CyberVibe Studio (<a href="/repo-xml" class="text-cyan-400 underline">/repo-xml</a>).
+*   **ИЛИ** [**Создай Issue на GitHub**](${gitHubIssueUrl}) (откроется в новой вкладке).
+
+Детали для Issue уже частично заполнены.`;
+
 
              navigator.clipboard.writeText(prompt)
                .then(() => {
@@ -103,44 +127,15 @@ ${shortStack}
       };
 
       // --- Safely render parts ---
-      const renderTitle = () => (
-         <h2 id="error-overlay-title" className="text-2xl font-bold text-red-300 flex items-center gap-2">
-            <FaExclamationTriangle className="text-red-400" />
-            Ошибочка вышла!
-         </h2>
-      );
-
-      const renderMessage = () => (
-         <p className="text-lg text-red-200 font-semibold">
-            {errorInfo.message || "Неизвестная ошибка"}
-         </p>
-      );
-
-      const renderSource = () => (
-         errorInfo.source ? (
-            <p className="text-sm text-red-300 font-mono">
-              Источник: {errorInfo.source} (строка: {errorInfo.lineno ?? '?'}, столбец: {errorInfo.colno ?? '?'})
-            </p>
-         ) : null
-      );
-
-       const renderStackTrace = () => (
-           <details className="bg-red-950/50 p-3 rounded border border-red-700/50">
-             <summary className="cursor-pointer text-sm font-medium text-red-300 hover:text-red-200">
-               Технические детали (Stack Trace - начало)
-             </summary>
-             <pre className="mt-2 text-xs text-red-200/80 whitespace-pre-wrap break-words font-mono">
-               {getShortStackTrace(errorInfo.error)}
-             </pre>
-           </details>
-       );
-
-      const renderAdvice = () => (
-         <div className="mt-4 p-3 bg-yellow-900/30 border border-yellow-600/50 rounded text-yellow-200 text-sm">
-           <p className="font-semibold mb-1">🧘 Не паникуй, лови вайб!</p>
-           <p>Ошибки - это часть пути к просветлению кода. Скопируй инфу и кидай боту (или мне) в <a href="/repo-xml" className="underline hover:text-yellow-100">CyberVibe Studio</a> – разберемся!</p>
-         </div>
-      );
+      // Each section wrapped in its own try-catch for maximum resilience
+      const RenderSection: React.FC<{ title: string; children: () => React.ReactNode }> = ({ title, children }) => {
+          try {
+              return <>{children()}</>;
+          } catch (e: any) {
+              logger.error(`Error rendering overlay section "${title}":`, e);
+              return <div className="text-red-500 border border-dashed border-red-600 p-2 my-2 rounded">Error rendering {title}: {e?.message ?? 'Unknown'}</div>;
+          }
+      };
 
       return (
         <div
@@ -153,41 +148,85 @@ ${shortStack}
           <div className="bg-gradient-to-br from-red-900 via-red-950 to-black border border-red-600/50 rounded-lg shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] flex flex-col text-red-100">
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-               {/* Safely render title */}
-               {(() => { try { return renderTitle(); } catch (e: any) { logger.error("Error rendering overlay title:", e); return <h2 className="text-red-500">Error Rendering Title</h2>; } })()}
-            </div>
+             <RenderSection title="Header">
+                 {() => (
+                     <div className="flex items-center justify-between mb-4">
+                       <h2 id="error-overlay-title" className="text-2xl font-bold text-red-300 flex items-center gap-2">
+                          <FaExclamationTriangle className="text-red-400" />
+                          Ошибочка вышла!
+                       </h2>
+                     </div>
+                 )}
+            </RenderSection>
 
             {/* Body */}
             <div id="error-overlay-description" className="flex-grow overflow-y-auto simple-scrollbar pr-2 space-y-4 mb-4">
-                 {/* Safely render message */}
-                 {(() => { try { return renderMessage(); } catch (e: any) { logger.error("Error rendering overlay message:", e); return <p className="text-red-500">Error Rendering Message: {e?.message}</p>; } })()}
-                 {/* Safely render source */}
-                 {(() => { try { return renderSource(); } catch (e: any) { logger.error("Error rendering overlay source:", e); return <p className="text-red-500">Error Rendering Source</p>; } })()}
-                 {/* Safely render stack trace */}
-                 {(() => { try { return renderStackTrace(); } catch (e: any) { logger.error("Error rendering overlay stack trace:", e); return <p className="text-red-500">Error Rendering Stack Trace</p>; } })()}
-                 {/* Safely render advice */}
-                 {(() => { try { return renderAdvice(); } catch (e: any) { logger.error("Error rendering overlay advice:", e); return <p className="text-red-500">Error Rendering Advice</p>; } })()}
+                 <RenderSection title="Message">
+                      {() => (
+                          <p className="text-lg text-red-200 font-semibold">
+                             {(errorInfo?.message || "Неизвестная ошибка").toString()} {/* Ensure message is string */}
+                          </p>
+                      )}
+                 </RenderSection>
+                 <RenderSection title="Source">
+                      {() => errorInfo?.source ? (
+                         <p className="text-sm text-red-300 font-mono">
+                           Источник: {errorInfo.source} (строка: {errorInfo.lineno ?? '?'}, столбец: {errorInfo.colno ?? '?'})
+                         </p>
+                      ) : null}
+                 </RenderSection>
+                 <RenderSection title="StackTrace">
+                      {() => (
+                          <details className="bg-red-950/50 p-3 rounded border border-red-700/50">
+                            <summary className="cursor-pointer text-sm font-medium text-red-300 hover:text-red-200">
+                              Технические детали (Stack Trace - начало)
+                            </summary>
+                            <pre className="mt-2 text-xs text-red-200/80 whitespace-pre-wrap break-words font-mono">
+                              {getShortStackTrace(errorInfo?.error)}
+                            </pre>
+                          </details>
+                      )}
+                 </RenderSection>
+                 <RenderSection title="Advice">
+                      {() => (
+                         <div className="mt-4 p-3 bg-yellow-900/30 border border-yellow-600/50 rounded text-yellow-200 text-sm space-y-2">
+                           <p className="font-semibold">🧘 Не паникуй, лови вайб!</p>
+                           <p>Ошибки - это часть пути к просветлению кода. Помоги нам стать лучше:</p>
+                           <ul className='list-disc list-inside space-y-1'>
+                               <li>
+                                  Скопируй <button onClick={handleCopyVibeRequest} className="text-cyan-400 underline hover:text-cyan-300 px-1">Vibe Запрос</button> и вставь в CyberVibe Studio (<a href="/repo-xml" className="text-cyan-400 underline hover:text-cyan-300">/repo-xml</a>).
+                               </li>
+                               <li>
+                                   Или <a
+                                       href={`https://github.com/salavey13/oneSitePls/issues/new?title=Bug%20Report:%20${encodeURIComponent((errorInfo?.message || 'Unknown Error').substring(0,50))}&body=${encodeURIComponent(`**Type:** ${errorInfo?.type?.toUpperCase() || 'UNKNOWN'}\n**Message:** ${errorInfo?.message || 'N/A'}\n**Source:** ${errorInfo?.source || 'N/A'} (Line: ${errorInfo?.lineno ?? '?'})\n\n**Stack (start):**\n\`\`\`\n${getShortStackTrace(errorInfo?.error)}\n\`\`\`\n\n**Context/Steps:**\n[Please describe what you were doing]\n`)}`}
+                                       target="_blank"
+                                       rel="noopener noreferrer"
+                                       className="text-cyan-400 underline hover:text-cyan-300"
+                                    >
+                                       создай Issue на GitHub <FaGithub className="inline ml-1 h-3 w-3" />
+                                    </a> (детали частично заполнены).
+                               </li>
+                           </ul>
+                         </div>
+                      )}
+                 </RenderSection>
             </div>
 
             {/* Footer with Buttons */}
-            <div className="flex flex-col sm:flex-row justify-between items-center pt-4 border-t border-red-700/50 mt-auto gap-3">
-               <button
-                  onClick={handleCopyVibeRequest}
-                  className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-yellow-950 rounded-md text-sm font-semibold transition shadow hover:shadow-lg w-full sm:w-auto"
-                  aria-label="Скопировать запрос на исправление ошибки"
-               >
-                   <FaCopy />
-                   Скопировать Vibe Запрос
-               </button>
-               <button
-                 onClick={handleClose}
-                 className="px-4 py-2 bg-red-700 hover:bg-red-600 text-red-100 rounded-md text-sm font-semibold transition shadow hover:shadow-lg w-full sm:w-auto"
-                 aria-label="Закрыть оверлей ошибки"
-               >
-                 Закрыть
-               </button>
-            </div>
+            <RenderSection title="Footer">
+                 {() => (
+                     <div className="flex flex-col sm:flex-row justify-end items-center pt-4 border-t border-red-700/50 mt-auto gap-3">
+                        {/* Removed Copy button here as it's integrated into advice */}
+                       <button
+                         onClick={handleClose}
+                         className="px-4 py-2 bg-red-700 hover:bg-red-600 text-red-100 rounded-md text-sm font-semibold transition shadow hover:shadow-lg w-full sm:w-auto"
+                         aria-label="Закрыть оверлей ошибки"
+                       >
+                         Закрыть
+                       </button>
+                     </div>
+                 )}
+            </RenderSection>
 
           </div>
         </div>

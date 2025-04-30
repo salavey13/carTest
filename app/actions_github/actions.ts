@@ -13,7 +13,21 @@ interface SimplePullRequest { id: number; number: number; title: string; html_ur
 const BATCH_SIZE = 40;
 const DELAY_BETWEEN_BATCHES_MS = 600;
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-function parseRepoUrl(repoUrl: string) { const m=repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/); if(!m) throw new Error("Invalid GitHub URL"); return { owner: m[1], repo: m[2].replace(/\.git$/, '') }; }
+
+// --- Улучшенная parseRepoUrl ---
+function parseRepoUrl(repoUrl: string | null | undefined): { owner: string; repo: string } {
+    if (!repoUrl || typeof repoUrl !== 'string') {
+        throw new Error("Invalid GitHub URL: URL is empty or not a string.");
+    }
+    // Regex: Улучшен, чтобы обрабатывать опциональный '.git' и возможный '/' в конце
+    const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+?)(\.git)?\/?$/);
+    if (!match || !match[1] || !match[2]) {
+        console.error("Failed to parse GitHub URL:", repoUrl); // Логируем проблемный URL
+        throw new Error(`Invalid GitHub URL format: ${repoUrl}`);
+    }
+    return { owner: match[1], repo: match[2] };
+}
+
 
 // --- fetchRepoContents ---
 // ... (код fetchRepoContents без изменений) ...
@@ -53,7 +67,7 @@ export async function fetchRepoContents(repoUrl: string, customToken?: string, b
   } catch (error: any) {
     // --- Error Handling ---
     const endTime=Date.now(); const repoId=owner&&repo?`${owner}/${repo}`:repoUrl; const bInfo=targetBranch?` on ${targetBranch}`:''; console.error(`[Action] CRITICAL Error fetch ${repoId}${bInfo}:`,error);
-    if(error.status===403&&error.message?.includes('rate limit')){await notifyAdmin(`❌ Rate Limit ${repoId}${bInfo}.`);return {success:false, error:"GitHub API rate limit exceeded."};}
+    if(error.status===403&&error.message?.includes('rate limit')){await notifyAdmin(`⏳ Rate Limit ${repoId}${bInfo}.`);return {success:false, error:"GitHub API rate limit exceeded."};}
     if(error.status===404||error.message?.includes('not found')){await notifyAdmin(`❌ 404 Not Found ${repoId}${bInfo}.`);return {success:false, error:`Repo, branch ('${targetBranch}'), or resource not found.`};}
     if(error.status===401||error.status===403){await notifyAdmin(`❌ Auth Error (${error.status}) ${repoId}${bInfo}.`);return {success:false, error:`GitHub Auth error (${error.status}).`};}
     if(error.message?.startsWith('Too many files')){await notifyAdmin(`❌ Too many files ${repoId}${bInfo}.`);return {success:false, error:error.message};}
@@ -71,8 +85,8 @@ export async function createGitHubPullRequest( repoUrl: string, files: FileNode[
     const octokit = new Octokit({ auth: token }); const { data: repoData } = await octokit.repos.get({ owner, repo }); baseBranch = repoData.default_branch;
     const { data: refData } = await octokit.git.getRef({ owner, repo, ref: `heads/${baseBranch}` }); const baseSha = refData.object.sha;
     const MAX_BYTES=65000; let finalCommitMsg=commitMessage, finalPrDesc=prDescription; const enc=new TextEncoder();
-    if(enc.encode(finalCommitMsg).length>MAX_BYTES){finalCommitMsg=finalCommitMsg.substring(0,60000)+"...(trunc)"; console.warn(`[Action] Commit msg trunc.`);}
-    if(enc.encode(finalPrDesc).length>MAX_BYTES){finalPrDesc=finalPrDesc.substring(0,60000)+"\n\n...(trunc)"; console.warn(`[Action] PR desc trunc.`);}
+    if(enc.encode(finalCommitMsg).length>MAX_BYTES){ try { finalCommitMsg=finalCommitMsg.substring(0,60000)+"...(trunc)"; } catch(e){console.warn("[Action] Commit msg trunc failed."); finalCommitMsg="Commit message truncated.";} console.warn(`[Action] Commit msg trunc.`);}
+    if(enc.encode(finalPrDesc).length>MAX_BYTES){ try { finalPrDesc=finalPrDesc.substring(0,60000)+"\n\n...(trunc)"; } catch(e){console.warn("[Action] PR desc trunc failed."); finalPrDesc="PR description truncated.";} console.warn(`[Action] PR desc trunc.`);}
     const newBranch = branchName || `ai-patch-${Date.now()}`; let branchExists=false; let existingHeadSha:string|null=null;
     try { const { data: eRef } = await octokit.git.getRef({ owner, repo, ref: `heads/${newBranch}` }); branchExists = true; existingHeadSha = eRef.object.sha; console.warn(`[Action] Branch '${newBranch}' exists (SHA: ${existingHeadSha}). Updating.`); }
     catch (error: any) { if (error.status === 404) { console.log(`[Action] Branch '${newBranch}' not found. Creating...`); branchExists = false; } else { throw error; } }
@@ -92,7 +106,7 @@ export async function createGitHubPullRequest( repoUrl: string, files: FileNode[
 }
 
 // --- updateBranch ---
-// ... (код updateBranch без изменений, но с улучшенным логом комментария) ...
+// ... (код updateBranch без изменений, но с улучшенным логом комментария и безопасным substring) ...
 export async function updateBranch(
     repoUrl: string,
     files: FileNode[],
@@ -131,7 +145,10 @@ export async function updateBranch(
         const MAX_BYTES = 65000;
         let finalMsg = commitMessage;
         const enc = new TextEncoder();
-        if (enc.encode(finalMsg).length > MAX_BYTES) { finalMsg = finalMsg.substring(0, 60000) + "..."; console.warn(`[Action] Commit msg trunc.`); }
+        if (enc.encode(finalMsg).length > MAX_BYTES) {
+             try { finalMsg = finalMsg.substring(0, 60000) + "..."; } catch(e){console.warn("[Action] Commit msg substring failed."); finalMsg="Commit message truncated.";}
+             console.warn(`[Action] Commit msg trunc.`);
+        }
 
         console.log(`[Action] Creating ${files.length} blobs...`);
         const tree = await Promise.all(files.map(async (f) => { try { const { data } = await octokit.git.createBlob({ owner: owner!, repo: repo!, content: f.content, encoding: "utf-8" }); return { path: f.path, mode: "100644" as const, type: "blob" as const, sha: data.sha }; } catch (bE: any) { console.error(`[Action] Err blob ${f.path}:`, bE); throw new Error(`Failed blob ${f.path}: ${bE.message || bE}`); } }));
@@ -151,11 +168,13 @@ export async function updateBranch(
 
         // --- Логика добавления комментария ---
         if (prNumberToComment && commentBody) {
-            console.log(`[Action] Attempting to add comment to PR #${prNumberToComment}. Body length: ${commentBody.length}. Body starts: "${commentBody.substring(0, 100)}..."`); // Более детальный лог
+            // Safe substring for logging
+            const safeBodyStart = commentBody.substring(0, 100);
+            console.log(`[Action] Attempting to add comment to PR #${prNumberToComment}. Body length: ${commentBody.length}. Body starts: "${safeBodyStart}..."`);
             try {
                 let finalComment = commentBody;
                 if (enc.encode(finalComment).length > MAX_BYTES) {
-                    finalComment = finalComment.substring(0, 60000) + "\n\n...(truncated)";
+                    try { finalComment = finalComment.substring(0, 60000) + "\n\n...(truncated)"; } catch(e){console.warn("[Action] Comment body substring failed."); finalComment="Comment truncated.";}
                     console.warn(`[Action] Comment body for PR #${prNumberToComment} truncated.`);
                 }
                 // --- Вызов API для создания комментария ---
@@ -281,17 +300,18 @@ export async function deleteGitHubBranch(repoUrl: string, branchName: string) { 
 
 // --- mergePullRequest ---
 // ... (код mergePullRequest без изменений) ...
-export async function mergePullRequest(repoUrl: string, pullNumber: number) { console.log("[Action] mergePullRequest called..."); let owner: string|undefined; let repo: string|undefined; const rIP=parseRepoUrl(repoUrl); owner=rIP.owner; repo=rIP.repo; const rId=`${owner}/${repo}`; try { const token=process.env.GITHUB_TOKEN; if(!token) throw new Error("GH token missing"); const octokit = new Octokit({ auth: token }); console.log(`[Action] Merging PR #${pullNumber} in ${rId}...`); const { data: prData } = await octokit.pulls.get({ owner, repo, pull_number: pullNumber }); if (prData.state !== 'open') { console.warn(`[Action] PR #${pullNumber} not open (${prData.state}).`); throw new Error(`PR #${pullNumber} not open (${prData.state}).`); } if (prData.merged) { console.warn(`[Action] PR #${pullNumber} already merged.`); return { success: true, message: "PR already merged." }; } if (!prData.mergeable) { console.warn(`[Action] PR #${pullNumber} not mergeable (${prData.mergeable_state}). Check delay...`); await delay(2000); const { data: prUpd } = await octokit.pulls.get({ owner, repo, pull_number: pullNumber }); if (!prUpd.mergeable) { console.error(`[Action] PR #${pullNumber} still not mergeable (${prUpd.mergeable_state}).`); throw new Error(`PR #${pullNumber} not mergeable (${prUpd.mergeable_state}).`); } console.log(`[Action] PR #${pullNumber} became mergeable.`); } await octokit.pulls.merge({ owner, repo, pull_number: pullNumber, merge_method: "squash" }); console.log(`[Action] PR #${pullNumber} merged in ${rId}.`); const adminMsg = `🚀 Изменения #${pullNumber} в ${rId} смержены!\n\n[GitHub](https://github.com/${owner}/${repo}/pull/${pullNumber})`; await notifyAdmins(adminMsg); return { success: true }; } catch (error: any) { console.error(`[Action] Merge fail PR #${pullNumber} in ${rId}:`, error); let eM = error instanceof Error ? error.message : "Merge failed"; if (error.status === 405) { eM = `PR #${pullNumber} not mergeable (405).`; console.error(`[Action] ${eM}`, error.response?.data); } else if (error.status === 404) { eM = `PR #${pullNumber} not found (404).`; console.error(`[Action] ${eM}`); } else if (error.status === 403) { eM = `Permission denied (403) merge PR #${pullNumber}.`; console.error(`[Action] ${eM}`); } else if (error.status === 409) { eM = `Merge conflict PR #${pullNumber} (409).`; console.error(`[Action] ${eM}`); } await notifyAdmin(`❌ Ошибка мержа PR #${pullNumber} в ${rId}:\n${eM}`); return { success: false, error: eM }; } }
+export async function mergePullRequest(repoUrl: string, pullNumber: number) { console.log("[Action] mergePullRequest called..."); let owner: string|undefined; let repo: string|undefined; const rIP=parseRepoUrl(repoUrl); owner=rIP.owner; repo=rIP.repo; const rId=`${owner}/${repo}`; try { const token=process.env.GITHUB_TOKEN; if(!token) throw new Error("GH token missing"); const octokit=new Octokit({auth:token}); console.log(`[Action] Merging PR #${pullNumber} in ${rId}...`); const { data: prData } = await octokit.pulls.get({ owner, repo, pull_number: pullNumber }); if (prData.state !== 'open') { console.warn(`[Action] PR #${pullNumber} not open (${prData.state}).`); throw new Error(`PR #${pullNumber} not open (${prData.state}).`); } if (prData.merged) { console.warn(`[Action] PR #${pullNumber} already merged.`); return { success: true, message: "PR already merged." }; } if (!prData.mergeable) { console.warn(`[Action] PR #${pullNumber} not mergeable (${prData.mergeable_state}). Check delay...`); await delay(2000); const { data: prUpd } = await octokit.pulls.get({ owner, repo, pull_number: pullNumber }); if (!prUpd.mergeable) { console.error(`[Action] PR #${pullNumber} still not mergeable (${prUpd.mergeable_state}).`); throw new Error(`PR #${pullNumber} not mergeable (${prUpd.mergeable_state}).`); } console.log(`[Action] PR #${pullNumber} became mergeable.`); } await octokit.pulls.merge({ owner, repo, pull_number: pullNumber, merge_method: "squash" }); console.log(`[Action] PR #${pullNumber} merged in ${rId}.`); const adminMsg = `🚀 Изменения #${pullNumber} в ${rId} смержены!\n\n[GitHub](https://github.com/${owner}/${repo}/pull/${pullNumber})`; await notifyAdmins(adminMsg); return { success: true }; } catch (error: any) { console.error(`[Action] Merge fail PR #${pullNumber} in ${rId}:`, error); let eM = error instanceof Error ? error.message : "Merge failed"; if (error.status === 405) { eM = `PR #${pullNumber} not mergeable (405).`; console.error(`[Action] ${eM}`, error.response?.data); } else if (error.status === 404) { eM = `PR #${pullNumber} not found (404).`; console.error(`[Action] ${eM}`); } else if (error.status === 403) { eM = `Permission denied (403) merge PR #${pullNumber}.`; console.error(`[Action] ${eM}`); } else if (error.status === 409) { eM = `Merge conflict PR #${pullNumber} (409).`; console.error(`[Action] ${eM}`); } await notifyAdmin(`❌ Ошибка мержа PR #${pullNumber} в ${rId}:\n${eM}`); return { success: false, error: eM }; } }
 
 // --- getOpenPullRequests ---
 // (Updated with more detailed error handling)
 export async function getOpenPullRequests(repoUrl: string): Promise<{ success: boolean; pullRequests?: SimplePullRequest[]; error?: string }> {
     let owner: string | undefined, repo: string | undefined;
-    const rIP = parseRepoUrl(repoUrl);
-    owner = rIP.owner;
-    repo = rIP.repo;
-    const rId = `${owner}/${repo}`;
     try {
+        const repoInfo = parseRepoUrl(repoUrl); // Validate URL first
+        owner = repoInfo.owner;
+        repo = repoInfo.repo;
+        const rId = `${owner}/${repo}`;
+
         const token = process.env.GITHUB_TOKEN;
         if (!token) throw new Error("GH token missing");
         const octokit = new Octokit({ auth: token });
@@ -311,26 +331,30 @@ export async function getOpenPullRequests(repoUrl: string): Promise<{ success: b
         return { success: true, pullRequests: cleanData };
     } catch (error: any) {
         // Enhanced Error Logging and Reporting
-        console.error(`[Action] CRITICAL Error fetch PRs ${rId}:`, error); // Log the full error object
+        const repoId = owner && repo ? `${owner}/${repo}` : repoUrl; // Use parsed repoId if available
+        console.error(`[Action] CRITICAL Error fetch PRs ${repoId}:`, error); // Log the full error object
         let eM = error instanceof Error ? error.message : "Failed fetch PRs";
         const status = error.status ? ` (${error.status})` : '';
 
-        if (error.status === 404) {
-            eM = `Repo ${rId} not found${status}.`;
-            await notifyAdmin(`❌ Ошибка 404 при получении PR ${rId}. Проверь URL/доступ.`);
+        if (error.message.startsWith("Invalid GitHub URL")) { // Check specific error from parseRepoUrl
+            eM = error.message; // Use the message from parseRepoUrl
+            // No need to notify admin for invalid user input
+        } else if (error.status === 404) {
+            eM = `Repo ${repoId} not found${status}.`;
+            await notifyAdmin(`❌ Ошибка 404 при получении PR ${repoId}. Проверь URL/доступ.`);
         } else if (error.status === 403) {
-            eM = `Permission denied${status} fetch PRs ${rId}. Проверь права токена.`;
-            await notifyAdmin(`❌ Ошибка 403 при получении PR ${rId}. Проверь права токена.`);
+            eM = `Permission denied${status} fetch PRs ${repoId}. Проверь права токена.`;
+            await notifyAdmin(`❌ Ошибка 403 при получении PR ${repoId}. Проверь права токена.`);
         } else if (error.status === 401) {
-             eM = `Bad credentials${status} fetch PRs ${rId}. Токен невалиден?`;
-             await notifyAdmin(`❌ Ошибка 401 при получении PR ${rId}. Токен невалиден?`);
+             eM = `Bad credentials${status} fetch PRs ${repoId}. Токен невалиден?`;
+             await notifyAdmin(`❌ Ошибка 401 при получении PR ${repoId}. Токен невалиден?`);
         } else if (error.message?.includes('rate limit')) { // Explicit check for rate limit
-             eM = `GitHub API rate limit exceeded${status} fetch PRs ${rId}.`;
-             await notifyAdmin(`⏳ Rate Limit при получении PR ${rId}.`);
+             eM = `GitHub API rate limit exceeded${status} fetch PRs ${repoId}.`;
+             await notifyAdmin(`⏳ Rate Limit при получении PR ${repoId}.`);
         } else {
             // Notify for other unexpected errors
-            await notifyAdmin(`❌ Неизвестная ошибка (${status || 'N/A'}) при получении PR ${rId}:\n${eM}`);
-            console.error(`[Action] Non-critical/Unknown error fetch PRs ${rId}: Status=${status}`, error);
+            await notifyAdmin(`❌ Неизвестная ошибка (${status || 'N/A'}) при получении PR ${repoId}:\n${eM}`);
+            console.error(`[Action] Non-critical/Unknown error fetch PRs ${repoId}: Status=${status}`, error);
         }
         // Return the specific error message
         return { success: false, error: eM };
@@ -344,7 +368,7 @@ export async function getGitHubUserProfile(username: string) { try { const token
 
 // --- approvePullRequest ---
 // ... (код approvePullRequest без изменений) ...
-export async function approvePullRequest(repoUrl: string, pullNumber: number) { console.log("[Action] approvePullRequest called..."); let owner:string|undefined; let repo:string|undefined; const rIP=parseRepoUrl(repoUrl); owner=rIP.owner; repo=rIP.repo; const rId=`${owner}/${repo}`; try { const token=process.env.GITHUB_TOKEN; if(!token) throw new Error("GH token missing"); const octokit=new Octokit({auth:token}); console.log(`[Action] Approving PR #${pullNumber} in ${rId}...`); await octokit.pulls.createReview({owner,repo,pull_number:pullNumber,event:"APPROVE",body:"Approved."}); console.log(`[Action] PR #${pullNumber} approved in ${rId}.`); return {success:true}; } catch (error: any) { console.error(`[Action] Approve failed PR #${pullNumber} in ${rId}:`, error); let eM = error instanceof Error ? error.message : "Approve fail"; if(error.status===404){eM=`PR #${pullNumber} not found (404).`;} else if(error.status===403){eM=`Permission denied (403) approving PR #${pullNumber}.`;} else if(error.status===422&&error.message?.includes("review cannot be submitted")){console.warn(`[Action] Cannot approve PR #${pullNumber}: ${error.message}`); eM=`Cannot approve PR #${pullNumber}: ${error.message}`; return {success:false, error:eM};} await notifyAdmin(`❌ Ошибка одобрения PR #${pullNumber} в ${rId}:\n${eM}`); return {success:false, error:eM}; } }
+export async function approvePullRequest(repoUrl: string, pullNumber: number) { console.log("[Action] approvePullRequest called..."); let owner:string|undefined; let repo:string|undefined; const rIP=parseRepoUrl(repoUrl); owner=rIP.owner; repo=rIP.repo; const rId=`${owner}/${repo}`; try { const token=process.env.GITHUB_TOKEN; if(!token) throw new Error("GH token missing"); const octokit=new Octokit({auth:token}); console.log(`[Action] Approving PR #${pullNumber} in ${rId}...`); await octokit.pulls.createReview({owner,repo,pull_number:pullNumber,event:"APPROVE",body:"Approved."}); console.log(`[Action] PR #${pullNumber} approved in ${rId}.`); return {success:true}; } catch (error: any) { console.error(`[Action] Approve failed PR #${pullNumber} in ${rId}:`, error); let eM = error instanceof Error ? error.message : "Approve fail"; if(error.status===404){eM=`PR #${pullNumber} not found (404).`;} else if(error.status===403){eM=`Permission denied (403) approving PR #${pullNumber}.`;} else if(error.status===422&&error.message?.includes("review cannot be submitted")){console.warn(`[Action] Cannot approve PR #${pullNumber}: ${error.message}`); eM=`Cannot approve PR #${pullNumber}: ${error.message}`; return {success:false, error:eM};} await notifyAdmin(`❌ Ошибка одобрения PR #${pullNumber} в ${rId}:\n${eM}`); return { success: false, error: eM }; } }
 
 // --- closePullRequest ---
 // ... (код closePullRequest без изменений) ...
