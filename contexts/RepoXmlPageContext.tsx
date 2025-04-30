@@ -268,54 +268,63 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         }
     }, []); // Removed setKworkInputHasContentState from deps as it's stable
 
-    // --- Triggers ---
+    // --- Triggers (with try-catch around ref method calls) ---
     const triggerToggleSettingsModal = useCallback(() => { setIsSettingsModalOpenState(prev => !prev); }, []);
+
     const triggerFetch = useCallback(async (isRetry = false, branch?: string | null) => {
         if (fetcherRef.current?.handleFetch) {
             try {
                  await fetcherRef.current.handleFetch(isRetry, branch, imageReplaceTaskState);
-            } catch (error) {
+            } catch (error: any) {
                  logger.error("Error calling fetcherRef.handleFetch:", error);
-                 addToastStable("Критическая ошибка при запуске извлечения.", "error", 5000);
+                 addToastStable(`Критическая ошибка при запуске извлечения: ${error?.message ?? 'Неизвестно'}`, "error", 5000);
                  setFetchStatusState('error'); // Ensure status reflects critical error
             }
         } else { logger.error("triggerFetch: fetcherRef is not set."); addToastStable("Ошибка: Не удалось запустить извлечение (ref).", "error"); }
     }, [imageReplaceTaskState, addToastStable]);
+
     const triggerSelectHighlighted = useCallback(() => {
         if (fetcherRef.current?.selectHighlightedFiles) {
             try { fetcherRef.current.selectHighlightedFiles(); }
-            catch (error) { logger.error("Error calling fetcherRef.selectHighlightedFiles:", error); addToastStable("Ошибка выбора связанных файлов.", "error"); }
+            catch (error: any) { logger.error("Error calling fetcherRef.selectHighlightedFiles:", error); addToastStable(`Ошибка выбора связанных файлов: ${error?.message ?? 'Неизвестно'}`, "error"); }
         } else { logger.error("triggerSelectHighlighted: fetcherRef is not set."); } }, [addToastStable]);
+
     const triggerAddSelectedToKwork = useCallback(async (clearSelection = false) => {
         if (fetcherRef.current?.handleAddSelected) {
              if (selectedFetcherFilesState.size === 0) { addToastStable("Сначала выберите файлы в Экстракторе!", "warning"); return; }
              try {
                   await fetcherRef.current.handleAddSelected(selectedFetcherFilesState, allFetchedFilesState);
                   if (clearSelection) { setSelectedFetcherFilesState(new Set()); }
-             } catch (error) { logger.error("[Context] Error during handleAddSelected:", error); addToastStable("Ошибка добавления файлов в запрос.", "error"); }
+             } catch (error: any) { logger.error("[Context] Error during handleAddSelected:", error); addToastStable(`Ошибка добавления файлов: ${error?.message ?? 'Неизвестно'}`, "error"); }
         } else { logger.error("triggerAddSelectedToKwork: fetcherRef is not set."); addToastStable("Ошибка: Компонент Экстрактора недоступен.", "error"); }
     }, [selectedFetcherFilesState, allFetchedFilesState, addToastStable]);
+
     const triggerCopyKwork = useCallback((): boolean => {
         if (fetcherRef.current?.handleCopyToClipboard) {
              try { return fetcherRef.current.handleCopyToClipboard(); }
-             catch (error) { logger.error("Error calling fetcherRef.handleCopyToClipboard:", error); addToastStable("Ошибка копирования запроса.", "error"); return false; }
+             catch (error: any) { logger.error("Error calling fetcherRef.handleCopyToClipboard:", error); addToastStable(`Ошибка копирования запроса: ${error?.message ?? 'Неизвестно'}`, "error"); return false; }
         } else { logger.error("triggerCopyKwork: fetcherRef is not set."); return false; } }, [addToastStable]);
+
     const triggerAskAi = useCallback(async (): Promise<{ success: boolean; requestId?: string; error?: string }> => { logger.warn("AI Ask Triggered (No Longer Active - Use Copy/Paste Flow)"); addToastStable("Скопируйте запрос и вставьте в AI.", "info"); return { success: false, error: "Ask AI button disabled" }; }, [addToastStable]);
+
     const triggerParseResponse = useCallback(async () => {
         if (assistantRef.current?.handleParse) {
              try { await assistantRef.current.handleParse(); }
-             catch (error) { logger.error("Error calling assistantRef.handleParse:", error); addToastStable("Критическая ошибка разбора ответа.", "error", 5000); }
+             catch (error: any) { logger.error("Error calling assistantRef.handleParse:", error); addToastStable(`Критическая ошибка разбора ответа: ${error?.message ?? 'Неизвестно'}`, "error", 5000); }
         } else { logger.error("triggerParseResponse: assistantRef is not set."); } }, [addToastStable]);
+
     const triggerSelectAllParsed = useCallback(() => {
         if (assistantRef.current?.selectAllParsedFiles) {
              try { assistantRef.current.selectAllParsedFiles(); }
-             catch (error) { logger.error("Error calling assistantRef.selectAllParsedFiles:", error); addToastStable("Ошибка выбора всех файлов.", "error"); }
+             catch (error: any) { logger.error("Error calling assistantRef.selectAllParsedFiles:", error); addToastStable(`Ошибка выбора всех файлов: ${error?.message ?? 'Неизвестно'}`, "error"); }
         } else { logger.error("triggerSelectAllParsed: assistantRef is not set."); } }, [addToastStable]);
+
     const triggerCreateOrUpdatePR = useCallback(async () => {
         if (assistantRef.current?.handleCreatePR) {
              try { await assistantRef.current.handleCreatePR(); }
-             catch (error) { logger.error("Error calling assistantRef.handleCreatePR:", error); addToastStable("Критическая ошибка создания/обновления PR.", "error", 5000); }
+             catch (error: any) { logger.error("Error calling assistantRef.handleCreatePR:", error); addToastStable(`Критическая ошибка создания/обновления PR: ${error?.message ?? 'Неизвестно'}`, "error", 5000); }
         } else { logger.error("triggerCreateOrUpdatePR: assistantRef is not set."); } }, [addToastStable]);
+
     const triggerGetOpenPRs = useCallback(async (url: string) => {
          const effectiveUrl = url || repoUrlState;
          if (!effectiveUrl || !effectiveUrl.includes('github.com')) { setOpenPrsState([]); setLoadingPrsState(false); logger.warn("triggerGetOpenPRs: Invalid URL", effectiveUrl); return; }
@@ -336,6 +345,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
              setLoadingPrsState(false);
          }
      }, [repoUrlState, addToastStable]);
+
      const triggerUpdateBranch = useCallback(async ( repoUrlParam: string, filesToCommit: { path: string; content: string }[], commitMessage: string, branch: string, prNumber?: number | null, prDescription?: string ): Promise<{ success: boolean; error?: string }> => {
          logger.log(`[Context] triggerUpdateBranch: ${branch}, PR#: ${prNumber ?? 'N/A'}`);
          setAssistantLoadingState(true); // Set loading before async call
@@ -357,12 +367,14 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
              setAssistantLoadingState(false); // Ensure loading is reset
          }
      }, [addToastStable, triggerGetOpenPRs]); // triggerGetOpenPRs is stable via useCallback
+
     const updateRepoUrlInAssistant = useCallback((url: string) => {
         if (assistantRef.current?.updateRepoUrl) {
             try { assistantRef.current.updateRepoUrl(url); }
-            catch (error) { logger.error("Error calling assistantRef.updateRepoUrl:", error); }
+            catch (error: any) { logger.error(`Error calling assistantRef.updateRepoUrl: ${error?.message ?? 'Неизвестно'}`); }
         } else { /* logger.warn("updateRepoUrlInAssistant: assistantRef not ready."); */ } // Reduce noise
     }, []);
+
     const scrollToSection = useCallback((sectionId: string) => {
         const element = document.getElementById(sectionId);
         if (element) {
