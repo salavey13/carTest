@@ -82,7 +82,8 @@
     "vaul": "^0.9.6",
     "worker-loader": "^3.0.8",
     "zod": "^3.24.1",
-    "papaparse": "latest"
+    "papaparse": "latest",
+    "html-react-parser": "latest"
   },
   "devDependencies": {
     "@types/file-saver": "^2.0.7",
