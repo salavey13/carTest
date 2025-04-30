@@ -29,7 +29,7 @@ const badIconImportSource = 'react-icons/fa';
 
 // .. New: Map for known Fa6 corrections
 const fa6IconCorrectionMap: Record<string, string> = {
-    FaExclamationTriangle: 'FaTriangleExclamation',
+    FaExclamationTriangle: 'FaTriangleExclamation', // <<< CORRECT ICON USED HERE
     FaBalanceScale: 'FaScaleBalanced',
     FaTools: 'FaToolbox', // Corrected: FaToolbox is in the list
     FaUserCog: 'FaUserGear',
@@ -166,7 +166,7 @@ const validFa6Icons = new Set([
     'FaTintSlash', // Assuming FaDropletSlash equiv
     'FaToggleOff','FaToggleOn','FaToolbox','FaTools', // Keeping FaTools temporarily if used, prefer FaToolbox
     'FaTooth','FaTrashAlt', // Assuming FaTrashCan equiv
-    'FaTrashArrowUp','FaTrashCanArrowUp','FaTrashCan','FaTrash','FaTree','FaTriangleExclamation','FaTrophy',
+    'FaTrashArrowUp','FaTrashCanArrowUp','FaTrashCan','FaTrash','FaTree','FaTriangleExclamation','FaTrophy', // <<< CORRECT ICON USED HERE
     'FaTruckFast','FaTruckMedical','FaTruckMoving','FaTruckPickup','FaTruck','FaTv','FaUnderline','FaUndo', // Assuming FaArrowRotateLeft equiv
     'FaUniversalAccess','FaUniversity', // Assuming FaBuildingColumns equiv
     'FaUnlockAlt', // Assuming FaUnlockKeyhole equiv
@@ -482,14 +482,18 @@ export function useCodeParsingAndValidation() {
              return filesToFix;
         }
 
-        const updatedFiles = filesToFix.map(file => {
-            let currentContent = file.content; let fileChanged = false;
+        const updatedFilesMap = new Map(filesToFix.map(f => [f.id, f.content]));
+
+        filesToFix.forEach(file => {
+            let currentContent = updatedFilesMap.get(file.id) ?? file.content; // Get potentially updated content
+            let fileChanged = false;
             const fileIssues = fixableIssues.filter(issue => issue.fileId === file.id);
-            if (fileIssues.length === 0) return file;
+            if (fileIssues.length === 0) return;
 
             fileIssues.forEach(issue => {
                 try {
-                    // .. 1. NEW: Fix incorrect Fa6 icon names
+                    let contentBeforeFix = currentContent; // Store content before this specific fix attempt
+                    // .. 1. NEW: Fix incorrect Fa6 icon names (REVISED LOGIC)
                     if (issue.type === 'incorrectFa6IconName' && issue.details?.incorrectName && issue.details?.correctName && issue.details?.importStatement) {
                          const incorrectName = issue.details.incorrectName;
                          const correctName = issue.details.correctName;
@@ -498,7 +502,6 @@ export function useCodeParsingAndValidation() {
                          const importLineIndex = lines.findIndex(line => line.includes(importLine)); // Find the exact import line
 
                          if (importLineIndex !== -1) {
-                             // Replace within the specific line only
                              const nameRegex = new RegExp(`\\b${incorrectName}\\b`, 'g'); // Use word boundary
                              const originalLine = lines[importLineIndex];
                              const modifiedLine = originalLine.replace(nameRegex, correctName);
@@ -506,7 +509,6 @@ export function useCodeParsingAndValidation() {
                              if (modifiedLine !== originalLine) { // Check if replacement actually happened
                                  lines[importLineIndex] = modifiedLine;
                                  currentContent = lines.join('\n');
-                                 fileChanged = true;
                                  fixedMessages.push(`✅ Fa6 Иконка: ${incorrectName} -> ${correctName} в ${file.path}`);
                              } else {
                                  console.warn(`AutoFix: Incorrect icon name ${incorrectName} regex did not match in specific import line: "${originalLine}" in ${file.path}`);
@@ -519,7 +521,7 @@ export function useCodeParsingAndValidation() {
                     } else if (issue.type === 'iconLegacy' && issue.details?.badIcon && issue.details?.goodIcon) {
                         const bad = issue.details.badIcon; const good = issue.details.goodIcon; const usageOpenRegex = new RegExp(`<${bad}(?![-_a-zA-Z0-9])(\\s|\\/?>)`, 'g'); const usageCloseRegex = new RegExp(`</${bad}>`, 'g'); const lines = currentContent.split('\n'); let changedInLegacyFix = false;
                         const newLines = lines.map(line => { if (!line.trim().startsWith('//') && !line.trim().startsWith('/*') && (usageOpenRegex.test(line) || usageCloseRegex.test(line))) { changedInLegacyFix = true; let newLine = line.replace(usageOpenRegex, `<${good}$1`); newLine = newLine.replace(usageCloseRegex, `</${good}>`); return newLine; } return line; });
-                        if (changedInLegacyFix) { currentContent = newLines.join('\n'); fileChanged = true; fixedMessages.push(`✅ Legacy Icon: ${bad} -> ${good} в ${file.path}`);
+                        if (changedInLegacyFix) { currentContent = newLines.join('\n'); fixedMessages.push(`✅ Legacy Icon: ${bad} -> ${good} в ${file.path}`);
                             const importRegexFa = new RegExp(`(import\\s+{[^}]*}\\s+from\\s+['"]react-icons/fa['"])`);
                             if (importRegexFa.test(currentContent)) { currentContent = currentContent.replace(importRegexFa, `$1;\n// TODO: Consider changing import to 'react-icons/fa6' for ${good}`); }
                          }
@@ -529,7 +531,7 @@ export function useCodeParsingAndValidation() {
                         const lines = currentContent.split('\n'); let firstCodeLineIndex = -1;
                         for (let i = 0; i < lines.length; i++) { const trimmedLine = lines[i].trim(); if (trimmedLine !== '' && !trimmedLine.startsWith('//') && !trimmedLine.startsWith('/*')) { firstCodeLineIndex = i; break; } }
                         const alreadyHasUseClient = firstCodeLineIndex !== -1 && (lines[firstCodeLineIndex] === '"use client";' || lines[firstCodeLineIndex] === "'use client';");
-                        if (!alreadyHasUseClient) { const insertIndex = firstCodeLineIndex !== -1 ? firstCodeLineIndex : 0; const newLineChar = insertIndex === 0 || (firstCodeLineIndex !== -1 && lines[insertIndex].trim() !== '') ? '\n' : ''; lines.splice(insertIndex, 0, '"use client";' + newLineChar); currentContent = lines.join('\n'); fixedMessages.push(`✅ Added "use client"; to ${file.path}`); fileChanged = true; }
+                        if (!alreadyHasUseClient) { const insertIndex = firstCodeLineIndex !== -1 ? firstCodeLineIndex : 0; const newLineChar = insertIndex === 0 || (firstCodeLineIndex !== -1 && lines[insertIndex].trim() !== '') ? '\n' : ''; lines.splice(insertIndex, 0, '"use client";' + newLineChar); currentContent = lines.join('\n'); fixedMessages.push(`✅ Added "use client"; to ${file.path}`); }
 
                     // .. 4. Fix missing imports (keep existing logic)
                     } else if (issue.type === 'import' && issue.details?.importStatement && issue.details?.importRegex) {
@@ -538,27 +540,39 @@ export function useCodeParsingAndValidation() {
                             const lines = currentContent.split('\n'); let insertIndex = 0; let useClientIndex = -1;
                              for (let i = 0; i < lines.length; i++) { const tl = lines[i].trim(); if (tl === '"use client";' || tl === "'use client';") { useClientIndex = i; insertIndex = i + 1; } else if (tl.startsWith('import ')) { insertIndex = i + 1; } else if (tl !== '' && !tl.startsWith('//') && !tl.startsWith('/*')) { if (insertIndex === 0 && useClientIndex === -1) insertIndex = 0; break; } }
                              const prefixNewLine = (useClientIndex !== -1 || insertIndex > 0) && lines[insertIndex]?.trim() !== '' ? '\n' : '';
-                             lines.splice(insertIndex, 0, prefixNewLine + issue.details.importStatement); currentContent = lines.join('\n'); fixedMessages.push(`✅ Added import for '${issue.details.name}' to ${file.path}`); fileChanged = true;
+                             lines.splice(insertIndex, 0, prefixNewLine + issue.details.importStatement); currentContent = lines.join('\n'); fixedMessages.push(`✅ Added import for '${issue.details.name}' to ${file.path}`);
                         }
                     }
+
+                     // Check if this specific fix attempt changed the content
+                     if (contentBeforeFix !== currentContent) {
+                         fileChanged = true;
+                     }
+
                  } catch (fixError) {
                       console.error(`Error auto-fixing issue ${issue.id} (${issue.type}) in file ${file.path}:`, fixError);
                       toast.error(`Ошибка исправления ${issue.type} в ${file.path}`);
                  }
-            });
+            }); // End forEach issue in file
 
-            if (fileChanged) changesMadeCount++;
-            return { ...file, content: currentContent };
-        });
+            // Update the map only if changes were made in this file
+            if (fileChanged) {
+                 updatedFilesMap.set(file.id, currentContent);
+                 changesMadeCount++; // Increment total changes count
+            }
+        }); // End map through filesToFix
 
+        // --- Final Update and Re-validation ---
         if (changesMadeCount > 0) {
-            // --- CRITICAL FIX: Update the state with the modified files ---
-            setParsedFiles(updatedFiles); // <<< THIS LINE WAS MISSING!
-            // --- END CRITICAL FIX ---
-
+            const updatedFilesArray = filesToFix.map(f => ({
+                ...f,
+                content: updatedFilesMap.get(f.id) ?? f.content // Use updated content from map or original if unchanged
+            }));
+            setParsedFiles(updatedFilesArray); // Update the state with the truly modified files
             fixedMessages.forEach(msg => toast.success(msg, { duration: 4000 }));
             console.log("Re-validating files after auto-fix...");
-            validateParsedFiles(updatedFiles); // Re-validate AFTER fixing
+            validateParsedFiles(updatedFilesArray); // Re-validate AFTER fixing
+            return updatedFilesArray; // Return the updated array
         } else {
             // If no changes were made but there were fixable issues, something might be wrong
             if (fixableIssues.length > 0) {
@@ -569,9 +583,9 @@ export function useCodeParsingAndValidation() {
             if (validationStatus === 'warning' && !nonFixableOrRestorable) {
                 setValidationStatus('success');
             }
+            return filesToFix; // Return original array if no changes
         }
-        return updatedFiles; // Return the potentially modified files
-    }, [validationIssues, validationStatus, validateParsedFiles]);
+    }, [validationIssues, validationStatus, validateParsedFiles, setParsedFiles]);
 
 
     return {
