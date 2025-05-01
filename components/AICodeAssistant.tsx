@@ -370,7 +370,12 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     // --- <<< EARLY RETURN CHECK >>> ---
     if (!isMounted) {
         addToastDirect("[DEBUG] AICodeAssistant Render: Early return (!isMounted)", 'info', 1000);
-        return ( /* ... Loading ... */ );
+                    return (
+                 <div id="executor-loading" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4 min-h-[400px] items-center justify-center">
+                    <FaSpinner className="text-cyan-400 text-4xl animate-spin mb-4"/>
+                    <p className="text-gray-400 text-lg">Загрузка Ассистента...</p>
+                 </div>
+             );
     }
 
     // --- Derived State for Rendering ---
