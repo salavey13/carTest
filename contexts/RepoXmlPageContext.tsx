@@ -187,7 +187,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
     useEffect(() => { logger.log("RepoXmlPageContext Mounted (Client)"); }, []); // Log only on client mount
     useEffect(() => { setRepoUrlEnteredState(repoUrlState.trim().length > 0 && repoUrlState.includes("github.com")); }, [repoUrlState]);
 
-    // --- Callback Helpers --- (no changes required in these stable callbacks)
+    // --- Callback Helpers ---
     const addToastStable = useCallback((
         message: string | React.ReactNode,
         type: 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message' = 'info',
@@ -205,6 +205,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         }
     }, [appToast]);
 
+    // <<< FIX: Added explicit check for the function on the ref >>>
     const handleSetFilesFetchedStable = useCallback(( fetched: boolean, allFiles: FileNode[], primaryHighlight: string | null, secondaryHighlights: string[] ) => {
        logger.log("[Context] handleSetFilesFetchedStable called:", { fetched, primaryHighlight, secondaryCount: secondaryHighlights.length, allFilesCount: allFiles.length, taskActive: !!imageReplaceTaskState });
        const currentTask = imageReplaceTaskState;
@@ -223,25 +224,36 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                    logger.error(`[Context] Image Task Error: Target file ${currentTask.targetPath} not found!`);
                    addToastStable(`Ошибка: Файл ${currentTask.targetPath} для замены не найден.`, "error", 5000);
                    finalFetchStatus = 'error';
-                   setImageReplaceTaskState(null);
+                   setImageReplaceTaskState(null); // Clear task if file not found
                    setFilesFetchedState(false);
                } else {
                    logger.log(`[Context] Image Task: Target file ${currentTask.targetPath} found.`);
-                   if (assistantRef.current?.handleDirectImageReplace) {
-                       logger.log("[Context] Automatically triggering handleDirectImageReplace");
+                   // *** Robust Check Here ***
+                   if (assistantRef.current && typeof assistantRef.current.handleDirectImageReplace === 'function') {
+                       logger.log("[Context] assistantRef.current.handleDirectImageReplace is a function. Triggering...");
                        assistantRef.current.handleDirectImageReplace(currentTask, allFiles ?? [])
-                         .catch(err => logger.error("[Context] Auto image replace failed:", err));
+                         .then(() => { logger.log("[Context] handleDirectImageReplace promise resolved."); }) // Add logging for resolution
+                         .catch(err => logger.error("[Context] Auto image replace promise rejected:", err));
                    } else {
-                        logger.warn("[Context] Cannot auto-trigger image replace: assistantRef or handler not ready.");
+                        // Log why it wasn't called
+                        if (!assistantRef.current) {
+                             logger.error("[Context] Cannot auto-trigger image replace: assistantRef is null.");
+                        } else {
+                             logger.error("[Context] Cannot auto-trigger image replace: assistantRef.current.handleDirectImageReplace is not a function (type:", typeof assistantRef.current.handleDirectImageReplace, "). Check AICodeAssistant's useImperativeHandle.");
+                        }
+                         addToastStable("Ошибка: Не удалось запустить обработку картинки.", "error"); // Inform user
                    }
+                   // Keep fetch status as success because the *fetch* succeeded
+                   finalFetchStatus = 'success';
                }
            } else {
                 logger.error("[Context] Image Task Error: Fetch attempt failed.");
+                finalFetchStatus = 'error'; // Fetch itself failed
            }
        }
        setFetchStatusState(finalFetchStatus);
        logger.log(`[Context] handleSetFilesFetchedStable finished. Final Status: ${finalFetchStatus}, Files Fetched Flag: ${fetched}`);
-    }, [ imageReplaceTaskState, addToastStable ]);
+    }, [ imageReplaceTaskState, addToastStable, assistantRef ]); // Added assistantRef to dependencies
 
 
     const getKworkInputValueStable = useCallback((): string => kworkInputRef.current?.value || "", []);
@@ -484,7 +496,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         };
     }, [ // Complete list of dependencies (Restored full list including setters and refs)
         fetchStatusState, repoUrlEnteredState, filesFetchedState, selectedFetcherFilesState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, selectedAssistantFilesState, assistantLoadingState, aiActionLoadingState, loadingPrsState, targetBranchNameState, manualBranchNameState, openPrsState, isSettingsModalOpenState, isParsingState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState,
-        handleSetFilesFetchedStable, triggerToggleSettingsModal, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR, triggerUpdateBranch, triggerGetOpenPRs, updateRepoUrlInAssistant, getXuinityMessage, scrollToSection, addToastStable, getKworkInputValueStable, updateKworkInputStable,
+        handleSetFilesFetchedStable, // This now depends on assistantRef
+        triggerToggleSettingsModal, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR, triggerUpdateBranch, triggerGetOpenPRs, updateRepoUrlInAssistant, getXuinityMessage, scrollToSection, addToastStable, getKworkInputValueStable, updateKworkInputStable,
         triggerAddImportantToKwork, triggerAddTreeToKwork, triggerSelectAllFetcherFiles, triggerDeselectAllFetcherFiles, triggerClearKworkInput,
         // Include stable setters
         setFetchStatusState, setRepoUrlEnteredState, setSelectedFetcherFilesState, setKworkInputHasContentState, setRequestCopiedState, setAiResponseHasContentState, setFilesParsedState, setSelectedAssistantFilesState, setAssistantLoadingState, setAiActionLoadingState, setLoadingPrsState, setTargetBranchNameState, setManualBranchNameState, setOpenPrsState, setIsParsingState, setCurrentAiRequestIdState, setImageReplaceTaskState, setRepoUrlState,
