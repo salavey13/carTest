@@ -4,7 +4,7 @@ import React, {
   createContext, useContext, useState, useEffect, useCallback, useMemo,
   useRef, MutableRefObject, ReactNode
 } from 'react';
-import { useAppToast } from '@/hooks/useAppToast'; // <-- Используем useAppToast
+import { useAppToast } from '@/hooks/useAppToast';
 export interface FileNode { path: string; content: string; }
 export interface SimplePullRequest { id: number; number: number; title: string; html_url: string; user: { login: string | null; avatar_url: string | null } | null; head: { ref: string }; base: { ref: string }; updated_at: string; }
 import { debugLogger as logger } from '@/lib/debugLogger';
@@ -20,7 +20,7 @@ export interface ImageReplaceTask { targetPath: string; oldUrl: string; newUrl: 
 
 // --- Context Interface ---
 interface RepoXmlPageContextType {
-    // ... (все состояния и функции, КРОМЕ debugToastsEnabled и setDebugToastsEnabled)
+    // ... (все состояния и функции)
     fetchStatus: FetchStatus;
     repoUrlEntered: boolean;
     filesFetched: boolean;
@@ -59,11 +59,10 @@ interface RepoXmlPageContextType {
     setManualBranchName: React.Dispatch<React.SetStateAction<string>>;
     setOpenPrs: React.Dispatch<React.SetStateAction<SimplePullRequest[]>>;
     setIsParsing: React.Dispatch<React.SetStateAction<boolean>>;
-    setContextIsParsing: React.Dispatch<React.SetStateAction<boolean>>; // Alias for setIsParsing
+    setContextIsParsing: React.Dispatch<React.SetStateAction<boolean>>;
     setCurrentAiRequestId: React.Dispatch<React.SetStateAction<string | null>>;
     setImageReplaceTask: React.Dispatch<React.SetStateAction<ImageReplaceTask | null>>;
     setRepoUrl: React.Dispatch<React.SetStateAction<string>>;
-    // setDebugToastsEnabled: React.Dispatch<React.SetStateAction<boolean>>; // <-- УДАЛЕНО
     triggerToggleSettingsModal: () => void;
     triggerFetch: (isRetry?: boolean, branch?: string | null) => Promise<void>;
     triggerSelectHighlighted: () => void;
@@ -94,9 +93,8 @@ interface RepoXmlPageContextType {
 
 // --- Default Context Value ---
 const defaultContextValue: Partial<RepoXmlPageContextType> = { // Use Partial for default
-    // ... (все предыдущие значения по умолчанию, КРОМЕ debugToastsEnabled и его сеттера)
+    // ... (остальные значения по умолчанию)
     fetchStatus: 'idle', repoUrlEntered: false, filesFetched: false, selectedFetcherFiles: new Set(), kworkInputHasContent: false, requestCopied: false, aiResponseHasContent: false, filesParsed: false, selectedAssistantFiles: new Set(), assistantLoading: false, aiActionLoading: false, loadingPrs: false, targetBranchName: null, manualBranchName: '', openPrs: [], isSettingsModalOpen: false, isParsing: false, currentAiRequestId: null, imageReplaceTask: null, allFetchedFiles: [], currentStep: 'idle', repoUrl: "https://github.com/salavey13/carTest",
-    // debugToastsEnabled: true, // <-- УДАЛЕНО
     setFetchStatus: () => { logger.warn("setFetchStatus called on default context value"); },
     setRepoUrlEntered: () => { logger.warn("setRepoUrlEntered called on default context value"); },
     handleSetFilesFetched: () => { logger.warn("handleSetFilesFetched called on default context value"); },
@@ -117,7 +115,6 @@ const defaultContextValue: Partial<RepoXmlPageContextType> = { // Use Partial fo
     setCurrentAiRequestId: () => { logger.warn("setCurrentAiRequestId called on default context value"); },
     setImageReplaceTask: () => { logger.warn("setImageReplaceTask called on default context value"); },
     setRepoUrl: () => { logger.warn("setRepoUrl called on default context value"); },
-    // setDebugToastsEnabled: () => { logger.warn("setDebugToastsEnabled called on default context value"); }, // <-- УДАЛЕНО
     triggerToggleSettingsModal: () => { logger.warn("triggerToggleSettingsModal called on default context value"); },
     triggerFetch: async () => { logger.warn("triggerFetch called on default context value"); },
     triggerSelectHighlighted: () => { logger.warn("triggerSelectHighlighted called on default context value"); },
@@ -148,7 +145,7 @@ const RepoXmlPageContext = createContext<RepoXmlPageContextType>(defaultContextV
 
 // --- Context Provider Component ---
 export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ children }) => {
-    // ... (все useState без изменений, КРОМЕ debugToastsEnabledState)
+    // ... (все useState без изменений)
     const [fetchStatusState, setFetchStatusState] = useState<FetchStatus>('idle');
     const [repoUrlEnteredState, setRepoUrlEnteredState] = useState<boolean>(false);
     const [filesFetchedState, setFilesFetchedState] = useState<boolean>(false);
@@ -171,10 +168,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
     const [currentAiRequestIdState, setCurrentAiRequestIdState] = useState<string | null>(null);
     const [imageReplaceTaskState, setImageReplaceTaskState] = useState<ImageReplaceTask | null>(null);
     const [allFetchedFilesState, setAllFetchedFilesState] = useState<FileNode[]>([]);
-    const [repoUrlState, setRepoUrlState] = useState<string>(defaultContextValue.repoUrl ?? ''); // Use default or empty string
+    const [repoUrlState, setRepoUrlState] = useState<string>(defaultContextValue.repoUrl ?? '');
 
-
-    // --- debugToastsEnabledState УДАЛЕНО ОТСЮДА ---
 
     const fetcherRef = useRef<RepoTxtFetcherRef | null>(null);
     const assistantRef = useRef<AICodeAssistantRef | null>(null);
@@ -201,9 +196,14 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             case 'message': default: appToast.message(message, toastOptions); break;
         }
     }, [appToast]); // Зависит только от стабильного appToast
-    // --- КОНЕЦ МОДИФИКАЦИИ addToastStable ---
 
-    useEffect(() => { logger.log("RepoXmlPageContext Mounted (Client)"); }, []);
+    // --- Добавляем useEffect для тоста при монтировании провайдера ---
+    useEffect(() => {
+        addToastStable("[DEBUG_PROVIDER] RepoXmlPageProvider Mounted", 'info', 500);
+        logger.log("RepoXmlPageContext Mounted (Client - Provider Effect)");
+    }, [addToastStable]); // Зависим от стабильной функции тоста
+    // --- Конец добавления ---
+
     useEffect(() => { setRepoUrlEnteredState(repoUrlState.trim().length > 0 && repoUrlState.includes("github.com")); }, [repoUrlState]);
 
     // --- Stable Setters WITHOUT TOASTS (остаются без изменений) ---
@@ -264,9 +264,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
     const setRepoUrlStateStable = useCallback((url: string | ((prevState: string) => string)) => {
         setRepoUrlState(url);
     }, []);
-     // setDebugToastsEnabledStable УДАЛЕН
 
-    // --- Handlers and Triggers (остаются без изменений, но теперь используют addToastStable, который проверяет флаг внутри себя) ---
+    // --- Handlers and Triggers (остаются без изменений) ---
     const handleSetFilesFetchedStable = useCallback(( fetched: boolean, allFiles: FileNode[], primaryHighlight: string | null, secondaryHighlights: string[] ) => {
        const currentTask = imageReplaceTaskState;
        setFilesFetchedState(fetched);
@@ -611,7 +610,7 @@ export const useRepoXmlPageContext = (): RepoXmlPageContextType => {
     const context = useContext(RepoXmlPageContext);
     // Use Partial<> comparison to check if context has default values before full init
     const defaultKeys = Object.keys(defaultContextValue);
-    const contextKeys = Object.keys(context);
+    const contextKeys = Object.keys(context || {}); // Ensure context is not undefined
     if (context === undefined || defaultKeys.length === contextKeys.length) { // Basic check
         logger.error("useRepoXmlPageContext: Attempted to use context before the Provider has rendered its value or outside the provider.");
         return defaultContextValue as RepoXmlPageContextType; // Cast needed
