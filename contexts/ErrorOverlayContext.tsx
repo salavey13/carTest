@@ -5,7 +5,7 @@ import { createContext, useState, useContext, useMemo, useEffect, useCallback } 
 import { debugLogger as logger } from '@/lib/debugLogger'; // Import logger
 import type { ToastRecord } from '@/types/toast'; // Import the new type
 
-const MAX_TOAST_HISTORY = 5; // Max number of toasts to keep in history
+const MAX_TOAST_HISTORY = 50; // <<<<<<<<<<<<<<<<<<<<< INCREASED TO 50
 
 // Define the shape of the error info (matching DevErrorOverlay)
 export interface ErrorInfo {
