@@ -79,6 +79,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const {
         setHookParsedFiles, setValidationStatus, setValidationIssues,
         validationIssues, validationStatus, rawDescription, // Needed directly for UI logic
+        // Destructure the hook's isParsing state directly
+        isParsing: hookIsParsing,
     } = codeParserHook;
     const {
         setAiResponseHasContent, setFilesParsed, filesParsed,
@@ -88,7 +90,9 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         openPrs: contextOpenPrs, triggerGetOpenPRs,
         targetBranchName, triggerToggleSettingsModal,
         triggerUpdateBranch, updateRepoUrlInAssistant,
-        loadingPrs, setIsParsing: setContextIsParsing, isParsing: contextIsParsing,
+        loadingPrs, setIsParsing: setContextIsParsing,
+        // Destructure the context's isParsing state directly
+        isParsing: contextIsParsing,
         imageReplaceTask, setImageReplaceTask, // <<< Make sure setImageReplaceTask is destructured here
         fetchStatus, allFetchedFiles, repoUrlEntered,
         repoUrl: repoUrlFromContext,
@@ -144,7 +148,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         }
      }, [triggerGetOpenPRs]);
 
-    // <<< FIX: Moved useCallback definition BEFORE the early return >>>
     const handleResetImageError = useCallback(() => {
          setImageReplaceError(null);
          // Consider if clearing the task is also needed here, or if user should retry fetch
@@ -170,10 +173,28 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
      // This effect manages state resets based on various conditions
     useEffect(() => {
-        if (!isMounted) return; const hasContent = response.trim().length > 0; setAiResponseHasContent(hasContent);
-        if (!hasContent && !currentAiRequestId && !aiActionLoading && !imageReplaceTask && !assistantLoading && !isProcessingPR && !isParsing) { logger.log("[AICodeAssistant Effect] Resetting state (empty response)."); setFilesParsed(false); setSelectedAssistantFiles(new Set()); setValidationStatus('idle'); setValidationIssues([]); setOriginalRepoFiles([]); setComponentParsedFiles([]); setHookParsedFiles([]); setSelectedFileIds(new Set()); setPrTitle(""); setRequestCopied(false); }
-        else if (hasContent && componentParsedFiles.length === 0 && validationStatus !== 'idle' && !isParsing && !assistantLoading && !imageReplaceTask && !isProcessingPR && !aiActionLoading) { logger.log("[AICodeAssistant Effect] Resetting validation (response changed)."); setValidationStatus('idle'); setValidationIssues([]); }
-    }, [ isMounted, response, currentAiRequestId, aiActionLoading, imageReplaceTask, componentParsedFiles.length, isParsing, assistantLoading, isProcessingPR, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setHookParsedFiles, setOriginalRepoFiles, setComponentParsedFiles, setSelectedFileIds, setPrTitle, setRequestCopied, logger ]); // Ensure all setters used are dependencies
+        if (!isMounted) return;
+        const hasContent = response.trim().length > 0;
+        setAiResponseHasContent(hasContent);
+        // *** FIX: Use the combined check directly here ***
+        const currentlyParsing = contextIsParsing ?? hookIsParsing;
+        if (!hasContent && !currentAiRequestId && !aiActionLoading && !imageReplaceTask && !assistantLoading && !isProcessingPR && !currentlyParsing) {
+            logger.log("[AICodeAssistant Effect] Resetting state (empty response).");
+            setFilesParsed(false); setSelectedAssistantFiles(new Set()); setValidationStatus('idle'); setValidationIssues([]); setOriginalRepoFiles([]); setComponentParsedFiles([]); setHookParsedFiles([]); setSelectedFileIds(new Set()); setPrTitle(""); setRequestCopied(false);
+        } else if (hasContent && componentParsedFiles.length === 0 && validationStatus !== 'idle' && !currentlyParsing && !assistantLoading && !imageReplaceTask && !isProcessingPR && !aiActionLoading) {
+            logger.log("[AICodeAssistant Effect] Resetting validation (response changed).");
+            setValidationStatus('idle'); setValidationIssues([]);
+        }
+    }, [
+        isMounted, response, currentAiRequestId, aiActionLoading, imageReplaceTask,
+        componentParsedFiles.length,
+        // *** FIX: Depend on the original state values instead of the combined local variable ***
+        contextIsParsing, hookIsParsing,
+        assistantLoading, isProcessingPR, setAiResponseHasContent, setFilesParsed,
+        setSelectedAssistantFiles, setValidationStatus, setValidationIssues,
+        setHookParsedFiles, setOriginalRepoFiles, setComponentParsedFiles,
+        setSelectedFileIds, setPrTitle, setRequestCopied, logger
+    ]); // Dependencies updated
 
     // Fetch custom links effect
     useEffect(() => {
@@ -320,7 +341,10 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     // --- Derived State for Rendering ---
     // This logic is safe here, after the early return and all hooks
-    const isProcessingAny = assistantLoading || aiActionLoading || isParsing || isProcessingPR || isFetchingOriginals || loadingPrs;
+    // *** FIX: Use the combined check directly here ***
+    const effectiveIsParsing = contextIsParsing ?? hookIsParsing;
+    const isProcessingAny = assistantLoading || aiActionLoading || effectiveIsParsing || isProcessingPR || isFetchingOriginals || loadingPrs;
+
     const canSubmitRegularPR = !isProcessingAny && filesParsed && selectedAssistantFiles.size > 0 && !!prTitle.trim() && !!repoUrlForForm && !imageReplaceTask;
     const prButtonText = targetBranchName ? `Обновить Ветку` : "Создать PR";
     const prButtonIconNode = targetBranchName ? <FaCodeBranch /> : <FaGithub />;
@@ -330,9 +354,9 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const showImageReplaceUI = !!imageReplaceTask || !!imageReplaceError; // Show if task active OR if there's an error from a previous task attempt
     const showStandardAssistantUI = !showImageReplaceUI;
     const imageTaskFailed = !!imageReplaceError && !assistantLoading && !isProcessingPR; // Only show 'failed' state clearly when not actively processing
-    const commonDisabled = isProcessingAny;
-    const parseButtonDisabled = commonDisabled || isWaitingForAiResponse || !response.trim() || !!imageReplaceTask; // Disable parse during image task too
-    const fixButtonDisabled = commonDisabled || isWaitingForAiResponse || !!imageReplaceTask; // Disable fixes during image task
+    // *** FIX: Use isProcessingAny directly where commonDisabled was used ***
+    const parseButtonDisabled = isProcessingAny || isWaitingForAiResponse || !response.trim() || !!imageReplaceTask;
+    const fixButtonDisabled = isProcessingAny || isWaitingForAiResponse || !!imageReplaceTask;
     const submitButtonDisabled = !canSubmitRegularPR || isProcessingPR || assistantLoading || !!imageReplaceTask; // Disable regular PR submit during image task
 
 
@@ -352,33 +376,33 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             {showStandardAssistantUI && (
                  <>
                      <div>
-                          <p className="text-yellow-400 mb-2 text-xs md:text-sm min-h-[18px]"> {isWaitingForAiResponse ? `⏳ Жду AI... (ID: ${currentAiRequestId?.substring(0,6)}...)` : commonDisabled ? "⏳ Обработка..." : "2️⃣ Вставь ответ AI или жди. Затем '➡️'."} </p>
+                          <p className="text-yellow-400 mb-2 text-xs md:text-sm min-h-[18px]"> {isWaitingForAiResponse ? `⏳ Жду AI... (ID: ${currentAiRequestId?.substring(0,6)}...)` : isProcessingAny ? "⏳ Обработка..." : "2️⃣ Вставь ответ AI или жди. Затем '➡️'."} </p>
                           <div className="relative group">
-                              <textarea id="response-input" ref={aiResponseInputRefPassed} className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm min-h-[180px] resize-y simple-scrollbar" defaultValue={response} onChange={(e) => setResponseValue(e.target.value)} placeholder={isWaitingForAiResponse ? "AI думает..." : commonDisabled ? "Ожидание..." : "Ответ AI здесь..."} disabled={commonDisabled} spellCheck="false" />
-                              {/* Pass handlers from the hook */}
-                              <TextAreaUtilities response={response} isLoading={commonDisabled} onParse={handlers.handleParse} onOpenModal={handlers.handleOpenModal} onCopy={handlers.handleCopyResponse} onClear={handlers.handleClearResponse} onSelectFunction={handlers.handleSelectFunction} isParseDisabled={parseButtonDisabled} isProcessingPR={isProcessingPR || assistantLoading} />
+                              <textarea id="response-input" ref={aiResponseInputRefPassed} className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm min-h-[180px] resize-y simple-scrollbar" defaultValue={response} onChange={(e) => setResponseValue(e.target.value)} placeholder={isWaitingForAiResponse ? "AI думает..." : isProcessingAny ? "Ожидание..." : "Ответ AI здесь..."} disabled={isProcessingAny} spellCheck="false" />
+                              {/* Pass handlers from the hook, use isProcessingAny */}
+                              <TextAreaUtilities response={response} isLoading={isProcessingAny} onParse={handlers.handleParse} onOpenModal={handlers.handleOpenModal} onCopy={handlers.handleCopyResponse} onClear={handlers.handleClearResponse} onSelectFunction={handlers.handleSelectFunction} isParseDisabled={parseButtonDisabled} isProcessingPR={isProcessingPR || assistantLoading} />
                           </div>
                            <div className="flex justify-end items-start mt-1 gap-2 min-h-[30px]">
-                               {/* Pass handlers from the hook */}
+                               {/* Pass handlers from the hook, use isProcessingAny */}
                                {/* handleRestorationComplete uses toast via handlers hook */}
-                               <CodeRestorer parsedFiles={componentParsedFiles} originalFiles={originalRepoFiles} skippedIssues={validationIssues.filter(i => i.type === 'skippedCodeBlock')} onRestorationComplete={handlers.handleRestorationComplete} disabled={commonDisabled || validationStatus === 'validating' || isFetchingOriginals} />
+                               <CodeRestorer parsedFiles={componentParsedFiles} originalFiles={originalRepoFiles} skippedIssues={validationIssues.filter(i => i.type === 'skippedCodeBlock')} onRestorationComplete={handlers.handleRestorationComplete} disabled={isProcessingAny || validationStatus === 'validating' || isFetchingOriginals} />
                                {/* handleAutoFix / handleCopyFixPrompt use toast via handlers hook */}
                                <ValidationStatusIndicator status={validationStatus} issues={validationIssues} onAutoFix={handlers.handleAutoFix} onCopyPrompt={handlers.handleCopyFixPrompt} isFixDisabled={fixButtonDisabled} />
                           </div>
                       </div>
-                      {/* Pass handlers from the hook */}
+                      {/* Pass handlers from the hook, use isProcessingAny */}
                       {/* handleSaveFiles / handleDownloadZip / handleSendToTelegram use toast via handlers hook */}
-                     <ParsedFilesList parsedFiles={componentParsedFiles} selectedFileIds={selectedFileIds} validationIssues={validationIssues} onToggleSelection={handlers.handleToggleFileSelection} onSelectAll={handlers.handleSelectAllFiles} onDeselectAll={handlers.handleDeselectAllFiles} onSaveFiles={handlers.handleSaveFiles} onDownloadZip={handlers.handleDownloadZip} onSendToTelegram={handlers.handleSendToTelegram} isUserLoggedIn={!!user} isLoading={commonDisabled} />
+                     <ParsedFilesList parsedFiles={componentParsedFiles} selectedFileIds={selectedFileIds} validationIssues={validationIssues} onToggleSelection={handlers.handleToggleFileSelection} onSelectAll={handlers.handleSelectAllFiles} onDeselectAll={handlers.handleDeselectAllFiles} onSaveFiles={handlers.handleSaveFiles} onDownloadZip={handlers.handleDownloadZip} onSendToTelegram={handlers.handleSendToTelegram} isUserLoggedIn={!!user} isLoading={isProcessingAny} />
                      {/* Pass handlers from the hook */}
                      {/* handleCreateOrUpdatePR uses toast via handlers hook */}
                      <PullRequestForm id="pr-form-container" repoUrl={repoUrlForForm}
                       prTitle={prTitle} selectedFileCount={selectedAssistantFiles.size} isLoading={isProcessingPR || assistantLoading} isLoadingPrList={loadingPrs} onRepoUrlChange={updateRepoUrl} onPrTitleChange={setPrTitle} onCreatePR={handlers.handleCreateOrUpdatePR} buttonText={prButtonText} buttonIcon={prButtonLoadingIconNode} isSubmitDisabled={submitButtonDisabled} />
                      <OpenPrList openPRs={contextOpenPrs} />
                     <div className="flex items-center gap-3 mt-2 flex-wrap">
-                        {/* Pass handlers from the hook */}
+                        {/* Pass handlers from the hook, use isProcessingAny */}
                         {/* handleAddCustomLink uses toast via handlers hook */}
-                        <ToolsMenu customLinks={customLinks} onAddCustomLink={handlers.handleAddCustomLink} disabled={commonDisabled}/>
-                         <button onClick={() => setIsImageModalOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50 relative" disabled={commonDisabled} title="Загрузить/Связать Картинки (prompts_imgs.txt)" >
+                        <ToolsMenu customLinks={customLinks} onAddCustomLink={handlers.handleAddCustomLink} disabled={isProcessingAny}/>
+                         <button onClick={() => setIsImageModalOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50 relative" disabled={isProcessingAny} title="Загрузить/Связать Картинки (prompts_imgs.txt)" >
                              <FaImage className="text-gray-400" /> <span className="text-sm text-white">Картинки</span>
                              {componentParsedFiles.some(f => f.path === '/prompts_imgs.txt') && !isImageModalOpen && ( <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-gray-800 animate-pulse"></span> )}
                          </button>
