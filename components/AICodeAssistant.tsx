@@ -160,6 +160,10 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const processingImageReplace = useRef(false);
     const imageReplaceTaskRef = useRef(imageReplaceTask);
 
+    // --- <<< DERIVED STATE NEEDED BY HOOKS >>> ---
+    // Define variables used by useEffect hooks BEFORE the hooks themselves and the early return
+    const repoUrlForForm = repoUrlStateLocal || repoUrlFromContext || "";
+
     // --- Effects ---
     // ALL useEffect calls MUST be at the top level, before any returns or conditions
     useEffect(() => { setIsMounted(true); }, []);
@@ -176,7 +180,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         if (!isMounted) return;
         const hasContent = response.trim().length > 0;
         setAiResponseHasContent(hasContent);
-        // *** FIX: Use the combined check directly here ***
+        // Use the combined check directly here
         const currentlyParsing = contextIsParsing ?? hookIsParsing;
         if (!hasContent && !currentAiRequestId && !aiActionLoading && !imageReplaceTask && !assistantLoading && !isProcessingPR && !currentlyParsing) {
             logger.log("[AICodeAssistant Effect] Resetting state (empty response).");
@@ -188,7 +192,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     }, [
         isMounted, response, currentAiRequestId, aiActionLoading, imageReplaceTask,
         componentParsedFiles.length,
-        // *** FIX: Depend on the original state values instead of the combined local variable ***
+        // Depend on the original state values instead of the combined local variable
         contextIsParsing, hookIsParsing,
         assistantLoading, isProcessingPR, setAiResponseHasContent, setFilesParsed,
         setSelectedAssistantFiles, setValidationStatus, setValidationIssues,
@@ -221,9 +225,11 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     }, [isMounted, user, toastError]); // Removed supabaseAdmin from deps if it's stable, added toastError
 
      // Fetch original files effect
+     // <<< FIX: Moved repoUrlForForm definition *before* this hook >>>
     useEffect(() => {
         if (!isMounted || imageReplaceTask) return;
         const skipped = validationIssues.filter(i => i.type === 'skippedCodeBlock');
+        // Now repoUrlForForm is guaranteed to be defined here
         if (skipped.length > 0 && originalRepoFiles.length === 0 && !isFetchingOriginals && repoUrlForForm) {
             const fetchOrig = async () => {
                 setIsFetchingOriginals(true);
@@ -231,6 +237,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                 const branchDisp = targetBranchName ?? 'default';
                 toastInfo(`Загрузка оригиналов из ${branchDisp}...`); // <<< Use Hook
                 try {
+                    // repoUrlForForm is safe to use
                     const res = await fetchRepoContents(repoUrlForForm, undefined, branch);
                     if (res.success && Array.isArray(res.files)) {
                         const originalFilesData = res.files.map(f => ({ path: f.path, content: f.content }));
@@ -250,7 +257,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             };
             fetchOrig();
         }
-    }, [isMounted, validationIssues, originalRepoFiles.length, isFetchingOriginals, repoUrlForForm, targetBranchName, imageReplaceTask, toastInfo, toastSuccess, toastError]); // Added fetchRepoContents, toasts to deps if needed
+    // <<< FIX: Added repoUrlForForm to dependency array >>>
+    }, [isMounted, validationIssues, originalRepoFiles.length, isFetchingOriginals, repoUrlForForm, targetBranchName, imageReplaceTask, toastInfo, toastSuccess, toastError]); // Dependency array updated
 
     // Direct image replace effect - Uses handler hook which uses toasts internally
      useEffect(() => {
@@ -329,7 +337,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     }), [handlers, setResponseValue, updateRepoUrl]); // Depend on the handlers object and local wrappers
 
     // --- <<< EARLY RETURN CHECK >>> ---
-    // Now all hooks have been called, this check is safe
+    // Now all hooks and necessary derived state (like repoUrlForForm) have been defined, this check is safe
     if (!isMounted) {
         return (
              <div id="executor-loading" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4 min-h-[400px] items-center justify-center">
@@ -340,8 +348,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     }
 
     // --- Derived State for Rendering ---
-    // This logic is safe here, after the early return and all hooks
-    // *** FIX: Use the combined check directly here ***
+    // This logic is safe here, after the early return and all hooks/top-level derived state
     const effectiveIsParsing = contextIsParsing ?? hookIsParsing;
     const isProcessingAny = assistantLoading || aiActionLoading || effectiveIsParsing || isProcessingPR || isFetchingOriginals || loadingPrs;
 
@@ -354,7 +361,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const showImageReplaceUI = !!imageReplaceTask || !!imageReplaceError; // Show if task active OR if there's an error from a previous task attempt
     const showStandardAssistantUI = !showImageReplaceUI;
     const imageTaskFailed = !!imageReplaceError && !assistantLoading && !isProcessingPR; // Only show 'failed' state clearly when not actively processing
-    // *** FIX: Use isProcessingAny directly where commonDisabled was used ***
+    // Use isProcessingAny directly where commonDisabled was used
     const parseButtonDisabled = isProcessingAny || isWaitingForAiResponse || !response.trim() || !!imageReplaceTask;
     const fixButtonDisabled = isProcessingAny || isWaitingForAiResponse || !!imageReplaceTask;
     const submitButtonDisabled = !canSubmitRegularPR || isProcessingPR || assistantLoading || !!imageReplaceTask; // Disable regular PR submit during image task
@@ -395,6 +402,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                      <ParsedFilesList parsedFiles={componentParsedFiles} selectedFileIds={selectedFileIds} validationIssues={validationIssues} onToggleSelection={handlers.handleToggleFileSelection} onSelectAll={handlers.handleSelectAllFiles} onDeselectAll={handlers.handleDeselectAllFiles} onSaveFiles={handlers.handleSaveFiles} onDownloadZip={handlers.handleDownloadZip} onSendToTelegram={handlers.handleSendToTelegram} isUserLoggedIn={!!user} isLoading={isProcessingAny} />
                      {/* Pass handlers from the hook */}
                      {/* handleCreateOrUpdatePR uses toast via handlers hook */}
+                     {/* Use repoUrlForForm which is now defined before early return */}
                      <PullRequestForm id="pr-form-container" repoUrl={repoUrlForForm}
                       prTitle={prTitle} selectedFileCount={selectedAssistantFiles.size} isLoading={isProcessingPR || assistantLoading} isLoadingPrList={loadingPrs} onRepoUrlChange={updateRepoUrl} onPrTitleChange={setPrTitle} onCreatePR={handlers.handleCreateOrUpdatePR} buttonText={prButtonText} buttonIcon={prButtonLoadingIconNode} isSubmitDisabled={submitButtonDisabled} />
                      <OpenPrList openPRs={contextOpenPrs} />
