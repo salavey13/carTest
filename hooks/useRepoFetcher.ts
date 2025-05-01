@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-// Removed direct toast import, using context's addToast
 import { fetchRepoContents, getOpenPullRequests } from "@/app/actions_github/actions"; // Adjust if actions are elsewhere
 import { useRepoXmlPageContext, FetchStatus, SimplePullRequest, ImageReplaceTask, FileNode, ImportCategory } from "@/contexts/RepoXmlPageContext";
 import { debugLogger as logger } from "@/lib/debugLogger";
@@ -60,8 +59,7 @@ export const useRepoFetcher = ({
     // Context access within the hook
     const {
       fetchStatus, setFetchStatus,
-      // Use the handler function from context, not the direct setter
-      handleSetFilesFetched, // <<< Use the handler function from Context
+      handleSetFilesFetched, // Use the handler function from Context
       setSelectedFetcherFiles,
       setRequestCopied,
       setLoadingPrs, setOpenPrs, setTargetBranchName: setContextTargetBranch,
@@ -69,57 +67,67 @@ export const useRepoFetcher = ({
       updateKworkInput,
       addToast, // Use context's toast wrapper
       setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles,
-      allFetchedFiles // Get all fetched files from context if needed for consistency? (No, fetcher manages its own 'files' state)
+      // allFetchedFiles // Not needed directly here
     } = useRepoXmlPageContext();
 
+    // --- VIBE CHECK ---
+    addToast("[DEBUG] useRepoFetcher Hook Start", 'info', 1000);
+    // --- VIBE CHECK END ---
+
     // Internal state for this fetcher instance
+    addToast("[DEBUG] Before useRepoFetcher useState", 'info', 1000);
     const [files, setFiles] = useState<FileNode[]>([]); // Files fetched by *this* instance
     const [progress, setProgress] = useState<number>(0);
     const [error, setError] = useState<string | null>(null);
     const [primaryHighlightedPath, setPrimaryHighlightedPathState] = useState<string | null>(null);
     const [secondaryHighlightedPaths, setSecondaryHighlightedPathsState] = useState<Record<ImportCategory, string[]>>({ component: [], context: [], hook: [], lib: [], other: [] });
+    addToast("[DEBUG] After useRepoFetcher useState", 'info', 1000);
 
     // Refs
+    addToast("[DEBUG] Before useRepoFetcher useRef", 'info', 1000);
     const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const isImageTaskFetchInitiated = useRef(false);
     const isAutoFetchingRef = useRef(false);
     const fetchStatusRef = useRef(fetchStatus); // Track fetch status for interval cleanup
     const [isMounted, setIsMounted] = useState(false);
+    addToast("[DEBUG] After useRepoFetcher useRef/useState", 'info', 1000);
 
-    useEffect(() => { setIsMounted(true); }, []);
+    useEffect(() => { setIsMounted(true); addToast("[DEBUG] useRepoFetcher Mounted", 'info', 1000); }, [addToast]);
     useEffect(() => { fetchStatusRef.current = fetchStatus; }, [fetchStatus]);
 
     // --- Progress Simulation ---
     const stopProgressSimulation = useCallback(() => {
+        // addToast("[DEBUG] stopProgressSimulation called", 'info', 500); // Likely too noisy
         if (progressIntervalRef.current) {
             clearInterval(progressIntervalRef.current);
             progressIntervalRef.current = null;
         }
-    }, []);
+    }, []); // Stable
 
     const startProgressSimulation = useCallback((estimatedDurationSeconds = 13) => {
+        addToast(`[DEBUG] startProgressSimulation called. Type: ${typeof setInterval}`, 'info', 1000);
         stopProgressSimulation();
         setProgress(0);
         const ticks = estimatedDurationSeconds * 5;
         const increment = ticks > 0 ? 100 / ticks : 100;
         progressIntervalRef.current = setInterval(() => {
             setProgress(prev => {
-                // Check fetchStatusRef (which tracks context status) to stop simulation
                 const currentContextStatus = fetchStatusRef.current;
                 if (currentContextStatus !== 'loading' && currentContextStatus !== 'retrying') {
+                    addToast("[DEBUG] Progress Interval: Stopping due to context status change", 'info', 500);
                     stopProgressSimulation();
-                    // Don't jump to 95 if already succeeded/failed
                     return currentContextStatus === 'success' ? 100 : prev;
                 }
                 const nextProgress = prev + increment;
                 if (nextProgress >= 95) {
-                    stopProgressSimulation(); // Stop simulation near the end
+                    addToast("[DEBUG] Progress Interval: Reached >= 95%, stopping.", 'info', 500);
+                    stopProgressSimulation();
                     return 95;
                 }
                 return nextProgress;
             });
         }, 200);
-    }, [stopProgressSimulation]); // stopProgressSimulation is stable
+    }, [stopProgressSimulation, addToast]); // Add addToast
 
     // --- Core Fetch Logic ---
     const handleFetchManual = useCallback(async (
@@ -131,50 +139,70 @@ export const useRepoFetcher = ({
         const isAutoFetchWithIdea = autoFetch && !!ideaFromUrl && !isManualRetry;
         const currentTask = taskForEarlyCheck || imageReplaceTask;
 
-        logger.log(`Fetcher Hook: Start handleFetchManual. Retry: ${isManualRetry}, Initial Branch: ${initialBranchGuess}, Task Active: ${!!currentTask}, AutoFetchIdea: ${isAutoFetchWithIdea}`);
-        // Add Debug Toast
-        addToast(`[Debug] handleFetchManual started. Branch: ${initialBranchGuess}`, 'message', 1500);
+        addToast(`[DEBUG] handleFetchManual START. Branch: ${initialBranchGuess}. Task: ${!!currentTask}`, 'info', 1000);
 
         // --- Guards ---
-        if (currentTask && isImageTaskFetchInitiated.current && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying')) { logger.warn("Fetcher Hook: Image task fetch already running."); return; }
-        if (!currentTask && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying') && !isManualRetry) { logger.warn("Fetcher Hook: Standard fetch already running."); addToast("Уже идет загрузка...", "info"); return; }
-        if (!repoUrl.trim()) { logger.error("Fetcher Hook: Repo URL empty."); addToast("Введите URL репозитория", 'error'); setError("URL репозитория не указан."); triggerToggleSettingsModal(); return; }
-        if (loadingPrs || assistantLoading || isParsing || aiActionLoading) { logger.warn(`Fetcher Hook: Blocked by processing state (PRs: ${loadingPrs}, Assistant: ${assistantLoading}, Parsing: ${isParsing}, AI Action: ${aiActionLoading}).`); addToast("Подождите завершения.", "warning"); return; }
+        if (currentTask && isImageTaskFetchInitiated.current && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying')) {
+            addToast("[DEBUG] handleFetchManual SKIP: Image fetch already running", 'warning', 1000);
+            logger.warn("Fetcher Hook: Image task fetch already running."); return;
+        }
+        if (!currentTask && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying') && !isManualRetry) {
+            addToast("[DEBUG] handleFetchManual SKIP: Standard fetch already running", 'warning', 1000);
+            logger.warn("Fetcher Hook: Standard fetch already running."); addToast("Уже идет загрузка...", "info"); return;
+        }
+        if (!repoUrl.trim()) {
+            addToast("[DEBUG] handleFetchManual ERROR: Repo URL empty", 'error', 3000);
+            logger.error("Fetcher Hook: Repo URL empty."); addToast("Введите URL репозитория", 'error'); setError("URL репозитория не указан."); triggerToggleSettingsModal(); return;
+        }
+        if (loadingPrs || assistantLoading || isParsing || aiActionLoading) {
+            addToast("[DEBUG] handleFetchManual SKIP: Blocked by other process", 'warning', 1000);
+            logger.warn(`Fetcher Hook: Blocked by processing state (PRs: ${loadingPrs}, Assistant: ${assistantLoading}, Parsing: ${isParsing}, AI Action: ${aiActionLoading}).`); addToast("Подождите завершения.", "warning"); return;
+        }
 
         // --- Reset State ---
-        logger.log("Fetcher Hook: Starting process - resetting states.");
-        setFetchStatus('loading'); // Update context status
-        setError(null); // Reset local error
-        setFiles([]); // Reset local files
-        setPrimaryHighlightedPathState(null); // Reset local highlights
-        setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); // Reset local highlights
-        setSelectedFetcherFiles(new Set()); // Reset context selection
+        addToast("[DEBUG] handleFetchManual Resetting State", 'info', 1000);
+        // --- VIBE FIX: Delay the status update ---
+        setTimeout(() => {
+            addToast("[DEBUG] handleFetchManual Setting fetchStatus to 'loading' (delayed)", 'info', 1000);
+            setFetchStatus('loading');
+        }, 0);
+        // --- END VIBE FIX ---
+        setError(null);
+        setFiles([]);
+        setPrimaryHighlightedPathState(null);
+        setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] });
+        setSelectedFetcherFiles(new Set());
+        // Only reset these if NOT an image task
         if (!currentTask) {
+             addToast("[DEBUG] handleFetchManual: Standard task - resetting AI states", 'info', 1000);
              setRequestCopied(false);
              setAiResponseHasContent(false);
              setFilesParsed(false);
              setSelectedAssistantFiles(new Set());
              if (!isAutoFetchWithIdea) { logger.log("Fetcher Hook: Manual fetch or auto without idea. Kwork input untouched by Fetcher initially."); }
         } else {
-             logger.log("Fetcher Hook: Image Task mode - setting flag, clearing kwork.");
+             addToast("[DEBUG] handleFetchManual: Image Task mode - setting flag", 'info', 1000);
              isImageTaskFetchInitiated.current = true;
-             updateKworkInput("");
+             updateKworkInput(""); // Clear kwork for image task
         }
 
         // --- Branch / PR Logic (Image Task Only) ---
         let branchForContentFetch = initialBranchGuess;
         let identifiedPrBranch = false;
         if (currentTask && !isManualRetry) {
-            logger.log(`[Fetcher Hook] Image task (${currentTask.targetPath}). Checking PRs...`);
-            setLoadingPrs(true);
-            try {
-                const prResult = await getOpenPullRequests(repoUrl);
-                if (prResult.success && prResult.pullRequests) {
+             addToast("[DEBUG] handleFetchManual: Image Task PR Check START", 'info', 1000);
+             setLoadingPrs(true);
+             try {
+                 addToast(`[DEBUG] Before getOpenPullRequests. Type: ${typeof getOpenPullRequests}`, 'info', 1000);
+                 const prResult = await getOpenPullRequests(repoUrl);
+                 addToast(`[DEBUG] After getOpenPullRequests. Success: ${prResult.success}`, 'info', 1000);
+                 if (prResult.success && prResult.pullRequests) {
                     logger.log(`[Fetcher Hook] Found ${prResult.pullRequests.length} open PRs.`);
                     const expectedPrTitlePrefix = `chore: Update image`; const expectedPrFile = currentTask.targetPath;
                     const matchPr = prResult.pullRequests.find(pr => pr.title?.startsWith(expectedPrTitlePrefix) && pr.title?.includes(expectedPrFile) && pr.head?.ref);
-                    if (matchPr && matchPr.head?.ref) {
+                    if (matchPr?.head?.ref) { // Check ref exists
                         branchForContentFetch = matchPr.head.ref; identifiedPrBranch = true;
+                        addToast(`[DEBUG] Found PR branch: ${branchForContentFetch}`, 'info', 1000);
                         setContextTargetBranch(branchForContentFetch); setOpenPrs(prResult.pullRequests as SimplePullRequest[]);
                         logger.log(`[Fetcher Hook] Found relevant PR #${matchPr.number} on branch '${branchForContentFetch}'. Fetching from this branch.`);
                         addToast(`Найден PR #${matchPr.number}. Загружаю из ветки ${branchForContentFetch}...`, "info");
@@ -186,17 +214,18 @@ export const useRepoFetcher = ({
                     logger.error(`[Fetcher Hook] Failed to get open PRs: ${prResult.error}. Proceeding with: ${branchForContentFetch}`);
                     addToast("Не удалось проверить PR. Загружаю...", "error", { description: prResult.error }); setOpenPrs([]);
                 }
-            } catch (prError: any) {
-                logger.error(`[Fetcher Hook] CRITICAL Error during getOpenPullRequests: ${prError.message}. Proceeding with: ${branchForContentFetch}`);
-                addToast("Крит. ошибка проверки PR. Загружаю...", "error", { description: prError.message }); setOpenPrs([]);
-            } finally { setLoadingPrs(false); }
+             } catch (prError: any) {
+                 addToast(`[DEBUG] CRITICAL Error getOpenPullRequests`, 'error', 3000);
+                 logger.error(`[Fetcher Hook] CRITICAL Error during getOpenPullRequests: ${prError.message}. Proceeding with: ${branchForContentFetch}`);
+                 addToast("Крит. ошибка проверки PR. Загружаю...", "error", { description: prError.message }); setOpenPrs([]);
+             } finally { setLoadingPrs(false); addToast("[DEBUG] handleFetchManual: Image Task PR Check FINISH", 'info', 1000);}
         }
 
         // --- Fetch Execution ---
-        const effectiveBranchDisplay = branchForContentFetch;
-        addToast(`Запрос файлов из ветки (${effectiveBranchDisplay})...`, 'loading', 15000, {id: 'fetch-toast'}); // Use loading toast
+        addToast(`[DEBUG] handleFetchManual Fetching from: ${branchForContentFetch}`, 'info', 1000);
+        addToast(`Запрос файлов из ветки (${branchForContentFetch})...`, 'loading', 15000, {id: 'fetch-toast'});
+        addToast(`[DEBUG] Before startProgressSimulation. Type: ${typeof startProgressSimulation}`, 'info', 1000);
         startProgressSimulation(identifiedPrBranch ? 8 : 13);
-        logger.log("Fetcher Hook: Progress simulation started.");
 
         let fetchResult: Awaited<ReturnType<typeof fetchRepoContents>> | null = null;
         let fetchAttemptSucceeded = false;
@@ -206,32 +235,48 @@ export const useRepoFetcher = ({
         let filesToAutoSelect = new Set<string>();
 
         try {
-            logger.log(`Fetcher Hook: Calling fetchRepoContents: URL=${repoUrl}, Branch="${branchForContentFetch}", Token Provided: ${!!token}`);
+            addToast(`[DEBUG] Before fetchRepoContents. Type: ${typeof fetchRepoContents}`, 'info', 1000);
             fetchResult = await fetchRepoContents(repoUrl, token || undefined, branchForContentFetch);
+            addToast(`[DEBUG] After fetchRepoContents. Success: ${fetchResult?.success}`, 'info', 1000);
+
             if (fetchResult?.success && Array.isArray(fetchResult.files)) {
-                fetchAttemptSucceeded = true; fetchedFilesData = fetchResult.files;
+                fetchAttemptSucceeded = true; // Mark success early
+                fetchedFilesData = fetchResult.files;
                 const allPaths = fetchedFilesData.map(f => f.path);
                 logger.log(`Fetcher Hook: Fetched ${fetchedFilesData.length} files from '${branchForContentFetch}'.`);
-                if (currentTask) {
+                addToast(`[DEBUG] Fetched ${fetchedFilesData.length} files.`, 'info', 1000);
+
+                if (currentTask) { // Image Task Path
+                    addToast(`[DEBUG] Image Task Path processing`, 'info', 1000);
                     primaryHighlightPathInternal = currentTask.targetPath;
                     if (!allPaths.includes(primaryHighlightPathInternal)) {
+                        addToast(`[DEBUG] ERROR: Image Task target ${primaryHighlightPathInternal} NOT FOUND!`, 'error', 5000);
                         logger.error(`Fetcher Hook: Image Task - Target ${primaryHighlightPathInternal} NOT FOUND in fetched files from branch ${branchForContentFetch}.`);
-                        setError(`Файл (${primaryHighlightPathInternal}) не найден в ветке ${branchForContentFetch}.`); addToast(`Файл (${primaryHighlightPathInternal}) не найден.`, 'error', undefined, {id: 'fetch-toast'}); fetchAttemptSucceeded = false;
+                        setError(`Файл (${primaryHighlightPathInternal}) не найден в ветке ${branchForContentFetch}.`);
+                        addToast(`Файл (${primaryHighlightPathInternal}) не найден.`, 'error', undefined, {id: 'fetch-toast'});
+                        fetchAttemptSucceeded = false; // OVERRIDE success if target missing
                     } else {
                         logger.log(`Fetcher Hook: Image Task - Target ${primaryHighlightPathInternal} found.`);
-                        addToast(`Файл для замены (${primaryHighlightPathInternal.split('/').pop()}) загружен из ${branchForContentFetch}.`, 'success', undefined, {id: 'fetch-toast'}); filesToAutoSelect.add(primaryHighlightPathInternal);
+                        addToast(`[DEBUG] Image Task target found. Auto-selecting.`, 'info', 1000);
+                        addToast(`Файл для замены (${primaryHighlightPathInternal.split('/').pop()}) загружен из ${branchForContentFetch}.`, 'success', undefined, {id: 'fetch-toast'});
+                        filesToAutoSelect.add(primaryHighlightPathInternal);
                     }
                     secondaryHighlightPathsDataInternal = { component: [], context: [], hook: [], lib: [], other: [] };
-                } else {
+                } else { // Standard Task Path
+                    addToast(`[DEBUG] Standard Task Path processing`, 'info', 1000);
                     if (highlightedPathFromUrl) {
-                        logger.log(`Fetcher Hook: Standard Task - Processing highlights for URL param: ${highlightedPathFromUrl}`);
+                        addToast(`[DEBUG] Standard Task - Processing highlights for ${highlightedPathFromUrl}`, 'info', 1000);
+                        addToast(`[DEBUG] Before repoUtils.getPageFilePath. Type: ${typeof repoUtils.getPageFilePath}`, 'info', 1000);
                         primaryHighlightPathInternal = repoUtils.getPageFilePath(highlightedPathFromUrl, allPaths);
+                        addToast(`[DEBUG] Primary Path resolved: ${primaryHighlightPathInternal}`, 'info', 1000);
                         if (primaryHighlightPathInternal) {
                             const primaryFileNode = fetchedFilesData.find(f => f.path === primaryHighlightPathInternal);
                             if (primaryFileNode) {
-                                logger.log(`Fetcher Hook: Primary file located: ${primaryHighlightPathInternal}`); filesToAutoSelect.add(primaryHighlightPathInternal);
-                                const imports = repoUtils.extractImports(primaryFileNode.content); logger.log(`Fetcher Hook: Found ${imports.length} imports in primary file.`);
+                                filesToAutoSelect.add(primaryHighlightPathInternal);
+                                addToast(`[DEBUG] Before repoUtils.extractImports. Type: ${typeof repoUtils.extractImports}`, 'info', 1000);
+                                const imports = repoUtils.extractImports(primaryFileNode.content);
                                 const tempSecPathsSet: Record<ImportCategory, Set<string>> = {component:new Set(), context:new Set(), hook:new Set(), lib:new Set(), other:new Set()};
+                                addToast(`[DEBUG] Before repoUtils.resolveImportPath/categorize loop (${imports.length} imports). Types: ${typeof repoUtils.resolveImportPath}, ${typeof repoUtils.categorizeResolvedPath}`, 'info', 1000);
                                 imports.forEach(imp => {
                                     const resolvedPath = repoUtils.resolveImportPath(imp, primaryFileNode.path, fetchedFilesData);
                                     if (resolvedPath && resolvedPath !== primaryHighlightPathInternal && allPaths.includes(resolvedPath)) {
@@ -240,100 +285,119 @@ export const useRepoFetcher = ({
                                     }
                                 });
                                 secondaryHighlightPathsDataInternal = { component: Array.from(tempSecPathsSet.component), context: Array.from(tempSecPathsSet.context), hook: Array.from(tempSecPathsSet.hook), lib: Array.from(tempSecPathsSet.lib), other: Array.from(tempSecPathsSet.other) };
-                            } else { logger.warn(`Fetcher Hook: Primary path ${primaryHighlightPathInternal} resolved but node not found in fetched data.`); primaryHighlightPathInternal = null; addToast(`Ошибка: Данные для (${primaryHighlightPathInternal}) не найдены.`, 'error', undefined, {id: 'fetch-toast'}); }
-                        } else { logger.warn(`Fetcher Hook: Page file path for URL (${highlightedPathFromUrl}) not found among fetched files.`); addToast(`Файл страницы для URL (${highlightedPathFromUrl}) не найден.`, 'warning', undefined, {id: 'fetch-toast'}); }
-                        logger.log(`Fetcher Hook: Checking ${importantFiles.length} important files.`); let addedImportantCount = 0;
-                        importantFiles.forEach(p => { if (allPaths.includes(p) && !filesToAutoSelect.has(p)) { filesToAutoSelect.add(p); addedImportantCount++; } });
-                        if (addedImportantCount > 0) logger.log(`Fetcher Hook: Auto-selected ${addedImportantCount} important files.`);
+                                addToast(`[DEBUG] Secondary paths calculated. Comp: ${secondaryHighlightPathsDataInternal.component.length}, Ctx: ${secondaryHighlightPathsDataInternal.context.length}, Hook: ${secondaryHighlightPathsDataInternal.hook.length}, Lib: ${secondaryHighlightPathsDataInternal.lib.length}`, 'info', 1000);
+                            } else {
+                                addToast(`[DEBUG] WARN: Primary path ${primaryHighlightPathInternal} not found in fetched data`, 'warning', 2000);
+                                logger.warn(`Fetcher Hook: Primary path ${primaryHighlightPathInternal} resolved but node not found in fetched data.`); primaryHighlightPathInternal = null; addToast(`Ошибка: Данные для (${primaryHighlightPathInternal}) не найдены.`, 'error', undefined, {id: 'fetch-toast'});
+                            }
+                        } else {
+                           addToast(`[DEBUG] WARN: Page file for URL ${highlightedPathFromUrl} not found`, 'warning', 2000);
+                           logger.warn(`Fetcher Hook: Page file path for URL (${highlightedPathFromUrl}) not found among fetched files.`); addToast(`Файл страницы для URL (${highlightedPathFromUrl}) не найден.`, 'warning', undefined, {id: 'fetch-toast'});
+                        }
+                        addToast(`[DEBUG] Checking important files. Count: ${importantFiles.length}`, 'info', 1000);
+                        let addedImportantCount = 0; importantFiles.forEach(p => { if (allPaths.includes(p) && !filesToAutoSelect.has(p)) { filesToAutoSelect.add(p); addedImportantCount++; } });
+                        if (addedImportantCount > 0) { addToast(`[DEBUG] Auto-selected ${addedImportantCount} important files`, 'info', 1000); logger.log(`Fetcher Hook: Auto-selected ${addedImportantCount} important files.`);}
                         if (filesToAutoSelect.size > 0) {
                             const numSecondary = secondaryHighlightPathsDataInternal.component.length + secondaryHighlightPathsDataInternal.context.length + secondaryHighlightPathsDataInternal.hook.length + secondaryHighlightPathsDataInternal.lib.length;
                             const numImportant = filesToAutoSelect.size - (primaryHighlightPathInternal ? 1 : 0) - numSecondary; let msg = `✅ Авто-выбор: `; const parts = [];
-                            if (primaryHighlightPathInternal) parts.push(`1 стр.`); if (numSecondary > 0) parts.push(`${numSecondary} связ.`); if (numImportant > 0) parts.push(`${numImportant} важн.`); msg += parts.join(', ') + ` (${filesToAutoSelect.size} всего).`; addToast(msg, 'success'); // Separate success toast
+                            if (primaryHighlightPathInternal) parts.push(`1 стр.`); if (numSecondary > 0) parts.push(`${numSecondary} связ.`); if (numImportant > 0) parts.push(`${numImportant} важн.`); msg += parts.join(', ') + ` (${filesToAutoSelect.size} всего).`; addToast(msg, 'success');
                         } else {
-                           // Update loading toast to success if no auto-selection happened but fetch was ok
                            addToast(`Извлечено ${fetchedFilesData.length} файлов!`, 'success', undefined, {id: 'fetch-toast'});
                         }
                     } else {
-                        logger.log("Fetcher Hook: Standard Task - No URL params, basic fetch completed.");
-                        addToast(`Извлечено ${fetchedFilesData.length} файлов!`, 'success', undefined, {id: 'fetch-toast'}); // Update loading toast to success
+                        addToast(`[DEBUG] Standard Task - No URL params, basic fetch completed.`, 'info', 1000);
+                        addToast(`Извлечено ${fetchedFilesData.length} файлов!`, 'success', undefined, {id: 'fetch-toast'});
                         primaryHighlightPathInternal = null; secondaryHighlightPathsDataInternal = { component: [], context: [], hook: [], lib: [], other: [] }; filesToAutoSelect = new Set();
                     }
                 }
-            } else { fetchAttemptSucceeded = false; throw new Error(fetchResult?.error || `Не удалось получить файлы из ${branchForContentFetch}.`); }
+            } else {
+                addToast(`[DEBUG] fetchRepoContents failed. Error: ${fetchResult?.error}`, 'error', 3000);
+                fetchAttemptSucceeded = false;
+                throw new Error(fetchResult?.error || `Не удалось получить файлы из ${branchForContentFetch}.`);
+            }
         } catch (err: any) {
-            const displayError = err?.message || "Неизвестная ошибка при загрузке."; logger.error(`Fetcher Hook: Fetch Error - ${displayError}`, err);
-            setError(displayError); addToast(`Ошибка: ${displayError}`, 'error', undefined, {id: 'fetch-toast'}); // Update loading toast to error
-            fetchAttemptSucceeded = false;
+            addToast(`[DEBUG] fetchRepoContents CATCH block: ${err?.message}`, 'error', 3000);
+            const displayError = err?.message || "Неизвестная ошибка при загрузке.";
+            logger.error(`Fetcher Hook: Fetch Error - ${displayError}`, err);
+            setError(displayError);
+            addToast(`Ошибка: ${displayError}`, 'error', undefined, {id: 'fetch-toast'});
+            fetchAttemptSucceeded = false; // Ensure marked as failed
             fetchedFilesData = []; primaryHighlightPathInternal = null; secondaryHighlightPathsDataInternal = { component: [], context: [], hook: [], lib: [], other: [] }; filesToAutoSelect = new Set();
         } finally {
+            addToast(`[DEBUG] handleFetchManual FINALLY block. Attempt Succeeded: ${fetchAttemptSucceeded}`, 'info', 1000);
+            addToast(`[DEBUG] Before stopProgressSimulation. Type: ${typeof stopProgressSimulation}`, 'info', 1000);
             stopProgressSimulation();
-            const overallSuccess = fetchAttemptSucceeded;
-            setFiles(fetchedFilesData); // Update local state for the FileList component
-            setPrimaryHighlightedPathState(primaryHighlightPathInternal); // Update local state
-            setSecondaryHighlightedPathsState(secondaryHighlightPathsDataInternal); // Update local state
+            setFiles(fetchedFilesData);
+            setPrimaryHighlightedPathState(primaryHighlightPathInternal);
+            setSecondaryHighlightedPathsState(secondaryHighlightPathsDataInternal);
              if (filesToAutoSelect.size > 0) {
-                 logger.log(`Fetcher Hook: Updating context selection with ${filesToAutoSelect.size} auto-selected files.`);
-                 setSelectedFetcherFiles(filesToAutoSelect); // Update context selection
+                 addToast(`[DEBUG] Updating context selection: ${filesToAutoSelect.size} files`, 'info', 1000);
+                 setSelectedFetcherFiles(filesToAutoSelect);
              }
-            // *** THE FIX: Call the handler from context ***
-            handleSetFilesFetched(
-                overallSuccess,
-                fetchedFilesData, // Pass the actual files fetched in *this* attempt
+            addToast(`[DEBUG] Before handleSetFilesFetched. Type: ${typeof handleSetFilesFetched}`, 'info', 1000);
+            handleSetFilesFetched( // Call context handler to update global state and potentially trigger image processing
+                fetchAttemptSucceeded,
+                fetchedFilesData,
                 primaryHighlightPathInternal,
                 Object.values(secondaryHighlightPathsDataInternal).flat()
             );
-            // Update local progress based on success
-            setProgress(overallSuccess ? 100 : 0);
-            // Context status is updated by handleSetFilesFetched
-            // setFetchStatus(overallSuccess ? 'success' : 'error'); // This is now redundant
-            if (currentTask && !overallSuccess) { logger.log("Fetcher Hook: Resetting image task initiated flag due to fetch failure."); isImageTaskFetchInitiated.current = false; }
-            if(isSettingsModalOpen) { triggerToggleSettingsModal(); } // Close modal regardless of success/fail?
-            logger.log(`Fetcher Hook: Finished handleFetchManual. Success: ${overallSuccess}, Branch Fetched: ${branchForContentFetch}`);
-            // Add Debug Toast
-            // addToast(`[Debug] handleFetchManual finished. Success: ${overallSuccess}`, 'message', 1500);
+            addToast(`[DEBUG] After handleSetFilesFetched`, 'info', 1000);
+            setProgress(fetchAttemptSucceeded ? 100 : 0);
+            if (currentTask && !fetchAttemptSucceeded) {
+                addToast("[DEBUG] handleFetchManual: Resetting image task flag due to fetch failure", 'warning', 1000);
+                isImageTaskFetchInitiated.current = false;
+            }
+            if(isSettingsModalOpen) { triggerToggleSettingsModal(); }
+            addToast(`[DEBUG] handleFetchManual FINISHED`, 'info', 1000);
         }
     }, [
+        // Full list of dependencies - MAKE SURE THEY ARE ALL LISTED
         repoUrl, token, targetBranchName, manualBranchName, imageReplaceTask,
         highlightedPathFromUrl, importantFiles, autoFetch, ideaFromUrl, isSettingsModalOpen,
         loadingPrs, assistantLoading, isParsing, aiActionLoading,
-        setFetchStatus, handleSetFilesFetched, // <<< Corrected Dependency
+        setFetchStatus, handleSetFilesFetched,
         setSelectedFetcherFiles, setRequestCopied,
         setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setLoadingPrs,
         setOpenPrs, setContextTargetBranch, triggerToggleSettingsModal, updateKworkInput, addToast,
         setError, setFiles, setPrimaryHighlightedPathState, setSecondaryHighlightedPathsState,
         startProgressSimulation, stopProgressSimulation,
-        logger
+        logger // Assuming logger is stable
     ]);
 
     // --- Effect: Auto-Fetch ---
     useEffect(() => {
-        if (!isMounted || !repoUrlEntered) return;
+        addToast("[DEBUG] useRepoFetcher Auto-Fetch Effect Check", 'info', 1000);
+        if (!isMounted || !repoUrlEntered) { addToast("[DEBUG] Auto-Fetch SKIP: Not mounted or no URL", 'info', 1000); return; }
         const currentTask = imageReplaceTask;
         const branch = targetBranchName || manualBranchName || null;
         const canTriggerFetch = autoFetch && (fetchStatus === 'idle' || fetchStatus === 'failed_retries' || fetchStatus === 'error');
         const isImageFetchReady = currentTask && !isImageTaskFetchInitiated.current;
         const isStandardFetchReady = !currentTask && autoFetch;
+        addToast(`[DEBUG] Auto-Fetch Check: canTrigger=${canTriggerFetch}, isAutoFetchingRef=${isAutoFetchingRef.current}, isImageReady=${isImageFetchReady}, isStandardReady=${isStandardFetchReady}`, 'info', 1000);
 
-        // Add short delay to auto-fetch to prevent rapid loops if state is unstable initially
         const timerId = setTimeout(() => {
             if (canTriggerFetch && !isAutoFetchingRef.current && (isImageFetchReady || isStandardFetchReady)) {
                 const mode = currentTask ? "Image Task" : "Standard";
-                logger.log(`[AutoFetch Effect Hook] Triggering fetch (${mode}). Guard ON. Task: ${currentTask?.targetPath ?? 'N/A'}`);
-                // Add Debug Toast
-                // addToast(`[Debug] AutoFetch triggered (${mode})`, 'message', 1500);
+                addToast(`[DEBUG] Auto-Fetch Triggering handleFetchManual (${mode}). Guard ON.`, 'info', 1000);
                 isAutoFetchingRef.current = true;
                 handleFetchManual(false, branch, currentTask)
-                    .catch(err => { logger.error(`[AutoFetch Effect Hook] handleFetchManual (${mode}) threw an unexpected error:`, err); })
+                    .catch(err => {
+                         addToast(`[DEBUG] Auto-Fetch handleFetchManual ERROR`, 'error', 3000);
+                         logger.error(`[AutoFetch Effect Hook] handleFetchManual (${mode}) threw an unexpected error:`, err); })
                     .finally(() => {
-                        logger.log("[AutoFetch Effect Hook] Resetting fetch guard."); isAutoFetchingRef.current = false;
-                        const finalStatus = fetchStatusRef.current; logger.log(`[AutoFetch Effect Hook] Fetch attempt finished with status: ${finalStatus}`);
-                        if (currentTask && (finalStatus === 'error' || finalStatus === 'failed_retries')) { logger.log(`[AutoFetch Effect Hook] Resetting image task initiated flag due to final status: ${finalStatus}.`); isImageTaskFetchInitiated.current = false; }
+                        addToast("[DEBUG] Auto-Fetch FINALLY: Resetting guard.", 'info', 1000);
+                        isAutoFetchingRef.current = false;
+                        const finalStatus = fetchStatusRef.current;
+                        addToast(`[DEBUG] Auto-Fetch finished with status: ${finalStatus}`, 'info', 1000);
+                        if (currentTask && (finalStatus === 'error' || finalStatus === 'failed_retries')) {
+                             addToast(`[DEBUG] Auto-Fetch resetting image task flag due to error`, 'warning', 1000);
+                             isImageTaskFetchInitiated.current = false;
+                        }
                     });
-            }
+            } else { addToast("[DEBUG] Auto-Fetch conditions NOT met or already running", 'info', 1000); }
         }, 100); // 100ms delay
 
-        return () => clearTimeout(timerId); // Cleanup timeout
-
+        return () => clearTimeout(timerId);
     }, [
         isMounted, repoUrlEntered, autoFetch, targetBranchName, manualBranchName,
         imageReplaceTask, fetchStatus, // React to context status
@@ -342,14 +406,20 @@ export const useRepoFetcher = ({
     ]);
 
     // --- Cleanup Effect ---
-    useEffect(() => { return () => { stopProgressSimulation(); }; }, [stopProgressSimulation]);
+    useEffect(() => {
+         return () => {
+             addToast("[DEBUG] useRepoFetcher Unmount Cleanup - Stopping Progress", 'info', 1000);
+             stopProgressSimulation();
+         };
+    }, [stopProgressSimulation, addToast]); // Add addToast
 
     // --- Derived State ---
     const isLoading = fetchStatus === 'loading' || fetchStatus === 'retrying';
-    // Disable fetch if context status is loading/retrying OR if specific blocking states are active
     const isFetchDisabled = isLoading || loadingPrs || !repoUrlEntered || assistantLoading || isParsing || aiActionLoading || (!!imageReplaceTask && isImageTaskFetchInitiated.current && isLoading);
+    addToast(`[DEBUG] useRepoFetcher derived: isLoading=${isLoading}, isFetchDisabled=${isFetchDisabled}`, 'info', 1000);
 
     // --- Return values ---
+    addToast("[DEBUG] useRepoFetcher Hook End - Returning values", 'info', 1000);
     return {
         files, // Return local files state for FileList display
         progress,
