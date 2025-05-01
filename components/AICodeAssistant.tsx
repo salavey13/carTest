@@ -224,45 +224,62 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     // Direct image replace effect - Uses handler hook which uses toasts internally
      useEffect(() => {
+        // Check if conditions are met to START the process
+        // assistantLoading check here prevents starting a new process if one is running
         const canProcess = imageReplaceTask && fetchStatus === 'success' && allFetchedFiles.length > 0 && allFetchedFiles.some(f => f.path === imageReplaceTask.targetPath) && !assistantLoading && !processingImageReplace.current;
 
         if (canProcess) {
             logger.log("[Effect] Conditions met. Starting image replace process...");
-            processingImageReplace.current = true;
+            processingImageReplace.current = true; // Prevent re-entry within this effect run
             setImageReplaceError(null);
+
             // Ensure handlers and the specific handler exist before calling
             if (handlers?.handleDirectImageReplace) {
                 // Handler now uses useAppToast internally
                 handlers.handleDirectImageReplace(imageReplaceTask, allFetchedFiles)
                     .then(() => {
                          // Logic based on task completion is handled within the handler now
-                         if (imageReplaceTaskRef.current) {
-                            if(imageReplaceError) { logger.warn(`[Effect] Replace finished, but with issue: ${imageReplaceError}`); }
-                            else { /*logger.info("[Effect] Replace process resolved, but task might still be active if PR failed?");*/ }
-                         } else { logger.log("[Effect] Replace process resolved successfully (task cleared)."); }
+                         if (imageReplaceTaskRef.current) { // Check if task is still active after handler resolves
+                            if(imageReplaceError) {
+                                logger.warn(`[Effect] Replace finished, but with issue: ${imageReplaceError}`);
+                            } else {
+                                // Task might still be active if PR creation/update within handler failed but didn't throw/reject
+                                // This state is less ideal, but the UI should reflect the error via imageReplaceError
+                                logger.info("[Effect] Replace process resolved, but task might still be active (check logs/UI error state).");
+                            }
+                         } else {
+                            logger.log("[Effect] Replace process resolved successfully (task was cleared by handler).");
+                         }
                     })
                     .catch(err => {
                         // Error logging/toast is likely handled within the handler now
-                        const errorMsg = err?.message || "Unknown error";
+                        const errorMsg = err?.message || "Unknown error during image replace";
                         logger.error("[Effect] handleDirectImageReplace Promise REJECTED:", errorMsg);
-                        // Optionally set local error state if handler doesn't cover it
+                        // Optionally set local error state if handler doesn't cover it thoroughly
                         setImageReplaceError(`Promise rejected: ${errorMsg}`);
                     })
                     .finally(() => {
-                        logger.log("[Effect] Process finished (finally block).");
-                        processingImageReplace.current = false; // Always reset flag
+                        logger.log("[Effect] Image replace process finished (finally block).");
+                        processingImageReplace.current = false; // Always reset flag after process completes/errors
                     });
             } else {
                  logger.error("[Effect] handleDirectImageReplace handler is not available!");
                  setImageReplaceError("Internal error: Image replace handler missing.");
                  processingImageReplace.current = false; // Ensure flag is reset
-                 toastError("Внутренняя ошибка: Обработчик замены картинки отсутствует."); // <<< Use Hook
+                 toastError("Внутренняя ошибка: Обработчик замены картинки отсутствует."); // Use Hook
             }
-        } else if (imageReplaceTask && fetchStatus === 'error') {
+        // Handle case where fetch failed while task was active
+        } else if (imageReplaceTask && fetchStatus === 'error' && !processingImageReplace.current) {
             logger.warn("[Effect] Image task active, but fetch status is error.");
              setImageReplaceError("Failed to fetch target file.");
         }
-     }, [ imageReplaceTask, fetchStatus, allFetchedFiles, assistantLoading, handlers, setImageReplaceError, imageReplaceError, logger, toastError ]); // Added handlers and toastError to dependency array
+        // NOTE: No 'else' block resetting the error here, it should persist until explicitly cleared or a new task starts.
+
+        // --- DEPENDENCY ARRAY UPDATED: assistantLoading REMOVED ---
+     }, [
+        imageReplaceTask, fetchStatus, allFetchedFiles, /* assistantLoading REMOVED */
+        handlers, setImageReplaceError, imageReplaceError, logger, toastError
+     ]); // Dependency array updated
 
 
     // --- Imperative Handle (Expose handlers from the hook) ---
@@ -287,19 +304,21 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const prButtonLoadingIconNode = (isProcessingPR || assistantLoading) && !imageReplaceTask ? <FaSpinner className="animate-spin"/> : prButtonIconNode;
     const assistantTooltipText = `Вставь ответ AI -> '➡️' -> Проверь/Исправь -> Выбери файлы -> ${prButtonText}`;
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
-    const showImageReplaceUI = !!imageReplaceTask || !!imageReplaceError;
+    const showImageReplaceUI = !!imageReplaceTask || !!imageReplaceError; // Show if task active OR if there's an error from a previous task attempt
     const showStandardAssistantUI = !showImageReplaceUI;
-    const imageTaskFailed = !!imageReplaceError && !assistantLoading && !isProcessingPR;
+    const imageTaskFailed = !!imageReplaceError && !assistantLoading && !isProcessingPR; // Only show 'failed' state clearly when not actively processing
     const commonDisabled = isProcessingAny;
-    const parseButtonDisabled = commonDisabled || isWaitingForAiResponse || !response.trim() || !!imageReplaceTask;
-    const fixButtonDisabled = commonDisabled || isWaitingForAiResponse || !!imageReplaceTask;
-    const submitButtonDisabled = !canSubmitRegularPR || isProcessingPR || assistantLoading;
+    const parseButtonDisabled = commonDisabled || isWaitingForAiResponse || !response.trim() || !!imageReplaceTask; // Disable parse during image task too
+    const fixButtonDisabled = commonDisabled || isWaitingForAiResponse || !!imageReplaceTask; // Disable fixes during image task
+    const submitButtonDisabled = !canSubmitRegularPR || isProcessingPR || assistantLoading || !!imageReplaceTask; // Disable regular PR submit during image task
 
     // Local handler for resetting image error state
     const handleResetImageError = useCallback(() => {
          setImageReplaceError(null);
+         // Consider if clearing the task is also needed here, or if user should retry fetch
+         // setImageReplaceTask(null); // Optional: Uncomment if resetting error should also discard the task
          toastInfo("Состояние ошибки сброшено."); // <<< Use Hook
-     }, [setImageReplaceError, toastInfo]);
+     }, [setImageReplaceError, toastInfo]); // Added setImageReplaceTask if uncommented
 
     return (
         <div id="executor" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
@@ -353,25 +372,32 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             {/* --- Image Replace UI --- */}
             {showImageReplaceUI && (
                 <div className={`flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed min-h-[200px] ${imageTaskFailed ? 'border-red-500' : 'border-blue-400'}`}>
+                     {/* Status Icon Logic */}
                      {(assistantLoading || isProcessingPR) ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> )
                        : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> )
                        : imageTaskFailed ? <FaCircleXmark className="text-red-400 text-4xl mb-4" />
-                       : imageReplaceTask ? <FaImages className="text-blue-400 text-4xl mb-4" />
-                       : <FaCheck className="text-green-400 text-4xl mb-4" /> }
+                       : imageReplaceTask ? <FaImages className="text-blue-400 text-4xl mb-4" /> // Task active, but not failed and not loading = waiting/idle
+                       : <FaCheck className="text-green-400 text-4xl mb-4" /> } {/* Task cleared = success */}
+
+                     {/* Status Title Logic */}
                      <p className={`text-lg font-semibold ${imageTaskFailed ? 'text-red-300' : 'text-blue-300'}`}>
                          {(assistantLoading || isProcessingPR) ? "Обработка Замены..."
                            : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Загрузка Файла..."
                            : imageTaskFailed ? "Ошибка Замены Картинки"
                            : imageReplaceTask ? "Задача Замены Активна"
-                           : "Замена Завершена Успешно"} {/* Assuming task is cleared on success */}
+                           : "Замена Завершена Успешно"}
                      </p>
+
+                     {/* Status Description Logic */}
                      <p className="text-sm text-gray-400 mt-2">
                          {(assistantLoading || isProcessingPR) ? "Создание/обновление PR..."
-                           : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Ожидание..."
-                           : imageTaskFailed ? (imageReplaceError || "Произошла ошибка.")
-                           : imageReplaceTask ? "Файл загружен, ожидание обработки Ассистентом..."
-                           : "Процесс завершен."} {/* Simplified success message */}
+                           : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Ожидание ответа от GitHub..."
+                           : imageTaskFailed ? (imageReplaceError || "Произошла неизвестная ошибка.") // Show specific error
+                           : imageReplaceTask ? "Файл загружен, ожидание обработки Ассистентом..." // Waiting for handler trigger
+                           : "Процесс завершен. Проверьте PR."} {/* Success message */}
                      </p>
+
+                     {/* Display Task Details if active */}
                      {imageReplaceTask && (
                          <div className="mt-3 text-xs text-gray-500 break-all text-left bg-gray-900/50 p-2 rounded max-w-full overflow-x-auto simple-scrollbar">
                              <p><span className="font-semibold text-gray-400">Файл:</span> {imageReplaceTask.targetPath}</p>
@@ -379,9 +405,11 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                              <p><span className="font-semibold text-gray-400">Новый URL:</span> {imageReplaceTask.newUrl}</p>
                          </div>
                      )}
+
+                     {/* Show Reset Button only on failure */}
                      {imageTaskFailed && (
                           <button
-                              onClick={handleResetImageError} // <<< Use stable local handler
+                              onClick={handleResetImageError}
                               className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs rounded-md transition"
                           > Сбросить Ошибку </button>
                       )}
