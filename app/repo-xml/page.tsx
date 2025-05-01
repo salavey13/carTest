@@ -24,7 +24,7 @@ import { motion } from 'framer-motion';
 import parse, { domToReact, HTMLReactParserOptions, Element, attributesToProps } from 'html-react-parser';
 
 
-// --- I18N Translations (Keep Vibe 2.0 Philosophy from previous step) ---
+// --- I18N Translations ---
 const translations = {
   en: {
     loading: "Booting SUPERVIBE ENGINE...",
@@ -114,7 +114,6 @@ const translations = {
 // --- End I18N ---
 
 type Language = 'en' | 'ru';
-// Define a type for the translation object to ensure structure
 type TranslationSet = typeof translations['en'];
 
 // --- Fallback component for AutomationBuddy ---
@@ -122,10 +121,10 @@ function LoadingBuddyFallback() {
     return ( <div className="fixed bottom-4 right-4 z-50 w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 animate-pulse" aria-hidden="true" ></div> );
 }
 
-// --- html-react-parser Configuration (More robust checks) ---
+// --- html-react-parser Configuration (No Toasts) ---
 const parserOptions: HTMLReactParserOptions = {
   replace: (domNode) => {
-    if (!(domNode instanceof Element && domNode.attribs)) { return undefined; } // Ensure it's an element with attributes
+    if (!(domNode instanceof Element && domNode.attribs)) { return undefined; }
 
     const { name, attribs, children } = domNode;
     const lowerCaseName = name?.toLowerCase();
@@ -133,7 +132,15 @@ const parserOptions: HTMLReactParserOptions = {
     // Handle Font Awesome Icons
     if (name && typeof name === 'string' && name.startsWith('Fa') && FaIcons[name as keyof typeof FaIcons]) {
       try {
-          const IconComponent = FaIcons[name as keyof typeof FaIcons];
+          const iconCompFn = FaIcons[name as keyof typeof FaIcons];
+          const isFunction = typeof iconCompFn === 'function';
+          logger.log(`[DEBUG][parserOptions] Check FaIcon <${name}>. Exists: ${isFunction}. Type: ${typeof iconCompFn}`);
+
+          if (!isFunction) {
+              logger.error(`[parserOptions] FaIcon <${name}> is not a function!`);
+              return <span>{`[Icon Load Error: ${name} is not a Function]`}</span>;
+          }
+          const IconComponent = iconCompFn;
           const props = attributesToProps(attribs);
           const baseClassName = "inline-block align-middle mx-1";
           const specificClassName = props.className || '';
@@ -141,7 +148,7 @@ const parserOptions: HTMLReactParserOptions = {
           return React.createElement(IconComponent, props);
       } catch (iconError) {
           logger.error(`[parserOptions] Error rendering FaIcon <${name}>:`, iconError);
-          return <span>{`[Icon Error: ${name}]`}</span>; // Fallback for icon error
+          return <span>{`[Icon Render Error: ${name}]`}</span>; // Fallback for icon error
       }
     }
 
@@ -159,26 +166,24 @@ const parserOptions: HTMLReactParserOptions = {
     }
 
     // Handle other standard HTML tags
-    if (typeof name === 'string' && /^[a-z][a-z0-9-]*$/.test(lowerCaseName || '')) { // Basic check for valid lowercase tag names
+    if (typeof name === 'string' && /^[a-z][a-z0-9-]*$/.test(lowerCaseName || '')) {
       try {
           return React.createElement(lowerCaseName!, attributesToProps(attribs), children ? domToReact(children, parserOptions) : undefined);
       } catch (createElementError) {
           logger.error(`[parserOptions] Error React.createElement for <${lowerCaseName}>:`, createElementError);
-          // Fallback: Render children without the problematic tag
           return <>{children ? domToReact(children, parserOptions) : null}</>;
       }
     }
 
-    // Default: let the parser handle or skip
     return undefined;
   },
 };
 
 
-// --- REVISED: RenderContent Component (More robust) ---
+// --- REVISED: RenderContent Component (No Toasts) ---
 const RenderContent: React.FC<{ content: string | null | undefined }> = React.memo(({ content }) => {
     if (typeof content !== 'string' || !content.trim()) {
-        return null; // Return null for invalid or empty content
+        return null;
     }
     const contentWithStrong = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     try {
@@ -186,32 +191,32 @@ const RenderContent: React.FC<{ content: string | null | undefined }> = React.me
       return <>{parsedContent}</>;
     } catch (error) {
       logger.error("[RenderContent] Error during parse:", error, "Input:", contentWithStrong);
-      // Fallback to safer rendering if parse fails catastrophically
       return <span dangerouslySetInnerHTML={{ __html: `[Parse Error] ${contentWithStrong.substring(0, 100)}...` }} />;
     }
 });
 RenderContent.displayName = 'RenderContent';
 
 
-// --- REVISED: getPlainText helper (Browser-safe) ---
+// --- REVISED: getPlainText helper (No Toasts) ---
 const getPlainText = (htmlString: string | null | undefined): string => {
     if (typeof htmlString !== 'string' || !htmlString) { return ''; }
     try {
-        // Remove FontAwesome tags first
         const withoutIcons = htmlString.replace(/<Fa[A-Z][a-zA-Z0-9]+(?:\s+[^>]*?)?\s*\/?>/g, '');
-        // Basic tag stripping (less robust than DOM parsing but safe for SSR/initial render)
         const plainText = withoutIcons.replace(/<[^>]*>/g, '');
-        // Basic entity decoding (add more if needed)
         return plainText.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
     } catch (e) {
         logger.error("Error stripping HTML for title:", e, "Input:", htmlString);
-        return htmlString; // Fallback
+        return htmlString;
     }
 };
 
 
-// --- ActualPageContent Component ---
+// --- ActualPageContent Component (Reduced Toasts) ---
 function ActualPageContent() {
+    const { addToast } = useRepoXmlPageContext();
+    // Toast at the very start
+    // addToast("[DEBUG] ActualPageContent Function Start", 'info', 1000); // Optional: Can be restored if needed
+
     const { user } = useAppContext();
     const {
         fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef,
@@ -226,26 +231,23 @@ function ActualPageContent() {
     const searchParams = useSearchParams();
     const [initialIdea, setInitialIdea] = useState<string | null>(null);
     const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(false);
-    // --- State for Translations ---
     const [t, setT] = useState<TranslationSet | null>(null);
 
     // --- Effects ---
-
-    // Set mounted and initial language/translation object
     useEffect(() => {
+      // addToast("[DEBUG] ActualPageContent Mount Effect Running", 'info', 1000); // Optional
       setIsMounted(true);
       const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
       const userLang = user?.language_code;
       const resolvedLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
       setLang(resolvedLang);
-      setT(translations[resolvedLang] ?? translations.en); // Ensure 't' is set
+      setT(translations[resolvedLang] ?? translations.en);
       logger.log(`[ActualPageContent Effect 1] Lang set to: ${resolvedLang}`);
-    }, [user]); // Depend only on user
+    }, [user]);
 
-
-    // Process URL Params & Easter Egg (Depends on setRepoUrl, setImageReplaceTask)
     useEffect(() => {
-      if (!isMounted) return; // Wait for mount
+      // addToast("[DEBUG] ActualPageContent URL Effect Check", 'info', 1000); // Optional
+      if (!isMounted) return;
 
       console.log(
         "%c🚀 CyberVibe Studio 2.0 Initialized! 🚀\n%cCo-created with the Vibe Community & AI. Let's build!\n%cEaster Egg added by request. 😉",
@@ -273,7 +275,6 @@ function ActualPageContent() {
             try {
                 decodedPath = decodeURIComponent(pathParam); decodedIdea = decodeURIComponent(ideaParam);
                 if (decodedIdea && decodedIdea.startsWith("ImageReplace|")) {
-                     // ... (ImageReplace logic - unchanged) ...
                     logger.log("[ActualPageContent Effect 2] Processing Image Replace task from URL.");
                     try {
                         const parts = decodedIdea.split('|');
@@ -284,7 +285,7 @@ function ActualPageContent() {
                             const oldUrl = decodeURIComponent(oldUrlParam.substring(7));
                             const newUrl = decodeURIComponent(newUrlParam.substring(7));
 
-                            if (oldUrl && newUrl) { // Ensure URLs are valid after decode
+                            if (oldUrl && newUrl) {
                                 const task: ImageReplaceTask = { targetPath: decodedPath, oldUrl: oldUrl, newUrl: newUrl };
                                 logger.log("[ActualPageContent Effect 2] Setting image task:", task);
                                 setImageReplaceTask(task);
@@ -316,21 +317,27 @@ function ActualPageContent() {
                  logger.error("[ActualPageContent Effect 2] Error decoding path or idea params:", decodeError);
                  setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
             }
-            if (decodedPath || decodedIdea) { setShowComponents(true); }
+            if (decodedPath || decodedIdea) {
+                // Automatically show components if URL params present relevant info
+                setShowComponents(true);
+                addToast("[DEBUG] setShowComponents(true) due to URL params", 'info', 1000);
+            }
         } else {
             logger.log(`[ActualPageContent Effect 2] No valid path/idea params found.`);
             setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
         }
-    }, [isMounted, searchParams, setImageReplaceTask, setRepoUrl]); // Removed user dependency
+        // addToast("[DEBUG] URL Effect Finish", 'info', 1000); // Optional
+    }, [isMounted, searchParams, setImageReplaceTask, setRepoUrl, addToast]); // addToast added
 
 
-    // Effect 3: Populate Kwork Input (Depends on fetchStatus, initialIdea, refs)
      useEffect(() => {
-        if (!isMounted) return; // Wait for mount
+        // addToast("[DEBUG] Kwork Populate Effect Check", 'info', 1000); // Optional
+        if (!isMounted) return;
 
         const fetchAttemptFinished = ['success', 'error', 'failed_retries'].includes(fetchStatus);
 
         if (fetchAttemptFinished && initialIdea && !initialIdeaProcessed && !imageReplaceTask && kworkInputRef.current) {
+            // addToast("[DEBUG] Kwork Populate Conditions MET", 'info', 1000); // Optional
             logger.log(`[ActualPageContent Effect 3] Fetch finished (${fetchStatus}). Populating kwork...`);
             kworkInputRef.current.value = initialIdea;
             try { const inputEvent = new Event('input', { bubbles: true }); kworkInputRef.current.dispatchEvent(inputEvent); }
@@ -349,26 +356,27 @@ function ActualPageContent() {
 
             const kworkElement = document.getElementById('kwork-input-section');
             if (kworkElement) { setTimeout(() => { try { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); logger.log("[ActualPageContent Effect 3] Scrolled to kwork."); } catch (scrollError) { logger.error("[ActualPageContent Effect 3] Error scrolling to kwork:", scrollError); } }, 250); }
-             setInitialIdeaProcessed(true); // Mark as processed
+             setInitialIdeaProcessed(true);
+             // addToast("[DEBUG] Kwork Populate Finished, idea processed", 'info', 1000); // Optional
         } else if (fetchAttemptFinished && !initialIdeaProcessed) {
              setInitialIdeaProcessed(true);
              logger.log(`[ActualPageContent Effect 3] Fetch finished (${fetchStatus}), no pending idea or kworkInputRef not ready.`);
         }
-    }, [ isMounted, fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles ]); // Ensure all dependencies are listed
+     }, [ isMounted, fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles ]);
 
 
     // --- Callbacks ---
-    const memoizedGetPlainText = useCallback(getPlainText, [logger]); // Memoize the stable function reference
+    const memoizedGetPlainText = useCallback(getPlainText, [logger]);
 
     const scrollToSectionNav = useCallback((id: string) => {
-        // ... (scroll logic using logger - unchanged) ...
+        // addToast(`[DEBUG] scrollToSectionNav called for ${id}`, 'info', 1000); // Optional
         const sectionsRequiringReveal = ['extractor', 'executor', 'cybervibe-section', 'philosophy-steps'];
         const targetElement = document.getElementById(id);
 
         if (sectionsRequiringReveal.includes(id) && !showComponents) {
             logger.log(`[Scroll] Revealing components for "${id}"`);
-            setShowComponents(true);
-            requestAnimationFrame(() => {
+            setShowComponents(true); // Trigger re-render which will show components
+            requestAnimationFrame(() => { // Wait for next frame after re-render
                 const revealedElement = document.getElementById(id);
                 if (revealedElement) {
                      try {
@@ -387,29 +395,36 @@ function ActualPageContent() {
                  logger.log(`[Scroll] Scrolled to "${id}"`);
              } catch (scrollError) { logger.error(`[Scroll] Error scrolling to "${id}":`, scrollError); }
         } else { logger.error(`[Scroll] Target element with id "${id}" not found.`); }
-    }, [showComponents, logger]); // Include showComponents dependency
+    }, [showComponents, logger]); // Removed addToast from deps
+
+    const handleShowComponents = () => {
+        addToast("[DEBUG] Reveal Button Clicked. Before setShowComponents.", 'info', 1000);
+        setShowComponents(true);
+        addToast("[DEBUG] showComponents set to true by button click.", 'info', 1000);
+    };
 
     // --- Loading / Initial State ---
-     if (!isMounted || !t) { // Check if translations object 't' is loaded
+     if (!isMounted || !t) {
+         // Initial Loading State
          const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
          const loadingText = translations[loadingLang]?.loading ?? translations.en.loading;
          return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
      }
 
     // --- Derived State & Safe Render ---
+    // addToast("[DEBUG] ActualPageContent Render: Main Content Calc", 'info', 1000); // Optional
     const userName = user?.first_name || (lang === 'ru' ? 'Нео' : 'Neo');
     const navTitleIntro = memoizedGetPlainText(t.navIntro);
     const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe);
     const navTitleGrabber = memoizedGetPlainText(t.navGrabber);
     const navTitleAssistant = memoizedGetPlainText(t.navAssistant);
 
-    // Safe render function
     const renderSafeContent = (contentKey: keyof TranslationSet) => {
         const content = t?.[contentKey];
-        return content ? <RenderContent content={content} /> : `[${contentKey}]`; // Fallback text
+        return content ? <RenderContent content={content} /> : `[${contentKey}]`;
     };
 
-
+    // addToast("[DEBUG] ActualPageContent Render: Returning JSX", 'info', 1000); // Optional
     return (
         <>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -458,7 +473,7 @@ function ActualPageContent() {
                                      <iframe
                                          className="w-full h-full"
                                          src="https://www.youtube.com/embed/imxzYWYKCyQ"
-                                         title="YouTube video player - Vibe Level Explanation" // More descriptive title
+                                         title="YouTube video player - Vibe Level Explanation"
                                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                                          allowFullScreen>
                                     </iframe>
@@ -494,7 +509,7 @@ function ActualPageContent() {
                 {!showComponents && (
                     <section id="reveal-trigger" className="mb-12 w-full max-w-3xl text-center">
                         <Button
-                            onClick={() => setShowComponents(true)}
+                            onClick={handleShowComponents}
                             className="bg-gradient-to-r from-green-500 via-cyan-500 to-purple-600 text-gray-900 font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:scale-105 transform transition duration-300 animate-bounce hover:animate-none ring-2 ring-offset-2 ring-offset-gray-950 ring-transparent hover:ring-cyan-300"
                             size="lg"
                         >
@@ -506,17 +521,22 @@ function ActualPageContent() {
                 {/* WORKHORSE Components */}
                 {showComponents && (
                      <>
+                        {/* Section Title - Rendered Unconditionally when showComponents is true */}
                         <h2 className="text-3xl font-bold text-center text-brand-green mb-8 animate-pulse">{renderSafeContent('componentsTitle')}</h2>
+                         {/* RepoTxtFetcher Section */}
                          <section id="extractor" className="mb-12 w-full max-w-4xl">
                              <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg backdrop-blur-sm">
                                  <CardContent className="p-4">
+                                     {/* RepoTxtFetcher Component - Will mount and trigger its internal toasts */}
                                      <RepoTxtFetcher ref={fetcherRef} />
                                  </CardContent>
                              </Card>
                          </section>
+                         {/* AICodeAssistant Section */}
                         <section id="executor" className="mb-12 w-full max-w-4xl pb-16">
                              <Card className="bg-gray-900/80 border border-purple-700/50 shadow-lg backdrop-blur-sm">
                                  <CardContent className="p-4">
+                                     {/* AICodeAssistant Component - Will mount and trigger its internal toasts */}
                                      <AICodeAssistant
                                          ref={assistantRef}
                                          kworkInputRefPassed={kworkInputRef}
@@ -546,9 +566,9 @@ function ActualPageContent() {
                     animate={{ scale: [1, 1.03, 1] }}
                     transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}
                  >
-                    {/* Use pre-calculated plain text titles */}
                      <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700/80 backdrop-blur-sm rounded-full hover:bg-gray-600 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-gray-200" /> </button>
                      <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-purple-700/80 backdrop-blur-sm rounded-full hover:bg-purple-600 transition shadow-md" title={navTitleVibeLoop} aria-label={navTitleVibeLoop || "Scroll to Vibe Loop"} > <FaUpLong className="text-lg text-white" /> </button>
+                     {/* Conditionally rendered nav buttons - NO useMemo toasts here */}
                      {showComponents && ( <>
                             <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-blue-700/80 backdrop-blur-sm rounded-full hover:bg-blue-600 transition shadow-md" title={navTitleGrabber} aria-label={navTitleGrabber || "Scroll to Grabber"} > <FaDownload className="text-lg text-white" /> </button>
                             <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-indigo-700/80 backdrop-blur-sm rounded-full hover:bg-indigo-600 transition shadow-md" title={navTitleAssistant} aria-label={navTitleAssistant || "Scroll to Assistant"} > <FaRobot className="text-lg text-white" /> </button>
@@ -572,6 +592,5 @@ export default function RepoXmlPage() {
     const fallbackLoadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
     const fallbackLoadingText = translations[fallbackLoadingLang]?.loading ?? translations.en.loading; // Fallback to English
     const fallbackLoading = ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{fallbackLoadingText}</p> </div> );
-    // Wrap the entire page layout with Suspense for useSearchParams
     return ( <Suspense fallback={fallbackLoading}> <RepoXmlPageLayout /> </Suspense> );
 }

@@ -5,9 +5,6 @@ import React, { useMemo, useState, useEffect, useImperativeHandle, forwardRef, M
 import {
     useRepoXmlPageContext, AICodeAssistantRef, SimplePullRequest, ImageReplaceTask, FileNode
 } from "@/contexts/RepoXmlPageContext";
-// Removed direct action imports if handled solely by context triggers passed to hook
-// import { createGitHubPullRequest, updateBranch, fetchRepoContents } from "@/app/actions_github/actions";
-// import { notifyAdmin, sendTelegramDocument } from "@/app/actions";
 import { supabaseAdmin } from "@/hooks/supabase"; // Keep if used for Supabase Admin client
 import { useAppContext } from "@/contexts/AppContext";
 // Hooks & Components
@@ -24,7 +21,6 @@ import { ImageToolsModal } from './assistant_components/ImageToolsModal';
 import { SwapModal } from './assistant_components/SwapModal';
 import { CodeRestorer } from './assistant_components/CodeRestorer';
 // UI & Utils
-// REMOVED: import { toast } from "sonner"; // <<< REMOVED direct import
 import { AnimatePresence, motion } from "framer-motion";
 import {
     FaCircleInfo, FaCodeBranch, FaGithub, FaWandMagicSparkles, FaArrowsRotate,
@@ -32,8 +28,6 @@ import {
     FaCheck, FaCircleXmark, FaExclamation
 } from "react-icons/fa6";
 import clsx from "clsx";
-// import { saveAs } from "file-saver"; // Moved to handlers.ts
-// import { selectFunctionDefinition, extractFunctionName } from "@/lib/codeUtils"; // Moved to handlers.ts
 import { debugLogger as logger } from "@/lib/debugLogger"; // Keep logger
 import { fetchRepoContents } from "@/app/actions_github/actions"; // <<< Keep for fetchOrig
 
@@ -92,7 +86,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const { user } = appContext;
     const {
         setHookParsedFiles, setValidationStatus, setValidationIssues,
-        validationIssues, validationStatus, rawDescription, // Needed directly for UI logic
+        validationIssues, validationStatus, rawDescription,
         isParsing: hookIsParsing,
     } = codeParserHook;
     const {
@@ -370,12 +364,12 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     // --- <<< EARLY RETURN CHECK >>> ---
     if (!isMounted) {
         addToastDirect("[DEBUG] AICodeAssistant Render: Early return (!isMounted)", 'info', 1000);
-                    return (
-                 <div id="executor-loading" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4 min-h-[400px] items-center justify-center">
-                    <FaSpinner className="text-cyan-400 text-4xl animate-spin mb-4"/>
-                    <p className="text-gray-400 text-lg">Загрузка Ассистента...</p>
-                 </div>
-             );
+        return (
+             <div id="executor-loading" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4 min-h-[400px] items-center justify-center">
+                <FaSpinner className="text-cyan-400 text-4xl animate-spin mb-4"/>
+                <p className="text-gray-400 text-lg">Загрузка Ассистента...</p>
+             </div>
+         );
     }
 
     // --- Derived State for Rendering ---
