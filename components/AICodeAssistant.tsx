@@ -162,7 +162,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     // --- <<< DERIVED STATE NEEDED BY HOOKS >>> ---
     // Define variables used by useEffect hooks BEFORE the hooks themselves and the early return
-    const repoUrlForForm = repoUrlStateLocal || repoUrlFromContext || "";
+    // <<< FIX: Moved this definition higher, ensuring it's always available before the useEffect that uses it >>>
+    const derivedRepoUrlForHooks = repoUrlStateLocal || repoUrlFromContext || "";
 
     // --- Effects ---
     // ALL useEffect calls MUST be at the top level, before any returns or conditions
@@ -225,20 +226,19 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     }, [isMounted, user, toastError]); // Removed supabaseAdmin from deps if it's stable, added toastError
 
      // Fetch original files effect
-     // <<< FIX: Moved repoUrlForForm definition *before* this hook >>>
     useEffect(() => {
         if (!isMounted || imageReplaceTask) return;
         const skipped = validationIssues.filter(i => i.type === 'skippedCodeBlock');
-        // Now repoUrlForForm is guaranteed to be defined here
-        if (skipped.length > 0 && originalRepoFiles.length === 0 && !isFetchingOriginals && repoUrlForForm) {
+        // Use the derivedRepoUrlForHooks which is now guaranteed to be defined
+        if (skipped.length > 0 && originalRepoFiles.length === 0 && !isFetchingOriginals && derivedRepoUrlForHooks) {
             const fetchOrig = async () => {
                 setIsFetchingOriginals(true);
                 const branch = targetBranchName ?? undefined;
                 const branchDisp = targetBranchName ?? 'default';
                 toastInfo(`Загрузка оригиналов из ${branchDisp}...`); // <<< Use Hook
                 try {
-                    // repoUrlForForm is safe to use
-                    const res = await fetchRepoContents(repoUrlForForm, undefined, branch);
+                    // derivedRepoUrlForHooks is safe to use
+                    const res = await fetchRepoContents(derivedRepoUrlForHooks, undefined, branch);
                     if (res.success && Array.isArray(res.files)) {
                         const originalFilesData = res.files.map(f => ({ path: f.path, content: f.content }));
                         setOriginalRepoFiles(originalFilesData);
@@ -257,8 +257,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             };
             fetchOrig();
         }
-    // <<< FIX: Added repoUrlForForm to dependency array >>>
-    }, [isMounted, validationIssues, originalRepoFiles.length, isFetchingOriginals, repoUrlForForm, targetBranchName, imageReplaceTask, toastInfo, toastSuccess, toastError]); // Dependency array updated
+    // Use derivedRepoUrlForHooks in the dependency array
+    }, [isMounted, validationIssues, originalRepoFiles.length, isFetchingOriginals, derivedRepoUrlForHooks, targetBranchName, imageReplaceTask, toastInfo, toastSuccess, toastError]); // Dependency array updated
 
     // Direct image replace effect - Uses handler hook which uses toasts internally
      useEffect(() => {
@@ -337,7 +337,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     }), [handlers, setResponseValue, updateRepoUrl]); // Depend on the handlers object and local wrappers
 
     // --- <<< EARLY RETURN CHECK >>> ---
-    // Now all hooks and necessary derived state (like repoUrlForForm) have been defined, this check is safe
+    // Now all hooks and necessary derived state (like derivedRepoUrlForHooks) have been defined, this check is safe
     if (!isMounted) {
         return (
              <div id="executor-loading" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4 min-h-[400px] items-center justify-center">
@@ -349,10 +349,12 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     // --- Derived State for Rendering ---
     // This logic is safe here, after the early return and all hooks/top-level derived state
+    // Calculate these directly here before the return statement
     const effectiveIsParsing = contextIsParsing ?? hookIsParsing;
     const isProcessingAny = assistantLoading || aiActionLoading || effectiveIsParsing || isProcessingPR || isFetchingOriginals || loadingPrs;
+    const finalRepoUrlForForm = repoUrlStateLocal || repoUrlFromContext || ""; // Use the state/context values available now
 
-    const canSubmitRegularPR = !isProcessingAny && filesParsed && selectedAssistantFiles.size > 0 && !!prTitle.trim() && !!repoUrlForForm && !imageReplaceTask;
+    const canSubmitRegularPR = !isProcessingAny && filesParsed && selectedAssistantFiles.size > 0 && !!prTitle.trim() && !!finalRepoUrlForForm && !imageReplaceTask;
     const prButtonText = targetBranchName ? `Обновить Ветку` : "Создать PR";
     const prButtonIconNode = targetBranchName ? <FaCodeBranch /> : <FaGithub />;
     const prButtonLoadingIconNode = (isProcessingPR || assistantLoading) && !imageReplaceTask ? <FaSpinner className="animate-spin"/> : prButtonIconNode;
@@ -402,8 +404,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                      <ParsedFilesList parsedFiles={componentParsedFiles} selectedFileIds={selectedFileIds} validationIssues={validationIssues} onToggleSelection={handlers.handleToggleFileSelection} onSelectAll={handlers.handleSelectAllFiles} onDeselectAll={handlers.handleDeselectAllFiles} onSaveFiles={handlers.handleSaveFiles} onDownloadZip={handlers.handleDownloadZip} onSendToTelegram={handlers.handleSendToTelegram} isUserLoggedIn={!!user} isLoading={isProcessingAny} />
                      {/* Pass handlers from the hook */}
                      {/* handleCreateOrUpdatePR uses toast via handlers hook */}
-                     {/* Use repoUrlForForm which is now defined before early return */}
-                     <PullRequestForm id="pr-form-container" repoUrl={repoUrlForForm}
+                     {/* Use finalRepoUrlForForm which is now defined before return */}
+                     <PullRequestForm id="pr-form-container" repoUrl={finalRepoUrlForForm}
                       prTitle={prTitle} selectedFileCount={selectedAssistantFiles.size} isLoading={isProcessingPR || assistantLoading} isLoadingPrList={loadingPrs} onRepoUrlChange={updateRepoUrl} onPrTitleChange={setPrTitle} onCreatePR={handlers.handleCreateOrUpdatePR} buttonText={prButtonText} buttonIcon={prButtonLoadingIconNode} isSubmitDisabled={submitButtonDisabled} />
                      <OpenPrList openPRs={contextOpenPrs} />
                     <div className="flex items-center gap-3 mt-2 flex-wrap">
