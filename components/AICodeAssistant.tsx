@@ -11,6 +11,7 @@ import {
 import { supabaseAdmin } from "@/hooks/supabase"; // Keep if used for Supabase Admin client
 import { useAppContext } from "@/contexts/AppContext";
 // Hooks & Components
+import { useAppToast } from '@/hooks/useAppToast'; // <<< IMPORT useAppToast
 import { useCodeParsingAndValidation, ValidationIssue, FileEntry as ValidationFileEntry, ValidationStatus } from "@/hooks/useCodeParsingAndValidation";
 import { useAICodeAssistantHandlers } from './assistant_components/handlers'; // <<< IMPORT THE NEW HOOK
 import { TextAreaUtilities } from './assistant_components/TextAreaUtilities';
@@ -23,7 +24,7 @@ import { ImageToolsModal } from './assistant_components/ImageToolsModal';
 import { SwapModal } from './assistant_components/SwapModal';
 import { CodeRestorer } from './assistant_components/CodeRestorer';
 // UI & Utils
-import { toast } from "sonner";
+// REMOVED: import { toast } from "sonner"; // <<< REMOVED direct import
 import { AnimatePresence, motion } from "framer-motion";
 import {
     FaCircleInfo, FaCodeBranch, FaGithub, FaWandMagicSparkles, FaArrowsRotate,
@@ -34,6 +35,7 @@ import clsx from "clsx";
 // import { saveAs } from "file-saver"; // Moved to handlers.ts
 // import { selectFunctionDefinition, extractFunctionName } from "@/lib/codeUtils"; // Moved to handlers.ts
 import { debugLogger as logger } from "@/lib/debugLogger"; // Keep logger
+import { fetchRepoContents } from "@/app/actions_github/actions"; // <<< Keep for fetchOrig
 
 // Interfaces (Keep if needed)
 interface FileEntry extends ValidationFileEntry {}
@@ -68,6 +70,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const appContext = useAppContext(); // Get full AppContext
     const codeParserHook = useCodeParsingAndValidation(); // Get full Code Parser hook result
     const pageContext = useRepoXmlPageContext(); // Get full Page Context
+    const { success: toastSuccess, error: toastError, info: toastInfo, warning: toastWarning } = useAppToast(); // <<< USE THE HOOK
 
     // --- Destructure necessary parts from contexts/hooks for passing & direct use ---
     const { user } = appContext;
@@ -87,7 +90,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         imageReplaceTask, setImageReplaceTask, // <<< Make sure setImageReplaceTask is destructured here
         fetchStatus, allFetchedFiles, repoUrlEntered,
         repoUrl: repoUrlFromContext,
-        setRequestCopied // Needed for handlers hook
+        setRequestCopied, // Needed for handlers hook
+        addToast // Use context toast for consistency if needed, or local useAppToast
     } = pageContext;
 
     // --- <<< USE THE NEW HANDLERS HOOK >>> ---
@@ -103,18 +107,19 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         // Pass refs
         aiResponseInputRefPassed,
         kworkInputRefPassed,
-        // --- FIX: Pass setImageReplaceTask ---
-        setImageReplaceTask, // Add this line
+        // Pass setImageReplaceTask
+        setImageReplaceTask,
     });
 
     // --- Destructure the handlers for use ---
+    // (handleRestorationComplete uses toast internally via handlers hook)
     const {
         handleParse, handleAutoFix, handleCopyFixPrompt, handleRestorationComplete,
         handleUpdateParsedFiles, handleClearResponse, handleCopyResponse, handleOpenModal,
         handleSwap, handleSearch, handleSelectFunction, handleToggleFileSelection,
         handleSelectAllFiles, handleDeselectAllFiles, handleSaveFiles, handleDownloadZip,
         handleSendToTelegram, handleAddCustomLink, handleCreateOrUpdatePR,
-        // Note: setResponseValue and updateRepoUrl are slightly different as they modify state directly
+        handleDirectImageReplace // Make sure this is destructured if used directly
     } = handlers;
 
     // Handler for setting response value (directly updates state here)
@@ -173,27 +178,51 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                     setCustomLinks([]);
                     if (e && e.code !== 'PGRST116') {
                         logger.error("Error loading custom links (supabase):", e);
-                        toast.error("Error loading custom links: " + e.message);
+                        toastError("Error loading custom links: " + e.message); // <<< Use Hook
                     }
                 }
             } catch (e: any) {
                 logger.error("Error loading custom links (catch):", e);
-                toast.error("Error loading custom links: " + e.message);
+                toastError("Error loading custom links: " + e.message); // <<< Use Hook
                 setCustomLinks([]);
             }
         };
         loadLinks();
-    }, [isMounted, user]); // Removed supabaseAdmin from deps if it's stable
+    }, [isMounted, user, toastError]); // Removed supabaseAdmin from deps if it's stable, added toastError
 
      // Fetch original files effect
     useEffect(() => {
-        if (!isMounted || imageReplaceTask) return; const skipped = validationIssues.filter(i => i.type === 'skippedCodeBlock');
+        if (!isMounted || imageReplaceTask) return;
+        const skipped = validationIssues.filter(i => i.type === 'skippedCodeBlock');
         if (skipped.length > 0 && originalRepoFiles.length === 0 && !isFetchingOriginals && repoUrlForForm) {
-            const fetchOrig = async () => { setIsFetchingOriginals(true); const branch = targetBranchName ?? undefined; const branchDisp = targetBranchName ?? 'default'; toast.info(`Загрузка оригиналов из ${branchDisp}...`); try { const res = await fetchRepoContents(repoUrlForForm, undefined, branch); if (res.success && Array.isArray(res.files)) { const originalFilesData = res.files.map(f => ({ path: f.path, content: f.content })); setOriginalRepoFiles(originalFilesData); toast.success("Оригиналы загружены."); } else { toast.error("Ошибка загрузки оригиналов: " + (res.error ?? '?')); setOriginalRepoFiles([]); } } catch (e) { toast.error("Крит. ошибка загрузки оригиналов."); logger.error("Fetch originals error:", e); setOriginalRepoFiles([]); } finally { setIsFetchingOriginals(false); } }; fetchOrig();
+            const fetchOrig = async () => {
+                setIsFetchingOriginals(true);
+                const branch = targetBranchName ?? undefined;
+                const branchDisp = targetBranchName ?? 'default';
+                toastInfo(`Загрузка оригиналов из ${branchDisp}...`); // <<< Use Hook
+                try {
+                    const res = await fetchRepoContents(repoUrlForForm, undefined, branch);
+                    if (res.success && Array.isArray(res.files)) {
+                        const originalFilesData = res.files.map(f => ({ path: f.path, content: f.content }));
+                        setOriginalRepoFiles(originalFilesData);
+                        toastSuccess("Оригиналы загружены."); // <<< Use Hook
+                    } else {
+                        toastError("Ошибка загрузки оригиналов: " + (res.error ?? '?')); // <<< Use Hook
+                        setOriginalRepoFiles([]);
+                    }
+                } catch (e: any) {
+                    toastError("Крит. ошибка загрузки оригиналов: " + e?.message); // <<< Use Hook
+                    logger.error("Fetch originals error:", e);
+                    setOriginalRepoFiles([]);
+                } finally {
+                    setIsFetchingOriginals(false);
+                }
+            };
+            fetchOrig();
         }
-    }, [isMounted, validationIssues, originalRepoFiles.length, isFetchingOriginals, repoUrlForForm, targetBranchName, imageReplaceTask]); // Added fetchRepoContents to deps if it's not stable
+    }, [isMounted, validationIssues, originalRepoFiles.length, isFetchingOriginals, repoUrlForForm, targetBranchName, imageReplaceTask, toastInfo, toastSuccess, toastError]); // Added fetchRepoContents, toasts to deps if needed
 
-    // Direct image replace effect
+    // Direct image replace effect - Uses handler hook which uses toasts internally
      useEffect(() => {
         const canProcess = imageReplaceTask && fetchStatus === 'success' && allFetchedFiles.length > 0 && allFetchedFiles.some(f => f.path === imageReplaceTask.targetPath) && !assistantLoading && !processingImageReplace.current;
 
@@ -203,36 +232,41 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             setImageReplaceError(null);
             // Ensure handlers and the specific handler exist before calling
             if (handlers?.handleDirectImageReplace) {
+                // Handler now uses useAppToast internally
                 handlers.handleDirectImageReplace(imageReplaceTask, allFetchedFiles)
                     .then(() => {
+                         // Logic based on task completion is handled within the handler now
                          if (imageReplaceTaskRef.current) {
                             if(imageReplaceError) { logger.warn(`[Effect] Replace finished, but with issue: ${imageReplaceError}`); }
-                            else { logger.info("[Effect] Replace process resolved, but task still active? (Check logic)"); }
-                         } else { logger.log("[Effect] Replace process resolved successfully."); }
+                            else { /*logger.info("[Effect] Replace process resolved, but task might still be active if PR failed?");*/ }
+                         } else { logger.log("[Effect] Replace process resolved successfully (task cleared)."); }
                     })
                     .catch(err => {
+                        // Error logging/toast is likely handled within the handler now
                         const errorMsg = err?.message || "Unknown error";
                         logger.error("[Effect] handleDirectImageReplace Promise REJECTED:", errorMsg);
-                        toast.error("Image replace failed: " + errorMsg);
+                        // Optionally set local error state if handler doesn't cover it
                         setImageReplaceError(`Promise rejected: ${errorMsg}`);
                     })
                     .finally(() => {
                         logger.log("[Effect] Process finished (finally block).");
-                        processingImageReplace.current = false;
+                        processingImageReplace.current = false; // Always reset flag
                     });
             } else {
                  logger.error("[Effect] handleDirectImageReplace handler is not available!");
                  setImageReplaceError("Internal error: Image replace handler missing.");
                  processingImageReplace.current = false; // Ensure flag is reset
+                 toastError("Внутренняя ошибка: Обработчик замены картинки отсутствует."); // <<< Use Hook
             }
         } else if (imageReplaceTask && fetchStatus === 'error') {
             logger.warn("[Effect] Image task active, but fetch status is error.");
              setImageReplaceError("Failed to fetch target file.");
         }
-     }, [ imageReplaceTask, fetchStatus, allFetchedFiles, assistantLoading, handlers, setImageReplaceError, imageReplaceError, logger ]); // Added handlers to dependency array
+     }, [ imageReplaceTask, fetchStatus, allFetchedFiles, assistantLoading, handlers, setImageReplaceError, imageReplaceError, logger, toastError ]); // Added handlers and toastError to dependency array
 
 
     // --- Imperative Handle (Expose handlers from the hook) ---
+    // Ensure handlers object and local wrappers are stable via useCallback if needed
     useImperativeHandle(ref, () => ({
         handleParse: handlers.handleParse, // Expose handler from hook
         selectAllParsedFiles: handlers.handleSelectAllFiles, // Map to correct handler name
@@ -261,6 +295,12 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const fixButtonDisabled = commonDisabled || isWaitingForAiResponse || !!imageReplaceTask;
     const submitButtonDisabled = !canSubmitRegularPR || isProcessingPR || assistantLoading;
 
+    // Local handler for resetting image error state
+    const handleResetImageError = useCallback(() => {
+         setImageReplaceError(null);
+         toastInfo("Состояние ошибки сброшено."); // <<< Use Hook
+     }, [setImageReplaceError, toastInfo]);
+
     return (
         <div id="executor" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
             <header className="flex justify-between items-center gap-2 flex-wrap">
@@ -284,18 +324,23 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                           </div>
                            <div className="flex justify-end items-start mt-1 gap-2 min-h-[30px]">
                                {/* Pass handlers from the hook */}
+                               {/* handleRestorationComplete uses toast via handlers hook */}
                                <CodeRestorer parsedFiles={componentParsedFiles} originalFiles={originalRepoFiles} skippedIssues={validationIssues.filter(i => i.type === 'skippedCodeBlock')} onRestorationComplete={handlers.handleRestorationComplete} disabled={commonDisabled || validationStatus === 'validating' || isFetchingOriginals} />
+                               {/* handleAutoFix / handleCopyFixPrompt use toast via handlers hook */}
                                <ValidationStatusIndicator status={validationStatus} issues={validationIssues} onAutoFix={handlers.handleAutoFix} onCopyPrompt={handlers.handleCopyFixPrompt} isFixDisabled={fixButtonDisabled} />
                           </div>
                       </div>
                       {/* Pass handlers from the hook */}
+                      {/* handleSaveFiles / handleDownloadZip / handleSendToTelegram use toast via handlers hook */}
                      <ParsedFilesList parsedFiles={componentParsedFiles} selectedFileIds={selectedFileIds} validationIssues={validationIssues} onToggleSelection={handlers.handleToggleFileSelection} onSelectAll={handlers.handleSelectAllFiles} onDeselectAll={handlers.handleDeselectAllFiles} onSaveFiles={handlers.handleSaveFiles} onDownloadZip={handlers.handleDownloadZip} onSendToTelegram={handlers.handleSendToTelegram} isUserLoggedIn={!!user} isLoading={commonDisabled} />
                      {/* Pass handlers from the hook */}
+                     {/* handleCreateOrUpdatePR uses toast via handlers hook */}
                      <PullRequestForm id="pr-form-container" repoUrl={repoUrlForForm}
                       prTitle={prTitle} selectedFileCount={selectedAssistantFiles.size} isLoading={isProcessingPR || assistantLoading} isLoadingPrList={loadingPrs} onRepoUrlChange={updateRepoUrl} onPrTitleChange={setPrTitle} onCreatePR={handlers.handleCreateOrUpdatePR} buttonText={prButtonText} buttonIcon={prButtonLoadingIconNode} isSubmitDisabled={submitButtonDisabled} />
                      <OpenPrList openPRs={contextOpenPrs} />
                     <div className="flex items-center gap-3 mt-2 flex-wrap">
                         {/* Pass handlers from the hook */}
+                        {/* handleAddCustomLink uses toast via handlers hook */}
                         <ToolsMenu customLinks={customLinks} onAddCustomLink={handlers.handleAddCustomLink} disabled={commonDisabled}/>
                          <button onClick={() => setIsImageModalOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50 relative" disabled={commonDisabled} title="Загрузить/Связать Картинки (prompts_imgs.txt)" >
                              <FaImage className="text-gray-400" /> <span className="text-sm text-white">Картинки</span>
@@ -305,7 +350,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                  </>
             )}
 
-            {/* --- Image Replace UI (No changes here) --- */}
+            {/* --- Image Replace UI --- */}
             {showImageReplaceUI && (
                 <div className={`flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed min-h-[200px] ${imageTaskFailed ? 'border-red-500' : 'border-blue-400'}`}>
                      {(assistantLoading || isProcessingPR) ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> )
@@ -318,14 +363,14 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                            : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Загрузка Файла..."
                            : imageTaskFailed ? "Ошибка Замены Картинки"
                            : imageReplaceTask ? "Задача Замены Активна"
-                           : "Замена Завершена Успешно"}
+                           : "Замена Завершена Успешно"} {/* Assuming task is cleared on success */}
                      </p>
                      <p className="text-sm text-gray-400 mt-2">
                          {(assistantLoading || isProcessingPR) ? "Создание/обновление PR..."
                            : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Ожидание..."
                            : imageTaskFailed ? (imageReplaceError || "Произошла ошибка.")
-                           : imageReplaceTask ? "Файл загружен, ожидание обработки..."
-                           : "Процесс завершен."}
+                           : imageReplaceTask ? "Файл загружен, ожидание обработки Ассистентом..."
+                           : "Процесс завершен."} {/* Simplified success message */}
                      </p>
                      {imageReplaceTask && (
                          <div className="mt-3 text-xs text-gray-500 break-all text-left bg-gray-900/50 p-2 rounded max-w-full overflow-x-auto simple-scrollbar">
@@ -336,7 +381,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                      )}
                      {imageTaskFailed && (
                           <button
-                              onClick={() => { setImageReplaceError(null); toast.info("Состояние ошибки сброшено."); }}
+                              onClick={handleResetImageError} // <<< Use stable local handler
                               className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs rounded-md transition"
                           > Сбросить Ошибку </button>
                       )}
