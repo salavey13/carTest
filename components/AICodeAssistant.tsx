@@ -51,6 +51,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const { kworkInputRefPassed, aiResponseInputRefPassed } = props;
 
     // --- State (Keep state managed by this component) ---
+    // ALL useState calls MUST be at the top level, before any returns or conditions
     const [isMounted, setIsMounted] = useState(false);
     const [response, setResponse] = useState<string>("");
     const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
@@ -67,6 +68,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const [imageReplaceError, setImageReplaceError] = useState<string | null>(null);
 
     // --- Hooks ---
+    // ALL hook calls MUST be at the top level, before any returns or conditions
     const appContext = useAppContext(); // Get full AppContext
     const codeParserHook = useCodeParsingAndValidation(); // Get full Code Parser hook result
     const pageContext = useRepoXmlPageContext(); // Get full Page Context
@@ -95,6 +97,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     } = pageContext;
 
     // --- <<< USE THE NEW HANDLERS HOOK >>> ---
+    // Must be called at the top level
     const handlers = useAICodeAssistantHandlers({
         // Pass all required state and setters
         response, componentParsedFiles, selectedFileIds, repoUrlStateLocal, prTitle, customLinks, originalRepoFiles, isFetchingOriginals, imageReplaceTask,
@@ -122,7 +125,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         handleDirectImageReplace // Make sure this is destructured if used directly
     } = handlers;
 
-    // Handler for setting response value (directly updates state here)
+    // --- Callback Hooks ---
+    // ALL useCallback calls MUST be at the top level, before any returns or conditions
     const setResponseValue = useCallback((value: string) => {
         setResponse(value);
         if (aiResponseInputRefPassed.current) aiResponseInputRefPassed.current.value = value;
@@ -133,7 +137,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         logger.log("Response value set manually, resetting parsed state.");
      }, [aiResponseInputRefPassed, setHookParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, codeParserHook, setRequestCopied, setAiResponseHasContent]); // Added codeParserHook dependency
 
-    // Handler for updating local repo URL state (and triggering PR fetch)
     const updateRepoUrl = useCallback((url: string) => {
         setRepoUrlStateLocal(url);
         if (url && url.includes("github.com")) {
@@ -141,24 +144,30 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         }
      }, [triggerGetOpenPRs]);
 
+    // <<< FIX: Moved useCallback definition BEFORE the early return >>>
+    const handleResetImageError = useCallback(() => {
+         setImageReplaceError(null);
+         // Consider if clearing the task is also needed here, or if user should retry fetch
+         // setImageReplaceTask(null); // Optional: Uncomment if resetting error should also discard the task
+         toastInfo("Состояние ошибки сброшено."); // <<< Use Hook
+     }, [setImageReplaceError, toastInfo]); // Added setImageReplaceTask if uncommented
 
-    // --- Derived State (Keep this logic here) ---
-    const isParsing = contextIsParsing ?? codeParserHook.isParsing;
-    const repoUrlForForm = repoUrlStateLocal || repoUrlFromContext || "";
-
-    // --- Refs (Keep refs managed here if not passed down) ---
+    // --- Refs ---
+    // ALL useRef calls MUST be at the top level, before any returns or conditions
     const processingImageReplace = useRef(false);
     const imageReplaceTaskRef = useRef(imageReplaceTask);
-    useEffect(() => { imageReplaceTaskRef.current = imageReplaceTask; }, [imageReplaceTask]);
 
-
-    // --- Effects (Keep effects managed by this component) ---
+    // --- Effects ---
+    // ALL useEffect calls MUST be at the top level, before any returns or conditions
     useEffect(() => { setIsMounted(true); }, []);
+
     // This effect needs componentParsedFiles which is state managed here
     useEffect(() => { setFilesParsed(componentParsedFiles.length > 0); }, [componentParsedFiles, setFilesParsed]);
+
     useEffect(() => {
         if (isMounted && repoUrlFromContext && !repoUrlStateLocal) { setRepoUrlStateLocal(repoUrlFromContext); }
     }, [isMounted, repoUrlFromContext, repoUrlStateLocal]);
+
      // This effect manages state resets based on various conditions
     useEffect(() => {
         if (!isMounted) return; const hasContent = response.trim().length > 0; setAiResponseHasContent(hasContent);
@@ -281,9 +290,14 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         handlers, setImageReplaceError, imageReplaceError, logger, toastError
      ]); // Dependency array updated
 
+     // Effect to update the ref when the imageReplaceTask state changes
+     // MUST be at the top level
+    useEffect(() => {
+        imageReplaceTaskRef.current = imageReplaceTask;
+    }, [imageReplaceTask]);
 
-    // --- Imperative Handle (Expose handlers from the hook) ---
-    // Ensure handlers object and local wrappers are stable via useCallback if needed
+    // --- Imperative Handle ---
+    // MUST be at the top level
     useImperativeHandle(ref, () => ({
         handleParse: handlers.handleParse, // Expose handler from hook
         selectAllParsedFiles: handlers.handleSelectAllFiles, // Map to correct handler name
@@ -293,10 +307,19 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         handleDirectImageReplace: handlers.handleDirectImageReplace, // Expose handler from hook
     }), [handlers, setResponseValue, updateRepoUrl]); // Depend on the handlers object and local wrappers
 
+    // --- <<< EARLY RETURN CHECK >>> ---
+    // Now all hooks have been called, this check is safe
+    if (!isMounted) {
+        return (
+             <div id="executor-loading" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4 min-h-[400px] items-center justify-center">
+                <FaSpinner className="text-cyan-400 text-4xl animate-spin mb-4"/>
+                <p className="text-gray-400 text-lg">Загрузка Ассистента...</p>
+             </div>
+         );
+    }
 
-    // --- RENDER (Use handlers obtained from the hook) ---
-    if (!isMounted) { return ( <div id="executor-loading" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4 min-h-[400px] items-center justify-center"> <FaSpinner className="text-cyan-400 text-4xl animate-spin mb-4"/> <p className="text-gray-400 text-lg">Загрузка Ассистента...</p> </div> ); }
-
+    // --- Derived State for Rendering ---
+    // This logic is safe here, after the early return and all hooks
     const isProcessingAny = assistantLoading || aiActionLoading || isParsing || isProcessingPR || isFetchingOriginals || loadingPrs;
     const canSubmitRegularPR = !isProcessingAny && filesParsed && selectedAssistantFiles.size > 0 && !!prTitle.trim() && !!repoUrlForForm && !imageReplaceTask;
     const prButtonText = targetBranchName ? `Обновить Ветку` : "Создать PR";
@@ -312,14 +335,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const fixButtonDisabled = commonDisabled || isWaitingForAiResponse || !!imageReplaceTask; // Disable fixes during image task
     const submitButtonDisabled = !canSubmitRegularPR || isProcessingPR || assistantLoading || !!imageReplaceTask; // Disable regular PR submit during image task
 
-    // Local handler for resetting image error state
-    const handleResetImageError = useCallback(() => {
-         setImageReplaceError(null);
-         // Consider if clearing the task is also needed here, or if user should retry fetch
-         // setImageReplaceTask(null); // Optional: Uncomment if resetting error should also discard the task
-         toastInfo("Состояние ошибки сброшено."); // <<< Use Hook
-     }, [setImageReplaceError, toastInfo]); // Added setImageReplaceTask if uncommented
 
+    // --- FINAL RENDER ---
     return (
         <div id="executor" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
             <header className="flex justify-between items-center gap-2 flex-wrap">
@@ -409,7 +426,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                      {/* Show Reset Button only on failure */}
                      {imageTaskFailed && (
                           <button
-                              onClick={handleResetImageError}
+                              onClick={handleResetImageError} // Use the hook that's now defined correctly
                               className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs rounded-md transition"
                           > Сбросить Ошибку </button>
                       )}
