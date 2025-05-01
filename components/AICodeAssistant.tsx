@@ -42,42 +42,16 @@ interface OriginalFile { path: string; content: string; }
 // --- Main Component ---
 const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((props, ref) => {
 
-    // --- VIBE CHECK: Get toast function early ---
-    // Moved context retrieval after isMounted check
-
     // --- Props ---
     const { kworkInputRefPassed, aiResponseInputRefPassed } = props;
 
-    // --- State (isMounted FIRST!) ---
-    const [isMounted, setIsMounted] = useState(false);
-    useEffect(() => {
-        // Keep toast inside useEffect as it runs after initial render
-        // but get addToast later
-        const { addToast } = useRepoXmlPageContext.getState ? useRepoXmlPageContext.getState() : { addToast: () => {} }; // Temporary access if context is not yet ready? Better to get context AFTER mount check.
-        addToast("[DEBUG] AICodeAssistant Mounted Effect", 'info', 1000);
-        setIsMounted(true);
-    }, []); // Empty dependency array
+    // --- Get Context and Toast early ---
+    const pageContext = useRepoXmlPageContext(); // Get context now
+    const { addToast: addToastDirect } = pageContext; // Get toast function
+    addToastDirect("[DEBUG] AICodeAssistant Function Start", 'info', 1000); // Initial toast
 
-    // === EARLY RETURN CHECK - MOVED TO TOP ===
-    if (!isMounted) {
-        // const { addToast } = useRepoXmlPageContext(); // Cannot call hook here conditionally
-        // addToast("[DEBUG] AICodeAssistant Render: Early return (!isMounted)", 'info', 1000); // Cannot toast here easily
-        return (
-             <div id="executor-loading" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4 min-h-[400px] items-center justify-center">
-                <FaSpinner className="text-cyan-400 text-4xl animate-spin mb-4"/>
-                <p className="text-gray-400 text-lg">Загрузка Ассистента...</p>
-             </div>
-         );
-    }
-    // === END EARLY RETURN CHECK ===
-
-    // --- Now call hooks as we are mounted ---
-    const pageContextForToast = useRepoXmlPageContext(); // Get context now
-    const { addToast: addToastDirect } = pageContextForToast; // Get toast function
-    addToastDirect("[DEBUG] AICodeAssistant Function Start (Post Mount)", 'info', 1000);
-
-    // --- Other State ---
-    addToastDirect("[DEBUG] Before AICodeAssistant useState (Post Mount)", 'info', 1000);
+    // --- State (NO isMounted) ---
+    addToastDirect("[DEBUG] Before AICodeAssistant useState", 'info', 1000);
     const [response, setResponse] = useState<string>("");
     const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
     const [repoUrlStateLocal, setRepoUrlStateLocal] = useState<string>("");
@@ -91,21 +65,21 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [componentParsedFiles, setComponentParsedFiles] = useState<ValidationFileEntry[]>([]);
     const [imageReplaceError, setImageReplaceError] = useState<string | null>(null);
-    addToastDirect("[DEBUG] After AICodeAssistant useState (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] After AICodeAssistant useState", 'info', 1000);
+
 
     // --- Hooks ---
-    addToastDirect("[DEBUG] Before AICodeAssistant Hooks (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] Before AICodeAssistant Hooks", 'info', 1000);
     const appContext = useAppContext();
-    addToastDirect("[DEBUG] Before useCodeParsingAndValidation Hook (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] Before useCodeParsingAndValidation Hook", 'info', 1000);
     const codeParserHook = useCodeParsingAndValidation();
-    addToastDirect("[DEBUG] After useCodeParsingAndValidation Hook (Post Mount)", 'info', 1000);
-    const pageContext = pageContextForToast; // Use the one already retrieved
-    addToastDirect("[DEBUG] Before useAppToast Hook (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] After useCodeParsingAndValidation Hook", 'info', 1000);
+    addToastDirect("[DEBUG] Before useAppToast Hook", 'info', 1000);
     const { success: toastSuccess, error: toastError, info: toastInfo, warning: toastWarning } = useAppToast();
-    addToastDirect("[DEBUG] After Standard Hooks (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] After Standard Hooks", 'info', 1000);
 
     // --- Destructure necessary parts from contexts/hooks ---
-    addToastDirect("[DEBUG] Before AICodeAssistant Destructuring (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] Before AICodeAssistant Destructuring", 'info', 1000);
     const { user } = appContext;
     const {
         setHookParsedFiles, setValidationStatus, setValidationIssues,
@@ -128,10 +102,10 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         setRequestCopied,
         addToast // Use context toast already destructured
     } = pageContext;
-    addToastDirect("[DEBUG] After AICodeAssistant Destructuring (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] After AICodeAssistant Destructuring", 'info', 1000);
 
     // --- USE THE NEW HANDLERS HOOK ---
-    addToastDirect("[DEBUG] Before useAICodeAssistantHandlers Hook (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] Before useAICodeAssistantHandlers Hook", 'info', 1000);
     const handlers = useAICodeAssistantHandlers({
         response, componentParsedFiles, selectedFileIds, repoUrlStateLocal, prTitle, customLinks, originalRepoFiles, isFetchingOriginals, imageReplaceTask,
         setResponse, setSelectedFileIds, setPrTitle, setCustomLinks, setShowModal, setModalMode, setIsProcessingPR, setOriginalRepoFiles, setIsFetchingOriginals, setIsImageModalOpen, setComponentParsedFiles, setImageReplaceError, setRepoUrlStateLocal,
@@ -142,7 +116,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         aiResponseInputRefPassed,
         kworkInputRefPassed,
     });
-    addToastDirect("[DEBUG] After useAICodeAssistantHandlers Hook (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] After useAICodeAssistantHandlers Hook", 'info', 1000);
 
     // --- Destructure the handlers ---
     const {
@@ -155,7 +129,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     } = handlers;
 
     // --- Callback Hooks ---
-    addToastDirect("[DEBUG] Before AICodeAssistant useCallback (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] Before AICodeAssistant useCallback", 'info', 1000);
     const setResponseValue = useCallback((value: string) => {
         addToastDirect(`[DEBUG] setResponseValue called. Type: ${typeof setResponse}`, 'info', 500);
         setResponse(value);
@@ -180,29 +154,33 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
          setImageReplaceError(null);
          toastInfo("Состояние ошибки сброшено.");
      }, [setImageReplaceError, toastInfo, addToastDirect]);
-    addToastDirect("[DEBUG] After AICodeAssistant useCallback (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] After AICodeAssistant useCallback", 'info', 1000);
 
 
     // --- Refs ---
-    addToastDirect("[DEBUG] Before AICodeAssistant useRef (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] Before AICodeAssistant useRef", 'info', 1000);
     const processingImageReplace = useRef(false);
     const imageReplaceTaskRef = useRef(imageReplaceTask);
-    addToastDirect("[DEBUG] After AICodeAssistant useRef (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] After AICodeAssistant useRef", 'info', 1000);
 
     // --- DERIVED STATE NEEDED BY HOOKS ---
-    addToastDirect("[DEBUG] AICodeAssistant Defining derivedRepoUrlForHooks (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] AICodeAssistant Defining derivedRepoUrlForHooks", 'info', 1000);
     const derivedRepoUrlForHooks = repoUrlStateLocal || repoUrlFromContext || "";
 
-    // --- Other Effects (Now run only when mounted) ---
-    addToastDirect("[DEBUG] Before AICodeAssistant useEffects (Post Mount)", 'info', 1000);
+    // --- Effects (No isMounted checks needed) ---
+    addToastDirect("[DEBUG] Before AICodeAssistant useEffects", 'info', 1000);
+
+    // Effect to simply log mount (optional)
+    useEffect(() => {
+        addToastDirect("[DEBUG] AICodeAssistant Mounted (Effect)", 'info', 1000);
+    }, [addToastDirect]);
 
     useEffect(() => { addToastDirect(`[DEBUG] Files Parsed Effect: ${componentParsedFiles.length > 0}`, 'info', 500); setFilesParsed(componentParsedFiles.length > 0); }, [componentParsedFiles, setFilesParsed, addToastDirect]);
 
-    useEffect(() => { addToastDirect(`[DEBUG] URL Sync Effect: ${repoUrlFromContext}`, 'info', 500); if (repoUrlFromContext && !repoUrlStateLocal) { setRepoUrlStateLocal(repoUrlFromContext); } }, [repoUrlFromContext, repoUrlStateLocal, addToastDirect]); // Removed isMounted check
+    useEffect(() => { addToastDirect(`[DEBUG] URL Sync Effect: ${repoUrlFromContext}`, 'info', 500); if (repoUrlFromContext && !repoUrlStateLocal) { setRepoUrlStateLocal(repoUrlFromContext); } }, [repoUrlFromContext, repoUrlStateLocal, addToastDirect]);
 
     useEffect(() => {
         addToastDirect("[DEBUG] AICodeAssistant State Reset Effect Check", 'info', 1000);
-        // Removed isMounted check
         const hasContent = response.trim().length > 0;
         setAiResponseHasContent(hasContent);
         const currentlyParsing = contextIsParsing ?? hookIsParsing;
@@ -227,7 +205,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     useEffect(() => {
         addToastDirect("[DEBUG] Custom Links Effect Check", 'info', 1000);
-        if (!user) { addToastDirect("[DEBUG] Custom Links SKIP: no user", 'info', 1000); setCustomLinks([]); return; } // Removed isMounted check
+        if (!user) { addToastDirect("[DEBUG] Custom Links SKIP: no user", 'info', 1000); setCustomLinks([]); return; }
         const loadLinks = async () => {
             addToastDirect("[DEBUG] loadLinks START", 'info', 1000);
             try {
@@ -257,7 +235,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     useEffect(() => {
         addToastDirect("[DEBUG] Fetch Originals Effect Check", 'info', 1000);
-        if (imageReplaceTask) { addToastDirect("[DEBUG] Fetch Originals SKIP: image task active", 'info', 1000); return; } // Removed isMounted check
+        if (imageReplaceTask) { addToastDirect("[DEBUG] Fetch Originals SKIP: image task active", 'info', 1000); return; }
         const skipped = validationIssues.filter(i => i.type === 'skippedCodeBlock');
         addToastDirect(`[DEBUG] Fetch Originals Check: skipped=${skipped.length}, noOriginals=${originalRepoFiles.length === 0}, notFetching=${!isFetchingOriginals}, hasUrl=${!!derivedRepoUrlForHooks}`, 'info', 1000);
         if (skipped.length > 0 && originalRepoFiles.length === 0 && !isFetchingOriginals && derivedRepoUrlForHooks) {
@@ -308,40 +286,22 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             if (handlers?.handleDirectImageReplace) {
                 addToastDirect("[DEBUG] Calling handlers.handleDirectImageReplace", 'info', 1000);
                 handlers.handleDirectImageReplace(imageReplaceTask, allFetchedFiles)
-                    .then(() => {
-                         addToastDirect("[DEBUG] Image Replace .then()", 'info', 1000);
-                         if (imageReplaceTaskRef.current) {
-                            addToastDirect("[DEBUG] Image Replace .then() - Task still active?", 'warning', 1000);
-                         } else {
-                            addToastDirect("[DEBUG] Image Replace .then() - Task cleared OK", 'info', 1000);
-                         }
-                    })
-                    .catch(err => {
-                        const errorMsg = err?.message || "Unknown error during image replace";
-                        addToastDirect(`[DEBUG] Image Replace .catch(): ${errorMsg}`, 'error', 3000);
-                        logger.error("[Effect] handleDirectImageReplace Promise REJECTED:", errorMsg);
-                        setImageReplaceError(`Promise rejected: ${errorMsg}`);
-                    })
-                    .finally(() => {
-                        addToastDirect("[DEBUG] Image Replace .finally()", 'info', 1000);
-                        logger.log("[Effect] Image replace process finished (finally block).");
-                        processingImageReplace.current = false;
-                    });
+                    .then(() => { addToastDirect("[DEBUG] Image Replace .then()", 'info', 1000); /* ... */ })
+                    .catch(err => { /* ... */ addToastDirect(`[DEBUG] Image Replace .catch(): ${err?.message}`, 'error', 3000); })
+                    .finally(() => { addToastDirect("[DEBUG] Image Replace .finally()", 'info', 1000); processingImageReplace.current = false; });
             } else {
                  addToastDirect("[DEBUG] Image Replace ERROR: Handler missing!", 'error', 5000);
-                 logger.error("[Effect] handleDirectImageReplace handler is not available!");
                  setImageReplaceError("Internal error: Image replace handler missing.");
                  processingImageReplace.current = false;
                  toastError("Внутренняя ошибка: Обработчик замены картинки отсутствует.");
             }
         } else if (imageReplaceTask && fetchStatus === 'error' && !processingImageReplace.current) {
             addToastDirect("[DEBUG] Image Replace SET ERROR: Fetch failed.", 'error', 3000);
-            logger.warn("[Effect] Image task active, but fetch status is error.");
              setImageReplaceError("Failed to fetch target file.");
         }
         addToastDirect("[DEBUG] Image Replace Effect FINISH", 'info', 1000);
      }, [
-        imageReplaceTask, fetchStatus, allFetchedFiles, /* assistantLoading REMOVED */
+        imageReplaceTask, fetchStatus, allFetchedFiles, assistantLoading, // Keep assistantLoading check
         handlers, setImageReplaceError, imageReplaceError, logger, toastError, addToastDirect
      ]);
 
@@ -349,10 +309,42 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         addToastDirect(`[DEBUG] Image Task Ref Update Effect. New task: ${!!imageReplaceTask}`, 'info', 500);
         imageReplaceTaskRef.current = imageReplaceTask;
     }, [imageReplaceTask, addToastDirect]);
-    addToastDirect("[DEBUG] After AICodeAssistant useEffects (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] After AICodeAssistant useEffects", 'info', 1000);
+
+
+    // --- Imperative Handle ---
+    addToastDirect("[DEBUG] Before AICodeAssistant useImperativeHandle", 'info', 1000);
+    useImperativeHandle(ref, () => ({
+        handleParse: () => {
+            addToastDirect(`[DEBUG] Imperative handleParse called. Handler type: ${typeof handlers.handleParse}`, 'info', 1000);
+            handlers.handleParse();
+        },
+        selectAllParsedFiles: () => {
+             addToastDirect(`[DEBUG] Imperative selectAllParsedFiles called. Handler type: ${typeof handlers.handleSelectAllFiles}`, 'info', 1000);
+             handlers.handleSelectAllFiles();
+        },
+        handleCreatePR: () => {
+             addToastDirect(`[DEBUG] Imperative handleCreatePR called. Handler type: ${typeof handlers.handleCreateOrUpdatePR}`, 'info', 1000);
+             handlers.handleCreateOrUpdatePR();
+        },
+        setResponseValue: (val: string) => {
+            addToastDirect(`[DEBUG] Imperative setResponseValue called. Local type: ${typeof setResponseValue}`, 'info', 1000);
+            setResponseValue(val);
+        },
+        updateRepoUrl: (url: string) => {
+            addToastDirect(`[DEBUG] Imperative updateRepoUrl called. Local type: ${typeof updateRepoUrl}`, 'info', 1000);
+            updateRepoUrl(url);
+        },
+        handleDirectImageReplace: (task: ImageReplaceTask, files: FileNode[]) => {
+             addToastDirect(`[DEBUG] Imperative handleDirectImageReplace called. Handler type: ${typeof handlers.handleDirectImageReplace}`, 'info', 1000);
+             return handlers.handleDirectImageReplace(task, files);
+        },
+    }), [handlers, setResponseValue, updateRepoUrl, addToastDirect]);
+    addToastDirect("[DEBUG] After AICodeAssistant useImperativeHandle", 'info', 1000);
+
 
     // --- Derived State for Rendering ---
-    addToastDirect("[DEBUG] AICodeAssistant Calculate Derived State (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] AICodeAssistant Calculate Derived State", 'info', 1000);
     const effectiveIsParsing = contextIsParsing ?? hookIsParsing;
     const isProcessingAny = assistantLoading || aiActionLoading || effectiveIsParsing || isProcessingPR || isFetchingOriginals || loadingPrs;
     const finalRepoUrlForForm = repoUrlStateLocal || repoUrlFromContext || "";
@@ -371,11 +363,13 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
 
     // --- FINAL RENDER ---
-    addToastDirect("[DEBUG] AICodeAssistant Render: Returning JSX (Post Mount)", 'info', 1000);
+    addToastDirect("[DEBUG] AICodeAssistant Render: Returning JSX", 'info', 1000);
+    // Use `isProcessingAny` or specific loading states to potentially show a loading overlay
+    // instead of returning null or a different component structure based on mount status.
     return (
         <div id="executor" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
-            {/* ... остальной JSX без изменений ... */}
-            <header className="flex justify-between items-center gap-2 flex-wrap">
+            {/* Header remains the same */}
+             <header className="flex justify-between items-center gap-2 flex-wrap">
                  <div className="flex items-center gap-2">
                      <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse">
                          {showImageReplaceUI ? (imageTaskFailed ? "🖼️ Ошибка Замены Картинки" : "🖼️ Статус Замены Картинки") : "🤖 AI Code Assistant"}
@@ -385,8 +379,10 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                  <button id="settings-modal-trigger-assistant" onClick={() => { addToastDirect("[DEBUG] Settings Toggle Click (Assistant)", 'info', 1000); triggerToggleSettingsModal(); }} className="p-2 text-gray-400 hover:text-cyan-400 transition rounded-full hover:bg-gray-700/50 disabled:opacity-50" disabled={isProcessingPR || assistantLoading} title="Настройки URL / Token / Ветки / PRs" > <FaCodeBranch className="text-xl" /> </button>
              </header>
 
+            {/* Conditional rendering based on task type, NOT mount status */}
             {showStandardAssistantUI && (
                  <>
+                    {/* ... Rest of the standard UI ... */}
                      <div>
                           <p className="text-yellow-400 mb-2 text-xs md:text-sm min-h-[18px]"> {isWaitingForAiResponse ? `⏳ Жду AI... (ID: ${currentAiRequestId?.substring(0,6)}...)` : isProcessingAny ? "⏳ Обработка..." : "2️⃣ Вставь ответ AI или жди. Затем '➡️'."} </p>
                           <div className="relative group">
@@ -423,16 +419,14 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
             {/* --- Image Replace UI --- */}
             {showImageReplaceUI && (
-                <div className={`flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed min-h-[200px] ${imageTaskFailed ? 'border-red-500' : 'border-blue-400'}`}>
-                     {React.useMemo(() => { addToastDirect("[DEBUG] Rendering Image Replace UI", 'info', 1000); return null; }, [addToastDirect])}
-                     {/* Status Icon Logic */}
+                 <div className={`flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed min-h-[200px] ${imageTaskFailed ? 'border-red-500' : 'border-blue-400'}`}>
+                    {/* ... Image Replace UI content ... */}
+                    {React.useMemo(() => { addToastDirect("[DEBUG] Rendering Image Replace UI", 'info', 1000); return null; }, [addToastDirect])}
                      {(assistantLoading || isProcessingPR) ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> )
                        : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> )
                        : imageTaskFailed ? <FaCircleXmark className="text-red-400 text-4xl mb-4" />
                        : imageReplaceTask ? <FaImages className="text-blue-400 text-4xl mb-4" />
                        : <FaCheck className="text-green-400 text-4xl mb-4" /> }
-
-                     {/* Status Title Logic */}
                      <p className={`text-lg font-semibold ${imageTaskFailed ? 'text-red-300' : 'text-blue-300'}`}>
                          {(assistantLoading || isProcessingPR) ? "Обработка Замены..."
                            : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Загрузка Файла..."
@@ -440,8 +434,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                            : imageReplaceTask ? "Задача Замены Активна"
                            : "Замена Завершена Успешно"}
                      </p>
-
-                     {/* Status Description Logic */}
                      <p className="text-sm text-gray-400 mt-2">
                          {(assistantLoading || isProcessingPR) ? "Создание/обновление PR..."
                            : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Ожидание ответа от GitHub..."
@@ -449,8 +441,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                            : imageReplaceTask ? "Файл загружен, ожидание обработки Ассистентом..."
                            : "Процесс завершен. Проверьте PR."}
                      </p>
-
-                     {/* Display Task Details if active */}
                      {imageReplaceTask && (
                          <div className="mt-3 text-xs text-gray-500 break-all text-left bg-gray-900/50 p-2 rounded max-w-full overflow-x-auto simple-scrollbar">
                              <p><span className="font-semibold text-gray-400">Файл:</span> {imageReplaceTask.targetPath}</p>
@@ -458,8 +448,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                              <p><span className="font-semibold text-gray-400">Новый URL:</span> {imageReplaceTask.newUrl}</p>
                          </div>
                      )}
-
-                     {/* Show Reset Button only on failure */}
                      {imageTaskFailed && (
                           <button
                               onClick={handleResetImageError}
