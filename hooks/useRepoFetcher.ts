@@ -62,42 +62,47 @@ export const useRepoFetcher = ({
       handleSetFilesFetched, // Use the handler function from Context
       setSelectedFetcherFiles,
       setRequestCopied,
-      setLoadingPrs, setOpenPrs, setTargetBranchName: setContextTargetBranch,
+      setLoadingPrs, setOpenPrs, setContextTargetBranch,
       triggerToggleSettingsModal,
       updateKworkInput,
       addToast, // Use context's toast wrapper
       setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles,
-      // allFetchedFiles // Not needed directly here
     } = useRepoXmlPageContext();
 
-    // --- VIBE CHECK ---
-    addToast("[DEBUG] useRepoFetcher Hook Start", 'info', 1000);
-    // --- VIBE CHECK END ---
-
-    // Internal state for this fetcher instance
-    addToast("[DEBUG] Before useRepoFetcher useState", 'info', 1000);
-    const [files, setFiles] = useState<FileNode[]>([]); // Files fetched by *this* instance
+    // --- Internal state for this fetcher instance ---
+    const [files, setFiles] = useState<FileNode[]>([]);
     const [progress, setProgress] = useState<number>(0);
     const [error, setError] = useState<string | null>(null);
     const [primaryHighlightedPath, setPrimaryHighlightedPathState] = useState<string | null>(null);
     const [secondaryHighlightedPaths, setSecondaryHighlightedPathsState] = useState<Record<ImportCategory, string[]>>({ component: [], context: [], hook: [], lib: [], other: [] });
-    addToast("[DEBUG] After useRepoFetcher useState", 'info', 1000);
+    const [isMounted, setIsMounted] = useState(false);
 
-    // Refs
-    addToast("[DEBUG] Before useRepoFetcher useRef", 'info', 1000);
+    // --- Refs ---
     const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const isImageTaskFetchInitiated = useRef(false);
     const isAutoFetchingRef = useRef(false);
     const fetchStatusRef = useRef(fetchStatus); // Track fetch status for interval cleanup
-    const [isMounted, setIsMounted] = useState(false);
-    addToast("[DEBUG] After useRepoFetcher useRef/useState", 'info', 1000);
 
-    useEffect(() => { setIsMounted(true); addToast("[DEBUG] useRepoFetcher Mounted", 'info', 1000); }, [addToast]);
-    useEffect(() => { fetchStatusRef.current = fetchStatus; }, [fetchStatus]);
+    // --- Effects ---
+    useEffect(() => {
+        setIsMounted(true);
+        addToast("[DEBUG] useRepoFetcher Mounted", 'info', 1000);
+        // Cleanup function for mounting effect
+        return () => {
+            addToast("[DEBUG] useRepoFetcher Unmounting - Stopping Progress", 'info', 1000);
+            if (progressIntervalRef.current) {
+                clearInterval(progressIntervalRef.current);
+            }
+        };
+    }, [addToast]); // Add addToast as dependency
+
+    useEffect(() => {
+        // Update the ref whenever the context status changes
+        fetchStatusRef.current = fetchStatus;
+    }, [fetchStatus]);
 
     // --- Progress Simulation ---
     const stopProgressSimulation = useCallback(() => {
-        // addToast("[DEBUG] stopProgressSimulation called", 'info', 500); // Likely too noisy
         if (progressIntervalRef.current) {
             clearInterval(progressIntervalRef.current);
             progressIntervalRef.current = null;
@@ -108,26 +113,29 @@ export const useRepoFetcher = ({
         addToast(`[DEBUG] startProgressSimulation called. Type: ${typeof setInterval}`, 'info', 1000);
         stopProgressSimulation();
         setProgress(0);
-        const ticks = estimatedDurationSeconds * 5;
+        const ticks = estimatedDurationSeconds * 5; // 5 ticks per second
         const increment = ticks > 0 ? 100 / ticks : 100;
         progressIntervalRef.current = setInterval(() => {
             setProgress(prev => {
-                const currentContextStatus = fetchStatusRef.current;
+                const currentContextStatus = fetchStatusRef.current; // Read from ref
+                // Stop if status is no longer loading/retrying
                 if (currentContextStatus !== 'loading' && currentContextStatus !== 'retrying') {
                     addToast("[DEBUG] Progress Interval: Stopping due to context status change", 'info', 500);
                     stopProgressSimulation();
+                    // Set progress to 100 on success, otherwise keep last value
                     return currentContextStatus === 'success' ? 100 : prev;
                 }
                 const nextProgress = prev + increment;
+                // Stop near the end to avoid jumping straight to 100 unless fetch finishes
                 if (nextProgress >= 95) {
-                    addToast("[DEBUG] Progress Interval: Reached >= 95%, stopping.", 'info', 500);
+                    addToast("[DEBUG] Progress Interval: Reached >= 95%, stopping simulation.", 'info', 500);
                     stopProgressSimulation();
-                    return 95;
+                    return 95; // Hold at 95% until fetch completes
                 }
                 return nextProgress;
             });
-        }, 200);
-    }, [stopProgressSimulation, addToast]); // Add addToast
+        }, 200); // 200ms interval (5 times per second)
+    }, [stopProgressSimulation, addToast]);
 
     // --- Core Fetch Logic ---
     const handleFetchManual = useCallback(async (
@@ -161,18 +169,16 @@ export const useRepoFetcher = ({
 
         // --- Reset State ---
         addToast("[DEBUG] handleFetchManual Resetting State", 'info', 1000);
-        // --- VIBE FIX: Delay the status update ---
+        // Use setTimeout to allow current render cycle to finish before updating status
         setTimeout(() => {
             addToast("[DEBUG] handleFetchManual Setting fetchStatus to 'loading' (delayed)", 'info', 1000);
             setFetchStatus('loading');
         }, 0);
-        // --- END VIBE FIX ---
         setError(null);
         setFiles([]);
         setPrimaryHighlightedPathState(null);
         setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] });
         setSelectedFetcherFiles(new Set());
-        // Only reset these if NOT an image task
         if (!currentTask) {
              addToast("[DEBUG] handleFetchManual: Standard task - resetting AI states", 'info', 1000);
              setRequestCopied(false);
@@ -240,7 +246,7 @@ export const useRepoFetcher = ({
             addToast(`[DEBUG] After fetchRepoContents. Success: ${fetchResult?.success}`, 'info', 1000);
 
             if (fetchResult?.success && Array.isArray(fetchResult.files)) {
-                fetchAttemptSucceeded = true; // Mark success early
+                fetchAttemptSucceeded = true;
                 fetchedFilesData = fetchResult.files;
                 const allPaths = fetchedFilesData.map(f => f.path);
                 logger.log(`Fetcher Hook: Fetched ${fetchedFilesData.length} files from '${branchForContentFetch}'.`);
@@ -254,7 +260,7 @@ export const useRepoFetcher = ({
                         logger.error(`Fetcher Hook: Image Task - Target ${primaryHighlightPathInternal} NOT FOUND in fetched files from branch ${branchForContentFetch}.`);
                         setError(`Файл (${primaryHighlightPathInternal}) не найден в ветке ${branchForContentFetch}.`);
                         addToast(`Файл (${primaryHighlightPathInternal}) не найден.`, 'error', undefined, {id: 'fetch-toast'});
-                        fetchAttemptSucceeded = false; // OVERRIDE success if target missing
+                        fetchAttemptSucceeded = false;
                     } else {
                         logger.log(`Fetcher Hook: Image Task - Target ${primaryHighlightPathInternal} found.`);
                         addToast(`[DEBUG] Image Task target found. Auto-selecting.`, 'info', 1000);
@@ -321,7 +327,7 @@ export const useRepoFetcher = ({
             logger.error(`Fetcher Hook: Fetch Error - ${displayError}`, err);
             setError(displayError);
             addToast(`Ошибка: ${displayError}`, 'error', undefined, {id: 'fetch-toast'});
-            fetchAttemptSucceeded = false; // Ensure marked as failed
+            fetchAttemptSucceeded = false;
             fetchedFilesData = []; primaryHighlightPathInternal = null; secondaryHighlightPathsDataInternal = { component: [], context: [], hook: [], lib: [], other: [] }; filesToAutoSelect = new Set();
         } finally {
             addToast(`[DEBUG] handleFetchManual FINALLY block. Attempt Succeeded: ${fetchAttemptSucceeded}`, 'info', 1000);
@@ -335,23 +341,25 @@ export const useRepoFetcher = ({
                  setSelectedFetcherFiles(filesToAutoSelect);
              }
             addToast(`[DEBUG] Before handleSetFilesFetched. Type: ${typeof handleSetFilesFetched}`, 'info', 1000);
-            handleSetFilesFetched( // Call context handler to update global state and potentially trigger image processing
+            // Call context handler to update global state and potentially trigger image processing
+            handleSetFilesFetched(
                 fetchAttemptSucceeded,
                 fetchedFilesData,
                 primaryHighlightPathInternal,
                 Object.values(secondaryHighlightPathsDataInternal).flat()
             );
             addToast(`[DEBUG] After handleSetFilesFetched`, 'info', 1000);
-            setProgress(fetchAttemptSucceeded ? 100 : 0);
+            setProgress(fetchAttemptSucceeded ? 100 : 0); // Set final progress
             if (currentTask && !fetchAttemptSucceeded) {
                 addToast("[DEBUG] handleFetchManual: Resetting image task flag due to fetch failure", 'warning', 1000);
-                isImageTaskFetchInitiated.current = false;
+                isImageTaskFetchInitiated.current = false; // Reset flag on failure
             }
-            if(isSettingsModalOpen) { triggerToggleSettingsModal(); }
+            if(isSettingsModalOpen && fetchAttemptSucceeded) { // Close settings only on success
+                triggerToggleSettingsModal();
+            }
             addToast(`[DEBUG] handleFetchManual FINISHED`, 'info', 1000);
         }
     }, [
-        // Full list of dependencies - MAKE SURE THEY ARE ALL LISTED
         repoUrl, token, targetBranchName, manualBranchName, imageReplaceTask,
         highlightedPathFromUrl, importantFiles, autoFetch, ideaFromUrl, isSettingsModalOpen,
         loadingPrs, assistantLoading, isParsing, aiActionLoading,
@@ -364,70 +372,96 @@ export const useRepoFetcher = ({
         logger // Assuming logger is stable
     ]);
 
-    // --- Effect: Auto-Fetch ---
+    // --- Effect: Auto-Fetch (REVISED) ---
     useEffect(() => {
         addToast("[DEBUG] useRepoFetcher Auto-Fetch Effect Check", 'info', 1000);
-        if (!isMounted || !repoUrlEntered) { addToast("[DEBUG] Auto-Fetch SKIP: Not mounted or no URL", 'info', 1000); return; }
-        const currentTask = imageReplaceTask;
-        const branch = targetBranchName || manualBranchName || null;
-        const canTriggerFetch = autoFetch && (fetchStatus === 'idle' || fetchStatus === 'failed_retries' || fetchStatus === 'error');
-        const isImageFetchReady = currentTask && !isImageTaskFetchInitiated.current;
-        const isStandardFetchReady = !currentTask && autoFetch;
-        addToast(`[DEBUG] Auto-Fetch Check: canTrigger=${canTriggerFetch}, isAutoFetchingRef=${isAutoFetchingRef.current}, isImageReady=${isImageFetchReady}, isStandardReady=${isStandardFetchReady}`, 'info', 1000);
+        if (!isMounted || !repoUrlEntered) {
+            addToast("[DEBUG] Auto-Fetch SKIP: Not mounted or no URL", 'info', 1000);
+            return;
+        }
 
+        const currentTask = imageReplaceTask;
+        const branch = targetBranchName || manualBranchName || null; // Branch *at the time the effect runs*
+
+        // Condition to consider starting the timer: autoFetch is true AND
+        // it's either an image task OR relevant URL params exist
+        const shouldConsiderAutoFetch = autoFetch && (!!currentTask || !!highlightedPathFromUrl || !!ideaFromUrl);
+
+        addToast(`[DEBUG] Auto-Fetch Should Consider: ${shouldConsiderAutoFetch}`, 'info', 1000);
+
+        if (!shouldConsiderAutoFetch) {
+             return; // Exit if autoFetch is not needed based on current logic
+        }
+
+        // Set a timer to trigger the fetch after a delay
         const timerId = setTimeout(() => {
-            if (canTriggerFetch && !isAutoFetchingRef.current && (isImageFetchReady || isStandardFetchReady)) {
+            // Re-check the fetch status *inside* the timeout using the ref for the latest value
+            const currentContextStatus = fetchStatusRef.current;
+            const canTriggerFetchNow = (currentContextStatus === 'idle' || currentContextStatus === 'failed_retries' || currentContextStatus === 'error');
+
+            addToast(`[DEBUG] Auto-Fetch Timer Fired. Can Trigger Now: ${canTriggerFetchNow}, Already Running Ref: ${isAutoFetchingRef.current}`, 'info', 1000);
+
+            // Trigger fetch only if idle/error and not already fetching via auto-fetch ref guard
+            if (canTriggerFetchNow && !isAutoFetchingRef.current) {
                 const mode = currentTask ? "Image Task" : "Standard";
                 addToast(`[DEBUG] Auto-Fetch Triggering handleFetchManual (${mode}). Guard ON.`, 'info', 1000);
-                isAutoFetchingRef.current = true;
+                isAutoFetchingRef.current = true; // Set guard
+
+                // Call handleFetchManual using values captured when the effect ran
                 handleFetchManual(false, branch, currentTask)
                     .catch(err => {
                          addToast(`[DEBUG] Auto-Fetch handleFetchManual ERROR`, 'error', 3000);
-                         logger.error(`[AutoFetch Effect Hook] handleFetchManual (${mode}) threw an unexpected error:`, err); })
+                         logger.error(`[AutoFetch Effect Hook] handleFetchManual (${mode}) threw an unexpected error:`, err);
+                    })
                     .finally(() => {
                         addToast("[DEBUG] Auto-Fetch FINALLY: Resetting guard.", 'info', 1000);
-                        isAutoFetchingRef.current = false;
-                        const finalStatus = fetchStatusRef.current;
+                        isAutoFetchingRef.current = false; // Reset guard
+                        // Log final status after attempt
+                        const finalStatus = fetchStatusRef.current; // Check ref again for final status
                         addToast(`[DEBUG] Auto-Fetch finished with status: ${finalStatus}`, 'info', 1000);
+                        // Reset image task initiation flag if it failed during auto-fetch
                         if (currentTask && (finalStatus === 'error' || finalStatus === 'failed_retries')) {
                              addToast(`[DEBUG] Auto-Fetch resetting image task flag due to error`, 'warning', 1000);
                              isImageTaskFetchInitiated.current = false;
                         }
                     });
-            } else { addToast("[DEBUG] Auto-Fetch conditions NOT met or already running", 'info', 1000); }
-        }, 100); // 100ms delay
+            } else {
+                addToast("[DEBUG] Auto-Fetch conditions inside timer NOT met or already running", 'info', 1000);
+            }
+        }, 500); // Increased delay to 500ms
 
+        // Cleanup function to clear the timeout if dependencies change or component unmounts
         return () => clearTimeout(timerId);
     }, [
-        isMounted, repoUrlEntered, autoFetch, targetBranchName, manualBranchName,
-        imageReplaceTask, fetchStatus, // React to context status
-        handleFetchManual, // Stable callback
+        isMounted, // Effect should re-run if mount status changes (though unlikely after first mount)
+        repoUrlEntered,
+        autoFetch,
+        targetBranchName,
+        manualBranchName,
+        imageReplaceTask,
+        highlightedPathFromUrl, // Dependency for shouldConsiderAutoFetch
+        ideaFromUrl,          // Dependency for shouldConsiderAutoFetch
+        // fetchStatus removed from deps, using fetchStatusRef inside timeout
+        handleFetchManual, // Stable callback from useCallback
         logger, addToast // Stable helpers
     ]);
 
-    // --- Cleanup Effect ---
-    useEffect(() => {
-         return () => {
-             addToast("[DEBUG] useRepoFetcher Unmount Cleanup - Stopping Progress", 'info', 1000);
-             stopProgressSimulation();
-         };
-    }, [stopProgressSimulation, addToast]); // Add addToast
-
     // --- Derived State ---
     const isLoading = fetchStatus === 'loading' || fetchStatus === 'retrying';
+    // Recalculate isFetchDisabled based on potentially updated isLoading and other context states
     const isFetchDisabled = isLoading || loadingPrs || !repoUrlEntered || assistantLoading || isParsing || aiActionLoading || (!!imageReplaceTask && isImageTaskFetchInitiated.current && isLoading);
     addToast(`[DEBUG] useRepoFetcher derived: isLoading=${isLoading}, isFetchDisabled=${isFetchDisabled}`, 'info', 1000);
 
     // --- Return values ---
     addToast("[DEBUG] useRepoFetcher Hook End - Returning values", 'info', 1000);
     return {
-        files, // Return local files state for FileList display
+        files,
         progress,
-        error, // Return local error state
-        primaryHighlightedPath, // Return local highlight state
-        secondaryHighlightedPaths, // Return local highlight state
-        handleFetchManual, // Expose manual fetch trigger
-        isLoading: fetchStatus === 'loading' || fetchStatus === 'retrying', // Derive isLoading from context status
-        isFetchDisabled, // Expose derived disabled state
+        error,
+        primaryHighlightedPath,
+        secondaryHighlightedPaths,
+        handleFetchManual,
+        isLoading, // Use derived isLoading
+        isFetchDisabled, // Use derived isFetchDisabled
     };
 };
