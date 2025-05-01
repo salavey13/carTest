@@ -114,87 +114,100 @@ const translations = {
 // --- End I18N ---
 
 type Language = 'en' | 'ru';
+// Define a type for the translation object to ensure structure
+type TranslationSet = typeof translations['en'];
 
 // --- Fallback component for AutomationBuddy ---
 function LoadingBuddyFallback() {
     return ( <div className="fixed bottom-4 right-4 z-50 w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 animate-pulse" aria-hidden="true" ></div> );
 }
 
-// --- REVISED: Configuration for html-react-parser ---
+// --- html-react-parser Configuration (More robust checks) ---
 const parserOptions: HTMLReactParserOptions = {
   replace: (domNode) => {
-    if (domNode instanceof Element && domNode.attribs) {
-      const { name, attribs, children } = domNode;
-      const lowerCaseName = name?.toLowerCase();
+    if (!(domNode instanceof Element && domNode.attribs)) { return undefined; } // Ensure it's an element with attributes
 
-      // Handle Font Awesome Icons: Check if the tag name is a valid key in FaIcons
-      if (name && typeof name === 'string' && FaIcons[name as keyof typeof FaIcons]) {
-        const IconComponent = FaIcons[name as keyof typeof FaIcons];
-        const props = attributesToProps(attribs);
-        const baseClassName = "inline-block align-middle mx-1";
-        const specificClassName = props.className || '';
-        props.className = `${baseClassName} ${specificClassName}`.trim();
-        // Ensure children are not passed if the icon component doesn't expect them
-        // Assuming most icon components don't render children
-        return React.createElement(IconComponent, props);
-      }
+    const { name, attribs, children } = domNode;
+    const lowerCaseName = name?.toLowerCase();
 
-      // Handle Links: Convert internal links to Next.js <Link>
-      if (lowerCaseName === 'a') {
-        const props = attributesToProps(attribs);
-        const isInternal = props.href && (props.href.startsWith('/') || props.href.startsWith('#'));
-        // Ensure children are parsed correctly even for external links
-        const parsedChildren = children ? domToReact(children, parserOptions) : null;
-        if (isInternal && !props.target) {
-          // Prevent passing invalid props like 'class' to NextLink
-          const { class: _, ...validProps } = props;
-          try {
-            return <Link href={props.href} {...validProps} className={props.className}>{parsedChildren}</Link>;
-          } catch (linkError) {
-             logger.error("[RenderContent] Error creating Next Link:", linkError, props);
-             // Fallback to regular anchor tag if Link creation fails
-             return <a {...props}>{parsedChildren}</a>;
-          }
-        }
-        // Regular anchor tag for external links or those with target="_blank"
-        return <a {...props}>{parsedChildren}</a>;
-      }
-
-      // Handle other elements (including nested ones)
-      if (children && children.length > 0) {
-          const elementChildren = domToReact(children, parserOptions);
-          // Check if React.createElement can handle the tag name
-          if (typeof name === 'string' && /^[a-zA-Z][a-zA-Z0-9-]*$/.test(name)) { // Basic check for valid tag names
-              return React.createElement(name, attributesToProps(attribs), elementChildren);
-          }
-      } else if (typeof name === 'string' && /^[a-zA-Z][a-zA-Z0-9-]*$/.test(name)) {
-          // Handle void elements or elements without children
-          return React.createElement(name, attributesToProps(attribs));
+    // Handle Font Awesome Icons
+    if (name && typeof name === 'string' && name.startsWith('Fa') && FaIcons[name as keyof typeof FaIcons]) {
+      try {
+          const IconComponent = FaIcons[name as keyof typeof FaIcons];
+          const props = attributesToProps(attribs);
+          const baseClassName = "inline-block align-middle mx-1";
+          const specificClassName = props.className || '';
+          props.className = `${baseClassName} ${specificClassName}`.trim();
+          return React.createElement(IconComponent, props);
+      } catch (iconError) {
+          logger.error(`[parserOptions] Error rendering FaIcon <${name}>:`, iconError);
+          return <span>{`[Icon Error: ${name}]`}</span>; // Fallback for icon error
       }
     }
-    // Return undefined to let the parser handle the node default way or skip if invalid
+
+    // Handle Internal Links
+    if (lowerCaseName === 'a') {
+      const props = attributesToProps(attribs);
+      const isInternal = props.href && (props.href.startsWith('/') || props.href.startsWith('#'));
+      const parsedChildren = children ? domToReact(children, parserOptions) : null;
+      if (isInternal && !props.target) {
+          const { class: _, ...validProps } = props;
+          try { return <Link href={props.href} {...validProps} className={props.className}>{parsedChildren}</Link>; }
+          catch (linkError) { logger.error("[parserOptions] Error creating Next Link:", linkError, props); return <a {...props}>{parsedChildren}</a>; } // Fallback
+      }
+      return <a {...props}>{parsedChildren}</a>; // External link
+    }
+
+    // Handle other standard HTML tags
+    if (typeof name === 'string' && /^[a-z][a-z0-9-]*$/.test(lowerCaseName || '')) { // Basic check for valid lowercase tag names
+      try {
+          return React.createElement(lowerCaseName!, attributesToProps(attribs), children ? domToReact(children, parserOptions) : undefined);
+      } catch (createElementError) {
+          logger.error(`[parserOptions] Error React.createElement for <${lowerCaseName}>:`, createElementError);
+          // Fallback: Render children without the problematic tag
+          return <>{children ? domToReact(children, parserOptions) : null}</>;
+      }
+    }
+
+    // Default: let the parser handle or skip
     return undefined;
   },
 };
 
 
-// --- REVISED: RenderContent Component ---
+// --- REVISED: RenderContent Component (More robust) ---
 const RenderContent: React.FC<{ content: string | null | undefined }> = React.memo(({ content }) => {
-    // Ensure content is a string before processing
-    const safeContent = typeof content === 'string' ? content : '';
-    // Replace markdown bold (**text**) with <strong> tags
-    const contentWithStrong = safeContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    if (typeof content !== 'string' || !content.trim()) {
+        return null; // Return null for invalid or empty content
+    }
+    const contentWithStrong = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     try {
-      // Use optional chaining and nullish coalescing for safety
-      const parsedContent = parse(contentWithStrong ?? '', parserOptions);
+      const parsedContent = parse(contentWithStrong, parserOptions);
       return <>{parsedContent}</>;
     } catch (error) {
-      logger.error("Error parsing content in RenderContent:", error, "Original Content:", safeContent);
-      // Fallback to dangerouslySetInnerHTML only if parse fails
-      return <span dangerouslySetInnerHTML={{ __html: contentWithStrong }} />;
+      logger.error("[RenderContent] Error during parse:", error, "Input:", contentWithStrong);
+      // Fallback to safer rendering if parse fails catastrophically
+      return <span dangerouslySetInnerHTML={{ __html: `[Parse Error] ${contentWithStrong.substring(0, 100)}...` }} />;
     }
 });
 RenderContent.displayName = 'RenderContent';
+
+
+// --- REVISED: getPlainText helper (Browser-safe) ---
+const getPlainText = (htmlString: string | null | undefined): string => {
+    if (typeof htmlString !== 'string' || !htmlString) { return ''; }
+    try {
+        // Remove FontAwesome tags first
+        const withoutIcons = htmlString.replace(/<Fa[A-Z][a-zA-Z0-9]+(?:\s+[^>]*?)?\s*\/?>/g, '');
+        // Basic tag stripping (less robust than DOM parsing but safe for SSR/initial render)
+        const plainText = withoutIcons.replace(/<[^>]*>/g, '');
+        // Basic entity decoding (add more if needed)
+        return plainText.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
+    } catch (e) {
+        logger.error("Error stripping HTML for title:", e, "Input:", htmlString);
+        return htmlString; // Fallback
+    }
+};
 
 
 // --- ActualPageContent Component ---
@@ -213,22 +226,33 @@ function ActualPageContent() {
     const searchParams = useSearchParams();
     const [initialIdea, setInitialIdea] = useState<string | null>(null);
     const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(false);
+    // --- State for Translations ---
+    const [t, setT] = useState<TranslationSet | null>(null);
 
-    // Effect 1: Process URL Params & Easter Egg
+    // --- Effects ---
+
+    // Set mounted and initial language/translation object
     useEffect(() => {
       setIsMounted(true);
+      const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
+      const userLang = user?.language_code;
+      const resolvedLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
+      setLang(resolvedLang);
+      setT(translations[resolvedLang] ?? translations.en); // Ensure 't' is set
+      logger.log(`[ActualPageContent Effect 1] Lang set to: ${resolvedLang}`);
+    }, [user]); // Depend only on user
+
+
+    // Process URL Params & Easter Egg (Depends on setRepoUrl, setImageReplaceTask)
+    useEffect(() => {
+      if (!isMounted) return; // Wait for mount
+
       console.log(
         "%c🚀 CyberVibe Studio 2.0 Initialized! 🚀\n%cCo-created with the Vibe Community & AI. Let's build!\n%cEaster Egg added by request. 😉",
         "color: #E1FF01; font-size: 1.2em; font-weight: bold; text-shadow: 0 0 5px #E1FF01;",
         "color: #00FF9D; font-size: 0.9em;",
         "color: #888; font-size: 0.8em;"
       );
-
-      const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
-      const userLang = user?.language_code;
-      const initialLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
-      setLang(initialLang);
-      logger.log(`[ActualPageContent Effect 1] Lang set to: ${initialLang}`);
 
       const pathParam = searchParams.get("path");
       const ideaParam = searchParams.get("idea");
@@ -239,21 +263,18 @@ function ActualPageContent() {
                const decodedRepoUrl = decodeURIComponent(repoParam);
                if (decodedRepoUrl && typeof decodedRepoUrl === 'string' && decodedRepoUrl.includes("github.com")) {
                    setRepoUrl(decodedRepoUrl);
-                   logger.log(`[ActualPageContent Effect 1] Repo URL set from param: ${decodedRepoUrl}`);
-               } else { logger.warn(`[ActualPageContent Effect 1] Invalid or empty repo URL from param: ${repoParam}`); }
-           } catch (e) { logger.error("[ActualPageContent Effect 1] Error decoding repo URL param:", e); }
+                   logger.log(`[ActualPageContent Effect 2] Repo URL set from param: ${decodedRepoUrl}`);
+               } else { logger.warn(`[ActualPageContent Effect 2] Invalid or empty repo URL from param: ${repoParam}`); }
+           } catch (e) { logger.error("[ActualPageContent Effect 2] Error decoding repo URL param:", e); }
        }
 
-        if (pathParam && ideaParam) { // Check both exist
-            let decodedIdea: string | null = null;
-            let decodedPath: string | null = null;
-
+        if (pathParam && ideaParam) {
+            let decodedIdea: string | null = null; let decodedPath: string | null = null;
             try {
-                decodedPath = decodeURIComponent(pathParam);
-                decodedIdea = decodeURIComponent(ideaParam);
-
+                decodedPath = decodeURIComponent(pathParam); decodedIdea = decodeURIComponent(ideaParam);
                 if (decodedIdea && decodedIdea.startsWith("ImageReplace|")) {
-                    logger.log("[ActualPageContent Effect 1] Processing Image Replace task from URL.");
+                     // ... (ImageReplace logic - unchanged) ...
+                    logger.log("[ActualPageContent Effect 2] Processing Image Replace task from URL.");
                     try {
                         const parts = decodedIdea.split('|');
                         const oldUrlParam = parts.find(p => p.startsWith("OldURL="));
@@ -265,196 +286,132 @@ function ActualPageContent() {
 
                             if (oldUrl && newUrl) { // Ensure URLs are valid after decode
                                 const task: ImageReplaceTask = { targetPath: decodedPath, oldUrl: oldUrl, newUrl: newUrl };
-                                logger.log("[ActualPageContent Effect 1] Setting image task:", task);
+                                logger.log("[ActualPageContent Effect 2] Setting image task:", task);
                                 setImageReplaceTask(task);
                                 setInitialIdea(null);
                             } else {
-                                logger.error("[ActualPageContent Effect 1] Invalid image task URL data after decoding parts:", { decodedPath, oldUrl, newUrl });
+                                logger.error("[ActualPageContent Effect 2] Invalid image task URL data after decoding parts:", { decodedPath, oldUrl, newUrl });
                                 setImageReplaceTask(null); setInitialIdea(null);
                             }
                         } else {
-                            logger.error("[ActualPageContent Effect 1] Could not parse Old/New URL or path from image task parts:", decodedIdea);
+                            logger.error("[ActualPageContent Effect 2] Could not parse Old/New URL or path from image task parts:", decodedIdea);
                             setImageReplaceTask(null); setInitialIdea(null);
                         }
                     } catch (splitError) {
-                        logger.error("[ActualPageContent Effect 1] Error splitting ImageReplace task string:", splitError);
+                        logger.error("[ActualPageContent Effect 2] Error splitting ImageReplace task string:", splitError);
                         setImageReplaceTask(null); setInitialIdea(null);
                     }
                     setInitialIdeaProcessed(true); // Mark as processed even if error occurred parsing
 
                 } else if (decodedIdea) {
-                    logger.log("[ActualPageContent Effect 1] Regular idea param found, storing:", decodedIdea.substring(0, 50) + "...");
+                    logger.log("[ActualPageContent Effect 2] Regular idea param found, storing:", decodedIdea.substring(0, 50) + "...");
                     setInitialIdea(decodedIdea);
                     setImageReplaceTask(null);
-                    setInitialIdeaProcessed(false); // Process in Effect 2
+                    setInitialIdeaProcessed(false); // Process in Effect 3
                 } else {
-                    logger.warn("[ActualPageContent Effect 1] Decoded idea is empty or invalid, skipping idea processing.");
+                    logger.warn("[ActualPageContent Effect 2] Decoded idea is empty or invalid, skipping idea processing.");
                     setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
                 }
-
             } catch (decodeError) {
-                logger.error("[ActualPageContent Effect 1] Error decoding path or idea params:", decodeError);
-                setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
+                 logger.error("[ActualPageContent Effect 2] Error decoding path or idea params:", decodeError);
+                 setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
             }
-            // Reveal components only if valid params were likely intended
-            if (decodedPath || decodedIdea) {
-                setShowComponents(true);
-            }
-
+            if (decodedPath || decodedIdea) { setShowComponents(true); }
         } else {
-            // No valid path/idea params, ensure states are clean
-            logger.log(`[ActualPageContent Effect 1] No valid path/idea params found (path: ${pathParam || 'null'}, idea: ${ideaParam || 'null'}).`);
-            setImageReplaceTask(null);
-            setInitialIdea(null);
-            setInitialIdeaProcessed(true);
+            logger.log(`[ActualPageContent Effect 2] No valid path/idea params found.`);
+            setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
         }
+    }, [isMounted, searchParams, setImageReplaceTask, setRepoUrl]); // Removed user dependency
 
-    }, [user, searchParams, setImageReplaceTask, setRepoUrl]); // Ensure all setters used are dependencies
 
-
-    // Effect 2: Populate Kwork Input
+    // Effect 3: Populate Kwork Input (Depends on fetchStatus, initialIdea, refs)
      useEffect(() => {
-        const fetchAttemptFinished = isMounted && ['success', 'error', 'failed_retries'].includes(fetchStatus);
+        if (!isMounted) return; // Wait for mount
 
-        // Ensure kworkInputRef.current exists before accessing it
+        const fetchAttemptFinished = ['success', 'error', 'failed_retries'].includes(fetchStatus);
+
         if (fetchAttemptFinished && initialIdea && !initialIdeaProcessed && !imageReplaceTask && kworkInputRef.current) {
-            logger.log(`[ActualPageContent Effect 2] Fetch finished (${fetchStatus}). Populating kwork...`);
+            logger.log(`[ActualPageContent Effect 3] Fetch finished (${fetchStatus}). Populating kwork...`);
             kworkInputRef.current.value = initialIdea;
-            // Ensure input event dispatch is robust
-            try {
-                const inputEvent = new Event('input', { bubbles: true });
-                kworkInputRef.current.dispatchEvent(inputEvent);
-            } catch (eventError) {
-                 logger.error("[ActualPageContent Effect 2] Error dispatching input event:", eventError);
-            }
+            try { const inputEvent = new Event('input', { bubbles: true }); kworkInputRef.current.dispatchEvent(inputEvent); }
+            catch (eventError) { logger.error("[ActualPageContent Effect 3] Error dispatching input event:", eventError); }
             setKworkInputHasContent(initialIdea.trim().length > 0);
-            logger.log("[ActualPageContent Effect 2] Populated kwork input.");
+            logger.log("[ActualPageContent Effect 3] Populated kwork input.");
 
-            // Ensure fetcherRef.current and handleAddSelected exist
             if (fetcherRef.current?.handleAddSelected) {
                 if (selectedFetcherFiles.size > 0) {
-                    logger.log("[ActualPageContent Effect 2] Calling fetcherRef.handleAddSelected.");
-                    const filesToAdd = selectedFetcherFiles ?? new Set<string>();
-                    const allFilesData = allFetchedFiles ?? [];
-                    // Wrap async call in try-catch
-                    (async () => {
-                        try {
-                            await fetcherRef.current!.handleAddSelected(filesToAdd, allFilesData);
-                            logger.log("[ActualPageContent Effect 2] handleAddSelected call finished successfully.");
-                        } catch (err) {
-                            logger.error("[ActualPageContent Effect 2] Error during handleAddSelected call:", err);
-                        }
-                    })();
-                } else { logger.log("[ActualPageContent Effect 2] Skipping handleAddSelected (empty selection)."); }
-            } else { logger.warn("[ActualPageContent Effect 2] handleAddSelected method not found on fetcherRef or fetcherRef is null."); }
+                     logger.log("[ActualPageContent Effect 3] Calling fetcherRef.handleAddSelected.");
+                     const filesToAdd = selectedFetcherFiles ?? new Set<string>();
+                     const allFilesData = allFetchedFiles ?? [];
+                     (async () => { try { await fetcherRef.current!.handleAddSelected(filesToAdd, allFilesData); logger.log("[ActualPageContent Effect 3] handleAddSelected call finished successfully."); } catch (err) { logger.error("[ActualPageContent Effect 3] Error during handleAddSelected call:", err); } })();
+                } else { logger.log("[ActualPageContent Effect 3] Skipping handleAddSelected (empty selection)."); }
+            } else { logger.warn("[ActualPageContent Effect 3] handleAddSelected not found or fetcherRef null."); }
 
-            // Scroll to kwork input
             const kworkElement = document.getElementById('kwork-input-section');
-            if (kworkElement) {
-                 setTimeout(() => {
-                     try {
-                         kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                         logger.log("[ActualPageContent Effect 2] Scrolled to kwork.");
-                     } catch (scrollError) {
-                         logger.error("[ActualPageContent Effect 2] Error scrolling to kwork:", scrollError);
-                     }
-                 }, 250);
-             }
-             setInitialIdeaProcessed(true); // Mark as processed after attempting population
+            if (kworkElement) { setTimeout(() => { try { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); logger.log("[ActualPageContent Effect 3] Scrolled to kwork."); } catch (scrollError) { logger.error("[ActualPageContent Effect 3] Error scrolling to kwork:", scrollError); } }, 250); }
+             setInitialIdeaProcessed(true); // Mark as processed
         } else if (fetchAttemptFinished && !initialIdeaProcessed) {
-            // No pending idea or kworkInputRef not ready, mark as processed
-            setInitialIdeaProcessed(true);
-            logger.log(`[ActualPageContent Effect 2] Fetch finished (${fetchStatus}), no pending idea or kworkInputRef not ready.`);
+             setInitialIdeaProcessed(true);
+             logger.log(`[ActualPageContent Effect 3] Fetch finished (${fetchStatus}), no pending idea or kworkInputRef not ready.`);
         }
-    }, [
-        isMounted, fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask,
-        kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles,
-        selectedFetcherFiles // Add all dependencies used inside
-    ]);
+    }, [ isMounted, fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles ]); // Ensure all dependencies are listed
 
 
-    const t = translations[lang];
-    const userName = user?.first_name || (lang === 'ru' ? 'Нео' : 'Neo');
+    // --- Callbacks ---
+    const memoizedGetPlainText = useCallback(getPlainText, [logger]); // Memoize the stable function reference
 
-    // REVISED: getPlainText helper with improved safety
-    const getPlainText = useCallback((htmlString: string | null | undefined): string => {
-       if (typeof htmlString !== 'string' || !htmlString) {
-           return ''; // Return empty string for non-string or empty input
-       }
-       try {
-           // Remove FontAwesome tags more reliably
-           const withoutIcons = htmlString.replace(/<Fa[A-Z][a-zA-Z0-9]+(?:\s+[^>]*?)?\s*\/?>/g, '');
-           // Strip remaining HTML tags
-           const plainText = withoutIcons.replace(/<[^>]*>/g, '');
-           // Decode HTML entities like &nbsp;
-           const tempElement = document.createElement('div');
-           tempElement.innerHTML = plainText;
-           return tempElement.textContent || tempElement.innerText || '';
-       } catch (e) {
-           logger.error("Error stripping HTML for title:", e, "Input:", htmlString);
-           // Fallback to original string if error occurs (less ideal but safe)
-           return htmlString;
-       }
-    }, [logger]); // Include logger in dependencies if used
-
-    const scrollToSectionNav = (id: string) => {
+    const scrollToSectionNav = useCallback((id: string) => {
+        // ... (scroll logic using logger - unchanged) ...
         const sectionsRequiringReveal = ['extractor', 'executor', 'cybervibe-section', 'philosophy-steps'];
         const targetElement = document.getElementById(id);
 
         if (sectionsRequiringReveal.includes(id) && !showComponents) {
             logger.log(`[Scroll] Revealing components for "${id}"`);
             setShowComponents(true);
-            // Use requestAnimationFrame to ensure the element is rendered after state update
             requestAnimationFrame(() => {
                 const revealedElement = document.getElementById(id);
                 if (revealedElement) {
                      try {
-                         const offsetTop = window.scrollY + revealedElement.getBoundingClientRect().top - 80; // 80px offset for header
+                         const offsetTop = window.scrollY + revealedElement.getBoundingClientRect().top - 80;
                          window.scrollTo({ top: offsetTop, behavior: 'smooth' });
                          logger.log(`[Scroll] Scrolled to revealed "${id}"`);
                      } catch (scrollError) {
                          logger.error(`[Scroll] Error scrolling to revealed "${id}":`, scrollError);
                      }
-                } else {
-                    logger.error(`[Scroll] Target "${id}" not found after reveal attempt.`);
-                }
+                } else { logger.error(`[Scroll] Target "${id}" not found after reveal attempt.`); }
             });
         } else if (targetElement) {
-            try {
-                const offsetTop = window.scrollY + targetElement.getBoundingClientRect().top - 80; // 80px offset for header
-                window.scrollTo({ top: offsetTop, behavior: 'smooth' });
-                logger.log(`[Scroll] Scrolled to "${id}"`);
-            } catch (scrollError) {
-                 logger.error(`[Scroll] Error scrolling to "${id}":`, scrollError);
-            }
-        } else {
-             logger.error(`[Scroll] Target element with id "${id}" not found.`);
-        }
-    };
+             try {
+                 const offsetTop = window.scrollY + targetElement.getBoundingClientRect().top - 80;
+                 window.scrollTo({ top: offsetTop, behavior: 'smooth' });
+                 logger.log(`[Scroll] Scrolled to "${id}"`);
+             } catch (scrollError) { logger.error(`[Scroll] Error scrolling to "${id}":`, scrollError); }
+        } else { logger.error(`[Scroll] Target element with id "${id}" not found.`); }
+    }, [showComponents, logger]); // Include showComponents dependency
 
-
-    if (!isMounted) {
+    // --- Loading / Initial State ---
+     if (!isMounted || !t) { // Check if translations object 't' is loaded
          const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
-         const loadingText = translations[loadingLang]?.loading ?? translations.en.loading; // Fallback to English
+         const loadingText = translations[loadingLang]?.loading ?? translations.en.loading;
          return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
      }
 
-    // --- Pre-calculate nav titles safely ---
-    const navTitleIntro = getPlainText(t?.navIntro);
-    const navTitleVibeLoop = getPlainText(t?.navCyberVibe);
-    const navTitleGrabber = getPlainText(t?.navGrabber);
-    const navTitleAssistant = getPlainText(t?.navAssistant);
+    // --- Derived State & Safe Render ---
+    const userName = user?.first_name || (lang === 'ru' ? 'Нео' : 'Neo');
+    const navTitleIntro = memoizedGetPlainText(t.navIntro);
+    const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe);
+    const navTitleGrabber = memoizedGetPlainText(t.navGrabber);
+    const navTitleAssistant = memoizedGetPlainText(t.navAssistant);
 
-    // --- RenderContent safely ---
-    const renderSafeContent = (contentKey: keyof typeof t) => {
+    // Safe render function
+    const renderSafeContent = (contentKey: keyof TranslationSet) => {
         const content = t?.[contentKey];
-        return content ? <RenderContent content={content} /> : null;
+        return content ? <RenderContent content={content} /> : `[${contentKey}]`; // Fallback text
     };
 
 
     return (
         <>
-            {/* Ensure viewport meta is correct and scalable for accessibility if needed, current setup restricts scaling */}
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <div className="min-h-screen bg-gray-950 p-4 sm:p-6 pt-24 text-white flex flex-col items-center relative overflow-y-auto">
 
@@ -490,9 +447,8 @@ function ActualPageContent() {
                 {/* Your Vibe Path Section - NEW PHILOSOPHY */}
                 <section id="philosophy-steps" className="mb-12 w-full max-w-3xl">
                     <details className="bg-gray-900/80 border border-gray-700 rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50">
-                        <summary className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-gray-800/50 rounded-t-lg transition-colors group"> {/* Added group class */}
+                        <summary className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-gray-800/50 rounded-t-lg transition-colors group">
                             <span className="flex items-center gap-2"><FaCodeBranch /> {renderSafeContent('philosophyTitle')}</span>
-                             {/* Use group-open utility */}
                             <span className="text-xs text-gray-500 group-open:rotate-180 transition-transform duration-300">▼</span>
                         </summary>
                         <div className="px-6 pt-2 text-gray-300 space-y-4 text-base prose prose-invert prose-p:my-2 prose-li:my-1 prose-strong:text-yellow-300 prose-em:text-cyan-300 prose-a:text-brand-blue max-w-none">
@@ -554,7 +510,6 @@ function ActualPageContent() {
                          <section id="extractor" className="mb-12 w-full max-w-4xl">
                              <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg backdrop-blur-sm">
                                  <CardContent className="p-4">
-                                     {/* Ensure ref is passed correctly */}
                                      <RepoTxtFetcher ref={fetcherRef} />
                                  </CardContent>
                              </Card>
@@ -562,7 +517,6 @@ function ActualPageContent() {
                         <section id="executor" className="mb-12 w-full max-w-4xl pb-16">
                              <Card className="bg-gray-900/80 border border-purple-700/50 shadow-lg backdrop-blur-sm">
                                  <CardContent className="p-4">
-                                     {/* Ensure refs are passed correctly */}
                                      <AICodeAssistant
                                          ref={assistantRef}
                                          kworkInputRefPassed={kworkInputRef}

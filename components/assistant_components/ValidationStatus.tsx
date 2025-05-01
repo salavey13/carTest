@@ -3,7 +3,7 @@
 import React from 'react';
 // REMOVED Tooltip Imports
 import { ValidationStatus, ValidationIssue } from '../../hooks/useCodeParsingAndValidation'; // Adjust path
-import { FaRotate, FaCircleCheck, FaCircleExclamation, FaBroom, FaClipboardQuestion, FaTriangleExclamation } from 'react-icons/fa6'; // Added FaTriangleExclamation explicitly
+import { FaRotate, FaCircleCheck, FaBroom, FaClipboardQuestion, FaTriangleExclamation } from 'react-icons/fa6'; // Changed from FaCircleExclamation
 
 interface ValidationStatusProps {
     status: ValidationStatus;

@@ -88,12 +88,12 @@ const DevErrorOverlay: React.FC = () => {
       // --- Safely prepare GitHub issue link & copy text ---
       const prepareIssueAndCopyData = () => {
           try {
-             const safeErrorInfo = errorInfo ?? { message: 'Unknown error', type: 'unknown' };
+             const safeErrorInfo = errorInfo ?? { message: 'Unknown error', type: 'unknown' }; // Fallback
              const errorType = safeErrorInfo.type?.toUpperCase() || 'UNKNOWN';
              const message = safeErrorInfo.message || 'Нет сообщения';
-             const shortStack = getShortStackTrace(safeErrorInfo.error);
+             const shortStack = getShortStackTrace(safeErrorInfo.error); // Execute safely
              const source = safeErrorInfo.source ? ` (${safeErrorInfo.source}:${safeErrorInfo.lineno ?? '?'})` : '';
-             const repoName = 'carTest'; // <<< UPDATED REPO NAME
+             const repoName = 'carTest'; // <<< CORRECT REPO NAME
 
              // Creative Russian Title
              const issueTitleOptions = [
@@ -101,6 +101,7 @@ const DevErrorOverlay: React.FC = () => {
                  `Баг в Коде: ${errorType} ${message.substring(0, 35)}...`,
                  `Аномалия: ${message.substring(0, 45)}...`,
                  `Нужна Помощь: ${errorType} (${source || 'N/A'})`,
+                 `Глитч! ${errorType}: ${source || 'N/A'}`,
              ];
              const issueTitle = encodeURIComponent(issueTitleOptions[Math.floor(Math.random() * issueTitleOptions.length)]);
 
@@ -145,6 +146,7 @@ ${shortStack}
       };
 
       // --- Safely render parts ---
+      // Each section wrapped in its own try-catch for maximum resilience
       const RenderSection: React.FC<{ title: string; children: () => React.ReactNode }> = ({ title, children }) => {
           try {
               return <>{children()}</>;
@@ -162,7 +164,8 @@ ${shortStack}
           aria-labelledby="error-overlay-title"
           aria-describedby="error-overlay-description"
         >
-          <div className="bg-gradient-to-br from-gray-900 via-indigo-950 to-black border border-cyan-500/30 rounded-lg shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] flex flex-col text-gray-200 glitch-border-animate"> {/* Cyberpunk style */}
+          {/* Cyberpunk style container */}
+          <div className="bg-gradient-to-br from-gray-900 via-indigo-950 to-black border border-cyan-500/30 rounded-lg shadow-2xl p-6 max-w-2xl w-full max-h-[90vh] flex flex-col text-gray-200 glitch-border-animate">
 
             {/* Header */}
              <RenderSection title="Header">
