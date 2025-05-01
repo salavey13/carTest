@@ -56,21 +56,21 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
         assistantRef, updateRepoUrlInAssistant,
         getKworkInputValue, updateKworkInput
     } = useRepoXmlPageContext();
-    addToast("[DEBUG] RepoTxtFetcher Function Start", 'info', 1000);
+    // logger.log("[DEBUG] RepoTxtFetcher Function Start"); // Use logger instead of toast
     // === VIBE CHECK END ===
 
     // === Basic Component State ===
-    addToast("[DEBUG] Before RepoTxtFetcher useState", 'info', 1000);
+    // logger.log("[DEBUG] Before RepoTxtFetcher useState"); // Use logger
     const [isMounted, setIsMounted] = useState(false);
     const [token, setToken] = useState<string>("");
-    addToast("[DEBUG] After RepoTxtFetcher useState", 'info', 1000);
+    // logger.log("[DEBUG] After RepoTxtFetcher useState"); // Use logger
 
     // === Context (already destructured above) ===
     const repoUrl = repoUrlFromContext;
     const handleRepoUrlChange = setRepoUrlInContext;
 
     // === URL Params & Derived State ===
-    addToast("[DEBUG] Before RepoTxtFetcher URL Params/Memo", 'info', 1000);
+    // logger.log("[DEBUG] Before RepoTxtFetcher URL Params/Memo"); // Use logger
     const searchParams = useSearchParams();
     const highlightedPathFromUrl = useMemo(() => searchParams.get("path") || "", [searchParams]);
     const ideaFromUrl = useMemo(() => {
@@ -84,10 +84,10 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
         "components/repo/prompt.ts", "hooks/supabase.ts", "app/actions.ts", "app/actions_github/actions.ts",
         "app/webhook-handlers/proxy.ts", "package.json", "tailwind.config.ts",
     ], []);
-    addToast("[DEBUG] After RepoTxtFetcher URL Params/Memo", 'info', 1000);
+    // logger.log("[DEBUG] After RepoTxtFetcher URL Params/Memo"); // Use logger
 
     // === Custom Hooks ===
-    addToast("[DEBUG] Before useRepoFetcher Hook", 'info', 1000);
+    // logger.log("[DEBUG] Before useRepoFetcher Hook"); // Use logger
     const {
         files: fetchedFiles,
         progress,
@@ -103,9 +103,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
         repoUrlEntered, assistantLoading, isParsing, aiActionLoading,
         loadingPrs, // Pass loadingPrs here
     });
-    addToast("[DEBUG] After useRepoFetcher Hook", 'info', 1000);
+    // logger.log("[DEBUG] After useRepoFetcher Hook"); // Use logger
 
-    addToast("[DEBUG] Before useFileSelection Hook", 'info', 1000);
+    // logger.log("[DEBUG] Before useFileSelection Hook"); // Use logger
     const {
         toggleFileSelection,
         selectHighlightedFiles,
@@ -119,9 +119,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
         importantFiles,
         imageReplaceTaskActive: !!imageReplaceTask,
     });
-    addToast("[DEBUG] After useFileSelection Hook", 'info', 1000);
+    // logger.log("[DEBUG] After useFileSelection Hook"); // Use logger
 
-    addToast("[DEBUG] Before useKworkInput Hook", 'info', 1000);
+    // logger.log("[DEBUG] Before useKworkInput Hook"); // Use logger
     const {
         handleAddSelected,
         handleCopyToClipboard,
@@ -133,32 +133,32 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
         imageReplaceTaskActive: !!imageReplaceTask,
         files: fetchedFiles,
     });
-    addToast("[DEBUG] After useKworkInput Hook", 'info', 1000);
+    // logger.log("[DEBUG] After useKworkInput Hook"); // Use logger
 
     // === Effects ===
     useEffect(() => {
-        addToast("[DEBUG] RepoTxtFetcher Mount Effect", 'info', 1000);
+        // logger.log("[DEBUG] RepoTxtFetcher Mount Effect"); // Use logger
         setIsMounted(true);
-    }, [addToast]); // Add addToast
+    }, []); // Removed addToast dependency
 
     useEffect(() => {
-        addToast("[DEBUG] RepoTxtFetcher URL Sync Effect Running", 'info', 1000);
+        // logger.log("[DEBUG] RepoTxtFetcher URL Sync Effect Running"); // Use logger
         if (isMounted && assistantRef?.current?.updateRepoUrl) {
-             addToast(`[DEBUG] Attempting assistantRef.updateRepoUrl. Type: ${typeof assistantRef.current.updateRepoUrl}`, 'info', 1000);
+             // logger.log(`[DEBUG] Attempting assistantRef.updateRepoUrl. Type: ${typeof assistantRef.current.updateRepoUrl}`); // Use logger
              updateRepoUrlInAssistant(repoUrl);
         } else if (isMounted) {
-             addToast("[DEBUG] RepoTxtFetcher URL Sync Effect - assistantRef not ready", 'warning', 1000);
+             logger.warn("[DEBUG] RepoTxtFetcher URL Sync Effect - assistantRef not ready"); // Use logger
         }
-    }, [isMounted, repoUrl, updateRepoUrlInAssistant, assistantRef, addToast]); // Add addToast
+    }, [isMounted, repoUrl, updateRepoUrlInAssistant, assistantRef]); // Removed addToast dependency
 
     useEffect(() => {
-        addToast("[DEBUG] RepoTxtFetcher Scroll Effect Check", 'info', 1000);
+        // logger.log("[DEBUG] RepoTxtFetcher Scroll Effect Check"); // Use logger
         if (!isMounted || fetchStatus !== 'success' || !!imageReplaceTask || autoFetch) {
-             addToast("[DEBUG] RepoTxtFetcher Scroll Effect - SKIPPED", 'info', 1000);
+             // logger.log("[DEBUG] RepoTxtFetcher Scroll Effect - SKIPPED"); // Use logger
              return;
         }
         const scrollToFile = (path: string, block: ScrollLogicalPosition = "center") => {
-            addToast(`[DEBUG] scrollToFile called for ${path}. Typeof getElementById: ${typeof document?.getElementById}`, 'info', 1000);
+            // logger.log(`[DEBUG] scrollToFile called for ${path}. Typeof getElementById: ${typeof document?.getElementById}`); // Use logger
              const el = document.getElementById(`file-${path}`);
              if (el) {
                  logger.log(`Scrolling to file: ${path}`);
@@ -168,107 +168,107 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                      el.classList.remove('highlight-scroll');
                  }, 2500);
                  return () => clearTimeout(removeClassTimer);
-             } else { addToast(`[DEBUG] scrollToFile: Element not found for ${path}`, 'warning', 1000); }
+             } else { logger.warn(`[DEBUG] scrollToFile: Element not found for ${path}`); } // Use logger
              return () => {};
         };
         let cleanupScroll = () => {};
         if (primaryHighlightedPath) {
-             addToast(`[DEBUG] Scroll Effect: Found primary highlight ${primaryHighlightedPath}`, 'info', 1000);
+             // logger.log(`[DEBUG] Scroll Effect: Found primary highlight ${primaryHighlightedPath}`); // Use logger
              const timer = setTimeout(() => {
                  cleanupScroll = scrollToFile(primaryHighlightedPath);
              }, 300);
              return () => { clearTimeout(timer); cleanupScroll(); };
         } else if (fetchedFiles.length > 0) {
-             addToast("[DEBUG] Scroll Effect: No primary, scrolling to container", 'info', 1000);
+             // logger.log("[DEBUG] Scroll Effect: No primary, scrolling to container"); // Use logger
              logger.log("Scrolling to file list container");
              scrollToSection('file-list-container');
         }
-    }, [isMounted, fetchStatus, primaryHighlightedPath, imageReplaceTask, autoFetch, fetchedFiles, scrollToSection, logger, addToast]); // Add addToast
+    }, [isMounted, fetchStatus, primaryHighlightedPath, imageReplaceTask, autoFetch, fetchedFiles, scrollToSection]); // Removed logger, addToast dependencies
 
     // === Imperative Handle ===
-    addToast("[DEBUG] Before RepoTxtFetcher useImperativeHandle", 'info', 1000);
+    // logger.log("[DEBUG] Before RepoTxtFetcher useImperativeHandle"); // Use logger
     useImperativeHandle(ref, () => ({
         handleFetch: (isManualRetry?: boolean, branchNameToFetchOverride?: string | null, taskForEarlyCheck?: ImageReplaceTask | null) => {
-            addToast(`[DEBUG] Imperative handleFetch called. Type: ${typeof handleFetchManual}`, 'info', 1000);
+            // logger.log(`[DEBUG] Imperative handleFetch called. Type: ${typeof handleFetchManual}`); // Use logger
             return handleFetchManual(isManualRetry, branchNameToFetchOverride, taskForEarlyCheck || imageReplaceTask);
         },
         selectHighlightedFiles: () => {
-             addToast(`[DEBUG] Imperative selectHighlightedFiles called. Type: ${typeof selectHighlightedFiles}`, 'info', 1000);
+             // logger.log(`[DEBUG] Imperative selectHighlightedFiles called. Type: ${typeof selectHighlightedFiles}`); // Use logger
              selectHighlightedFiles();
         },
-        handleAddSelected: (filesToAdd: Set<string>, allFiles: FileNode[]) => { // Modify if Kwork hook exposes differently
-            addToast(`[DEBUG] Imperative handleAddSelected called. Type: ${typeof handleAddSelected}`, 'info', 1000);
-            // The handleAddSelected from useKworkInput doesn't take args, it uses context
+        handleAddSelected: (filesToAdd: Set<string>, allFiles: FileNode[]) => {
+            // logger.log(`[DEBUG] Imperative handleAddSelected called. Type: ${typeof handleAddSelected}`); // Use logger
             handleAddSelected(); // Call the hook's handler
             return Promise.resolve(); // Return promise to match old signature if needed
         },
         handleCopyToClipboard: (text?: string, scroll?: boolean) => {
-             addToast(`[DEBUG] Imperative handleCopyToClipboard called. Type: ${typeof handleCopyToClipboard}`, 'info', 1000);
+             // logger.log(`[DEBUG] Imperative handleCopyToClipboard called. Type: ${typeof handleCopyToClipboard}`); // Use logger
              return handleCopyToClipboard(text, scroll);
         },
         clearAll: () => {
-             addToast(`[DEBUG] Imperative clearAll called. Type: ${typeof handleClearAll}`, 'info', 1000);
+             // logger.log(`[DEBUG] Imperative clearAll called. Type: ${typeof handleClearAll}`); // Use logger
              handleClearAll();
         },
         getKworkInputValue: () => {
-             addToast(`[DEBUG] Imperative getKworkInputValue called. Type: ${typeof getKworkInputValue}`, 'info', 1000);
+             // logger.log(`[DEBUG] Imperative getKworkInputValue called. Type: ${typeof getKworkInputValue}`); // Use logger
              return getKworkInputValue();
         },
         // Add new handlers if needed by consumers
         handleAddImportantFiles: () => {
-             addToast(`[DEBUG] Imperative handleAddImportantFiles called. Type: ${typeof handleAddImportantFiles}`, 'info', 1000);
+             // logger.log(`[DEBUG] Imperative handleAddImportantFiles called. Type: ${typeof handleAddImportantFiles}`); // Use logger
              handleAddImportantFiles();
         },
         handleAddFullTree: () => {
-             addToast(`[DEBUG] Imperative handleAddFullTree called. Type: ${typeof handleAddFullTree}`, 'info', 1000);
+             // logger.log(`[DEBUG] Imperative handleAddFullTree called. Type: ${typeof handleAddFullTree}`); // Use logger
              handleAddFullTree();
         },
         selectAllFiles: () => {
-             addToast(`[DEBUG] Imperative selectAllFiles called. Type: ${typeof handleSelectAll}`, 'info', 1000);
+             // logger.log(`[DEBUG] Imperative selectAllFiles called. Type: ${typeof handleSelectAll}`); // Use logger
              handleSelectAll();
         },
         deselectAllFiles: () => {
-            addToast(`[DEBUG] Imperative deselectAllFiles called. Type: ${typeof handleDeselectAll}`, 'info', 1000);
+            // logger.log(`[DEBUG] Imperative deselectAllFiles called. Type: ${typeof handleDeselectAll}`); // Use logger
             handleDeselectAll();
         },
 
     }), [
         handleFetchManual, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll,
-        getKworkInputValue, imageReplaceTask, handleAddImportantFiles, handleAddFullTree, handleSelectAll, handleDeselectAll, addToast // Add addToast
+        getKworkInputValue, imageReplaceTask, handleAddImportantFiles, handleAddFullTree, handleSelectAll, handleDeselectAll
+        // Removed addToast dependency
     ]);
-    addToast("[DEBUG] After RepoTxtFetcher useImperativeHandle", 'info', 1000);
+    // logger.log("[DEBUG] After RepoTxtFetcher useImperativeHandle"); // Use logger
 
     // --- Local Event Handlers (defined using useCallback) ---
      const handleManualBranchChange = useCallback((branch: string) => {
-          addToast(`[DEBUG] handleManualBranchChange called. Branch: ${branch}. Type setManualBranchName: ${typeof setManualBranchName}`, 'info', 1000);
+          // logger.log(`[DEBUG] handleManualBranchChange called. Branch: ${branch}. Type setManualBranchName: ${typeof setManualBranchName}`); // Use logger
           setManualBranchName(branch);
           if (targetBranchName) {
-            addToast(`[DEBUG] Clearing targetBranchName. Type setTargetBranchName: ${typeof setTargetBranchName}`, 'info', 1000);
+            // logger.log(`[DEBUG] Clearing targetBranchName. Type setTargetBranchName: ${typeof setTargetBranchName}`); // Use logger
             setTargetBranchName(null);
           }
-     }, [setManualBranchName, targetBranchName, setTargetBranchName, addToast]); // Add addToast
+     }, [setManualBranchName, targetBranchName, setTargetBranchName]); // Removed addToast dependency
 
       const handleSelectPrBranch = useCallback((branch: string | null) => {
-          addToast(`[DEBUG] handleSelectPrBranch called. Branch: ${branch}. Type setTargetBranchName: ${typeof setTargetBranchName}`, 'info', 1000);
+          // logger.log(`[DEBUG] handleSelectPrBranch called. Branch: ${branch}. Type setTargetBranchName: ${typeof setTargetBranchName}`); // Use logger
           setTargetBranchName(branch);
           if (branch) {
-              addToast(`[DEBUG] Clearing manualBranchName. Type setManualBranchName: ${typeof setManualBranchName}`, 'info', 1000);
+              // logger.log(`[DEBUG] Clearing manualBranchName. Type setManualBranchName: ${typeof setManualBranchName}`); // Use logger
               setManualBranchName("");
           }
-      }, [setTargetBranchName, setManualBranchName, addToast]); // Add addToast
+      }, [setTargetBranchName, setManualBranchName]); // Removed addToast dependency
 
       const handleLoadPrs = useCallback(() => {
-          addToast(`[DEBUG] handleLoadPrs called. Type triggerGetOpenPRs: ${typeof triggerGetOpenPRs}`, 'info', 1000);
+          // logger.log(`[DEBUG] handleLoadPrs called. Type triggerGetOpenPRs: ${typeof triggerGetOpenPRs}`); // Use logger
           if (repoUrl) {
               triggerGetOpenPRs(repoUrl);
           } else {
-              addToast("Введите URL репозитория для загрузки PR.", "error");
+              addToast("Введите URL репозитория для загрузки PR.", "error"); // Keep this user-facing toast
           }
-      }, [repoUrl, triggerGetOpenPRs, addToast]); // Add addToast
+      }, [repoUrl, triggerGetOpenPRs, addToast]); // Keep addToast dependency ONLY for user feedback
 
     // === Early Return Check - MOVED HERE, AFTER ALL HOOKS ===
     if (!isMounted) {
-        addToast("[DEBUG] RepoTxtFetcher Render: Early return (!isMounted)", 'info', 1000);
+        // logger.log("[DEBUG] RepoTxtFetcher Render: Early return (!isMounted)"); // Use logger
         // Return loading state only after all hooks above have been called
         return (
             <div id="extractor-loading" className="w-full p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm text-gray-200 font-mono rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] border border-gray-700/50 min-h-[300px] flex items-center justify-center">
@@ -280,7 +280,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
     }
 
     // --- Derived States for Rendering (Calculated after isMounted check) ---
-    addToast("[DEBUG] RepoTxtFetcher Calculate Derived State", 'info', 1000);
+    // logger.log("[DEBUG] RepoTxtFetcher Calculate Derived State"); // Use logger
     const currentImageTask = imageReplaceTask;
     const showProgressBar = fetchStatus !== 'idle';
     const isActionDisabled = isFetchLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing || !!currentImageTask;
@@ -293,7 +293,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
 
 
     // --- FINAL RENDER of the actual component ---
-    addToast("[DEBUG] RepoTxtFetcher Render: Returning JSX", 'info', 1000);
+    // logger.log("[DEBUG] RepoTxtFetcher Render: Returning JSX"); // Use logger
     return (
       <div id="extractor" className="w-full p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm text-gray-200 font-mono rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] border border-gray-700/50 relative overflow-hidden">
          {/* Header and Settings Toggle Button */}
@@ -323,7 +323,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
               </div>
               {/* Settings Toggle Button */}
               <motion.button
-                  onClick={() => { addToast("[DEBUG] Settings Toggle Clicked", 'info', 1000); triggerToggleSettingsModal(); }}
+                  onClick={() => { logger.log("[DEBUG] Settings Toggle Clicked"); triggerToggleSettingsModal(); }}
                   disabled={isFetchLoading || assistantLoading || isParsing}
                   whileHover={{ scale: (isFetchLoading || assistantLoading || isParsing) ? 1 : 1.1, rotate: isSettingsModalOpen ? 10 : -10 }}
                   whileTap={{ scale: (isFetchLoading || assistantLoading || isParsing) ? 1 : 0.95 }}
@@ -337,7 +337,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
           </div>
 
          {/* Settings Modal */}
-         {React.useMemo(() => { addToast("[DEBUG] Rendering SettingsModal", 'info', 1000); return null; }, [addToast])}
+         {/* Removed debug toast for rendering */}
          <SettingsModal
               isOpen={isSettingsModalOpen}
               repoUrl={repoUrl}
@@ -358,7 +358,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
          {/* Fetch Button */}
          <div className="mb-4 flex justify-center">
               <motion.button
-                  onClick={() => { addToast("[DEBUG] Fetch Button Clicked", 'info', 1000); handleFetchManual(fetchStatus === 'failed_retries' || fetchStatus === 'error', null, currentImageTask); }}
+                  onClick={() => { logger.log("[DEBUG] Fetch Button Clicked"); handleFetchManual(fetchStatus === 'failed_retries' || fetchStatus === 'error', null, currentImageTask); }}
                   disabled={isFetchDisabled}
                   className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-white bg-gradient-to-r ${fetchStatus === 'failed_retries' || fetchStatus === 'error' ? 'from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600' : 'from-purple-600 to-cyan-500'} transition-all shadow-lg shadow-purple-500/30 hover:shadow-cyan-500/40 ${isFetchDisabled ? "opacity-60 cursor-not-allowed" : "hover:brightness-110 active:scale-[0.98]"}`}
                   whileHover={{ scale: isFetchDisabled ? 1 : 1.03 }}
@@ -374,7 +374,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
          {/* Progress Bar and Status Messages */}
          {showProgressBar && (
               <div className="mb-4 min-h-[40px]">
-                  {React.useMemo(() => { addToast("[DEBUG] Rendering ProgressBar", 'info', 1000); return null; }, [addToast])}
+                  {/* Removed debug toast for rendering */}
                   <ProgressBar status={fetchStatus === 'failed_retries' ? 'error' : fetchStatus} progress={progress} />
                   {isFetchLoading && <p className="text-cyan-300 text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? '(Повтор)' : ''}</p>}
                   {isParsing && !currentImageTask && <p className="text-yellow-400 text-xs font-mono mt-1 text-center animate-pulse">Разбор ответа AI...</p>}
@@ -411,13 +411,13 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
              {/* --- Column 1: File List & Preview (Standard Mode) --- */}
              {!currentImageTask && (isFetchLoading || fetchedFiles.length > 0) && (
                  <div className={`flex flex-col gap-4 ${ (fetchedFiles.length > 0 || kworkInputHasContent) ? '' : 'md:col-span-2'}`}>
-                     {React.useMemo(() => { addToast("[DEBUG] Rendering SelectedFilesPreview", 'info', 1000); return null; }, [addToast])}
+                     {/* Removed debug toast for rendering */}
                      <SelectedFilesPreview
                          selectedFiles={selectedFetcherFiles}
                          allFiles={fetchedFiles} // Use local fetchedFiles for preview
                          getLanguage={repoUtils.getLanguage}
                      />
-                     {React.useMemo(() => { addToast("[DEBUG] Rendering FileList", 'info', 1000); return null; }, [addToast])}
+                     {/* Removed debug toast for rendering */}
                      <FileList
                          id="file-list-container"
                          files={fetchedFiles} // Use local fetchedFiles
@@ -441,12 +441,12 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
              {/* --- Column 2: Kwork Input (Standard Mode) --- */}
              {!currentImageTask && (fetchedFiles.length > 0 || kworkInputHasContent) && (
                   <div id="kwork-input-section" className="flex flex-col gap-3">
-                      {React.useMemo(() => { addToast("[DEBUG] Rendering RequestInput", 'info', 1000); return null; }, [addToast])}
+                      {/* Removed debug toast for rendering */}
                       <RequestInput
                           kworkInputRef={kworkInputRef}
-                          onCopyToClipboard={() => { addToast("[DEBUG] RequestInput Copy Click", 'info', 1000); handleCopyToClipboard(undefined, true); }}
-                          onClearAll={() => { addToast("[DEBUG] RequestInput Clear Click", 'info', 1000); handleClearAll(); }}
-                          onAddSelected={() => { addToast("[DEBUG] RequestInput AddSelected Click", 'info', 1000); handleAddSelected(); }}
+                          onCopyToClipboard={() => { logger.log("[DEBUG] RequestInput Copy Click"); handleCopyToClipboard(undefined, true); }}
+                          onClearAll={() => { logger.log("[DEBUG] RequestInput Clear Click"); handleClearAll(); }}
+                          onAddSelected={() => { logger.log("[DEBUG] RequestInput AddSelected Click"); handleAddSelected(); }}
                           isCopyDisabled={isCopyDisabled}
                           isClearDisabled={isClearDisabled}
                           isAddSelectedDisabled={isAddSelectedDisabled}
@@ -459,7 +459,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
              {/* --- Status Display (Image Task Mode) --- */}
              {currentImageTask && filesFetched && (
                   <div className={`md:col-span-1 flex flex-col items-center justify-center text-center p-4 bg-gray-700/30 rounded-lg border border-dashed ${imageTaskTargetFileReady ? 'border-blue-400' : (fetchStatus === 'error' || fetchStatus === 'failed_retries') ? 'border-red-500' : 'border-gray-600'} min-h-[200px]`}>
-                       {React.useMemo(() => { addToast("[DEBUG] Rendering Image Task Status Display", 'info', 1000); return null; }, [addToast])}
+                       {/* Removed debug toast for rendering */}
                       {isFetchLoading ? <FaSpinner className="text-blue-400 text-3xl mb-3 animate-spin" />
                        : assistantLoading ? <FaSpinner className="text-purple-400 text-3xl mb-3 animate-spin" />
                        : imageTaskTargetFileReady ? <FaCircleCheck className="text-green-400 text-3xl mb-3" />

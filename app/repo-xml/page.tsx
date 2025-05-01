@@ -134,7 +134,7 @@ const parserOptions: HTMLReactParserOptions = {
       try {
           const iconCompFn = FaIcons[name as keyof typeof FaIcons];
           const isFunction = typeof iconCompFn === 'function';
-          logger.log(`[DEBUG][parserOptions] Check FaIcon <${name}>. Exists: ${isFunction}. Type: ${typeof iconCompFn}`);
+          // logger.log(`[DEBUG][parserOptions] Check FaIcon <${name}>. Exists: ${isFunction}. Type: ${typeof iconCompFn}`); // Removed DEBUG log
 
           if (!isFunction) {
               logger.error(`[parserOptions] FaIcon <${name}> is not a function!`);
@@ -213,9 +213,7 @@ const getPlainText = (htmlString: string | null | undefined): string => {
 
 // --- ActualPageContent Component (Reduced Toasts) ---
 function ActualPageContent() {
-    const { addToast } = useRepoXmlPageContext();
-    // Toast at the very start
-    // addToast("[DEBUG] ActualPageContent Function Start", 'info', 1000); // Optional: Can be restored if needed
+    // const { addToast } = useRepoXmlPageContext(); // Removed unused addToast
 
     const { user } = useAppContext();
     const {
@@ -235,7 +233,7 @@ function ActualPageContent() {
 
     // --- Effects ---
     useEffect(() => {
-      // addToast("[DEBUG] ActualPageContent Mount Effect Running", 'info', 1000); // Optional
+      // logger.log("[DEBUG] ActualPageContent Mount Effect Running"); // Use logger instead of toast
       setIsMounted(true);
       const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
       const userLang = user?.language_code;
@@ -246,7 +244,7 @@ function ActualPageContent() {
     }, [user]);
 
     useEffect(() => {
-      // addToast("[DEBUG] ActualPageContent URL Effect Check", 'info', 1000); // Optional
+      // logger.log("[DEBUG] ActualPageContent URL Effect Check"); // Use logger
       if (!isMounted) return;
 
       console.log(
@@ -320,24 +318,24 @@ function ActualPageContent() {
             if (decodedPath || decodedIdea) {
                 // Automatically show components if URL params present relevant info
                 setShowComponents(true);
-                addToast("[DEBUG] setShowComponents(true) due to URL params", 'info', 1000);
+                logger.log("[DEBUG] setShowComponents(true) due to URL params"); // Use logger
             }
         } else {
             logger.log(`[ActualPageContent Effect 2] No valid path/idea params found.`);
             setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
         }
-        // addToast("[DEBUG] URL Effect Finish", 'info', 1000); // Optional
-    }, [isMounted, searchParams, setImageReplaceTask, setRepoUrl, addToast]); // addToast added
+        // logger.log("[DEBUG] URL Effect Finish"); // Use logger
+    }, [isMounted, searchParams, setImageReplaceTask, setRepoUrl]);
 
 
      useEffect(() => {
-        // addToast("[DEBUG] Kwork Populate Effect Check", 'info', 1000); // Optional
+        // logger.log("[DEBUG] Kwork Populate Effect Check"); // Use logger
         if (!isMounted) return;
 
         const fetchAttemptFinished = ['success', 'error', 'failed_retries'].includes(fetchStatus);
 
         if (fetchAttemptFinished && initialIdea && !initialIdeaProcessed && !imageReplaceTask && kworkInputRef.current) {
-            // addToast("[DEBUG] Kwork Populate Conditions MET", 'info', 1000); // Optional
+            // logger.log("[DEBUG] Kwork Populate Conditions MET"); // Use logger
             logger.log(`[ActualPageContent Effect 3] Fetch finished (${fetchStatus}). Populating kwork...`);
             kworkInputRef.current.value = initialIdea;
             try { const inputEvent = new Event('input', { bubbles: true }); kworkInputRef.current.dispatchEvent(inputEvent); }
@@ -357,7 +355,7 @@ function ActualPageContent() {
             const kworkElement = document.getElementById('kwork-input-section');
             if (kworkElement) { setTimeout(() => { try { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); logger.log("[ActualPageContent Effect 3] Scrolled to kwork."); } catch (scrollError) { logger.error("[ActualPageContent Effect 3] Error scrolling to kwork:", scrollError); } }, 250); }
              setInitialIdeaProcessed(true);
-             // addToast("[DEBUG] Kwork Populate Finished, idea processed", 'info', 1000); // Optional
+             // logger.log("[DEBUG] Kwork Populate Finished, idea processed"); // Use logger
         } else if (fetchAttemptFinished && !initialIdeaProcessed) {
              setInitialIdeaProcessed(true);
              logger.log(`[ActualPageContent Effect 3] Fetch finished (${fetchStatus}), no pending idea or kworkInputRef not ready.`);
@@ -366,10 +364,10 @@ function ActualPageContent() {
 
 
     // --- Callbacks ---
-    const memoizedGetPlainText = useCallback(getPlainText, [logger]);
+    const memoizedGetPlainText = useCallback(getPlainText, []); // Removed logger dependency
 
     const scrollToSectionNav = useCallback((id: string) => {
-        // addToast(`[DEBUG] scrollToSectionNav called for ${id}`, 'info', 1000); // Optional
+        // logger.log(`[DEBUG] scrollToSectionNav called for ${id}`); // Use logger
         const sectionsRequiringReveal = ['extractor', 'executor', 'cybervibe-section', 'philosophy-steps'];
         const targetElement = document.getElementById(id);
 
@@ -395,12 +393,12 @@ function ActualPageContent() {
                  logger.log(`[Scroll] Scrolled to "${id}"`);
              } catch (scrollError) { logger.error(`[Scroll] Error scrolling to "${id}":`, scrollError); }
         } else { logger.error(`[Scroll] Target element with id "${id}" not found.`); }
-    }, [showComponents, logger]); // Removed addToast from deps
+    }, [showComponents]); // Removed logger dependency
 
     const handleShowComponents = () => {
-        addToast("[DEBUG] Reveal Button Clicked. Before setShowComponents.", 'info', 1000);
+        logger.log("[DEBUG] Reveal Button Clicked. Before setShowComponents."); // Use logger
         setShowComponents(true);
-        addToast("[DEBUG] showComponents set to true by button click.", 'info', 1000);
+        logger.log("[DEBUG] showComponents set to true by button click."); // Use logger
     };
 
     // --- Loading / Initial State ---
@@ -412,7 +410,7 @@ function ActualPageContent() {
      }
 
     // --- Derived State & Safe Render ---
-    // addToast("[DEBUG] ActualPageContent Render: Main Content Calc", 'info', 1000); // Optional
+    // logger.log("[DEBUG] ActualPageContent Render: Main Content Calc"); // Use logger
     const userName = user?.first_name || (lang === 'ru' ? 'Нео' : 'Neo');
     const navTitleIntro = memoizedGetPlainText(t.navIntro);
     const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe);
@@ -424,7 +422,7 @@ function ActualPageContent() {
         return content ? <RenderContent content={content} /> : `[${contentKey}]`;
     };
 
-    // addToast("[DEBUG] ActualPageContent Render: Returning JSX", 'info', 1000); // Optional
+    // logger.log("[DEBUG] ActualPageContent Render: Returning JSX"); // Use logger
     return (
         <>
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -527,7 +525,7 @@ function ActualPageContent() {
                          <section id="extractor" className="mb-12 w-full max-w-4xl">
                              <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg backdrop-blur-sm">
                                  <CardContent className="p-4">
-                                     {/* RepoTxtFetcher Component - Will mount and trigger its internal toasts */}
+                                     {/* RepoTxtFetcher Component */}
                                      <RepoTxtFetcher ref={fetcherRef} />
                                  </CardContent>
                              </Card>
@@ -536,7 +534,7 @@ function ActualPageContent() {
                         <section id="executor" className="mb-12 w-full max-w-4xl pb-16">
                              <Card className="bg-gray-900/80 border border-purple-700/50 shadow-lg backdrop-blur-sm">
                                  <CardContent className="p-4">
-                                     {/* AICodeAssistant Component - Will mount and trigger its internal toasts */}
+                                     {/* AICodeAssistant Component */}
                                      <AICodeAssistant
                                          ref={assistantRef}
                                          kworkInputRefPassed={kworkInputRef}
@@ -568,7 +566,7 @@ function ActualPageContent() {
                  >
                      <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700/80 backdrop-blur-sm rounded-full hover:bg-gray-600 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-gray-200" /> </button>
                      <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-purple-700/80 backdrop-blur-sm rounded-full hover:bg-purple-600 transition shadow-md" title={navTitleVibeLoop} aria-label={navTitleVibeLoop || "Scroll to Vibe Loop"} > <FaUpLong className="text-lg text-white" /> </button>
-                     {/* Conditionally rendered nav buttons - NO useMemo toasts here */}
+                     {/* Conditionally rendered nav buttons */}
                      {showComponents && ( <>
                             <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-blue-700/80 backdrop-blur-sm rounded-full hover:bg-blue-600 transition shadow-md" title={navTitleGrabber} aria-label={navTitleGrabber || "Scroll to Grabber"} > <FaDownload className="text-lg text-white" /> </button>
                             <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-indigo-700/80 backdrop-blur-sm rounded-full hover:bg-indigo-600 transition shadow-md" title={navTitleAssistant} aria-label={navTitleAssistant || "Scroll to Assistant"} > <FaRobot className="text-lg text-white" /> </button>
