@@ -154,22 +154,22 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         setValidationStatus('idle'); setValidationIssues([]); setPrTitle(''); codeParserHook.setRawDescription('');
         setRequestCopied(false); setAiResponseHasContent(value.trim().length > 0);
         logger.log("Response value set manually, resetting parsed state.");
-     }, [aiResponseInputRefPassed, setHookParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, codeParserHook, setRequestCopied, setAiResponseHasContent, addToastDirect]);
+     }, [aiResponseInputRefPassed, setHookParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, codeParserHook, setRequestCopied, setAiResponseHasContent, addToastDirect]); // Added addToastDirect dependency
 
+    // --- ИЗМЕНЕННЫЙ updateRepoUrl ---
     const updateRepoUrl = useCallback((url: string) => {
         addToastDirect(`[DEBUG_CB] updateRepoUrl called. URL: ${url}`, 'info', 500);
         setRepoUrlStateLocal(url);
-        if (url && url.includes("github.com")) {
-            addToastDirect(`[DEBUG_CB] updateRepoUrl triggering PRs.`, 'info', 500);
-            triggerGetOpenPRs(url);
-        }
-     }, [triggerGetOpenPRs, addToastDirect]);
+        // НЕ вызываем triggerGetOpenPRs здесь автоматически
+        // logger.log("[AICodeAssistant] updateRepoUrl - PR refresh trigger removed from here."); // Убираем логгер тоже, если он не нужен
+     }, [addToastDirect]); // Зависимость только от addToastDirect
+    // --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
     const handleResetImageError = useCallback(() => {
          addToastDirect(`[DEBUG_CB] handleResetImageError called.`, 'info', 500);
          setImageReplaceError(null);
          toastInfo("Состояние ошибки сброшено.");
-     }, [setImageReplaceError, toastInfo, addToastDirect]);
+     }, [setImageReplaceError, toastInfo, addToastDirect]); // Added addToastDirect dependency
     addToastDirect("[DEBUG_RENDER] AICodeAssistant After useCallback", 'info', 500);
 
 
@@ -187,11 +187,20 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     addToastDirect("[DEBUG_RENDER] AICodeAssistant Before useEffects", 'info', 500);
     useEffect(() => {
         addToastDirect("[DEBUG_EFFECT] AICodeAssistant Mounted", 'info', 500);
-    }, [addToastDirect]);
+        // --- ОПЦИОНАЛЬНО: Загрузка PR при монтировании, если URL уже есть ---
+        const initialRepoUrl = repoUrlStateLocal || repoUrlFromContext;
+        if (initialRepoUrl && initialRepoUrl.includes("github.com")) {
+            addToastDirect(`[DEBUG_EFFECT] AICodeAssistant Initial Mount - Triggering PRs for ${initialRepoUrl}`, 'info', 500);
+            triggerGetOpenPRs(initialRepoUrl);
+        } else {
+            addToastDirect(`[DEBUG_EFFECT] AICodeAssistant Initial Mount - Skipping PRs (no valid URL)`, 'info', 500);
+        }
+        // --- КОНЕЦ ОПЦИОНАЛЬНОГО БЛОКА ---
+    }, [addToastDirect, triggerGetOpenPRs, repoUrlStateLocal, repoUrlFromContext]); // Добавили зависимости для initialRepoUrl
 
     useEffect(() => { addToastDirect(`[DEBUG_EFFECT] Files Parsed: ${componentParsedFiles.length > 0}`, 'info', 500); setFilesParsed(componentParsedFiles.length > 0); }, [componentParsedFiles, setFilesParsed, addToastDirect]);
 
-    useEffect(() => { addToastDirect(`[DEBUG_EFFECT] URL Sync: ${repoUrlFromContext}`, 'info', 500); if (repoUrlFromContext && !repoUrlStateLocal) { setRepoUrlStateLocal(repoUrlFromContext); } }, [repoUrlFromContext, repoUrlStateLocal, addToastDirect]);
+    useEffect(() => { addToastDirect(`[DEBUG_EFFECT] URL Sync: ${repoUrlFromContext}`, 'info', 500); if (repoUrlFromContext && !repoUrlStateLocal) { updateRepoUrl(repoUrlFromContext); } }, [repoUrlFromContext, repoUrlStateLocal, updateRepoUrl, addToastDirect]); // Используем updateRepoUrl
 
     useEffect(() => {
         addToastDirect("[DEBUG_EFFECT] State Reset Check START", 'info', 500);
