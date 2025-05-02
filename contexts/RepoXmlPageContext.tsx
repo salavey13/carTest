@@ -1,7 +1,7 @@
 "use client";
 
 import React, {
-  createContext, useContext, useState, useEffect, useCallback, useMemo,
+  createContext, useContext, useState, useEffect, useCallback, useMemo, // <-- ADDED useCallback HERE
   useRef, MutableRefObject, ReactNode
 } from 'react';
 import { useAppToast } from '@/hooks/useAppToast';
@@ -141,11 +141,11 @@ const defaultContextValue: Partial<RepoXmlPageContextType> = {
 };
 
 // --- Context Creation ---
-const RepoXmlPageContext = createContext<RepoXmlPageContextType>(defaultContextValue as RepoXmlPageContextType); // Cast default for creation
+const RepoXmlPageContext = createContext<RepoXmlPageContextType>(defaultContextValue as RepoXmlPageContextType);
 
 // --- Context Provider Component ---
 export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ children }) => {
-    logger.log("[RepoXmlPageProvider] Initializing..."); // Log initialization start
+    logger.log("[RepoXmlPageProvider] Initializing...");
 
     // --- State Initialization ---
     logger.debug("[RepoXmlPageProvider] Initializing State...");
@@ -182,14 +182,12 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
     logger.debug("[RepoXmlPageProvider] Refs initialized.");
 
     // --- Hooks ---
-    // Wrap potentially problematic hook calls
     let appToast: ReturnType<typeof useAppToast>;
     try {
       appToast = useAppToast();
       logger.debug("[RepoXmlPageProvider] useAppToast initialized.");
     } catch (e) {
       logger.fatal("[RepoXmlPageProvider] CRITICAL ERROR initializing useAppToast:", e);
-      // Provide a dummy toast object if hook fails, to prevent further crashes
       appToast = {
         success: (m) => logger.error("Toast (success) suppressed, hook failed:", m),
         error:   (m) => logger.error("Toast (error) suppressed, hook failed:", m),
@@ -202,14 +200,13 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
       };
     }
 
-
+    // --- addToast Stable Callback ---
     const addToastStable = useCallback((
         message: string | React.ReactNode,
         type: 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message' = 'info',
         duration: number = 3000,
         options: any = {}
     ) => {
-        // Ensure appToast is valid before using
         if (!appToast || typeof appToast.message !== 'function') {
              logger.error("addToastStable cannot execute: appToast is invalid.", { message, type });
              return;
@@ -223,7 +220,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             case 'loading': appToast.loading(message, toastOptions); break;
             case 'message': default: appToast.message(message, toastOptions); break;
         }
-    }, [appToast]); // Depend on appToast instance
+    }, [appToast]);
 
     useEffect(() => {
         logger.log("[RepoXmlPageProvider] Mounted (Provider level)");
@@ -234,7 +231,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         setRepoUrlEnteredState(repoUrlState.trim().length > 0 && repoUrlState.includes("github.com"));
     }, [repoUrlState]);
 
-    // --- Stable Setters (Callbacks remain unchanged from previous version) ---
+    // --- Stable Setters ---
     const setFetchStatusStateStable = useCallback((status: FetchStatus | ((prevState: FetchStatus) => FetchStatus)) => { logger.debug(`[Context Setter] setFetchStatus: ${typeof status === 'function' ? 'function' : status}`); setFetchStatusState(status); }, []);
     const setRepoUrlEnteredStateStable = useCallback((entered: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setRepoUrlEntered: ${typeof entered === 'function' ? 'function' : entered}`); setRepoUrlEnteredState(entered); }, []);
     const setSelectedFetcherFilesStateStable = useCallback((files: Set<string> | ((prevState: Set<string>) => Set<string>)) => { logger.debug(`[Context Setter] setSelectedFetcherFiles size: ${typeof files === 'function' ? 'function' : files.size}`); setSelectedFetcherFilesState(files); }, []);
@@ -256,10 +253,10 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
     const setRepoUrlStateStable = useCallback((url: string | ((prevState: string) => string)) => { logger.debug(`[Context Setter] setRepoUrl`); setRepoUrlState(url); }, []);
 
 
-    // --- Handlers and Triggers (Callbacks remain unchanged from previous version) ---
+    // --- Handlers and Triggers ---
     const handleSetFilesFetchedStable = useCallback(( fetched: boolean, allFiles: FileNode[], primaryHighlight: string | null, secondaryHighlights: Record<ImportCategory, string[]> ) => {
        logger.debug(`[Context] handleSetFilesFetchedStable called. fetched=${fetched}, allFiles=${allFiles?.length}, primary=${primaryHighlight}`);
-       const currentTask = imageReplaceTaskState; // Read state directly inside callback
+       const currentTask = imageReplaceTaskState;
        setFilesFetchedState(fetched);
        if (fetched) {
            logger.log(`[Context] Setting allFetchedFilesState: ${allFiles?.length} files`);
@@ -280,9 +277,9 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                    logger.error(`[Context] Image Task Error: Target file ${currentTask.targetPath} not found!`);
                    finalFetchStatus = 'error';
                    addToastStable(`Ошибка Задачи Изображения: Целевой файл ${currentTask.targetPath} не найден!`, 'error', 5000);
-                   setImageReplaceTaskStateStable(null); // Clear the task on error
-                   setFilesFetchedState(false); // Reset fetched state flag
-                   setAllFetchedFilesStateStable([]); // Clear files on error
+                   setImageReplaceTaskStateStable(null);
+                   setFilesFetchedState(false);
+                   setAllFetchedFilesStateStable([]);
                } else {
                    logger.info(`[Context] Image Task: Target file ${currentTask.targetPath} found. Triggering replacement.`);
                    finalFetchStatus = 'success';
@@ -376,8 +373,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         });
     }, [
         fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState, filesParsedState, requestCopiedState, primaryHighlightPathState, secondaryHighlightPathsState,
-        selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, allFetchedFilesState, assistantLoadingState, repoUrlEnteredState, // State dependencies
-        // Ensure all dependencies are primitive or stable references (Set size/array length might not be stable if object reference changes)
+        selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, allFetchedFilesState, assistantLoadingState, repoUrlEnteredState,
     ]);
 
     // --- Buddy Message Logic ---
@@ -424,7 +420,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
      }, [
          currentStep, manualBranchNameState, targetBranchNameState,
          imageReplaceTaskState, fetchStatusState, allFetchedFilesState, filesFetchedState, assistantLoadingState,
-         selectedFetcherFilesState, selectedAssistantFilesState, // Depend on the state values directly
+         selectedFetcherFilesState, selectedAssistantFilesState,
      ]);
 
 
@@ -503,11 +499,9 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         logger.debug("[RepoXmlPageProvider] Memoizing context value END");
         return value;
     }, [
-        // List ALL state values and stable callbacks/values returned by the context
         fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, secondaryHighlightPathsState,
         setFetchStatusStateStable, setRepoUrlEnteredStateStable, handleSetFilesFetchedStable, setSelectedFetcherFilesStateStable, setKworkInputHasContentStateStable, setRequestCopiedStateStable, setAiResponseHasContentStateStable, setFilesParsedStateStable, setSelectedAssistantFilesStateStable, setAssistantLoadingStateStable, setAiActionLoadingStateStable, setLoadingPrsStateStable, setTargetBranchNameStateStable, setManualBranchNameStateStable, setOpenPrsStateStable, setIsParsingStateStable, setCurrentAiRequestIdStateStable, setImageReplaceTaskStateStable, setRepoUrlStateStable,
         triggerToggleSettingsModal, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR, triggerUpdateBranchStable, triggerGetOpenPRsStable, updateRepoUrlInAssistantStable, getXuinityMessageStable, scrollToSectionStable, triggerAddImportantToKworkStable, triggerAddTreeToKworkStable, triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFilesStable, triggerClearKworkInputStable, addToastStable, getKworkInputValueStable, updateKworkInputStable,
-        // Refs don't need to be listed as dependencies for useMemo itself
     ]);
 
     logger.log("[RepoXmlPageProvider] Rendering Provider wrapper", { step: contextValue.currentStep });
@@ -521,8 +515,8 @@ export const useRepoXmlPageContext = (): RepoXmlPageContextType => {
          logger.fatal("useRepoXmlPageContext used outside RepoXmlPageProvider!");
          throw new Error("useRepoXmlPageContext must be used within a RepoXmlPageProvider");
     }
-    if (context.addToast === defaultContextValue.addToast) {
-        logger.warn("useRepoXmlPageContext: Context might not be fully initialized yet or is the default value.");
+    if (context.addToast === defaultContextValue.addToast && typeof context.addToast === 'function') { // Check against default FUNCTION reference
+        logger.warn("useRepoXmlPageContext: Context might be the default value (check provider setup).");
     }
     return context as RepoXmlPageContextType;
 };
