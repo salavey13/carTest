@@ -1,3 +1,4 @@
+"use client";
 import { toast as sonnerToast } from 'sonner';
 import { useErrorOverlay } from '@/contexts/ErrorOverlayContext';
 import { useAppContext } from '@/contexts/AppContext'; // <-- Импортируем useAppContext
