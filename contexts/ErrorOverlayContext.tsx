@@ -38,7 +38,8 @@ interface ErrorOverlayContextType {
 const ErrorOverlayContext = createContext<ErrorOverlayContextType | undefined>(undefined);
 
 export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  logger.log("[ErrorOverlayProvider] Initializing...");
+  // Use console.log for earliest possible log
+  console.log("[ErrorOverlayProvider] Initializing...");
   const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
   const [toastHistory, setToastHistory] = useState<ToastRecord[]>([]);
   const [logHistory, setLogHistory] = useState<LogRecord[]>([]);
@@ -48,9 +49,11 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
       console.log(`[ErrorOverlayProvider] Dev Overlay System ACTIVE.`);
   }, []);
 
-  logger.debug("[ErrorOverlayProvider] State initialized.");
+  // Use console.debug for state init end, as logger might not be set yet
+  console.debug("[ErrorOverlayProvider] State initialized.");
 
   const addToastToHistory = useCallback((record: Omit<ToastRecord, 'id'>) => {
+    // Use logger once handler is likely set
     logger.debug(`[ErrorOverlayProvider] addToastToHistory called`, record);
     setToastHistory(prevHistory => {
         const newRecord: ToastRecord = { ...record, id: Date.now() + Math.random() };
@@ -68,9 +71,9 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
    }, []);
 
   useEffect(() => {
-      logger.log('[ErrorOverlayProvider Effect] Setting logger handler.');
+      console.log('[ErrorOverlayProvider Effect] Setting logger handler.'); // Use console log
       logger.setLogHandler(addLogToHistory);
-      logger.log('[ErrorOverlayProvider Effect] Logger handler initialized and set.');
+      logger.log('[ErrorOverlayProvider Effect] Logger handler initialized and set.'); // Now use logger
       return () => {
         logger.log('[ErrorOverlayProvider Effect] Clearing logger handler.');
         logger.setLogHandler(null);
@@ -80,20 +83,23 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Глобальные слушатели ошибок (always active now)
   useEffect(() => {
-    logger.debug("[ErrorOverlayProvider Effect] Attaching global event listeners...");
+    // Use console.debug for attachment start
+    console.debug("[ErrorOverlayProvider Effect] Attaching global event listeners...");
 
     const handleError = (event: ErrorEvent) => {
-        logger.debug("[Global Event Listener] 'error' event received", event);
+        // Log immediately using console.error
+        console.error("[Global Error Listener Raw] 'error' event caught:", event);
+
         // Basic checks to prevent loops or useless reports
         if (event.message === 'Script error.' && !event.filename) {
-            logger.warn("Global 'error' event ignored: Generic 'Script error.'", { msg: event.message }); return;
+            console.warn("[Global Error Listener] Ignored: Generic 'Script error.'"); return;
         }
         const stack = event.error?.stack || '';
         if (stack.includes('DevErrorOverlay')) {
-             logger.warn("Global 'error' event ignored: Originates from DevErrorOverlay.", { msg: event.message }); return;
+             console.warn("[Global Error Listener] Ignored: Originates from DevErrorOverlay."); return;
         }
         if (stack.includes('ErrorOverlayContext')) {
-            logger.fatal("Global 'error' event ignored: Likely loop originating from ErrorOverlayContext itself.", { msg: event.message, error: event.error }); return;
+            console.error("[Global Error Listener] FATAL: Ignored: Likely loop originating from ErrorOverlayContext itself.", { msg: event.message, error: event.error }); return;
         }
 
         const errorDetails: ErrorInfo = {
@@ -105,32 +111,31 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
           type: 'error'
         };
 
-        logger.error("Global 'error' event caught. Preparing to set context:", errorDetails);
-
-        // --- ADDED try-catch around setErrorInfo ---
+        // --- Robust setErrorInfo call ---
         try {
+             // Attempt to set state AFTER logging raw error
              setErrorInfo(errorDetails);
-             logger.info("Global 'error' event context set successfully.");
+             console.info("[Global Error Listener] Context state set successfully for 'error' event.");
         } catch (contextSetError: any) {
-             logger.fatal("[ErrorOverlayContext] CRITICAL: Failed to set errorInfo state in global error handler!", contextSetError);
+             // If setErrorInfo fails, log this critical failure using console.error
              console.error("[ErrorOverlayContext] CRITICAL: Failed to set errorInfo state in global error handler!", { originalError: errorDetails, contextSetError });
-             // Attempt a basic alert as a last resort if console might be broken/ignored
-             // try { alert(`FATAL CONTEXT SETTER FAILURE (error): ${contextSetError.message}\nOriginal: ${errorDetails.message}`); } catch {}
         }
-        // -------------------------------------------
+        // ---------------------------------
     };
 
     const handleRejection = (event: PromiseRejectionEvent) => {
-        logger.debug("[Global Event Listener] 'unhandledrejection' event received", event);
+        // Log immediately using console.error
+        console.error("[Global Error Listener Raw] 'unhandledrejection' event caught:", event);
+
         const reason = event.reason;
         const stack = (reason instanceof Error) ? reason.stack : '';
 
         // Basic checks to prevent loops or useless reports
         if (stack && stack.includes('DevErrorOverlay')) {
-            logger.warn("Global 'unhandledrejection' event ignored: Originates from DevErrorOverlay.", { reason }); return;
+            console.warn("[Global Error Listener] Ignored: Rejection originates from DevErrorOverlay.", { reason }); return;
         }
         if (stack && stack.includes('ErrorOverlayContext')) {
-             logger.fatal("Global 'unhandledrejection' event ignored: Likely loop originating from ErrorOverlayContext itself.", { reason }); return;
+             console.error("[Global Error Listener] FATAL: Ignored: Rejection likely loop originating from ErrorOverlayContext itself.", { reason }); return;
         }
 
         let message = 'Unhandled promise rejection';
@@ -148,42 +153,41 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
             type: 'rejection'
         };
 
-        logger.error("Global 'unhandledrejection' event caught. Preparing to set context:", rejectionDetails);
-
-        // --- ADDED try-catch around setErrorInfo ---
+         // --- Robust setErrorInfo call ---
         try {
+             // Attempt to set state AFTER logging raw rejection
              setErrorInfo(rejectionDetails);
-             logger.info("Global 'unhandledrejection' event context set successfully.");
+             console.info("[Global Error Listener] Context state set successfully for 'unhandledrejection' event.");
         } catch (contextSetError: any) {
-             logger.fatal("[ErrorOverlayContext] CRITICAL: Failed to set errorInfo state in global rejection handler!", contextSetError);
+             // If setErrorInfo fails, log this critical failure using console.error
              console.error("[ErrorOverlayContext] CRITICAL: Failed to set errorInfo state in global rejection handler!", { originalRejection: rejectionDetails, contextSetError });
-             // try { alert(`FATAL CONTEXT SETTER FAILURE (rejection): ${contextSetError.message}\nOriginal: ${rejectionDetails.message}`); } catch {}
         }
-        // -------------------------------------------
+        // ---------------------------------
     };
 
     try {
         window.addEventListener('error', handleError);
         window.addEventListener('unhandledrejection', handleRejection);
-        logger.log("[ErrorOverlayProvider Effect] Global event listeners attached successfully.");
+        console.log("[ErrorOverlayProvider Effect] Global event listeners attached successfully."); // Use console log
     } catch (attachError) {
-        logger.fatal("[ErrorOverlayProvider Effect] FAILED TO ATTACH global event listeners:", attachError);
+        console.error("[ErrorOverlayProvider Effect] FAILED TO ATTACH global event listeners:", attachError); // Use console.error
     }
 
     return () => {
-      logger.debug("[ErrorOverlayProvider Effect Cleanup] Removing global event listeners...");
+      console.debug("[ErrorOverlayProvider Effect Cleanup] Removing global event listeners..."); // Use console.debug
       try {
         window.removeEventListener('error', handleError);
         window.removeEventListener('unhandledrejection', handleRejection);
-        logger.log("[ErrorOverlayProvider Effect Cleanup] Global event listeners removed successfully.");
+        console.log("[ErrorOverlayProvider Effect Cleanup] Global event listeners removed successfully."); // Use console.log
       } catch (removeError) {
-         logger.error("[ErrorOverlayProvider Effect Cleanup] Error removing global event listeners:", removeError);
+         console.error("[ErrorOverlayProvider Effect Cleanup] Error removing global event listeners:", removeError); // Use console.error
       }
     };
   }, []); // No dependencies, always active
 
   const contextValue = useMemo(() => {
-    logger.debug("[ErrorOverlayProvider] Memoizing context value...");
+    // Use console.debug for memoization log
+    console.debug("[ErrorOverlayProvider] Memoizing context value...");
     return {
         errorInfo, setErrorInfo, showOverlay,
         toastHistory, addToastToHistory,
@@ -191,7 +195,8 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
    }, [errorInfo, showOverlay, toastHistory, logHistory, addToastToHistory, addLogToHistory, setErrorInfo]);
 
-  logger.log("[ErrorOverlayProvider] Rendering Provider with value:", { showOverlay: contextValue.showOverlay, hasErrorInfo: !!contextValue.errorInfo, logCount: contextValue.logHistory.length });
+  // Use console.log for final render log
+  console.log("[ErrorOverlayProvider] Rendering Provider wrapper", { showOverlay: contextValue.showOverlay, hasErrorInfo: !!contextValue.errorInfo, logCount: contextValue.logHistory.length });
   return (
     <ErrorOverlayContext.Provider value={contextValue}>
       {children}
@@ -203,7 +208,7 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
 const fallbackErrorContext: ErrorOverlayContextType = {
     errorInfo: null,
     setErrorInfo: (info) => { console.error("[Fallback Context] setErrorInfo called! Error likely occurred before context provider initialization.", info); },
-    showOverlay: true, // Default to true, as we removed the env var check
+    showOverlay: true, // Default to true
     toastHistory: [],
     addToastToHistory: (record) => { console.warn("[Fallback Context] addToastToHistory called! Toast suppressed.", record); },
     logHistory: [],

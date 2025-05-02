@@ -94,6 +94,8 @@ const getLevelColor = (level: LogLevel | ToastRecord['type']): string => {
 
 // --- Main Overlay Component ---
 const DevErrorOverlay: React.FC = () => {
+  // Log start of render using console.log
+  console.log("[DevErrorOverlay] START Render");
   const [internalRenderError, setInternalRenderError] = useState<Error | null>(null);
 
   // Safely access context
@@ -109,6 +111,7 @@ const DevErrorOverlay: React.FC = () => {
        showOverlay = context.showOverlay;
        toastHistory = context.toastHistory;
        logHistory = context.logHistory;
+        console.log("[DevErrorOverlay] Context access successful.");
   } catch(contextError: any) {
        console.error(t.fatalContextError, contextError);
        return <div className="fixed inset-0 z-[100] bg-black text-red-500 p-4">{t.fatalContextError}</div>;
@@ -127,18 +130,21 @@ const DevErrorOverlay: React.FC = () => {
      return <ErrorOverlayFallback message={errorInfo?.message || t.unknownError} renderErrorMessage={internalRenderError.message} />;
   }
 
-  // Main Component Logic Wrapped in try-catch for robustness
+  // --- Main Component Logic ---
+  // Wrap THE ENTIRE JSX RETURN in try-catch
   try {
       if (!errorInfo || !showOverlay) {
+        console.debug("[DevErrorOverlay] No errorInfo or overlay disabled, returning null.");
         return null;
       }
+      console.debug("[DevErrorOverlay] Rendering overlay UI...");
 
       const handleClose = () => {
+          console.debug("[DevErrorOverlay] Close button clicked.");
           try { setErrorInfo(null); }
           catch (e) { console.error("[DevErrorOverlay] Error in setErrorInfo during handleClose:", e); }
       };
 
-      // --- Wrapped helper function calls in try-catch ---
       const getShortStackTraceSafe = (error?: Error | string | any): string => {
           try {
               if (!error) return t.stackTraceEmpty;
@@ -224,7 +230,6 @@ ${formattedToastHistory}
              return { gitHubIssueUrl: `https://github.com/${process.env.NEXT_PUBLIC_GITHUB_ORG || 'salavey13'}/${process.env.NEXT_PUBLIC_GITHUB_REPO || 'carTest'}/issues/new`, copyPrompt: `Error generating copy data: ${e?.message}` };
          }
       };
-      // ----------------------------------------------------
 
       const { gitHubIssueUrl, copyPrompt } = prepareIssueAndCopyDataSafe(); // Use safe version
 
@@ -254,6 +259,7 @@ ${formattedToastHistory}
           }
       };
 
+      // --- JSX Return ---
       return (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
@@ -277,102 +283,37 @@ ${formattedToastHistory}
                  {/* Error Message */}
                  <RenderSection title="Message">
                       {() => {
-                          // Added try-catch for accessing errorInfo properties
                           let messageText = t.unknownError;
-                          try {
-                              messageText = (errorInfo?.message || t.unknownError).toString();
-                          } catch (e: any) {
-                               console.error("[DevErrorOverlay] Error accessing errorInfo.message:", e);
-                               messageText = `[Error Displaying Message: ${e.message}]`;
-                               setInternalRenderError(e); // Trigger fallback
-                          }
+                          try { messageText = (errorInfo?.message || t.unknownError).toString(); }
+                          catch (e: any) { console.error("[DevErrorOverlay] Error accessing errorInfo.message:", e); messageText = `[Error Displaying Message: ${e.message}]`; setInternalRenderError(e); }
                           return <p className="text-lg text-red-300 font-semibold bg-red-900/30 p-2 rounded border border-red-700/50">{messageText}</p>;
                       }}
                  </RenderSection>
                  {/* Source Info */}
                  <RenderSection title="Source">
                       {() => {
-                          try {
-                             return errorInfo?.source && errorInfo.source !== 'N/A' ? (
-                                 <p className="text-sm text-purple-300 font-mono"> {t.sourceLabel}: {errorInfo.source} ({t.lineLabel}: {errorInfo.lineno ?? '?'}, {t.columnLabel}: {errorInfo.colno ?? '?'}) </p>
-                              ) : null;
-                          } catch (e: any) {
-                               console.error("[DevErrorOverlay] Error accessing errorInfo source/line/col:", e);
-                               setInternalRenderError(e);
-                               return <p className="text-xs text-red-400">[Error Displaying Source]</p>;
-                          }
+                          try { return errorInfo?.source && errorInfo.source !== 'N/A' ? (<p className="text-sm text-purple-300 font-mono"> {t.sourceLabel}: {errorInfo.source} ({t.lineLabel}: {errorInfo.lineno ?? '?'}, {t.columnLabel}: {errorInfo.colno ?? '?'}) </p>) : null; }
+                          catch (e: any) { console.error("[DevErrorOverlay] Error accessing errorInfo source/line/col:", e); setInternalRenderError(e); return <p className="text-xs text-red-400">[Error Displaying Source]</p>; }
                       }}
                  </RenderSection>
                  {/* Stack Trace */}
                  <RenderSection title="StackTrace">
-                      {() => (
-                          <details className="bg-black/30 p-3 rounded border border-gray-700/50">
-                            <summary className="cursor-pointer text-sm font-medium text-gray-400 hover:text-gray-200"> {t.stackTraceLabel} </summary>
-                            <pre className="mt-2 text-xs text-gray-300/80 whitespace-pre-wrap break-words font-mono max-h-32 overflow-y-auto simple-scrollbar"> {getShortStackTraceSafe(errorInfo?.error)} </pre>
-                          </details>
-                      )}
+                      {() => (<details className="bg-black/30 p-3 rounded border border-gray-700/50"> <summary className="cursor-pointer text-sm font-medium text-gray-400 hover:text-gray-200"> {t.stackTraceLabel} </summary> <pre className="mt-2 text-xs text-gray-300/80 whitespace-pre-wrap break-words font-mono max-h-32 overflow-y-auto simple-scrollbar"> {getShortStackTraceSafe(errorInfo?.error)} </pre> </details>)}
                  </RenderSection>
 
                  {/* Logs Section */}
                  <RenderSection title="RecentLogs">
-                     {() => (
-                         <details className="bg-black/40 p-3 rounded border border-gray-600/60" open={logHistory.length > 0}>
-                             <summary className="cursor-pointer text-sm font-medium text-gray-300 hover:text-white"> {t.recentLogsTitle} ({logHistory.length}) </summary>
-                             {logHistory.length > 0 ? (
-                                 <ul className="mt-2 space-y-1.5 text-xs font-mono max-h-60 overflow-y-auto simple-scrollbar pr-1">
-                                     {logHistory.slice().reverse().map((log) => ( // Newest first
-                                         <li key={log.id} className="flex items-start gap-2">
-                                             <span className="mt-0.5 flex-shrink-0 w-4 h-4 flex items-center justify-center" title={log.level.toUpperCase()}>{getLevelIcon(log.level)}</span>
-                                             <span className={`flex-1 ${getLevelColor(log.level)}`}>
-                                                 <span className="block break-words whitespace-pre-wrap">{log.message}</span>
-                                                 <span className="block text-gray-500 text-[0.65rem] leading-tight opacity-80">
-                                                    <FaRegClock className="inline mr-1 h-2.5 w-2.5" />
-                                                    {formatDistanceToNow(log.timestamp, { addSuffix: true, locale: ru })} ({new Date(log.timestamp).toLocaleTimeString('ru-RU',{hour12:false})})
-                                                 </span>
-                                             </span>
-                                         </li>
-                                     ))}
-                                 </ul>
-                             ) : (
-                                 <p className="mt-2 text-xs text-gray-500">{t.noRecentLogs}</p>
-                             )}
-                         </details>
-                     )}
+                     {() => (<details className="bg-black/40 p-3 rounded border border-gray-600/60" open={logHistory.length > 0}> <summary className="cursor-pointer text-sm font-medium text-gray-300 hover:text-white"> {t.recentLogsTitle} ({logHistory.length}) </summary> {logHistory.length > 0 ? (<ul className="mt-2 space-y-1.5 text-xs font-mono max-h-60 overflow-y-auto simple-scrollbar pr-1"> {logHistory.slice().reverse().map((log) => ( <li key={log.id} className="flex items-start gap-2"> <span className="mt-0.5 flex-shrink-0 w-4 h-4 flex items-center justify-center" title={log.level.toUpperCase()}>{getLevelIcon(log.level)}</span> <span className={`flex-1 ${getLevelColor(log.level)}`}> <span className="block break-words whitespace-pre-wrap">{log.message}</span> <span className="block text-gray-500 text-[0.65rem] leading-tight opacity-80"> <FaRegClock className="inline mr-1 h-2.5 w-2.5" /> {formatDistanceToNow(log.timestamp, { addSuffix: true, locale: ru })} ({new Date(log.timestamp).toLocaleTimeString('ru-RU',{hour12:false})}) </span> </span> </li> ))} </ul>) : (<p className="mt-2 text-xs text-gray-500">{t.noRecentLogs}</p>)} </details>)}
                  </RenderSection>
 
                  {/* Toasts Section */}
                  <RenderSection title="RecentToasts">
-                     {() => (
-                         <details className="bg-black/30 p-3 rounded border border-gray-700/50" open={toastHistory.length > 0}>
-                             <summary className="cursor-pointer text-sm font-medium text-gray-400 hover:text-gray-200"> {t.recentToastsTitle} ({toastHistory.length}) </summary>
-                             {toastHistory.length > 0 ? (
-                                 <ul className="mt-2 space-y-1 text-xs font-mono max-h-40 overflow-y-auto simple-scrollbar pr-1">
-                                     {toastHistory.slice().reverse().map((toast) => ( // Newest first
-                                         <li key={toast.id} className="flex items-start gap-2 text-gray-300/90">
-                                             <span className="mt-0.5 flex-shrink-0 w-4 h-4 flex items-center justify-center" title={toast.type.toUpperCase()}>{getLevelIcon(toast.type)}</span>
-                                             <span className="flex-1 break-words">{toast.message}</span>
-                                         </li>
-                                     ))}
-                                 </ul>
-                             ) : (
-                                 <p className="mt-2 text-xs text-gray-500">{t.noRecentToasts}</p>
-                             )}
-                         </details>
-                     )}
+                     {() => (<details className="bg-black/30 p-3 rounded border border-gray-700/50" open={toastHistory.length > 0}> <summary className="cursor-pointer text-sm font-medium text-gray-400 hover:text-gray-200"> {t.recentToastsTitle} ({toastHistory.length}) </summary> {toastHistory.length > 0 ? (<ul className="mt-2 space-y-1 text-xs font-mono max-h-40 overflow-y-auto simple-scrollbar pr-1"> {toastHistory.slice().reverse().map((toast) => ( <li key={toast.id} className="flex items-start gap-2 text-gray-300/90"> <span className="mt-0.5 flex-shrink-0 w-4 h-4 flex items-center justify-center" title={toast.type.toUpperCase()}>{getLevelIcon(toast.type)}</span> <span className="flex-1 break-words">{toast.message}</span> </li> ))} </ul>) : (<p className="mt-2 text-xs text-gray-500">{t.noRecentToasts}</p>)} </details>)}
                  </RenderSection>
 
                  {/* Advice Section */}
                  <RenderSection title="Advice">
-                      {() => (
-                         <div className="mt-4 p-3 bg-yellow-900/30 border border-yellow-600/50 rounded text-yellow-200 text-sm space-y-2">
-                           <p className="font-semibold">{t.adviceTitle}</p>
-                           <p>{t.adviceLine1}</p>
-                           <ul className='list-disc list-inside space-y-1'>
-                               <li> {t.adviceCopyAction} <button onClick={handleCopyVibeRequest} className="text-cyan-400 underline hover:text-cyan-300 px-1 font-semibold inline-flex items-center gap-1"><FaCopy className="h-3 w-3"/> {t.adviceCopyLink}</button> {t.adviceCopyDestination} (<a href="/repo-xml" target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline hover:text-cyan-300">/repo-xml</a>). </li>
-                               <li> {t.adviceGithubAction} <a href={gitHubIssueUrl} target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline hover:text-cyan-300 font-semibold inline-flex items-center gap-1"> {t.adviceGithubLink} <FaGithub className="inline ml-1 h-3 w-3" /> </a> {t.adviceGithubPrepared} </li>
-                           </ul>
-                         </div>
-                      )}
+                      {() => (<div className="mt-4 p-3 bg-yellow-900/30 border border-yellow-600/50 rounded text-yellow-200 text-sm space-y-2"> <p className="font-semibold">{t.adviceTitle}</p> <p>{t.adviceLine1}</p> <ul className='list-disc list-inside space-y-1'> <li> {t.adviceCopyAction} <button onClick={handleCopyVibeRequest} className="text-cyan-400 underline hover:text-cyan-300 px-1 font-semibold inline-flex items-center gap-1"><FaCopy className="h-3 w-3"/> {t.adviceCopyLink}</button> {t.adviceCopyDestination} (<a href="/repo-xml" target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline hover:text-cyan-300">/repo-xml</a>). </li> <li> {t.adviceGithubAction} <a href={gitHubIssueUrl} target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline hover:text-cyan-300 font-semibold inline-flex items-center gap-1"> {t.adviceGithubLink} <FaGithub className="inline ml-1 h-3 w-3" /> </a> {t.adviceGithubPrepared} </li> </ul> </div>)}
                  </RenderSection>
             </div>
 
@@ -388,14 +329,17 @@ ${formattedToastHistory}
           </div>
         </div>
       );
+      // --- End JSX Return ---
 
-    } catch (renderError: any) {
-        // If render fails even with RenderSection, set internal error state
-        // This should ideally be caught by RenderSection, but acts as a final safety net
-        setInternalRenderError(renderError);
-        // Return null here, the state update will trigger the fallback on next render
-        return null;
-    }
+  } catch (renderError: any) {
+      // If rendering the overlay UI itself fails, trigger fallback
+      console.error("[DevErrorOverlay] CRITICAL: Failed during main render execution:", renderError);
+      setInternalRenderError(renderError);
+      // Return null here, the state update will trigger the fallback on next render cycle
+      return null;
+  } finally {
+       console.log("[DevErrorOverlay] END Render");
+  }
 };
 
 export default DevErrorOverlay;
