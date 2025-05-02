@@ -1,18 +1,18 @@
 "use client";
 
 import React, { Component, ErrorInfo as ReactErrorInfo, ReactNode } from 'react';
-import { useErrorOverlay, ErrorInfo } from '@/contexts/ErrorOverlayContext'; // Import context hook and type
+import { useErrorOverlay, ErrorInfo } from '@/contexts/ErrorOverlayContext';
+import { debugLogger as logger } from '@/lib/debugLogger'; // Import logger
 
 // Props for the ErrorBoundary
 interface Props {
   children: ReactNode;
-  // Fallback UI is handled by DevErrorOverlay, so no fallbackRender needed here
 }
 
 // State for the ErrorBoundary
 interface State {
   hasError: boolean;
-  error: Error | null; // Store the caught error
+  error: Error | null;
 }
 
 // Higher-order component to inject context hook into class component
@@ -21,7 +21,6 @@ function withErrorOverlayContext<P extends object>(
 ): React.FC<P> {
     const ComponentWithContext: React.FC<P> = (props) => {
         const context = useErrorOverlay();
-        // Render the wrapped component with the context passed as a prop
         return <WrappedComponent {...props} context={context} />;
     };
     ComponentWithContext.displayName = `WithErrorOverlayContext(${WrappedComponent.displayName || WrappedComponent.name || 'Component'})`;
@@ -36,46 +35,42 @@ class ErrorBoundaryForOverlayInternal extends Component<Props & { context: Retur
     this.state = { hasError: false, error: null };
   }
 
-  // Update state so the next render will show the fallback UI (or nothing, in our case).
+  // Update state so the next render will show the fallback UI (or nothing).
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error: error };
   }
 
   // Catch errors in any components below and log them to the context
   componentDidCatch(error: Error, errorInfo: ReactErrorInfo): void {
-    const { setErrorInfo, logHistory, toastHistory } = this.props.context; // Access context via props
+    const { setErrorInfo } = this.props.context; // Access context via props
 
-    console.error("ErrorBoundaryForOverlay caught an error:", error, errorInfo); // Log to console too
+    // Log to our system AND the console
+    logger.error("[ErrorBoundaryForOverlay] Caught React Error:", error, errorInfo?.componentStack); // Use our logger
+    console.error("ErrorBoundaryForOverlay caught an error:", error, errorInfo); // Keep console log too
 
     // Prepare data for the context
     const errorDetails: ErrorInfo = {
-      message: error.message || "React component error",
+      message: error.message || "React component render error",
       error: error, // Pass the actual error object
-      // Attempt to get source info from componentStack if possible (often limited)
+      // Attempt to get source info from componentStack
       source: errorInfo?.componentStack?.split('\n')[1]?.trim() || 'React Component Tree',
+      lineno: undefined, // Often not available directly here
+      colno: undefined, // Often not available directly here
       type: 'react',
     };
 
     // Send the error details to the context
-    // This will trigger the DevErrorOverlay to display
     setErrorInfo(errorDetails);
-
-    // Optional: Log additional info to our logger (which also goes to context history)
-    // logger.error("[ErrorBoundaryForOverlay] Caught React Error", {
-    //     error: error.toString(),
-    //     componentStack: errorInfo?.componentStack
-    // });
   }
 
   render(): ReactNode {
-    // If an error occurred, React will automatically unmount the children.
-    // We don't render a fallback UI here because DevErrorOverlay handles it.
-    // We just render the children normally if there's no error.
     if (this.state.hasError) {
-      // Optionally, render nothing or a minimal placeholder if children MUST be removed
-       // return null;
-       // OR render children anyway and let DevErrorOverlay appear on top
-       return this.props.children;
+      // --- CHANGE HERE ---
+      // When an error is caught, don't render the children.
+      // The DevErrorOverlay will be displayed by the context update.
+      logger.debug("[ErrorBoundaryForOverlay] Render suppressed due to error state.");
+      return null;
+      // --- END CHANGE ---
     }
 
     return this.props.children;
