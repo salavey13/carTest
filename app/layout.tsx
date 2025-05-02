@@ -1,20 +1,20 @@
 import type React from "react";
 import Script from "next/script";
-import { Suspense } from 'react'; // Keep Suspense import
+import { Suspense } from 'react';
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import StickyChatButton from "@/components/StickyChatButton";
-import { AppProvider } from "@/contexts/AppContext";
-import { Toaster as SonnerToaster } from "sonner"; // Renamed import to avoid naming conflict
+import { AppProvider } from "@/contexts/AppContext"; // Keep AppProvider
+import { Toaster as SonnerToaster } from "sonner";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import type { Metadata, Viewport } from 'next';
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 // --- NEW IMPORTS for Error Handling ---
-import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext";
-import ErrorBoundaryForOverlay from "@/components/ErrorBoundaryForOverlay";
-import DevErrorOverlay from "@/components/DevErrorOverlay"; // Import the new overlay component
+import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext"; // Import the Provider
+import ErrorBoundaryForOverlay from "@/components/ErrorBoundaryForOverlay"; // Import the Boundary
+import DevErrorOverlay from "@/components/DevErrorOverlay"; // Import the Overlay display component
 // ------------------------------------
 
 // --- Fallback component for StickyChatButton ---
@@ -44,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="h-full">
       <head>
+        {/* Head content remains the same */}
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="format-detection" content="telephone=no" />
@@ -57,13 +58,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={cn(
           "flex min-h-screen flex-col bg-gray-900 text-white antialiased",
       )}>
-        {/* --- Wrap everything with ErrorOverlayProvider --- */}
+        {/* --- Wrap EVERYTHING with ErrorOverlayProvider --- */}
         <ErrorOverlayProvider>
-          <TooltipProvider>
-            <AppProvider>
+          {/* AppProvider needs ErrorOverlay context for useAppToast, so it's inside */}
+          <AppProvider>
+            {/* TooltipProvider can be inside AppProvider */}
+            <TooltipProvider>
 
               {/* --- ErrorBoundaryForOverlay Wraps main app content --- */}
-              {/* It catches errors and sends them to the ErrorOverlayContext */}
+              {/* It catches render errors and sends them to ErrorOverlayContext */}
               <ErrorBoundaryForOverlay>
                 <Header />
                 <main className="flex-1">
@@ -76,7 +79,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </ErrorBoundaryForOverlay>
               {/* --- End of ErrorBoundaryForOverlay Wrap --- */}
 
-              {/* Sonner Toaster remains outside the boundary */}
+              {/* Sonner Toaster remains outside the boundary, but inside AppProvider for context */}
               <SonnerToaster
                 position="bottom-right"
                 richColors
@@ -97,8 +100,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {/* It's OUTSIDE ErrorBoundaryForOverlay so it renders even if the boundary caught an error */}
               <DevErrorOverlay />
 
-            </AppProvider>
-          </TooltipProvider>
+            </TooltipProvider>
+          </AppProvider>
         </ErrorOverlayProvider> {/* --- Close ErrorOverlayProvider --- */}
       </body>
     </html>

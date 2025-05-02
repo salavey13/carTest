@@ -1,5 +1,5 @@
 "use client";
-import React, { Suspense, useRef, useState, useEffect, ReactNode, useCallback, useMemo } from "react"; // Добавил useMemo
+import React, { Suspense, useRef, useState, useEffect, ReactNode, useCallback, useMemo } from "react";
 import { useSearchParams } from 'next/navigation';
 import RepoTxtFetcher from "@/components/RepoTxtFetcher";
 import AICodeAssistant from "@/components/AICodeAssistant";
@@ -10,7 +10,8 @@ import {
     RepoXmlPageContextType // Import RepoXmlPageContextType
 } from '@/contexts/RepoXmlPageContext';
 import { useAppContext } from "@/contexts/AppContext";
-import { debugLogger as logger } from "@/lib/debugLogger";
+import { debugLogger as logger } from "@/lib/debugLogger"; // Use logger
+import { useAppToast } from "@/hooks/useAppToast"; // Use toast hook
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -20,7 +21,7 @@ import {
     FaTools, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket
 } from "react-icons/fa6";
 import Link from "next/link";
-import * as FaIcons from "react-icons/fa6"; // Оставляем импорт FaIcons, хотя он не используется в упрощенном парсере
+// Removed FaIcons import as it wasn't used in the simplified parser
 import { motion } from 'framer-motion';
 import parse, { domToReact, HTMLReactParserOptions, Element, attributesToProps } from 'html-react-parser';
 
@@ -122,7 +123,7 @@ function LoadingBuddyFallback() {
     return ( <div className="fixed bottom-4 right-4 z-50 w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 animate-pulse" aria-hidden="true" ></div> );
 }
 
-// --- html-react-parser Configuration (УПРОЩЕННАЯ ВЕРСИЯ - БЕЗ ИКОНОК) ---
+// --- html-react-parser Configuration (Simplified - No Icons) ---
 const parserOptions: HTMLReactParserOptions = {
     replace: (domNode) => {
         if (domNode instanceof Element && domNode.attribs) {
@@ -137,48 +138,52 @@ const parserOptions: HTMLReactParserOptions = {
                 if (isInternal && !props.target) {
                     const { class: _, ...validProps } = props;
                     try {
-                         logger.debug("[parserOptions - Simple] Creating Next Link:", props.href);
+                         logger.debug("[Parser - Simple] Creating Next Link:", props.href);
                          return <Link href={props.href} {...validProps} className={props.className}>{parsedChildren}</Link>;
                     } catch (linkError) {
-                        logger.error("[parserOptions - Simple] Error creating Next Link:", linkError, props);
+                        logger.error("[Parser - Simple] Error creating Next Link:", linkError, props);
                         return <a {...props}>{parsedChildren}</a>;
                     }
                 }
-                 logger.debug("[parserOptions - Simple] Creating External Link:", props.href);
+                 logger.debug("[Parser - Simple] Creating External Link:", props.href);
                 return <a {...props}>{parsedChildren}</a>;
             }
 
-            // Handle other standard HTML tags (БЕЗ ОБРАБОТКИ ИКОНОК)
+            // Handle other standard HTML tags (NO ICON PROCESSING)
             if (typeof name === 'string' && /^[a-z][a-z0-9-]*$/.test(lowerCaseName || '')) {
                 try {
-                     logger.debug(`[parserOptions - Simple] Creating standard element: <${lowerCaseName}>`);
+                     logger.debug(`[Parser - Simple] Creating standard element: <${lowerCaseName}>`);
                      return React.createElement(lowerCaseName!, attributesToProps(attribs), children ? domToReact(children, parserOptions) : undefined);
                 } catch (createElementError) {
-                    logger.error(`[parserOptions - Simple] Error React.createElement for <${lowerCaseName}>:`, createElementError);
-                    return <>{children ? domToReact(children, parserOptions) : null}</>;
+                    logger.error(`[Parser - Simple] Error React.createElement for <${lowerCaseName}>:`, createElementError);
+                    return <>{children ? domToReact(children, parserOptions) : null}</>; // Render children on error
                 }
             }
         }
+        // Let the library handle default rendering for non-elements or unmatched tags
         return undefined;
     },
 };
-// --- КОНЕЦ УПРОЩЕННОЙ ВЕРСИИ parserOptions ---
+// --- END Simplified parserOptions ---
 
 // --- RenderContent Component ---
 const RenderContent: React.FC<{ content: string | null | undefined }> = React.memo(({ content }) => {
     logger.debug("[RenderContent] Rendering content:", content ? content.substring(0, 50) + "..." : "null/undefined");
     if (typeof content !== 'string' || !content.trim()) {
+        logger.debug("[RenderContent] Null or empty content, returning null.");
         return null;
     }
+    // Basic Markdown-like bold replacement
     const contentWithStrong = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     try {
-      // Используем УПРОЩЕННЫЕ parserOptions
+      // Use the simplified parser options
       const parsedContent = parse(contentWithStrong, parserOptions);
       logger.debug("[RenderContent] Parsing successful.");
       return <>{parsedContent}</>;
     } catch (error) {
       logger.error("[RenderContent] Error during parse:", error, "Input:", contentWithStrong);
-      return <span dangerouslySetInnerHTML={{ __html: `[Parse Error] ${contentWithStrong.substring(0, 100)}...` }} />;
+      // Return a safe fallback, maybe just the raw string or an error message
+      return <span className="text-red-500" dangerouslySetInnerHTML={{ __html: `[Parse Error] ${contentWithStrong.substring(0, 100)}...` }} />;
     }
 });
 RenderContent.displayName = 'RenderContent';
@@ -188,49 +193,38 @@ const getPlainText = (htmlString: string | null | undefined): string => {
     logger.debug("[getPlainText] Stripping HTML:", htmlString ? htmlString.substring(0, 50) + "..." : "null/undefined");
     if (typeof htmlString !== 'string' || !htmlString) { return ''; }
     try {
+        // Remove potential icon tags first (simple regex, might not be perfect)
         const withoutIcons = htmlString.replace(/<Fa[A-Z][a-zA-Z0-9]+(?:\s+[^>]*?)?\s*\/?>/g, '');
+        // Remove all other HTML tags
         const plainText = withoutIcons.replace(/<[^>]*>/g, '');
+        // Decode common HTML entities
         return plainText.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
     } catch (e) {
         logger.error("Error stripping HTML for title:", e, "Input:", htmlString);
-        return htmlString;
+        return htmlString; // Return original on error
     }
 };
-
-
-// --- Helper to Inject Toast ---
-const ToastInjector: React.FC<{ id: string; context: RepoXmlPageContextType | null }> = ({ id, context }) => {
-    if (!context || !context.addToast) {
-        if (!context) logger.warn(`ToastInjector ${id}: Context is null`);
-        else if (!context.addToast) logger.warn(`ToastInjector ${id}: context.addToast is not available`);
-        return null;
-    }
-    try {
-        context.addToast(`[DEBUG_INJECT] ToastInjector Rendered: ${id}`, 'info', 500);
-    } catch (e) {
-        logger.error(`ToastInjector ${id} failed to toast:`, e);
-    }
-    return null;
-};
-
 
 // --- ActualPageContent Component ---
 function ActualPageContent() {
-    logger.log("[LOG_POINT] ActualPageContent START RENDER");
+    logger.log("[ActualPageContent] START RENDER");
 
     const { user } = useAppContext();
-    logger.log("[LOG_POINT] ActualPageContent -> useAppContext DONE");
+    logger.log("[ActualPageContent] useAppContext DONE");
     const pageContext = useRepoXmlPageContext();
-    logger.log("[LOG_POINT] ActualPageContent -> useRepoXmlPageContext DONE");
+    logger.log("[ActualPageContent] useRepoXmlPageContext DONE");
+    const { info: toastInfo } = useAppToast(); // Use toast hook
+    logger.log("[ActualPageContent] useAppToast DONE");
 
-    logger.log("[LOG_POINT] ActualPageContent -> pageContext VALUE:", pageContext);
+    logger.log("[ActualPageContent] pageContext VALUE:", pageContext ? "Available" : "NULL");
 
-
+    // Destructure context safely
     const {
         fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef,
         setImageReplaceTask, setKworkInputHasContent, fetchStatus,
         imageReplaceTask, allFetchedFiles, selectedFetcherFiles,
-        repoUrl, setRepoUrl, addToast
+        repoUrl, setRepoUrl,
+        // addToast is now handled by useAppToast generally
     } = pageContext;
 
     const [lang, setLang] = useState<Language>('en');
@@ -239,24 +233,21 @@ function ActualPageContent() {
     const [initialIdea, setInitialIdea] = useState<string | null>(null);
     const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(false);
     const [t, setT] = useState<TranslationSet | null>(null);
-    logger.log("[LOG_POINT] ActualPageContent -> useState DONE");
+    logger.log("[ActualPageContent] useState DONE");
 
     // --- Effects ---
     useEffect(() => {
-      addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 1 (Lang) START", 'info', 500);
+      logger.debug("[Effect Lang] START");
       const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
       const userLang = user?.language_code;
       const resolvedLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
       setLang(resolvedLang);
       setT(translations[resolvedLang] ?? translations.en);
-      logger.log(`[ActualPageContent Effect 1] Lang set to: ${resolvedLang}`);
-      addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 1 (Lang) END", 'info', 500);
-    }, [user, addToast]);
+      logger.info(`[Effect Lang] Language set to: ${resolvedLang}`);
+    }, [user]); // Only depends on user
 
     useEffect(() => {
-      addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 2 (URL) START", 'info', 500);
-      // Убрали console.log с Easter Egg
-
+      logger.debug("[Effect URL Params] START");
       const pathParam = searchParams.get("path");
       const ideaParam = searchParams.get("idea");
       const repoParam = searchParams.get("repo");
@@ -266,169 +257,151 @@ function ActualPageContent() {
                const decodedRepoUrl = decodeURIComponent(repoParam);
                if (decodedRepoUrl && typeof decodedRepoUrl === 'string' && decodedRepoUrl.includes("github.com")) {
                    setRepoUrl(decodedRepoUrl);
-                   logger.log(`[ActualPageContent Effect 2] Repo URL set from param: ${decodedRepoUrl}`);
-               } else { logger.warn(`[ActualPageContent Effect 2] Invalid or empty repo URL from param: ${repoParam}`); }
-           } catch (e) { logger.error("[ActualPageContent Effect 2] Error decoding repo URL param:", e); }
+                   logger.info(`[Effect URL Params] Repo URL set from param: ${decodedRepoUrl}`);
+               } else { logger.warn(`[Effect URL Params] Invalid or empty repo URL from param: ${repoParam}`); }
+           } catch (e) { logger.error("[Effect URL Params] Error decoding repo URL param:", e); }
        }
 
         if (pathParam && ideaParam) {
             let decodedIdea: string | null = null; let decodedPath: string | null = null;
             try {
                 decodedPath = decodeURIComponent(pathParam); decodedIdea = decodeURIComponent(ideaParam);
-                if (decodedIdea && decodedIdea.startsWith("ImageReplace|")) {
-                   logger.log("[ActualPageContent Effect 2] Processing Image Replace task from URL.");
+                if (decodedIdea?.startsWith("ImageReplace|")) {
+                   logger.log("[Effect URL Params] Processing Image Replace task from URL.");
                     try {
                         const parts = decodedIdea.split('|');
-                        const oldUrlParam = parts.find(p => p.startsWith("OldURL="));
-                        const newUrlParam = parts.find(p => p.startsWith("NewURL="));
+                        const oldUrlParam = parts.find(p => p.startsWith("OldURL=")); const newUrlParam = parts.find(p => p.startsWith("NewURL="));
 
                         if (oldUrlParam && newUrlParam && decodedPath) {
-                            const oldUrl = decodeURIComponent(oldUrlParam.substring(7));
-                            const newUrl = decodeURIComponent(newUrlParam.substring(7));
-
+                            const oldUrl = decodeURIComponent(oldUrlParam.substring(7)); const newUrl = decodeURIComponent(newUrlParam.substring(7));
                             if (oldUrl && newUrl) {
+                                logger.info(`[Effect URL Params] Setting ImageReplaceTask`, { decodedPath, oldUrl, newUrl });
                                 const task: ImageReplaceTask = { targetPath: decodedPath, oldUrl: oldUrl, newUrl: newUrl };
-                                logger.log("[ActualPageContent Effect 2] Setting image task:", task);
-                                setImageReplaceTask(task);
-                                setInitialIdea(null);
-                            } else {
-                                logger.error("[ActualPageContent Effect 2] Invalid image task URL data after decoding parts:", { decodedPath, oldUrl, newUrl });
-                                setImageReplaceTask(null); setInitialIdea(null);
-                            }
-                        } else {
-                            logger.error("[ActualPageContent Effect 2] Could not parse Old/New URL or path from image task parts:", decodedIdea);
-                            setImageReplaceTask(null); setInitialIdea(null);
-                        }
-                    } catch (splitError) {
-                        logger.error("[ActualPageContent Effect 2] Error splitting ImageReplace task string:", splitError);
-                        setImageReplaceTask(null); setInitialIdea(null);
-                    }
+                                setImageReplaceTask(task); setInitialIdea(null);
+                            } else { logger.error("[Effect URL Params] Invalid image task URL data after decoding parts:", { decodedPath, oldUrl, newUrl }); setImageReplaceTask(null); setInitialIdea(null); }
+                        } else { logger.error("[Effect URL Params] Could not parse Old/New URL or path from image task parts:", decodedIdea); setImageReplaceTask(null); setInitialIdea(null); }
+                    } catch (splitError) { logger.error("[Effect URL Params] Error splitting ImageReplace task string:", splitError); setImageReplaceTask(null); setInitialIdea(null); }
                    setInitialIdeaProcessed(true);
                 } else if (decodedIdea) {
-                   logger.log("[ActualPageContent Effect 2] Regular idea param found, storing:", decodedIdea.substring(0, 50) + "...");
-                    setInitialIdea(decodedIdea);
-                    setImageReplaceTask(null);
-                    setInitialIdeaProcessed(false);
-                } else {
-                   logger.warn("[ActualPageContent Effect 2] Decoded idea is empty or invalid.");
-                   setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
-                }
-            } catch (decodeError) {
-                 logger.error("[ActualPageContent Effect 2] Error decoding path or idea params:", decodeError);
-                 setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
-            }
+                   logger.log("[Effect URL Params] Regular idea param found, storing:", decodedIdea.substring(0, 50) + "...");
+                    setInitialIdea(decodedIdea); setImageReplaceTask(null); setInitialIdeaProcessed(false);
+                } else { logger.warn("[Effect URL Params] Decoded idea is empty or invalid."); setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true); }
+            } catch (decodeError) { logger.error("[Effect URL Params] Error decoding path or idea params:", decodeError); setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true); }
             if (decodedPath || decodedIdea) {
-                addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 2: Setting showComponents=true due to URL params", 'info', 500);
+                logger.debug("[Effect URL Params] Setting showComponents=true due to URL params");
                 setShowComponents(true);
             }
         } else {
-            logger.log(`[ActualPageContent Effect 2] No valid path/idea params found.`);
+            logger.log(`[Effect URL Params] No valid path/idea params found.`);
             setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
         }
-       addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 2 (URL) END", 'info', 500);
-    }, [searchParams, setImageReplaceTask, setRepoUrl, addToast]);
+       logger.debug("[Effect URL Params] END");
+    }, [searchParams, setImageReplaceTask, setRepoUrl]); // Removed addToast dependency
 
      useEffect(() => {
-        addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 3 (Kwork Populate) START", 'info', 500);
+        logger.debug("[Effect Kwork Populate] Check START");
         const fetchAttemptFinished = ['success', 'error', 'failed_retries'].includes(fetchStatus);
 
         if (fetchAttemptFinished && initialIdea && !initialIdeaProcessed && !imageReplaceTask && kworkInputRef.current) {
-           logger.log(`[ActualPageContent Effect 3] Fetch finished (${fetchStatus}). Populating kwork...`);
+           logger.info(`[Effect Kwork Populate] Fetch finished (${fetchStatus}). Populating kwork input and adding selected files.`);
             kworkInputRef.current.value = initialIdea;
             try { const inputEvent = new Event('input', { bubbles: true }); kworkInputRef.current.dispatchEvent(inputEvent); }
-            catch (eventError) { logger.error("[ActualPageContent Effect 3] Error dispatching input event:", eventError); }
+            catch (eventError) { logger.error("[Effect Kwork Populate] Error dispatching input event:", eventError); }
             setKworkInputHasContent(initialIdea.trim().length > 0);
-            logger.log("[ActualPageContent Effect 3] Populated kwork input.");
 
             if (fetcherRef.current?.handleAddSelected) {
                 if (selectedFetcherFiles.size > 0) {
-                     logger.log("[ActualPageContent Effect 3] Calling fetcherRef.handleAddSelected.");
+                     logger.log("[Effect Kwork Populate] Calling fetcherRef.handleAddSelected.");
                      const filesToAdd = selectedFetcherFiles ?? new Set<string>();
                      const allFilesData = allFetchedFiles ?? [];
-                     (async () => { try { await fetcherRef.current!.handleAddSelected(filesToAdd, allFilesData); logger.log("[ActualPageContent Effect 3] handleAddSelected call finished successfully."); } catch (err) { logger.error("[ActualPageContent Effect 3] Error during handleAddSelected call:", err); } })();
-                } else { logger.log("[ActualPageContent Effect 3] Skipping handleAddSelected (empty selection)."); }
-            } else { logger.warn("[ActualPageContent Effect 3] handleAddSelected not found or fetcherRef null."); }
+                     (async () => {
+                        try {
+                            await fetcherRef.current!.handleAddSelected(filesToAdd, allFilesData);
+                            logger.log("[Effect Kwork Populate] handleAddSelected call finished successfully.");
+                        } catch (err) {
+                            logger.error("[Effect Kwork Populate] Error during handleAddSelected call:", err);
+                        }
+                     })();
+                } else { logger.log("[Effect Kwork Populate] Skipping handleAddSelected (empty selection)."); }
+            } else { logger.warn("[Effect Kwork Populate] handleAddSelected not found or fetcherRef null."); }
 
             const kworkElement = document.getElementById('kwork-input-section');
-            if (kworkElement) { setTimeout(() => { try { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); logger.log("[ActualPageContent Effect 3] Scrolled to kwork."); } catch (scrollError) { logger.error("[ActualPageContent Effect 3] Error scrolling to kwork:", scrollError); } }, 250); }
-             setInitialIdeaProcessed(true);
+            if (kworkElement) { setTimeout(() => { try { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); logger.log("[Effect Kwork Populate] Scrolled to kwork."); } catch (scrollError) { logger.error("[Effect Kwork Populate] Error scrolling to kwork:", scrollError); } }, 250); }
+            setInitialIdeaProcessed(true);
         } else if (fetchAttemptFinished && !initialIdeaProcessed) {
-             setInitialIdeaProcessed(true);
-             logger.log(`[ActualPageContent Effect 3] Fetch finished (${fetchStatus}), no pending idea or kworkInputRef not ready.`);
+            setInitialIdeaProcessed(true);
+            logger.log(`[Effect Kwork Populate] Fetch finished (${fetchStatus}), no pending idea or kworkInputRef not ready.`);
         }
-       addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 3 (Kwork Populate) END", 'info', 500);
-     }, [ fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles, addToast ]);
+        logger.debug("[Effect Kwork Populate] Check END");
+     }, [ fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles ]); // Removed addToast dependency
 
 
     // --- Callbacks ---
     const memoizedGetPlainText = useCallback(getPlainText, []);
 
     const scrollToSectionNav = useCallback((id: string) => {
-        addToast(`[DEBUG_CB] scrollToSectionNav for ${id}`, 'info', 500);
+        logger.debug(`[CB ScrollNav] Attempting scroll to: ${id}`);
         const sectionsRequiringReveal = ['extractor', 'executor', 'cybervibe-section', 'philosophy-steps'];
         const targetElement = document.getElementById(id);
 
         if (sectionsRequiringReveal.includes(id) && !showComponents) {
-            logger.log(`[Scroll] Revealing components for "${id}"`);
+            logger.info(`[CB ScrollNav] Revealing components for "${id}"`);
             setShowComponents(true);
+            // Use requestAnimationFrame to ensure the element is visible before scrolling
             requestAnimationFrame(() => {
                 const revealedElement = document.getElementById(id);
                 if (revealedElement) {
                      try {
-                         const offsetTop = window.scrollY + revealedElement.getBoundingClientRect().top - 80;
+                         const offsetTop = window.scrollY + revealedElement.getBoundingClientRect().top - 80; // Adjust offset if needed
                          window.scrollTo({ top: offsetTop, behavior: 'smooth' });
-                         logger.log(`[Scroll] Scrolled to revealed "${id}"`);
-                     } catch (scrollError) { logger.error(`[Scroll] Error scrolling to revealed "${id}":`, scrollError); }
-                } else { logger.error(`[Scroll] Target "${id}" not found after reveal attempt.`); }
+                         logger.log(`[CB ScrollNav] Scrolled to revealed "${id}"`);
+                     } catch (scrollError) { logger.error(`[CB ScrollNav] Error scrolling to revealed "${id}":`, scrollError); }
+                } else { logger.error(`[CB ScrollNav] Target "${id}" not found after reveal attempt.`); }
             });
         } else if (targetElement) {
              try {
-                 const offsetTop = window.scrollY + targetElement.getBoundingClientRect().top - 80;
+                 const offsetTop = window.scrollY + targetElement.getBoundingClientRect().top - 80; // Adjust offset if needed
                  window.scrollTo({ top: offsetTop, behavior: 'smooth' });
-                 logger.log(`[Scroll] Scrolled to "${id}"`);
-             } catch (scrollError) { logger.error(`[Scroll] Error scrolling to "${id}":`, scrollError); }
-        } else { logger.error(`[Scroll] Target element with id "${id}" not found.`); }
-    }, [showComponents, addToast]);
+                 logger.log(`[CB ScrollNav] Scrolled to "${id}"`);
+             } catch (scrollError) { logger.error(`[CB ScrollNav] Error scrolling to "${id}":`, scrollError); }
+        } else { logger.error(`[CB ScrollNav] Target element with id "${id}" not found.`); }
+    }, [showComponents]); // Removed addToast dependency
 
     const handleShowComponents = () => {
-        addToast("[DEBUG_CB] handleShowComponents START", 'info', 500);
-        logger.log("[LOG_POINT] handleShowComponents CLICKED");
+        logger.info("[Button Click] handleShowComponents (Reveal)");
         setShowComponents(true);
-        logger.log("[LOG_POINT] setShowComponents(true) CALLED");
-        addToast("[DEBUG_CB] handleShowComponents END - setShowComponents(true) called", 'info', 500);
+        toastInfo("Компоненты загружены!", { duration: 1500 });
     };
 
     // --- Loading / Initial State ---
      if (!t) {
-         logger.log("[LOG_POINT] ActualPageContent Render: Early return (!t)");
+         logger.log("[Render] ActualPageContent: Early return - waiting for translations (t)");
          const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
          const loadingText = translations[loadingLang]?.loading ?? translations.en.loading;
          return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
      }
 
     // --- Derived State & Safe Render ---
-    logger.log("[LOG_POINT] ActualPageContent -> Calculating derived state");
-    const userName = user?.first_name || (lang === 'ru' ? 'Нео' : 'Neo');
+    logger.log("[ActualPageContent] Calculating derived state");
+    const userName = user?.first_name || 'Vibe Master'; // Default username
     const navTitleIntro = memoizedGetPlainText(t.navIntro);
     const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe);
     const navTitleGrabber = memoizedGetPlainText(t.navGrabber);
     const navTitleAssistant = memoizedGetPlainText(t.navAssistant);
 
     const renderSafeContent = (contentKey: keyof TranslationSet) => {
-        // logger.debug(`[RenderContent Call] Key: ${contentKey}`); // Убрали логгер отсюда
+        // Reduced logging frequency here
+        // logger.debug(`[RenderContent Call] Key: ${contentKey}`);
         const content = t?.[contentKey];
         return content ? <RenderContent content={content} /> : `[${contentKey}]`;
     };
 
-    logger.log("[LOG_POINT] ActualPageContent -> BEFORE RETURN JSX");
-    addToast("[DEBUG_RENDER] ActualPageContent: Before Return JSX", 'info', 500);
+    logger.log("[ActualPageContent] BEFORE RETURN JSX");
 
     return (
         <>
-            <ToastInjector id="ActualPageContent-Top" context={pageContext} />
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <div className="min-h-screen bg-gray-950 p-4 sm:p-6 pt-24 text-white flex flex-col items-center relative overflow-y-auto">
-                 <ToastInjector id="ActualPageContent-InsideMainDiv" context={pageContext} />
 
                 {/* Intro Section */}
                 <section id="intro" className="mb-12 text-center max-w-3xl w-full">
@@ -440,7 +413,6 @@ function ActualPageContent() {
                         {renderSafeContent('intro2')}
                         <p className="font-semibold text-brand-green">{renderSafeContent('intro3')}</p>
                     </div>
-                     <ToastInjector id="ActualPageContent-AfterIntro" context={pageContext} />
                 </section>
 
                 {/* === The Vibe Loop Section === */}
@@ -458,7 +430,6 @@ function ActualPageContent() {
                             <p className="text-purple-300 font-semibold">{renderSafeContent('cyberVibe4')}</p>
                          </CardContent>
                      </Card>
-                      <ToastInjector id="ActualPageContent-AfterVibeLoop" context={pageContext} />
                  </section>
 
                 {/* Your Vibe Path Section - NEW PHILOSOPHY */}
@@ -505,14 +476,12 @@ function ActualPageContent() {
                             </div>
                         </div>
                     </details>
-                    <ToastInjector id="ActualPageContent-AfterPhilosophy" context={pageContext} />
                 </section>
 
-                 <ToastInjector id="ActualPageContent-BeforeRevealButtonCheck" context={pageContext} />
                 {/* Reveal Button */}
                 {!showComponents && (
                     <section id="reveal-trigger" className="mb-12 w-full max-w-3xl text-center">
-                       <ToastInjector id="ActualPageContent-RenderingRevealButton" context={pageContext} />
+                        {logger.debug("[Render] Rendering Reveal Button")}
                         <Button
                             onClick={handleShowComponents}
                             className="bg-gradient-to-r from-green-500 via-cyan-500 to-purple-600 text-gray-900 font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:scale-105 transform transition duration-300 animate-bounce hover:animate-none ring-2 ring-offset-2 ring-offset-gray-950 ring-transparent hover:ring-cyan-300"
@@ -523,27 +492,22 @@ function ActualPageContent() {
                     </section>
                 )}
 
-                 <ToastInjector id="ActualPageContent-BeforeShowComponentsCheck" context={pageContext} />
                 {/* WORKHORSE Components */}
                 {showComponents && (
                      <>
-                        <ToastInjector id="ActualPageContent-InsideShowComponentsStart" context={pageContext} />
+                        {logger.debug("[Render] Rendering Workhorse Components")}
                         <h2 className="text-3xl font-bold text-center text-brand-green mb-8 animate-pulse">{renderSafeContent('componentsTitle')}</h2>
                          <section id="extractor" className="mb-12 w-full max-w-4xl">
-                           <ToastInjector id="ActualPageContent-BeforeRepoFetcherRender" context={pageContext} />
-                           {/* logger.log("[LOG_POINT] Rendering RepoTxtFetcher...") - УБРАНО */}
+                           {logger.debug("[Render] Rendering RepoTxtFetcher Component...")}
                              <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg backdrop-blur-sm">
                                  <CardContent className="p-4">
                                      <RepoTxtFetcher ref={fetcherRef} />
                                  </CardContent>
                              </Card>
-                            <ToastInjector id="ActualPageContent-AfterRepoFetcherRender" context={pageContext} />
                          </section>
 
-                         <ToastInjector id="ActualPageContent-BeforeAIAssistantSection" context={pageContext} />
                          <section id="executor" className="mb-12 w-full max-w-4xl pb-16">
-                           <ToastInjector id="ActualPageContent-BeforeAIAssistantRender" context={pageContext} />
-                            {/* logger.log("[LOG_POINT] Rendering AICodeAssistant...") - УБРАНО */}
+                            {logger.debug("[Render] Rendering AICodeAssistant Component...")}
                              <Card className="bg-gray-900/80 border border-purple-700/50 shadow-lg backdrop-blur-sm">
                                  <CardContent className="p-4">
                                      <AICodeAssistant
@@ -553,15 +517,14 @@ function ActualPageContent() {
                                      />
                                  </CardContent>
                              </Card>
-                            <ToastInjector id="ActualPageContent-AfterAIAssistantRender" context={pageContext} />
                          </section>
-                         <ToastInjector id="ActualPageContent-InsideShowComponentsEnd" context={pageContext} />
                      </>
                  )}
 
                 {/* Final CTA */}
                  {showComponents && (
                      <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
+                          {logger.debug("[Render] Rendering Final CTA")}
                           <div className="bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 p-6 rounded-lg shadow-lg animate-pulse border-2 border-white/50 prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 max-w-none">
                              <h3 className="text-2xl font-bold text-white mb-3"><RenderContent content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
                              <p className="text-white text-lg mb-4"> {renderSafeContent('ctaDesc')} </p>
@@ -586,8 +549,10 @@ function ActualPageContent() {
                 </motion.nav>
 
                 {/* Automation Buddy */}
-                <Suspense fallback={<LoadingBuddyFallback />}> <AutomationBuddy /> </Suspense>
-                <ToastInjector id="ActualPageContent-End" context={pageContext} />
+                <Suspense fallback={<LoadingBuddyFallback />}>
+                    {logger.debug("[Render] Rendering AutomationBuddy (Suspense)")}
+                    <AutomationBuddy />
+                </Suspense>
             </div>
         </>
     );
@@ -595,15 +560,19 @@ function ActualPageContent() {
 
 // --- Layout Component ---
 function RepoXmlPageLayout() {
-    // logger.log("[LOG_POINT] RepoXmlPageLayout rendering RepoXmlPageProvider"); // Убираем лог
+    logger.log("[Render] RepoXmlPageLayout rendering RepoXmlPageProvider");
     return ( <RepoXmlPageProvider> <ActualPageContent /> </RepoXmlPageProvider> );
 }
 
 // --- Exported Page Component ---
 export default function RepoXmlPage() {
-     // logger.log("[LOG_POINT] RepoXmlPage START RENDER"); // Убираем лог
+     logger.log("[Render] RepoXmlPage START RENDER (Exported Component)");
     const fallbackLoadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
     const fallbackLoadingText = translations[fallbackLoadingLang]?.loading ?? translations.en.loading;
     const fallbackLoading = ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{fallbackLoadingText}</p> </div> );
-    return ( <Suspense fallback={fallbackLoading}> <RepoXmlPageLayout /> </Suspense> );
+    return (
+        <Suspense fallback={fallbackLoading}>
+            <RepoXmlPageLayout />
+        </Suspense>
+    );
 }
