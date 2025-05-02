@@ -9,12 +9,13 @@ class DebugLogger {
   private maxInternalLogs = 100; // Можно увеличить при необходимости
   private isBrowser: boolean = typeof window !== 'undefined';
   private logHandler: LogHandler | null = null; // Обработчик для отправки логов в контекст
+  private isLoggingInternally: boolean = false; // Флаг для предотвращения рекурсии
 
   // Метод для установки обработчика извне (из ErrorOverlayProvider)
   setLogHandler(handler: LogHandler | null) { // Позволяем установить null для сброса
     this.logHandler = handler;
     // Логируем установку/сброс только если логгер уже инициализирован
-    if (this.logInternal) {
+    if (this.logInternal && !this.isLoggingInternally) { // Check flag
         this.logInternal('debug', `[Logger] Log handler ${handler ? 'set' : 'cleared'}.`);
     }
   }
@@ -58,6 +59,12 @@ class DebugLogger {
 
   // Внутренний метод для добавления в массив и вызова обработчика
   private logInternal(level: LogLevel, ...args: any[]) {
+     if (this.isLoggingInternally) {
+         console.warn("[Logger] Recursive log attempt detected, skipping:", level, args);
+         return; // Предотвращаем рекурсию
+     }
+     this.isLoggingInternally = true; // Устанавливаем флаг
+
     const timestamp = Date.now();
     let message = '';
     try {
@@ -118,6 +125,8 @@ class DebugLogger {
         if (this.logHandler) {
             try { this.logHandler('fatal', errorMsg, timestamp); } catch { /* ignore handler error here */ }
         }
+    } finally {
+         this.isLoggingInternally = false; // Сбрасываем флаг
     }
   }
 

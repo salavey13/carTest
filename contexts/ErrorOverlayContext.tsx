@@ -60,6 +60,7 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const addLogToHistory = useCallback<LogHandler>((level, message, timestamp) => {
     setLogHistory(prevHistory => {
         const newRecord: LogRecord = { level, message, timestamp, id: timestamp + Math.random() + '-log' };
+        // console.debug(`[addLogToHistory] Adding: ${level} - ${message.substring(0, 30)}...`, newRecord.id); // Debug log add
         return [...prevHistory, newRecord].slice(-MAX_LOG_HISTORY);
     });
    }, []);
@@ -72,21 +73,22 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return () => {
         // Сбрасываем обработчик при размонтировании, чтобы избежать утечек
         logger.setLogHandler(null);
-         logger.log('[ErrorOverlayProvider] Logger handler cleared.');
+         // Используем console.log, т.к. logger уже может быть без обработчика
+         console.log('[ErrorOverlayProvider] Logger handler cleared.');
       };
   }, [addLogToHistory]); // Зависимость от стабильной функции
 
   // Глобальные слушатели ошибок
   useEffect(() => {
+    if (!showOverlay) return; // Exit early if overlay is disabled
+
     const handleError = (event: ErrorEvent) => {
         if (event.message === 'Script error.' && !event.filename) {
             logger.warn("Global 'error' event ignored: Generic 'Script error.'", { msg: event.message, file: event.filename });
             return;
         }
         logger.error("Global 'error' event caught:", { msg: event.message, file: event.filename, line: event.lineno, col: event.colno, errorObj: event.error });
-        if (showOverlay) {
-            setErrorInfo({ message: event.message || 'Unknown error event', source: event.filename || 'N/A', lineno: event.lineno || undefined, colno: event.colno || undefined, error: event.error || event.message, type: 'error' });
-        }
+        setErrorInfo({ message: event.message || 'Unknown error event', source: event.filename || 'N/A', lineno: event.lineno || undefined, colno: event.colno || undefined, error: event.error || event.message, type: 'error' });
     };
     const handleRejection = (event: PromiseRejectionEvent) => {
         logger.error("Global 'unhandledrejection' event caught:", { reason: event.reason });
@@ -98,15 +100,19 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
             else if (event.reason && typeof event.reason.message === 'string') message = event.reason.message;
             else { try { message = JSON.stringify(event.reason); } catch { message = 'Unhandled promise rejection with non-serializable reason'; } }
         } catch (e) { message = "Error processing rejection reason itself."; }
-        if (showOverlay) { setErrorInfo({ message: message || "Unknown rejection reason", error: errorObject, type: 'rejection' }); }
+        setErrorInfo({ message: message || "Unknown rejection reason", error: errorObject, type: 'rejection' });
     };
+
     window.addEventListener('error', handleError);
     window.addEventListener('unhandledrejection', handleRejection);
+    logger.log("[ErrorOverlayProvider] Global error listeners attached."); // Log attach
+
     return () => {
       window.removeEventListener('error', handleError);
       window.removeEventListener('unhandledrejection', handleRejection);
+      logger.log("[ErrorOverlayProvider] Global error listeners removed."); // Log remove
     };
-  }, [showOverlay]); // showOverlay - единственная реальная зависимость
+  }, [showOverlay]); // Only depends on showOverlay
 
   // Мемоизируем значение контекста
   const contextValue = useMemo(() => ({

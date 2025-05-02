@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react'; // Added useState for internal render error handling
 import { useErrorOverlay, ErrorInfo, LogRecord, ToastRecord, LogLevel } from '@/contexts/ErrorOverlayContext';
 import {
     FaCopy, FaTriangleExclamation, FaGithub, FaRegClock, FaCircleInfo, FaCircleCheck,
     FaCircleXmark, FaBug, FaFileLines, FaTerminal // Added icons
 } from 'react-icons/fa6';
 import { toast as sonnerToast } from 'sonner'; // Use sonner directly only for copy feedback inside overlay
-import { debugLogger as logger } from '@/lib/debugLogger'; // Use ONLY for internal overlay errors
+// Removed import of debugLogger - avoid logging within the overlay itself
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
@@ -96,47 +96,55 @@ const getLevelColor = (level: LogLevel | ToastRecord['type']): string => {
 
 // --- Main Overlay Component ---
 const DevErrorOverlay: React.FC = () => {
+  // --- Internal state for rendering errors WITHIN the overlay ---
+  const [internalRenderError, setInternalRenderError] = useState<Error | null>(null);
+
   // Safely access context
   let errorInfo: ErrorInfo | null = null;
   let setErrorInfo: React.Dispatch<React.SetStateAction<ErrorInfo | null>> = () => {};
   let showOverlay = false;
   let toastHistory: ToastRecord[] = [];
-  let logHistory: LogRecord[] = []; // <-- Get log history
+  let logHistory: LogRecord[] = [];
   try {
        const context = useErrorOverlay();
        errorInfo = context.errorInfo;
        setErrorInfo = context.setErrorInfo;
        showOverlay = context.showOverlay;
        toastHistory = context.toastHistory;
-       logHistory = context.logHistory; // <-- Get log history
-       // Internal log confirming context retrieval (will appear in the overlay's log history)
-       logger.debug("[DevErrorOverlay] Context retrieved successfully.", { hasErrorInfo: !!errorInfo, toastCount: toastHistory.length, logCount: logHistory.length });
+       logHistory = context.logHistory;
+       // Avoid logging context retrieval here to prevent loops
+       // console.debug("[DevErrorOverlay] Context retrieved successfully.");
   } catch(contextError: any) {
-       // Log the critical context error using the logger itself
-       logger.fatal(t.fatalContextError, contextError);
+       // Log critical context error directly to console
+       console.error(t.fatalContextError, contextError);
        // Return a simple div, as the error is already logged
        return <div className="fixed inset-0 z-[100] bg-black text-red-500 p-4">{t.fatalContextError}</div>;
   }
 
-  // Log received error info only once when it appears
+  // Log received error info only once when it appears (to console)
   useEffect(() => {
-    if (errorInfo) {
-      logger.error("[DevErrorOverlay] Received errorInfo to display:", errorInfo);
+    if (errorInfo && showOverlay) {
+      console.info("[DevErrorOverlay] Received errorInfo to display:", errorInfo);
     }
-  }, [errorInfo]); // Depends only on errorInfo
+  }, [errorInfo, showOverlay]); // Depends on errorInfo and showOverlay
+
+  // --- Render Fallback if internal error occurs ---
+  if (internalRenderError) {
+     console.error("[DevErrorOverlay] FATAL: Component failed to render!", { originalErrorInfo: errorInfo, overlayRenderError: internalRenderError });
+     return <ErrorOverlayFallback message={errorInfo?.message || t.unknownError} renderErrorMessage={internalRenderError.message} />;
+  }
 
   // Main Component Logic Wrapped in try-catch for robustness
   try {
       if (!errorInfo || !showOverlay) {
-        // This state is normal, don't log anything here unless debugging the overlay itself
         return null;
       }
-      logger.info("[DevErrorOverlay] Rendering error overlay UI."); // Log when UI is actually rendered
+      // console.info("[DevErrorOverlay] Rendering error overlay UI."); // Avoid logging render
 
       const handleClose = () => {
-          logger.info("[DevErrorOverlay] Close button clicked.");
+          // console.info("[DevErrorOverlay] Close button clicked."); // Avoid logging close
           try { setErrorInfo(null); } // Attempt to clear the error state in the context
-          catch (e) { logger.error("[DevErrorOverlay] Error in setErrorInfo during handleClose:", e); }
+          catch (e) { console.error("[DevErrorOverlay] Error in setErrorInfo during handleClose:", e); }
       };
 
       const getShortStackTrace = (error?: Error | string | any): string => {
@@ -156,14 +164,15 @@ const DevErrorOverlay: React.FC = () => {
              // Limit stack trace length
              return stack.split('\n').slice(0, 8).join('\n') || t.stackTraceEmpty;
          } catch (e: any) {
-             logger.error("[DevErrorOverlay] Error getting/formatting stack trace:", e);
+             // Log internal errors directly to console
+             console.error("[DevErrorOverlay] Error getting/formatting stack trace:", e);
              return `${t.stackTraceError}: ${e?.message ?? 'Unknown'}`;
          }
       };
 
       const prepareIssueAndCopyData = () => {
           try {
-             logger.debug("[DevErrorOverlay] Preparing issue/copy data...");
+             // console.debug("[DevErrorOverlay] Preparing issue/copy data..."); // Avoid logging prepare
              const safeErrorInfo = errorInfo ?? { message: t.unknownError, type: 'unknown' };
              const errorType = safeErrorInfo.type?.toUpperCase() || 'UNKNOWN';
              const message = safeErrorInfo.message || t.unknownError;
@@ -225,10 +234,10 @@ ${formattedToastHistory}
 
 Задача: Проанализируй ошибку, стек, логи и уведомления. Предложи исправления кода или объясни причину.`;
 
-             logger.debug("[DevErrorOverlay] Issue/copy data prepared.");
+             // console.debug("[DevErrorOverlay] Issue/copy data prepared."); // Avoid logging prepare end
              return { gitHubIssueUrl, copyPrompt };
          } catch (e: any) {
-             logger.error("[DevErrorOverlay] Error preparing issue/copy data:", e);
+             console.error("[DevErrorOverlay] Error preparing issue/copy data:", e);
              // Use sonner directly for feedback *within* the overlay
              sonnerToast.error(`${t.copyDataErrorToast}: ${e?.message ?? 'Unknown'}`);
              return { gitHubIssueUrl: `https://github.com/${process.env.NEXT_PUBLIC_GITHUB_ORG || 'salavey13'}/${process.env.NEXT_PUBLIC_GITHUB_REPO || 'carTest'}/issues/new`, copyPrompt: `Error generating copy data: ${e?.message}` };
@@ -238,19 +247,19 @@ ${formattedToastHistory}
       const { gitHubIssueUrl, copyPrompt } = prepareIssueAndCopyData();
 
       const handleCopyVibeRequest = () => {
-         logger.info("[DevErrorOverlay] Copy Vibe Request button clicked.");
+         // console.info("[DevErrorOverlay] Copy Vibe Request button clicked."); // Avoid logging copy
          try {
              navigator.clipboard.writeText(copyPrompt)
                .then(() => {
-                   logger.log("[DevErrorOverlay] Copy successful.");
+                   // console.log("[DevErrorOverlay] Copy successful."); // Avoid logging success
                    sonnerToast.success(t.copySuccessToast); // Use sonner directly
                })
                .catch(err => {
-                   logger.error("[DevErrorOverlay] Failed to copy vibe request:", err);
+                   console.error("[DevErrorOverlay] Failed to copy vibe request:", err);
                    sonnerToast.error(t.copyErrorToast); // Use sonner directly
                });
          } catch (e: any) {
-             logger.error("[DevErrorOverlay] Error during copy action:", e);
+             console.error("[DevErrorOverlay] Error during copy action:", e);
              sonnerToast.error(`${t.copyGenericError}: ${e?.message ?? 'Unknown'}`); // Use sonner directly
          }
       };
@@ -259,9 +268,11 @@ ${formattedToastHistory}
       const RenderSection: React.FC<{ title: string; children: () => React.ReactNode }> = ({ title, children }) => {
           try { return <>{children()}</>; }
           catch (e: any) {
-              logger.error(`[DevErrorOverlay] Error rendering section "${title}":`, e);
-              // Render a fallback *within* the section
-              return <div className="text-red-500 border border-dashed border-red-600 p-2 my-2 rounded">Error rendering {title}: {e?.message ?? 'Unknown'}</div>;
+              console.error(`[DevErrorOverlay] Error rendering section "${title}":`, e);
+              // Set internal error state to trigger fallback
+              setInternalRenderError(e);
+              // Return null here, the main catch block will handle the fallback
+              return null;
           }
       };
 
@@ -382,10 +393,11 @@ ${formattedToastHistory}
       );
 
     } catch (renderError: any) {
-        // Log the overlay rendering error itself using the logger
-        logger.fatal("[DevErrorOverlay] FATAL: Component failed to render!", { originalErrorInfo: errorInfo, overlayRenderError: renderError });
-        // Display the minimal fallback UI
-        return <ErrorOverlayFallback message={errorInfo?.message || t.unknownError} renderErrorMessage={renderError?.message} />;
+        // If render fails even with RenderSection, set internal error state
+        // This should ideally be caught by RenderSection, but acts as a final safety net
+        setInternalRenderError(renderError);
+        // Return null here, the state update will trigger the fallback on next render
+        return null;
     }
 };
 
