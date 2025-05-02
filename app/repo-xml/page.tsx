@@ -160,7 +160,6 @@ function ActualPageContent() {
     // --- CONTEXT VALIDATION ---
     if (!pageContext || typeof pageContext.addToast !== 'function') {
          logger.fatal("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!");
-         // Render a minimal error state or return null to prevent further errors
          return <div className="text-red-500 p-4">Критическая ошибка: Контекст страницы не загружен.</div>;
     }
     logger.log("[ActualPageContent] pageContext VALUE:", pageContext ? "Available" : "NULL");
@@ -191,10 +190,16 @@ function ActualPageContent() {
     } catch (e: any) {
       searchParamsError = e;
       logger.error("[ActualPageContent] Error initializing useSearchParams:", e);
-      // Don't toast here, handle error display if needed later
     }
 
     // --- Effects ---
+    useEffect(() => {
+        logger.log("[ActualPageContent] Client-side hydration COMPLETE.");
+        return () => {
+          logger.log("[ActualPageContent] Unmounting.");
+        };
+      }, []);
+
     useEffect(() => {
       logger.debug("[Effect Lang] START");
       const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
@@ -206,10 +211,9 @@ function ActualPageContent() {
     }, [user]);
 
     useEffect(() => {
-      // Ensure searchParams was initialized successfully
       if (!searchParams) {
           logger.warn("[Effect URL Params] Skipping effect, searchParams failed to initialize.");
-          setInitialIdeaProcessed(true); // Prevent kwork population effect from running without params
+          setInitialIdeaProcessed(true);
           return;
       }
       logger.debug("[Effect URL Params] START");
@@ -261,7 +265,6 @@ function ActualPageContent() {
             setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
         }
        logger.debug("[Effect URL Params] END");
-       // Dependencies updated: searchParams is now potentially null
     }, [searchParams, setImageReplaceTask, setRepoUrl, addToast]);
 
      useEffect(() => {
@@ -303,7 +306,7 @@ function ActualPageContent() {
 
 
     // --- Callbacks ---
-    const memoizedGetPlainText = useCallback(getPlainText, []); // getPlainText is updated
+    const memoizedGetPlainText = useCallback(getPlainText, []);
 
     const scrollToSectionNav = useCallback((id: string) => {
         logger.debug(`[CB ScrollNav] Attempting scroll to: ${id}`);
@@ -345,7 +348,6 @@ function ActualPageContent() {
          const loadingText = translations[loadingLang]?.loading ?? translations.en.loading;
          return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
      }
-     // Handle searchParams error during rendering
      if (searchParamsError) {
         logger.error("[Render] ActualPageContent: Rendering error state due to searchParams failure.");
         return <div className="text-red-500 p-4">Ошибка: Не удалось инициализировать параметры URL ({searchParamsError.message}).</div>;

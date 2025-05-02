@@ -1,23 +1,21 @@
 import type React from "react";
 import Script from "next/script";
-import { Suspense } from 'react';
+import { Suspense } from 'react'; // Removed useEffect
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import StickyChatButton from "@/components/StickyChatButton";
-import { AppProvider } from "@/contexts/AppContext"; // Keep AppProvider
+import { AppProvider } from "@/contexts/AppContext";
 import { Toaster as SonnerToaster } from "sonner";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import type { Metadata, Viewport } from 'next';
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext";
+import ErrorBoundaryForOverlay from "@/components/ErrorBoundaryForOverlay";
+import DevErrorOverlay from "@/components/DevErrorOverlay";
+// Removed logger import as useEffect is removed
 
-// --- NEW IMPORTS for Error Handling ---
-import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext"; // Import the Provider
-import ErrorBoundaryForOverlay from "@/components/ErrorBoundaryForOverlay"; // Import the Boundary
-import DevErrorOverlay from "@/components/DevErrorOverlay"; // Import the Overlay display component
-// ------------------------------------
-
-// --- Fallback component for StickyChatButton ---
+// Fallback component remains the same
 function LoadingChatButtonFallback() {
   return (
     <div
@@ -26,13 +24,12 @@ function LoadingChatButtonFallback() {
     ></div>
   );
 }
-// ------------------------------------------
 
+// Static metadata and viewport exports are now safe again
 export const metadata: Metadata = {
   title: "V0 Car Test App",
   description: "Find your perfect V0 car.",
 };
-
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -40,11 +37,13 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Removed logger call from here
+
   return (
     <html lang="en" className="h-full">
       <head>
-        {/* Head content remains the same */}
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="format-detection" content="telephone=no" />
@@ -58,16 +57,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={cn(
           "flex min-h-screen flex-col bg-gray-900 text-white antialiased",
       )}>
-        {/* --- Wrap EVERYTHING with ErrorOverlayProvider --- */}
         <ErrorOverlayProvider>
-          {/* AppProvider needs ErrorOverlay context for logging, so it's inside */}
           <AppProvider>
-            {/* TooltipProvider can be inside AppProvider */}
             <TooltipProvider>
-
-              {/* --- ErrorBoundaryForOverlay Wraps main app content --- */}
-              {/* It catches render errors and sends them to ErrorOverlayContext */}
-              {/* If it catches, it renders NULL, letting DevErrorOverlay handle display */}
               <ErrorBoundaryForOverlay>
                 <Header />
                 <main className="flex-1">
@@ -78,9 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </Suspense>
                 <Footer />
               </ErrorBoundaryForOverlay>
-              {/* --- End of ErrorBoundaryForOverlay Wrap --- */}
 
-              {/* Sonner Toaster remains outside the boundary, but inside AppProvider for context */}
               <SonnerToaster
                 position="bottom-right"
                 richColors
@@ -95,16 +85,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   className: 'text-sm',
                 }}
               />
-
-              {/* --- DevErrorOverlay is placed here --- */}
-              {/* It's INSIDE ErrorOverlayProvider to get context */}
-              {/* It's OUTSIDE ErrorBoundaryForOverlay so it renders even if the boundary caught an error */}
-              {/* It has its own internal error handling */}
               <DevErrorOverlay />
-
             </TooltipProvider>
           </AppProvider>
-        </ErrorOverlayProvider> {/* --- Close ErrorOverlayProvider --- */}
+        </ErrorOverlayProvider>
       </body>
     </html>
   );
