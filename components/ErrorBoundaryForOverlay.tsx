@@ -21,6 +21,13 @@ function withErrorOverlayContext<P extends object>(
 ): React.FC<P> {
     const ComponentWithContext: React.FC<P> = (props) => {
         const context = useErrorOverlay();
+        // Ensure context is available before rendering WrappedComponent
+        if (!context) {
+             // This should not happen if ErrorOverlayProvider wraps this, but good safety check
+             console.error("CRITICAL: ErrorOverlayContext not found in withErrorOverlayContext!");
+             // Render children directly or a minimal fallback, but avoid crashing
+             return <>{props.children}</>;
+        }
         return <WrappedComponent {...props} context={context} />;
     };
     ComponentWithContext.displayName = `WithErrorOverlayContext(${WrappedComponent.displayName || WrappedComponent.name || 'Component'})`;
@@ -37,15 +44,25 @@ class ErrorBoundaryForOverlayInternal extends Component<Props & { context: Retur
 
   // Update state so the next render will show the fallback UI (or nothing).
   static getDerivedStateFromError(error: Error): State {
+    // Log the error immediately when it's caught
+    logger.error("[ErrorBoundaryForOverlay] getDerivedStateFromError caught:", error);
     return { hasError: true, error: error };
   }
 
   // Catch errors in any components below and log them to the context
   componentDidCatch(error: Error, errorInfo: ReactErrorInfo): void {
-    const { setErrorInfo } = this.props.context; // Access context via props
+    // Context might not be available immediately if the error happens very early
+    // or if the HOC somehow failed, so check defensively.
+    const context = this.props.context;
+    if (!context || !context.setErrorInfo) {
+        logger.fatal("[ErrorBoundaryForOverlay] CRITICAL: Context or setErrorInfo missing in componentDidCatch!", { error, errorInfo });
+        console.error("CRITICAL: ErrorBoundary context/setErrorInfo missing!", error, errorInfo);
+        return; // Cannot report error to context
+    }
+    const { setErrorInfo } = context;
 
     // Log to our system AND the console
-    logger.error("[ErrorBoundaryForOverlay] Caught React Error:", error, errorInfo?.componentStack); // Use our logger
+    logger.error("[ErrorBoundaryForOverlay] componentDidCatch reporting error:", error, errorInfo?.componentStack); // Use our logger
     console.error("ErrorBoundaryForOverlay caught an error:", error, errorInfo); // Keep console log too
 
     // Prepare data for the context
@@ -60,19 +77,26 @@ class ErrorBoundaryForOverlayInternal extends Component<Props & { context: Retur
     };
 
     // Send the error details to the context
-    setErrorInfo(errorDetails);
+    try {
+       setErrorInfo(errorDetails);
+       logger.info("[ErrorBoundaryForOverlay] Error successfully reported to ErrorOverlayContext.");
+    } catch (e) {
+       logger.fatal("[ErrorBoundaryForOverlay] CRITICAL: Failed to report error to ErrorOverlayContext!", e);
+       console.error("CRITICAL: Failed to report error to ErrorOverlayContext!", e);
+    }
   }
 
   render(): ReactNode {
     if (this.state.hasError) {
       // --- CHANGE HERE ---
       // When an error is caught, don't render the children.
-      // The DevErrorOverlay will be displayed by the context update.
-      logger.debug("[ErrorBoundaryForOverlay] Render suppressed due to error state.");
-      return null;
+      // The DevErrorOverlay (outside this boundary) will be displayed by the context update.
+      logger.warn("[ErrorBoundaryForOverlay] Render suppressed due to error state.");
+      return null; // Return null to let the external overlay handle it
       // --- END CHANGE ---
     }
 
+    // Normally, render children
     return this.props.children;
   }
 }

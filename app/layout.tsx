@@ -60,13 +60,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       )}>
         {/* --- Wrap EVERYTHING with ErrorOverlayProvider --- */}
         <ErrorOverlayProvider>
-          {/* AppProvider needs ErrorOverlay context for useAppToast, so it's inside */}
+          {/* AppProvider needs ErrorOverlay context for logging, so it's inside */}
           <AppProvider>
             {/* TooltipProvider can be inside AppProvider */}
             <TooltipProvider>
 
               {/* --- ErrorBoundaryForOverlay Wraps main app content --- */}
               {/* It catches render errors and sends them to ErrorOverlayContext */}
+              {/* If it catches, it renders NULL, letting DevErrorOverlay handle display */}
               <ErrorBoundaryForOverlay>
                 <Header />
                 <main className="flex-1">
@@ -98,6 +99,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {/* --- DevErrorOverlay is placed here --- */}
               {/* It's INSIDE ErrorOverlayProvider to get context */}
               {/* It's OUTSIDE ErrorBoundaryForOverlay so it renders even if the boundary caught an error */}
+              {/* It has its own internal error handling */}
               <DevErrorOverlay />
 
             </TooltipProvider>

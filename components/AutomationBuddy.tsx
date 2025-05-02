@@ -51,7 +51,7 @@ const notificationVariants = { hidden: { scale: 0, opacity: 0 }, visible: { scal
 
 // --- Main Component ---
 const AutomationBuddy: React.FC = () => {
-    logger.debug("[AutomationBuddy] Rendering");
+    logger.debug("[AutomationBuddy] Rendering START");
     // --- State ---
     const [isMounted, setIsMounted] = useState(false); // Keep isMounted for client-side logic
     const [isOpen, setIsOpen] = useState(false);
@@ -72,7 +72,8 @@ const AutomationBuddy: React.FC = () => {
         selectedAssistantFiles, assistantLoading, aiActionLoading, loadingPrs,
         targetBranchName, manualBranchName, isSettingsModalOpen, isParsing,
         currentAiRequestId, imageReplaceTask, allFetchedFiles,
-        primaryHighlightedPath, secondaryHighlightedPaths, // Get highlight info
+        // Highlights
+        primaryHighlightedPath, secondaryHighlightedPaths,
 
         // Triggers
         triggerFetch = () => logger.warn("[Buddy] triggerFetch not available"),
@@ -85,6 +86,7 @@ const AutomationBuddy: React.FC = () => {
         triggerCreateOrUpdatePR = async () => logger.warn("[Buddy] triggerCreateOrUpdatePR not available"),
         triggerToggleSettingsModal = () => logger.warn("[Buddy] triggerToggleSettingsModal not available"),
         scrollToSection = () => logger.warn("[Buddy] scrollToSection not available"),
+        triggerClearKworkInput = () => logger.warn("[Buddy] triggerClearKworkInput not available"), // Added Clear trigger
 
         // Refs
         fetcherRef,
@@ -102,49 +104,9 @@ const AutomationBuddy: React.FC = () => {
     const activeMessage = useMemo(() => {
         logger.debug(`[AutomationBuddy Memo] Calculating activeMessage. currentStep=${currentStep}, fetchStatus=${fetchStatus}`);
         if (!isMounted) return "Загрузка Бадди...";
-
-        // --- Level 1 Task: Image Replacement ---
-        if (imageReplaceTask) {
-            if (fetchStatus === 'loading' || fetchStatus === 'retrying') return "Гружу файл для замены картинки...";
-            if (fetchStatus === 'error' || fetchStatus === 'failed_retries') return "Опа! Не смог загрузить файл для замены. Проверь URL/ветку и жми 'Попробовать Снова'.";
-            const targetFileExists = allFetchedFiles?.some(f => f.path === imageReplaceTask.targetPath);
-            if (fetchStatus === 'success' && !targetFileExists && filesFetched) return "Файл для замены не найден в репе! Проверь путь/ветку.";
-            if (fetchStatus === 'success' && targetFileExists) {
-                if (assistantLoading) return "Меняю картинку и делаю PR... Магия в процессе!";
-                return "Файл загружен! Сейчас Ассистент заменит картинку и создаст PR автоматом.";
-            }
-            return "Готовлюсь к замене картинки..."; // Default for image task
-        }
-
-        // --- Standard Levels & Vibe Philosophy ---
-        switch (currentStep) {
-            case 'idle': return "Введи URL репы GitHub или найди баг/идею на странице и скажи мне!";
-            case 'ready_to_fetch': return "Окей, URL есть. Жми 'Извлечь Файлы', чтобы я загрузил код для AI.";
-            case 'fetching': return `Качаю файлы из ветки (${manualBranchName.trim() || targetBranchName || 'default'})... Дай мне секунду.`;
-            case 'fetch_failed': return "Бл*ть, не смог скачать файлы. Сеть? Права? URL? Попробуй еще раз.";
-            case 'files_fetched': return "Файлы загружены! Можешь выбрать нужные вручную или сразу дать AI общую идею.";
-            case 'files_fetched_highlights': return "Нашел связанные файлы (компоненты, хуки)! Выбери их (+1 Vibe Perk!) или добавь в запрос (+), чтобы AI точно понял контекст.";
-            case 'files_selected': return `Выбрано ${selectedFetcherFiles.size} файлов. Добавь их в запрос (+) или сразу проси AI их обработать (с добавл.).`;
-            case 'request_written': return "Запрос готов! Можешь скопировать его или сразу отправить AI на обработку.";
-            case 'request_copied': return "Запрос скопирован. Теперь вставляй его в AI (ChatGPT, Gemini...) и жди ответ. Потом вставь ответ в поле ниже.";
-            case 'generating_ai_response':
-                if (aiActionLoading) return `Жду ответ от AI... (ID: ${currentAiRequestId?.substring(0,6)}...)`;
-                if (assistantLoading) return "Обрабатываю ответ AI / Создаю или обновляю PR... Почти готово!";
-                return "Обработка..."; // Fallback
-            case 'response_pasted': return "Ответ AI получен! Жми '➡️', чтобы я его разобрал по файлам и проверил.";
-            case 'parsing_response': return "Разбираю ответ AI на файлы... Проверяю код...";
-            case 'response_parsed': // Fallthrough to 'pr_ready'
-            case 'pr_ready':
-                 if (selectedAssistantFiles.size === 0) return "Файлы разобраны! Теперь выбери, какие из них включить в PR/обновление.";
-                 return `Выбрано ${selectedAssistantFiles.size} файлов для ${targetBranchName ? 'обновления ветки' : 'создания PR'}. Жми кнопку ниже!`;
-            default: return "Готов к вайбу! Что будем делать?";
-        }
-    }, [
-        isMounted, currentStep, fetchStatus, repoUrlEntered, filesFetched,
-        selectedFetcherFiles.size, aiResponseHasContent, filesParsed, assistantLoading, aiActionLoading,
-        loadingPrs, targetBranchName, manualBranchName, currentAiRequestId, imageReplaceTask,
-        allFetchedFiles, // Need this for image task check
-    ]);
+        return useRepoXmlPageContext().getXuinityMessage(); // Use the centralized message logic from context
+    }, [isMounted, currentStep, fetchStatus, // Add other state dependencies used by getXuinityMessage if necessary
+        repoUrlEntered, filesFetched, selectedFetcherFiles.size, kworkInputHasContent, aiResponseHasContent, filesParsed, assistantLoading, aiActionLoading, loadingPrs, targetBranchName, manualBranchName, currentAiRequestId, imageReplaceTask, allFetchedFiles.length, selectedAssistantFiles.size, isParsing, primaryHighlightedPath, secondaryHighlightedPaths.length > 0]);
 
 
     // --- Calculate Suggestions (NEW VIBE LOGIC) ---
@@ -162,18 +124,18 @@ const AutomationBuddy: React.FC = () => {
             const branchInfo = effectiveBranch === 'default' ? '' : ` (${effectiveBranch})`;
             const createOrUpdateActionText = targetBranchName ? `Обновить Ветку '${targetBranchName}'` : "Создать PR";
             const createOrUpdateIcon = targetBranchName ? <FaCodeBranch /> : <FaGithub />;
+            const hasAnyHighlights = !!primaryHighlightedPath || Object.values(secondaryHighlightedPaths).some(arr => arr.length > 0);
 
             const addSuggestion = (id: string, text: string, action: () => any, icon: React.ReactNode, condition = true, disabled = false, tooltip = '') => {
                 if (condition) {
                     let isDisabled = disabled || isAnyLoading; // Start with general loading disable
-                    logger.debug(`[Suggestion Add] ID: ${id}, Initial Disabled: ${isDisabled}`);
+                    // logger.debug(`[Suggestion Add] ID: ${id}, Initial Disabled: ${isDisabled}`); // Reduce verbosity
                     // Specific overrides/checks
                     if (['fetch', 'retry-fetch', 'retry-fetch-img', 'clear-all'].includes(id)) isDisabled = disabled || isFetcherLoading || isAssistantProcessing || isAiGenerating;
                     if (id.includes('ask-ai')) isDisabled = disabled || isAiGenerating;
                     if (id === 'parse-response') isDisabled = disabled || isParsing || isAiGenerating || !aiResponseHasContent; // Disable if no response
                     if (id === 'create-pr' || id === 'update-branch') isDisabled = disabled || isAssistantProcessing || selectedAssistantFiles.size === 0; // Disable if no files selected
                     if (id.includes('toggle-settings')) isDisabled = disabled || isAssistantProcessing || isAiGenerating; // Settings allowed unless Assistant/AI busy
-                    const hasAnyHighlights = !!primaryHighlightedPath || Object.values(secondaryHighlightedPaths).some(arr => arr.length > 0);
                     if (id === 'select-highlighted') {
                          isDisabled = disabled || isFetcherLoading || isAssistantProcessing || isAiGenerating || !hasAnyHighlights;
                          if (!hasAnyHighlights) tooltip = "Нет связанных файлов для выбора";
@@ -181,10 +143,10 @@ const AutomationBuddy: React.FC = () => {
                     if (id === 'add-selected') isDisabled = disabled || isFetcherLoading || isAssistantProcessing || isAiGenerating || selectedFetcherFiles.size === 0;
                     if (id.includes('ask-ai') && id !== 'ask-ai-empty') isDisabled = isDisabled || selectedFetcherFiles.size === 0; // Needs selection if not empty ask
 
-                    logger.debug(`[Suggestion Add] ID: ${id}, Final Disabled: ${isDisabled}, Tooltip: ${tooltip}`);
+                    // logger.debug(`[Suggestion Add] ID: ${id}, Final Disabled: ${isDisabled}, Tooltip: ${tooltip}`); // Reduce verbosity
                     suggestionsList.push({ id, text, action, icon, disabled: isDisabled, tooltip });
                 } else {
-                     logger.debug(`[Suggestion Add] ID: ${id} skipped (condition false)`);
+                     // logger.debug(`[Suggestion Add] ID: ${id} skipped (condition false)`); // Reduce verbosity
                 }
             };
 
@@ -226,7 +188,6 @@ const AutomationBuddy: React.FC = () => {
                      // Removed "Ask AI empty" - user should add context or write request first
                      break;
                  case 'files_fetched_highlights': {
-                     const hasHighlights = !!(primaryHighlightedPath || Object.values(secondaryHighlightedPaths).flat().length > 0);
                      addSuggestion("select-highlighted", "Выбрать Связанные", triggerSelectHighlighted, <FaHighlighter />, true); // Disable handled by addSuggestion
                      addSuggestion("goto-files", `К Списку Файлов (${allFetchedFiles.length})`, () => scrollToSection('file-list-container'), <FaEye />, true);
                      addSuggestion("add-selected", `Добавить Выбранные (${selectedFetcherFiles.size})`, () => triggerAddSelectedToKwork(false), <FaPlus />, true, false, "Добавить выбранные файлы в поле запроса"); // Disable handled by addSuggestion
@@ -263,8 +224,8 @@ const AutomationBuddy: React.FC = () => {
 
             // --- Add Clear All if applicable ---
             const canClear = selectedFetcherFiles.size > 0 || kworkInputHasContent || aiResponseHasContent || filesParsed;
-            if (!imageReplaceTask && canClear && fetcherRef?.current?.clearAll) {
-                addSuggestion("clear-all", "Очистить Все?", fetcherRef.current.clearAll, <FaBroom/>, true);
+            if (!imageReplaceTask && canClear) {
+                addSuggestion("clear-all", "Очистить Все?", triggerClearKworkInput, <FaBroom/>, true);
             }
 
              // --- General Loading Indicator ---
@@ -288,7 +249,7 @@ const AutomationBuddy: React.FC = () => {
 
     }, [
         isMounted, currentStep, fetchStatus, repoUrlEntered, filesFetched, selectedFetcherFiles, kworkInputHasContent, aiResponseHasContent, filesParsed, selectedAssistantFiles, assistantLoading, aiActionLoading, loadingPrs, targetBranchName, manualBranchName, isSettingsModalOpen, isParsing, currentAiRequestId, imageReplaceTask, allFetchedFiles, primaryHighlightedPath, secondaryHighlightedPaths, // State dependencies
-        triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR, triggerToggleSettingsModal, scrollToSection, fetcherRef // Context triggers & Ref
+        triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR, triggerToggleSettingsModal, scrollToSection, triggerClearKworkInput // Context triggers & Ref
     ]);
 
     // --- Suggestion Change Detection ---

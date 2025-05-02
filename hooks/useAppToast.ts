@@ -11,12 +11,17 @@ type ToastType = 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message
 /**
  * Custom hook for displaying toasts using 'sonner' and logging them to the ErrorOverlayContext history.
  * Use this hook throughout the application instead of importing 'toast' directly from 'sonner'.
+ * Provides centralized control over toast display (e.g., disabling debug toasts).
  *
  * @returns An object with methods mirroring the 'sonner' API (success, error, info, etc.).
  */
 export const useAppToast = () => {
-    const { addToastToHistory } = useErrorOverlay();
-    const { debugToastsEnabled } = useAppContext(); // <-- Получаем флаг из AppContext
+    const errorOverlay = useErrorOverlay(); // Get the whole context
+    const appContext = useAppContext(); // Get the whole context
+
+    // Ensure contexts are loaded before trying to use them
+    // This check is important, especially if this hook is used early in the render tree
+    const isReady = !!errorOverlay && !!appContext && appContext.hasOwnProperty('debugToastsEnabled');
 
     // Generic function to show toast and add to history
     const showToast = (
@@ -24,6 +29,16 @@ export const useAppToast = () => {
         message: string | React.ReactNode, // Sonner accepts ReactNode
         options?: any // Sonner options object
     ) => {
+        if (!isReady) {
+            logger.warn("useAppToast: Contexts not ready, toast suppressed.", { type, message });
+            // Fallback to console if contexts aren't ready?
+            console.warn(`[Toast Suppressed/Context Not Ready] ${type}:`, message);
+            return undefined;
+        }
+
+        const { addToastToHistory } = errorOverlay;
+        const { debugToastsEnabled } = appContext;
+
         try {
             // Convert ReactNode message to string for history (simplification)
             const messageString = typeof message === 'string' ? message : '[ReactNode]'; // Or implement more complex serialization if needed
@@ -61,7 +76,7 @@ export const useAppToast = () => {
             }
 
             // Add to history only if message is a string (or successfully converted)
-             if (messageString) {
+             if (messageString && addToastToHistory) { // Ensure addToastToHistory is available
                 const record: Omit<ToastRecord, 'id'> = {
                     message: messageString,
                     type: type === 'custom' ? 'info' : type, // Log custom as info for simplicity
@@ -69,7 +84,7 @@ export const useAppToast = () => {
                 };
                 addToastToHistory(record);
             } else if (type !== 'custom') {
-                 logger.warn("useAppToast: Could not add non-string toast message to history", { type });
+                 logger.warn("useAppToast: Could not add non-string toast message to history or addToastToHistory not available", { type, hasFunc: !!addToastToHistory });
             }
              // For custom toasts, logging might need specific handling if context is needed
 
@@ -86,6 +101,21 @@ export const useAppToast = () => {
     };
 
     // Return the API mirroring sonner
+    // If not ready, return dummy functions that log warnings
+    if (!isReady) {
+        const notReadyWarn = (method: string) => logger.warn(`useAppToast: Attempted to call ${method} before context was ready.`);
+        return {
+            success: (msg: any) => notReadyWarn('success'),
+            error: (msg: any) => notReadyWarn('error'),
+            info: (msg: any) => notReadyWarn('info'),
+            warning: (msg: any) => notReadyWarn('warning'),
+            loading: (msg: any) => notReadyWarn('loading'),
+            message: (msg: any) => notReadyWarn('message'),
+            custom: (fn: any) => notReadyWarn('custom'),
+            dismiss: (id?: any) => notReadyWarn('dismiss'),
+        };
+    }
+
     return {
         success: (message: string | React.ReactNode, options?: any) => showToast('success', message, options),
         error: (message: string | React.ReactNode, options?: any) => showToast('error', message, options),

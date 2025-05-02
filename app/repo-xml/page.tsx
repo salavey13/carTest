@@ -145,7 +145,7 @@ const getPlainText = (htmlString: string | null | undefined): string => {
         // Decode common HTML entities
         return text.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
     } catch (e) {
-        logger.error("Error stripping HTML for title:", e, "Input:", htmlString);
+        logger.error("[getPlainText] Error stripping HTML for title:", e, "Input:", htmlString);
         return htmlString; // Return original on error
     }
 };

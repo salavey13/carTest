@@ -7,7 +7,7 @@ import type { ToastRecord } from '@/types/toast';
 import type { LogHandler, LogLevel } from '@/lib/debugLogger'; // Импортируем типы из логгера
 
 const MAX_TOAST_HISTORY = 50;
-const MAX_LOG_HISTORY = 200; // Увеличим лимит логов еще больше
+const MAX_LOG_HISTORY = 250; // Increased log limit
 
 // Тип для записей лога
 export interface LogRecord {
@@ -23,8 +23,8 @@ export interface ErrorInfo {
   source?: string;
   lineno?: number;
   colno?: number;
-  error?: Error | string | any;
-  type: 'error' | 'rejection' | 'react';
+  error?: Error | string | any; // Store the original error/reason object
+  type: 'error' | 'rejection' | 'react'; // Type of error source
 }
 
 // Форма контекста
@@ -46,13 +46,22 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
   const [toastHistory, setToastHistory] = useState<ToastRecord[]>([]);
   const [logHistory, setLogHistory] = useState<LogRecord[]>([]);
-  const showOverlay = process.env.NEXT_PUBLIC_ENABLE_DEV_OVERLAY === 'true';
+  // Read overlay enable flag ONCE on mount, default to true if not set or invalid
+  const showOverlay = useMemo(() => {
+       const flag = process.env.NEXT_PUBLIC_ENABLE_DEV_OVERLAY;
+       const enabled = flag === 'true';
+       console.log(`[ErrorOverlayProvider] Dev Error Overlay ${enabled ? 'ENABLED' : 'DISABLED'} (NEXT_PUBLIC_ENABLE_DEV_OVERLAY=${flag})`);
+       return enabled;
+  }, []);
+
 
   // Функция добавления тоста
   const addToastToHistory = useCallback((record: Omit<ToastRecord, 'id'>) => {
     setToastHistory(prevHistory => {
         const newRecord: ToastRecord = { ...record, id: Date.now() + Math.random() };
-        return [...prevHistory, newRecord].slice(-MAX_TOAST_HISTORY);
+        const nextHistory = [...prevHistory, newRecord];
+        // Ensure limit is respected
+        return nextHistory.length > MAX_TOAST_HISTORY ? nextHistory.slice(nextHistory.length - MAX_TOAST_HISTORY) : nextHistory;
     });
   }, []);
 
@@ -61,14 +70,16 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setLogHistory(prevHistory => {
         const newRecord: LogRecord = { level, message, timestamp, id: timestamp + Math.random() + '-log' };
         // console.debug(`[addLogToHistory] Adding: ${level} - ${message.substring(0, 30)}...`, newRecord.id); // Debug log add
-        return [...prevHistory, newRecord].slice(-MAX_LOG_HISTORY);
+        const nextHistory = [...prevHistory, newRecord];
+        // Ensure limit is respected
+        return nextHistory.length > MAX_LOG_HISTORY ? nextHistory.slice(nextHistory.length - MAX_LOG_HISTORY) : nextHistory;
     });
    }, []);
 
   // Связываем debugLogger с addLogToHistory
   useEffect(() => {
-      logger.setLogHandler(addLogToHistory);
       // Логируем через сам логгер, чтобы это тоже попало в историю
+      logger.setLogHandler(addLogToHistory);
       logger.log('[ErrorOverlayProvider] Logger handler initialized.');
       return () => {
         // Сбрасываем обработчик при размонтировании, чтобы избежать утечек
@@ -80,18 +91,37 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Глобальные слушатели ошибок
   useEffect(() => {
-    if (!showOverlay) return; // Exit early if overlay is disabled
+    // Only attach listeners if the overlay is enabled
+    if (!showOverlay) {
+        logger.info("[ErrorOverlayProvider] Skipping global error listeners (overlay disabled).");
+        return;
+    }
 
     const handleError = (event: ErrorEvent) => {
+        // Avoid generic script errors which provide no details
         if (event.message === 'Script error.' && !event.filename) {
-            logger.warn("Global 'error' event ignored: Generic 'Script error.'", { msg: event.message, file: event.filename });
+            logger.warn("Global 'error' event ignored: Generic 'Script error.'", { msg: event.message });
             return;
         }
-        logger.error("Global 'error' event caught:", { msg: event.message, file: event.filename, line: event.lineno, col: event.colno, errorObj: event.error });
-        setErrorInfo({ message: event.message || 'Unknown error event', source: event.filename || 'N/A', lineno: event.lineno || undefined, colno: event.colno || undefined, error: event.error || event.message, type: 'error' });
+        // Avoid logging errors originating from the DevErrorOverlay component itself
+        if (event.error && event.error.stack && event.error.stack.includes('DevErrorOverlay')) {
+             logger.warn("Global 'error' event ignored: Originates from DevErrorOverlay.", { msg: event.message });
+             return;
+        }
+
+        logger.error("Global 'error' event caught by ErrorOverlayContext:", { msg: event.message, file: event.filename, line: event.lineno, col: event.colno, errorObj: event.error });
+        setErrorInfo({ message: event.message || 'Unknown error event', source: event.filename || 'N/A', lineno: event.lineno || undefined, colno: event.colno || undefined, error: event.error || event.message, // Store the error object
+            type: 'error' });
     };
+
     const handleRejection = (event: PromiseRejectionEvent) => {
-        logger.error("Global 'unhandledrejection' event caught:", { reason: event.reason });
+        // Avoid logging rejections originating from the DevErrorOverlay component itself
+        if (event.reason instanceof Error && event.reason.stack && event.reason.stack.includes('DevErrorOverlay')) {
+            logger.warn("Global 'unhandledrejection' event ignored: Originates from DevErrorOverlay.", { reason: event.reason });
+            return;
+        }
+
+        logger.error("Global 'unhandledrejection' event caught by ErrorOverlayContext:", { reason: event.reason });
         let message = 'Unhandled promise rejection';
         let errorObject: any = event.reason;
         try {
@@ -100,7 +130,8 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
             else if (event.reason && typeof event.reason.message === 'string') message = event.reason.message;
             else { try { message = JSON.stringify(event.reason); } catch { message = 'Unhandled promise rejection with non-serializable reason'; } }
         } catch (e) { message = "Error processing rejection reason itself."; }
-        setErrorInfo({ message: message || "Unknown rejection reason", error: errorObject, type: 'rejection' });
+        setErrorInfo({ message: message || "Unknown rejection reason", error: errorObject, // Store the reason object
+            type: 'rejection' });
     };
 
     window.addEventListener('error', handleError);
@@ -112,7 +143,7 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
       window.removeEventListener('unhandledrejection', handleRejection);
       logger.log("[ErrorOverlayProvider] Global error listeners removed."); // Log remove
     };
-  }, [showOverlay]); // Only depends on showOverlay
+  }, [showOverlay]); // Only depends on showOverlay to attach/detach
 
   // Мемоизируем значение контекста
   const contextValue = useMemo(() => ({
@@ -132,7 +163,15 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
 export const useErrorOverlay = (): ErrorOverlayContextType => {
   const context = useContext(ErrorOverlayContext);
   if (context === undefined) {
-    throw new Error('useErrorOverlay must be used within an ErrorOverlayProvider');
+    // Log critical error
+    const error = new Error('useErrorOverlay must be used within an ErrorOverlayProvider');
+    console.error("FATAL:", error);
+    // Provide a default fallback object to prevent immediate crashes in consumers,
+    // although functionality will be broken.
+    return {
+        errorInfo: null, setErrorInfo: () => {}, showOverlay: false, toastHistory: [], addToastToHistory: () => {}, logHistory: [], addLogToHistory: () => {}
+    };
+    // OR re-throw the error if preferred: throw error;
   }
   return context;
 };
