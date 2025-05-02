@@ -3,8 +3,8 @@
 import React, { useMemo, useState, useEffect, useImperativeHandle, forwardRef, MutableRefObject, useCallback, useRef } from "react";
 // Context & Actions
 import {
-    useRepoXmlPageContext, AICodeAssistantRef, SimplePullRequest, ImageReplaceTask, FileNode
-} from "@/contexts/RepoXmlPageContext";
+    useRepoXmlPageContext, AICodeAssistantRef, SimplePullRequest, ImageReplaceTask, FileNode, RepoXmlPageContextType
+} from "@/contexts/RepoXmlPageContext"; // Import RepoXmlPageContextType
 import { supabaseAdmin } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
 // Hooks & Components
@@ -39,8 +39,8 @@ interface AICodeAssistantProps {
 }
 interface OriginalFile { path: string; content: string; }
 
-// --- Helper Component (Moved from page.tsx for clarity) ---
-const ToastInjector: React.FC<{ id: string; context: ReturnType<typeof useRepoXmlPageContext> | null }> = ({ id, context }) => {
+// --- Helper Component ---
+const ToastInjector: React.FC<{ id: string; context: RepoXmlPageContextType | null }> = ({ id, context }) => {
     if (!context || !context.addToast) {
         if (!context) logger.warn(`ToastInjector ${id}: Context is null`);
         else if (!context.addToast) logger.warn(`ToastInjector ${id}: context.addToast is not available`);
@@ -53,6 +53,7 @@ const ToastInjector: React.FC<{ id: string; context: ReturnType<typeof useRepoXm
     }
     return null;
 };
+
 
 // --- Main Component ---
 const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((props, ref) => {
@@ -243,7 +244,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         };
         loadLinks();
         addToastDirect("[DEBUG_EFFECT] Custom Links Effect Check END", 'info', 500);
-    }, [user, toastError, addToastDirect]);
+    }, [user, toastError, addToastDirect]); // Removed addToastDirect dependency
 
     useEffect(() => {
         addToastDirect("[DEBUG_EFFECT] Fetch Originals Effect Check START", 'info', 500);
@@ -280,7 +281,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             fetchOrig();
         }
         addToastDirect("[DEBUG_EFFECT] Fetch Originals Effect Check END", 'info', 500);
-    }, [validationIssues, originalRepoFiles.length, isFetchingOriginals, derivedRepoUrlForHooks, targetBranchName, imageReplaceTask, toastInfo, toastSuccess, toastError, addToastDirect]);
+    }, [validationIssues, originalRepoFiles.length, isFetchingOriginals, derivedRepoUrlForHooks, targetBranchName, imageReplaceTask, toastInfo, toastSuccess, toastError, addToastDirect]); // Added addToastDirect dependency
 
     useEffect(() => {
         addToastDirect("[DEBUG_EFFECT] Image Replace Effect Check START", 'info', 500);
@@ -358,7 +359,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     addToastDirect("[DEBUG_RENDER] AICodeAssistant Render: Returning JSX", 'info', 500);
     return (
         <div id="executor" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
-            {/* Добавляем инжектор в самое начало */}
             <ToastInjector id="AICodeAssistant-Start" context={pageContext} />
             <header className="flex justify-between items-center gap-2 flex-wrap">
                  <div className="flex items-center gap-2">
@@ -402,7 +402,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                         <ToastInjector id="AICodeAssistant-BeforeImageButton" context={pageContext} />
                          <button onClick={() => { addToastDirect("[DEBUG_CLICK] Image Button Click", 'info', 500); setIsImageModalOpen(true); }} className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50 relative" disabled={isProcessingAny} title="Загрузить/Связать Картинки (prompts_imgs.txt)" >
                              <FaImage className="text-gray-400" /> <span className="text-sm text-white">Картинки</span>
-                             {componentParsedFiles.some(f => f.path === '/prompts_imgs.txt') && !isImageModalOpen && ( <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-gray-800 animate-pulse"></span> )}
+                             {componentParsedFiles.some(f => f.path === '/prompts_imgs.txt') && !isImageModalOpen && ( <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-gray-800 shadow-md animate-pulse"></span> )}
                          </button>
                     </div>
                     <ToastInjector id="AICodeAssistant-StandardUI-End" context={pageContext} />
@@ -421,7 +421,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                        : <FaCheck className="text-green-400 text-4xl mb-4" /> }
 
                      <p className={`text-lg font-semibold ${imageTaskFailed ? 'text-red-300' : 'text-blue-300'}`}>
-                         {/* ... Status Title Logic ... */}
                          {(assistantLoading || isProcessingPR) ? "Обработка Замены..."
                            : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Загрузка Файла..."
                            : imageTaskFailed ? "Ошибка Замены Картинки"
@@ -429,7 +428,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                            : "Замена Завершена Успешно"}
                      </p>
                      <p className="text-sm text-gray-400 mt-2">
-                         {/* ... Status Description Logic ... */}
                           {(assistantLoading || isProcessingPR) ? "Создание/обновление PR..."
                            : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Ожидание ответа от GitHub..."
                            : imageTaskFailed ? (imageReplaceError || "Произошла неизвестная ошибка.")

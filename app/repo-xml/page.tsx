@@ -6,7 +6,8 @@ import AICodeAssistant from "@/components/AICodeAssistant";
 import AutomationBuddy from "@/components/AutomationBuddy";
 import {
     useRepoXmlPageContext, RepoXmlPageProvider,
-    RepoTxtFetcherRef, AICodeAssistantRef, ImageReplaceTask
+    RepoTxtFetcherRef, AICodeAssistantRef, ImageReplaceTask,
+    RepoXmlPageContextType // Import RepoXmlPageContextType
 } from '@/contexts/RepoXmlPageContext';
 import { useAppContext } from "@/contexts/AppContext";
 import { debugLogger as logger } from "@/lib/debugLogger";
@@ -116,34 +117,12 @@ const translations = {
 type Language = 'en' | 'ru';
 type TranslationSet = typeof translations['en'];
 
-
-
-
-// --- ВСТАВЛЯЕМ ОПРЕДЕЛЕНИЕ ToastInjector ЗДЕСЬ ---
-const ToastInjector: React.FC<{ id: string; context: RepoXmlPageContextType | null }> = ({ id, context }) => {
-    if (!context || !context.addToast) { // Добавили проверку на addToast
-        // Не можем показать тост, если контекст или функция недоступны
-        if (!context) logger.warn(`ToastInjector ${id}: Context is null`);
-        else if (!context.addToast) logger.warn(`ToastInjector ${id}: context.addToast is not available`);
-        return null;
-    }
-    try {
-        // Вызываем addToast сразу во время рендера
-        context.addToast(`[DEBUG_INJECT] ToastInjector Rendered: ${id}`, 'info', 500);
-    } catch (e) {
-        // Логируем ошибку, если сам вызов тоста падает
-        logger.error(`ToastInjector ${id} failed to toast:`, e);
-    }
-    return null; // Компонент ничего не рендерит визуально
-};
-// --- КОНЕЦ ОПРЕДЕЛЕНИЯ ToastInjector ---
-
 // --- Fallback component for AutomationBuddy ---
 function LoadingBuddyFallback() {
     return ( <div className="fixed bottom-4 right-4 z-50 w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 animate-pulse" aria-hidden="true" ></div> );
 }
 
-// --- html-react-parser Configuration (No Toasts) ---
+// --- html-react-parser Configuration ---
 const parserOptions: HTMLReactParserOptions = {
   replace: (domNode) => {
     if (!(domNode instanceof Element && domNode.attribs)) { return undefined; }
@@ -231,21 +210,18 @@ const getPlainText = (htmlString: string | null | undefined): string => {
 
 
 // --- Helper to Inject Toast ---
-// This component will attempt to call addToast during the render phase.
-// If it succeeds before the error, we'll see the toast.
-const ToastInjector: React.FC<{ id: string; context: ReturnType<typeof useRepoXmlPageContext> | null }> = ({ id, context }) => {
-    if (!context) {
-        // Cannot toast if context is not available yet (shouldn't happen if used correctly)
+const ToastInjector: React.FC<{ id: string; context: RepoXmlPageContextType | null }> = ({ id, context }) => {
+    if (!context || !context.addToast) {
+        if (!context) logger.warn(`ToastInjector ${id}: Context is null`);
+        else if (!context.addToast) logger.warn(`ToastInjector ${id}: context.addToast is not available`);
         return null;
     }
     try {
-        // Attempt to call addToast immediately during render
         context.addToast(`[DEBUG_INJECT] ToastInjector Rendered: ${id}`, 'info', 500);
     } catch (e) {
-        // Log error if toasting itself fails, but don't crash the render
         logger.error(`ToastInjector ${id} failed to toast:`, e);
     }
-    return null; // This component doesn't render anything visually
+    return null;
 };
 
 
@@ -275,18 +251,18 @@ function ActualPageContent() {
 
     // --- Effects ---
     useEffect(() => {
-      addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 1 (Lang) START", 'info', 500); // Use addToast
+      addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 1 (Lang) START", 'info', 500);
       const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
       const userLang = user?.language_code;
       const resolvedLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
       setLang(resolvedLang);
       setT(translations[resolvedLang] ?? translations.en);
       logger.log(`[ActualPageContent Effect 1] Lang set to: ${resolvedLang}`);
-      addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 1 (Lang) END", 'info', 500); // Use addToast
-    }, [user, addToast]); // Add addToast dependency
+      addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 1 (Lang) END", 'info', 500);
+    }, [user, addToast]);
 
     useEffect(() => {
-      addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 2 (URL) START", 'info', 500); // Use addToast
+      addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 2 (URL) START", 'info', 500);
       console.log(
         "%c🚀 CyberVibe Studio 2.0 Initialized! 🚀\n%cCo-created with the Vibe Community & AI. Let's build!\n%cEaster Egg added by request. 😉",
         "color: #E1FF01; font-size: 1.2em; font-weight: bold; text-shadow: 0 0 5px #E1FF01;",
@@ -314,9 +290,32 @@ function ActualPageContent() {
                 decodedPath = decodeURIComponent(pathParam); decodedIdea = decodeURIComponent(ideaParam);
                 if (decodedIdea && decodedIdea.startsWith("ImageReplace|")) {
                    logger.log("[ActualPageContent Effect 2] Processing Image Replace task from URL.");
-                   // ... (image replace logic)
-                   setImageReplaceTask(/*...*/); // Assuming task is constructed
-                   setInitialIdea(null);
+                    try {
+                        const parts = decodedIdea.split('|');
+                        const oldUrlParam = parts.find(p => p.startsWith("OldURL="));
+                        const newUrlParam = parts.find(p => p.startsWith("NewURL="));
+
+                        if (oldUrlParam && newUrlParam && decodedPath) {
+                            const oldUrl = decodeURIComponent(oldUrlParam.substring(7));
+                            const newUrl = decodeURIComponent(newUrlParam.substring(7));
+
+                            if (oldUrl && newUrl) {
+                                const task: ImageReplaceTask = { targetPath: decodedPath, oldUrl: oldUrl, newUrl: newUrl };
+                                logger.log("[ActualPageContent Effect 2] Setting image task:", task);
+                                setImageReplaceTask(task);
+                                setInitialIdea(null);
+                            } else {
+                                logger.error("[ActualPageContent Effect 2] Invalid image task URL data after decoding parts:", { decodedPath, oldUrl, newUrl });
+                                setImageReplaceTask(null); setInitialIdea(null);
+                            }
+                        } else {
+                            logger.error("[ActualPageContent Effect 2] Could not parse Old/New URL or path from image task parts:", decodedIdea);
+                            setImageReplaceTask(null); setInitialIdea(null);
+                        }
+                    } catch (splitError) {
+                        logger.error("[ActualPageContent Effect 2] Error splitting ImageReplace task string:", splitError);
+                        setImageReplaceTask(null); setInitialIdea(null);
+                    }
                    setInitialIdeaProcessed(true);
                 } else if (decodedIdea) {
                    logger.log("[ActualPageContent Effect 2] Regular idea param found, storing:", decodedIdea.substring(0, 50) + "...");
@@ -339,11 +338,11 @@ function ActualPageContent() {
             logger.log(`[ActualPageContent Effect 2] No valid path/idea params found.`);
             setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
         }
-       addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 2 (URL) END", 'info', 500); // Use addToast
-    }, [searchParams, setImageReplaceTask, setRepoUrl, addToast]); // Add addToast dependency
+       addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 2 (URL) END", 'info', 500);
+    }, [searchParams, setImageReplaceTask, setRepoUrl, addToast]);
 
      useEffect(() => {
-        addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 3 (Kwork Populate) START", 'info', 500); // Use addToast
+        addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 3 (Kwork Populate) START", 'info', 500);
         const fetchAttemptFinished = ['success', 'error', 'failed_retries'].includes(fetchStatus);
 
         if (fetchAttemptFinished && initialIdea && !initialIdeaProcessed && !imageReplaceTask && kworkInputRef.current) {
@@ -357,7 +356,9 @@ function ActualPageContent() {
             if (fetcherRef.current?.handleAddSelected) {
                 if (selectedFetcherFiles.size > 0) {
                      logger.log("[ActualPageContent Effect 3] Calling fetcherRef.handleAddSelected.");
-                     // ... (async call)
+                     const filesToAdd = selectedFetcherFiles ?? new Set<string>();
+                     const allFilesData = allFetchedFiles ?? [];
+                     (async () => { try { await fetcherRef.current!.handleAddSelected(filesToAdd, allFilesData); logger.log("[ActualPageContent Effect 3] handleAddSelected call finished successfully."); } catch (err) { logger.error("[ActualPageContent Effect 3] Error during handleAddSelected call:", err); } })();
                 } else { logger.log("[ActualPageContent Effect 3] Skipping handleAddSelected (empty selection)."); }
             } else { logger.warn("[ActualPageContent Effect 3] handleAddSelected not found or fetcherRef null."); }
 
@@ -368,22 +369,22 @@ function ActualPageContent() {
              setInitialIdeaProcessed(true);
              logger.log(`[ActualPageContent Effect 3] Fetch finished (${fetchStatus}), no pending idea or kworkInputRef not ready.`);
         }
-       addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 3 (Kwork Populate) END", 'info', 500); // Use addToast
-     }, [ fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles, addToast ]); // Add addToast dependency
+       addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 3 (Kwork Populate) END", 'info', 500);
+     }, [ fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles, addToast ]);
 
 
     // --- Callbacks ---
     const memoizedGetPlainText = useCallback(getPlainText, []);
 
     const scrollToSectionNav = useCallback((id: string) => {
-        addToast(`[DEBUG_CB] scrollToSectionNav for ${id}`, 'info', 500); // Use addToast
+        addToast(`[DEBUG_CB] scrollToSectionNav for ${id}`, 'info', 500);
         const sectionsRequiringReveal = ['extractor', 'executor', 'cybervibe-section', 'philosophy-steps'];
         const targetElement = document.getElementById(id);
 
         if (sectionsRequiringReveal.includes(id) && !showComponents) {
             logger.log(`[Scroll] Revealing components for "${id}"`);
             setShowComponents(true);
-            requestAnimationFrame(() => { // Wait for next frame after re-render
+            requestAnimationFrame(() => {
                 const revealedElement = document.getElementById(id);
                 if (revealedElement) {
                      try {
@@ -400,26 +401,26 @@ function ActualPageContent() {
                  logger.log(`[Scroll] Scrolled to "${id}"`);
              } catch (scrollError) { logger.error(`[Scroll] Error scrolling to "${id}":`, scrollError); }
         } else { logger.error(`[Scroll] Target element with id "${id}" not found.`); }
-    }, [showComponents, addToast]); // Add addToast dependency
+    }, [showComponents, addToast]);
 
     const handleShowComponents = () => {
-        addToast("[DEBUG_CB] handleShowComponents START", 'info', 500); // Use addToast
+        addToast("[DEBUG_CB] handleShowComponents START", 'info', 500);
         logger.log("[DEBUG] Reveal Button Clicked. Before setShowComponents.");
         setShowComponents(true);
         logger.log("[DEBUG] showComponents set to true by button click.");
-        addToast("[DEBUG_CB] handleShowComponents END - setShowComponents(true) called", 'info', 500); // Use addToast
+        addToast("[DEBUG_CB] handleShowComponents END - setShowComponents(true) called", 'info', 500);
     };
 
     // --- Loading / Initial State ---
-     if (!t) { // Убрали isMounted из проверки, т.к. он больше не нужен
-         logger.log("[CONSOLE_LOG] ActualPageContent Render: Early return (!t)"); // <--- LOG
+     if (!t) {
+         logger.log("[CONSOLE_LOG] ActualPageContent Render: Early return (!t)");
          const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
          const loadingText = translations[loadingLang]?.loading ?? translations.en.loading;
          return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
      }
 
     // --- Derived State & Safe Render ---
-    logger.log("[CONSOLE_LOG] ActualPageContent -> Calculating derived state"); // <--- LOG
+    logger.log("[CONSOLE_LOG] ActualPageContent -> Calculating derived state");
     const userName = user?.first_name || (lang === 'ru' ? 'Нео' : 'Neo');
     const navTitleIntro = memoizedGetPlainText(t.navIntro);
     const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe);
@@ -431,12 +432,11 @@ function ActualPageContent() {
         return content ? <RenderContent content={content} /> : `[${contentKey}]`;
     };
 
-    logger.log("[CONSOLE_LOG] ActualPageContent -> BEFORE RETURN JSX"); // <--- LOG
-    addToast("[DEBUG_RENDER] ActualPageContent: Before Return JSX", 'info', 500); // <--- РАННИЙ ТОСТ РЕНДЕРА
+    logger.log("[CONSOLE_LOG] ActualPageContent -> BEFORE RETURN JSX");
+    addToast("[DEBUG_RENDER] ActualPageContent: Before Return JSX", 'info', 500);
 
     return (
         <>
-            {/* Inject toasts at critical render points */}
             <ToastInjector id="ActualPageContent-Top" context={pageContext} />
 
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -445,19 +445,79 @@ function ActualPageContent() {
 
                 {/* Intro Section */}
                 <section id="intro" className="mb-12 text-center max-w-3xl w-full">
-                     {/* ... intro content ... */}
+                     <div className="flex justify-center mb-4"> <FaBolt className="w-16 h-16 text-[#E1FF01] text-shadow-[0_0_15px_#E1FF01] animate-pulse" /> </div>
+                    <h1 className="text-4xl md:text-5xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-4"> {renderSafeContent('pageTitle')} </h1>
+                    <p className="text-xl md:text-2xl text-gray-200 mt-4 font-semibold"> {renderSafeContent('welcome')} <span className="text-brand-cyan">{userName}!</span> </p>
+                    <div className="text-lg md:text-xl text-gray-300 mt-3 space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-yellow-300 prose-em:text-purple-300 max-w-none">
+                        {renderSafeContent('intro1')}
+                        {renderSafeContent('intro2')}
+                        <p className="font-semibold text-brand-green">{renderSafeContent('intro3')}</p>
+                    </div>
                      <ToastInjector id="ActualPageContent-AfterIntro" context={pageContext} />
                 </section>
 
                 {/* === The Vibe Loop Section === */}
                 <section id="cybervibe-section" className="mb-12 w-full max-w-3xl">
-                     {/* ... vibe loop content ... */}
+                     <Card className="bg-gradient-to-br from-purple-900/40 via-black/60 to-indigo-900/40 border border-purple-600/60 shadow-xl rounded-lg p-6 backdrop-blur-sm">
+                         <CardHeader className="p-0 mb-4">
+                             <CardTitle className="text-2xl md:text-3xl font-bold text-center text-brand-purple flex items-center justify-center gap-2">
+                                <FaAtom className="animate-spin-slow"/> {renderSafeContent('cyberVibeTitle')} <FaBrain className="animate-pulse"/>
+                            </CardTitle>
+                         </CardHeader>
+                         <CardContent className="p-0 text-gray-300 text-base md:text-lg space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-purple-300 prose-em:text-cyan-300 max-w-none">
+                            {renderSafeContent('cyberVibe1')}
+                            {renderSafeContent('cyberVibe2')}
+                            {renderSafeContent('cyberVibe3')}
+                            <p className="text-purple-300 font-semibold">{renderSafeContent('cyberVibe4')}</p>
+                         </CardContent>
+                     </Card>
                       <ToastInjector id="ActualPageContent-AfterVibeLoop" context={pageContext} />
                  </section>
 
                 {/* Your Vibe Path Section - NEW PHILOSOPHY */}
                 <section id="philosophy-steps" className="mb-12 w-full max-w-3xl">
-                   {/* ... philosophy content ... */}
+                    <details className="bg-gray-900/80 border border-gray-700 rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50">
+                        <summary className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-gray-800/50 rounded-t-lg transition-colors group">
+                            <span className="flex items-center gap-2"><FaCodeBranch /> {renderSafeContent('philosophyTitle')}</span>
+                            <span className="text-xs text-gray-500 group-open:rotate-180 transition-transform duration-300">▼</span>
+                        </summary>
+                        <div className="px-6 pt-2 text-gray-300 space-y-4 text-base prose prose-invert prose-p:my-2 prose-li:my-1 prose-strong:text-yellow-300 prose-em:text-cyan-300 prose-a:text-brand-blue max-w-none">
+                             <div className="my-4 not-prose">
+                                 <h4 className="text-lg font-semibold text-cyan-400 mb-2">{renderSafeContent('philosophyVideoTitle')}</h4>
+                                 <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
+                                     <iframe
+                                         className="w-full h-full"
+                                         src="https://www.youtube.com/embed/imxzYWYKCyQ"
+                                         title="YouTube video player - Vibe Level Explanation"
+                                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                         allowFullScreen>
+                                    </iframe>
+                                 </div>
+                             </div>
+                            <hr className="border-gray-700 my-3"/>
+                             <p className="text-purple-300 italic">{renderSafeContent('philosophyCore')}</p>
+                             <hr className="border-gray-700 my-3"/>
+                            <h4 className="text-lg font-semibold text-cyan-400 pt-1">Level Progression (+1 Vibe Perk):</h4>
+                            <ul className="list-none space-y-2 pl-2 text-sm md:text-base">
+                                <li>{renderSafeContent('philosophyLvl0_1')}</li>
+                                <li>{renderSafeContent('philosophyLvl1_2')}</li>
+                                <li>{renderSafeContent('philosophyLvl2_3')}</li>
+                                <li>{renderSafeContent('philosophyLvl3_4')}</li>
+                                <li>{renderSafeContent('philosophyLvl4_5')}</li>
+                                <li>{renderSafeContent('philosophyLvl5_6')}</li>
+                                <li>{renderSafeContent('philosophyLvl6_7')}</li>
+                                <li>{renderSafeContent('philosophyLvl8_10')}</li>
+                            </ul>
+                            <hr className="border-gray-700 my-3"/>
+                            <p className="font-bold text-brand-green">{renderSafeContent('philosophyEnd')}</p>
+                            <hr className="border-gray-700 my-4"/>
+                            <h4 className="text-lg font-semibold text-cyan-400 pt-2">{renderSafeContent('stepsTitle')}</h4>
+                            <div className="text-sm space-y-2">
+                                 <p><RenderContent content={t?.step1Title ? `<strong>${t.step1Title}</strong> ${t.step1Desc ?? ''} ${t.step1DescEnd ?? ''}` : ''} /></p>
+                                 <p><RenderContent content={t?.step2Title ? `<strong>${t.step2Title}</strong> ${t.step2Desc ?? ''} ${t.step2DescEnd ?? ''}` : ''} /></p>
+                            </div>
+                        </div>
+                    </details>
                     <ToastInjector id="ActualPageContent-AfterPhilosophy" context={pageContext} />
                 </section>
 
@@ -511,7 +571,12 @@ function ActualPageContent() {
                 {/* Final CTA */}
                  {showComponents && (
                      <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
-                         {/* ... cta content ... */}
+                          <div className="bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 p-6 rounded-lg shadow-lg animate-pulse border-2 border-white/50 prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 max-w-none">
+                             <h3 className="text-2xl font-bold text-white mb-3"><RenderContent content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
+                             <p className="text-white text-lg mb-4"> {renderSafeContent('ctaDesc')} </p>
+                             <p className="text-white text-xl font-semibold mb-4 bg-black/30 p-3 rounded"> <FaHeart className="inline mr-2 text-red-400 animate-ping"/> {renderSafeContent('ctaHotChick')} <FaUserAstronaut className="inline ml-2 text-pink-300"/> </p>
+                             <p className="text-gray-300 text-base"> {renderSafeContent('ctaDude')} </p>
+                         </div>
                      </section>
                  )}
 
@@ -521,8 +586,13 @@ function ActualPageContent() {
                     animate={{ scale: [1, 1.03, 1] }}
                     transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}
                  >
-                    {/* ... nav buttons ... */}
-                 </motion.nav>
+                     <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700/80 backdrop-blur-sm rounded-full hover:bg-gray-600 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-gray-200" /> </button>
+                     <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-purple-700/80 backdrop-blur-sm rounded-full hover:bg-purple-600 transition shadow-md" title={navTitleVibeLoop} aria-label={navTitleVibeLoop || "Scroll to Vibe Loop"} > <FaUpLong className="text-lg text-white" /> </button>
+                     {showComponents && ( <>
+                            <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-blue-700/80 backdrop-blur-sm rounded-full hover:bg-blue-600 transition shadow-md" title={navTitleGrabber} aria-label={navTitleGrabber || "Scroll to Grabber"} > <FaDownload className="text-lg text-white" /> </button>
+                            <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-indigo-700/80 backdrop-blur-sm rounded-full hover:bg-indigo-600 transition shadow-md" title={navTitleAssistant} aria-label={navTitleAssistant || "Scroll to Assistant"} > <FaRobot className="text-lg text-white" /> </button>
+                     </> )}
+                </motion.nav>
 
                 {/* Automation Buddy */}
                 <Suspense fallback={<LoadingBuddyFallback />}> <AutomationBuddy /> </Suspense>
@@ -534,7 +604,6 @@ function ActualPageContent() {
 
 // --- Layout Component ---
 function RepoXmlPageLayout() {
-    // Добавим лог сюда тоже, чтобы видеть инициализацию Provider
     logger.log("[CONSOLE_LOG] RepoXmlPageLayout rendering RepoXmlPageProvider");
     return ( <RepoXmlPageProvider> <ActualPageContent /> </RepoXmlPageProvider> );
 }

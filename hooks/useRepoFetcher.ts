@@ -94,7 +94,6 @@ export const useRepoFetcher = ({
 
     addToastDirect("[DEBUG_HOOK] useRepoFetcher Before Callbacks", 'info', 500);
     const stopProgressSimulation = useCallback(() => {
-        // addToastDirect("[DEBUG_CB] stopProgressSimulation called", 'info', 500); // Too noisy
         if (progressIntervalRef.current) {
             clearInterval(progressIntervalRef.current);
             progressIntervalRef.current = null;
@@ -111,13 +110,11 @@ export const useRepoFetcher = ({
             setProgress(prev => {
                 const currentContextStatus = fetchStatusRef.current;
                 if (currentContextStatus !== 'loading' && currentContextStatus !== 'retrying') {
-                    // addToastDirect("[DEBUG_CB] Progress Interval: Stopping due to context status change", 'info', 500); // Too noisy
                     stopProgressSimulation();
                     return currentContextStatus === 'success' ? 100 : prev;
                 }
                 const nextProgress = prev + increment;
                 if (nextProgress >= 95) {
-                    // addToastDirect("[DEBUG_CB] Progress Interval: Reached >= 95%", 'info', 500); // Too noisy
                     stopProgressSimulation();
                     return 95;
                 }
