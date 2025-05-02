@@ -380,9 +380,15 @@ export const useRepoFetcher = ({
     addToastDirect(`[DEBUG_HOOK] useRepoFetcher derived: isLoading=${isLoading}, isFetchDisabled=${isFetchDisabled}`, 'info', 500);
 
     // --- Return values ---
-    addToastDirect("[DEBUG_HOOK] useRepoFetcher Hook End - Returning values", 'info', 500);
-    return {
+    const returnValue = {
         files, progress, error, primaryHighlightedPath, secondaryHighlightedPaths,
         handleFetchManual, isLoading, isFetchDisabled,
     };
+    logger.log("[LOG_POINT] useRepoFetcher Returning Value:", returnValue);
+    console.log("--- useRepoFetcher Returning Value ---");
+    console.dir(returnValue);
+    console.log("------------------------------------");
+    addToastDirect("[DEBUG_HOOK] useRepoFetcher Hook End - Returning values", 'info', 500);
+
+    return returnValue;
 };
