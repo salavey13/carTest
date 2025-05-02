@@ -3,7 +3,7 @@ import { toast as sonnerToast } from 'sonner';
 import { useErrorOverlay } from '@/contexts/ErrorOverlayContext';
 import type { ToastRecord } from '@/types/toast';
 import { debugLogger as logger } from '@/lib/debugLogger';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react'; // Imports are correct
 
 type ToastType = 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message' | 'custom';
 
@@ -27,22 +27,12 @@ export const useAppToast = () => {
         message: string | React.ReactNode,
         options?: any
     ) => {
+        // Fallback to console.warn if context isn't ready
+        const logWarn = isReady ? logger.warn : console.warn;
+        const logError = isReady ? logger.error : console.error;
+
         if (!isReady) {
-            // Use console.warn as logger might not be ready if context isn't
-             console.warn(`[Toast Suppressed/Context Not Ready] ${type}:`, message);
-             // Attempt direct display anyway
-             try {
-                 if (typeof (sonnerToast as any)[type] === 'function') {
-                    (sonnerToast as any)[type](message, options);
-                 } else if (type === 'custom' && typeof message === 'function') {
-                     sonnerToast.custom(message as (id: number | string) => React.ReactNode, options);
-                 } else {
-                    sonnerToast.message(String(message), options); // Fallback to message
-                 }
-             } catch (e) {
-                 console.error("Error showing direct toast when context not ready:", e);
-             }
-            return undefined;
+            logWarn("useAppToast: Context not ready, attempting direct toast display.", { type, message });
         }
 
         const addToastToHistory = errorOverlay?.addToastToHistory;
@@ -61,7 +51,7 @@ export const useAppToast = () => {
                     if (typeof message === 'function') {
                        toastId = sonnerToast.custom(message as (id: number | string) => React.ReactNode, options);
                     } else {
-                        logger.warn("useAppToast: 'custom' type requires a function as message.");
+                        logWarn("useAppToast: 'custom' type requires a function as message.");
                         toastId = sonnerToast.message(messageString, options);
                     }
                     break;
@@ -80,23 +70,22 @@ export const useAppToast = () => {
                     };
                     addToastToHistory(record);
                 } catch (logError) {
-                    logger.error("useAppToast: Failed to add toast to history", logError);
+                    logError("useAppToast: Failed to add toast to history", logError);
                 }
             } else if (type !== 'custom' && !addToastToHistory) {
-                 // Use console.warn if logger might be unavailable
-                 console.warn("useAppToast: Could not add toast to history because addToastToHistory is not available", { type });
+                 logWarn("useAppToast: Could not add toast to history because addToastToHistory is not available", { type });
             }
 
             return toastId;
 
         } catch (err) {
-            logger.error("Error in useAppToast while showing/logging toast:", err, { type, message, options });
+            logError("Error in useAppToast while showing/logging toast:", err, { type, message, options });
             try {
                 sonnerToast.error("Internal issue: Could not display toast.", { duration: 2000 });
             } catch { /* Silently fail */ }
             return undefined;
         }
-    }, [isReady, errorOverlay]); // Added dependencies for useCallback
+    }, [isReady, errorOverlay]);
 
 
     // Fallback using console directly
@@ -118,7 +107,6 @@ export const useAppToast = () => {
 
     // Memoize the returned object
     return useMemo(() => {
-        // Return dummy functions if not ready
         if (!isReady) {
              return {
                  success: (msg: any, opts?: any) => notReadyWarn('success', msg),
@@ -131,7 +119,6 @@ export const useAppToast = () => {
                  dismiss: (id?: any) => notReadyWarn('dismiss', id),
              };
         }
-        // Return real functions bound to showToast if ready
         return {
             success: (message: string | React.ReactNode, options?: any) => showToast('success', message, options),
             error: (message: string | React.ReactNode, options?: any) => showToast('error', message, options),
@@ -142,7 +129,6 @@ export const useAppToast = () => {
             custom: (component: (id: number | string) => React.ReactNode, options?: any) => showToast('custom', component, options),
             dismiss: (toastId?: string | number) => sonnerToast.dismiss(toastId),
         }
-    // Ensure dependencies are correct
     }, [isReady, errorOverlay, showToast, notReadyWarn]);
 
 };
