@@ -2,7 +2,7 @@
 import React, { Suspense, useRef, useState, useEffect, ReactNode, useCallback } from "react";
 import { useSearchParams } from 'next/navigation';
 import RepoTxtFetcher from "@/components/RepoTxtFetcher";
-import AICodeAssistant from "@/components/AICodeAssistant";
+import AICodeAssistant from "@/components/AICodeAssistant"; // Оставляем импорт
 import AutomationBuddy from "@/components/AutomationBuddy";
 import {
     useRepoXmlPageContext, RepoXmlPageProvider,
@@ -231,15 +231,21 @@ function ActualPageContent() {
 
     const { user } = useAppContext();
     logger.log("[CONSOLE_LOG] ActualPageContent -> useAppContext DONE");
-    const pageContext = useRepoXmlPageContext(); // Get context ONCE
+    const pageContext = useRepoXmlPageContext();
     logger.log("[CONSOLE_LOG] ActualPageContent -> useRepoXmlPageContext DONE");
+
+    logger.log("[LOG_POINT] ActualPageContent -> pageContext VALUE:", pageContext);
+    console.log("--- pageContext VALUE ---");
+    console.dir(pageContext);
+    console.log("-------------------------");
+
 
     const {
         fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef,
         setImageReplaceTask, setKworkInputHasContent, fetchStatus,
         imageReplaceTask, allFetchedFiles, selectedFetcherFiles,
-        repoUrl, setRepoUrl, addToast // Destructure addToast from context
-    } = pageContext; // Use the retrieved context
+        repoUrl, setRepoUrl, addToast
+    } = pageContext;
 
     const [lang, setLang] = useState<Language>('en');
     const [showComponents, setShowComponents] = useState(false);
@@ -405,22 +411,26 @@ function ActualPageContent() {
 
     const handleShowComponents = () => {
         addToast("[DEBUG_CB] handleShowComponents START", 'info', 500);
-        logger.log("[DEBUG] Reveal Button Clicked. Before setShowComponents.");
+        logger.log("[LOG_POINT] handleShowComponents CLICKED");
+        console.log("[CONSOLE_LOG] handleShowComponents CLICKED");
         setShowComponents(true);
-        logger.log("[DEBUG] showComponents set to true by button click.");
+        logger.log("[LOG_POINT] setShowComponents(true) CALLED");
+        console.log("[CONSOLE_LOG] setShowComponents(true) CALLED");
         addToast("[DEBUG_CB] handleShowComponents END - setShowComponents(true) called", 'info', 500);
     };
 
     // --- Loading / Initial State ---
      if (!t) {
-         logger.log("[CONSOLE_LOG] ActualPageContent Render: Early return (!t)");
+         logger.log("[LOG_POINT] ActualPageContent Render: Early return (!t)");
+         console.log("[CONSOLE_LOG] ActualPageContent Render: Early return (!t)");
          const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
          const loadingText = translations[loadingLang]?.loading ?? translations.en.loading;
          return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
      }
 
     // --- Derived State & Safe Render ---
-    logger.log("[CONSOLE_LOG] ActualPageContent -> Calculating derived state");
+    logger.log("[LOG_POINT] ActualPageContent -> Calculating derived state");
+    console.log("[CONSOLE_LOG] ActualPageContent -> Calculating derived state");
     const userName = user?.first_name || (lang === 'ru' ? 'Нео' : 'Neo');
     const navTitleIntro = memoizedGetPlainText(t.navIntro);
     const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe);
@@ -432,13 +442,13 @@ function ActualPageContent() {
         return content ? <RenderContent content={content} /> : `[${contentKey}]`;
     };
 
-    logger.log("[CONSOLE_LOG] ActualPageContent -> BEFORE RETURN JSX");
+    logger.log("[LOG_POINT] ActualPageContent -> BEFORE RETURN JSX");
+    console.log("[CONSOLE_LOG] ActualPageContent -> BEFORE RETURN JSX");
     addToast("[DEBUG_RENDER] ActualPageContent: Before Return JSX", 'info', 500);
 
     return (
         <>
             <ToastInjector id="ActualPageContent-Top" context={pageContext} />
-
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
             <div className="min-h-screen bg-gray-950 p-4 sm:p-6 pt-24 text-white flex flex-col items-center relative overflow-y-auto">
                  <ToastInjector id="ActualPageContent-InsideMainDiv" context={pageContext} />
@@ -544,6 +554,8 @@ function ActualPageContent() {
                         <h2 className="text-3xl font-bold text-center text-brand-green mb-8 animate-pulse">{renderSafeContent('componentsTitle')}</h2>
                          <section id="extractor" className="mb-12 w-full max-w-4xl">
                            <ToastInjector id="ActualPageContent-BeforeRepoFetcherRender" context={pageContext} />
+                           {logger.log("[LOG_POINT] Rendering RepoTxtFetcher. fetcherRef type:", typeof fetcherRef)}
+                           {console.log("[CONSOLE_LOG] Rendering RepoTxtFetcher. fetcherRef:", fetcherRef)}
                              <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg backdrop-blur-sm">
                                  <CardContent className="p-4">
                                      <RepoTxtFetcher ref={fetcherRef} />
@@ -551,8 +563,13 @@ function ActualPageContent() {
                              </Card>
                             <ToastInjector id="ActualPageContent-AfterRepoFetcherRender" context={pageContext} />
                          </section>
+
+                         {/* === ВОЗВРАЩАЕМ AICodeAssistant, НО СНАЧАЛА ТОСТ ПРОВЕРКИ === */}
+                         <ToastInjector id="ActualPageContent-BeforeAIAssistantSection" context={pageContext} />
                          <section id="executor" className="mb-12 w-full max-w-4xl pb-16">
                            <ToastInjector id="ActualPageContent-BeforeAIAssistantRender" context={pageContext} />
+                           {logger.log("[LOG_POINT] Rendering AICodeAssistant. assistantRef type:", typeof assistantRef, "kworkInputRefPassed type:", typeof kworkInputRefPassed, "aiResponseInputRefPassed type:", typeof aiResponseInputRefPassed)}
+                           {console.log("[CONSOLE_LOG] Rendering AICodeAssistant. Refs:", { assistantRef, kworkInputRefPassed, aiResponseInputRefPassed })}
                              <Card className="bg-gray-900/80 border border-purple-700/50 shadow-lg backdrop-blur-sm">
                                  <CardContent className="p-4">
                                      <AICodeAssistant
@@ -564,6 +581,8 @@ function ActualPageContent() {
                              </Card>
                             <ToastInjector id="ActualPageContent-AfterAIAssistantRender" context={pageContext} />
                          </section>
+                         {/* === КОНЕЦ БЛОКА AICodeAssistant === */}
+
                          <ToastInjector id="ActualPageContent-InsideShowComponentsEnd" context={pageContext} />
                      </>
                  )}
@@ -604,13 +623,15 @@ function ActualPageContent() {
 
 // --- Layout Component ---
 function RepoXmlPageLayout() {
-    logger.log("[CONSOLE_LOG] RepoXmlPageLayout rendering RepoXmlPageProvider");
+    logger.log("[LOG_POINT] RepoXmlPageLayout rendering RepoXmlPageProvider");
+    console.log("[CONSOLE_LOG] RepoXmlPageLayout rendering RepoXmlPageProvider");
     return ( <RepoXmlPageProvider> <ActualPageContent /> </RepoXmlPageProvider> );
 }
 
 // --- Exported Page Component ---
 export default function RepoXmlPage() {
-     logger.log("[CONSOLE_LOG] RepoXmlPage START RENDER");
+     logger.log("[LOG_POINT] RepoXmlPage START RENDER");
+     console.log("[CONSOLE_LOG] RepoXmlPage START RENDER");
     const fallbackLoadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
     const fallbackLoadingText = translations[fallbackLoadingLang]?.loading ?? translations.en.loading; // Fallback to English
     const fallbackLoading = ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{fallbackLoadingText}</p> </div> );
