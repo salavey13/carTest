@@ -11,12 +11,19 @@ import { debugLogger as logger } from '@/lib/debugLogger';
 import { getOpenPullRequests, updateBranch } from '@/app/actions_github/actions';
 import type { RepoTxtFetcherRef } from '@/components/RepoTxtFetcher';
 import type { AICodeAssistantRef } from '@/components/AICodeAssistant';
-
+// NEW: Import action for PR check
+import { checkExistingPrBranch } from '@/app/actions_github/actions';
 
 export type ImportCategory = 'component' | 'context' | 'hook' | 'lib' | 'other';
 export type FetchStatus = 'idle' | 'loading' | 'success' | 'error' | 'retrying' | 'failed_retries';
 export type WorkflowStep = | 'idle' | 'ready_to_fetch' | 'fetching' | 'fetch_failed' | 'files_fetched' | 'files_fetched_highlights' | 'files_fetched_image_replace' | 'files_selected' | 'request_written' | 'request_copied' | 'generating_ai_response' | 'response_pasted' | 'parsing_response' | 'pr_ready';
 export interface ImageReplaceTask { targetPath: string; oldUrl: string; newUrl: string; }
+// NEW: Flow details type
+export interface PendingFlowDetails {
+    type: 'ImageSwap' | 'ErrorFix';
+    targetPath: string;
+    details: any; // Contains newUrl for ImageSwap, error info for ErrorFix
+}
 
 // --- Context Interface ---
 interface RepoXmlPageContextType {
@@ -33,6 +40,8 @@ interface RepoXmlPageContextType {
     loadingPrs: boolean;
     isSettingsModalOpen: boolean;
     isParsing: boolean;
+    // NEW: Pre-check state
+    isPreChecking: boolean;
     // State Data
     selectedFetcherFiles: Set<string>;
     selectedAssistantFiles: Set<string>;
@@ -46,8 +55,9 @@ interface RepoXmlPageContextType {
     repoUrl: string;
     primaryHighlightedPath: string | null;
     secondaryHighlightedPaths: Record<ImportCategory, string[]>;
-    // NEW: Target PR Data
-    targetPrData: { number: number; url: string } | null;
+    targetPrData: { number: number; url: string } | null; // Keep PR data
+    // NEW: Pending Flow Data
+    pendingFlowDetails: PendingFlowDetails | null;
 
     // Setters (Stable Callbacks)
     setFetchStatus: React.Dispatch<React.SetStateAction<FetchStatus>>;
@@ -70,12 +80,16 @@ interface RepoXmlPageContextType {
     setCurrentAiRequestId: React.Dispatch<React.SetStateAction<string | null>>;
     setImageReplaceTask: React.Dispatch<React.SetStateAction<ImageReplaceTask | null>>;
     setRepoUrl: React.Dispatch<React.SetStateAction<string>>;
-    // NEW: Target PR Data Setter
     setTargetPrData: React.Dispatch<React.SetStateAction<{ number: number; url: string } | null>>;
+    // NEW: Setters for pre-check state
+    setIsPreChecking: React.Dispatch<React.SetStateAction<boolean>>;
+    setPendingFlowDetails: React.Dispatch<React.SetStateAction<PendingFlowDetails | null>>;
 
     // Triggers (Stable Callbacks)
     triggerToggleSettingsModal: () => void;
-    triggerFetch: (isRetry?: boolean, branch?: string | null) => Promise<void>;
+    // NEW: Trigger for pre-check
+    triggerPreCheckAndFetch: (repoUrlToCheck: string, potentialBranchName: string, flowType: 'ImageSwap' | 'ErrorFix', flowDetails: any, targetPath: string) => Promise<void>;
+    triggerFetch: (isRetry?: boolean, branch?: string | null) => Promise<void>; // Keep manual fetch trigger
     triggerSelectHighlighted: () => void;
     triggerAddSelectedToKwork: (clearSelection?: boolean) => Promise<void>;
     triggerCopyKwork: () => boolean;
@@ -108,7 +122,7 @@ interface RepoXmlPageContextType {
 
 // --- Default Context Value ---
 const defaultContextValue: Partial<RepoXmlPageContextType> = {
-    fetchStatus: 'idle', repoUrlEntered: false, filesFetched: false, selectedFetcherFiles: new Set(), kworkInputHasContent: false, requestCopied: false, aiResponseHasContent: false, filesParsed: false, selectedAssistantFiles: new Set(), assistantLoading: false, aiActionLoading: false, loadingPrs: false, targetBranchName: null, manualBranchName: '', openPrs: [], isSettingsModalOpen: false, isParsing: false, currentAiRequestId: null, imageReplaceTask: null, allFetchedFiles: [], currentStep: 'idle', repoUrl: "https://github.com/salavey13/carTest", primaryHighlightedPath: null, secondaryHighlightedPaths: { component: [], context: [], hook: [], lib: [], other: [] }, targetPrData: null,
+    fetchStatus: 'idle', repoUrlEntered: false, filesFetched: false, selectedFetcherFiles: new Set(), kworkInputHasContent: false, requestCopied: false, aiResponseHasContent: false, filesParsed: false, selectedAssistantFiles: new Set(), assistantLoading: false, aiActionLoading: false, loadingPrs: false, targetBranchName: null, manualBranchName: '', openPrs: [], isSettingsModalOpen: false, isParsing: false, currentAiRequestId: null, imageReplaceTask: null, allFetchedFiles: [], currentStep: 'idle', repoUrl: "https://github.com/salavey13/carTest", primaryHighlightedPath: null, secondaryHighlightedPaths: { component: [], context: [], hook: [], lib: [], other: [] }, targetPrData: null, isPreChecking: false, pendingFlowDetails: null,
     setFetchStatus: () => { logger.warn("setFetchStatus called on default context value"); },
     setRepoUrlEntered: () => { logger.warn("setRepoUrlEntered called on default context value"); },
     handleSetFilesFetched: () => { logger.warn("handleSetFilesFetched called on default context value"); },
@@ -130,7 +144,10 @@ const defaultContextValue: Partial<RepoXmlPageContextType> = {
     setImageReplaceTask: () => { logger.warn("setImageReplaceTask called on default context value"); },
     setRepoUrl: () => { logger.warn("setRepoUrl called on default context value"); },
     setTargetPrData: () => { logger.warn("setTargetPrData called on default context value"); },
+    setIsPreChecking: () => { logger.warn("setIsPreChecking called on default context value"); },
+    setPendingFlowDetails: () => { logger.warn("setPendingFlowDetails called on default context value"); },
     triggerToggleSettingsModal: () => { logger.warn("triggerToggleSettingsModal called on default context value"); },
+    triggerPreCheckAndFetch: async () => { logger.warn("triggerPreCheckAndFetch called on default context value"); },
     triggerFetch: async () => { logger.warn("triggerFetch called on default context value"); },
     triggerSelectHighlighted: () => { logger.warn("triggerSelectHighlighted called on default context value"); },
     triggerAddSelectedToKwork: async () => { logger.warn("triggerAddSelectedToKwork called on default context value"); },
@@ -189,8 +206,10 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const [imageReplaceTaskState, setImageReplaceTaskState] = useState<ImageReplaceTask | null>(null);
         const [allFetchedFilesState, setAllFetchedFilesState] = useState<FileNode[]>([]);
         const [repoUrlState, setRepoUrlState] = useState<string>(defaultContextValue.repoUrl ?? '');
-        // NEW State for PR data
         const [targetPrDataState, setTargetPrDataState] = useState<{ number: number; url: string } | null>(null);
+        // NEW: Pre-check state
+        const [isPreCheckingState, setIsPreCheckingState] = useState<boolean>(false);
+        const [pendingFlowDetailsState, setPendingFlowDetailsState] = useState<PendingFlowDetails | null>(null);
         logger.debug("[RepoXmlPageProvider] State initialized.");
 
         // --- Refs ---
@@ -263,8 +282,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const setImageReplaceTaskStateStable = useCallback((task: ImageReplaceTask | null | ((prevState: ImageReplaceTask | null) => ImageReplaceTask | null)) => { logger.debug(`[Context Setter] setImageReplaceTask: ${typeof task === 'function' ? 'function' : !!task}`); setImageReplaceTaskState(task); }, []);
         const setAllFetchedFilesStateStable = useCallback((files: FileNode[] | ((prevState: FileNode[]) => FileNode[])) => { logger.debug(`[Context Setter] setAllFetchedFiles count: ${typeof files === 'function' ? 'function' : files.length}`); setAllFetchedFilesState(files); }, []);
         const setRepoUrlStateStable = useCallback((url: string | ((prevState: string) => string)) => { logger.debug(`[Context Setter] setRepoUrl`); setRepoUrlState(url); }, []);
-        // NEW Setter for PR Data
         const setTargetPrDataStable = useCallback((data: { number: number; url: string } | null | ((prevState: { number: number; url: string } | null) => { number: number; url: string } | null)) => { logger.debug(`[Context Setter] setTargetPrData: ${typeof data === 'function' ? 'function' : data ? `PR #${data.number}`: 'null'}`); setTargetPrDataState(data); }, []);
+        // NEW Setters for pre-check state
+        const setIsPreCheckingStateStable = useCallback((checking: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setIsPreChecking: ${typeof checking === 'function' ? 'function' : checking}`); setIsPreCheckingState(checking); }, []);
+        const setPendingFlowDetailsStateStable = useCallback((details: PendingFlowDetails | null | ((prevState: PendingFlowDetails | null) => PendingFlowDetails | null)) => { logger.debug(`[Context Setter] setPendingFlowDetails: ${typeof details === 'function' ? 'function' : details?.type}`); setPendingFlowDetailsState(details); }, []);
+
 
         // --- Handlers and Triggers ---
         const handleSetFilesFetchedStable = useCallback(( fetched: boolean, allFiles: FileNode[], primaryHighlight: string | null, secondaryHighlights: Record<ImportCategory, string[]> ) => {
@@ -344,17 +366,68 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const triggerDeselectAllFetcherFilesStable = useCallback(() => { logger.log(`[DEBUG][CONTEXT] triggerDeselectAllFetcherFiles called. Ref ready: ${!!fetcherRef.current?.deselectAllFiles}`); fetcherRef.current?.deselectAllFiles?.(); }, [fetcherRef]);
         const triggerClearKworkInputStable = useCallback(() => { logger.log(`[DEBUG][CONTEXT] triggerClearKworkInput called. Ref ready: ${!!fetcherRef.current?.clearAll}`); fetcherRef.current?.clearAll?.(); }, [fetcherRef]);
 
+         // --- NEW: Trigger for Pre-Check and Fetch ---
+         const triggerPreCheckAndFetch = useCallback(async (
+             repoUrlToCheck: string,
+             potentialBranchName: string,
+             flowType: 'ImageSwap' | 'ErrorFix',
+             flowDetails: any,
+             targetPath: string
+         ) => {
+             logger.log(`[Context] triggerPreCheckAndFetch called for branch: ${potentialBranchName}, flow: ${flowType}`);
+             setIsPreCheckingStateStable(true);
+             setPendingFlowDetailsStateStable({ type: flowType, details: flowDetails, targetPath });
+             setTargetPrDataStable(null); // Clear previous PR data
+             setTargetBranchNameStateStable(null); // Clear target branch initially
+
+             let branchToFetch: string | null = null;
+             try {
+                 const checkResult = await checkExistingPrBranch(repoUrlToCheck, potentialBranchName);
+                 if (checkResult.success && checkResult.data) {
+                     if (checkResult.data.exists) {
+                         logger.info(`[Context] Pre-check found existing PR #${checkResult.data.prNumber} for branch ${potentialBranchName}. Setting as target.`);
+                         setTargetBranchNameStateStable(potentialBranchName); // Set target branch
+                         setTargetPrDataStable({ number: checkResult.data.prNumber!, url: checkResult.data.prUrl! }); // Store PR data
+                         branchToFetch = potentialBranchName; // Fetch this existing branch
+                     } else {
+                         logger.info(`[Context] Pre-check: No existing PR/branch found for ${potentialBranchName}. Will use default/manual or create later.`);
+                         // No specific branch set from check, fetcher will use default or manual
+                         branchToFetch = manualBranchNameState || null; // Fallback to manual or default
+                     }
+                 } else {
+                     logger.warn(`[Context] Pre-check failed for ${potentialBranchName}: ${checkResult.error}. Proceeding with default/manual branch.`);
+                     addToastStable(`Не удалось проверить PR для ${potentialBranchName}. Используется ветка по умолчанию/вручную.`, 'warning');
+                      branchToFetch = manualBranchNameState || null; // Fallback on check error
+                 }
+             } catch (err: any) {
+                 logger.error(`[Context] Critical error during pre-check:`, err);
+                 addToastStable(`Критическая ошибка проверки PR: ${err.message}`, 'error');
+                 branchToFetch = manualBranchNameState || null; // Fallback on critical error
+             } finally {
+                 setIsPreCheckingStateStable(false);
+                 logger.log(`[Context] Pre-check complete. Determined fetch branch: ${branchToFetch ?? 'default/repo default'}`);
+                 // Now trigger the actual fetch using the determined branch
+                 await triggerFetch(false, branchToFetch); // Use the determined branch or null (for default)
+                 // Kwork/task population will happen in ActualPageContent's useEffect based on fetchStatus and pendingFlowDetails
+             }
+         }, [ addToastStable, setTargetBranchNameStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, manualBranchNameState, triggerFetch ]); // Added manualBranchNameState and triggerFetch
+
 
         // --- Workflow Step Calculation ---
         const [currentStep, setCurrentStep] = useState<WorkflowStep>('idle');
         useEffect(() => {
             let calculatedStep: WorkflowStep = 'idle';
-             if (imageReplaceTaskState) {
+             // Handle pre-check loading state
+            if (isPreCheckingState) {
+                 calculatedStep = 'fetching'; // Treat pre-check as part of fetching phase
+            } else if (imageReplaceTaskState) {
+                 // Image task logic (mostly unchanged, but depends on fetchStatus set *after* pre-check)
                  if (fetchStatusState === 'loading' || fetchStatusState === 'retrying') calculatedStep = 'fetching';
                  else if (fetchStatusState === 'success' && filesFetchedState && allFetchedFilesState.some(f => f.path === imageReplaceTaskState.targetPath)) calculatedStep = assistantLoadingState ? 'generating_ai_response' : 'files_fetched_image_replace';
                  else if (fetchStatusState === 'error' || fetchStatusState === 'failed_retries' || (filesFetchedState && imageReplaceTaskState && !allFetchedFilesState.some(f => f.path === imageReplaceTaskState?.targetPath))) calculatedStep = 'fetch_failed';
                  else calculatedStep = repoUrlEnteredState ? 'ready_to_fetch' : 'idle';
              } else {
+                 // Standard flow logic (unchanged)
                  if (fetchStatusState === 'loading' || fetchStatusState === 'retrying') calculatedStep = 'fetching';
                  else if (fetchStatusState === 'error' || fetchStatusState === 'failed_retries') calculatedStep = 'fetch_failed';
                  else if (isParsingState) calculatedStep = 'parsing_response';
@@ -385,8 +458,9 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                  return prevStep;
             });
         }, [
+            // Added isPreCheckingState
             fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState, filesParsedState, requestCopiedState, primaryHighlightPathState, secondaryHighlightPathsState,
-            selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, allFetchedFilesState, assistantLoadingState, repoUrlEnteredState,
+            selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, allFetchedFilesState, assistantLoadingState, repoUrlEnteredState, isPreCheckingState,
         ]);
 
         // --- Buddy Message Logic ---
@@ -397,7 +471,10 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
              const allFilesLength = allFetchedFilesState.length;
              const selectedFetchSize = selectedFetcherFilesState.size;
              const selectedAssistSize = selectedAssistantFilesState.size;
-             logger.debug(`[getXuinityMessageStable] Calculating message for step: ${step}, task: ${!!currentTask}`);
+             logger.debug(`[getXuinityMessageStable] Calculating message for step: ${step}, task: ${!!currentTask}, isPreChecking: ${isPreCheckingState}`);
+
+             // Handle pre-checking state
+            if (isPreCheckingState) return `Проверяю наличие PR/ветки для '${pendingFlowDetailsState?.targetPath.split('/').pop() ?? 'файла'}'...`;
 
             if (currentTask) {
                 if (fetchStatusState === 'loading' || fetchStatusState === 'retrying') return "Гружу файл для замены картинки...";
@@ -434,93 +511,113 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
              currentStep, manualBranchNameState, targetBranchNameState,
              imageReplaceTaskState, fetchStatusState, allFetchedFilesState, filesFetchedState, assistantLoadingState,
              selectedFetcherFilesState, selectedAssistantFilesState,
+             isPreCheckingState, pendingFlowDetailsState // Added new state dependencies
          ]);
 
 
         // --- Memoized Context Value ---
         const contextValue = useMemo((): RepoXmlPageContextType => {
-            logger.debug("[RepoXmlPageProvider] Memoizing context value START");
-            const value = {
-                fetchStatus: fetchStatusState,
-                repoUrlEntered: repoUrlEnteredState,
-                filesFetched: filesFetchedState,
-                kworkInputHasContent: kworkInputHasContentState,
-                requestCopied: requestCopiedState,
-                aiResponseHasContent: aiResponseHasContentState,
-                filesParsed: filesParsedState,
-                assistantLoading: assistantLoadingState,
-                aiActionLoading: aiActionLoadingState,
-                loadingPrs: loadingPrsState,
-                isSettingsModalOpen: isSettingsModalOpenState,
-                isParsing: isParsingState,
-                selectedFetcherFiles: selectedFetcherFilesState,
-                selectedAssistantFiles: selectedAssistantFilesState,
-                targetBranchName: targetBranchNameState,
-                manualBranchName: manualBranchNameState,
-                openPrs: openPrsState,
-                currentAiRequestId: currentAiRequestIdState,
-                imageReplaceTask: imageReplaceTaskState,
-                allFetchedFiles: allFetchedFilesState,
-                currentStep,
-                repoUrl: repoUrlState,
-                primaryHighlightedPath: primaryHighlightPathState,
-                secondaryHighlightedPaths: secondaryHighlightPathsState,
-                 // NEW PR Data
-                targetPrData: targetPrDataState,
+            // Wrap memoization in try-catch
+             try {
+                logger.debug("[RepoXmlPageProvider] Memoizing context value START");
+                const value = {
+                    // State Flags
+                    fetchStatus: fetchStatusState,
+                    repoUrlEntered: repoUrlEnteredState,
+                    filesFetched: filesFetchedState,
+                    kworkInputHasContent: kworkInputHasContentState,
+                    requestCopied: requestCopiedState,
+                    aiResponseHasContent: aiResponseHasContentState,
+                    filesParsed: filesParsedState,
+                    assistantLoading: assistantLoadingState,
+                    aiActionLoading: aiActionLoadingState,
+                    loadingPrs: loadingPrsState,
+                    isSettingsModalOpen: isSettingsModalOpenState,
+                    isParsing: isParsingState,
+                    isPreChecking: isPreCheckingState, // NEW
+                    // State Data
+                    selectedFetcherFiles: selectedFetcherFilesState,
+                    selectedAssistantFiles: selectedAssistantFilesState,
+                    targetBranchName: targetBranchNameState,
+                    manualBranchName: manualBranchNameState,
+                    openPrs: openPrsState,
+                    currentAiRequestId: currentAiRequestIdState,
+                    imageReplaceTask: imageReplaceTaskState,
+                    allFetchedFiles: allFetchedFilesState,
+                    currentStep,
+                    repoUrl: repoUrlState,
+                    primaryHighlightedPath: primaryHighlightPathState,
+                    secondaryHighlightedPaths: secondaryHighlightPathsState,
+                    targetPrData: targetPrDataState,
+                    pendingFlowDetails: pendingFlowDetailsState, // NEW
 
-                setFetchStatus: setFetchStatusStateStable,
-                setRepoUrlEntered: setRepoUrlEnteredStateStable,
-                handleSetFilesFetched: handleSetFilesFetchedStable,
-                setSelectedFetcherFiles: setSelectedFetcherFilesStateStable,
-                setKworkInputHasContent: setKworkInputHasContentStateStable,
-                setRequestCopied: setRequestCopiedStateStable,
-                setAiResponseHasContent: setAiResponseHasContentStateStable,
-                setFilesParsed: setFilesParsedStateStable,
-                setSelectedAssistantFiles: setSelectedAssistantFilesStateStable,
-                setAssistantLoading: setAssistantLoadingStateStable,
-                setAiActionLoading: setAiActionLoadingStateStable,
-                setLoadingPrs: setLoadingPrsStateStable,
-                setTargetBranchName: setTargetBranchNameStateStable,
-                setManualBranchName: setManualBranchNameStateStable,
-                setOpenPrs: setOpenPrsStateStable,
-                setIsParsing: setIsParsingStateStable,
-                setContextIsParsing: setIsParsingStateStable,
-                setCurrentAiRequestId: setCurrentAiRequestIdStateStable,
-                setImageReplaceTask: setImageReplaceTaskStateStable,
-                setRepoUrl: setRepoUrlStateStable,
-                // NEW PR Data Setter
-                setTargetPrData: setTargetPrDataStable,
+                    // Setters (Stable Callbacks)
+                    setFetchStatus: setFetchStatusStateStable,
+                    setRepoUrlEntered: setRepoUrlEnteredStateStable,
+                    handleSetFilesFetched: handleSetFilesFetchedStable,
+                    setSelectedFetcherFiles: setSelectedFetcherFilesStateStable,
+                    setKworkInputHasContent: setKworkInputHasContentStateStable,
+                    setRequestCopied: setRequestCopiedStateStable,
+                    setAiResponseHasContent: setAiResponseHasContentStateStable,
+                    setFilesParsed: setFilesParsedStateStable,
+                    setSelectedAssistantFiles: setSelectedAssistantFilesStateStable,
+                    setAssistantLoading: setAssistantLoadingStateStable,
+                    setAiActionLoading: setAiActionLoadingStateStable,
+                    setLoadingPrs: setLoadingPrsStateStable,
+                    setTargetBranchName: setTargetBranchNameStateStable,
+                    setManualBranchName: setManualBranchNameStateStable,
+                    setOpenPrs: setOpenPrsStateStable,
+                    setIsParsing: setIsParsingStateStable,
+                    setContextIsParsing: setIsParsingStateStable,
+                    setCurrentAiRequestId: setCurrentAiRequestIdStateStable,
+                    setImageReplaceTask: setImageReplaceTaskStateStable,
+                    setRepoUrl: setRepoUrlStateStable,
+                    setTargetPrData: setTargetPrDataStable,
+                    setIsPreChecking: setIsPreCheckingStateStable, // NEW
+                    setPendingFlowDetails: setPendingFlowDetailsStateStable, // NEW
 
-                triggerToggleSettingsModal,
-                triggerFetch,
-                triggerSelectHighlighted,
-                triggerAddSelectedToKwork,
-                triggerCopyKwork,
-                triggerAskAi,
-                triggerParseResponse,
-                triggerSelectAllParsed,
-                triggerCreateOrUpdatePR,
-                triggerUpdateBranch: triggerUpdateBranchStable,
-                triggerGetOpenPRs: triggerGetOpenPRsStable,
-                updateRepoUrlInAssistant: updateRepoUrlInAssistantStable,
-                getXuinityMessage: getXuinityMessageStable,
-                scrollToSection: scrollToSectionStable,
-                triggerAddImportantToKwork: triggerAddImportantToKworkStable,
-                triggerAddTreeToKwork: triggerAddTreeToKworkStable,
-                triggerSelectAllFetcherFiles: triggerSelectAllFetcherFilesStable,
-                triggerDeselectAllFetcherFiles: triggerDeselectAllFetcherFilesStable,
-                triggerClearKworkInput: triggerClearKworkInputStable,
-                kworkInputRef, aiResponseInputRef, fetcherRef, assistantRef,
-                addToast: addToastStable,
-                getKworkInputValue: getKworkInputValueStable,
-                updateKworkInput: updateKworkInputStable,
-            };
-            logger.debug("[RepoXmlPageProvider] Memoizing context value END");
-            return value;
+                    // Triggers (Stable Callbacks)
+                    triggerToggleSettingsModal,
+                    triggerPreCheckAndFetch, // NEW
+                    triggerFetch,
+                    triggerSelectHighlighted,
+                    triggerAddSelectedToKwork,
+                    triggerCopyKwork,
+                    triggerAskAi,
+                    triggerParseResponse,
+                    triggerSelectAllParsed,
+                    triggerCreateOrUpdatePR,
+                    triggerUpdateBranch: triggerUpdateBranchStable,
+                    triggerGetOpenPRs: triggerGetOpenPRsStable,
+                    updateRepoUrlInAssistant: updateRepoUrlInAssistantStable,
+                    getXuinityMessage: getXuinityMessageStable,
+                    scrollToSection: scrollToSectionStable,
+                    triggerAddImportantToKwork: triggerAddImportantToKworkStable,
+                    triggerAddTreeToKwork: triggerAddTreeToKworkStable,
+                    triggerSelectAllFetcherFiles: triggerSelectAllFetcherFilesStable,
+                    triggerDeselectAllFetcherFiles: triggerDeselectAllFetcherFilesStable,
+                    triggerClearKworkInput: triggerClearKworkInputStable,
+
+                    // Refs
+                    kworkInputRef, aiResponseInputRef, fetcherRef, assistantRef,
+
+                    // Utilities
+                    addToast: addToastStable,
+                    getKworkInputValue: getKworkInputValueStable,
+                    updateKworkInput: updateKworkInputStable,
+                };
+                logger.debug("[RepoXmlPageProvider] Memoizing context value END");
+                return value;
+            } catch (memoError: any) {
+                 logger.fatal("[RepoXmlPageProvider] CRITICAL ERROR during context value memoization:", memoError);
+                 // Return a minimal, safe default to prevent crashing the provider entirely
+                 return defaultContextValue as RepoXmlPageContextType;
+             }
         }, [
-            fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, secondaryHighlightPathsState, targetPrDataState, // Added targetPrDataState
-            setFetchStatusStateStable, setRepoUrlEnteredStateStable, handleSetFilesFetchedStable, setSelectedFetcherFilesStateStable, setKworkInputHasContentStateStable, setRequestCopiedStateStable, setAiResponseHasContentStateStable, setFilesParsedStateStable, setSelectedAssistantFilesStateStable, setAssistantLoadingStateStable, setAiActionLoadingStateStable, setLoadingPrsStateStable, setTargetBranchNameStateStable, setManualBranchNameStateStable, setOpenPrsStateStable, setIsParsingStateStable, setCurrentAiRequestIdStateStable, setImageReplaceTaskStateStable, setRepoUrlStateStable, setTargetPrDataStable, // Added setTargetPrDataStable
-            triggerToggleSettingsModal, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR, triggerUpdateBranchStable, triggerGetOpenPRsStable, updateRepoUrlInAssistantStable, getXuinityMessageStable, scrollToSectionStable, triggerAddImportantToKworkStable, triggerAddTreeToKworkStable, triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFilesStable, triggerClearKworkInputStable, addToastStable, getKworkInputValueStable, updateKworkInputStable,
+            // List ALL state values and stable callbacks/values returned by the context
+            fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, isPreCheckingState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, secondaryHighlightPathsState, targetPrDataState, pendingFlowDetailsState,
+            setFetchStatusStateStable, setRepoUrlEnteredStateStable, handleSetFilesFetchedStable, setSelectedFetcherFilesStateStable, setKworkInputHasContentStateStable, setRequestCopiedStateStable, setAiResponseHasContentStateStable, setFilesParsedStateStable, setSelectedAssistantFilesStateStable, setAssistantLoadingStateStable, setAiActionLoadingStateStable, setLoadingPrsStateStable, setTargetBranchNameStateStable, setManualBranchNameStateStable, setOpenPrsStateStable, setIsParsingStateStable, setCurrentAiRequestIdStateStable, setImageReplaceTaskStateStable, setRepoUrlStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable,
+            triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR, triggerUpdateBranchStable, triggerGetOpenPRsStable, updateRepoUrlInAssistantStable, getXuinityMessageStable, scrollToSectionStable, triggerAddImportantToKworkStable, triggerAddTreeToKworkStable, triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFilesStable, triggerClearKworkInputStable, addToastStable, getKworkInputValueStable, updateKworkInputStable,
         ]);
 
         logger.log("[RepoXmlPageProvider] Rendering Provider wrapper", { step: contextValue.currentStep });
@@ -528,23 +625,23 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
 
     } catch (providerError: any) {
         logger.fatal("[RepoXmlPageProvider] CRITICAL INITIALIZATION ERROR:", providerError);
-        // Render a simple error message instead of children if provider itself fails
         return <div className="text-red-500 p-4">Критическая ошибка инициализации провайдера страницы: {providerError.message}</div>;
     }
 };
 
-// --- Consumer Hook (Unchanged) ---
+// --- Consumer Hook ---
 export const useRepoXmlPageContext = (): RepoXmlPageContextType => {
     const context = useContext(RepoXmlPageContext);
     if (context === undefined) {
          logger.fatal("useRepoXmlPageContext used outside RepoXmlPageProvider!");
          throw new Error("useRepoXmlPageContext must be used within a RepoXmlPageProvider");
     }
-    if (context.addToast === defaultContextValue.addToast && typeof context.addToast === 'function') { // Check against default FUNCTION reference
+    // Add a check for a newly added required field to ensure it's not the default
+    if (context.setTargetPrData === defaultContextValue.setTargetPrData) {
         logger.warn("useRepoXmlPageContext: Context might be the default value (check provider setup).");
     }
     return context as RepoXmlPageContextType;
 };
 
-// Export necessary types (Unchanged)
-export type { FileNode, SimplePullRequest, RepoTxtFetcherRef, AICodeAssistantRef, ImportCategory, FetchStatus, WorkflowStep, ImageReplaceTask, RepoXmlPageContextType };
+// Export necessary types
+export type { FileNode, SimplePullRequest, RepoTxtFetcherRef, AICodeAssistantRef, ImportCategory, FetchStatus, WorkflowStep, ImageReplaceTask, RepoXmlPageContextType, PendingFlowDetails };

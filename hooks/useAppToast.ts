@@ -3,7 +3,7 @@ import { toast as sonnerToast } from 'sonner';
 import { useErrorOverlay } from '@/contexts/ErrorOverlayContext';
 import type { ToastRecord } from '@/types/toast';
 import { debugLogger as logger } from '@/lib/debugLogger';
-import { useCallback, useMemo } from 'react'; // Imports are correct
+import { useCallback, useMemo } from 'react';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message' | 'custom';
 
@@ -27,9 +27,9 @@ export const useAppToast = () => {
         message: string | React.ReactNode,
         options?: any
     ) => {
-        // Fallback to console.warn if context isn't ready
-        const logWarn = isReady ? logger.warn : console.warn;
-        const logError = isReady ? logger.error : console.error;
+        // Use console.warn/error directly if context/logger might be unstable
+        const logWarn = (isReady && logger) ? logger.warn : console.warn;
+        const logError = (isReady && logger) ? logger.error : console.error;
 
         if (!isReady) {
             logWarn("useAppToast: Context not ready, attempting direct toast display.", { type, message });
@@ -69,8 +69,8 @@ export const useAppToast = () => {
                         timestamp: Date.now(),
                     };
                     addToastToHistory(record);
-                } catch (logError) {
-                    logError("useAppToast: Failed to add toast to history", logError);
+                } catch (loggingError) { // Catch potential errors during logging itself
+                    logError("useAppToast: Failed to add toast to history", loggingError);
                 }
             } else if (type !== 'custom' && !addToastToHistory) {
                  logWarn("useAppToast: Could not add toast to history because addToastToHistory is not available", { type });
