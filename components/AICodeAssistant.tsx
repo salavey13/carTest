@@ -39,6 +39,21 @@ interface AICodeAssistantProps {
 }
 interface OriginalFile { path: string; content: string; }
 
+// --- Helper Component (Moved from page.tsx for clarity) ---
+const ToastInjector: React.FC<{ id: string; context: ReturnType<typeof useRepoXmlPageContext> | null }> = ({ id, context }) => {
+    if (!context || !context.addToast) {
+        if (!context) logger.warn(`ToastInjector ${id}: Context is null`);
+        else if (!context.addToast) logger.warn(`ToastInjector ${id}: context.addToast is not available`);
+        return null;
+    }
+    try {
+        context.addToast(`[DEBUG_INJECT] ToastInjector Rendered: ${id}`, 'info', 500);
+    } catch (e) {
+        logger.error(`ToastInjector ${id} failed to toast:`, e);
+    }
+    return null;
+};
+
 // --- Main Component ---
 const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((props, ref) => {
 
@@ -46,11 +61,11 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const { kworkInputRefPassed, aiResponseInputRefPassed } = props;
 
     // --- Get Context and Toast early ---
-    const pageContext = useRepoXmlPageContext(); // Get context now
-    const { addToast: addToastDirect } = pageContext; // Get toast function
-    addToastDirect("[DEBUG_RENDER] AICodeAssistant Function START", 'info', 500); // Initial toast
+    const pageContext = useRepoXmlPageContext();
+    const { addToast: addToastDirect } = pageContext;
+    addToastDirect("[DEBUG_RENDER] AICodeAssistant Function START", 'info', 500);
 
-    // --- State (NO isMounted) ---
+    // --- State ---
     addToastDirect("[DEBUG_RENDER] AICodeAssistant Before useState", 'info', 500);
     const [response, setResponse] = useState<string>("");
     const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
@@ -343,6 +358,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     addToastDirect("[DEBUG_RENDER] AICodeAssistant Render: Returning JSX", 'info', 500);
     return (
         <div id="executor" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
+            {/* Добавляем инжектор в самое начало */}
+            <ToastInjector id="AICodeAssistant-Start" context={pageContext} />
             <header className="flex justify-between items-center gap-2 flex-wrap">
                  <div className="flex items-center gap-2">
                      <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse">
@@ -352,62 +369,92 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                  </div>
                  <button id="settings-modal-trigger-assistant" onClick={() => { addToastDirect("[DEBUG_CLICK] Settings Toggle Click (Assistant)", 'info', 500); triggerToggleSettingsModal(); }} className="p-2 text-gray-400 hover:text-cyan-400 transition rounded-full hover:bg-gray-700/50 disabled:opacity-50" disabled={isProcessingPR || assistantLoading} title="Настройки URL / Token / Ветки / PRs" > <FaCodeBranch className="text-xl" /> </button>
              </header>
+             <ToastInjector id="AICodeAssistant-AfterHeader" context={pageContext} />
 
             {showStandardAssistantUI && (
                  <>
+                     <ToastInjector id="AICodeAssistant-StandardUI-Start" context={pageContext} />
                      <div>
                           <p className="text-yellow-400 mb-2 text-xs md:text-sm min-h-[18px]"> {isWaitingForAiResponse ? `⏳ Жду AI... (ID: ${currentAiRequestId?.substring(0,6)}...)` : isProcessingAny ? "⏳ Обработка..." : "2️⃣ Вставь ответ AI или жди. Затем '➡️'."} </p>
                           <div className="relative group">
-                              {/* Injector 1 */}
                               <ToastInjector id="AICodeAssistant-BeforeTextarea" context={pageContext} />
                               <textarea id="response-input" ref={aiResponseInputRefPassed} className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm min-h-[180px] resize-y simple-scrollbar" defaultValue={response} onChange={(e) => setResponseValue(e.target.value)} placeholder={isWaitingForAiResponse ? "AI думает..." : isProcessingAny ? "Ожидание..." : "Ответ AI здесь..."} disabled={isProcessingAny} spellCheck="false" />
-                              {/* Injector 2 */}
                               <ToastInjector id="AICodeAssistant-BeforeTextareaUtils" context={pageContext} />
                               <TextAreaUtilities response={response} isLoading={isProcessingAny} onParse={handlers.handleParse} onOpenModal={handlers.handleOpenModal} onCopy={handlers.handleCopyResponse} onClear={handlers.handleClearResponse} onSelectFunction={handlers.handleSelectFunction} isParseDisabled={parseButtonDisabled} isProcessingPR={isProcessingPR || assistantLoading} />
                           </div>
                            <div className="flex justify-end items-start mt-1 gap-2 min-h-[30px]">
-                               {/* Injector 3 */}
                                <ToastInjector id="AICodeAssistant-BeforeCodeRestorer" context={pageContext} />
                                <CodeRestorer parsedFiles={componentParsedFiles} originalFiles={originalRepoFiles} skippedIssues={validationIssues.filter(i => i.type === 'skippedCodeBlock')} onRestorationComplete={handlers.handleRestorationComplete} disabled={isProcessingAny || validationStatus === 'validating' || isFetchingOriginals} />
-                               {/* Injector 4 */}
                                <ToastInjector id="AICodeAssistant-BeforeValidationIndicator" context={pageContext} />
                                <ValidationStatusIndicator status={validationStatus} issues={validationIssues} onAutoFix={handlers.handleAutoFix} onCopyPrompt={handlers.handleCopyFixPrompt} isFixDisabled={fixButtonDisabled} />
                           </div>
                       </div>
-                      {/* Injector 5 */}
                       <ToastInjector id="AICodeAssistant-BeforeParsedList" context={pageContext} />
                      <ParsedFilesList parsedFiles={componentParsedFiles} selectedFileIds={selectedFileIds} validationIssues={validationIssues} onToggleSelection={handlers.handleToggleFileSelection} onSelectAll={handlers.handleSelectAllFiles} onDeselectAll={handlers.handleDeselectAllFiles} onSaveFiles={handlers.handleSaveFiles} onDownloadZip={handlers.handleDownloadZip} onSendToTelegram={handlers.handleSendToTelegram} isUserLoggedIn={!!user} isLoading={isProcessingAny} />
-                     {/* Injector 6 */}
                      <ToastInjector id="AICodeAssistant-BeforePRForm" context={pageContext} />
                      <PullRequestForm id="pr-form-container" repoUrl={finalRepoUrlForForm}
                       prTitle={prTitle} selectedFileCount={selectedAssistantFiles.size} isLoading={isProcessingPR || assistantLoading} isLoadingPrList={loadingPrs} onRepoUrlChange={updateRepoUrl} onPrTitleChange={setPrTitle} onCreatePR={handlers.handleCreateOrUpdatePR} buttonText={prButtonText} buttonIcon={prButtonLoadingIconNode} isSubmitDisabled={submitButtonDisabled} />
-                     {/* Injector 7 */}
                      <ToastInjector id="AICodeAssistant-BeforeOpenPrList" context={pageContext} />
                      <OpenPrList openPRs={contextOpenPrs} />
                     <div className="flex items-center gap-3 mt-2 flex-wrap">
-                         {/* Injector 8 */}
-                         <ToastInjector id="AICodeAssistant-BeforeToolsMenu" context={pageContext} />
+                        <ToastInjector id="AICodeAssistant-BeforeToolsMenu" context={pageContext} />
                         <ToolsMenu customLinks={customLinks} onAddCustomLink={handlers.handleAddCustomLink} disabled={isProcessingAny}/>
-                         {/* Injector 9 */}
-                         <ToastInjector id="AICodeAssistant-BeforeImageButton" context={pageContext} />
+                        <ToastInjector id="AICodeAssistant-BeforeImageButton" context={pageContext} />
                          <button onClick={() => { addToastDirect("[DEBUG_CLICK] Image Button Click", 'info', 500); setIsImageModalOpen(true); }} className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50 relative" disabled={isProcessingAny} title="Загрузить/Связать Картинки (prompts_imgs.txt)" >
                              <FaImage className="text-gray-400" /> <span className="text-sm text-white">Картинки</span>
-                             {componentParsedFiles.some(f => f.path === '/prompts_imgs.txt') && !isImageModalOpen && ( <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-gray-800 shadow-md animate-pulse"></span> )}
+                             {componentParsedFiles.some(f => f.path === '/prompts_imgs.txt') && !isImageModalOpen && ( <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-gray-800 animate-pulse"></span> )}
                          </button>
                     </div>
+                    <ToastInjector id="AICodeAssistant-StandardUI-End" context={pageContext} />
                  </>
             )}
 
             {/* --- Image Replace UI --- */}
             {showImageReplaceUI && (
                  <div className={`flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed min-h-[200px] ${imageTaskFailed ? 'border-red-500' : 'border-blue-400'}`}>
-                    {/* ... Image Replace UI content ... */}
+                    <ToastInjector id="AICodeAssistant-ImageUI-Start" context={pageContext} />
+                     {/* Status Icon Logic */}
+                     {(assistantLoading || isProcessingPR) ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> )
+                       : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> )
+                       : imageTaskFailed ? <FaCircleXmark className="text-red-400 text-4xl mb-4" />
+                       : imageReplaceTask ? <FaImages className="text-blue-400 text-4xl mb-4" />
+                       : <FaCheck className="text-green-400 text-4xl mb-4" /> }
+
+                     <p className={`text-lg font-semibold ${imageTaskFailed ? 'text-red-300' : 'text-blue-300'}`}>
+                         {/* ... Status Title Logic ... */}
+                         {(assistantLoading || isProcessingPR) ? "Обработка Замены..."
+                           : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Загрузка Файла..."
+                           : imageTaskFailed ? "Ошибка Замены Картинки"
+                           : imageReplaceTask ? "Задача Замены Активна"
+                           : "Замена Завершена Успешно"}
+                     </p>
+                     <p className="text-sm text-gray-400 mt-2">
+                         {/* ... Status Description Logic ... */}
+                          {(assistantLoading || isProcessingPR) ? "Создание/обновление PR..."
+                           : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Ожидание ответа от GitHub..."
+                           : imageTaskFailed ? (imageReplaceError || "Произошла неизвестная ошибка.")
+                           : imageReplaceTask ? "Файл загружен, ожидание обработки Ассистентом..."
+                           : "Процесс завершен. Проверьте PR."}
+                     </p>
+                     {imageReplaceTask && (
+                         <div className="mt-3 text-xs text-gray-500 break-all text-left bg-gray-900/50 p-2 rounded max-w-full overflow-x-auto simple-scrollbar">
+                             <p><span className="font-semibold text-gray-400">Файл:</span> {imageReplaceTask.targetPath}</p>
+                             <p><span className="font-semibold text-gray-400">Старый URL:</span> {imageReplaceTask.oldUrl}</p>
+                             <p><span className="font-semibold text-gray-400">Новый URL:</span> {imageReplaceTask.newUrl}</p>
+                         </div>
+                     )}
+                     {imageTaskFailed && (
+                          <button
+                              onClick={handleResetImageError}
+                              className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs rounded-md transition"
+                          > Сбросить Ошибку </button>
+                      )}
+                     <ToastInjector id="AICodeAssistant-ImageUI-End" context={pageContext} />
                  </div>
              )}
 
             {/* --- Modals --- */}
             <AnimatePresence>
-                {/* Injector 10 */}
                  <ToastInjector id="AICodeAssistant-BeforeModals" context={pageContext} />
                 {showStandardAssistantUI && showModal && (
                     <SwapModal isOpen={showModal} onClose={() => setShowModal(false)} onSwap={handlers.handleSwap} onSearch={handlers.handleSearch} initialMode={modalMode} />
@@ -416,7 +463,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                     <ImageToolsModal isOpen={isImageModalOpen} onClose={() => setIsImageModalOpen(false)} parsedFiles={componentParsedFiles} onUpdateParsedFiles={handlers.handleUpdateParsedFiles}/>
                 )}
              </AnimatePresence>
-             {/* Injector 11 */}
              <ToastInjector id="AICodeAssistant-End" context={pageContext} />
         </div>
       );

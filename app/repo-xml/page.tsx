@@ -116,6 +116,28 @@ const translations = {
 type Language = 'en' | 'ru';
 type TranslationSet = typeof translations['en'];
 
+
+
+
+// --- ВСТАВЛЯЕМ ОПРЕДЕЛЕНИЕ ToastInjector ЗДЕСЬ ---
+const ToastInjector: React.FC<{ id: string; context: RepoXmlPageContextType | null }> = ({ id, context }) => {
+    if (!context || !context.addToast) { // Добавили проверку на addToast
+        // Не можем показать тост, если контекст или функция недоступны
+        if (!context) logger.warn(`ToastInjector ${id}: Context is null`);
+        else if (!context.addToast) logger.warn(`ToastInjector ${id}: context.addToast is not available`);
+        return null;
+    }
+    try {
+        // Вызываем addToast сразу во время рендера
+        context.addToast(`[DEBUG_INJECT] ToastInjector Rendered: ${id}`, 'info', 500);
+    } catch (e) {
+        // Логируем ошибку, если сам вызов тоста падает
+        logger.error(`ToastInjector ${id} failed to toast:`, e);
+    }
+    return null; // Компонент ничего не рендерит визуально
+};
+// --- КОНЕЦ ОПРЕДЕЛЕНИЯ ToastInjector ---
+
 // --- Fallback component for AutomationBuddy ---
 function LoadingBuddyFallback() {
     return ( <div className="fixed bottom-4 right-4 z-50 w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 animate-pulse" aria-hidden="true" ></div> );

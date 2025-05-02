@@ -94,6 +94,7 @@ export const useRepoFetcher = ({
 
     addToastDirect("[DEBUG_HOOK] useRepoFetcher Before Callbacks", 'info', 500);
     const stopProgressSimulation = useCallback(() => {
+        // addToastDirect("[DEBUG_CB] stopProgressSimulation called", 'info', 500); // Too noisy
         if (progressIntervalRef.current) {
             clearInterval(progressIntervalRef.current);
             progressIntervalRef.current = null;
@@ -110,11 +111,13 @@ export const useRepoFetcher = ({
             setProgress(prev => {
                 const currentContextStatus = fetchStatusRef.current;
                 if (currentContextStatus !== 'loading' && currentContextStatus !== 'retrying') {
+                    // addToastDirect("[DEBUG_CB] Progress Interval: Stopping due to context status change", 'info', 500); // Too noisy
                     stopProgressSimulation();
                     return currentContextStatus === 'success' ? 100 : prev;
                 }
                 const nextProgress = prev + increment;
                 if (nextProgress >= 95) {
+                    // addToastDirect("[DEBUG_CB] Progress Interval: Reached >= 95%", 'info', 500); // Too noisy
                     stopProgressSimulation();
                     return 95;
                 }
@@ -346,7 +349,7 @@ export const useRepoFetcher = ({
         logger
     ]);
 
-    // --- Effect: Auto-Fetch (без изменений) ---
+    // --- Effect: Auto-Fetch ---
     useEffect(() => {
         addToastDirect("[DEBUG_EFFECT] Auto-Fetch Effect Check", 'info', 500);
         if (!repoUrlEntered) { addToastDirect("[DEBUG_EFFECT] Auto-Fetch SKIP: no URL", 'info', 500); return; }
@@ -374,12 +377,12 @@ export const useRepoFetcher = ({
 
     addToastDirect("[DEBUG_HOOK] useRepoFetcher After Callbacks and Effects", 'info', 500);
 
-    // --- Derived State (без изменений) ---
+    // --- Derived State ---
     const isLoading = fetchStatus === 'loading' || fetchStatus === 'retrying';
     const isFetchDisabled = isLoading || loadingPrs || !repoUrlEntered || assistantLoading || isParsing || aiActionLoading || (!!imageReplaceTask && isImageTaskFetchInitiated.current && isLoading);
     addToastDirect(`[DEBUG_HOOK] useRepoFetcher derived: isLoading=${isLoading}, isFetchDisabled=${isFetchDisabled}`, 'info', 500);
 
-    // --- Return values (без изменений) ---
+    // --- Return values ---
     addToastDirect("[DEBUG_HOOK] useRepoFetcher Hook End - Returning values", 'info', 500);
     return {
         files, progress, error, primaryHighlightedPath, secondaryHighlightedPaths,
