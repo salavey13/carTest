@@ -41,7 +41,7 @@ import ProgressBar from "./repo/ProgressBar";
 const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
 
     // === VIBE CHECK ===
-    const { addToast: addToastContext,
+    const { addToast: addToastContext, // Renamed to avoid conflict
         fetchStatus, filesFetched,
         repoUrl: repoUrlFromContext, setRepoUrl: setRepoUrlInContext, repoUrlEntered,
         selectedFetcherFiles,

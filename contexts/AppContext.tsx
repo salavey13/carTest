@@ -52,19 +52,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // потому что `useAppToast` сам зависит от `AppContext` и мы не можем его здесь использовать.
   useEffect(() => {
     let currentToastId: string | number | undefined;
+    let loadingTimer: NodeJS.Timeout | null = null;
 
     // Показываем тост загрузки, только если она занимает заметное время
     if (contextValue.isLoading) {
-       // Можно добавить задержку, если нужно
-       // const loadingTimer = setTimeout(() => {
-       //    // Показываем тост только если все еще грузится
-       //    if (contextValue.isLoading && document.visibilityState === 'visible') { // Проверка видимости
-       //       currentToastId = toast.loading("Авторизация...", { id: "auth-loading-toast" });
-       //    }
-       // }, 300);
-       // return () => clearTimeout(loadingTimer);
+       // Добавляем задержку, чтобы не показывать тост при быстрой загрузке
+       loadingTimer = setTimeout(() => {
+          // Показываем тост только если все еще грузится
+          if (contextValue.isLoading && document.visibilityState === 'visible') { // Проверка видимости
+             debugLogger.debug("[AppContext] Showing auth loading toast...");
+             currentToastId = toast.loading("Авторизация...", { id: "auth-loading-toast" });
+          }
+       }, 300); // 300ms задержка
     } else {
-        // Убираем тост загрузки, если он был
+        // Если загрузка завершилась до таймера, отменяем его
+        if (loadingTimer) clearTimeout(loadingTimer);
+        // Убираем тост загрузки, если он был показан
+        debugLogger.debug("[AppContext] Dismissing auth loading toast (if any)...");
         toast.dismiss("auth-loading-toast");
 
         // Показываем тост успеха ТОЛЬКО ОДИН РАЗ при успешной авторизации
@@ -72,24 +76,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             // Используем ID, чтобы тост не дублировался при быстрых обновлениях
             // Проверяем видимость документа, чтобы не показывать тост в фоне
              if (document.visibilityState === 'visible') {
+                 debugLogger.debug("[AppContext] Showing auth success toast...");
                  currentToastId = toast.success("Пользователь авторизован", { id: "auth-success-toast", duration: 2000 });
              }
         }
         // Опционально: показываем тост ошибки при неудаче
         else if (contextValue.error) {
             if (document.visibilityState === 'visible') {
+                 debugLogger.error("[AppContext] Showing auth error toast:", contextValue.error);
                  currentToastId = toast.error("Ошибка авторизации", { id: "auth-error-toast", description: contextValue.error.message });
             }
         }
     }
 
-    // Функция очистки для скрытия тоста при размонтировании или изменении зависимостей
-    // (хотя для RootLayout это маловероятно)
+    // Функция очистки для отмены таймера
     return () => {
-        if (currentToastId) {
-            // Можно раскомментировать, если нужно немедленно убирать тост при изменениях
-            // toast.dismiss(currentToastId);
+        if (loadingTimer) {
+            clearTimeout(loadingTimer);
         }
+        // Опционально: скрывать тост при размонтировании? (Маловероятно для AppProvider)
+        // if (currentToastId) {
+        //     toast.dismiss(currentToastId);
+        // }
     };
     // Зависимости: реагируем на изменение статуса аутентификации, загрузки и ошибки
   }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.error]);
@@ -104,9 +112,11 @@ export const useAppContext = (): AppContextData => {
   const context = useContext(AppContext);
   // Ensure the hook is used within a provider and context is fully formed
   // Проверяем не только на undefined, но и наличие нашего нового поля
-  if (context === undefined || !context.hasOwnProperty('debugToastsEnabled')) {
+  if (!context || !context.hasOwnProperty('debugToastsEnabled')) {
     // Эта ошибка критична и означает неправильное использование контекста
-    throw new Error("useAppContext must be used within an AppProvider and after its initialization");
+     const error = new Error("useAppContext must be used within an AppProvider and after its initialization");
+     debugLogger.fatal("useAppContext Error:", error); // Логируем критическую ошибку
+     throw error;
   }
   // Cast to full type once checks pass
   return context as AppContextData;
