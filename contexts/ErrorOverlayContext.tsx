@@ -28,7 +28,7 @@ export interface ErrorInfo {
 interface ErrorOverlayContextType {
   errorInfo: ErrorInfo | null;
   setErrorInfo: React.Dispatch<React.SetStateAction<ErrorInfo | null>>;
-  showOverlay: boolean; // Keep this for potential future use, but always true now
+  showOverlay: boolean;
   toastHistory: ToastRecord[];
   addToastToHistory: (record: Omit<ToastRecord, 'id'>) => void;
   logHistory: LogRecord[];
@@ -43,14 +43,10 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [toastHistory, setToastHistory] = useState<ToastRecord[]>([]);
   const [logHistory, setLogHistory] = useState<LogRecord[]>([]);
 
-  // --- REMOVED ENV VAR CHECK ---
-  // Overlay and listeners are now always active for debugging purposes
-  const showOverlay = true; // Always enabled
+  const showOverlay = true; // Always enabled for dev
   useEffect(() => {
-      // Use console.log as logger might not be fully ready
       console.log(`[ErrorOverlayProvider] Dev Overlay System ACTIVE.`);
   }, []);
-  // ---------------------------
 
   logger.debug("[ErrorOverlayProvider] State initialized.");
 
@@ -88,57 +84,82 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     const handleError = (event: ErrorEvent) => {
         logger.debug("[Global Event Listener] 'error' event received", event);
+        // Basic checks to prevent loops or useless reports
         if (event.message === 'Script error.' && !event.filename) {
-            logger.warn("Global 'error' event ignored: Generic 'Script error.'", { msg: event.message });
-            return;
+            logger.warn("Global 'error' event ignored: Generic 'Script error.'", { msg: event.message }); return;
         }
-        if (event.error && event.error.stack && event.error.stack.includes('DevErrorOverlay')) {
-             logger.warn("Global 'error' event ignored: Originates from DevErrorOverlay.", { msg: event.message });
-             return;
+        const stack = event.error?.stack || '';
+        if (stack.includes('DevErrorOverlay')) {
+             logger.warn("Global 'error' event ignored: Originates from DevErrorOverlay.", { msg: event.message }); return;
         }
-        if (event.error && event.error.stack && event.error.stack.includes('ErrorOverlayContext')) {
-            logger.fatal("Global 'error' event ignored: Likely loop originating from ErrorOverlayContext itself.", { msg: event.message, error: event.error });
-            return;
+        if (stack.includes('ErrorOverlayContext')) {
+            logger.fatal("Global 'error' event ignored: Likely loop originating from ErrorOverlayContext itself.", { msg: event.message, error: event.error }); return;
         }
 
-        logger.error("Global 'error' event caught by ErrorOverlayContext:", { msg: event.message, file: event.filename, line: event.lineno, col: event.colno, errorObj: event.error });
-        // Use functional update to be safe if multiple errors happen quickly
-        setErrorInfo(prev => ({
-             message: event.message || 'Unknown error event',
-             source: event.filename || 'N/A',
-             lineno: event.lineno || undefined,
-             colno: event.colno || undefined,
-             error: event.error || event.message,
-             type: 'error'
-         }));
+        const errorDetails: ErrorInfo = {
+          message: event.message || 'Unknown error event',
+          source: event.filename || 'N/A',
+          lineno: event.lineno || undefined,
+          colno: event.colno || undefined,
+          error: event.error || event.message,
+          type: 'error'
+        };
+
+        logger.error("Global 'error' event caught. Preparing to set context:", errorDetails);
+
+        // --- ADDED try-catch around setErrorInfo ---
+        try {
+             setErrorInfo(errorDetails);
+             logger.info("Global 'error' event context set successfully.");
+        } catch (contextSetError: any) {
+             logger.fatal("[ErrorOverlayContext] CRITICAL: Failed to set errorInfo state in global error handler!", contextSetError);
+             console.error("[ErrorOverlayContext] CRITICAL: Failed to set errorInfo state in global error handler!", { originalError: errorDetails, contextSetError });
+             // Attempt a basic alert as a last resort if console might be broken/ignored
+             // try { alert(`FATAL CONTEXT SETTER FAILURE (error): ${contextSetError.message}\nOriginal: ${errorDetails.message}`); } catch {}
+        }
+        // -------------------------------------------
     };
 
     const handleRejection = (event: PromiseRejectionEvent) => {
         logger.debug("[Global Event Listener] 'unhandledrejection' event received", event);
-        if (event.reason instanceof Error && event.reason.stack && event.reason.stack.includes('DevErrorOverlay')) {
-            logger.warn("Global 'unhandledrejection' event ignored: Originates from DevErrorOverlay.", { reason: event.reason });
-            return;
+        const reason = event.reason;
+        const stack = (reason instanceof Error) ? reason.stack : '';
+
+        // Basic checks to prevent loops or useless reports
+        if (stack && stack.includes('DevErrorOverlay')) {
+            logger.warn("Global 'unhandledrejection' event ignored: Originates from DevErrorOverlay.", { reason }); return;
         }
-        if (event.reason instanceof Error && event.reason.stack && event.reason.stack.includes('ErrorOverlayContext')) {
-             logger.fatal("Global 'unhandledrejection' event ignored: Likely loop originating from ErrorOverlayContext itself.", { reason: event.reason });
-             return;
+        if (stack && stack.includes('ErrorOverlayContext')) {
+             logger.fatal("Global 'unhandledrejection' event ignored: Likely loop originating from ErrorOverlayContext itself.", { reason }); return;
         }
 
-        logger.error("Global 'unhandledrejection' event caught by ErrorOverlayContext:", { reason: event.reason });
         let message = 'Unhandled promise rejection';
-        let errorObject: any = event.reason;
+        let errorObject: any = reason;
         try {
-            if (event.reason instanceof Error) message = event.reason.message;
-            else if (typeof event.reason === 'string') message = event.reason;
-            else if (event.reason && typeof event.reason.message === 'string') message = event.reason.message;
-            else { try { message = JSON.stringify(event.reason); } catch { message = 'Unhandled promise rejection with non-serializable reason'; } }
+            if (reason instanceof Error) message = reason.message;
+            else if (typeof reason === 'string') message = reason;
+            else if (reason && typeof reason.message === 'string') message = reason.message;
+            else { try { message = JSON.stringify(reason); } catch { message = 'Unhandled promise rejection with non-serializable reason'; } }
         } catch (e) { message = "Error processing rejection reason itself."; }
-        // Use functional update
-        setErrorInfo(prev => ({
-             message: message || "Unknown rejection reason",
-             error: errorObject,
-             type: 'rejection'
-         }));
+
+        const rejectionDetails: ErrorInfo = {
+            message: message || "Unknown rejection reason",
+            error: errorObject,
+            type: 'rejection'
+        };
+
+        logger.error("Global 'unhandledrejection' event caught. Preparing to set context:", rejectionDetails);
+
+        // --- ADDED try-catch around setErrorInfo ---
+        try {
+             setErrorInfo(rejectionDetails);
+             logger.info("Global 'unhandledrejection' event context set successfully.");
+        } catch (contextSetError: any) {
+             logger.fatal("[ErrorOverlayContext] CRITICAL: Failed to set errorInfo state in global rejection handler!", contextSetError);
+             console.error("[ErrorOverlayContext] CRITICAL: Failed to set errorInfo state in global rejection handler!", { originalRejection: rejectionDetails, contextSetError });
+             // try { alert(`FATAL CONTEXT SETTER FAILURE (rejection): ${contextSetError.message}\nOriginal: ${rejectionDetails.message}`); } catch {}
+        }
+        // -------------------------------------------
     };
 
     try {
