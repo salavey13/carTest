@@ -1,3 +1,4 @@
+"use client";
 import React from 'react';
 import { motion } from 'framer-motion';
 import { FetchStatus } from '@/contexts/RepoXmlPageContext'; // Import FetchStatus if needed for typing
