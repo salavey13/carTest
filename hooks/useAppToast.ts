@@ -21,7 +21,18 @@ export const useAppToast = () => {
 
     // Ensure contexts are loaded before trying to use them
     // This check is important, especially if this hook is used early in the render tree
-    const isReady = !!errorOverlay && !!appContext && appContext.hasOwnProperty('debugToastsEnabled');
+    const isReady = !!errorOverlay && !!appContext && appContext.hasOwnProperty('debugToastsEnabled') && typeof errorOverlay.addToastToHistory === 'function';
+    // Add specific check for addToastToHistory availability from errorOverlay
+
+    if (!isReady && typeof window !== 'undefined') { // Log only once client-side if not ready
+        logger.warn("useAppToast: Contexts not fully ready yet. Toasts might be suppressed or logged incorrectly.", {
+             hasErrorOverlay: !!errorOverlay,
+             hasAppContext: !!appContext,
+             hasDebugFlag: appContext?.hasOwnProperty('debugToastsEnabled'),
+             hasAddToastFunc: typeof errorOverlay?.addToastToHistory === 'function'
+        });
+    }
+
 
     // Generic function to show toast and add to history
     const showToast = (
@@ -29,9 +40,9 @@ export const useAppToast = () => {
         message: string | React.ReactNode, // Sonner accepts ReactNode
         options?: any // Sonner options object
     ) => {
+        // Re-check readiness inside the function call for extra safety
         if (!isReady) {
             logger.warn("useAppToast: Contexts not ready, toast suppressed.", { type, message });
-            // Fallback to console if contexts aren't ready?
             console.warn(`[Toast Suppressed/Context Not Ready] ${type}:`, message);
             return undefined;
         }
@@ -41,18 +52,16 @@ export const useAppToast = () => {
 
         try {
             // Convert ReactNode message to string for history (simplification)
-            const messageString = typeof message === 'string' ? message : '[ReactNode]'; // Or implement more complex serialization if needed
+            const messageString = typeof message === 'string' ? message : '[ReactNode]';
 
             // --- ПРОВЕРКА ФЛАГА ---
             if (messageString.startsWith('[DEBUG]') && !debugToastsEnabled) {
-                 // logger.debug(`Muted Debug Toast: ${messageString}`); // Log muted toast if needed
+                 // logger.debug(`Muted Debug Toast: ${messageString}`);
                  return undefined; // Не показываем тост
             }
             // --- КОНЕЦ ПРОВЕРКИ ---
 
 
-            // Call the appropriate sonner function
-            // Use a more robust way to call sonner methods
             let toastId: string | number | undefined;
             switch(type) {
                 case 'success': toastId = sonnerToast.success(message, options); break;
@@ -61,63 +70,63 @@ export const useAppToast = () => {
                 case 'warning': toastId = sonnerToast.warning(message, options); break;
                 case 'loading': toastId = sonnerToast.loading(message, options); break;
                 case 'custom':
-                    // Assuming 'message' is the function for custom toasts in this context
                     if (typeof message === 'function') {
                        toastId = sonnerToast.custom(message as (id: number | string) => React.ReactNode, options);
                     } else {
                         logger.warn("useAppToast: 'custom' type requires a function as message.");
-                        // Fallback to default message toast
                         toastId = sonnerToast.message(messageString, options);
                     }
                     break;
-                case 'message': // Default case
+                case 'message':
                 default:
-                    toastId = sonnerToast.message(message, options); break; // Use 'message' for default
+                    toastId = sonnerToast.message(message, options); break;
             }
 
-            // Add to history only if message is a string (or successfully converted)
-             if (messageString && addToastToHistory) { // Ensure addToastToHistory is available
+            // Add to history only if message is a string and function exists
+             if (messageString && addToastToHistory) {
                 const record: Omit<ToastRecord, 'id'> = {
                     message: messageString,
-                    type: type === 'custom' ? 'info' : type, // Log custom as info for simplicity
+                    type: type === 'custom' ? 'info' : type,
                     timestamp: Date.now(),
                 };
                 addToastToHistory(record);
             } else if (type !== 'custom') {
                  logger.warn("useAppToast: Could not add non-string toast message to history or addToastToHistory not available", { type, hasFunc: !!addToastToHistory });
             }
-             // For custom toasts, logging might need specific handling if context is needed
 
-            return toastId; // Return the ID like sonner does
+            return toastId;
 
         } catch (err) {
-            logger.error("Error in useAppToast while showing/logging toast:", err);
-            // Optionally, try a fallback toast notification about the failure
+            logger.error("Error in useAppToast while showing/logging toast:", err, { type, message, options });
             try {
                 sonnerToast.error("Internal error: Could not display toast.", { duration: 2000 });
             } catch { /* Silently fail */ }
-            return undefined; // Indicate failure
+            return undefined;
         }
     };
 
     // Return the API mirroring sonner
     // If not ready, return dummy functions that log warnings
+    const notReadyWarn = useCallback((method: string, msg?: any) => {
+        logger.warn(`useAppToast: Attempted to call ${method} before context was ready. Message:`, msg);
+        console.warn(`[Toast Method Suppressed/Context Not Ready] ${method}`);
+    }, []); // Empty dependency array for stable callback
+
     if (!isReady) {
-        const notReadyWarn = (method: string) => logger.warn(`useAppToast: Attempted to call ${method} before context was ready.`);
-        const dummyFunc = (...args: any[]) => notReadyWarn(args[0] || 'toast method');
         return {
-            success: dummyFunc.bind(null, 'success'),
-            error: dummyFunc.bind(null, 'error'),
-            info: dummyFunc.bind(null, 'info'),
-            warning: dummyFunc.bind(null, 'warning'),
-            loading: dummyFunc.bind(null, 'loading'),
-            message: dummyFunc.bind(null, 'message'),
-            custom: dummyFunc.bind(null, 'custom'),
-            dismiss: dummyFunc.bind(null, 'dismiss'),
+            success: (msg: any, opts?: any) => notReadyWarn('success', msg),
+            error: (msg: any, opts?: any) => notReadyWarn('error', msg),
+            info: (msg: any, opts?: any) => notReadyWarn('info', msg),
+            warning: (msg: any, opts?: any) => notReadyWarn('warning', msg),
+            loading: (msg: any, opts?: any) => notReadyWarn('loading', msg),
+            message: (msg: any, opts?: any) => notReadyWarn('message', msg),
+            custom: (fn: any, opts?: any) => notReadyWarn('custom', '[Function]'),
+            dismiss: (id?: any) => notReadyWarn('dismiss', id),
         };
     }
 
-    return {
+    // Return memoized functions if ready
+    return useMemo(() => ({
         success: (message: string | React.ReactNode, options?: any) => showToast('success', message, options),
         error: (message: string | React.ReactNode, options?: any) => showToast('error', message, options),
         info: (message: string | React.ReactNode, options?: any) => showToast('info', message, options),
@@ -125,9 +134,7 @@ export const useAppToast = () => {
         loading: (message: string | React.ReactNode, options?: any) => showToast('loading', message, options),
         message: (message: string | React.ReactNode, options?: any) => showToast('message', message, options),
         custom: (component: (id: number | string) => React.ReactNode, options?: any) => showToast('custom', component, options),
-        // Add dismiss, promise etc. if needed, ensuring they also log appropriately
         dismiss: (toastId?: string | number) => sonnerToast.dismiss(toastId),
-        // 'promise' is more complex to log generically, might need specific handling
-        // promise: sonnerToast.promise,
-    };
+    }), [isReady, errorOverlay, appContext, showToast]); // Depend on readiness and context instances
+
 };
