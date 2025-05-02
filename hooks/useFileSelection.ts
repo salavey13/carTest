@@ -1,3 +1,4 @@
+"use client";
 import { useCallback } from "react";
 import { useRepoXmlPageContext, FileNode, ImportCategory } from "@/contexts/RepoXmlPageContext"; // Assuming types are here
 import { debugLogger as logger } from "@/lib/debugLogger";
