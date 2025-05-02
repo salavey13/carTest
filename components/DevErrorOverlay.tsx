@@ -124,12 +124,14 @@ const DevErrorOverlay: React.FC = () => {
   // Log received error info only once when it appears (to console)
   useEffect(() => {
     if (errorInfo && showOverlay) {
+      // Use console.info directly to avoid loop if logger itself is broken
       console.info("[DevErrorOverlay] Received errorInfo to display:", errorInfo);
     }
   }, [errorInfo, showOverlay]); // Depends on errorInfo and showOverlay
 
   // --- Render Fallback if internal error occurs ---
   if (internalRenderError) {
+     // Use console.error directly
      console.error("[DevErrorOverlay] FATAL: Component failed to render!", { originalErrorInfo: errorInfo, overlayRenderError: internalRenderError });
      return <ErrorOverlayFallback message={errorInfo?.message || t.unknownError} renderErrorMessage={internalRenderError.message} />;
   }
@@ -139,10 +141,12 @@ const DevErrorOverlay: React.FC = () => {
       if (!errorInfo || !showOverlay) {
         return null;
       }
-      // console.info("[DevErrorOverlay] Rendering error overlay UI."); // Avoid logging render
+      // Use console.info directly if needed for debugging render start
+      // console.info("[DevErrorOverlay] Rendering error overlay UI.");
 
       const handleClose = () => {
-          // console.info("[DevErrorOverlay] Close button clicked."); // Avoid logging close
+          // Use console.info directly
+          // console.info("[DevErrorOverlay] Close button clicked.");
           try { setErrorInfo(null); } // Attempt to clear the error state in the context
           catch (e) { console.error("[DevErrorOverlay] Error in setErrorInfo during handleClose:", e); }
       };
@@ -172,7 +176,8 @@ const DevErrorOverlay: React.FC = () => {
 
       const prepareIssueAndCopyData = () => {
           try {
-             // console.debug("[DevErrorOverlay] Preparing issue/copy data..."); // Avoid logging prepare
+             // Use console.debug directly if needed
+             // console.debug("[DevErrorOverlay] Preparing issue/copy data...");
              const safeErrorInfo = errorInfo ?? { message: t.unknownError, type: 'unknown' };
              const errorType = safeErrorInfo.type?.toUpperCase() || 'UNKNOWN';
              const message = safeErrorInfo.message || t.unknownError;
@@ -233,8 +238,8 @@ ${formattedLogHistory}
 ${formattedToastHistory}
 
 Задача: Проанализируй ошибку, стек, логи и уведомления. Предложи исправления кода или объясни причину.`;
-
-             // console.debug("[DevErrorOverlay] Issue/copy data prepared."); // Avoid logging prepare end
+             // Use console.debug directly if needed
+             // console.debug("[DevErrorOverlay] Issue/copy data prepared.");
              return { gitHubIssueUrl, copyPrompt };
          } catch (e: any) {
              console.error("[DevErrorOverlay] Error preparing issue/copy data:", e);
@@ -247,11 +252,13 @@ ${formattedToastHistory}
       const { gitHubIssueUrl, copyPrompt } = prepareIssueAndCopyData();
 
       const handleCopyVibeRequest = () => {
-         // console.info("[DevErrorOverlay] Copy Vibe Request button clicked."); // Avoid logging copy
+         // Use console.info directly
+         // console.info("[DevErrorOverlay] Copy Vibe Request button clicked.");
          try {
              navigator.clipboard.writeText(copyPrompt)
                .then(() => {
-                   // console.log("[DevErrorOverlay] Copy successful."); // Avoid logging success
+                   // Use console.log directly
+                   // console.log("[DevErrorOverlay] Copy successful.");
                    sonnerToast.success(t.copySuccessToast); // Use sonner directly
                })
                .catch(err => {
@@ -268,6 +275,7 @@ ${formattedToastHistory}
       const RenderSection: React.FC<{ title: string; children: () => React.ReactNode }> = ({ title, children }) => {
           try { return <>{children()}</>; }
           catch (e: any) {
+              // Use console.error directly
               console.error(`[DevErrorOverlay] Error rendering section "${title}":`, e);
               // Set internal error state to trigger fallback
               setInternalRenderError(e);

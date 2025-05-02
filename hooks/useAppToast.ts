@@ -45,8 +45,8 @@ export const useAppToast = () => {
 
             // --- ПРОВЕРКА ФЛАГА ---
             if (messageString.startsWith('[DEBUG]') && !debugToastsEnabled) {
-                // logger.debug(`Muted Toast: ${messageString}`); // Логируем в консоль, если нужно
-                return undefined; // Не показываем тост
+                 // logger.debug(`Muted Debug Toast: ${messageString}`); // Log muted toast if needed
+                 return undefined; // Не показываем тост
             }
             // --- КОНЕЦ ПРОВЕРКИ ---
 
@@ -104,15 +104,16 @@ export const useAppToast = () => {
     // If not ready, return dummy functions that log warnings
     if (!isReady) {
         const notReadyWarn = (method: string) => logger.warn(`useAppToast: Attempted to call ${method} before context was ready.`);
+        const dummyFunc = (...args: any[]) => notReadyWarn(args[0] || 'toast method');
         return {
-            success: (msg: any) => notReadyWarn('success'),
-            error: (msg: any) => notReadyWarn('error'),
-            info: (msg: any) => notReadyWarn('info'),
-            warning: (msg: any) => notReadyWarn('warning'),
-            loading: (msg: any) => notReadyWarn('loading'),
-            message: (msg: any) => notReadyWarn('message'),
-            custom: (fn: any) => notReadyWarn('custom'),
-            dismiss: (id?: any) => notReadyWarn('dismiss'),
+            success: dummyFunc.bind(null, 'success'),
+            error: dummyFunc.bind(null, 'error'),
+            info: dummyFunc.bind(null, 'info'),
+            warning: dummyFunc.bind(null, 'warning'),
+            loading: dummyFunc.bind(null, 'loading'),
+            message: dummyFunc.bind(null, 'message'),
+            custom: dummyFunc.bind(null, 'custom'),
+            dismiss: dummyFunc.bind(null, 'dismiss'),
         };
     }
 

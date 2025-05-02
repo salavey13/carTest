@@ -169,7 +169,7 @@ function ActualPageContent() {
         fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef,
         setImageReplaceTask, setKworkInputHasContent, fetchStatus,
         imageReplaceTask, allFetchedFiles, selectedFetcherFiles,
-        repoUrl, setRepoUrl,
+        repoUrl, setRepoUrl, addToast, // Keep addToast from context for now if needed, but prefer useAppToast
     } = pageContext;
 
     const [lang, setLang] = useState<Language>('en');
@@ -241,7 +241,7 @@ function ActualPageContent() {
             setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
         }
        logger.debug("[Effect URL Params] END");
-    }, [searchParams, setImageReplaceTask, setRepoUrl]); // Removed addToast dependency
+    }, [searchParams, setImageReplaceTask, setRepoUrl, addToast]); // Keep addToast dependency if it's used internally for errors
 
      useEffect(() => {
         logger.debug("[Effect Kwork Populate] Check START");
@@ -278,7 +278,7 @@ function ActualPageContent() {
             logger.log(`[Effect Kwork Populate] Fetch finished (${fetchStatus}), no pending idea or kworkInputRef not ready.`);
         }
         logger.debug("[Effect Kwork Populate] Check END");
-     }, [ fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles ]); // Removed addToast dependency
+     }, [ fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles, addToast ]); // Keep addToast dependency if used
 
 
     // --- Callbacks ---
