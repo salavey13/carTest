@@ -1,85 +1,138 @@
+type LogLevel = 'log' | 'warn' | 'error' | 'info' | 'debug' | 'fatal'; // Добавляем уровни
+
+// Тип для обработчика логов, который будет передан из контекста
+export type LogHandler = (level: LogLevel, message: string, timestamp: number) => void; // Экспортируем тип
+
 class DebugLogger {
-  private logs: string[] = [];
-  private maxLogs = 100;
-  private isBrowser: boolean = typeof window !== 'undefined'; // Check if running in browser
+  // Оставляем внутренний лог на случай, если обработчик не установится
+  private internalLogs: string[] = [];
+  private maxInternalLogs = 100; // Можно увеличить при необходимости
+  private isBrowser: boolean = typeof window !== 'undefined';
+  private logHandler: LogHandler | null = null; // Обработчик для отправки логов в контекст
+
+  // Метод для установки обработчика извне (из ErrorOverlayProvider)
+  setLogHandler(handler: LogHandler | null) { // Позволяем установить null для сброса
+    this.logHandler = handler;
+    // Логируем установку/сброс только если логгер уже инициализирован
+    if (this.logInternal) {
+        this.logInternal('debug', `[Logger] Log handler ${handler ? 'set' : 'cleared'}.`);
+    }
+  }
 
   private safelyStringify(arg: any): string {
     try {
-      // Handle potential circular structures more gracefully if needed,
-      // but for basic objects, JSON.stringify should work.
-      // If specific errors occur, consider a library like 'safe-json-stringify'
       if (arg instanceof Error) {
-        return `Error: ${arg.message}${arg.stack ? `\nStack: ${arg.stack}` : ''}`;
+        // Включаем больше деталей для ошибки
+        return `Error: ${arg.message}${arg.name ? ` (${arg.name})` : ''}${arg.stack ? `\nStack: ${arg.stack}` : ''}`;
       }
-      return typeof arg === 'object' && arg !== null
-        ? JSON.stringify(arg, null, 2) // Pretty print objects
-        : String(arg);
+      // Пробуем JSON.stringify с обработкой циклических ссылок
+      if (typeof arg === 'object' && arg !== null) {
+          try {
+              const cache = new Set();
+              return JSON.stringify(arg, (key, value) => {
+                  if (typeof value === 'object' && value !== null) {
+                      if (cache.has(value)) { return '[Circular Reference]'; }
+                      cache.add(value);
+                  }
+                  // Обработка BigInt, если он используется
+                  if (typeof value === 'bigint') { return value.toString() + 'n'; }
+                  return value;
+              }, 2);
+          } catch (e) {
+               // Пробуем вывести ключи объекта, если stringify не удался
+               try { return `[Unserializable Object: Keys: ${Object.keys(arg).join(', ')}]`; }
+               catch { return '[Unserializable Object: Failed to stringify]'; }
+          }
+      }
+       // Преобразование Symbol в строку
+       if (typeof arg === 'symbol') { return arg.toString(); }
+       // Преобразование undefined и null
+       if (arg === undefined) { return 'undefined'; }
+       if (arg === null) { return 'null'; }
+
+      return String(arg);
     } catch (stringifyError) {
-      return `[Unserializable Object: ${stringifyError instanceof Error ? stringifyError.message : 'Unknown Error'}]`;
+      return `[Unserializable Value: ${stringifyError instanceof Error ? stringifyError.message : 'Unknown Error'}]`;
     }
   }
 
-  private addToInternalLogs(level: string, ...args: any[]) {
-      try {
-          const message = args.map(this.safelyStringify).join(" ");
-          this.logs.push(`${level.toUpperCase()} ${new Date().toISOString()}: ${message}`);
-          if (this.logs.length > this.maxLogs) {
-              this.logs.shift();
-          }
-      } catch (e) {
-          // Very unlikely fallback
-          this.logs.push(`FATAL ${new Date().toISOString()}: [Internal Logging Error during message construction]`);
-          if (this.logs.length > this.maxLogs) {
-              this.logs.shift();
-          }
-      }
-  }
+  // Внутренний метод для добавления в массив и вызова обработчика
+  private logInternal(level: LogLevel, ...args: any[]) {
+    const timestamp = Date.now();
+    let message = '';
+    try {
+        // Формируем сообщение для внутреннего лога и для обработчика
+         message = args.map(this.safelyStringify).join(" ");
 
-  log(...args: any[]) {
-    if (this.isBrowser && typeof console !== 'undefined' && typeof console.log === 'function') {
-      try {
-        console.log(...args);
-      } catch (e) {
-        // Fallback if console.log itself throws (very rare)
-        console.error("Internal console.log error:", e);
-      }
+        // 1. Добавляем во внутренний лог (на всякий случай)
+        this.internalLogs.push(`${level.toUpperCase()} ${new Date(timestamp).toISOString()}: ${message}`);
+        if (this.internalLogs.length > this.maxInternalLogs) {
+            this.internalLogs.shift();
+        }
+
+        // 2. Вызываем внешний обработчик, если он установлен
+        if (this.logHandler) {
+            try {
+                 this.logHandler(level, message, timestamp);
+            } catch (handlerError) {
+                 console.error("[Logger] FATAL: Log handler failed!", handlerError);
+                 // Попытка записать ошибку обработчика во внутренний лог
+                 const handlerErrorMessage = `[Internal Error] Log handler failed: ${this.safelyStringify(handlerError)}`;
+                 this.internalLogs.push(`FATAL ${new Date().toISOString()}: ${handlerErrorMessage}`);
+                 if (this.internalLogs.length > this.maxInternalLogs) { this.internalLogs.shift(); }
+            }
+        }
+
+        // 3. Выводим в консоль браузера (если доступно)
+        if (this.isBrowser && typeof console !== 'undefined') {
+            const browserArgs = args.map(arg => (arg instanceof Error ? arg : this.safelyStringify(arg))); // Форматируем для браузера
+            const timestampStr = new Date(timestamp).toLocaleTimeString('ru-RU', { hour12: false });
+            const prefix = `%c[${level.toUpperCase()}] %c${timestampStr}:`;
+            let color = 'inherit';
+            switch(level) {
+                 case 'error': case 'fatal': color = 'color: red; font-weight: bold;'; break;
+                 case 'warn': color = 'color: orange;'; break;
+                 case 'info': color = 'color: cyan;'; break;
+                 case 'debug': color = 'color: magenta;'; break;
+                 default: color = 'color: gray;'; break;
+            }
+            const consoleMethod = console[level] || console.log; // Используем метод по уровню или fallback на log
+            try {
+                 consoleMethod(prefix, color, 'color: inherit;', ...browserArgs);
+            } catch (e) {
+                console.error("[Logger] Error during console output:", e, "Original args:", args);
+                // Fallback to simple log if specific level fails
+                if (level !== 'log') {
+                    try { console.log(`[${level.toUpperCase()}] ${timestampStr}:`, ...browserArgs); } catch {}
+                }
+            }
+        }
+
+    } catch (e) {
+        // Очень маловероятная ошибка при формировании сообщения
+        const errorMsg = `[Internal Logging Error during message construction: ${this.safelyStringify(e)}]`;
+        console.error(errorMsg);
+        this.internalLogs.push(`FATAL ${new Date(timestamp).toISOString()}: ${errorMsg}`);
+        if (this.internalLogs.length > this.maxInternalLogs) { this.internalLogs.shift(); }
+        // Попытка уведомить обработчик об этой ошибке
+        if (this.logHandler) {
+            try { this.logHandler('fatal', errorMsg, timestamp); } catch { /* ignore handler error here */ }
+        }
     }
-    this.addToInternalLogs('log', ...args);
   }
 
-  error(...args: any[]) {
-    if (this.isBrowser && typeof console !== 'undefined' && typeof console.error === 'function') {
-      try {
-        console.error(...args);
-      } catch (e) {
-         // If console.error fails, try console.log as last resort for visibility
-         if (typeof console.log === 'function') {
-            try { console.log("ERROR (logged via console.log fallback):", ...args); } catch { /* Give up */ }
-         }
-      }
-    }
-    this.addToInternalLogs('error', ...args);
-  }
+  // Публичные методы логгирования
+  log = (...args: any[]) => this.logInternal('log', ...args);
+  error = (...args: any[]) => this.logInternal('error', ...args);
+  warn = (...args: any[]) => this.logInternal('warn', ...args);
+  info = (...args: any[]) => this.logInternal('info', ...args);
+  debug = (...args: any[]) => this.logInternal('debug', ...args);
+  fatal = (...args: any[]) => this.logInternal('fatal', ...args);
 
-  warn(...args: any[]) {
-     if (this.isBrowser && typeof console !== 'undefined') {
-         if (typeof console.warn === 'function') {
-             try { console.warn(...args); } catch (e) { this.error("Internal console.warn error:", e, "Original args:", ...args); } // Log warning error as an error
-         } else if (typeof console.log === 'function') { // Fallback to log if warn doesn't exist
-             try { console.log("WARN (logged via console.log):", ...args); } catch (e) { this.error("Internal console.log (for warn) error:", e, "Original args:", ...args); }
-         }
-     }
-     this.addToInternalLogs('warn', ...args);
-  }
-
-  getLogs() {
-    return this.logs.join("\n");
-  }
-
-  clear() {
-    this.logs = [];
-  }
+  // Методы для доступа к внутренним логам (если понадобится)
+  getInternalLogs = () => this.internalLogs.join("\n");
+  clearInternalLogs = () => { this.internalLogs = []; };
 }
 
-// Ensure it's exported correctly
+// Создаем и экспортируем один экземпляр логгера
 export const debugLogger = new DebugLogger();

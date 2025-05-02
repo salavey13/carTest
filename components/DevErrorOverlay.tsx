@@ -1,14 +1,15 @@
 "use client";
 
 import React from 'react';
-import { useErrorOverlay, ErrorInfo } from '@/contexts/ErrorOverlayContext';
-import { FaCopy, FaTriangleExclamation, FaGithub, FaRegClock, FaCircleInfo, FaCircleCheck, FaCircleXmark } from 'react-icons/fa6';
+import { useErrorOverlay, ErrorInfo, LogRecord, ToastRecord, LogLevel } from '@/contexts/ErrorOverlayContext';
+import {
+    FaCopy, FaTriangleExclamation, FaGithub, FaRegClock, FaCircleInfo, FaCircleCheck,
+    FaCircleXmark, FaBug, FaFileLines, FaTerminal // Добавили иконки
+} from 'react-icons/fa6';
 import { toast as sonnerToast } from 'sonner';
-import { debugLogger as logger } from '@/lib/debugLogger';
-import type { ToastRecord } from '@/types/toast';
-// Removed date-fns imports as they are no longer used for display
-// import { formatDistanceToNow } from 'date-fns';
-// import { ru } from 'date-fns/locale';
+import { debugLogger as logger } from '@/lib/debugLogger'; // Используем ТОЛЬКО для внутренних ошибок оверлея
+import { formatDistanceToNow } from 'date-fns';
+import { ru } from 'date-fns/locale';
 
 // --- i18n ---
 const translations = {
@@ -43,13 +44,15 @@ const translations = {
     copyDataErrorToast: "Не удалось подготовить данные",
     copyGenericError: "Ошибка копирования",
     closeButton: "Закрыть",
-    recentToastsTitle: "Недавние Уведомления",
+    recentToastsTitle: "Недавние Уведомления (Тосты)", // Уточнили
     noRecentToasts: "Нет недавних уведомлений.",
+    recentLogsTitle: "Последние События (Логи)", // Новое
+    noRecentLogs: "Нет недавних событий.", // Новое
   },
 };
 const t = translations.ru;
 
-// --- Simple Fallback Component ---
+// --- Fallback Component ---
 const ErrorOverlayFallback: React.FC<{ message: string, renderErrorMessage?: string }> = ({ message, renderErrorMessage }) => (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-red-900/90 p-4 text-white font-mono">
         <div className="text-center">
@@ -65,50 +68,74 @@ const ErrorOverlayFallback: React.FC<{ message: string, renderErrorMessage?: str
     </div>
 );
 
-// --- Helper to get Toast Icon ---
-const getToastIcon = (type: string): React.ReactElement => {
-    switch (type.toLowerCase()) {
+// --- Icon Helpers ---
+const getLevelIcon = (level: LogLevel | ToastRecord['type']): React.ReactElement => {
+    switch (level?.toLowerCase()) {
         case 'success': return <FaCircleCheck className="text-green-400" />;
-        case 'error': return <FaCircleXmark className="text-red-400" />;
-        case 'warning': return <FaTriangleExclamation className="text-yellow-400" />;
+        case 'error': case 'fatal': return <FaCircleXmark className="text-red-400" />;
+        case 'warn': case 'warning': return <FaTriangleExclamation className="text-yellow-400" />;
         case 'info': return <FaCircleInfo className="text-blue-400" />;
-        default: return <FaCircleInfo className="text-gray-400" />;
+        case 'debug': return <FaBug className="text-purple-400" />;
+        case 'log': return <FaTerminal className="text-gray-400" />;
+        default: return <FaFileLines className="text-gray-500" />;
     }
 };
 
+const getLevelColor = (level: LogLevel | ToastRecord['type']): string => {
+     switch (level?.toLowerCase()) {
+        case 'success': return "text-green-300";
+        case 'error': case 'fatal': return "text-red-300 font-semibold";
+        case 'warn': case 'warning': return "text-yellow-300";
+        case 'info': return "text-blue-300";
+        case 'debug': return "text-purple-300";
+        case 'log': return "text-gray-300";
+        default: return "text-gray-400";
+    }
+}
 
+
+// --- Main Overlay Component ---
 const DevErrorOverlay: React.FC = () => {
   // Safely access context
   let errorInfo: ErrorInfo | null = null;
   let setErrorInfo: React.Dispatch<React.SetStateAction<ErrorInfo | null>> = () => {};
   let showOverlay = false;
   let toastHistory: ToastRecord[] = [];
+  let logHistory: LogRecord[] = []; // <-- Получаем историю логов
   try {
        const context = useErrorOverlay();
        errorInfo = context.errorInfo;
        setErrorInfo = context.setErrorInfo;
        showOverlay = context.showOverlay;
        toastHistory = context.toastHistory;
+       logHistory = context.logHistory; // <-- Получаем историю логов
+       // Логируем получение контекста самим логгером (это попадет в историю логов)
+       logger.debug("[DevErrorOverlay] Context retrieved successfully.", { hasErrorInfo: !!errorInfo, toastCount: toastHistory.length, logCount: logHistory.length });
   } catch(contextError: any) {
+       // Используем logger.fatal, который попытается записать и в консоль, и во внутренний лог
        logger.fatal(t.fatalContextError, contextError);
+       // Возвращаем простой div, так как логгер уже записал ошибку
        return <div className="fixed inset-0 z-[100] bg-black text-red-500 p-4">{t.fatalContextError}</div>;
   }
 
-
-  React.useEffect(() => {
+  // Log received error info only once
+  useEffect(() => {
     if (errorInfo) {
-      logger.error("DevErrorOverlay received errorInfo:", errorInfo);
+      logger.error("[DevErrorOverlay] Received errorInfo:", errorInfo);
     }
-  }, [errorInfo]);
+  }, [errorInfo]); // Зависит только от errorInfo
 
   // Main Component Logic Wrapped in try-catch
   try {
       if (!errorInfo || !showOverlay) {
+        // logger.debug("[DevErrorOverlay] Render skipped (no error or overlay disabled)"); // Излишний лог
         return null;
       }
+      // logger.debug("[DevErrorOverlay] Rendering error overlay"); // Излишний лог
 
-      // Safe event handlers
-      const handleClose = () => { try { setErrorInfo(null); } catch (e) { logger.error("Error in setErrorInfo during handleClose:", e); } };
+      const handleClose = () => {
+          try { setErrorInfo(null); } catch (e) { logger.error("[DevErrorOverlay] Error in setErrorInfo during handleClose:", e); }
+      };
 
       const getShortStackTrace = (error?: Error | string | any): string => {
          try {
@@ -118,11 +145,10 @@ const DevErrorOverlay: React.FC = () => {
              else if (typeof error === 'string') { stack = error.split('\\n').join('\n'); }
              else { try { stack = JSON.stringify(error, null, 2); } catch { stack = String(error); } }
              if (stack.trim() === '' && errorInfo?.message === 'Script error.') { return t.stackTraceUnavailable; }
-             return stack.split('\n').slice(0, 5).join('\n') || t.stackTraceEmpty;
-         } catch (e: any) { logger.error("Error getting/formatting stack trace in DevErrorOverlay:", e); return `${t.stackTraceError}: ${e?.message ?? 'Unknown'}`; }
+             return stack.split('\n').slice(0, 8).join('\n') || t.stackTraceEmpty; // Slightly more lines
+         } catch (e: any) { logger.error("[DevErrorOverlay] Error getting/formatting stack trace:", e); return `${t.stackTraceError}: ${e?.message ?? 'Unknown'}`; }
       };
 
-      // Safely prepare GitHub issue link & copy text
       const prepareIssueAndCopyData = () => {
           try {
              const safeErrorInfo = errorInfo ?? { message: t.unknownError, type: 'unknown' };
@@ -130,21 +156,44 @@ const DevErrorOverlay: React.FC = () => {
              const message = safeErrorInfo.message || t.unknownError;
              const shortStack = getShortStackTrace(safeErrorInfo.error);
              const source = safeErrorInfo.source ? ` (${safeErrorInfo.source}:${safeErrorInfo.lineno ?? '?'})` : '';
-             // <<<<<<<<<<<<<<<<<<<<< FIXED REPO NAME >>>>>>>>>>>>>>>>>>>>>
              const repoName = process.env.NEXT_PUBLIC_GITHUB_REPO || 'carTest';
 
              const issueTitleOptions = [ `Сбой в Матрице: ${message.substring(0, 40)}...`, `Баг в Коде: ${errorType} ${message.substring(0, 35)}...`, `Аномалия: ${message.substring(0, 45)}...`, `Нужна Помощь: ${errorType} (${source || 'N/A'})`, `Глитч! ${errorType}: ${source || 'N/A'}`, ];
              const issueTitle = encodeURIComponent(issueTitleOptions[Math.floor(Math.random() * issueTitleOptions.length)]);
 
-             // Format Toast History (NO TIMESTAMP)
+             // Format Log History (Newest first, with level)
+             const formattedLogHistory = logHistory.length > 0
+                ? logHistory.slice().reverse().map(log => `- [${log.level.toUpperCase()}] ${new Date(log.timestamp).toLocaleTimeString('ru-RU',{hour12:false})} | ${log.message.substring(0, 200)}${log.message.length > 200 ? '...' : ''}`).join('\n') // Increased length
+                : t.noRecentLogs;
+
+            // Format Toast History (Newest first, with type)
              const formattedToastHistory = toastHistory.length > 0
-                ? toastHistory.slice().reverse().map(th => `- [${th.type.toUpperCase()}]: ${th.message.substring(0, 150)}${th.message.length > 150 ? '...' : ''}`).join('\n') // Increased length slightly
+                ? toastHistory.slice().reverse().map(th => `- [${th.type.toUpperCase()}] ${th.message.substring(0, 200)}${th.message.length > 200 ? '...' : ''}`).join('\n') // Increased length
                 : t.noRecentToasts;
 
-             const issueBody = encodeURIComponent(`**Тип Ошибки:** ${errorType}\n**Сообщение:** ${message}\n**Источник:** ${source || 'N/A'}\n\n**Стек (начало):**\n\`\`\`\n${shortStack}\n\`\`\`\n\n**Недавние Уведомления:**\n${formattedToastHistory}\n\n**Контекст/Шаги:**\n[Опиши, что ты делал(а), когда это случилось]\n`);
+             const issueBody = encodeURIComponent(
+`**Тип Ошибки:** ${errorType}
+**Сообщение:** ${message}
+**Источник:** ${source || 'N/A'}
+
+**Стек (начало):**
+\`\`\`
+${shortStack}
+\`\`\`
+
+**Последние События (Логи):**
+${formattedLogHistory}
+
+**Недавние Уведомления (Тосты):**
+${formattedToastHistory}
+
+**Контекст/Шаги:**
+[Опиши, что ты делал(а), когда это случилось]
+`);
              const gitHubIssueUrl = `https://github.com/${process.env.NEXT_PUBLIC_GITHUB_ORG || 'salavey13'}/${repoName}/issues/new?title=${issueTitle}&body=${issueBody}`;
 
-             const copyPrompt = `Йоу! Поймал ошибку в ${repoName}, помоги разгрести!
+             const copyPrompt =
+`Йоу! Поймал ошибку в ${repoName}, помоги разгрести!
 
 Ошибка (${errorType})${source}:
 ${message}
@@ -154,15 +203,18 @@ ${message}
 ${shortStack}
 \`\`\`
 
-Недавние уведомления:
+Последние События (Логи):
+${formattedLogHistory}
+
+Недавние уведомления (Тосты):
 ${formattedToastHistory}
 
-Задача: Проанализируй ошибку, стек и недавние уведомления. Предложи исправления кода или объясни причину.`;
+Задача: Проанализируй ошибку, стек, логи и уведомления. Предложи исправления кода или объясни причину.`;
+
              return { gitHubIssueUrl, copyPrompt };
          } catch (e: any) {
-             logger.error("Error preparing issue/copy data:", e);
+             logger.error("[DevErrorOverlay] Error preparing issue/copy data:", e);
              sonnerToast.error(`${t.copyDataErrorToast}: ${e?.message ?? 'Unknown'}`);
-             // <<<<<<<<<<<<<<<<<<<<< FIXED REPO NAME IN FALLBACK >>>>>>>>>>>>>>>>>>>>>
              return { gitHubIssueUrl: `https://github.com/${process.env.NEXT_PUBLIC_GITHUB_ORG || 'salavey13'}/${process.env.NEXT_PUBLIC_GITHUB_REPO || 'carTest'}/issues/new`, copyPrompt: `Error generating copy data: ${e?.message}` };
          }
       };
@@ -173,14 +225,14 @@ ${formattedToastHistory}
          try {
              navigator.clipboard.writeText(copyPrompt)
                .then(() => { sonnerToast.success(t.copySuccessToast); })
-               .catch(err => { logger.error("Failed to copy vibe request:", err); sonnerToast.error(t.copyErrorToast); });
-         } catch (e: any) { logger.error("Error during copy action:", e); sonnerToast.error(`${t.copyGenericError}: ${e?.message ?? 'Unknown'}`); }
+               .catch(err => { logger.error("[DevErrorOverlay] Failed to copy vibe request:", err); sonnerToast.error(t.copyErrorToast); });
+         } catch (e: any) { logger.error("[DevErrorOverlay] Error during copy action:", e); sonnerToast.error(`${t.copyGenericError}: ${e?.message ?? 'Unknown'}`); }
       };
 
       // Safely render parts
       const RenderSection: React.FC<{ title: string; children: () => React.ReactNode }> = ({ title, children }) => {
           try { return <>{children()}</>; }
-          catch (e: any) { logger.error(`Error rendering overlay section "${title}":`, e); return <div className="text-red-500 border border-dashed border-red-600 p-2 my-2 rounded">Error rendering {title}: {e?.message ?? 'Unknown'}</div>; }
+          catch (e: any) { logger.error(`[DevErrorOverlay] Error rendering section "${title}":`, e); return <div className="text-red-500 border border-dashed border-red-600 p-2 my-2 rounded">Error rendering {title}: {e?.message ?? 'Unknown'}</div>; }
       };
 
       return (
@@ -188,7 +240,7 @@ ${formattedToastHistory}
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
           role="alertdialog" aria-modal="true" aria-labelledby="error-overlay-title" aria-describedby="error-overlay-description"
         >
-          <div className="bg-gradient-to-br from-gray-900 via-indigo-950 to-black border border-cyan-500/30 rounded-lg shadow-2xl p-6 max-w-3xl w-full max-h-[90vh] flex flex-col text-gray-200 glitch-border-animate">
+          <div className="bg-gradient-to-br from-gray-900 via-indigo-950 to-black border border-cyan-500/30 rounded-lg shadow-2xl p-6 max-w-4xl w-full max-h-[95vh] flex flex-col text-gray-200 glitch-border-animate"> {/* Increased max-w and max-h */}
 
             {/* Header */}
              <RenderSection title="Header">
@@ -202,7 +254,7 @@ ${formattedToastHistory}
             </RenderSection>
 
             {/* Body */}
-            <div id="error-overlay-description" className="flex-grow overflow-y-auto simple-scrollbar pr-2 space-y-4 mb-4">
+            <div id="error-overlay-description" className="flex-grow overflow-y-auto simple-scrollbar pr-2 space-y-3 mb-4"> {/* Reduced gap slightly */}
                  <RenderSection title="Message">
                       {() => ( <p className="text-lg text-gray-100 font-semibold"> {(errorInfo?.message || t.unknownError).toString()} </p> )}
                  </RenderSection>
@@ -220,21 +272,44 @@ ${formattedToastHistory}
                       )}
                  </RenderSection>
 
-                 {/* --- NEW: Recent Toasts Section (No Timestamp) --- */}
+                 {/* --- Logs Section --- */}
+                 <RenderSection title="RecentLogs">
+                     {() => (
+                         <details className="bg-black/40 p-3 rounded border border-gray-600/60" open={logHistory.length > 0}>
+                             <summary className="cursor-pointer text-sm font-medium text-gray-300 hover:text-white"> {t.recentLogsTitle} ({logHistory.length}) </summary>
+                             {logHistory.length > 0 ? (
+                                 <ul className="mt-2 space-y-1.5 text-xs font-mono max-h-60 overflow-y-auto simple-scrollbar pr-1"> {/* Increased max-h */}
+                                     {logHistory.slice().reverse().map((log) => ( // reverse() to show newest first
+                                         <li key={log.id} className="flex items-start gap-2">
+                                             <span className="mt-0.5 flex-shrink-0 w-4 h-4 flex items-center justify-center" title={log.level.toUpperCase()}>{getLevelIcon(log.level)}</span>
+                                             <span className={`flex-1 ${getLevelColor(log.level)}`}>
+                                                 <span className="block break-words whitespace-pre-wrap">{log.message}</span> {/* Allow wrapping */}
+                                                 <span className="block text-gray-500 text-[0.65rem] leading-tight opacity-80">
+                                                    <FaRegClock className="inline mr-1 h-2.5 w-2.5" />
+                                                    {formatDistanceToNow(log.timestamp, { addSuffix: true, locale: ru })} ({new Date(log.timestamp).toLocaleTimeString('ru-RU',{hour12:false})})
+                                                 </span>
+                                             </span>
+                                         </li>
+                                     ))}
+                                 </ul>
+                             ) : (
+                                 <p className="mt-2 text-xs text-gray-500">{t.noRecentLogs}</p>
+                             )}
+                         </details>
+                     )}
+                 </RenderSection>
+
+                 {/* --- Toasts Section --- */}
                  <RenderSection title="RecentToasts">
                      {() => (
                          <details className="bg-black/30 p-3 rounded border border-gray-700/50" open={toastHistory.length > 0}>
                              <summary className="cursor-pointer text-sm font-medium text-gray-400 hover:text-gray-200"> {t.recentToastsTitle} ({toastHistory.length}) </summary>
                              {toastHistory.length > 0 ? (
-                                 <ul className="mt-2 space-y-1 text-xs font-mono">
+                                 <ul className="mt-2 space-y-1 text-xs font-mono max-h-40 overflow-y-auto simple-scrollbar pr-1">
                                      {toastHistory.slice().reverse().map((toast) => (
                                          <li key={toast.id} className="flex items-start gap-2 text-gray-300/90">
-                                             <span className="mt-0.5">{getToastIcon(toast.type)}</span>
-                                             <span className="flex-1">
-                                                 <span className="block break-words">{toast.message}</span>
-                                                 {/* <<<<<<<<<<<< REMOVED TIMESTAMP DISPLAY >>>>>>>>>>>> */}
-                                                 {/* <span className="block text-gray-500 text-[0.65rem] leading-tight"> <FaRegClock className="inline mr-1 h-2.5 w-2.5" /> {formatDistanceToNow(toast.timestamp, { addSuffix: true, locale: ru })} </span> */}
-                                             </span>
+                                             <span className="mt-0.5 flex-shrink-0 w-4 h-4 flex items-center justify-center" title={toast.type.toUpperCase()}>{getLevelIcon(toast.type)}</span>
+                                             <span className="flex-1 break-words">{toast.message}</span>
                                          </li>
                                      ))}
                                  </ul>
@@ -244,7 +319,6 @@ ${formattedToastHistory}
                          </details>
                      )}
                  </RenderSection>
-                 {/* --- End of Recent Toasts Section --- */}
 
                  <RenderSection title="Advice">
                       {() => (
@@ -274,7 +348,9 @@ ${formattedToastHistory}
       );
 
     } catch (renderError: any) {
-        logger.fatal("FATAL: DevErrorOverlay component itself failed to render!", { originalErrorInfo: errorInfo, overlayRenderError: renderError });
+        // Используем logger здесь тоже, чтобы ошибка рендера оверлея попала в лог
+        logger.fatal("[DevErrorOverlay] FATAL: Component failed to render!", { originalErrorInfo: errorInfo, overlayRenderError: renderError });
+        // Fallback UI
         return <ErrorOverlayFallback message={errorInfo?.message || t.unknownError} renderErrorMessage={renderError?.message} />;
     }
 };
