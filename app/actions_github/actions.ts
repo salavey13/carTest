@@ -28,9 +28,83 @@ function parseRepoUrl(repoUrl: string | null | undefined): { owner: string; repo
     return { owner: match[1], repo: match[2] };
 }
 
+// /app/actions_github/actions.ts
+
+// ... (other imports)
+
+interface PrCheckResult {
+    exists: boolean;
+    prNumber?: number;
+    prUrl?: string;
+    branchName?: string; // Return branch name for consistency
+}
+
+export async function checkExistingPrBranch(
+    repoUrl: string,
+    potentialBranchName: string
+): Promise<{ success: boolean; data?: PrCheckResult; error?: string }> {
+    let owner: string | undefined, repo: string | undefined;
+    try {
+        const repoInfo = parseRepoUrl(repoUrl);
+        owner = repoInfo.owner;
+        repo = repoInfo.repo;
+        const rId = `${owner}/${repo}`;
+        console.log(`[Action] Checking for existing PR with head branch '${potentialBranchName}' in ${rId}`);
+
+        const token = process.env.GITHUB_TOKEN;
+        if (!token) throw new Error("GitHub token is missing.");
+        const octokit = new Octokit({ auth: token });
+
+        // List open PRs with the specific head branch
+        const { data: existingPrs } = await octokit.pulls.list({
+            owner,
+            repo,
+            state: 'open',
+            head: `${owner}:${potentialBranchName}`, // Filter by head repo:branch
+        });
+
+        if (existingPrs.length > 0) {
+            const pr = existingPrs[0]; // Assume the first one is the relevant one
+            console.log(`[Action] Found existing open PR #${pr.number} for branch '${potentialBranchName}'.`);
+            return {
+                success: true,
+                data: {
+                    exists: true,
+                    prNumber: pr.number,
+                    prUrl: pr.html_url,
+                    branchName: potentialBranchName // Return the name back
+                }
+            };
+        } else {
+            console.log(`[Action] No existing open PR found for branch '${potentialBranchName}'.`);
+            // Optional: Check if the branch *exists* even if no PR is open?
+            // try {
+            //   await octokit.git.getRef({ owner, repo, ref: `heads/${potentialBranchName}` });
+            //   console.log(`[Action] Branch '${potentialBranchName}' exists but has no open PR.`);
+            //   // Decide how to handle this - maybe still treat as non-existent for flow?
+            // } catch (refError: any) {
+            //   if (refError.status !== 404) throw refError; // Re-throw unexpected errors
+            // }
+            return { success: true, data: { exists: false, branchName: potentialBranchName } };
+        }
+
+    } catch (error: any) {
+        const repoId = owner && repo ? `${owner}/${repo}` : repoUrl;
+        console.error(`[Action] Error checking for PR branch '${potentialBranchName}' in ${repoId}:`, error);
+        let eM = error instanceof Error ? error.message : "Failed to check for existing PR";
+         // Add specific error handling like in other actions (404, 403 etc.)
+        if (error.status === 404) { eM = `Repo ${repoId} not found (${error.status}).`; }
+        else if (error.status === 403) { eM = `Permission denied (${error.status}) checking PRs for ${repoId}.`; }
+        // ... other status codes
+        // Avoid notifying admin for potentially common checks unless it's a persistent failure
+        return { success: false, error: eM };
+    }
+}
+
+
 
 // --- fetchRepoContents ---
-// ... (код fetchRepoContents без изменений) ...
+
 export async function fetchRepoContents(repoUrl: string, customToken?: string, branchName?: string | null) {
   console.log(`[Action] Fetching: ${repoUrl}${branchName ? ` @ ${branchName}` : ' (default)'}`);
   const startTime = Date.now(); let owner: string | undefined, repo: string | undefined; let targetBranch = branchName; let isDefaultFetched = false;
