@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import { useEffect } from 'react';
 import { useErrorOverlay, ErrorInfo, LogRecord, ToastRecord, LogLevel } from '@/contexts/ErrorOverlayContext';
 import {
     FaCopy, FaTriangleExclamation, FaGithub, FaRegClock, FaCircleInfo, FaCircleCheck,
