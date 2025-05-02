@@ -35,7 +35,7 @@ import SelectedFilesPreview from "./repo/SelectedFilesPreview";
 import RequestInput from "./repo/RequestInput";
 import ProgressBar from "./repo/ProgressBar";
 // --- VIBE CHECK: Import the centralized renderer if needed ---
-// import VibeContentRenderer from '@/components/VibeContentRenderer';
+import VibeContentRenderer from '@/components/VibeContentRenderer';
 
 // --- Component Definition ---
 const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
@@ -83,6 +83,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
         "app/repo-xml/page.tsx", "components/RepoTxtFetcher.tsx", "components/AICodeAssistant.tsx", "components/AutomationBuddy.tsx",
         "components/repo/prompt.ts", "hooks/supabase.ts", "app/actions.ts", "app/actions_github/actions.ts",
         "app/webhook-handlers/proxy.ts", "package.json", "tailwind.config.ts",
+        "lib/debugLogger.ts", "contexts/ErrorOverlayContext.tsx", "components/DevErrorOverlay.tsx", "components/ErrorBoundaryForOverlay.tsx" // Added error handling files
     ], []);
     logger.debug("[RepoTxtFetcher] After URL Params/Memo");
 
@@ -298,20 +299,16 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                     {currentImageTask ? <FaImages className="text-blue-400" /> : <FaDownload className="text-purple-400" />}
                     {currentImageTask ? "Задача: Замена Картинки" : "Кибер-Экстрактор Кода"}
                  </h2>
-                 {/* Instructions - Render as plain text or use VibeContentRenderer if they contain icons */}
+                 {/* Instructions - Use VibeContentRenderer as they contain icons */}
                   {!currentImageTask && (
-                     <>
-                         {/* VIBE CHECK: If these strings ever contain <Fa..> tags, use VibeContentRenderer */}
-                         <p className="text-yellow-300/80 text-xs md:text-sm mb-1">1. Настрой (<FaCodeBranch title="Настройки" className="inline text-cyan-400 cursor-pointer hover:underline" onClick={() => { logger.debug("[Click] Settings Icon Click"); triggerToggleSettingsModal(); }}/>).</p>
-                         <p className="text-yellow-300/80 text-xs md:text-sm mb-1">2. Жми <span className="font-bold text-purple-400 mx-1">"Извлечь файлы"</span>.</p>
-                         <p className="text-yellow-300/80 text-xs md:text-sm mb-1">3. Выбери файлы или <span className="font-bold text-teal-400 mx-1">связанные</span> / <span className="font-bold text-orange-400 mx-1">важные</span>.</p>
-                         <p className="text-yellow-300/80 text-xs md:text-sm mb-1">4. Опиши задачу ИЛИ добавь файлы (<FaPlus title="Добавить выбранные в запрос" className="inline text-sm"/>) / все (<FaTree title="Добавить все файлы в запрос" className="inline text-sm"/>).</p>
-                         <p className="text-yellow-300/80 text-xs md:text-sm mb-2">5. Скопируй (<FaCopy title="Скопировать запрос" className="inline text-sm mx-px"/>) или передай дальше.</p>
-                         {/* Example using VibeContentRenderer if needed: */}
-                         {/* <div className="text-yellow-300/80 text-xs md:text-sm mb-1"> */}
-                         {/*    <VibeContentRenderer content={"1. Настрой (<FaCodeBranch title='Настройки' class='inline text-cyan-400 cursor-pointer hover:underline'/>)."} /> */}
-                         {/* </div> */}
-                     </>
+                     <div className="text-yellow-300/80 text-xs md:text-sm space-y-1 mb-2">
+                        {/* Use VibeContentRenderer for instructions with icons */}
+                        <VibeContentRenderer content={"1. Настрой (<FaCodeBranch title='Настройки' class='inline text-cyan-400 cursor-pointer hover:underline' onClick={() => { console.log('settings clicked'); triggerToggleSettingsModal(); }}/>)."} />
+                        <VibeContentRenderer content={"2. Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>."} />
+                        <VibeContentRenderer content={"3. Выбери файлы или <span class='font-bold text-teal-400 mx-1'>связанные</span> / <span class='font-bold text-orange-400 mx-1'>важные</span>."} />
+                        <VibeContentRenderer content={"4. Опиши задачу ИЛИ добавь файлы (<FaPlus title='Добавить выбранные в запрос' class='inline text-sm'/>) / все (<FaTree title='Добавить все файлы в запрос' class='inline text-sm'/>)."} />
+                        <VibeContentRenderer content={"5. Скопируй (<FaCopy title='Скопировать запрос' class='inline text-sm mx-px'/>) или передай дальше."} />
+                    </div>
                   )}
                   {/* Image Task Info */}
                   {currentImageTask && (
@@ -415,7 +412,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                          selectedFiles={selectedFetcherFiles}
                          allFiles={fetchedFiles}
                          getLanguage={repoUtils.getLanguage}
-                         // VIBE CHECK: If SelectedFilesPreview renders HTML with icons, pass VibeContentRenderer or use it internally
+                         // VibeContentRenderer handled internally if needed
                      />
                      {logger.debug("[Render] Rendering FileList (conditional)")}
                      <FileList
@@ -434,7 +431,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                          onDeselectAll={handleDeselectAll}
                          onAddSelected={handleAddSelected}
                          onAddTree={handleAddFullTree}
-                         // VIBE CHECK: If FileList renders HTML with icons, pass VibeContentRenderer or use it internally
+                         // VibeContentRenderer handled internally if needed
                       />
                   </div>
              )}
@@ -453,7 +450,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                           isAddSelectedDisabled={isAddSelectedDisabled}
                           selectedFetcherFilesCount={selectedFetcherFiles.size}
                           onInputChange={(value) => setKworkInputHasContent(value.trim().length > 0)}
-                          // VIBE CHECK: If RequestInput renders HTML with icons, pass VibeContentRenderer or use it internally
+                          // VibeContentRenderer handled internally if needed
                       />
                   </div>
              )}

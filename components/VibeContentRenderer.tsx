@@ -30,9 +30,25 @@ const robustParserOptions: HTMLReactParserOptions = {
                         const IconComponent = Fa6Icons[iconComponentName];
                         try {
                             // logger.debug(`[VibeContentRenderer] Rendering icon: <${iconComponentName}>`); // Less verbose log
-                            const { class: className, ...restProps } = props; // Allow className
+                            const { class: className, style, ...restProps } = props; // Allow className and style
+                            // Filter out potentially problematic attributes passed directly
+                            const safeProps = Object.entries(restProps).reduce((acc, [key, value]) => {
+                                // Example: only allow string/number props or specific known safe props
+                                if (typeof value === 'string' || typeof value === 'number' || key === 'title' || key.startsWith('aria-')) {
+                                    acc[key] = value;
+                                } else {
+                                    // logger.warn(`[VibeContentRenderer] Skipping potentially unsafe prop '${key}' for icon <${iconComponentName}>`);
+                                }
+                                return acc;
+                            }, {} as Record<string, any>);
+
                             const parsedChildren = children && domNode.children.length > 0 ? domToReact(children, robustParserOptions) : null;
-                            return React.createElement(IconComponent, { className: className ?? '', ...restProps }, parsedChildren);
+                            // Apply className and style separately if they exist
+                            const finalProps: Record<string, any> = { ...safeProps };
+                            if (className) finalProps.className = className;
+                            if (style) finalProps.style = style;
+
+                            return React.createElement(IconComponent, finalProps, parsedChildren);
                         } catch (iconRenderError: any) {
                             logger.error(`[VibeContentRenderer] Error rendering VALID icon <${iconComponentName}>!`, iconRenderError, { props });
                             return <span title={`Error rendering icon: ${iconComponentName}`} className="text-red-500 font-bold">[ICON ERR!]</span>;
@@ -67,17 +83,29 @@ const robustParserOptions: HTMLReactParserOptions = {
                 // --- End Link Handling ---
 
                 // --- Standard HTML Elements (General Fallback) ---
-                const knownTags = /^(p|div|span|ul|ol|li|h[1-6]|strong|em|b|i|u|s|code|pre|blockquote|hr|br)$/;
-                if (typeof lowerCaseName === 'string' && knownTags.test(lowerCaseName)) {
+                // Added more tags and ensure self-closing tags like <br/> and <hr/> are handled (parser usually does this, but good to be explicit if needed)
+                 const knownTags = /^(p|div|span|ul|ol|li|h[1-6]|strong|em|b|i|u|s|code|pre|blockquote|hr|br|img|table|thead|tbody|tr|th|td)$/;
+                 if (typeof lowerCaseName === 'string' && knownTags.test(lowerCaseName)) {
                     try {
                          // logger.debug(`[VibeContentRenderer] Creating standard element: <${lowerCaseName}>`); // Less verbose log
-                         return React.createElement(lowerCaseName!, props, children ? domToReact(children, robustParserOptions) : undefined);
+                         // Handle cases where children might be undefined or null more gracefully
+                         const childrenToRender = children ? domToReact(children, robustParserOptions) : null;
+                         // For self-closing tags, React expects no children prop
+                         if (lowerCaseName === 'br' || lowerCaseName === 'hr' || lowerCaseName === 'img') {
+                              return React.createElement(lowerCaseName, props);
+                         } else {
+                             return React.createElement(lowerCaseName, props, childrenToRender);
+                         }
                     } catch (createElementError) {
-                        logger.error(`[VibeContentRenderer] Error React.createElement for <${lowerCaseName}>:`, createElementError);
+                        logger.error(`[VibeContentRenderer] Error React.createElement for <${lowerCaseName}>:`, createElementError, { props });
+                        // Fallback: Render children without the problematic container if possible
                         return <>{children ? domToReact(children, robustParserOptions) : null}</>;
                     }
                 }
                  // --- End Standard HTML Elements ---
+
+                 // Default: If no specific rule matches, let the parser handle it or return undefined
+                 // logger.debug(`[VibeContentRenderer] No specific rule for <${name}>, letting parser handle.`);
 
             } catch (replaceError: any) {
                  logger.error("[VibeContentRenderer] Error in replace function:", replaceError, { name, attribs });
@@ -85,7 +113,7 @@ const robustParserOptions: HTMLReactParserOptions = {
                  return <span title={`Error processing element: ${name}`} className="text-red-500">[PROCESS ERR]</span>;
             }
         }
-        // Let the library handle text nodes and other defaults
+        // Let the library handle text nodes and other defaults (like comments)
         return undefined;
     },
 };
@@ -105,12 +133,15 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
     }
 
     try {
-      const parsedContent = parse(content, robustParserOptions);
+      // Wrap with a div if className is provided, otherwise use React Fragment
+      const ParsedComponent = () => parse(content, robustParserOptions);
       // logger.debug("[VibeContentRenderer] Parsing successful."); // Less verbose log
-      return className ? <div className={className}>{parsedContent}</div> : <>{parsedContent}</>;
+      return className ? <div className={className}><ParsedComponent /></div> : <><ParsedComponent /></>;
     } catch (error) {
       logger.error("[VibeContentRenderer] Error during parse:", error, "Input:", content);
-      return <span className={`text-red-500 ${className ?? ''}`}>[Parse Error]</span>;
+      // Return the error message wrapped in the optional className div/span
+      const ErrorSpan = () => <span className="text-red-500">[Parse Error]</span>;
+      return className ? <div className={className}><ErrorSpan /></div> : <ErrorSpan />;
     }
 });
 

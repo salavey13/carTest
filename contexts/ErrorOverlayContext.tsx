@@ -50,6 +50,7 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const showOverlay = useMemo(() => {
        const flag = process.env.NEXT_PUBLIC_ENABLE_DEV_OVERLAY;
        const enabled = flag === 'true';
+       // Use console.log directly here as logger might not be initialized
        console.log(`[ErrorOverlayProvider] Dev Error Overlay ${enabled ? 'ENABLED' : 'DISABLED'} (NEXT_PUBLIC_ENABLE_DEV_OVERLAY=${flag})`);
        return enabled;
   }, []);
@@ -150,7 +151,7 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
     errorInfo, setErrorInfo, showOverlay,
     toastHistory, addToastToHistory,
     logHistory, addLogToHistory // Передаем новые поля
-  }), [errorInfo, showOverlay, toastHistory, logHistory, addToastToHistory, addLogToHistory]);
+  }), [errorInfo, showOverlay, toastHistory, logHistory, addToastToHistory, addLogToHistory, setErrorInfo]); // Added setErrorInfo
 
   return (
     <ErrorOverlayContext.Provider value={contextValue}>
@@ -165,11 +166,17 @@ export const useErrorOverlay = (): ErrorOverlayContextType => {
   if (context === undefined) {
     // Log critical error
     const error = new Error('useErrorOverlay must be used within an ErrorOverlayProvider');
-    console.error("FATAL:", error);
+    logger.fatal("FATAL:", error); // Use logger for fatal error
     // Provide a default fallback object to prevent immediate crashes in consumers,
     // although functionality will be broken.
     return {
-        errorInfo: null, setErrorInfo: () => {}, showOverlay: false, toastHistory: [], addToastToHistory: () => {}, logHistory: [], addLogToHistory: () => {}
+        errorInfo: null,
+        setErrorInfo: () => { console.error("setErrorInfo called on fallback context!"); }, // Log error on fallback call
+        showOverlay: false,
+        toastHistory: [],
+        addToastToHistory: () => { console.error("addToastToHistory called on fallback context!"); }, // Log error on fallback call
+        logHistory: [],
+        addLogToHistory: () => { console.error("addLogToHistory called on fallback context!"); } // Log error on fallback call
     };
     // OR re-throw the error if preferred: throw error;
   }

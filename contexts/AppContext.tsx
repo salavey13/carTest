@@ -3,7 +3,7 @@
 import type React from "react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react"; // Добавили useState
 import { useTelegram } from "@/hooks/useTelegram";
-import { debugLogger } from "@/lib/debugLogger";
+import { debugLogger as logger } from "@/lib/debugLogger"; // Use logger instead of direct console
 import { toast } from "sonner"; // Используем напрямую для тостов авторизации, т.к. useAppToast зависит от этого контекста
 
 // Define the shape of the context data
@@ -35,7 +35,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Log context changes for debugging (only when contextValue actually changes)
   useEffect(() => {
     // Логируем только когда contextValue действительно изменился (проверка по ссылке)
-    debugLogger.log("AppContext updated:", {
+    logger.log("AppContext updated:", { // Use logger
       isAuthenticated: contextValue.isAuthenticated,
       isLoading: contextValue.isLoading,
       userId: contextValue.dbUser?.user_id ?? contextValue.user?.id,
@@ -53,6 +53,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     let currentToastId: string | number | undefined;
     let loadingTimer: NodeJS.Timeout | null = null;
+    const LOADING_TOAST_DELAY = 300; // 300ms задержка
 
     // Показываем тост загрузки, только если она занимает заметное время
     if (contextValue.isLoading) {
@@ -60,15 +61,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
        loadingTimer = setTimeout(() => {
           // Показываем тост только если все еще грузится
           if (contextValue.isLoading && document.visibilityState === 'visible') { // Проверка видимости
-             debugLogger.debug("[AppContext] Showing auth loading toast...");
+             logger.debug("[AppContext] Showing auth loading toast..."); // Use logger
              currentToastId = toast.loading("Авторизация...", { id: "auth-loading-toast" });
           }
-       }, 300); // 300ms задержка
+       }, LOADING_TOAST_DELAY);
     } else {
         // Если загрузка завершилась до таймера, отменяем его
         if (loadingTimer) clearTimeout(loadingTimer);
         // Убираем тост загрузки, если он был показан
-        debugLogger.debug("[AppContext] Dismissing auth loading toast (if any)...");
+        // logger.debug("[AppContext] Dismissing auth loading toast (if any)..."); // Use logger (can be noisy)
         toast.dismiss("auth-loading-toast");
 
         // Показываем тост успеха ТОЛЬКО ОДИН РАЗ при успешной авторизации
@@ -76,14 +77,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             // Используем ID, чтобы тост не дублировался при быстрых обновлениях
             // Проверяем видимость документа, чтобы не показывать тост в фоне
              if (document.visibilityState === 'visible') {
-                 debugLogger.debug("[AppContext] Showing auth success toast...");
+                 logger.debug("[AppContext] Showing auth success toast..."); // Use logger
                  currentToastId = toast.success("Пользователь авторизован", { id: "auth-success-toast", duration: 2000 });
              }
         }
         // Опционально: показываем тост ошибки при неудаче
         else if (contextValue.error) {
             if (document.visibilityState === 'visible') {
-                 debugLogger.error("[AppContext] Showing auth error toast:", contextValue.error);
+                 logger.error("[AppContext] Showing auth error toast:", contextValue.error); // Use logger
                  currentToastId = toast.error("Ошибка авторизации", { id: "auth-error-toast", description: contextValue.error.message });
             }
         }
@@ -115,7 +116,7 @@ export const useAppContext = (): AppContextData => {
   if (!context || !context.hasOwnProperty('debugToastsEnabled')) {
     // Эта ошибка критична и означает неправильное использование контекста
      const error = new Error("useAppContext must be used within an AppProvider and after its initialization");
-     debugLogger.fatal("useAppContext Error:", error); // Логируем критическую ошибку
+     logger.fatal("useAppContext Error:", error); // Логируем критическую ошибку
      throw error;
   }
   // Cast to full type once checks pass

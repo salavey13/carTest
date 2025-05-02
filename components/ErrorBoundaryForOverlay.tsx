@@ -24,6 +24,7 @@ function withErrorOverlayContext<P extends object>(
         // Ensure context is available before rendering WrappedComponent
         if (!context) {
              // This should not happen if ErrorOverlayProvider wraps this, but good safety check
+             logger.fatal("[ErrorBoundaryForOverlay] CRITICAL: ErrorOverlayContext not found in withErrorOverlayContext!");
              console.error("CRITICAL: ErrorOverlayContext not found in withErrorOverlayContext!");
              // Render children directly or a minimal fallback, but avoid crashing
              return <>{props.children}</>;

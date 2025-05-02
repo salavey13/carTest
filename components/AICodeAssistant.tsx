@@ -136,19 +136,19 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         setValidationStatus('idle'); setValidationIssues([]); setPrTitle(''); codeParserHook.setRawDescription('');
         setRequestCopied(false); setAiResponseHasContent(value.trim().length > 0);
         logger.log("[CB setResponseValue] Response value set manually, resetting parsed state.");
-     }, [aiResponseInputRefPassed, setHookParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, codeParserHook, setRequestCopied, setAiResponseHasContent]); // Removed addToastDirect dependency
+     }, [aiResponseInputRefPassed, setHookParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, codeParserHook, setRequestCopied, setAiResponseHasContent, setSelectedFileIds]); // Added missing dependency
 
     const updateRepoUrl = useCallback((url: string) => {
         logger.info(`[CB updateRepoUrl] Updating local URL: ${url}`);
         setRepoUrlStateLocal(url);
         // NOT triggering PR refresh automatically here
-     }, []); // Removed addToastDirect dependency
+     }, []);
 
     const handleResetImageError = useCallback(() => {
          logger.info(`[CB handleResetImageError] Resetting image error state.`);
          setImageReplaceError(null);
          toastInfo("Состояние ошибки сброшено.");
-     }, [setImageReplaceError, toastInfo]); // Removed addToastDirect dependency
+     }, [setImageReplaceError, toastInfo]);
     logger.debug("[AICodeAssistant] After useCallback");
 
 
@@ -280,8 +280,15 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     useEffect(() => {
         logger.debug("[Effect Image Replace] START");
-        const canProcess = imageReplaceTask && fetchStatus === 'success' && allFetchedFiles.length > 0 && allFetchedFiles.some(f => f.path === imageReplaceTask.targetPath) && !assistantLoading && !processingImageReplace.current;
-        logger.debug(`[Effect Image Replace] Check: canProcess=${canProcess}, task=${!!imageReplaceTask}, fetchStatus=${fetchStatus}, fetchFailed=${fetchStatus === 'error'}`, { task: imageReplaceTask, fetchStatus, allFilesCount: allFetchedFiles.length, assistantLoading, processingRef: processingImageReplace.current });
+        // Read state directly inside the effect
+        const currentTask = imageReplaceTask;
+        const currentFetchStatus = fetchStatus;
+        const currentAllFiles = allFetchedFiles;
+        const currentAssistantLoading = assistantLoading;
+        const currentProcessingRefVal = processingImageReplace.current;
+
+        const canProcess = currentTask && currentFetchStatus === 'success' && currentAllFiles.length > 0 && currentAllFiles.some(f => f.path === currentTask.targetPath) && !currentAssistantLoading && !currentProcessingRefVal;
+        logger.debug(`[Effect Image Replace] Check: canProcess=${canProcess}, task=${!!currentTask}, fetchStatus=${currentFetchStatus}`, { task: currentTask, fetchStatus: currentFetchStatus, allFilesCount: currentAllFiles.length, assistantLoading: currentAssistantLoading, processingRef: currentProcessingRefVal });
 
         if (canProcess) {
             logger.info("[Effect Image Replace] Conditions MET. Starting image replace process...");
@@ -290,7 +297,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
             if (handlers?.handleDirectImageReplace) {
                 logger.debug("[Effect Image Replace] Calling handlers.handleDirectImageReplace");
-                handlers.handleDirectImageReplace(imageReplaceTask, allFetchedFiles)
+                handlers.handleDirectImageReplace(currentTask, currentAllFiles) // Pass current values
                     .then(() => { logger.info("[Effect Image Replace] .then() - Success"); })
                     .catch(err => { logger.error(`[Effect Image Replace] .catch(): ${err?.message}`, err); })
                     .finally(() => { logger.info("[Effect Image Replace] .finally()"); processingImageReplace.current = false; });
@@ -300,15 +307,16 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                  processingImageReplace.current = false;
                  toastError("Внутренняя ошибка: Обработчик замены картинки отсутствует.");
             }
-        } else if (imageReplaceTask && fetchStatus === 'error' && !processingImageReplace.current) {
+        } else if (currentTask && currentFetchStatus === 'error' && !currentProcessingRefVal) {
             logger.warn("[Effect Image Replace] Setting error state: Fetch failed.");
              setImageReplaceError("Failed to fetch target file.");
         }
         logger.debug("[Effect Image Replace] END");
      }, [
-        imageReplaceTask, fetchStatus, allFetchedFiles, assistantLoading,
-        handlers, setImageReplaceError, imageReplaceError, toastError // Removed logger dependency
+        imageReplaceTask, fetchStatus, allFetchedFiles, assistantLoading, // Listen to state changes
+        handlers, setImageReplaceError, toastError // Stable dependencies
      ]);
+
 
     useEffect(() => {
         logger.debug(`[Effect Image Task Ref Update] New task present: ${!!imageReplaceTask}`);
@@ -326,7 +334,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         setResponseValue: (val: string) => { logger.debug(`[Imperative] setResponseValue called.`); setResponseValue(val); },
         updateRepoUrl: (url: string) => { logger.debug(`[Imperative] updateRepoUrl called.`); updateRepoUrl(url); },
         handleDirectImageReplace: (task: ImageReplaceTask, files: FileNode[]) => { logger.debug(`[Imperative] handleDirectImageReplace called.`); return handlers.handleDirectImageReplace(task, files); },
-    }), [handlers, setResponseValue, updateRepoUrl]); // Removed addToastDirect dependency
+    }), [handlers, setResponseValue, updateRepoUrl]);
     logger.debug("[AICodeAssistant] After useImperativeHandle");
 
 
