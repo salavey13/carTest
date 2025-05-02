@@ -4,6 +4,7 @@ import { useErrorOverlay } from '@/contexts/ErrorOverlayContext';
 // --- REMOVED useAppContext import ---
 import type { ToastRecord } from '@/types/toast';
 import { debugLogger as logger } from '@/lib/debugLogger';
+import { useCallback, useMemo } from 'react'; // <-- ADDED useCallback and useMemo imports
 
 type ToastType = 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message' | 'custom';
 
@@ -26,7 +27,8 @@ export const useAppToast = () => {
     }
 
     // Generic function to show toast and add to history
-    const showToast = (
+    // Wrapped showToast in useCallback for potential stability, although its dependencies make it likely to change often anyway.
+    const showToast = useCallback((
         type: ToastType,
         message: string | React.ReactNode,
         options?: any
@@ -85,11 +87,12 @@ export const useAppToast = () => {
         } catch (err) {
             logger.error("Error in useAppToast while showing/logging toast:", err, { type, message, options });
             try {
-                sonnerToast.error("Internal error: Could not display toast.", { duration: 2000 });
+                sonnerToast.error("Internal issue: Could not display toast.", { duration: 2000 }); // Slightly clearer message
             } catch { /* Silently fail */ }
             return undefined;
         }
-    };
+    }, [isReady, errorOverlay]); // Added dependencies for useCallback
+
 
     // Return the API mirroring sonner
     const notReadyWarn = useCallback((method: string, msg?: any) => {
@@ -106,18 +109,34 @@ export const useAppToast = () => {
         } catch(e) {
              logger.error("Error during fallback sonner call:", e);
         }
-    }, []);
+    }, []); // Empty dependency array for stable callback
 
-    // Return memoized functions
-    return useMemo(() => ({
-        success: (message: string | React.ReactNode, options?: any) => showToast('success', message, options),
-        error: (message: string | React.ReactNode, options?: any) => showToast('error', message, options),
-        info: (message: string | React.ReactNode, options?: any) => showToast('info', message, options),
-        warning: (message: string | React.ReactNode, options?: any) => showToast('warning', message, options),
-        loading: (message: string | React.ReactNode, options?: any) => showToast('loading', message, options),
-        message: (message: string | React.ReactNode, options?: any) => showToast('message', message, options),
-        custom: (component: (id: number | string) => React.ReactNode, options?: any) => showToast('custom', component, options),
-        dismiss: (toastId?: string | number) => sonnerToast.dismiss(toastId),
-    }), [isReady, errorOverlay, showToast]); // Dependencies ensure re-memoization if context becomes ready
+    // Return memoized functions if ready
+    return useMemo(() => {
+        if (!isReady) {
+            // Return dummy functions if not ready
+             return {
+                 success: (msg: any, opts?: any) => notReadyWarn('success', msg),
+                 error: (msg: any, opts?: any) => notReadyWarn('error', msg),
+                 info: (msg: any, opts?: any) => notReadyWarn('info', msg),
+                 warning: (msg: any, opts?: any) => notReadyWarn('warning', msg),
+                 loading: (msg: any, opts?: any) => notReadyWarn('loading', msg),
+                 message: (msg: any, opts?: any) => notReadyWarn('message', msg),
+                 custom: (fn: any, opts?: any) => notReadyWarn('custom', '[Function]'),
+                 dismiss: (id?: any) => notReadyWarn('dismiss', id),
+             };
+        }
+        // Return real functions bound to showToast if ready
+        return {
+            success: (message: string | React.ReactNode, options?: any) => showToast('success', message, options),
+            error: (message: string | React.ReactNode, options?: any) => showToast('error', message, options),
+            info: (message: string | React.ReactNode, options?: any) => showToast('info', message, options),
+            warning: (message: string | React.ReactNode, options?: any) => showToast('warning', message, options),
+            loading: (message: string | React.ReactNode, options?: any) => showToast('loading', message, options),
+            message: (message: string | React.ReactNode, options?: any) => showToast('message', message, options),
+            custom: (component: (id: number | string) => React.ReactNode, options?: any) => showToast('custom', component, options),
+            dismiss: (toastId?: string | number) => sonnerToast.dismiss(toastId),
+        }
+    }, [isReady, showToast, notReadyWarn]); // Dependencies for useMemo
 
 };
