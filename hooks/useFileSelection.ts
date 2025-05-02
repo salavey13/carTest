@@ -1,7 +1,8 @@
 "use client";
 import { useCallback } from "react";
 import { useRepoXmlPageContext, FileNode, ImportCategory } from "@/contexts/RepoXmlPageContext"; // Assuming types are here
-import { debugLogger as logger } from "@/lib/debugLogger";
+import { debugLogger as logger } from "@/lib/debugLogger"; // Use logger
+import { useAppToast } from "@/hooks/useAppToast"; // Use toast hook
 
 interface UseFileSelectionProps {
     files: FileNode[]; // Current list of fetched files (from useRepoFetcher hook)
@@ -26,108 +27,125 @@ export const useFileSelection = ({
     importantFiles,
     imageReplaceTaskActive,
 }: UseFileSelectionProps): UseFileSelectionReturn => {
+    logger.debug("[useFileSelection] Hook initialized");
+    const { success: toastSuccess, warning: toastWarning } = useAppToast(); // Get toast functions
 
     const {
         setSelectedFetcherFiles, // Context setter for the selection state
-        addToast // Context helper for notifications
+        // addToast is no longer needed directly here
     } = useRepoXmlPageContext();
 
     /** Toggle selection state for a single file path. */
     const toggleFileSelection = useCallback((path: string) => {
         if (imageReplaceTaskActive) {
-             addToast("Выбор файлов недоступен во время задачи замены картинки.", "warning");
+             logger.warn("[File Selection] Toggle skipped: Image replace task active.");
+             toastWarning("Выбор файлов недоступен во время задачи замены картинки.");
              return;
         }
-        logger.log("Toggle selection:", path);
+        logger.log("[File Selection] Toggle selection for:", path);
         setSelectedFetcherFiles(prev => {
             const newSet = new Set(prev);
             if (newSet.has(path)) {
                 newSet.delete(path);
+                 logger.debug(`[File Selection] Deselected: ${path}`);
             } else {
                 newSet.add(path);
+                 logger.debug(`[File Selection] Selected: ${path}`);
             }
             return newSet;
         });
-    }, [setSelectedFetcherFiles, imageReplaceTaskActive, addToast, logger]);
+    }, [setSelectedFetcherFiles, imageReplaceTaskActive, toastWarning, logger]);
 
     /** Selects the primary highlighted file and all secondary highlighted files. */
     const selectHighlightedFiles = useCallback(() => {
         if (imageReplaceTaskActive) {
-             addToast("Выбор файлов недоступен во время задачи замены картинки.", "warning");
+             logger.warn("[File Selection] Select Highlighted skipped: Image replace task active.");
+             toastWarning("Выбор файлов недоступен во время задачи замены картинки.");
              return;
         }
         const filesToSelect = new Set<string>();
         // Ensure primary file exists in the current fetched list before adding
         if (primaryHighlightedPath && files.some(f => f.path === primaryHighlightedPath)) {
              filesToSelect.add(primaryHighlightedPath);
+             logger.debug(`[File Selection] Adding primary highlight: ${primaryHighlightedPath}`);
         }
         // Ensure secondary files exist in the current fetched list before adding
         Object.values(secondaryHighlightedPaths).flat().forEach(p => {
              if (files.some(f => f.path === p)) {
                  filesToSelect.add(p);
+                 logger.debug(`[File Selection] Adding secondary highlight: ${p}`);
              }
         });
 
         if (filesToSelect.size === 0) {
-            addToast("Нет выделенных или связанных файлов для выбора.", 'warning');
+            toastWarning("Нет выделенных или связанных файлов для выбора.");
+             logger.warn("[File Selection] No highlighted files available to select.");
             return;
         }
 
-        logger.log("Selecting highlighted files:", filesToSelect);
+        logger.info(`[File Selection] Selecting ${filesToSelect.size} highlighted files.`);
         setSelectedFetcherFiles(filesToSelect); // Update context state
-        addToast(`Выбрано ${filesToSelect.size} связанных файлов.`, 'success');
-    }, [ primaryHighlightedPath, secondaryHighlightedPaths, files, setSelectedFetcherFiles, addToast, imageReplaceTaskActive, logger ]);
+        toastSuccess(`Выбрано ${filesToSelect.size} связанных файлов.`);
+    }, [ primaryHighlightedPath, secondaryHighlightedPaths, files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger ]);
 
     /** Adds predefined important files to the current selection if they exist. */
     const handleAddImportantFiles = useCallback(() => {
         if (imageReplaceTaskActive) {
-             addToast("Выбор файлов недоступен во время задачи замены картинки.", "warning");
+             logger.warn("[File Selection] Add Important skipped: Image replace task active.");
+             toastWarning("Выбор файлов недоступен во время задачи замены картинки.");
              return;
         }
         // Filter importantFiles to only include those present in the current 'files' list
         const availableImportant = importantFiles.filter(p => files.some(f => f.path === p));
         if (availableImportant.length === 0) {
-            addToast("Важные файлы не найдены в текущем списке файлов репозитория.", "warning");
+            toastWarning("Важные файлы не найдены в текущем списке файлов репозитория.");
+             logger.warn("[File Selection] No important files found in current file list.");
             return;
         }
 
-        logger.log("Adding important files:", availableImportant);
+        logger.info(`[File Selection] Adding ${availableImportant.length} important files to selection.`);
         setSelectedFetcherFiles(prev => {
             const newSet = new Set(prev);
-            availableImportant.forEach(p => newSet.add(p));
+            availableImportant.forEach(p => {
+                if (!newSet.has(p)) logger.debug(`[File Selection] Adding important: ${p}`);
+                newSet.add(p);
+            });
             return newSet;
         }); // Update context state
-        addToast(`Добавлено ${availableImportant.length} важных файлов к выделению.`, 'success');
-    }, [importantFiles, files, setSelectedFetcherFiles, addToast, imageReplaceTaskActive, logger]);
+        toastSuccess(`Добавлено ${availableImportant.length} важных файлов к выделению.`);
+    }, [importantFiles, files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger]);
 
     /** Selects all files currently available in the 'files' list. */
     const handleSelectAll = useCallback(() => {
         if (imageReplaceTaskActive) {
-             addToast("Выбор файлов недоступен во время задачи замены картинки.", "warning");
+             logger.warn("[File Selection] Select All skipped: Image replace task active.");
+             toastWarning("Выбор файлов недоступен во время задачи замены картинки.");
              return;
         }
         if (files.length === 0) {
-             addToast("Нет файлов для выбора.", "warning");
+             toastWarning("Нет файлов для выбора.");
+              logger.warn("[File Selection] No files available to select all.");
              return;
         }
         const allPaths = new Set(files.map(f => f.path));
-        logger.log("Selecting all files:", allPaths.size);
+        logger.info(`[File Selection] Selecting all ${allPaths.size} files.`);
         setSelectedFetcherFiles(allPaths); // Update context state
-        addToast(`Выбраны все ${allPaths.size} файлов.`, 'success');
-    }, [files, setSelectedFetcherFiles, addToast, imageReplaceTaskActive, logger]);
+        toastSuccess(`Выбраны все ${allPaths.size} файлов.`);
+    }, [files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger]);
 
     /** Clears the current file selection. */
     const handleDeselectAll = useCallback(() => {
         if (imageReplaceTaskActive) {
-             addToast("Выбор файлов недоступен во время задачи замены картинки.", "warning");
+             logger.warn("[File Selection] Deselect All skipped: Image replace task active.");
+             toastWarning("Выбор файлов недоступен во время задачи замены картинки.");
              return;
         }
-        logger.log("Deselecting all files.");
+        logger.info("[File Selection] Deselecting all files.");
         setSelectedFetcherFiles(new Set()); // Update context state
-        addToast("Выделение снято со всех файлов.", 'success');
-    }, [setSelectedFetcherFiles, addToast, imageReplaceTaskActive, logger]);
+        toastSuccess("Выделение снято со всех файлов.");
+    }, [setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger]);
 
-
+     logger.debug("[useFileSelection] Hook setup complete.");
     return {
         toggleFileSelection,
         selectHighlightedFiles,

@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { toast } from "sonner";
+// Removed direct sonner import import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import {
     FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
     FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard,
     FaCopy, FaListCheck, FaBug, FaSync, FaPlus, FaPaperPlane, FaBroom, FaCheck,
     FaRobot, FaArrowRotateRight, FaArrowsRotate, FaAngrycreative, FaPoo,
-    FaList, FaCodeBranch, FaExclamation, FaImages, FaSpinner, FaUpLong // Use correct icon
+    FaList, FaCodeBranch, FaExclamation, FaImages, FaSpinner, FaUpLong
 } from "react-icons/fa6";
 
 // Import Subcomponents
@@ -22,7 +22,8 @@ import { SuggestionList } from "@/components/stickyChat_components/SuggestionLis
 import {
     useRepoXmlPageContext, FetchStatus, WorkflowStep, FileNode, SimplePullRequest, ImageReplaceTask
 } from "@/contexts/RepoXmlPageContext";
-import { debugLogger as logger } from '@/lib/debugLogger';
+import { debugLogger as logger } from '@/lib/debugLogger'; // Use logger
+import { useAppToast } from "@/hooks/useAppToast"; // Use toast hook
 
 // --- Constants & Types ---
 const AUTO_OPEN_DELAY_MS_BUDDY = 4000;
@@ -50,8 +51,9 @@ const notificationVariants = { hidden: { scale: 0, opacity: 0 }, visible: { scal
 
 // --- Main Component ---
 const AutomationBuddy: React.FC = () => {
+    logger.debug("[AutomationBuddy] Rendering");
     // --- State ---
-    const [isMounted, setIsMounted] = useState(false);
+    const [isMounted, setIsMounted] = useState(false); // Keep isMounted for client-side logic
     const [isOpen, setIsOpen] = useState(false);
     const [hasAutoOpened, setHasAutoOpened] = useState(false);
     const [hasNewSuggestions, setHasNewSuggestions] = useState(false);
@@ -60,6 +62,7 @@ const AutomationBuddy: React.FC = () => {
 
     // --- Hooks ---
     const searchParams = useSearchParams();
+    const { error: toastError } = useAppToast(); // Get toast hook function
 
     // --- Context ---
     const {
@@ -69,29 +72,35 @@ const AutomationBuddy: React.FC = () => {
         selectedAssistantFiles, assistantLoading, aiActionLoading, loadingPrs,
         targetBranchName, manualBranchName, isSettingsModalOpen, isParsing,
         currentAiRequestId, imageReplaceTask, allFetchedFiles,
+        primaryHighlightedPath, secondaryHighlightedPaths, // Get highlight info
 
         // Triggers
-        triggerFetch = () => logger.warn("triggerFetch not available"),
-        triggerSelectHighlighted = () => logger.warn("triggerSelectHighlighted not available"),
-        triggerAddSelectedToKwork = async () => logger.warn("triggerAddSelectedToKwork not available"),
-        triggerCopyKwork = () => { logger.warn("triggerCopyKwork not available"); return false; },
-        triggerAskAi = async () => { logger.warn("triggerAskAi not available"); return { success: false, error: "Context unavailable" }; },
-        triggerParseResponse = async () => logger.warn("triggerParseResponse not available"),
-        triggerSelectAllParsed = () => logger.warn("triggerSelectAllParsed not available"),
-        triggerCreateOrUpdatePR = async () => logger.warn("triggerCreateOrUpdatePR not available"),
-        triggerToggleSettingsModal = () => logger.warn("triggerToggleSettingsModal not available"),
-        scrollToSection = () => logger.warn("scrollToSection not available"),
+        triggerFetch = () => logger.warn("[Buddy] triggerFetch not available"),
+        triggerSelectHighlighted = () => logger.warn("[Buddy] triggerSelectHighlighted not available"),
+        triggerAddSelectedToKwork = async () => logger.warn("[Buddy] triggerAddSelectedToKwork not available"),
+        triggerCopyKwork = () => { logger.warn("[Buddy] triggerCopyKwork not available"); return false; },
+        triggerAskAi = async () => { logger.warn("[Buddy] triggerAskAi not available"); return { success: false, error: "Context unavailable" }; },
+        triggerParseResponse = async () => logger.warn("[Buddy] triggerParseResponse not available"),
+        triggerSelectAllParsed = () => logger.warn("[Buddy] triggerSelectAllParsed not available"),
+        triggerCreateOrUpdatePR = async () => logger.warn("[Buddy] triggerCreateOrUpdatePR not available"),
+        triggerToggleSettingsModal = () => logger.warn("[Buddy] triggerToggleSettingsModal not available"),
+        scrollToSection = () => logger.warn("[Buddy] scrollToSection not available"),
 
         // Refs
         fetcherRef,
 
     } = useRepoXmlPageContext();
+    logger.debug(`[AutomationBuddy] Context State: currentStep=${currentStep}, fetchStatus=${fetchStatus}, imageTask=${!!imageReplaceTask}`);
 
     // --- Effects ---
-    useEffect(() => { setIsMounted(true); }, []);
+    useEffect(() => {
+        setIsMounted(true);
+        logger.debug("[AutomationBuddy Effect] Mounted");
+     }, []);
 
     // --- Get Active Message (NEW VIBE LOGIC) ---
     const activeMessage = useMemo(() => {
+        logger.debug(`[AutomationBuddy Memo] Calculating activeMessage. currentStep=${currentStep}, fetchStatus=${fetchStatus}`);
         if (!isMounted) return "Загрузка Бадди...";
 
         // --- Level 1 Task: Image Replacement ---
@@ -140,7 +149,8 @@ const AutomationBuddy: React.FC = () => {
 
     // --- Calculate Suggestions (NEW VIBE LOGIC) ---
     useEffect(() => {
-        if (!isMounted) { setSuggestions([]); return; }
+        logger.debug("[AutomationBuddy Effect] Calculating suggestions START");
+        if (!isMounted) { logger.debug("[AutomationBuddy Effect] Skipping suggestion calc (not mounted)"); setSuggestions([]); return; }
 
         const calculateSuggestions = (): Suggestion[] => {
             const suggestionsList: Suggestion[] = [];
@@ -156,22 +166,31 @@ const AutomationBuddy: React.FC = () => {
             const addSuggestion = (id: string, text: string, action: () => any, icon: React.ReactNode, condition = true, disabled = false, tooltip = '') => {
                 if (condition) {
                     let isDisabled = disabled || isAnyLoading; // Start with general loading disable
+                    logger.debug(`[Suggestion Add] ID: ${id}, Initial Disabled: ${isDisabled}`);
                     // Specific overrides/checks
                     if (['fetch', 'retry-fetch', 'retry-fetch-img', 'clear-all'].includes(id)) isDisabled = disabled || isFetcherLoading || isAssistantProcessing || isAiGenerating;
                     if (id.includes('ask-ai')) isDisabled = disabled || isAiGenerating;
                     if (id === 'parse-response') isDisabled = disabled || isParsing || isAiGenerating || !aiResponseHasContent; // Disable if no response
                     if (id === 'create-pr' || id === 'update-branch') isDisabled = disabled || isAssistantProcessing || selectedAssistantFiles.size === 0; // Disable if no files selected
                     if (id.includes('toggle-settings')) isDisabled = disabled || isAssistantProcessing || isAiGenerating; // Settings allowed unless Assistant/AI busy
-                    if (id === 'select-highlighted' && selectedFetcherFiles.size === 0 && !(primaryHighlightedPath || secondaryHighlightedPaths?.component?.length || secondaryHighlightedPaths?.context?.length || secondaryHighlightedPaths?.hook?.length || secondaryHighlightedPaths?.lib?.length)) tooltip = "Нет связанных файлов для выбора"; // Tooltip for highlight
+                    const hasAnyHighlights = !!primaryHighlightedPath || Object.values(secondaryHighlightedPaths).some(arr => arr.length > 0);
+                    if (id === 'select-highlighted') {
+                         isDisabled = disabled || isFetcherLoading || isAssistantProcessing || isAiGenerating || !hasAnyHighlights;
+                         if (!hasAnyHighlights) tooltip = "Нет связанных файлов для выбора";
+                    }
                     if (id === 'add-selected') isDisabled = disabled || isFetcherLoading || isAssistantProcessing || isAiGenerating || selectedFetcherFiles.size === 0;
                     if (id.includes('ask-ai') && id !== 'ask-ai-empty') isDisabled = isDisabled || selectedFetcherFiles.size === 0; // Needs selection if not empty ask
 
+                    logger.debug(`[Suggestion Add] ID: ${id}, Final Disabled: ${isDisabled}, Tooltip: ${tooltip}`);
                     suggestionsList.push({ id, text, action, icon, disabled: isDisabled, tooltip });
+                } else {
+                     logger.debug(`[Suggestion Add] ID: ${id} skipped (condition false)`);
                 }
             };
 
             // --- Image Replace Task Flow ---
              if (imageReplaceTask) {
+                 logger.debug("[Suggestion Calc] Image Task Flow");
                  const targetFileExists = filesFetched && allFetchedFiles?.some(f => f.path === imageReplaceTask.targetPath);
                  const isErrorState = fetchStatus === 'error' || fetchStatus === 'failed_retries' || (fetchStatus === 'success' && !targetFileExists && filesFetched);
 
@@ -191,6 +210,7 @@ const AutomationBuddy: React.FC = () => {
              }
 
              // --- Standard Workflow ---
+             logger.debug("[Suggestion Calc] Standard Workflow");
              addSuggestion( 'toggle-settings', isSettingsModalOpen ? "Закрыть Настройки" : `Настройки (Цель: ${effectiveBranch})`, triggerToggleSettingsModal, <FaCodeBranch />, true );
 
              switch (currentStep) {
@@ -207,14 +227,14 @@ const AutomationBuddy: React.FC = () => {
                      break;
                  case 'files_fetched_highlights': {
                      const hasHighlights = !!(primaryHighlightedPath || Object.values(secondaryHighlightedPaths).flat().length > 0);
-                     addSuggestion("select-highlighted", "Выбрать Связанные", triggerSelectHighlighted, <FaHighlighter />, hasHighlights);
+                     addSuggestion("select-highlighted", "Выбрать Связанные", triggerSelectHighlighted, <FaHighlighter />, true); // Disable handled by addSuggestion
                      addSuggestion("goto-files", `К Списку Файлов (${allFetchedFiles.length})`, () => scrollToSection('file-list-container'), <FaEye />, true);
-                     addSuggestion("add-selected", `Добавить Выбранные (${selectedFetcherFiles.size})`, () => triggerAddSelectedToKwork(false), <FaPlus />, selectedFetcherFiles.size > 0, false, "Добавить выбранные файлы в поле запроса");
+                     addSuggestion("add-selected", `Добавить Выбранные (${selectedFetcherFiles.size})`, () => triggerAddSelectedToKwork(false), <FaPlus />, true, false, "Добавить выбранные файлы в поле запроса"); // Disable handled by addSuggestion
                      // Removed "Ask AI highlights" - force adding context first
                      break;
                  }
                  case 'files_selected':
-                    addSuggestion("add-selected", `Добавить Выбранные (${selectedFetcherFiles.size})`, () => triggerAddSelectedToKwork(false), <FaPlus />, true, false, "Добавить выбранные файлы в поле запроса");
+                    addSuggestion("add-selected", `Добавить Выбранные (${selectedFetcherFiles.size})`, () => triggerAddSelectedToKwork(false), <FaPlus />, true, false, "Добавить выбранные файлы в поле запроса"); // Disable handled by addSuggestion
                     // Removed "Ask AI selected" - force adding context first
                     addSuggestion("goto-kwork", "К Полю Запроса", () => scrollToSection('kwork-input-section'), <FaKeyboard />, true);
                     break;
@@ -224,10 +244,10 @@ const AutomationBuddy: React.FC = () => {
                      break;
                  case 'request_copied': // User needs to paste response
                     addSuggestion("goto-ai-response", "К Полю Ответа AI", () => scrollToSection('response-input'), <FaArrowRight />, true);
-                    addSuggestion("parse-response", "➡️ Вставил Ответ? Разбери!", triggerParseResponse, <FaWandMagicSparkles />, aiResponseHasContent);
+                    addSuggestion("parse-response", "➡️ Вставил Ответ? Разбери!", triggerParseResponse, <FaWandMagicSparkles />, true); // Disable handled by addSuggestion
                     break;
                  case 'response_pasted': // Response is pasted, ready to parse
-                     addSuggestion("parse-response", "➡️ Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, true);
+                     addSuggestion("parse-response", "➡️ Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, true); // Disable handled by addSuggestion
                      addSuggestion("goto-ai-response", "К Полю Ответа", () => scrollToSection('response-input'), <FaKeyboard />, true);
                     break;
                  case 'parsing_response': /* Loading indicator handled by general logic */ break;
@@ -235,7 +255,7 @@ const AutomationBuddy: React.FC = () => {
                  case 'pr_ready':
                      addSuggestion("select-all-parsed", "Выбрать Все Файлы", triggerSelectAllParsed, <FaListCheck />, filesParsed);
                      addSuggestion("goto-assistant-files", "К Разобранным Файлам", () => scrollToSection('executor'), <FaEye />, true);
-                     addSuggestion( targetBranchName ? "update-branch" : "create-pr", createOrUpdateActionText, triggerCreateOrUpdatePR, createOrUpdateIcon, selectedAssistantFiles.size > 0);
+                     addSuggestion( targetBranchName ? "update-branch" : "create-pr", createOrUpdateActionText, triggerCreateOrUpdatePR, createOrUpdateIcon, true); // Disable handled by addSuggestion
                      addSuggestion("goto-pr-form", "К Форме PR/Ветки", () => scrollToSection('pr-form-container'), <FaRocket />, true);
                      break;
                  default: break;
@@ -262,24 +282,30 @@ const AutomationBuddy: React.FC = () => {
         };
 
         const newSuggestions = calculateSuggestions();
+        logger.debug(`[AutomationBuddy Effect] Calculated ${newSuggestions.length} suggestions.`);
         setSuggestions(newSuggestions);
+        logger.debug("[AutomationBuddy Effect] Calculating suggestions END");
 
     }, [
-        isMounted, currentStep, fetchStatus, repoUrlEntered, filesFetched, selectedFetcherFiles, kworkInputHasContent, aiResponseHasContent, filesParsed, selectedAssistantFiles, assistantLoading, aiActionLoading, loadingPrs, targetBranchName, manualBranchName, isSettingsModalOpen, isParsing, currentAiRequestId, imageReplaceTask, allFetchedFiles, // State dependencies
+        isMounted, currentStep, fetchStatus, repoUrlEntered, filesFetched, selectedFetcherFiles, kworkInputHasContent, aiResponseHasContent, filesParsed, selectedAssistantFiles, assistantLoading, aiActionLoading, loadingPrs, targetBranchName, manualBranchName, isSettingsModalOpen, isParsing, currentAiRequestId, imageReplaceTask, allFetchedFiles, primaryHighlightedPath, secondaryHighlightedPaths, // State dependencies
         triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR, triggerToggleSettingsModal, scrollToSection, fetcherRef // Context triggers & Ref
     ]);
 
     // --- Suggestion Change Detection ---
     useEffect(() => {
-        if (!isMounted || isOpen) { setHasNewSuggestions(false); return; } // Reset immediately if open
+        if (!isMounted || isOpen) {
+            if (isOpen) logger.debug("[AutomationBuddy Effect] Suggestion Change - Resetting notification (buddy open)");
+            setHasNewSuggestions(false);
+            return;
+        }
         const currentIds = new Set(suggestions.map(s => s.id));
         const prevIds = previousSuggestionIds.current;
-        const meaningfulChange = ![...currentIds].every(id => prevIds.has(id)) || ![...prevIds].every(id => currentIds.has(id)); // Simple set comparison
-        if (meaningfulChange && !suggestions.every(s => s.id.includes('loading') || s.id.includes('img-'))) { // Don't notify just for loading changes
+        const meaningfulChange = ![...currentIds].every(id => prevIds.has(id)) || ![...prevIds].every(id => currentIds.has(id));
+        if (meaningfulChange && !suggestions.every(s => s.id.includes('loading') || s.id.includes('img-'))) {
              setHasNewSuggestions(true);
-             logger.log("Buddy: New suggestions available!");
+             logger.info("[AutomationBuddy Effect] New suggestions available!");
         }
-        previousSuggestionIds.current = currentIds; // Update previous IDs
+        previousSuggestionIds.current = currentIds;
     }, [isMounted, suggestions, isOpen]);
 
 
@@ -289,37 +315,54 @@ const AutomationBuddy: React.FC = () => {
         if (isMounted && !hasAutoOpened && !isOpen) {
             const hasParams = searchParams.has("path") || searchParams.has("idea");
             const delayMs = hasParams ? AUTO_OPEN_DELAY_MS_BUDDY : AUTO_OPEN_DELAY_MS_BUDDY_SIMPLE_CASE;
-            logger.log(`Buddy: Setting auto-open timer for ${delayMs}ms (hasParams: ${hasParams})`);
+            logger.log(`[AutomationBuddy Effect] Setting auto-open timer for ${delayMs}ms (hasParams: ${hasParams})`);
             t = setTimeout(() => {
                 setIsOpen(true);
                 setHasAutoOpened(true);
-                logger.log(`Buddy: Auto-opened after ${delayMs}ms`);
+                logger.info(`[AutomationBuddy Effect] Auto-opened after ${delayMs}ms`);
             }, delayMs);
         }
         return () => { if (t) clearTimeout(t); };
     }, [isMounted, hasAutoOpened, isOpen, searchParams]);
 
     // --- Handle Escape Key ---
-    const handleEscKey = useCallback((e:KeyboardEvent) => { if(e.key==='Escape'&&isOpen)setIsOpen(false);}, [isOpen]);
+    const handleEscKey = useCallback((e:KeyboardEvent) => { if(e.key==='Escape'&&isOpen) { logger.debug("[AutomationBuddy CB] Escape key pressed, closing."); setIsOpen(false);} }, [isOpen]);
     useEffect(() => { document.addEventListener('keydown',handleEscKey); return()=>{document.removeEventListener('keydown',handleEscKey);}; }, [handleEscKey]);
 
     // --- Event Handlers ---
     const handleSuggestionClick = (suggestion: Suggestion) => {
-        if(suggestion.disabled)return; logger.log("Buddy Click:",suggestion.id); if(suggestion.action){ const r=suggestion.action();
-             if (!suggestion.id.startsWith('goto-') && !suggestion.id.includes('toggle-settings') && !suggestion.id.includes('retry-fetch') && suggestion.id !== 'img-replace-status') { setIsOpen(false); }
-             else if (suggestion.id.startsWith('goto-')) { setTimeout(() => setIsOpen(false), 300); }
-             if(r instanceof Promise){r.catch(err=>{logger.error(`Buddy action (${suggestion.id}) error:`, err); toast.error(`Действие "${suggestion.text}" не удалось.`);});} } else {setIsOpen(false);}
+        if(suggestion.disabled){ logger.debug(`[Buddy Click] Suggestion ${suggestion.id} clicked but disabled.`); return; }
+        logger.info(`[Buddy Click] Suggestion clicked: ${suggestion.id}`);
+        if(suggestion.action){
+             const r=suggestion.action();
+             // Keep open for navigation, settings, retry actions
+             if (!suggestion.id.startsWith('goto-') && !suggestion.id.includes('toggle-settings') && !suggestion.id.includes('retry-fetch') && suggestion.id !== 'img-replace-status') {
+                 logger.debug(`[Buddy Click] Closing buddy after action: ${suggestion.id}`);
+                 setIsOpen(false);
+             } else if (suggestion.id.startsWith('goto-')) {
+                  logger.debug(`[Buddy Click] Delaying close for navigation: ${suggestion.id}`);
+                  setTimeout(() => setIsOpen(false), 300);
+             } else {
+                 logger.debug(`[Buddy Click] Keeping buddy open for action: ${suggestion.id}`);
+             }
+             if(r instanceof Promise){ r.catch(err=>{logger.error(`[Buddy Click] Action (${suggestion.id}) failed:`, err); toastError(`Действие "${suggestion.text}" не удалось.`);});}
+        } else {
+            logger.debug(`[Buddy Click] No action for suggestion ${suggestion.id}, closing.`);
+            setIsOpen(false);
+        }
     };
-    const handleOverlayClick = () => { setIsOpen(false); requestAnimationFrame(() => document.body.focus()); };
+    const handleOverlayClick = () => { logger.debug("[Buddy Click] Overlay clicked, closing."); setIsOpen(false); requestAnimationFrame(() => document.body.focus()); };
     const handleDialogClick = (e:React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
     const handleFabClick = () => {
+        logger.info(`[Buddy Click] FAB clicked. Current state: ${isOpen ? 'Open' : 'Closed'}`);
         setIsOpen(prev => { const nextOpen = !prev; if (!nextOpen) { requestAnimationFrame(() => document.body.focus()); } return nextOpen; });
-        if(!isOpen){setHasAutoOpened(true);setHasNewSuggestions(false);}
+        if(!isOpen){ logger.debug("[Buddy Click] FAB click opened buddy, resetting auto-open/notification."); setHasAutoOpened(true);setHasNewSuggestions(false);}
     };
 
     // --- Render Logic ---
-    if (!isMounted) return null;
+    if (!isMounted) return null; // Render nothing server-side or before mount
 
+    logger.debug(`[AutomationBuddy Render] Final render. isOpen=${isOpen}, hasNewSuggestions=${hasNewSuggestions}`);
     return (
         <AnimatePresence>
             {isOpen ? (
