@@ -1,8 +1,8 @@
 "use client";
-import React, { Suspense, useRef, useState, useEffect, ReactNode, useCallback } from "react";
+import React, { Suspense, useRef, useState, useEffect, ReactNode, useCallback, useMemo } from "react"; // Добавил useMemo
 import { useSearchParams } from 'next/navigation';
 import RepoTxtFetcher from "@/components/RepoTxtFetcher";
-import AICodeAssistant from "@/components/AICodeAssistant"; // Оставляем импорт
+import AICodeAssistant from "@/components/AICodeAssistant";
 import AutomationBuddy from "@/components/AutomationBuddy";
 import {
     useRepoXmlPageContext, RepoXmlPageProvider,
@@ -20,7 +20,7 @@ import {
     FaTools, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket
 } from "react-icons/fa6";
 import Link from "next/link";
-import * as FaIcons from "react-icons/fa6";
+import * as FaIcons from "react-icons/fa6"; // Оставляем импорт FaIcons, хотя он не используется в упрощенном парсере
 import { motion } from 'framer-motion';
 import parse, { domToReact, HTMLReactParserOptions, Element, attributesToProps } from 'html-react-parser';
 
@@ -69,14 +69,14 @@ const translations = {
     navIntro: "Intro <FaCircleInfo/>",
     navCyberVibe: "Vibe Loop <FaUpLong/>",
   },
-  ru: { // --- RUSSIAN TRANSLATIONS (KEEP Vibe 2.0 Philosophy) ---
+  ru: { // --- RUSSIAN TRANSLATIONS ---
     loading: "Запуск SUPERVIBE ДВИЖКА...",
     pageTitle: "SUPERVIBE СТУДИЯ 2.0",
     welcome: "Йоу,",
     intro1: "Код пугает? Забудь! Это <strong>СЕЙЧАС</strong>. Твой личный <strong>dev-ускоритель</strong>. Мгновенный Level UP!",
     intro2: "Думай: Волшебная Песочница. Есть идеи? Говори. AI строит, система чекает, PR улетает. <strong>Бум.</strong> Ты рулишь процессом.",
     intro3: "Хватит потреблять, стань <strong>ТВОРЦОМ</strong>. Строй СВОЮ реальность, решай СВОИ проблемы, <strong>валидируй идеи МГНОВЕННО</strong>. Вот это вайб.",
-    cyberVibeTitle: "Петля Вайба: Твой Движок Прокачки <FaUpLong/>", // FIXED ICON
+    cyberVibeTitle: "Петля Вайба: Твой Движок Прокачки <FaUpLong/>",
     cyberVibe1: "Это не просто тулзы – это <strong>накопительная петля обратной связи</strong>. Каждое действие качает тебя, делает следующий шаг легче. Ты эволюционируешь.",
     cyberVibe2: "<FaGithub class='inline mr-1 text-gray-400'/> - твой <strong>кибер-сундук</strong>. Эта Студия + AI? Твой интерфейс для <strong>ремикса и трансмутации</strong> этих знаний в новые вайбы, фичи, фиксы... <strong>мгновенно</strong>.",
     cyberVibe3: "Ты не <em>учишь</em> код; ты <strong>ремиксуешь матрицу</strong>. Взаимодействуешь, понимаешь структуру, <strong>командуешь AI</strong>. Ты - Вайб Мастер.",
@@ -109,7 +109,7 @@ const translations = {
     navGrabber: "Граббер <FaDownload/>",
     navAssistant: "Ассистент <FaRobot/>",
     navIntro: "Интро <FaCircleInfo/>",
-    navCyberVibe: "Петля Вайба <FaUpLong/>", // FIXED ICON
+    navCyberVibe: "Петля Вайба <FaUpLong/>",
   }
 };
 // --- End I18N ---
@@ -122,71 +122,59 @@ function LoadingBuddyFallback() {
     return ( <div className="fixed bottom-4 right-4 z-50 w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 animate-pulse" aria-hidden="true" ></div> );
 }
 
-// --- html-react-parser Configuration ---
+// --- html-react-parser Configuration (УПРОЩЕННАЯ ВЕРСИЯ - БЕЗ ИКОНОК) ---
 const parserOptions: HTMLReactParserOptions = {
-  replace: (domNode) => {
-    if (!(domNode instanceof Element && domNode.attribs)) { return undefined; }
+    replace: (domNode) => {
+        if (domNode instanceof Element && domNode.attribs) {
+            const { name, attribs, children } = domNode;
+            const lowerCaseName = name?.toLowerCase();
 
-    const { name, attribs, children } = domNode;
-    const lowerCaseName = name?.toLowerCase();
+            // Handle Internal Links
+            if (lowerCaseName === 'a') {
+                const props = attributesToProps(attribs);
+                const isInternal = props.href && (props.href.startsWith('/') || props.href.startsWith('#'));
+                const parsedChildren = children ? domToReact(children, parserOptions) : null;
+                if (isInternal && !props.target) {
+                    const { class: _, ...validProps } = props;
+                    try {
+                         logger.debug("[parserOptions - Simple] Creating Next Link:", props.href);
+                         return <Link href={props.href} {...validProps} className={props.className}>{parsedChildren}</Link>;
+                    } catch (linkError) {
+                        logger.error("[parserOptions - Simple] Error creating Next Link:", linkError, props);
+                        return <a {...props}>{parsedChildren}</a>;
+                    }
+                }
+                 logger.debug("[parserOptions - Simple] Creating External Link:", props.href);
+                return <a {...props}>{parsedChildren}</a>;
+            }
 
-    // Handle Font Awesome Icons
-    if (name && typeof name === 'string' && name.startsWith('Fa') && FaIcons[name as keyof typeof FaIcons]) {
-      try {
-          const iconCompFn = FaIcons[name as keyof typeof FaIcons];
-          const isFunction = typeof iconCompFn === 'function';
-
-          if (!isFunction) {
-              logger.error(`[parserOptions] FaIcon <${name}> is not a function!`);
-              return <span>{`[Icon Load Error: ${name} is not a Function]`}</span>;
-          }
-          const IconComponent = iconCompFn;
-          const props = attributesToProps(attribs);
-          const baseClassName = "inline-block align-middle mx-1";
-          const specificClassName = props.className || '';
-          props.className = `${baseClassName} ${specificClassName}`.trim();
-          return React.createElement(IconComponent, props);
-      } catch (iconError) {
-          logger.error(`[parserOptions] Error rendering FaIcon <${name}>:`, iconError);
-          return <span>{`[Icon Render Error: ${name}]`}</span>;
-      }
-    }
-
-    // Handle Internal Links
-    if (lowerCaseName === 'a') {
-      const props = attributesToProps(attribs);
-      const isInternal = props.href && (props.href.startsWith('/') || props.href.startsWith('#'));
-      const parsedChildren = children ? domToReact(children, parserOptions) : null;
-      if (isInternal && !props.target) {
-          const { class: _, ...validProps } = props;
-          try { return <Link href={props.href} {...validProps} className={props.className}>{parsedChildren}</Link>; }
-          catch (linkError) { logger.error("[parserOptions] Error creating Next Link:", linkError, props); return <a {...props}>{parsedChildren}</a>; }
-      }
-      return <a {...props}>{parsedChildren}</a>;
-    }
-
-    // Handle other standard HTML tags
-    if (typeof name === 'string' && /^[a-z][a-z0-9-]*$/.test(lowerCaseName || '')) {
-      try {
-          return React.createElement(lowerCaseName!, attributesToProps(attribs), children ? domToReact(children, parserOptions) : undefined);
-      } catch (createElementError) {
-          logger.error(`[parserOptions] Error React.createElement for <${lowerCaseName}>:`, createElementError);
-          return <>{children ? domToReact(children, parserOptions) : null}</>;
-      }
-    }
-
-    return undefined;
-  },
+            // Handle other standard HTML tags (БЕЗ ОБРАБОТКИ ИКОНОК)
+            if (typeof name === 'string' && /^[a-z][a-z0-9-]*$/.test(lowerCaseName || '')) {
+                try {
+                     logger.debug(`[parserOptions - Simple] Creating standard element: <${lowerCaseName}>`);
+                     return React.createElement(lowerCaseName!, attributesToProps(attribs), children ? domToReact(children, parserOptions) : undefined);
+                } catch (createElementError) {
+                    logger.error(`[parserOptions - Simple] Error React.createElement for <${lowerCaseName}>:`, createElementError);
+                    return <>{children ? domToReact(children, parserOptions) : null}</>;
+                }
+            }
+        }
+        return undefined;
+    },
 };
+// --- КОНЕЦ УПРОЩЕННОЙ ВЕРСИИ parserOptions ---
 
 // --- RenderContent Component ---
 const RenderContent: React.FC<{ content: string | null | undefined }> = React.memo(({ content }) => {
+    logger.debug("[RenderContent] Rendering content:", content ? content.substring(0, 50) + "..." : "null/undefined");
     if (typeof content !== 'string' || !content.trim()) {
         return null;
     }
     const contentWithStrong = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     try {
+      // Используем УПРОЩЕННЫЕ parserOptions
       const parsedContent = parse(contentWithStrong, parserOptions);
+      logger.debug("[RenderContent] Parsing successful.");
       return <>{parsedContent}</>;
     } catch (error) {
       logger.error("[RenderContent] Error during parse:", error, "Input:", contentWithStrong);
@@ -197,6 +185,7 @@ RenderContent.displayName = 'RenderContent';
 
 // --- getPlainText helper ---
 const getPlainText = (htmlString: string | null | undefined): string => {
+    logger.debug("[getPlainText] Stripping HTML:", htmlString ? htmlString.substring(0, 50) + "..." : "null/undefined");
     if (typeof htmlString !== 'string' || !htmlString) { return ''; }
     try {
         const withoutIcons = htmlString.replace(/<Fa[A-Z][a-zA-Z0-9]+(?:\s+[^>]*?)?\s*\/?>/g, '');
@@ -227,17 +216,14 @@ const ToastInjector: React.FC<{ id: string; context: RepoXmlPageContextType | nu
 
 // --- ActualPageContent Component ---
 function ActualPageContent() {
-    logger.log("[CONSOLE_LOG] ActualPageContent START RENDER");
+    logger.log("[LOG_POINT] ActualPageContent START RENDER");
 
     const { user } = useAppContext();
-    logger.log("[CONSOLE_LOG] ActualPageContent -> useAppContext DONE");
+    logger.log("[LOG_POINT] ActualPageContent -> useAppContext DONE");
     const pageContext = useRepoXmlPageContext();
-    logger.log("[CONSOLE_LOG] ActualPageContent -> useRepoXmlPageContext DONE");
+    logger.log("[LOG_POINT] ActualPageContent -> useRepoXmlPageContext DONE");
 
     logger.log("[LOG_POINT] ActualPageContent -> pageContext VALUE:", pageContext);
-    console.log("--- pageContext VALUE ---");
-    console.dir(pageContext);
-    console.log("-------------------------");
 
 
     const {
@@ -253,7 +239,7 @@ function ActualPageContent() {
     const [initialIdea, setInitialIdea] = useState<string | null>(null);
     const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(false);
     const [t, setT] = useState<TranslationSet | null>(null);
-    logger.log("[CONSOLE_LOG] ActualPageContent -> useState DONE");
+    logger.log("[LOG_POINT] ActualPageContent -> useState DONE");
 
     // --- Effects ---
     useEffect(() => {
@@ -269,12 +255,7 @@ function ActualPageContent() {
 
     useEffect(() => {
       addToast("[DEBUG_EFFECT] ActualPageContent -> useEffect 2 (URL) START", 'info', 500);
-      console.log(
-        "%c🚀 CyberVibe Studio 2.0 Initialized! 🚀\n%cCo-created with the Vibe Community & AI. Let's build!\n%cEaster Egg added by request. 😉",
-        "color: #E1FF01; font-size: 1.2em; font-weight: bold; text-shadow: 0 0 5px #E1FF01;",
-        "color: #00FF9D; font-size: 0.9em;",
-        "color: #888; font-size: 0.8em;"
-      );
+      // Убрали console.log с Easter Egg
 
       const pathParam = searchParams.get("path");
       const ideaParam = searchParams.get("idea");
@@ -412,17 +393,14 @@ function ActualPageContent() {
     const handleShowComponents = () => {
         addToast("[DEBUG_CB] handleShowComponents START", 'info', 500);
         logger.log("[LOG_POINT] handleShowComponents CLICKED");
-        console.log("[CONSOLE_LOG] handleShowComponents CLICKED");
         setShowComponents(true);
         logger.log("[LOG_POINT] setShowComponents(true) CALLED");
-        console.log("[CONSOLE_LOG] setShowComponents(true) CALLED");
         addToast("[DEBUG_CB] handleShowComponents END - setShowComponents(true) called", 'info', 500);
     };
 
     // --- Loading / Initial State ---
      if (!t) {
          logger.log("[LOG_POINT] ActualPageContent Render: Early return (!t)");
-         console.log("[CONSOLE_LOG] ActualPageContent Render: Early return (!t)");
          const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
          const loadingText = translations[loadingLang]?.loading ?? translations.en.loading;
          return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
@@ -430,7 +408,6 @@ function ActualPageContent() {
 
     // --- Derived State & Safe Render ---
     logger.log("[LOG_POINT] ActualPageContent -> Calculating derived state");
-    console.log("[CONSOLE_LOG] ActualPageContent -> Calculating derived state");
     const userName = user?.first_name || (lang === 'ru' ? 'Нео' : 'Neo');
     const navTitleIntro = memoizedGetPlainText(t.navIntro);
     const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe);
@@ -438,12 +415,12 @@ function ActualPageContent() {
     const navTitleAssistant = memoizedGetPlainText(t.navAssistant);
 
     const renderSafeContent = (contentKey: keyof TranslationSet) => {
+        // logger.debug(`[RenderContent Call] Key: ${contentKey}`); // Убрали логгер отсюда
         const content = t?.[contentKey];
         return content ? <RenderContent content={content} /> : `[${contentKey}]`;
     };
 
     logger.log("[LOG_POINT] ActualPageContent -> BEFORE RETURN JSX");
-    console.log("[CONSOLE_LOG] ActualPageContent -> BEFORE RETURN JSX");
     addToast("[DEBUG_RENDER] ActualPageContent: Before Return JSX", 'info', 500);
 
     return (
@@ -554,8 +531,7 @@ function ActualPageContent() {
                         <h2 className="text-3xl font-bold text-center text-brand-green mb-8 animate-pulse">{renderSafeContent('componentsTitle')}</h2>
                          <section id="extractor" className="mb-12 w-full max-w-4xl">
                            <ToastInjector id="ActualPageContent-BeforeRepoFetcherRender" context={pageContext} />
-                           {logger.log("[LOG_POINT] Rendering RepoTxtFetcher. fetcherRef type:", typeof fetcherRef)}
-                           {console.log("[CONSOLE_LOG] Rendering RepoTxtFetcher. fetcherRef:", fetcherRef)}
+                           {/* logger.log("[LOG_POINT] Rendering RepoTxtFetcher...") - УБРАНО */}
                              <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg backdrop-blur-sm">
                                  <CardContent className="p-4">
                                      <RepoTxtFetcher ref={fetcherRef} />
@@ -564,12 +540,10 @@ function ActualPageContent() {
                             <ToastInjector id="ActualPageContent-AfterRepoFetcherRender" context={pageContext} />
                          </section>
 
-                         {/* === ВОЗВРАЩАЕМ AICodeAssistant, НО СНАЧАЛА ТОСТ ПРОВЕРКИ === */}
                          <ToastInjector id="ActualPageContent-BeforeAIAssistantSection" context={pageContext} />
                          <section id="executor" className="mb-12 w-full max-w-4xl pb-16">
                            <ToastInjector id="ActualPageContent-BeforeAIAssistantRender" context={pageContext} />
-                           {logger.log("[LOG_POINT] Rendering AICodeAssistant. assistantRef type:", typeof assistantRef, "kworkInputRefPassed type:", typeof kworkInputRefPassed, "aiResponseInputRefPassed type:", typeof aiResponseInputRefPassed)}
-                           {console.log("[CONSOLE_LOG] Rendering AICodeAssistant. Refs:", { assistantRef, kworkInputRefPassed, aiResponseInputRefPassed })}
+                            {/* logger.log("[LOG_POINT] Rendering AICodeAssistant...") - УБРАНО */}
                              <Card className="bg-gray-900/80 border border-purple-700/50 shadow-lg backdrop-blur-sm">
                                  <CardContent className="p-4">
                                      <AICodeAssistant
@@ -581,8 +555,6 @@ function ActualPageContent() {
                              </Card>
                             <ToastInjector id="ActualPageContent-AfterAIAssistantRender" context={pageContext} />
                          </section>
-                         {/* === КОНЕЦ БЛОКА AICodeAssistant === */}
-
                          <ToastInjector id="ActualPageContent-InsideShowComponentsEnd" context={pageContext} />
                      </>
                  )}
@@ -623,17 +595,15 @@ function ActualPageContent() {
 
 // --- Layout Component ---
 function RepoXmlPageLayout() {
-    logger.log("[LOG_POINT] RepoXmlPageLayout rendering RepoXmlPageProvider");
-    console.log("[CONSOLE_LOG] RepoXmlPageLayout rendering RepoXmlPageProvider");
+    // logger.log("[LOG_POINT] RepoXmlPageLayout rendering RepoXmlPageProvider"); // Убираем лог
     return ( <RepoXmlPageProvider> <ActualPageContent /> </RepoXmlPageProvider> );
 }
 
 // --- Exported Page Component ---
 export default function RepoXmlPage() {
-     logger.log("[LOG_POINT] RepoXmlPage START RENDER");
-     console.log("[CONSOLE_LOG] RepoXmlPage START RENDER");
+     // logger.log("[LOG_POINT] RepoXmlPage START RENDER"); // Убираем лог
     const fallbackLoadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
-    const fallbackLoadingText = translations[fallbackLoadingLang]?.loading ?? translations.en.loading; // Fallback to English
+    const fallbackLoadingText = translations[fallbackLoadingLang]?.loading ?? translations.en.loading;
     const fallbackLoading = ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{fallbackLoadingText}</p> </div> );
     return ( <Suspense fallback={fallbackLoading}> <RepoXmlPageLayout /> </Suspense> );
 }
