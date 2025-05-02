@@ -19,11 +19,12 @@ import {
     FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye,
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaTools, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket
-} from "react-icons/fa6";
+} from "react-icons/fa6"; // Keep icon imports for direct use if any (like in buttons)
 import Link from "next/link";
-// Removed FaIcons import as it wasn't used in the simplified parser
+// Removed FaIcons import - not needed anymore for parsing
 import { motion } from 'framer-motion';
-import parse, { domToReact, HTMLReactParserOptions, Element, attributesToProps } from 'html-react-parser';
+// Removed parse, domToReact, etc. imports for html-react-parser - VibeContentRenderer handles it
+import VibeContentRenderer from '@/components/VibeContentRenderer'; // <-- ADD THIS IMPORT
 
 
 // --- I18N Translations ---
@@ -123,87 +124,32 @@ function LoadingBuddyFallback() {
     return ( <div className="fixed bottom-4 right-4 z-50 w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 animate-pulse" aria-hidden="true" ></div> );
 }
 
-// --- html-react-parser Configuration (Simplified - No Icons) ---
-const parserOptions: HTMLReactParserOptions = {
-    replace: (domNode) => {
-        if (domNode instanceof Element && domNode.attribs) {
-            const { name, attribs, children } = domNode;
-            const lowerCaseName = name?.toLowerCase();
 
-            // Handle Internal Links
-            if (lowerCaseName === 'a') {
-                const props = attributesToProps(attribs);
-                const isInternal = props.href && (props.href.startsWith('/') || props.href.startsWith('#'));
-                const parsedChildren = children ? domToReact(children, parserOptions) : null;
-                if (isInternal && !props.target) {
-                    const { class: _, ...validProps } = props;
-                    try {
-                         logger.debug("[Parser - Simple] Creating Next Link:", props.href);
-                         return <Link href={props.href} {...validProps} className={props.className}>{parsedChildren}</Link>;
-                    } catch (linkError) {
-                        logger.error("[Parser - Simple] Error creating Next Link:", linkError, props);
-                        return <a {...props}>{parsedChildren}</a>;
-                    }
-                }
-                 logger.debug("[Parser - Simple] Creating External Link:", props.href);
-                return <a {...props}>{parsedChildren}</a>;
-            }
+// --- REMOVED OLD parserOptions ---
 
-            // Handle other standard HTML tags (NO ICON PROCESSING)
-            if (typeof name === 'string' && /^[a-z][a-z0-9-]*$/.test(lowerCaseName || '')) {
-                try {
-                     logger.debug(`[Parser - Simple] Creating standard element: <${lowerCaseName}>`);
-                     return React.createElement(lowerCaseName!, attributesToProps(attribs), children ? domToReact(children, parserOptions) : undefined);
-                } catch (createElementError) {
-                    logger.error(`[Parser - Simple] Error React.createElement for <${lowerCaseName}>:`, createElementError);
-                    return <>{children ? domToReact(children, parserOptions) : null}</>; // Render children on error
-                }
-            }
-        }
-        // Let the library handle default rendering for non-elements or unmatched tags
-        return undefined;
-    },
-};
-// --- END Simplified parserOptions ---
 
-// --- RenderContent Component ---
-const RenderContent: React.FC<{ content: string | null | undefined }> = React.memo(({ content }) => {
-    logger.debug("[RenderContent] Rendering content:", content ? content.substring(0, 50) + "..." : "null/undefined");
-    if (typeof content !== 'string' || !content.trim()) {
-        logger.debug("[RenderContent] Null or empty content, returning null.");
-        return null;
-    }
-    // Basic Markdown-like bold replacement
-    const contentWithStrong = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    try {
-      // Use the simplified parser options
-      const parsedContent = parse(contentWithStrong, parserOptions);
-      logger.debug("[RenderContent] Parsing successful.");
-      return <>{parsedContent}</>;
-    } catch (error) {
-      logger.error("[RenderContent] Error during parse:", error, "Input:", contentWithStrong);
-      // Return a safe fallback, maybe just the raw string or an error message
-      return <span className="text-red-500" dangerouslySetInnerHTML={{ __html: `[Parse Error] ${contentWithStrong.substring(0, 100)}...` }} />;
-    }
-});
-RenderContent.displayName = 'RenderContent';
+// --- REMOVED OLD RenderContent ---
 
-// --- getPlainText helper ---
+
+// --- getPlainText helper (Updated) ---
 const getPlainText = (htmlString: string | null | undefined): string => {
-    logger.debug("[getPlainText] Stripping HTML:", htmlString ? htmlString.substring(0, 50) + "..." : "null/undefined");
+    // logger.debug("[getPlainText] Stripping HTML:", htmlString ? htmlString.substring(0, 50) + "..." : "null/undefined");
     if (typeof htmlString !== 'string' || !htmlString) { return ''; }
     try {
-        // Remove potential icon tags first (simple regex, might not be perfect)
-        const withoutIcons = htmlString.replace(/<Fa[A-Z][a-zA-Z0-9]+(?:\s+[^>]*?)?\s*\/?>/g, '');
-        // Remove all other HTML tags
-        const plainText = withoutIcons.replace(/<[^>]*>/g, '');
+        // Remove potential icon tags AND placeholders first
+        let text = htmlString.replace(/<Fa[A-Z][a-zA-Z0-9]+(?:\s+[^>]*?)?\s*\/?>/g, ''); // Remove <Fa...> tags
+        text = text.replace(/\[\?\]/g, ''); // Remove [?] placeholder
+        text = text.replace(/\[ICON ERR!\]/g, ''); // Remove [ICON ERR!] placeholder
+        // Remove other HTML tags
+        text = text.replace(/<[^>]*>/g, '');
         // Decode common HTML entities
-        return plainText.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
+        return text.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
     } catch (e) {
         logger.error("Error stripping HTML for title:", e, "Input:", htmlString);
         return htmlString; // Return original on error
     }
 };
+
 
 // --- ActualPageContent Component ---
 function ActualPageContent() {
@@ -224,7 +170,6 @@ function ActualPageContent() {
         setImageReplaceTask, setKworkInputHasContent, fetchStatus,
         imageReplaceTask, allFetchedFiles, selectedFetcherFiles,
         repoUrl, setRepoUrl,
-        // addToast is now handled by useAppToast generally
     } = pageContext;
 
     const [lang, setLang] = useState<Language>('en');
@@ -244,7 +189,7 @@ function ActualPageContent() {
       setLang(resolvedLang);
       setT(translations[resolvedLang] ?? translations.en);
       logger.info(`[Effect Lang] Language set to: ${resolvedLang}`);
-    }, [user]); // Only depends on user
+    }, [user]);
 
     useEffect(() => {
       logger.debug("[Effect URL Params] START");
@@ -337,7 +282,7 @@ function ActualPageContent() {
 
 
     // --- Callbacks ---
-    const memoizedGetPlainText = useCallback(getPlainText, []);
+    const memoizedGetPlainText = useCallback(getPlainText, []); // getPlainText is updated
 
     const scrollToSectionNav = useCallback((id: string) => {
         logger.debug(`[CB ScrollNav] Attempting scroll to: ${id}`);
@@ -347,12 +292,11 @@ function ActualPageContent() {
         if (sectionsRequiringReveal.includes(id) && !showComponents) {
             logger.info(`[CB ScrollNav] Revealing components for "${id}"`);
             setShowComponents(true);
-            // Use requestAnimationFrame to ensure the element is visible before scrolling
             requestAnimationFrame(() => {
                 const revealedElement = document.getElementById(id);
                 if (revealedElement) {
                      try {
-                         const offsetTop = window.scrollY + revealedElement.getBoundingClientRect().top - 80; // Adjust offset if needed
+                         const offsetTop = window.scrollY + revealedElement.getBoundingClientRect().top - 80;
                          window.scrollTo({ top: offsetTop, behavior: 'smooth' });
                          logger.log(`[CB ScrollNav] Scrolled to revealed "${id}"`);
                      } catch (scrollError) { logger.error(`[CB ScrollNav] Error scrolling to revealed "${id}":`, scrollError); }
@@ -360,12 +304,12 @@ function ActualPageContent() {
             });
         } else if (targetElement) {
              try {
-                 const offsetTop = window.scrollY + targetElement.getBoundingClientRect().top - 80; // Adjust offset if needed
+                 const offsetTop = window.scrollY + targetElement.getBoundingClientRect().top - 80;
                  window.scrollTo({ top: offsetTop, behavior: 'smooth' });
                  logger.log(`[CB ScrollNav] Scrolled to "${id}"`);
              } catch (scrollError) { logger.error(`[CB ScrollNav] Error scrolling to "${id}":`, scrollError); }
         } else { logger.error(`[CB ScrollNav] Target element with id "${id}" not found.`); }
-    }, [showComponents]); // Removed addToast dependency
+    }, [showComponents]);
 
     const handleShowComponents = () => {
         logger.info("[Button Click] handleShowComponents (Reveal)");
@@ -383,18 +327,17 @@ function ActualPageContent() {
 
     // --- Derived State & Safe Render ---
     logger.log("[ActualPageContent] Calculating derived state");
-    const userName = user?.first_name || 'Vibe Master'; // Default username
-    const navTitleIntro = memoizedGetPlainText(t.navIntro);
-    const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe);
-    const navTitleGrabber = memoizedGetPlainText(t.navGrabber);
-    const navTitleAssistant = memoizedGetPlainText(t.navAssistant);
+    const userName = user?.first_name || 'Vibe Master';
+    const navTitleIntro = memoizedGetPlainText(t.navIntro); // Uses updated getPlainText
+    const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe); // Uses updated getPlainText
+    const navTitleGrabber = memoizedGetPlainText(t.navGrabber); // Uses updated getPlainText
+    const navTitleAssistant = memoizedGetPlainText(t.navAssistant); // Uses updated getPlainText
 
-    const renderSafeContent = (contentKey: keyof TranslationSet) => {
-        // Reduced logging frequency here
-        // logger.debug(`[RenderContent Call] Key: ${contentKey}`);
-        const content = t?.[contentKey];
-        return content ? <RenderContent content={content} /> : `[${contentKey}]`;
-    };
+    // --- NEW: Helper using VibeContentRenderer ---
+    const renderVibeContent = useCallback((contentKey: keyof TranslationSet, wrapperClassName?: string) => {
+         const content = t?.[contentKey];
+         return content ? <VibeContentRenderer content={content} className={wrapperClassName} /> : `[${contentKey}]`;
+    }, [t]);
 
     logger.log("[ActualPageContent] BEFORE RETURN JSX");
 
@@ -406,12 +349,13 @@ function ActualPageContent() {
                 {/* Intro Section */}
                 <section id="intro" className="mb-12 text-center max-w-3xl w-full">
                      <div className="flex justify-center mb-4"> <FaBolt className="w-16 h-16 text-[#E1FF01] text-shadow-[0_0_15px_#E1FF01] animate-pulse" /> </div>
-                    <h1 className="text-4xl md:text-5xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-4"> {renderSafeContent('pageTitle')} </h1>
-                    <p className="text-xl md:text-2xl text-gray-200 mt-4 font-semibold"> {renderSafeContent('welcome')} <span className="text-brand-cyan">{userName}!</span> </p>
+                    <h1 className="text-4xl md:text-5xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-4"> {renderVibeContent('pageTitle')} </h1>
+                    <p className="text-xl md:text-2xl text-gray-200 mt-4 font-semibold"> {renderVibeContent('welcome')} <span className="text-brand-cyan">{userName}!</span> </p>
+                    {/* Use VibeContentRenderer for blocks expecting HTML */}
                     <div className="text-lg md:text-xl text-gray-300 mt-3 space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-yellow-300 prose-em:text-purple-300 max-w-none">
-                        {renderSafeContent('intro1')}
-                        {renderSafeContent('intro2')}
-                        <p className="font-semibold text-brand-green">{renderSafeContent('intro3')}</p>
+                        {renderVibeContent('intro1')}
+                        {renderVibeContent('intro2')}
+                        <div className="font-semibold text-brand-green">{renderVibeContent('intro3')}</div> {/* Wrap p in div or use className */}
                     </div>
                 </section>
 
@@ -420,14 +364,16 @@ function ActualPageContent() {
                      <Card className="bg-gradient-to-br from-purple-900/40 via-black/60 to-indigo-900/40 border border-purple-600/60 shadow-xl rounded-lg p-6 backdrop-blur-sm">
                          <CardHeader className="p-0 mb-4">
                              <CardTitle className="text-2xl md:text-3xl font-bold text-center text-brand-purple flex items-center justify-center gap-2">
-                                <FaAtom className="animate-spin-slow"/> {renderSafeContent('cyberVibeTitle')} <FaBrain className="animate-pulse"/>
+                                {/* Render title content, icons are handled by VibeContentRenderer */}
+                                <FaAtom className="animate-spin-slow"/> {renderVibeContent('cyberVibeTitle')} <FaBrain className="animate-pulse"/>
                             </CardTitle>
                          </CardHeader>
+                         {/* Use VibeContentRenderer for card content */}
                          <CardContent className="p-0 text-gray-300 text-base md:text-lg space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-purple-300 prose-em:text-cyan-300 max-w-none">
-                            {renderSafeContent('cyberVibe1')}
-                            {renderSafeContent('cyberVibe2')}
-                            {renderSafeContent('cyberVibe3')}
-                            <p className="text-purple-300 font-semibold">{renderSafeContent('cyberVibe4')}</p>
+                            {renderVibeContent('cyberVibe1')}
+                            {renderVibeContent('cyberVibe2')}
+                            {renderVibeContent('cyberVibe3')}
+                            <div className="text-purple-300 font-semibold">{renderVibeContent('cyberVibe4')}</div> {/* Wrap p in div */}
                          </CardContent>
                      </Card>
                  </section>
@@ -436,12 +382,13 @@ function ActualPageContent() {
                 <section id="philosophy-steps" className="mb-12 w-full max-w-3xl">
                     <details className="bg-gray-900/80 border border-gray-700 rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50">
                         <summary className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-gray-800/50 rounded-t-lg transition-colors group">
-                            <span className="flex items-center gap-2"><FaCodeBranch /> {renderSafeContent('philosophyTitle')}</span>
+                            <span className="flex items-center gap-2"><FaCodeBranch /> {renderVibeContent('philosophyTitle')}</span>
                             <span className="text-xs text-gray-500 group-open:rotate-180 transition-transform duration-300">▼</span>
                         </summary>
                         <div className="px-6 pt-2 text-gray-300 space-y-4 text-base prose prose-invert prose-p:my-2 prose-li:my-1 prose-strong:text-yellow-300 prose-em:text-cyan-300 prose-a:text-brand-blue max-w-none">
                              <div className="my-4 not-prose">
-                                 <h4 className="text-lg font-semibold text-cyan-400 mb-2">{renderSafeContent('philosophyVideoTitle')}</h4>
+                                 <h4 className="text-lg font-semibold text-cyan-400 mb-2">{renderVibeContent('philosophyVideoTitle')}</h4>
+                                 {/* YouTube iframe remains */}
                                  <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
                                      <iframe
                                          className="w-full h-full"
@@ -453,26 +400,28 @@ function ActualPageContent() {
                                  </div>
                              </div>
                             <hr className="border-gray-700 my-3"/>
-                             <p className="text-purple-300 italic">{renderSafeContent('philosophyCore')}</p>
+                             <div className="text-purple-300 italic">{renderVibeContent('philosophyCore')}</div> {/* Wrap p in div */}
                              <hr className="border-gray-700 my-3"/>
                             <h4 className="text-lg font-semibold text-cyan-400 pt-1">Level Progression (+1 Vibe Perk):</h4>
+                            {/* Use VibeContentRenderer inside li */}
                             <ul className="list-none space-y-2 pl-2 text-sm md:text-base">
-                                <li>{renderSafeContent('philosophyLvl0_1')}</li>
-                                <li>{renderSafeContent('philosophyLvl1_2')}</li>
-                                <li>{renderSafeContent('philosophyLvl2_3')}</li>
-                                <li>{renderSafeContent('philosophyLvl3_4')}</li>
-                                <li>{renderSafeContent('philosophyLvl4_5')}</li>
-                                <li>{renderSafeContent('philosophyLvl5_6')}</li>
-                                <li>{renderSafeContent('philosophyLvl6_7')}</li>
-                                <li>{renderSafeContent('philosophyLvl8_10')}</li>
+                                <li>{renderVibeContent('philosophyLvl0_1')}</li>
+                                <li>{renderVibeContent('philosophyLvl1_2')}</li>
+                                <li>{renderVibeContent('philosophyLvl2_3')}</li>
+                                <li>{renderVibeContent('philosophyLvl3_4')}</li>
+                                <li>{renderVibeContent('philosophyLvl4_5')}</li>
+                                <li>{renderVibeContent('philosophyLvl5_6')}</li>
+                                <li>{renderVibeContent('philosophyLvl6_7')}</li>
+                                <li>{renderVibeContent('philosophyLvl8_10')}</li>
                             </ul>
                             <hr className="border-gray-700 my-3"/>
-                            <p className="font-bold text-brand-green">{renderSafeContent('philosophyEnd')}</p>
+                            <div className="font-bold text-brand-green">{renderVibeContent('philosophyEnd')}</div> {/* Wrap p in div */}
                             <hr className="border-gray-700 my-4"/>
-                            <h4 className="text-lg font-semibold text-cyan-400 pt-2">{renderSafeContent('stepsTitle')}</h4>
+                            <h4 className="text-lg font-semibold text-cyan-400 pt-2">{renderVibeContent('stepsTitle')}</h4>
+                            {/* Use VibeContentRenderer for steps */}
                             <div className="text-sm space-y-2">
-                                 <p><RenderContent content={t?.step1Title ? `<strong>${t.step1Title}</strong> ${t.step1Desc ?? ''} ${t.step1DescEnd ?? ''}` : ''} /></p>
-                                 <p><RenderContent content={t?.step2Title ? `<strong>${t.step2Title}</strong> ${t.step2Desc ?? ''} ${t.step2DescEnd ?? ''}` : ''} /></p>
+                                 <div><VibeContentRenderer content={t?.step1Title ? `<strong>${t.step1Title}</strong> ${t.step1Desc ?? ''} ${t.step1DescEnd ?? ''}` : ''} /></div> {/* Wrap p */}
+                                 <div><VibeContentRenderer content={t?.step2Title ? `<strong>${t.step2Title}</strong> ${t.step2Desc ?? ''} ${t.step2DescEnd ?? ''}` : ''} /></div> {/* Wrap p */}
                             </div>
                         </div>
                     </details>
@@ -487,7 +436,7 @@ function ActualPageContent() {
                             className="bg-gradient-to-r from-green-500 via-cyan-500 to-purple-600 text-gray-900 font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:scale-105 transform transition duration-300 animate-bounce hover:animate-none ring-2 ring-offset-2 ring-offset-gray-950 ring-transparent hover:ring-cyan-300"
                             size="lg"
                         >
-                            <FaHandSparkles className="mr-2"/> {renderSafeContent('readyButton')}
+                            <FaHandSparkles className="mr-2"/> {renderVibeContent('readyButton')}
                         </Button>
                     </section>
                 )}
@@ -496,7 +445,7 @@ function ActualPageContent() {
                 {showComponents && (
                      <>
                         {logger.debug("[Render] Rendering Workhorse Components")}
-                        <h2 className="text-3xl font-bold text-center text-brand-green mb-8 animate-pulse">{renderSafeContent('componentsTitle')}</h2>
+                        <h2 className="text-3xl font-bold text-center text-brand-green mb-8 animate-pulse">{renderVibeContent('componentsTitle')}</h2>
                          <section id="extractor" className="mb-12 w-full max-w-4xl">
                            {logger.debug("[Render] Rendering RepoTxtFetcher Component...")}
                              <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg backdrop-blur-sm">
@@ -525,16 +474,17 @@ function ActualPageContent() {
                  {showComponents && (
                      <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
                           {logger.debug("[Render] Rendering Final CTA")}
+                          {/* Use VibeContentRenderer for CTA content */}
                           <div className="bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 p-6 rounded-lg shadow-lg animate-pulse border-2 border-white/50 prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 max-w-none">
-                             <h3 className="text-2xl font-bold text-white mb-3"><RenderContent content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
-                             <p className="text-white text-lg mb-4"> {renderSafeContent('ctaDesc')} </p>
-                             <p className="text-white text-xl font-semibold mb-4 bg-black/30 p-3 rounded"> <FaHeart className="inline mr-2 text-red-400 animate-ping"/> {renderSafeContent('ctaHotChick')} <FaUserAstronaut className="inline ml-2 text-pink-300"/> </p>
-                             <p className="text-gray-300 text-base"> {renderSafeContent('ctaDude')} </p>
+                             <h3 className="text-2xl font-bold text-white mb-3"><VibeContentRenderer content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
+                             <div className="text-white text-lg mb-4"> {renderVibeContent('ctaDesc')} </div> {/* Wrap p */}
+                             <div className="text-white text-xl font-semibold mb-4 bg-black/30 p-3 rounded"> <FaHeart className="inline mr-2 text-red-400 animate-ping"/> {renderVibeContent('ctaHotChick')} <FaUserAstronaut className="inline ml-2 text-pink-300"/> </div> {/* Wrap p */}
+                             <div className="text-gray-300 text-base"> {renderVibeContent('ctaDude')} </div> {/* Wrap p */}
                          </div>
                      </section>
                  )}
 
-                {/* Navigation Icons */}
+                {/* Navigation Icons - Titles use getPlainText which is updated */}
                  <motion.nav
                     className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40"
                     animate={{ scale: [1, 1.03, 1] }}

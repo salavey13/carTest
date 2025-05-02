@@ -19,14 +19,14 @@ import {
     SimplePullRequest,
     FetchStatus
 } from "@/contexts/RepoXmlPageContext";
-import { debugLogger as logger } from "@/lib/debugLogger"; // Use logger
+import { debugLogger as logger } from "@/lib/debugLogger";
 
 // --- Hooks & Utils ---
 import * as repoUtils from "@/lib/repoUtils";
 import { useRepoFetcher } from "@/hooks/useRepoFetcher";
 import { useFileSelection } from "@/hooks/useFileSelection";
 import { useKworkInput } from "@/hooks/useKworkInput";
-import { useAppToast } from "@/hooks/useAppToast"; // Use toast hook
+import { useAppToast } from "@/hooks/useAppToast";
 
 // --- Sub-components (Assumed paths) ---
 import SettingsModal from "./repo/SettingsModal";
@@ -34,14 +34,14 @@ import FileList from "./repo/FileList";
 import SelectedFilesPreview from "./repo/SelectedFilesPreview";
 import RequestInput from "./repo/RequestInput";
 import ProgressBar from "./repo/ProgressBar";
-
+// --- VIBE CHECK: Import the centralized renderer if needed ---
+// import VibeContentRenderer from '@/components/VibeContentRenderer';
 
 // --- Component Definition ---
 const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
 
     // === VIBE CHECK ===
-    const { addToast: addToastContext, // Get context toast function (can remove if not used directly)
-        // Retrieve other context values needed
+    const { addToast: addToastContext,
         fetchStatus, filesFetched,
         repoUrl: repoUrlFromContext, setRepoUrl: setRepoUrlInContext, repoUrlEntered,
         selectedFetcherFiles,
@@ -57,7 +57,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
         assistantRef, updateRepoUrlInAssistant,
         getKworkInputValue, updateKworkInput
     } = useRepoXmlPageContext();
-    const { error: toastError, info: toastInfo } = useAppToast(); // Use toast hook
+    const { error: toastError, info: toastInfo } = useAppToast();
     logger.debug("[RepoTxtFetcher] Function Start");
     // === VIBE CHECK END ===
 
@@ -197,7 +197,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
         },
         handleAddSelected: (filesToAdd: Set<string>, allFiles: FileNode[]) => {
             logger.debug(`[Imperative] handleAddSelected called. Type: ${typeof handleAddSelected}`);
-            handleAddSelected(); // Assuming hook handles this now
+            handleAddSelected(); // Hook handles this
             return Promise.resolve();
         },
         handleCopyToClipboard: (text?: string, scroll?: boolean) => {
@@ -277,6 +277,15 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
     const imageTaskTargetFileReady = currentImageTask && fetchStatus === 'success' && fetchedFiles.some(f => f.path === currentImageTask.targetPath);
     logger.debug(`[Render State] isActionDisabled=${isActionDisabled}, isFetchLoading=${isFetchLoading}, showProgressBar=${showProgressBar}`);
 
+
+    // --- VIBE CHECK: Remove any old icon parsing logic ---
+    // Search this component for 'html-react-parser', '<Fa', etc.
+    // If found (e.g., in tooltips, file previews), REMOVE that logic.
+    // If this component NEEDS to render HTML with icons:
+    // 1. Import VibeContentRenderer: import VibeContentRenderer from '@/components/VibeContentRenderer';
+    // 2. Replace the old parsing/rendering with: <VibeContentRenderer content={yourHtmlString} />
+
+
     // --- RENDER ---
     logger.debug("[RepoTxtFetcher] Render: Returning JSX");
     return (
@@ -289,15 +298,19 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                     {currentImageTask ? <FaImages className="text-blue-400" /> : <FaDownload className="text-purple-400" />}
                     {currentImageTask ? "Задача: Замена Картинки" : "Кибер-Экстрактор Кода"}
                  </h2>
-                 {/* Instructions */}
+                 {/* Instructions - Render as plain text or use VibeContentRenderer if they contain icons */}
                   {!currentImageTask && (
                      <>
-                         {/* Instructions remain the same */}
+                         {/* VIBE CHECK: If these strings ever contain <Fa..> tags, use VibeContentRenderer */}
                          <p className="text-yellow-300/80 text-xs md:text-sm mb-1">1. Настрой (<FaCodeBranch title="Настройки" className="inline text-cyan-400 cursor-pointer hover:underline" onClick={() => { logger.debug("[Click] Settings Icon Click"); triggerToggleSettingsModal(); }}/>).</p>
                          <p className="text-yellow-300/80 text-xs md:text-sm mb-1">2. Жми <span className="font-bold text-purple-400 mx-1">"Извлечь файлы"</span>.</p>
                          <p className="text-yellow-300/80 text-xs md:text-sm mb-1">3. Выбери файлы или <span className="font-bold text-teal-400 mx-1">связанные</span> / <span className="font-bold text-orange-400 mx-1">важные</span>.</p>
                          <p className="text-yellow-300/80 text-xs md:text-sm mb-1">4. Опиши задачу ИЛИ добавь файлы (<FaPlus title="Добавить выбранные в запрос" className="inline text-sm"/>) / все (<FaTree title="Добавить все файлы в запрос" className="inline text-sm"/>).</p>
                          <p className="text-yellow-300/80 text-xs md:text-sm mb-2">5. Скопируй (<FaCopy title="Скопировать запрос" className="inline text-sm mx-px"/>) или передай дальше.</p>
+                         {/* Example using VibeContentRenderer if needed: */}
+                         {/* <div className="text-yellow-300/80 text-xs md:text-sm mb-1"> */}
+                         {/*    <VibeContentRenderer content={"1. Настрой (<FaCodeBranch title='Настройки' class='inline text-cyan-400 cursor-pointer hover:underline'/>)."} /> */}
+                         {/* </div> */}
                      </>
                   )}
                   {/* Image Task Info */}
@@ -402,6 +415,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                          selectedFiles={selectedFetcherFiles}
                          allFiles={fetchedFiles}
                          getLanguage={repoUtils.getLanguage}
+                         // VIBE CHECK: If SelectedFilesPreview renders HTML with icons, pass VibeContentRenderer or use it internally
                      />
                      {logger.debug("[Render] Rendering FileList (conditional)")}
                      <FileList
@@ -420,6 +434,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                          onDeselectAll={handleDeselectAll}
                          onAddSelected={handleAddSelected}
                          onAddTree={handleAddFullTree}
+                         // VIBE CHECK: If FileList renders HTML with icons, pass VibeContentRenderer or use it internally
                       />
                   </div>
              )}
@@ -438,6 +453,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                           isAddSelectedDisabled={isAddSelectedDisabled}
                           selectedFetcherFilesCount={selectedFetcherFiles.size}
                           onInputChange={(value) => setKworkInputHasContent(value.trim().length > 0)}
+                          // VIBE CHECK: If RequestInput renders HTML with icons, pass VibeContentRenderer or use it internally
                       />
                   </div>
              )}
