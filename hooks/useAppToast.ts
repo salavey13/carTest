@@ -3,13 +3,12 @@ import { toast as sonnerToast } from 'sonner';
 import { useErrorOverlay } from '@/contexts/ErrorOverlayContext';
 import type { ToastRecord } from '@/types/toast';
 import { debugLogger as logger } from '@/lib/debugLogger';
-import { useCallback, useMemo } from 'react'; // Imports are correct
+import { useCallback, useMemo } from 'react';
 
 type ToastType = 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message' | 'custom';
 
 /**
  * Custom hook for displaying toasts using 'sonner' and logging them to the ErrorOverlayContext history.
- * FOCUS: Logging toasts, NOT conditional display based on debug flags.
  */
 export const useAppToast = () => {
     const errorOverlay = useErrorOverlay();
@@ -29,9 +28,21 @@ export const useAppToast = () => {
         options?: any
     ) => {
         if (!isReady) {
-            logger.warn("useAppToast: Context not ready, attempting direct toast display.", { type, message });
             // Use console.warn as logger might not be ready if context isn't
              console.warn(`[Toast Suppressed/Context Not Ready] ${type}:`, message);
+             // Attempt direct display anyway
+             try {
+                 if (typeof (sonnerToast as any)[type] === 'function') {
+                    (sonnerToast as any)[type](message, options);
+                 } else if (type === 'custom' && typeof message === 'function') {
+                     sonnerToast.custom(message as (id: number | string) => React.ReactNode, options);
+                 } else {
+                    sonnerToast.message(String(message), options); // Fallback to message
+                 }
+             } catch (e) {
+                 console.error("Error showing direct toast when context not ready:", e);
+             }
+            return undefined;
         }
 
         const addToastToHistory = errorOverlay?.addToastToHistory;
@@ -88,28 +99,26 @@ export const useAppToast = () => {
     }, [isReady, errorOverlay]); // Added dependencies for useCallback
 
 
-    // --- UPDATED Fallback ---
+    // Fallback using console directly
     const notReadyWarn = useCallback((method: string, msg?: any) => {
-        // Use console.warn directly for fallback
         console.warn(`useAppToast: Attempted to call ${method} while context potentially not ready. Message:`, msg);
         console.warn(`[Toast Method Suppressed/Context Not Ready] ${method}`);
-        // Still attempt direct sonner call as a fallback
         try {
             if (method === 'dismiss') {
                 sonnerToast.dismiss(msg);
             } else if (typeof (sonnerToast as any)[method] === 'function') {
                  (sonnerToast as any)[method](msg);
             } else {
-                sonnerToast.message(String(msg || 'Suppressed toast call')); // Default fallback with string conversion
+                sonnerToast.message(String(msg || 'Suppressed toast call'));
             }
         } catch(e) {
-             // Use console.error directly for fallback error
              console.error("Error during fallback sonner call:", e);
         }
-    }, []); // Empty dependency array for stable callback
-    // -------------------------
+    }, []);
 
+    // Memoize the returned object
     return useMemo(() => {
+        // Return dummy functions if not ready
         if (!isReady) {
              return {
                  success: (msg: any, opts?: any) => notReadyWarn('success', msg),
@@ -122,6 +131,7 @@ export const useAppToast = () => {
                  dismiss: (id?: any) => notReadyWarn('dismiss', id),
              };
         }
+        // Return real functions bound to showToast if ready
         return {
             success: (message: string | React.ReactNode, options?: any) => showToast('success', message, options),
             error: (message: string | React.ReactNode, options?: any) => showToast('error', message, options),
@@ -132,7 +142,7 @@ export const useAppToast = () => {
             custom: (component: (id: number | string) => React.ReactNode, options?: any) => showToast('custom', component, options),
             dismiss: (toastId?: string | number) => sonnerToast.dismiss(toastId),
         }
-    // Make sure dependencies are correct for useMemo
+    // Ensure dependencies are correct
     }, [isReady, errorOverlay, showToast, notReadyWarn]);
 
 };
