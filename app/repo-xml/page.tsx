@@ -172,7 +172,9 @@ function ActualPageContent() {
         // NEW: Destructure target PR data and setter
         targetPrData, setTargetPrData,
         // NEW: Destructure pre-check state and setter
-        isPreChecking, setPendingFlowDetails
+        isPreChecking, setPendingFlowDetails,
+        // *** FIX: Destructure the correct state variable ***
+        pendingFlowDetails // <-- ADDED THIS
     } = pageContext;
 
     // --- State Initialization ---
@@ -331,14 +333,16 @@ function ActualPageContent() {
           }
          logger.debug("[Effect URL Params] END");
        // Added context setters to dependencies
-      }, [searchParams, setImageReplaceTask, setRepoUrl, addToast, setPendingFlowDetails, pageContext.setTargetBranchName, pageContext.setManualBranchName, pageContext.setTargetPrData]);
+      }, [searchParams, setImageReplaceTask, setRepoUrl, addToast, setPendingFlowDetails, pageContext.setTargetBranchName, pageContext.setManualBranchName, pageContext.setTargetPrData]); // Dependency list includes stable context setters
 
        // --- Effect for Kwork/Task Population (Triggered AFTER fetch) ---
        useEffect(() => {
-            logger.debug("[Effect Populate] Check START", { fetchStatus, isPreChecking, pendingFlow: !!pendingFlowDetailsState, initialIdea: !!initialIdea });
+            // *** FIX: Use the correct variable name `pendingFlowDetails` ***
+            logger.debug("[Effect Populate] Check START", { fetchStatus, isPreChecking, pendingFlow: !!pendingFlowDetails, initialIdea: !!initialIdea });
             // Wait for fetch to succeed AND pre-check (if any) to finish
             if (fetchStatus === 'success' && !isPreChecking) {
-                 const flow = pendingFlowDetailsState;
+                 // *** FIX: Use the correct variable name `pendingFlowDetails` ***
+                 const flow = pendingFlowDetails;
                  if (flow) {
                       logger.info(`[Effect Populate] Processing Pending Flow: ${flow.type}`);
                       if (flow.type === 'ImageSwap') {
@@ -385,7 +389,8 @@ function ActualPageContent() {
                  }
             }
             logger.debug("[Effect Populate] Check END");
-        }, [ fetchStatus, isPreChecking, pendingFlowDetailsState, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, fetcherRef, allFetchedFiles, selectedFetcherFiles, addToast, setKworkInputHasContent, setImageReplaceTask, setPendingFlowDetails ]); // Added new dependencies
+        // *** FIX: Use the correct variable name `pendingFlowDetails` in the dependency array ***
+        }, [ fetchStatus, isPreChecking, pendingFlowDetails, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, fetcherRef, allFetchedFiles, selectedFetcherFiles, addToast, setKworkInputHasContent, setImageReplaceTask, setPendingFlowDetails ]); // Added new dependencies
 
 
     // --- Callbacks ---
