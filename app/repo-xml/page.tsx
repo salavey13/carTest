@@ -280,11 +280,11 @@ function ActualPageContent() {
                               const newUrl = decodeURIComponent(newUrlParam.substring(7));
                               if (oldUrl && newUrl) {
                                   const flowDetails = { oldUrl, newUrl };
-                                  setPendingFlowDetailsStateStable({ type: 'ImageSwap', targetPath: decodedPath, details: flowDetails });
+                                  setPendingFlowDetails({ type: 'ImageSwap', targetPath: decodedPath, details: flowDetails });
                                   logger.info(`[Effect URL Params] Setting Pending Flow: ImageSwap`, { path: decodedPath, details: flowDetails });
-                              } else { logger.error("[Effect URL Params] Invalid image task URL data", { decodedPath, oldUrl, newUrl }); setPendingFlowDetailsStateStable(null); }
-                          } else { logger.error("[Effect URL Params] Could not parse ImageReplace parts:", decodedIdea); setPendingFlowDetailsStateStable(null); }
-                      } catch (splitError) { logger.error("[Effect URL Params] Error splitting ImageReplace task:", splitError); setPendingFlowDetailsStateStable(null); }
+                              } else { logger.error("[Effect URL Params] Invalid image task URL data", { decodedPath, oldUrl, newUrl }); setPendingFlowDetails(null); }
+                          } else { logger.error("[Effect URL Params] Could not parse ImageReplace parts:", decodedIdea); setPendingFlowDetails(null); }
+                      } catch (splitError) { logger.error("[Effect URL Params] Error splitting ImageReplace task:", splitError); setPendingFlowDetails(null); }
                      setInitialIdeaProcessed(true); // Mark processed for image swap immediately
                      setInitialIdea(null); setImageReplaceTask(null); // Clear other related states
 
@@ -302,10 +302,10 @@ function ActualPageContent() {
                                  }
                              });
                              if (decodedPath && details.Message) {
-                                 setPendingFlowDetailsStateStable({ type: 'ErrorFix', targetPath: decodedPath, details });
+                                 setPendingFlowDetails({ type: 'ErrorFix', targetPath: decodedPath, details });
                                  logger.info(`[Effect URL Params] Setting Pending Flow: ErrorFix`, { path: decodedPath, details });
-                             } else { logger.error("[Effect URL Params] Invalid ErrorFix data (missing path or message)", { decodedPath, details }); setPendingFlowDetailsStateStable(null); }
-                         } catch (parseError) { logger.error("[Effect URL Params] Error parsing ErrorFix task:", parseError); setPendingFlowDetailsStateStable(null); }
+                             } else { logger.error("[Effect URL Params] Invalid ErrorFix data (missing path or message)", { decodedPath, details }); setPendingFlowDetails(null); }
+                         } catch (parseError) { logger.error("[Effect URL Params] Error parsing ErrorFix task:", parseError); setPendingFlowDetails(null); }
                          setInitialIdeaProcessed(false); // Allow kwork population for error fix
                          setInitialIdea(null); setImageReplaceTask(null);
 
@@ -313,13 +313,13 @@ function ActualPageContent() {
                      logger.log("[Effect URL Params] Simple idea param found:", decodedIdea.substring(0, 50) + "...");
                      setInitialIdea(decodedIdea);
                      setImageReplaceTask(null);
-                     setPendingFlowDetailsStateStable(null); // Clear any pending flow
+                     setPendingFlowDetails(null); // Clear any pending flow
                      setInitialIdeaProcessed(false); // Allow kwork population
                   } else {
                       logger.warn("[Effect URL Params] Decoded idea empty/invalid.");
-                      setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetailsStateStable(null); setInitialIdeaProcessed(true);
+                      setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true);
                   }
-              } catch (decodeError) { logger.error("[Effect URL Params] Error decoding params:", decodeError); setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetailsStateStable(null); setInitialIdeaProcessed(true); }
+              } catch (decodeError) { logger.error("[Effect URL Params] Error decoding params:", decodeError); setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true); }
 
               // Show components if any relevant param was found
               if (decodedPath || decodedIdea) {
@@ -327,11 +327,11 @@ function ActualPageContent() {
               }
           } else {
               logger.log(`[Effect URL Params] No path/idea params.`);
-              setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetailsStateStable(null); setInitialIdeaProcessed(true);
+              setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true);
           }
          logger.debug("[Effect URL Params] END");
        // Added context setters to dependencies
-      }, [searchParams, setImageReplaceTask, setRepoUrl, addToast, setPendingFlowDetailsStateStable, pageContext.setTargetBranchName, pageContext.setManualBranchName, pageContext.setTargetPrData]);
+      }, [searchParams, setImageReplaceTask, setRepoUrl, addToast, setPendingFlowDetails, pageContext.setTargetBranchName, pageContext.setManualBranchName, pageContext.setTargetPrData]);
 
        // --- Effect for Kwork/Task Population (Triggered AFTER fetch) ---
        useEffect(() => {
@@ -361,7 +361,7 @@ function ActualPageContent() {
                             }
                            setInitialIdeaProcessed(true); // Mark as processed
                       }
-                      setPendingFlowDetailsStateStable(null); // Clear pending flow once processed
+                      setPendingFlowDetails(null); // Clear pending flow once processed
                       const targetElement = document.getElementById('executor'); // Scroll to Assistant
                       if (targetElement) { setTimeout(() => { try { targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e){logger.error("Scroll error:",e)} }, 250); }
 
@@ -385,7 +385,7 @@ function ActualPageContent() {
                  }
             }
             logger.debug("[Effect Populate] Check END");
-        }, [ fetchStatus, isPreChecking, pendingFlowDetailsState, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, fetcherRef, allFetchedFiles, selectedFetcherFiles, addToast, setKworkInputHasContent, setImageReplaceTask, setPendingFlowDetailsStateStable ]); // Added new dependencies
+        }, [ fetchStatus, isPreChecking, pendingFlowDetailsState, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, fetcherRef, allFetchedFiles, selectedFetcherFiles, addToast, setKworkInputHasContent, setImageReplaceTask, setPendingFlowDetails ]); // Added new dependencies
 
 
     // --- Callbacks ---
