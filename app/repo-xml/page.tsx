@@ -10,8 +10,8 @@ import {
     RepoXmlPageContextType // Import RepoXmlPageContextType
 } from '@/contexts/RepoXmlPageContext';
 import { useAppContext } from "@/contexts/AppContext";
-import { debugLogger as logger } from "@/lib/debugLogger"; // Use logger
-import { useAppToast } from "@/hooks/useAppToast"; // Use toast hook
+import { debugLogger as logger } from "@/lib/debugLogger";
+import { useAppToast } from "@/hooks/useAppToast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -19,13 +19,10 @@ import {
     FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye,
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaTools, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket
-} from "react-icons/fa6"; // Keep icon imports for direct use if any (like in buttons)
+} from "react-icons/fa6";
 import Link from "next/link";
-// Removed FaIcons import - not needed anymore for parsing
 import { motion } from 'framer-motion';
-// Removed parse, domToReact, etc. imports for html-react-parser - VibeContentRenderer handles it
-import VibeContentRenderer from '@/components/VibeContentRenderer'; // <-- ADD THIS IMPORT
-
+import VibeContentRenderer from '@/components/VibeContentRenderer';
 
 // --- I18N Translations (Unchanged) ---
 const translations = {
@@ -146,10 +143,9 @@ const getPlainText = (htmlString: string | null | undefined): string => {
 
 // --- ActualPageContent Component ---
 function ActualPageContent() {
-    // ADDED Log at the very start
     logger.log("[ActualPageContent] START Render - Top Level");
 
-    // --- HOOKS ---
+    // --- HOOKS (Called Unconditionally at Top Level) ---
     const { user } = useAppContext();
     logger.log("[ActualPageContent] useAppContext DONE");
     const pageContext = useRepoXmlPageContext();
@@ -157,31 +153,23 @@ function ActualPageContent() {
     const { info: toastInfo, error: toastError } = useAppToast();
     logger.log("[ActualPageContent] useAppToast DONE");
 
-    // --- CONTEXT VALIDATION ---
-    if (!pageContext || typeof pageContext.addToast !== 'function') {
-         logger.fatal("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!");
-         return <div className="text-red-500 p-4">Критическая ошибка: Контекст страницы не загружен.</div>;
-    }
-    logger.log("[ActualPageContent] pageContext VALUE:", pageContext ? "Available" : "NULL");
+    // Refs
+    const fetcherRef = pageContext?.fetcherRef; // Get refs from context
+    const assistantRef = pageContext?.assistantRef;
+    const kworkInputRef = pageContext?.kworkInputRef;
+    const aiResponseInputRef = pageContext?.aiResponseInputRef;
 
-    // --- Destructure context ---
-    const {
-        fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef,
-        setImageReplaceTask, setKworkInputHasContent, fetchStatus,
-        imageReplaceTask, allFetchedFiles, selectedFetcherFiles,
-        repoUrl, setRepoUrl, addToast, // Keep context addToast for effects if needed
-    } = pageContext;
-
-    // --- State Initialization ---
+    // State
     logger.log("[ActualPageContent] Initializing State...");
     const [lang, setLang] = useState<Language>('en');
     const [showComponents, setShowComponents] = useState(false);
     const [initialIdea, setInitialIdea] = useState<string | null>(null);
     const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(false);
     const [t, setT] = useState<TranslationSet | null>(null);
+    const [isPageLoading, setIsPageLoading] = useState<boolean>(true); // NEW Loading state
     logger.log("[ActualPageContent] useState DONE");
 
-    // --- useSearchParams initialization ---
+    // Search Params (with error handling)
     let searchParams: URLSearchParams | null = null;
     let searchParamsError: Error | null = null;
     try {
@@ -192,13 +180,31 @@ function ActualPageContent() {
       logger.error("[ActualPageContent] Error initializing useSearchParams:", e);
     }
 
+    // --- CONTEXT VALIDATION ---
+    if (!pageContext || typeof pageContext.addToast !== 'function') {
+         logger.fatal("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!");
+         return <div className="text-red-500 p-4">Критическая ошибка: Контекст страницы не загружен.</div>;
+    }
+    logger.log("[ActualPageContent] pageContext VALUE:", pageContext ? "Available" : "NULL");
+
+    // --- Destructure context ---
+    const {
+        // Keep destructuring state used in effects or callbacks
+        setImageReplaceTask, setKworkInputHasContent, fetchStatus,
+        imageReplaceTask, allFetchedFiles, selectedFetcherFiles,
+        repoUrl, setRepoUrl, addToast,
+        // No need to destructure refs again if taken above
+    } = pageContext;
+
     // --- Effects ---
     useEffect(() => {
         logger.log("[ActualPageContent] Client-side hydration COMPLETE.");
+        // Determine initial loading state based on translation availability
+        setIsPageLoading(!t);
         return () => {
           logger.log("[ActualPageContent] Unmounting.");
         };
-      }, []);
+      }, [t]); // Re-evaluate loading when t changes
 
     useEffect(() => {
       logger.debug("[Effect Lang] START");
@@ -206,8 +212,10 @@ function ActualPageContent() {
       const userLang = user?.language_code;
       const resolvedLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
       setLang(resolvedLang);
-      setT(translations[resolvedLang] ?? translations.en);
-      logger.info(`[Effect Lang] Language set to: ${resolvedLang}`);
+      const newTranslations = translations[resolvedLang] ?? translations.en;
+      setT(newTranslations); // Set translations
+      setIsPageLoading(false); // Set loading to false *after* translations are set
+      logger.info(`[Effect Lang] Language set to: ${resolvedLang}. Page loading set to false.`);
     }, [user]);
 
     useEffect(() => {
@@ -240,28 +248,25 @@ function ActualPageContent() {
                     try {
                         const parts = decodedIdea.split('|');
                         const oldUrlParam = parts.find(p => p.startsWith("OldURL=")); const newUrlParam = parts.find(p => p.startsWith("NewURL="));
-
                         if (oldUrlParam && newUrlParam && decodedPath) {
                             const oldUrl = decodeURIComponent(oldUrlParam.substring(7)); const newUrl = decodeURIComponent(newUrlParam.substring(7));
                             if (oldUrl && newUrl) {
-                                logger.info(`[Effect URL Params] Setting ImageReplaceTask`, { decodedPath, oldUrl, newUrl });
                                 const task: ImageReplaceTask = { targetPath: decodedPath, oldUrl: oldUrl, newUrl: newUrl };
-                                setImageReplaceTask(task); setInitialIdea(null);
-                            } else { logger.error("[Effect URL Params] Invalid image task URL data after decoding parts:", { decodedPath, oldUrl, newUrl }); setImageReplaceTask(null); setInitialIdea(null); }
-                        } else { logger.error("[Effect URL Params] Could not parse Old/New URL or path from image task parts:", decodedIdea); setImageReplaceTask(null); setInitialIdea(null); }
-                    } catch (splitError) { logger.error("[Effect URL Params] Error splitting ImageReplace task string:", splitError); setImageReplaceTask(null); setInitialIdea(null); }
+                                setImageReplaceTask(task); setInitialIdea(null); logger.info(`[Effect URL Params] Setting ImageReplaceTask`, task);
+                            } else { logger.error("[Effect URL Params] Invalid image task URL data", { decodedPath, oldUrl, newUrl }); setImageReplaceTask(null); setInitialIdea(null); }
+                        } else { logger.error("[Effect URL Params] Could not parse ImageReplace parts:", decodedIdea); setImageReplaceTask(null); setInitialIdea(null); }
+                    } catch (splitError) { logger.error("[Effect URL Params] Error splitting ImageReplace task:", splitError); setImageReplaceTask(null); setInitialIdea(null); }
                    setInitialIdeaProcessed(true);
                 } else if (decodedIdea) {
-                   logger.log("[Effect URL Params] Regular idea param found, storing:", decodedIdea.substring(0, 50) + "...");
+                   logger.log("[Effect URL Params] Regular idea param found:", decodedIdea.substring(0, 50) + "...");
                     setInitialIdea(decodedIdea); setImageReplaceTask(null); setInitialIdeaProcessed(false);
-                } else { logger.warn("[Effect URL Params] Decoded idea is empty or invalid."); setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true); }
-            } catch (decodeError) { logger.error("[Effect URL Params] Error decoding path or idea params:", decodeError); setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true); }
+                } else { logger.warn("[Effect URL Params] Decoded idea empty/invalid."); setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true); }
+            } catch (decodeError) { logger.error("[Effect URL Params] Error decoding params:", decodeError); setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true); }
             if (decodedPath || decodedIdea) {
-                logger.debug("[Effect URL Params] Setting showComponents=true due to URL params");
-                setShowComponents(true);
+                logger.debug("[Effect URL Params] Setting showComponents=true"); setShowComponents(true);
             }
         } else {
-            logger.log(`[Effect URL Params] No valid path/idea params found.`);
+            logger.log(`[Effect URL Params] No valid path/idea params.`);
             setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
         }
        logger.debug("[Effect URL Params] END");
@@ -271,41 +276,37 @@ function ActualPageContent() {
         logger.debug("[Effect Kwork Populate] Check START");
         const fetchAttemptFinished = ['success', 'error', 'failed_retries'].includes(fetchStatus);
 
-        if (fetchAttemptFinished && initialIdea && !initialIdeaProcessed && !imageReplaceTask && kworkInputRef.current) {
-           logger.info(`[Effect Kwork Populate] Fetch finished (${fetchStatus}). Populating kwork input and adding selected files.`);
+        if (fetchAttemptFinished && initialIdea && !initialIdeaProcessed && !imageReplaceTask && kworkInputRef?.current) { // Added null check for ref
+           logger.info(`[Effect Kwork Populate] Fetch finished (${fetchStatus}). Populating kwork.`);
             kworkInputRef.current.value = initialIdea;
-            try { const inputEvent = new Event('input', { bubbles: true }); kworkInputRef.current.dispatchEvent(inputEvent); }
-            catch (eventError) { logger.error("[Effect Kwork Populate] Error dispatching input event:", eventError); }
+            try { kworkInputRef.current.dispatchEvent(new Event('input', { bubbles: true })); }
+            catch (eventError) { logger.error("[Effect Kwork Populate] Dispatch input event error:", eventError); }
             setKworkInputHasContent(initialIdea.trim().length > 0);
 
-            if (fetcherRef.current?.handleAddSelected) {
+            if (fetcherRef?.current?.handleAddSelected) { // Added null check
                 if (selectedFetcherFiles.size > 0) {
                      logger.log("[Effect Kwork Populate] Calling fetcherRef.handleAddSelected.");
                      const filesToAdd = selectedFetcherFiles ?? new Set<string>();
                      const allFilesData = allFetchedFiles ?? [];
                      (async () => {
-                        try {
-                            await fetcherRef.current!.handleAddSelected(filesToAdd, allFilesData);
-                            logger.log("[Effect Kwork Populate] handleAddSelected call finished successfully.");
-                        } catch (err) {
-                            logger.error("[Effect Kwork Populate] Error during handleAddSelected call:", err);
-                        }
+                        try { await fetcherRef.current!.handleAddSelected(filesToAdd, allFilesData); logger.log("[Effect Kwork Populate] handleAddSelected success."); }
+                        catch (err) { logger.error("[Effect Kwork Populate] handleAddSelected error:", err); }
                      })();
                 } else { logger.log("[Effect Kwork Populate] Skipping handleAddSelected (empty selection)."); }
             } else { logger.warn("[Effect Kwork Populate] handleAddSelected not found or fetcherRef null."); }
 
             const kworkElement = document.getElementById('kwork-input-section');
-            if (kworkElement) { setTimeout(() => { try { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); logger.log("[Effect Kwork Populate] Scrolled to kwork."); } catch (scrollError) { logger.error("[Effect Kwork Populate] Error scrolling to kwork:", scrollError); } }, 250); }
+            if (kworkElement) { setTimeout(() => { try { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); logger.log("[Effect Kwork Populate] Scrolled to kwork."); } catch (e) { logger.error("Error scrolling to kwork:", e); } }, 250); }
             setInitialIdeaProcessed(true);
         } else if (fetchAttemptFinished && !initialIdeaProcessed) {
             setInitialIdeaProcessed(true);
-            logger.log(`[Effect Kwork Populate] Fetch finished (${fetchStatus}), no pending idea or kworkInputRef not ready.`);
+            logger.log(`[Effect Kwork Populate] Fetch finished (${fetchStatus}), no pending idea/kworkInputRef.`);
         }
         logger.debug("[Effect Kwork Populate] Check END");
      }, [ fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles, addToast ]);
 
 
-    // --- Callbacks ---
+    // --- Callbacks (Defined Unconditionally) ---
     const memoizedGetPlainText = useCallback(getPlainText, []);
 
     const scrollToSectionNav = useCallback((id: string) => {
@@ -319,62 +320,57 @@ function ActualPageContent() {
             requestAnimationFrame(() => {
                 const revealedElement = document.getElementById(id);
                 if (revealedElement) {
-                     try {
-                         const offsetTop = window.scrollY + revealedElement.getBoundingClientRect().top - 80;
-                         window.scrollTo({ top: offsetTop, behavior: 'smooth' });
-                         logger.log(`[CB ScrollNav] Scrolled to revealed "${id}"`);
-                     } catch (scrollError) { logger.error(`[CB ScrollNav] Error scrolling to revealed "${id}":`, scrollError); }
+                     try { const offsetTop = window.scrollY + revealedElement.getBoundingClientRect().top - 80; window.scrollTo({ top: offsetTop, behavior: 'smooth' }); logger.log(`[CB ScrollNav] Scrolled to revealed "${id}"`); }
+                     catch (e) { logger.error(`[CB ScrollNav] Error scrolling to revealed "${id}":`, e); }
                 } else { logger.error(`[CB ScrollNav] Target "${id}" not found after reveal attempt.`); }
             });
         } else if (targetElement) {
-             try {
-                 const offsetTop = window.scrollY + targetElement.getBoundingClientRect().top - 80;
-                 window.scrollTo({ top: offsetTop, behavior: 'smooth' });
-                 logger.log(`[CB ScrollNav] Scrolled to "${id}"`);
-             } catch (scrollError) { logger.error(`[CB ScrollNav] Error scrolling to "${id}":`, scrollError); }
+             try { const offsetTop = window.scrollY + targetElement.getBoundingClientRect().top - 80; window.scrollTo({ top: offsetTop, behavior: 'smooth' }); logger.log(`[CB ScrollNav] Scrolled to "${id}"`); }
+             catch (e) { logger.error(`[CB ScrollNav] Error scrolling to "${id}":`, e); }
         } else { logger.error(`[CB ScrollNav] Target element with id "${id}" not found.`); }
     }, [showComponents]);
 
-    const handleShowComponents = () => {
+    const handleShowComponents = useCallback(() => {
         logger.info("[Button Click] handleShowComponents (Reveal)");
         setShowComponents(true);
         toastInfo("Компоненты загружены!", { duration: 1500 });
-    };
+    }, [toastInfo]); // Added toastInfo dependency
 
-    // --- Loading / Initial State / Error State ---
-     if (!t) {
-         logger.log("[Render] ActualPageContent: Early return - waiting for translations (t)");
-         const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
-         const loadingText = translations[loadingLang]?.loading ?? translations.en.loading;
-         return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
-     }
-     if (searchParamsError) {
-        logger.error("[Render] ActualPageContent: Rendering error state due to searchParams failure.");
-        return <div className="text-red-500 p-4">Ошибка: Не удалось инициализировать параметры URL ({searchParamsError.message}).</div>;
-     }
-
-    // --- Derived State & Safe Render ---
+    // --- Derived State (Calculated Unconditionally) ---
     logger.log("[ActualPageContent] Calculating derived state");
     const userName = user?.first_name || 'Vibe Master';
-    const navTitleIntro = memoizedGetPlainText(t.navIntro);
-    const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe);
-    const navTitleGrabber = memoizedGetPlainText(t.navGrabber);
-    const navTitleAssistant = memoizedGetPlainText(t.navAssistant);
+    const navTitleIntro = useMemo(() => t ? memoizedGetPlainText(t.navIntro) : "Intro", [t, memoizedGetPlainText]);
+    const navTitleVibeLoop = useMemo(() => t ? memoizedGetPlainText(t.navCyberVibe) : "Vibe Loop", [t, memoizedGetPlainText]);
+    const navTitleGrabber = useMemo(() => t ? memoizedGetPlainText(t.navGrabber) : "Grabber", [t, memoizedGetPlainText]);
+    const navTitleAssistant = useMemo(() => t ? memoizedGetPlainText(t.navAssistant) : "Assistant", [t, memoizedGetPlainText]);
 
-    // --- Helper using VibeContentRenderer ---
+    // --- Render Helper (Defined Unconditionally) ---
     const renderVibeContent = useCallback((contentKey: keyof TranslationSet, wrapperClassName?: string) => {
          const content = t?.[contentKey];
          return content ? <VibeContentRenderer content={content} className={wrapperClassName} /> : `[Missing Translation: ${contentKey}]`;
     }, [t]);
 
-    logger.log("[ActualPageContent] BEFORE RETURN JSX");
+    // --- Loading / Error States (Checked before main return) ---
+     if (searchParamsError) {
+        logger.error("[Render] ActualPageContent: Rendering error state due to searchParams failure.");
+        return <div className="text-red-500 p-4">Ошибка: Не удалось инициализировать параметры URL ({searchParamsError.message}).</div>;
+     }
+     if (isPageLoading || !t) { // Use combined loading check
+         logger.log("[Render] ActualPageContent: Rendering Loading State");
+         const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
+         const loadingText = translations[loadingLang]?.loading ?? translations.en.loading;
+         return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
+     }
 
-    // Wrap return in try-catch for extra safety during initial render/hang investigation
+    // --- Main Render Logic ---
+    logger.log("[ActualPageContent] Proceeding to main JSX RETURN");
     try {
         return (
             <>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+                 {/* Main container rendered unconditionally */}
                 <div className="min-h-screen bg-gray-950 p-4 sm:p-6 pt-24 text-white flex flex-col items-center relative overflow-y-auto">
+                     {/* Conditional rendering *inside* the main container */}
 
                     {/* Intro Section */}
                     <section id="intro" className="mb-12 text-center max-w-3xl w-full">
@@ -416,13 +412,7 @@ function ActualPageContent() {
                                  <div className="my-4 not-prose">
                                      <h4 className="text-lg font-semibold text-cyan-400 mb-2">{renderVibeContent('philosophyVideoTitle')}</h4>
                                      <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
-                                         <iframe
-                                             className="w-full h-full"
-                                             src="https://www.youtube.com/embed/imxzYWYKCyQ"
-                                             title="YouTube video player - Vibe Level Explanation"
-                                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                             allowFullScreen>
-                                        </iframe>
+                                         <iframe className="w-full h-full" src="https://www.youtube.com/embed/imxzYWYKCyQ" title="YouTube video player - Vibe Level Explanation" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                                      </div>
                                  </div>
                                 <hr className="border-gray-700 my-3"/>
@@ -455,11 +445,7 @@ function ActualPageContent() {
                     {!showComponents && (
                         <section id="reveal-trigger" className="mb-12 w-full max-w-3xl text-center">
                             {logger.debug("[Render] Rendering Reveal Button")}
-                            <Button
-                                onClick={handleShowComponents}
-                                className="bg-gradient-to-r from-green-500 via-cyan-500 to-purple-600 text-gray-900 font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:scale-105 transform transition duration-300 animate-bounce hover:animate-none ring-2 ring-offset-2 ring-offset-gray-950 ring-transparent hover:ring-cyan-300"
-                                size="lg"
-                            >
+                            <Button onClick={handleShowComponents} className="bg-gradient-to-r from-green-500 via-cyan-500 to-purple-600 text-gray-900 font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:scale-105 transform transition duration-300 animate-bounce hover:animate-none ring-2 ring-offset-2 ring-offset-gray-950 ring-transparent hover:ring-cyan-300" size="lg">
                                 <FaHandSparkles className="mr-2"/> {renderVibeContent('readyButton')}
                             </Button>
                         </section>
@@ -484,11 +470,7 @@ function ActualPageContent() {
                                 {logger.debug("[Render] Rendering AICodeAssistant Component Wrapper...")}
                                  <Card className="bg-gray-900/80 border border-purple-700/50 shadow-lg backdrop-blur-sm">
                                      <CardContent className="p-4">
-                                         <AICodeAssistant
-                                             ref={assistantRef}
-                                             kworkInputRefPassed={kworkInputRef}
-                                             aiResponseInputRefPassed={aiResponseInputRef}
-                                         />
+                                         <AICodeAssistant ref={assistantRef} kworkInputRefPassed={kworkInputRef} aiResponseInputRefPassed={aiResponseInputRef} />
                                      </CardContent>
                                  </Card>
                                 {logger.debug("[Render] Rendering AICodeAssistant Component Wrapper DONE")}
@@ -511,11 +493,7 @@ function ActualPageContent() {
                      )}
 
                     {/* Navigation Icons */}
-                     <motion.nav
-                        className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40"
-                        animate={{ scale: [1, 1.03, 1] }}
-                        transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}
-                     >
+                     <motion.nav className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40" animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}>
                          <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700/80 backdrop-blur-sm rounded-full hover:bg-gray-600 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-gray-200" /> </button>
                          <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-purple-700/80 backdrop-blur-sm rounded-full hover:bg-purple-600 transition shadow-md" title={navTitleVibeLoop} aria-label={navTitleVibeLoop || "Scroll to Vibe Loop"} > <FaUpLong className="text-lg text-white" /> </button>
                          {showComponents && ( <>
@@ -530,13 +508,13 @@ function ActualPageContent() {
                         <AutomationBuddy />
                         {logger.debug("[Render] Rendering AutomationBuddy Wrapper DONE")}
                     </Suspense>
+                    {logger.log("[ActualPageContent] Main Content Rendered Successfully")}
                 </div>
                 {logger.log("[ActualPageContent] RETURN JSX COMPLETED NORMALLY")}
             </>
         );
     } catch (renderError: any) {
          logger.fatal("[ActualPageContent] CRITICAL RENDER ERROR in return JSX:", renderError);
-         // Attempt to render a minimal error message directly
          return <div className="text-red-500 p-4">Критическая ошибка рендеринга страницы: {renderError.message}</div>;
     } finally {
         logger.log("[ActualPageContent] END Render");
@@ -545,10 +523,14 @@ function ActualPageContent() {
 
 // --- Layout Component ---
 function RepoXmlPageLayout() {
-    // ADDED Log
     logger.log("[RepoXmlPageLayout] START Render");
     try {
-      return ( <RepoXmlPageProvider> <ActualPageContent /> </RepoXmlPageProvider> );
+      // Wrap provider initialization in try-catch
+      return (
+           <RepoXmlPageProvider>
+               <ActualPageContent />
+           </RepoXmlPageProvider>
+       );
     } catch (layoutError: any) {
       logger.fatal("[RepoXmlPageLayout] CRITICAL RENDER ERROR:", layoutError);
       return <div className="text-red-500 p-4">Критическая ошибка в слое разметки: {layoutError.message}</div>;
@@ -559,7 +541,6 @@ function RepoXmlPageLayout() {
 
 // --- Exported Page Component ---
 export default function RepoXmlPage() {
-     // ADDED Log
      logger.log("[RepoXmlPage] START Render (Exported Component)");
     const fallbackLoadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
     const fallbackLoadingText = translations[fallbackLoadingLang]?.loading ?? translations.en.loading;
