@@ -1,304 +1,207 @@
-/* /app/globals.css */
+/* Поместите @import в начало файла для лучшей практики */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+/* @import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&display=swap'); <-- Удаляем Comic Neue */
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&display=swap');
-.font-comic {
+
+/* Удаляем класс .font-comic */
+/* .font-comic {
   font-family: 'Comic Neue', cursive;
-}
-/* Orbitron Font Import - Correctly placed at the end */
-@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap");
+} */
+
 :root {
-  --background: 0 0% 0%;
-  --foreground: 0 0% 100%;
-  --card: 0 0% 0%;
-  --card-foreground: 0 0% 100%;
-  --popover: 0 0% 0%;
-  --popover-foreground: 0 0% 100%;
-  --primary: 0 85% 70%;
-  --primary-foreground: 0 0% 0%;
-  --secondary: 173 71% 55%;
-  --secondary-foreground: 0 0% 0%;
-  --muted: 0 0% 20%;
-  --muted-foreground: 0 0% 60%;
-  --accent: 45 100% 62%;
-  --accent-foreground: 0 0% 0%;
-  --destructive: 0 100% 50%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 0 85% 70%;
-  --input: 0 85% 70%;
-  --ring: 0 85% 70%;
-  --dark-bg-rgb: 26, 26, 46;  /* RGB for #1a1a2e */
-  --dark-card-rgb: 22, 33, 62; /* RGB for #16213e */
+  /* GTA 6 / Vice City Palette - Пример */
+  /* Основано на закатах, неоне, Майами */
+  --background: 240 10% 3.9%; /* Темно-синий/фиолетовый фон */
+  --foreground: 0 0% 98%;     /* Очень светлый текст для контраста */
+
+  --card: 240 10% 6%; /* Чуть светлее фона */
+  --card-foreground: 0 0% 98%;
+
+  --popover: 240 10% 3.9%;
+  --popover-foreground: 0 0% 98%;
+
+  /* Основные акцентные цвета */
+  --primary: 330 100% 65%;    /* Яркий Розовый (Неон) */
+  --primary-foreground: 330 100% 10%; /* Темный текст на розовом */
+
+  --secondary: 185 100% 50%;  /* Яркий Бирюзовый/Голубой */
+  --secondary-foreground: 185 100% 10%; /* Темный текст на бирюзовом */
+
+  --accent: 30 100% 60%;      /* Яркий Оранжевый */
+  --accent-foreground: 30 100% 10%;  /* Темный текст на оранжевом */
+
+  /* Остальные цвета */
+  --muted: 240 5% 25%;      /* Приглушенный серый/синий */
+  --muted-foreground: 240 5% 65%; /* Светло-серый/синий текст */
+
+  --destructive: 0 84% 60%; /* Красный */
+  --destructive-foreground: 0 0% 98%;
+
+  --border: 330 100% 65%;     /* Розовая граница (как primary) */
+  --input: 240 5% 15%;       /* Темный инпут */
+  --ring: 185 100% 50%;      /* Бирюзовое кольцо фокуса (как secondary) */
+
+  --radius: 0.5rem; /* Пример радиуса скругления, можно настроить в tailwind.config */
+
+  /* RGB для градиентов в Tailwind */
+  --dark-bg-rgb: 26, 26, 46; /* Оставляем для совместимости или удаляем */
+  --dark-card-rgb: 22, 33, 62; /* Оставляем для совместимости или удаляем */
+
+  /* Новые цвета для градиента фона */
+  --gta-sky-start: 260 60% 15%; /* Темно-фиолетовый */
+  --gta-sky-end: 330 100% 65%; /* Ярко-розовый */
+  --gta-sun-color: 30 100% 60%; /* Оранжевый (для акцента в градиенте) */
 }
 
 .dark {
-  --background: 0 0% 0%;
-  --foreground: 0 0% 100%;
-  --card: 0 0% 3%;
-  --card-foreground: 0 0% 100%;
-  --popover: 0 0% 3%;
-  --popover-foreground: 0 0% 100%;
-  --primary: 0 85% 70%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 173 71% 55%;
-  --secondary-foreground: 0 0% 100%;
-  --muted: 0 0% 20%;
-  --muted-foreground: 0 0% 60%;
-  --accent: 45 100% 62%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 100% 50%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 0 0% 20%;
-  --input: 0 0% 20%;
-  --ring: 0 85% 70%;
-  --dark-bg-rgb: 26, 26, 46;  /* RGB for #1a1a2e */
-  --dark-card-rgb: 22, 33, 62; /* RGB for #16213e */
+  /* Можно просто использовать :root, если темная тема - единственная */
+  /* Или скопировать значения из :root сюда */
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
+  --card: 240 10% 6%;
+  --card-foreground: 0 0% 98%;
+  --popover: 240 10% 3.9%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 330 100% 65%;
+  --primary-foreground: 330 100% 10%;
+  --secondary: 185 100% 50%;
+  --secondary-foreground: 185 100% 10%;
+  --accent: 30 100% 60%;
+  --accent-foreground: 30 100% 10%;
+  --muted: 240 5% 25%;
+  --muted-foreground: 240 5% 65%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 330 100% 65%;
+  --input: 240 5% 15%;
+  --ring: 185 100% 50%;
+
+  /* RGB для градиентов в Tailwind */
+  --dark-bg-rgb: 26, 26, 46;
+  --dark-card-rgb: 22, 33, 62;
+
+  --gta-sky-start: 260 60% 15%;
+  --gta-sky-end: 330 100% 65%;
+  --gta-sun-color: 30 100% 60%;
 }
 
 body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  /* Применяем градиентный фон */
+  /* background: linear-gradient(145deg, hsl(var(--gta-sky-start)), hsl(var(--gta-sky-end))); */
+  /* Или используем Tailwind класс на главном div лэйаута */
+  background-color: hsl(var(--background)); /* Фоллбэк */
+  color: hsl(var(--foreground));
 }
 
 section {
   scroll-margin-top: 96px; /* Matches pt-24 */
 }
 
+/* --- Эффекты и Анимации --- */
+
+/* Обновляем цвета для неоновых эффектов */
+.text-shadow-neon {
+  /* Используем основной акцентный цвет (розовый) */
+  text-shadow: 0 0 5px hsla(var(--primary), 0.8), 0 0 10px hsla(var(--primary), 0.6), 0 0 15px hsla(var(--primary), 0.4);
+}
+
+/* Обновляем градиент текста */
+.text-gradient {
+  /* Градиент от розового к оранжевому */
+  background: linear-gradient(to right, hsl(var(--primary)), hsl(var(--accent)));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Анимация свечения с использованием основного цвета */
+@keyframes glow {
+  0%, 100% {
+    text-shadow: 0 0 5px hsla(var(--primary), 0.5);
+  }
+  50% {
+    text-shadow: 0 0 15px hsla(var(--primary), 0.8), 0 0 25px hsla(var(--primary), 0.5); /* Усилено */
+  }
+}
+.text-glow {
+  animation: glow 2.5s infinite ease-in-out; /* Чуть медленнее и плавнее */
+}
+
+
+/* Глитч эффект - можно оставить, но использовать реже, он больше к киберпанку */
+/* ... существующие стили glitch ... */
+/* Убедитесь, что есть только ОДНО определение @keyframes glitch */
+/* Удалите дублирующееся определение @keyframes glitch в конце файла */
+
+/* Анимация неона для cyber-text (используем secondary - бирюзовый) */
+.cyber-text {
+  font-family: "Orbitron", sans-serif; /* Оставляем Orbitron для этого стиля */
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: hsl(var(--secondary)); /* Бирюзовый цвет */
+  text-shadow: 0 0 4px hsl(var(--secondary)), 0 0 8px hsla(var(--secondary), 0.7); /* Обновленное свечение */
+}
+
+@keyframes neon-pulse { /* Переименовано из neon, чтобы не конфликтовать, если есть другой */
+  0%,
+  100% {
+    text-shadow: 0 0 4px hsl(var(--secondary)), 0 0 8px hsla(var(--secondary), 0.7);
+  }
+  50% {
+    text-shadow: 0 0 6px hsl(var(--secondary)), 0 0 12px hsla(var(--secondary), 0.9), 0 0 18px hsla(var(--secondary), 0.6);
+  }
+}
+/* .animate-neon { animation: neon-pulse 1.5s infinite alternate; } */ /* Пример класса для применения */
+
+
+/* Удаляем стили, связанные с Comic Sans */
+/* .comic-bubble { ... } */
+/* .font-comic { ... } */
+
+/* Удаляем дубликат @keyframes pulse-slow */
+
+/* --- Остальные стили --- */
+/* Стили скроллбара, repo-xml-content-wrapper и т.д. остаются без изменений, если они нужны */
+
 .repo-xml-content-wrapper {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
+/* ... остальные стили ... */
 
-@media (max-width: 767px) {
-  .repo-xml-content-wrapper {
-    min-width: 1024px;
-    transform: scale(0.7);
-    transform-origin: top left;
-    width: 1463px; /* 1024 / 0.7 */
-  }
+/* Стили для скроллбара (можно настроить цвета) */
+.simple-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
-
-/* Improved glitch animation */
-@keyframes glitch {
-  0% {
-    transform: translate(0);
-    opacity: 1;
-    filter: blur(0);
-  }
-  10% {
-    transform: translate(-1px, 1px) skew(2deg);
-    opacity: 0.95;
-    filter: blur(0.5px);
-  }
-  20% {
-    transform: translate(1px, -1px) skew(-2deg);
-    opacity: 0.9;
-  }
-  30% {
-    transform: translate(0);
-    opacity: 1;
-    filter: blur(0);
-  }
-  50% {
-    transform: translate(-1px, 0) scale(1.01);
-    opacity: 0.85;
-    filter: blur(1px);
-  }
-  60% {
-    transform: translate(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(0);
-    opacity: 1;
-    filter: blur(0);
-  }
-}
-
-.animate-glitch {
-  animation: glitch 1.5s infinite ease-in-out; 
-}
-
-.animate-glitch:hover {
-  animation: glitch 0.5s infinite ease-in-out; /* Faster on hover, but still controlled */
-  box-shadow: 0 0 15px rgba(57, 255, 20, 0.8); 
-}
-/* Ticker animation */
-@keyframes ticker {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
-}
-.animate-ticker {
-  animation: ticker 20s linear infinite;
-}
-.text-shadow-neon {
-  text-shadow: 0 0 5px rgba(255, 107, 107, 0.8), 0 0 10px rgba(255, 107, 107, 0.6), 0 0 15px rgba(255, 107, 107, 0.4);
-}
-
-.animate-gradient-shift {
-  animation: gradientShift 10s infinite linear;
-}
-
-@keyframes gradientShift {
-  0% { background-position: 0% 0%; }
-  50% { background-position: 100% 100%; }
-  100% { background-position: 0% 0%; }
-}
-.bg-grid-pattern {
-  background-size: 50px 50px;
-  background-image: linear-gradient(to right, rgba(255, 107, 107, 0.1) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 107, 107, 0.1) 1px, transparent 1px);
-}
-webkit-scrollbar-track {
+.simple-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
 .simple-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(107, 114, 128, 0.5);
+  background-color: hsla(var(--primary), 0.4); /* Полупрозрачный розовый */
   border-radius: 3px;
 }
 .simple-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(107, 114, 128, 0.7); 
+  background-color: hsla(var(--primary), 0.7); /* Розовый поярче при наведении */
 }
 
-.cyber-text {
-   text-shadow: 0 0 5px rgba(0, 255, 157, 0.7), 0 0 10px rgba(0, 255, 157, 0.5); 
-}
-
-@keyframes glitch {
-  0% { text-shadow: 0.05em 0 0 rgba(255,0,0,.75), -0.05em -0.025em 0 rgba(0,255,0,.75), -0.025em 0.05em 0 rgba(0,0,255,.75); }
-  14% { text-shadow: 0.05em 0 0 rgba(255,0,0,.75), -0.05em -0.025em 0 rgba(0,255,0,.75), -0.025em 0.05em 0 rgba(0,0,255,.75); }
-  15% { text-shadow: -0.05em -0.025em 0 rgba(255,0,0,.75), 0.025em 0.025em 0 rgba(0,255,0,.75), -0.05em -0.05em 0 rgba(0,0,255,.75); }
-  49% { text-shadow: -0.05em -0.025em 0 rgba(255,0,0,.75), 0.025em 0.025em 0 rgba(0,255,0,.75), -0.05em -0.05em 0 rgba(0,0,255,.75); }
-  50% { text-shadow: 0.025em 0.05em 0 rgba(255,0,0,.75), 0.05em 0 0 rgba(0,255,0,.75), 0 -0.05em 0 rgba(0,0,255,.75); }
-  99% { text-shadow: 0.025em 0.05em 0 rgba(255,0,0,.75), 0.05em 0 0 rgba(0,255,0,.75), 0 -0.05em 0 rgba(0,0,255,.75); }
-  100% { text-shadow: -0.025em 0 0 rgba(255,0,0,.75), -0.025em -0.025em 0 rgba(0,255,0,.75), -0.025em -0.05em 0 rgba(0,0,255,.75); }
-}
-
-.glitch {
-  position: relative;
-  animation: glitch 1s linear infinite;
-}
-
-.glitch::before,
-.glitch::after {
-  content: attr(data-text);
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  background: inherit;
-  overflow: hidden;
-  clip: rect(0, 900px, 0, 0);
-}
-
-.glitch::before {
-  left: 2px;
-  text-shadow: -1px 0 red;
-  animation: glitch-anim-1 2s infinite linear alternate-reverse;
-}
-
-.glitch::after {
-  left: -2px;
-  text-shadow: -1px 0 blue;
-  animation: glitch-anim-2 2s infinite linear alternate-reverse;
-}
-
-@keyframes glitch-anim-1 { 0% { clip: rect(44px, 9999px, 49px, 0); } 5% { clip: rect(5px, 9999px, 100px, 0); } 10% { clip: rect(13px, 9999px, 60px, 0); } 15% { clip: rect(80px, 9999px, 40px, 0); } 20% { clip: rect(22px, 9999px, 75px, 0); } 25% { clip: rect(90px, 9999px, 15px, 0); } 30% { clip: rect(50px, 9999px, 88px, 0); } 35% { clip: rect(10px, 9999px, 45px, 0); } 40% { clip: rect(70px, 9999px, 30px, 0); } 45% { clip: rect(25px, 9999px, 95px, 0); } 50% { clip: rect(60px, 9999px, 20px, 0); } 55% { clip: rect(5px, 9999px, 55px, 0); } 60% { clip: rect(75px, 9999px, 35px, 0); } 65% { clip: rect(18px, 9999px, 80px, 0); } 70% { clip: rect(85px, 9999px, 22px, 0); } 75% { clip: rect(40px, 9999px, 65px, 0); } 80% { clip: rect(3px, 9999px, 90px, 0); } 85% { clip: rect(68px, 9999px, 28px, 0); } 90% { clip: rect(33px, 9999px, 77px, 0); } 95% { clip: rect(98px, 9999px, 10px, 0); } 100% { clip: rect(52px, 9999px, 58px, 0); } }
-@keyframes glitch-anim-2 { 0% { clip: rect(6px, 9999px, 94px, 0); } 5% { clip: rect(88px, 9999px, 12px, 0); } 10% { clip: rect(38px, 9999px, 68px, 0); } 15% { clip: rect(20px, 9999px, 85px, 0); } 20% { clip: rect(72px, 9999px, 18px, 0); } 25% { clip: rect(10px, 9999px, 90px, 0); } 30% { clip: rect(58px, 9999px, 32px, 0); } 35% { clip: rect(80px, 9999px, 8px, 0); } 40% { clip: rect(28px, 9999px, 78px, 0); } 45% { clip: rect(42px, 9999px, 52px, 0); } 50% { clip: rect(92px, 9999px, 25px, 0); } 55% { clip: rect(15px, 9999px, 82px, 0); } 60% { clip: rect(62px, 9999px, 42px, 0); } 65% { clip: rect(4px, 9999px, 70px, 0); } 70% { clip: rect(77px, 9999px, 10px, 0); } 75% { clip: rect(22px, 9999px, 88px, 0); } 80% { clip: rect(50px, 9999px, 48px, 0); } 85% { clip: rect(95px, 9999px, 38px, 0); } 90% { clip: rect(30px, 9999px, 60px, 0); } 95% { clip: rect(65px, 9999px, 15px, 0); } 100% { clip: rect(8px, 9999px, 98px, 0); } }
-
-.text-gradient {
-  background: linear-gradient(to right, #FF6B6B, #4ECDC4);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-@keyframes glow {
-  0% {
-    text-shadow: 0 0 5px rgba(255, 107, 107, 0.5);
-  }
-  50% {
-    text-shadow: 0 0 20px rgba(255, 107, 107, 0.8);
-  }
-  100% {
-    text-shadow: 0 0 5px rgba(255, 107, 107, 0.5);
-  }
-}
-
-.text-glow {
-  animation: glow 2s infinite;
-}
-
-/* Cyber-text style for that futuristic feel */
-.cyber-text {
-  font-family: "Orbitron", sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #0ff;
-  text-shadow: 0 0 5px #0ff, 0 0 10px #0ff;
-}
-@keyframes pulse-slow {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 0.9; }
-}
-.animate-pulse-slow {
-  animation: pulse-slow 4s infinite;
-}
-input[type="search"]::-webkit-search-cancel-button,
-input[type="search"]::-ms-clear {
-  display: none;
-}
-
-.comic-bubble {
-  position: relative;
-  background: white;
-  border: 2px solid black;
-  border-radius: 15px;
-}
-.font-comic {
-  font-family: "Comic Sans MS", "Chalkboard", sans-serif;
-}
-
-@keyframes pulse-slow {
-    0%, 100% { opacity: 0.7; }
-    50% { opacity: 0.9; }
-  }
-.animate-pulse-slow {
-    animation: pulse-slow 4s infinite;
-  }
-
-@keyframes neon {
-  0%,
-  100% {
-    text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 20px #00ffff;
-  }
-  50% {
-    text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff;
-  }
-}
-
-@keyframes drift {
-  0% {
-    background-position: 0 0;
-  }
-  100% {
-    background-position: 200px 200px;
-  }
-}
-
-@font-face {
-  font-family: 'Orbitron';
-  src: url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
-}
-
+/* Тень для карточек и элементов */
 .shadow-glow {
-  box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+   /* Используем бирюзовый для тени */
+  box-shadow: 0 0 10px hsla(var(--secondary), 0.5);
+  transition: box-shadow 0.3s ease-in-out;
+}
+.shadow-glow:hover {
+  box-shadow: 0 0 15px hsla(var(--secondary), 0.7), 0 0 25px hsla(var(--secondary), 0.3);
 }
 
-.shadow-glow:hover {
-  box-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
+/* Класс для фона с градиентом (если не используется Tailwind) */
+.bg-gta-gradient {
+   background: linear-gradient(145deg, hsl(var(--gta-sky-start)), hsl(var(--gta-sky-end)));
 }
