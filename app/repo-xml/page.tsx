@@ -10,21 +10,24 @@ import {
     RepoXmlPageContextType // Import RepoXmlPageContextType
 } from '@/contexts/RepoXmlPageContext';
 import { useAppContext } from "@/contexts/AppContext";
-import { debugLogger as logger } from "@/lib/debugLogger";
-import { useAppToast } from "@/hooks/useAppToast";
+import { debugLogger as logger } from "@/lib/debugLogger"; // Use logger
+import { useAppToast } from "@/hooks/useAppToast"; // Use toast hook
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-    FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong,
+    FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong, // Added FaUpLong
     FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye,
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaTools, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket
-} from "react-icons/fa6";
+} from "react-icons/fa6"; // Keep icon imports for direct use if any (like in buttons)
 import Link from "next/link";
+// Removed FaIcons import - not needed anymore for parsing
 import { motion } from 'framer-motion';
-import VibeContentRenderer from '@/components/VibeContentRenderer';
+// Removed parse, domToReact, etc. imports for html-react-parser - VibeContentRenderer handles it
+import VibeContentRenderer from '@/components/VibeContentRenderer'; // <-- ADD THIS IMPORT
 
-// --- I18N Translations (Unchanged) ---
+
+// --- I18N Translations (Restored) ---
 const translations = {
   en: {
     loading: "Booting SUPERVIBE ENGINE...",
@@ -121,7 +124,7 @@ function LoadingBuddyFallback() {
     return ( <div className="fixed bottom-4 right-4 z-50 w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 animate-pulse" aria-hidden="true" ></div> );
 }
 
-// --- getPlainText helper (Unchanged) ---
+// --- getPlainText helper (Restored) ---
 const getPlainText = (htmlString: string | null | undefined): string => {
     // logger.debug("[getPlainText] Stripping HTML:", htmlString ? htmlString.substring(0, 50) + "..." : "null/undefined");
     if (typeof htmlString !== 'string' || !htmlString) { return ''; }
@@ -145,40 +148,13 @@ const getPlainText = (htmlString: string | null | undefined): string => {
 function ActualPageContent() {
     logger.log("[ActualPageContent] START Render - Top Level");
 
-    // --- HOOKS (Called Unconditionally at Top Level) ---
+    // --- HOOKS ---
     const { user } = useAppContext();
     logger.log("[ActualPageContent] useAppContext DONE");
     const pageContext = useRepoXmlPageContext();
     logger.log("[ActualPageContent] useRepoXmlPageContext DONE");
     const { info: toastInfo, error: toastError } = useAppToast();
     logger.log("[ActualPageContent] useAppToast DONE");
-
-    // Refs
-    const fetcherRef = pageContext?.fetcherRef; // Get refs from context
-    const assistantRef = pageContext?.assistantRef;
-    const kworkInputRef = pageContext?.kworkInputRef;
-    const aiResponseInputRef = pageContext?.aiResponseInputRef;
-
-    // State
-    logger.log("[ActualPageContent] Initializing State...");
-    const [lang, setLang] = useState<Language>('en');
-    const [showComponents, setShowComponents] = useState(false);
-    const [initialIdea, setInitialIdea] = useState<string | null>(null);
-    const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(false);
-    const [t, setT] = useState<TranslationSet | null>(null);
-    const [isPageLoading, setIsPageLoading] = useState<boolean>(true); // NEW Loading state
-    logger.log("[ActualPageContent] useState DONE");
-
-    // Search Params (with error handling)
-    let searchParams: URLSearchParams | null = null;
-    let searchParamsError: Error | null = null;
-    try {
-      searchParams = useSearchParams();
-      logger.log("[ActualPageContent] useSearchParams DONE");
-    } catch (e: any) {
-      searchParamsError = e;
-      logger.error("[ActualPageContent] Error initializing useSearchParams:", e);
-    }
 
     // --- CONTEXT VALIDATION ---
     if (!pageContext || typeof pageContext.addToast !== 'function') {
@@ -189,22 +165,43 @@ function ActualPageContent() {
 
     // --- Destructure context ---
     const {
-        // Keep destructuring state used in effects or callbacks
+        fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef,
         setImageReplaceTask, setKworkInputHasContent, fetchStatus,
         imageReplaceTask, allFetchedFiles, selectedFetcherFiles,
         repoUrl, setRepoUrl, addToast,
-        // No need to destructure refs again if taken above
+        // NEW: Destructure target PR data and setter
+        targetPrData, setTargetPrData,
+        // NEW: Destructure pre-check state and setter
+        isPreChecking, setPendingFlowDetails
     } = pageContext;
+
+    // --- State Initialization ---
+    logger.log("[ActualPageContent] Initializing State...");
+    const [lang, setLang] = useState<Language>('en');
+    const [showComponents, setShowComponents] = useState(false);
+    const [initialIdea, setInitialIdea] = useState<string | null>(null);
+    const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(false);
+    const [t, setT] = useState<TranslationSet | null>(null);
+    const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
+    logger.log("[ActualPageContent] useState DONE");
+
+    // --- useSearchParams initialization ---
+    let searchParams: URLSearchParams | null = null;
+    let searchParamsError: Error | null = null;
+    try {
+      searchParams = useSearchParams();
+      logger.log("[ActualPageContent] useSearchParams DONE");
+    } catch (e: any) {
+      searchParamsError = e;
+      logger.error("[ActualPageContent] Error initializing useSearchParams:", e);
+    }
 
     // --- Effects ---
     useEffect(() => {
         logger.log("[ActualPageContent] Client-side hydration COMPLETE.");
-        // Determine initial loading state based on translation availability
         setIsPageLoading(!t);
-        return () => {
-          logger.log("[ActualPageContent] Unmounting.");
-        };
-      }, [t]); // Re-evaluate loading when t changes
+        return () => { logger.log("[ActualPageContent] Unmounting."); };
+      }, [t]);
 
     useEffect(() => {
       logger.debug("[Effect Lang] START");
@@ -213,164 +210,222 @@ function ActualPageContent() {
       const resolvedLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
       setLang(resolvedLang);
       const newTranslations = translations[resolvedLang] ?? translations.en;
-      setT(newTranslations); // Set translations
-      setIsPageLoading(false); // Set loading to false *after* translations are set
+      setT(newTranslations);
+      setIsPageLoading(false);
       logger.info(`[Effect Lang] Language set to: ${resolvedLang}. Page loading set to false.`);
     }, [user]);
 
+    // --- Effect for URL Params (Simplified - No Pre-check Call) ---
     useEffect(() => {
-      if (!searchParams) {
-          logger.warn("[Effect URL Params] Skipping effect, searchParams failed to initialize.");
-          setInitialIdeaProcessed(true);
-          return;
-      }
-      logger.debug("[Effect URL Params] START");
-      const pathParam = searchParams.get("path");
-      const ideaParam = searchParams.get("idea");
-      const repoParam = searchParams.get("repo");
+        if (!searchParams) {
+            logger.warn("[Effect URL Params] Skipping effect, searchParams failed to initialize.");
+            setInitialIdeaProcessed(true);
+            return;
+        }
+        logger.debug("[Effect URL Params] START");
+        const pathParam = searchParams.get("path");
+        const ideaParam = searchParams.get("idea");
+        const repoParam = searchParams.get("repo");
+        const targetBranchParam = searchParams.get("targetBranch"); // Read target branch
+        const prNumberParam = searchParams.get("prNumber"); // Read PR number
+        const prUrlParam = searchParams.get("prUrl"); // Read PR URL
 
-      if (repoParam) {
-           try {
-               const decodedRepoUrl = decodeURIComponent(repoParam);
-               if (decodedRepoUrl && typeof decodedRepoUrl === 'string' && decodedRepoUrl.includes("github.com")) {
-                   setRepoUrl(decodedRepoUrl);
-                   logger.info(`[Effect URL Params] Repo URL set from param: ${decodedRepoUrl}`);
-               } else { logger.warn(`[Effect URL Params] Invalid or empty repo URL from param: ${repoParam}`); }
-           } catch (e) { logger.error("[Effect URL Params] Error decoding repo URL param:", e); }
-       }
+        if (repoParam) {
+             try {
+                 const decodedRepoUrl = decodeURIComponent(repoParam);
+                 if (decodedRepoUrl && typeof decodedRepoUrl === 'string' && decodedRepoUrl.includes("github.com")) {
+                     setRepoUrl(decodedRepoUrl);
+                     logger.info(`[Effect URL Params] Repo URL set from param: ${decodedRepoUrl}`);
+                 } else { logger.warn(`[Effect URL Params] Invalid or empty repo URL from param: ${repoParam}`); }
+             } catch (e) { logger.error("[Effect URL Params] Error decoding repo URL param:", e); }
+         }
 
-        if (pathParam && ideaParam) {
-            let decodedIdea: string | null = null; let decodedPath: string | null = null;
-            try {
-                decodedPath = decodeURIComponent(pathParam); decodedIdea = decodeURIComponent(ideaParam);
-                if (decodedIdea?.startsWith("ImageReplace|")) {
-                   logger.log("[Effect URL Params] Processing Image Replace task from URL.");
-                    try {
-                        const parts = decodedIdea.split('|');
-                        const oldUrlParam = parts.find(p => p.startsWith("OldURL=")); const newUrlParam = parts.find(p => p.startsWith("NewURL="));
-                        if (oldUrlParam && newUrlParam && decodedPath) {
-                            const oldUrl = decodeURIComponent(oldUrlParam.substring(7)); const newUrl = decodeURIComponent(newUrlParam.substring(7));
-                            if (oldUrl && newUrl) {
-                                const task: ImageReplaceTask = { targetPath: decodedPath, oldUrl: oldUrl, newUrl: newUrl };
-                                setImageReplaceTask(task); setInitialIdea(null); logger.info(`[Effect URL Params] Setting ImageReplaceTask`, task);
-                            } else { logger.error("[Effect URL Params] Invalid image task URL data", { decodedPath, oldUrl, newUrl }); setImageReplaceTask(null); setInitialIdea(null); }
-                        } else { logger.error("[Effect URL Params] Could not parse ImageReplace parts:", decodedIdea); setImageReplaceTask(null); setInitialIdea(null); }
-                    } catch (splitError) { logger.error("[Effect URL Params] Error splitting ImageReplace task:", splitError); setImageReplaceTask(null); setInitialIdea(null); }
-                   setInitialIdeaProcessed(true);
-                } else if (decodedIdea) {
-                   logger.log("[Effect URL Params] Regular idea param found:", decodedIdea.substring(0, 50) + "...");
-                    setInitialIdea(decodedIdea); setImageReplaceTask(null); setInitialIdeaProcessed(false);
-                } else { logger.warn("[Effect URL Params] Decoded idea empty/invalid."); setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true); }
-            } catch (decodeError) { logger.error("[Effect URL Params] Error decoding params:", decodeError); setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true); }
-            if (decodedPath || decodedIdea) {
-                logger.debug("[Effect URL Params] Setting showComponents=true"); setShowComponents(true);
+         // Set Target Branch / PR Data from URL if present
+         if (targetBranchParam) {
+             const decodedBranch = decodeURIComponent(targetBranchParam);
+             pageContext.setTargetBranchName(decodedBranch); // Use context setter directly
+             pageContext.setManualBranchName(''); // Clear manual input if target is from URL
+             logger.info(`[Effect URL Params] Target Branch set from param: ${decodedBranch}`);
+             if (prNumberParam && prUrlParam) {
+                 try {
+                     const prNum = parseInt(decodeURIComponent(prNumberParam), 10);
+                     const prUrl = decodeURIComponent(prUrlParam);
+                     if (!isNaN(prNum) && prUrl) {
+                         pageContext.setTargetPrData({ number: prNum, url: prUrl });
+                         logger.info(`[Effect URL Params] Target PR Data set from param: #${prNum}`);
+                     }
+                 } catch (e) { logger.error("Error parsing PR number/url from URL params", e); }
+             }
+         } else {
+             // If no targetBranch in URL, clear target PR data
+             pageContext.setTargetPrData(null);
+         }
+
+          // Handle Idea / Image Task (Set Pending Flow Details instead of directly setting task)
+          if (pathParam && ideaParam) {
+              let decodedIdea: string | null = null; let decodedPath: string | null = null;
+              try {
+                  decodedPath = decodeURIComponent(pathParam);
+                  decodedIdea = decodeURIComponent(ideaParam);
+
+                  if (decodedIdea?.startsWith("ImageReplace|")) {
+                     logger.log("[Effect URL Params] Image Replace flow detected.");
+                      try {
+                          const parts = decodedIdea.split('|');
+                          const oldUrlParam = parts.find(p => p.startsWith("OldURL="));
+                          const newUrlParam = parts.find(p => p.startsWith("NewURL="));
+
+                          if (oldUrlParam && newUrlParam && decodedPath) {
+                              const oldUrl = decodeURIComponent(oldUrlParam.substring(7));
+                              const newUrl = decodeURIComponent(newUrlParam.substring(7));
+                              if (oldUrl && newUrl) {
+                                  const flowDetails = { oldUrl, newUrl };
+                                  setPendingFlowDetailsStateStable({ type: 'ImageSwap', targetPath: decodedPath, details: flowDetails });
+                                  logger.info(`[Effect URL Params] Setting Pending Flow: ImageSwap`, { path: decodedPath, details: flowDetails });
+                              } else { logger.error("[Effect URL Params] Invalid image task URL data", { decodedPath, oldUrl, newUrl }); setPendingFlowDetailsStateStable(null); }
+                          } else { logger.error("[Effect URL Params] Could not parse ImageReplace parts:", decodedIdea); setPendingFlowDetailsStateStable(null); }
+                      } catch (splitError) { logger.error("[Effect URL Params] Error splitting ImageReplace task:", splitError); setPendingFlowDetailsStateStable(null); }
+                     setInitialIdeaProcessed(true); // Mark processed for image swap immediately
+                     setInitialIdea(null); setImageReplaceTask(null); // Clear other related states
+
+                  } else if (decodedIdea?.startsWith("ErrorFix|")) {
+                        logger.log("[Effect URL Params] Error Fix flow detected.");
+                         try {
+                             const parts = decodedIdea.substring(9).split('|'); // Remove "ErrorFix|" prefix
+                             const details: Record<string, string> = {};
+                             parts.forEach(part => {
+                                 const eqIndex = part.indexOf('=');
+                                 if (eqIndex > 0) {
+                                     const key = part.substring(0, eqIndex);
+                                     const value = decodeURIComponent(part.substring(eqIndex + 1));
+                                     details[key] = value;
+                                 }
+                             });
+                             if (decodedPath && details.Message) {
+                                 setPendingFlowDetailsStateStable({ type: 'ErrorFix', targetPath: decodedPath, details });
+                                 logger.info(`[Effect URL Params] Setting Pending Flow: ErrorFix`, { path: decodedPath, details });
+                             } else { logger.error("[Effect URL Params] Invalid ErrorFix data (missing path or message)", { decodedPath, details }); setPendingFlowDetailsStateStable(null); }
+                         } catch (parseError) { logger.error("[Effect URL Params] Error parsing ErrorFix task:", parseError); setPendingFlowDetailsStateStable(null); }
+                         setInitialIdeaProcessed(false); // Allow kwork population for error fix
+                         setInitialIdea(null); setImageReplaceTask(null);
+
+                  } else if (decodedIdea) { // Handle simple idea passed in URL
+                     logger.log("[Effect URL Params] Simple idea param found:", decodedIdea.substring(0, 50) + "...");
+                     setInitialIdea(decodedIdea);
+                     setImageReplaceTask(null);
+                     setPendingFlowDetailsStateStable(null); // Clear any pending flow
+                     setInitialIdeaProcessed(false); // Allow kwork population
+                  } else {
+                      logger.warn("[Effect URL Params] Decoded idea empty/invalid.");
+                      setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetailsStateStable(null); setInitialIdeaProcessed(true);
+                  }
+              } catch (decodeError) { logger.error("[Effect URL Params] Error decoding params:", decodeError); setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetailsStateStable(null); setInitialIdeaProcessed(true); }
+
+              // Show components if any relevant param was found
+              if (decodedPath || decodedIdea) {
+                  logger.debug("[Effect URL Params] Setting showComponents=true"); setShowComponents(true);
+              }
+          } else {
+              logger.log(`[Effect URL Params] No path/idea params.`);
+              setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetailsStateStable(null); setInitialIdeaProcessed(true);
+          }
+         logger.debug("[Effect URL Params] END");
+       // Added context setters to dependencies
+      }, [searchParams, setImageReplaceTask, setRepoUrl, addToast, setPendingFlowDetailsStateStable, pageContext.setTargetBranchName, pageContext.setManualBranchName, pageContext.setTargetPrData]);
+
+       // --- Effect for Kwork/Task Population (Triggered AFTER fetch) ---
+       useEffect(() => {
+            logger.debug("[Effect Populate] Check START", { fetchStatus, isPreChecking, pendingFlow: !!pendingFlowDetailsState, initialIdea: !!initialIdea });
+            // Wait for fetch to succeed AND pre-check (if any) to finish
+            if (fetchStatus === 'success' && !isPreChecking) {
+                 const flow = pendingFlowDetailsState;
+                 if (flow) {
+                      logger.info(`[Effect Populate] Processing Pending Flow: ${flow.type}`);
+                      if (flow.type === 'ImageSwap') {
+                          const task: ImageReplaceTask = { targetPath: flow.targetPath, oldUrl: flow.details.oldUrl, newUrl: flow.details.newUrl };
+                          setImageReplaceTask(task); // Set the actual task now
+                           logger.log("[Effect Populate] ImageReplaceTask set from pending flow.");
+                          setInitialIdea(null); // Ensure simple idea doesn't interfere
+                          setInitialIdeaProcessed(true);
+                      } else if (flow.type === 'ErrorFix' && kworkInputRef?.current) {
+                           // Format the Kwork input based on error details
+                           const { Message, Stack, Logs, Source } = flow.details;
+                           const prompt = `Fix error in ${flow.targetPath}:\n\nMessage: ${Message}\nSource: ${Source || 'N/A'}\n\nStack:\n\`\`\`\n${Stack || 'N/A'}\n\`\`\`\n\nLogs:\n${Logs || 'N/A'}\n\nProvide ONLY the corrected code block or full file content.`;
+                           kworkInputRef.current.value = prompt;
+                            try { kworkInputRef.current.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { logger.error("Dispatch input event error:", e); }
+                            setKworkInputHasContent(true);
+                            logger.log("[Effect Populate] Kwork populated for ErrorFix flow.");
+                            if(fetcherRef?.current?.handleAddSelected) {
+                                fetcherRef.current.handleAddSelected(new Set([flow.targetPath]), allFetchedFiles); // Auto-add target file
+                                logger.log("[Effect Populate] Target error file added to kwork context.");
+                            }
+                           setInitialIdeaProcessed(true); // Mark as processed
+                      }
+                      setPendingFlowDetailsStateStable(null); // Clear pending flow once processed
+                      const targetElement = document.getElementById('executor'); // Scroll to Assistant
+                      if (targetElement) { setTimeout(() => { try { targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e){logger.error("Scroll error:",e)} }, 250); }
+
+                 } else if (initialIdea && !initialIdeaProcessed && !imageReplaceTask && kworkInputRef?.current) {
+                    // Standard Kwork population from simple 'idea' param (no flow type)
+                    logger.info(`[Effect Populate] Populating kwork with simple initialIdea.`);
+                     kworkInputRef.current.value = initialIdea;
+                     try { kworkInputRef.current.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { logger.error("Dispatch input event error:", e); }
+                     setKworkInputHasContent(initialIdea.trim().length > 0);
+                     if (fetcherRef?.current?.handleAddSelected && selectedFetcherFiles.size > 0) {
+                         logger.log("[Effect Populate] Calling handleAddSelected for simple idea.");
+                         (async () => { try { await fetcherRef.current!.handleAddSelected(selectedFetcherFiles, allFetchedFiles); } catch (err) { logger.error("handleAddSelected error:", err); } })();
+                     }
+                     const kworkElement = document.getElementById('kwork-input-section');
+                     if (kworkElement) { setTimeout(() => { try { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e){logger.error("Scroll error:", e)} }, 250); }
+                     setInitialIdeaProcessed(true);
+                 } else if (!initialIdeaProcessed) {
+                      // Mark as processed if fetch finished but no pending actions
+                      setInitialIdeaProcessed(true);
+                      logger.log(`[Effect Populate] Fetch finished (${fetchStatus}), no pending idea/flow.`);
+                 }
             }
-        } else {
-            logger.log(`[Effect URL Params] No valid path/idea params.`);
-            setImageReplaceTask(null); setInitialIdea(null); setInitialIdeaProcessed(true);
-        }
-       logger.debug("[Effect URL Params] END");
-    }, [searchParams, setImageReplaceTask, setRepoUrl, addToast]);
-
-     useEffect(() => {
-        logger.debug("[Effect Kwork Populate] Check START");
-        const fetchAttemptFinished = ['success', 'error', 'failed_retries'].includes(fetchStatus);
-
-        if (fetchAttemptFinished && initialIdea && !initialIdeaProcessed && !imageReplaceTask && kworkInputRef?.current) { // Added null check for ref
-           logger.info(`[Effect Kwork Populate] Fetch finished (${fetchStatus}). Populating kwork.`);
-            kworkInputRef.current.value = initialIdea;
-            try { kworkInputRef.current.dispatchEvent(new Event('input', { bubbles: true })); }
-            catch (eventError) { logger.error("[Effect Kwork Populate] Dispatch input event error:", eventError); }
-            setKworkInputHasContent(initialIdea.trim().length > 0);
-
-            if (fetcherRef?.current?.handleAddSelected) { // Added null check
-                if (selectedFetcherFiles.size > 0) {
-                     logger.log("[Effect Kwork Populate] Calling fetcherRef.handleAddSelected.");
-                     const filesToAdd = selectedFetcherFiles ?? new Set<string>();
-                     const allFilesData = allFetchedFiles ?? [];
-                     (async () => {
-                        try { await fetcherRef.current!.handleAddSelected(filesToAdd, allFilesData); logger.log("[Effect Kwork Populate] handleAddSelected success."); }
-                        catch (err) { logger.error("[Effect Kwork Populate] handleAddSelected error:", err); }
-                     })();
-                } else { logger.log("[Effect Kwork Populate] Skipping handleAddSelected (empty selection)."); }
-            } else { logger.warn("[Effect Kwork Populate] handleAddSelected not found or fetcherRef null."); }
-
-            const kworkElement = document.getElementById('kwork-input-section');
-            if (kworkElement) { setTimeout(() => { try { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); logger.log("[Effect Kwork Populate] Scrolled to kwork."); } catch (e) { logger.error("Error scrolling to kwork:", e); } }, 250); }
-            setInitialIdeaProcessed(true);
-        } else if (fetchAttemptFinished && !initialIdeaProcessed) {
-            setInitialIdeaProcessed(true);
-            logger.log(`[Effect Kwork Populate] Fetch finished (${fetchStatus}), no pending idea/kworkInputRef.`);
-        }
-        logger.debug("[Effect Kwork Populate] Check END");
-     }, [ fetchStatus, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, setKworkInputHasContent, fetcherRef, allFetchedFiles, selectedFetcherFiles, addToast ]);
+            logger.debug("[Effect Populate] Check END");
+        }, [ fetchStatus, isPreChecking, pendingFlowDetailsState, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, fetcherRef, allFetchedFiles, selectedFetcherFiles, addToast, setKworkInputHasContent, setImageReplaceTask, setPendingFlowDetailsStateStable ]); // Added new dependencies
 
 
-    // --- Callbacks (Defined Unconditionally) ---
+    // --- Callbacks ---
     const memoizedGetPlainText = useCallback(getPlainText, []);
 
     const scrollToSectionNav = useCallback((id: string) => {
         logger.debug(`[CB ScrollNav] Attempting scroll to: ${id}`);
         const sectionsRequiringReveal = ['extractor', 'executor', 'cybervibe-section', 'philosophy-steps'];
         const targetElement = document.getElementById(id);
-
         if (sectionsRequiringReveal.includes(id) && !showComponents) {
             logger.info(`[CB ScrollNav] Revealing components for "${id}"`);
             setShowComponents(true);
-            requestAnimationFrame(() => {
-                const revealedElement = document.getElementById(id);
-                if (revealedElement) {
-                     try { const offsetTop = window.scrollY + revealedElement.getBoundingClientRect().top - 80; window.scrollTo({ top: offsetTop, behavior: 'smooth' }); logger.log(`[CB ScrollNav] Scrolled to revealed "${id}"`); }
-                     catch (e) { logger.error(`[CB ScrollNav] Error scrolling to revealed "${id}":`, e); }
-                } else { logger.error(`[CB ScrollNav] Target "${id}" not found after reveal attempt.`); }
-            });
-        } else if (targetElement) {
-             try { const offsetTop = window.scrollY + targetElement.getBoundingClientRect().top - 80; window.scrollTo({ top: offsetTop, behavior: 'smooth' }); logger.log(`[CB ScrollNav] Scrolled to "${id}"`); }
-             catch (e) { logger.error(`[CB ScrollNav] Error scrolling to "${id}":`, e); }
-        } else { logger.error(`[CB ScrollNav] Target element with id "${id}" not found.`); }
+            requestAnimationFrame(() => { const el = document.getElementById(id); if (el) { try { const offsetTop = window.scrollY + el.getBoundingClientRect().top - 80; window.scrollTo({ top: offsetTop, behavior: 'smooth' }); logger.log(`[CB ScrollNav] Scrolled to revealed "${id}"`); } catch (e) { logger.error(`[CB ScrollNav] Error scrolling:`, e); } } else { logger.error(`[CB ScrollNav] Target "${id}" not found after reveal.`); } });
+        } else if (targetElement) { try { const offsetTop = window.scrollY + targetElement.getBoundingClientRect().top - 80; window.scrollTo({ top: offsetTop, behavior: 'smooth' }); logger.log(`[CB ScrollNav] Scrolled to "${id}"`); } catch (e) { logger.error(`[CB ScrollNav] Error scrolling:`, e); } } else { logger.error(`[CB ScrollNav] Target element "${id}" not found.`); }
     }, [showComponents]);
 
-    const handleShowComponents = useCallback(() => {
-        logger.info("[Button Click] handleShowComponents (Reveal)");
-        setShowComponents(true);
-        toastInfo("Компоненты загружены!", { duration: 1500 });
-    }, [toastInfo]); // Added toastInfo dependency
+    const handleShowComponents = useCallback(() => { logger.info("[Button Click] handleShowComponents (Reveal)"); setShowComponents(true); toastInfo("Компоненты загружены!", { duration: 1500 }); }, [toastInfo]);
 
-    // --- Derived State (Calculated Unconditionally) ---
+    // --- Loading / Error States ---
+     if (searchParamsError) { logger.error("[Render] Rendering error state due to searchParams failure."); return <div className="text-red-500 p-4">Ошибка: Не удалось инициализировать параметры URL ({searchParamsError.message}).</div>; }
+     if (isPageLoading) { logger.log("[Render] ActualPageContent: Rendering Loading State"); const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en'; const loadingText = translations[loadingLang]?.loading ?? translations.en.loading; return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> ); }
+     if (!t) { logger.error("[Render] ActualPageContent: Critical - translations (t) are null after loading."); return <div className="text-red-500 p-4">Критическая ошибка: Не удалось загрузить тексты страницы.</div>; } // Added check for null t after loading
+
+    // --- Derived State ---
     logger.log("[ActualPageContent] Calculating derived state");
     const userName = user?.first_name || 'Vibe Master';
-    const navTitleIntro = useMemo(() => t ? memoizedGetPlainText(t.navIntro) : "Intro", [t, memoizedGetPlainText]);
-    const navTitleVibeLoop = useMemo(() => t ? memoizedGetPlainText(t.navCyberVibe) : "Vibe Loop", [t, memoizedGetPlainText]);
-    const navTitleGrabber = useMemo(() => t ? memoizedGetPlainText(t.navGrabber) : "Grabber", [t, memoizedGetPlainText]);
-    const navTitleAssistant = useMemo(() => t ? memoizedGetPlainText(t.navAssistant) : "Assistant", [t, memoizedGetPlainText]);
+    const navTitleIntro = memoizedGetPlainText(t.navIntro);
+    const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe);
+    const navTitleGrabber = memoizedGetPlainText(t.navGrabber);
+    const navTitleAssistant = memoizedGetPlainText(t.navAssistant);
 
-    // --- Render Helper (Defined Unconditionally) ---
-    const renderVibeContent = useCallback((contentKey: keyof TranslationSet, wrapperClassName?: string) => {
-         const content = t?.[contentKey];
-         return content ? <VibeContentRenderer content={content} className={wrapperClassName} /> : `[Missing Translation: ${contentKey}]`;
-    }, [t]);
+    // --- Render Helper ---
+    const renderVibeContent = useCallback((contentKey: keyof TranslationSet, wrapperClassName?: string) => { const content = t?.[contentKey]; return content ? <VibeContentRenderer content={content} className={wrapperClassName} /> : `[Missing Translation: ${contentKey}]`; }, [t]);
 
-    // --- Loading / Error States (Checked before main return) ---
-     if (searchParamsError) {
-        logger.error("[Render] ActualPageContent: Rendering error state due to searchParams failure.");
-        return <div className="text-red-500 p-4">Ошибка: Не удалось инициализировать параметры URL ({searchParamsError.message}).</div>;
-     }
-     if (isPageLoading || !t) { // Use combined loading check
-         logger.log("[Render] ActualPageContent: Rendering Loading State");
-         const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
-         const loadingText = translations[loadingLang]?.loading ?? translations.en.loading;
-         return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
-     }
-
-    // --- Main Render Logic ---
-    logger.log("[ActualPageContent] Proceeding to main JSX RETURN");
+    logger.log("[ActualPageContent] BEFORE RETURN JSX");
     try {
         return (
             <>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-                 {/* Main container rendered unconditionally */}
                 <div className="min-h-screen bg-gray-950 p-4 sm:p-6 pt-24 text-white flex flex-col items-center relative overflow-y-auto">
-                     {/* Conditional rendering *inside* the main container */}
 
                     {/* Intro Section */}
                     <section id="intro" className="mb-12 text-center max-w-3xl w-full">
