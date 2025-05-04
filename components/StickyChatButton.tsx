@@ -6,7 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
     FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard,
-    FaPaperPlane, FaLightbulb, FaImages, FaSquareArrowUpRight, FaFileImport // Added icon
+    FaPaperPlane, FaLightbulb, FaImages, FaSquareArrowUpRight, FaFileImport,
+    FaClipboardList, FaCircleCheck // Added icons
 } from "react-icons/fa6";
 
 // Import Subcomponents
@@ -20,6 +21,8 @@ import { toast } from "sonner";
 // Import Context & Actions
 import { useAppContext } from "@/contexts/AppContext";
 import { getGitHubUserProfile } from "@/app/actions_github/actions";
+import { debugLogger, LogRecord } from "@/lib/debugLogger"; // Import logger and type
+import { useAppToast } from "@/hooks/useAppToast"; // Use our toast hook
 
 // --- Constants & Types ---
 const AUTO_OPEN_DELAY_MS = 13000;
@@ -30,6 +33,7 @@ const HIRE_ME_TEXT = "Найми меня! ✨";
 const REPLACE_IMAGE_ID = "replace-image-trigger";
 const ADD_NEW_ID = "add-new"; // ID for the button we will modify
 const HIRE_ME_ID = "hire-me";
+const COPY_LOGS_ID = "copy-logs"; // ID for the new copy logs button
 
 interface Suggestion { id: string; text: string; link?: string; action?: () => void; icon?: React.ReactNode; isHireMe?: boolean; isFixAction?: boolean; isImageReplaceAction?: boolean; disabled?: boolean; tooltip?: string; }
 interface GitHubProfile { login: string; avatar_url: string; html_url: string; name?: string | null; }
@@ -47,8 +51,10 @@ const isImageUrl = (url: string): boolean => { if (!url || !isValidUrl(url)) { r
 const StickyChatButton: React.FC = () => {
     // --- State ---
     const [isOpen, setIsOpen] = useState(false); const [hasAutoOpened, setHasAutoOpened] = useState(false); const [activeMessage, setActiveMessage] = useState<string>("Загрузка..."); const [githubProfile, setGithubProfile] = useState<GitHubProfile | null>(null); const [githubLoading, setGithubLoading] = useState<boolean>(false); const [prevGithubLoading, setPrevGithubLoading] = useState<boolean>(false); const [customIdea, setCustomIdea] = useState<string>(""); const [potentialOldImageUrl, setPotentialOldImageUrl] = useState<string | null>(null); const [showReplaceTool, setShowReplaceTool] = useState<boolean>(false);
+    const [logsCopied, setLogsCopied] = useState(false); // State for copy logs button feedback
     // --- Hooks ---
     const currentPath = usePathname(); const router = useRouter(); const searchParams = useSearchParams(); const { user: appContextUser, isLoading: isAppLoading } = useAppContext();
+    const { success: toastSuccess, error: toastError, info: toastInfo } = useAppToast(); // Use our toast hook
 
     // --- Fetch GitHub Profile ---
     useEffect(() => { setPrevGithubLoading(githubLoading); if (isOpen && !isAppLoading && appContextUser?.username && !githubProfile && !githubLoading) { const fetchProfile = async () => { setGithubLoading(true); const result = await getGitHubUserProfile(appContextUser.username!); if (result.success && result.profile) { setGithubProfile(result.profile); } else { console.warn("(StickyChat) GitHub fetch failed:", result.error); setGithubProfile(null); } setGithubLoading(false); }; fetchProfile(); } if (!appContextUser) { setGithubProfile(null); setGithubLoading(false); } }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading]);
@@ -62,8 +68,12 @@ const StickyChatButton: React.FC = () => {
         }
         baseSuggestions.push({ id: HIRE_ME_ID, text: HIRE_ME_TEXT, link: "/selfdev", isHireMe: true, icon: <FaStar className="mr-1.5" />, tooltip: "Узнать о SelfDev пути и заказать консультацию" });
         if (potentialOldImageUrl && !isToolPage && !showReplaceTool) { baseSuggestions.unshift({ id: REPLACE_IMAGE_ID, text: "Заменить Картинку? 🖼️", action: () => setShowReplaceTool(true), icon: <FaImages className="mr-1.5 text-blue-400" />, tooltip: `Начать процесс замены картинки: ${potentialOldImageUrl.substring(0, 30)}...` }); }
+
+        // Add "Copy Logs" button
+        baseSuggestions.push({ id: COPY_LOGS_ID, text: logsCopied ? "Логи скопированы!" : "Скопировать Логи", action: handleCopyLogs, icon: logsCopied ? <FaCircleCheck className="mr-1.5 text-green-400"/> : <FaClipboardList className="mr-1.5" />, tooltip: "Скопировать историю системных логов в буфер обмена для отладки" });
+
         return baseSuggestions;
-    }, [currentPath, potentialOldImageUrl, showReplaceTool, customIdea]);
+    }, [currentPath, potentialOldImageUrl, showReplaceTool, customIdea, logsCopied]); // Added logsCopied dependency
 
     // --- Update Active Message Logic ---
     useEffect(() => {
@@ -79,9 +89,31 @@ const StickyChatButton: React.FC = () => {
     const handleEscKey = useCallback((event: KeyboardEvent) => { if (event.key === 'Escape' && isOpen) { setIsOpen(false); setShowReplaceTool(false); } }, [isOpen]);
     useEffect(() => { if (isOpen) { document.addEventListener('keydown', handleEscKey); } else { document.removeEventListener('keydown', handleEscKey); } return () => { document.removeEventListener('keydown', handleEscKey); }; }, [isOpen, handleEscKey]);
     // --- Reset state on path change ---
-    useEffect(() => { setCustomIdea(""); setPotentialOldImageUrl(null); setShowReplaceTool(false); setIsOpen(false); setHasAutoOpened(false); }, [currentPath]);
+    useEffect(() => { setCustomIdea(""); setPotentialOldImageUrl(null); setShowReplaceTool(false); setIsOpen(false); setHasAutoOpened(false); setLogsCopied(false); }, [currentPath]);
     // --- Detect Image URL in Custom Input ---
     useEffect(() => { const trimmedIdea = customIdea.trim(); if (trimmedIdea && isImageUrl(trimmedIdea)) { setPotentialOldImageUrl(trimmedIdea); } else { setPotentialOldImageUrl(null); if (showReplaceTool) { setShowReplaceTool(false); } } }, [customIdea, showReplaceTool]);
+
+    // --- Copy Logs Handler ---
+    const handleCopyLogs = useCallback(async () => {
+        try {
+            const logRecords: ReadonlyArray<LogRecord> = debugLogger.getInternalLogRecords();
+            if (logRecords.length === 0) {
+                toastInfo("Нет логов для копирования.");
+                return;
+            }
+            const formattedLogs = logRecords.map(log =>
+                `${log.level.toUpperCase().padEnd(5)} [${new Date(log.timestamp).toISOString()}] ${log.message}`
+            ).join("\n");
+
+            await navigator.clipboard.writeText(formattedLogs);
+            toastSuccess("Логи скопированы в буфер обмена!");
+            setLogsCopied(true);
+            setTimeout(() => setLogsCopied(false), 2000); // Reset button text after 2s
+        } catch (err) {
+            console.error("Failed to copy logs:", err);
+            toastError("Не удалось скопировать логи.");
+        }
+    }, [toastSuccess, toastError, toastInfo]);
 
     // --- Event Handlers ---
     const handleSuggestionClick = (suggestion: Suggestion) => {
@@ -95,16 +127,19 @@ const StickyChatButton: React.FC = () => {
             } else { toast.info("🚀 Перехожу..."); }
             router.push(finalLink); setIsOpen(false);
         }
-        if (suggestion.id !== REPLACE_IMAGE_ID) { setIsOpen(false); }
+        // Don't close if it's the copy logs button or replace image trigger
+        if (suggestion.id !== REPLACE_IMAGE_ID && suggestion.id !== COPY_LOGS_ID) {
+            setIsOpen(false);
+        }
     };
     const handleReplaceConfirmed = (newImageUrl: string) => {
-        if (!potentialOldImageUrl) { toast.error("Ошибка: Старый URL не найден."); return; } const structuredIdea = `ImageReplace|OldURL=${encodeURIComponent(potentialOldImageUrl)}|NewURL=${encodeURIComponent(newImageUrl)}`; const cleanPath = currentPath.split('?')[0]; let targetPath = cleanPath === "/" ? "app/page.tsx" : `app${cleanPath}`; if (!targetPath.match(/\.(tsx|jsx|js|ts)$/)) { targetPath = targetPath.endsWith('/') ? targetPath + 'page.tsx' : targetPath + '/page.tsx'; } if (!targetPath.startsWith('app/')) targetPath = 'app/' + targetPath; const encodedTargetPath = encodeURIComponent(targetPath); const encodedIdea = encodeURIComponent(structuredIdea); const redirectUrl = `/repo-xml?path=${encodedTargetPath}&idea=${encodedIdea}`;
-        toast.info("🚀 Перехожу в Студию для замены..."); router.push(redirectUrl); setIsOpen(false); setShowReplaceTool(false);
+        if (!potentialOldImageUrl) { toastError("Ошибка: Старый URL не найден."); return; } const structuredIdea = `ImageReplace|OldURL=${encodeURIComponent(potentialOldImageUrl)}|NewURL=${encodeURIComponent(newImageUrl)}`; const cleanPath = currentPath.split('?')[0]; let targetPath = cleanPath === "/" ? "app/page.tsx" : `app${cleanPath}`; if (!targetPath.match(/\.(tsx|jsx|js|ts)$/)) { targetPath = targetPath.endsWith('/') ? targetPath + 'page.tsx' : targetPath + '/page.tsx'; } if (!targetPath.startsWith('app/')) targetPath = 'app/' + targetPath; const encodedTargetPath = encodeURIComponent(targetPath); const encodedIdea = encodeURIComponent(structuredIdea); const redirectUrl = `/repo-xml?path=${encodedTargetPath}&idea=${encodedIdea}`;
+        toastInfo("🚀 Перехожу в Студию для замены..."); router.push(redirectUrl); setIsOpen(false); setShowReplaceTool(false);
     };
     const handleCancelReplace = () => { setShowReplaceTool(false); };
     const handleOverlayClick = () => { setIsOpen(false); setShowReplaceTool(false); requestAnimationFrame(() => document.body.focus()); };
     const handleDialogClick = (e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
-    const handleFabClick = () => { const willOpen = !isOpen; setIsOpen(willOpen); if (willOpen) { setHasAutoOpened(true); setShowReplaceTool(false); setCustomIdea(""); setPotentialOldImageUrl(null); } else { setShowReplaceTool(false); requestAnimationFrame(() => document.body.focus()); } };
+    const handleFabClick = () => { const willOpen = !isOpen; setIsOpen(willOpen); if (willOpen) { setHasAutoOpened(true); setShowReplaceTool(false); setCustomIdea(""); setPotentialOldImageUrl(null); setLogsCopied(false); } else { setShowReplaceTool(false); requestAnimationFrame(() => document.body.focus()); } };
 
     // --- Render Logic ---
     const showInputArea = isOpen && !showReplaceTool && currentPath !== '/repo-xml';

@@ -72,12 +72,13 @@ const AutomationBuddy: React.FC = () => {
         targetBranchName, manualBranchName, isSettingsModalOpen, isParsing,
         currentAiRequestId, imageReplaceTask, allFetchedFiles,
         primaryHighlightedPath, secondaryHighlightedPaths,
+        showComponents, // <<< Get showComponents state
         triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork,
         triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed,
         triggerCreateOrUpdatePR, triggerToggleSettingsModal, scrollToSection,
         triggerClearKworkInput, getXuinityMessage
     } = context;
-    logger.debug(`[AutomationBuddy] Context State Read: currentStep=${currentStep}, fetchStatus=${fetchStatus}, imageTask=${!!imageReplaceTask}`);
+    logger.debug(`[AutomationBuddy] Context State Read: currentStep=${currentStep}, fetchStatus=${fetchStatus}, imageTask=${!!imageReplaceTask}, showComponents=${showComponents}`);
 
     // --- Effects ---
     useEffect(() => {
@@ -110,6 +111,7 @@ const AutomationBuddy: React.FC = () => {
             assistantLoading, aiActionLoading, loadingPrs, targetBranchName, manualBranchName,
             isSettingsModalOpen, isParsing, currentAiRequestId, imageReplaceTask, allFetchedFiles,
             primaryHighlightedPath, secondaryHighlightedPaths,
+            showComponents // <<< Read showComponents state
         };
 
         const calculateSuggestions = (): Suggestion[] => {
@@ -120,7 +122,8 @@ const AutomationBuddy: React.FC = () => {
                 aiActionLoading: aiLoading, loadingPrs: prsLoading, targetBranchName: targetBranch,
                 manualBranchName: manualBranch, isSettingsModalOpen: settingsOpen, isParsing: parsing,
                 currentAiRequestId: reqId, imageReplaceTask: task, allFetchedFiles: allFiles,
-                primaryHighlightedPath: primaryHighlight, secondaryHighlightedPaths: secondaryHighlights
+                primaryHighlightedPath: primaryHighlight, secondaryHighlightedPaths: secondaryHighlights,
+                showComponents: componentsVisible // <<< Use local copy of showComponents
             } = currentContextState; // Use local copy
 
             const suggestionsList: Suggestion[] = [];
@@ -134,9 +137,17 @@ const AutomationBuddy: React.FC = () => {
             const createOrUpdateIcon = targetBranch ? <FaCodeBranch /> : <FaGithub />;
             const hasAnyHighlights = !!primaryHighlight || Object.values(secondaryHighlights).some(arr => arr.length > 0);
 
-            const addSuggestion = (id: string, text: string, action: (() => any) | undefined, icon: React.ReactNode, condition = true, disabled = false, tooltip = '') => {
+            // Only show component-dependent actions if components are visible
+            const canShowComponentActions = componentsVisible;
+
+            const addSuggestion = (id: string, text: string, action: (() => any) | undefined, icon: React.ReactNode, condition = true, disabled = false, tooltip = '', requiresComponents = false) => {
                 // Ensure action is a function if provided
                 const safeAction = typeof action === 'function' ? action : () => logger.warn(`No action defined for suggestion ID: ${id}`);
+
+                // Check component visibility requirement
+                if (requiresComponents && !canShowComponentActions) {
+                    condition = false;
+                }
 
                 if (condition) {
                     let isDisabled = disabled || isAnyLoading;
@@ -163,64 +174,64 @@ const AutomationBuddy: React.FC = () => {
                  const targetFileExists = fetched && allFiles?.some(f => f.path === task.targetPath);
                  const isErrorState = status === 'error' || status === 'failed_retries' || (status === 'success' && !targetFileExists && fetched);
 
-                 addSuggestion( 'toggle-settings', settingsOpen ? "Закрыть Настройки" : "Настройки (URL/Ветка)", triggerToggleSettingsModal, <FaCodeBranch />, true, assistLoading );
+                 addSuggestion( 'toggle-settings', settingsOpen ? "Закрыть Настройки" : "Настройки (URL/Ветка)", triggerToggleSettingsModal, <FaCodeBranch />, true, assistLoading, '', true ); // Requires components
 
                  if (isErrorState) {
-                     addSuggestion("retry-fetch-img", `Ошибка! Попробовать Загрузить Снова?`, () => triggerFetch(true, effectiveBranch || null), <FaArrowRotateRight className="text-red-400"/>, true);
+                     addSuggestion("retry-fetch-img", `Ошибка! Попробовать Загрузить Снова?`, () => triggerFetch(true, effectiveBranch || null), <FaArrowRotateRight className="text-red-400"/>, true, false, '', true); // Requires components
                  } else if (status === 'loading' || status === 'retrying') {
-                     addSuggestion("img-loading", "Загрузка Файла...", undefined, <FaSpinner className="animate-spin text-blue-400"/>, true, true);
+                     addSuggestion("img-loading", "Загрузка Файла...", undefined, <FaSpinner className="animate-spin text-blue-400"/>, true, true, '', true); // Requires components
                  } else if (assistLoading) {
-                     addSuggestion("img-processing", "Замена и PR/Обновление...", undefined, <FaSpinner className="animate-spin text-purple-400"/>, true, true);
+                     addSuggestion("img-processing", "Замена и PR/Обновление...", undefined, <FaSpinner className="animate-spin text-purple-400"/>, true, true, '', true); // Requires components
                  } else if (status === 'success' && targetFileExists) {
-                     addSuggestion("img-ready", "Файл готов к замене Ассистентом", () => scrollToSection('executor'), <FaCheck className="text-green-400"/>, true, true);
+                     addSuggestion("img-ready", "Файл готов к замене Ассистентом", () => scrollToSection('executor'), <FaCheck className="text-green-400"/>, true, true, '', true); // Requires components
                  }
-                 addSuggestion("goto-status", "К Статусу Замены", () => scrollToSection('executor'), <FaEye />, true);
+                 addSuggestion("goto-status", "К Статусу Замены", () => scrollToSection('executor'), <FaEye />, true, false, '', true); // Requires components
                  return suggestionsList;
              }
 
              // --- Standard Workflow ---
              logger.debug("[Suggestion Calc] Standard Workflow");
-             addSuggestion( 'toggle-settings', settingsOpen ? "Закрыть Настройки" : `Настройки (Цель: ${effectiveBranch})`, triggerToggleSettingsModal, <FaCodeBranch />, true );
+             addSuggestion( 'toggle-settings', settingsOpen ? "Закрыть Настройки" : `Настройки (Цель: ${effectiveBranch})`, triggerToggleSettingsModal, <FaCodeBranch />, true, false, '', true ); // Requires components
 
              switch (step) {
                  case 'ready_to_fetch':
-                     addSuggestion("fetch", `Извлечь Файлы${branchInfo}`, () => triggerFetch(false, effectiveBranch || null), <FaDownload />, urlEntered);
+                     addSuggestion("fetch", `Извлечь Файлы${branchInfo}`, () => triggerFetch(false, effectiveBranch || null), <FaDownload />, urlEntered, false, '', true); // Requires components
                      break;
                  case 'fetching': break; // Loading handled globally
                  case 'fetch_failed':
-                     addSuggestion("retry-fetch", `Ошибка! Попробовать Снова${branchInfo}?`, () => triggerFetch(true, effectiveBranch || null), <FaArrowRotateRight className="text-red-400"/>, true);
+                     addSuggestion("retry-fetch", `Ошибка! Попробовать Снова${branchInfo}?`, () => triggerFetch(true, effectiveBranch || null), <FaArrowRotateRight className="text-red-400"/>, true, false, '', true); // Requires components
                      break;
                  case 'files_fetched':
-                     addSuggestion("goto-files", `К Списку Файлов (${allFiles.length})`, () => scrollToSection('file-list-container'), <FaEye />, fetched);
+                     addSuggestion("goto-files", `К Списку Файлов (${allFiles.length})`, () => scrollToSection('file-list-container'), <FaEye />, fetched, false, '', true); // Requires components
                      break;
                  case 'files_fetched_highlights': {
-                     addSuggestion("select-highlighted", "Выбрать Связанные", triggerSelectHighlighted, <FaHighlighter />, true);
-                     addSuggestion("goto-files", `К Списку Файлов (${allFiles.length})`, () => scrollToSection('file-list-container'), <FaEye />, true);
-                     addSuggestion("add-selected", `Добавить Выбранные (${selectedFetch.size})`, () => triggerAddSelectedToKwork(false), <FaPlus />, true, false, "Добавить выбранные файлы в поле запроса");
+                     addSuggestion("select-highlighted", "Выбрать Связанные", triggerSelectHighlighted, <FaHighlighter />, true, false, '', true); // Requires components
+                     addSuggestion("goto-files", `К Списку Файлов (${allFiles.length})`, () => scrollToSection('file-list-container'), <FaEye />, true, false, '', true); // Requires components
+                     addSuggestion("add-selected", `Добавить Выбранные (${selectedFetch.size})`, () => triggerAddSelectedToKwork(false), <FaPlus />, true, false, "Добавить выбранные файлы в поле запроса", true); // Requires components
                      break;
                  }
                  case 'files_selected':
-                    addSuggestion("add-selected", `Добавить Выбранные (${selectedFetch.size})`, () => triggerAddSelectedToKwork(false), <FaPlus />, true, false, "Добавить выбранные файлы в поле запроса");
-                    addSuggestion("goto-kwork", "К Полю Запроса", () => scrollToSection('kwork-input-section'), <FaKeyboard />, true);
+                    addSuggestion("add-selected", `Добавить Выбранные (${selectedFetch.size})`, () => triggerAddSelectedToKwork(false), <FaPlus />, true, false, "Добавить выбранные файлы в поле запроса", true); // Requires components
+                    addSuggestion("goto-kwork", "К Полю Запроса", () => scrollToSection('kwork-input-section'), <FaKeyboard />, true, false, '', true); // Requires components
                     break;
                  case 'request_written':
-                     addSuggestion("copy-kwork", "Скопировать Запрос -> AI", triggerCopyKwork, <FaCopy />, kworkContent);
-                     addSuggestion("goto-kwork", "К Полю Запроса", () => scrollToSection('kwork-input-section'), <FaKeyboard />, true);
-                     break;
+                     addSuggestion("copy-kwork", "Скопировать Запрос -> AI", triggerCopyKwork, <FaCopy />, kworkContent, false, '', true); // Requires components
+                     addSuggestion("goto-kwork", "К Полю Запроса", () => scrollToSection('kwork-input-section'), <FaKeyboard />, true, false, '', true); // Requires components
+                    break;
                  case 'request_copied':
-                    addSuggestion("goto-ai-response", "К Полю Ответа AI", () => scrollToSection('response-input'), <FaArrowRight />, true);
-                    addSuggestion("parse-response", "➡️ Вставил Ответ? Разбери!", triggerParseResponse, <FaWandMagicSparkles />, true);
+                    addSuggestion("goto-ai-response", "К Полю Ответа AI", () => scrollToSection('response-input'), <FaArrowRight />, true, false, '', true); // Requires components
+                    addSuggestion("parse-response", "➡️ Вставил Ответ? Разбери!", triggerParseResponse, <FaWandMagicSparkles />, true, false, '', true); // Requires components
                     break;
                  case 'response_pasted':
-                     addSuggestion("parse-response", "➡️ Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, true);
-                     addSuggestion("goto-ai-response", "К Полю Ответа", () => scrollToSection('response-input'), <FaKeyboard />, true);
+                     addSuggestion("parse-response", "➡️ Разобрать Ответ", triggerParseResponse, <FaWandMagicSparkles />, true, false, '', true); // Requires components
+                     addSuggestion("goto-ai-response", "К Полю Ответа", () => scrollToSection('response-input'), <FaKeyboard />, true, false, '', true); // Requires components
                     break;
                  case 'parsing_response': break; // Loading handled globally
                  case 'pr_ready':
-                     addSuggestion("select-all-parsed", "Выбрать Все Файлы", triggerSelectAllParsed, <FaListCheck />, parsed);
-                     addSuggestion("goto-assistant-files", "К Разобранным Файлам", () => scrollToSection('executor'), <FaEye />, true);
-                     addSuggestion( targetBranch ? "update-branch" : "create-pr", createOrUpdateActionText, triggerCreateOrUpdatePR, createOrUpdateIcon, true);
-                     addSuggestion("goto-pr-form", "К Форме PR/Ветки", () => scrollToSection('pr-form-container'), <FaRocket />, true);
+                     addSuggestion("select-all-parsed", "Выбрать Все Файлы", triggerSelectAllParsed, <FaListCheck />, parsed, false, '', true); // Requires components
+                     addSuggestion("goto-assistant-files", "К Разобранным Файлам", () => scrollToSection('executor'), <FaEye />, true, false, '', true); // Requires components
+                     addSuggestion( targetBranch ? "update-branch" : "create-pr", createOrUpdateActionText, triggerCreateOrUpdatePR, createOrUpdateIcon, true, false, '', true); // Requires components
+                     addSuggestion("goto-pr-form", "К Форме PR/Ветки", () => scrollToSection('pr-form-container'), <FaRocket />, true, false, '', true); // Requires components
                      break;
                  default: break;
              }
@@ -228,7 +239,7 @@ const AutomationBuddy: React.FC = () => {
             // --- Add Clear All if applicable ---
             const canClear = selectedFetch.size > 0 || kworkContent || aiContent || parsed;
             if (!task && canClear) {
-                addSuggestion("clear-all", "Очистить Все?", triggerClearKworkInput, <FaBroom/>, true);
+                addSuggestion("clear-all", "Очистить Все?", triggerClearKworkInput, <FaBroom/>, true, false, '', true); // Requires components
             }
 
              // --- General Loading Indicator ---
@@ -238,7 +249,7 @@ const AutomationBuddy: React.FC = () => {
                 else if (parsing) loadingText = "Разбор ответа...";
                 else if (aiLoading) loadingText = `Жду AI (${reqId?.substring(0,6)}...)`;
                 else if (assistLoading) loadingText = "Работа с GitHub...";
-                 addSuggestion("loading-indicator", loadingText, undefined, <FaSpinner className="animate-spin"/>, true, true);
+                 addSuggestion("loading-indicator", loadingText, undefined, <FaSpinner className="animate-spin"/>, true, true, '', true); // Requires components (it relates to them)
              }
 
 
@@ -257,12 +268,12 @@ const AutomationBuddy: React.FC = () => {
         kworkInputHasContent, aiResponseHasContent, filesParsed, selectedAssistantFiles,
         assistantLoading, aiActionLoading, loadingPrs, targetBranchName, manualBranchName,
         isSettingsModalOpen, isParsing, currentAiRequestId, imageReplaceTask, allFetchedFiles,
-        primaryHighlightedPath, secondaryHighlightedPaths,
+        primaryHighlightedPath, secondaryHighlightedPaths, showComponents, // <<< Added showComponents
         // Context Triggers (stable references from context)
         triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork,
         triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR,
-        triggerToggleSettingsModal, scrollToSection, triggerClearKworkInput
-        // Removed context object itself, rely on destructuring stable functions/values
+        triggerToggleSettingsModal, scrollToSection, triggerClearKworkInput,
+        logger // Added logger
     ]);
 
     // --- Suggestion Change Detection ---
@@ -280,7 +291,7 @@ const AutomationBuddy: React.FC = () => {
              logger.info("[AutomationBuddy Effect] New suggestions available!");
         }
         previousSuggestionIds.current = currentIds;
-    }, [isMounted, suggestions, isOpen]);
+    }, [isMounted, suggestions, isOpen, logger]); // Added logger
 
 
     // --- Auto-open Timer ---
@@ -297,10 +308,10 @@ const AutomationBuddy: React.FC = () => {
             }, delayMs);
         }
         return () => { if (t) clearTimeout(t); };
-    }, [isMounted, hasAutoOpened, isOpen, searchParams]);
+    }, [isMounted, hasAutoOpened, isOpen, searchParams, logger]); // Added logger
 
     // --- Handle Escape Key ---
-    const handleEscKey = useCallback((e:KeyboardEvent) => { if(e.key==='Escape'&&isOpen) { logger.debug("[AutomationBuddy CB] Escape key pressed, closing."); setIsOpen(false);} }, [isOpen]);
+    const handleEscKey = useCallback((e:KeyboardEvent) => { if(e.key==='Escape'&&isOpen) { logger.debug("[AutomationBuddy CB] Escape key pressed, closing."); setIsOpen(false);} }, [isOpen, logger]); // Added logger
     useEffect(() => { document.addEventListener('keydown',handleEscKey); return()=>{document.removeEventListener('keydown',handleEscKey);}; }, [handleEscKey]);
 
     // --- Event Handlers ---

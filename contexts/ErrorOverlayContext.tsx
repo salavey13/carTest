@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { ErrorInfo as ReactErrorInfo } from 'react';
 import type { ToastRecord } from '@/types/toast';
 // *** REMOVED LogHandler import from debugLogger ***
@@ -25,10 +25,8 @@ interface ErrorOverlayContextType {
     toastHistory: ToastRecord[]; // Renamed from 'history' for clarity
     errorInfo: ErrorInfo | null;
     isClientReady: boolean;
-    // *** REMOVED logHistory from type ***
-    // *** REMOVED setHandler from type ***
     addToastToHistory: (toast: Omit<ToastRecord, 'id'>) => void;
-    setErrorInfo: React.Dispatch<React.SetStateAction<ErrorInfo | null>>; // Expose setter directly
+    addErrorInfo: (errorDetails: ErrorInfo) => void; // Simplified adding errors
     clearHistory: () => void;
     showOverlay: boolean; // Flag to control overlay visibility
 }
@@ -39,10 +37,8 @@ const defaultState: ErrorOverlayContextType = {
     toastHistory: [], // Renamed
     errorInfo: null,
     isClientReady: false,
-    // *** REMOVED logHistory default ***
-    // *** REMOVED setHandler default ***
     addToastToHistory: () => { console.warn("ErrorOverlayContext: addToastToHistory called before provider ready."); },
-    setErrorInfo: () => { console.warn("ErrorOverlayContext: setErrorInfo called before provider ready."); },
+    addErrorInfo: () => { console.warn("ErrorOverlayContext: addErrorInfo called before provider ready."); },
     clearHistory: () => { console.warn("ErrorOverlayContext: clearHistory called before provider ready."); },
     showOverlay: false,
 };
@@ -84,6 +80,7 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
         });
     }, []); // No dependencies needed if only using setHistory
 
+    // Simplified error adding
     const addErrorInfo = useCallback((errorDetails: ErrorInfo) => {
          const newErrorInfo = {
              ...errorDetails,
@@ -92,6 +89,7 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
          debugLogger.error("[ErrorOverlayContext CB] addErrorInfo (will trigger overlay)", newErrorInfo);
          setErrorInfo(newErrorInfo); // This will update errorInfo and trigger showOverlay=true effect
      }, []);
+
 
     const clearHistory = useCallback(() => {
         debugLogger.info("[ErrorOverlayContext CB] clearHistory called.");
@@ -108,10 +106,8 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
             toastHistory, // Renamed
             errorInfo,
             isClientReady,
-            // *** REMOVED logHistory ***
-            // *** REMOVED setHandler ***
             addToastToHistory, // Stable callback
-            setErrorInfo,      // Direct state setter (stable by default)
+            addErrorInfo,      // Stable callback
             clearHistory,      // Stable callback
             showOverlay,       // Include show flag
         };
@@ -120,7 +116,7 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
         errorInfo,
         isClientReady,
         addToastToHistory,
-        setErrorInfo,
+        addErrorInfo, // Added
         clearHistory,
         showOverlay, // Added showOverlay
     ]);
