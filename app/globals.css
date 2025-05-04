@@ -235,13 +235,14 @@ input[type="search"]::-ms-clear {
   font-family: "Comic Sans MS", "Chalkboard", sans-serif;
 }
 
-@keyframes pulse-slow {
+/* Duplicated pulse-slow removed */
+/* @keyframes pulse-slow {
     0%, 100% { opacity: 0.7; }
     50% { opacity: 0.9; }
   }
 .animate-pulse-slow {
     animation: pulse-slow 4s infinite;
-  }
+  } */
 
 @keyframes neon {
   0%,
