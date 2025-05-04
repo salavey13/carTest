@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-// *** REMOVED LogRecord import from context ***
+// Import context types but get logs directly from logger
 import { useErrorOverlay, ErrorInfo, ToastRecord, ErrorSourceType } from '@/contexts/ErrorOverlayContext';
 import {
     FaCopy, FaTriangleExclamation, FaGithub, FaRegClock, FaCircleInfo, FaCircleCheck,
@@ -10,8 +10,8 @@ import {
 import { toast as sonnerToast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
-// *** Import logger and LogLevel type directly ***
-import { debugLogger, LogLevel, LogRecord } from '@/lib/debugLogger';
+// Import logger and LogLevel type directly
+import { debugLogger as logger, LogLevel, LogRecord } from '@/lib/debugLogger';
 
 // --- i18n Translations (Unchanged) ---
 const translations = {
@@ -123,14 +123,26 @@ const DevErrorOverlay: React.FC = () => {
   const contextAvailable = !!setErrorInfo; // Check if setter function exists
 
   // --- Get Logs directly from the logger instance ---
-  const logHistory: ReadonlyArray<LogRecord> = debugLogger.getInternalLogRecords();
+  // Safeguard access to logger
+  let logHistory: ReadonlyArray<LogRecord> = [];
+  if (typeof logger !== 'undefined') {
+      try {
+          logHistory = logger.getInternalLogRecords();
+      } catch (e) {
+           console.error("[DevErrorOverlay] Error calling logger.getInternalLogRecords():", e);
+           // Keep logHistory as empty array
+      }
+  } else {
+       console.warn("[DevErrorOverlay] Logger not defined when trying to get history.");
+  }
+
 
   // Log context access result safely
   useEffect(() => {
       if (contextAvailable) {
-           logger.log("[DevErrorOverlay Effect] Context access successful (Real Context obtained).");
+           if (typeof logger !== 'undefined') logger.log("[DevErrorOverlay Effect] Context access successful (Real Context obtained)."); else console.log("[DevErrorOverlay Effect] Context access successful (Real Context obtained).");
       } else {
-           logger.warn("[DevErrorOverlay Effect] Context access returned fallback. Overlay functionality may be limited.");
+           if (typeof logger !== 'undefined') logger.warn("[DevErrorOverlay Effect] Context access returned fallback. Overlay functionality may be limited."); else console.warn("[DevErrorOverlay Effect] Context access returned fallback. Overlay functionality may be limited.");
       }
   }, [contextAvailable]);
 
@@ -138,18 +150,28 @@ const DevErrorOverlay: React.FC = () => {
   // Log received error info using useEffect (runs after render)
   useEffect(() => {
     if (errorInfo && showOverlay && contextAvailable) {
-      logger.info("[DevErrorOverlay Effect] Received errorInfo from context:", {
-          type: errorInfo.type,
-          message: errorInfo.message?.substring(0, 100) + "...",
-          source: errorInfo.source,
-      });
+        const logPayload = {
+              type: errorInfo.type,
+              message: errorInfo.message?.substring(0, 100) + "...",
+              source: errorInfo.source,
+          };
+      if (typeof logger !== 'undefined') {
+          logger.info("[DevErrorOverlay Effect] Received errorInfo from context:", logPayload);
+      } else {
+          console.info("[DevErrorOverlay Effect] Received errorInfo from context (logger unavailable):", logPayload);
+      }
     }
   }, [errorInfo, showOverlay, contextAvailable]);
 
   // --- Render Fallback if internal rendering error occurs ---
   if (internalRenderError) {
-     // Use logger for fatal errors within the component itself
-     logger.fatal("[DevErrorOverlay] FATAL: Component failed during its own render!", { originalErrorInfo: errorInfo, overlayRenderError: internalRenderError });
+     // Use logger safely
+     const fatalMsg = "[DevErrorOverlay] FATAL: Component failed during its own render!";
+     if (typeof logger !== 'undefined') {
+         logger.fatal(fatalMsg, { originalErrorInfo: errorInfo, overlayRenderError: internalRenderError });
+     } else {
+         console.error(fatalMsg, { originalErrorInfo: errorInfo, overlayRenderError: internalRenderError });
+     }
      console.error("[DevErrorOverlay] FATAL: Component failed to render!", { originalErrorInfo: errorInfo, overlayRenderError: internalRenderError });
      return <ErrorOverlayFallback message={errorInfo?.message || t.unknownError} renderErrorMessage={internalRenderError.message} />;
   }
@@ -167,24 +189,26 @@ const DevErrorOverlay: React.FC = () => {
 
       // --- Event Handlers ---
       const handleClose = () => {
-          // Logger is safe here as it's a user interaction, not part of render loop
-          logger.log("[DevErrorOverlay] Close button clicked.");
+          const logPrefix = "[DevErrorOverlay]";
+          // Log safely
+          if (typeof logger !== 'undefined') logger.log(`${logPrefix} Close button clicked.`); else console.log(`${logPrefix} Close button clicked.`);
           if (!contextAvailable) {
-             logger.error("[DevErrorOverlay] Cannot close: setErrorInfo not available (context failed).");
+             if (typeof logger !== 'undefined') logger.error(`${logPrefix} Cannot close: setErrorInfo not available (context failed).`); else console.error(`${logPrefix} Cannot close: setErrorInfo not available (context failed).`);
              window.location.reload(); // Fallback: try reloading if context is broken
              return;
           }
           try {
               setErrorInfo(null); // Call the function from the hook
-              logger.info("[DevErrorOverlay] ErrorInfo cleared via context.");
+              if (typeof logger !== 'undefined') logger.info(`${logPrefix} ErrorInfo cleared via context.`); else console.info(`${logPrefix} ErrorInfo cleared via context.`);
           } catch (e) {
-              logger.error("[DevErrorOverlay] Error calling setErrorInfo(null) during handleClose:", e);
-              console.error("[DevErrorOverlay] Error in setErrorInfo during handleClose:", e);
+              if (typeof logger !== 'undefined') logger.error(`${logPrefix} Error calling setErrorInfo(null) during handleClose:`, e); else console.error(`${logPrefix} Error calling setErrorInfo(null) during handleClose:`, e);
+              console.error(`${logPrefix} Error in setErrorInfo during handleClose:`, e); // Also log raw error
           }
       };
 
-      // --- Helper to safely get stack trace (Unchanged) ---
+      // --- Helper to safely get stack trace ---
       const getShortStackTraceSafe = (error?: Error | string | any): string => {
+          const logPrefix = "[DevErrorOverlay]";
           try {
               if (!error) return t.stackTraceEmpty;
               let stack = '';
@@ -195,14 +219,15 @@ const DevErrorOverlay: React.FC = () => {
               const lines = stack.split('\n'); const shortStack = lines.slice(0, 10).join('\n');
               return shortStack || t.stackTraceEmpty;
           } catch (e: any) {
-              logger.error("[DevErrorOverlay] Error getting/formatting stack trace:", e);
-              console.error("[DevErrorOverlay] Error getting/formatting stack trace:", e);
+              if (typeof logger !== 'undefined') logger.error(`${logPrefix} Error getting/formatting stack trace:`, e); else console.error(`${logPrefix} Error getting/formatting stack trace:`, e);
+              console.error(`${logPrefix} Error getting/formatting stack trace:`, e); // Raw error
               return `${t.stackTraceError}: ${e?.message ?? 'Unknown'}`;
           }
       };
 
-       // --- Helper to prepare data (uses logHistory from logger) ---
+       // --- Helper to prepare data (with internal try-catch) ---
       const prepareIssueAndCopyDataSafe = () => {
+          const logPrefix = "[DevErrorOverlay]";
           try {
              const safeErrorInfo = errorInfo as ErrorInfo; // Safe here due to outer check
              const errorType = safeErrorInfo.type?.toUpperCase() || 'UNKNOWN';
@@ -214,7 +239,7 @@ const DevErrorOverlay: React.FC = () => {
              const issueTitleOptions = [ `Сбой в Матрице: ${message.substring(0, 40)}...`, `Баг в Коде: ${errorType} ${message.substring(0, 35)}...`, `Аномалия: ${message.substring(0, 45)}...`, `Нужна Помощь: ${errorType} (${source || 'N/A'})`, `Глитч! ${errorType}: ${source || 'N/A'}`, ];
              const issueTitle = encodeURIComponent(issueTitleOptions[Math.floor(Math.random() * issueTitleOptions.length)]);
              // --- Use logs from logger ---
-             const logsFromLogger = debugLogger.getInternalLogRecords(); // Get logs directly
+             const logsFromLogger = typeof logger !== 'undefined' ? logger.getInternalLogRecords() : []; // Get logs safely
              const formattedLogHistory = logsFromLogger.length > 0 ? logsFromLogger.slice().reverse().map(log => `- [${log.level.toUpperCase()}] ${new Date(log.timestamp).toLocaleTimeString('ru-RU',{hour12:false})} | ${log.message.substring(0, 200)}${log.message.length > 200 ? '...' : ''}`).join('\n') : t.noRecentLogs;
              // --- Use toasts from context ---
              const formattedToastHistory = toastHistory.length > 0 ? toastHistory.slice().reverse().map(th => `- [${th.type.toUpperCase()}] ${String(th.message).substring(0, 200)}${String(th.message).length > 200 ? '...' : ''}`).join('\n') : t.noRecentToasts;
@@ -224,23 +249,24 @@ const DevErrorOverlay: React.FC = () => {
              const copyPrompt = `Йоу! Поймал ошибку в ${repoName}, помоги разгрести!\n\nОшибка (${errorType}) Источник: ${source}\n${message}\n\nСтек (начало):\n\`\`\`\n${shortStack}\n\`\`\`\n\nПоследние События (Логи):\n${formattedLogHistory}\n\nНедавние уведомления (Тосты):\n${formattedToastHistory}\n\nЗадача: Проанализируй ошибку, стек, логи и уведомления. Предложи исправления кода или объясни причину.`;
              return { gitHubIssueUrl, copyPrompt };
          } catch (e: any) {
-             logger.error("[DevErrorOverlay] Error preparing issue/copy data:", e);
+             if (typeof logger !== 'undefined') logger.error(`${logPrefix} Error preparing issue/copy data:`, e); else console.error(`${logPrefix} Error preparing issue/copy data:`, e);
              sonnerToast.error(`${t.copyDataErrorToast}: ${e?.message ?? 'Unknown'}`);
              return { gitHubIssueUrl: `https://github.com/${process.env.NEXT_PUBLIC_GITHUB_ORG || 'salavey13'}/${process.env.NEXT_PUBLIC_GITHUB_REPO || 'carTest'}/issues/new`, copyPrompt: `Error generating copy data: ${e?.message}` };
          }
       };
       const { gitHubIssueUrl, copyPrompt } = prepareIssueAndCopyDataSafe();
 
-      // --- Handle Copy Action (Unchanged) ---
+      // --- Handle Copy Action ---
       const handleCopyVibeRequest = () => {
-         logger.debug("[DevErrorOverlay] handleCopyVibeRequest called.");
+         const logPrefix = "[DevErrorOverlay]";
+         if (typeof logger !== 'undefined') logger.debug(`${logPrefix} handleCopyVibeRequest called.`); else console.debug(`${logPrefix} handleCopyVibeRequest called.`);
          try {
              if (!navigator.clipboard) { throw new Error("Clipboard API not available."); }
              navigator.clipboard.writeText(copyPrompt)
                .then(() => { sonnerToast.success(t.copySuccessToast); })
-               .catch(err => { logger.error("[DevErrorOverlay] Failed to copy vibe request using clipboard API:", err); sonnerToast.error(t.copyErrorToast); });
+               .catch(err => { if (typeof logger !== 'undefined') logger.error(`${logPrefix} Failed to copy vibe request using clipboard API:`, err); else console.error(`${logPrefix} Failed to copy vibe request using clipboard API:`, err); sonnerToast.error(t.copyErrorToast); });
          } catch (e: any) {
-             logger.error("[DevErrorOverlay] Error during copy action setup:", e);
+             if (typeof logger !== 'undefined') logger.error(`${logPrefix} Error during copy action setup:`, e); else console.error(`${logPrefix} Error during copy action setup:`, e);
              sonnerToast.error(`${t.copyGenericError}: ${e?.message ?? 'Unknown'}`);
          }
       };
@@ -251,8 +277,9 @@ const DevErrorOverlay: React.FC = () => {
               // console.debug(`[DevErrorOverlay] Rendering section: ${title}`); // Console for render phase
               return <>{children()}</>;
           } catch (e: any) {
-              logger.error(`[DevErrorOverlay] Error rendering section "${title}":`, e); // Logger for actual errors
-              console.error(`[DevErrorOverlay] Error rendering section "${title}":`, e);
+              const logPrefix = "[DevErrorOverlay]";
+              if (typeof logger !== 'undefined') logger.error(`${logPrefix} Error rendering section "${title}":`, e); else console.error(`${logPrefix} Error rendering section "${title}":`, e);
+              console.error(`${logPrefix} Error rendering section "${title}":`, e); // Raw error
               setInternalRenderError(new Error(`Failed to render section "${title}": ${e.message}`));
               return <div className="text-red-500 p-2 bg-red-900/30 rounded">Ошибка рендера секции: {title}</div>;
           }
@@ -274,7 +301,6 @@ const DevErrorOverlay: React.FC = () => {
                        <h2 id="error-overlay-title" className="text-xl md:text-2xl font-bold text-cyan-300 flex items-center gap-2 glitch-text-shadow">
                           <FaTriangleExclamation className="text-yellow-400" /> {t.systemFailureTitle}
                        </h2>
-                       {/* Optional: Add close button directly in header if preferred */}
                      </div>
                  )}
             </RenderSection>
@@ -320,7 +346,7 @@ const DevErrorOverlay: React.FC = () => {
                        </details>)}
                  </RenderSection>
 
-                 {/* Logs Section (Uses logger directly) */}
+                 {/* Logs Section (Uses logHistory from logger) */}
                  <RenderSection title="RecentLogs">
                      {() => (<details className="bg-black/40 p-3 rounded border border-gray-600/60" open={logHistory.length > 0}>
                           <summary className="cursor-pointer text-sm font-medium text-gray-300 hover:text-white transition-colors"> {t.recentLogsTitle} ({logHistory.length}) </summary>
@@ -360,7 +386,7 @@ const DevErrorOverlay: React.FC = () => {
                         </details>)}
                  </RenderSection>
 
-                 {/* Advice Section (Unchanged logic, but uses updated logHistory source indirectly via prepare function) */}
+                 {/* Advice Section (Unchanged logic) */}
                  <RenderSection title="Advice">
                       {() => (<div className="mt-4 p-3 bg-yellow-900/30 border border-yellow-600/50 rounded text-yellow-200 text-xs md:text-sm space-y-2">
                            <p className="font-semibold">{t.adviceTitle}</p>
@@ -411,8 +437,9 @@ const DevErrorOverlay: React.FC = () => {
 
   } catch (renderError: any) {
       // Catch errors specifically during the rendering of the overlay's UI
-      logger.fatal("[DevErrorOverlay] CRITICAL: Failed during main UI render execution!", renderError);
-      console.error("[DevErrorOverlay] CRITICAL: Failed during main render execution!", renderError);
+      const fatalMsg = "[DevErrorOverlay] CRITICAL: Failed during main UI render execution!";
+      if (typeof logger !== 'undefined') logger.fatal(fatalMsg, renderError); else console.error(fatalMsg, renderError);
+      console.error("[DevErrorOverlay] CRITICAL: Failed during main render execution!", renderError); // Raw error
       setInternalRenderError(renderError);
       return null; // Fallback will be rendered on next cycle
   } finally {
