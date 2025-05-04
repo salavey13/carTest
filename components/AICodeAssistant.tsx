@@ -61,7 +61,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const [customLinks, setCustomLinks] = useState<{ name: string; url: string }[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [modalMode, setModalMode] = useState<'replace' | 'search'>('replace');
-    const [isProcessingPR, setIsProcessingPR] = useState(false);
+    const [isProcessingPR, setIsProcessingPR] = useState(false); // State for internal PR button press
     // REMOVED originalRepoFiles and isFetchingOriginals state
     // const [originalRepoFiles, setOriginalRepoFiles] = useState<OriginalFile[]>([]);
     // const [isFetchingOriginals, setIsFetchingOriginals] = useState(false);
@@ -90,7 +90,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const {
         setAiResponseHasContent, setFilesParsed, filesParsed,
         selectedAssistantFiles, setSelectedAssistantFiles,
-        setAssistantLoading, assistantLoading,
+        setAssistantLoading, assistantLoading, // Context loading state for image swap etc.
         aiActionLoading, currentAiRequestId,
         openPrs: contextOpenPrs, triggerGetOpenPRs,
         targetBranchName, triggerToggleSettingsModal,
@@ -131,7 +131,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         handleSwap, handleSearch, handleSelectFunction, handleToggleFileSelection,
         handleSelectAllFiles, handleDeselectAllFiles, handleSaveFiles, handleDownloadZip,
         handleSendToTelegram, handleAddCustomLink, handleCreateOrUpdatePR,
-        handleDirectImageReplace
+        handleDirectImageReplace // Still need this for the imperative handle
     } = handlers;
 
     // --- Callback Hooks ---
@@ -156,14 +156,15 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const handleResetImageError = useCallback(() => {
          logger.info(`[CB handleResetImageError] Resetting image error state.`);
          setImageReplaceError(null);
+         setImageReplaceTask(null); // Also clear the task
          toastInfo("Состояние ошибки сброшено.");
-     }, [setImageReplaceError, toastInfo]);
+     }, [setImageReplaceError, setImageReplaceTask, toastInfo]);
     logger.debug("[AICodeAssistant] After useCallback");
 
 
     // --- Refs ---
     logger.debug("[AICodeAssistant] Before useRef");
-    const processingImageReplace = useRef(false);
+    // const processingImageReplace = useRef(false); // Handled by assistantLoading now
     const imageReplaceTaskRef = useRef(imageReplaceTask);
     logger.debug("[AICodeAssistant] After useRef");
 
@@ -234,22 +235,45 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     // REMOVED useEffect for Fetching Originals
     // useEffect(() => { /* ... */ }, [validationIssues, originalRepoFiles.length, ...]);
 
+    // --- Image Replace Logic (Simpler check) ---
     useEffect(() => {
-        // .. Image Replace effect unchanged
-        logger.debug("[Effect Image Replace] START");
+        logger.debug("[Effect Image Replace] START Check");
         const currentTask = imageReplaceTask;
-        const currentFetchStatus = fetchStatus;
-        const currentAllFiles = allFetchedFiles;
-        const currentAssistantLoading = assistantLoading;
-        const currentProcessingRefVal = processingImageReplace.current;
-        const canProcess = currentTask && currentFetchStatus === 'success' && currentAllFiles.length > 0 && currentAllFiles.some(f => f.path === currentTask.targetPath) && !currentAssistantLoading && !currentProcessingRefVal;
-        logger.debug(`[Effect Image Replace] Check: canProcess=${canProcess}, task=${!!currentTask}, fetchStatus=${currentFetchStatus}`, { /* ... */ });
-        if (canProcess) { /* ... */ }
-        else if (currentTask && currentFetchStatus === 'error' && !currentProcessingRefVal) { /* ... */ }
-        logger.debug("[Effect Image Replace] END");
+        const currentFetchStatus = fetchStatus; // Read directly from context
+        const canProcess = currentTask && currentFetchStatus === 'success';
+        logger.debug(`[Effect Image Replace] Check: canProcess=${canProcess}, task=${!!currentTask}, fetchStatus=${currentFetchStatus}, assistantLoading=${assistantLoading}`);
+
+        if (canProcess && !assistantLoading) {
+             logger.info(`[Effect Image Replace] Task Ready: ${currentTask.targetPath}. Calling handler.`);
+             // No need to check allFetchedFiles here, assumed handleSetFilesFetched did that
+              handleDirectImageReplace(currentTask, allFetchedFiles)
+                 .then(({ success, error }) => {
+                     if (success) {
+                          logger.info("[Effect Image Replace] handleDirectImageReplace reported SUCCESS.");
+                          //setImageReplaceTask(null); // Clear the task on successful completion
+                     } else {
+                          logger.error("[Effect Image Replace] handleDirectImageReplace reported FAILURE:", error);
+                         setImageReplaceError(error || "Ошибка при замене изображения и создании PR.");
+                         setImageReplaceTask(null); // Clear task on failure
+                     }
+                 })
+                 .catch(err => {
+                      logger.error("[Effect Image Replace] handleDirectImageReplace CRITICAL FAILURE:", err);
+                      setImageReplaceError(`Критическая ошибка замены: ${err?.message ?? 'Неизвестно'}`);
+                      setImageReplaceTask(null); // Clear task on critical failure
+                 });
+        } else if (currentTask && fetchStatus === 'error' && !assistantLoading) {
+             logger.error(`[Effect Image Replace] Fetch error occurred for task: ${currentTask.targetPath}`);
+             setImageReplaceError(`Ошибка загрузки файла ${currentTask.targetPath}. Попробуйте снова.`);
+             setImageReplaceTask(null); // Clear the task if fetch failed
+        } else {
+            logger.debug("[Effect Image Replace] Conditions not met or already processing.");
+        }
+        logger.debug("[Effect Image Replace] END Check");
      }, [
         imageReplaceTask, fetchStatus, allFetchedFiles, assistantLoading, // Listen to state changes
-        handlers, setImageReplaceError, toastError // Stable dependencies
+        handleDirectImageReplace, setImageReplaceError, setImageReplaceTask, // Stable dependencies/callbacks
+        logger // Logger
      ]);
 
 
@@ -268,7 +292,11 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         handleCreatePR: () => { logger.debug(`[Imperative] handleCreatePR called.`); handlers.handleCreateOrUpdatePR(); },
         setResponseValue: (val: string) => { logger.debug(`[Imperative] setResponseValue called.`); setResponseValue(val); },
         updateRepoUrl: (url: string) => { logger.debug(`[Imperative] updateRepoUrl called.`); updateRepoUrl(url); },
-        handleDirectImageReplace: (task: ImageReplaceTask, files: FileNode[]) => { logger.debug(`[Imperative] handleDirectImageReplace called.`); return handlers.handleDirectImageReplace(task, files); },
+        // Keep direct image replace for context interaction
+        handleDirectImageReplace: (task: ImageReplaceTask, files: FileNode[]) => {
+            logger.debug(`[Imperative] handleDirectImageReplace called from context.`);
+            return handlers.handleDirectImageReplace(task, files);
+        },
     }), [handlers, setResponseValue, updateRepoUrl]);
     logger.debug("[AICodeAssistant] After useImperativeHandle");
 
@@ -276,8 +304,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     // --- Derived State for Rendering ---
     logger.debug("[AICodeAssistant] Calculate Derived State");
     const effectiveIsParsing = contextIsParsing ?? hookIsParsing;
-    // REMOVED isFetchingOriginals from isProcessingAny check
-    const isProcessingAny = assistantLoading || aiActionLoading || effectiveIsParsing || isProcessingPR || loadingPrs;
+    // Combined loading state: assistantLoading (for image replace/PR), internal PR processing, AI generating, parsing, PR list loading
+    const isProcessingAny = assistantLoading || isProcessingPR || aiActionLoading || effectiveIsParsing || loadingPrs;
     const finalRepoUrlForForm = repoUrlStateLocal || repoUrlFromContext || "";
     const canSubmitRegularPR = !isProcessingAny && filesParsed && selectedAssistantFiles.size > 0 && !!prTitle.trim() && !!finalRepoUrlForForm && !imageReplaceTask;
     const prButtonText = targetBranchName ? `Обновить Ветку` : "Создать PR";
@@ -287,12 +315,14 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
     const showImageReplaceUI = !!imageReplaceTask || !!imageReplaceError;
     const showStandardAssistantUI = !showImageReplaceUI;
-    const imageTaskFailed = !!imageReplaceError && !assistantLoading && !isProcessingPR;
+    // Image task is considered "failed" if there's an error *and* it's not currently trying to process (assistantLoading)
+    const imageTaskFailed = !!imageReplaceError && !assistantLoading;
     const parseButtonDisabled = isProcessingAny || isWaitingForAiResponse || !response.trim() || !!imageReplaceTask;
     // .. fixButtonDisabled remains, but CodeRestorer is removed
     const fixButtonDisabled = isProcessingAny || isWaitingForAiResponse || !!imageReplaceTask;
-    const submitButtonDisabled = !canSubmitRegularPR || isProcessingPR || assistantLoading || !!imageReplaceTask;
-    logger.debug(`[Render State] isProcessingAny=${isProcessingAny}, effectiveIsParsing=${effectiveIsParsing}, filesParsed=${filesParsed}, selectedAssistantFiles=${selectedAssistantFiles.size}, canSubmitRegularPR=${canSubmitRegularPR}, showImageReplaceUI=${showImageReplaceUI}`);
+    // Submit PR button disabled if processing, no files selected, or if image task is active
+    const submitButtonDisabled = !canSubmitRegularPR || isProcessingAny || !!imageReplaceTask;
+    logger.debug(`[Render State] isProcessingAny=${isProcessingAny}, effectiveIsParsing=${effectiveIsParsing}, filesParsed=${filesParsed}, selectedAssistantFiles=${selectedAssistantFiles.size}, canSubmitRegularPR=${canSubmitRegularPR}, showImageReplaceUI=${showImageReplaceUI}, assistantLoading=${assistantLoading}`);
 
     // --- Log before return ---
     logger.debug("[AICodeAssistant] Preparing to render JSX...");
@@ -307,7 +337,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                      </h1>
                      {showStandardAssistantUI && ( <button className="cursor-help p-1" title={assistantTooltipText}> <FaCircleInfo className="text-blue-400 hover:text-blue-300 transition" /> </button> )}
                  </div>
-                 <button id="settings-modal-trigger-assistant" onClick={() => { logger.debug("[Click] Settings Toggle Click (Assistant)"); triggerToggleSettingsModal(); }} className="p-2 text-gray-400 hover:text-cyan-400 transition rounded-full hover:bg-gray-700/50 disabled:opacity-50" disabled={isProcessingPR || assistantLoading} title="Настройки URL / Token / Ветки / PRs" > <FaCodeBranch className="text-xl" /> </button>
+                 <button id="settings-modal-trigger-assistant" onClick={() => { logger.debug("[Click] Settings Toggle Click (Assistant)"); triggerToggleSettingsModal(); }} className="p-2 text-gray-400 hover:text-cyan-400 transition rounded-full hover:bg-gray-700/50 disabled:opacity-50" disabled={isProcessingAny} title="Настройки URL / Token / Ветки / PRs" > <FaCodeBranch className="text-xl" /> </button>
              </header>
 
             {showStandardAssistantUI && (
@@ -318,7 +348,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                               {/* .. Textarea unchanged .. */}
                               <textarea id="response-input" ref={aiResponseInputRefPassed} className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm min-h-[180px] resize-y simple-scrollbar" defaultValue={response} onChange={(e) => setResponseValue(e.target.value)} placeholder={isWaitingForAiResponse ? "AI думает..." : isProcessingAny ? "Ожидание..." : "Ответ AI здесь..."} disabled={isProcessingAny} spellCheck="false" />
                               {/* .. TextAreaUtilities unchanged .. */}
-                              <TextAreaUtilities response={response} isLoading={isProcessingAny} onParse={handlers.handleParse} onOpenModal={handlers.handleOpenModal} onCopy={handlers.handleCopyResponse} onClear={handlers.handleClearResponse} onSelectFunction={handlers.handleSelectFunction} isParseDisabled={parseButtonDisabled} isProcessingPR={isProcessingPR || assistantLoading} />
+                              <TextAreaUtilities response={response} isLoading={isProcessingAny} onParse={handlers.handleParse} onOpenModal={handlers.handleOpenModal} onCopy={handlers.handleCopyResponse} onClear={handlers.handleClearResponse} onSelectFunction={handlers.handleSelectFunction} isParseDisabled={parseButtonDisabled} isProcessingPR={assistantLoading || isProcessingPR} />
                           </div>
                            <div className="flex justify-end items-start mt-1 gap-2 min-h-[30px]">
                                {/* REMOVED CodeRestorer */}
@@ -346,32 +376,33 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                  </>
             )}
 
-            {/* --- Image Replace UI (Unchanged) --- */}
+            {/* --- Image Replace UI --- */}
             {showImageReplaceUI && (
                  <div className={`flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed min-h-[200px] ${imageTaskFailed ? 'border-red-500' : 'border-blue-400'}`}>
-                    {(() => { logger.debug("[Render] Rendering Image Replace UI", { /* ... */ }); return null; })()}
+                    {(() => { logger.debug("[Render] Rendering Image Replace UI", { imageReplaceTask: !!imageReplaceTask, assistantLoading, fetchStatus, imageTaskFailed, imageReplaceError }); return null; })()}
                      {/* Status Icon Logic */}
-                     {(assistantLoading || isProcessingPR) ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> )
-                       : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> )
+                     {assistantLoading ? <FaSpinner className="text-purple-400 text-4xl mb-4 animate-spin" />
+                       : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" />
                        : imageTaskFailed ? <FaCircleXmark className="text-red-400 text-4xl mb-4" />
                        : imageReplaceTask ? <FaImages className="text-blue-400 text-4xl mb-4" />
-                       : <FaCheck className="text-green-400 text-4xl mb-4" /> }
+                       : <FaCheck className="text-green-400 text-4xl mb-4" /> // Default/Success case if task is cleared
+                     }
 
                      <p className={`text-lg font-semibold ${imageTaskFailed ? 'text-red-300' : 'text-blue-300'}`}>
                          {/* ... Text based on state ... */}
-                         {(assistantLoading || isProcessingPR) ? "Обработка Замены..."
+                         {assistantLoading ? "Обработка Замены..."
                            : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Загрузка Файла..."
                            : imageTaskFailed ? "Ошибка Замены Картинки"
                            : imageReplaceTask ? "Задача Замены Активна"
-                           : "Замена Завершена Успешно"}
+                           : "Процесс Замены Завершен"} {/* Adjusted success message */}
                      </p>
                      <p className="text-sm text-gray-400 mt-2">
                           {/* ... Text based on state ... */}
-                          {(assistantLoading || isProcessingPR) ? "Создание/обновление PR..."
+                          {assistantLoading ? "Меняю URL в файле и создаю/обновляю PR..."
                            : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Ожидание ответа от GitHub..."
                            : imageTaskFailed ? (imageReplaceError || "Произошла неизвестная ошибка.")
                            : imageReplaceTask ? "Файл загружен, ожидание обработки Ассистентом..."
-                           : "Процесс завершен. Проверьте PR."}
+                           : "Задача выполнена или сброшена."} {/* Adjusted success message */}
                      </p>
                      {imageReplaceTask && (
                          <div className="mt-3 text-xs text-gray-500 break-all text-left bg-gray-900/50 p-2 rounded max-w-full overflow-x-auto simple-scrollbar">

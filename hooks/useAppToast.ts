@@ -13,18 +13,18 @@ type ToastType = 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message
 export const useAppToast = () => {
     const errorOverlay = useErrorOverlay();
 
-    const isReady = !!errorOverlay && typeof errorOverlay.addToastToHistory === 'function';
-
-    // Log warning only once if context isn't ready on first render client-side
-    useMemo(() => {
-        if (!isReady && typeof window !== 'undefined') {
+    // Check context readiness once and store it
+    const isContextReady = useMemo(() => {
+        const ready = !!errorOverlay && typeof errorOverlay.addToastToHistory === 'function';
+        if (!ready && typeof window !== 'undefined') {
             logger.warn("useAppToast Initializing: ErrorOverlayContext not fully ready yet. Toasts will show but might not be logged correctly initially.", {
-                 hasErrorOverlay: !!errorOverlay,
-                 hasAddToastFunc: typeof errorOverlay?.addToastToHistory === 'function'
+                hasErrorOverlay: !!errorOverlay,
+                hasAddToastFunc: typeof errorOverlay?.addToastToHistory === 'function'
             });
         }
+        return ready;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Run only once on mount
+    }, [errorOverlay]); // Re-check only if errorOverlay reference changes
 
     const showToast = useCallback((
         type: ToastType,
@@ -34,11 +34,10 @@ export const useAppToast = () => {
         const logWarn = logger.warn; // Assume logger is available
         const logError = logger.error;
 
-        // Check readiness *inside* the function that uses it
-        const currentIsReady = !!errorOverlay && typeof errorOverlay.addToastToHistory === 'function';
-        const addToastToHistory = currentIsReady ? errorOverlay.addToastToHistory : null;
+        // Use the readiness check from useMemo
+        const addToastToHistoryFunc = isContextReady ? errorOverlay.addToastToHistory : null;
 
-        if (!currentIsReady) {
+        if (!isContextReady) {
             logWarn("useAppToast: Context not ready at time of toast call, logging to history will be skipped.", { type, messageString: typeof message === 'string' ? message : '[ReactNode]' });
         }
 
@@ -66,14 +65,14 @@ export const useAppToast = () => {
             }
 
             // Add to history ONLY if context/function is ready *at the time of call*
-             if (messageString !== '[ReactNode]' && addToastToHistory) { // Also ensure message isn't just a node for logging
+             if (messageString !== '[ReactNode]' && addToastToHistoryFunc) { // Also ensure message isn't just a node for logging
                 try {
                     const record: Omit<ToastRecord, 'id'> = {
                         message: messageString,
                         type: type === 'custom' ? 'info' : type, // Log custom as info
                         timestamp: Date.now(),
                     };
-                    addToastToHistory(record);
+                    addToastToHistoryFunc(record);
                 } catch (loggingError) { // Catch potential errors during logging itself
                     logError("useAppToast: Failed to add toast to history", loggingError);
                 }
@@ -89,11 +88,10 @@ export const useAppToast = () => {
             } catch { /* Silently fail if even fallback fails */ }
             return undefined;
         }
-    }, [errorOverlay]); // Depend only on errorOverlay to re-check readiness inside
+    }, [isContextReady, errorOverlay]); // Depend on readiness check and errorOverlay
 
 
     // Memoize the returned object of functions
-    // CRITICAL FIX: Remove the conditional logic inside useMemo
     return useMemo(() => {
         logger.debug("useAppToast: Re-memoizing returned functions object.");
         // ALWAYS return the same object structure, relying on showToast to handle readiness internally.

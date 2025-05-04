@@ -53,8 +53,14 @@ class DebugLogger {
             cache.add(value);
           }
           if (typeof value === 'bigint') { return value.toString() + 'n'; }
+          // Handle common non-serializable types gracefully
+          if (value instanceof Map) { return `[Map (${value.size} entries)]`; }
+          if (value instanceof Set) { return `[Set (${value.size} entries)]`; }
+          if (value instanceof HTMLElement) { return `[HTMLElement: ${value.tagName}]`; }
+          if (value instanceof Event) { return `[Event: ${value.type}]`; }
+          if (value instanceof Function) { return `[Function: ${value.name || 'anonymous'}]`; }
           return value;
-        }, 2);
+        }, 2); // Indent for readability
       }
       if (typeof arg === 'symbol') { return arg.toString(); }
       if (arg === undefined) { return 'undefined'; }
@@ -76,6 +82,7 @@ class DebugLogger {
       return errorMsg;
     }
   }
+
 
   private logInternal(level: LogLevel, ...args: any[]) {
     if (this.isLoggingInternally) {
@@ -139,6 +146,7 @@ class DebugLogger {
         }
         const consoleMethod = (console as any)[level] || console.log;
         try {
+          // Pass original args to console for better inspection
           consoleMethod(prefix, color, 'color: inherit;', ...args);
         } catch (e) {
            // Fallback for problematic args/styling

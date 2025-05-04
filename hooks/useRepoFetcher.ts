@@ -9,7 +9,7 @@ import { useAppToast } from "@/hooks/useAppToast"; // Use toast hook
 interface UseRepoFetcherProps {
     repoUrl: string;
     token: string;
-    targetBranchName: string | null;
+    targetBranchName: string | null; // Can be PR source branch
     manualBranchName: string;
     imageReplaceTask: ImageReplaceTask | null;
     highlightedPathFromUrl: string;
@@ -42,7 +42,7 @@ interface UseRepoFetcherReturn {
 export const useRepoFetcher = ({
     repoUrl,
     token,
-    targetBranchName,
+    targetBranchName, // Actual branch to fetch (determined by context/pre-check)
     manualBranchName,
     imageReplaceTask,
     highlightedPathFromUrl,
@@ -60,9 +60,10 @@ export const useRepoFetcher = ({
     const {
         // Get context setters and some state directly
         fetchStatus, setFetchStatus, handleSetFilesFetched, setSelectedFetcherFiles,
-        setRequestCopied, setLoadingPrs, setOpenPrs, setTargetBranchName: setContextTargetBranch, // Renamed setter
+        setRequestCopied, setLoadingPrs, setOpenPrs, setTargetBranchName: setContextTargetBranch,
         triggerToggleSettingsModal, updateKworkInput,
         setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles,
+        targetPrData, // Read target PR data
         // Removed addToast from context destructuring
     } = useRepoXmlPageContext();
     const { success: toastSuccess, error: toastError, info: toastInfo, warning: toastWarning, loading: toastLoading, message: toastMessage } = useAppToast(); // Get toast functions
@@ -137,10 +138,19 @@ export const useRepoFetcher = ({
         taskForEarlyCheck?: ImageReplaceTask | null
     ) => {
         logger.info("[Fetch Manual CB] START");
-        const initialBranchGuess = branchNameToFetchOverride || targetBranchName || manualBranchName || 'default';
+        // Determine the final branch to fetch: Override > Context Target (PR Source) > Manual > null (default)
+        const finalBranchToFetch = branchNameToFetchOverride !== undefined
+            ? branchNameToFetchOverride // Explicit override takes precedence
+            : targetBranchName          // Then use target branch from context (set by pre-check)
+            ?? manualBranchName         // Then use manually entered branch
+            || null;                    // Finally, null means repo default
+
+        const effectiveBranchDisplay = finalBranchToFetch || 'default';
+        logger.debug(`[Fetch Manual CB] Final branch to fetch: ${effectiveBranchDisplay}, Override: ${branchNameToFetchOverride}, Target: ${targetBranchName}, Manual: ${manualBranchName}`);
+
         const isAutoFetchWithIdea = autoFetch && !!ideaFromUrl && !isManualRetry;
         const currentTask = taskForEarlyCheck || imageReplaceTask;
-        logger.debug(`[Fetch Manual CB] Args: isRetry=${isManualRetry}, branchOverride=${branchNameToFetchOverride}, task=${!!currentTask}, initialBranch=${initialBranchGuess}`);
+        logger.debug(`[Fetch Manual CB] Args: isRetry=${isManualRetry}, branch=${effectiveBranchDisplay}, task=${!!currentTask}`);
 
         // Guards
         if (currentTask && isImageTaskFetchInitiated.current && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying')) { logger.warn("[Fetch Manual CB] SKIP: Image fetch already running."); return; }
@@ -164,35 +174,12 @@ export const useRepoFetcher = ({
             isImageTaskFetchInitiated.current = true; updateKworkInput(""); // Clear Kwork for image task
         }
 
-        // Branch / PR Logic (Image Task Only)
-        let branchForContentFetch = initialBranchGuess;
-        let identifiedPrBranch = false;
-        if (currentTask && !isManualRetry) {
-             logger.info("[Fetch Manual CB] Image Task - Checking for existing PR...");
-             setLoadingPrs(true);
-             try {
-                 const prResult = await getOpenPullRequests(repoUrl);
-                  logger.debug(`[Fetch Manual CB] PR check result: Success=${prResult.success}, Count=${prResult.pullRequests?.length ?? 'N/A'}`);
-                  if (prResult.success && prResult.pullRequests) {
-                    const expectedPrTitlePrefix = `chore: Update image`; const expectedPrFile = currentTask.targetPath;
-                    const matchPr = prResult.pullRequests.find(pr => pr.title?.startsWith(expectedPrTitlePrefix) && pr.title?.includes(expectedPrFile) && pr.head?.ref);
-                    if (matchPr?.head?.ref) {
-                        branchForContentFetch = matchPr.head.ref; identifiedPrBranch = true;
-                        logger.info(`[Fetch Manual CB] Found matching PR #${matchPr.number}, fetching from branch: ${branchForContentFetch}`);
-                        setContextTargetBranch(branchForContentFetch); setOpenPrs(prResult.pullRequests as SimplePullRequest[]);
-                        toastInfo(`Найден PR #${matchPr.number}. Загружаю из ветки ${branchForContentFetch}...`);
-                    } else { logger.debug("[Fetch Manual CB] No matching PR found for image task."); setOpenPrs(prResult.pullRequests as SimplePullRequest[]); }
-                } else { toastError("Ошибка загрузки PR: " + (prResult.error ?? 'Неизвестно')); setOpenPrs([]); }
-             } catch (prError: any) {
-                 logger.error("[Fetch Manual CB] Critical error checking PRs:", prError);
-                 toastError("Крит. ошибка проверки PR. Загружаю...", { description: prError.message }); setOpenPrs([]); }
-             finally { setLoadingPrs(false); logger.info("[Fetch Manual CB] Image Task PR Check FINISHED"); }
-        }
+        // --- Branch / PR Logic REMOVED - Handled by context pre-check now ---
 
         // Fetch Execution
-        logger.info(`[Fetch Manual CB] Starting content fetch from branch: ${branchForContentFetch}`);
-        const fetchToastId = toastLoading(`Запрос файлов из ветки (${branchForContentFetch})...`, { duration: 15000 });
-        startProgressSimulation(identifiedPrBranch ? 8 : 13);
+        logger.info(`[Fetch Manual CB] Starting content fetch from branch: ${effectiveBranchDisplay}`);
+        const fetchToastId = toastLoading(`Запрос файлов из ветки (${effectiveBranchDisplay})...`, { duration: 15000 });
+        startProgressSimulation(13); // Use a standard duration
 
         let fetchResult: Awaited<ReturnType<typeof fetchRepoContents>> | null = null;
         let fetchAttemptSucceeded = false;
@@ -202,8 +189,8 @@ export const useRepoFetcher = ({
         let filesToAutoSelect = new Set<string>();
 
         try {
-            logger.debug("[Fetch Manual CB] Calling fetchRepoContents...");
-            fetchResult = await fetchRepoContents(repoUrl, token || undefined, branchForContentFetch);
+            logger.debug(`[Fetch Manual CB] Calling fetchRepoContents with branch: ${finalBranchToFetch}`);
+            fetchResult = await fetchRepoContents(repoUrl, token || undefined, finalBranchToFetch); // Use the final determined branch
             logger.info(`[Fetch Manual CB] fetchRepoContents Result: Success=${fetchResult?.success}, Files=${fetchResult?.files?.length ?? 'N/A'}`);
 
             if (fetchResult?.success && Array.isArray(fetchResult.files)) {
@@ -216,96 +203,98 @@ export const useRepoFetcher = ({
                     logger.info(`[Fetch Manual CB] Processing Image Task Path. Target: ${currentTask.targetPath}`);
                     primaryHighlightPathInternal = currentTask.targetPath;
                     if (!allPaths.includes(primaryHighlightPathInternal)) {
-                        const errorMsg = `Файл (${primaryHighlightPathInternal}) не найден в ветке ${branchForContentFetch}.`;
+                        const errorMsg = `Файл (${primaryHighlightPathInternal}) не найден в ветке ${effectiveBranchDisplay}.`;
                         logger.error(`[Fetch Manual CB] ERROR: Image Task target NOT FOUND! Path: ${primaryHighlightPathInternal}`);
                         setError(errorMsg);
                         toastError(errorMsg, { id: fetchToastId });
                         fetchAttemptSucceeded = false;
                     } else {
                         logger.info(`[Fetch Manual CB] Image Task target found: ${primaryHighlightPathInternal}. Auto-selecting.`);
-                        toastSuccess(`Файл для замены (${primaryHighlightPathInternal.split('/').pop()}) загружен из ${branchForContentFetch}.`, { id: fetchToastId });
+                        toastSuccess(`Файл для замены (${primaryHighlightPathInternal.split('/').pop()}) загружен из ${effectiveBranchDisplay}.`, { id: fetchToastId });
                         filesToAutoSelect.add(primaryHighlightPathInternal);
                     }
                     secondaryHighlightPathsDataInternal = { component: [], context: [], hook: [], lib: [], other: [] };
 
                 } else { // Standard Task Path
                      logger.info(`[Fetch Manual CB] Processing Standard Task Path.`);
-                    if (highlightedPathFromUrl) {
-                        logger.debug(`[Fetch Manual CB] Standard Task - Processing highlights for URL param: ${highlightedPathFromUrl}`);
-                        primaryHighlightPathInternal = repoUtils.getPageFilePath(highlightedPathFromUrl, allPaths);
-                        logger.debug(`[Fetch Manual CB] Primary Path resolved: ${primaryHighlightPathInternal}`);
+                     primaryHighlightPathInternal = null; // Reset primary highlight for standard tasks
+                     secondaryHighlightPathsDataInternal = { component: [], context: [], hook: [], lib: [], other: [] }; // Reset secondary
+                     filesToAutoSelect = new Set(); // Reset auto-select
 
-                        if (primaryHighlightPathInternal) {
-                            const primaryFileNode = fetchedFilesData.find(f => f.path === primaryHighlightPathInternal);
-                            if (primaryFileNode) {
-                                filesToAutoSelect.add(primaryHighlightPathInternal);
-                                logger.debug(`[Fetch Manual CB] Extracting imports from ${primaryHighlightPathInternal}`);
-                                const imports = repoUtils.extractImports(primaryFileNode.content);
-                                const tempSecPathsSet: Record<ImportCategory, Set<string>> = {component:new Set(), context:new Set(), hook:new Set(), lib:new Set(), other:new Set()};
-                                logger.debug(`[Fetch Manual CB] Resolving/categorizing ${imports.length} imports`);
+                     // If a path was passed via URL params (potentially with an idea)
+                     if (highlightedPathFromUrl) {
+                         logger.debug(`[Fetch Manual CB] Standard Task - Processing highlights for URL param: ${highlightedPathFromUrl}`);
+                         primaryHighlightPathInternal = repoUtils.getPageFilePath(highlightedPathFromUrl, allPaths);
+                         logger.debug(`[Fetch Manual CB] Primary Path resolved: ${primaryHighlightPathInternal}`);
 
-                                imports.forEach(imp => {
-                                    const resolvedPath = repoUtils.resolveImportPath(imp, primaryFileNode.path, fetchedFilesData);
-                                    if (resolvedPath && resolvedPath !== primaryHighlightPathInternal && allPaths.includes(resolvedPath)) {
-                                        const category = repoUtils.categorizeResolvedPath(resolvedPath);
-                                        tempSecPathsSet[category].add(resolvedPath);
-                                        if (category === 'component' || category === 'context' || category === 'hook' || category === 'lib') {
-                                            filesToAutoSelect.add(resolvedPath);
-                                        }
-                                    }
-                                });
-                                secondaryHighlightPathsDataInternal = {
-                                    component: Array.from(tempSecPathsSet.component), context: Array.from(tempSecPathsSet.context), hook: Array.from(tempSecPathsSet.hook), lib: Array.from(tempSecPathsSet.lib), other: Array.from(tempSecPathsSet.other)
-                                };
-                                logger.debug(`[Fetch Manual CB] Secondary paths calculated.`, secondaryHighlightPathsDataInternal);
-                            } else {
-                                logger.warn(`[Fetch Manual CB] WARN: Primary path ${primaryHighlightPathInternal} node not found in fetched data.`);
-                                primaryHighlightPathInternal = null;
-                                toastError(`Ошибка: Данные для (${highlightedPathFromUrl}) не найдены.`, { id: fetchToastId });
-                            }
-                        } else {
-                           logger.warn(`[Fetch Manual CB] WARN: Page file path for URL ${highlightedPathFromUrl} not found.`);
-                           toastWarning(`Файл страницы для URL (${highlightedPathFromUrl}) не найден.`, { id: fetchToastId });
-                        }
+                         if (primaryHighlightPathInternal) {
+                             const primaryFileNode = fetchedFilesData.find(f => f.path === primaryHighlightPathInternal);
+                             if (primaryFileNode) {
+                                 filesToAutoSelect.add(primaryHighlightPathInternal);
+                                 logger.debug(`[Fetch Manual CB] Extracting imports from ${primaryHighlightPathInternal}`);
+                                 const imports = repoUtils.extractImports(primaryFileNode.content);
+                                 const tempSecPathsSet: Record<ImportCategory, Set<string>> = {component:new Set(), context:new Set(), hook:new Set(), lib:new Set(), other:new Set()};
+                                 logger.debug(`[Fetch Manual CB] Resolving/categorizing ${imports.length} imports`);
 
-                         logger.debug(`[Fetch Manual CB] Checking important files. Count: ${importantFiles.length}`);
-                        let addedImportantCount = 0;
-                        importantFiles.forEach(p => {
-                            if (allPaths.includes(p) && !filesToAutoSelect.has(p)) {
-                                filesToAutoSelect.add(p);
-                                addedImportantCount++;
-                            }
-                        });
-                        if (addedImportantCount > 0) logger.info(`[Fetch Manual CB] Auto-selected ${addedImportantCount} important files.`);
+                                 imports.forEach(imp => {
+                                     const resolvedPath = repoUtils.resolveImportPath(imp, primaryFileNode.path, fetchedFilesData);
+                                     if (resolvedPath && resolvedPath !== primaryHighlightPathInternal && allPaths.includes(resolvedPath)) {
+                                         const category = repoUtils.categorizeResolvedPath(resolvedPath);
+                                         tempSecPathsSet[category].add(resolvedPath);
+                                         if (category === 'component' || category === 'context' || category === 'hook' || category === 'lib') {
+                                             filesToAutoSelect.add(resolvedPath);
+                                         }
+                                     }
+                                 });
+                                 secondaryHighlightPathsDataInternal = {
+                                     component: Array.from(tempSecPathsSet.component), context: Array.from(tempSecPathsSet.context), hook: Array.from(tempSecPathsSet.hook), lib: Array.from(tempSecPathsSet.lib), other: Array.from(tempSecPathsSet.other)
+                                 };
+                                 logger.debug(`[Fetch Manual CB] Secondary paths calculated.`, secondaryHighlightPathsDataInternal);
+                             } else {
+                                 logger.warn(`[Fetch Manual CB] WARN: Primary path ${primaryHighlightPathInternal} node not found in fetched data.`);
+                                 primaryHighlightPathInternal = null;
+                                 toastError(`Ошибка: Данные для файла (${highlightedPathFromUrl}) не найдены.`, { id: fetchToastId });
+                             }
+                         } else {
+                            logger.warn(`[Fetch Manual CB] WARN: Page file path for URL ${highlightedPathFromUrl} not found.`);
+                            toastWarning(`Файл страницы для URL (${highlightedPathFromUrl}) не найден.`, { id: fetchToastId });
+                         }
+                     } else {
+                         logger.info(`[Fetch Manual CB] Standard Task - No URL path param provided.`);
+                     }
 
-                        if (filesToAutoSelect.size > 0) {
-                            const numSecondary = secondaryHighlightPathsDataInternal.component.length + secondaryHighlightPathsDataInternal.context.length + secondaryHighlightPathsDataInternal.hook.length + secondaryHighlightPathsDataInternal.lib.length;
-                            const numImportant = filesToAutoSelect.size - (primaryHighlightPathInternal ? 1 : 0) - numSecondary;
-                            let msg = `✅ Авто-выбор: `;
-                            const parts = [];
-                            if (primaryHighlightPathInternal) parts.push(`1 стр.`);
-                            if (numSecondary > 0) parts.push(`${numSecondary} связ.`);
-                            if (numImportant > 0) parts.push(`${numImportant} важн.`);
-                            msg += parts.join(', ') + ` (${filesToAutoSelect.size} всего).`;
-                            toastSuccess(msg, { id: fetchToastId });
-                        } else if (primaryHighlightPathInternal === null && highlightedPathFromUrl) {
-                            // Only show fetch success if no specific file was targeted but failed
-                             toastSuccess(`Извлечено ${fetchedFilesData.length} файлов! (Целевой URL файл не найден)`, { id: fetchToastId });
-                        } else if (fetchAttemptSucceeded) {
-                             toastSuccess(`Извлечено ${fetchedFilesData.length} файлов!`, { id: fetchToastId });
-                        }
-                    } else {
-                         logger.info(`[Fetch Manual CB] Standard Task - No URL params, basic fetch completed.`);
-                         toastSuccess(`Извлечено ${fetchedFilesData.length} файлов!`, { id: fetchToastId });
-                        primaryHighlightPathInternal = null;
-                        secondaryHighlightPathsDataInternal = { component: [], context: [], hook: [], lib: [], other: [] };
-                        filesToAutoSelect = new Set();
-                    }
+                     // Add important files regardless of URL param presence
+                     logger.debug(`[Fetch Manual CB] Checking important files. Count: ${importantFiles.length}`);
+                     let addedImportantCount = 0;
+                     importantFiles.forEach(p => {
+                         if (allPaths.includes(p) && !filesToAutoSelect.has(p)) {
+                             filesToAutoSelect.add(p);
+                             addedImportantCount++;
+                         }
+                     });
+                     if (addedImportantCount > 0) logger.info(`[Fetch Manual CB] Auto-selected ${addedImportantCount} important files.`);
+
+                    // Determine success message based on what was found
+                     if (filesToAutoSelect.size > 0) {
+                         const numSecondary = secondaryHighlightPathsDataInternal.component.length + secondaryHighlightPathsDataInternal.context.length + secondaryHighlightPathsDataInternal.hook.length + secondaryHighlightPathsDataInternal.lib.length;
+                         const numImportant = filesToAutoSelect.size - (primaryHighlightPathInternal ? 1 : 0) - numSecondary;
+                         let msg = `✅ Авто-выбор: `;
+                         const parts = [];
+                         if (primaryHighlightPathInternal) parts.push(`1 стр.`);
+                         if (numSecondary > 0) parts.push(`${numSecondary} связ.`);
+                         if (numImportant > 0) parts.push(`${numImportant} важн.`);
+                         msg += parts.join(', ') + ` (${filesToAutoSelect.size} всего).`;
+                         toastSuccess(msg, { id: fetchToastId });
+                     } else if (primaryHighlightPathInternal === null && highlightedPathFromUrl) {
+                         toastSuccess(`Извлечено ${fetchedFilesData.length} файлов из ${effectiveBranchDisplay}! (Целевой URL файл не найден)`, { id: fetchToastId });
+                     } else if (fetchAttemptSucceeded) {
+                         toastSuccess(`Извлечено ${fetchedFilesData.length} файлов из ${effectiveBranchDisplay}!`, { id: fetchToastId });
+                     }
                 }
             } else {
                  logger.error(`[Fetch Manual CB] fetchRepoContents failed. Error: ${fetchResult?.error}`);
                 fetchAttemptSucceeded = false;
-                throw new Error(fetchResult?.error || `Не удалось получить файлы из ${branchForContentFetch}.`);
+                throw new Error(fetchResult?.error || `Не удалось получить файлы из ${effectiveBranchDisplay}.`);
             }
         } catch (err: any) {
              logger.error(`[Fetch Manual CB] CATCH block:`, err);
@@ -325,7 +314,13 @@ export const useRepoFetcher = ({
                  setSelectedFetcherFiles(filesToAutoSelect);
              }
              logger.debug(`[Fetch Manual CB] Finally - Calling handleSetFilesFetched. Success=${fetchAttemptSucceeded}`);
-            handleSetFilesFetched( fetchAttemptSucceeded, fetchedFilesData, primaryHighlightPathInternal, Object.values(secondaryHighlightPathsDataInternal).flat() );
+            // Ensure handleSetFilesFetched is called even if fetch fails to update status correctly
+            handleSetFilesFetched(
+                 fetchAttemptSucceeded,
+                 fetchedFilesData,
+                 primaryHighlightPathInternal,
+                 secondaryHighlightPathsDataInternal // Pass the whole object
+             );
             setProgress(fetchAttemptSucceeded ? 100 : 0);
             if (currentTask && !fetchAttemptSucceeded) {
                  logger.info("[Fetch Manual CB] Finally - Resetting image task initiation flag due to failure.");
@@ -338,7 +333,7 @@ export const useRepoFetcher = ({
              logger.info(`[Fetch Manual CB] FINISHED. Final Status via Ref: ${fetchStatusRef.current}`);
         }
     }, [
-        repoUrl, token, targetBranchName, manualBranchName, imageReplaceTask,
+        repoUrl, token, targetBranchName, manualBranchName, imageReplaceTask, targetPrData, // Include targetPrData as it might influence branch logic indirectly via context
         highlightedPathFromUrl, importantFiles, autoFetch, ideaFromUrl, isSettingsModalOpen,
         loadingPrs, assistantLoading, isParsing, aiActionLoading,
         setFetchStatus, handleSetFilesFetched,
@@ -356,9 +351,18 @@ export const useRepoFetcher = ({
         logger.debug("[Effect Auto-Fetch] Check START");
         if (!repoUrlEntered) { logger.debug("[Effect Auto-Fetch] SKIP: no URL entered"); return; }
         const currentTask = imageReplaceTask;
-        const branch = targetBranchName || manualBranchName || null;
+        // **Auto-fetch should use the branch logic defined in handleFetchManual**
+        // It doesn't need to determine the branch itself; handleFetchManual does that.
+        const branch = null; // Let handleFetchManual determine the branch based on context state
         const shouldConsiderAutoFetch = autoFetch && (!!currentTask || !!highlightedPathFromUrl || !!ideaFromUrl);
+
         if (!shouldConsiderAutoFetch) { logger.debug("[Effect Auto-Fetch] SKIP: Conditions not met", { autoFetch, currentTask, highlightedPathFromUrl, ideaFromUrl }); return; }
+
+        // Added guard against multiple triggers
+        if (isAutoFetchingRef.current || fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying') {
+            logger.debug("[Effect Auto-Fetch] SKIP: Already fetching or auto-fetch in progress.");
+            return;
+        }
 
         logger.info("[Effect Auto-Fetch] Conditions met, setting timer...");
         const timerId = setTimeout(() => {
@@ -369,15 +373,19 @@ export const useRepoFetcher = ({
             if (canTriggerFetchNow && !isAutoFetchingRef.current) {
                 logger.info("[Effect Auto-Fetch Timer] Triggering handleFetchManual");
                 isAutoFetchingRef.current = true;
-                handleFetchManual(false, branch, currentTask)
+                handleFetchManual(false, branch, currentTask) // Pass null for branch
                     .catch(err => { logger.error(`[Effect Auto-Fetch Timer] handleFetchManual CATCH:`, err); })
-                    .finally(() => { logger.info("[Effect Auto-Fetch Timer] handleFetchManual FINALLY"); isAutoFetchingRef.current = false; });
+                    .finally(() => {
+                        logger.info("[Effect Auto-Fetch Timer] handleFetchManual FINALLY");
+                        // Delay resetting the ref slightly to prevent rapid re-triggering if status flips quickly
+                        setTimeout(() => { isAutoFetchingRef.current = false; }, 200);
+                    });
             } else { logger.debug("[Effect Auto-Fetch Timer] Conditions NOT met inside timer."); }
         }, 500); // Keep delay
 
         return () => { logger.debug("[Effect Auto-Fetch Cleanup] Clearing timer."); clearTimeout(timerId); };
     }, [
-        repoUrlEntered, autoFetch, targetBranchName, manualBranchName, imageReplaceTask,
+        repoUrlEntered, autoFetch, imageReplaceTask, // Target branch determination happens in handleFetchManual now
         highlightedPathFromUrl, ideaFromUrl, handleFetchManual, logger // Added logger
     ]);
 

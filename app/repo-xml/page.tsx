@@ -57,7 +57,7 @@ const translations = {
     step1Desc: "Enter GitHub URL -> Hit <FaDownload class='inline mx-1 text-purple-400 align-baseline'/> OR Spot bug/idea -> Activate Buddy <FaRobot class='inline mx-1 text-indigo-400 align-baseline'/> -> Describe.", // Added align-baseline
     step1DescEnd: "For images (Lv.1): Copy broken URL, paste in Buddy/Input.",
     step2Title: "2. AI Magic & Ship:",
-    step2Desc: "If needed (Lv.2+), use <span class='text-blue-400 font-semibold'>\"🤖 Ask AI\"</span> -> Check Assistant <FaWandMagicSparkles class='inline mx-1 text-yellow-400 align-baseline'/> -> Hit <FaGithub class='inline mx-1 text-green-400 align-baseline'/> PR Button.", // Added align-baseline
+    step2Desc: "If needed (Lv.2+), use <span class='text-blue-400 font-semibold'>\"🤖 Спросить AI\"</span> -> Check Assistant <FaWandMagicSparkles class='inline mx-1 text-yellow-400 align-baseline'/> -> Hit <FaGithub class='inline mx-1 text-green-400 align-baseline'/> PR Button.", // Added align-baseline
     step2DescEnd: "<strong>DONE.</strong> Site updates automagically.",
     readyButton: "LET'S F*CKING GO!",
     componentsTitle: "Engage Vibe Engines!",
@@ -159,14 +159,12 @@ function ActualPageContent() {
     // --- State Initialization ---
     if (typeof logger !== 'undefined') logger.log("[ActualPageContent] Initializing State..."); else console.log("[ActualPageContent] Initializing State...");
     const [lang, setLang] = useState<Language>('en');
-    const [showComponents, setShowComponents] = useState(false);
+    // const [showComponents, setShowComponents] = useState(false); // Moved to context
     const [initialIdea, setInitialIdea] = useState<string | null>(null);
     const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(false);
     const [t, setT] = useState<TranslationSet | null>(null);
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
-    // .. State to track if searchParams hook has successfully run
     const [searchParamsReady, setSearchParamsReady] = useState(false);
-    // .. NEW: State for props derived from searchParams
     const [highlightedPathProp, setHighlightedPathProp] = useState<string | null>(null);
     const [ideaProp, setIdeaProp] = useState<string | null>(null);
     if (typeof logger !== 'undefined') logger.log("[ActualPageContent] useState DONE"); else console.log("[ActualPageContent] useState DONE");
@@ -209,7 +207,8 @@ function ActualPageContent() {
         targetPrData, setTargetPrData,
         isPreChecking, setPendingFlowDetails,
         pendingFlowDetails,
-        setTargetBranchName, setManualBranchName // Needed for URL param effect
+        setTargetBranchName, setManualBranchName, // Needed for URL param effect
+        showComponents, setShowComponents // Get showComponents state and setter
     } = pageContext;
 
     // --- Effects ---
@@ -256,7 +255,7 @@ function ActualPageContent() {
         const pathParam = searchParams.get("path");
         const ideaParam = searchParams.get("idea");
         const repoParam = searchParams.get("repo");
-        const targetBranchParam = searchParams.get("targetBranch");
+        const targetBranchParam = searchParams.get("targetBranch"); // Can be the PR *base* branch initially
         const prNumberParam = searchParams.get("prNumber");
         const prUrlParam = searchParams.get("prUrl");
 
@@ -282,25 +281,18 @@ function ActualPageContent() {
              } catch (e) { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Error decoding repo URL param:", e); }
          }
 
-        // .. Branch/PR processing
-         if (targetBranchParam) {
-             const decodedBranch = decodeURIComponent(targetBranchParam);
-             setTargetBranchName(decodedBranch); // Use context setter
-             setManualBranchName(''); // Use context setter
-             if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Target Branch set from param: ${decodedBranch}`);
-             if (prNumberParam && prUrlParam) {
-                 try {
-                     const prNum = parseInt(decodeURIComponent(prNumberParam), 10);
-                     const prUrl = decodeURIComponent(prUrlParam);
-                     if (!isNaN(prNum) && prUrl) {
-                         setTargetPrData({ number: prNum, url: prUrl }); // Use context setter
-                         if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Target PR Data set from param: #${prNum}`);
-                     }
-                 } catch (e) { if (typeof logger !== 'undefined') logger.error("Error parsing PR number/url from URL params", e); }
-             }
-         } else {
-             setTargetPrData(null); // Use context setter
+         let prDetails = null;
+         if (prNumberParam && prUrlParam) {
+              try {
+                  const prNum = parseInt(decodeURIComponent(prNumberParam), 10);
+                  const prUrl = decodeURIComponent(prUrlParam);
+                  if (!isNaN(prNum) && prUrl) {
+                      prDetails = { number: prNum, url: prUrl };
+                      if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Target PR Data parsed from param: #${prNum}`);
+                  }
+              } catch (e) { if (typeof logger !== 'undefined') logger.error("Error parsing PR number/url from URL params", e); }
          }
+         setTargetPrData(prDetails); // Use context setter
 
         // .. Path/Idea processing for flows
           if (pathParam && ideaParam) {
@@ -320,8 +312,16 @@ function ActualPageContent() {
                               const newUrl = decodeURIComponent(newUrlParam.substring(7));
                               if (oldUrl && newUrl) {
                                   const flowDetails = { oldUrl, newUrl };
-                                  setPendingFlowDetails({ type: 'ImageSwap', targetPath: decodedPath, details: flowDetails });
-                                  if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Setting Pending Flow: ImageSwap`, { path: decodedPath, details: flowDetails });
+                                   // Trigger pre-check and fetch for image swap
+                                   if(pageContext.triggerPreCheckAndFetch && repoUrl) {
+                                      logger.info(`[Effect URL Params] Triggering pre-check and fetch for ImageSwap`);
+                                      // Guess branch name from path if possible, otherwise default
+                                      const potentialBranch = repoUtils.guessBranchNameFromPath(decodedPath) || 'image-update-' + Date.now().toString(36);
+                                      pageContext.triggerPreCheckAndFetch(repoUrl, potentialBranch, 'ImageSwap', flowDetails, decodedPath);
+                                  } else {
+                                      logger.error("[Effect URL Params] Cannot trigger pre-check/fetch: function or repoUrl missing.");
+                                      setPendingFlowDetails({ type: 'ImageSwap', targetPath: decodedPath, details: flowDetails }); // Fallback to just setting pending state
+                                  }
                               } else { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Invalid image task URL data", { decodedPath, oldUrl, newUrl }); setPendingFlowDetails(null); }
                           } else { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Could not parse ImageReplace parts:", decodedIdea); setPendingFlowDetails(null); }
                       } catch (splitError) { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Error splitting ImageReplace task:", splitError); setPendingFlowDetails(null); }
@@ -342,8 +342,16 @@ function ActualPageContent() {
                                  }
                              });
                              if (decodedPath && details.Message) {
-                                 setPendingFlowDetails({ type: 'ErrorFix', targetPath: decodedPath, details });
-                                 if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Setting Pending Flow: ErrorFix`, { path: decodedPath, details });
+                                // Trigger pre-check and fetch for error fix
+                                if(pageContext.triggerPreCheckAndFetch && repoUrl) {
+                                      logger.info(`[Effect URL Params] Triggering pre-check and fetch for ErrorFix`);
+                                      // Use PR branch if available, otherwise guess or default
+                                      const potentialBranch = targetBranchParam ? decodeURIComponent(targetBranchParam) : (repoUtils.guessBranchNameFromPath(decodedPath) || 'error-fix-' + Date.now().toString(36));
+                                      pageContext.triggerPreCheckAndFetch(repoUrl, potentialBranch, 'ErrorFix', details, decodedPath);
+                                  } else {
+                                      logger.error("[Effect URL Params] Cannot trigger pre-check/fetch: function or repoUrl missing.");
+                                      setPendingFlowDetails({ type: 'ErrorFix', targetPath: decodedPath, details }); // Fallback
+                                  }
                              } else { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Invalid ErrorFix data (missing path or message)", { decodedPath, details }); setPendingFlowDetails(null); }
                          } catch (parseError) { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Error parsing ErrorFix task:", parseError); setPendingFlowDetails(null); }
                          setInitialIdeaProcessed(false); // Keep as false to allow populate effect
@@ -355,6 +363,11 @@ function ActualPageContent() {
                      setImageReplaceTask(null);
                      setPendingFlowDetails(null);
                      setInitialIdeaProcessed(false); // Keep as false to allow populate effect
+                     // Trigger fetch for simple idea (no pre-check needed unless PR is specified)
+                      if (fetcherRef?.current?.handleFetch && repoUrl) {
+                          logger.info("[Effect URL Params] Triggering fetch for simple idea.");
+                          fetcherRef.current.handleFetch(false, targetBranchParam ? decodeURIComponent(targetBranchParam) : null);
+                      }
                   } else {
                       // .. Handle empty/invalid idea
                       if (typeof logger !== 'undefined') logger.warn("[Effect URL Params] Decoded idea empty/invalid.");
@@ -374,22 +387,27 @@ function ActualPageContent() {
          if (typeof logger !== 'undefined') logger.debug("[Effect URL Params] END"); else console.debug("[Effect URL Params] END");
       // --- DEPENDENCIES ---
       }, [
-          searchParamsReady, searchParams,
-          setImageReplaceTask, setRepoUrl, addToast, setPendingFlowDetails,
-          setTargetBranchName, setManualBranchName, setTargetPrData // Context setters are stable
+          searchParamsReady, searchParams, // Core dependencies for reading params
+          // Context setters (stable refs assumed)
+          setRepoUrl, addToast, setPendingFlowDetails,
+          setTargetBranchName, setManualBranchName, setTargetPrData,
+          setImageReplaceTask, setShowComponents,
+          // Functions from context/refs (should be stable)
+          pageContext.triggerPreCheckAndFetch, fetcherRef, repoUrl, // repoUrl needed for pre-check trigger
       ]);
 
        // --- Effect for Kwork/Task Population ---
        useEffect(() => {
             if (typeof logger !== 'undefined') logger.debug("[Effect Populate] Check START", { fetchStatus, isPreChecking, pendingFlow: !!pendingFlowDetails, initialIdea: !!initialIdea }); else console.debug("[Effect Populate] Check START", { fetchStatus, isPreChecking, pendingFlow: !!pendingFlowDetails, initialIdea: !!initialIdea });
+
+            // Wait for fetch success AND pre-check to be finished
             if (fetchStatus === 'success' && !isPreChecking) {
                  const flow = pendingFlowDetails;
                  if (flow) {
                       if (typeof logger !== 'undefined') logger.info(`[Effect Populate] Processing Pending Flow: ${flow.type}`); else console.info(`[Effect Populate] Processing Pending Flow: ${flow.type}`);
                       if (flow.type === 'ImageSwap') {
-                          const task: ImageReplaceTask = { targetPath: flow.targetPath, oldUrl: flow.details.oldUrl, newUrl: flow.details.newUrl };
-                          setImageReplaceTask(task);
-                           if (typeof logger !== 'undefined') logger.log("[Effect Populate] ImageReplaceTask set from pending flow."); else console.log("[Effect Populate] ImageReplaceTask set from pending flow.");
+                          // ImageSwap logic is now handled earlier during fetch success in handleSetFilesFetchedStable
+                          logger.log("[Effect Populate] ImageSwap flow processing handled earlier.");
                           setInitialIdea(null);
                           setInitialIdeaProcessed(true);
                       } else if (flow.type === 'ErrorFix' && kworkInputRef?.current) {
@@ -399,14 +417,20 @@ function ActualPageContent() {
                             try { kworkInputRef.current.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { if (typeof logger !== 'undefined') logger.error("Dispatch input event error:", e); else console.error("Dispatch input event error:", e); }
                             setKworkInputHasContent(true);
                             if (typeof logger !== 'undefined') logger.log("[Effect Populate] Kwork populated for ErrorFix flow."); else console.log("[Effect Populate] Kwork populated for ErrorFix flow.");
-                            if(fetcherRef?.current?.handleAddSelected) {
-                                fetcherRef.current.handleAddSelected(new Set([flow.targetPath]), allFetchedFiles);
-                                if (typeof logger !== 'undefined') logger.log("[Effect Populate] Target error file added to kwork context."); else console.log("[Effect Populate] Target error file added to kwork context.");
+                            // Auto-select the target file in the fetcher
+                            if(fetcherRef?.current && allFetchedFiles.some(f => f.path === flow.targetPath)) {
+                                fetcherRef.current.toggleFileSelection?.(flow.targetPath); // Use toggle to ensure selection
+                                setTimeout(() => { // Delay adding to kwork slightly
+                                    fetcherRef.current?.handleAddSelected?.(new Set([flow.targetPath]), allFetchedFiles);
+                                    if (typeof logger !== 'undefined') logger.log("[Effect Populate] Target error file added to kwork context."); else console.log("[Effect Populate] Target error file added to kwork context.");
+                                }, 100);
+                            } else {
+                                logger.warn("[Effect Populate] Could not auto-select error file (ref or file missing).");
                             }
                            setInitialIdeaProcessed(true);
                       }
-                      setPendingFlowDetails(null);
-                      const targetElement = document.getElementById('executor');
+                      setPendingFlowDetails(null); // Clear the flow details once processed
+                      const targetElement = document.getElementById('executor'); // Scroll to assistant after populating
                       if (targetElement) { setTimeout(() => { try { targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e){ if (typeof logger !== 'undefined') logger.error("Scroll error:",e); else console.error("Scroll error:",e)} }, 250); }
 
                  } else if (initialIdea && !initialIdeaProcessed && !imageReplaceTask && kworkInputRef?.current) {
@@ -414,10 +438,17 @@ function ActualPageContent() {
                      kworkInputRef.current.value = initialIdea;
                      try { kworkInputRef.current.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { if (typeof logger !== 'undefined') logger.error("Dispatch input event error:", e); else console.error("Dispatch input event error:", e); }
                      setKworkInputHasContent(initialIdea.trim().length > 0);
-                     if (fetcherRef?.current?.handleAddSelected && selectedFetcherFiles.size > 0) {
-                         if (typeof logger !== 'undefined') logger.log("[Effect Populate] Calling handleAddSelected for simple idea."); else console.log("[Effect Populate] Calling handleAddSelected for simple idea.");
-                         (async () => { try { await fetcherRef.current!.handleAddSelected(selectedFetcherFiles, allFetchedFiles); } catch (err) { if (typeof logger !== 'undefined') logger.error("handleAddSelected error:", err); else console.error("handleAddSelected error:", err); } })();
-                     }
+
+                      // Auto-select the target file if highlightedPathProp exists and is fetched
+                      if (highlightedPathProp && fetcherRef?.current && allFetchedFiles.some(f => f.path === highlightedPathProp)) {
+                          logger.log("[Effect Populate] Auto-selecting highlighted file for simple idea:", highlightedPathProp);
+                          fetcherRef.current.toggleFileSelection?.(highlightedPathProp); // Use toggle
+                          setTimeout(() => { // Delay adding to kwork slightly
+                             fetcherRef.current?.handleAddSelected?.(new Set([highlightedPathProp]), allFetchedFiles);
+                             logger.log("[Effect Populate] Highlighted file added to kwork context for simple idea.");
+                          }, 100);
+                      }
+
                      const kworkElement = document.getElementById('kwork-input-section');
                      if (kworkElement) { setTimeout(() => { try { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e){ if (typeof logger !== 'undefined') logger.error("Scroll error:", e); else console.error("Scroll error:", e) } }, 250); }
                      setInitialIdeaProcessed(true); // Mark as processed here
@@ -425,9 +456,19 @@ function ActualPageContent() {
                       setInitialIdeaProcessed(true);
                       if (typeof logger !== 'undefined') logger.log(`[Effect Populate] Fetch finished (${fetchStatus}), no pending idea/flow or already processed.`); else console.log(`[Effect Populate] Fetch finished (${fetchStatus}), no pending idea/flow or already processed.`);
                  }
+            } else if (!isPreChecking && fetchStatus !== 'loading' && fetchStatus !== 'retrying' && fetchStatus !== 'idle' && !initialIdeaProcessed) {
+                // Handle cases where fetch might fail but we still need to mark as processed
+                 logger.warn(`[Effect Populate] Fetch status is '${fetchStatus}' and not loading/idle/pre-checking. Marking initial idea as processed.`);
+                 setInitialIdeaProcessed(true);
             }
+
             if (typeof logger !== 'undefined') logger.debug("[Effect Populate] Check END"); else console.debug("[Effect Populate] Check END");
-        }, [ fetchStatus, isPreChecking, pendingFlowDetails, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, fetcherRef, allFetchedFiles, selectedFetcherFiles, addToast, setKworkInputHasContent, setImageReplaceTask, setPendingFlowDetails ]); // Keep dependencies
+        }, [
+            fetchStatus, isPreChecking, pendingFlowDetails, initialIdea, initialIdeaProcessed, imageReplaceTask,
+            kworkInputRef, fetcherRef, allFetchedFiles, highlightedPathProp, // Added highlightedPathProp
+            addToast, setKworkInputHasContent, setImageReplaceTask, setPendingFlowDetails, // Context setters
+            logger // Logger
+        ]);
 
 
     // --- Callbacks ---
@@ -465,9 +506,13 @@ function ActualPageContent() {
         } else {
             if (typeof logger !== 'undefined') logger.error(`[CB ScrollNav] Target element "${id}" not found.`); else console.error(`[CB ScrollNav] Target element "${id}" not found.`);
         }
-    }, [showComponents]);
+    }, [showComponents, setShowComponents, logger]); // Added setShowComponents and logger
 
-    const handleShowComponents = useCallback(() => { if (typeof logger !== 'undefined') logger.info("[Button Click] handleShowComponents (Reveal)"); setShowComponents(true); toastInfo("Компоненты загружены!", { duration: 1500 }); }, [toastInfo]);
+    const handleShowComponents = useCallback(() => {
+        if (typeof logger !== 'undefined') logger.info("[Button Click] handleShowComponents (Reveal)");
+        setShowComponents(true);
+        toastInfo("Компоненты загружены!", { duration: 1500 });
+    }, [setShowComponents, toastInfo, logger]); // Added setShowComponents and logger
 
 
     // --- Loading / Error States ---
