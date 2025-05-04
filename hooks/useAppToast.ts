@@ -9,28 +9,31 @@ type ToastType = 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message
 
 /**
  * Custom hook for displaying toasts using 'sonner' and logging them to the ErrorOverlayContext history.
+ * Made more resilient to context initialization order.
  */
 export const useAppToast = () => {
+    // Get context hook result. It might be the default value initially.
     const errorOverlay = useErrorOverlay();
 
-    // Memoize the showToast function for stability
+    // Memoize the core toast showing logic. This depends ONLY on the `errorOverlay` reference
+    // (which is stable after the context provider mounts) and the logger.
     const showToast = useCallback((
         type: ToastType,
         message: string | React.ReactNode,
         options?: any
     ) => {
-        const logWarn = logger.warn;
-        const logError = logger.error;
-        const logDebug = logger.debug;
-
-        // Check context readiness *at the time of the call*
+        // Grab specific functions from context *inside* the callback
+        // This ensures we use the latest functions if the context value updates,
+        // while keeping the callback itself stable.
+        // Check if context and its methods are ready *at the time of the call*
         const isContextReadyNow = !!errorOverlay && typeof errorOverlay.addToastToHistory === 'function';
         const addToastToHistoryFunc = isContextReadyNow ? errorOverlay.addToastToHistory : null;
 
+        // Log context readiness status during the call
         if (!isContextReadyNow) {
-            logWarn("useAppToast: Context not ready at time of toast call, logging to history will be skipped.", { type, messageString: typeof message === 'string' ? message : '[ReactNode]' });
+            logger.warn("useAppToast: Context not ready at time of toast call, logging to history will be skipped.", { type, messageString: typeof message === 'string' ? message : '[ReactNode]' });
         } else {
-            logDebug("useAppToast: Context ready, proceeding with toast and logging.");
+            logger.debug("useAppToast: Context ready, proceeding with toast and logging.");
         }
 
         try {
@@ -48,7 +51,7 @@ export const useAppToast = () => {
                     if (typeof message === 'function') {
                        toastId = sonnerToast.custom(message as (id: number | string) => React.ReactNode, options);
                     } else {
-                        logWarn("useAppToast: 'custom' type requires a function as message. Falling back to 'message'.");
+                        logger.warn("useAppToast: 'custom' type requires a function as message. Falling back to 'message'.");
                         toastId = sonnerToast.message(messageString, options); // Fallback for custom
                     }
                     break;
@@ -66,31 +69,32 @@ export const useAppToast = () => {
                         timestamp: Date.now(),
                     };
                     addToastToHistoryFunc(record);
+                    logger.debug("useAppToast: Added toast to history:", record);
                 } catch (loggingError) { // Catch potential errors during logging itself
-                    logError("useAppToast: Failed to add toast to history", loggingError);
+                    logger.error("useAppToast: Failed to add toast to history", loggingError);
                 }
             } else if (!addToastToHistoryFunc) {
-                 logDebug("useAppToast: Skipped adding toast to history because context function was not available.");
+                 logger.debug("useAppToast: Skipped adding toast to history because context function was not available.");
             } else {
-                 logDebug("useAppToast: Skipped adding ReactNode/CustomComponent toast content to history.");
+                 logger.debug("useAppToast: Skipped adding ReactNode/CustomComponent toast content to history.");
             }
 
             return toastId;
 
         } catch (err) {
-            logError("Error in useAppToast while showing/logging toast:", err, { type, messageString: typeof message === 'string' ? message : '[ReactNode]', options });
+            logger.error("Error in useAppToast while showing/logging toast:", err, { type, messageString: typeof message === 'string' ? message : '[ReactNode]', options });
             try {
                 // Attempt a fallback native toast
                 sonnerToast.error("Internal issue: Could not display toast.", { duration: 2000 });
             } catch { /* Silently fail if even fallback fails */ }
             return undefined;
         }
-    }, [errorOverlay]); // Depend only on errorOverlay reference
+    }, [errorOverlay]); // Depend only on the stable context reference
 
 
     // Memoize the returned object of functions using the stable showToast callback
     return useMemo(() => {
-        // logger.debug("useAppToast: Re-memoizing returned functions object."); // Can be noisy
+        logger.debug("useAppToast: Re-memoizing returned functions object."); // Keep for debugging memoization
         return {
             success: (message: string | React.ReactNode, options?: any) => showToast('success', message, options),
             error: (message: string | React.ReactNode, options?: any) => showToast('error', message, options),

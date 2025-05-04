@@ -146,6 +146,7 @@ const AutomationBuddy: React.FC = () => {
 
                 // Check component visibility requirement
                 if (requiresComponents && !canShowComponentActions) {
+                    logger.debug(`[Suggestion Calc] Skipping suggestion '${id}' because components are hidden.`);
                     condition = false;
                 }
 
@@ -174,6 +175,7 @@ const AutomationBuddy: React.FC = () => {
                  const targetFileExists = fetched && allFiles?.some(f => f.path === task.targetPath);
                  const isErrorState = status === 'error' || status === 'failed_retries' || (status === 'success' && !targetFileExists && fetched);
 
+                 // Settings button is always available if components are shown
                  addSuggestion( 'toggle-settings', settingsOpen ? "Закрыть Настройки" : "Настройки (URL/Ветка)", triggerToggleSettingsModal, <FaCodeBranch />, true, assistLoading, '', true ); // Requires components
 
                  if (isErrorState) {

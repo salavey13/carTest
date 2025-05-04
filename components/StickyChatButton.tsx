@@ -59,6 +59,30 @@ const StickyChatButton: React.FC = () => {
     // --- Fetch GitHub Profile ---
     useEffect(() => { setPrevGithubLoading(githubLoading); if (isOpen && !isAppLoading && appContextUser?.username && !githubProfile && !githubLoading) { const fetchProfile = async () => { setGithubLoading(true); const result = await getGitHubUserProfile(appContextUser.username!); if (result.success && result.profile) { setGithubProfile(result.profile); } else { console.warn("(StickyChat) GitHub fetch failed:", result.error); setGithubProfile(null); } setGithubLoading(false); }; fetchProfile(); } if (!appContextUser) { setGithubProfile(null); setGithubLoading(false); } }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading]);
 
+    // --- Copy Logs Handler ---
+    const handleCopyLogs = useCallback(async () => {
+        try {
+            const logRecords: ReadonlyArray<LogRecord> = debugLogger.getInternalLogRecords();
+            if (logRecords.length === 0) {
+                toastInfo("Нет логов для копирования.");
+                return;
+            }
+            // Format logs with timestamp and level
+            const formattedLogs = logRecords.map(log =>
+                `[${new Date(log.timestamp).toISOString()}] ${log.level.toUpperCase().padEnd(5)}: ${log.message}`
+            ).join("\n");
+
+            await navigator.clipboard.writeText(formattedLogs);
+            toastSuccess("Логи скопированы в буфер обмена!");
+            setLogsCopied(true);
+            setTimeout(() => setLogsCopied(false), 2000); // Reset button text after 2s
+        } catch (err) {
+            console.error("Failed to copy logs:", err);
+            toastError("Не удалось скопировать логи.");
+        }
+    }, [toastSuccess, toastError, toastInfo]); // Dependencies for toast functions
+
+
     // --- Suggestion Logic ---
     const suggestions = useMemo((): Suggestion[] => {
         const baseSuggestions: Suggestion[] = []; const isToolPage = currentPath === '/repo-xml'; const cleanPath = currentPath.split('?')[0]; const trimmedCustomIdea = customIdea.trim(); const hasCustomIdea = trimmedCustomIdea.length > 0 && !potentialOldImageUrl;
@@ -73,7 +97,7 @@ const StickyChatButton: React.FC = () => {
         baseSuggestions.push({ id: COPY_LOGS_ID, text: logsCopied ? "Логи скопированы!" : "Скопировать Логи", action: handleCopyLogs, icon: logsCopied ? <FaCircleCheck className="mr-1.5 text-green-400"/> : <FaClipboardList className="mr-1.5" />, tooltip: "Скопировать историю системных логов в буфер обмена для отладки" });
 
         return baseSuggestions;
-    }, [currentPath, potentialOldImageUrl, showReplaceTool, customIdea, logsCopied]); // Added logsCopied dependency
+    }, [currentPath, potentialOldImageUrl, showReplaceTool, customIdea, logsCopied, handleCopyLogs]); // Added logsCopied and handleCopyLogs dependency
 
     // --- Update Active Message Logic ---
     useEffect(() => {
@@ -93,27 +117,6 @@ const StickyChatButton: React.FC = () => {
     // --- Detect Image URL in Custom Input ---
     useEffect(() => { const trimmedIdea = customIdea.trim(); if (trimmedIdea && isImageUrl(trimmedIdea)) { setPotentialOldImageUrl(trimmedIdea); } else { setPotentialOldImageUrl(null); if (showReplaceTool) { setShowReplaceTool(false); } } }, [customIdea, showReplaceTool]);
 
-    // --- Copy Logs Handler ---
-    const handleCopyLogs = useCallback(async () => {
-        try {
-            const logRecords: ReadonlyArray<LogRecord> = debugLogger.getInternalLogRecords();
-            if (logRecords.length === 0) {
-                toastInfo("Нет логов для копирования.");
-                return;
-            }
-            const formattedLogs = logRecords.map(log =>
-                `${log.level.toUpperCase().padEnd(5)} [${new Date(log.timestamp).toISOString()}] ${log.message}`
-            ).join("\n");
-
-            await navigator.clipboard.writeText(formattedLogs);
-            toastSuccess("Логи скопированы в буфер обмена!");
-            setLogsCopied(true);
-            setTimeout(() => setLogsCopied(false), 2000); // Reset button text after 2s
-        } catch (err) {
-            console.error("Failed to copy logs:", err);
-            toastError("Не удалось скопировать логи.");
-        }
-    }, [toastSuccess, toastError, toastInfo]);
 
     // --- Event Handlers ---
     const handleSuggestionClick = (suggestion: Suggestion) => {

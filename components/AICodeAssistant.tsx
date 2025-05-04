@@ -5,7 +5,7 @@ import React, { useMemo, useState, useEffect, useImperativeHandle, forwardRef, M
 import {
     useRepoXmlPageContext, AICodeAssistantRef, SimplePullRequest, ImageReplaceTask, FileNode, RepoXmlPageContextType
 } from "@/contexts/RepoXmlPageContext";
-import { supabaseAdmin } from "@/hooks/supabase"; 
+import { supabaseAdmin } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
 // Hooks & Components
 import { useAppToast } from '@/hooks/useAppToast'; // Use the hook
@@ -19,8 +19,7 @@ import { OpenPrList } from './assistant_components/OpenPrList';
 import { ToolsMenu } from './assistant_components/ToolsMenu';
 import { ImageToolsModal } from './assistant_components/ImageToolsModal';
 import { SwapModal } from './assistant_components/SwapModal';
-// REMOVED CodeRestorer import
-// import { CodeRestorer } from './assistant_components/CodeRestorer';
+// .. REMOVED CodeRestorer import
 // UI & Utils
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -30,16 +29,14 @@ import {
 } from "react-icons/fa6";
 import clsx from "clsx";
 import { debugLogger as logger } from "@/lib/debugLogger"; // Use the logger
-// .. Removed fetchRepoContents if not used elsewhere
 
-// Interfaces (Keep if needed)
+// .. Interfaces (Keep if needed)
 interface FileEntry extends ValidationFileEntry {}
 interface AICodeAssistantProps {
      kworkInputRefPassed: MutableRefObject<HTMLTextAreaElement | null>;
      aiResponseInputRefPassed: MutableRefObject<HTMLTextAreaElement | null>;
 }
-// REMOVED OriginalFile interface
-// interface OriginalFile { path: string; content: string; }
+// .. REMOVED OriginalFile interface
 
 // --- Main Component ---
 const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((props, ref) => {
@@ -62,9 +59,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const [showModal, setShowModal] = useState(false);
     const [modalMode, setModalMode] = useState<'replace' | 'search'>('replace');
     const [isProcessingPR, setIsProcessingPR] = useState(false); // State for internal PR button press
-    // REMOVED originalRepoFiles and isFetchingOriginals state
-    // const [originalRepoFiles, setOriginalRepoFiles] = useState<OriginalFile[]>([]);
-    // const [isFetchingOriginals, setIsFetchingOriginals] = useState(false);
+    // .. REMOVED originalRepoFiles and isFetchingOriginals state
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [componentParsedFiles, setComponentParsedFiles] = useState<ValidationFileEntry[]>([]);
     const [imageReplaceError, setImageReplaceError] = useState<string | null>(null);
@@ -101,7 +96,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         fetchStatus, allFetchedFiles, repoUrlEntered,
         repoUrl: repoUrlFromContext,
         setRequestCopied,
-        addToast // Keep context addToast only if absolutely necessary (shouldn't be)
+        // .. Removed addToast - useAppToast hook provides it
     } = pageContext;
     logger.debug("[AICodeAssistant] After Destructuring");
 
@@ -109,10 +104,10 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     logger.debug("[AICodeAssistant] Before useAICodeAssistantHandlers");
     const handlers = useAICodeAssistantHandlers({
         response, componentParsedFiles, selectedFileIds, repoUrlStateLocal, prTitle, customLinks,
-        // REMOVED originalRepoFiles, isFetchingOriginals from props
+        // .. REMOVED originalRepoFiles, isFetchingOriginals from props
         imageReplaceTask,
         setResponse, setSelectedFileIds, setPrTitle, setCustomLinks, setShowModal, setModalMode, setIsProcessingPR,
-        // REMOVED setOriginalRepoFiles, setIsFetchingOriginals from props
+        // .. REMOVED setOriginalRepoFiles, setIsFetchingOriginals from props
         setIsImageModalOpen, setComponentParsedFiles, setImageReplaceError, setRepoUrlStateLocal,
         setImageReplaceTask,
         codeParserHook,
@@ -126,7 +121,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     // --- Destructure handlers ---
     const {
         handleParse, handleAutoFix,
-        // REMOVED handleCopyFixPrompt, handleRestorationComplete from handlers
+        // .. REMOVED handleCopyFixPrompt, handleRestorationComplete from handlers
         handleUpdateParsedFiles, handleClearResponse, handleCopyResponse, handleOpenModal,
         handleSwap, handleSearch, handleSelectFunction, handleToggleFileSelection,
         handleSelectAllFiles, handleDeselectAllFiles, handleSaveFiles, handleDownloadZip,
@@ -143,28 +138,28 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         setHookParsedFiles([]); setFilesParsed(false); setSelectedFileIds(new Set()); setSelectedAssistantFiles(new Set());
         setValidationStatus('idle'); setValidationIssues([]); setPrTitle(''); codeParserHook.setRawDescription('');
         setRequestCopied(false); setAiResponseHasContent(value.trim().length > 0);
-        // REMOVED setOriginalRepoFiles([]) call
+        // .. REMOVED setOriginalRepoFiles([]) call
         logger.log("[CB setResponseValue] Response value set manually, resetting parsed state.");
-     }, [aiResponseInputRefPassed, setHookParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, codeParserHook, setRequestCopied, setAiResponseHasContent, setSelectedFileIds]); // Added missing dependency
+     }, [aiResponseInputRefPassed, setHookParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, codeParserHook, setRequestCopied, setAiResponseHasContent, setSelectedFileIds, logger]); // Added logger
 
     const updateRepoUrl = useCallback((url: string) => {
         logger.info(`[CB updateRepoUrl] Updating local URL: ${url}`);
         setRepoUrlStateLocal(url);
         // NOT triggering PR refresh automatically here
-     }, []);
+     }, [logger]); // Added logger
 
     const handleResetImageError = useCallback(() => {
          logger.info(`[CB handleResetImageError] Resetting image error state.`);
          setImageReplaceError(null);
          setImageReplaceTask(null); // Also clear the task
          toastInfo("Состояние ошибки сброшено.");
-     }, [setImageReplaceError, setImageReplaceTask, toastInfo]);
+     }, [setImageReplaceError, setImageReplaceTask, toastInfo, logger]); // Added logger
     logger.debug("[AICodeAssistant] After useCallback");
 
 
     // --- Refs ---
     logger.debug("[AICodeAssistant] Before useRef");
-    // const processingImageReplace = useRef(false); // Handled by assistantLoading now
+    // .. const processingImageReplace = useRef(false); // Handled by assistantLoading now
     const imageReplaceTaskRef = useRef(imageReplaceTask);
     logger.debug("[AICodeAssistant] After useRef");
 
@@ -183,12 +178,12 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         } else {
             logger.debug(`[Effect Mount] Skipping initial PRs (no valid URL yet)`);
         }
-    }, [triggerGetOpenPRs, repoUrlStateLocal, repoUrlFromContext]); // Keep dependencies that define initialRepoUrl
+    }, [triggerGetOpenPRs, repoUrlStateLocal, repoUrlFromContext, logger]); // Added logger
 
     useEffect(() => {
         logger.debug(`[Effect FilesParsed] Update based on componentParsedFiles: ${componentParsedFiles.length > 0}`);
         setFilesParsed(componentParsedFiles.length > 0);
-     }, [componentParsedFiles, setFilesParsed]);
+     }, [componentParsedFiles, setFilesParsed, logger]); // Added logger
 
     useEffect(() => {
         logger.debug(`[Effect URL Sync] Context URL: ${repoUrlFromContext}, Local URL: ${repoUrlStateLocal}`);
@@ -196,7 +191,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
              logger.info(`[Effect URL Sync] Syncing local URL from context: ${repoUrlFromContext}`);
              updateRepoUrl(repoUrlFromContext);
         }
-    }, [repoUrlFromContext, repoUrlStateLocal, updateRepoUrl]); // Use the stable updateRepoUrl
+    }, [repoUrlFromContext, repoUrlStateLocal, updateRepoUrl, logger]); // Added logger
 
     useEffect(() => {
         logger.debug("[Effect State Reset Check] START");
@@ -207,7 +202,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         if (!hasContent && !currentAiRequestId && !aiActionLoading && !imageReplaceTask && !assistantLoading && !isProcessingPR && !currentlyParsing) {
             logger.log("[Effect State Reset Check] Resetting state (empty response/idle).");
             setFilesParsed(false); setSelectedAssistantFiles(new Set()); setValidationStatus('idle'); setValidationIssues([]);
-            // REMOVED setOriginalRepoFiles([]);
+            // .. REMOVED setOriginalRepoFiles([]);
             setComponentParsedFiles([]); setHookParsedFiles([]); setSelectedFileIds(new Set()); setPrTitle(""); setRequestCopied(false);
         } else if (hasContent && componentParsedFiles.length === 0 && validationStatus !== 'idle' && !currentlyParsing && !assistantLoading && !imageReplaceTask && !isProcessingPR && !aiActionLoading) {
             logger.log("[Effect State Reset Check] Resetting validation status (response changed, no files parsed).");
@@ -219,15 +214,16 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         componentParsedFiles.length, contextIsParsing, hookIsParsing,
         assistantLoading, isProcessingPR, setAiResponseHasContent, setFilesParsed,
         setSelectedAssistantFiles, setValidationStatus, setValidationIssues,
-        setHookParsedFiles, /* REMOVED setOriginalRepoFiles, */ setComponentParsedFiles,
-        setSelectedFileIds, setPrTitle, setRequestCopied
+        setHookParsedFiles, /* .. REMOVED setOriginalRepoFiles, */ setComponentParsedFiles,
+        setSelectedFileIds, setPrTitle, setRequestCopied,
+        logger // Added logger
     ]);
 
     // --- Restored Custom Links useEffect ---
     useEffect(() => {
         logger.debug("[Effect Custom Links] START - Loading custom links.");
         const loadLinks = async () => {
-            // Check if user object exists and has an id property
+            // .. Check if user object exists and has an id property
             if (!user?.id) {
                 logger.debug("[Effect Custom Links] SKIP: no user or user.id is missing.");
                 setCustomLinks([]); // Reset links if user logs out or is invalid
@@ -237,23 +233,23 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             try {
                 logger.debug(`[Effect Custom Links] Fetching metadata for user: ${user.id}`);
 
-                // Fetch metadata for the specific user
+                // .. Fetch metadata for the specific user
                 const { data: userData, error: fetchError } = await supabaseAdmin
                     .from("users") // Make sure 'users' is your correct table name
                     .select("metadata") // Select only the metadata column
                     .eq("user_id", user.id) // Ensure 'user_id' is the correct column name matching your user object's id
                     .single(); // Expecting only one record for the user
 
-                // Handle potential fetch errors
+                // .. Handle potential fetch errors
                 if (fetchError) {
                     logger.error("[Effect Custom Links] Error fetching user metadata:", fetchError);
-                    // Display error to the user (optional, but recommended)
+                    // .. Display error to the user (optional, but recommended)
                     toastError(`Ошибка загрузки ваших ссылок: ${fetchError.message}`);
                     setCustomLinks([]); // Reset on error
                     return; // Exit early on error
                 }
 
-                // Check if data exists and has the customLinks property within metadata
+                // .. Check if data exists and has the customLinks property within metadata
                 if (userData?.metadata?.customLinks && Array.isArray(userData.metadata.customLinks)) {
                     logger.debug("[Effect Custom Links] Found custom links in metadata:", userData.metadata.customLinks);
                     setCustomLinks(userData.metadata.customLinks); // Set the links from metadata
@@ -273,8 +269,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         loadLinks(); // Execute the async function
         logger.debug("[Effect Custom Links] END - loadLinks called.");
 
-    // Dependencies: Re-run this effect if the user object changes,
-    // or if the functions used inside (setCustomLinks, toastError, logger) change instance.
+    // .. Dependencies: Re-run this effect if the user object changes,
+    // .. or if the functions used inside (setCustomLinks, toastError, logger) change instance.
     }, [user, setCustomLinks, toastError, logger]); // Added missing dependencies for stability & linting
     // --- End Restored Custom Links useEffect ---
 
@@ -290,12 +286,12 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
         if (canProcess && !assistantLoading) {
              logger.info(`[Effect Image Replace] Task Ready: ${currentTask.targetPath}. Calling handler.`);
-             // No need to check allFetchedFiles here, assumed handleSetFilesFetched did that
+             // .. No need to check allFetchedFiles here, assumed handleSetFilesFetched did that
               handleDirectImageReplace(currentTask, allFetchedFiles)
                  .then(({ success, error }) => {
                      if (success) {
                           logger.info("[Effect Image Replace] handleDirectImageReplace reported SUCCESS.");
-                          //setImageReplaceTask(null); // Clear the task on successful completion
+                          //setImageReplaceTask(null); // Clear the task on successful completion - Handled by context now? Let's keep it cleared by context.
                      } else {
                           logger.error("[Effect Image Replace] handleDirectImageReplace reported FAILURE:", error);
                          setImageReplaceError(error || "Ошибка при замене изображения и создании PR.");
@@ -325,7 +321,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     useEffect(() => {
         logger.debug(`[Effect Image Task Ref Update] New task present: ${!!imageReplaceTask}`);
         imageReplaceTaskRef.current = imageReplaceTask;
-    }, [imageReplaceTask]);
+    }, [imageReplaceTask, logger]); // Added logger
     logger.debug("[AICodeAssistant] After useEffects");
 
 
@@ -337,19 +333,19 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         handleCreatePR: () => { logger.debug(`[Imperative] handleCreatePR called.`); handlers.handleCreateOrUpdatePR(); },
         setResponseValue: (val: string) => { logger.debug(`[Imperative] setResponseValue called.`); setResponseValue(val); },
         updateRepoUrl: (url: string) => { logger.debug(`[Imperative] updateRepoUrl called.`); updateRepoUrl(url); },
-        // Keep direct image replace for context interaction
+        // .. Keep direct image replace for context interaction
         handleDirectImageReplace: (task: ImageReplaceTask, files: FileNode[]) => {
             logger.debug(`[Imperative] handleDirectImageReplace called from context.`);
             return handlers.handleDirectImageReplace(task, files);
         },
-    }), [handlers, setResponseValue, updateRepoUrl]);
+    }), [handlers, setResponseValue, updateRepoUrl, logger]); // Added logger
     logger.debug("[AICodeAssistant] After useImperativeHandle");
 
 
     // --- Derived State for Rendering ---
     logger.debug("[AICodeAssistant] Calculate Derived State");
     const effectiveIsParsing = contextIsParsing ?? hookIsParsing;
-    // Combined loading state: assistantLoading (for image replace/PR), internal PR processing, AI generating, parsing, PR list loading
+    // .. Combined loading state: assistantLoading (for image replace/PR), internal PR processing, AI generating, parsing, PR list loading
     const isProcessingAny = assistantLoading || isProcessingPR || aiActionLoading || effectiveIsParsing || loadingPrs;
     const finalRepoUrlForForm = repoUrlStateLocal || repoUrlFromContext || "";
     const canSubmitRegularPR = !isProcessingAny && filesParsed && selectedAssistantFiles.size > 0 && !!prTitle.trim() && !!finalRepoUrlForForm && !imageReplaceTask;
@@ -360,12 +356,12 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
     const showImageReplaceUI = !!imageReplaceTask || !!imageReplaceError;
     const showStandardAssistantUI = !showImageReplaceUI;
-    // Image task is considered "failed" if there's an error *and* it's not currently trying to process (assistantLoading)
+    // .. Image task is considered "failed" if there's an error *and* it's not currently trying to process (assistantLoading)
     const imageTaskFailed = !!imageReplaceError && !assistantLoading;
     const parseButtonDisabled = isProcessingAny || isWaitingForAiResponse || !response.trim() || !!imageReplaceTask;
     // .. fixButtonDisabled remains, but CodeRestorer is removed
     const fixButtonDisabled = isProcessingAny || isWaitingForAiResponse || !!imageReplaceTask;
-    // Submit PR button disabled if processing, no files selected, or if image task is active
+    // .. Submit PR button disabled if processing, no files selected, or if image task is active
     const submitButtonDisabled = !canSubmitRegularPR || isProcessingAny || !!imageReplaceTask;
     logger.debug(`[Render State] isProcessingAny=${isProcessingAny}, effectiveIsParsing=${effectiveIsParsing}, filesParsed=${filesParsed}, selectedAssistantFiles=${selectedAssistantFiles.size}, canSubmitRegularPR=${canSubmitRegularPR}, showImageReplaceUI=${showImageReplaceUI}, assistantLoading=${assistantLoading}`);
 
@@ -396,9 +392,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                               <TextAreaUtilities response={response} isLoading={isProcessingAny} onParse={handlers.handleParse} onOpenModal={handlers.handleOpenModal} onCopy={handlers.handleCopyResponse} onClear={handlers.handleClearResponse} onSelectFunction={handlers.handleSelectFunction} isParseDisabled={parseButtonDisabled} isProcessingPR={assistantLoading || isProcessingPR} />
                           </div>
                            <div className="flex justify-end items-start mt-1 gap-2 min-h-[30px]">
-                               {/* REMOVED CodeRestorer */}
-                               {/* <CodeRestorer parsedFiles={componentParsedFiles} originalFiles={originalRepoFiles} skippedIssues={validationIssues.filter(i => i.type === 'skippedCodeBlock')} onRestorationComplete={handlers.handleRestorationComplete} disabled={isProcessingAny || validationStatus === 'validating' || isFetchingOriginals} /> */}
-                               {/* ValidationStatusIndicator (no CodeRestorer dep) */}
+                               {/* .. REMOVED CodeRestorer */}
+                               {/* .. ValidationStatusIndicator (no CodeRestorer dep) */}
                                <ValidationStatusIndicator status={validationStatus} issues={validationIssues} onAutoFix={handlers.handleAutoFix} onCopyPrompt={() => {}} isFixDisabled={fixButtonDisabled} />
                           </div>
                       </div>

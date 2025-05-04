@@ -4,7 +4,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { FaPaperPlane } from 'react-icons/fa6';
-import { Tooltip } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'; // Import Tooltip components
 
 interface Suggestion {
     id: string;
@@ -34,53 +34,52 @@ export const SuggestionList: React.FC<SuggestionListProps> = ({
     className = ''
 }) => {
     return (
-        <motion.div
-            variants={listVariants}
-            className={clsx("space-y-2 w-full flex-grow", className)} // Apply alignment class
-        >
-            <AnimatePresence initial={false}>
-                {suggestions.map((suggestion) => (
-                    <motion.button
-                        key={suggestion.id}
-                        variants={itemVariants}
-                        initial="hidden"
-                        animate="visible"
-                        exit="exit"
-                        layout
-                        onClick={() => onSuggestionClick(suggestion)}
-                        disabled={suggestion.disabled}
-                        whileHover={!suggestion.disabled ? { scale: 1.03, x: 3 } : {}} // Add subtle hover effect
-                        whileTap={!suggestion.disabled ? { scale: 0.98 } : {}}     // Add subtle tap effect
-                        className={clsx( // Dynamically apply classes
-                            // Reverted back to rounded-full for buttons
-                            "flex items-center w-full text-left px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ease-in-out",
-                            "shadow-[0_0_8px_rgba(0,255,157,0.3)] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-opacity-75",
-                            { // Conditional classes
-                                "bg-gradient-to-r from-yellow-500 to-orange-500 text-white hover:from-yellow-400 hover:to-orange-400": suggestion.isHireMe && !suggestion.disabled,
-                                "bg-gray-700 bg-opacity-80 text-cyan-400 hover:bg-opacity-90 hover:text-cyan-300": !suggestion.isHireMe && !suggestion.disabled,
-                                "bg-gray-600 bg-opacity-50 text-gray-400 cursor-not-allowed": suggestion.disabled,
-                                "hover:shadow-[0_0_14px_rgba(0,255,157,0.6)]": !suggestion.disabled,
-                            }
-                        )}
-                    >
-                        {/* Wrap button content in Tooltip if tooltip text exists */}
-                        {suggestion.tooltip ? (
-                            <Tooltip text={suggestion.tooltip} >
-                                <div className="flex items-center w-full">
+        <TooltipProvider delayDuration={100}> {/* Provide tooltip context */}
+            <motion.div
+                variants={listVariants}
+                className={clsx("space-y-2 w-full flex-grow", className)} // Apply alignment class
+            >
+                <AnimatePresence initial={false}>
+                    {suggestions.map((suggestion) => (
+                        <Tooltip key={suggestion.id}>
+                            <TooltipTrigger asChild>
+                                <motion.button
+                                    variants={itemVariants}
+                                    initial="hidden"
+                                    animate="visible"
+                                    exit="exit"
+                                    layout
+                                    onClick={() => onSuggestionClick(suggestion)}
+                                    disabled={suggestion.disabled}
+                                    whileHover={!suggestion.disabled ? { scale: 1.03, x: 3 } : {}} // Add subtle hover effect
+                                    whileTap={!suggestion.disabled ? { scale: 0.98 } : {}}     // Add subtle tap effect
+                                    className={clsx( // Dynamically apply classes
+                                        // Reverted back to rounded-full for buttons
+                                        "flex items-center w-full text-left px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ease-in-out",
+                                        "shadow-[0_0_8px_rgba(0,255,157,0.3)] focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-opacity-75",
+                                        { // Conditional classes
+                                            "bg-gradient-to-r from-yellow-500 to-orange-500 text-white hover:from-yellow-400 hover:to-orange-400": suggestion.isHireMe && !suggestion.disabled,
+                                            "bg-gray-700 bg-opacity-80 text-cyan-400 hover:bg-opacity-90 hover:text-cyan-300": !suggestion.isHireMe && !suggestion.disabled,
+                                            "bg-gray-600 bg-opacity-50 text-gray-400 cursor-not-allowed": suggestion.disabled,
+                                            "hover:shadow-[0_0_14px_rgba(0,255,157,0.6)]": !suggestion.disabled,
+                                        }
+                                    )}
+                                >
+                                    {/* Button content */}
                                     {suggestion.icon || <FaPaperPlane className="mr-1.5" />}
                                     <span className="flex-grow">{suggestion.text}</span>
-                                </div>
-                            </Tooltip>
-                        ) : (
-                            <div className="flex items-center w-full">
-                                {suggestion.icon || <FaPaperPlane className="mr-1.5" />}
-                                <span className="flex-grow">{suggestion.text}</span>
-                            </div>
-                        )}
-                    </motion.button>
-                ))}
-            </AnimatePresence>
-        </motion.div>
+                                </motion.button>
+                            </TooltipTrigger>
+                            {suggestion.tooltip && (
+                                <TooltipContent side="left" className="bg-gray-800 text-white border-gray-700 text-xs rounded shadow-lg p-2">
+                                    <p>{suggestion.tooltip}</p>
+                                </TooltipContent>
+                            )}
+                        </Tooltip>
+                    ))}
+                </AnimatePresence>
+            </motion.div>
+        </TooltipProvider>
     );
 };
 
