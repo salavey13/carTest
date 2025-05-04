@@ -7,6 +7,7 @@ import * as Fa6Icons from "react-icons/fa6";
 import { debugLogger as logger } from "@/lib/debugLogger";
 
 // --- Full Icon Name Map (Lowercase to PascalCase) ---
+// Corrected FaTools -> FaToolbox
 const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fa42group: "Fa42Group",
   fa500px: "Fa500Px",
@@ -543,7 +544,7 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   faarrowupfrombracket: "FaArrowUpFromBracket",
   faarrowupfromgroundwater: "FaArrowUpFromGroundWater",
   faarrowupfromwaterpump: "FaArrowUpFromWaterPump",
-  fauplong: "FaUpLong", // Corrected Map: faarrowuplong -> FaUpLong
+  fauplong: "FaUpLong",
   faarrowuprightdots: "FaArrowUpRightDots",
   faarrowuprightfromsquare: "FaArrowUpRightFromSquare",
   faarrowupshortwide: "FaArrowUpShortWide",
@@ -1715,7 +1716,7 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fatoiletportable: "FaToiletPortable",
   fatoilet: "FaToilet",
   fatoiletsportable: "FaToiletsPortable",
-  fatoolbox: "FaToolbox", // Corrected: fatools -> fatoolbox
+  fatoolbox: "FaToolbox",
   fatooth: "FaTooth",
   fatoriigate: "FaToriiGate",
   fatornado: "FaTornado",
@@ -2031,7 +2032,7 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   faregwindowmaximize: "FaRegWindowMaximize",
   faregwindowminimize: "FaRegWindowMinimize",
   faregwindowrestore: "FaRegWindowRestore",
-  // --- Added missing FaToolbox ---
+  // --- Added FaToolbox ---
   fatoolbox: "FaToolbox",
 };
 // --- End Icon Name Map ---
@@ -2122,7 +2123,7 @@ const robustParserOptions: HTMLReactParserOptions = {
                 }
                 // --- End Link Handling ---
 
-                // --- Standard HTML Elements (Reverted: Modify class, return undefined) ---
+                // --- Standard HTML Elements (Simplified: Modify class, return undefined) ---
                 const knownTags = /^(p|div|span|ul|ol|li|h[1-6]|strong|em|b|i|u|s|code|pre|blockquote|hr|br|img|table|thead|tbody|tr|th|td)$/;
                 if (typeof lowerCaseName === 'string' && knownTags.test(lowerCaseName)) {
                    // Only modify attribs if 'class' exists
@@ -2134,7 +2135,7 @@ const robustParserOptions: HTMLReactParserOptions = {
                        domNode.attribs = attributesToProps(mutableAttribs); // Update attribs on the original node
                    }
                    // Let the parser handle the actual rendering by returning undefined
-                   return undefined;
+                   return undefined; // <<< RETURN UNDEFINED HERE
                }
                 // --- End Standard HTML Elements ---
 
