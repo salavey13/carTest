@@ -140,11 +140,6 @@ const getPlainText = (htmlString: string | null | undefined): string => {
     } catch (e) {
         // Use console.error as logger might not be defined if this helper is called very early
         console.error("[getPlainText] Error stripping HTML for title:", e, "Input:", htmlString);
-        // if (typeof logger !== 'undefined') {
-        //     logger.error("[getPlainText] Error stripping HTML for title:", e, "Input:", htmlString);
-        // } else {
-        //     console.error("[getPlainText] Error stripping HTML (logger unavailable):", e, "Input:", htmlString);
-        // }
         return htmlString; // Return original on error
     }
 };
@@ -166,7 +161,6 @@ function ActualPageContent() {
     if (!pageContext || typeof pageContext.addToast !== 'function') {
          // Use console.error directly in case of fatal context issue
          console.error("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!");
-         // if (typeof logger !== 'undefined') logger.fatal("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!"); else console.error("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!");
          return <div className="text-red-500 p-4">Критическая ошибка: Контекст страницы не загружен.</div>;
     }
     if (typeof logger !== 'undefined') logger.log("[ActualPageContent] pageContext VALUE:", pageContext ? "Available" : "NULL"); else console.log("[ActualPageContent] pageContext VALUE:", pageContext ? "Available" : "NULL");
@@ -444,7 +438,7 @@ function ActualPageContent() {
     // --- Render Helper ---
     const renderVibeContent = useCallback((contentKey: keyof TranslationSet, wrapperClassName?: string) => { const content = t?.[contentKey]; return content ? <VibeContentRenderer content={content} className={wrapperClassName} /> : `[Missing Translation: ${contentKey}]`; }, [t]);
 
-    if (typeof logger !== 'undefined') logger.log("[ActualPageContent] BEFORE RETURN JSX"); else console.log("[ActualPageContent] BEFORE RETURN JSX");
+    // --- REMOVED misplaced log statement that caused build error ---
     try {
         return (
             <>
@@ -595,7 +589,6 @@ function ActualPageContent() {
     } catch (renderError: any) {
          // Use console.error as logger might not be defined
          console.error("[ActualPageContent] CRITICAL RENDER ERROR in return JSX:", renderError);
-         // if (typeof logger !== 'undefined') logger.fatal("[ActualPageContent] CRITICAL RENDER ERROR in return JSX:", renderError); else console.error("[ActualPageContent] CRITICAL RENDER ERROR in return JSX:", renderError);
          return <div className="text-red-500 p-4">Критическая ошибка рендеринга страницы: {renderError.message}</div>;
     } finally {
         if (typeof logger !== 'undefined') logger.log("[ActualPageContent] END Render"); else console.log("[ActualPageContent] END Render");
@@ -615,7 +608,6 @@ function RepoXmlPageLayout() {
     } catch (layoutError: any) {
       // Use console.error as logger might not be defined
       console.error("[RepoXmlPageLayout] CRITICAL RENDER ERROR:", layoutError);
-      // if (typeof logger !== 'undefined') logger.fatal("[RepoXmlPageLayout] CRITICAL RENDER ERROR:", layoutError); else console.error("[RepoXmlPageLayout] CRITICAL RENDER ERROR:", layoutError);
       return <div className="text-red-500 p-4">Критическая ошибка в слое разметки: {layoutError.message}</div>;
     } finally {
        if (typeof logger !== 'undefined') logger.log("[RepoXmlPageLayout] END Render"); else console.log("[RepoXmlPageLayout] END Render");
@@ -638,7 +630,6 @@ export default function RepoXmlPage() {
     } catch (pageError: any) {
          // Use console.error as logger might not be defined
          console.error("[RepoXmlPage] CRITICAL RENDER ERROR:", pageError);
-         // if (typeof logger !== 'undefined') logger.fatal("[RepoXmlPage] CRITICAL RENDER ERROR:", pageError); else console.error("[RepoXmlPage] CRITICAL RENDER ERROR:", pageError);
          return <div className="text-red-500 p-4">Критическая ошибка рендеринга компонента страницы: {pageError.message}</div>;
     } finally {
         if (typeof logger !== 'undefined') logger.log("[RepoXmlPage] END Render (Exported Component)"); else console.log("[RepoXmlPage] END Render (Exported Component)");
