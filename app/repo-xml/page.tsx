@@ -149,13 +149,31 @@ const getPlainText = (htmlString: string | null | undefined): string => {
 function ActualPageContent() {
     if (typeof logger !== 'undefined') logger.log("[ActualPageContent] START Render - Top Level"); else console.log("[ActualPageContent] START Render - Top Level");
 
-    // --- HOOKS ---
+    // --- HOOKS (MUST be called at the top level unconditionally) ---
     const { user } = useAppContext();
     if (typeof logger !== 'undefined') logger.log("[ActualPageContent] useAppContext DONE"); else console.log("[ActualPageContent] useAppContext DONE");
     const pageContext = useRepoXmlPageContext();
     if (typeof logger !== 'undefined') logger.log("[ActualPageContent] useRepoXmlPageContext DONE"); else console.log("[ActualPageContent] useRepoXmlPageContext DONE");
     const { info: toastInfo, error: toastError } = useAppToast();
     if (typeof logger !== 'undefined') logger.log("[ActualPageContent] useAppToast DONE"); else console.log("[ActualPageContent] useAppToast DONE");
+
+    // --- useSearchParams Hook Call (Moved to top level) ---
+    let searchParams: URLSearchParams | null = null;
+    let searchParamsError: Error | null = null;
+    try {
+      // Call the hook unconditionally
+      searchParams = useSearchParams();
+      if (typeof logger !== 'undefined') logger.log("[ActualPageContent] useSearchParams DONE (unconditional)"); else console.log("[ActualPageContent] useSearchParams DONE (unconditional)");
+    } catch (e: any) {
+      searchParamsError = e; // Store the error first
+      // Log the error safely
+      if (typeof logger !== 'undefined') {
+        logger.error("[ActualPageContent] Error initializing useSearchParams:", e);
+      } else {
+        console.error("[ActualPageContent] Error initializing useSearchParams (logger unavailable):", e);
+      }
+    }
+
 
     // --- CONTEXT VALIDATION ---
     if (!pageContext || typeof pageContext.addToast !== 'function') {
@@ -186,27 +204,6 @@ function ActualPageContent() {
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
     if (typeof logger !== 'undefined') logger.log("[ActualPageContent] useState DONE"); else console.log("[ActualPageContent] useState DONE");
 
-    // --- useSearchParams initialization ---
-    let searchParams: URLSearchParams | null = null;
-    let searchParamsError: Error | null = null;
-    // Safeguard: Only call useSearchParams on the client
-    if (typeof window !== 'undefined') {
-      try {
-        searchParams = useSearchParams();
-        if (typeof logger !== 'undefined') logger.log("[ActualPageContent] useSearchParams DONE"); else console.log("[ActualPageContent] useSearchParams DONE");
-      } catch (e: any) {
-        searchParamsError = e; // Store the error first
-        // Log the error safely
-        if (typeof logger !== 'undefined') {
-          logger.error("[ActualPageContent] Error initializing useSearchParams:", e);
-        } else {
-          console.error("[ActualPageContent] Error initializing useSearchParams (logger unavailable):", e);
-        }
-      }
-    } else {
-       if (typeof logger !== 'undefined') logger.warn("[ActualPageContent] Skipping useSearchParams on server."); else console.warn("[ActualPageContent] Skipping useSearchParams on server.");
-    }
-
     // --- Effects ---
     useEffect(() => {
         if (typeof logger !== 'undefined') logger.log("[ActualPageContent] Client-side hydration COMPLETE."); else console.log("[ActualPageContent] Client-side hydration COMPLETE.");
@@ -228,9 +225,9 @@ function ActualPageContent() {
 
     // --- Effect for URL Params ---
     useEffect(() => {
-        // Check if searchParams was initialized successfully
+        // Check if searchParams was initialized successfully (use the variable from the top level)
         if (!searchParams) {
-            if (typeof logger !== 'undefined') logger.warn("[Effect URL Params] Skipping effect, searchParams failed to initialize or not on client."); else console.warn("[Effect URL Params] Skipping effect, searchParams failed to initialize or not on client.");
+            if (typeof logger !== 'undefined') logger.warn("[Effect URL Params] Skipping effect, searchParams hook failed to initialize."); else console.warn("[Effect URL Params] Skipping effect, searchParams hook failed to initialize.");
             setInitialIdeaProcessed(true);
             return;
         }
@@ -424,8 +421,8 @@ function ActualPageContent() {
     const renderVibeContent = useCallback((contentKey: keyof TranslationSet, wrapperClassName?: string) => { const content = t?.[contentKey]; return content ? <VibeContentRenderer content={content} className={wrapperClassName} /> : `[Missing Translation: ${contentKey}]`; }, [t]);
 
     try {
-       // Assign JSX to a variable first
-       const pageContent = (
+       // Return JSX directly
+       return (
             <>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
                 <div className="min-h-screen bg-gray-950 p-4 sm:p-6 pt-24 text-white flex flex-col items-center relative overflow-y-auto">
@@ -570,8 +567,6 @@ function ActualPageContent() {
                 </div>
             </>
         );
-       // Return the variable
-       return pageContent;
     } catch (renderError: any) {
          // Use console.error as logger might not be defined
          console.error("[ActualPageContent] CRITICAL RENDER ERROR in return JSX:", renderError);
