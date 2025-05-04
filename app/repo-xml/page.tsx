@@ -319,7 +319,6 @@ function ActualPageContent() {
                           const parts = decodedIdea.split('|');
                           const oldUrlParam = parts.find(p => p.startsWith("OldURL="));
                           const newUrlParam = parts.find(p => p.startsWith("NewURL="));
-
                           if (oldUrlParam && newUrlParam && decodedPath) {
                               const oldUrl = decodeURIComponent(oldUrlParam.substring(7));
                               const newUrl = decodeURIComponent(newUrlParam.substring(7));
@@ -336,20 +335,20 @@ function ActualPageContent() {
                   } else if (decodedIdea?.startsWith("ErrorFix|")) {
                         if (typeof logger !== 'undefined') logger.log("[Effect URL Params] Error Fix flow detected.");
                          try {
-                            const parts = decodedIdea.substring(9).split('|');
-                            const details: Record<string, string> = {};
-                            parts.forEach(part => {
-                                const eqIndex = part.indexOf('=');
-                                if (eqIndex > 0) {
-                                    const key = part.substring(0, eqIndex);
-                                    const value = decodeURIComponent(part.substring(eqIndex + 1));
-                                    details[key] = value;
-                                }
-                            });
-                            if (decodedPath && details.Message) {
-                                setPendingFlowDetails({ type: 'ErrorFix', targetPath: decodedPath, details });
-                                if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Setting Pending Flow: ErrorFix`, { path: decodedPath, details });
-                            } else { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Invalid ErrorFix data (missing path or message)", { decodedPath, details }); setPendingFlowDetails(null); }
+                             const parts = decodedIdea.substring(9).split('|');
+                             const details: Record<string, string> = {};
+                             parts.forEach(part => {
+                                 const eqIndex = part.indexOf('=');
+                                 if (eqIndex > 0) {
+                                     const key = part.substring(0, eqIndex);
+                                     const value = decodeURIComponent(part.substring(eqIndex + 1));
+                                     details[key] = value;
+                                 }
+                             });
+                             if (decodedPath && details.Message) {
+                                 setPendingFlowDetails({ type: 'ErrorFix', targetPath: decodedPath, details });
+                                 if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Setting Pending Flow: ErrorFix`, { path: decodedPath, details });
+                             } else { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Invalid ErrorFix data (missing path or message)", { decodedPath, details }); setPendingFlowDetails(null); }
                          } catch (parseError) { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Error parsing ErrorFix task:", parseError); setPendingFlowDetails(null); }
                          setInitialIdeaProcessed(false); // Keep as false to allow populate effect
                          setInitialIdea(null); setImageReplaceTask(null); // Clear local state
@@ -361,10 +360,10 @@ function ActualPageContent() {
                      setPendingFlowDetails(null);
                      setInitialIdeaProcessed(false); // Keep as false to allow populate effect
                   } else {
-                      // .. Handle empty/invalid idea
+                      if (typeof logger !== 'undefined') logger.warn("[Effect URL Params] Decoded idea empty/invalid.");
                       setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true);
                   }
-              } catch (decodeError) { /* .. error handling .. */ setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true); }
+              } catch (decodeError) { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Error decoding params:", decodeError); setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true); }
 
               // Set showComponents only if valid path/idea params exist
               if (decodedPath || decodedIdea) {
