@@ -8,35 +8,19 @@ export interface LogRecord {
   timestamp: number;
 }
 
-export type LogHandler = (level: LogLevel, message: string, timestamp: number) => void;
+// LogHandler is no longer needed by ErrorOverlayContext
+// export type LogHandler = (level: LogLevel, message: string, timestamp: number) => void;
 
 class DebugLogger {
   // Store logs as structured records
   private internalLogs: LogRecord[] = [];
   private logIdCounter = 0; // Counter for unique log IDs
-  private maxInternalLogs = 200;
+  private maxInternalLogs = 200; // Keep a reasonable number of logs
   private isBrowser: boolean = typeof window !== 'undefined';
-  private logHandler: LogHandler | null = null;
+  // private logHandler: LogHandler | null = null; // Removed external handler state
   private isLoggingInternally: boolean = false; // Prevent recursion
 
-  setLogHandler(handler: LogHandler | null) {
-    // Avoid logging if setting the same handler or during recursion
-    if (this.logHandler === handler || this.isLoggingInternally) return;
-
-    const previousHandler = this.logHandler;
-    this.logHandler = handler;
-
-    // Log handler change using console directly to avoid loops
-    if (typeof console !== 'undefined') {
-      if (handler && !previousHandler) {
-        console.log("[Logger Internal] Log handler SET.");
-      } else if (!handler && previousHandler) {
-        console.log("[Logger Internal] Log handler CLEARED.");
-      } else if (handler !== previousHandler) {
-        console.log("[Logger Internal] Log handler CHANGED.");
-      }
-    }
-  }
+  /* Removed setLogHandler method */
 
   private safelyStringify(arg: any): string {
     try {
@@ -44,23 +28,27 @@ class DebugLogger {
         return `Error: ${arg.message}${arg.name ? ` (${arg.name})` : ''}${arg.stack ? `\nStack: ${arg.stack}` : ''}`;
       }
       if (typeof arg === 'object' && arg !== null) {
-        const cache = new Set();
-        return JSON.stringify(arg, (key, value) => {
-          if (typeof value === 'object' && value !== null) {
-            if (cache.has(value)) {
-              return '[Circular Reference]';
-            }
-            cache.add(value);
-          }
-          if (typeof value === 'bigint') { return value.toString() + 'n'; }
-          // Handle common non-serializable types gracefully
-          if (value instanceof Map) { return `[Map (${value.size} entries)]`; }
-          if (value instanceof Set) { return `[Set (${value.size} entries)]`; }
-          if (value instanceof HTMLElement) { return `[HTMLElement: ${value.tagName}]`; }
-          if (value instanceof Event) { return `[Event: ${value.type}]`; }
-          if (value instanceof Function) { return `[Function: ${value.name || 'anonymous'}]`; }
-          return value;
-        }, 2); // Indent for readability
+        // Basic circular reference check
+        try {
+          return JSON.stringify(arg, (key, value) => {
+            // Handle common non-serializable types gracefully within stringify
+            if (typeof value === 'bigint') { return value.toString() + 'n'; }
+            if (value instanceof Map) { return `[Map (${value.size} entries)]`; }
+            if (value instanceof Set) { return `[Set (${value.size} entries)]`; }
+            if (this.isBrowser && value instanceof HTMLElement) { return `[HTMLElement: ${value.tagName}]`; }
+            if (this.isBrowser && value instanceof Event) { return `[Event: ${value.type}]`; }
+            if (value instanceof Function) { return `[Function: ${value.name || 'anonymous'}]`; }
+            if (value instanceof Error) { return `Error: ${value.message}`; } // Stringify nested errors simply
+            return value;
+          }, 2); // Indent for readability
+        } catch (e) {
+           // Fallback if JSON.stringify fails even with replacer (e.g., complex circular)
+           if (e instanceof TypeError && e.message.includes('circular structure')) {
+               return '[Circular Object]';
+           }
+           console.warn("[Logger SafelyStringify] JSON.stringify failed:", e, "Arg:", arg);
+           return '[Unserializable Object]';
+        }
       }
       if (typeof arg === 'symbol') { return arg.toString(); }
       if (arg === undefined) { return 'undefined'; }
@@ -68,17 +56,9 @@ class DebugLogger {
       if (typeof arg === 'function') { return `[Function: ${arg.name || 'anonymous'}]`; }
       return String(arg);
     } catch (stringifyError) {
-      let errorMsg = '[Unserializable Value]';
-      if (stringifyError instanceof Error) {
-        errorMsg += `: ${stringifyError.message}`;
-        if (typeof arg === 'object' && arg !== null) {
-          try { errorMsg += ` (Keys: ${Object.keys(arg).slice(0,5).join(', ')}${Object.keys(arg).length > 5 ? '...' : ''})`; } catch {}
-        }
-      }
-      // Log stringify error to console for visibility
-      if (this.isBrowser) {
-        console.warn("[Logger SafelyStringify Error]", stringifyError, "Original Arg:", arg);
-      }
+      let errorMsg = '[SafelyStringify Error]';
+      if (stringifyError instanceof Error) { errorMsg += `: ${stringifyError.message}`; }
+      if (this.isBrowser) { console.warn(errorMsg, stringifyError, "Original Arg:", arg); }
       return errorMsg;
     }
   }
@@ -86,10 +66,7 @@ class DebugLogger {
 
   private logInternal(level: LogLevel, ...args: any[]) {
     if (this.isLoggingInternally) {
-      if (this.isBrowser) {
-        // Log recursion directly to console
-        console.warn("[Logger] Recursive log attempt detected, skipping:", level, args);
-      }
+      if (this.isBrowser) console.warn("[Logger] Recursive log attempt detected, skipping:", level, args);
       return;
     }
     this.isLoggingInternally = true;
@@ -97,7 +74,9 @@ class DebugLogger {
     const timestamp = Date.now();
     let message = '';
     try {
-      message = args.map(this.safelyStringify).join(" ");
+      // Ensure args is always an array before mapping
+      const argsArray = Array.isArray(args) ? args : [args];
+      message = argsArray.map(this.safelyStringify).join(" ");
 
       // Add to internal structured logs
       const logEntry: LogRecord = {
@@ -107,30 +86,12 @@ class DebugLogger {
           timestamp,
       };
       this.internalLogs.push(logEntry);
+      // Trim logs if exceeding max count
       if (this.internalLogs.length > this.maxInternalLogs) {
-        this.internalLogs.shift();
+        this.internalLogs = this.internalLogs.slice(this.internalLogs.length - this.maxInternalLogs);
       }
 
-      // Call external handler if set (this handler SHOULD NOT update react state directly)
-      if (this.logHandler) {
-        try {
-          this.logHandler(level, message, timestamp);
-        } catch (handlerError) {
-          // Use console to report handler errors to avoid loops
-          if (this.isBrowser) {
-            console.error("[Logger] FATAL: External log handler failed!", { level, message, handlerError });
-          }
-          // Also log the handler error internally
-          const handlerErrorMessage = `[Internal Error] External log handler failed: ${this.safelyStringify(handlerError)}`;
-          this.internalLogs.push({
-              id: this.logIdCounter++,
-              level: 'fatal',
-              message: handlerErrorMessage,
-              timestamp: Date.now(),
-          });
-          if (this.internalLogs.length > this.maxInternalLogs) { this.internalLogs.shift(); }
-        }
-      }
+      // --- Removed call to external logHandler ---
 
       // Log to browser console
       if (this.isBrowser && typeof console !== 'undefined') {
@@ -144,19 +105,22 @@ class DebugLogger {
           case 'debug': color = 'color: #9370DB;'; break;
           default: color = 'color: #A9A9A9;'; break;
         }
+        // Use appropriate console method, default to log
         const consoleMethod = (console as any)[level] || console.log;
         try {
-          // Pass original args to console for better inspection
-          consoleMethod(prefix, color, 'color: inherit;', ...args);
+          // Pass original args to console for better object inspection
+          consoleMethod(prefix, color, 'color: inherit;', ...argsArray);
         } catch (e) {
            // Fallback for problematic args/styling
            console.error("[Logger] Error during styled console output:", e);
-           try { console.log(`[${level.toUpperCase()}] ${timestampStr}:`, ...args); } catch {}
+           try { console.log(`[${level.toUpperCase()}] ${timestampStr}:`, ...argsArray); } catch {}
         }
       }
     } catch (e) {
       const errorMsg = `[Internal Logging Error during message construction: ${this.safelyStringify(e)}]`;
+      // Use console.error directly for internal logger errors
       if (this.isBrowser) { console.error(errorMsg); }
+      // Still try to log the internal error
       this.internalLogs.push({
           id: this.logIdCounter++,
           level: 'fatal',
@@ -164,9 +128,7 @@ class DebugLogger {
           timestamp: Date.now(),
       });
       if (this.internalLogs.length > this.maxInternalLogs) { this.internalLogs.shift(); }
-      if (this.logHandler) {
-        try { this.logHandler('fatal', errorMsg, timestamp); } catch { /* ignore handler error here */ }
-      }
+       // --- Removed call to external logHandler ---
     } finally {
       this.isLoggingInternally = false; // Reset recursion flag
     }
@@ -180,7 +142,7 @@ class DebugLogger {
   debug = (...args: any[]) => this.logInternal('debug', ...args);
   fatal = (...args: any[]) => this.logInternal('fatal', ...args);
 
-  // --- NEW: Method to get internal logs ---
+  // Method to get internal logs as structured records
   getInternalLogRecords = (): ReadonlyArray<LogRecord> => {
       // Return a shallow copy to prevent external modification
       return [...this.internalLogs];
@@ -195,9 +157,14 @@ class DebugLogger {
 
   clearInternalLogs = () => {
       this.internalLogs = [];
-      this.logIdCounter = 0; // Reset counter when clearing
+      // Don't reset counter, keep IDs unique across clears within session
+      // this.logIdCounter = 0;
       this.log('info', '[Logger] Internal logs cleared.'); // Log the clearing action itself
   };
 }
 
+// Export a single instance
 export const debugLogger = new DebugLogger();
+
+// Export types needed by consumers
+export type { LogLevel, LogRecord };
