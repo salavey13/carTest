@@ -299,6 +299,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                      {/* Instructions - Use VibeContentRenderer as they contain icons */}
                       {!currentImageTask && (
                          <div className="text-yellow-300/80 text-xs md:text-sm space-y-1 mb-2">
+                            {/* CORRECTED ICON NAMES */}
                             <VibeContentRenderer content={"1. Настрой (<FaCodeBranch title='Настройки' class='inline text-cyan-400 cursor-pointer hover:underline' onClick={() => { console.log('settings clicked'); triggerToggleSettingsModal(); }}/>)."} />
                             <VibeContentRenderer content={"2. Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>."} />
                             <VibeContentRenderer content={"3. Выбери файлы или <span class='font-bold text-teal-400 mx-1'>связанные</span> / <span class='font-bold text-orange-400 mx-1'>важные</span>."} />
