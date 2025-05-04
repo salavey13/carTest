@@ -423,9 +423,9 @@ function ActualPageContent() {
     // --- Render Helper ---
     const renderVibeContent = useCallback((contentKey: keyof TranslationSet, wrapperClassName?: string) => { const content = t?.[contentKey]; return content ? <VibeContentRenderer content={content} className={wrapperClassName} /> : `[Missing Translation: ${contentKey}]`; }, [t]);
 
-    // *** BUILD FIX: Removed misplaced log statement ***
     try {
-        return (
+       // Assign JSX to a variable first
+       const pageContent = (
             <>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
                 <div className="min-h-screen bg-gray-950 p-4 sm:p-6 pt-24 text-white flex flex-col items-center relative overflow-y-auto">
@@ -568,9 +568,10 @@ function ActualPageContent() {
                     </Suspense>
                     { if (typeof logger !== 'undefined') logger.log("[ActualPageContent] Main Content Rendered Successfully"); else console.log("[ActualPageContent] Main Content Rendered Successfully")}
                 </div>
-                { if (typeof logger !== 'undefined') logger.log("[ActualPageContent] RETURN JSX COMPLETED NORMALLY"); else console.log("[ActualPageContent] RETURN JSX COMPLETED NORMALLY")}
             </>
         );
+       // Return the variable
+       return pageContent;
     } catch (renderError: any) {
          // Use console.error as logger might not be defined
          console.error("[ActualPageContent] CRITICAL RENDER ERROR in return JSX:", renderError);
