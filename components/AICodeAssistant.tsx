@@ -5,7 +5,7 @@ import React, { useMemo, useState, useEffect, useImperativeHandle, forwardRef, M
 import {
     useRepoXmlPageContext, AICodeAssistantRef, SimplePullRequest, ImageReplaceTask, FileNode, RepoXmlPageContextType
 } from "@/contexts/RepoXmlPageContext";
-// .. Removed supabaseAdmin import if not used elsewhere
+import { supabaseAdmin } from "@/lib/supabase/admin"; // <-- IMPORT ADDED HERE (Adjust path if needed)
 import { useAppContext } from "@/contexts/AppContext";
 // Hooks & Components
 import { useAppToast } from '@/hooks/useAppToast'; // Use the hook
@@ -223,17 +223,62 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         setSelectedFileIds, setPrTitle, setRequestCopied
     ]);
 
+    // --- Restored Custom Links useEffect ---
     useEffect(() => {
-        // .. Custom Links effect unchanged
-        logger.debug("[Effect Custom Links] START");
-        if (!user) { logger.debug("[Effect Custom Links] SKIP: no user"); setCustomLinks([]); return; }
-        const loadLinks = async () => { /* ... */ };
-        loadLinks();
-        logger.debug("[Effect Custom Links] END");
-    }, [user, toastError]);
+        logger.debug("[Effect Custom Links] START - Loading custom links.");
+        const loadLinks = async () => {
+            // Check if user object exists and has an id property
+            if (!user?.id) {
+                logger.debug("[Effect Custom Links] SKIP: no user or user.id is missing.");
+                setCustomLinks([]); // Reset links if user logs out or is invalid
+                return;
+            }
 
-    // REMOVED useEffect for Fetching Originals
-    // useEffect(() => { /* ... */ }, [validationIssues, originalRepoFiles.length, ...]);
+            try {
+                logger.debug(`[Effect Custom Links] Fetching metadata for user: ${user.id}`);
+
+                // Fetch metadata for the specific user
+                const { data: userData, error: fetchError } = await supabaseAdmin
+                    .from("users") // Make sure 'users' is your correct table name
+                    .select("metadata") // Select only the metadata column
+                    .eq("user_id", user.id) // Ensure 'user_id' is the correct column name matching your user object's id
+                    .single(); // Expecting only one record for the user
+
+                // Handle potential fetch errors
+                if (fetchError) {
+                    logger.error("[Effect Custom Links] Error fetching user metadata:", fetchError);
+                    // Display error to the user (optional, but recommended)
+                    toastError(`Ошибка загрузки ваших ссылок: ${fetchError.message}`);
+                    setCustomLinks([]); // Reset on error
+                    return; // Exit early on error
+                }
+
+                // Check if data exists and has the customLinks property within metadata
+                if (userData?.metadata?.customLinks && Array.isArray(userData.metadata.customLinks)) {
+                    logger.debug("[Effect Custom Links] Found custom links in metadata:", userData.metadata.customLinks);
+                    setCustomLinks(userData.metadata.customLinks); // Set the links from metadata
+                } else {
+                    logger.debug("[Effect Custom Links] No custom links found in metadata or metadata is null/malformed.");
+                    setCustomLinks([]); // Reset if no links are found or data is malformed
+                }
+
+            } catch (e: any) { // Catch any unexpected errors during the async operation
+                logger.error("[Effect Custom Links] Exception during fetch:", e);
+                // Display a generic error to the user
+                toastError(`Критическая ошибка при загрузке ссылок: ${e.message ?? 'Неизвестно'}`);
+                setCustomLinks([]); // Reset on critical error
+            }
+        };
+
+        loadLinks(); // Execute the async function
+        logger.debug("[Effect Custom Links] END - loadLinks called.");
+
+    // Dependencies: Re-run this effect if the user object changes,
+    // or if the functions used inside (setCustomLinks, toastError, logger) change instance.
+    }, [user, setCustomLinks, toastError, logger]); // Added missing dependencies for stability & linting
+    // --- End Restored Custom Links useEffect ---
+
+
 
     // --- Image Replace Logic (Simpler check) ---
     useEffect(() => {

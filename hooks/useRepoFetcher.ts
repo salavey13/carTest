@@ -141,9 +141,10 @@ export const useRepoFetcher = ({
         // Determine the final branch to fetch: Override > Context Target (PR Source) > Manual > null (default)
         const finalBranchToFetch = branchNameToFetchOverride !== undefined
             ? branchNameToFetchOverride // Explicit override takes precedence
-            : targetBranchName          // Then use target branch from context (set by pre-check)
-            ?? manualBranchName         // Then use manually entered branch
-            || null;                    // Finally, null means repo default
+            // --- FIX START ---
+            : (targetBranchName ?? manualBranchName) // Evaluate nullish coalescing first
+              || null;                            // Then apply logical OR for the final fallback
+            // --- FIX END ---
 
         const effectiveBranchDisplay = finalBranchToFetch || 'default';
         logger.debug(`[Fetch Manual CB] Final branch to fetch: ${effectiveBranchDisplay}, Override: ${branchNameToFetchOverride}, Target: ${targetBranchName}, Manual: ${manualBranchName}`);
