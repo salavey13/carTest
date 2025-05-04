@@ -27,12 +27,11 @@ function withErrorOverlayContext<P extends object>(
     const ComponentWithContext: React.FC<P> = (props) => {
         const context = useErrorOverlay(); // Use the hook here
 
-        // Render null or a minimal fallback if context is somehow missing (shouldn't happen if setup correctly)
+        // Render null or a minimal fallback if context is somehow missing
         if (!context) {
-             logger.fatal("[ErrorBoundaryForOverlay HOC] CRITICAL: ErrorOverlayContext not found!");
-             console.error("CRITICAL: ErrorOverlayContext not found in withErrorOverlayContext!");
-             // Render children directly as a last resort, though the app might be broken
-             // Or render a specific error message component
+             // Use console.error as logger might not be defined yet
+             console.error("[ErrorBoundaryForOverlay HOC] CRITICAL: ErrorOverlayContext not found!");
+             // if (typeof logger !== 'undefined') logger.fatal("[ErrorBoundaryForOverlay HOC] CRITICAL: ErrorOverlayContext not found!"); else console.error("[ErrorBoundaryForOverlay HOC] CRITICAL: ErrorOverlayContext not found!");
              return <>{(props as any).children}</>; // Assuming children prop exists
         }
         // Pass the context down to the wrapped class component
@@ -48,52 +47,70 @@ class ErrorBoundaryForOverlayInternal extends Component<ErrorBoundaryInternalPro
   constructor(props: ErrorBoundaryInternalProps) {
     super(props);
     this.state = { hasError: false, error: null };
-    logger.log("[ErrorBoundaryForOverlay Internal] Constructor called.");
+    // Log safely
+    if (typeof logger !== 'undefined') logger.log("[ErrorBoundaryForOverlay Internal] Constructor called."); else console.log("[ErrorBoundaryForOverlay Internal] Constructor called.");
   }
 
   static getDerivedStateFromError(error: Error): State {
+    // Log safely
+    if (typeof logger !== 'undefined') logger.warn("[ErrorBoundaryForOverlay Internal] getDerivedStateFromError caught:", error.message); else console.warn("[ErrorBoundaryForOverlay Internal] getDerivedStateFromError caught:", error.message);
     // Update state to trigger fallback UI on the next render
-    logger.warn("[ErrorBoundaryForOverlay Internal] getDerivedStateFromError caught:", error.message);
-    // Store the first error encountered
     return { hasError: true, error: error };
   }
 
   componentDidCatch(error: Error, errorInfo: ReactErrorInfo): void {
     const { context } = this.props; // Get context from props (injected by HOC)
 
-    // Log the catch attempt
-    logger.error("[ErrorBoundaryForOverlay Internal] componentDidCatch triggered.", {
+    // Log the catch attempt safely
+    const errorPayload = {
         errorMsg: error?.message,
-        // errorStack: error?.stack, // Optionally log stack, be mindful of size/privacy
         componentStackProvided: !!errorInfo?.componentStack
-    });
+    };
+    if (typeof logger !== 'undefined') {
+        logger.error("[ErrorBoundaryForOverlay Internal] componentDidCatch triggered.", errorPayload);
+    } else {
+        console.error("[ErrorBoundaryForOverlay Internal] componentDidCatch triggered.", errorPayload);
+    }
+
 
     // Defensive check for context and setErrorInfo
     if (!context || typeof context.setErrorInfo !== 'function') {
-        logger.fatal("[ErrorBoundaryForOverlay Internal] CRITICAL: Context or setErrorInfo missing in componentDidCatch!", { error: error.message });
-        console.error("CRITICAL: ErrorBoundary context/setErrorInfo missing!", error, errorInfo);
+        const fatalMsg = "[ErrorBoundaryForOverlay Internal] CRITICAL: Context or setErrorInfo missing in componentDidCatch!";
+        if (typeof logger !== 'undefined') {
+            logger.fatal(fatalMsg, { error: error?.message });
+        } else {
+            console.error(fatalMsg, { error: error?.message });
+        }
+        console.error("Original Error:", error, errorInfo);
         return; // Cannot proceed without context
     }
 
     // --- LOOP PREVENTION ---
-    // Check if the overlay context *already* has an error set.
-    // If it does, don't try to set it again from this boundary.
-    // This prevents loops if multiple boundaries catch errors or if an error
-    // happens during the context state update itself.
     if (context.errorInfo !== null) {
-        logger.warn("[ErrorBoundaryForOverlay Internal] Suppressing setErrorInfo call: An error is already being displayed in context.", {
-            currentContextErrorType: context.errorInfo?.type,
-            currentContextErrorMessage: context.errorInfo?.message.substring(0, 50) + "...",
-            newErrorCaughtMessage: error?.message.substring(0, 50) + "...",
-        });
+        const warnMsg = "[ErrorBoundaryForOverlay Internal] Suppressing setErrorInfo call: An error is already being displayed in context.";
+        const warnPayload = {
+             currentContextErrorType: context.errorInfo?.type,
+             currentContextErrorMessage: context.errorInfo?.message.substring(0, 50) + "...",
+             newErrorCaughtMessage: error?.message.substring(0, 50) + "...",
+        };
+        if (typeof logger !== 'undefined') {
+            logger.warn(warnMsg, warnPayload);
+        } else {
+            console.warn(warnMsg, warnPayload);
+        }
         console.warn("ErrorBoundaryForOverlay: Suppressed redundant error report to context.");
         return; // <<<--- IMPORTANT: Stop here to prevent the loop
     }
     // --- END LOOP PREVENTION ---
 
 
-    // Log the error details using the logger before setting context
+    // Log the error details using console first (safer)
     console.error("ErrorBoundaryForOverlay caught an error (reporting to context):", error, errorInfo);
+    // Then try logger if available
+    if (typeof logger !== 'undefined') {
+       logger.error("ErrorBoundaryForOverlay caught an error (reporting details to context):", { error, errorInfo });
+    }
+
 
     // Prepare the error details for the context
     const errorDetails: ErrorInfo = {
@@ -109,19 +126,21 @@ class ErrorBoundaryForOverlayInternal extends Component<ErrorBoundaryInternalPro
     try {
        // Now it's considered safe to set the error for the first time
        context.setErrorInfo(errorDetails);
-       logger.info("[ErrorBoundaryForOverlay Internal] Initial error successfully reported to ErrorOverlayContext.");
+       if (typeof logger !== 'undefined') logger.info("[ErrorBoundaryForOverlay Internal] Initial error successfully reported to ErrorOverlayContext."); else console.info("[ErrorBoundaryForOverlay Internal] Initial error successfully reported to ErrorOverlayContext.");
     } catch (e) {
        // This catch is for errors *during* the setErrorInfo call itself
-       logger.fatal("[ErrorBoundaryForOverlay Internal] CRITICAL: Failed to report error to ErrorOverlayContext!", e);
+       const fatalMsg = "[ErrorBoundaryForOverlay Internal] CRITICAL: Failed to report error to ErrorOverlayContext!";
+       if (typeof logger !== 'undefined') {
+           logger.fatal(fatalMsg, e);
+       } else {
+           console.error(fatalMsg, e);
+       }
        console.error("CRITICAL: Failed to report error to ErrorOverlayContext!", e);
-       // If setting context fails, we might be in a deeper loop or React issue.
-       // Further actions might be needed, like trying to force a reload.
     }
   }
 
   render(): ReactNode {
     if (this.state.hasError) {
-      // Log suppression based on *local* state (this is okay, doesn't cause loop)
       // Use console.warn directly here to avoid potential loops if logger itself causes issues initially
       console.warn("[ErrorBoundaryForOverlay Internal] Render suppressed due to local 'hasError' state.");
       // Render null. The actual error UI is handled by DevErrorOverlay via context.
