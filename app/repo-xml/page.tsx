@@ -22,9 +22,7 @@ import {
     FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket
 } from "react-icons/fa6"; // Keep icon imports for direct use if any (like in buttons)
 import Link from "next/link";
-// .. Removed FaIcons import - not needed anymore for parsing
 import { motion } from 'framer-motion';
-// .. Removed parse, domToReact, etc. imports for html-react-parser - VibeContentRenderer handles it
 import VibeContentRenderer from '@/components/VibeContentRenderer'; // <-- Keep this import
 
 
@@ -208,12 +206,10 @@ function ActualPageContent() {
         setImageReplaceTask, setKworkInputHasContent, fetchStatus,
         imageReplaceTask, allFetchedFiles, selectedFetcherFiles,
         repoUrl, setRepoUrl, addToast,
-        targetPrData, // .. Corrected typo here - targetPrData
-        setTargetPrData,
+        targetPrData, setTargetPrData,
         isPreChecking, setPendingFlowDetails,
         pendingFlowDetails,
-        // .. Added context setters used in URL Params effect for dependency array
-        setTargetBranchName, setManualBranchName
+        setTargetBranchName, setManualBranchName // Needed for URL param effect
     } = pageContext;
 
     // --- Effects ---
@@ -360,6 +356,7 @@ function ActualPageContent() {
                      setPendingFlowDetails(null);
                      setInitialIdeaProcessed(false); // Keep as false to allow populate effect
                   } else {
+                      // .. Handle empty/invalid idea
                       if (typeof logger !== 'undefined') logger.warn("[Effect URL Params] Decoded idea empty/invalid.");
                       setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true);
                   }
@@ -371,6 +368,7 @@ function ActualPageContent() {
               }
           } else {
               // .. Handle no path/idea params
+              if (typeof logger !== 'undefined') logger.log(`[Effect URL Params] No path/idea params.`);
               setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true);
           }
          if (typeof logger !== 'undefined') logger.debug("[Effect URL Params] END"); else console.debug("[Effect URL Params] END");
@@ -435,11 +433,12 @@ function ActualPageContent() {
     // --- Callbacks ---
     const memoizedGetPlainText = useCallback(getPlainText, []);
     const scrollToSectionNav = useCallback((id: string) => {
-        if (typeof logger !== 'undefined') logger.debug(`[CB ScrollNav] Attempting scroll to: ${id}`); else console.debug(`[CB ScrollNav] Attempting scroll to: ${id}`);
+        // .. (Function content unchanged)
+        if (typeof logger !== 'undefined') logger.debug(`[CB ScrollNav] Attempting scroll to: ${id}`);
         const sectionsRequiringReveal = ['extractor', 'executor', 'cybervibe-section', 'philosophy-steps'];
         const targetElement = document.getElementById(id);
         if (sectionsRequiringReveal.includes(id) && !showComponents) {
-            if (typeof logger !== 'undefined') logger.info(`[CB ScrollNav] Revealing components for "${id}"`); else console.info(`[CB ScrollNav] Revealing components for "${id}"`);
+            if (typeof logger !== 'undefined') logger.info(`[CB ScrollNav] Revealing components for "${id}"`);
             setShowComponents(true);
             requestAnimationFrame(() => {
                 const el = document.getElementById(id);
@@ -466,9 +465,9 @@ function ActualPageContent() {
         } else {
             if (typeof logger !== 'undefined') logger.error(`[CB ScrollNav] Target element "${id}" not found.`); else console.error(`[CB ScrollNav] Target element "${id}" not found.`);
         }
-    }, [showComponents]); // Removed redundant dependency 'setShowComponents'
+    }, [showComponents]);
 
-    const handleShowComponents = useCallback(() => { if (typeof logger !== 'undefined') logger.info("[Button Click] handleShowComponents (Reveal)"); setShowComponents(true); toastInfo("Компоненты загружены!", { duration: 1500 }); }, [toastInfo]); // Removed redundant dependency 'setShowComponents'
+    const handleShowComponents = useCallback(() => { if (typeof logger !== 'undefined') logger.info("[Button Click] handleShowComponents (Reveal)"); setShowComponents(true); toastInfo("Компоненты загружены!", { duration: 1500 }); }, [toastInfo]);
 
 
     // --- Loading / Error States ---

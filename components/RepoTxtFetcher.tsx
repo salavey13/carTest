@@ -255,7 +255,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
             logger.debug(`[Imperative] deselectAllFiles called.`);
             handleDeselectAll();
         },
-        // .. Removed redundant properties like refs or state setters
     }), [
         handleFetchManual, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll,
         getKworkInputValue, imageReplaceTask, handleAddImportantFiles, handleAddFullTree, handleSelectAll, handleDeselectAll
@@ -323,6 +322,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                      {/* Instructions - Use VibeContentRenderer as they contain icons */}
                       {!currentImageTask && (
                          <div className="text-yellow-300/80 text-xs md:text-sm space-y-1 mb-2">
+                            {/* Instructions */}
                             <VibeContentRenderer content={"1. Настрой (<FaCodeBranch title='Настройки' class='inline text-cyan-400'/>)."} />
                             <VibeContentRenderer content={"2. Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>."} />
                             <VibeContentRenderer content={"3. Выбери файлы или <span class='font-bold text-teal-400 mx-1'>связанные</span> / <span class='font-bold text-orange-400 mx-1'>важные</span>."} />
@@ -337,7 +337,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                           </p>
                       )}
                   </div>
-                  {/* Settings Toggle Button (This handles the actual interaction) */}
+                  {/* Settings Toggle Button */}
                   <motion.button
                       onClick={() => { logger.debug("[Click] Settings Toggle Button Click"); triggerToggleSettingsModal(); }}
                       disabled={isFetchLoading || assistantLoading || isParsing}
@@ -349,7 +349,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                       className="p-2 bg-gray-700/50 rounded-full hover:bg-gray-600/70 transition-colors flex-shrink-0 disabled:opacity-50"
                   >
                       {isSettingsModalOpen ? <FaAngleUp className="text-cyan-400 text-xl" /> : <FaCodeBranch className="text-cyan-400 text-xl" />}
-                      {/* ^^^ Changed icon to FaCodeBranch when closed for consistency with instructions */}
                   </motion.button>
               </div>
 
