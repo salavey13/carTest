@@ -3,7 +3,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { ErrorInfo as ReactErrorInfo } from 'react';
 import type { ToastRecord } from '@/types/toast';
-import { debugLogger, LogHandler } from '@/lib/debugLogger';
+// *** REMOVED LogHandler import from debugLogger ***
+import { debugLogger } from '@/lib/debugLogger';
 
 // --- Types ---
 
@@ -16,29 +17,34 @@ export interface ErrorInfo {
     componentStack?: string | null;
     stack?: string; // Native error stack
     source?: string; // e.g., component name, function name, URL
+    error?: Error | any; // Keep original error if available
     extra?: Record<string, any>; // For additional context
 }
 
 interface ErrorOverlayContextType {
-    history: ToastRecord[];
+    toastHistory: ToastRecord[]; // Renamed from 'history' for clarity
     errorInfo: ErrorInfo | null;
     isClientReady: boolean;
+    // *** REMOVED logHistory from type ***
+    // *** REMOVED setHandler from type ***
     addToastToHistory: (toast: Omit<ToastRecord, 'id'>) => void;
-    addErrorInfo: (errorDetails: ErrorInfo) => void;
+    setErrorInfo: React.Dispatch<React.SetStateAction<ErrorInfo | null>>; // Expose setter directly
     clearHistory: () => void;
-    setHandler: (handler: LogHandler | null) => void; // For logger integration
+    showOverlay: boolean; // Flag to control overlay visibility
 }
 
 // --- Context ---
 
 const defaultState: ErrorOverlayContextType = {
-    history: [],
+    toastHistory: [], // Renamed
     errorInfo: null,
     isClientReady: false,
+    // *** REMOVED logHistory default ***
+    // *** REMOVED setHandler default ***
     addToastToHistory: () => { console.warn("ErrorOverlayContext: addToastToHistory called before provider ready."); },
-    addErrorInfo: () => { console.warn("ErrorOverlayContext: addErrorInfo called before provider ready."); },
+    setErrorInfo: () => { console.warn("ErrorOverlayContext: setErrorInfo called before provider ready."); },
     clearHistory: () => { console.warn("ErrorOverlayContext: clearHistory called before provider ready."); },
-    setHandler: () => { console.warn("ErrorOverlayContext: setHandler called before provider ready."); },
+    showOverlay: false,
 };
 
 const ErrorOverlayContext = createContext<ErrorOverlayContextType>(defaultState);
@@ -46,25 +52,34 @@ const ErrorOverlayContext = createContext<ErrorOverlayContextType>(defaultState)
 // --- Provider ---
 
 export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [history, setHistory] = useState<ToastRecord[]>([]);
+    const [toastHistory, setToastHistory] = useState<ToastRecord[]>([]); // Renamed state
     const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
     const [isClientReady, setIsClientReady] = useState(false);
-    const logHandlerRef = useRef<LogHandler | null>(null); // Ref for the handler
+    const [showOverlay, setShowOverlay] = useState<boolean>(false); // State to control overlay
 
     useEffect(() => {
         setIsClientReady(true);
         debugLogger.info("[ErrorOverlayProvider Effect] Client is ready, Provider mounted.");
     }, []);
 
+    // Update showOverlay flag when errorInfo changes
+    useEffect(() => {
+        const shouldShow = errorInfo !== null;
+        if (showOverlay !== shouldShow) {
+            debugLogger.log(`[ErrorOverlayProvider Effect] Setting showOverlay to: ${shouldShow}`);
+            setShowOverlay(shouldShow);
+        }
+    }, [errorInfo, showOverlay]); // Added showOverlay to deps
+
     const addToastToHistory = useCallback((toast: Omit<ToastRecord, 'id'>) => {
-        // Assume logger is safe to use after mount
-        debugLogger.debug("[ErrorOverlayContext CB] addToastToHistory", { type: toast.type, msg: toast.message.substring(0, 30) });
-        setHistory(prev => {
+        // Add only actual toasts shown via useAppToast
+        debugLogger.debug("[ErrorOverlayContext CB] addToastToHistory", { type: toast.type, msg: toast.message?.substring(0, 30) });
+        setToastHistory(prev => {
             const newHistory = [...prev, { ...toast, id: Date.now() + Math.random() }];
-            // Optional: Limit history size
-            // if (newHistory.length > 100) {
-            //     return newHistory.slice(newHistory.length - 100);
-            // }
+            // Optional: Limit history size (e.g., keep last 20 toasts)
+            if (newHistory.length > 20) {
+                return newHistory.slice(newHistory.length - 20);
+            }
             return newHistory;
         });
     }, []); // No dependencies needed if only using setHistory
@@ -74,84 +89,40 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
              ...errorDetails,
              timestamp: errorDetails.timestamp || Date.now(),
          };
-         debugLogger.error("[ErrorOverlayContext CB] addErrorInfo", newErrorInfo);
-         setErrorInfo(newErrorInfo);
-     }, []); // No dependencies needed if only using setErrorInfo
+         debugLogger.error("[ErrorOverlayContext CB] addErrorInfo (will trigger overlay)", newErrorInfo);
+         setErrorInfo(newErrorInfo); // This will update errorInfo and trigger showOverlay=true effect
+     }, []);
 
     const clearHistory = useCallback(() => {
         debugLogger.info("[ErrorOverlayContext CB] clearHistory called.");
-        setHistory([]);
-        setErrorInfo(null); // Also clear the main error display
-    }, []); // No dependencies needed
+        setToastHistory([]);
+        setErrorInfo(null); // This will update errorInfo and trigger showOverlay=false effect
+    }, []);
 
-    // --- Logger Integration ---
-    // Function to set the handler in the logger
-    const setHandler = useCallback((handler: LogHandler | null) => {
-        debugLogger.info(`[ErrorOverlayContext CB] setHandler called. Handler ${handler ? 'provided' : 'cleared'}.`);
-        logHandlerRef.current = handler;
-        // Pass the handler to the logger instance
-        debugLogger.setLogHandler(handler);
-    }, []); // No dependencies needed
+    // --- REMOVED Logger Integration useEffect ---
+    // The provider no longer needs to interact with the logger handler directly
 
-    // Effect to set the initial handler for the logger when the component mounts
-    useEffect(() => {
-        const handler: LogHandler = (level, message, timestamp) => {
-            // Add logs to history (similar to toasts)
-            // Map logger levels to toast types (optional, can simplify)
-            let toastType: ToastRecord['type'] = 'info';
-            switch (level) {
-                case 'error': case 'fatal': toastType = 'error'; break;
-                case 'warn': toastType = 'warning'; break;
-                case 'debug': toastType = 'info'; break; // Or handle differently
-                case 'log': toastType = 'message'; break;
-                default: toastType = 'info';
-            }
-            // Avoid logging the log message itself if it came *from* the logger to prevent loops?
-            // Careful here, maybe filter based on message content or add flag?
-            // For now, let's log everything passed *to* the handler.
-             try {
-                // Check ref just in case, although unlikely to be null here
-                if (logHandlerRef.current) {
-                    addToastToHistory({ message, type: toastType, timestamp });
-                }
-            } catch (e) {
-                 // Fallback console log if addToastToHistory fails inside handler
-                 console.error("!!! Error inside LogHandler adding toast:", e, { level, message, timestamp });
-            }
-        };
-
-        debugLogger.info("[ErrorOverlayProvider Effect] Setting logger handler.");
-        setHandler(handler); // Use the stable setter
-
-        // Cleanup: Remove handler when provider unmounts
-        return () => {
-            debugLogger.info("[ErrorOverlayProvider Cleanup] Clearing logger handler.");
-            setHandler(null); // Use the stable setter
-        };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Run only on mount, setHandler is stable
-
-
-    // *** FIX: Memoize the context value ***
     const contextValue = useMemo(() => {
         debugLogger.debug("[ErrorOverlayProvider] Memoizing context value.");
         return {
-            history,
+            toastHistory, // Renamed
             errorInfo,
             isClientReady,
-            addToastToHistory,
-            addErrorInfo,
-            clearHistory,
-            setHandler, // Include the stable setter
+            // *** REMOVED logHistory ***
+            // *** REMOVED setHandler ***
+            addToastToHistory, // Stable callback
+            setErrorInfo,      // Direct state setter (stable by default)
+            clearHistory,      // Stable callback
+            showOverlay,       // Include show flag
         };
     }, [
-        history,
+        toastHistory, // Renamed
         errorInfo,
         isClientReady,
-        addToastToHistory, // Stable callback
-        addErrorInfo,      // Stable callback
-        clearHistory,      // Stable callback
-        setHandler         // Stable callback
+        addToastToHistory,
+        setErrorInfo,
+        clearHistory,
+        showOverlay, // Added showOverlay
     ]);
 
     return (
@@ -166,13 +137,16 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
 export const useErrorOverlay = (): ErrorOverlayContextType => {
     const context = useContext(ErrorOverlayContext);
     if (context === undefined) {
-        // This error should ideally not happen if the provider wraps the app
         debugLogger.fatal("useErrorOverlay must be used within an ErrorOverlayProvider");
         throw new Error('useErrorOverlay must be used within an ErrorOverlayProvider');
     }
-    // Add a check to see if it's still the default value, indicating provider might not be ready
+    // Check if it's still the default value (can happen during initial SSR or if provider is missing)
     if (context.addToastToHistory === defaultState.addToastToHistory && typeof window !== 'undefined') {
          debugLogger.warn("useErrorOverlay: Context seems to hold default value. Provider might not be fully initialized yet.");
     }
     return context;
 };
+
+// Export necessary types
+// *** REMOVED LogRecord export as it's handled by debugLogger now ***
+export type { ErrorInfo, ToastRecord, ErrorSourceType, ErrorOverlayContextType };
