@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutGrid, X, Search } from "lucide-react";
+import { LayoutGrid, X, Search, Pin, PinOff } from "lucide-react"; // Added Pin, PinOff
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import UserInfo from "@/components/user-info";
 import { motion, AnimatePresence } from "framer-motion";
@@ -15,8 +15,9 @@ import {
   FaCircleInfo, FaListCheck, FaNetworkWired, FaRegLightbulb, FaUpload,
   FaUserNinja, FaGlobe, FaLandmarkDome, FaLeaf
 } from "react-icons/fa6";
+import { debugLogger as logger } from "@/lib/debugLogger"; // Added logger
 
-// --- Page Definitions ---
+// --- Page Definitions (Unchanged) ---
 interface PageInfo {
   path: string;
   name: string;
@@ -79,10 +80,6 @@ const translations: Record<string, Record<string, string>> = {
     "Bot Busters": "Bot Busters",
     "BS Detector": "BS Detector",
     "Wheel of Fortune": "Wheel of Fortune",
-    "Upload Advice": "Upload Advice",
-    "Admin Panel": "Admin Panel",
-    "Fleet Admin": "Fleet Admin",
-    "YT Admin": "YT Admin",
     "My Invoices": "My Invoices",
     "Subscribe": "Subscribe",
     "Donate": "Donate",
@@ -93,6 +90,10 @@ const translations: Record<string, Record<string, string>> = {
     "Geo Cheatsheet 6": "Geo Cheatsheet 6",
     "History Cheatsheet 6": "History Cheatsheet 6",
     "Biology Cheatsheet 6": "Biology Cheatsheet 6",
+    "Upload Advice": "Upload Advice",
+    "Admin Panel": "Admin Panel",
+    "Fleet Admin": "Fleet Admin",
+    "YT Admin": "YT Admin",
     "Search pages...": "Search pages...",
     "No pages found matching": "No pages found matching",
     "Admin Only": "Admin Only",
@@ -100,6 +101,8 @@ const translations: Record<string, Record<string, string>> = {
     "Open navigation": "Open navigation",
     "Close navigation": "Close navigation",
     "Hot": "Hot",
+    "Pin header": "Pin header (always visible)", // New
+    "Unpin header": "Unpin header (auto-hide on scroll)", // New
   },
   ru: {
     "Cyber Garage": "Кибер Гараж",
@@ -116,10 +119,6 @@ const translations: Record<string, Record<string, string>> = {
     "Bot Busters": "Охотники за Ботами",
     "BS Detector": "Детектор Чуши",
     "Wheel of Fortune": "Колесо Фортуны",
-    "Upload Advice": "Загрузить Совет",
-    "Admin Panel": "Админ Панель",
-    "Fleet Admin": "Админ Автопарка",
-    "YT Admin": "Админ YT",
     "My Invoices": "Мои Счета",
     "Subscribe": "Подписаться",
     "Donate": "Поддержать",
@@ -130,6 +129,10 @@ const translations: Record<string, Record<string, string>> = {
     "Geo Cheatsheet 6": "Шпаргалка Гео 6",
     "History Cheatsheet 6": "Шпаргалка Ист 6",
     "Biology Cheatsheet 6": "Шпаргалка Био 6",
+    "Upload Advice": "Загрузить Совет",
+    "Admin Panel": "Админ Панель",
+    "Fleet Admin": "Админ Автопарка",
+    "YT Admin": "Админ YT",
     "Search pages...": "Поиск страниц...",
     "No pages found matching": "Страницы не найдены по запросу",
     "Admin Only": "Только для админа",
@@ -137,6 +140,8 @@ const translations: Record<string, Record<string, string>> = {
     "Open navigation": "Открыть навигацию",
     "Close navigation": "Закрыть навигацию",
     "Hot": "Новинка",
+    "Pin header": "Закрепить хедер (всегда виден)", // New
+    "Unpin header": "Открепить хедер (авто-скрытие)", // New
   }
 };
 
@@ -144,10 +149,12 @@ const translations: Record<string, Record<string, string>> = {
 export default function Header() {
   const { isAdmin, user } = useAppContext();
   const [isNavOpen, setIsNavOpen] = useState(false);
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(false);
+  const [isPinned, setIsPinned] = useState(false); // New state for pinning
   const [lastScrollY, setLastScrollY] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const pathname = usePathname();
+  logger.log(`[Header] Render start. Path: ${pathname}, NavOpen: ${isNavOpen}, Pinned: ${isPinned}`);
 
   const initialLang = useMemo(() => {
     const userLang = user?.language_code;
@@ -159,7 +166,8 @@ export default function Header() {
     const userLang = user?.language_code;
     const newLangBasedOnUser = userLang === 'ru' ? 'ru' : 'en';
     if (newLangBasedOnUser !== currentLang) {
-      setCurrentLang(newLangBasedOnUser);
+       logger.log(`[Header Effect Lang] Updating language based on user: ${newLangBasedOnUser}`);
+       setCurrentLang(newLangBasedOnUser);
     }
   }, [user?.language_code, currentLang]);
 
@@ -168,8 +176,18 @@ export default function Header() {
   }, [currentLang]);
 
   const toggleLang = useCallback(() => {
+    logger.log(`[Header CB] Toggling language`);
     setCurrentLang(prevLang => prevLang === 'en' ? 'ru' : 'en');
   }, []);
+
+  const togglePin = useCallback(() => {
+    logger.log(`[Header CB] Toggling pin`);
+    setIsPinned(prev => !prev);
+    // If pinning, ensure header becomes visible immediately
+    if (!isPinned) {
+        setIsHeaderVisible(true);
+    }
+  }, [isPinned]); // Add isPinned dependency
 
   const currentLogoText = useMemo(() => {
     const currentPage = allPages.find(p => p.path === pathname);
@@ -194,39 +212,57 @@ export default function Header() {
 
   const handleScroll = useCallback(() => {
     const currentScrollY = window.scrollY;
-    if (isNavOpen) {
-      setIsHeaderVisible(true);
+    // If pinned or nav is open, always show header
+    if (isPinned || isNavOpen) {
+      if (!isHeaderVisible) setIsHeaderVisible(true); // Ensure it's visible if it wasn't
       setLastScrollY(currentScrollY);
       return;
     }
-    if (currentScrollY > lastScrollY && currentScrollY > 50) {
-      setIsHeaderVisible(false);
+    // Default scroll behavior (hide on down, show on up)
+    if (currentScrollY > lastScrollY && currentScrollY > 50) { // Hide threshold
+      if (isHeaderVisible) {
+        // logger.debug("[Header Scroll] Hiding header");
+        setIsHeaderVisible(false);
+      }
     } else if (currentScrollY < lastScrollY) {
-      setIsHeaderVisible(true);
+      if (!isHeaderVisible) {
+         // logger.debug("[Header Scroll] Showing header");
+         setIsHeaderVisible(true);
+      }
     }
     setLastScrollY(currentScrollY);
-  }, [lastScrollY, isNavOpen]);
+  }, [lastScrollY, isNavOpen, isPinned, isHeaderVisible]); // Added isPinned and isHeaderVisible
 
   useEffect(() => {
+    logger.log("[Header Effect Scroll] Attaching scroll listener.");
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
+      logger.log("[Header Effect Scroll] Removing scroll listener.");
       window.removeEventListener("scroll", handleScroll);
     };
   }, [handleScroll]);
 
   useEffect(() => {
-    setIsNavOpen(false);
-    setSearchTerm("");
-  }, [pathname]);
+    // Close nav and clear search on path change
+    if (isNavOpen) {
+      logger.log(`[Header Effect Path] Path changed to ${pathname}, closing nav.`);
+      setIsNavOpen(false);
+      setSearchTerm("");
+    }
+  }, [pathname, isNavOpen]); // Added isNavOpen dependency
 
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
     if (isNavOpen) {
+      logger.log("[Header Effect Nav Overflow] Nav open, hiding body overflow.");
       document.body.style.overflow = 'hidden';
     } else {
+      // logger.debug("[Header Effect Nav Overflow] Nav closed, restoring body overflow.");
       document.body.style.overflow = originalStyle;
     }
+    // Cleanup function to restore original style
     return () => {
+      // logger.debug("[Header Effect Nav Overflow Cleanup] Restoring body overflow.");
       document.body.style.overflow = originalStyle;
     };
   }, [isNavOpen]);
@@ -249,7 +285,7 @@ export default function Header() {
       <motion.header
         className={`fixed top-0 left-0 right-0 z-40 bg-black/70 border-b border-brand-purple/30 shadow-lg backdrop-blur-md transition-transform duration-300 ease-in-out`}
         initial={{ y: 0 }}
-        animate={{ y: isHeaderVisible ? 0 : "-100%" }}
+        animate={{ y: (isHeaderVisible || isPinned) ? 0 : "-100%" }} // Modified animation based on pin state
         transition={{ type: "tween", duration: 0.3 }}
       >
         <div className="container mx-auto px-4 py-3">
@@ -257,7 +293,22 @@ export default function Header() {
             <Link href="/" className="text-2xl md:text-3xl font-bold text-brand-purple cyber-text glitch hover:text-glow" data-text={currentLogoText}>
               {currentLogoText}
             </Link>
-            <div className="flex items-center gap-3 md:gap-4">
+            <div className="flex items-center gap-2 md:gap-3">
+               {/* Pin Toggle Button */}
+               <button
+                  onClick={togglePin}
+                  className={cn(
+                    "p-2 transition-colors focus:outline-none focus:ring-1 focus:ring-offset-2 focus:ring-offset-black rounded-md",
+                    isPinned
+                      ? "text-brand-yellow hover:text-brand-yellow/80 focus:ring-brand-yellow"
+                      : "text-gray-500 hover:text-gray-300 focus:ring-gray-400"
+                  )}
+                  aria-label={isPinned ? t("Unpin header") : t("Pin header")}
+                  title={isPinned ? t("Unpin header") : t("Pin header")}
+                >
+                  {isPinned ? <PinOff className="h-5 w-5" /> : <Pin className="h-5 w-5" />}
+                </button>
+
               {/* Language Toggle Button */}
               <button
                 onClick={toggleLang}
@@ -268,10 +319,13 @@ export default function Header() {
                 {currentLang === 'en' ? 'RU' : 'EN'}
               </button>
 
-              {/* Navigation Toggle Button */}
+              {/* User Info (Always Visible) */}
+              <UserInfo />
+
+              {/* Navigation Toggle Button (Conditional) */}
               {!isNavOpen && (
                 <button
-                  onClick={() => setIsNavOpen(true)}
+                  onClick={() => { logger.log("[Header Click] Opening nav."); setIsNavOpen(true); }}
                   className="p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md"
                   aria-label={t("Open navigation")}
                   aria-expanded={isNavOpen}
@@ -279,8 +333,6 @@ export default function Header() {
                   <LayoutGrid className="h-6 w-6" />
                 </button>
               )}
-              {/* User Info */}
-              <UserInfo />
             </div>
           </div>
         </div>
@@ -295,11 +347,11 @@ export default function Header() {
             animate={{ opacity: 1, clipPath: 'circle(150% at calc(100% - 2rem) 2rem)' }}
             exit={{ opacity: 0, clipPath: 'circle(0% at calc(100% - 2rem) 2rem)' }}
             transition={{ type: "spring", stiffness: 260, damping: 30 }}
-            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto pt-20 pb-10 px-4 md:pt-24"
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto pt-20 pb-10 px-4 md:pt-24" // Keep z-50 higher than header
           >
             {/* Close Button */}
             <button
-              onClick={() => setIsNavOpen(false)}
+              onClick={() => { logger.log("[Header Click] Closing nav."); setIsNavOpen(false); }}
               className="fixed top-4 right-4 z-60 p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md"
               aria-label={t("Close navigation")}
             >
@@ -332,7 +384,7 @@ export default function Header() {
                       <Link
                         key={page.path}
                         href={page.path}
-                        onClick={() => setIsNavOpen(false)}
+                        onClick={() => { logger.log(`[Header Nav Click] Navigating to ${page.path}.`); setIsNavOpen(false); }} // Log navigation
                         className={cn(
                           "group relative flex flex-col items-center justify-center rounded-md border transition-all duration-300 aspect-square text-center hover:scale-[1.03]",
                           "p-1.5 sm:p-2 md:p-1.5",
