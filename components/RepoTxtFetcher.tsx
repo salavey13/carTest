@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useMemo, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+// --- REMOVED useSearchParams import ---
+// import { useSearchParams } from "next/navigation";
 import {
     FaAngleDown, FaAngleUp,
     FaDownload, FaArrowsRotate, FaCircleCheck, FaXmark, FaCopy,
@@ -37,11 +38,21 @@ import ProgressBar from "./repo/ProgressBar";
 // --- VIBE CHECK: Import the centralized renderer if needed ---
 import VibeContentRenderer from '@/components/VibeContentRenderer';
 
+// --- NEW: Define props for parameters passed from parent ---
+interface RepoTxtFetcherProps {
+    highlightedPathProp: string | null;
+    ideaProp: string | null;
+}
+// --- END NEW ---
+
 // --- Component Definition ---
-const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
+// --- UPDATED: Add props to component definition ---
+const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
+    highlightedPathProp, ideaProp // Destructure new props
+}, ref) => {
     logger.log("[RepoTxtFetcher] START Render");
 
-    // === VIBE CHECK ===
+    // === VIBE CHECK (Context remains the same) ===
     const { addToast: addToastContext,
         fetchStatus, filesFetched,
         repoUrl: repoUrlFromContext, setRepoUrl: setRepoUrlInContext, repoUrlEntered,
@@ -70,14 +81,13 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
     const repoUrl = repoUrlFromContext;
     const handleRepoUrlChange = setRepoUrlInContext;
 
-    // === URL Params & Derived State ===
-    logger.debug("[RepoTxtFetcher] Before URL Params/Memo");
-    const searchParams = useSearchParams();
-    const highlightedPathFromUrl = useMemo(() => searchParams.get("path") || "", [searchParams]);
-    const ideaFromUrl = useMemo(() => {
-        const idea = searchParams.get("idea");
-        return idea && !decodeURIComponent(idea).startsWith("ImageReplace|") ? decodeURIComponent(idea) : "";
-    }, [searchParams]);
+    // === URL Params & Derived State ---
+    // --- Use props instead ---
+    const highlightedPathFromUrl = highlightedPathProp ?? "";
+    const ideaFromUrl = ideaProp ?? "";
+    logger.debug(`[RepoTxtFetcher] Received props: highlightedPathProp='${highlightedPathFromUrl}', ideaProp='${ideaFromUrl ? ideaFromUrl.substring(0,30)+'...' : null}'`);
+
+    // --- autoFetch depends on props now ---
     const autoFetch = useMemo(() => !!highlightedPathFromUrl || !!imageReplaceTask, [highlightedPathFromUrl, imageReplaceTask]);
     const importantFiles = useMemo(() => [
         "contexts/AppContext.tsx", "contexts/RepoXmlPageContext.tsx", "hooks/useTelegram.ts", "app/layout.tsx",
@@ -86,7 +96,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
         "app/webhook-handlers/proxy.ts", "package.json", "tailwind.config.ts",
         "lib/debugLogger.ts", "contexts/ErrorOverlayContext.tsx", "components/DevErrorOverlay.tsx", "components/ErrorBoundaryForOverlay.tsx"
     ], []);
-    logger.debug("[RepoTxtFetcher] After URL Params/Memo");
+    logger.debug("[RepoTxtFetcher] After Derived State/Memo");
 
     // === Custom Hooks ===
     logger.debug("[RepoTxtFetcher] Before useRepoFetcher Hook");
@@ -101,7 +111,11 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
         isFetchDisabled
     } = useRepoFetcher({
         repoUrl, token, targetBranchName, manualBranchName, imageReplaceTask,
-        highlightedPathFromUrl, importantFiles, autoFetch, ideaFromUrl, isSettingsModalOpen,
+        highlightedPathFromUrl, // Use the value derived from props
+        importantFiles,
+        autoFetch, // Use the value derived from props/context
+        ideaFromUrl, // Use the value derived from props
+        isSettingsModalOpen,
         repoUrlEntered, assistantLoading, isParsing, aiActionLoading,
         loadingPrs,
     });
@@ -137,7 +151,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
     });
     logger.debug("[RepoTxtFetcher] After useKworkInput Hook");
 
-    // === Effects ===
+    // === Effects (Remain the same) ===
     useEffect(() => {
         logger.debug("[Effect URL Sync] RepoTxtFetcher: Syncing Assistant URL START");
         if (assistantRef?.current?.updateRepoUrl) {
@@ -194,7 +208,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
             // No cleanup needed here
             return () => {}; // Return empty cleanup
         }
-        // Default empty cleanup if none of the conditions met (shouldn't be reachable due to above returns)
+        // // Default empty cleanup if none of the conditions met (shouldn't be reachable due to above returns)
         // return cleanupScroll;
     }, [fetchStatus, primaryHighlightedPath, imageReplaceTask, autoFetch, fetchedFiles.length, scrollToSection, toastInfo]); // Added toastInfo dependency
 
@@ -212,8 +226,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
         },
         handleAddSelected: (filesToAdd: Set<string>, allFiles: FileNode[]) => {
             logger.debug(`[Imperative] handleAddSelected called.`);
-            handleAddSelected();
-            return Promise.resolve();
+            handleAddSelected(); // Call the function from the hook
+            return Promise.resolve(); // Return a resolved promise
         },
         handleCopyToClipboard: (text?: string, scroll?: boolean) => {
              logger.debug(`[Imperative] handleCopyToClipboard called.`);
@@ -243,7 +257,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
             logger.debug(`[Imperative] deselectAllFiles called.`);
             handleDeselectAll();
         },
-
+        // .. Removed redundant properties like refs or state setters
     }), [
         handleFetchManual, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll,
         getKworkInputValue, imageReplaceTask, handleAddImportantFiles, handleAddFullTree, handleSelectAll, handleDeselectAll
@@ -311,8 +325,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                      {/* Instructions - Use VibeContentRenderer as they contain icons */}
                       {!currentImageTask && (
                          <div className="text-yellow-300/80 text-xs md:text-sm space-y-1 mb-2">
-                             {/* FIXED STRINGS: Removed onClick/cursor-pointer, Ensured PascalCase */}
-                             {/* The interactive element is the main settings button below */}
+                            {/* .. Restored Comments .. */}
+                            {/* FIXED STRINGS: Removed onClick/cursor-pointer, Ensured PascalCase */}
+                            {/* The interactive element is the main settings button below */}
                             <VibeContentRenderer content={"1. Настрой (<FaCodeBranch title='Настройки' class='inline text-cyan-400'/>)."} />
                             <VibeContentRenderer content={"2. Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>."} />
                             <VibeContentRenderer content={"3. Выбери файлы или <span class='font-bold text-teal-400 mx-1'>связанные</span> / <span class='font-bold text-orange-400 mx-1'>важные</span>."} />
@@ -423,7 +438,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                              selectedFiles={selectedFetcherFiles}
                              allFiles={fetchedFiles}
                              getLanguage={repoUtils.getLanguage}
-                             // VibeContentRenderer handled internally if needed
+                             // .. VibeContentRenderer handled internally if needed
                          />
                          {(() => { logger.debug("[Render] Rendering FileList (conditional)"); return null; })()}
                          <FileList
@@ -442,7 +457,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                              onDeselectAll={handleDeselectAll}
                              onAddSelected={handleAddSelected}
                              onAddTree={handleAddFullTree}
-                             // VibeContentRenderer handled internally if needed
+                             // .. VibeContentRenderer handled internally if needed
                           />
                       </div>
                  )}
@@ -461,7 +476,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                               isAddSelectedDisabled={isAddSelectedDisabled}
                               selectedFetcherFilesCount={selectedFetcherFiles.size}
                               onInputChange={(value) => setKworkInputHasContent(value.trim().length > 0)}
-                              // VibeContentRenderer handled internally if needed
+                              // .. VibeContentRenderer handled internally if needed
                           />
                       </div>
                  )}
