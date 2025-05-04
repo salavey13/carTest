@@ -159,7 +159,6 @@ function ActualPageContent() {
     if (typeof logger !== 'undefined') logger.log("[ActualPageContent] useAppToast DONE"); else console.log("[ActualPageContent] useAppToast DONE");
 
     // --- State Initialization ---
-    // Keep state initialization before useSearchParams, as it's standard practice
     if (typeof logger !== 'undefined') logger.log("[ActualPageContent] Initializing State..."); else console.log("[ActualPageContent] Initializing State...");
     const [lang, setLang] = useState<Language>('en');
     const [showComponents, setShowComponents] = useState(false);
@@ -167,8 +166,11 @@ function ActualPageContent() {
     const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(false);
     const [t, setT] = useState<TranslationSet | null>(null);
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
-    // New state to track if searchParams hook has successfully run
+    // .. State to track if searchParams hook has successfully run
     const [searchParamsReady, setSearchParamsReady] = useState(false);
+    // .. NEW: State for props derived from searchParams
+    const [highlightedPathProp, setHighlightedPathProp] = useState<string | null>(null);
+    const [ideaProp, setIdeaProp] = useState<string | null>(null);
     if (typeof logger !== 'undefined') logger.log("[ActualPageContent] useState DONE"); else console.log("[ActualPageContent] useState DONE");
 
 
@@ -176,12 +178,10 @@ function ActualPageContent() {
     let searchParams: URLSearchParams | null = null;
     let searchParamsError: Error | null = null;
     try {
-      searchParams = useSearchParams(); // Call the hook unconditionally
-      // If the hook call succeeds without throwing, we consider it "ready"
-      // We set the state inside useEffect based on this render's success
+      searchParams = useSearchParams();
       if (typeof logger !== 'undefined') logger.log("[ActualPageContent] useSearchParams() call SUCCEEDED in this render."); else console.log("[ActualPageContent] useSearchParams() call SUCCEEDED in this render.");
     } catch (e: any) {
-      searchParamsError = e; // Store the error
+      searchParamsError = e;
       if (typeof logger !== 'undefined') logger.error("[ActualPageContent] useSearchParams() call FAILED:", e); else console.error("[ActualPageContent] useSearchParams() call FAILED:", e);
     }
 
@@ -190,12 +190,12 @@ function ActualPageContent() {
          if (searchParamsError) {
               setSearchParamsReady(false); // Explicitly set not ready on error
          } else {
-              logger.log("[ActualPageContent Effect] searchParams hook succeeded in previous render, setting ready state.");
+              logger.log("[ActualPageContent Effect] searchParams hook succeeded, setting ready state.");
               setSearchParamsReady(true); // Signal ready state
          }
      }, [searchParamsError]); // Depend only on the error status
 
-    // --- CONTEXT VALIDATION (moved after hooks) ---
+    // --- CONTEXT VALIDATION ---
     if (!pageContext || typeof pageContext.addToast !== 'function') {
          console.error("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!");
          return <div className="text-red-500 p-4">Критическая ошибка: Контекст страницы не загружен.</div>;
@@ -211,7 +211,9 @@ function ActualPageContent() {
         targetPrData, // .. Corrected typo here - targetPrData
         setTargetPrData,
         isPreChecking, setPendingFlowDetails,
-        pendingFlowDetails
+        pendingFlowDetails,
+        // .. Added context setters used in URL Params effect for dependency array
+        setTargetBranchName, setManualBranchName
     } = pageContext;
 
     // --- Effects ---
@@ -222,38 +224,39 @@ function ActualPageContent() {
     }, [t]); // Only depends on translations
 
     useEffect(() => {
-        if (typeof logger !== 'undefined') logger.debug("[Effect Lang] START"); else console.debug("[Effect Lang] START");
-        const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
-        const userLang = user?.language_code;
-        const resolvedLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
-        setLang(resolvedLang);
-        const newTranslations = translations[resolvedLang] ?? translations.en;
-        setT(newTranslations);
-        setIsPageLoading(false); // Set loading false only after translations are set
-        if (typeof logger !== 'undefined') logger.info(`[Effect Lang] Language set to: ${resolvedLang}. Page loading set to false.`); else console.info(`[Effect Lang] Language set to: ${resolvedLang}. Page loading set to false.`);
+      if (typeof logger !== 'undefined') logger.debug("[Effect Lang] START"); else console.debug("[Effect Lang] START");
+      const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
+      const userLang = user?.language_code;
+      const resolvedLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
+      setLang(resolvedLang);
+      const newTranslations = translations[resolvedLang] ?? translations.en;
+      setT(newTranslations);
+      setIsPageLoading(false); // Set loading false only after translations are set
+      if (typeof logger !== 'undefined') logger.info(`[Effect Lang] Language set to: ${resolvedLang}. Page loading set to false.`); else console.info(`[Effect Lang] Language set to: ${resolvedLang}. Page loading set to false.`);
     }, [user]); // Only depends on user
 
     // --- Effect for URL Params (Depends on searchParamsReady) ---
     useEffect(() => {
         // !! CRITICAL !!: Only run if searchParams hook is ready and didn't error
         if (!searchParamsReady) {
-            if (searchParamsError) {
-                 logger.warn("[Effect URL Params] Skipping effect, searchParams hook failed to initialize.");
-            } else {
-                 logger.log("[Effect URL Params] Skipping effect, searchParams hook not ready yet.");
-            }
+            if (searchParamsError) { logger.warn("[Effect URL Params] Skipping effect, searchParams hook failed to initialize."); }
+            else { logger.log("[Effect URL Params] Skipping effect, searchParams hook not ready yet."); }
             setInitialIdeaProcessed(true); // Assume processed if params aren't ready/errored
+            // --- Reset props if params not ready ---
+            setHighlightedPathProp(null);
+            setIdeaProp(null);
             return;
         }
-        // Also check if searchParams object exists (belt-and-suspenders)
         if (!searchParams) {
             logger.error("[Effect URL Params] Skipping effect, searchParams object is unexpectedly null despite being ready.");
             setInitialIdeaProcessed(true);
+            setHighlightedPathProp(null);
+            setIdeaProp(null);
             return;
         }
 
         if (typeof logger !== 'undefined') logger.debug("[Effect URL Params] START (searchParams are ready)"); else console.debug("[Effect URL Params] START (searchParams are ready)");
-        // --- PARAMETER PROCESSING LOGIC (Unchanged from previous version) ---
+        // --- PARAMETER PROCESSING ---
         const pathParam = searchParams.get("path");
         const ideaParam = searchParams.get("idea");
         const repoParam = searchParams.get("repo");
@@ -261,35 +264,49 @@ function ActualPageContent() {
         const prNumberParam = searchParams.get("prNumber");
         const prUrlParam = searchParams.get("prUrl");
 
+        // --- Set props based on params ---
+        setHighlightedPathProp(pathParam); // Store path for prop
+        // Store decoded idea for prop, excluding ImageReplace format
+        const decodedIdeaForProp = ideaParam ? decodeURIComponent(ideaParam) : null;
+        if (decodedIdeaForProp && !decodedIdeaForProp.startsWith("ImageReplace|") && !decodedIdeaForProp.startsWith("ErrorFix|")) {
+            setIdeaProp(decodedIdeaForProp);
+        } else {
+            setIdeaProp(null); // Reset if it's a special flow or no idea
+        }
+        // --- End Set props ---
+
+        // .. Repo processing
         if (repoParam) {
              try {
                  const decodedRepoUrl = decodeURIComponent(repoParam);
                  if (decodedRepoUrl && typeof decodedRepoUrl === 'string' && decodedRepoUrl.includes("github.com")) {
                      setRepoUrl(decodedRepoUrl);
-                     if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Repo URL set from param: ${decodedRepoUrl}`); else console.info(`[Effect URL Params] Repo URL set from param: ${decodedRepoUrl}`);
-                 } else { if (typeof logger !== 'undefined') logger.warn(`[Effect URL Params] Invalid or empty repo URL from param: ${repoParam}`); else console.warn(`[Effect URL Params] Invalid or empty repo URL from param: ${repoParam}`); }
-             } catch (e) { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Error decoding repo URL param:", e); else console.error("[Effect URL Params] Error decoding repo URL param:", e); }
+                     if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Repo URL set from param: ${decodedRepoUrl}`);
+                 } else { if (typeof logger !== 'undefined') logger.warn(`[Effect URL Params] Invalid or empty repo URL from param: ${repoParam}`); }
+             } catch (e) { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Error decoding repo URL param:", e); }
          }
 
+        // .. Branch/PR processing
          if (targetBranchParam) {
              const decodedBranch = decodeURIComponent(targetBranchParam);
-             pageContext.setTargetBranchName(decodedBranch);
-             pageContext.setManualBranchName('');
-             if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Target Branch set from param: ${decodedBranch}`); else console.info(`[Effect URL Params] Target Branch set from param: ${decodedBranch}`);
+             setTargetBranchName(decodedBranch); // Use context setter
+             setManualBranchName(''); // Use context setter
+             if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Target Branch set from param: ${decodedBranch}`);
              if (prNumberParam && prUrlParam) {
                  try {
                      const prNum = parseInt(decodeURIComponent(prNumberParam), 10);
                      const prUrl = decodeURIComponent(prUrlParam);
                      if (!isNaN(prNum) && prUrl) {
-                         pageContext.setTargetPrData({ number: prNum, url: prUrl });
-                         if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Target PR Data set from param: #${prNum}`); else console.info(`[Effect URL Params] Target PR Data set from param: #${prNum}`);
+                         setTargetPrData({ number: prNum, url: prUrl }); // Use context setter
+                         if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Target PR Data set from param: #${prNum}`);
                      }
-                 } catch (e) { if (typeof logger !== 'undefined') logger.error("Error parsing PR number/url from URL params", e); else console.error("Error parsing PR number/url from URL params", e); }
+                 } catch (e) { if (typeof logger !== 'undefined') logger.error("Error parsing PR number/url from URL params", e); }
              }
          } else {
-             pageContext.setTargetPrData(null);
+             setTargetPrData(null); // Use context setter
          }
 
+        // .. Path/Idea processing for flows
           if (pathParam && ideaParam) {
               let decodedIdea: string | null = null; let decodedPath: string | null = null;
               try {
@@ -297,7 +314,7 @@ function ActualPageContent() {
                   decodedIdea = decodeURIComponent(ideaParam);
 
                   if (decodedIdea?.startsWith("ImageReplace|")) {
-                     if (typeof logger !== 'undefined') logger.log("[Effect URL Params] Image Replace flow detected."); else console.log("[Effect URL Params] Image Replace flow detected.");
+                     if (typeof logger !== 'undefined') logger.log("[Effect URL Params] Image Replace flow detected.");
                       try {
                           const parts = decodedIdea.split('|');
                           const oldUrlParam = parts.find(p => p.startsWith("OldURL="));
@@ -309,60 +326,63 @@ function ActualPageContent() {
                               if (oldUrl && newUrl) {
                                   const flowDetails = { oldUrl, newUrl };
                                   setPendingFlowDetails({ type: 'ImageSwap', targetPath: decodedPath, details: flowDetails });
-                                  if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Setting Pending Flow: ImageSwap`, { path: decodedPath, details: flowDetails }); else console.info(`[Effect URL Params] Setting Pending Flow: ImageSwap`, { path: decodedPath, details: flowDetails });
-                              } else { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Invalid image task URL data", { decodedPath, oldUrl, newUrl }); else console.error("[Effect URL Params] Invalid image task URL data", { decodedPath, oldUrl, newUrl }); setPendingFlowDetails(null); }
-                          } else { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Could not parse ImageReplace parts:", decodedIdea); else console.error("[Effect URL Params] Could not parse ImageReplace parts:", decodedIdea); setPendingFlowDetails(null); }
-                      } catch (splitError) { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Error splitting ImageReplace task:", splitError); else console.error("[Effect URL Params] Error splitting ImageReplace task:", splitError); setPendingFlowDetails(null); }
+                                  if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Setting Pending Flow: ImageSwap`, { path: decodedPath, details: flowDetails });
+                              } else { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Invalid image task URL data", { decodedPath, oldUrl, newUrl }); setPendingFlowDetails(null); }
+                          } else { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Could not parse ImageReplace parts:", decodedIdea); setPendingFlowDetails(null); }
+                      } catch (splitError) { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Error splitting ImageReplace task:", splitError); setPendingFlowDetails(null); }
                      setInitialIdeaProcessed(true);
-                     setInitialIdea(null); setImageReplaceTask(null);
+                     setInitialIdea(null); setImageReplaceTask(null); // Clear local state
 
                   } else if (decodedIdea?.startsWith("ErrorFix|")) {
-                        if (typeof logger !== 'undefined') logger.log("[Effect URL Params] Error Fix flow detected."); else console.log("[Effect URL Params] Error Fix flow detected.");
+                        if (typeof logger !== 'undefined') logger.log("[Effect URL Params] Error Fix flow detected.");
                          try {
-                             const parts = decodedIdea.substring(9).split('|');
-                             const details: Record<string, string> = {};
-                             parts.forEach(part => {
-                                 const eqIndex = part.indexOf('=');
-                                 if (eqIndex > 0) {
-                                     const key = part.substring(0, eqIndex);
-                                     const value = decodeURIComponent(part.substring(eqIndex + 1));
-                                     details[key] = value;
-                                 }
-                             });
-                             if (decodedPath && details.Message) {
-                                 setPendingFlowDetails({ type: 'ErrorFix', targetPath: decodedPath, details });
-                                 if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Setting Pending Flow: ErrorFix`, { path: decodedPath, details }); else console.info(`[Effect URL Params] Setting Pending Flow: ErrorFix`, { path: decodedPath, details });
-                             } else { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Invalid ErrorFix data (missing path or message)", { decodedPath, details }); else console.error("[Effect URL Params] Invalid ErrorFix data (missing path or message)", { decodedPath, details }); setPendingFlowDetails(null); }
-                         } catch (parseError) { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Error parsing ErrorFix task:", parseError); else console.error("[Effect URL Params] Error parsing ErrorFix task:", parseError); setPendingFlowDetails(null); }
-                         setInitialIdeaProcessed(false);
-                         setInitialIdea(null); setImageReplaceTask(null);
+                            const parts = decodedIdea.substring(9).split('|');
+                            const details: Record<string, string> = {};
+                            parts.forEach(part => {
+                                const eqIndex = part.indexOf('=');
+                                if (eqIndex > 0) {
+                                    const key = part.substring(0, eqIndex);
+                                    const value = decodeURIComponent(part.substring(eqIndex + 1));
+                                    details[key] = value;
+                                }
+                            });
+                            if (decodedPath && details.Message) {
+                                setPendingFlowDetails({ type: 'ErrorFix', targetPath: decodedPath, details });
+                                if (typeof logger !== 'undefined') logger.info(`[Effect URL Params] Setting Pending Flow: ErrorFix`, { path: decodedPath, details });
+                            } else { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Invalid ErrorFix data (missing path or message)", { decodedPath, details }); setPendingFlowDetails(null); }
+                         } catch (parseError) { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Error parsing ErrorFix task:", parseError); setPendingFlowDetails(null); }
+                         setInitialIdeaProcessed(false); // Keep as false to allow populate effect
+                         setInitialIdea(null); setImageReplaceTask(null); // Clear local state
 
                   } else if (decodedIdea) {
-                     if (typeof logger !== 'undefined') logger.log("[Effect URL Params] Simple idea param found:", decodedIdea.substring(0, 50) + "..."); else console.log("[Effect URL Params] Simple idea param found:", decodedIdea.substring(0, 50) + "...");
-                     setInitialIdea(decodedIdea);
+                     if (typeof logger !== 'undefined') logger.log("[Effect URL Params] Simple idea param found:", decodedIdea.substring(0, 50) + "...");
+                     setInitialIdea(decodedIdea); // Set local state for populate effect
                      setImageReplaceTask(null);
                      setPendingFlowDetails(null);
-                     setInitialIdeaProcessed(false);
+                     setInitialIdeaProcessed(false); // Keep as false to allow populate effect
                   } else {
-                      if (typeof logger !== 'undefined') logger.warn("[Effect URL Params] Decoded idea empty/invalid."); else console.warn("[Effect URL Params] Decoded idea empty/invalid.");
+                      // .. Handle empty/invalid idea
                       setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true);
                   }
-              } catch (decodeError) { if (typeof logger !== 'undefined') logger.error("[Effect URL Params] Error decoding params:", decodeError); else console.error("[Effect URL Params] Error decoding params:", decodeError); setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true); }
+              } catch (decodeError) { /* .. error handling .. */ setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true); }
 
+              // Set showComponents only if valid path/idea params exist
               if (decodedPath || decodedIdea) {
-                  if (typeof logger !== 'undefined') logger.debug("[Effect URL Params] Setting showComponents=true"); else console.debug("[Effect URL Params] Setting showComponents=true"); setShowComponents(true);
+                  if (typeof logger !== 'undefined') logger.debug("[Effect URL Params] Setting showComponents=true based on params"); setShowComponents(true);
               }
           } else {
-              if (typeof logger !== 'undefined') logger.log(`[Effect URL Params] No path/idea params.`); else console.log(`[Effect URL Params] No path/idea params.`);
+              // .. Handle no path/idea params
               setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true);
           }
          if (typeof logger !== 'undefined') logger.debug("[Effect URL Params] END"); else console.debug("[Effect URL Params] END");
       // --- DEPENDENCIES ---
-      // Depend on searchParamsReady state now
-      // Keep other necessary dependencies
-      }, [searchParamsReady, searchParams, setImageReplaceTask, setRepoUrl, addToast, setPendingFlowDetails, pageContext.setTargetBranchName, pageContext.setManualBranchName, pageContext.setTargetPrData]);
+      }, [
+          searchParamsReady, searchParams,
+          setImageReplaceTask, setRepoUrl, addToast, setPendingFlowDetails,
+          setTargetBranchName, setManualBranchName, setTargetPrData // Context setters are stable
+      ]);
 
-       // --- Effect for Kwork/Task Population (Unchanged) ---
+       // --- Effect for Kwork/Task Population ---
        useEffect(() => {
             if (typeof logger !== 'undefined') logger.debug("[Effect Populate] Check START", { fetchStatus, isPreChecking, pendingFlow: !!pendingFlowDetails, initialIdea: !!initialIdea }); else console.debug("[Effect Populate] Check START", { fetchStatus, isPreChecking, pendingFlow: !!pendingFlowDetails, initialIdea: !!initialIdea });
             if (fetchStatus === 'success' && !isPreChecking) {
@@ -403,19 +423,18 @@ function ActualPageContent() {
                      }
                      const kworkElement = document.getElementById('kwork-input-section');
                      if (kworkElement) { setTimeout(() => { try { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e){ if (typeof logger !== 'undefined') logger.error("Scroll error:", e); else console.error("Scroll error:", e) } }, 250); }
-                     setInitialIdeaProcessed(true);
-                 } else if (!initialIdeaProcessed) {
+                     setInitialIdeaProcessed(true); // Mark as processed here
+                 } else if (!initialIdeaProcessed) { // Ensures this runs even if no idea/flow
                       setInitialIdeaProcessed(true);
-                      if (typeof logger !== 'undefined') logger.log(`[Effect Populate] Fetch finished (${fetchStatus}), no pending idea/flow.`); else console.log(`[Effect Populate] Fetch finished (${fetchStatus}), no pending idea/flow.`);
+                      if (typeof logger !== 'undefined') logger.log(`[Effect Populate] Fetch finished (${fetchStatus}), no pending idea/flow or already processed.`); else console.log(`[Effect Populate] Fetch finished (${fetchStatus}), no pending idea/flow or already processed.`);
                  }
             }
             if (typeof logger !== 'undefined') logger.debug("[Effect Populate] Check END"); else console.debug("[Effect Populate] Check END");
         }, [ fetchStatus, isPreChecking, pendingFlowDetails, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, fetcherRef, allFetchedFiles, selectedFetcherFiles, addToast, setKworkInputHasContent, setImageReplaceTask, setPendingFlowDetails ]); // Keep dependencies
 
 
-    // --- Callbacks (Unchanged) ---
+    // --- Callbacks ---
     const memoizedGetPlainText = useCallback(getPlainText, []);
-
     const scrollToSectionNav = useCallback((id: string) => {
         if (typeof logger !== 'undefined') logger.debug(`[CB ScrollNav] Attempting scroll to: ${id}`); else console.debug(`[CB ScrollNav] Attempting scroll to: ${id}`);
         const sectionsRequiringReveal = ['extractor', 'executor', 'cybervibe-section', 'philosophy-steps'];
@@ -423,35 +442,55 @@ function ActualPageContent() {
         if (sectionsRequiringReveal.includes(id) && !showComponents) {
             if (typeof logger !== 'undefined') logger.info(`[CB ScrollNav] Revealing components for "${id}"`); else console.info(`[CB ScrollNav] Revealing components for "${id}"`);
             setShowComponents(true);
-            requestAnimationFrame(() => { const el = document.getElementById(id); if (el) { try { const offsetTop = window.scrollY + el.getBoundingClientRect().top - 80; window.scrollTo({ top: offsetTop, behavior: 'smooth' }); if (typeof logger !== 'undefined') logger.log(`[CB ScrollNav] Scrolled to revealed "${id}"`); else console.log(`[CB ScrollNav] Scrolled to revealed "${id}"`); } catch (e) { if (typeof logger !== 'undefined') logger.error(`[CB ScrollNav] Error scrolling:`, e); else console.error(`[CB ScrollNav] Error scrolling:`, e); } } else { if (typeof logger !== 'undefined') logger.error(`[CB ScrollNav] Target "${id}" not found after reveal.`); else console.error(`[CB ScrollNav] Target "${id}" not found after reveal.`); } });
-        } else if (targetElement) { try { const offsetTop = window.scrollY + targetElement.getBoundingClientRect().top - 80; window.scrollTo({ top: offsetTop, behavior: 'smooth' }); if (typeof logger !== 'undefined') logger.log(`[CB ScrollNav] Scrolled to "${id}"`); else console.log(`[CB ScrollNav] Scrolled to "${id}"`); } catch (e) { if (typeof logger !== 'undefined') logger.error(`[CB ScrollNav] Error scrolling:`, e); else console.error(`[CB ScrollNav] Error scrolling:`, e); } } else { if (typeof logger !== 'undefined') logger.error(`[CB ScrollNav] Target element "${id}" not found.`); else console.error(`[CB ScrollNav] Target element "${id}" not found.`); }
-    }, [showComponents]);
+            requestAnimationFrame(() => {
+                const el = document.getElementById(id);
+                if (el) {
+                    try {
+                        const offsetTop = window.scrollY + el.getBoundingClientRect().top - 80; // Adjusted offset for header
+                        window.scrollTo({ top: offsetTop, behavior: 'smooth' });
+                        if (typeof logger !== 'undefined') logger.log(`[CB ScrollNav] Scrolled to revealed "${id}"`); else console.log(`[CB ScrollNav] Scrolled to revealed "${id}"`);
+                    } catch (e) {
+                        if (typeof logger !== 'undefined') logger.error(`[CB ScrollNav] Error scrolling:`, e); else console.error(`[CB ScrollNav] Error scrolling:`, e);
+                    }
+                } else {
+                    if (typeof logger !== 'undefined') logger.error(`[CB ScrollNav] Target "${id}" not found after reveal.`); else console.error(`[CB ScrollNav] Target "${id}" not found after reveal.`);
+                }
+            });
+        } else if (targetElement) {
+            try {
+                const offsetTop = window.scrollY + targetElement.getBoundingClientRect().top - 80; // Adjusted offset for header
+                window.scrollTo({ top: offsetTop, behavior: 'smooth' });
+                if (typeof logger !== 'undefined') logger.log(`[CB ScrollNav] Scrolled to "${id}"`); else console.log(`[CB ScrollNav] Scrolled to "${id}"`);
+            } catch (e) {
+                if (typeof logger !== 'undefined') logger.error(`[CB ScrollNav] Error scrolling:`, e); else console.error(`[CB ScrollNav] Error scrolling:`, e);
+            }
+        } else {
+            if (typeof logger !== 'undefined') logger.error(`[CB ScrollNav] Target element "${id}" not found.`); else console.error(`[CB ScrollNav] Target element "${id}" not found.`);
+        }
+    }, [showComponents]); // Removed redundant dependency 'setShowComponents'
 
-    const handleShowComponents = useCallback(() => { if (typeof logger !== 'undefined') logger.info("[Button Click] handleShowComponents (Reveal)"); else console.info("[Button Click] handleShowComponents (Reveal)"); setShowComponents(true); toastInfo("Компоненты загружены!", { duration: 1500 }); }, [toastInfo]);
+    const handleShowComponents = useCallback(() => { if (typeof logger !== 'undefined') logger.info("[Button Click] handleShowComponents (Reveal)"); setShowComponents(true); toastInfo("Компоненты загружены!", { duration: 1500 }); }, [toastInfo]); // Removed redundant dependency 'setShowComponents'
 
 
-    // --- Loading / Error States (Logic remains the same as previous response) ---
-    // .. Check for searchParamsError first
+    // --- Loading / Error States ---
      if (searchParamsError) {
           if (typeof logger !== 'undefined') logger.error("[Render] Rendering error state due to searchParams hook failure."); else console.error("[Render] Rendering error state due to searchParams hook failure.");
           return <div className="text-red-500 p-4">Ошибка инициализации URL: {searchParamsError.message}. Попробуйте перезагрузить страницу.</div>;
      }
-     // .. Then check for page loading (translations, searchParamsReady)
-     if (isPageLoading || !searchParamsReady) {
+     if (isPageLoading || !searchParamsReady) { // Also wait for searchParams to be ready
          const reason = isPageLoading ? "translations" : "searchParams";
          if (typeof logger !== 'undefined') logger.log(`[Render] ActualPageContent: Rendering Loading State (Waiting for ${reason})`); else console.log(`[Render] ActualPageContent: Rendering Loading State (Waiting for ${reason})`);
          const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
          const loadingText = translations[loadingLang]?.loading ?? translations.en.loading;
          return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
      }
-     // .. Then check for null translations
      if (!t) {
          if (typeof logger !== 'undefined') logger.error("[Render] ActualPageContent: Critical - translations (t) are null after loading."); else console.error("[Render] ActualPageContent: Critical - translations (t) are null after loading.");
          return <div className="text-red-500 p-4">Критическая ошибка: Не удалось загрузить тексты страницы.</div>;
      }
 
-    // --- Derived State (Logic remains the same as previous response) ---
-    if (typeof logger !== 'undefined') logger.log("[ActualPageContent] Calculating derived state"); else console.log("[ActualPageContent] Calculating derived state");
+    // --- Derived State ---
+    if (typeof logger !== 'undefined') logger.log("[ActualPageContent] Calculating derived state");
     const userName = user?.first_name || 'Vibe Master';
     const navTitleIntro = memoizedGetPlainText(t.navIntro);
     const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe);
@@ -462,11 +501,10 @@ function ActualPageContent() {
     // --- Log before return ---
     if (typeof logger !== 'undefined') logger.log("[ActualPageContent] Preparing to render JSX...");
 
-    // --- MAIN JSX RENDER (Try-catch block unchanged, content remains the same as previous) ---
+    // --- MAIN JSX RENDER ---
     try {
        return (
-            // .. JSX content is identical to the previous response ..
-             <>
+            <>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
                 <div className="min-h-screen bg-gray-950 p-4 sm:p-6 pt-24 text-white flex flex-col items-center relative overflow-y-auto">
 
@@ -562,7 +600,12 @@ function ActualPageContent() {
                                {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering RepoTxtFetcher Component Wrapper..."); else console.debug("[Render] Rendering RepoTxtFetcher Component Wrapper..."); return null; })()}
                                  <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg backdrop-blur-sm">
                                      <CardContent className="p-4">
-                                         <RepoTxtFetcher ref={fetcherRef} />
+                                         {/* --- Pass derived props --- */}
+                                         <RepoTxtFetcher
+                                             ref={fetcherRef}
+                                             highlightedPathProp={highlightedPathProp}
+                                             ideaProp={ideaProp}
+                                         />
                                      </CardContent>
                                  </Card>
                                {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering RepoTxtFetcher Component Wrapper DONE"); else console.debug("[Render] Rendering RepoTxtFetcher Component Wrapper DONE"); return null; })()}
@@ -621,16 +664,18 @@ function ActualPageContent() {
     }
 }
 
-// --- Layout Component (Unchanged) ---
+// --- Layout Component ---
 function RepoXmlPageLayout() {
     if (typeof logger !== 'undefined') logger.log("[RepoXmlPageLayout] START Render"); else console.log("[RepoXmlPageLayout] START Render");
     try {
+      // Wrap provider initialization in try-catch
       return (
            <RepoXmlPageProvider>
                <ActualPageContent />
            </RepoXmlPageProvider>
        );
     } catch (layoutError: any) {
+      // Use console.error as logger might not be defined
       console.error("[RepoXmlPageLayout] CRITICAL RENDER ERROR:", layoutError);
       return <div className="text-red-500 p-4">Критическая ошибка в слое разметки: {layoutError.message}</div>;
     } finally {
@@ -638,7 +683,7 @@ function RepoXmlPageLayout() {
     }
 }
 
-// --- Exported Page Component (Unchanged) ---
+// --- Exported Page Component ---
 export default function RepoXmlPage() {
      if (typeof logger !== 'undefined') logger.log("[RepoXmlPage] START Render (Exported Component)"); else console.log("[RepoXmlPage] START Render (Exported Component)");
     const fallbackLoadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
@@ -652,6 +697,7 @@ export default function RepoXmlPage() {
             </Suspense>
         );
     } catch (pageError: any) {
+         // Use console.error as logger might not be defined
          console.error("[RepoXmlPage] CRITICAL RENDER ERROR:", pageError);
          return <div className="text-red-500 p-4">Критическая ошибка рендеринга компонента страницы: {pageError.message}</div>;
     } finally {
