@@ -151,7 +151,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     });
     logger.debug("[RepoTxtFetcher] After useKworkInput Hook");
 
-    // === Effects (Remain the same) ===
+    // === Effects ===
     useEffect(() => {
         logger.debug("[Effect URL Sync] RepoTxtFetcher: Syncing Assistant URL START");
         if (assistantRef?.current?.updateRepoUrl) {
@@ -208,8 +208,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
             // No cleanup needed here
             return () => {}; // Return empty cleanup
         }
-        // // Default empty cleanup if none of the conditions met (shouldn't be reachable due to above returns)
-        // return cleanupScroll;
     }, [fetchStatus, primaryHighlightedPath, imageReplaceTask, autoFetch, fetchedFiles.length, scrollToSection, toastInfo]); // Added toastInfo dependency
 
 
@@ -325,9 +323,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                      {/* Instructions - Use VibeContentRenderer as they contain icons */}
                       {!currentImageTask && (
                          <div className="text-yellow-300/80 text-xs md:text-sm space-y-1 mb-2">
-                            {/* .. Restored Comments .. */}
-                            {/* FIXED STRINGS: Removed onClick/cursor-pointer, Ensured PascalCase */}
-                            {/* The interactive element is the main settings button below */}
                             <VibeContentRenderer content={"1. Настрой (<FaCodeBranch title='Настройки' class='inline text-cyan-400'/>)."} />
                             <VibeContentRenderer content={"2. Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>."} />
                             <VibeContentRenderer content={"3. Выбери файлы или <span class='font-bold text-teal-400 mx-1'>связанные</span> / <span class='font-bold text-orange-400 mx-1'>важные</span>."} />
@@ -438,7 +433,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                              selectedFiles={selectedFetcherFiles}
                              allFiles={fetchedFiles}
                              getLanguage={repoUtils.getLanguage}
-                             // .. VibeContentRenderer handled internally if needed
                          />
                          {(() => { logger.debug("[Render] Rendering FileList (conditional)"); return null; })()}
                          <FileList
@@ -457,7 +451,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                              onDeselectAll={handleDeselectAll}
                              onAddSelected={handleAddSelected}
                              onAddTree={handleAddFullTree}
-                             // .. VibeContentRenderer handled internally if needed
                           />
                       </div>
                  )}
@@ -476,7 +469,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                               isAddSelectedDisabled={isAddSelectedDisabled}
                               selectedFetcherFilesCount={selectedFetcherFiles.size}
                               onInputChange={(value) => setKworkInputHasContent(value.trim().length > 0)}
-                              // .. VibeContentRenderer handled internally if needed
                           />
                       </div>
                  )}
