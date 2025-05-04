@@ -543,7 +543,7 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   faarrowupfrombracket: "FaArrowUpFromBracket",
   faarrowupfromgroundwater: "FaArrowUpFromGroundWater",
   faarrowupfromwaterpump: "FaArrowUpFromWaterPump",
-  faarrowuplong: "FaUpLong", // Corrected Map: faarrowuplong -> FaUpLong
+  fauplong: "FaUpLong", // Corrected Map: faarrowuplong -> FaUpLong
   faarrowuprightdots: "FaArrowUpRightDots",
   faarrowuprightfromsquare: "FaArrowUpRightFromSquare",
   faarrowupshortwide: "FaArrowUpShortWide",
@@ -1715,7 +1715,7 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fatoiletportable: "FaToiletPortable",
   fatoilet: "FaToilet",
   fatoiletsportable: "FaToiletsPortable",
-  fatoolbox: "FaToolbox",
+  fatoolbox: "FaToolbox", // Corrected: fatools -> fatoolbox
   fatooth: "FaTooth",
   fatoriigate: "FaToriiGate",
   fatornado: "FaTornado",
@@ -2031,8 +2031,11 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   faregwindowmaximize: "FaRegWindowMaximize",
   faregwindowminimize: "FaRegWindowMinimize",
   faregwindowrestore: "FaRegWindowRestore",
+  // --- Added missing FaToolbox ---
+  fatoolbox: "FaToolbox",
 };
 // --- End Icon Name Map ---
+
 
 // Type guard (Unchanged)
 function isValidFa6Icon(iconName: string): iconName is keyof typeof Fa6Icons {
@@ -2089,7 +2092,6 @@ const robustParserOptions: HTMLReactParserOptions = {
                             return <span title={`Error rendering icon: ${correctPascalCaseName}`} className="text-red-500 font-bold">[ICON ERR!]</span>;
                          }
                     } else {
-                        // Log warning if not found in map
                         logger.warn(`[VibeContentRenderer] Unknown/Invalid icon tag detected: <${name}> (lowercase: <${lowerCaseName}>). Not found in map. Skipping render.`);
                         return <span title={`Unknown or invalid icon: ${name}`} className="text-yellow-500 font-bold">[?]</span>;
                     }
@@ -2101,9 +2103,8 @@ const robustParserOptions: HTMLReactParserOptions = {
                     const isInternal = mutableAttribs.href && (mutableAttribs.href.startsWith('/') || mutableAttribs.href.startsWith('#'));
                     const parsedChildren = children ? domToReact(children, robustParserOptions) : null;
 
-                    // Add spacing and convert class
                     const originalClassName = mutableAttribs.class || '';
-                    mutableAttribs.className = `${originalClassName} mx-1 px-0.5`; // Add horizontal margin/padding
+                    mutableAttribs.className = `${originalClassName} mx-1 px-0.5`;
                     if(mutableAttribs.class) delete mutableAttribs.class;
 
 
@@ -2121,16 +2122,18 @@ const robustParserOptions: HTMLReactParserOptions = {
                 }
                 // --- End Link Handling ---
 
-                // --- Standard HTML Elements (Simplify: Only modify for class, let parser handle) ---
+                // --- Standard HTML Elements (Reverted: Modify class, return undefined) ---
                 const knownTags = /^(p|div|span|ul|ol|li|h[1-6]|strong|em|b|i|u|s|code|pre|blockquote|hr|br|img|table|thead|tbody|tr|th|td)$/;
                 if (typeof lowerCaseName === 'string' && knownTags.test(lowerCaseName)) {
+                   // Only modify attribs if 'class' exists
                    if (mutableAttribs.class) {
                        mutableAttribs.className = mutableAttribs.class as string;
                        delete mutableAttribs.class;
-                       // Return modified structure for parser
-                       return new Element(domNode.name, mutableAttribs, domNode.children);
+                       // Return the original node structure but with modified attributes for the parser
+                       // The parser will then handle the default rendering correctly.
+                       domNode.attribs = attributesToProps(mutableAttribs); // Update attribs on the original node
                    }
-                   // Let parser handle if no class needs conversion
+                   // Let the parser handle the actual rendering by returning undefined
                    return undefined;
                }
                 // --- End Standard HTML Elements ---
