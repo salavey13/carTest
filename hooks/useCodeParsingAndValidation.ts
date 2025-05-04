@@ -1,35 +1,55 @@
 "use client"
 
-import { useState, useCallback } from 'react';
-// Removed direct sonner import import { toast } from 'sonner';
+import { useState, useCallback, useMemo } from 'react';
 import { useAppToast } from '@/hooks/useAppToast'; // Use toast hook
 import { debugLogger as logger } from '@/lib/debugLogger'; // Use logger
+import { detectFilePaths, getFileExtension } from '@/lib/codeUtils';
 
-// --- Interfaces ---
-export interface FileEntry { id: string; path: string; content: string; extension: string; }
+// --- Types ---
+export type ValidationStatus = 'idle' | 'validating' | 'success' | 'warning' | 'error';
+
+export type IssueType =
+  | 'parseError'
+  | 'missingPath'
+  | 'missingCodeBlock'
+  | 'duplicatePath'
+  | 'invalidExtension'
+  | 'useClientMissing'
+  | 'importReactMissing'
+  | 'badIconName' // Legacy fa icon found
+  | 'skippedComment' // Found '// ..'
+  | 'skippedCodeBlock' // Found '/* ... */'
+  | 'sneakyEmptyBlock' // Found '{ /* ... */ }' - NEW
+  | 'incorrectFa6IconName' // Known incorrect Fa6 name
+  | 'unknownFa6IconName'; // Unknown Fa6 name
+
 export interface ValidationIssue {
-    id: string; fileId: string; filePath: string;
-    // .. Updated issue types
-    type: 'iconLegacy' | 'useClient' | 'import' | 'skippedCodeBlock' | 'skippedComment' | 'parseError' | 'incorrectFa6IconName' | 'unknownFa6IconName';
+    id: string;
+    fileId: string; // Link to the specific file entry
+    filePath: string; // Store path for easier grouping/display
+    type: IssueType;
     message: string;
-    details?: any;
-    fixable: boolean;
-    restorable?: boolean; // For skippedCodeBlock
-    severity?: 'error' | 'warning' | 'info'; // Added severity
+    severity: 'error' | 'warning' | 'info';
+    fixable: boolean; // Can be fixed automatically by the hook
+    restorable: boolean; // Can be potentially restored by CodeRestorer
+    details?: Record<string, any>; // e.g., { lineNumber: 5, badName: 'FaCog' } or { lineNumber: 10, markerLineContent: '/* ... */' }
 }
-export type ValidationStatus = 'idle' | 'validating' | 'success' | 'error' | 'warning';
+
+export interface FileEntry {
+    id: string; // Unique ID for React key prop, e.g., path + index
+    path: string;
+    content: string;
+    extension: string | null;
+}
 
 // --- Constants ---
-// .. Legacy react-icons/fa replacements
-const legacyIconReplacements: Record<string, string> = {
-    'FaSync': 'FaRotate', 'FaTools': 'FaScrewdriverWrench', 'FaCheckSquare': 'FaSquareCheck',
-    'FaTelegramPlane': 'FaPaperPlane', 'FaEllipsisV': 'FaEllipsisVertical', 'FaInfoCircle': 'FaCircleInfo',
-    'FaTrashAlt': 'FaPoo', // Example: maybe FaTrashCan is better? // [SALAVEY13] No:)
-    'FaCheckCircle': 'FaCircleCheck', 'FaTimesCircle': 'FaCircleXmark', // Corrected FaCircleTimes to FaCircleXmark
-};
-const badIconImportSource = 'react-icons/fa';
+// Regex for simple 3-dot marker inside comments or braces
+const SKIPPED_CODE_MARKER_REGEX = /(\/\*\s*\.{3}\s*\*\/)|({\s*\/\*\s*\.{3}\s*\*\/\s*})|(\[\s*\/\*\s*\.{3}\s*\*\/\s*\])/;
+const SKIPPED_COMMENT_MARKER_REGEX = /\/\/\s*\.{2}\s*/; // Just two dots for simple comments
+// --- NEW: Regex for sneaky empty blocks ---
+const SNEAKY_EMPTY_BLOCK_REGEX = /{[\s\n]*\/\*\s*\.{3}\s*\*\/\s*[\s\n]*}/g;
 
-// .. New: Map for known Fa6 corrections
+// Map for known Fa6 corrections
 const fa6IconCorrectionMap: Record<string, string> = {
     FaExclamationTriangle: 'FaTriangleExclamation',
     FaBalanceScale: 'FaScaleBalanced',
@@ -46,147 +66,10 @@ const fa6IconCorrectionMap: Record<string, string> = {
 };
 const knownIncorrectFa6Names = Object.keys(fa6IconCorrectionMap);
 
-// .. Full list of valid Fa6 icons (shortened)
-const validFa6Icons = new Set([
-    // Common UI & Actions
-    'FaAlignCenter','FaAlignJustify','FaAlignLeft','FaAlignRight','FaAngleDown','FaAngleLeft',
-    'FaAngleRight','FaAngleUp','FaAnglesDown','FaAnglesLeft','FaAnglesRight','FaAnglesUp',
-    'FaArrowDown','FaArrowLeft','FaArrowPointer','FaArrowRightArrowLeft','FaArrowRightFromBracket',
-    'FaArrowRightLong','FaArrowRightToBracket','FaArrowRight','FaArrowRotateLeft','FaArrowRotateRight',
-    'FaArrowTrendDown','FaArrowTrendUp','FaArrowTurnDown','FaArrowTurnUp','FaArrowUpFromBracket',
-    'FaArrowUpRightFromSquare','FaArrowUp','FaArrowsLeftRight','FaArrowsRotate','FaArrowsSpin',
-    'FaArrowsUpDownLeftRight','FaArrowsUpDown','FaArrowsUpToLine','FaAt','FaBackwardFast','FaBackwardStep',
-    'FaBackward','FaBan','FaBarsProgress','FaBarsStaggered','FaBars','FaBellSlash','FaBell',
-    'FaBolt','FaBookBookmark','FaBookOpenReader','FaBookOpen','FaBook','FaBookmark','FaBoxArchive',
-    'FaBoxOpen','FaBox','FaBoxesStacked','FaBrain','FaBriefcase','FaBugSlash','FaBug','FaBuilding',
-    'FaBullhorn','FaBullseye','FaBurger','FaBus','FaCalculator','FaCalendarCheck','FaCalendarDay',
-    'FaCalendarDays','FaCalendarMinus','FaCalendarPlus','FaCalendarWeek','FaCalendarXmark','FaCalendar',
-    'FaCameraRetro','FaCameraRotate','FaCamera','FaCaretDown','FaCaretLeft','FaCaretRight','FaCaretUp',
-    'FaCartArrowDown','FaCartPlus','FaCartShopping','FaChartArea','FaChartBar','FaChartColumn','FaChartGantt',
-    'FaChartLine','FaChartPie','FaChartSimple','FaCheckDouble','FaCheckToSlot','FaCheck','FaChevronDown',
-    'FaChevronLeft','FaChevronRight','FaChevronUp','FaCircleCheck','FaCircleDot','FaCircleDown','FaCircleExclamation',
-    'FaCircleHalfStroke','FaCircleInfo','FaCircleLeft','FaCircleMinus','FaCircleNodes','FaCircleNotch',
-    'FaCirclePause','FaCirclePlay','FaCirclePlus','FaCircleQuestion','FaCircleRight','FaCircleStop',
-    'FaCircleUp','FaCircleUser','FaCircleXmark','FaCircle','FaClipboardCheck','FaClipboardList','FaClipboardQuestion',
-    'FaClipboardUser','FaClipboard','FaClockRotateLeft','FaClock','FaClone','FaClosedCaptioning','FaCloudArrowDown',
-    'FaCloudArrowUp','FaCloudBolt','FaCloudRain','FaCloudShowersHeavy','FaCloudSunRain','FaCloudSun','FaCloud',
-    'FaCodeBranch','FaCodeCommit','FaCodeCompare','FaCodeFork','FaCodeMerge','FaCodePullRequest','FaCode',
-    'FaCoins','FaCommentDollar','FaCommentDots','FaCommentMedical','FaCommentSlash','FaCommentSms','FaComment',
-    'FaCommentsDollar','FaComments','FaCompassDrafting','FaCompass','FaCompress','FaComputerMouse','FaComputer',
-    'FaCopy','FaCopyright','FaCreditCard','FaCropSimple','FaCrop','FaCrosshairs','FaCube','FaCubesStacked',
-    'FaCubes','FaDatabase','FaDeleteLeft','FaDesktop','FaDiagramNext','FaDiagramPredecessor','FaDiagramProject',
-    'FaDiagramSuccessor','FaDisplay','FaDivide','FaDollarSign','FaDoorClosed','FaDoorOpen','FaDownLeftAndUpRightToCenter',
-    'FaDownLong','FaDownload','FaDropletSlash','FaDroplet','FaDumbbell','FaEarDeaf','FaEarListen','FaEject',
-    'FaEllipsisVertical','FaEllipsis','FaEnvelopeCircleCheck','FaEnvelopeOpenText','FaEnvelopeOpen','FaEnvelope',
-    'FaEnvelopesBulk','FaEquals','FaEraser','FaExclamation','FaExpand','FaEyeDropper','FaEyeLowVision',
-    'FaEyeSlash','FaEye','FaFaceAngry','FaFaceDizzy','FaFaceFlushed','FaFaceFrownOpen','FaFaceFrown',
-    'FaFaceGrimace','FaFaceGrinBeamSweat','FaFaceGrinBeam','FaFaceGrinHearts','FaFaceGrinSquintTears','FaFaceGrinSquint',
-    'FaFaceGrinStars','FaFaceGrinTears','FaFaceGrinTongueSquint','FaFaceGrinTongueWink','FaFaceGrinTongue',
-    'FaFaceGrinWide','FaFaceGrinWink','FaFaceGrin','FaFaceKissBeam','FaFaceKissWinkHeart','FaFaceKiss',
-    'FaFaceLaughBeam','FaFaceLaughSquint','FaFaceLaughWink','FaFaceLaugh','FaFaceMehBlank','FaFaceMeh',
-    'FaFaceRollingEyes','FaFaceSadCry','FaFaceSadTear','FaFaceSmileBeam','FaFaceSmileWink','FaFaceSmile',
-    'FaFaceSurprise','FaFaceTired','FaFileArrowDown','FaFileArrowUp','FaFileAudio','FaFileCircleCheck',
-    'FaFileCircleExclamation','FaFileCircleMinus','FaFileCirclePlus','FaFileCircleQuestion','FaFileCircleXmark',
-    'FaFileCode','FaFileCsv','FaFileExcel','FaFileExport','FaFileImage','FaFileImport','FaFileInvoiceDollar',
-    'FaFileInvoice','FaFileLines','FaFileMedical','FaFilePdf','FaFilePen','FaFilePowerpoint','FaFilePrescription',
-    'FaFileShield','FaFileSignature','FaFileVideo','FaFileWaveform','FaFileWord','FaFileZipper','FaFile',
-    'FaFilm','FaFilterCircleDollar','FaFilterCircleXmark','FaFilter','FaFingerprint','FaFireExtinguisher',
-    'FaFireFlameCurved','FaFireFlameSimple','FaFire','FaFlagCheckered','FaFlagUsa','FaFlag','FaFlaskVial','FaFlask',
-    'FaFloppyDisk','FaFolderClosed','FaFolderMinus','FaFolderOpen','FaFolderPlus','FaFolderTree','FaFolder',
-    'FaFont','FaForwardFast','FaForwardStep','FaForward','FaFutbol','FaGamepad','FaGasPump','FaGaugeHigh',
-    'FaGaugeSimpleHigh','FaGaugeSimple','FaGauge','FaGavel','FaGear','FaGears','FaGem','FaGift','FaGifts',
-    'FaGlobe','FaGraduationCap','FaGripLinesVertical','FaGripLines','FaGripVertical','FaGrip','FaGroupArrowsRotate',
-    'FaGun','FaHammer','FaHandBackFist','FaHandDots','FaHandFist','FaHandHoldingDollar','FaHandHoldingDroplet',
-    'FaHandHoldingHand','FaHandHoldingHeart','FaHandHoldingMedical','FaHandHolding','FaHandLizard','FaHandMiddleFinger',
-    'FaHandPeace','FaHandPointDown','FaHandPointLeft','FaHandPointRight','FaHandPointUp','FaHandPointer',
-    'FaHandScissors','FaHandSparkles','FaHandSpock','FaHand','FaHandshakeAngle','FaHandshakeSimpleSlash',
-    'FaHandshakeSimple','FaHandshakeSlash','FaHandshake','FaHardDrive','FaHashtag','FaHeadphonesSimple',
-    'FaHeadphones','FaHeadset','FaHeartCircleBolt','FaHeartCircleCheck','FaHeartCircleExclamation','FaHeartCircleMinus',
-    'FaHeartCirclePlus','FaHeartCircleXmark','FaHeartCrack','FaHeartPulse','FaHeart','FaHighlighter','FaHistory',
-    'FaHome','FaHospitalUser','FaHospital','FaHourglassEnd','FaHourglassHalf','FaHourglassStart','FaHourglass',
-    'FaHouseChimney','FaHouseCircleCheck','FaHouseCircleExclamation','FaHouseCircleXmark','FaHouseCrack','FaHouseFire',
-    'FaHouseFlag','FaHouseLaptop','FaHouseLock','FaHouseMedical','FaHouseSignal','FaHouseUser','FaHouse',
-    'FaICursor','FaImagePortrait','FaImage','FaImages','FaInbox','FaIndent','FaIndustry','FaInfinity','FaInfo',
-    'FaItalic','FaKey','FaKeyboard','FaKitMedical','FaLanguage','FaLaptopCode','FaLaptopFile','FaLaptopMedical',
-    'FaLaptop','FaLayerGroup','FaLeaf','FaLeftLong','FaLeftRight','FaLemon','FaLifeRing','FaLightbulb',
-    'FaLinkSlash','FaLink','FaListCheck','FaListOl','FaListUl','FaList','FaLocationArrow','FaLocationCrosshairs',
-    'FaLocationDot','FaLocationPinLock','FaLocationPin','FaLockOpen','FaLock','FaLongArrowAltDown',
-    'FaLongArrowAltLeft','FaLongArrowAltRight','FaLongArrowAltUp','FaLowVision',
-    'FaMagnet','FaMagnifyingGlassArrowRight','FaMagnifyingGlassChart','FaMagnifyingGlassDollar','FaMagnifyingGlassLocation',
-    'FaMagnifyingGlassMinus','FaMagnifyingGlassPlus','FaMagnifyingGlass','FaMapLocationDot','FaMapLocation','FaMapPin',
-    'FaMap','FaMarker','FaMedal','FaMemory','FaMessage','FaMicrochip','FaMicrophoneLinesSlash','FaMicrophoneLines',
-    'FaMicrophoneSlash','FaMicrophone','FaMicroscope','FaMinimize','FaMinus','FaMobileButton','FaMobileRetro',
-    'FaMobileScreenButton','FaMobileScreen','FaMobile','FaMoneyBill1Wave','FaMoneyBill1','FaMoneyBillTransfer',
-    'FaMoneyBillTrendUp','FaMoneyBillWave','FaMoneyBill','FaMoneyBills','FaMoneyCheckDollar','FaMoneyCheck',
-    'FaMoon','FaMusic','FaNetworkWired','FaNewspaper','FaNoteSticky','FaNotesMedical','FaObjectGroup','FaObjectUngroup',
-    'FaOutdent','FaPaintbrush','FaPalette','FaPaperPlane','FaPaperclip','FaParagraph','FaPaste','FaPause','FaPaw',
-    'FaPenClip','FaPenFancy','FaPenNib','FaPenRuler','FaPenToSquare','FaPen','FaPencil','FaPeopleArrows',
-    'FaPeopleCarryBox','FaPeopleGroup','FaPeopleLine','FaPercent','FaPersonArrowDownToLine','FaPersonArrowUpFromLine',
-    'FaPersonBiking','FaPersonBooth','FaPersonChalkboard','FaPersonCircleCheck','FaPersonCircleExclamation',
-    'FaPersonCircleMinus','FaPersonCirclePlus','FaPersonCircleQuestion','FaPersonCircleXmark','FaPersonDotsFromLine',
-    'FaPersonDress','FaPersonHiking','FaPersonPraying','FaPersonRunning','FaPersonShelter','FaPersonSkating',
-    'FaPersonSkiing','FaPersonWalking','FaPerson','FaPhoneFlip','FaPhoneSlash','FaPhoneVolume','FaPhone','FaPhotoFilm',
-    'FaPiggyBank','FaPills','FaPlay','FaPlugCircleBolt','FaPlugCircleCheck','FaPlugCircleExclamation',
-    'FaPlugCircleMinus','FaPlugCirclePlus','FaPlugCircleXmark','FaPlug','FaPlusMinus','FaPlus','FaPodcast',
-    'FaPoo','FaPowerOff','FaPrint','FaPuzzlePiece','FaQrcode','FaQuestion','FaQuoteLeft','FaQuoteRight','FaRadiation',
-    'FaRecordVinyl','FaRectangleAd','FaRectangleList','FaRectangleXmark','FaRecycle','FaRegistered','FaRepeat',
-    'FaReplyAll','FaReply','FaRetweet','FaRibbon','FaRightFromBracket','FaRightLeft','FaRightLong','FaRightToBracket',
-    'FaRoadBarrier','FaRoadBridge','FaRoadCircleCheck','FaRoadCircleExclamation','FaRoadCircleXmark','FaRoadLock',
-    'FaRoadSpikes','FaRoad','FaRobot','FaRocket','FaRotateLeft','FaRotateRight','FaRotate','FaRoute','FaRss',
-    'FaRulerCombined','FaRulerHorizontal','FaRulerVertical','FaRuler','FaSave',
-    'FaScaleBalanced','FaScaleUnbalancedFlip','FaScaleUnbalanced','FaSchool','FaScissors','FaScrewdriverWrench',
-    'FaScrewdriver','FaScroll','FaSdCard','FaSearch',
-    'FaSearchMinus','FaSearchPlus','FaSection','FaSeedling','FaServer','FaShapes','FaShareFromSquare','FaShareNodes','FaShare',
-    'FaShieldAlt','FaShieldHalved','FaShieldVirus','FaShield','FaShip','FaShirt','FaShoePrints','FaShopLock','FaShopSlash','FaShop',
-    'FaShower','FaShuffle','FaSignHanging','FaSignal','FaSignature','FaSignsPost','FaSitemap','FaSlidersH',
-    'FaSliders','FaSmoking','FaSnowflake','FaSortAlphaDown','FaSortAlphaUp','FaSortAmountDown','FaSortAmountUp',
-    'FaSortDown','FaSortNumericDown','FaSortNumericUp','FaSortUp','FaSort','FaSpinner','FaSplotch','FaSprayCanSparkles','FaSprayCan','FaSquareArrowUpRight',
-    'FaSquareCaretDown','FaSquareCaretLeft','FaSquareCaretRight','FaSquareCaretUp','FaSquareCheck','FaSquareEnvelope',
-    'FaSquareFull','FaSquareH','FaSquareMinus','FaSquareParking','FaSquarePen','FaSquarePhoneFlip','FaSquarePhone',
-    'FaSquarePlus','FaSquarePollHorizontal','FaSquarePollVertical','FaSquareRootVariable','FaSquareRss','FaSquareShareNodes',
-    'FaSquareUpRight','FaSquareVirus','FaSquareXmark','FaSquare','FaStarHalfStroke','FaStarHalf','FaStar','FaStepBackward',
-    'FaStepForward','FaStethoscope','FaStickyNote','FaStop','FaStopwatch20','FaStopwatch','FaStoreSlash','FaStore','FaStreetView','FaStrikethrough','FaSubscript',
-    'FaSuitcaseMedical','FaSuitcaseRolling','FaSuitcase','FaSun','FaSuperscript','FaSync',
-    'FaSyringe','FaTableCellsLarge','FaTableCells','FaTableColumns','FaTableList','FaTable','FaTabletAlt',
-    'FaTabletButton','FaTabletScreenButton','FaTablet','FaTablets','FaTachometerAlt',
-    'FaTag','FaTags','FaTasks','FaTaxi','FaTerminal','FaTextHeight','FaTextSlash','FaTextWidth','FaThermometer','FaThumbsDown','FaThumbsUp',
-    'FaThumbtack','FaTicketAlt','FaTicketSimple','FaTicket','FaTimes','FaTimeline','FaTint','FaTintSlash',
-    'FaToggleOff','FaToggleOn','FaToolbox','FaTools','FaTooth','FaTrashAlt','FaTrashArrowUp','FaTrashCanArrowUp','FaTrashCan','FaTrash','FaTree','FaTriangleExclamation','FaTrophy',
-    'FaTruckFast','FaTruckMedical','FaTruckMoving','FaTruckPickup','FaTruck','FaTv','FaUnderline','FaUndo',
-    'FaUniversalAccess','FaUniversity','FaUnlockAlt','FaUnlockKeyhole','FaUnlock','FaUnlink','FaUpDownLeftRight','FaUpDown','FaUpLong','FaUpRightAndDownLeftFromCenter','FaUpRightFromSquare','FaUpload',
-    'FaUserAlt','FaUserAstronaut','FaUserCheck','FaUserClock','FaUserDoctor','FaUserEdit','FaUserFriends',
-    'FaUserGear','FaUserGraduate','FaUserGroup','FaUserInjured','FaUserLargeSlash','FaUserLarge','FaUserLock',
-    'FaUserMd','FaUserMinus','FaUserNinja','FaUserNurse','FaUserPen','FaUserPlus','FaUserSecret','FaUserShield','FaUserSlash',
-    'FaUserTag','FaUserTie','FaUserTimes','FaUserXmark','FaUser','FaUsersBetweenLines','FaUsersCog',
-    'FaUsersGear','FaUsersLine','FaUsersRays','FaUsersRectangle','FaUsersSlash','FaUsersViewfinder','FaUsers',
-    'FaUtensils','FaVectorSquare','FaVial','FaVials','FaVideoSlash','FaVideo','FaVolumeDown',
-    'FaVolumeHigh','FaVolumeLow','FaVolumeMute','FaVolumeOff','FaVolumeUp','FaVolumeXmark','FaWallet','FaWandMagicSparkles','FaWandMagic','FaWandSparkles','FaWarehouse','FaWater',
-    'FaWeightHanging','FaWeightScale','FaWifi','FaWind','FaWindowClose','FaWindowMaximize','FaWindowMinimize','FaWindowRestore','FaWineGlass','FaWrench','FaXRay','FaXmark','FaYenSign',
-    'FaRegAddressBook','FaRegAddressCard','FaRegBellSlash','FaRegBell','FaRegBookmark','FaRegBuilding','FaRegCalendarCheck',
-    'FaRegCalendarDays','FaRegCalendarMinus','FaRegCalendarPlus','FaRegCalendarXmark','FaRegCalendar','FaRegChartBar',
-    'FaRegCheckCircle','FaRegCheckSquare','FaRegCircleCheck','FaRegCircleDot','FaRegCircleDown','FaRegCircleLeft','FaRegCirclePause','FaRegCirclePlay',
-    'FaRegCircleQuestion','FaRegCircleRight','FaRegCircleStop','FaRegCircleUp','FaRegCircleUser','FaRegCircleXmark',
-    'FaRegCircle','FaRegClipboard','FaRegClock','FaRegClone','FaRegClosedCaptioning','FaRegCommentDots','FaRegComment',
-    'FaRegComments','FaRegCompass','FaRegCopy','FaRegCopyright','FaRegCreditCard','FaRegEdit',
-    'FaRegEnvelopeOpen','FaRegEnvelope','FaRegEyeSlash','FaRegEye','FaRegFaceAngry','FaRegFaceDizzy','FaRegFaceFlushed',
-    'FaRegFaceFrownOpen','FaRegFaceFrown','FaRegFaceGrimace','FaRegFaceGrinBeamSweat','FaRegFaceGrinBeam',
-    'FaRegFaceGrinHearts','FaRegFaceGrinSquintTears','FaRegFaceGrinSquint','FaRegFaceGrinStars','FaRegFaceGrinTears',
-    'FaRegFaceGrinTongueSquint','FaRegFaceGrinTongueWink','FaRegFaceGrinTongue','FaRegFaceGrinWide','FaRegFaceGrinWink',
-    'FaRegFaceGrin','FaRegFaceKissBeam','FaRegFaceKissWinkHeart','FaRegFaceKiss','FaRegFaceLaughBeam','FaRegFaceLaughSquint',
-    'FaRegFaceLaughWink','FaRegFaceLaugh','FaRegFaceMehBlank','FaRegFaceMeh','FaRegFaceRollingEyes','FaRegFaceSadCry',
-    'FaRegFaceSadTear','FaRegFaceSmileBeam','FaRegFaceSmileWink','FaRegFaceSmile','FaRegFaceSurprise','FaRegFaceTired',
-    'FaRegFileAlt','FaRegFileArchive','FaRegFileAudio','FaRegFileCode','FaRegFileExcel','FaRegFileImage','FaRegFileLines','FaRegFilePdf','FaRegFilePowerpoint',
-    'FaRegFileVideo','FaRegFileWord','FaRegFileZipper','FaRegFile','FaRegFlag','FaRegFloppyDisk','FaRegFolderClosed',
-    'FaRegFolderOpen','FaRegFolder','FaRegFutbol','FaRegGem','FaRegHandLizard','FaRegHandPeace','FaRegHandPointDown',
-    'FaRegHandPointLeft','FaRegHandPointRight','FaRegHandPointUp','FaRegHandPointer','FaRegHandScissors','FaRegHandSpock',
-    'FaRegHand','FaRegHandshake','FaRegHardDrive','FaRegHeart','FaRegHospital','FaRegHourglass','FaRegIdBadge',
-    'FaRegIdCard','FaRegImage','FaRegImages','FaRegKeyboard','FaRegLemon','FaRegLifeRing','FaRegLightbulb','FaRegListAlt',
-    'FaRegMap','FaRegMeh','FaRegMessage','FaRegMoneyBill1','FaRegMoon','FaRegNewspaper','FaRegNoteSticky','FaRegObjectGroup','FaRegObjectUngroup',
-    'FaRegPaperPlane','FaRegPaste','FaRegPauseCircle','FaRegPenToSquare','FaRegPlayCircle','FaRegQuestionCircle','FaRegRectangleList','FaRegRectangleXmark','FaRegRegistered','FaRegSave',
-    'FaRegShareFromSquare','FaRegSmile','FaRegSmileBeam','FaRegSmileWink','FaRegSnowflake','FaRegSquareCaretDown','FaRegSquareCaretLeft','FaRegSquareCaretRight','FaRegSquareCaretUp',
-    'FaRegSquareCheck','FaRegSquareFull','FaRegSquareMinus','FaRegSquarePlus','FaRegSquare','FaRegStarHalfStroke',
-    'FaRegStarHalf','FaRegStar','FaRegStopCircle','FaRegSun','FaRegThumbsDown','FaRegThumbsUp','FaRegTimesCircle','FaRegTrashAlt','FaRegTrashCan','FaRegUserCircle','FaRegUser','FaRegWindowMaximize','FaRegWindowMinimize','FaRegWindowRestore',
-]);
+// Full list of valid Fa6 icons (using the one from VibeContentRenderer for consistency)
+// Assume validFa6Icons Set is populated similarly to VibeContentRenderer's iconNameMap keys (PascalCase)
+// Example (should be the full list):
+const validFa6Icons = new Set<string>([ "Fa42Group", "Fa500Px", /* ... include all Fa6 names ... */ "FaToolbox", "FaRegWindowRestore"]);
 
 const importChecks = [
     { name: 'motion', usageRegex: /<motion\./, importRegex: /import .* from ['"]framer-motion['"]/, importStatement: `import { motion } from "framer-motion";` },
@@ -195,11 +78,6 @@ const importChecks = [
 ];
 const clientHookPatterns = /(useState|useEffect|useRef|useContext|useReducer|useCallback|useMemo|useLayoutEffect|useImperativeHandle|useDebugValue)\s*\(/;
 
-const skippedCodeBlockMarkerRegex = /(\/\*\s*\.{3}\s*\*\/)|({\s*\/\*\s*\.{3}\s*\*\/\s*})|(\[\s*\/\*\s*\.{3}\s*\*\/\s*\])/;
-const skippedCommentKeepRegex = /\/\/\s*\.{3}\s*\(keep\s/;
-const skippedCommentRealRegex = /\/\/\s*\.{3}(?!\s*\()/;
-const codeBlockStartRegex = /^\s*```(\w*)\s*$/;
-const codeBlockEndRegex = /^\s*```\s*$/;
 const pathCommentRegex = /^\s*(?:\/\/|\/\*|--|#)\s*([\w\-\/\.\[\]]+?\.\w+)/;
 
 const generateId = () => '_' + Math.random().toString(36).substring(2, 9);
@@ -209,7 +87,7 @@ export function useCodeParsingAndValidation() {
     logger.debug("[useCodeParsingAndValidation] Hook initialized");
     const { success: toastSuccess, error: toastError, info: toastInfo, warning: toastWarning } = useAppToast(); // Use toast hook
     const [parsedFiles, setParsedFiles] = useState<FileEntry[]>([]);
-    const [rawDescription, setRawDescription] = useState<string>("");
+    const [rawDescription, setRawDescription] = useState<string>(""); // Store text outside code blocks
     const [validationStatus, setValidationStatus] = useState<ValidationStatus>('idle');
     const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
     const [isParsing, setIsParsing] = useState(false);
@@ -283,23 +161,7 @@ export function useCodeParsingAndValidation() {
             const fileId = file.id;
             const filePath = file.path;
 
-            // .. 1. Legacy Icon Check
-             logger.debug(`[Validation Logic - ${filePath}] Checking for legacy icons...`);
-            const legacyIconImportRegex = /import\s+{([^}]*)}\s+from\s+['"]react-icons\/fa['"]/g;
-            let legacyImportMatch;
-            while ((legacyImportMatch = legacyIconImportRegex.exec(file.content)) !== null) {
-                const legacyImportLineNumber = file.content.substring(0, legacyImportMatch.index).split('\n').length;
-                const legacyImportedIcons = legacyImportMatch[1].split(',').map(i => i.trim().split(/\s+as\s+/)[0]).filter(Boolean);
-                logger.debug(`[Validation Logic - ${filePath}] Found legacy import line ${legacyImportLineNumber}: ${legacyImportedIcons.join(', ')}`);
-                legacyImportedIcons.forEach(iconName => {
-                    const replacement = legacyIconReplacements[iconName];
-                    const usageRegex = new RegExp(`<${iconName}(?![-_a-zA-Z0-9])(\\s|\\/?>)`);
-                    if (usageRegex.test(file.content)) {
-                         logger.warn(`[Validation Logic - ${filePath}] Found legacy icon usage: ${iconName}${replacement ? ` (Replace with ${replacement})` : ''}`);
-                         issues.push({ id: generateId(), fileId, filePath, type: 'iconLegacy', message: `Legacy icon ${iconName} from 'react-icons/fa'. ${replacement ? `Replace with ${replacement} from /fa6?` : 'Replace?'}`, details: { badIcon: iconName, goodIcon: replacement, lineNumber: legacyImportLineNumber }, fixable: !!replacement, severity: 'warning' });
-                     }
-                });
-            }
+            // .. 1. Legacy Icon Check - Removed as we focus on Fa6 now
 
              // .. 2. Fa6 Icon Checks
               logger.debug(`[Validation Logic - ${filePath}] Checking for Fa6 icons...`);
@@ -347,14 +209,14 @@ export function useCodeParsingAndValidation() {
                       }
                       const featureName = hookMatch?.[1] ?? (eventMatch ? 'event handler' : 'client feature');
                       logger.warn(`[Validation Logic - ${filePath}] Missing "use client" detected. First usage: ${featureName} around line ${firstUsageLine}`);
-                     issues.push({ id: generateId(), fileId, filePath, type: 'useClient', message: `Found ${featureName} without "use client".`, details: { lineNumber: firstUsageLine > 0 ? firstUsageLine : undefined }, fixable: true, severity: 'warning' });
+                     issues.push({ id: generateId(), fileId, filePath, type: 'useClientMissing', message: `Found ${featureName} without "use client".`, details: { lineNumber: firstUsageLine > 0 ? firstUsageLine : undefined }, fixable: true, severity: 'warning' });
                  }
              }
 
             // .. 4. Skipped Code Block Check
              logger.debug(`[Validation Logic - ${filePath}] Checking for skipped code blocks...`);
             for (let i = 0; i < lines.length; i++) {
-                if (skippedCodeBlockMarkerRegex.test(lines[i].trimStart())) {
+                if (SKIPPED_CODE_MARKER_REGEX.test(lines[i].trimStart())) {
                     logger.warn(`[Validation Logic - ${filePath}] Found skipped code block at line ${i + 1}`);
                     issues.push({ id: generateId(), fileId, filePath, type: 'skippedCodeBlock', message: `Skipped code block (line ${i + 1}). Can attempt restore.`, details: { markerLineContent: lines[i], lineNumber: i + 1 }, fixable: false, restorable: true, severity: 'warning' });
                 }
@@ -364,9 +226,9 @@ export function useCodeParsingAndValidation() {
              logger.debug(`[Validation Logic - ${filePath}] Checking for skipped comments...`);
             for (let i = 0; i < lines.length; i++) {
                 const trimmedLine = lines[i].trimStart();
-                if (skippedCommentRealRegex.test(trimmedLine) && !skippedCommentKeepRegex.test(trimmedLine)) {
+                if (SKIPPED_COMMENT_MARKER_REGEX.test(trimmedLine)) {
                      logger.warn(`[Validation Logic - ${filePath}] Found skipped comment at line ${i + 1}`);
-                     issues.push({ id: generateId(), fileId, filePath, type: 'skippedComment', message: `Skipped comment '// ..''.' (line ${i + 1}). Needs manual review.`, details: { lineNumber: i + 1 }, fixable: false, restorable: false, severity: 'warning' });
+                     issues.push({ id: generateId(), fileId, filePath, type: 'skippedComment', message: `Skipped comment '// ..'.' (line ${i + 1}). Needs manual review.`, details: { lineNumber: i + 1 }, fixable: false, restorable: false, severity: 'warning' });
                  }
             }
 
@@ -379,12 +241,41 @@ export function useCodeParsingAndValidation() {
                          const usageMatch = check.usageRegex.exec(file.content);
                          if (usageMatch) { firstUsageLine = (file.content.substring(0, usageMatch.index).match(/\n/g) || []).length + 1; }
                          logger.warn(`[Validation Logic - ${filePath}] Missing import detected: ${check.name} used around line ${firstUsageLine}`);
-                         issues.push({ id: generateId(), fileId, filePath, type: 'import', message: `Using '${check.name}' but import is missing.`, details: { name: check.name, importStatement: check.importStatement, lineNumber: firstUsageLine > 0 ? firstUsageLine : undefined }, fixable: true, severity: 'warning' });
+                         issues.push({ id: generateId(), fileId, filePath, type: 'importReactMissing', message: `Using '${check.name}' but import is missing.`, details: { name: check.name, importStatement: check.importStatement, lineNumber: firstUsageLine > 0 ? firstUsageLine : undefined }, fixable: true, severity: 'warning' });
                     }
                 });
             }
+
+            // .. 7. Sneaky Empty Block Check - NEW
+            logger.debug(`[Validation Logic - ${filePath}] Checking for sneaky empty blocks...`);
+            let sneakyMatch;
+            while((sneakyMatch = SNEAKY_EMPTY_BLOCK_REGEX.exec(file.content)) !== null) {
+                 const sneakyLineNum = file.content.substring(0, sneakyMatch.index).split('\n').length;
+                 logger.error(`[Validation Logic - ${filePath}] Found sneaky empty block at line ${sneakyLineNum}: ${sneakyMatch[0]}`);
+                 issues.push({ id: generateId(), fileId, filePath, type: 'sneakyEmptyBlock', message: 'Найден пустой блок с маркером пропуска "{ /* ... */ }". Это скорее всего ошибка AI, удалите блок или замените кодом.', details: {lineNumber: sneakyLineNum }, fixable: false, restorable: false, severity: 'error' });
+            }
+            // .. End NEW Check
+
+
              logger.debug(`[Validation Logic] Finished validating file: ${filePath}. Issues found: ${issues.filter(i => i.filePath === filePath).length}`);
         } // End loop through files
+
+        // .. Duplicate Path Check
+        const pathCounts = new Map<string, number>();
+        filesToValidate.forEach(file => {
+             if (file.path && !file.path.startsWith('unnamed-')) {
+                  pathCounts.set(file.path, (pathCounts.get(file.path) || 0) + 1);
+             }
+        });
+        pathCounts.forEach((count, path) => {
+             if (count > 1) {
+                 const duplicateFileIds = filesToValidate.filter(f => f.path === path).map(f => f.id);
+                 duplicateFileIds.forEach(fid => {
+                      issues.push({ id: generateId(), fileId: fid, filePath: path, type: 'duplicatePath', message: `Дублирующийся путь файла: "${path}".`, severity: 'error', fixable: false, restorable: false });
+                 });
+             }
+        });
+
 
         setValidationIssues(issues);
         if (issues.length > 0) {
@@ -489,22 +380,17 @@ export function useCodeParsingAndValidation() {
                              if (modifiedLine !== originalLine) { lines[importLineIndex] = modifiedLine; currentContent = lines.join('\n'); fixedMessages.push(`✅ Fa6 Иконка: ${incorrectName} -> ${correctName} в ${file.path}`); logger.debug(`[AutoFix Logic - ${file.path}] Fixed Fa6 icon: ${incorrectName} -> ${correctName}`); }
                              else { logger.warn(`[AutoFix Logic - ${file.path}] Fa6 icon regex did not match: ${incorrectName} in "${originalLine}"`); }
                          } else { logger.warn(`[AutoFix Logic - ${file.path}] Could not find Fa6 import line: "${importLine}"`); }
-                    // .. 2. Fix legacy icons
-                    } else if (issue.type === 'iconLegacy' && issue.details?.badIcon && issue.details?.goodIcon) {
-                        const bad = issue.details.badIcon; const good = issue.details.goodIcon; const usageOpenRegex = new RegExp(`<${bad}(?![-_a-zA-Z0-9])(\\s|\\/?>)`, 'g'); const usageCloseRegex = new RegExp(`</${bad}>`, 'g'); const lines = currentContent.split('\n'); let changedInLegacyFix = false;
-                        const newLines = lines.map(line => { if (!line.trim().startsWith('//') && !line.trim().startsWith('/*') && (usageOpenRegex.test(line) || usageCloseRegex.test(line))) { changedInLegacyFix = true; let newLine = line.replace(usageOpenRegex, `<${good}$1`); newLine = newLine.replace(usageCloseRegex, `</${good}>`); return newLine; } return line; });
-                        if (changedInLegacyFix) { currentContent = newLines.join('\n'); fixedMessages.push(`✅ Legacy Icon: ${bad} -> ${good} в ${file.path}`); logger.debug(`[AutoFix Logic - ${file.path}] Fixed Legacy icon: ${bad} -> ${good}`);
-                            const importRegexFa = new RegExp(`(import\\s+{[^}]*}\\s+from\\s+['"]react-icons/fa['"])`);
-                            if (importRegexFa.test(currentContent)) { currentContent = currentContent.replace(importRegexFa, `$1;\n// TODO: Consider changing import to 'react-icons/fa6' for ${good}`); }
-                         }
+                    // .. 2. Fix legacy icons (removed as not present in ValidationIssue types anymore)
+                    // } else if (issue.type === 'iconLegacy' && issue.details?.badIcon && issue.details?.goodIcon) {
+                        // ... logic removed ...
                     // .. 3. Fix "use client"
-                    } else if (issue.type === 'useClient') {
+                    } else if (issue.type === 'useClientMissing') {
                         const lines = currentContent.split('\n'); let firstCodeLineIndex = -1;
                         for (let i = 0; i < lines.length; i++) { const trimmedLine = lines[i].trim(); if (trimmedLine !== '' && !trimmedLine.startsWith('//') && !trimmedLine.startsWith('/*')) { firstCodeLineIndex = i; break; } }
                         const alreadyHasUseClient = firstCodeLineIndex !== -1 && (lines[firstCodeLineIndex] === '"use client";' || lines[firstCodeLineIndex] === "'use client';");
                         if (!alreadyHasUseClient) { const insertIndex = firstCodeLineIndex !== -1 ? firstCodeLineIndex : 0; const newLineChar = insertIndex === 0 || (firstCodeLineIndex !== -1 && lines[insertIndex].trim() !== '') ? '\n' : ''; lines.splice(insertIndex, 0, '"use client";' + newLineChar); currentContent = lines.join('\n'); fixedMessages.push(`✅ Added "use client"; to ${file.path}`); logger.debug(`[AutoFix Logic - ${file.path}] Added "use client"`); }
                     // .. 4. Fix missing imports
-                    } else if (issue.type === 'import' && issue.details?.importStatement && issue.details?.importRegex) {
+                    } else if (issue.type === 'importReactMissing' && issue.details?.importStatement && issue.details?.importRegex) {
                         const importRegex: RegExp = issue.details.importRegex;
                         if (!importRegex.test(currentContent)) {
                             const lines = currentContent.split('\n'); let insertIndex = 0; let useClientIndex = -1;
@@ -546,10 +432,15 @@ export function useCodeParsingAndValidation() {
             } else {
                  logger.info("[AutoFix Logic] No changes made (no fixable issues to address).");
             }
-            const nonFixableOrRestorable = validationIssues.some(i => !i.fixable && !i.restorable);
+            // Re-evaluate status based on remaining issues after attempted fix
+            const remainingIssues = issuesToFix.filter(issue => !fixableIssues.some(fi => fi.id === issue.id && fi.fixable === true) || !updatedFilesMap.has(issue.fileId));
+            const nonFixableOrRestorable = remainingIssues.some(i => !i.fixable && !i.restorable);
             if (validationStatus === 'warning' && !nonFixableOrRestorable) {
                 logger.info("[AutoFix Logic] All remaining issues are restorable/informational, setting status to success.");
                 setValidationStatus('success');
+            } else if (remainingIssues.length === 0) {
+                 logger.info("[AutoFix Logic] No issues remaining after attempt, setting status to success.");
+                 setValidationStatus('success');
             }
             return filesToFix;
         }
@@ -558,8 +449,18 @@ export function useCodeParsingAndValidation() {
 
      logger.debug("[useCodeParsingAndValidation] Hook setup complete.");
     return {
-        parsedFiles, rawDescription, validationStatus, validationIssues, isParsing,
-        parseAndValidateResponse, autoFixIssues,
-        setParsedFiles, setValidationStatus, setValidationIssues, setIsParsing, setRawDescription, // Expose setters if needed externally
+        parsedFiles,
+        rawDescription,
+        validationStatus,
+        validationIssues,
+        isParsing,
+        parseAndValidateResponse,
+        autoFixIssues,
+        // Expose setters if AICodeAssistant needs to manipulate them directly (less ideal)
+        setHookParsedFiles: setParsedFiles, // Renamed for clarity
+        setValidationStatus,
+        setValidationIssues,
+        setIsParsing, // Allow parent to control parsing state if needed externally
+        setRawDescription
     };
 }
