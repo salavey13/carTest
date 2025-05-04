@@ -15,16 +15,21 @@ function isValidFa6Icon(iconName: string): iconName is keyof typeof Fa6Icons {
 // Function to attempt PascalCase reconstruction from lowercase fa* tags
 function reconstructPascalCase(lowerCaseName: string): string | null {
     if (typeof lowerCaseName !== 'string' || !lowerCaseName.startsWith('fa') || lowerCaseName.length <= 2) {
+        // logger.debug(`[reconstructPascalCase] Input '${lowerCaseName}' is not a candidate.`);
         return null; // Not a candidate for reconstruction
     }
     // Simple rule: Fa + Uppercase(3rd char) + rest
     // Example: 'facopy' -> 'Fa' + 'C' + 'opy' = 'FaCopy'
     // Example: 'faangleup' -> 'Fa' + 'A' + 'ngleup' = 'FaAngleUp'
     // Example: 'fa6' -> 'Fa' + '6' + '' = 'Fa6' (handles single char after fa)
+    // Example: faarrowuprightfromsquare -> FaArrowuprightfromsquare (This is the limitation, needs manual check/mapping for multi-word)
+    // Example: faimagereplacetask -> FaImagereplacetask
     const thirdChar = lowerCaseName.charAt(2);
     if (!thirdChar) return null; // Should not happen if length > 2, but safety first
     const restOfString = lowerCaseName.substring(3);
-    return `Fa${thirdChar.toUpperCase()}${restOfString}`;
+    const reconstructed = `Fa${thirdChar.toUpperCase()}${restOfString}`;
+    // logger.debug(`[reconstructPascalCase] Reconstructed '${lowerCaseName}' -> '${reconstructed}'`);
+    return reconstructed;
 }
 
 
