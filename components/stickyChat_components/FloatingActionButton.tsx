@@ -37,7 +37,7 @@ export const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
     const commonProps = {
         'aria-label': ariaLabel,
         onClick: onClick,
-        className: `${baseClasses} ${defaultStyleClasses} ${className}`,
+        className: `${baseClasses} ${defaultStyleClasses} ${className}`, // Apply default styles first, then allow override
     };
     const motionProps = variants ? {
         key: "fab", // Keep key for AnimatePresence if using motion

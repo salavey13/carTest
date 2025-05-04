@@ -7,7 +7,7 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import { toast } from "sonner"; // Keep for auth toasts
 
 // Define the shape of the context data
-// --- REMOVED debugToastsEnabled ---
+// .. REMOVED debugToastsEnabled ---
 interface AppContextData extends ReturnType<typeof useTelegram> {}
 
 // Create the context with an initial undefined value
@@ -17,7 +17,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Get data from the useTelegram hook
   const telegramData = useTelegram();
 
-  // --- REMOVED debugToastsEnabled state ---
+  // .. REMOVED debugToastsEnabled state ---
 
   // Context value now only contains telegram data
   const contextValue = useMemo(() => ({
@@ -33,7 +33,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dbUserStatus: contextValue.dbUser?.status,
       error: contextValue.error?.message,
       isInTelegram: contextValue.isInTelegramContext,
-      // --- REMOVED debugToastsEnabled log ---
+      // .. REMOVED debugToastsEnabled log ---
     });
   }, [contextValue]);
 
@@ -65,7 +65,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         else if (contextValue.error) {
             if (document.visibilityState === 'visible') {
                  logger.error("[AppContext] Showing auth error toast:", contextValue.error);
-                 currentToastId = toast.error("Ошибка авторизации", { id: "auth-error-toast", description: contextValue.error.message });
+                 // Show a more generic error, details might be sensitive or confusing
+                 currentToastId = toast.error("Ошибка авторизации", { id: "auth-error-toast", description: "Не удалось войти. Попробуйте позже." });
             }
         }
     }
@@ -74,6 +75,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (loadingTimer) {
             clearTimeout(loadingTimer);
         }
+        // Do not dismiss persistent error toasts here on unmount
+        // toast.dismiss(currentToastId);
     };
   }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.error]);
 
@@ -84,11 +87,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 // Custom hook for consuming the context
 export const useAppContext = (): AppContextData => {
   const context = useContext(AppContext);
-  // --- REMOVED hasOwnProperty check for debugToastsEnabled ---
-  if (!context) {
+  // .. REMOVED hasOwnProperty check for debugToastsEnabled ---
+  if (!context || Object.keys(context).length === 0) { // Check if context is empty (initial state)
      const error = new Error("useAppContext must be used within an AppProvider and after its initialization");
-     logger.fatal("useAppContext Error:", error);
-     throw error;
+     logger.fatal("useAppContext Error: Context is empty or undefined.", error);
+     // Throw error only if context is truly undefined (Provider missing)
+     if (context === undefined) throw error;
+      // If context exists but is empty, return a safe default or log warning
+      logger.warn("useAppContext: Context appears to be empty (potentially during initialization). Returning partial default.");
+      return { /* return minimal safe defaults or cast Partial<AppContextData> */ } as AppContextData;
   }
   // Cast to full type once checks pass
   return context as AppContextData;

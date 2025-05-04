@@ -10,6 +10,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import type { Metadata, Viewport } from 'next';
 import { TooltipProvider } from "@/components/ui/tooltip";
+// Import ErrorOverlayProvider FIRST
 import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext";
 import ErrorBoundaryForOverlay from "@/components/ErrorBoundaryForOverlay";
 import DevErrorOverlay from "@/components/DevErrorOverlay";
@@ -57,6 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={cn(
           "flex min-h-screen flex-col bg-gray-900 text-white antialiased",
       )}>
+        {/* Wrap everything including AppProvider in ErrorOverlayProvider */}
         <ErrorOverlayProvider>
           <AppProvider>
             <TooltipProvider>
@@ -65,6 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <main className="flex-1">
                   {children}
                 </main>
+                {/* StickyChatButton now uses AppContext and ErrorOverlayContext */}
                 <Suspense fallback={<LoadingChatButtonFallback />}>
                   <StickyChatButton />
                 </Suspense>
@@ -85,6 +88,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   className: 'text-sm',
                 }}
               />
+              {/* DevErrorOverlay uses ErrorOverlayContext */}
               <DevErrorOverlay />
             </TooltipProvider>
           </AppProvider>

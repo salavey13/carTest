@@ -1,11 +1,10 @@
-// No changes needed.
 "use client";
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { FaUpload, FaPaperPlane, FaSpinner } from 'react-icons/fa6';
 import { toast } from 'sonner';
-// ИСПОЛЬЗУЕМ ЭКШЕН uploadBatchImages, КАК В МОДАЛКЕ
+// .. ИСПОЛЬЗУЕМ ЭКШЕН uploadBatchImages, КАК В МОДАЛКЕ
 import { uploadBatchImages } from '@/app/actions';
 import { Input } from '@/components/ui/input';
 
@@ -57,7 +56,7 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
         // --- ИСПОЛЬЗУЕМ uploadBatchImages ---
         const formData = new FormData();
         // !!! ВАЖНО: Убедись, что бакет 'about' существует и публичен, или используй другой бакет !!!
-        const bucketName = "about";
+        const bucketName = "about"; // TODO: Make this configurable or pass as prop?
         formData.append("bucketName", bucketName);
         formData.append("files", file); // Добавляем один файл
 
