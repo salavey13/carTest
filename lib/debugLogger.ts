@@ -1,9 +1,19 @@
 type LogLevel = 'log' | 'warn' | 'error' | 'info' | 'debug' | 'fatal';
 
+// Define the structure for log records
+export interface LogRecord {
+  id: number;
+  level: LogLevel;
+  message: string;
+  timestamp: number;
+}
+
 export type LogHandler = (level: LogLevel, message: string, timestamp: number) => void;
 
 class DebugLogger {
-  private internalLogs: string[] = [];
+  // Store logs as structured records
+  private internalLogs: LogRecord[] = [];
+  private logIdCounter = 0; // Counter for unique log IDs
   private maxInternalLogs = 200;
   private isBrowser: boolean = typeof window !== 'undefined';
   private logHandler: LogHandler | null = null;
@@ -82,26 +92,40 @@ class DebugLogger {
     try {
       message = args.map(this.safelyStringify).join(" ");
 
-      const internalLogEntry = `${level.toUpperCase()} ${new Date(timestamp).toISOString()}: ${message}`;
-      this.internalLogs.push(internalLogEntry);
+      // Add to internal structured logs
+      const logEntry: LogRecord = {
+          id: this.logIdCounter++,
+          level,
+          message,
+          timestamp,
+      };
+      this.internalLogs.push(logEntry);
       if (this.internalLogs.length > this.maxInternalLogs) {
         this.internalLogs.shift();
       }
 
+      // Call external handler if set (this handler SHOULD NOT update react state directly)
       if (this.logHandler) {
         try {
           this.logHandler(level, message, timestamp);
         } catch (handlerError) {
           // Use console to report handler errors to avoid loops
           if (this.isBrowser) {
-            console.error("[Logger] FATAL: Log handler failed!", { level, message, handlerError });
+            console.error("[Logger] FATAL: External log handler failed!", { level, message, handlerError });
           }
-          const handlerErrorMessage = `[Internal Error] Log handler failed: ${this.safelyStringify(handlerError)}`;
-          this.internalLogs.push(`FATAL ${new Date().toISOString()}: ${handlerErrorMessage}`);
+          // Also log the handler error internally
+          const handlerErrorMessage = `[Internal Error] External log handler failed: ${this.safelyStringify(handlerError)}`;
+          this.internalLogs.push({
+              id: this.logIdCounter++,
+              level: 'fatal',
+              message: handlerErrorMessage,
+              timestamp: Date.now(),
+          });
           if (this.internalLogs.length > this.maxInternalLogs) { this.internalLogs.shift(); }
         }
       }
 
+      // Log to browser console
       if (this.isBrowser && typeof console !== 'undefined') {
         const timestampStr = new Date(timestamp).toLocaleTimeString('ru-RU', { hour12: false });
         const prefix = `%c[${level.toUpperCase()}] %c${timestampStr}:`;
@@ -125,7 +149,12 @@ class DebugLogger {
     } catch (e) {
       const errorMsg = `[Internal Logging Error during message construction: ${this.safelyStringify(e)}]`;
       if (this.isBrowser) { console.error(errorMsg); }
-      this.internalLogs.push(`FATAL ${new Date(timestamp).toISOString()}: ${errorMsg}`);
+      this.internalLogs.push({
+          id: this.logIdCounter++,
+          level: 'fatal',
+          message: errorMsg,
+          timestamp: Date.now(),
+      });
       if (this.internalLogs.length > this.maxInternalLogs) { this.internalLogs.shift(); }
       if (this.logHandler) {
         try { this.logHandler('fatal', errorMsg, timestamp); } catch { /* ignore handler error here */ }
@@ -143,9 +172,24 @@ class DebugLogger {
   debug = (...args: any[]) => this.logInternal('debug', ...args);
   fatal = (...args: any[]) => this.logInternal('fatal', ...args);
 
-  // Access internal logs
-  getInternalLogs = () => this.internalLogs.join("\n");
-  clearInternalLogs = () => { this.internalLogs = []; };
+  // --- NEW: Method to get internal logs ---
+  getInternalLogRecords = (): ReadonlyArray<LogRecord> => {
+      // Return a shallow copy to prevent external modification
+      return [...this.internalLogs];
+  };
+
+  // Method to get logs as a formatted string (kept for potential compatibility)
+  getInternalLogs = (): string => {
+      return this.internalLogs
+          .map(log => `${log.level.toUpperCase()} ${new Date(log.timestamp).toISOString()}: ${log.message}`)
+          .join("\n");
+  }
+
+  clearInternalLogs = () => {
+      this.internalLogs = [];
+      this.logIdCounter = 0; // Reset counter when clearing
+      this.log('info', '[Logger] Internal logs cleared.'); // Log the clearing action itself
+  };
 }
 
 export const debugLogger = new DebugLogger();

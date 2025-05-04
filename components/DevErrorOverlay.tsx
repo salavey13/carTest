@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from 'react'; // Added React import
-import { useErrorOverlay, ErrorInfo, LogRecord, ToastRecord, LogLevel } from '@/contexts/ErrorOverlayContext';
+import React, { useEffect, useState } from 'react';
+// *** REMOVED LogRecord import from context ***
+import { useErrorOverlay, ErrorInfo, ToastRecord, ErrorSourceType } from '@/contexts/ErrorOverlayContext';
 import {
     FaCopy, FaTriangleExclamation, FaGithub, FaRegClock, FaCircleInfo, FaCircleCheck,
     FaCircleXmark, FaBug, FaFileLines, FaTerminal, FaArrowUpRightFromSquare
@@ -9,9 +10,10 @@ import {
 import { toast as sonnerToast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import { debugLogger as logger } from '@/lib/debugLogger'; // Import logger
+// *** Import logger and LogLevel type directly ***
+import { debugLogger, LogLevel, LogRecord } from '@/lib/debugLogger';
 
-// --- i18n Translations ---
+// --- i18n Translations (Unchanged) ---
 const translations = {
   ru: {
     overlayCrashedTitle: "🚧 DevErrorOverlay СЛОМАЛСЯ! 🚧",
@@ -52,7 +54,7 @@ const translations = {
 };
 const t = translations.ru;
 
-// --- Fallback Component (For when the overlay itself crashes) ---
+// --- Fallback Component (Unchanged) ---
 const ErrorOverlayFallback: React.FC<{ message: string, renderErrorMessage?: string }> = ({ message, renderErrorMessage }) => (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-red-900/95 p-4 text-white font-mono">
         <div className="text-center bg-black/30 p-6 rounded-lg border border-red-500 max-w-lg">
@@ -77,7 +79,7 @@ const ErrorOverlayFallback: React.FC<{ message: string, renderErrorMessage?: str
     </div>
 );
 
-// --- Icon Helpers ---
+// --- Icon Helpers (Unchanged) ---
 const getLevelIcon = (level: LogLevel | ToastRecord['type']): React.ReactElement => {
     switch (level?.toLowerCase()) {
         case 'success': return <FaCircleCheck className="text-green-400" />;
@@ -110,15 +112,18 @@ const DevErrorOverlay: React.FC = () => {
 
   const [internalRenderError, setInternalRenderError] = useState<Error | null>(null);
 
-  // Use the hook which now returns an inline fallback if context is unavailable
+  // Get context values
   const {
       errorInfo,
-      setErrorInfo,
+      setErrorInfo, // Use the direct setter
       showOverlay,
-      toastHistory,
-      logHistory
+      toastHistory, // Still use context for *toasts*
+      // logHistory is no longer needed from context
   } = useErrorOverlay();
-  const contextAvailable = !!setErrorInfo; // A simple check if we got the real context vs fallback
+  const contextAvailable = !!setErrorInfo; // Check if setter function exists
+
+  // --- Get Logs directly from the logger instance ---
+  const logHistory: ReadonlyArray<LogRecord> = debugLogger.getInternalLogRecords();
 
   // Log context access result safely
   useEffect(() => {
@@ -178,7 +183,7 @@ const DevErrorOverlay: React.FC = () => {
           }
       };
 
-      // --- Helper to safely get stack trace ---
+      // --- Helper to safely get stack trace (Unchanged) ---
       const getShortStackTraceSafe = (error?: Error | string | any): string => {
           try {
               if (!error) return t.stackTraceEmpty;
@@ -196,20 +201,22 @@ const DevErrorOverlay: React.FC = () => {
           }
       };
 
-       // --- Helper to prepare data (with internal try-catch) ---
+       // --- Helper to prepare data (uses logHistory from logger) ---
       const prepareIssueAndCopyDataSafe = () => {
           try {
              const safeErrorInfo = errorInfo as ErrorInfo; // Safe here due to outer check
              const errorType = safeErrorInfo.type?.toUpperCase() || 'UNKNOWN';
              const message = safeErrorInfo.message || t.unknownError;
              const shortStack = getShortStackTraceSafe(safeErrorInfo.error);
-             const source = safeErrorInfo.source ? `${safeErrorInfo.source}:${safeErrorInfo.lineno ?? '?'}` : 'N/A';
+             const source = safeErrorInfo.source ? `${safeErrorInfo.source}${typeof safeErrorInfo.lineno === 'number' ? ':' + safeErrorInfo.lineno : ''}` : 'N/A'; // Simplified source
              const repoOrg = process.env.NEXT_PUBLIC_GITHUB_ORG || 'salavey13';
              const repoName = process.env.NEXT_PUBLIC_GITHUB_REPO || 'carTest';
              const issueTitleOptions = [ `Сбой в Матрице: ${message.substring(0, 40)}...`, `Баг в Коде: ${errorType} ${message.substring(0, 35)}...`, `Аномалия: ${message.substring(0, 45)}...`, `Нужна Помощь: ${errorType} (${source || 'N/A'})`, `Глитч! ${errorType}: ${source || 'N/A'}`, ];
              const issueTitle = encodeURIComponent(issueTitleOptions[Math.floor(Math.random() * issueTitleOptions.length)]);
-             // Use logHistory and toastHistory directly (guaranteed to be arrays by the hook)
-             const formattedLogHistory = logHistory.length > 0 ? logHistory.slice().reverse().map(log => `- [${log.level.toUpperCase()}] ${new Date(log.timestamp).toLocaleTimeString('ru-RU',{hour12:false})} | ${log.message.substring(0, 200)}${log.message.length > 200 ? '...' : ''}`).join('\n') : t.noRecentLogs;
+             // --- Use logs from logger ---
+             const logsFromLogger = debugLogger.getInternalLogRecords(); // Get logs directly
+             const formattedLogHistory = logsFromLogger.length > 0 ? logsFromLogger.slice().reverse().map(log => `- [${log.level.toUpperCase()}] ${new Date(log.timestamp).toLocaleTimeString('ru-RU',{hour12:false})} | ${log.message.substring(0, 200)}${log.message.length > 200 ? '...' : ''}`).join('\n') : t.noRecentLogs;
+             // --- Use toasts from context ---
              const formattedToastHistory = toastHistory.length > 0 ? toastHistory.slice().reverse().map(th => `- [${th.type.toUpperCase()}] ${String(th.message).substring(0, 200)}${String(th.message).length > 200 ? '...' : ''}`).join('\n') : t.noRecentToasts;
              const issueBodyContent = `**Тип Ошибки:** ${errorType}\n**Сообщение:** ${message}\n**Источник:** ${source}\n\n**Стек (начало):**\n\`\`\`\n${shortStack}\n\`\`\`\n\n**Последние События (Логи):**\n${formattedLogHistory}\n\n**Недавние Уведомления (Тосты):**\n${formattedToastHistory}\n\n**Контекст/Шаги:**\n[Опиши, что ты делал(а), когда это случилось]\n`;
              const issueBody = encodeURIComponent(issueBodyContent);
@@ -224,9 +231,8 @@ const DevErrorOverlay: React.FC = () => {
       };
       const { gitHubIssueUrl, copyPrompt } = prepareIssueAndCopyDataSafe();
 
-      // --- Handle Copy Action ---
+      // --- Handle Copy Action (Unchanged) ---
       const handleCopyVibeRequest = () => {
-         // Logger is safe here
          logger.debug("[DevErrorOverlay] handleCopyVibeRequest called.");
          try {
              if (!navigator.clipboard) { throw new Error("Clipboard API not available."); }
@@ -239,8 +245,7 @@ const DevErrorOverlay: React.FC = () => {
          }
       };
 
-      // --- Safe Render Helper ---
-      // Ensures an error rendering one part doesn't kill the whole overlay
+      // --- Safe Render Helper (Unchanged) ---
       const RenderSection: React.FC<{ title: string; children: () => React.ReactNode }> = ({ title, children }) => {
           try {
               // console.debug(`[DevErrorOverlay] Rendering section: ${title}`); // Console for render phase
@@ -262,7 +267,7 @@ const DevErrorOverlay: React.FC = () => {
           {/* Main Content Container */}
           <div className="bg-gradient-to-br from-gray-900 via-indigo-950 to-black border border-cyan-500/30 rounded-lg shadow-2xl p-4 md:p-6 max-w-4xl w-full max-h-[95vh] flex flex-col text-gray-200 glitch-border-animate">
 
-            {/* Header */}
+            {/* Header (Unchanged) */}
              <RenderSection title="Header">
                  {() => (
                      <div className="flex items-center justify-between mb-4 flex-shrink-0">
@@ -276,17 +281,17 @@ const DevErrorOverlay: React.FC = () => {
 
             {/* Body (Scrollable Area) */}
             <div id="error-overlay-description" className="flex-grow overflow-y-auto simple-scrollbar pr-2 space-y-4 mb-4">
-                 {/* Error Message */}
+                 {/* Error Message (Unchanged) */}
                  <RenderSection title="Message">
                       {() => {
                           let messageText = t.unknownError;
-                          try { messageText = String(errorInfo?.message || t.unknownError); } // Ensure string conversion
+                          try { messageText = String(errorInfo?.message || t.unknownError); }
                           catch (e: any) { messageText = `[Error Displaying Message]`; }
                           return <p className="text-base md:text-lg text-red-300 font-semibold bg-red-900/30 p-2 rounded border border-red-700/50 break-words">{messageText}</p>;
                       }}
                  </RenderSection>
 
-                 {/* Source Info */}
+                 {/* Source Info (Unchanged) */}
                  <RenderSection title="Source">
                       {() => {
                           try {
@@ -305,7 +310,7 @@ const DevErrorOverlay: React.FC = () => {
                       }}
                  </RenderSection>
 
-                 {/* Stack Trace */}
+                 {/* Stack Trace (Unchanged) */}
                  <RenderSection title="StackTrace">
                       {() => (<details className="bg-black/30 p-3 rounded border border-gray-700/50">
                             <summary className="cursor-pointer text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors"> {t.stackTraceLabel} </summary>
@@ -315,13 +320,13 @@ const DevErrorOverlay: React.FC = () => {
                        </details>)}
                  </RenderSection>
 
-                 {/* Logs Section */}
+                 {/* Logs Section (Uses logger directly) */}
                  <RenderSection title="RecentLogs">
                      {() => (<details className="bg-black/40 p-3 rounded border border-gray-600/60" open={logHistory.length > 0}>
                           <summary className="cursor-pointer text-sm font-medium text-gray-300 hover:text-white transition-colors"> {t.recentLogsTitle} ({logHistory.length}) </summary>
                           {logHistory.length > 0 ? (
                              <ul className="mt-2 space-y-1.5 text-xs font-mono max-h-60 overflow-y-auto simple-scrollbar pr-1">
-                                {logHistory.slice().reverse().map((log) => (
+                                {logHistory.slice().reverse().map((log) => ( // Use logHistory from logger
                                     <li key={log.id} className="flex items-start gap-2">
                                         <span className="mt-0.5 flex-shrink-0 w-4 h-4 flex items-center justify-center" title={log.level.toUpperCase()}>{getLevelIcon(log.level)}</span>
                                         <span className={`flex-1 ${getLevelColor(log.level)}`}>
@@ -338,16 +343,16 @@ const DevErrorOverlay: React.FC = () => {
                         </details>)}
                  </RenderSection>
 
-                 {/* Toasts Section */}
+                 {/* Toasts Section (Uses context) */}
                  <RenderSection title="RecentToasts">
                      {() => (<details className="bg-black/30 p-3 rounded border border-gray-700/50" open={toastHistory.length > 0}>
                           <summary className="cursor-pointer text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors"> {t.recentToastsTitle} ({toastHistory.length}) </summary>
                           {toastHistory.length > 0 ? (
                              <ul className="mt-2 space-y-1 text-xs font-mono max-h-40 overflow-y-auto simple-scrollbar pr-1">
-                                {toastHistory.slice().reverse().map((toast) => (
+                                {toastHistory.slice().reverse().map((toast) => ( // Use toastHistory from context
                                     <li key={toast.id} className="flex items-start gap-2 text-gray-300/90">
                                         <span className="mt-0.5 flex-shrink-0 w-4 h-4 flex items-center justify-center" title={toast.type.toUpperCase()}>{getLevelIcon(toast.type)}</span>
-                                        <span className="flex-1 break-words">{String(toast.message)}</span> {/* Ensure message is string */}
+                                        <span className="flex-1 break-words">{String(toast.message)}</span>
                                     </li>
                                 ))}
                              </ul>
@@ -355,7 +360,7 @@ const DevErrorOverlay: React.FC = () => {
                         </details>)}
                  </RenderSection>
 
-                 {/* Advice Section */}
+                 {/* Advice Section (Unchanged logic, but uses updated logHistory source indirectly via prepare function) */}
                  <RenderSection title="Advice">
                       {() => (<div className="mt-4 p-3 bg-yellow-900/30 border border-yellow-600/50 rounded text-yellow-200 text-xs md:text-sm space-y-2">
                            <p className="font-semibold">{t.adviceTitle}</p>
@@ -383,7 +388,7 @@ const DevErrorOverlay: React.FC = () => {
                  </RenderSection>
             </div> {/* End Scrollable Body */}
 
-            {/* Footer (Non-scrolling Area) */}
+            {/* Footer (Unchanged) */}
             <RenderSection title="Footer">
                  {() => (
                      <div className="flex flex-col sm:flex-row justify-end items-center pt-4 border-t border-cyan-700/50 mt-auto gap-3 flex-shrink-0">
