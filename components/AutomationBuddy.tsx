@@ -336,6 +336,7 @@ const AutomationBuddy: React.FC = () => {
     // --- Render Logic ---
     if (!isMounted) return null; // Render nothing server-side or before mount
 
+    // Log before final render
     logger.debug(`[AutomationBuddy Render] Final render. isOpen=${isOpen}, hasNewSuggestions=${hasNewSuggestions}`);
     try {
         return (

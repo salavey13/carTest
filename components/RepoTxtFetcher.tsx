@@ -281,8 +281,10 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
     logger.debug(`[Render State] isActionDisabled=${isActionDisabled}, isFetchLoading=${isFetchLoading}, showProgressBar=${showProgressBar}`);
 
 
+    // --- Log before return ---
+    logger.debug("[RepoTxtFetcher] Preparing to render JSX...");
+
     // --- RENDER ---
-    logger.debug("[RepoTxtFetcher] Render: Returning JSX");
     try {
         return (
           <div id="extractor" className="w-full p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm text-gray-200 font-mono rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] border border-gray-700/50 relative overflow-hidden">
@@ -327,7 +329,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
               </div>
 
              {/* Settings Modal */}
-             {logger.debug("[Render] Rendering SettingsModal (conditional)")}
+             {/* Log before rendering SettingsModal */}
+             {(() => { logger.debug("[Render] Rendering SettingsModal (conditional)"); return null; })()}
              <SettingsModal
                   isOpen={isSettingsModalOpen}
                   repoUrl={repoUrl}
@@ -364,7 +367,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
              {/* Progress Bar and Status Messages */}
              {showProgressBar && (
                   <div className="mb-4 min-h-[40px]">
-                      {logger.debug("[Render] Rendering ProgressBar (conditional)")}
+                      {/* Log before rendering ProgressBar */}
+                      {(() => { logger.debug("[Render] Rendering ProgressBar (conditional)"); return null; })()}
                       <ProgressBar status={fetchStatus === 'failed_retries' ? 'error' : fetchStatus} progress={progress} />
                       {isFetchLoading && <p className="text-cyan-300 text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? '(Повтор)' : ''}</p>}
                       {isParsing && !currentImageTask && <p className="text-yellow-400 text-xs font-mono mt-1 text-center animate-pulse">Разбор ответа AI...</p>}
@@ -401,14 +405,16 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                  {/* --- Column 1: File List & Preview (Standard Mode) --- */}
                  {!currentImageTask && (isFetchLoading || fetchedFiles.length > 0) && (
                      <div className={`flex flex-col gap-4 ${ (fetchedFiles.length > 0 || kworkInputHasContent) ? '' : 'md:col-span-2'}`}>
-                         {logger.debug("[Render] Rendering SelectedFilesPreview (conditional)")}
+                         {/* Log before SelectedFilesPreview */}
+                         {(() => { logger.debug("[Render] Rendering SelectedFilesPreview (conditional)"); return null; })()}
                          <SelectedFilesPreview
                              selectedFiles={selectedFetcherFiles}
                              allFiles={fetchedFiles}
                              getLanguage={repoUtils.getLanguage}
                              // VibeContentRenderer handled internally if needed
                          />
-                         {logger.debug("[Render] Rendering FileList (conditional)")}
+                         {/* Log before FileList */}
+                         {(() => { logger.debug("[Render] Rendering FileList (conditional)"); return null; })()}
                          <FileList
                              id="file-list-container"
                              files={fetchedFiles}
@@ -433,7 +439,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                  {/* --- Column 2: Kwork Input (Standard Mode) --- */}
                  {!currentImageTask && (fetchedFiles.length > 0 || kworkInputHasContent) && (
                       <div id="kwork-input-section" className="flex flex-col gap-3">
-                          {logger.debug("[Render] Rendering RequestInput (conditional)")}
+                          {/* Log before RequestInput */}
+                          {(() => { logger.debug("[Render] Rendering RequestInput (conditional)"); return null; })()}
                           <RequestInput
                               kworkInputRef={kworkInputRef}
                               onCopyToClipboard={() => { logger.debug("[Input Action] Copy Click"); handleCopyToClipboard(undefined, true); }}
@@ -452,7 +459,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                  {/* --- Status Display (Image Task Mode) --- */}
                  {currentImageTask && filesFetched && (
                       <div className={`md:col-span-1 flex flex-col items-center justify-center text-center p-4 bg-gray-700/30 rounded-lg border border-dashed ${imageTaskTargetFileReady ? 'border-blue-400' : (fetchStatus === 'error' || fetchStatus === 'failed_retries') ? 'border-red-500' : 'border-gray-600'} min-h-[200px]`}>
-                           {logger.debug("[Render] Rendering Image Task Status Display", { imageTaskTargetFileReady, isFetchLoading, assistantLoading, fetchStatus })}
+                           {/* Log before Image Task Status */}
+                           {(() => { logger.debug("[Render] Rendering Image Task Status Display", { imageTaskTargetFileReady, isFetchLoading, assistantLoading, fetchStatus }); return null; })()}
                           {isFetchLoading ? <FaSpinner className="text-blue-400 text-3xl mb-3 animate-spin" />
                            : assistantLoading ? <FaSpinner className="text-purple-400 text-3xl mb-3 animate-spin" />
                            : imageTaskTargetFileReady ? <FaCircleCheck className="text-green-400 text-3xl mb-3" />
@@ -474,7 +482,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, {}>((props, ref) => {
                       </div>
                  )}
             </div> {/* End Grid */}
-            {logger.log("[RepoTxtFetcher] RETURN JSX COMPLETED NORMALLY")}
           </div> // End Extractor Root
         );
     } catch (renderError: any) {
