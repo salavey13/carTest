@@ -5,7 +5,7 @@ import React, { useMemo, useState, useEffect, useImperativeHandle, forwardRef, M
 import {
     useRepoXmlPageContext, AICodeAssistantRef, SimplePullRequest, ImageReplaceTask, FileNode, RepoXmlPageContextType
 } from "@/contexts/RepoXmlPageContext";
-import { supabaseAdmin } from "@/lib/supabase/admin"; // <-- IMPORT ADDED HERE (Adjust path if needed)
+import { supabaseAdmin } from "@/hooks/supabase"; 
 import { useAppContext } from "@/contexts/AppContext";
 // Hooks & Components
 import { useAppToast } from '@/hooks/useAppToast'; // Use the hook
