@@ -6,7 +6,6 @@ import { saveAs } from 'file-saver';
 import JSZip from 'jszip'; // Ensure JSZip is installed
 
 // Context & Types (adjust paths if necessary)
-// Adjust these imports based on your actual context/type locations
 import { useAppContext } from '@/contexts/AppContext';
 import {
     useRepoXmlPageContext,
@@ -23,7 +22,7 @@ import {
 import {
     createGitHubPullRequest,
     updateBranch,
-    fetchRepoContents,
+    // REMOVED fetchRepoContents import
     getOpenPullRequests // Need this for image replace check
 } from '@/app/actions_github/actions'; // Added getOpenPullRequests
 import { sendTelegramDocument, notifyAdmin } from '@/app/actions';
@@ -57,8 +56,7 @@ interface UseAICodeAssistantHandlersProps {
     repoUrlStateLocal: string;
     prTitle: string;
     customLinks: { name: string; url: string }[];
-    originalRepoFiles: { path: string; content: string }[];
-    isFetchingOriginals: boolean;
+    // REMOVED originalRepoFiles, isFetchingOriginals
     imageReplaceTask: ImageReplaceTask | null;
     // State setters from AICodeAssistant
     setResponse: React.Dispatch<React.SetStateAction<string>>;
@@ -68,12 +66,10 @@ interface UseAICodeAssistantHandlersProps {
     setShowModal: React.Dispatch<React.SetStateAction<boolean>>;
     setModalMode: React.Dispatch<React.SetStateAction<'replace' | 'search'>>;
     setIsProcessingPR: React.Dispatch<React.SetStateAction<boolean>>;
-    setOriginalRepoFiles: React.Dispatch<React.SetStateAction<{ path: string; content: string }[]>>;
-    setIsFetchingOriginals: React.Dispatch<React.SetStateAction<boolean>>;
+    // REMOVED setOriginalRepoFiles, setIsFetchingOriginals
     setIsImageModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     setComponentParsedFiles: React.Dispatch<React.SetStateAction<ValidationFileEntry[]>>;
     setImageReplaceError: React.Dispatch<React.SetStateAction<string | null>>;
-    // --- FIX: Add setImageReplaceTask type ---
     setImageReplaceTask: React.Dispatch<React.SetStateAction<ImageReplaceTask | null>>;
     setRepoUrlStateLocal: React.Dispatch<React.SetStateAction<string>>;
     // Props from useCodeParsingAndValidation hook
@@ -90,9 +86,8 @@ interface UseAICodeAssistantHandlersProps {
 export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProps) => {
     const {
         // Destructure all props
-        response, componentParsedFiles, selectedFileIds, repoUrlStateLocal, prTitle, customLinks, originalRepoFiles, isFetchingOriginals, imageReplaceTask,
-        setResponse, setSelectedFileIds, setPrTitle, setCustomLinks, setShowModal, setModalMode, setIsProcessingPR, setOriginalRepoFiles, setIsFetchingOriginals, setIsImageModalOpen, setComponentParsedFiles, setImageReplaceError, setRepoUrlStateLocal,
-        // --- FIX: Destructure setImageReplaceTask ---
+        response, componentParsedFiles, selectedFileIds, repoUrlStateLocal, prTitle, customLinks, /* REMOVED originalRepoFiles, isFetchingOriginals, */ imageReplaceTask,
+        setResponse, setSelectedFileIds, setPrTitle, setCustomLinks, setShowModal, setModalMode, setIsProcessingPR, /* REMOVED setOriginalRepoFiles, setIsFetchingOriginals, */ setIsImageModalOpen, setComponentParsedFiles, setImageReplaceError, setRepoUrlStateLocal,
         setImageReplaceTask,
         codeParserHook, appContext, pageContext,
         aiResponseInputRefPassed, kworkInputRefPassed
@@ -124,7 +119,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         if (imageReplaceTask) { toast.warn("Разбор не нужен для картинки."); return; }
         if (!response.trim()) { toast.warn("Нет ответа AI для разбора."); return; }
         logger.log("[Handler] Starting parse...");
-        setContextIsParsing(true); setAssistantLoading(true); setOriginalRepoFiles([]);
+        setContextIsParsing(true); setAssistantLoading(true); // REMOVED setOriginalRepoFiles([]);
         try {
             const { files: newlyParsedFiles, description: parsedRawDesc, issues: parseValidationIssues } = await parseAndValidateResponse(response);
             setHookParsedFiles(newlyParsedFiles);
@@ -138,7 +133,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             const textForTitle = parsedRawDesc || response || "";
             setPrTitle(extractPRTitleHint(textForTitle));
             setFilesParsed(newlyParsedFiles.length > 0); // Keep this true if any block was found
-            setValidationStatus(parseValidationIssues.length > 0 ? (parseValidationIssues.some(i => !i.fixable && !i.restorable) ? 'error' : 'warning') : 'success');
+            setValidationStatus(parseValidationIssues.length > 0 ? (parseValidationIssues.some(i => i.severity === 'error') ? 'error' : 'warning') : 'success');
             setValidationIssues(parseValidationIssues);
             setRawDescription(parsedRawDesc); // Ensure raw description is set
 
@@ -152,7 +147,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             setContextIsParsing(false); setAssistantLoading(false);
         }
      }, [
-        response, imageReplaceTask, parseAndValidateResponse, setFilesParsed, setSelectedAssistantFiles, setContextIsParsing, setAssistantLoading, setValidationStatus, setValidationIssues, setHookParsedFiles, logger, extractPRTitleHint, setPrTitle, setOriginalRepoFiles, setSelectedFileIds, setComponentParsedFiles, setRawDescription // Added missing dependencies
+        response, imageReplaceTask, parseAndValidateResponse, setFilesParsed, setSelectedAssistantFiles, setContextIsParsing, setAssistantLoading, setValidationStatus, setValidationIssues, setHookParsedFiles, logger, extractPRTitleHint, setPrTitle, /* REMOVED setOriginalRepoFiles, */ setSelectedFileIds, setComponentParsedFiles, setRawDescription // Added missing dependencies
      ]);
 
     const handleAutoFix = useCallback(() => {
@@ -167,26 +162,11 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         }
      }, [autoFixIssues, componentParsedFiles, validationIssues, imageReplaceTask, setComponentParsedFiles, logger]);
 
-    const handleCopyFixPrompt = useCallback(() => {
-        if (imageReplaceTask) return;
-        const skipped = validationIssues.filter(i => i.type === 'skippedComment');
-        if (skipped.length === 0) { toast.info("Нет маркеров '// ..''.'."); return; }
-        const fList = skipped.map(i => `- ${i.filePath} (~${i.details?.lineNumber ?? '?'})`).join('\n');
-        const prompt = `Восстанови пропуски ('// ..''.') в новых файлах, референс - старые:\n${fList}\n\nВерни полные новые версии.`;
-        navigator.clipboard.writeText(prompt).then(() => toast.success("Prompt для исправления скопирован!")).catch((err) => { logger.error("Copy fix prompt error:", err); toast.error("Ошибка копирования промпта."); });
-     }, [validationIssues, imageReplaceTask, logger]);
+    // REMOVED handleCopyFixPrompt as button is removed
+    // const handleCopyFixPrompt = useCallback(() => { /* ... */ }, [validationIssues, imageReplaceTask, logger]);
 
-    const handleRestorationComplete = useCallback((updatedFiles: ValidationFileEntry[], successCount: number, errorCount: number) => {
-        if (imageReplaceTask) return;
-        setHookParsedFiles(updatedFiles);
-        setComponentParsedFiles(updatedFiles);
-        // Recalculate validation status based on remaining issues
-        const remaining = validationIssues.filter(i => i.type !== 'skippedCodeBlock');
-        setValidationIssues(remaining);
-        setValidationStatus(remaining.length > 0 ? (remaining.some(i => !i.fixable && !i.restorable) ? 'error' : 'warning') : 'success');
-        if (successCount > 0) toast.success(`${successCount} блоков кода восстановлено.`);
-        if (errorCount > 0) toast.error(`${errorCount} блоков не удалось восстановить.`);
-     }, [validationIssues, setHookParsedFiles, setValidationIssues, setValidationStatus, imageReplaceTask, setComponentParsedFiles]);
+    // REMOVED handleRestorationComplete as CodeRestorer is removed
+    // const handleRestorationComplete = useCallback((updatedFiles: ValidationFileEntry[], successCount: number, errorCount: number) => { /* ... */ }, [validationIssues, setHookParsedFiles, setValidationIssues, setValidationStatus, imageReplaceTask, setComponentParsedFiles]);
 
     const handleUpdateParsedFiles = useCallback((updatedFiles: ValidationFileEntry[]) => {
         if (imageReplaceTask) return;
@@ -212,13 +192,13 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         setSelectedAssistantFiles(new Set());
         setValidationStatus('idle');
         setValidationIssues([]);
-        setOriginalRepoFiles([]);
+        // REMOVED setOriginalRepoFiles([]);
         setPrTitle('');
         setRequestCopied(false);
         setRawDescription(''); // Clear raw description too
         toast.info("Поле ответа AI и связанные состояния очищены.");
      }, [
-        imageReplaceTask, setResponse, aiResponseInputRefPassed, setAiResponseHasContent, setFilesParsed, setHookParsedFiles, setComponentParsedFiles, setSelectedFileIds, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setOriginalRepoFiles, setPrTitle, setRequestCopied, setRawDescription // Added setRawDescription
+        imageReplaceTask, setResponse, aiResponseInputRefPassed, setAiResponseHasContent, setFilesParsed, setHookParsedFiles, setComponentParsedFiles, setSelectedFileIds, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, /* REMOVED setOriginalRepoFiles, */ setPrTitle, setRequestCopied, setRawDescription // Added setRawDescription
      ]);
 
     const handleCopyResponse = useCallback(() => {
@@ -505,7 +485,8 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         if (!prTitle.trim()) { toast.error("Введите Заголовок PR/Commit."); return; }
 
         // More robust validation check - ensure severity is checked
-        const errors = validationIssues.filter(i => i.severity === 'error' && (!i.fixable || !i.restorable)); // Check for unfixable/unrestorable errors
+        // REMOVED restorable check, as restoration is removed
+        const errors = validationIssues.filter(i => i.severity === 'error' && !i.fixable);
         if (errors.length > 0) {
              toast.error(`Найдены критические ошибки (${errors.length}), которые нужно исправить перед созданием PR!`, {
                 description: errors.map(e => `- ${e.filePath}: ${e.message}`).join('\n'),
@@ -522,7 +503,8 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
              logger.warn("Using truncated AI response as PR description (rawDescription was empty).");
         }
         finalDescription += `\n\n**Файлы (${selectedFilesContent.length}):**\n` + selectedFilesContent.map(f => `- \`${f.path}\``).join('\n');
-        const relevantIssues = validationIssues.filter(i => i.type !== 'skippedCodeBlock' && i.type !== 'skippedComment' && i.severity !== 'info'); // Include warnings
+        // Simplified relevant issues - exclude only info level
+        const relevantIssues = validationIssues.filter(i => i.severity !== 'info');
         if (relevantIssues.length > 0) { finalDescription += "\n\n**Проблемы Валидации:**\n" + relevantIssues.map(i => `- [${i.severity?.toUpperCase()}] **${i.filePath}**: ${i.message}`).join('\n'); }
 
         const commitSubject = prTitle.trim().substring(0, 70);
@@ -615,14 +597,12 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
 
           if (!oldUrlRegex.test(targetFile.content)) {
               logger.warn(`[handleDirectImageReplace] Old URL "${task.oldUrl}" not found in file ${task.targetPath}. Proceeding anyway (might indicate prior replacement or error).`);
-              // Decide if this should be an error or just a warning
               // toast.warn(`Старый URL не найден в файле ${task.targetPath}. Возможно, уже заменено?`, { id: toastId });
           }
 
           const updatedContent = targetFile.content.replace(oldUrlRegex, task.newUrl);
           if (updatedContent === targetFile.content) {
               logger.warn(`[handleDirectImageReplace] Content unchanged after replace for ${task.targetPath}. Old URL might not exist or is same as new.`);
-              // No need to proceed if content is identical
               toast.info(`Содержимое файла ${task.targetPath} не изменилось.`, { id: toastId });
               setImageReplaceTask(null); // Clear task as it's effectively done or irrelevant
               setAssistantLoading(false); setIsProcessingPR(false);
@@ -641,28 +621,23 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
           let prToUpdate: SimplePullRequest | null = null;
           if (openPrsResult.success && Array.isArray(openPrsResult.pullRequests)) {
               const expectedPrTitlePrefix = `chore: Update image`;
-              // More robust finding of PR, checking head ref exists
               prToUpdate = openPrsResult.pullRequests.find(pr =>
                   pr?.title?.startsWith(expectedPrTitlePrefix) &&
-                  pr?.title?.includes(task.targetPath) && // Ensure it mentions the specific file
-                  pr?.head?.ref // Make sure branch ref exists
+                  pr?.title?.includes(task.targetPath) &&
+                  pr?.head?.ref
               ) ?? null;
           } else if (!openPrsResult.success) {
               logger.warn("[handleDirectImageReplace] Failed to get open PRs:", openPrsResult.error);
-              // Continue, but won't be able to update existing PR
           }
 
           if (prToUpdate?.head?.ref) {
                logger.log(`[handleDirectImageReplace] Found existing PR #${prToUpdate.number}. Updating branch '${prToUpdate.head.ref}'.`);
                toast.info(`Обновление ветки '${prToUpdate.head.ref}' для PR #${prToUpdate.number}...`, { id: toastId });
-               // Use the triggerUpdateBranch from context
                const updateResult = await triggerUpdateBranch(repoUrlForForm, filesToCommit, fullCommitMessage, prToUpdate.head.ref, prToUpdate.number, prDescription);
                if (!updateResult.success) throw new Error(updateResult.error || 'Ошибка обновления ветки');
-               // Success toast is handled by triggerUpdateBranch
            } else {
                logger.log("[handleDirectImageReplace] No existing relevant PR found. Creating new PR.");
                toast.info("Создание нового PR для замены картинки...", { id: toastId });
-               // Use createGitHubPullRequest action directly
                const createResult = await createGitHubPullRequest(repoUrlForForm, filesToCommit, prTitleText, prDescription, fullCommitMessage);
                if (!createResult.success || !createResult.prUrl) throw new Error(createResult.error || 'Ошибка создания PR');
                toast.success(`PR для замены картинки создан: ${createResult.prUrl}`, { id: toastId, duration: 5000 });
@@ -677,9 +652,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
           const errorMsg = err?.message || "Неизвестная ошибка при замене картинки.";
           toast.error(`Ошибка: ${errorMsg}`, { id: toastId, duration: 6000 });
           setImageReplaceError(errorMsg); // Set error state for UI feedback
-          // Do NOT clear the task on error, let the user see the error state
       } finally {
-          // Ensure loading states are reset regardless of success/error
           setAssistantLoading(false); setIsProcessingPR(false);
           logger.log("[handleDirectImageReplace] Finally block reached.");
       }
@@ -696,8 +669,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
     return {
         handleParse,
         handleAutoFix,
-        handleCopyFixPrompt,
-        handleRestorationComplete,
+        // REMOVED handleCopyFixPrompt, handleRestorationComplete
         handleUpdateParsedFiles,
         handleClearResponse,
         handleCopyResponse,
