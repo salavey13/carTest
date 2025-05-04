@@ -21,9 +21,9 @@ import {
     FaTools, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket
 } from "react-icons/fa6"; // Keep icon imports for direct use if any (like in buttons)
 import Link from "next/link";
-// Removed FaIcons import - not needed anymore for parsing
+// .. Removed FaIcons import - not needed anymore for parsing
 import { motion } from 'framer-motion';
-// Removed parse, domToReact, etc. imports for html-react-parser - VibeContentRenderer handles it
+// .. Removed parse, domToReact, etc. imports for html-react-parser - VibeContentRenderer handles it
 import VibeContentRenderer from '@/components/VibeContentRenderer'; // <-- ADD THIS IMPORT
 
 
@@ -335,7 +335,7 @@ function ActualPageContent() {
               setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true);
           }
          if (typeof logger !== 'undefined') logger.debug("[Effect URL Params] END"); else console.debug("[Effect URL Params] END");
-      }, [searchParams, setImageReplaceTask, setRepoUrl, addToast, setPendingFlowDetails, pageContext.setTargetBranchName, pageContext.setManualBranchName, pageContext.setTargetPrData]);
+      }, [searchParams, setImageReplaceTask, setRepoUrl, addToast, setPendingFlowDetails, pageContext.setTargetBranchName, pageContext.setManualBranchName, pageContext.setTargetPrData]); // Keep dependencies
 
        // --- Effect for Kwork/Task Population ---
        useEffect(() => {
@@ -385,7 +385,7 @@ function ActualPageContent() {
                  }
             }
             if (typeof logger !== 'undefined') logger.debug("[Effect Populate] Check END"); else console.debug("[Effect Populate] Check END");
-        }, [ fetchStatus, isPreChecking, pendingFlowDetails, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, fetcherRef, allFetchedFiles, selectedFetcherFiles, addToast, setKworkInputHasContent, setImageReplaceTask, setPendingFlowDetails ]);
+        }, [ fetchStatus, isPreChecking, pendingFlowDetails, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, fetcherRef, allFetchedFiles, selectedFetcherFiles, addToast, setKworkInputHasContent, setImageReplaceTask, setPendingFlowDetails ]); // Keep dependencies
 
 
     // --- Callbacks ---
@@ -419,6 +419,9 @@ function ActualPageContent() {
 
     // --- Render Helper ---
     const renderVibeContent = useCallback((contentKey: keyof TranslationSet, wrapperClassName?: string) => { const content = t?.[contentKey]; return content ? <VibeContentRenderer content={content} className={wrapperClassName} /> : `[Missing Translation: ${contentKey}]`; }, [t]);
+
+    // --- Log before return ---
+    if (typeof logger !== 'undefined') logger.log("[ActualPageContent] Preparing to render JSX...");
 
     try {
        // Return JSX directly
@@ -499,7 +502,8 @@ function ActualPageContent() {
                     {/* Reveal Button */}
                     {!showComponents && (
                         <section id="reveal-trigger" className="mb-12 w-full max-w-3xl text-center">
-                            { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering Reveal Button"); else console.debug("[Render] Rendering Reveal Button")}
+                            {/* Log before rendering button */}
+                            {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering Reveal Button"); else console.debug("[Render] Rendering Reveal Button"); return null; })()}
                             <Button onClick={handleShowComponents} className="bg-gradient-to-r from-green-500 via-cyan-500 to-purple-600 text-gray-900 font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:scale-105 transform transition duration-300 animate-bounce hover:animate-none ring-2 ring-offset-2 ring-offset-gray-950 ring-transparent hover:ring-cyan-300" size="lg">
                                 <FaHandSparkles className="mr-2"/> {renderVibeContent('readyButton')}
                             </Button>
@@ -509,35 +513,42 @@ function ActualPageContent() {
                     {/* WORKHORSE Components */}
                     {showComponents && (
                          <>
-                            { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering Workhorse Components Container"); else console.debug("[Render] Rendering Workhorse Components Container")}
+                            {/* Log before rendering workhorse components */}
+                            {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering Workhorse Components Container"); else console.debug("[Render] Rendering Workhorse Components Container"); return null; })()}
                             <h2 className="text-3xl font-bold text-center text-brand-green mb-8 animate-pulse">{renderVibeContent('componentsTitle')}</h2>
                              <section id="extractor" className="mb-12 w-full max-w-4xl">
-                               { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering RepoTxtFetcher Component Wrapper..."); else console.debug("[Render] Rendering RepoTxtFetcher Component Wrapper...")}
+                               {/* Log before RepoTxtFetcher */}
+                               {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering RepoTxtFetcher Component Wrapper..."); else console.debug("[Render] Rendering RepoTxtFetcher Component Wrapper..."); return null; })()}
                                  <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg backdrop-blur-sm">
                                      <CardContent className="p-4">
                                          <RepoTxtFetcher ref={fetcherRef} />
                                      </CardContent>
                                  </Card>
-                               { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering RepoTxtFetcher Component Wrapper DONE"); else console.debug("[Render] Rendering RepoTxtFetcher Component Wrapper DONE")}
+                               {/* Log after RepoTxtFetcher */}
+                               {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering RepoTxtFetcher Component Wrapper DONE"); else console.debug("[Render] Rendering RepoTxtFetcher Component Wrapper DONE"); return null; })()}
                              </section>
 
                              <section id="executor" className="mb-12 w-full max-w-4xl pb-16">
-                                { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering AICodeAssistant Component Wrapper..."); else console.debug("[Render] Rendering AICodeAssistant Component Wrapper...")}
+                                {/* Log before AICodeAssistant */}
+                                {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering AICodeAssistant Component Wrapper..."); else console.debug("[Render] Rendering AICodeAssistant Component Wrapper..."); return null; })()}
                                  <Card className="bg-gray-900/80 border border-purple-700/50 shadow-lg backdrop-blur-sm">
                                      <CardContent className="p-4">
                                          <AICodeAssistant ref={assistantRef} kworkInputRefPassed={kworkInputRef} aiResponseInputRefPassed={aiResponseInputRef} />
                                      </CardContent>
                                  </Card>
-                                { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering AICodeAssistant Component Wrapper DONE"); else console.debug("[Render] Rendering AICodeAssistant Component Wrapper DONE")}
+                                {/* Log after AICodeAssistant */}
+                                {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering AICodeAssistant Component Wrapper DONE"); else console.debug("[Render] Rendering AICodeAssistant Component Wrapper DONE"); return null; })()}
                              </section>
-                            { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering Workhorse Components Container DONE"); else console.debug("[Render] Rendering Workhorse Components Container DONE")}
+                            {/* Log after workhorse components */}
+                            {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering Workhorse Components Container DONE"); else console.debug("[Render] Rendering Workhorse Components Container DONE"); return null; })()}
                          </>
                      )}
 
                     {/* Final CTA */}
                      {showComponents && (
                          <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
-                              { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering Final CTA"); else console.debug("[Render] Rendering Final CTA")}
+                              {/* Log before Final CTA */}
+                              {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering Final CTA"); else console.debug("[Render] Rendering Final CTA"); return null; })()}
                               <div className="bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 p-6 rounded-lg shadow-lg animate-pulse border-2 border-white/50 prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 max-w-none">
                                  <h3 className="text-2xl font-bold text-white mb-3"><VibeContentRenderer content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
                                  <div className="text-white text-lg mb-4"> {renderVibeContent('ctaDesc')} </div>
@@ -558,12 +569,11 @@ function ActualPageContent() {
                     </motion.nav>
 
                     {/* Automation Buddy */}
+                     {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Preparing AutomationBuddy Wrapper (Suspense)"); else console.debug("[Render] Preparing AutomationBuddy Wrapper (Suspense)"); return null; })()}
                     <Suspense fallback={<LoadingBuddyFallback />}>
-                        { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering AutomationBuddy Wrapper (Suspense)"); else console.debug("[Render] Rendering AutomationBuddy Wrapper (Suspense)")}
                         <AutomationBuddy />
-                        { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering AutomationBuddy Wrapper DONE"); else console.debug("[Render] Rendering AutomationBuddy Wrapper DONE")}
                     </Suspense>
-                    { if (typeof logger !== 'undefined') logger.log("[ActualPageContent] Main Content Rendered Successfully"); else console.log("[ActualPageContent] Main Content Rendered Successfully")}
+                    {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] AutomationBuddy Wrapper Rendered"); else console.debug("[Render] AutomationBuddy Wrapper Rendered"); return null; })()}
                 </div>
             </>
         );

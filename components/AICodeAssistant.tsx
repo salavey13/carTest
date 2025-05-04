@@ -357,8 +357,10 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const submitButtonDisabled = !canSubmitRegularPR || isProcessingPR || assistantLoading || !!imageReplaceTask;
     logger.debug(`[Render State] isProcessingAny=${isProcessingAny}, effectiveIsParsing=${effectiveIsParsing}, filesParsed=${filesParsed}, selectedAssistantFiles=${selectedAssistantFiles.size}, canSubmitRegularPR=${canSubmitRegularPR}, showImageReplaceUI=${showImageReplaceUI}`);
 
+    // --- Log before return ---
+    logger.debug("[AICodeAssistant] Preparing to render JSX...");
+
     // --- FINAL RENDER ---
-    logger.debug("[AICodeAssistant] Render: Returning JSX");
     return (
         <div id="executor" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
             <header className="flex justify-between items-center gap-2 flex-wrap">
@@ -376,29 +378,38 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                      <div>
                           <p className="text-yellow-400 mb-2 text-xs md:text-sm min-h-[18px]"> {isWaitingForAiResponse ? `⏳ Жду AI... (ID: ${currentAiRequestId?.substring(0,6)}...)` : isProcessingAny ? "⏳ Обработка..." : "2️⃣ Вставь ответ AI или жди. Затем '➡️'."} </p>
                           <div className="relative group">
-                              {logger.debug("[Render] Rendering Response Textarea")}
+                              {/* Log before rendering textarea */}
+                              {(() => { logger.debug("[Render] Rendering Response Textarea"); return null; })()}
                               <textarea id="response-input" ref={aiResponseInputRefPassed} className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm min-h-[180px] resize-y simple-scrollbar" defaultValue={response} onChange={(e) => setResponseValue(e.target.value)} placeholder={isWaitingForAiResponse ? "AI думает..." : isProcessingAny ? "Ожидание..." : "Ответ AI здесь..."} disabled={isProcessingAny} spellCheck="false" />
-                              {logger.debug("[Render] Rendering TextAreaUtilities")}
+                              {/* Log before rendering TextAreaUtilities */}
+                              {(() => { logger.debug("[Render] Rendering TextAreaUtilities"); return null; })()}
                               <TextAreaUtilities response={response} isLoading={isProcessingAny} onParse={handlers.handleParse} onOpenModal={handlers.handleOpenModal} onCopy={handlers.handleCopyResponse} onClear={handlers.handleClearResponse} onSelectFunction={handlers.handleSelectFunction} isParseDisabled={parseButtonDisabled} isProcessingPR={isProcessingPR || assistantLoading} />
                           </div>
                            <div className="flex justify-end items-start mt-1 gap-2 min-h-[30px]">
-                               {logger.debug("[Render] Rendering CodeRestorer")}
+                               {/* Log before rendering CodeRestorer */}
+                               {(() => { logger.debug("[Render] Rendering CodeRestorer"); return null; })()}
                                <CodeRestorer parsedFiles={componentParsedFiles} originalFiles={originalRepoFiles} skippedIssues={validationIssues.filter(i => i.type === 'skippedCodeBlock')} onRestorationComplete={handlers.handleRestorationComplete} disabled={isProcessingAny || validationStatus === 'validating' || isFetchingOriginals} />
-                               {logger.debug("[Render] Rendering ValidationStatusIndicator")}
+                               {/* Log before rendering ValidationStatusIndicator */}
+                               {(() => { logger.debug("[Render] Rendering ValidationStatusIndicator"); return null; })()}
                                <ValidationStatusIndicator status={validationStatus} issues={validationIssues} onAutoFix={handlers.handleAutoFix} onCopyPrompt={handlers.handleCopyFixPrompt} isFixDisabled={fixButtonDisabled} />
                           </div>
                       </div>
-                      {logger.debug("[Render] Rendering ParsedFilesList")}
+                      {/* Log before rendering ParsedFilesList */}
+                      {(() => { logger.debug("[Render] Rendering ParsedFilesList"); return null; })()}
                      <ParsedFilesList parsedFiles={componentParsedFiles} selectedFileIds={selectedFileIds} validationIssues={validationIssues} onToggleSelection={handlers.handleToggleFileSelection} onSelectAll={handlers.handleSelectAllFiles} onDeselectAll={handlers.handleDeselectAllFiles} onSaveFiles={handlers.handleSaveFiles} onDownloadZip={handlers.handleDownloadZip} onSendToTelegram={handlers.handleSendToTelegram} isUserLoggedIn={!!user} isLoading={isProcessingAny} />
-                     {logger.debug("[Render] Rendering PullRequestForm")}
+                     {/* Log before rendering PullRequestForm */}
+                     {(() => { logger.debug("[Render] Rendering PullRequestForm"); return null; })()}
                      <PullRequestForm id="pr-form-container" repoUrl={finalRepoUrlForForm}
                       prTitle={prTitle} selectedFileCount={selectedAssistantFiles.size} isLoading={isProcessingPR || assistantLoading} isLoadingPrList={loadingPrs} onRepoUrlChange={updateRepoUrl} onPrTitleChange={setPrTitle} onCreatePR={handlers.handleCreateOrUpdatePR} buttonText={prButtonText} buttonIcon={prButtonLoadingIconNode} isSubmitDisabled={submitButtonDisabled} />
-                     {logger.debug("[Render] Rendering OpenPrList")}
+                     {/* Log before rendering OpenPrList */}
+                     {(() => { logger.debug("[Render] Rendering OpenPrList"); return null; })()}
                      <OpenPrList openPRs={contextOpenPrs} />
                     <div className="flex items-center gap-3 mt-2 flex-wrap">
-                        {logger.debug("[Render] Rendering ToolsMenu")}
+                        {/* Log before rendering ToolsMenu */}
+                        {(() => { logger.debug("[Render] Rendering ToolsMenu"); return null; })()}
                         <ToolsMenu customLinks={customLinks} onAddCustomLink={handlers.handleAddCustomLink} disabled={isProcessingAny}/>
-                        {logger.debug("[Render] Rendering Image Button")}
+                        {/* Log before rendering Image Button */}
+                        {(() => { logger.debug("[Render] Rendering Image Button"); return null; })()}
                          <button onClick={() => { logger.debug("[Click] Image Button Click"); setIsImageModalOpen(true); }} className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50 relative" disabled={isProcessingAny} title="Загрузить/Связать Картинки (prompts_imgs.txt)" >
                              <FaImage className="text-gray-400" /> <span className="text-sm text-white">Картинки</span>
                              {componentParsedFiles.some(f => f.path === '/prompts_imgs.txt') && !isImageModalOpen && ( <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-gray-800 shadow-md animate-pulse"></span> )}
@@ -410,7 +421,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             {/* --- Image Replace UI --- */}
             {showImageReplaceUI && (
                  <div className={`flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed min-h-[200px] ${imageTaskFailed ? 'border-red-500' : 'border-blue-400'}`}>
-                    {logger.debug("[Render] Rendering Image Replace UI", { imageTaskFailed, assistantLoading, isProcessingPR, fetchStatus, imageReplaceTask, imageReplaceError })}
+                    {/* Log before rendering Image Replace UI */}
+                    {(() => { logger.debug("[Render] Rendering Image Replace UI", { imageTaskFailed, assistantLoading, isProcessingPR, fetchStatus, imageReplaceTask, imageReplaceError }); return null; })()}
                      {/* Status Icon Logic */}
                      {(assistantLoading || isProcessingPR) ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> )
                        : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? ( <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" /> )
@@ -450,7 +462,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
             {/* --- Modals --- */}
             <AnimatePresence>
-                 {logger.debug("[Render] Rendering Modals (conditional)")}
+                 {/* Log before rendering Modals */}
+                 {(() => { logger.debug("[Render] Rendering Modals (conditional)"); return null; })()}
                 {showStandardAssistantUI && showModal && (
                     <SwapModal isOpen={showModal} onClose={() => setShowModal(false)} onSwap={handlers.handleSwap} onSearch={handlers.handleSearch} initialMode={modalMode} />
                 )}
