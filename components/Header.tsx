@@ -325,7 +325,7 @@ export default function Header() {
               {/* Navigation Toggle Button (Conditional) */}
               {!isNavOpen && (
                 <button
-                  onClick={() => { logger.log("[Header Click] Opening nav."); setIsNavOpen(true); }}
+                  onClick={() => { setIsNavOpen(true); }}
                   className="p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md"
                   aria-label={t("Open navigation")}
                   aria-expanded={isNavOpen}
@@ -351,7 +351,7 @@ export default function Header() {
           >
             {/* Close Button */}
             <button
-              onClick={() => { logger.log("[Header Click] Closing nav."); setIsNavOpen(false); }}
+              onClick={() => { setIsNavOpen(false); }}
               className="fixed top-4 right-4 z-60 p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md"
               aria-label={t("Close navigation")}
             >
@@ -384,7 +384,7 @@ export default function Header() {
                       <Link
                         key={page.path}
                         href={page.path}
-                        onClick={() => { logger.log(`[Header Nav Click] Navigating to ${page.path}.`); setIsNavOpen(false); }} // Log navigation
+                        onClick={() => { setIsNavOpen(false); }} // Log navigation
                         className={cn(
                           "group relative flex flex-col items-center justify-center rounded-md border transition-all duration-300 aspect-square text-center hover:scale-[1.03]",
                           "p-1.5 sm:p-2 md:p-1.5",
