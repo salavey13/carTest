@@ -2031,7 +2031,6 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   faregwindowmaximize: "FaRegWindowMaximize",
   faregwindowminimize: "FaRegWindowMinimize",
   faregwindowrestore: "FaRegWindowRestore",
-  fatools: "FaTools", // Added FaTools
 };
 // --- End Icon Name Map ---
 
