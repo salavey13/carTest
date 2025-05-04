@@ -7,7 +7,6 @@ import * as Fa6Icons from "react-icons/fa6";
 import { debugLogger as logger } from "@/lib/debugLogger";
 
 // --- Full Icon Name Map (Lowercase to PascalCase) ---
-// Generated from the provided list of valid Fa6 icons
 const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fa42group: "Fa42Group",
   fa500px: "Fa500Px",
@@ -119,7 +118,6 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fadhl: "FaDhl",
   fadiaspora: "FaDiaspora",
   fadigitalocean: "FaDigitalOcean",
-  //fadigitalocean: "FaDigitalOcean", // Duplicate removed
   fadiscord: "FaDiscord",
   fadiscourse: "FaDiscourse",
   fadochub: "FaDochub",
@@ -296,7 +294,7 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fapaypal: "FaPaypal",
   faperbyte: "FaPerbyte",
   faperiscope: "FaPeriscope",
-  faphpfabricator: "FaPhabricator", // Assuming fix here
+  faphpfabricator: "FaPhabricator",
   faphoenixframework: "FaPhoenixFramework",
   faphoenixsquadron: "FaPhoenixSquadron",
   faphp: "FaPhp",
@@ -545,7 +543,7 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   faarrowupfrombracket: "FaArrowUpFromBracket",
   faarrowupfromgroundwater: "FaArrowUpFromGroundWater",
   faarrowupfromwaterpump: "FaArrowUpFromWaterPump",
-  faarrowuplong: "FaArrowUpLong",
+  faarrowuplong: "FaUpLong", // Corrected Map: faarrowuplong -> FaUpLong
   faarrowuprightdots: "FaArrowUpRightDots",
   faarrowuprightfromsquare: "FaArrowUpRightFromSquare",
   faarrowupshortwide: "FaArrowUpShortWide",
@@ -553,7 +551,7 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   faarrowupza: "FaArrowUpZA",
   faarrowup: "FaArrowUp",
   faarrowsdowntoline: "FaArrowsDownToLine",
-  faarrowsdowntopeople: "FaArrowsDownToPeople", // Corrected typo
+  faarrowsdowntopeople: "FaArrowsDownToPeople",
   faarrowsleftrighttoline: "FaArrowsLeftRightToLine",
   faarrowsleftright: "FaArrowsLeftRight",
   faarrowsrotate: "FaArrowsRotate",
@@ -938,7 +936,7 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   faeye: "FaEye",
   faf: "FaF",
   fafaceangry: "FaFaceAngry",
-  fafaceizzy: "FaFaceDizzy", // Corrected typo
+  fafaceizzy: "FaFaceDizzy",
   fafaceflushed: "FaFaceFlushed",
   fafacefrownopen: "FaFaceFrownOpen",
   fafacefrown: "FaFaceFrown",
@@ -963,7 +961,7 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fafacelaughsquint: "FaFaceLaughSquint",
   fafacelaughwink: "FaFaceLaughWink",
   fafacelaugh: "FaFaceLaugh",
-  fafaceblank: "FaFaceMehBlank", // Corrected typo
+  fafaceblank: "FaFaceMehBlank",
   fafacemeh: "FaFaceMeh",
   fafacerollingeyes: "FaFaceRollingEyes",
   fafacesadcry: "FaFaceSadCry",
@@ -1038,7 +1036,7 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fafolderplus: "FaFolderPlus",
   fafoldertree: "FaFolderTree",
   fafolder: "FaFolder",
-  fafon: "FaFont", // Corrected typo
+  fafon: "FaFont",
   fafootball: "FaFootball",
   faforwardfast: "FaForwardFast",
   faforwardstep: "FaForwardStep",
@@ -1145,11 +1143,11 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fahelmetsafety: "FaHelmetSafety",
   fahelmetun: "FaHelmetUn",
   fahighlighter: "FaHighlighter",
-  fahitavalanche: "FaHillAvalanche", // Corrected typo
+  fahitavalanche: "FaHillAvalanche",
   fahillrockslide: "FaHillRockslide",
   fahippo: "FaHippo",
   fahockeypuck: "FaHockeyPuck",
-  faholyberry: "FaHollyBerry", // Corrected typo
+  faholyberry: "FaHollyBerry",
   fahorsehead: "FaHorseHead",
   fahorse: "FaHorse",
   fahospitaluser: "FaHospitalUser",
@@ -1739,7 +1737,6 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fatreecity: "FaTreeCity",
   fatree: "FaTree",
   fatriangleexclamation: "FaTriangleExclamation",
-  // fatriangleexclamation: "FaTriangleExclamation", // Duplicate removed
   fatrophy: "FaTrophy",
   fatrowelbricks: "FaTrowelBricks",
   fatrowel: "FaTrowel",
@@ -1944,7 +1941,7 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   faregfacelaughsquint: "FaRegFaceLaughSquint",
   faregfacelaughwink: "FaRegFaceLaughWink",
   faregfacelaugh: "FaRegFaceLaugh",
-  faregfaceblank: "FaRegFaceMehBlank", // Corrected typo
+  faregfaceblank: "FaRegFaceMehBlank",
   faregfacemeh: "FaRegFaceMeh",
   faregfacerollingeyes: "FaRegFaceRollingEyes",
   faregfacesadcry: "FaRegFaceSadCry",
@@ -2034,12 +2031,12 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   faregwindowmaximize: "FaRegWindowMaximize",
   faregwindowminimize: "FaRegWindowMinimize",
   faregwindowrestore: "FaRegWindowRestore",
+  fatools: "FaTools", // Added FaTools
 };
 // --- End Icon Name Map ---
 
-// Type guard to check if a key exists on the Fa6Icons object
+// Type guard (Unchanged)
 function isValidFa6Icon(iconName: string): iconName is keyof typeof Fa6Icons {
-    // Ensure it starts with Fa and exists in the Fa6Icons object
     return typeof iconName === 'string' && iconName.startsWith('Fa') && iconName in Fa6Icons;
 }
 
@@ -2047,12 +2044,11 @@ function isValidFa6Icon(iconName: string): iconName is keyof typeof Fa6Icons {
 const robustParserOptions: HTMLReactParserOptions = {
     replace: (domNode) => {
         if (domNode instanceof Element && domNode.attribs) {
-            const { name, attribs, children } = domNode; // 'name' might be lowercased by the parser
-            // Make a mutable copy of attributes for potential modification
+            const { name, attribs, children } = domNode;
             const mutableAttribs = { ...attributesToProps(attribs) };
-            const lowerCaseName = name?.toLowerCase(); // Ensure we always have the lowercase version
+            const lowerCaseName = name?.toLowerCase();
 
-            try { // Top-level try-catch
+            try {
 
                 // --- Icon Handling (Use Map Lookup) ---
                 if (lowerCaseName?.startsWith('fa')) {
@@ -2060,10 +2056,7 @@ const robustParserOptions: HTMLReactParserOptions = {
                     if (correctPascalCaseName && isValidFa6Icon(correctPascalCaseName)) {
                          const IconComponent = Fa6Icons[correctPascalCaseName];
                          try {
-                            // logger.debug(`[VibeContentRenderer] Rendering icon via map: <${lowerCaseName}> -> <${correctPascalCaseName}>`);
-                            const { class: className, style, onClick, ...restProps } = mutableAttribs; // Ignore onClick
-
-                            // Filter props
+                            const { class: className, style, onClick, ...restProps } = mutableAttribs;
                             const safeProps = Object.entries(restProps).reduce((acc, [key, value]) => {
                                 if (key.startsWith('aria-') || key.startsWith('data-') || key === 'title' || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
                                      acc[key] = value;
@@ -2072,10 +2065,11 @@ const robustParserOptions: HTMLReactParserOptions = {
                             }, {} as Record<string, any>);
 
                             const parsedChildren = children && domNode.children.length > 0 ? domToReact(children, robustParserOptions) : null;
-                            const finalProps: Record<string, any> = { ...safeProps };
-                             if (className) finalProps.className = className as string; // Convert class -> className
-
-                            // Parse inline style
+                            const finalProps: Record<string, any> = {
+                                ...safeProps,
+                                className: `${className || ''} inline align-baseline mx-px`, // Add default alignment/spacing
+                            };
+                             // Parse inline style
                             if (typeof style === 'string') {
                                try {
                                   const styleObject = style.split(';').reduce((acc, stylePart) => {
@@ -2087,71 +2081,57 @@ const robustParserOptions: HTMLReactParserOptions = {
                                     return acc;
                                   }, {} as React.CSSProperties);
                                   finalProps.style = styleObject;
-                                } catch (styleParseError){
-                                    logger.error(`[VibeContentRenderer] Error parsing inline style string for <${lowerCaseName}>:`, style, styleParseError);
-                               }
-                            } else if (typeof style === 'object' && style !== null) {
-                                finalProps.style = style;
-                            }
+                                } catch (styleParseError){ logger.error(`[VibeContentRenderer] Error parsing inline style string for <${lowerCaseName}>:`, style, styleParseError); }
+                            } else if (typeof style === 'object' && style !== null) { finalProps.style = style; }
 
-                            // Render the valid icon component
                             return React.createElement(IconComponent, finalProps, parsedChildren);
                          } catch (iconRenderError: any) {
                             logger.error(`[VibeContentRenderer] Error rendering icon <${correctPascalCaseName}> found via map!`, iconRenderError, { attribs: mutableAttribs });
                             return <span title={`Error rendering icon: ${correctPascalCaseName}`} className="text-red-500 font-bold">[ICON ERR!]</span>;
                          }
                     } else {
-                        // Lowercase tag was not found in our map or map pointed to invalid icon
-                        if (correctPascalCaseName) {
-                            logger.error(`[VibeContentRenderer] Icon name '${correctPascalCaseName}' from map is NOT valid in Fa6Icons import! Original tag: <${lowerCaseName}>`);
-                            return <span title={`Invalid icon reference: ${correctPascalCaseName}`} className="text-red-500 font-bold">[REF ERR!]</span>;
-                        } else {
-                            logger.warn(`[VibeContentRenderer] Unknown/Invalid icon tag detected: <${name}> (lowercase: <${lowerCaseName}>). Not found in map. Skipping render.`);
-                            return <span title={`Unknown or invalid icon: ${name}`} className="text-yellow-500 font-bold">[?]</span>;
-                        }
+                        // Log warning if not found in map
+                        logger.warn(`[VibeContentRenderer] Unknown/Invalid icon tag detected: <${name}> (lowercase: <${lowerCaseName}>). Not found in map. Skipping render.`);
+                        return <span title={`Unknown or invalid icon: ${name}`} className="text-yellow-500 font-bold">[?]</span>;
                     }
                 }
                 // --- End Icon Handling ---
 
-                // --- Link Handling (Convert class, handle internal/external) ---
+                // --- Link Handling (Add spacing) ---
                 if (lowerCaseName === 'a') {
                     const isInternal = mutableAttribs.href && (mutableAttribs.href.startsWith('/') || mutableAttribs.href.startsWith('#'));
                     const parsedChildren = children ? domToReact(children, robustParserOptions) : null;
 
-                    // Convert class to className if it exists
-                    if (mutableAttribs.class) {
-                        mutableAttribs.className = mutableAttribs.class as string;
-                        delete mutableAttribs.class;
-                    }
+                    // Add spacing and convert class
+                    const originalClassName = mutableAttribs.class || '';
+                    mutableAttribs.className = `${originalClassName} mx-1 px-0.5`; // Add horizontal margin/padding
+                    if(mutableAttribs.class) delete mutableAttribs.class;
+
 
                     if (isInternal && !mutableAttribs.target && mutableAttribs.href) {
                         try {
-                           // Destructure known Link props, pass rest
                            const { href, className, style, title, children: _c, ...restLinkProps } = mutableAttribs;
                            return <Link href={href} className={className as string} style={style as React.CSSProperties} title={title as string} {...restLinkProps}>{parsedChildren}</Link>;
                         } catch (linkError) {
                             logger.error("[VibeContentRenderer] Error creating Next Link:", linkError, mutableAttribs);
-                            // Fallback to regular 'a' tag using the modified attribs
                             return React.createElement('a', mutableAttribs, parsedChildren);
                         }
                     } else {
-                         // Render as regular 'a' tag using the modified attribs
                          return React.createElement('a', mutableAttribs, parsedChildren);
                     }
                 }
                 // --- End Link Handling ---
 
-                // --- Standard HTML Elements (ONLY convert class to className, let parser handle the rest) ---
+                // --- Standard HTML Elements (Simplify: Only modify for class, let parser handle) ---
                 const knownTags = /^(p|div|span|ul|ol|li|h[1-6]|strong|em|b|i|u|s|code|pre|blockquote|hr|br|img|table|thead|tbody|tr|th|td)$/;
                 if (typeof lowerCaseName === 'string' && knownTags.test(lowerCaseName)) {
-                   // Only modify attribs if 'class' exists
                    if (mutableAttribs.class) {
                        mutableAttribs.className = mutableAttribs.class as string;
                        delete mutableAttribs.class;
-                       // Return the modified element structure for the parser to handle
+                       // Return modified structure for parser
                        return new Element(domNode.name, mutableAttribs, domNode.children);
                    }
-                   // If no 'class', return undefined to let the parser handle it normally
+                   // Let parser handle if no class needs conversion
                    return undefined;
                }
                 // --- End Standard HTML Elements ---
@@ -2162,29 +2142,23 @@ const robustParserOptions: HTMLReactParserOptions = {
             }
         }
         // Let the library handle text nodes and other defaults
-        return undefined; // Important: return undefined for default handling
+        return undefined;
     },
 };
 
-// The Component Itself
+// The Component Itself (Unchanged)
 interface VibeContentRendererProps {
   content: string | null | undefined;
-  className?: string; // Optional className for the wrapper
+  className?: string;
 }
 
 export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ content, className }) => {
-    // logger.debug("[VibeContentRenderer] Rendering content:", content ? content.substring(0, 50) + "..." : "null/undefined");
-
     if (typeof content !== 'string' || !content.trim()) {
         return null;
     }
-
     try {
-      // Ensure content is treated as a string for the parser
       const contentToParse = String(content);
       const parsedContent = parse(contentToParse, robustParserOptions);
-      // logger.debug("[VibeContentRenderer] Parsing successful.");
-
       return className ? <div className={className}>{parsedContent}</div> : <>{parsedContent}</>;
     } catch (error) {
       logger.error("[VibeContentRenderer] Error during parse:", error, "Input:", content);
@@ -2194,5 +2168,4 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
 });
 
 VibeContentRenderer.displayName = 'VibeContentRenderer';
-
 export default VibeContentRenderer;

@@ -38,27 +38,27 @@ const translations = {
     intro3: "Stop consuming, start <strong>CREATING</strong>. Build YOUR reality, crush YOUR problems, <strong>validate ideas INSTANTLY</strong>. This is how you vibe.",
     cyberVibeTitle: "The Vibe Loop: Your Level Up Engine <FaUpLong/>",
     cyberVibe1: "This ain't just tools – it's a <strong>compounding feedback loop</strong>. Every action levels you up, makes the next step easier. You evolve.",
-    cyberVibe2: "<FaGithub class='inline mr-1 text-gray-400'/> is your <strong>cyberchest</strong>. This Studio + AI? Your interface to <strong>remix and transmute</strong> that knowledge into new vibes, features, fixes... <strong>instantly</strong>.",
+    cyberVibe2: "<FaGithub class='inline mr-1 text-gray-400 align-baseline'/> is your <strong>cyberchest</strong>. This Studio + AI? Your interface to <strong>remix and transmute</strong> that knowledge into new vibes, features, fixes... <strong>instantly</strong>.", // Added align-baseline
     cyberVibe3: "You're not <em>learning</em> code; you're <strong>remixing the matrix</strong>. You interact, you understand structure, you <strong>command the AI</strong>. You're the Vibe Master.",
     cyberVibe4: "It's <strong>co-creation</strong> with the machine. Push boundaries. Earn bandwidth. Infinite context. Infinite power. This is <strong>CYBERVIBE 2.0</strong>.",
     philosophyTitle: "Your Vibe Path: The Inevitable Level Up (Tap)",
     philosophyVideoTitle: "Watch: The Level System Explained <FaVideo/>:",
     philosophyCore: "The secret? <strong>You're not asking the bot for help, YOU are helping the BOT</strong>. Each level adds <strong>+1 Vibe Perk</strong>, one more click, one more skill to guide the AI. It's not a grind, it's evolution. You get lazy doing the old stuff, so you <em>automatically</em> level up. And there's <strong>NO GOING BACK!</strong>",
     philosophyLvl0_1: "<strong>Lv.0 -> 1 <FaBolt/> (Instant Win):</strong> Fix a broken image. Copy URL -> Paste -> Upload new -> <strong>DONE</strong>. System auto-PRs. <strong>ANYONE</strong> can do this <em>NOW</em>. This is your entry point.",
-    philosophyLvl1_2: "<strong>Lv.1 -> 2 <FaTools/> (+1 File/AI):</strong> Simple idea? Change text/button? Give AI the idea + 1 file context -> PR. <strong>DONE.</strong>",
+    philosophyLvl1_2: "<strong>Lv.1 -> 2 <FaTools/> (+1 File/AI):</strong> Simple idea? Change text/button? Give AI the idea + 1 file context -> PR. <strong>DONE.</strong>", // Verified FaTools is correct
     philosophyLvl2_3: "<strong>Lv.2 -> 3 <FaCode/> (+Multi-File):</strong> Slightly complex? 2-5 files? Give AI idea + context -> Check -> PR. <strong>DONE.</strong>",
     philosophyLvl3_4: "<strong>Lv.3 -> 4 <FaBug/> (+Log Check):</strong> Build failed? Runtime error? 99% it's a bad icon! Check Vercel logs (link in PR comment!) -> Copy red lines -> Feed error to AI -> <strong>FIXED.</strong> +1 Vibe Perk: Debugging.",
-    philosophyLvl4_5: "<strong>Lv.4 -> 5 <FaLink/> (+Icon Hunt):</strong> Tired of icon errors? Find the <em>perfect</em> Fa6 icon yourself! Use <a href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-blue hover:underline font-semibold'>FontAwesome Search <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-1'/></a> -> Add link to Assistant Quick Links -> Fix icons proactively. +1 Perk: Resourcefulness.",
+    philosophyLvl4_5: "<strong>Lv.4 -> 5 <FaLink/> (+Icon Hunt):</strong> Tired of icon errors? Find the <em>perfect</em> Fa6 icon yourself! Use <a href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-blue hover:underline font-semibold px-1'>FontAwesome Search <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/></a> -> Add link to Assistant Quick Links -> Fix icons proactively. +1 Perk: Resourcefulness.", // Added align-baseline/spacing
     philosophyLvl5_6: "<strong>Lv.5 -> 6 <FaMicrophone/>/<FaVideo/> (+Multimedia):</strong> Use audio commands! Attach videos! Watch them turn into page content automatically. +1 Perk: Multi-modal Input.",
     philosophyLvl6_7: "<strong>Lv.6 -> 7 <FaDatabase/> (+SQL/DB):</strong> Discover new file types! AI generates SQL -> Paste into Supabase (1 click) -> <strong>DONE.</strong> Same flow, different context. +1 Perk: Data Handling.",
     philosophyLvl8_10: "<strong>Lv.8-10+ <FaServer/>/<FaRocket/> (+Independence):</strong> Deploy your OWN CyberVibe! Use/steal my Supabase! Set your own Bot Token! Build your own XTRs! <strong>UNLIMITED POWER!</strong>",
     philosophyEnd: "Step-by-step, level-up is <strong>inevitable</strong>. You're too lazy for the old shit. One extra click, one new skill, and you're automatically stronger. Welcome, <strong>Neo</strong>.",
     stepsTitle: "Quick Start Guide:",
     step1Title: "1. Grab Repo / Point Wish:",
-    step1Desc: "Enter GitHub URL -> Hit <FaDownload class='inline mx-1 text-purple-400'/> OR Spot bug/idea -> Activate Buddy <FaRobot class='inline mx-1 text-indigo-400'/> -> Describe.",
+    step1Desc: "Enter GitHub URL -> Hit <FaDownload class='inline mx-1 text-purple-400 align-baseline'/> OR Spot bug/idea -> Activate Buddy <FaRobot class='inline mx-1 text-indigo-400 align-baseline'/> -> Describe.", // Added align-baseline
     step1DescEnd: "For images (Lv.1): Copy broken URL, paste in Buddy/Input.",
     step2Title: "2. AI Magic & Ship:",
-    step2Desc: "If needed (Lv.2+), use <span class='text-blue-400 font-semibold'>\"🤖 Ask AI\"</span> -> Check Assistant <FaWandMagicSparkles class='inline mx-1 text-yellow-400'/> -> Hit <FaGithub class='inline mx-1 text-green-400'/> PR Button.",
+    step2Desc: "If needed (Lv.2+), use <span class='text-blue-400 font-semibold'>\"🤖 Ask AI\"</span> -> Check Assistant <FaWandMagicSparkles class='inline mx-1 text-yellow-400 align-baseline'/> -> Hit <FaGithub class='inline mx-1 text-green-400 align-baseline'/> PR Button.", // Added align-baseline
     step2DescEnd: "<strong>DONE.</strong> Site updates automagically.",
     readyButton: "LET'S F*CKING GO!",
     componentsTitle: "Engage Vibe Engines!",
@@ -71,7 +71,7 @@ const translations = {
     navIntro: "Intro <FaCircleInfo/>",
     navCyberVibe: "Vibe Loop <FaUpLong/>",
   },
-  ru: { // --- RUSSIAN TRANSLATIONS (Unchanged) ---
+  ru: { // --- RUSSIAN TRANSLATIONS (Added align-baseline/spacing where needed) ---
     loading: "Запуск SUPERVIBE ДВИЖКА...",
     pageTitle: "SUPERVIBE СТУДИЯ 2.0",
     welcome: "Йоу,",
@@ -80,27 +80,27 @@ const translations = {
     intro3: "Хватит потреблять, стань <strong>ТВОРЦОМ</strong>. Строй СВОЮ реальность, решай СВОИ проблемы, <strong>валидируй идеи МГНОВЕННО</strong>. Вот это вайб.",
     cyberVibeTitle: "Петля Вайба: Твой Движок Прокачки <FaUpLong/>",
     cyberVibe1: "Это не просто тулзы – это <strong>накопительная петля обратной связи</strong>. Каждое действие качает тебя, делает следующий шаг легче. Ты эволюционируешь.",
-    cyberVibe2: "<FaGithub class='inline mr-1 text-gray-400'/> - твой <strong>кибер-сундук</strong>. Эта Студия + AI? Твой интерфейс для <strong>ремикса и трансмутации</strong> этих знаний в новые вайбы, фичи, фиксы... <strong>мгновенно</strong>.",
+    cyberVibe2: "<FaGithub class='inline mr-1 text-gray-400 align-baseline'/> - твой <strong>кибер-сундук</strong>. Эта Студия + AI? Твой интерфейс для <strong>ремикса и трансмутации</strong> этих знаний в новые вайбы, фичи, фиксы... <strong>мгновенно</strong>.", // Added align-baseline
     cyberVibe3: "Ты не <em>учишь</em> код; ты <strong>ремиксуешь матрицу</strong>. Взаимодействуешь, понимаешь структуру, <strong>командуешь AI</strong>. Ты - Вайб Мастер.",
     cyberVibe4: "Это <strong>со-творчество</strong> с машиной. Двигай границы. Зарабатывай bandwidth. Бесконечный контекст. Бесконечная мощь. Это <strong>CYBERVIBE 2.0</strong>.",
     philosophyTitle: "Твой Путь Вайба: Неизбежный Level Up (Жми)",
     philosophyVideoTitle: "Смотри: Объяснение Системы Уровней <FaVideo/>:",
     philosophyCore: "Секрет? <strong>Не ты просишь бота помочь, а ТЫ помогаешь БОТУ</strong>. Каждый левел дает <strong>+1 Вайб Перк</strong>, +1 клик, +1 скилл, чтобы направлять AI. Это не гринд, это эволюция. Тебе становится лень делать старое, и ты <em>автоматически</em> апаешь левел. И <strong>НАЗАД ДОРОГИ НЕТ!</strong>",
     philosophyLvl0_1: "<strong>Лв.0 -> 1 <FaBolt/> (Мгновенный Вин):</strong> Починить битую картинку. Скопируй URL -> Вставь -> Загрузи новую -> <strong>ГОТОВО</strong>. Система авто-PR. <strong>ЛЮБОЙ</strong> может это <em>ПРЯМО СЕЙЧАС</em>. Это твой вход.",
-    philosophyLvl1_2: "<strong>Лв.1 -> 2 <FaTools/> (+1 Файл/AI):</strong> Простая идея? Текст/кнопку поменять? Дай AI идею + 1 файл контекста -> PR. <strong>ГОТОВО.</strong>",
+    philosophyLvl1_2: "<strong>Лв.1 -> 2 <FaTools/> (+1 Файл/AI):</strong> Простая идея? Текст/кнопку поменять? Дай AI идею + 1 файл контекста -> PR. <strong>ГОТОВО.</strong>", // Verified FaTools
     philosophyLvl2_3: "<strong>Лв.2 -> 3 <FaCode/> (+Мульти-Файл):</strong> Чуть сложнее? 2-5 файлов? Дай AI идею + контекст -> Проверь -> PR. <strong>ГОТОВО.</strong>",
     philosophyLvl3_4: "<strong>Лв.3 -> 4 <FaBug/> (+Чек Логов):</strong> Упала сборка? Ошибка в рантайме? 99% - еб*ная иконка! Открой логи Vercel (ссылка в комменте PR!) -> Скопируй красные строки -> Скорми ошибку AI -> <strong>ПОЧИНЕНО.</strong> +1 Вайб Перк: Дебаггинг.",
-    philosophyLvl4_5: "<strong>Лв.4 -> 5 <FaLink/> (+Охота за Иконками):</strong> Зае*али ошибки иконок? Найди <em>идеальную</em> Fa6 иконку сам! Юзай <a href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-blue hover:underline font-semibold'>Поиск FontAwesome <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-1'/></a> -> Добавь в Быстрые Ссылки Ассистента -> Фикси иконки проактивно. +1 Перк: Находчивость.",
+    philosophyLvl4_5: "<strong>Лв.4 -> 5 <FaLink/> (+Охота за Иконками):</strong> Зае*али ошибки иконок? Найди <em>идеальную</em> Fa6 иконку сам! Юзай <a href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-blue hover:underline font-semibold px-1'>Поиск FontAwesome <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/></a> -> Добавь в Быстрые Ссылки Ассистента -> Фикси иконки проактивно. +1 Перк: Находчивость.", // Added align-baseline/spacing
     philosophyLvl5_6: "<strong>Лв.5 -> 6 <FaMicrophone/>/<FaVideo/> (+Мультимедиа):</strong> Используй аудио-команды! Прикрепляй видосы! Смотри, как они автоматом становятся контентом страницы. +1 Перк: Мультимодальный Ввод.",
     philosophyLvl6_7: "<strong>Лв.6 -> 7 <FaDatabase/> (+SQL/БД):</strong> Открой новые типы файлов! AI генерит SQL -> Вставь в Supabase (1 клик) -> <strong>ГОТОВО.</strong> Тот же флоу, другой контекст. +1 Перк: Работа с Данными.",
     philosophyLvl8_10: "<strong>Лв.8-10+ <FaServer/>/<FaRocket/> (+Независимость):</strong> Разверни свой CyberVibe! Юзай/спи*ди мою Supabase! Поставь свой Токен Бота! Строй свои XTR-ы! <strong>БЕЗГРАНИЧНАЯ МОЩЬ!</strong>",
     philosophyEnd: "Шаг за шагом, левел-ап <strong>неизбежен</strong>. Тебе слишком лень для старой х*йни. Один лишний клик, один новый скилл - и ты автоматом сильнее. Добро пожаловать, <strong>Нео</strong>.",
     stepsTitle: "Краткий Гайд:",
     step1Title: "1. Хватай Репу / Укажи Желание:",
-    step1Desc: "Введи GitHub URL -> Жми <FaDownload class='inline mx-1 text-purple-400'/> ИЛИ Видишь баг/идею -> Вызови Бадди <FaRobot class='inline mx-1 text-indigo-400'/> -> Опиши.",
+    step1Desc: "Введи GitHub URL -> Жми <FaDownload class='inline mx-1 text-purple-400 align-baseline'/> ИЛИ Видишь баг/идею -> Вызови Бадди <FaRobot class='inline mx-1 text-indigo-400 align-baseline'/> -> Опиши.", // Added align-baseline
     step1DescEnd: "Для картинок (Лв.1): Скопируй битый URL, вставь Бадди/в Инпут.",
     step2Title: "2. AI Магия & Отправка:",
-    step2Desc: "Если нужно (Лв.2+), юзай <span class='text-blue-400 font-semibold'>\"🤖 Спросить AI\"</span> -> Проверь Ассистента <FaWandMagicSparkles class='inline mx-1 text-yellow-400'/> -> Жми <FaGithub class='inline mx-1 text-green-400'/> Кнопку PR.",
+    step2Desc: "Если нужно (Лв.2+), юзай <span class='text-blue-400 font-semibold'>\"🤖 Спросить AI\"</span> -> Проверь Ассистента <FaWandMagicSparkles class='inline mx-1 text-yellow-400 align-baseline'/> -> Жми <FaGithub class='inline mx-1 text-green-400 align-baseline'/> Кнопку PR.", // Added align-baseline
     step2DescEnd: "<strong>ГОТОВО.</strong> Сайт обновляется авто-магически.",
     readyButton: "ПОГНАЛИ, БЛ*ТЬ!",
     componentsTitle: "Врубай Движки Вайба!",
@@ -157,31 +157,49 @@ function ActualPageContent() {
     const { info: toastInfo, error: toastError } = useAppToast();
     if (typeof logger !== 'undefined') logger.log("[ActualPageContent] useAppToast DONE"); else console.log("[ActualPageContent] useAppToast DONE");
 
-    // --- useSearchParams Hook Call (Moved to top level) ---
+    // --- State Initialization ---
+    // Keep state initialization before useSearchParams, as it's standard practice
+    if (typeof logger !== 'undefined') logger.log("[ActualPageContent] Initializing State..."); else console.log("[ActualPageContent] Initializing State...");
+    const [lang, setLang] = useState<Language>('en');
+    const [showComponents, setShowComponents] = useState(false);
+    const [initialIdea, setInitialIdea] = useState<string | null>(null);
+    const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(false);
+    const [t, setT] = useState<TranslationSet | null>(null);
+    const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
+    // New state to track if searchParams hook has successfully run
+    const [searchParamsReady, setSearchParamsReady] = useState(false);
+    if (typeof logger !== 'undefined') logger.log("[ActualPageContent] useState DONE"); else console.log("[ActualPageContent] useState DONE");
+
+
+    // --- useSearchParams Hook Call (MUST BE UNCONDITIONAL) ---
     let searchParams: URLSearchParams | null = null;
     let searchParamsError: Error | null = null;
     try {
-      // Call the hook unconditionally
-      searchParams = useSearchParams();
-      if (typeof logger !== 'undefined') logger.log("[ActualPageContent] useSearchParams DONE (unconditional)"); else console.log("[ActualPageContent] useSearchParams DONE (unconditional)");
+      searchParams = useSearchParams(); // Call the hook unconditionally
+      // If the hook call succeeds without throwing, we consider it "ready"
+      // We set the state inside useEffect based on this render's success
+      if (typeof logger !== 'undefined') logger.log("[ActualPageContent] useSearchParams() call SUCCEEDED in this render."); else console.log("[ActualPageContent] useSearchParams() call SUCCEEDED in this render.");
     } catch (e: any) {
-      searchParamsError = e; // Store the error first
-      // Log the error safely
-      if (typeof logger !== 'undefined') {
-        logger.error("[ActualPageContent] Error initializing useSearchParams:", e);
-      } else {
-        console.error("[ActualPageContent] Error initializing useSearchParams (logger unavailable):", e);
-      }
+      searchParamsError = e; // Store the error
+      if (typeof logger !== 'undefined') logger.error("[ActualPageContent] useSearchParams() call FAILED:", e); else console.error("[ActualPageContent] useSearchParams() call FAILED:", e);
     }
 
+     // --- Effect to Signal searchParams Readiness/Error ---
+     useEffect(() => {
+         if (searchParamsError) {
+              setSearchParamsReady(false); // Explicitly set not ready on error
+         } else {
+              logger.log("[ActualPageContent Effect] searchParams hook succeeded in previous render, setting ready state.");
+              setSearchParamsReady(true); // Signal ready state
+         }
+     }, [searchParamsError]); // Depend only on the error status
 
-    // --- CONTEXT VALIDATION ---
+    // --- CONTEXT VALIDATION (moved after hooks) ---
     if (!pageContext || typeof pageContext.addToast !== 'function') {
-         // Use console.error directly in case of fatal context issue
          console.error("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!");
          return <div className="text-red-500 p-4">Критическая ошибка: Контекст страницы не загружен.</div>;
     }
-    if (typeof logger !== 'undefined') logger.log("[ActualPageContent] pageContext VALUE:", pageContext ? "Available" : "NULL"); else console.log("[ActualPageContent] pageContext VALUE:", pageContext ? "Available" : "NULL");
+    if (typeof logger !== 'undefined') logger.log("[ActualPageContent] pageContext check passed."); else console.log("[ActualPageContent] pageContext check passed.");
 
     // --- Destructure context ---
     const {
@@ -194,44 +212,46 @@ function ActualPageContent() {
         pendingFlowDetails
     } = pageContext;
 
-    // --- State Initialization ---
-    if (typeof logger !== 'undefined') logger.log("[ActualPageContent] Initializing State..."); else console.log("[ActualPageContent] Initializing State...");
-    const [lang, setLang] = useState<Language>('en');
-    const [showComponents, setShowComponents] = useState(false);
-    const [initialIdea, setInitialIdea] = useState<string | null>(null);
-    const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(false);
-    const [t, setT] = useState<TranslationSet | null>(null);
-    const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
-    if (typeof logger !== 'undefined') logger.log("[ActualPageContent] useState DONE"); else console.log("[ActualPageContent] useState DONE");
-
     // --- Effects ---
     useEffect(() => {
         if (typeof logger !== 'undefined') logger.log("[ActualPageContent] Client-side hydration COMPLETE."); else console.log("[ActualPageContent] Client-side hydration COMPLETE.");
-        setIsPageLoading(!t);
+        setIsPageLoading(!t); // Keep this simple based on translations
         return () => { if (typeof logger !== 'undefined') logger.log("[ActualPageContent] Unmounting."); else console.log("[ActualPageContent] Unmounting."); };
-      }, [t]);
+    }, [t]); // Only depends on translations
 
     useEffect(() => {
-      if (typeof logger !== 'undefined') logger.debug("[Effect Lang] START"); else console.debug("[Effect Lang] START");
-      const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
-      const userLang = user?.language_code;
-      const resolvedLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
-      setLang(resolvedLang);
-      const newTranslations = translations[resolvedLang] ?? translations.en;
-      setT(newTranslations);
-      setIsPageLoading(false);
-      if (typeof logger !== 'undefined') logger.info(`[Effect Lang] Language set to: ${resolvedLang}. Page loading set to false.`); else console.info(`[Effect Lang] Language set to: ${resolvedLang}. Page loading set to false.`);
-    }, [user]);
+        if (typeof logger !== 'undefined') logger.debug("[Effect Lang] START"); else console.debug("[Effect Lang] START");
+        const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
+        const userLang = user?.language_code;
+        const resolvedLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
+        setLang(resolvedLang);
+        const newTranslations = translations[resolvedLang] ?? translations.en;
+        setT(newTranslations);
+        setIsPageLoading(false); // Set loading false only after translations are set
+        if (typeof logger !== 'undefined') logger.info(`[Effect Lang] Language set to: ${resolvedLang}. Page loading set to false.`); else console.info(`[Effect Lang] Language set to: ${resolvedLang}. Page loading set to false.`);
+    }, [user]); // Only depends on user
 
-    // --- Effect for URL Params ---
+    // --- Effect for URL Params (Depends on searchParamsReady) ---
     useEffect(() => {
-        // Check if searchParams was initialized successfully (use the variable from the top level)
+        // !! CRITICAL !!: Only run if searchParams hook is ready and didn't error
+        if (!searchParamsReady) {
+            if (searchParamsError) {
+                 logger.warn("[Effect URL Params] Skipping effect, searchParams hook failed to initialize.");
+            } else {
+                 logger.log("[Effect URL Params] Skipping effect, searchParams hook not ready yet.");
+            }
+            setInitialIdeaProcessed(true); // Assume processed if params aren't ready/errored
+            return;
+        }
+        // Also check if searchParams object exists (belt-and-suspenders)
         if (!searchParams) {
-            if (typeof logger !== 'undefined') logger.warn("[Effect URL Params] Skipping effect, searchParams hook failed to initialize."); else console.warn("[Effect URL Params] Skipping effect, searchParams hook failed to initialize.");
+            logger.error("[Effect URL Params] Skipping effect, searchParams object is unexpectedly null despite being ready.");
             setInitialIdeaProcessed(true);
             return;
         }
-        if (typeof logger !== 'undefined') logger.debug("[Effect URL Params] START"); else console.debug("[Effect URL Params] START");
+
+        if (typeof logger !== 'undefined') logger.debug("[Effect URL Params] START (searchParams are ready)"); else console.debug("[Effect URL Params] START (searchParams are ready)");
+        // --- PARAMETER PROCESSING LOGIC (Unchanged from previous version) ---
         const pathParam = searchParams.get("path");
         const ideaParam = searchParams.get("idea");
         const repoParam = searchParams.get("repo");
@@ -335,9 +355,12 @@ function ActualPageContent() {
               setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true);
           }
          if (typeof logger !== 'undefined') logger.debug("[Effect URL Params] END"); else console.debug("[Effect URL Params] END");
-      }, [searchParams, setImageReplaceTask, setRepoUrl, addToast, setPendingFlowDetails, pageContext.setTargetBranchName, pageContext.setManualBranchName, pageContext.setTargetPrData]); // Keep dependencies
+      // --- DEPENDENCIES ---
+      // Depend on searchParamsReady state now
+      // Keep other necessary dependencies
+      }, [searchParamsReady, searchParams, setImageReplaceTask, setRepoUrl, addToast, setPendingFlowDetails, pageContext.setTargetBranchName, pageContext.setManualBranchName, pageContext.setTargetPrData]);
 
-       // --- Effect for Kwork/Task Population ---
+       // --- Effect for Kwork/Task Population (Unchanged) ---
        useEffect(() => {
             if (typeof logger !== 'undefined') logger.debug("[Effect Populate] Check START", { fetchStatus, isPreChecking, pendingFlow: !!pendingFlowDetails, initialIdea: !!initialIdea }); else console.debug("[Effect Populate] Check START", { fetchStatus, isPreChecking, pendingFlow: !!pendingFlowDetails, initialIdea: !!initialIdea });
             if (fetchStatus === 'success' && !isPreChecking) {
@@ -388,7 +411,7 @@ function ActualPageContent() {
         }, [ fetchStatus, isPreChecking, pendingFlowDetails, initialIdea, initialIdeaProcessed, imageReplaceTask, kworkInputRef, fetcherRef, allFetchedFiles, selectedFetcherFiles, addToast, setKworkInputHasContent, setImageReplaceTask, setPendingFlowDetails ]); // Keep dependencies
 
 
-    // --- Callbacks ---
+    // --- Callbacks (Unchanged) ---
     const memoizedGetPlainText = useCallback(getPlainText, []);
 
     const scrollToSectionNav = useCallback((id: string) => {
@@ -404,16 +427,26 @@ function ActualPageContent() {
 
     const handleShowComponents = useCallback(() => { if (typeof logger !== 'undefined') logger.info("[Button Click] handleShowComponents (Reveal)"); else console.info("[Button Click] handleShowComponents (Reveal)"); setShowComponents(true); toastInfo("Компоненты загружены!", { duration: 1500 }); }, [toastInfo]);
 
-    // --- REMOVED useCallback for renderVibeContent ---
-    // const renderVibeContent = useCallback((contentKey: keyof TranslationSet, wrapperClassName?: string) => {
-    //     const content = t?.[contentKey];
-    //     return content ? <VibeContentRenderer content={content} className={wrapperClassName} /> : `[Missing Translation: ${contentKey}]`;
-    // }, [t]);
 
     // --- Loading / Error States ---
-     if (searchParamsError) { if (typeof logger !== 'undefined') logger.error("[Render] Rendering error state due to searchParams failure."); else console.error("[Render] Rendering error state due to searchParams failure."); return <div className="text-red-500 p-4">Ошибка: Не удалось инициализировать параметры URL ({searchParamsError.message}).</div>; }
-     if (isPageLoading) { if (typeof logger !== 'undefined') logger.log("[Render] ActualPageContent: Rendering Loading State"); else console.log("[Render] ActualPageContent: Rendering Loading State"); const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en'; const loadingText = translations[loadingLang]?.loading ?? translations.en.loading; return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> ); }
-     if (!t) { if (typeof logger !== 'undefined') logger.error("[Render] ActualPageContent: Critical - translations (t) are null after loading."); else console.error("[Render] ActualPageContent: Critical - translations (t) are null after loading."); return <div className="text-red-500 p-4">Критическая ошибка: Не удалось загрузить тексты страницы.</div>; } // Added check for null t after loading
+    // !! CRITICAL !!: Check for searchParamsError *first*
+     if (searchParamsError) {
+          if (typeof logger !== 'undefined') logger.error("[Render] Rendering error state due to searchParams hook failure."); else console.error("[Render] Rendering error state due to searchParams hook failure.");
+          return <div className="text-red-500 p-4">Ошибка инициализации URL: {searchParamsError.message}. Попробуйте перезагрузить страницу.</div>;
+     }
+     // Then check for page loading (translations, etc.)
+     if (isPageLoading || !searchParamsReady) { // Also wait for searchParams to be ready
+         const reason = isPageLoading ? "translations" : "searchParams";
+         if (typeof logger !== 'undefined') logger.log(`[Render] ActualPageContent: Rendering Loading State (Waiting for ${reason})`); else console.log(`[Render] ActualPageContent: Rendering Loading State (Waiting for ${reason})`);
+         const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
+         const loadingText = translations[loadingLang]?.loading ?? translations.en.loading;
+         return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
+     }
+     // Then check for null translations after loading phase
+     if (!t) {
+         if (typeof logger !== 'undefined') logger.error("[Render] ActualPageContent: Critical - translations (t) are null after loading."); else console.error("[Render] ActualPageContent: Critical - translations (t) are null after loading.");
+         return <div className="text-red-500 p-4">Критическая ошибка: Не удалось загрузить тексты страницы.</div>;
+     }
 
     // --- Derived State ---
     if (typeof logger !== 'undefined') logger.log("[ActualPageContent] Calculating derived state"); else console.log("[ActualPageContent] Calculating derived state");
@@ -427,6 +460,7 @@ function ActualPageContent() {
     // --- Log before return ---
     if (typeof logger !== 'undefined') logger.log("[ActualPageContent] Preparing to render JSX...");
 
+    // --- MAIN JSX RENDER (Try-catch block unchanged) ---
     try {
        // Return JSX directly
        return (
@@ -438,7 +472,6 @@ function ActualPageContent() {
                     <section id="intro" className="mb-12 text-center max-w-3xl w-full">
                          <div className="flex justify-center mb-4"> <FaBolt className="w-16 h-16 text-[#E1FF01] text-shadow-[0_0_15px_#E1FF01] animate-pulse" /> </div>
                         <h1 className="text-4xl md:text-5xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-4">
-                           {/* Use VibeContentRenderer directly */}
                            <VibeContentRenderer content={t.pageTitle} />
                         </h1>
                         <p className="text-xl md:text-2xl text-gray-200 mt-4 font-semibold">
@@ -511,7 +544,6 @@ function ActualPageContent() {
                     {/* Reveal Button */}
                     {!showComponents && (
                         <section id="reveal-trigger" className="mb-12 w-full max-w-3xl text-center">
-                            {/* Log before rendering button */}
                             {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering Reveal Button"); else console.debug("[Render] Rendering Reveal Button"); return null; })()}
                             <Button onClick={handleShowComponents} className="bg-gradient-to-r from-green-500 via-cyan-500 to-purple-600 text-gray-900 font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:scale-105 transform transition duration-300 animate-bounce hover:animate-none ring-2 ring-offset-2 ring-offset-gray-950 ring-transparent hover:ring-cyan-300" size="lg">
                                 <FaHandSparkles className="mr-2"/> <VibeContentRenderer content={t.readyButton} />
@@ -522,33 +554,27 @@ function ActualPageContent() {
                     {/* WORKHORSE Components */}
                     {showComponents && (
                          <>
-                            {/* Log before rendering workhorse components */}
                             {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering Workhorse Components Container"); else console.debug("[Render] Rendering Workhorse Components Container"); return null; })()}
                             <h2 className="text-3xl font-bold text-center text-brand-green mb-8 animate-pulse"><VibeContentRenderer content={t.componentsTitle} /></h2>
                              <section id="extractor" className="mb-12 w-full max-w-4xl">
-                               {/* Log before RepoTxtFetcher */}
                                {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering RepoTxtFetcher Component Wrapper..."); else console.debug("[Render] Rendering RepoTxtFetcher Component Wrapper..."); return null; })()}
                                  <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg backdrop-blur-sm">
                                      <CardContent className="p-4">
                                          <RepoTxtFetcher ref={fetcherRef} />
                                      </CardContent>
                                  </Card>
-                               {/* Log after RepoTxtFetcher */}
                                {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering RepoTxtFetcher Component Wrapper DONE"); else console.debug("[Render] Rendering RepoTxtFetcher Component Wrapper DONE"); return null; })()}
                              </section>
 
                              <section id="executor" className="mb-12 w-full max-w-4xl pb-16">
-                                {/* Log before AICodeAssistant */}
                                 {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering AICodeAssistant Component Wrapper..."); else console.debug("[Render] Rendering AICodeAssistant Component Wrapper..."); return null; })()}
                                  <Card className="bg-gray-900/80 border border-purple-700/50 shadow-lg backdrop-blur-sm">
                                      <CardContent className="p-4">
                                          <AICodeAssistant ref={assistantRef} kworkInputRefPassed={kworkInputRef} aiResponseInputRefPassed={aiResponseInputRef} />
                                      </CardContent>
                                  </Card>
-                                {/* Log after AICodeAssistant */}
                                 {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering AICodeAssistant Component Wrapper DONE"); else console.debug("[Render] Rendering AICodeAssistant Component Wrapper DONE"); return null; })()}
                              </section>
-                            {/* Log after workhorse components */}
                             {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering Workhorse Components Container DONE"); else console.debug("[Render] Rendering Workhorse Components Container DONE"); return null; })()}
                          </>
                      )}
@@ -556,7 +582,6 @@ function ActualPageContent() {
                     {/* Final CTA */}
                      {showComponents && (
                          <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
-                              {/* Log before Final CTA */}
                               {(() => { if (typeof logger !== 'undefined') logger.debug("[Render] Rendering Final CTA"); else console.debug("[Render] Rendering Final CTA"); return null; })()}
                               <div className="bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 p-6 rounded-lg shadow-lg animate-pulse border-2 border-white/50 prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 max-w-none">
                                  <h3 className="text-2xl font-bold text-white mb-3"><VibeContentRenderer content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
@@ -587,7 +612,6 @@ function ActualPageContent() {
             </>
         );
     } catch (renderError: any) {
-         // Use console.error as logger might not be defined
          console.error("[ActualPageContent] CRITICAL RENDER ERROR in return JSX:", renderError);
          return <div className="text-red-500 p-4">Критическая ошибка рендеринга страницы: {renderError.message}</div>;
     } finally {
@@ -595,18 +619,16 @@ function ActualPageContent() {
     }
 }
 
-// --- Layout Component ---
+// --- Layout Component (Unchanged) ---
 function RepoXmlPageLayout() {
     if (typeof logger !== 'undefined') logger.log("[RepoXmlPageLayout] START Render"); else console.log("[RepoXmlPageLayout] START Render");
     try {
-      // Wrap provider initialization in try-catch
       return (
            <RepoXmlPageProvider>
                <ActualPageContent />
            </RepoXmlPageProvider>
        );
     } catch (layoutError: any) {
-      // Use console.error as logger might not be defined
       console.error("[RepoXmlPageLayout] CRITICAL RENDER ERROR:", layoutError);
       return <div className="text-red-500 p-4">Критическая ошибка в слое разметки: {layoutError.message}</div>;
     } finally {
@@ -614,7 +636,7 @@ function RepoXmlPageLayout() {
     }
 }
 
-// --- Exported Page Component ---
+// --- Exported Page Component (Unchanged) ---
 export default function RepoXmlPage() {
      if (typeof logger !== 'undefined') logger.log("[RepoXmlPage] START Render (Exported Component)"); else console.log("[RepoXmlPage] START Render (Exported Component)");
     const fallbackLoadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
@@ -628,7 +650,6 @@ export default function RepoXmlPage() {
             </Suspense>
         );
     } catch (pageError: any) {
-         // Use console.error as logger might not be defined
          console.error("[RepoXmlPage] CRITICAL RENDER ERROR:", pageError);
          return <div className="text-red-500 p-4">Критическая ошибка рендеринга компонента страницы: {pageError.message}</div>;
     } finally {
