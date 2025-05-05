@@ -338,10 +338,9 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     finalFetchStatus = 'success';
                     if (fetcherRef?.current?.handleAddSelected) {
                         logger.debug("[Context] Triggering handleAddSelected for ErrorFix target file.");
-                        setTimeout(() => { try { fetcherRef.current?.handleAddSelected?.(new Set([currentPendingFlow.targetPath]), allFiles); logger.info("[Context] ErrorFix target file added to kwork via imperative handle."); scrollToSectionStable('executor'); } catch (addErr) { logger.error("[Context] Error calling handleAddSelected for ErrorFix:", addErr); } }, 100);
+                        setTimeout(() => { try { fetcherRef.current?.handleAddSelected?.(new Set([currentPendingFlow.targetPath]), allFiles); logger.info("[Context] ErrorFix target file added to kwork via imperative handle."); scrollToSectionStable('executor'); } catch (addErr) { logger.error("[Context] Error calling handleAddSelected for ErrorFix:", addErr); } }, 100); // Use logger.error
                     } else {
-                        // FIX: Corrected warn to logger.warn
-                        logger.warn("[Context] Fetcher ref or handleAddSelected missing for ErrorFix auto-add.");
+                        logger.warn("[Context] Fetcher ref or handleAddSelected missing for ErrorFix auto-add."); // Use logger.warn
                         scrollToSectionStable('executor');
                     }
                     setPendingFlowDetailsStateStable(null); // Clear flow after processing
@@ -365,7 +364,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
              // Refs are stable, their .current is read inside
              imageReplaceTaskStateRef, pendingFlowDetailsRef,
              // Utilities
-             logger, error // Logger functions assumed stable (removed warn as it's internal)
+             logger // Logger functions assumed stable
          ]);
 
 
