@@ -216,7 +216,7 @@ export const useRepoFetcher = ({
                      logger.info(`[Fetch Manual CB] Processing Standard Task Path.`);
                      primaryHighlightPathInternal = null; // Reset primary highlight for standard tasks
                      secondaryHighlightPathsDataInternal = { component: [], context: [], hook: [], lib: [], other: [] }; // Reset secondary
-                     filesToAutoSelect = new Set(); // Reset auto-select
+                     filesToAutoSelect = new Set<string>(); // Reset auto-select
 
                      // If a path was passed via URL params (potentially with an idea)
                      if (highlightedPathFromUrl) {

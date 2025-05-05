@@ -95,11 +95,11 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     , [imageReplaceTask, highlightedPathFromUrl, ideaFromUrl]); // Dependencies
 
     const importantFiles = useMemo(() => [
-        "contexts/AppContext.tsx", "hooks/useTelegram.ts", "app/layout.tsx",
-        "hooks/supabase.ts", "app/actions.ts", "app/actions_github/actions.ts",
+        "contexts/AppContext.tsx", "contexts/RepoXmlPageContext.tsx", "hooks/useTelegram.ts", "app/layout.tsx",
+        "app/repo-xml/page.tsx", "components/RepoTxtFetcher.tsx", "components/AICodeAssistant.tsx", "components/AutomationBuddy.tsx",
+        "components/repo/prompt.ts", "hooks/supabase.ts", "app/actions.ts", "app/actions_github/actions.ts",
         "app/webhook-handlers/proxy.ts", "package.json", "tailwind.config.ts",
-"hooks/useAppToast.ts",
-    "components/VibeContentRenderer.tsx”, "types/supabase.ts",    "app/globals.css", ""lib/debugLogger.ts", 
+        "lib/debugLogger.ts", "contexts/ErrorOverlayContext.tsx", "components/DevErrorOverlay.tsx", "components/ErrorBoundaryForOverlay.tsx"
     ], []);
     logger.debug("[RepoTxtFetcher] After Derived State/Memo");
 
