@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useMemo, useCallback } from "react";
 // --- REMOVED useSearchParams import ---
-// import { useSearchParams } from "next/navigation";
 import {
     FaAngleDown, FaAngleUp,
     FaDownload, FaArrowsRotate, FaCircleCheck, FaXmark, FaCopy,
@@ -48,7 +47,8 @@ interface RepoTxtFetcherProps {
 // --- Component Definition ---
 // --- UPDATED: Add props to component definition ---
 const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
-    highlightedPathProp, ideaProp // Destructure new props
+    highlightedPathProp, // Get from props
+    ideaProp            // Get from props
 }, ref) => {
     logger.log("[RepoTxtFetcher] START Render");
 
@@ -82,19 +82,24 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const handleRepoUrlChange = setRepoUrlInContext;
 
     // === URL Params & Derived State ---
-    // --- Use props instead ---
-    const highlightedPathFromUrl = highlightedPathProp ?? "";
-    const ideaFromUrl = ideaProp ?? "";
+    // --- Use props ---
+    const highlightedPathFromUrl = highlightedPathProp ?? ""; // Use prop
+    const ideaFromUrl = ideaProp ?? "";                      // Use prop
     logger.debug(`[RepoTxtFetcher] Received props: highlightedPathProp='${highlightedPathFromUrl}', ideaProp='${ideaFromUrl ? ideaFromUrl.substring(0,30)+'...' : null}'`);
 
-    // --- autoFetch depends on props now ---
-    const autoFetch = useMemo(() => !!highlightedPathFromUrl || !!imageReplaceTask, [highlightedPathFromUrl, imageReplaceTask]);
+    // --- autoFetch depends on props/context now ---
+    // It should be true if *either* a task exists OR a path/idea came from URL
+    const autoFetch = useMemo(() =>
+        !!imageReplaceTask || // From context
+        (!!highlightedPathFromUrl || !!ideaFromUrl) // From props
+    , [imageReplaceTask, highlightedPathFromUrl, ideaFromUrl]); // Dependencies
+
     const importantFiles = useMemo(() => [
-        "contexts/AppContext.tsx", "contexts/RepoXmlPageContext.tsx", "hooks/useTelegram.ts", "app/layout.tsx",
-        "app/repo-xml/page.tsx", "components/RepoTxtFetcher.tsx", "components/AICodeAssistant.tsx", "components/AutomationBuddy.tsx",
-        "components/repo/prompt.ts", "hooks/supabase.ts", "app/actions.ts", "app/actions_github/actions.ts",
+        "contexts/AppContext.tsx", "hooks/useTelegram.ts", "app/layout.tsx",
+        "hooks/supabase.ts", "app/actions.ts", "app/actions_github/actions.ts",
         "app/webhook-handlers/proxy.ts", "package.json", "tailwind.config.ts",
-        "lib/debugLogger.ts", "contexts/ErrorOverlayContext.tsx", "components/DevErrorOverlay.tsx", "components/ErrorBoundaryForOverlay.tsx"
+"hooks/useAppToast.ts",
+    "components/VibeContentRenderer.tsx”, "types/supabase.ts",    "app/globals.css", ""lib/debugLogger.ts", 
     ], []);
     logger.debug("[RepoTxtFetcher] After Derived State/Memo");
 
@@ -111,10 +116,10 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         isFetchDisabled
     } = useRepoFetcher({
         repoUrl, token, targetBranchName, manualBranchName, imageReplaceTask,
-        highlightedPathFromUrl, // Use the value derived from props
+        highlightedPathFromUrl, // Pass value derived from prop
         importantFiles,
-        autoFetch, // Use the value derived from props/context
-        ideaFromUrl, // Use the value derived from props
+        autoFetch,              // Pass value derived from prop/context
+        ideaFromUrl,            // Pass value derived from prop
         isSettingsModalOpen,
         repoUrlEntered, assistantLoading, isParsing, aiActionLoading,
         loadingPrs,

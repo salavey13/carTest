@@ -7,7 +7,7 @@ import AutomationBuddy from "@/components/AutomationBuddy";
 import {
     useRepoXmlPageContext, RepoXmlPageProvider,
     RepoTxtFetcherRef, AICodeAssistantRef, ImageReplaceTask,
-    RepoXmlPageContextType, FileNode // Import FileNode here if used locally
+    RepoXmlPageContextType, FileNode, TargetPrData, PendingFlowDetails // Import FileNode here if used locally
 } from '@/contexts/RepoXmlPageContext';
 import { useAppContext } from "@/contexts/AppContext";
 import { debugLogger as logger } from "@/lib/debugLogger"; // Use logger
@@ -264,62 +264,64 @@ function ActualPageContent() {
         const pathParam = searchParams.get("path");
         const ideaParam = searchParams.get("idea");
         const repoParam = searchParams.get("repo");
-        const targetBranchParam = searchParams.get("targetBranch"); // Can be the PR *base* branch initially
+        const targetBranchParam = searchParams.get("targetBranch");
         const prNumberParam = searchParams.get("prNumber");
         const prUrlParam = searchParams.get("prUrl");
 
-        // --- Set props based on params ---
-        setHighlightedPathProp(pathParam); // Store path for prop
-        // Store decoded idea for prop, excluding ImageReplace format
+        let needsProcessing = false; // Flag to track if we should scroll/show components
+        let newRepoUrl: string | null = null;
+        let newInitialIdea: string | null = null;
+        let newImageReplaceTask: ImageReplaceTask | null = null; // Not used directly, flow sets PendingDetails
+        let newPendingFlowDetails: PendingFlowDetails | null = null;
+        let newTargetPath: string | null = null;
+        let newTargetPrData: TargetPrData | null = null;
+        let newBranchToUse: string | null = null; // Branch to suggest or use for pre-check/fetch
+        let flowType: 'ImageSwap' | 'ErrorFix' | 'Simple' | null = null;
+
+        // Set props based on params (these only depend on params)
+        setHighlightedPathProp(pathParam);
         const decodedIdeaForProp = ideaParam ? decodeURIComponent(ideaParam) : null;
         if (decodedIdeaForProp && !decodedIdeaForProp.startsWith("ImageReplace|") && !decodedIdeaForProp.startsWith("ErrorFix|")) {
             setIdeaProp(decodedIdeaForProp);
         } else {
             setIdeaProp(null); // Reset if it's a special flow or no idea
         }
-        // --- End Set props ---
 
         // .. Repo processing
         if (repoParam) {
              try {
                  const decodedRepoUrl = decodeURIComponent(repoParam);
                  if (decodedRepoUrl && typeof decodedRepoUrl === 'string' && decodedRepoUrl.includes("github.com")) {
-                     if (repoUrl !== decodedRepoUrl) { // Only set if different
-                         setRepoUrl(decodedRepoUrl);
-                         log(`[Effect URL Params] Repo URL set from param: ${decodedRepoUrl}`);
-                     }
+                      newRepoUrl = decodedRepoUrl; // Store locally, set state outside loop
+                      log(`[Effect URL Params] Repo URL determined from param: ${decodedRepoUrl}`);
                  } else { warn(`[Effect URL Params] Invalid or empty repo URL from param: ${repoParam}`); }
              } catch (e) { error("[Effect URL Params] Error decoding repo URL param:", e); }
          }
 
-         let prDetails = null;
+         // .. PR Data processing
          if (prNumberParam && prUrlParam) {
               try {
                   const prNum = parseInt(decodeURIComponent(prNumberParam), 10);
                   const prUrl = decodeURIComponent(prUrlParam);
                   if (!isNaN(prNum) && prUrl) {
-                      prDetails = { number: prNum, url: prUrl };
+                      newTargetPrData = { number: prNum, url: prUrl };
                       log(`[Effect URL Params] Target PR Data parsed from param: #${prNum}`);
                   }
               } catch (e) { error("Error parsing PR number/url from URL params", e); }
          }
-         // Only update context if different
-         if (JSON.stringify(targetPrData) !== JSON.stringify(prDetails)) {
-            setTargetPrData(prDetails); // Use context setter
-         }
-
 
         // .. Path/Idea processing for flows
-          let needsProcessing = false; // Flag to track if we should scroll/show components
           if (pathParam && ideaParam) {
               let decodedIdea: string | null = null; let decodedPath: string | null = null;
               try {
                   decodedPath = decodeURIComponent(pathParam);
                   decodedIdea = decodeURIComponent(ideaParam);
                   needsProcessing = true; // Params exist
+                  newTargetPath = decodedPath; // Store target path
 
                   if (decodedIdea?.startsWith("ImageReplace|")) {
                       log("[Effect URL Params] Image Replace flow detected.");
+                      flowType = 'ImageSwap';
                       try {
                           const parts = decodedIdea.split('|');
                           const oldUrlParam = parts.find(p => p.startsWith("OldURL="));
@@ -329,24 +331,16 @@ function ActualPageContent() {
                               const newUrl = decodeURIComponent(newUrlParam.substring(7));
                               if (oldUrl && newUrl) {
                                   const flowDetails = { oldUrl, newUrl };
-                                  if (pageContext.triggerPreCheckAndFetch && repoUrl) {
-                                      log(`[Effect URL Params] Triggering pre-check and fetch for ImageSwap`);
-                                      // const potentialBranch = repoUtils.guessBranchNameFromPath(decodedPath) || 'image-update-' + Date.now().toString(36); // Let context handle branch name logic
-                                      // Trigger but don't await here, let the context manage the async flow
-                                      pageContext.triggerPreCheckAndFetch(repoUrl, 'image-update', 'ImageSwap', flowDetails, decodedPath)
-                                           .catch(preCheckErr => error("Error during ImageSwap pre-check trigger:", preCheckErr));
-                                  } else {
-                                      error("[Effect URL Params] Cannot trigger pre-check/fetch: function or repoUrl missing.");
-                                      setPendingFlowDetails({ type: 'ImageSwap', targetPath: decodedPath, details: flowDetails }); // Fallback to just setting pending state
-                                  }
-                              } else { error("[Effect URL Params] Invalid image task URL data", { decodedPath, oldUrl, newUrl }); setPendingFlowDetails(null); }
-                          } else { error("[Effect URL Params] Could not parse ImageReplace parts:", decodedIdea); setPendingFlowDetails(null); }
-                      } catch (splitError) { error("[Effect URL Params] Error splitting ImageReplace task:", splitError); setPendingFlowDetails(null); }
-                      setInitialIdeaProcessed(true); // Mark processed for this flow type
-                      setInitialIdea(null); setImageReplaceTask(null); // Clear local state
+                                  newPendingFlowDetails = { type: 'ImageSwap', targetPath: decodedPath, details: flowDetails };
+                                  // Derive branch name suggestion here based on path
+                                  newBranchToUse = targetBranchParam ? decodeURIComponent(targetBranchParam) : repoUtils.guessBranchNameFromPath(decodedPath) || 'image-update-' + Date.now().toString(36);
+                              } else { error("[Effect URL Params] Invalid image task URL data", { decodedPath, oldUrl, newUrl }); needsProcessing = false; }
+                          } else { error("[Effect URL Params] Could not parse ImageReplace parts:", decodedIdea); needsProcessing = false; }
+                      } catch (splitError) { error("[Effect URL Params] Error splitting ImageReplace task:", splitError); needsProcessing = false; }
 
                   } else if (decodedIdea?.startsWith("ErrorFix|")) {
                         log("[Effect URL Params] Error Fix flow detected.");
+                        flowType = 'ErrorFix';
                          try {
                              const parts = decodedIdea.substring(9).split('|');
                              const details: Record<string, string> = {};
@@ -359,75 +353,120 @@ function ActualPageContent() {
                                  }
                              });
                              if (decodedPath && details.Message) {
-                                if(pageContext.triggerPreCheckAndFetch && repoUrl) {
-                                      log(`[Effect URL Params] Triggering pre-check and fetch for ErrorFix`);
-                                      // Use PR branch if available, otherwise suggest a name
-                                      const suggestedBranchName = targetBranchParam ? decodeURIComponent(targetBranchParam) : ('error-fix-' + Date.now().toString(36).substring(0,6));
-                                      // Trigger but don't await
-                                      pageContext.triggerPreCheckAndFetch(repoUrl, suggestedBranchName, 'ErrorFix', details, decodedPath)
-                                        .catch(preCheckErr => error("Error during ErrorFix pre-check trigger:", preCheckErr));
-                                  } else {
-                                      error("[Effect URL Params] Cannot trigger pre-check/fetch: function or repoUrl missing.");
-                                      setPendingFlowDetails({ type: 'ErrorFix', targetPath: decodedPath, details }); // Fallback
-                                  }
-                             } else { error("[Effect URL Params] Invalid ErrorFix data (missing path or message)", { decodedPath, details }); setPendingFlowDetails(null); }
-                         } catch (parseError) { error("[Effect URL Params] Error parsing ErrorFix task:", parseError); setPendingFlowDetails(null); }
-                         setInitialIdeaProcessed(false); // Keep as false to allow populate effect
-                         setInitialIdea(null); setImageReplaceTask(null); // Clear local state
+                                 newPendingFlowDetails = { type: 'ErrorFix', targetPath: decodedPath, details };
+                                // Use PR branch if available, otherwise suggest a name
+                                newBranchToUse = targetBranchParam ? decodeURIComponent(targetBranchParam) : ('error-fix-' + Date.now().toString(36).substring(0,6));
+                             } else { error("[Effect URL Params] Invalid ErrorFix data (missing path or message)", { decodedPath, details }); needsProcessing = false;}
+                         } catch (parseError) { error("[Effect URL Params] Error parsing ErrorFix task:", parseError); needsProcessing = false;}
 
                   } else if (decodedIdea) {
                      log("[Effect URL Params] Simple idea param found:", decodedIdea.substring(0, 50) + "...");
-                     if (initialIdea !== decodedIdea) setInitialIdea(decodedIdea); // Set local state for populate effect
-                     if (imageReplaceTask) setImageReplaceTask(null);
-                     if (pendingFlowDetails) setPendingFlowDetails(null);
-                     setInitialIdeaProcessed(false); // Keep as false to allow populate effect
-
-                      // Trigger fetch for simple idea only if repoUrl is available
-                      if (fetcherRef?.current?.handleFetch && repoUrl) {
-                          log("[Effect URL Params] Triggering fetch for simple idea.");
-                          const branchToUse = targetBranchParam ? decodeURIComponent(targetBranchParam) : null;
-                          // Don't await fetch here
-                          fetcherRef.current.handleFetch(false, branchToUse)
-                             .catch(fetchErr => error("Error triggering fetch for simple idea:", fetchErr));
-                      } else {
-                          warn("[Effect URL Params] Cannot trigger fetch for simple idea (ref or repoUrl missing).");
-                      }
+                     flowType = 'Simple';
+                     newInitialIdea = decodedIdea;
+                     newBranchToUse = targetBranchParam ? decodeURIComponent(targetBranchParam) : null; // Use target or null (default)
                   } else {
                       // .. Handle empty/invalid idea
-                      warn("[Effect URL Params] Decoded idea empty/invalid.");
-                      setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true);
-                      needsProcessing = false; // No valid idea/path
+                      warn("[Effect URL Params] Decoded idea empty/invalid."); needsProcessing = false;
                   }
-              } catch (decodeError) { error("[Effect URL Params] Error decoding params:", decodeError); setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true); needsProcessing = false;}
-
-              // Set showComponents only if valid path/idea params existed and were processed
-              if (needsProcessing && !showComponents) {
-                  debug("[Effect URL Params] Setting showComponents=true based on valid params");
-                  setShowComponents(true);
-              }
+              } catch (decodeError) { error("[Effect URL Params] Error decoding params:", decodeError); needsProcessing = false;}
 
           } else {
               // .. Handle no path/idea params
-              log(`[Effect URL Params] No path/idea params found.`);
-              setInitialIdea(null); setImageReplaceTask(null); setPendingFlowDetails(null); setInitialIdeaProcessed(true);
+              log(`[Effect URL Params] No path/idea params found.`); needsProcessing = false;
           }
 
+
+         // --- Update Context State (Grouped Updates) ---
+         // Only update if the value derived from params is different from current context state
+         if (newRepoUrl && repoUrl !== newRepoUrl) {
+             setRepoUrl(newRepoUrl);
+         }
+         // Update PR data only if different
+         if (JSON.stringify(targetPrData) !== JSON.stringify(newTargetPrData)) {
+            setTargetPrData(newTargetPrData);
+         }
+
+         // Handle flow state updates together to avoid intermediate renders triggering effects prematurely
+         let shouldProcessIdea = false;
+         if (flowType === 'ImageSwap' && newPendingFlowDetails && newTargetPath) {
+             // For ImageSwap, set the pending details and trigger pre-check
+              setImageReplaceTask(null); // Clear any old direct task
+              setInitialIdea(null); // Clear simple idea state
+              setPendingFlowDetails(newPendingFlowDetails);
+              setInitialIdeaProcessed(false); // Mark as *not* processed yet (fetch needs to run)
+             if (pageContext.triggerPreCheckAndFetch && newRepoUrl && newBranchToUse) {
+                 log(`[Effect URL Params] Triggering pre-check and fetch for ImageSwap (Branch: ${newBranchToUse})`);
+                 pageContext.triggerPreCheckAndFetch(newRepoUrl, newBranchToUse, 'ImageSwap', newPendingFlowDetails.details, newTargetPath)
+                     .catch(preCheckErr => error("Error during ImageSwap pre-check trigger:", preCheckErr));
+             } else {
+                 error("[Effect URL Params] Cannot trigger pre-check/fetch for ImageSwap: function or repoUrl/branch missing.");
+                 // Fallback: Just set pending state, hoping fetch happens some other way (less ideal)
+             }
+         } else if (flowType === 'ErrorFix' && newPendingFlowDetails && newTargetPath) {
+              // For ErrorFix, set pending details and trigger pre-check
+              setImageReplaceTask(null);
+              setInitialIdea(null);
+              setPendingFlowDetails(newPendingFlowDetails);
+              setInitialIdeaProcessed(false); // Mark as *not* processed yet
+             if (pageContext.triggerPreCheckAndFetch && newRepoUrl && newBranchToUse) {
+                 log(`[Effect URL Params] Triggering pre-check and fetch for ErrorFix (Branch: ${newBranchToUse})`);
+                 pageContext.triggerPreCheckAndFetch(newRepoUrl, newBranchToUse, 'ErrorFix', newPendingFlowDetails.details, newTargetPath)
+                     .catch(preCheckErr => error("Error during ErrorFix pre-check trigger:", preCheckErr));
+             } else {
+                 error("[Effect URL Params] Cannot trigger pre-check/fetch for ErrorFix: function or repoUrl/branch missing.");
+             }
+         } else if (flowType === 'Simple' && newInitialIdea) {
+             // For Simple Idea, set the initial idea state
+             setImageReplaceTask(null);
+             setPendingFlowDetails(null);
+             setInitialIdea(newInitialIdea); // Set the idea to be populated later
+             setInitialIdeaProcessed(false); // Mark as *not* processed yet
+             // **DO NOT trigger fetch here.** Let useRepoFetcher handle it via autoFetch prop.
+             log(`[Effect URL Params] Simple idea '${newInitialIdea.substring(0, 30)}...' set. Auto-fetch should trigger.`);
+              // If a specific branch was requested for the simple idea, set it
+              if (newBranchToUse) {
+                  setTargetBranchName(newBranchToUse); // Set target (PR source) if specified
+                  setManualBranchName(''); // Clear manual
+              } else {
+                  // If no specific branch, *don't* clear existing context branches
+                  // Let the user/settings modal control the default branch target
+              }
+         } else {
+              // No flow, or invalid flow
+              setImageReplaceTask(null);
+              setPendingFlowDetails(null);
+              setInitialIdea(null);
+              setInitialIdeaProcessed(true); // Mark as processed since there's nothing to do
+         }
+
+        // Set showComponents only if valid path/idea params existed and were processed
+        // Do this *after* setting flow details
+        if (needsProcessing && !showComponents) {
+            debug("[Effect URL Params] Setting showComponents=true based on valid params");
+            setShowComponents(true);
+        }
+
          debug("[Effect URL Params] END");
-      // --- DEPENDENCIES ---
-      }, [
-          // Core dependencies for reading params
-          searchParamsReady, searchParams, searchParamsError, // Depend on error state too
-          // Context setters (stable refs assumed, used for updates)
-          setRepoUrl, addToast, setPendingFlowDetails,
-          setTargetBranchName, setManualBranchName, setTargetPrData,
-          setImageReplaceTask, setShowComponents,
-          // Functions from context/refs (should be stable)
-          pageContext.triggerPreCheckAndFetch, fetcherRef,
-          // State values read for comparison or triggering actions
-          repoUrl, showComponents, initialIdea, imageReplaceTask, pendingFlowDetails, targetPrData,
-          // External Utils (constant)
-          // repoUtils.guessBranchNameFromPath, // Removed - logic moved to context potentially
-      ]); // Added state values read inside
+
+    // --- MINIMAL DEPENDENCY ARRAY ---
+    // Only react to the searchParams themselves changing or becoming ready.
+    // Stable setters from context are fine. Refs are fine.
+    // pageContext should be stable. repoUtils functions are stable.
+    }, [
+        searchParamsReady, searchParams, // Core dependency
+        searchParamsError,             // Depend on error state too
+        // Stable Setters from Context (used to update state based on params)
+        setHighlightedPathProp, setIdeaProp, setRepoUrl, setTargetPrData,
+        setImageReplaceTask, setInitialIdea, setPendingFlowDetails,
+        setInitialIdeaProcessed, setShowComponents, setTargetBranchName, setManualBranchName,
+        // Stable Functions/Refs from Context (used to trigger actions)
+        pageContext.triggerPreCheckAndFetch, // Assuming context itself is stable
+        // Read-only state needed for *comparison* before setting (should be stable enough if not changed often)
+        repoUrl, targetPrData, showComponents,
+        // Stable utilities
+        addToast, error, warn, log, debug,
+        repoUtils.guessBranchNameFromPath,
+    ]); // Added state values read inside for comparison
 
 
        // --- Effect for Kwork/Task Population ---
@@ -440,9 +479,10 @@ function ActualPageContent() {
                  if (flow) {
                       log(`[Effect Populate] Processing Pending Flow: ${flow.type}`);
                       if (flow.type === 'ImageSwap') {
-                          // ImageSwap setup is now handled earlier in handleSetFilesFetchedStable
+                          // ImageSwap setup is now handled earlier in handleSetFilesFetchedStable (via assistantRef)
                           log("[Effect Populate] ImageSwap flow processing handled earlier.");
                           setInitialIdea(null); // Clear local idea state if any
+                          // We don't clear pending flow here; let the assistant clearing the ImageReplaceTask handle finality
                       } else if (flow.type === 'ErrorFix' && kworkInputRef?.current) {
                            const { Message, Stack, Logs, Source } = flow.details;
                            const prompt = `Fix error in ${flow.targetPath}:\n\nMessage: ${Message}\nSource: ${Source || 'N/A'}\n\nStack:\n\`\`\`\n${Stack || 'N/A'}\n\`\`\`\n\nLogs:\n${Logs || 'N/A'}\n\nProvide ONLY the corrected code block or full file content.`;
@@ -454,11 +494,14 @@ function ActualPageContent() {
                            log("[Effect Populate] Kwork populated for ErrorFix flow.");
                             // Auto-select the target file in the fetcher
                            if(fetcherRef?.current && allFetchedFiles.some(f => f.path === flow.targetPath) && !selectedFetcherFiles.has(flow.targetPath)) {
-                                // fetcherRef.current.toggleFileSelection?.(flow.targetPath); // Use toggle to ensure selection
-                                // Add to kwork directly via imperative handle
+                                // Use the imperative handle to add to kwork directly after a delay
                                 setTimeout(() => {
-                                    fetcherRef.current?.handleAddSelected?.(new Set([flow.targetPath]), allFetchedFiles);
-                                    log("[Effect Populate] Target error file added to kwork context via imperative handle.");
+                                    try {
+                                        fetcherRef.current?.handleAddSelected?.(new Set([flow.targetPath]), allFetchedFiles);
+                                        log("[Effect Populate] Target error file added to kwork context via imperative handle.");
+                                    } catch (addErr) {
+                                        error("[Effect Populate] Error calling handleAddSelected via imperative handle:", addErr);
+                                    }
                                 }, 100); // Delay slightly
                             } else if (selectedFetcherFiles.has(flow.targetPath)) {
                                 log("[Effect Populate] Target error file already selected.");
@@ -481,10 +524,14 @@ function ActualPageContent() {
                       // Auto-select the target file if highlightedPathProp exists and is fetched
                       if (highlightedPathProp && fetcherRef?.current && allFetchedFiles.some(f => f.path === highlightedPathProp) && !selectedFetcherFiles.has(highlightedPathProp)) {
                           log("[Effect Populate] Auto-adding highlighted file for simple idea:", highlightedPathProp);
-                          // fetcherRef.current.toggleFileSelection?.(highlightedPathProp); // Use toggle
-                          setTimeout(() => { // Delay adding to kwork slightly
-                             fetcherRef.current?.handleAddSelected?.(new Set([highlightedPathProp]), allFetchedFiles);
-                             log("[Effect Populate] Highlighted file added to kwork context for simple idea via imperative handle.");
+                          // Delay adding to kwork slightly via imperative handle
+                          setTimeout(() => {
+                             try {
+                                fetcherRef.current?.handleAddSelected?.(new Set([highlightedPathProp]), allFetchedFiles);
+                                log("[Effect Populate] Highlighted file added to kwork context for simple idea via imperative handle.");
+                             } catch(addErr) {
+                                error("[Effect Populate] Error calling handleAddSelected for simple idea:", addErr);
+                             }
                           }, 100);
                       } else if (highlightedPathProp && selectedFetcherFiles.has(highlightedPathProp)) {
                           log("[Effect Populate] Highlighted file already selected for simple idea.");
@@ -493,6 +540,7 @@ function ActualPageContent() {
                      const kworkElement = document.getElementById('kwork-input-section');
                      if (kworkElement) { setTimeout(() => { try { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e){ error("Scroll error:", e); } }, 250); }
                      setInitialIdeaProcessed(true); // Mark as processed here
+                     setInitialIdea(null); // Clear the local initial idea state after population
                  } else { // No flow, no idea, but fetch is done and not pre-checking
                       log(`[Effect Populate] Fetch finished (${fetchStatus}), no pending idea/flow to process.`);
                       setInitialIdeaProcessed(true); // Mark processed to prevent re-running
@@ -501,13 +549,17 @@ function ActualPageContent() {
                 // Handle cases where fetch might fail but we still need to mark as processed
                  warn(`[Effect Populate] Fetch status is '${fetchStatus}' and not loading/idle/pre-checking. Marking initial idea as processed.`);
                  setInitialIdeaProcessed(true);
+                 // Clear local idea state on error as well
+                 if (fetchStatus === 'error' || fetchStatus === 'failed_retries') {
+                     setInitialIdea(null);
+                 }
             }
 
             debug("[Effect Populate] Check END");
         }, [
             fetchStatus, isPreChecking, pendingFlowDetails, initialIdea, initialIdeaProcessed, imageReplaceTask, // Core state dependencies
             kworkInputRef, fetcherRef, allFetchedFiles, highlightedPathProp, selectedFetcherFiles, // Refs and derived/passed state
-            addToast, setKworkInputHasContent, setImageReplaceTask, setPendingFlowDetails, // Context setters used inside
+            addToast, setKworkInputHasContent, setImageReplaceTask, setPendingFlowDetails, setInitialIdea, // Context setters used inside
             logger // Logger (assuming stable)
         ]);
 
