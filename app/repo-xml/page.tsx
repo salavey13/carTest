@@ -154,8 +154,8 @@ function ActualPageContent() {
 
     // --- State Initialization ---
     log("[ActualPageContent] Initializing State...");
-    const [lang, setLang] = useState<Language>('en');
-    const [t, setT] = useState<TranslationSet | null>(null);
+    const [lang, setLang] = useState<keyof typeof translations>('en'); // Use keyof for Language type
+    const [t, setT] = useState<typeof translations.en | null>(null); // Use typeof for TranslationSet type
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
     const [searchParamsReady, setSearchParamsReady] = useState(false);
     const [searchParamsError, setSearchParamsError] = useState<Error | null>(null);
@@ -206,7 +206,7 @@ function ActualPageContent() {
       debug("[Effect Lang] START");
       const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'en';
       const userLang = user?.language_code;
-      const resolvedLang = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
+      const resolvedLang: keyof typeof translations = userLang === 'ru' || (!userLang && browserLang === 'ru') ? 'ru' : 'en';
       setLang(resolvedLang);
       const newTranslations = translations[resolvedLang] ?? translations.en;
       setT(newTranslations);
@@ -355,7 +355,8 @@ function ActualPageContent() {
                 if (!currentVal.includes(ideaToAdd)) {
                     // --- SAFEST TRIM ---
                     // Only add separator if currentVal actually has non-whitespace content
-                    const separator = currentVal && currentVal.trim() ? "\n\n" : ""; // Check type AND call trim
+                    // Use the already safeguarded currentVal
+                    const separator = currentVal.trim() ? "\n\n" : ""; // <<< THIS IS SAFE NOW
                     // --- END SAFEST TRIM ---
                     return currentVal + separator + ideaToAdd;
                 }
@@ -580,7 +581,7 @@ function ActualPageContent() {
                               <div className="bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 p-6 rounded-lg shadow-lg animate-pulse border-2 border-white/50 prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 max-w-none">
                                  <h3 className="text-2xl font-bold text-white mb-3"><VibeContentRenderer content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
                                  <div className="text-white text-lg mb-4"> <VibeContentRenderer content={t.ctaDesc} /> </div>
-                                 <div className="text-white text-xl font-semibold mb-4 bg-black/30 p-3 rounded"> <FaHeart className="inline mr-2 text-red-400 animate-ping"/> <VibeContentRenderer content={t.ctaHotChick} /> <FaUserAstronaut className="inline ml-2 text-pink-300"/> </div>
+                                 <div className="text-white text-xl font-semibold mb-4 bg-black/30 p-3 rounded"> <FaRocket className="inline mr-2 text-cyan-300 animate-pulse"/> <VibeContentRenderer content={t.ctaHotChick} /> <FaUserAstronaut className="inline ml-2 text-pink-300"/> </div>
                                  <div className="text-gray-300 text-base"> <VibeContentRenderer content={t.ctaDude} /> </div>
                              </div>
                          </section>
