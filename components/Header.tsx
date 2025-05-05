@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutGrid, X, Search, Pin, PinOff } from "lucide-react"; // Added Pin, PinOff
+import { LayoutGrid, X, Search } from "lucide-react"; // Removed Pin, PinOff
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import UserInfo from "@/components/user-info";
 import { motion, AnimatePresence } from "framer-motion";
@@ -15,9 +15,9 @@ import {
   FaCircleInfo, FaListCheck, FaNetworkWired, FaRegLightbulb, FaUpload,
   FaUserNinja, FaGlobe, FaLandmarkDome, FaLeaf
 } from "react-icons/fa6";
-import { debugLogger as logger } from "@/lib/debugLogger"; // Added logger
+import { debugLogger as logger } from "@/lib/debugLogger";
 
-// --- Page Definitions (Unchanged) ---
+// --- Page Definitions ---
 interface PageInfo {
   path: string;
   name: string;
@@ -29,7 +29,6 @@ interface PageInfo {
 }
 
 const allPages: PageInfo[] = [
-  // --- Важные ссылки ---
   { path: "/", name: "Cyber Garage", icon: FaCar, isImportant: true, color: "cyan" },
   { path: "/about", name: "About Me", icon: FaCircleUser, isImportant: true, color: "blue" },
   { path: "/repo-xml", name: "SUPERVIBE Studio", icon: FaWandMagicSparkles, isImportant: true, color: "yellow" },
@@ -39,7 +38,6 @@ const allPages: PageInfo[] = [
   { path: "/ai-work-future", name: "AI & Future of Work", icon: FaNetworkWired, color: "cyan", isImportant: true },
   { path: "/advice", name: "Advice", icon: FaRegLightbulb, isImportant: true, color: "purple" },
   { path: "/vpr-tests", name: "VPR Tests", icon: FaListCheck, isImportant: true, color: 'pink' },
-  // --- Обычные ссылки ---
   { path: "/purpose-profit", name: "Purpose & Profit", icon: FaBookOpen, color: "purple" },
   { path: "/expmind", name: "Experimental Mindset", icon: FaBrain, color: "pink" },
   { path: "/botbusters", name: "Bot Busters", icon: FaRobot },
@@ -52,11 +50,9 @@ const allPages: PageInfo[] = [
   { path: "/onesitepls", name: "oneSitePls Info", icon: FaCircleInfo },
   { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: FaListCheck },
   { path: "/rent-car", name: "Rent a Car", icon: FaCar },
-  // --- Шпаргалки ---
   { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: FaGlobe, color: 'green' },
   { path: "/vpr/history/6/cheatsheet", name: "History Cheatsheet 6", icon: FaLandmarkDome, color: 'yellow' },
   { path: "/vpr/biology/6/cheatsheet", name: "Biology Cheatsheet 6", icon: FaLeaf, color: 'lime' },
-  // --- Админские ссылки ---
   { path: "/advice-upload", name: "Upload Advice", icon: FaUpload, isAdminOnly: true, isImportant: true, color: "red" },
   { path: "/admin", name: "Admin Panel", icon: FaUserShield, isAdminOnly: true, color: "red" },
   { path: "/shadow-fleet-admin", name: "Fleet Admin", icon: FaCarOn, isAdminOnly: true, color: "red" },
@@ -66,82 +62,10 @@ const allPages: PageInfo[] = [
 // --- Translations ---
 const translations: Record<string, Record<string, string>> = {
   en: {
-    "Cyber Garage": "Cyber Garage",
-    "About Me": "About Me",
-    "SUPERVIBE Studio": "SUPERVIBE Studio",
-    "Jumpstart Kit": "Jumpstart Kit",
-    "SelfDev Path": "SelfDev Path",
-    "VIBE Plan": "VIBE Plan",
-    "Advice": "Advice",
-    "AI & Future of Work": "AI & Future of Work",
-    "VPR Tests": "VPR Tests",
-    "Purpose & Profit": "Purpose & Profit",
-    "Experimental Mindset": "Experimental Mindset",
-    "Bot Busters": "Bot Busters",
-    "BS Detector": "BS Detector",
-    "Wheel of Fortune": "Wheel of Fortune",
-    "My Invoices": "My Invoices",
-    "Subscribe": "Subscribe",
-    "Donate": "Donate",
-    "Style Guide": "Style Guide",
-    "oneSitePls Info": "oneSitePls Info",
-    "oneSitePls How-To": "oneSitePls How-To",
-    "Rent a Car": "Rent a Car",
-    "Geo Cheatsheet 6": "Geo Cheatsheet 6",
-    "History Cheatsheet 6": "History Cheatsheet 6",
-    "Biology Cheatsheet 6": "Biology Cheatsheet 6",
-    "Upload Advice": "Upload Advice",
-    "Admin Panel": "Admin Panel",
-    "Fleet Admin": "Fleet Admin",
-    "YT Admin": "YT Admin",
-    "Search pages...": "Search pages...",
-    "No pages found matching": "No pages found matching",
-    "Admin Only": "Admin Only",
-    "Toggle Language": "Toggle Language",
-    "Open navigation": "Open navigation",
-    "Close navigation": "Close navigation",
-    "Hot": "Hot",
-    "Pin header": "Pin header (always visible)", // New
-    "Unpin header": "Unpin header (auto-hide on scroll)", // New
+    "Cyber Garage": "Cyber Garage", "About Me": "About Me", "SUPERVIBE Studio": "SUPERVIBE Studio", "Jumpstart Kit": "Jumpstart Kit", "SelfDev Path": "SelfDev Path", "VIBE Plan": "VIBE Plan", "Advice": "Advice", "AI & Future of Work": "AI & Future of Work", "VPR Tests": "VPR Tests", "Purpose & Profit": "Purpose & Profit", "Experimental Mindset": "Experimental Mindset", "Bot Busters": "Bot Busters", "BS Detector": "BS Detector", "Wheel of Fortune": "Wheel of Fortune", "My Invoices": "My Invoices", "Subscribe": "Subscribe", "Donate": "Donate", "Style Guide": "Style Guide", "oneSitePls Info": "oneSitePls Info", "oneSitePls How-To": "oneSitePls How-To", "Rent a Car": "Rent a Car", "Geo Cheatsheet 6": "Geo Cheatsheet 6", "History Cheatsheet 6": "History Cheatsheet 6", "Biology Cheatsheet 6": "Biology Cheatsheet 6", "Upload Advice": "Upload Advice", "Admin Panel": "Admin Panel", "Fleet Admin": "Fleet Admin", "YT Admin": "YT Admin", "Search pages...": "Search pages...", "No pages found matching": "No pages found matching", "Admin Only": "Admin Only", "Toggle Language": "Toggle Language", "Open navigation": "Open navigation", "Close navigation": "Close navigation", "Hot": "Hot", // Pin translations removed
   },
   ru: {
-    "Cyber Garage": "Кибер Гараж",
-    "About Me": "Обо мне",
-    "SUPERVIBE Studio": "SUPERVIBE Studio",
-    "Jumpstart Kit": "Набор Jumpstart",
-    "SelfDev Path": "Путь Саморазвития",
-    "VIBE Plan": "VIBE План",
-    "Advice": "Советы",
-    "AI & Future of Work": "ИИ и Будущее Работы",
-    "VPR Tests": "ВПР Тесты",
-    "Purpose & Profit": "Цель и Прибыль",
-    "Experimental Mindset": "Эксперим. Мышление",
-    "Bot Busters": "Охотники за Ботами",
-    "BS Detector": "Детектор Чуши",
-    "Wheel of Fortune": "Колесо Фортуны",
-    "My Invoices": "Мои Счета",
-    "Subscribe": "Подписаться",
-    "Donate": "Поддержать",
-    "Style Guide": "Гайд по Стилю",
-    "oneSitePls Info": "Инфо oneSitePls",
-    "oneSitePls How-To": "Как юзать oneSitePls",
-    "Rent a Car": "Аренда Авто",
-    "Geo Cheatsheet 6": "Шпаргалка Гео 6",
-    "History Cheatsheet 6": "Шпаргалка Ист 6",
-    "Biology Cheatsheet 6": "Шпаргалка Био 6",
-    "Upload Advice": "Загрузить Совет",
-    "Admin Panel": "Админ Панель",
-    "Fleet Admin": "Админ Автопарка",
-    "YT Admin": "Админ YT",
-    "Search pages...": "Поиск страниц...",
-    "No pages found matching": "Страницы не найдены по запросу",
-    "Admin Only": "Только для админа",
-    "Toggle Language": "Переключить язык",
-    "Open navigation": "Открыть навигацию",
-    "Close navigation": "Закрыть навигацию",
-    "Hot": "Новинка",
-    "Pin header": "Закрепить хедер (всегда виден)", // New
-    "Unpin header": "Открепить хедер (авто-скрытие)", // New
+    "Cyber Garage": "Кибер Гараж", "About Me": "Обо мне", "SUPERVIBE Studio": "SUPERVIBE Studio", "Jumpstart Kit": "Набор Jumpstart", "SelfDev Path": "Путь Саморазвития", "VIBE Plan": "VIBE План", "Advice": "Советы", "AI & Future of Work": "ИИ и Будущее Работы", "VPR Tests": "ВПР Тесты", "Purpose & Profit": "Цель и Прибыль", "Experimental Mindset": "Эксперим. Мышление", "Bot Busters": "Охотники за Ботами", "BS Detector": "Детектор Чуши", "Wheel of Fortune": "Колесо Фортуны", "My Invoices": "Мои Счета", "Subscribe": "Подписаться", "Donate": "Поддержать", "Style Guide": "Гайд по Стилю", "oneSitePls Info": "Инфо oneSitePls", "oneSitePls How-To": "Как юзать oneSitePls", "Rent a Car": "Аренда Авто", "Geo Cheatsheet 6": "Шпаргалка Гео 6", "History Cheatsheet 6": "Шпаргалка Ист 6", "Biology Cheatsheet 6": "Шпаргалка Био 6", "Upload Advice": "Загрузить Совет", "Admin Panel": "Админ Панель", "Fleet Admin": "Админ Автопарка", "YT Admin": "Админ YT", "Search pages...": "Поиск страниц...", "No pages found matching": "Страницы не найдены по запросу", "Admin Only": "Только для админа", "Toggle Language": "Переключить язык", "Open navigation": "Открыть навигацию", "Close navigation": "Закрыть навигацию", "Hot": "Новинка", // Pin translations removed
   }
 };
 
@@ -149,12 +73,11 @@ const translations: Record<string, Record<string, string>> = {
 export default function Header() {
   const { isAdmin, user } = useAppContext();
   const [isNavOpen, setIsNavOpen] = useState(false);
-  const [isHeaderVisible, setIsHeaderVisible] = useState(false);
-  const [isPinned, setIsPinned] = useState(false); // New state for pinning
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true); // Default to true, let scroll hide it
   const [lastScrollY, setLastScrollY] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const pathname = usePathname();
-  logger.log(`[Header] Render start. Path: ${pathname}, NavOpen: ${isNavOpen}, Pinned: ${isPinned}`);
+  logger.log(`[Header] Render start. Path: ${pathname}, NavOpen: ${isNavOpen}`);
 
   const initialLang = useMemo(() => {
     const userLang = user?.language_code;
@@ -180,14 +103,7 @@ export default function Header() {
     setCurrentLang(prevLang => prevLang === 'en' ? 'ru' : 'en');
   }, []);
 
-  const togglePin = useCallback(() => {
-    logger.log(`[Header CB] Toggling pin`);
-    setIsPinned(prev => !prev);
-    // If pinning, ensure header becomes visible immediately
-    if (!isPinned) {
-        setIsHeaderVisible(true);
-    }
-  }, [isPinned]); // Add isPinned dependency
+  // Removed togglePin callback
 
   const currentLogoText = useMemo(() => {
     const currentPage = allPages.find(p => p.path === pathname);
@@ -212,26 +128,24 @@ export default function Header() {
 
   const handleScroll = useCallback(() => {
     const currentScrollY = window.scrollY;
-    // If pinned or nav is open, always show header
-    if (isPinned || isNavOpen) {
-      if (!isHeaderVisible) setIsHeaderVisible(true); // Ensure it's visible if it wasn't
+    // If nav is open, always show header
+    if (isNavOpen) {
+      if (!isHeaderVisible) setIsHeaderVisible(true);
       setLastScrollY(currentScrollY);
       return;
     }
-    // Default scroll behavior (hide on down, show on up)
+    // Scroll behavior: hide on down, show on up
     if (currentScrollY > lastScrollY && currentScrollY > 50) { // Hide threshold
       if (isHeaderVisible) {
-        // logger.debug("[Header Scroll] Hiding header");
         setIsHeaderVisible(false);
       }
-    } else if (currentScrollY < lastScrollY) {
+    } else if (currentScrollY < lastScrollY || currentScrollY <= 50) { // Show if scrolling up OR near top
       if (!isHeaderVisible) {
-         // logger.debug("[Header Scroll] Showing header");
          setIsHeaderVisible(true);
       }
     }
     setLastScrollY(currentScrollY);
-  }, [lastScrollY, isNavOpen, isPinned, isHeaderVisible]); // Added isPinned and isHeaderVisible
+  }, [lastScrollY, isNavOpen, isHeaderVisible]); // Dependencies simplified
 
   useEffect(() => {
     logger.log("[Header Effect Scroll] Attaching scroll listener.");
@@ -243,13 +157,12 @@ export default function Header() {
   }, [handleScroll]);
 
   useEffect(() => {
-    // Close nav and clear search on path change
     if (isNavOpen) {
       logger.log(`[Header Effect Path] Path changed to ${pathname}, closing nav.`);
       setIsNavOpen(false);
       setSearchTerm("");
     }
-  }, [pathname, isNavOpen]); // Added isNavOpen dependency
+  }, [pathname]); // isNavOpen is not needed here; we only care if path *changes*
 
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
@@ -257,13 +170,19 @@ export default function Header() {
       logger.log("[Header Effect Nav Overflow] Nav open, hiding body overflow.");
       document.body.style.overflow = 'hidden';
     } else {
-      // logger.debug("[Header Effect Nav Overflow] Nav closed, restoring body overflow.");
-      document.body.style.overflow = originalStyle;
+      // Restore only if it was previously hidden by this effect
+      if (document.body.style.overflow === 'hidden') {
+         logger.log("[Header Effect Nav Overflow] Nav closed, restoring body overflow.");
+         document.body.style.overflow = originalStyle;
+      }
     }
-    // Cleanup function to restore original style
+    // Cleanup function
     return () => {
-      // logger.debug("[Header Effect Nav Overflow Cleanup] Restoring body overflow.");
-      document.body.style.overflow = originalStyle;
+      // Ensure we restore if component unmounts while nav is open
+      if (document.body.style.overflow === 'hidden') {
+        logger.log("[Header Effect Nav Overflow Cleanup] Restoring body overflow on unmount/close.");
+        document.body.style.overflow = originalStyle;
+      }
     };
   }, [isNavOpen]);
 
@@ -285,7 +204,7 @@ export default function Header() {
       <motion.header
         className={`fixed top-0 left-0 right-0 z-40 bg-black/70 border-b border-brand-purple/30 shadow-lg backdrop-blur-md transition-transform duration-300 ease-in-out`}
         initial={{ y: 0 }}
-        animate={{ y: (isHeaderVisible || isPinned) ? 0 : "-100%" }} // Modified animation based on pin state
+        animate={{ y: isHeaderVisible ? 0 : "-100%" }} // Simplified animation
         transition={{ type: "tween", duration: 0.3 }}
       >
         <div className="container mx-auto px-4 py-3">
@@ -294,20 +213,7 @@ export default function Header() {
               {currentLogoText}
             </Link>
             <div className="flex items-center gap-2 md:gap-3">
-               {/* Pin Toggle Button */}
-               <button
-                  onClick={togglePin}
-                  className={cn(
-                    "p-2 transition-colors focus:outline-none focus:ring-1 focus:ring-offset-2 focus:ring-offset-black rounded-md",
-                    isPinned
-                      ? "text-brand-yellow hover:text-brand-yellow/80 focus:ring-brand-yellow"
-                      : "text-gray-500 hover:text-gray-300 focus:ring-gray-400"
-                  )}
-                  aria-label={isPinned ? t("Unpin header") : t("Pin header")}
-                  title={isPinned ? t("Unpin header") : t("Pin header")}
-                >
-                  {isPinned ? <PinOff className="h-5 w-5" /> : <Pin className="h-5 w-5" />}
-                </button>
+              {/* Pin Toggle Button Removed */}
 
               {/* Language Toggle Button */}
               <button
@@ -319,19 +225,26 @@ export default function Header() {
                 {currentLang === 'en' ? 'RU' : 'EN'}
               </button>
 
-              {/* User Info (Always Visible) */}
+              {/* User Info */}
               <UserInfo />
 
-              {/* Navigation Toggle Button (Conditional) */}
-              {!isNavOpen && (
-                <button
-                  onClick={() => { setIsNavOpen(true); }}
-                  className="p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md"
-                  aria-label={t("Open navigation")}
-                  aria-expanded={isNavOpen}
-                >
-                  <LayoutGrid className="h-6 w-6" />
-                </button>
+              {/* Navigation Toggle Button */}
+              {/* Combined Open/Close logic into one button state for simplicity if preferred, but separate is fine */}
+              {!isNavOpen ? (
+                  <button
+                    onClick={() => {
+                      logger.log("[Header Click] Opening Nav");
+                      setIsNavOpen(true);
+                    }}
+                    className="p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md"
+                    aria-label={t("Open navigation")}
+                    aria-expanded={isNavOpen}
+                  >
+                    <LayoutGrid className="h-6 w-6" />
+                  </button>
+              ) : (
+                 // Close button is now rendered inside the overlay, so this button is only for opening
+                 null
               )}
             </div>
           </div>
@@ -347,12 +260,15 @@ export default function Header() {
             animate={{ opacity: 1, clipPath: 'circle(150% at calc(100% - 2rem) 2rem)' }}
             exit={{ opacity: 0, clipPath: 'circle(0% at calc(100% - 2rem) 2rem)' }}
             transition={{ type: "spring", stiffness: 260, damping: 30 }}
-            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto pt-20 pb-10 px-4 md:pt-24" // Keep z-50 higher than header
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto pt-20 pb-10 px-4 md:pt-24"
           >
-            {/* Close Button */}
+            {/* Close Button (Inside Overlay) */}
             <button
-              onClick={() => { setIsNavOpen(false); }}
-              className="fixed top-4 right-4 z-60 p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md"
+              onClick={() => {
+                 logger.log("[Header Click] Closing Nav from Overlay Button");
+                 setIsNavOpen(false);
+               }}
+              className="fixed top-4 right-4 z-[51] p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md"
               aria-label={t("Close navigation")}
             >
               <X className="h-6 w-6" />
@@ -384,7 +300,10 @@ export default function Header() {
                       <Link
                         key={page.path}
                         href={page.path}
-                        onClick={() => { setIsNavOpen(false); }} // Log navigation
+                        onClick={() => {
+                          logger.log(`[Header Click] Navigating to ${page.path}, closing nav.`);
+                          setIsNavOpen(false);
+                        }}
                         className={cn(
                           "group relative flex flex-col items-center justify-center rounded-md border transition-all duration-300 aspect-square text-center hover:scale-[1.03]",
                           "p-1.5 sm:p-2 md:p-1.5",
@@ -393,7 +312,6 @@ export default function Header() {
                           isCurrentPage ? 'ring-1 ring-offset-1 ring-offset-black ring-brand-green' : ''
                         )}
                       >
-                        {/* --- Иконка Новинки (Hot) --- */}
                         {page.isHot && (
                           <span
                             title={t("Hot")}
@@ -403,7 +321,6 @@ export default function Header() {
                             🔥
                           </span>
                         )}
-                        {/* ---------------------------- */}
                         {PageIcon && (
                           <PageIcon className={cn(
                             "h-4 w-4 sm:h-5 sm:w-5 md:h-4 md:w-4 mb-0.5 transition-transform duration-300 group-hover:scale-110",
@@ -417,7 +334,6 @@ export default function Header() {
                         )}>
                           {page.translatedName}
                         </span>
-                        {/* Иконка Админа */}
                         {page.isAdminOnly && (
                           <span title={t("Admin Only")} className="absolute top-0.5 right-0.5 text-[0.5rem] text-red-400 bg-black/60 rounded-full px-1 py-0 leading-none">🛡️</span>
                         )}
