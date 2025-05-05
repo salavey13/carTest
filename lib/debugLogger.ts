@@ -8,21 +8,16 @@ export interface LogRecord {
   timestamp: number;
 }
 
-// LogHandler is no longer needed by ErrorOverlayContext
-// export type LogHandler = (level: LogLevel, message: string, timestamp: number) => void;
-
 class DebugLogger {
   // Store logs as structured records
   private internalLogs: LogRecord[] = [];
   private logIdCounter = 0; // Counter for unique log IDs
   private maxInternalLogs = 200; // Keep a reasonable number of logs
-  private isBrowser: boolean = typeof window !== 'undefined';
-  // private logHandler: LogHandler | null = null; // Removed external handler state
+  private readonly isBrowser: boolean = typeof window !== 'undefined'; // Use readonly and initialize here
   private isLoggingInternally: boolean = false; // Prevent recursion
 
-  /* Removed setLogHandler method */
-
-  private safelyStringify(arg: any): string {
+  // --- Safely Stringify (Improved binding) ---
+  private safelyStringify = (arg: any): string => { // Use arrow function for 'this' binding
     try {
       if (arg instanceof Error) {
         return `Error: ${arg.message}${arg.name ? ` (${arg.name})` : ''}${arg.stack ? `\nStack: ${arg.stack}` : ''}`;
@@ -30,19 +25,21 @@ class DebugLogger {
       if (typeof arg === 'object' && arg !== null) {
         // Basic circular reference check
         try {
-          return JSON.stringify(arg, (key, value) => {
+          // --- Pass a *bound* function or use a standalone helper ---
+          const replacer = (key: string, value: any) => {
             // Handle common non-serializable types gracefully within stringify
             if (typeof value === 'bigint') { return value.toString() + 'n'; }
             if (value instanceof Map) { return `[Map (${value.size} entries)]`; }
             if (value instanceof Set) { return `[Set (${value.size} entries)]`; }
+            // Use 'this.isBrowser' safely here because safelyStringify is an arrow function
             if (this.isBrowser && value instanceof HTMLElement) { return `[HTMLElement: ${value.tagName}]`; }
             if (this.isBrowser && value instanceof Event) { return `[Event: ${value.type}]`; }
             if (value instanceof Function) { return `[Function: ${value.name || 'anonymous'}]`; }
             if (value instanceof Error) { return `Error: ${value.message}`; } // Stringify nested errors simply
             return value;
-          }, 2); // Indent for readability
+          };
+          return JSON.stringify(arg, replacer, 2); // Indent for readability
         } catch (e) {
-           // Fallback if JSON.stringify fails even with replacer (e.g., complex circular)
            if (e instanceof TypeError && e.message.includes('circular structure')) {
                return '[Circular Object]';
            }
@@ -62,6 +59,7 @@ class DebugLogger {
       return errorMsg;
     }
   }
+  // --- End Safely Stringify ---
 
 
   private logInternal(level: LogLevel, ...args: any[]) {
@@ -74,9 +72,8 @@ class DebugLogger {
     const timestamp = Date.now();
     let message = '';
     try {
-      // Ensure args is always an array before mapping
       const argsArray = Array.isArray(args) ? args : [args];
-      message = argsArray.map(this.safelyStringify).join(" ");
+      message = argsArray.map(this.safelyStringify).join(" "); // Use the bound safelyStringify
 
       // Add to internal structured logs
       const logEntry: LogRecord = {
@@ -86,12 +83,9 @@ class DebugLogger {
           timestamp,
       };
       this.internalLogs.push(logEntry);
-      // Trim logs if exceeding max count
       if (this.internalLogs.length > this.maxInternalLogs) {
         this.internalLogs = this.internalLogs.slice(this.internalLogs.length - this.maxInternalLogs);
       }
-
-      // --- Removed call to external logHandler ---
 
       // Log to browser console
       if (this.isBrowser && typeof console !== 'undefined') {
@@ -105,36 +99,21 @@ class DebugLogger {
           case 'debug': color = 'color: #9370DB;'; break;
           default: color = 'color: #A9A9A9;'; break;
         }
-        // Use appropriate console method, default to log
         const consoleMethod = (console as any)[level] || console.log;
-        try {
-          // Pass original args to console for better object inspection
-          consoleMethod(prefix, color, 'color: inherit;', ...argsArray);
-        } catch (e) {
-           // Fallback for problematic args/styling
-           console.error("[Logger] Error during styled console output:", e);
-           try { console.log(`[${level.toUpperCase()}] ${timestampStr}:`, ...argsArray); } catch {}
-        }
+        try { consoleMethod(prefix, color, 'color: inherit;', ...argsArray); }
+        catch (e) { console.error("[Logger] Error during styled console output:", e); try { console.log(`[${level.toUpperCase()}] ${timestampStr}:`, ...argsArray); } catch {} }
       }
     } catch (e) {
       const errorMsg = `[Internal Logging Error during message construction: ${this.safelyStringify(e)}]`;
-      // Use console.error directly for internal logger errors
       if (this.isBrowser) { console.error(errorMsg); }
-      // Still try to log the internal error
-      this.internalLogs.push({
-          id: this.logIdCounter++,
-          level: 'fatal',
-          message: errorMsg,
-          timestamp: Date.now(),
-      });
+      this.internalLogs.push({ id: this.logIdCounter++, level: 'fatal', message: errorMsg, timestamp: Date.now() });
       if (this.internalLogs.length > this.maxInternalLogs) { this.internalLogs.shift(); }
-       // --- Removed call to external logHandler ---
     } finally {
-      this.isLoggingInternally = false; // Reset recursion flag
+      this.isLoggingInternally = false;
     }
   }
 
-  // Public methods
+  // Public methods (use arrow functions for auto-binding)
   log = (...args: any[]) => this.logInternal('log', ...args);
   error = (...args: any[]) => this.logInternal('error', ...args);
   warn = (...args: any[]) => this.logInternal('warn', ...args);
@@ -144,7 +123,6 @@ class DebugLogger {
 
   // Method to get internal logs as structured records
   getInternalLogRecords = (): ReadonlyArray<LogRecord> => {
-      // Return a shallow copy to prevent external modification
       return [...this.internalLogs];
   };
 
@@ -157,8 +135,6 @@ class DebugLogger {
 
   clearInternalLogs = () => {
       this.internalLogs = [];
-      // Don't reset counter, keep IDs unique across clears within session
-      // this.logIdCounter = 0;
       this.log('info', '[Logger] Internal logs cleared.'); // Log the clearing action itself
   };
 }

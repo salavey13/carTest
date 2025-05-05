@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type { ErrorInfo as ReactErrorInfo } from 'react';
 import type { ToastRecord } from '@/types/toast';
-import { debugLogger as logger } from '@/lib/debugLogger'; // Use logger directly
+import { debugLogger as logger } from '@/lib/debugLogger';
 
 // --- Types ---
 
@@ -13,33 +13,29 @@ export interface ErrorInfo {
     type: ErrorSourceType;
     message: string;
     timestamp?: number;
-    componentStack?: string | null; // React component stack
-    stack?: string; // Native JS error stack
-    source?: string; // e.g., component name, function name, URL
-    error?: Error | any; // Keep original error if available
-    extra?: Record<string, any>; // For additional context
+    componentStack?: string | null;
+    stack?: string;
+    source?: string;
+    error?: Error | any;
+    extra?: Record<string, any>;
 }
 
 interface ErrorOverlayContextType {
-    toastHistory: ToastRecord[]; // Renamed from 'history' for clarity
+    toastHistory: ToastRecord[];
     errorInfo: ErrorInfo | null;
     isClientReady: boolean;
-    // Stable callback signature
     addToastToHistory: (toast: Omit<ToastRecord, 'id'>) => void;
-    // Stable callback signature
-    addErrorInfo: (errorDetails: ErrorInfo) => void; // Renamed from setErrorInfo for clarity
-    // Stable callback signature
+    addErrorInfo: (errorDetails: ErrorInfo | null) => void; // Accept null for clearing
     clearHistory: () => void;
-    showOverlay: boolean; // Flag to control overlay visibility
+    showOverlay: boolean;
 }
 
 // --- Context ---
 
 const defaultState: ErrorOverlayContextType = {
-    toastHistory: [], // Renamed
+    toastHistory: [],
     errorInfo: null,
     isClientReady: false,
-    // Default functions log warnings to indicate context is not ready
     addToastToHistory: () => { console.warn("ErrorOverlayContext: addToastToHistory called before provider ready."); },
     addErrorInfo: () => { console.warn("ErrorOverlayContext: addErrorInfo called before provider ready."); },
     clearHistory: () => { console.warn("ErrorOverlayContext: clearHistory called before provider ready."); },
@@ -51,10 +47,10 @@ const ErrorOverlayContext = createContext<ErrorOverlayContextType>(defaultState)
 // --- Provider ---
 
 export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [toastHistoryState, setToastHistoryState] = useState<ToastRecord[]>([]); // Renamed state
+    const [toastHistoryState, setToastHistoryState] = useState<ToastRecord[]>([]);
     const [errorInfoState, setErrorInfoState] = useState<ErrorInfo | null>(null);
     const [isClientReadyState, setIsClientReadyState] = useState(false);
-    const [showOverlayState, setShowOverlayState] = useState<boolean>(false); // State to control overlay
+    const [showOverlayState, setShowOverlayState] = useState<boolean>(false);
 
     useEffect(() => {
         setIsClientReadyState(true);
@@ -68,64 +64,63 @@ export const ErrorOverlayProvider: React.FC<{ children: React.ReactNode }> = ({ 
             logger.log(`[ErrorOverlayProvider Effect] Setting showOverlay to: ${shouldShow}`);
             setShowOverlayState(shouldShow);
         }
-    }, [errorInfoState, showOverlayState]); // Added showOverlayState to deps
+    }, [errorInfoState, showOverlayState]);
 
     // Stable callback using useCallback
     const addToastToHistoryStable = useCallback((toast: Omit<ToastRecord, 'id'>) => {
-        // Add only actual toasts shown via useAppToast
         logger.debug("[ErrorOverlayContext CB] addToastToHistory", { type: toast.type, msg: String(toast.message)?.substring(0, 30) });
         setToastHistoryState(prev => {
             const newHistory = [...prev, { ...toast, id: Date.now() + Math.random() }];
-            // Limit history size
             const MAX_TOASTS = 20;
             if (newHistory.length > MAX_TOASTS) {
                 return newHistory.slice(newHistory.length - MAX_TOASTS);
             }
             return newHistory;
         });
-    }, []); // No dependencies needed if only using setToastHistoryState
+    }, []);
 
-    // Renamed for clarity: This sets the error and implicitly shows the overlay
-    // Stable callback using useCallback
-    const addErrorInfoStable = useCallback((errorDetails: ErrorInfo) => {
-         const newErrorInfo = {
-             ...errorDetails,
-             timestamp: errorDetails.timestamp || Date.now(),
-         };
-         // Log the error being set *before* updating state
-         logger.error("[ErrorOverlayContext CB] addErrorInfo (setting error, will trigger overlay)", newErrorInfo);
-         setErrorInfoState(newErrorInfo); // This will update errorInfoState and trigger showOverlay=true effect via useEffect
+    // Stable callback using useCallback - Modified to handle null for clearing
+    const addErrorInfoStable = useCallback((errorDetails: ErrorInfo | null) => {
+         if (errorDetails === null) {
+             // Clear the error
+             logger.info("[ErrorOverlayContext CB] addErrorInfo(null) called, clearing error.");
+             setErrorInfoState(null); // This will trigger showOverlay=false effect
+         } else {
+             // Set a new error
+             const newErrorInfo = {
+                 ...errorDetails,
+                 timestamp: errorDetails.timestamp || Date.now(), // Ensure timestamp exists
+             };
+             logger.error("[ErrorOverlayContext CB] addErrorInfo (setting error, will trigger overlay)", newErrorInfo);
+             setErrorInfoState(newErrorInfo); // This will trigger showOverlay=true effect
+         }
      }, []); // No dependencies needed if only using setErrorInfoState
 
     // Stable callback using useCallback
     const clearHistoryStable = useCallback(() => {
         logger.info("[ErrorOverlayContext CB] clearHistory called.");
         setToastHistoryState([]);
-        setErrorInfoState(null); // This will update errorInfoState and trigger showOverlay=false effect via useEffect
-    }, []); // No dependencies needed if only using states setters
+        setErrorInfoState(null); // This will trigger showOverlay=false effect
+    }, []);
 
-
-    // --- REMOVED Logger Integration useEffect ---
 
     // Memoize the context value, depends on state values and stable callbacks
     const contextValue = useMemo((): ErrorOverlayContextType => {
-        logger.debug("[ErrorOverlayProvider] Memoizing context value."); // Keep for debugging memoization
+        logger.debug("[ErrorOverlayProvider] Memoizing context value.");
         return {
-            toastHistory: toastHistoryState, // Use state value
-            errorInfo: errorInfoState,         // Use state value
-            isClientReady: isClientReadyState, // Use state value
-            addToastToHistory: addToastToHistoryStable, // Use stable callback
-            addErrorInfo: addErrorInfoStable,           // Use stable callback
-            clearHistory: clearHistoryStable,           // Use stable callback
-            showOverlay: showOverlayState,              // Use state value
+            toastHistory: toastHistoryState,
+            errorInfo: errorInfoState,
+            isClientReady: isClientReadyState,
+            addToastToHistory: addToastToHistoryStable,
+            addErrorInfo: addErrorInfoStable,
+            clearHistory: clearHistoryStable,
+            showOverlay: showOverlayState,
         };
     }, [
         toastHistoryState,
         errorInfoState,
         isClientReadyState,
         showOverlayState,
-        // Stable callbacks don't need to be dependencies for useMemo here,
-        // but including them doesn't hurt and makes it explicit what the value contains.
         addToastToHistoryStable,
         addErrorInfoStable,
         clearHistoryStable,
@@ -144,14 +139,10 @@ export const useErrorOverlay = (): ErrorOverlayContextType => {
     const context = useContext(ErrorOverlayContext);
     if (context === undefined) {
         const errorMsg = "useErrorOverlay must be used within an ErrorOverlayProvider";
-        // Use console.error as logger might rely on the context itself indirectly
         console.error(`[${errorMsg}]`);
         throw new Error(errorMsg);
     }
-    // Check if it's still the default value (can happen during initial SSR or if provider is missing/failed)
-    // Use a function known to be defined in the real context but not the default
     if (context.addErrorInfo === defaultState.addErrorInfo && typeof window !== 'undefined') {
-         // Use console.warn as logger might not be fully ready
          console.warn("[useErrorOverlay Hook] Context seems to hold default value. Provider might not be fully initialized yet or is missing higher up the tree.");
     }
     return context;
