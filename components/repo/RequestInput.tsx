@@ -37,10 +37,13 @@ const RequestInput: React.FC<RequestInputProps> = ({
     const { success: toastSuccess, error: toastError } = useAppToast(); // Получаем функции тостов
 
     // --- Безопасное вычисление зависимых состояний ---
+    // Используем typeof для проверки и trim(), если это строка, иначе пустая строка
     const kworkValueTrimmed = typeof kworkInputValue === 'string' ? kworkInputValue.trim() : '';
     const hasContent = kworkValueTrimmed.length > 0;
 
+    // Кнопка копирования активна, если есть контент и действия не заблокированы
     const calculatedIsCopyDisabled = !hasContent || isActionDisabled;
+    // Кнопка очистки активна, если есть контент ИЛИ выбраны файлы ИЛИ файлы были загружены (чтобы можно было очистить даже пустой инпут после загрузки), и действия не заблокированы
     const calculatedIsClearDisabled = (!hasContent && selectedFetcherFilesCount === 0 && !filesFetched) || isActionDisabled;
     // --- Конец безопасного вычисления ---
 
@@ -63,7 +66,7 @@ const RequestInput: React.FC<RequestInputProps> = ({
                     <Textarea
                         ref={kworkInputRef}
                         id="kworkInput"
-                        value={kworkInputValue ?? ''} // Гарантируем строку
+                        value={kworkInputValue ?? ''} // Гарантируем строку здесь
                         onChange={(e) => onValueChange(e.target.value)}
                         className="w-full p-3 pr-10 bg-gray-800 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none transition shadow-[0_0_8px_rgba(168,85,247,0.3)] text-sm min-h-[150px] resize-y simple-scrollbar"
                         placeholder="4. Напиши свой запрос к AI здесь ИЛИ добавь выбранные файлы как контекст ->"

@@ -1,4 +1,3 @@
-// No changes needed based on the last analysis, but providing full code as requested.
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useMemo, useCallback } from "react";
@@ -218,7 +217,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     useImperativeHandle(ref, () => ({
         handleFetch: (isManualRetry?: boolean, branchNameToFetchOverride?: string | null, taskForEarlyCheck?: ImageReplaceTask | null) => {
             logger.debug(`[Imperative] handleFetch called.`);
-            return handleFetchManual(isManualRetry, branchNameToFetchOverride, taskForEarlyCheck || imageReplaceTask);
+            // Pass override, but task/flow info is now read from context inside handleFetchManual
+            return handleFetchManual(isManualRetry, branchNameToFetchOverride);
         },
         selectHighlightedFiles: () => {
              logger.debug(`[Imperative] selectHighlightedFiles called.`);
@@ -298,8 +298,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const currentImageTask = imageReplaceTask;
     const showProgressBar = fetchStatus !== 'idle';
     const isActionDisabled = isFetchLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing || !!currentImageTask;
-    const isCopyDisabled = !kworkInputValue.trim() || isActionDisabled;
-    const isClearDisabled = (!kworkInputValue.trim() && selectedFetcherFiles.size === 0 && !filesFetched) || isActionDisabled;
+    // Ensure kworkInputValue is treated as a string for trim()
+    const isCopyDisabled = !(kworkInputValue ?? '').trim() || isActionDisabled;
+    const isClearDisabled = (!(kworkInputValue ?? '').trim() && selectedFetcherFiles.size === 0 && !filesFetched) || isActionDisabled;
     const isAddSelectedDisabled = selectedFetcherFiles.size === 0 || isActionDisabled;
     const effectiveBranchDisplay = targetBranchName || manualBranchName || "default";
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
@@ -327,8 +328,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                             <VibeContentRenderer content={"1. Настрой (<FaCodeBranch title='Настройки' class='inline text-cyan-400'/>)."} />
                             <VibeContentRenderer content={"2. Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>."} />
                             <VibeContentRenderer content={"3. Выбери файлы или <span class='font-bold text-teal-400 mx-1'>связанные</span> / <span class='font-bold text-orange-400 mx-1'>важные</span>."} />
-                            <VibeContentRenderer content={"4. Опиши задачу ИЛИ добавь файлы (<FaPlus title='Добавить выбранные в запрос' class='inline text-sm'/>) / все (<FaTree title='Добавить все файлы в запрос' class='inline text-sm'/>)."} />
-                            <VibeContentRenderer content={"5. Скопируй (<FaCopy title='Скопировать запрос' class='inline text-sm mx-px'/>) или передай дальше."} />
+                            {/* Removed brackets around icons */}
+                            <VibeContentRenderer content={"4. Опиши задачу ИЛИ добавь файлы <FaPlus title='Добавить выбранные в запрос' class='inline text-sm'/> / все <FaTree title='Добавить все файлы в запрос' class='inline text-sm'/>."} />
+                            <VibeContentRenderer content={"5. Скопируй <FaCopy title='Скопировать запрос' class='inline text-sm mx-px'/> или передай дальше."} />
                         </div>
                       )}
                       {currentImageTask && (
@@ -374,7 +376,11 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              {/* Fetch Button */}
              <div className="mb-4 flex justify-center">
                   <motion.button
-                      onClick={() => { logger.info("[Click] Fetch Button Clicked"); handleFetchManual(fetchStatus === 'failed_retries' || fetchStatus === 'error', null, currentImageTask); }}
+                      onClick={() => {
+                          logger.info("[Click] Fetch Button Clicked");
+                          // Call handleFetchManual without task/flow args - it reads context now
+                          handleFetchManual(fetchStatus === 'failed_retries' || fetchStatus === 'error');
+                       }}
                       disabled={isFetchDisabled}
                       className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-white bg-gradient-to-r ${fetchStatus === 'failed_retries' || fetchStatus === 'error' ? 'from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600' : 'from-purple-600 to-cyan-500'} transition-all shadow-lg shadow-purple-500/30 hover:shadow-cyan-500/40 ${isFetchDisabled ? "opacity-60 cursor-not-allowed" : "hover:brightness-110 active:scale-[0.98]"}`}
                       whileHover={{ scale: isFetchDisabled ? 1 : 1.03 }}
@@ -388,6 +394,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
               </div>
 
              {/* Progress Bar and Status Messages */}
+             {/* NOTE: The logic for displaying the correct branch name ('effectiveBranchDisplay') was already correct here. */}
+             {/* If the displayed branch is wrong, the issue is likely in the SERVER ACTION not using the correct branch. */}
              {showProgressBar && (
                   <div className="mb-4 min-h-[40px]">
                       {(() => { logger.debug("[Render] Rendering ProgressBar (conditional)"); return null; })()}
@@ -426,7 +434,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              <div className={`grid grid-cols-1 ${ (fetchedFiles.length > 0 && !currentImageTask) ? 'md:grid-cols-2' : ''} gap-4 md:gap-6`}>
                  {/* --- Column 1: File List & Preview (Standard Mode) --- */}
                  {!currentImageTask && (isFetchLoading || fetchedFiles.length > 0) && (
-                     <div className={`flex flex-col gap-4 ${ (fetchedFiles.length > 0 || kworkInputHasContent) ? '' : 'md:col-span-2'}`}>
+                     <div className={`flex flex-col gap-4 ${ (fetchedFiles.length > 0 || (kworkInputValue ?? '').trim().length > 0) ? '' : 'md:col-span-2'}`}> {/* Adjusted visibility condition */}
                          {(() => { logger.debug("[Render] Rendering SelectedFilesPreview (conditional)"); return null; })()}
                          <SelectedFilesPreview
                              selectedFiles={selectedFetcherFiles}
@@ -456,7 +464,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
 
                  {/* --- Column 2: Kwork Input (Standard Mode) --- */}
                   {/* Show input if files fetched OR if input already has content (even if fetch fails later) */}
-                 {!currentImageTask && (fetchedFiles.length > 0 || kworkInputValue.trim().length > 0) && (
+                 {!currentImageTask && (fetchedFiles.length > 0 || (kworkInputValue ?? '').trim().length > 0) && (
                       <div id="kwork-input-section" className="flex flex-col gap-3">
                           {(() => { logger.debug("[Render] Rendering RequestInput (conditional)"); return null; })()}
                           <RequestInput
@@ -466,10 +474,12 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                               onCopyToClipboard={() => { logger.debug("[Input Action] Copy Click"); handleCopyToClipboard(undefined, true); }}
                               onClearAll={() => { logger.debug("[Input Action] Clear Click"); handleClearAll(); }}
                               onAddSelected={() => { logger.debug("[Input Action] AddSelected Click"); handleAddSelected(); }}
-                              isCopyDisabled={isCopyDisabled}
-                              isClearDisabled={isClearDisabled}
-                              isAddSelectedDisabled={isAddSelectedDisabled}
+                              isCopyDisabled={isCopyDisabled} // Use derived state
+                              isClearDisabled={isClearDisabled} // Use derived state
+                              isAddSelectedDisabled={isAddSelectedDisabled} // Use derived state
                               selectedFetcherFilesCount={selectedFetcherFiles.size}
+                              filesFetched={filesFetched} // Pass filesFetched status
+                              isActionDisabled={isActionDisabled} // Pass general action disable flag
                           />
                       </div>
                  )}
