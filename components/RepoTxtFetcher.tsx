@@ -299,8 +299,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const showProgressBar = fetchStatus !== 'idle';
     const isActionDisabled = isFetchLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing || !!currentImageTask;
     // Ensure kworkInputValue is treated as a string for trim()
-    const isCopyDisabled = !(kworkInputValue ?? '').trim() || isActionDisabled;
-    const isClearDisabled = (!(kworkInputValue ?? '').trim() && selectedFetcherFiles.size === 0 && !filesFetched) || isActionDisabled;
+    const kworkValueForCheck = kworkInputValue ?? ''; // Safeguard here for derivation
+    const isCopyDisabled = !kworkValueForCheck.trim() || isActionDisabled;
+    const isClearDisabled = (!kworkValueForCheck.trim() && selectedFetcherFiles.size === 0 && !filesFetched) || isActionDisabled;
     const isAddSelectedDisabled = selectedFetcherFiles.size === 0 || isActionDisabled;
     const effectiveBranchDisplay = targetBranchName || manualBranchName || "default";
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
@@ -434,7 +435,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              <div className={`grid grid-cols-1 ${ (fetchedFiles.length > 0 && !currentImageTask) ? 'md:grid-cols-2' : ''} gap-4 md:gap-6`}>
                  {/* --- Column 1: File List & Preview (Standard Mode) --- */}
                  {!currentImageTask && (isFetchLoading || fetchedFiles.length > 0) && (
-                     <div className={`flex flex-col gap-4 ${ (fetchedFiles.length > 0 || (kworkInputValue ?? '').trim().length > 0) ? '' : 'md:col-span-2'}`}> {/* Adjusted visibility condition */}
+                     <div className={`flex flex-col gap-4 ${ (fetchedFiles.length > 0 || (kworkValueForCheck ?? '').trim().length > 0) ? '' : 'md:col-span-2'}`}> {/* Adjusted visibility condition */}
                          {(() => { logger.debug("[Render] Rendering SelectedFilesPreview (conditional)"); return null; })()}
                          <SelectedFilesPreview
                              selectedFiles={selectedFetcherFiles}
@@ -464,12 +465,14 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
 
                  {/* --- Column 2: Kwork Input (Standard Mode) --- */}
                   {/* Show input if files fetched OR if input already has content (even if fetch fails later) */}
-                 {!currentImageTask && (fetchedFiles.length > 0 || (kworkInputValue ?? '').trim().length > 0) && (
+                 {!currentImageTask && (fetchedFiles.length > 0 || (kworkValueForCheck ?? '').trim().length > 0) && (
                       <div id="kwork-input-section" className="flex flex-col gap-3">
                           {(() => { logger.debug("[Render] Rendering RequestInput (conditional)"); return null; })()}
+                          {/* LOGGING: Pass the safeguarded value */}
+                          {(() => { logger.debug(`[Render] Passing kworkInputValue to RequestInput: '${(kworkInputValue ?? '').substring(0,50)}...'`); return null; })()}
                           <RequestInput
                               kworkInputRef={kworkInputRef} // Pass ref for focus/imperative actions
-                              kworkInputValue={kworkInputValue ?? ''} // <<< ADDED SAFEGUARD HERE
+                              kworkInputValue={kworkInputValue ?? ''} // <<< SAFEGUARDED VALUE PASSED
                               onValueChange={setKworkInputValue} // Pass state setter
                               onCopyToClipboard={() => { logger.debug("[Input Action] Copy Click"); handleCopyToClipboard(undefined, true); }}
                               onClearAll={() => { logger.debug("[Input Action] Clear Click"); handleClearAll(); }}

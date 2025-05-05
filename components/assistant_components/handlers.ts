@@ -569,93 +569,99 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
      ]);
 
     // --- Direct Image Replace Handler ---
-    const handleDirectImageReplace = useCallback(async (task: ImageReplaceTask, currentAllFiles: FileNode[]): Promise<void> => {
+    const handleDirectImageReplace = useCallback(async (task: ImageReplaceTask, currentAllFiles: FileNode[]): Promise<{ success: boolean; error?: string }> => {
       if (!task?.targetPath || !task.oldUrl || !task.newUrl) {
-          logger.warn("[handleDirectImageReplace] Invalid task provided:", task);
+          logger.warn("[Flow 1 - Image Swap] handleDirectImageReplace: Invalid task provided:", task);
           setImageReplaceError("Некорректные данные для задачи замены.");
-          return;
+          return { success: false, error: "Invalid task data" };
       }
       if (!repoUrlForForm || !repoUrlForForm.includes("github.com")) {
-           logger.error("[handleDirectImageReplace] Invalid repo URL:", repoUrlForForm);
+           logger.error("[Flow 1 - Image Swap] handleDirectImageReplace: Invalid repo URL:", repoUrlForForm);
            setImageReplaceError("Некорректный URL репозитория GitHub.");
-           return;
+           return { success: false, error: "Invalid repo URL" };
       }
       // Use the passed 'currentAllFiles' instead of context one, as context might not be updated yet
       const allFilesForReplace = currentAllFiles ?? [];
-      logger.log("[handleDirectImageReplace] Starting direct image replace process for task:", task);
+      logger.info("[Flow 1 - Image Swap] handleDirectImageReplace: Starting process", { task, repo: repoUrlForForm });
       setAssistantLoading(true); setIsProcessingPR(true); setImageReplaceError(null);
       const toastId = toast.loading(`Замена картинки в ${task.targetPath.split('/').pop()}...`);
+      let success = false; let errorMsg: string | undefined = undefined;
 
       try {
           const targetFile = allFilesForReplace.find(f => f.path === task.targetPath);
           if (!targetFile) { throw new Error(`Целевой файл ${task.targetPath} не найден среди загруженных.`); }
           if (typeof targetFile.content !== 'string') { throw new Error(`Содержимое файла ${task.targetPath} не является строкой.`); }
 
+          logger.debug("[Flow 1 - Image Swap] handleDirectImageReplace: Target file found", { path: targetFile.path });
+
           // Escape old URL for regex
           const escapedOldUrl = task.oldUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           const oldUrlRegex = new RegExp(escapedOldUrl, 'g');
 
           if (!oldUrlRegex.test(targetFile.content)) {
-              logger.warn(`[handleDirectImageReplace] Old URL "${task.oldUrl}" not found in file ${task.targetPath}. Proceeding anyway (might indicate prior replacement or error).`);
-              // toast.warn(`Старый URL не найден в файле ${task.targetPath}. Возможно, уже заменено?`, { id: toastId });
+              logger.warn(`[Flow 1 - Image Swap] handleDirectImageReplace: Old URL "${task.oldUrl}" not found in file ${task.targetPath}. Proceeding anyway.`);
           }
 
           const updatedContent = targetFile.content.replace(oldUrlRegex, task.newUrl);
           if (updatedContent === targetFile.content) {
-              logger.warn(`[handleDirectImageReplace] Content unchanged after replace for ${task.targetPath}. Old URL might not exist or is same as new.`);
+              logger.warn(`[Flow 1 - Image Swap] handleDirectImageReplace: Content unchanged after replace for ${task.targetPath}.`);
               toast.info(`Содержимое файла ${task.targetPath} не изменилось.`, { id: toastId });
               setImageReplaceTask(null); // Clear task as it's effectively done or irrelevant
-              setAssistantLoading(false); setIsProcessingPR(false);
-              return;
+              success = true; // Consider it success if no change was needed
+          } else {
+              logger.info(`[Flow 1 - Image Swap] handleDirectImageReplace: Content updated for ${task.targetPath}.`);
+              const filesToCommit = [{ path: task.targetPath, content: updatedContent }];
+              const commitSubject = `chore: Update image ${task.targetPath.split('/').pop()}`;
+              const commitBody = `Replaced image: ${task.oldUrl}\nWith new image: ${task.newUrl}\n\nFile: ${task.targetPath}`;
+              const fullCommitMessage = `${commitSubject}\n\n${commitBody}`;
+              const prTitleText = `${commitSubject} via CyberVibe`;
+              const prDescription = `Automatic image replacement request via CyberVibe Studio.\n\n**Details:**\n- File: \`${task.targetPath}\`\n- Old URL: ${task.oldUrl}\n- New URL: ${task.newUrl}`;
+
+              logger.debug("[Flow 1 - Image Swap] handleDirectImageReplace: Checking for existing PRs...");
+              const openPrsResult = await getOpenPullRequests(repoUrlForForm);
+              let prToUpdate: SimplePullRequest | null = null;
+              if (openPrsResult.success && Array.isArray(openPrsResult.pullRequests)) {
+                  const expectedPrTitlePrefix = `chore: Update image`;
+                  prToUpdate = openPrsResult.pullRequests.find(pr =>
+                      pr?.title?.startsWith(expectedPrTitlePrefix) &&
+                      pr?.title?.includes(task.targetPath) &&
+                      pr?.head?.ref
+                  ) ?? null;
+                   logger.debug(`[Flow 1 - Image Swap] handleDirectImageReplace: Found ${openPrsResult.pullRequests.length} PRs. Matching PR found: ${!!prToUpdate}`);
+              } else if (!openPrsResult.success) {
+                  logger.warn("[Flow 1 - Image Swap] handleDirectImageReplace: Failed to get open PRs:", openPrsResult.error);
+              }
+
+              if (prToUpdate?.head?.ref) {
+                   logger.info(`[Flow 1 - Image Swap] handleDirectImageReplace: Found existing PR #${prToUpdate.number}. Updating branch '${prToUpdate.head.ref}'.`);
+                   toast.info(`Обновление ветки '${prToUpdate.head.ref}' для PR #${prToUpdate.number}...`, { id: toastId });
+                   const updateResult = await triggerUpdateBranch(repoUrlForForm, filesToCommit, fullCommitMessage, prToUpdate.head.ref, prToUpdate.number, prDescription);
+                   if (!updateResult.success) throw new Error(updateResult.error || 'Ошибка обновления ветки');
+                   logger.info(`[Flow 1 - Image Swap] handleDirectImageReplace: Branch update successful.`);
+               } else {
+                   logger.info("[Flow 1 - Image Swap] handleDirectImageReplace: No existing relevant PR found. Creating new PR.");
+                   toast.info("Создание нового PR для замены картинки...", { id: toastId });
+                   const createResult = await createGitHubPullRequest(repoUrlForForm, filesToCommit, prTitleText, prDescription, fullCommitMessage);
+                   if (!createResult.success || !createResult.prUrl) throw new Error(createResult.error || 'Ошибка создания PR');
+                   toast.success(`PR для замены картинки создан: ${createResult.prUrl}`, { id: toastId, duration: 5000 });
+                   await triggerGetOpenPRs(repoUrlForForm); // Refresh PR list
+                   logger.info(`[Flow 1 - Image Swap] handleDirectImageReplace: New PR created: ${createResult.prUrl}`);
+               }
+              success = true; // Mark as success if PR/update completed
+              setImageReplaceTask(null); // Clear the task only on FULL success
           }
-
-          const filesToCommit = [{ path: task.targetPath, content: updatedContent }];
-          const commitSubject = `chore: Update image ${task.targetPath.split('/').pop()}`;
-          const commitBody = `Replaced image: ${task.oldUrl}\nWith new image: ${task.newUrl}\n\nFile: ${task.targetPath}`;
-          const fullCommitMessage = `${commitSubject}\n\n${commitBody}`;
-          const prTitleText = `${commitSubject} via CyberVibe`;
-          const prDescription = `Automatic image replacement request via CyberVibe Studio.\n\n**Details:**\n- File: \`${task.targetPath}\`\n- Old URL: ${task.oldUrl}\n- New URL: ${task.newUrl}`;
-
-          logger.log("[handleDirectImageReplace] Checking for existing PRs for this image task...");
-          const openPrsResult = await getOpenPullRequests(repoUrlForForm);
-          let prToUpdate: SimplePullRequest | null = null;
-          if (openPrsResult.success && Array.isArray(openPrsResult.pullRequests)) {
-              const expectedPrTitlePrefix = `chore: Update image`;
-              prToUpdate = openPrsResult.pullRequests.find(pr =>
-                  pr?.title?.startsWith(expectedPrTitlePrefix) &&
-                  pr?.title?.includes(task.targetPath) &&
-                  pr?.head?.ref
-              ) ?? null;
-          } else if (!openPrsResult.success) {
-              logger.warn("[handleDirectImageReplace] Failed to get open PRs:", openPrsResult.error);
-          }
-
-          if (prToUpdate?.head?.ref) {
-               logger.log(`[handleDirectImageReplace] Found existing PR #${prToUpdate.number}. Updating branch '${prToUpdate.head.ref}'.`);
-               toast.info(`Обновление ветки '${prToUpdate.head.ref}' для PR #${prToUpdate.number}...`, { id: toastId });
-               const updateResult = await triggerUpdateBranch(repoUrlForForm, filesToCommit, fullCommitMessage, prToUpdate.head.ref, prToUpdate.number, prDescription);
-               if (!updateResult.success) throw new Error(updateResult.error || 'Ошибка обновления ветки');
-           } else {
-               logger.log("[handleDirectImageReplace] No existing relevant PR found. Creating new PR.");
-               toast.info("Создание нового PR для замены картинки...", { id: toastId });
-               const createResult = await createGitHubPullRequest(repoUrlForForm, filesToCommit, prTitleText, prDescription, fullCommitMessage);
-               if (!createResult.success || !createResult.prUrl) throw new Error(createResult.error || 'Ошибка создания PR');
-               toast.success(`PR для замены картинки создан: ${createResult.prUrl}`, { id: toastId, duration: 5000 });
-               await triggerGetOpenPRs(repoUrlForForm); // Refresh PR list
-           }
-
-          logger.log("[handleDirectImageReplace] Image replacement and PR/Update process finished successfully.");
-          setImageReplaceTask(null); // Clear the task only on FULL success
 
       } catch (err: any) {
-          logger.error("[handleDirectImageReplace] Error during process:", err);
-          const errorMsg = err?.message || "Неизвестная ошибка при замене картинки.";
+          errorMsg = err?.message || "Неизвестная ошибка при замене картинки.";
+          logger.error("[Flow 1 - Image Swap] handleDirectImageReplace: Error during process:", err);
           toast.error(`Ошибка: ${errorMsg}`, { id: toastId, duration: 6000 });
           setImageReplaceError(errorMsg); // Set error state for UI feedback
+          success = false;
       } finally {
           setAssistantLoading(false); setIsProcessingPR(false);
-          logger.log("[handleDirectImageReplace] Finally block reached.");
+          logger.info(`[Flow 1 - Image Swap] handleDirectImageReplace: Finally block reached. Success: ${success}`);
       }
+       return { success, error: errorMsg }; // Return success status and error message
     }, [
         repoUrlForForm, setAssistantLoading, setIsProcessingPR, setImageReplaceError,
         triggerUpdateBranch, createGitHubPullRequest, triggerGetOpenPRs,
