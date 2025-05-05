@@ -191,14 +191,14 @@ function ActualPageContent() {
 
     // --- Destructure context ---
     const {
-        fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef,
-        setImageReplaceTask, setKworkInputValue, fetchStatus, setKworkInputHasContent,
-        imageReplaceTask, allFetchedFiles, selectedFetcherFiles, kworkInputValue,
+        fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef, // Refs
+        setImageReplaceTask, setKworkInputValue, fetchStatus, setKworkInputHasContent, // State setters
+        imageReplaceTask, allFetchedFiles, selectedFetcherFiles, kworkInputValue, // State values
         repoUrl, setRepoUrl, addToast,
         targetPrData, setTargetPrData,
         isPreChecking, setPendingFlowDetails, pendingFlowDetails,
         setTargetBranchName, setManualBranchName, showComponents, setShowComponents,
-        triggerPreCheckAndFetch,
+        triggerPreCheckAndFetch, // Stable trigger
     } = pageContext;
 
     // --- Effect 1: Language ---
@@ -345,28 +345,27 @@ function ActualPageContent() {
         debug("[Effect Populate Kwork] Conditions met, checking derived idea...");
 
         // Only populate if a 'Simple' idea was derived from URL params
-        if (derivedIdea) {
+        if (typeof derivedIdea === 'string' && derivedIdea.trim() !== '') {
             log(`[Effect Populate Kwork] Populating kwork with simple idea: ${derivedIdea.substring(0, 30)}...`);
-            // Use functional update with checks for undefined/null
+
+            // More robust update function
             setKworkInputValue(prev => {
-                const currentVal = prev || ""; // Default to empty string if prev is null/undefined
-                const ideaToAdd = derivedIdea || ""; // Ensure ideaToAdd is a string
-                // Check both prev and ideaToAdd are valid strings before comparing/concatenating
-                if (typeof currentVal === 'string' && typeof ideaToAdd === 'string' && !currentVal.includes(ideaToAdd)) {
-                    return (currentVal.trim() ? currentVal + "\n\n" : "") + ideaToAdd; // Use trim() safely
+                const currentVal = (typeof prev === 'string' ? prev : "") || ""; // Ensure string
+                const ideaToAdd = derivedIdea || ""; // Ensure string
+                if (!currentVal.includes(ideaToAdd)) {
+                    // Use trim() safely on currentVal only if it's confirmed non-empty
+                    const separator = currentVal.trim() ? "\n\n" : "";
+                    return currentVal + separator + ideaToAdd;
                 }
-                debug("[Effect Populate Kwork] Input already contains the idea or invalid values, skipping update.");
-                return currentVal; // Return unchanged value
+                debug("[Effect Populate Kwork] Input already contains the idea, skipping update.");
+                return currentVal; // Return unchanged value if already present
             });
 
             // Auto-add highlighted file context
             if (derivedHighlightedPath && fetcherRef?.current && allFetchedFiles.some(f => f.path === derivedHighlightedPath)) {
                 if (!selectedFetcherFiles.has(derivedHighlightedPath)) {
                     log("[Effect Populate Kwork] Auto-adding highlighted file context:", derivedHighlightedPath);
-                    setTimeout(() => { // Delay slightly
-                        try { fetcherRef.current?.handleAddSelected?.(new Set([derivedHighlightedPath]), allFetchedFiles); }
-                        catch(addErr) { error("[Effect Populate Kwork] Error calling handleAddSelected imperatively:", addErr); }
-                    }, 50);
+                    setTimeout(() => { try { fetcherRef.current?.handleAddSelected?.(new Set([derivedHighlightedPath]), allFetchedFiles); } catch(addErr) { error("[Effect Populate Kwork] Error calling handleAddSelected imperatively:", addErr); } }, 50);
                 } else { log("[Effect Populate Kwork] Highlighted file already selected, skipping auto-add context."); }
             } else if (derivedHighlightedPath) { warn("[Effect Populate Kwork] Highlighted path exists, but file/ref not found for auto-add context."); }
 
@@ -386,6 +385,7 @@ function ActualPageContent() {
         fetchStatus, isPreChecking, initialUrlProcessed, derivedIdea, derivedHighlightedPath, // Core triggers
         kworkInputRef, fetcherRef, allFetchedFiles, selectedFetcherFiles, // Refs/state needed *inside*
         setKworkInputValue, // Stable context setter
+        // DO NOT add kworkInputValue here - prevents infinite loop
         error, warn, log, debug, // Utilities
     ]);
 
