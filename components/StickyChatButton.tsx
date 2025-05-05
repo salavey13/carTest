@@ -61,13 +61,18 @@ const StickyChatButton: React.FC = () => {
 
     // --- Copy Logs Handler ---
     const handleCopyLogs = useCallback(async () => {
+        const plannedAction = "[StickyChat] Plan: Copy internal logs to clipboard.";
+        logger.info(plannedAction);
+        let success = false;
         try {
-            logger.info("[StickyChat] Attempting to copy logs..."); // Log start
+            if (!navigator?.clipboard?.writeText) {
+                throw new Error("Clipboard API (writeText) not available or not permitted in this context.");
+            }
             const logRecords: ReadonlyArray<LogRecord> = debugLogger.getInternalLogRecords();
             if (logRecords.length === 0) {
-                logger.warn("[StickyChat] No logs found to copy.");
+                logger.warn("[StickyChat] HasBeenPlanter: Copy logs failed - No logs found.");
                 toastInfo("Нет логов для копирования.");
-                return;
+                return; // No need to proceed
             }
             // Format logs with timestamp and level
             const formattedLogs = logRecords.map(log =>
@@ -75,13 +80,16 @@ const StickyChatButton: React.FC = () => {
             ).join("\n");
 
             await navigator.clipboard.writeText(formattedLogs);
-            logger.info(`[StickyChat] Copied ${logRecords.length} log records to clipboard.`);
+            success = true; // Mark success only after writeText resolves
+            logger.info(`[StickyChat] HasBeenPlanter: Copy logs SUCCESS - Copied ${logRecords.length} records.`);
             toastSuccess("Логи скопированы в буфер обмена!");
             setLogsCopied(true);
             setTimeout(() => setLogsCopied(false), 2000); // Reset button text after 2s
-        } catch (err) {
-            logger.error("[StickyChat] Failed to copy logs:", err);
-            toastError("Не удалось скопировать логи.");
+
+        } catch (err: any) {
+            success = false;
+            logger.error("[StickyChat] HasBeenPlanter: Copy logs FAILED.", { plannedAction, error: err?.message ?? err });
+            toastError(`Не удалось скопировать логи: ${err?.message ?? 'Unknown error'}`);
         }
     }, [toastSuccess, toastError, toastInfo]); // Dependencies for toast functions
 
@@ -106,7 +114,7 @@ const StickyChatButton: React.FC = () => {
     useEffect(() => {
         if (isAppLoading || githubLoading) { let loadingMsg = "Подключаюсь..."; if (githubLoading) loadingMsg = `Ищу твой профиль GitHub... 🧐`; setActiveMessage(loadingMsg); return; } let userIdentifier = githubProfile?.name || appContextUser?.first_name || appContextUser?.username || null; const baseGreeting = userIdentifier ? `Здарова, ${userIdentifier}!` : "Эй, Кодер!"; const justLoadedProfile = prevGithubLoading && !githubLoading && githubProfile; const cleanPath = currentPath.split('?')[0]; const isToolPage = cleanPath === '/repo-xml'; let message = "";
         if (isToolPage) { message = `${baseGreeting} Ты в СуперВайб Студии! ✨ Используй Бадди справа для помощи.`; }
-        else { const pageName = cleanPath === '/' ? 'главную' : `страницу (${cleanPath})`; if (showReplaceTool) { message = `Окей, ${userIdentifier || 'дружок'}, давай заменим картинку! 👇`; } else if (potentialOldImageUrl) { message = `${baseGreeting} Заметил URL картинки. Хочешь заменить её?`; } else if (customIdea.trim().length > 0) { message = `${baseGreeting} Вижу твою идею! Жми "Передать Идею в Студию", чтобы начать магию. ✨`; } else if (justLoadedProfile) { message = `ВОУ, ${userIdentifier}! ✨ Нашел твой GitHub! Хочешь ${pageName} прокачать? 😉 Или введи идею/URL картинки!`; } else if (githubProfile) { message = `${baseGreeting} Рад видеть твой GitHub! ${pageName.charAt(0).toUpperCase() + pageName.slice(1)} будем править? Или введи идею/URL картинки!`; } else { message = `${baseGreeting} GitHub не найден... Не важно! ${pageName.charAt(0).toUpperCase() + pageName.slice(1)} будем улучшать? 😉 Или введи идею/URL картинки!`; } }
+        else { const pageName = cleanPath === '/' ? 'главную' : `страницу (${cleanPath})`; if (showReplaceTool) { message = `Окей, ${userIdentifier || 'дружок'}, давай заменим картинку! 👇`; } else if (potentialOldImageUrl) { message = `${baseGreeting} Заметил URL картинки. Хочешь заменить её?`; } else if (customIdea.trim().length > 0) { message = `${baseGreeting} Вижу твою идею! Жми "Передать Идею в Студию", чтобы начать магию. ✨`; } else if (justLoadedProfile) { message = `ВОУ, ${userIdentifier}! ✨ Нашел твой GitHub! Хочешь ${pageName} прокачать? 😉 Или введи идею/URL картинки!`; } else if (githubProfile) { message = `${baseGreeting} Рад видеть твой GitHub! ${pageName.charAt(0).toUpperCase() + pageName.slice(1)} будем править? Или введи идею/URL картинки.`; } else { message = `${baseGreeting} GitHub не найден... Не важно! ${pageName.charAt(0).toUpperCase() + pageName.slice(1)} будем улучшать? 😉 Или введи идею/URL картинки!`; } }
         setActiveMessage(message);
     }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading, prevGithubLoading, currentPath, potentialOldImageUrl, showReplaceTool, customIdea]);
 

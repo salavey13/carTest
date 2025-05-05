@@ -46,16 +46,16 @@ const translations = {
     philosophyLvl0_1: "<strong>Lv.0 -> 1 <FaBolt/> (Instant Win):</strong> Fix a broken image. Copy URL -> Paste -> Upload new -> <strong>DONE</strong>. System auto-PRs. <strong>ANYONE</strong> can do this <em>NOW</em>. This is your entry point.",
     philosophyLvl1_2: "<strong>Lv.1 -> 2 <FaToolbox/> (+1 File/AI):</strong> Simple idea? Change text/button? Give AI the idea + 1 file context -> PR. <strong>DONE.</strong>",
     philosophyLvl2_3: "<strong>Lv.2 -> 3 <FaCode/> (+Multi-File):</strong> Slightly complex? 2-5 files? Give AI idea + context -> Check -> PR. <strong>DONE.</strong>",
-    philosophyLvl3_4: "<strong>Lv.3 -> 4 <FaBug/> (+Log Check):</strong> Build failed? Runtime error? 99% it's a bad icon! Check Vercel logs (link in PR comment!) -> Copy red lines -> Feed error to AI -> <strong>FIXED.</strong> +1 Vibe Perk: Debugging.",
-    philosophyLvl4_5: "<strong>Lv.4 -> 5 <FaLink/> (+Icon Hunt):</strong> Tired of icon errors? Find the <em>perfect</em> Fa6 icon yourself! Use <a href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-blue hover:underline font-semibold px-1'>FontAwesome Search <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/></a> -> Add link to Assistant Quick Links -> Fix icons proactively. +1 Perk: Resourcefulness.",
+    philosophyLvl3_4: "<strong>Lv.3 -> 4 <FaBug/> (+Log Check):</strong> Build failed? Runtime error? Use Dev Overlay (<FaBug /> icon top-right on error) to copy error + logs -> Feed to AI with file context -> <strong>FIXED.</strong> +1 Vibe Perk: Debugging.",
+    philosophyLvl4_5: "<strong>Lv.4 -> 5 <FaLink/> (+Icon Hunt / Proactive Log Check):</strong> Tired of icon errors? Find the <em>perfect</em> Fa6 icon yourself! Use <a href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-blue hover:underline font-semibold px-1'>FontAwesome Search <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/></a> -> Add link to Assistant Quick Links -> Fix icons proactively. Check Vercel logs (link in PR comment!) even without errors. +1 Perk: Resourcefulness.",
     philosophyLvl5_6: "<strong>Lv.5 -> 6 <FaMicrophone/>/<FaVideo/> (+Multimedia):</strong> Use audio commands! Attach videos! Watch them turn into page content automatically. +1 Perk: Multi-modal Input.",
     philosophyLvl6_7: "<strong>Lv.6 -> 7 <FaDatabase/> (+SQL/DB):</strong> Discover new file types! AI generates SQL -> Paste into Supabase (1 click) -> <strong>DONE.</strong> Same flow, different context. +1 Perk: Data Handling.",
     philosophyLvl8_10: "<strong>Lv.8-10+ <FaServer/>/<FaRocket/> (+Independence):</strong> Deploy your OWN CyberVibe! Use/steal my Supabase! Set your own Bot Token! Build your own XTRs! <strong>UNLIMITED POWER!</strong>",
     philosophyLvl11: "<strong>Lv.11 <FaFastForward/> (Speedrunner):</strong> Instantly notice omissions/flaws when quickly scrolling large amounts of text/code.",
-    philosophyLvl12: "<strong>Lv.12 <FaMemory/> (Context Guru):</strong> Not afraid of 65k+ characters in AI response, easily manage large code snippets and context.",
+    philosophyLvl12: "<strong>Lv.12 <FaMemory/> (Context Guru):</strong> Not afraid of 65k+ tokens in AI response, easily manage large code snippets and context.",
     philosophyLvl13: "<strong>Lv.13 <FaKeyboard/> (Marathoner):</strong> Type/dictate detailed requests and edits non-stop for >10 minutes, maintaining focus.",
     philosophyLvl14: "<strong>Lv.14 <FaBriefcase/> (Side-Hustler):</strong> Add small, unrelated tasks 'on the side' to a single AI request to optimize workflow.",
-    philosophyLvl15: "<strong>Lv.15 <FaMagnifyingGlassChart/> (Log Detective):</strong> Use logs (HasBeenPlanter) to see the difference between *what was planned* by the system and *what actually happened*, finding root causes of bugs.",
+    philosophyLvl15: "<strong>Lv.15 <FaMagnifyingGlassChart/> (Log Detective):</strong> Use logs (`HasBeenPlanter`) to see the difference between *what was planned* by the system and *what actually happened*, finding root causes of bugs.",
     philosophyEnd: "Step-by-step, level-up is <strong>inevitable</strong>. You're too lazy for the old shit. One extra click, one new skill, and you're automatically stronger. Welcome, <strong>Neo</strong>.",
     stepsTitle: "Quick Start Guide:",
     step1Title: "1. Grab Repo / Point Wish:",
@@ -93,13 +93,13 @@ const translations = {
     philosophyLvl0_1: "<strong>Лв.0 -> 1 <FaBolt/> (Мгновенный Вин / Image Swap Flow):</strong> Починить битую картинку. Скопируй URL -> Вставь -> Загрузи новую -> <strong>ГОТОВО</strong>. Это <strong>полный автомат</strong> - система сама создаст PR! <strong>ЛЮБОЙ</strong> может это <em>ПРЯМО СЕЙЧАС</em>. Твой вход в матрицу.",
     philosophyLvl1_2: "<strong>Лв.1 -> 2 <FaToolbox/> (Простая Идея / Generic Idea Flow):</strong> Простая идея? Текст/кнопку поменять? Дай AI идею + 1 файл контекста -> PR. <strong>ГОТОВО.</strong> Ты сказал - AI сделал.",
     philosophyLvl2_3: "<strong>Лв.2 -> 3 <FaCode/> (+Мульти-Файл / Generic Idea Flow):</strong> Чуть сложнее? 2-5 файлов? Дай AI идею + контекст -> Проверь ответ AI в Ассистенте -> PR. <strong>ГОТОВО.</strong> Ты контролируешь больше.",
-    philosophyLvl3_4: "<strong>Лв.3 -> 4 <FaBug/> (Дебаг Логов / Error Fix Flow):</strong> Упала сборка? Ошибка в рантайме? Скорее всего иконка! Открой логи Vercel (ссылка в комменте PR!) -> Скопируй красные строки -> Скорми ошибку + <strong>контекст файла</strong> AI -> <strong>ПОЧИНЕНО.</strong> +1 Вайб Перк: Дебаггинг.",
-    philosophyLvl4_5: "<strong>Лв.4 -> 5 <FaLink/> (+Охота за Иконками):</strong> Зае*али ошибки иконок? Найди <em>идеальную</em> Fa6 иконку сам! Юзай <a href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-blue hover:underline font-semibold px-1'>Поиск FontAwesome <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/></a> -> Добавь в Быстрые Ссылки Ассистента -> Фикси иконки проактивно. +1 Перк: Находчивость.",
+    philosophyLvl3_4: "<strong>Лв.3 -> 4 <FaBug/> (Дебаг Логов / Error Fix Flow):</strong> Упала сборка? Ошибка в рантайме? Используй Оверлей Ошибки (<FaBug/> иконка вверху справа при ошибке), чтобы скопировать ошибку и логи -> Скорми AI + <strong>контекст файла</strong> -> <strong>ПОЧИНЕНО.</strong> +1 Вайб Перк: Дебаггинг.",
+    philosophyLvl4_5: "<strong>Лв.4 -> 5 <FaLink/> (Проактивный Дебаг / Icon Hunt):</strong> Проверяй логи Vercel (ссылка в комменте PR!) даже *без* ошибок. Ищи варнинги, странности. Устал от ошибок иконок? Найди <em>идеальную</em> Fa6 иконку сам! Юзай <a href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-blue hover:underline font-semibold px-1'>Поиск FontAwesome <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/></a> -> Добавь в Быстрые Ссылки -> Фикси проактивно. +1 Перк: Находчивость/Предусмотрительность.",
     philosophyLvl5_6: "<strong>Лв.5 -> 6 <FaMicrophone/>/<FaVideo/> (+Мультимедиа):</strong> Используй аудио-команды! Прикрепляй видосы! Смотри, как они автоматом становятся контентом страницы. +1 Перк: Мультимодальный Ввод.",
     philosophyLvl6_7: "<strong>Лв.6 -> 7 <FaDatabase/> (+SQL/БД):</strong> Открой новые типы файлов! AI генерит SQL -> Вставь в Supabase (1 клик) -> <strong>ГОТОВО.</strong> Тот же флоу, другой контекст. +1 Перк: Работа с Данными.",
     philosophyLvl8_10: "<strong>Лв.8-10+ <FaServer/>/<FaRocket/> (+Независимость):</strong> Разверни свой CyberVibe! Юзай/спи*ди мою Supabase! Поставь свой Токен Бота! Строй свои XTR-ы! <strong>БЕЗГРАНИЧНАЯ МОЩЬ!</strong>",
     philosophyLvl11: "<strong>Лв.11 <FaFastForward/> (Спидраннер):</strong> Мгновенно замечаешь пропуски/недочеты при быстрой прокрутке больших объемов текста/кода. +1 Перк: Детекция Пропусков.",
-    philosophyLvl12: "<strong>Лв.12 <FaMemory/> (Гуру Контекста):</strong> Не боишься 65к+ символов в ответе AI, легко управляешь большими фрагментами кода и контекста. +1 Перк: Управление Большим Контекстом.",
+    philosophyLvl12: "<strong>Лв.12 <FaMemory/> (Гуру Контекста):</strong> Не боишься 65k+ токенов в ответе AI, легко управляешь большими фрагментами кода и контекста. +1 Перк: Управление Большим Контекстом.",
     philosophyLvl13: "<strong>Лв.13 <FaKeyboard/> (Марафонец):</strong> Печатаешь/диктуешь развернутые запросы и правки без остановки >10 минут, поддерживая фокус. +1 Перк: Фокус Потока.",
     philosophyLvl14: "<strong>Лв.14 <FaBriefcase/> (Сайд-Хастлер):</strong> В один запрос к AI добавляешь мелкие, не связанные задачи 'заодно', чтобы оптимизировать поток. +1 Перк: Оптимизация Запросов.",
     philosophyLvl15: "<strong>Лв.15 <FaMagnifyingGlassChart/> (Лог-Детектив):</strong> По логам (`HasBeenPlanter`) видишь разницу между тем, *что было запланировано* системой, и тем, *что реально произошло*, находя корневые причины багов. +1 Перк: Продвинутый Дебаг.",
@@ -575,10 +575,16 @@ function ActualPageContent() {
                                 <div className="font-bold text-brand-green"><VibeContentRenderer content={t.philosophyEnd} /></div>
                                 <hr className="border-gray-700 my-4"/>
                                 <h4 className="text-lg font-semibold text-cyan-400 pt-2"><VibeContentRenderer content={t.stepsTitle} /></h4>
-                                <div className="text-sm space-y-2">
-                                     <VibeContentRenderer wrapperClassName="block" content={t?.step1Title ? `<strong>${t.step1Title}</strong> ${t.step1Desc ?? ''} ${t.step1DescEnd ?? ''}` : ''} />
-                                     <VibeContentRenderer wrapperClassName="block" content={t?.step2Title ? `<strong>${t.step2Title}</strong> ${t.step2Desc ?? ''} ${t.step2DescEnd ?? ''}` : ''} />
+                                 {/* --- APPLIED FLEXBOX FIX --- */}
+                                <div className="flex flex-col text-sm space-y-2">
+                                     <VibeContentRenderer content={"1. Настрой <FaCodeBranch title='Настройки' class='inline text-cyan-400'/> ."} /> {/* Added space before period */}
+                                     <VibeContentRenderer content={"2. Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>."} />
+                                     <VibeContentRenderer content={"3. Выбери файлы или <span class='font-bold text-teal-400 mx-1'>связанные</span> / <span class='font-bold text-orange-400 mx-1'>важные</span>."} />
+                                     {/* Removed brackets around icons */}
+                                     <VibeContentRenderer content={"4. Опиши задачу ИЛИ добавь файлы <FaPlus title='Добавить выбранные в запрос' class='inline text-sm'/> / все <FaTree title='Добавить все файлы в запрос' class='inline text-sm'/>."} />
+                                     <VibeContentRenderer content={"5. Скопируй <FaCopy title='Скопировать запрос' class='inline text-sm mx-px'/> или передай дальше."} />
                                 </div>
+                                 {/* --- END FLEXBOX FIX --- */}
                             </div>
                         </details>
                     </section>
