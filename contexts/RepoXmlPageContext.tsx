@@ -339,7 +339,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     if (fetcherRef?.current?.handleAddSelected) {
                         logger.debug("[Context] Triggering handleAddSelected for ErrorFix target file.");
                         setTimeout(() => { try { fetcherRef.current?.handleAddSelected?.(new Set([currentPendingFlow.targetPath]), allFiles); logger.info("[Context] ErrorFix target file added to kwork via imperative handle."); scrollToSectionStable('executor'); } catch (addErr) { logger.error("[Context] Error calling handleAddSelected for ErrorFix:", addErr); } }, 100);
-                    } else { warn("[Context] Fetcher ref or handleAddSelected missing for ErrorFix auto-add."); scrollToSectionStable('executor'); }
+                    } else {
+                        // FIX: Corrected warn to logger.warn
+                        logger.warn("[Context] Fetcher ref or handleAddSelected missing for ErrorFix auto-add.");
+                        scrollToSectionStable('executor');
+                    }
                     setPendingFlowDetailsStateStable(null); // Clear flow after processing
                 } else {
                     logger.error(`[Context] ErrorFix target file NOT FOUND: ${currentPendingFlow.targetPath}`); addToastStable(`Ошибка Исправления: Целевой файл ${currentPendingFlow.targetPath} не найден!`, 'error', 5000);
@@ -361,7 +365,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
              // Refs are stable, their .current is read inside
              imageReplaceTaskStateRef, pendingFlowDetailsRef,
              // Utilities
-             logger, warn, error // Logger functions assumed stable
+             logger, error // Logger functions assumed stable (removed warn as it's internal)
          ]);
 
 
@@ -484,7 +488,9 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         return ( <RepoXmlPageContext.Provider value={contextValue}> {children} </RepoXmlPageContext.Provider> );
 
     } catch (providerError: any) {
-        logger.fatal("[RepoXmlPageProvider] CRITICAL INITIALIZATION ERROR:", providerError);
+        // Use console.error here as logger might not be initialized if this part fails
+        console.error("[RepoXmlPageProvider] CRITICAL INITIALIZATION ERROR:", providerError);
+        // Render a fallback UI instead of crashing the app
         return <div className="fixed inset-0 flex items-center justify-center bg-red-900 text-white p-4 z-[9999]">Критическая ошибка инициализации провайдера страницы: {providerError.message}</div>;
     }
 };
