@@ -348,13 +348,15 @@ function ActualPageContent() {
         if (typeof derivedIdea === 'string' && derivedIdea.trim() !== '') {
             log(`[Effect Populate Kwork] Populating kwork with simple idea: ${derivedIdea.substring(0, 30)}...`);
 
-            // More robust update function
             setKworkInputValue(prev => {
                 const currentVal = (typeof prev === 'string' ? prev : "") || ""; // Ensure string
                 const ideaToAdd = derivedIdea || ""; // Ensure string
+
                 if (!currentVal.includes(ideaToAdd)) {
-                    // Use trim() safely on currentVal only if it's confirmed non-empty
-                    const separator = currentVal.trim() ? "\n\n" : "";
+                    // --- SAFEST TRIM ---
+                    // Only add separator if currentVal actually has non-whitespace content
+                    const separator = currentVal && currentVal.trim() ? "\n\n" : ""; // Check type AND call trim
+                    // --- END SAFEST TRIM ---
                     return currentVal + separator + ideaToAdd;
                 }
                 debug("[Effect Populate Kwork] Input already contains the idea, skipping update.");
@@ -455,7 +457,7 @@ function ActualPageContent() {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
                 <div className="min-h-screen bg-gray-950 p-4 sm:p-6 pt-24 text-white flex flex-col items-center relative overflow-y-auto">
 
-                    {/* Intro Section */}
+                    {/* --- FULL INTRO SECTION --- */}
                     <section id="intro" className="mb-12 text-center max-w-3xl w-full">
                          <div className="flex justify-center mb-4"> <FaBolt className="w-16 h-16 text-[#E1FF01] text-shadow-[0_0_15px_#E1FF01] animate-pulse" /> </div>
                         <h1 className="text-4xl md:text-5xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-4">
@@ -471,7 +473,7 @@ function ActualPageContent() {
                         </div>
                     </section>
 
-                    {/* === The Vibe Loop Section === */}
+                    {/* --- FULL VIBE LOOP SECTION --- */}
                     <section id="cybervibe-section" className="mb-12 w-full max-w-3xl">
                          <Card className="bg-gradient-to-br from-purple-900/40 via-black/60 to-indigo-900/40 border border-purple-600/60 shadow-xl rounded-lg p-6 backdrop-blur-sm">
                              <CardHeader className="p-0 mb-4">
@@ -488,7 +490,7 @@ function ActualPageContent() {
                          </Card>
                      </section>
 
-                    {/* Your Vibe Path Section - NEW PHILOSOPHY */}
+                    {/* --- FULL PHILOSOPHY SECTION --- */}
                     <section id="philosophy-steps" className="mb-12 w-full max-w-3xl">
                         <details className="bg-gray-900/80 border border-gray-700 rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50">
                             <summary className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-gray-800/50 rounded-t-lg transition-colors group">
@@ -528,7 +530,7 @@ function ActualPageContent() {
                         </details>
                     </section>
 
-                    {/* Reveal Button */}
+                    {/* --- FULL REVEAL BUTTON SECTION --- */}
                     {!showComponents && (
                         <section id="reveal-trigger" className="mb-12 w-full max-w-3xl text-center">
                             {(() => { debug("[Render] Rendering Reveal Button"); return null; })()}
@@ -538,7 +540,7 @@ function ActualPageContent() {
                         </section>
                     )}
 
-                    {/* WORKHORSE Components */}
+                    {/* --- FULL WORKHORSE COMPONENTS SECTION --- */}
                     {showComponents && (
                          <>
                             {(() => { debug("[Render] Rendering Workhorse Components Container"); return null; })()}
@@ -571,7 +573,7 @@ function ActualPageContent() {
                          </>
                      )}
 
-                    {/* Final CTA */}
+                    {/* --- FULL FINAL CTA SECTION --- */}
                      {showComponents && (
                          <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
                               {(() => { debug("[Render] Rendering Final CTA"); return null; })()}
@@ -584,7 +586,7 @@ function ActualPageContent() {
                          </section>
                      )}
 
-                    {/* Navigation Icons */}
+                    {/* --- FULL NAVIGATION ICONS --- */}
                      <motion.nav className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40" animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}>
                          <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700/80 backdrop-blur-sm rounded-full hover:bg-gray-600 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-gray-200" /> </button>
                          <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-purple-700/80 backdrop-blur-sm rounded-full hover:bg-purple-600 transition shadow-md" title={navTitleVibeLoop} aria-label={navTitleVibeLoop || "Scroll to Vibe Loop"} > <FaUpLong className="text-lg text-white" /> </button>
@@ -594,7 +596,7 @@ function ActualPageContent() {
                          </> )}
                     </motion.nav>
 
-                    {/* Automation Buddy */}
+                    {/* --- FULL AUTOMATION BUDDY SECTION --- */}
                      {(() => { debug("[Render] Preparing AutomationBuddy Wrapper (Suspense)"); return null; })()}
                     <Suspense fallback={<LoadingBuddyFallback />}>
                         <AutomationBuddy />
