@@ -469,7 +469,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                           {(() => { logger.debug("[Render] Rendering RequestInput (conditional)"); return null; })()}
                           <RequestInput
                               kworkInputRef={kworkInputRef} // Pass ref for focus/imperative actions
-                              kworkInputValue={kworkInputValue} // Pass state value
+                              kworkInputValue={kworkInputValue ?? ''} // <<< ADDED SAFEGUARD HERE
                               onValueChange={setKworkInputValue} // Pass state setter
                               onCopyToClipboard={() => { logger.debug("[Input Action] Copy Click"); handleCopyToClipboard(undefined, true); }}
                               onClearAll={() => { logger.debug("[Input Action] Clear Click"); handleClearAll(); }}
