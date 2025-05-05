@@ -11,8 +11,8 @@ import { debugLogger as logger } from '@/lib/debugLogger';
 import { getOpenPullRequests, updateBranch } from '@/app/actions_github/actions';
 import type { RepoTxtFetcherRef } from '@/components/RepoTxtFetcher';
 import type { AICodeAssistantRef } from '@/components/AICodeAssistant';
-import { checkExistingPrBranch } from '@/app/actions_github/actions'; // Correct import path
-import * as repoUtils from "@/lib/repoUtils"; // Import repoUtils for guessing branch name
+import { checkExistingPrBranch } from '@/app/actions_github/actions';
+import * as repoUtils from "@/lib/repoUtils";
 
 export type ImportCategory = 'component' | 'context' | 'hook' | 'lib' | 'other';
 export type FetchStatus = 'idle' | 'loading' | 'success' | 'error' | 'retrying' | 'failed_retries';
@@ -43,7 +43,7 @@ interface RepoXmlPageContextType {
     showComponents: boolean;
     selectedFetcherFiles: Set<string>;
     selectedAssistantFiles: Set<string>;
-    targetBranchName: string | null; // This can be the PR *source* branch
+    targetBranchName: string | null;
     manualBranchName: string;
     openPrs: SimplePullRequest[];
     currentAiRequestId: string | null;
@@ -55,7 +55,7 @@ interface RepoXmlPageContextType {
     secondaryHighlightedPaths: Record<ImportCategory, string[]>;
     targetPrData: TargetPrData | null;
     pendingFlowDetails: PendingFlowDetails | null;
-    kworkInputValue: string; // <<< ADDED: State for the input value
+    kworkInputValue: string;
     // Stable Setters
     setFetchStatus: React.Dispatch<React.SetStateAction<FetchStatus>>;
     setRepoUrlEntered: React.Dispatch<React.SetStateAction<boolean>>;
@@ -73,7 +73,7 @@ interface RepoXmlPageContextType {
     setManualBranchName: React.Dispatch<React.SetStateAction<string>>;
     setOpenPrs: React.Dispatch<React.SetStateAction<SimplePullRequest[]>>;
     setIsParsing: React.Dispatch<React.SetStateAction<boolean>>;
-    setContextIsParsing: React.Dispatch<React.SetStateAction<boolean>>; // Alias for setIsParsing
+    setContextIsParsing: React.Dispatch<React.SetStateAction<boolean>>;
     setCurrentAiRequestId: React.Dispatch<React.SetStateAction<string | null>>;
     setImageReplaceTask: React.Dispatch<React.SetStateAction<ImageReplaceTask | null>>;
     setRepoUrl: React.Dispatch<React.SetStateAction<string>>;
@@ -81,7 +81,7 @@ interface RepoXmlPageContextType {
     setIsPreChecking: React.Dispatch<React.SetStateAction<boolean>>;
     setPendingFlowDetails: React.Dispatch<React.SetStateAction<PendingFlowDetails | null>>;
     setShowComponents: React.Dispatch<React.SetStateAction<boolean>>;
-    setKworkInputValue: React.Dispatch<React.SetStateAction<string>>; // <<< ADDED: Setter for the input value
+    setKworkInputValue: React.Dispatch<React.SetStateAction<string>>;
     // Stable Triggers
     triggerToggleSettingsModal: () => void;
     triggerPreCheckAndFetch: (repoUrlToCheck: string, potentialBranchName: string, flowType: 'ImageSwap' | 'ErrorFix', flowDetails: any, targetPath: string) => Promise<void>;
@@ -115,7 +115,7 @@ interface RepoXmlPageContextType {
 // --- Default Context Value ---
 const defaultContextValue: Partial<RepoXmlPageContextType> = {
     fetchStatus: 'idle', repoUrlEntered: false, filesFetched: false, selectedFetcherFiles: new Set(), kworkInputHasContent: false, requestCopied: false, aiResponseHasContent: false, filesParsed: false, selectedAssistantFiles: new Set(), assistantLoading: false, aiActionLoading: false, loadingPrs: false, targetBranchName: null, manualBranchName: '', openPrs: [], isSettingsModalOpen: false, isParsing: false, currentAiRequestId: null, imageReplaceTask: null, allFetchedFiles: [], currentStep: 'idle', repoUrl: "https://github.com/salavey13/carTest", primaryHighlightedPath: null, secondaryHighlightedPaths: { component: [], context: [], hook: [], lib: [], other: [] }, targetPrData: null, isPreChecking: false, pendingFlowDetails: null, showComponents: true,
-    kworkInputValue: '', // <<< ADDED Default
+    kworkInputValue: '',
     setFetchStatus: () => { logger.warn("setFetchStatus called on default context value"); },
     setRepoUrlEntered: () => { logger.warn("setRepoUrlEntered called on default context value"); },
     handleSetFilesFetched: () => { logger.warn("handleSetFilesFetched called on default context value"); },
@@ -140,7 +140,7 @@ const defaultContextValue: Partial<RepoXmlPageContextType> = {
     setIsPreChecking: () => { logger.warn("setIsPreChecking called on default context value"); },
     setPendingFlowDetails: () => { logger.warn("setPendingFlowDetails called on default context value"); },
     setShowComponents: () => { logger.warn("setShowComponents called on default context value"); },
-    setKworkInputValue: () => { logger.warn("setKworkInputValue called on default context value"); }, // <<< ADDED Default setter
+    setKworkInputValue: () => { logger.warn("setKworkInputValue called on default context value"); },
     triggerToggleSettingsModal: () => { logger.warn("triggerToggleSettingsModal called on default context value"); },
     triggerPreCheckAndFetch: async () => { logger.warn("triggerPreCheckAndFetch called on default context value"); },
     triggerFetch: async () => { logger.warn("triggerFetch called on default context value"); },
@@ -182,7 +182,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const [secondaryHighlightPathsState, setSecondaryHighlightPathsState] = useState<Record<ImportCategory, string[]>>({ component: [], context: [], hook: [], lib: [], other: [] });
         const [selectedFetcherFilesState, setSelectedFetcherFilesState] = useState<Set<string>>(new Set());
         const [kworkInputHasContentState, setKworkInputHasContentState] = useState<boolean>(false);
-        const [kworkInputValueState, setKworkInputValueState] = useState<string>(''); // <<< ADDED State
+        const [kworkInputValueState, setKworkInputValueState] = useState<string>('');
         const [requestCopiedState, setRequestCopiedState] = useState<boolean>(false);
         const [aiResponseHasContentState, setAiResponseHasContentState] = useState<boolean>(false);
         const [filesParsedState, setFilesParsedState] = useState<boolean>(false);
@@ -210,6 +210,9 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const assistantRef = useRef<AICodeAssistantRef | null>(null);
         const kworkInputRef = useRef<HTMLTextAreaElement | null>(null);
         const aiResponseInputRef = useRef<HTMLTextAreaElement | null>(null);
+        const imageReplaceTaskStateRef = useRef(imageReplaceTaskState); // Ref for task state
+        const pendingFlowDetailsRef = useRef(pendingFlowDetailsState); // Ref for pending flow
+        const repoUrlStateRef = useRef(repoUrlState); // Ref for repo URL
         logger.debug("[RepoXmlPageProvider] Refs initialized.");
 
         // --- Hooks ---
@@ -222,208 +225,189 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             appToast = { success: (m) => logger.error("Toast (success) suppressed, hook failed:", m), error: (m) => logger.error("Toast (error) suppressed, hook failed:", m), info: (m) => logger.warn("Toast (info) suppressed, hook failed:", m), warning: (m) => logger.warn("Toast (warning) suppressed, hook failed:", m), loading: (m) => logger.warn("Toast (loading) suppressed, hook failed:", m), message: (m) => logger.warn("Toast (message) suppressed, hook failed:", m), custom: (m) => logger.warn("Toast (custom) suppressed, hook failed:", m), dismiss: () => logger.warn("Toast (dismiss) suppressed, hook failed"), };
         }
 
-        // --- addToast Stable Callback ---
-        const addToastStable = useCallback((message: string | React.ReactNode, type: 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message' = 'info', duration: number = 3000, options: any = {}) => {
-            if (!appToast || typeof appToast.message !== 'function') { logger.error("addToastStable cannot execute: appToast is invalid.", { message, type }); return; }
-            const toastOptions = duration ? { ...options, duration } : options;
-            switch (type) { case 'success': appToast.success(message, toastOptions); break; case 'error': appToast.error(message, toastOptions); break; case 'info': appToast.info(message, toastOptions); break; case 'warning': appToast.warning(message, toastOptions); break; case 'loading': appToast.loading(message, toastOptions); break; case 'message': default: appToast.message(message, toastOptions); break; }
-        }, [appToast]);
-
-        useEffect(() => { logger.log("[RepoXmlPageProvider] Mounted (Provider level)"); }, []);
-        useEffect(() => { logger.debug(`[RepoXmlPageProvider Effect] repoUrlState changed: ${repoUrlState}. Updating repoUrlEnteredState.`); setRepoUrlEnteredState(repoUrlState.trim().length > 0 && repoUrlState.includes("github.com")); }, [repoUrlState]);
-
-        // --- Stable Setters (Wrapped with useCallback) ---
-        const setFetchStatusStateStable = useCallback((status: FetchStatus | ((prevState: FetchStatus) => FetchStatus)) => { logger.debug(`[Context Setter] setFetchStatus: ${typeof status === 'function' ? 'function' : status}`); setFetchStatusState(status); }, []);
-        const setRepoUrlEnteredStateStable = useCallback((entered: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setRepoUrlEntered: ${typeof entered === 'function' ? 'function' : entered}`); setRepoUrlEnteredState(entered); }, []);
-        const setSelectedFetcherFilesStateStable = useCallback((files: Set<string> | ((prevState: Set<string>) => Set<string>)) => { logger.debug(`[Context Setter] setSelectedFetcherFiles size: ${typeof files === 'function' ? 'function' : files.size}`); setSelectedFetcherFilesState(files); }, []);
-        const setKworkInputHasContentStateStable = useCallback((hasContent: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setKworkInputHasContent: ${typeof hasContent === 'function' ? 'function' : hasContent}`); setKworkInputHasContentState(hasContent); }, []);
-        const setRequestCopiedStateStable = useCallback((copied: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setRequestCopied: ${typeof copied === 'function' ? 'function' : copied}`); setRequestCopiedState(copied); }, []);
-        const setAiResponseHasContentStateStable = useCallback((hasContent: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setAiResponseHasContent: ${typeof hasContent === 'function' ? 'function' : hasContent}`); setAiResponseHasContentState(hasContent); }, []);
-        const setFilesParsedStateStable = useCallback((parsed: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setFilesParsed: ${typeof parsed === 'function' ? 'function' : parsed}`); setFilesParsedState(parsed); }, []);
-        const setSelectedAssistantFilesStateStable = useCallback((files: Set<string> | ((prevState: Set<string>) => Set<string>)) => { logger.debug(`[Context Setter] setSelectedAssistantFiles size: ${typeof files === 'function' ? 'function' : files.size}`); setSelectedAssistantFilesState(files); }, []);
-        const setAssistantLoadingStateStable = useCallback((loading: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setAssistantLoading: ${typeof loading === 'function' ? 'function' : loading}`); setAssistantLoadingState(loading); }, []);
-        const setAiActionLoadingStateStable = useCallback((loading: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setAiActionLoading: ${typeof loading === 'function' ? 'function' : loading}`); setAiActionLoadingState(loading); }, []);
-        const setLoadingPrsStateStable = useCallback((loading: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setLoadingPrs: ${typeof loading === 'function' ? 'function' : loading}`); setLoadingPrsState(loading); }, []);
-        const setTargetBranchNameStateStable = useCallback((name: string | null | ((prevState: string | null) => string | null)) => { logger.debug(`[Context Setter] setTargetBranchName: ${typeof name === 'function' ? 'function' : name}`); setTargetBranchNameState(name); }, []);
-        const setManualBranchNameStateStable = useCallback((name: string | ((prevState: string) => string)) => { logger.debug(`[Context Setter] setManualBranchName: ${typeof name === 'function' ? 'function' : name}`); setManualBranchNameState(name); }, []);
-        const setOpenPrsStateStable = useCallback((prs: SimplePullRequest[] | ((prevState: SimplePullRequest[]) => SimplePullRequest[])) => { logger.debug(`[Context Setter] setOpenPrs count: ${typeof prs === 'function' ? 'function' : prs.length}`); setOpenPrsState(prs); }, []);
-        const setIsParsingStateStable = useCallback((parsing: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setIsParsing: ${typeof parsing === 'function' ? 'function' : parsing}`); setIsParsingState(parsing); }, []);
-        const setCurrentAiRequestIdStateStable = useCallback((id: string | null | ((prevState: string | null) => string | null)) => { logger.debug(`[Context Setter] setCurrentAiRequestId: ${typeof id === 'function' ? 'function' : id?.substring(0,6)}`); setCurrentAiRequestIdState(id); }, []);
-        const setImageReplaceTaskStateStable = useCallback((task: ImageReplaceTask | null | ((prevState: ImageReplaceTask | null) => ImageReplaceTask | null)) => { logger.debug(`[Context Setter] setImageReplaceTask: ${typeof task === 'function' ? 'function' : !!task}`); setImageReplaceTaskState(task); }, []);
-        const setAllFetchedFilesStateStable = useCallback((files: FileNode[] | ((prevState: FileNode[]) => FileNode[])) => { logger.debug(`[Context Setter] setAllFetchedFiles count: ${typeof files === 'function' ? 'function' : files.length}`); setAllFetchedFilesState(files); }, []);
+        // --- Stable Callbacks for State Setters ---
+        const addToastStable = useCallback((message: string | React.ReactNode, type: 'success' | 'error' | 'info' | 'warning' | 'loading' | 'message' = 'info', duration: number = 3000, options: any = {}) => { if (!appToast?.message) { logger.error("addToastStable: appToast invalid", { message, type }); return; } const toastOptions = duration ? { ...options, duration } : options; switch (type) { case 'success': appToast.success(message, toastOptions); break; case 'error': appToast.error(message, toastOptions); break; case 'info': appToast.info(message, toastOptions); break; case 'warning': appToast.warning(message, toastOptions); break; case 'loading': appToast.loading(message, toastOptions); break; case 'message': default: appToast.message(message, toastOptions); break; } }, [appToast]);
+        const setFetchStatusStateStable = useCallback((status: FetchStatus | ((prevState: FetchStatus) => FetchStatus)) => { logger.debug(`[Context Setter] setFetchStatus: ${typeof status === 'function' ? 'func' : status}`); setFetchStatusState(status); }, []);
+        const setRepoUrlEnteredStateStable = useCallback((entered: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setRepoUrlEntered: ${typeof entered === 'function' ? 'func' : entered}`); setRepoUrlEnteredState(entered); }, []);
+        const setSelectedFetcherFilesStateStable = useCallback((files: Set<string> | ((prevState: Set<string>) => Set<string>)) => { logger.debug(`[Context Setter] setSelectedFetcherFiles size: ${typeof files === 'function' ? 'func' : files.size}`); setSelectedFetcherFilesState(files); }, []);
+        const setKworkInputHasContentStateStable = useCallback((hasContent: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setKworkInputHasContent: ${typeof hasContent === 'function' ? 'func' : hasContent}`); setKworkInputHasContentState(hasContent); }, []);
+        const setKworkInputValueStateStable = useCallback((value: string | ((prevState: string) => string)) => { logger.debug(`[Context Setter] setKworkInputValue`); let newValue: string; if (typeof value === 'function') { setKworkInputValueState(prev => { newValue = value(prev); return newValue; }); } else { newValue = value; setKworkInputValueState(newValue); } setKworkInputHasContentStateStable(newValue.trim().length > 0); }, [setKworkInputHasContentStateStable]);
+        const setRequestCopiedStateStable = useCallback((copied: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setRequestCopied: ${typeof copied === 'function' ? 'func' : copied}`); setRequestCopiedState(copied); }, []);
+        const setAiResponseHasContentStateStable = useCallback((hasContent: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setAiResponseHasContent: ${typeof hasContent === 'function' ? 'func' : hasContent}`); setAiResponseHasContentState(hasContent); }, []);
+        const setFilesParsedStateStable = useCallback((parsed: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setFilesParsed: ${typeof parsed === 'function' ? 'func' : parsed}`); setFilesParsedState(parsed); }, []);
+        const setSelectedAssistantFilesStateStable = useCallback((files: Set<string> | ((prevState: Set<string>) => Set<string>)) => { logger.debug(`[Context Setter] setSelectedAssistantFiles size: ${typeof files === 'function' ? 'func' : files.size}`); setSelectedAssistantFilesState(files); }, []);
+        const setAssistantLoadingStateStable = useCallback((loading: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setAssistantLoading: ${typeof loading === 'function' ? 'func' : loading}`); setAssistantLoadingState(loading); }, []);
+        const setAiActionLoadingStateStable = useCallback((loading: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setAiActionLoading: ${typeof loading === 'function' ? 'func' : loading}`); setAiActionLoadingState(loading); }, []);
+        const setLoadingPrsStateStable = useCallback((loading: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setLoadingPrs: ${typeof loading === 'function' ? 'func' : loading}`); setLoadingPrsState(loading); }, []);
+        const setTargetBranchNameStateStable = useCallback((name: string | null | ((prevState: string | null) => string | null)) => { logger.debug(`[Context Setter] setTargetBranchName: ${typeof name === 'function' ? 'func' : name}`); setTargetBranchNameState(name); }, []);
+        const setManualBranchNameStateStable = useCallback((name: string | ((prevState: string) => string)) => { logger.debug(`[Context Setter] setManualBranchName: ${typeof name === 'function' ? 'func' : name}`); setManualBranchNameState(name); }, []);
+        const setOpenPrsStateStable = useCallback((prs: SimplePullRequest[] | ((prevState: SimplePullRequest[]) => SimplePullRequest[])) => { logger.debug(`[Context Setter] setOpenPrs count: ${typeof prs === 'function' ? 'func' : prs.length}`); setOpenPrsState(prs); }, []);
+        const setIsParsingStateStable = useCallback((parsing: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setIsParsing: ${typeof parsing === 'function' ? 'func' : parsing}`); setIsParsingState(parsing); }, []);
+        const setCurrentAiRequestIdStateStable = useCallback((id: string | null | ((prevState: string | null) => string | null)) => { logger.debug(`[Context Setter] setCurrentAiRequestId: ${typeof id === 'function' ? 'func' : id?.substring(0,6)}`); setCurrentAiRequestIdState(id); }, []);
+        const setImageReplaceTaskStateStable = useCallback((task: ImageReplaceTask | null | ((prevState: ImageReplaceTask | null) => ImageReplaceTask | null)) => { logger.debug(`[Context Setter] setImageReplaceTask: ${typeof task === 'function' ? 'func' : !!task}`); setImageReplaceTaskState(task); }, []);
+        const setAllFetchedFilesStateStable = useCallback((files: FileNode[] | ((prevState: FileNode[]) => FileNode[])) => { logger.debug(`[Context Setter] setAllFetchedFiles count: ${typeof files === 'function' ? 'func' : files.length}`); setAllFetchedFilesState(files); }, []);
         const setRepoUrlStateStable = useCallback((url: string | ((prevState: string) => string)) => { logger.debug(`[Context Setter] setRepoUrl`); setRepoUrlState(url); }, []);
-        const setTargetPrDataStable = useCallback((data: TargetPrData | null | ((prevState: TargetPrData | null) => TargetPrData | null)) => { logger.debug(`[Context Setter] setTargetPrData: ${typeof data === 'function' ? 'function' : data ? `PR #${data.number}`: 'null'}`); setTargetPrDataState(data); }, []);
-        const setIsPreCheckingStateStable = useCallback((checking: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setIsPreChecking: ${typeof checking === 'function' ? 'function' : checking}`); setIsPreCheckingState(checking); }, []);
-        const setPendingFlowDetailsStateStable = useCallback((details: PendingFlowDetails | null | ((prevState: PendingFlowDetails | null) => PendingFlowDetails | null)) => { logger.debug(`[Context Setter] setPendingFlowDetails: ${typeof details === 'function' ? 'function' : details?.type}`); setPendingFlowDetailsState(details); }, []);
-        const setShowComponentsStateStable = useCallback((show: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setShowComponents: ${typeof show === 'function' ? 'function' : show}`); setShowComponentsState(show); }, []);
-        const setKworkInputValueStateStable = useCallback((value: string | ((prevState: string) => string)) => {
-            logger.debug(`[Context Setter] setKworkInputValue`);
-            let newValue: string;
-            // Determine the new value first
-            if (typeof value === 'function') {
-                setKworkInputValueState(prev => {
-                    newValue = value(prev);
-                    return newValue;
-                });
-            } else {
-                newValue = value;
-                setKworkInputValueState(newValue);
-            }
-            // Update the boolean flag *after* the state update has been queued
-            // Note: We might read the 'newValue' calculated above, which is correct for this update cycle.
-            // If strict dependency on the *committed* state is needed, use an effect, but here it's likely fine.
-            setKworkInputHasContentStateStable(newValue.trim().length > 0);
-        }, [setKworkInputHasContentStateStable]); // <<< ADDED Stable Setter for kworkInputValue
+        const setTargetPrDataStable = useCallback((data: TargetPrData | null | ((prevState: TargetPrData | null) => TargetPrData | null)) => { logger.debug(`[Context Setter] setTargetPrData: ${typeof data === 'function' ? 'func' : data ? `PR #${data.number}`: 'null'}`); setTargetPrDataState(data); }, []);
+        const setIsPreCheckingStateStable = useCallback((checking: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setIsPreChecking: ${typeof checking === 'function' ? 'func' : checking}`); setIsPreCheckingState(checking); }, []);
+        const setPendingFlowDetailsStateStable = useCallback((details: PendingFlowDetails | null | ((prevState: PendingFlowDetails | null) => PendingFlowDetails | null)) => { logger.debug(`[Context Setter] setPendingFlowDetails: ${typeof details === 'function' ? 'func' : details?.type}`); setPendingFlowDetailsState(details); }, []);
+        const setShowComponentsStateStable = useCallback((show: boolean | ((prevState: boolean) => boolean)) => { logger.debug(`[Context Setter] setShowComponents: ${typeof show === 'function' ? 'func' : show}`); setShowComponentsState(show); }, []);
 
+        // --- Effects for Refs (keep refs updated with latest state) ---
+        useEffect(() => { imageReplaceTaskStateRef.current = imageReplaceTaskState; }, [imageReplaceTaskState]);
+        useEffect(() => { pendingFlowDetailsRef.current = pendingFlowDetailsState; }, [pendingFlowDetailsState]);
+        useEffect(() => { repoUrlStateRef.current = repoUrlState; }, [repoUrlState]);
+        useEffect(() => { logger.log("[RepoXmlPageProvider] Mounted (Provider level)"); }, []);
+        useEffect(() => { logger.debug(`[RepoXmlPageProvider Effect] repoUrlState changed: ${repoUrlState}. Updating repoUrlEnteredState.`); setRepoUrlEnteredStateStable(repoUrlState.trim().length > 0 && repoUrlState.includes("github.com")); }, [repoUrlState, setRepoUrlEnteredStateStable]);
 
-        // --- Handlers and Triggers (Wrapped with useCallback) ---
+        // --- Stable Callback for Scrolling ---
+        const scrollToSectionStable = useCallback((sectionId: string) => {
+           logger.log(`[DEBUG][CONTEXT] scrollToSection called for ${sectionId}`);
+           const element = document.getElementById(sectionId);
+           if (element) {
+               try {
+                   const offsetTop = window.scrollY + element.getBoundingClientRect().top - 80; // Adjust offset
+                   window.scrollTo({ top: offsetTop, behavior: 'smooth' });
+                   // Highlight effect
+                   setTimeout(() => {
+                       element.classList.add('highlight-scroll');
+                       setTimeout(() => element.classList.remove('highlight-scroll'), 1500);
+                   }, 300);
+               } catch (scrollError) { logger.error(`Error scrolling to ${sectionId}:`, scrollError); }
+           } else { logger.warn(`Scroll target not found: ${sectionId}`); }
+        }, []); // No dependencies, uses browser APIs
+
+        // --- Stable Callback: handleSetFilesFetchedStable ---
         const handleSetFilesFetchedStable = useCallback(( fetched: boolean, allFiles: FileNode[], primaryHighlight: string | null, secondaryHighlights: Record<ImportCategory, string[]> ) => {
-           logger.debug(`[Context] handleSetFilesFetchedStable called. fetched=${fetched}, allFiles=${allFiles?.length}, primary=${primaryHighlight}`);
-           const currentTask = imageReplaceTaskStateRef.current; // Use ref for latest value within useCallback
-           setFilesFetchedState(fetched);
-           if (fetched) { logger.log(`[Context] Setting allFetchedFilesState: ${allFiles?.length} files`); setAllFetchedFilesStateStable(allFiles ?? []); }
-           else { logger.log(`[Context] Clearing allFetchedFilesState because fetched=${fetched}`); setAllFetchedFilesStateStable([]); }
-           setPrimaryHighlightPathState(primaryHighlight);
-           setSecondaryHighlightPathsState(secondaryHighlights ?? { component: [], context: [], hook: [], lib: [], other: [] });
+            logger.debug(`[Context] handleSetFilesFetchedStable called. fetched=${fetched}, allFiles=${allFiles?.length}, primary=${primaryHighlight}`);
+            const currentTask = imageReplaceTaskStateRef.current; // Use ref for latest value
+            const currentPendingFlow = pendingFlowDetailsRef.current; // Use ref for pending flow
 
-           let finalFetchStatus: FetchStatus = fetched ? 'success' : 'error';
-           if (currentTask) {
-               logger.debug("[Context] handleSetFilesFetchedStable - Processing Image Task");
-               if (fetched) {
-                   const targetFileExists = (allFiles ?? []).some(f => f.path === currentTask.targetPath);
-                   if (!targetFileExists) {
+            setFilesFetchedState(fetched);
+            if (fetched) { logger.log(`[Context] Setting allFetchedFilesState: ${allFiles?.length} files`); setAllFetchedFilesStateStable(allFiles ?? []); }
+            else { logger.log(`[Context] Clearing allFetchedFilesState because fetched=${fetched}`); setAllFetchedFilesStateStable([]); }
+            setPrimaryHighlightPathState(primaryHighlight);
+            setSecondaryHighlightPathsState(secondaryHighlights ?? { component: [], context: [], hook: [], lib: [], other: [] });
+
+            let finalFetchStatus: FetchStatus = fetched ? 'success' : 'error';
+
+            if (currentTask) {
+                // --- Image Task Handling ---
+                logger.debug("[Context] handleSetFilesFetchedStable - Processing Image Task");
+                if (fetched) {
+                    const targetFileExists = (allFiles ?? []).some(f => f.path === currentTask.targetPath);
+                    if (!targetFileExists) {
                        logger.error(`[Context] Image Task Failure: Target file ${currentTask.targetPath} not found!`);
-                       finalFetchStatus = 'error';
-                       addToastStable(`Ошибка Задачи Изображения: Целевой файл ${currentTask.targetPath} не найден!`, 'error', 5000);
-                       setImageReplaceTaskStateStable(null); setFilesFetchedState(false); setAllFetchedFilesStateStable([]); setAssistantLoadingStateStable(false); // Ensure loading stops on error
-                   } else {
-                       logger.info(`[Context] Image Task: Target file ${currentTask.targetPath} found. Triggering replacement via Assistant ref.`);
-                       finalFetchStatus = 'success'; // Status is success for fetch, assistant will handle replacement
-                       if (assistantRef.current && typeof assistantRef.current.handleDirectImageReplace === 'function') {
+                       finalFetchStatus = 'error'; addToastStable(`Ошибка Задачи Изображения: Целевой файл ${currentTask.targetPath} не найден!`, 'error', 5000);
+                       setImageReplaceTaskStateStable(null); setAssistantLoadingStateStable(false);
+                    } else {
+                       logger.info(`[Context] Image Task: Target file ${currentTask.targetPath} found. Triggering replacement.`);
+                       finalFetchStatus = 'success';
+                       if (assistantRef.current?.handleDirectImageReplace) {
                            logger.log(`[Context] Calling assistantRef.handleDirectImageReplace for task:`, currentTask);
-                           setAssistantLoadingStateStable(true); // Set loading BEFORE calling the async function
+                           setAssistantLoadingStateStable(true);
                             assistantRef.current.handleDirectImageReplace(currentTask, allFiles ?? [])
-                                .then(({ success, error }) => {
+                                .then(({ success, error: replaceError }) => {
                                      logger.log(`[Context] handleDirectImageReplace promise resolved. Success: ${success}`);
-                                     if(!success) {
-                                         addToastStable(`Ошибка замены/PR: ${error || 'Неизвестно'}`, 'error');
-                                         setImageReplaceTaskStateStable(null); // Clear task on failure
-                                     }
-                                     // Task is implicitly cleared by assistant upon PR creation/update success
+                                     if(!success) { addToastStable(`Ошибка замены/PR: ${replaceError || 'Неизвестно'}`, 'error'); setImageReplaceTaskStateStable(null); }
                                 })
-                               .catch(replaceError => {
-                                   logger.error("[Context] Issue calling handleDirectImageReplace:", replaceError);
-                                   addToastStable(`Проблема при вызове замены изображения: ${replaceError?.message ?? 'Неизвестно'}`, 'error', 6000);
-                                   setImageReplaceTaskStateStable(null); // Clear task on critical error
-                               })
-                               .finally(() => {
-                                   logger.log("[Context] handleDirectImageReplace finally block.");
-                                   setAssistantLoadingStateStable(false); // Clear loading AFTER function completes/errors
-                               });
+                               .catch(replaceError => { logger.error("[Context] Issue calling handleDirectImageReplace:", replaceError); addToastStable(`Проблема при вызове замены изображения: ${replaceError?.message ?? 'Неизвестно'}`, 'error', 6000); setImageReplaceTaskStateStable(null); })
+                               .finally(() => { logger.log("[Context] handleDirectImageReplace finally block."); setAssistantLoadingStateStable(false); });
                        } else {
                             logger.fatal("[Context] CRITICAL PROBLEM: Cannot call handleDirectImageReplace.", { hasRef: !!assistantRef.current, hasMethod: typeof assistantRef.current?.handleDirectImageReplace });
                             addToastStable(`КРИТИЧЕСКАЯ ПРОБЛЕМА: Не удалось вызвать замену изображения.`, 'error', 7000);
-                            finalFetchStatus = 'error'; setImageReplaceTaskStateStable(null); setAssistantLoadingStateStable(false); // Stop loading
+                            finalFetchStatus = 'error'; setImageReplaceTaskStateStable(null); setAssistantLoadingStateStable(false);
                        }
-                   }
-               } else {
-                    logger.error("[Context] Image Task Failure: Failed to fetch any files."); finalFetchStatus = 'error';
-                    addToastStable(`Ошибка Задачи Изображения: Не удалось загрузить файлы.`, 'error', 5000);
-                    setFilesFetchedState(false); setAllFetchedFilesStateStable([]); setAssistantLoadingStateStable(false); // Stop loading
-               }
-           }
-           setFetchStatusStateStable(finalFetchStatus);
-           logger.log(`[Context] handleSetFilesFetchedStable finished. Final Status: ${finalFetchStatus}, Files Fetched Flag: ${fetched}`);
-        }, [ addToastStable, assistantRef, setFetchStatusStateStable, setAllFetchedFilesStateStable, setImageReplaceTaskStateStable, setAssistantLoadingStateStable ]);
-
-         const imageReplaceTaskStateRef = useRef(imageReplaceTaskState);
-         useEffect(() => { imageReplaceTaskStateRef.current = imageReplaceTaskState; }, [imageReplaceTaskState]);
-
-        const triggerToggleSettingsModal = useCallback(() => { logger.log(`[DEBUG][CONTEXT] triggerToggleSettingsModal`); setIsSettingsModalOpenState(prev => !prev); }, []);
-        const triggerFetch = useCallback(async (isRetry = false, branch?: string | null) => { logger.log(`[DEBUG][CONTEXT] triggerFetch (Manual) called. Ref ready: ${!!fetcherRef.current?.handleFetch}`); if (fetcherRef.current?.handleFetch) { try { await fetcherRef.current.handleFetch(isRetry, branch, imageReplaceTaskStateRef.current); } catch (error: any) { logger.error("Error calling fetcherRef.handleFetch:", error); addToastStable(`Критическая ошибка при запуске извлечения: ${error?.message ?? 'Неизвестно'}`, "error", 5000); setFetchStatusStateStable('error'); } } else { logger.error("triggerFetch: fetcherRef is not set."); addToastStable("Ошибка: Не удалось запустить извлечение (ref).", "error"); } }, [addToastStable, setFetchStatusStateStable, fetcherRef]);
-        const triggerPreCheckAndFetch = useCallback(async ( repoUrlToCheck: string, potentialBranchName: string, flowType: 'ImageSwap' | 'ErrorFix', flowDetails: any, targetPath: string ) => {
-            logger.log(`[Context] triggerPreCheckAndFetch called for branch: ${potentialBranchName}, flow: ${flowType}`);
-            setIsPreCheckingStateStable(true);
-            setPendingFlowDetailsStateStable({ type: flowType, details: flowDetails, targetPath });
-            setTargetPrDataStable(null);
-            setTargetBranchNameStateStable(null);
-            setManualBranchNameStateStable('');
-            setFetchStatusStateStable('loading');
-
-            let branchToFetch: string | null = null;
-            let branchSource: string = 'default';
-
-            try {
-                logger.info(`[Context] Calling checkExistingPrBranch for ${potentialBranchName}`);
-                const checkResult = await checkExistingPrBranch(repoUrlToCheck, potentialBranchName);
-                if (checkResult.success && checkResult.data) {
-                    if (checkResult.data.exists && checkResult.data.branchName) {
-                        const prSourceBranch = checkResult.data.branchName;
-                        logger.info(`[Context] Pre-check found existing PR #${checkResult.data.prNumber} for branch ${potentialBranchName}. Source branch: ${prSourceBranch}. Setting as target.`);
-                        setTargetBranchNameStateStable(prSourceBranch);
-                        setTargetPrDataStable({ number: checkResult.data.prNumber!, url: checkResult.data.prUrl! });
-                        branchToFetch = prSourceBranch;
-                        branchSource = 'existing_pr';
-                    } else {
-                        logger.info(`[Context] Pre-check: No existing PR/branch found for ${potentialBranchName}. Will use default branch.`);
-                        branchToFetch = null;
-                        branchSource = 'default_no_pr';
                     }
                 } else {
-                    logger.warn(`[Context] Pre-check failed for ${potentialBranchName}: ${checkResult.error}. Proceeding with default branch.`);
-                    addToastStable(`Не удалось проверить PR для ${potentialBranchName}. Используется ветка по умолчанию.`, 'warning');
-                     branchToFetch = null;
-                     branchSource = 'default_check_failed';
+                    logger.error("[Context] Image Task Failure: Failed to fetch any files."); finalFetchStatus = 'error';
+                    addToastStable(`Ошибка Задачи Изображения: Не удалось загрузить файлы.`, 'error', 5000);
+                    setImageReplaceTaskStateStable(null); setAssistantLoadingStateStable(false);
                 }
-            } catch (err: any) {
-                logger.error(`[Context] Critical error during pre-check:`, err);
-                addToastStable(`Критическая ошибка проверки PR: ${err.message}`, 'error');
-                branchToFetch = null;
-                branchSource = 'default_critical_error';
-            } finally {
-                 setIsPreCheckingStateStable(false);
-                 logger.log(`[Context] Pre-check complete. Determined fetch branch: ${branchToFetch ?? 'repo default'} (Source: ${branchSource})`);
-                 await triggerFetch(false, branchToFetch);
-             }
+                // Ensure pending flow is cleared if an image task was active
+                if (currentPendingFlow) setPendingFlowDetailsStateStable(null);
+
+           } else if (currentPendingFlow && currentPendingFlow.type === 'ErrorFix' && fetched) {
+                // --- Error Fix Handling ---
+                logger.info(`[Context] handleSetFilesFetchedStable - Processing ErrorFix flow for: ${currentPendingFlow.targetPath}`);
+                const targetFileExists = allFiles.some(f => f.path === currentPendingFlow.targetPath);
+                if (targetFileExists) {
+                    logger.debug(`[Context] ErrorFix target file found. Populating kwork.`);
+                    const { Message, Stack, Logs, Source } = currentPendingFlow.details;
+                    const prompt = `Fix error in ${currentPendingFlow.targetPath}:\n\nMessage: ${Message}\nSource: ${Source || 'N/A'}\n\nStack:\n\`\`\`\n${Stack || 'N/A'}\n\`\`\`\n\nLogs:\n${Logs || 'N/A'}\n\nProvide ONLY the corrected code block or full file content.`;
+                    setKworkInputValueStateStable(prompt);
+                    finalFetchStatus = 'success';
+                    if (fetcherRef?.current?.handleAddSelected) {
+                        logger.debug("[Context] Triggering handleAddSelected for ErrorFix target file.");
+                        setTimeout(() => { try { fetcherRef.current?.handleAddSelected?.(new Set([currentPendingFlow.targetPath]), allFiles); logger.info("[Context] ErrorFix target file added to kwork via imperative handle."); scrollToSectionStable('executor'); } catch (addErr) { logger.error("[Context] Error calling handleAddSelected for ErrorFix:", addErr); } }, 100);
+                    } else { warn("[Context] Fetcher ref or handleAddSelected missing for ErrorFix auto-add."); scrollToSectionStable('executor'); }
+                    setPendingFlowDetailsStateStable(null); // Clear flow after processing
+                } else {
+                    logger.error(`[Context] ErrorFix target file NOT FOUND: ${currentPendingFlow.targetPath}`); addToastStable(`Ошибка Исправления: Целевой файл ${currentPendingFlow.targetPath} не найден!`, 'error', 5000);
+                    finalFetchStatus = 'error'; setPendingFlowDetailsStateStable(null); // Clear flow on error
+                }
+           } else {
+                // --- Standard Fetch Completion ---
+                 logger.debug("[Context] handleSetFilesFetchedStable - Standard fetch completion.");
+                 if (fetched && currentPendingFlow) { logger.warn("[Context] Clearing potentially stale pending flow details after standard fetch success."); setPendingFlowDetailsStateStable(null); }
+                 if (fetched && imageReplaceTaskStateRef.current) { logger.warn("[Context] Clearing potentially stale image task after standard fetch success."); setImageReplaceTaskStateStable(null); }
+           }
+
+           setFetchStatusStateStable(finalFetchStatus);
+           logger.log(`[Context] handleSetFilesFetchedStable finished. Final Status: ${finalFetchStatus}, Files Fetched Flag: ${fetched}`);
+        }, [ // Dependencies MUST include all stable setters/triggers used inside
+             addToastStable, assistantRef, fetcherRef, setFetchStatusStateStable, setAllFetchedFilesStateStable,
+             setImageReplaceTaskStateStable, setAssistantLoadingStateStable, setPendingFlowDetailsStateStable,
+             setKworkInputValueStateStable, scrollToSectionStable,
+             // Refs are stable, their .current is read inside
+             imageReplaceTaskStateRef, pendingFlowDetailsRef,
+             // Utilities
+             logger, warn, error // Logger functions assumed stable
+         ]);
+
+
+        // --- Other Stable Trigger Callbacks ---
+        const triggerToggleSettingsModal = useCallback(() => { logger.log(`[DEBUG][CONTEXT] triggerToggleSettingsModal`); setIsSettingsModalOpenState(prev => !prev); }, []);
+        const triggerFetch = useCallback(async (isRetry = false, branch?: string | null) => { logger.log(`[DEBUG][CONTEXT] triggerFetch called. Ref ready: ${!!fetcherRef.current?.handleFetch}`); if (fetcherRef.current?.handleFetch) { try { await fetcherRef.current.handleFetch(isRetry, branch, imageReplaceTaskStateRef.current); } catch (e: any) { logger.error("Error calling fetcherRef.handleFetch:", e); addToastStable(`Крит. ошибка запуска извлечения: ${e?.message ?? 'Неизвестно'}`, "error", 5000); setFetchStatusStateStable('error'); } } else { logger.error("triggerFetch: fetcherRef not set."); addToastStable("Ошибка: Не удалось запустить извлечение (ref).", "error"); } }, [addToastStable, setFetchStatusStateStable, fetcherRef]);
+        const triggerPreCheckAndFetch = useCallback(async ( repoUrlToCheck: string, potentialBranchName: string, flowType: 'ImageSwap' | 'ErrorFix', flowDetails: any, targetPath: string ) => {
+            logger.log(`[Context] triggerPreCheckAndFetch called for branch: ${potentialBranchName}, flow: ${flowType}`);
+            setIsPreCheckingStateStable(true); setPendingFlowDetailsStateStable({ type: flowType, details: flowDetails, targetPath }); setTargetPrDataStable(null); setTargetBranchNameStateStable(null); setManualBranchNameStateStable(''); setFetchStatusStateStable('loading');
+            let branchToFetch: string | null = null; let branchSource: string = 'default';
+            try { logger.info(`[Context] Calling checkExistingPrBranch for ${potentialBranchName}`); const checkResult = await checkExistingPrBranch(repoUrlToCheck, potentialBranchName);
+                if (checkResult.success && checkResult.data?.exists && checkResult.data?.branchName) {
+                    const prSourceBranch = checkResult.data.branchName; logger.info(`[Context] Pre-check found existing PR #${checkResult.data.prNumber} for branch ${potentialBranchName}. Source branch: ${prSourceBranch}. Setting as target.`);
+                    setTargetBranchNameStateStable(prSourceBranch); setTargetPrDataStable({ number: checkResult.data.prNumber!, url: checkResult.data.prUrl! }); branchToFetch = prSourceBranch; branchSource = 'existing_pr';
+                } else if (checkResult.success) { logger.info(`[Context] Pre-check: No existing PR/branch found for ${potentialBranchName}. Will use default branch.`); branchToFetch = null; branchSource = 'default_no_pr'; }
+                else { logger.warn(`[Context] Pre-check failed for ${potentialBranchName}: ${checkResult.error}. Proceeding with default branch.`); addToastStable(`Не удалось проверить PR для ${potentialBranchName}. Используется ветка по умолчанию.`, 'warning'); branchToFetch = null; branchSource = 'default_check_failed'; }
+            } catch (err: any) { logger.error(`[Context] Critical error during pre-check:`, err); addToastStable(`Критическая ошибка проверки PR: ${err.message}`, 'error'); branchToFetch = null; branchSource = 'default_critical_error'; }
+            finally { setIsPreCheckingStateStable(false); logger.log(`[Context] Pre-check complete. Determined fetch branch: ${branchToFetch ?? 'repo default'} (Source: ${branchSource})`); await triggerFetch(false, branchToFetch); }
         }, [ addToastStable, setTargetBranchNameStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setManualBranchNameStateStable, setFetchStatusStateStable, triggerFetch ]);
-
-        const triggerSelectHighlighted = useCallback(() => { logger.log(`[DEBUG][CONTEXT] triggerSelectHighlighted called. Ref ready: ${!!fetcherRef.current?.selectHighlightedFiles}`); if (fetcherRef.current?.selectHighlightedFiles) { try { fetcherRef.current.selectHighlightedFiles(); } catch (error: any) { logger.error("Error calling fetcherRef.selectHighlightedFiles:", error); addToastStable(`Ошибка выбора связанных файлов: ${error?.message ?? 'Неизвестно'}`, "error"); } } else { logger.error("triggerSelectHighlighted: fetcherRef is not set."); } }, [addToastStable, fetcherRef]);
-        const triggerAddSelectedToKwork = useCallback(async (clearSelection = false) => { logger.log(`[DEBUG][CONTEXT] triggerAddSelectedToKwork called. Ref ready: ${!!fetcherRef.current?.handleAddSelected}. Selected: ${selectedFetcherFilesState.size}`); const currentSelected = selectedFetcherFilesRef.current; const currentAllFiles = allFetchedFilesRef.current; if (fetcherRef.current?.handleAddSelected) { if (currentSelected.size === 0) { addToastStable("Сначала выберите файлы в Экстракторе!", "warning"); return; } try { await fetcherRef.current.handleAddSelected(currentSelected, currentAllFiles); if (clearSelection) { setSelectedFetcherFilesStateStable(new Set()); } } catch (error: any) { logger.error("[Context] Error during handleAddSelected:", error); addToastStable(`Ошибка добавления файлов: ${error?.message ?? 'Неизвестно'}`, "error"); } } else { logger.error("triggerAddSelectedToKwork: fetcherRef is not set."); addToastStable("Ошибка: Компонент Экстрактора недоступен.", "error"); } }, [addToastStable, setSelectedFetcherFilesStateStable, fetcherRef]);
-         const selectedFetcherFilesRef = useRef(selectedFetcherFilesState); useEffect(() => { selectedFetcherFilesRef.current = selectedFetcherFilesState; }, [selectedFetcherFilesState]);
-         const allFetchedFilesRef = useRef(allFetchedFilesState); useEffect(() => { allFetchedFilesRef.current = allFetchedFilesState; }, [allFetchedFilesState]);
-
-        const triggerCopyKwork = useCallback((): boolean => { logger.log(`[DEBUG][CONTEXT] triggerCopyKwork called. Ref ready: ${!!fetcherRef.current?.handleCopyToClipboard}`); if (fetcherRef.current?.handleCopyToClipboard) { try { return fetcherRef.current.handleCopyToClipboard(undefined, true); } catch (error: any) { logger.error("Error calling fetcherRef.handleCopyToClipboard:", error); addToastStable(`Ошибка копирования запроса: ${error?.message ?? 'Неизвестно'}`, "error"); return false; } } else { logger.error("triggerCopyKwork: fetcherRef is not set."); addToastStable("Ошибка копирования: Компонент Экстрактора недоступен.", "error"); return false; } }, [addToastStable, fetcherRef]);
+        const triggerSelectHighlighted = useCallback(() => { logger.log(`[DEBUG][CONTEXT] triggerSelectHighlighted called. Ref ready: ${!!fetcherRef.current?.selectHighlightedFiles}`); if (fetcherRef.current?.selectHighlightedFiles) { try { fetcherRef.current.selectHighlightedFiles(); } catch (e: any) { logger.error("Error calling fetcherRef.selectHighlightedFiles:", e); addToastStable(`Ошибка выбора связанных файлов: ${e?.message ?? 'Неизвестно'}`, "error"); } } else { logger.error("triggerSelectHighlighted: fetcherRef is not set."); } }, [addToastStable, fetcherRef]);
+        const triggerAddSelectedToKwork = useCallback(async (clearSelection = false) => { logger.log(`[DEBUG][CONTEXT] triggerAddSelectedToKwork called. Ref ready: ${!!fetcherRef.current?.handleAddSelected}. Selected: ${selectedFetcherFilesState.size}`); const currentSelected = selectedFetcherFilesRef.current; const currentAllFiles = allFetchedFilesRef.current; if (fetcherRef.current?.handleAddSelected) { if (currentSelected.size === 0) { addToastStable("Сначала выберите файлы в Экстракторе!", "warning"); return; } try { await fetcherRef.current.handleAddSelected(currentSelected, currentAllFiles); if (clearSelection) { setSelectedFetcherFilesStateStable(new Set()); } } catch (e: any) { logger.error("[Context] Error during handleAddSelected:", e); addToastStable(`Ошибка добавления файлов: ${e?.message ?? 'Неизвестно'}`, "error"); } } else { logger.error("triggerAddSelectedToKwork: fetcherRef is not set."); addToastStable("Ошибка: Компонент Экстрактора недоступен.", "error"); } }, [addToastStable, setSelectedFetcherFilesStateStable, fetcherRef]);
+        const selectedFetcherFilesRef = useRef(selectedFetcherFilesState); useEffect(() => { selectedFetcherFilesRef.current = selectedFetcherFilesState; }, [selectedFetcherFilesState]);
+        const allFetchedFilesRef = useRef(allFetchedFilesState); useEffect(() => { allFetchedFilesRef.current = allFetchedFilesState; }, [allFetchedFilesState]);
+        const triggerCopyKwork = useCallback((): boolean => { logger.log(`[DEBUG][CONTEXT] triggerCopyKwork called. Ref ready: ${!!fetcherRef.current?.handleCopyToClipboard}`); if (fetcherRef.current?.handleCopyToClipboard) { try { return fetcherRef.current.handleCopyToClipboard(undefined, true); } catch (e: any) { logger.error("Error calling fetcherRef.handleCopyToClipboard:", e); addToastStable(`Ошибка копирования запроса: ${e?.message ?? 'Неизвестно'}`, "error"); return false; } } else { logger.error("triggerCopyKwork: fetcherRef is not set."); addToastStable("Ошибка копирования: Компонент Экстрактора недоступен.", "error"); return false; } }, [addToastStable, fetcherRef]);
         const triggerAskAi = useCallback(async () => { logger.warn("AI Ask Triggered (No Longer Active - Use Copy/Paste Flow)"); addToastStable("Скопируйте запрос и вставьте в AI.", "info"); return { success: false, error: "Ask AI button disabled" }; }, [addToastStable]);
-        const triggerParseResponse = useCallback(async () => { logger.log(`[DEBUG][CONTEXT] triggerParseResponse called. Ref ready: ${!!assistantRef.current?.handleParse}`); if (assistantRef.current?.handleParse) { try { await assistantRef.current.handleParse(); } catch (error: any) { logger.error("Error calling assistantRef.handleParse:", error); addToastStable(`Критическая ошибка разбора ответа: ${error?.message ?? 'Неизвестно'}`, "error", 5000); } } else { logger.error("triggerParseResponse: assistantRef is not set."); addToastStable("Ошибка разбора: Компонент Ассистента недоступен.", "error");} }, [addToastStable, assistantRef]);
-        const triggerSelectAllParsed = useCallback(() => { logger.log(`[DEBUG][CONTEXT] triggerSelectAllParsed called. Ref ready: ${!!assistantRef.current?.selectAllParsedFiles}`); if (assistantRef.current?.selectAllParsedFiles) { try { assistantRef.current.selectAllParsedFiles(); } catch (error: any) { logger.error("Error calling assistantRef.selectAllParsedFiles:", error); addToastStable(`Ошибка выбора всех файлов: ${error?.message ?? 'Неизвестно'}`, "error"); } } else { logger.error("triggerSelectAllParsed: assistantRef is not set."); addToastStable("Ошибка выбора: Компонент Ассистента недоступен.", "error");} }, [addToastStable, assistantRef]);
-        const triggerCreateOrUpdatePR = useCallback(async () => { logger.log(`[DEBUG][CONTEXT] triggerCreateOrUpdatePR called. Ref ready: ${!!assistantRef.current?.handleCreatePR}`); if (assistantRef.current?.handleCreatePR) { try { await assistantRef.current.handleCreatePR(); } catch (error: any) { logger.error("Error calling assistantRef.handleCreatePR:", error); addToastStable(`Критическая ошибка создания/обновления PR: ${error?.message ?? 'Неизвестно'}`, "error", 5000); } } else { logger.error("triggerCreateOrUpdatePR: assistantRef is not set."); addToastStable("Ошибка PR: Компонент Ассистента недоступен.", "error");} }, [addToastStable, assistantRef]);
-        const triggerGetOpenPRsStable = useCallback(async (url: string) => { const effectiveUrl = url || repoUrlStateRef.current; logger.log(`[DEBUG][CONTEXT] triggerGetOpenPRs called for ${effectiveUrl}`); if (!effectiveUrl || !effectiveUrl.includes('github.com')) { setOpenPrsStateStable([]); setLoadingPrsStateStable(false); logger.warn("triggerGetOpenPRs: Invalid URL", effectiveUrl); return; } logger.log("triggerGetOpenPRs: Fetching for", effectiveUrl); setLoadingPrsStateStable(true); try { const result = await getOpenPullRequests(effectiveUrl); if (result.success && result.pullRequests) { setOpenPrsStateStable(result.pullRequests as SimplePullRequest[]); } else { addToastStable("Ошибка загрузки PR: " + (result.error ?? 'Неизвестно'), "error"); setOpenPrsStateStable([]); } } catch (error: any) { logger.error("triggerGetOpenPRs Action Error:", error); addToastStable(`Крит. ошибка загрузки PR: ${error?.message ?? 'Неизвестно'}`, "error", 5000); setOpenPrsStateStable([]); } finally { setLoadingPrsStateStable(false); } }, [addToastStable, setLoadingPrsStateStable, setOpenPrsStateStable]);
-         const repoUrlStateRef = useRef(repoUrlState); useEffect(() => { repoUrlStateRef.current = repoUrlState; }, [repoUrlState]);
-
-        const triggerUpdateBranchStable = useCallback(async ( repoUrlParam: string, filesToCommit: { path: string; content: string }[], commitMessage: string, branch: string, prNumber?: number | null, prDescription?: string ): Promise<{ success: boolean; error?: string }> => { logger.log(`[Context] triggerUpdateBranch: ${branch}, PR#: ${prNumber ?? 'N/A'}`); setAssistantLoadingStateStable(true); try { const result = await updateBranch(repoUrlParam, filesToCommit, commitMessage, branch, prNumber ?? undefined, prDescription); if (result.success) { logger.log(`[DEBUG][CONTEXT] triggerUpdateBranch SUCCESS. Triggering PR refresh.`); triggerGetOpenPRsStable(repoUrlParam).catch(err => logger.error("Failed to refresh PRs after branch update:", err)); return { success: true }; } else { addToastStable(`Ошибка обновления ветки: ${result.error}`, 'error', 5000); return { success: false, error: result.error }; } } catch (error: any) { logger.error("[Context] triggerUpdateBranch critical Error:", error); addToastStable(`Крит. ошибка обновления ветки: ${error.message}`, "error", 5000); return { success: false, error: error.message }; } finally { logger.log(`[DEBUG][CONTEXT] triggerUpdateBranch FINALLY`); setAssistantLoadingStateStable(false); } }, [addToastStable, triggerGetOpenPRsStable, setAssistantLoadingStateStable]);
-        const updateRepoUrlInAssistantStable = useCallback((url: string) => { logger.log(`[DEBUG][CONTEXT] updateRepoUrlInAssistant called. Ref ready: ${!!assistantRef.current?.updateRepoUrl}`); if (assistantRef.current?.updateRepoUrl) { try { assistantRef.current.updateRepoUrl(url); } catch (error: any) { logger.error(`Error calling assistantRef.updateRepoUrl: ${error?.message ?? 'Неизвестно'}`); } } }, [assistantRef]);
-        const scrollToSectionStable = useCallback((sectionId: string) => { logger.log(`[DEBUG][CONTEXT] scrollToSection called for ${sectionId}`); const element = document.getElementById(sectionId); if (element) { try { element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }); setTimeout(() => { element.classList.add('highlight-scroll'); setTimeout(() => element.classList.remove('highlight-scroll'), 1500); }, 300); } catch (scrollError) { logger.error(`Error scrolling to ${sectionId}:`, scrollError); } } else { logger.warn(`Scroll target not found: ${sectionId}`); } }, []);
+        const triggerParseResponse = useCallback(async () => { logger.log(`[DEBUG][CONTEXT] triggerParseResponse called. Ref ready: ${!!assistantRef.current?.handleParse}`); if (assistantRef.current?.handleParse) { try { await assistantRef.current.handleParse(); } catch (e: any) { logger.error("Error calling assistantRef.handleParse:", e); addToastStable(`Крит. ошибка разбора ответа: ${e?.message ?? 'Неизвестно'}`, "error", 5000); } } else { logger.error("triggerParseResponse: assistantRef is not set."); addToastStable("Ошибка разбора: Компонент Ассистента недоступен.", "error");} }, [addToastStable, assistantRef]);
+        const triggerSelectAllParsed = useCallback(() => { logger.log(`[DEBUG][CONTEXT] triggerSelectAllParsed called. Ref ready: ${!!assistantRef.current?.selectAllParsedFiles}`); if (assistantRef.current?.selectAllParsedFiles) { try { assistantRef.current.selectAllParsedFiles(); } catch (e: any) { logger.error("Error calling assistantRef.selectAllParsedFiles:", e); addToastStable(`Ошибка выбора всех файлов: ${e?.message ?? 'Неизвестно'}`, "error"); } } else { logger.error("triggerSelectAllParsed: assistantRef is not set."); addToastStable("Ошибка выбора: Компонент Ассистента недоступен.", "error");} }, [addToastStable, assistantRef]);
+        const triggerCreateOrUpdatePR = useCallback(async () => { logger.log(`[DEBUG][CONTEXT] triggerCreateOrUpdatePR called. Ref ready: ${!!assistantRef.current?.handleCreatePR}`); if (assistantRef.current?.handleCreatePR) { try { await assistantRef.current.handleCreatePR(); } catch (e: any) { logger.error("Error calling assistantRef.handleCreatePR:", e); addToastStable(`Крит. ошибка создания/обновления PR: ${e?.message ?? 'Неизвестно'}`, "error", 5000); } } else { logger.error("triggerCreateOrUpdatePR: assistantRef is not set."); addToastStable("Ошибка PR: Компонент Ассистента недоступен.", "error");} }, [addToastStable, assistantRef]);
+        const triggerGetOpenPRsStable = useCallback(async (url: string) => { const effectiveUrl = url || repoUrlStateRef.current; logger.log(`[DEBUG][CONTEXT] triggerGetOpenPRs called for ${effectiveUrl}`); if (!effectiveUrl || !effectiveUrl.includes('github.com')) { setOpenPrsStateStable([]); setLoadingPrsStateStable(false); logger.warn("triggerGetOpenPRs: Invalid URL", effectiveUrl); return; } logger.log("triggerGetOpenPRs: Fetching for", effectiveUrl); setLoadingPrsStateStable(true); try { const result = await getOpenPullRequests(effectiveUrl); if (result.success && result.pullRequests) { setOpenPrsStateStable(result.pullRequests as SimplePullRequest[]); } else { addToastStable("Ошибка загрузки PR: " + (result.error ?? 'Неизвестно'), "error"); setOpenPrsStateStable([]); } } catch (e: any) { logger.error("triggerGetOpenPRs Action Error:", e); addToastStable(`Крит. ошибка загрузки PR: ${e?.message ?? 'Неизвестно'}`, "error", 5000); setOpenPrsStateStable([]); } finally { setLoadingPrsStateStable(false); } }, [addToastStable, setLoadingPrsStateStable, setOpenPrsStateStable]);
+        const triggerUpdateBranchStable = useCallback(async ( repoUrlParam: string, filesToCommit: { path: string; content: string }[], commitMessage: string, branch: string, prNumber?: number | null, prDescription?: string ): Promise<{ success: boolean; error?: string }> => { logger.log(`[Context] triggerUpdateBranch: ${branch}, PR#: ${prNumber ?? 'N/A'}`); setAssistantLoadingStateStable(true); try { const result = await updateBranch(repoUrlParam, filesToCommit, commitMessage, branch, prNumber ?? undefined, prDescription); if (result.success) { logger.log(`[DEBUG][CONTEXT] triggerUpdateBranch SUCCESS. Triggering PR refresh.`); triggerGetOpenPRsStable(repoUrlParam).catch(err => logger.error("Failed to refresh PRs after branch update:", err)); return { success: true }; } else { addToastStable(`Ошибка обновления ветки: ${result.error}`, 'error', 5000); return { success: false, error: result.error }; } } catch (e: any) { logger.error("[Context] triggerUpdateBranch critical Error:", e); addToastStable(`Крит. ошибка обновления ветки: ${e.message}`, "error", 5000); return { success: false, error: e.message }; } finally { logger.log(`[DEBUG][CONTEXT] triggerUpdateBranch FINALLY`); setAssistantLoadingStateStable(false); } }, [addToastStable, triggerGetOpenPRsStable, setAssistantLoadingStateStable]);
+        const updateRepoUrlInAssistantStable = useCallback((url: string) => { logger.log(`[DEBUG][CONTEXT] updateRepoUrlInAssistant called. Ref ready: ${!!assistantRef.current?.updateRepoUrl}`); if (assistantRef.current?.updateRepoUrl) { try { assistantRef.current.updateRepoUrl(url); } catch (e: any) { logger.error(`Error calling assistantRef.updateRepoUrl: ${e?.message ?? 'Неизвестно'}`); } } }, [assistantRef]);
         const triggerAddImportantToKworkStable = useCallback(() => { logger.log(`[DEBUG][CONTEXT] triggerAddImportantToKwork called. Ref ready: ${!!fetcherRef.current?.handleAddImportantFiles}`); fetcherRef.current?.handleAddImportantFiles?.(); }, [fetcherRef]);
         const triggerAddTreeToKworkStable = useCallback(() => { logger.log(`[DEBUG][CONTEXT] triggerAddTreeToKwork called. Ref ready: ${!!fetcherRef.current?.handleAddFullTree}`); fetcherRef.current?.handleAddFullTree?.(); }, [fetcherRef]);
         const triggerSelectAllFetcherFilesStable = useCallback(() => { logger.log(`[DEBUG][CONTEXT] triggerSelectAllFetcherFiles called. Ref ready: ${!!fetcherRef.current?.selectAllFiles}`); fetcherRef.current?.selectAllFiles?.(); }, [fetcherRef]);
         const triggerDeselectAllFetcherFilesStable = useCallback(() => { logger.log(`[DEBUG][CONTEXT] triggerDeselectAllFetcherFiles called. Ref ready: ${!!fetcherRef.current?.deselectAllFiles}`); fetcherRef.current?.deselectAllFiles?.(); }, [fetcherRef]);
         const triggerClearKworkInputStable = useCallback(() => { logger.log(`[DEBUG][CONTEXT] triggerClearKworkInput called. Ref ready: ${!!fetcherRef.current?.clearAll}`); fetcherRef.current?.clearAll?.(); }, [fetcherRef]);
 
-
         // --- Workflow Step Calculation ---
         const [currentStep, setCurrentStep] = useState<WorkflowStep>('idle');
         useEffect(() => {
             let calculatedStep: WorkflowStep = 'idle';
-            if (isPreCheckingState) {
-                 calculatedStep = 'fetching';
-            } else if (imageReplaceTaskState) {
+            if (isPreCheckingState) { calculatedStep = 'fetching'; }
+            else if (imageReplaceTaskState) {
                  if (fetchStatusState === 'loading' || fetchStatusState === 'retrying') calculatedStep = 'fetching';
-                 else if (fetchStatusState === 'success' && filesFetchedState && allFetchedFilesState.some(f => f.path === imageReplaceTaskState.targetPath)) {
-                      calculatedStep = assistantLoadingState ? 'generating_ai_response' : 'files_fetched_image_replace';
-                 }
-                 else if (fetchStatusState === 'error' || fetchStatusState === 'failed_retries' || (filesFetchedState && imageReplaceTaskState && !allFetchedFilesState.some(f => f.path === imageReplaceTaskState?.targetPath))) {
-                     calculatedStep = 'fetch_failed';
-                 }
+                 else if (fetchStatusState === 'success' && filesFetchedState && allFetchedFilesState.some(f => f.path === imageReplaceTaskState.targetPath)) { calculatedStep = assistantLoadingState ? 'generating_ai_response' : 'files_fetched_image_replace'; }
+                 else if (fetchStatusState === 'error' || fetchStatusState === 'failed_retries' || (filesFetchedState && imageReplaceTaskState && !allFetchedFilesState.some(f => f.path === imageReplaceTaskState?.targetPath))) { calculatedStep = 'fetch_failed'; }
                  else calculatedStep = repoUrlEnteredState ? 'ready_to_fetch' : 'idle';
              } else {
                  if (fetchStatusState === 'loading' || fetchStatusState === 'retrying') calculatedStep = 'fetching';
@@ -432,64 +416,29 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                  else if (assistantLoadingState) calculatedStep = 'generating_ai_response';
                  else if (aiActionLoadingState) calculatedStep = 'generating_ai_response';
                  else if (filesFetchedState) {
-                     if (aiResponseHasContentState) {
-                         calculatedStep = filesParsedState ? 'pr_ready' : 'response_pasted';
-                     } else if (kworkInputHasContentState) { // Use the boolean flag here
-                         calculatedStep = requestCopiedState ? 'request_copied' : 'request_written';
-                     } else if (selectedFetcherFilesState.size > 0) {
-                         calculatedStep = 'files_selected';
-                     } else if (primaryHighlightPathState || Object.values(secondaryHighlightPathsState).some(arr => arr.length > 0)) {
-                         calculatedStep = 'files_fetched_highlights';
-                     } else {
-                         calculatedStep = 'files_fetched';
-                     }
+                     if (aiResponseHasContentState) { calculatedStep = filesParsedState ? 'pr_ready' : 'response_pasted'; }
+                     else if (kworkInputHasContentState) { calculatedStep = requestCopiedState ? 'request_copied' : 'request_written'; }
+                     else if (selectedFetcherFilesState.size > 0) { calculatedStep = 'files_selected'; }
+                     else if (primaryHighlightPathState || Object.values(secondaryHighlightPathsState).some(arr => arr.length > 0)) { calculatedStep = 'files_fetched_highlights'; }
+                     else { calculatedStep = 'files_fetched'; }
                  }
-                 else {
-                     calculatedStep = repoUrlEnteredState ? 'ready_to_fetch' : 'idle';
-                 }
+                 else { calculatedStep = repoUrlEnteredState ? 'ready_to_fetch' : 'idle'; }
              }
-            setCurrentStep(prevStep => {
-                 if (prevStep !== calculatedStep) {
-                     logger.log(`Context Step Updated: ${prevStep} -> ${calculatedStep}`);
-                     return calculatedStep;
-                 }
-                 return prevStep;
-            });
-        }, [
-            fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState, filesParsedState, requestCopiedState, primaryHighlightPathState, secondaryHighlightPathsState,
-            selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, allFetchedFilesState, assistantLoadingState, repoUrlEnteredState, isPreCheckingState,
-        ]);
+            setCurrentStep(prevStep => { if (prevStep !== calculatedStep) { logger.log(`Context Step Updated: ${prevStep} -> ${calculatedStep}`); return calculatedStep; } return prevStep; });
+        }, [ fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState, filesParsedState, requestCopiedState, primaryHighlightPathState, secondaryHighlightPathsState, selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, allFetchedFilesState, assistantLoadingState, repoUrlEnteredState, isPreCheckingState ]);
 
         // --- Buddy Message Logic (Stable Callback Wrapper) ---
          const getXuinityMessageStable = useCallback((): string => {
-             const localCurrentStep = currentStep;
-             const localManualBranchName = manualBranchNameState;
-             const localTargetBranchName = targetBranchNameState;
-             const localImageReplaceTask = imageReplaceTaskState;
-             const localFetchStatus = fetchStatusState;
-             const localAllFilesLength = allFetchedFilesState.length;
-             const localSelectedFetchSize = selectedFetcherFilesState.size;
-             const localSelectedAssistSize = selectedAssistantFilesState.size;
-             const localIsPreChecking = isPreCheckingState;
-             const localPendingFlowDetails = pendingFlowDetailsState;
-             const localFilesFetched = filesFetchedState;
-             const localAssistantLoading = assistantLoadingState;
-             const localAllFetchedFiles = allFetchedFilesState;
-
+             const localCurrentStep = currentStep; const localManualBranchName = manualBranchNameState; const localTargetBranchName = targetBranchNameState; const localImageReplaceTask = imageReplaceTaskState; const localFetchStatus = fetchStatusState; const localAllFilesLength = allFetchedFilesState.length; const localSelectedFetchSize = selectedFetcherFilesState.size; const localSelectedAssistSize = selectedAssistantFilesState.size; const localIsPreChecking = isPreCheckingState; const localPendingFlowDetails = pendingFlowDetailsState; const localFilesFetched = filesFetchedState; const localAssistantLoading = assistantLoadingState; const localAllFetchedFiles = allFetchedFilesState;
              const effectiveBranch = localManualBranchName.trim() || localTargetBranchName || 'default';
              logger.debug(`[getXuinityMessageStable] Calculating message for step: ${localCurrentStep}, task: ${!!localImageReplaceTask}, isPreChecking: ${localIsPreChecking}`);
-
              if (localIsPreChecking) return `Проверяю наличие PR/ветки для '${localPendingFlowDetails?.targetPath.split('/').pop() ?? 'файла'}'...`;
-
              if (localImageReplaceTask) {
                  if (localFetchStatus === 'loading' || localFetchStatus === 'retrying') return `Гружу файл ${localImageReplaceTask.targetPath.split('/').pop()} из ветки ${effectiveBranch}...`;
                  if (localFetchStatus === 'error' || localFetchStatus === 'failed_retries') return "Твою ж! Ошибка загрузки файла. URL/ветка верные? Жми 'Попробовать Снова'.";
                  const targetFileExists = localAllFetchedFiles?.some(f => f.path === localImageReplaceTask.targetPath);
                  if (localFetchStatus === 'success' && !targetFileExists && localFilesFetched) return "Файл для замены НЕ НАЙДЕН в репе! Проверь путь/ветку!";
-                 if (localFetchStatus === 'success' && targetFileExists) {
-                     if (localAssistantLoading) return "Меняю картинку и делаю авто-PR... Магия!";
-                     return "Файл на месте! Ассистент сейчас сам всё заменит и запушит PR. Левел 1 пройден!";
-                 }
+                 if (localFetchStatus === 'success' && targetFileExists) { if (localAssistantLoading) return "Меняю картинку и делаю авто-PR... Магия!"; return "Файл на месте! Ассистент сейчас сам всё заменит и запушит PR. Левел 1 пройден!"; }
                  return "Готовлю авто-замену картинки (Level 1)...";
              }
              switch (localCurrentStep) {
@@ -504,60 +453,31 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                  case 'request_copied': return "Скопировал? Красава! Теперь жду ответ от твоего AI. Вставь его в поле ниже.";
                  case 'response_pasted': return "Есть ответ! Отлично. Жми '➡️', я разберу код и проверю на ошибки.";
                  case 'parsing_response': return "Парсю код, ищу косяки... (+1 Parser Perk!)";
-                 case 'pr_ready':
-                     const actionText = localTargetBranchName ? 'обновления ветки' : 'создания PR';
-                     if (localSelectedAssistSize === 0) return "Код разобран и проверен! Теперь выбери файлы, которые пойдут в коммит.";
-                     return `Код разобран! Выбрано ${localSelectedAssistSize} файлов для ${actionText}. Проверь код в ассистенте (ошибки/варнинги?). Жми кнопку PR/Update!`;
-                 default:
-                     logger.warn(`[getXuinityMessageStable] Reached default case for step: ${localCurrentStep}`);
-                     return "Вайб неопределен... Что будем делать?";
+                 case 'pr_ready': const actionText = localTargetBranchName ? 'обновления ветки' : 'создания PR'; if (localSelectedAssistSize === 0) return "Код разобран и проверен! Теперь выбери файлы, которые пойдут в коммит."; return `Код разобран! Выбрано ${localSelectedAssistSize} файлов для ${actionText}. Проверь код в ассистенте (ошибки/варнинги?). Жми кнопку PR/Update!`;
+                 default: logger.warn(`[getXuinityMessageStable] Reached default case for step: ${localCurrentStep}`); return "Вайб неопределен... Что будем делать?";
              }
-          }, [
-              currentStep, manualBranchNameState, targetBranchNameState,
-              imageReplaceTaskState, fetchStatusState, allFetchedFilesState,
-              filesFetchedState, assistantLoadingState, selectedFetcherFilesState.size, // Use size for stability
-              selectedAssistantFilesState.size, isPreCheckingState, pendingFlowDetailsState,
-              logger
-          ]);
-
+          }, [ currentStep, manualBranchNameState, targetBranchNameState, imageReplaceTaskState, fetchStatusState, allFetchedFilesState, filesFetchedState, assistantLoadingState, selectedFetcherFilesState.size, selectedAssistantFilesState.size, isPreCheckingState, pendingFlowDetailsState, logger ]);
 
         // --- Memoized Context Value ---
         const contextValue = useMemo((): RepoXmlPageContextType => {
              try {
                 logger.debug("[RepoXmlPageProvider] Memoizing context value START");
                 const value = {
-                    // State values
-                    fetchStatus: fetchStatusState, repoUrlEntered: repoUrlEnteredState, filesFetched: filesFetchedState, kworkInputHasContent: kworkInputHasContentState, requestCopied: requestCopiedState, aiResponseHasContent: aiResponseHasContentState, filesParsed: filesParsedState, assistantLoading: assistantLoadingState, aiActionLoading: aiActionLoadingState, loadingPrs: loadingPrsState, isSettingsModalOpen: isSettingsModalOpenState, isParsing: isParsingState, isPreChecking: isPreCheckingState, showComponents: showComponentsState,
-                    selectedFetcherFiles: selectedFetcherFilesState, selectedAssistantFiles: selectedAssistantFilesState, targetBranchName: targetBranchNameState, manualBranchName: manualBranchNameState, openPrs: openPrsState, currentAiRequestId: currentAiRequestIdState, imageReplaceTask: imageReplaceTaskState, allFetchedFiles: allFetchedFilesState, currentStep, repoUrl: repoUrlState, primaryHighlightedPath: primaryHighlightPathState, secondaryHighlightedPaths: secondaryHighlightPathsState, targetPrData: targetPrDataState, pendingFlowDetails: pendingFlowDetailsState,
-                    kworkInputValue: kworkInputValueState, // <<< ADDED State value
-                    // Stable Setters
-                    setFetchStatus: setFetchStatusStateStable, setRepoUrlEntered: setRepoUrlEnteredStateStable, handleSetFilesFetched: handleSetFilesFetchedStable, setSelectedFetcherFiles: setSelectedFetcherFilesStateStable, setKworkInputHasContent: setKworkInputHasContentStateStable, setRequestCopied: setRequestCopiedStateStable, setAiResponseHasContent: setAiResponseHasContentStateStable, setFilesParsed: setFilesParsedStateStable, setSelectedAssistantFiles: setSelectedAssistantFilesStateStable, setAssistantLoading: setAssistantLoadingStateStable, setAiActionLoading: setAiActionLoadingStateStable, setLoadingPrs: setLoadingPrsStateStable, setTargetBranchName: setTargetBranchNameStateStable, setManualBranchName: setManualBranchNameStateStable, setOpenPrs: setOpenPrsStateStable, setIsParsing: setIsParsingStateStable, setContextIsParsing: setIsParsingStateStable, setCurrentAiRequestId: setCurrentAiRequestIdStateStable, setImageReplaceTask: setImageReplaceTaskStateStable, setRepoUrl: setRepoUrlStateStable, setTargetPrData: setTargetPrDataStable, setIsPreChecking: setIsPreCheckingStateStable, setPendingFlowDetails: setPendingFlowDetailsStateStable, setShowComponents: setShowComponentsStateStable,
-                    setKworkInputValue: setKworkInputValueStateStable, // <<< ADDED Stable setter
-                    // Stable Triggers
+                    fetchStatus: fetchStatusState, repoUrlEntered: repoUrlEnteredState, filesFetched: filesFetchedState, kworkInputHasContent: kworkInputHasContentState, requestCopied: requestCopiedState, aiResponseHasContent: aiResponseHasContentState, filesParsed: filesParsedState, assistantLoading: assistantLoadingState, aiActionLoading: aiActionLoadingState, loadingPrs: loadingPrsState, isSettingsModalOpen: isSettingsModalOpenState, isParsing: isParsingState, isPreChecking: isPreCheckingState, showComponents: showComponentsState, selectedFetcherFiles: selectedFetcherFilesState, selectedAssistantFiles: selectedAssistantFilesState, targetBranchName: targetBranchNameState, manualBranchName: manualBranchNameState, openPrs: openPrsState, currentAiRequestId: currentAiRequestIdState, imageReplaceTask: imageReplaceTaskState, allFetchedFiles: allFetchedFilesState, currentStep, repoUrl: repoUrlState, primaryHighlightedPath: primaryHighlightPathState, secondaryHighlightedPaths: secondaryHighlightPathsState, targetPrData: targetPrDataState, pendingFlowDetails: pendingFlowDetailsState, kworkInputValue: kworkInputValueState,
+                    setFetchStatus: setFetchStatusStateStable, setRepoUrlEntered: setRepoUrlEnteredStateStable, handleSetFilesFetched: handleSetFilesFetchedStable, setSelectedFetcherFiles: setSelectedFetcherFilesStateStable, setKworkInputHasContent: setKworkInputHasContentStateStable, setRequestCopied: setRequestCopiedStateStable, setAiResponseHasContent: setAiResponseHasContentStateStable, setFilesParsed: setFilesParsedStateStable, setSelectedAssistantFiles: setSelectedAssistantFilesStateStable, setAssistantLoading: setAssistantLoadingStateStable, setAiActionLoading: setAiActionLoadingStateStable, setLoadingPrs: setLoadingPrsStateStable, setTargetBranchName: setTargetBranchNameStateStable, setManualBranchName: setManualBranchNameStateStable, setOpenPrs: setOpenPrsStateStable, setIsParsing: setIsParsingStateStable, setContextIsParsing: setIsParsingStateStable, setCurrentAiRequestId: setCurrentAiRequestIdStateStable, setImageReplaceTask: setImageReplaceTaskStateStable, setRepoUrl: setRepoUrlStateStable, setTargetPrData: setTargetPrDataStable, setIsPreChecking: setIsPreCheckingStateStable, setPendingFlowDetails: setPendingFlowDetailsStateStable, setShowComponents: setShowComponentsStateStable, setKworkInputValue: setKworkInputValueStateStable,
                     triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR, triggerUpdateBranch: triggerUpdateBranchStable, triggerGetOpenPRs: triggerGetOpenPRsStable, updateRepoUrlInAssistant: updateRepoUrlInAssistantStable, getXuinityMessage: getXuinityMessageStable, scrollToSection: scrollToSectionStable, triggerAddImportantToKwork: triggerAddImportantToKworkStable, triggerAddTreeToKwork: triggerAddTreeToKworkStable, triggerSelectAllFetcherFiles: triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFiles: triggerDeselectAllFetcherFilesStable, triggerClearKworkInput: triggerClearKworkInputStable,
-                    // Refs
                     kworkInputRef, aiResponseInputRef, fetcherRef, assistantRef,
-                    // Stable Utils
                     addToast: addToastStable,
                 };
                 logger.debug("[RepoXmlPageProvider] Memoizing context value END");
                 return value;
-            } catch (memoError: any) {
-                 logger.fatal("[RepoXmlPageProvider] CRITICAL ERROR during context value memoization:", memoError);
-                 return defaultContextValue as RepoXmlPageContextType; // Fallback
-             }
+            } catch (memoError: any) { logger.fatal("[RepoXmlPageProvider] CRITICAL ERROR during context value memoization:", memoError); return defaultContextValue as RepoXmlPageContextType; }
         }, [
-            // State values
-            fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, isPreCheckingState, showComponentsState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, secondaryHighlightPathsState, targetPrDataState, pendingFlowDetailsState,
-            kworkInputValueState, // <<< ADDED Dependency
-            // Stable Setters (dependencies for the value itself)
-            setFetchStatusStateStable, setRepoUrlEnteredStateStable, handleSetFilesFetchedStable, setSelectedFetcherFilesStateStable, setKworkInputHasContentStateStable, setRequestCopiedStateStable, setAiResponseHasContentStateStable, setFilesParsedStateStable, setSelectedAssistantFilesStateStable, setAssistantLoadingStateStable, setAiActionLoadingStateStable, setLoadingPrsStateStable, setTargetBranchNameStateStable, setManualBranchNameStateStable, setOpenPrsStateStable, setIsParsingStateStable, setCurrentAiRequestIdStateStable, setImageReplaceTaskStateStable, setRepoUrlStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setShowComponentsStateStable,
-            setKworkInputValueStateStable, // <<< ADDED Dependency
-            // Stable Triggers (dependencies for the value itself)
+            fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, isPreCheckingState, showComponentsState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, secondaryHighlightPathsState, targetPrDataState, pendingFlowDetailsState, kworkInputValueState,
+            setFetchStatusStateStable, setRepoUrlEnteredStateStable, handleSetFilesFetchedStable, setSelectedFetcherFilesStateStable, setKworkInputHasContentStateStable, setRequestCopiedStateStable, setAiResponseHasContentStateStable, setFilesParsedStateStable, setSelectedAssistantFilesStateStable, setAssistantLoadingStateStable, setAiActionLoadingStateStable, setLoadingPrsStateStable, setTargetBranchNameStateStable, setManualBranchNameStateStable, setOpenPrsStateStable, setIsParsingStateStable, setCurrentAiRequestIdStateStable, setImageReplaceTaskStateStable, setRepoUrlStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setShowComponentsStateStable, setKworkInputValueStateStable,
             triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR, triggerUpdateBranchStable, triggerGetOpenPRsStable, updateRepoUrlInAssistantStable, getXuinityMessageStable, scrollToSectionStable, triggerAddImportantToKworkStable, triggerAddTreeToKworkStable, triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFilesStable, triggerClearKworkInputStable,
-            // Stable Utils (dependency for the value itself)
             addToastStable,
-            // Refs (refs themselves are stable, no need to list)
+            kworkInputRef, aiResponseInputRef, fetcherRef, assistantRef // Refs are stable
         ]);
 
         logger.log("[RepoXmlPageProvider] Rendering Provider wrapper", { step: contextValue.currentStep });
@@ -565,7 +485,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
 
     } catch (providerError: any) {
         logger.fatal("[RepoXmlPageProvider] CRITICAL INITIALIZATION ERROR:", providerError);
-        // Render a fallback UI instead of crashing the app
         return <div className="fixed inset-0 flex items-center justify-center bg-red-900 text-white p-4 z-[9999]">Критическая ошибка инициализации провайдера страницы: {providerError.message}</div>;
     }
 };
@@ -573,17 +492,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
 // --- Consumer Hook ---
 export const useRepoXmlPageContext = (): RepoXmlPageContextType => {
     const context = useContext(RepoXmlPageContext);
-    if (context === undefined) {
-         logger.fatal("useRepoXmlPageContext used outside RepoXmlPageProvider!");
-         throw new Error("useRepoXmlPageContext must be used within a RepoXmlPageProvider");
-    }
-    // Check if context is still the default value, which might indicate an issue
-    if (context.setTargetPrData === defaultContextValue.setTargetPrData && typeof window !== 'undefined') {
-        // Check against a known stable setter that was added
-        if (context.setKworkInputValue === defaultContextValue.setKworkInputValue) {
-             logger.warn("useRepoXmlPageContext: Context might be the default value (check provider setup).");
-        }
-    }
+    if (context === undefined) { logger.fatal("useRepoXmlPageContext used outside RepoXmlPageProvider!"); throw new Error("useRepoXmlPageContext must be used within a RepoXmlPageProvider"); }
+    if (context.setKworkInputValue === defaultContextValue.setKworkInputValue && typeof window !== 'undefined') { logger.warn("useRepoXmlPageContext: Context might be the default value (check provider setup)."); }
     return context as RepoXmlPageContextType;
 };
 
