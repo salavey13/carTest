@@ -166,14 +166,14 @@ function ActualPageContent() {
     // --- State Initialization ---
     log("[ActualPageContent] Initializing State...");
     const [lang, setLang] = useState<Language>('en');
-    const [initialIdea, setInitialIdea] = useState<string | null>(null);
-    const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(false);
+    const [initialIdea, setInitialIdea] = useState<string | null>(null); // Local state for initial idea from URL
+    const [initialIdeaProcessed, setInitialIdeaProcessed] = useState<boolean>(true); // Start as true, set to false when URL params provide an idea/task
     const [t, setT] = useState<TranslationSet | null>(null);
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
     const [searchParamsReady, setSearchParamsReady] = useState(false); // <<< NEW State
     const [searchParamsError, setSearchParamsError] = useState<Error | null>(null); // <<< NEW State
-    const [highlightedPathProp, setHighlightedPathProp] = useState<string | null>(null);
-    const [ideaProp, setIdeaProp] = useState<string | null>(null);
+    const [highlightedPathProp, setHighlightedPathProp] = useState<string | null>(null); // Prop for RepoTxtFetcher
+    const [ideaProp, setIdeaProp] = useState<string | null>(null); // Prop for RepoTxtFetcher
     log("[ActualPageContent] useState DONE");
 
 
