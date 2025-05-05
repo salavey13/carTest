@@ -1,3 +1,4 @@
+// No changes needed based on the last analysis, but providing full code as requested.
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useMemo, useCallback } from "react";
@@ -217,57 +218,48 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     useImperativeHandle(ref, () => ({
         handleFetch: (isManualRetry?: boolean, branchNameToFetchOverride?: string | null, taskForEarlyCheck?: ImageReplaceTask | null) => {
             logger.debug(`[Imperative] handleFetch called.`);
-            // Ensure handleFetchManual from the hook is called correctly
             return handleFetchManual(isManualRetry, branchNameToFetchOverride, taskForEarlyCheck || imageReplaceTask);
         },
         selectHighlightedFiles: () => {
              logger.debug(`[Imperative] selectHighlightedFiles called.`);
-             // Call the function from the useFileSelection hook
              selectHighlightedFiles();
         },
         handleAddSelected: (filesToAdd: Set<string>, allFiles: FileNode[]) => {
             logger.debug(`[Imperative] handleAddSelected called.`);
-            // Call the function from the useKworkInput hook
             handleAddSelected();
-            return Promise.resolve(); // Return a resolved promise matching the old signature if needed
+            return Promise.resolve();
         },
         handleCopyToClipboard: (text?: string, scroll?: boolean) => {
              logger.debug(`[Imperative] handleCopyToClipboard called.`);
-             // Call the function from the useKworkInput hook
              return handleCopyToClipboard(text, scroll);
         },
         clearAll: () => {
              logger.debug(`[Imperative] clearAll called.`);
-             // Call the function from the useKworkInput hook
              handleClearAll();
         },
-        getKworkInputValue: () => { // Keep if needed externally, now reads state
+        getKworkInputValue: () => {
              logger.debug(`[Imperative] getKworkInputValue called.`);
-             return kworkInputValue; // Read directly from context state
+             return kworkInputValue;
         },
         handleAddImportantFiles: () => {
              logger.debug(`[Imperative] handleAddImportantFiles called.`);
-             // Call the function from the useFileSelection hook
              handleAddImportantFiles();
         },
         handleAddFullTree: () => {
              logger.debug(`[Imperative] handleAddFullTree called.`);
-             // Call the function from the useKworkInput hook
              handleAddFullTree();
         },
         selectAllFiles: () => {
              logger.debug(`[Imperative] selectAllFiles called.`);
-             // Call the function from the useFileSelection hook
              handleSelectAll();
         },
         deselectAllFiles: () => {
             logger.debug(`[Imperative] deselectAllFiles called.`);
-            // Call the function from the useFileSelection hook
             handleDeselectAll();
         },
     }), [
         handleFetchManual, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll,
-        kworkInputValue, // <<< ADD state dependency for getKworkInputValue
+        kworkInputValue, // Need state value for getter
         imageReplaceTask, handleAddImportantFiles, handleAddFullTree, handleSelectAll, handleDeselectAll
     ]);
     logger.debug("[RepoTxtFetcher] After useImperativeHandle");
@@ -306,7 +298,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const currentImageTask = imageReplaceTask;
     const showProgressBar = fetchStatus !== 'idle';
     const isActionDisabled = isFetchLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing || !!currentImageTask;
-    // Use kworkInputValue state for disabling buttons
     const isCopyDisabled = !kworkInputValue.trim() || isActionDisabled;
     const isClearDisabled = (!kworkInputValue.trim() && selectedFetcherFiles.size === 0 && !filesFetched) || isActionDisabled;
     const isAddSelectedDisabled = selectedFetcherFiles.size === 0 || isActionDisabled;
@@ -470,8 +461,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                           {(() => { logger.debug("[Render] Rendering RequestInput (conditional)"); return null; })()}
                           <RequestInput
                               kworkInputRef={kworkInputRef} // Pass ref for focus/imperative actions
-                              kworkInputValue={kworkInputValue} // <<< PASS state value
-                              onValueChange={setKworkInputValue} // <<< PASS state setter
+                              kworkInputValue={kworkInputValue} // Pass state value
+                              onValueChange={setKworkInputValue} // Pass state setter
                               onCopyToClipboard={() => { logger.debug("[Input Action] Copy Click"); handleCopyToClipboard(undefined, true); }}
                               onClearAll={() => { logger.debug("[Input Action] Clear Click"); handleClearAll(); }}
                               onAddSelected={() => { logger.debug("[Input Action] AddSelected Click"); handleAddSelected(); }}
