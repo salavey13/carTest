@@ -70,6 +70,9 @@ export const useRepoFetcher = ({
     const isFetchInitiatedRef = useRef(false);
     const isAutoFetchingRef = useRef(false);
     const fetchStatusRef = useRef(fetchStatus);
+    // Use refs to hold the latest context values for use inside callbacks without triggering them
+    const imageReplaceTaskRef = useRef(imageReplaceTask);
+    const pendingFlowDetailsRef = useRef(pendingFlowDetails);
     logger.debug("[useRepoFetcher] After useRef");
 
     logger.debug("[useRepoFetcher] Before Effects");
@@ -78,12 +81,17 @@ export const useRepoFetcher = ({
         return () => { if (progressIntervalRef.current) { clearInterval(progressIntervalRef.current); } };
     }, []);
     useEffect(() => { fetchStatusRef.current = fetchStatus; }, [fetchStatus]);
+    // Update refs when context values change
+    useEffect(() => { imageReplaceTaskRef.current = imageReplaceTask; }, [imageReplaceTask]);
+    useEffect(() => { pendingFlowDetailsRef.current = pendingFlowDetails; }, [pendingFlowDetails]);
+
 
     logger.debug("[useRepoFetcher] Before Callbacks");
     const stopProgressSimulation = useCallback(() => { if (progressIntervalRef.current) { clearInterval(progressIntervalRef.current); progressIntervalRef.current = null; } }, []);
     const startProgressSimulation = useCallback((estimatedDurationSeconds = 13) => { stopProgressSimulation(); setProgress(0); const ticks = estimatedDurationSeconds * 5; const increment = ticks > 0 ? 100 / ticks : 100; progressIntervalRef.current = setInterval(() => { setProgress(prev => { const currentContextStatus = fetchStatusRef.current; if (currentContextStatus !== 'loading' && currentContextStatus !== 'retrying') { stopProgressSimulation(); return currentContextStatus === 'success' ? 100 : prev; } const nextProgress = prev + increment; if (nextProgress >= 95) { stopProgressSimulation(); return 95; } return nextProgress; }); }, 200); }, [stopProgressSimulation, logger]);
 
     // --- UPDATED handleFetchManual ---
+    // Reads imageReplaceTask and pendingFlowDetails directly from refs inside the function
     const handleFetchManual = useCallback(async (
         isManualRetry = false,
         branchNameToFetchOverride?: string | null
@@ -96,9 +104,9 @@ export const useRepoFetcher = ({
         const effectiveBranchDisplay = finalBranchToFetch || 'default';
         logger.debug(`[Fetch Manual CB] Final branch: ${effectiveBranchDisplay}`);
 
-        // --- Read current flow/task info DIRECTLY from context ---
-        const currentFlow = pendingFlowDetails; // Read from context
-        const currentImageTaskDirect = imageReplaceTask; // Read from context
+        // --- Read current flow/task info DIRECTLY from refs ---
+        const currentFlow = pendingFlowDetailsRef.current; // Read from ref
+        const currentImageTaskDirect = imageReplaceTaskRef.current; // Read from ref
         // --- Determine flow type based on context values ---
         const isImageFlow = currentFlow?.type === 'ImageSwap' || !!currentImageTaskDirect;
         const isErrorFixFlow = currentFlow?.type === 'ErrorFix';
@@ -121,6 +129,11 @@ export const useRepoFetcher = ({
 
         // Fetch Execution (Unchanged logic)
         logger.info(`[Fetch Manual CB] Starting content fetch from branch: ${effectiveBranchDisplay}`);
+        // NOTE: The toast below correctly uses 'effectiveBranchDisplay'.
+        // If the toast shows 'default' when another branch was intended,
+        // the issue is likely that 'targetBranchName' or 'manualBranchName'
+        // were not correctly set *before* this function was called, OR
+        // the SERVER ACTION is ignoring the branch argument.
         const fetchToastId = toastLoading(`Запрос файлов из ветки (${effectiveBranchDisplay})...`, { duration: 15000 });
         startProgressSimulation(13);
         let fetchResult: Awaited<ReturnType<typeof fetchRepoContents>> | null = null;
@@ -132,6 +145,9 @@ export const useRepoFetcher = ({
 
         try {
             logger.debug(`[Fetch Manual CB] Calling fetchRepoContents with branch: ${finalBranchToFetch}`);
+            // NOTE: 'finalBranchToFetch' holds the branch name passed to the server action.
+            // If the fetched files are from the default branch instead, the problem is
+            // highly likely within the 'fetchRepoContents' server action itself.
             fetchResult = await fetchRepoContents(repoUrl, token || undefined, finalBranchToFetch);
             logger.info(`[Fetch Manual CB] fetchRepoContents Result: Success=${fetchResult?.success}, Files=${fetchResult?.files?.length ?? 'N/A'}`);
 
@@ -140,7 +156,7 @@ export const useRepoFetcher = ({
                 const allPaths = fetchedFilesData.map(f => f.path);
                 logger.log(`[Fetch Manual CB] Fetched ${fetchedFilesData.length} files successfully.`);
 
-                // --- FLOW SPECIFIC LOGIC (Uses currentTargetPath determined from context) ---
+                // --- FLOW SPECIFIC LOGIC (Uses currentTargetPath determined from context refs) ---
                 if ((isImageFlow || isErrorFixFlow) && currentTargetPath) {
                     const flowName = isImageFlow ? "Image Flow" : "Error Fix";
                     logger.info(`[Fetch Manual CB] Processing ${flowName} Path. Target: ${currentTargetPath}`);
@@ -168,6 +184,8 @@ export const useRepoFetcher = ({
                      }
                      logger.debug(`[Fetch Manual CB] Checking important files. Count: ${importantFiles.length}`); let addedImportantCount = 0; importantFiles.forEach(p => { if (allPaths.includes(p) && !filesToAutoSelect.has(p)) { filesToAutoSelect.add(p); addedImportantCount++; } }); if (addedImportantCount > 0) logger.info(`[Fetch Manual CB] Auto-selected ${addedImportantCount} important files.`);
                      // Determine success message
+                     // NOTE: Toast uses 'effectiveBranchDisplay', which should be correct based on client state.
+                     // If it shows 'default' wrongly, check context state before this call or server action.
                      if (filesToAutoSelect.size > 0) { const numSecondary = Object.values(secondaryHighlightPathsDataInternal).flat().filter(p => p !== primaryHighlightPathInternal && !importantFiles.includes(p)).length; const numImportant = filesToAutoSelect.size - (primaryHighlightPathInternal ? 1 : 0) - numSecondary; let msg = `✅ Авто-выбор: `; const parts = []; if (primaryHighlightPathInternal) parts.push(`1 стр.`); if (numSecondary > 0) parts.push(`${numSecondary} связ.`); if (numImportant > 0) parts.push(`${numImportant} важн.`); msg += parts.join(', ') + ` (${filesToAutoSelect.size} всего).`; toastSuccess(msg, { id: fetchToastId }); }
                      else if (primaryHighlightPathInternal === null && highlightedPathFromUrl) { toastSuccess(`Извлечено ${fetchedFilesData.length} файлов из ${effectiveBranchDisplay}! (Целевой URL файл не найден)`, { id: fetchToastId }); }
                      else if (fetchAttemptSucceeded) { toastSuccess(`Извлечено ${fetchedFilesData.length} файлов из ${effectiveBranchDisplay}!`, { id: fetchToastId }); }
@@ -190,7 +208,8 @@ export const useRepoFetcher = ({
              logger.info(`[Fetch Manual CB] FINISHED. Final Status via Ref: ${fetchStatusRef.current}`);
         }
     }, [ // Dependencies - Read context values needed inside
-        repoUrl, token, targetBranchName, manualBranchName, imageReplaceTask, pendingFlowDetails, // Context state values
+        repoUrl, token, targetBranchName, manualBranchName, // Context state values (for determining final branch)
+        // imageReplaceTask, pendingFlowDetails, // Removed: Now read from refs inside
         highlightedPathFromUrl, importantFiles, // Props
         isSettingsModalOpen, loadingPrs, assistantLoading, isParsing, aiActionLoading, // Context state flags
         setFetchStatus, handleSetFilesFetched, setSelectedFetcherFiles, // Context setters
@@ -199,7 +218,8 @@ export const useRepoFetcher = ({
         setError, setFiles, setPrimaryHighlightedPathState, setSecondaryHighlightedPathsState, // Local setters
         startProgressSimulation, stopProgressSimulation, // Local callbacks
         toastSuccess, toastError, toastInfo, toastWarning, toastLoading, // Toast functions
-        logger // Logger
+        logger, // Logger
+        // Refs don't need to be dependencies for the callback definition itself
     ]);
 
 
@@ -232,7 +252,6 @@ export const useRepoFetcher = ({
         return () => { logger.debug("[Effect Auto-Fetch Cleanup] Clearing timer."); clearTimeout(timerId); };
     }, [ // Minimal stable dependencies
         repoUrlEntered, autoFetch, // Trigger conditions
-        // pendingFlowDetails, imageReplaceTask, // Removed - handleFetchManual reads context now
         handleFetchManual, logger // Stable callback and util
     ]);
 
