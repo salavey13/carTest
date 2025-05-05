@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useMemo, useCallback } from "react";
-// --- REMOVED useSearchParams import ---
 import {
     FaAngleDown, FaAngleUp,
     FaDownload, FaArrowsRotate, FaCircleCheck, FaXmark, FaCopy,
@@ -28,36 +27,36 @@ import { useFileSelection } from "@/hooks/useFileSelection";
 import { useKworkInput } from "@/hooks/useKworkInput";
 import { useAppToast } from "@/hooks/useAppToast";
 
-// --- Sub-components (Assumed paths) ---
+// --- Sub-components ---
 import SettingsModal from "./repo/SettingsModal";
 import FileList from "./repo/FileList";
 import SelectedFilesPreview from "./repo/SelectedFilesPreview";
 import RequestInput from "./repo/RequestInput";
 import ProgressBar from "./repo/ProgressBar";
-// --- VIBE CHECK: Import the centralized renderer if needed ---
 import VibeContentRenderer from '@/components/VibeContentRenderer';
 
-// --- NEW: Define props for parameters passed from parent ---
+// --- Component Props ---
 interface RepoTxtFetcherProps {
     highlightedPathProp: string | null;
     ideaProp: string | null;
 }
-// --- END NEW ---
 
 // --- Component Definition ---
-// --- UPDATED: Add props to component definition ---
 const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
-    highlightedPathProp, // Get from props
-    ideaProp            // Get from props
+    highlightedPathProp,
+    ideaProp
 }, ref) => {
     logger.log("[RepoTxtFetcher] START Render");
 
-    // === VIBE CHECK (Context remains the same) ===
+    // === Context ===
     const { addToast: addToastContext,
         fetchStatus, filesFetched,
         repoUrl: repoUrlFromContext, setRepoUrl: setRepoUrlInContext, repoUrlEntered,
         selectedFetcherFiles,
-        kworkInputHasContent, setKworkInputHasContent, kworkInputRef,
+        kworkInputHasContent, // Keep reading this boolean flag if needed for quick checks
+        kworkInputValue,      // <<< GET state value
+        setKworkInputValue,   // <<< GET state setter
+        kworkInputRef,
         loadingPrs,
         assistantLoading, isParsing, aiActionLoading,
         targetBranchName, setTargetBranchName, manualBranchName, setManualBranchName, openPrs,
@@ -67,11 +66,11 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         imageReplaceTask,
         allFetchedFiles,
         assistantRef, updateRepoUrlInAssistant,
-        getKworkInputValue, updateKworkInput
+        // getKworkInputValue, // Removed
+        // updateKworkInput, // Removed
     } = useRepoXmlPageContext();
     const { error: toastError, info: toastInfo } = useAppToast();
     logger.debug("[RepoTxtFetcher] Function Start");
-    // === VIBE CHECK END ===
 
     // === Basic Component State ===
     const [token, setToken] = useState<string>("");
@@ -82,17 +81,14 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const handleRepoUrlChange = setRepoUrlInContext;
 
     // === URL Params & Derived State ---
-    // --- Use props ---
-    const highlightedPathFromUrl = highlightedPathProp ?? ""; // Use prop
-    const ideaFromUrl = ideaProp ?? "";                      // Use prop
+    const highlightedPathFromUrl = highlightedPathProp ?? "";
+    const ideaFromUrl = ideaProp ?? "";
     logger.debug(`[RepoTxtFetcher] Received props: highlightedPathProp='${highlightedPathFromUrl}', ideaProp='${ideaFromUrl ? ideaFromUrl.substring(0,30)+'...' : null}'`);
 
-    // --- autoFetch depends on props/context now ---
-    // It should be true if *either* a task exists OR a path/idea came from URL
     const autoFetch = useMemo(() =>
-        !!imageReplaceTask || // From context
-        (!!highlightedPathFromUrl || !!ideaFromUrl) // From props
-    , [imageReplaceTask, highlightedPathFromUrl, ideaFromUrl]); // Dependencies
+        !!imageReplaceTask ||
+        (!!highlightedPathFromUrl || !!ideaFromUrl)
+    , [imageReplaceTask, highlightedPathFromUrl, ideaFromUrl]);
 
     const importantFiles = useMemo(() => [
         "contexts/AppContext.tsx", "contexts/RepoXmlPageContext.tsx", "hooks/useTelegram.ts", "app/layout.tsx",
@@ -116,10 +112,10 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         isFetchDisabled
     } = useRepoFetcher({
         repoUrl, token, targetBranchName, manualBranchName, imageReplaceTask,
-        highlightedPathFromUrl, // Pass value derived from prop
+        highlightedPathFromUrl,
         importantFiles,
-        autoFetch,              // Pass value derived from prop/context
-        ideaFromUrl,            // Pass value derived from prop
+        autoFetch,
+        ideaFromUrl,
         isSettingsModalOpen,
         repoUrlEntered, assistantLoading, isParsing, aiActionLoading,
         loadingPrs,
@@ -207,13 +203,13 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         } else if (fetchedFiles.length > 0) {
              logger.debug("[Effect Scroll] No primary highlight, scrolling to file list container.");
              const cleanupDirectScroll = scrollToSection('file-list-container'); // Assuming returns cleanup if needed
-             return cleanupDirectScroll; // Return cleanup from scrollToSection directly
+             // Cast the potential cleanup function from scrollToSection to the expected type
+             return cleanupDirectScroll as (() => void) | undefined;
         } else {
             logger.debug("[Effect Scroll] No primary highlight and no fetched files, doing nothing.");
-            // No cleanup needed here
-            return () => {}; // Return empty cleanup
+            return () => {};
         }
-    }, [fetchStatus, primaryHighlightedPath, imageReplaceTask, autoFetch, fetchedFiles.length, scrollToSection, toastInfo]); // Added toastInfo dependency
+    }, [fetchStatus, primaryHighlightedPath, imageReplaceTask, autoFetch, fetchedFiles.length, scrollToSection, toastInfo]);
 
 
     // === Imperative Handle ===
@@ -221,48 +217,58 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     useImperativeHandle(ref, () => ({
         handleFetch: (isManualRetry?: boolean, branchNameToFetchOverride?: string | null, taskForEarlyCheck?: ImageReplaceTask | null) => {
             logger.debug(`[Imperative] handleFetch called.`);
+            // Ensure handleFetchManual from the hook is called correctly
             return handleFetchManual(isManualRetry, branchNameToFetchOverride, taskForEarlyCheck || imageReplaceTask);
         },
         selectHighlightedFiles: () => {
              logger.debug(`[Imperative] selectHighlightedFiles called.`);
+             // Call the function from the useFileSelection hook
              selectHighlightedFiles();
         },
         handleAddSelected: (filesToAdd: Set<string>, allFiles: FileNode[]) => {
             logger.debug(`[Imperative] handleAddSelected called.`);
-            handleAddSelected(); // Call the function from the hook
-            return Promise.resolve(); // Return a resolved promise
+            // Call the function from the useKworkInput hook
+            handleAddSelected();
+            return Promise.resolve(); // Return a resolved promise matching the old signature if needed
         },
         handleCopyToClipboard: (text?: string, scroll?: boolean) => {
              logger.debug(`[Imperative] handleCopyToClipboard called.`);
+             // Call the function from the useKworkInput hook
              return handleCopyToClipboard(text, scroll);
         },
         clearAll: () => {
              logger.debug(`[Imperative] clearAll called.`);
+             // Call the function from the useKworkInput hook
              handleClearAll();
         },
-        getKworkInputValue: () => {
+        getKworkInputValue: () => { // Keep if needed externally, now reads state
              logger.debug(`[Imperative] getKworkInputValue called.`);
-             return getKworkInputValue();
+             return kworkInputValue; // Read directly from context state
         },
         handleAddImportantFiles: () => {
              logger.debug(`[Imperative] handleAddImportantFiles called.`);
+             // Call the function from the useFileSelection hook
              handleAddImportantFiles();
         },
         handleAddFullTree: () => {
              logger.debug(`[Imperative] handleAddFullTree called.`);
+             // Call the function from the useKworkInput hook
              handleAddFullTree();
         },
         selectAllFiles: () => {
              logger.debug(`[Imperative] selectAllFiles called.`);
+             // Call the function from the useFileSelection hook
              handleSelectAll();
         },
         deselectAllFiles: () => {
             logger.debug(`[Imperative] deselectAllFiles called.`);
+            // Call the function from the useFileSelection hook
             handleDeselectAll();
         },
     }), [
         handleFetchManual, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll,
-        getKworkInputValue, imageReplaceTask, handleAddImportantFiles, handleAddFullTree, handleSelectAll, handleDeselectAll
+        kworkInputValue, // <<< ADD state dependency for getKworkInputValue
+        imageReplaceTask, handleAddImportantFiles, handleAddFullTree, handleSelectAll, handleDeselectAll
     ]);
     logger.debug("[RepoTxtFetcher] After useImperativeHandle");
 
@@ -300,8 +306,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const currentImageTask = imageReplaceTask;
     const showProgressBar = fetchStatus !== 'idle';
     const isActionDisabled = isFetchLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing || !!currentImageTask;
-    const isCopyDisabled = !kworkInputHasContent || isActionDisabled;
-    const isClearDisabled = (!kworkInputHasContent && selectedFetcherFiles.size === 0 && !filesFetched) || isActionDisabled;
+    // Use kworkInputValue state for disabling buttons
+    const isCopyDisabled = !kworkInputValue.trim() || isActionDisabled;
+    const isClearDisabled = (!kworkInputValue.trim() && selectedFetcherFiles.size === 0 && !filesFetched) || isActionDisabled;
     const isAddSelectedDisabled = selectedFetcherFiles.size === 0 || isActionDisabled;
     const effectiveBranchDisplay = targetBranchName || manualBranchName || "default";
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
@@ -324,10 +331,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                         {currentImageTask ? <FaImages className="text-blue-400" /> : <FaDownload className="text-purple-400" />}
                         {currentImageTask ? "Задача: Замена Картинки" : "Кибер-Экстрактор Кода"}
                      </h2>
-                     {/* Instructions - Use VibeContentRenderer as they contain icons */}
                       {!currentImageTask && (
                          <div className="text-yellow-300/80 text-xs md:text-sm space-y-1 mb-2">
-                            {/* Instructions */}
                             <VibeContentRenderer content={"1. Настрой (<FaCodeBranch title='Настройки' class='inline text-cyan-400'/>)."} />
                             <VibeContentRenderer content={"2. Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>."} />
                             <VibeContentRenderer content={"3. Выбери файлы или <span class='font-bold text-teal-400 mx-1'>связанные</span> / <span class='font-bold text-orange-400 mx-1'>важные</span>."} />
@@ -335,7 +340,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                             <VibeContentRenderer content={"5. Скопируй (<FaCopy title='Скопировать запрос' class='inline text-sm mx-px'/>) или передай дальше."} />
                         </div>
                       )}
-                      {/* Image Task Info */}
                       {currentImageTask && (
                           <p className="text-blue-300/80 text-xs md:text-sm mb-2">
                               Авто-загрузка файла для замены: <code className="text-xs bg-gray-700 px-1 py-0.5 rounded">{currentImageTask.targetPath}</code>...
@@ -435,7 +439,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                          {(() => { logger.debug("[Render] Rendering SelectedFilesPreview (conditional)"); return null; })()}
                          <SelectedFilesPreview
                              selectedFiles={selectedFetcherFiles}
-                             allFiles={fetchedFiles}
+                             allFiles={fetchedFiles} // Pass current fetched files for preview
                              getLanguage={repoUtils.getLanguage}
                          />
                          {(() => { logger.debug("[Render] Rendering FileList (conditional)"); return null; })()}
@@ -453,18 +457,21 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                              onSelectHighlighted={selectHighlightedFiles}
                              onSelectAll={handleSelectAll}
                              onDeselectAll={handleDeselectAll}
-                             onAddSelected={handleAddSelected}
-                             onAddTree={handleAddFullTree}
+                             onAddSelected={handleAddSelected} // Pass hook handler
+                             onAddTree={handleAddFullTree}     // Pass hook handler
                           />
                       </div>
                  )}
 
                  {/* --- Column 2: Kwork Input (Standard Mode) --- */}
-                 {!currentImageTask && (fetchedFiles.length > 0 || kworkInputHasContent) && (
+                  {/* Show input if files fetched OR if input already has content (even if fetch fails later) */}
+                 {!currentImageTask && (fetchedFiles.length > 0 || kworkInputValue.trim().length > 0) && (
                       <div id="kwork-input-section" className="flex flex-col gap-3">
                           {(() => { logger.debug("[Render] Rendering RequestInput (conditional)"); return null; })()}
                           <RequestInput
-                              kworkInputRef={kworkInputRef}
+                              kworkInputRef={kworkInputRef} // Pass ref for focus/imperative actions
+                              kworkInputValue={kworkInputValue} // <<< PASS state value
+                              onValueChange={setKworkInputValue} // <<< PASS state setter
                               onCopyToClipboard={() => { logger.debug("[Input Action] Copy Click"); handleCopyToClipboard(undefined, true); }}
                               onClearAll={() => { logger.debug("[Input Action] Clear Click"); handleClearAll(); }}
                               onAddSelected={() => { logger.debug("[Input Action] AddSelected Click"); handleAddSelected(); }}
@@ -472,7 +479,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                               isClearDisabled={isClearDisabled}
                               isAddSelectedDisabled={isAddSelectedDisabled}
                               selectedFetcherFilesCount={selectedFetcherFiles.size}
-                              onInputChange={(value) => setKworkInputHasContent(value.trim().length > 0)}
                           />
                       </div>
                  )}

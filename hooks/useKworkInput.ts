@@ -1,8 +1,8 @@
 "use client";
 import { useCallback } from "react";
-import { useRepoXmlPageContext, FileNode } from "@/contexts/RepoXmlPageContext"; // Assuming types are here
-import { debugLogger as logger } from "@/lib/debugLogger"; // Use logger
-import { useAppToast } from "@/hooks/useAppToast"; // Use toast hook
+import { useRepoXmlPageContext, FileNode } from "@/contexts/RepoXmlPageContext";
+import { debugLogger as logger } from "@/lib/debugLogger";
+import { useAppToast } from "@/hooks/useAppToast";
 
 interface UseKworkInputProps {
     selectedFetcherFiles: Set<string>; // Current selection from context
@@ -19,28 +19,24 @@ interface UseKworkInputReturn {
 }
 
 export const useKworkInput = ({
-    selectedFetcherFiles, // Use selection from context
-    allFetchedFiles, // Use all files from context (for looking up content of selected)
+    selectedFetcherFiles,
+    allFetchedFiles,
     imageReplaceTaskActive,
-    files, // Use *current* files list from fetcher hook (for AddFullTree)
+    files,
 }: UseKworkInputProps): UseKworkInputReturn => {
     logger.debug("[useKworkInput] Hook initialized");
-    const { success: toastSuccess, error: toastError, warning: toastWarning } = useAppToast(); // Get toast functions
+    const { success: toastSuccess, error: toastError, warning: toastWarning } = useAppToast();
 
     const {
-        kworkInputRef, // Context ref to the textarea
-        setKworkInputHasContent, // Context state setter
-        setRequestCopied, // Context state setter
-        setSelectedFetcherFiles, // Context selection setter (needed for clearAll)
-        // States to reset on clearAll:
+        kworkInputRef,          // Keep ref for focus/scroll if needed
+        kworkInputValue,        // <<< USE new state value
+        setKworkInputValue,     // <<< USE new state setter
+        setRequestCopied,
+        setSelectedFetcherFiles,
         setAiResponseHasContent,
         setFilesParsed,
         setSelectedAssistantFiles,
-        // Actions/helpers from context:
         scrollToSection,
-        // addToast is no longer needed directly
-        updateKworkInput, // Function to set the input value
-        getKworkInputValue, // Function to get the input value
     } = useRepoXmlPageContext();
 
     /** Adds the content of the currently selected files into the Kwork input textarea. */
@@ -57,7 +53,7 @@ export const useKworkInput = ({
         }
         logger.info(`[Kwork Input] Adding ${selectedFetcherFiles.size} selected files to input...`);
 
-        const currentKworkValue = getKworkInputValue();
+        const currentKworkValue = kworkInputValue; // <<< READ from state
         const contextRegex = /(Контекст кода для анализа:\s*```(?:\w+\n)?)([\s\S]*?)(\n?```)/;
         const fileSeparator = "\n\n// ---- FILE SEPARATOR ----\n\n";
         let newContextContent = "";
@@ -83,18 +79,19 @@ export const useKworkInput = ({
              finalKworkValue = currentKworkValue + separator + fullContextBlock;
         }
 
-        updateKworkInput(finalKworkValue);
+        setKworkInputValue(finalKworkValue); // <<< UPDATE state
         toastSuccess(`${selectedFetcherFiles.size} файлов добавлено в запрос.`);
         scrollToSection('kworkInput');
 
     }, [
         selectedFetcherFiles, allFetchedFiles, imageReplaceTaskActive, toastSuccess, toastWarning,
-        getKworkInputValue, updateKworkInput, scrollToSection, logger
+        kworkInputValue, setKworkInputValue, // <<< USE state and setter
+        scrollToSection, logger
     ]);
 
     /** Copies text (defaults to Kwork input) to the clipboard. */
     const handleCopyToClipboard = useCallback((textToCopy?: string, shouldScroll = true): boolean => {
-        const content = textToCopy ?? getKworkInputValue();
+        const content = textToCopy ?? kworkInputValue; // <<< READ from state
         if (!content.trim()) {
             toastWarning("Нет текста для копирования");
             logger.warn("[Kwork Input] Copy skipped: Input is empty.");
@@ -105,14 +102,14 @@ export const useKworkInput = ({
             toastSuccess("Текст запроса скопирован!");
             setRequestCopied(true);
             logger.info("[Kwork Input] Copied request to clipboard.");
-            if (shouldScroll) scrollToSection('executor');
+            if (shouldScroll) scrollToSection('executor'); // Assuming 'executor' is the ID of the next section (e.g., AI Assistant)
             return true;
         } catch (e) {
             logger.error("[Kwork Input] Clipboard write error:", e);
             toastError("Ошибка копирования в буфер обмена");
             return false;
         }
-    }, [getKworkInputValue, toastSuccess, toastWarning, toastError, setRequestCopied, scrollToSection, logger]);
+    }, [kworkInputValue, toastSuccess, toastWarning, toastError, setRequestCopied, scrollToSection, logger]); // <<< ADD state dependency
 
     /** Clears Kwork input, file selection, and related AI/parsing states. */
     const handleClearAll = useCallback(() => {
@@ -123,15 +120,15 @@ export const useKworkInput = ({
         }
         logger.info("[Kwork Input] Clearing input, selection, and related states.");
         setSelectedFetcherFiles(new Set());
-        updateKworkInput("");
+        setKworkInputValue(""); // <<< UPDATE state
         setAiResponseHasContent(false);
         setFilesParsed(false);
         setSelectedAssistantFiles(new Set());
         setRequestCopied(false);
         toastSuccess("Форма очищена ✨");
-        if (kworkInputRef.current) kworkInputRef.current.focus();
+        if (kworkInputRef.current) kworkInputRef.current.focus(); // Ref still useful for focus
     }, [
-        imageReplaceTaskActive, setSelectedFetcherFiles, updateKworkInput,
+        imageReplaceTaskActive, setSelectedFetcherFiles, setKworkInputValue, // <<< USE state setter
         setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setRequestCopied,
         toastSuccess, toastWarning, logger, kworkInputRef
     ]);
@@ -161,17 +158,17 @@ export const useKworkInput = ({
 
          const prefix = "Контекст кода для анализа (ВСЕ ФАЙЛЫ):\n```plaintext\n";
          const suffix = "\n```";
-         const currentKworkValue = getKworkInputValue();
+         const currentKworkValue = kworkInputValue; // <<< READ from state
          const contextRegex = /(Контекст кода для анализа:\s*```(?:\w+\n)?)([\s\S]*?)(\n?```)/;
          const textWithoutContext = currentKworkValue.replace(contextRegex, '').trim();
          const separator = textWithoutContext ? '\n\n' : '';
 
          const newContent = `${textWithoutContext}${separator}${prefix}${allCode}${suffix}`;
 
-         updateKworkInput(newContent);
+         setKworkInputValue(newContent); // <<< UPDATE state
          toastSuccess(`Полное дерево (${files.length} файлов) добавлено в запрос.`);
          scrollToSection('kworkInput');
-     }, [files, imageReplaceTaskActive, getKworkInputValue, updateKworkInput, toastSuccess, toastWarning, scrollToSection, logger]);
+     }, [files, imageReplaceTaskActive, kworkInputValue, setKworkInputValue, toastSuccess, toastWarning, scrollToSection, logger]); // <<< USE state and setter
 
      logger.debug("[useKworkInput] Hook setup complete.");
     return {
