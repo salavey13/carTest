@@ -232,7 +232,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         setResponseValue: (val: string) => { logger.debug(`[Imperative] setResponseValue called.`); setResponseValue(val); },
         updateRepoUrl: (url: string) => { logger.debug(`[Imperative] updateRepoUrl called.`); updateRepoUrl(url); },
         handleDirectImageReplace: (task: ImageReplaceTask, files: FileNode[]) => {
-            logger.debug(`[Imperative] handleDirectImageReplace called from context.`);
+            logger.debug(`[Imperative] handleDirectImageReplace called from context. Task:`, task);
             // Ensure the internal handler is called, which now handles loading states and task clearing
             return handlers.handleDirectImageReplace(task, files);
         },

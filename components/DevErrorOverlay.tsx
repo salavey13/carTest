@@ -106,7 +106,7 @@ const getLevelColor = (level: LogLevel | ToastRecord['type']): string => {
 
 // --- Main Overlay Component ---
 const DevErrorOverlay: React.FC = () => {
-  console.log("[DevErrorOverlay] START Render (via console)");
+  logger.debug("[DevErrorOverlay] START Render"); // Use debug
 
   const [internalRenderError, setInternalRenderError] = useState<Error | null>(null);
   const [logHistory, setLogHistory] = useState<ReadonlyArray<LogRecord>>([]);
@@ -123,41 +123,41 @@ const DevErrorOverlay: React.FC = () => {
       if (showOverlay) {
           let currentLogs: ReadonlyArray<LogRecord> = [];
           if (typeof logger !== 'undefined' && typeof logger.getInternalLogRecords === 'function') {
-              try { currentLogs = logger.getInternalLogRecords(); console.debug("[DevErrorOverlay Effect] Fetched logs:", currentLogs.length); }
-              catch (e) { console.error("[DevErrorOverlay Effect] Error calling logger.getInternalLogRecords():", e); }
-          } else { console.warn("[DevErrorOverlay Effect] Logger/getInternalLogRecords not available."); }
+              try { currentLogs = logger.getInternalLogRecords(); logger.debug("[DevErrorOverlay Effect] Fetched logs:", currentLogs.length); }
+              catch (e) { logger.error("[DevErrorOverlay Effect] Error calling logger.getInternalLogRecords():", e); }
+          } else { logger.warn("[DevErrorOverlay Effect] Logger/getInternalLogRecords not available."); }
           setLogHistory(currentLogs);
       }
   }, [showOverlay]);
 
 
   useEffect(() => {
-      if (contextAvailable) { console.log("[DevErrorOverlay Effect] Context access successful."); }
-      else { console.warn("[DevErrorOverlay Effect] Context access returned fallback or missing function."); }
+      if (contextAvailable) { logger.debug("[DevErrorOverlay Effect] Context access successful."); } // Use debug
+      else { logger.warn("[DevErrorOverlay Effect] Context access returned fallback or missing function."); }
   }, [contextAvailable]);
 
 
   useEffect(() => {
     if (errorInfo && showOverlay && contextAvailable) {
         const logPayload = { type: errorInfo.type, message: String(errorInfo.message)?.substring(0, 100) + "...", source: errorInfo.source, };
-      console.info("[DevErrorOverlay Effect] Received errorInfo from context:", logPayload);
+      logger.info("[DevErrorOverlay Effect] Received errorInfo from context:", logPayload);
     }
   }, [errorInfo, showOverlay, contextAvailable]);
 
   if (internalRenderError) {
-     console.error("[DevErrorOverlay] FATAL: Component failed during its own render!", { originalErrorInfo: errorInfo, overlayRenderError: internalRenderError });
+     logger.fatal("[DevErrorOverlay] FATAL: Component failed during its own render!", { originalErrorInfo: errorInfo, overlayRenderError: internalRenderError });
      return <ErrorOverlayFallback message={errorInfo?.message || t.unknownError} renderErrorMessage={internalRenderError.message} />;
   }
 
   try {
-      if (!errorInfo || !showOverlay) { console.debug("[DevErrorOverlay] No errorInfo or overlay disabled, returning null."); return null; }
-      console.debug("[DevErrorOverlay] Conditions met, rendering overlay UI...");
+      if (!errorInfo || !showOverlay) { logger.debug("[DevErrorOverlay] No errorInfo or overlay disabled, returning null."); return null; }
+      logger.debug("[DevErrorOverlay] Conditions met, rendering overlay UI...");
 
       const handleClose = () => {
-          console.log("[DevErrorOverlay] Close button clicked.");
-          if (!contextAvailable) { console.error("[DevErrorOverlay] Cannot close: context failed. Reloading fallback."); window.location.reload(); return; }
-          try { addErrorInfo(null); console.info("[DevErrorOverlay] ErrorInfo cleared via context."); }
-          catch (e) { console.error("[DevErrorOverlay] Error calling addErrorInfo(null):", e); }
+          logger.log("[DevErrorOverlay] Close button clicked.");
+          if (!contextAvailable) { logger.error("[DevErrorOverlay] Cannot close: context failed. Reloading fallback."); window.location.reload(); return; }
+          try { addErrorInfo(null); logger.info("[DevErrorOverlay] ErrorInfo cleared via context."); }
+          catch (e) { logger.error("[DevErrorOverlay] Error calling addErrorInfo(null):", e); }
       };
 
       const getTruncatedStackTrace = (error?: Error | string | any, maxLines = 10): string => {
@@ -171,13 +171,14 @@ const DevErrorOverlay: React.FC = () => {
               if (stack.trim() === '' && errorInfo?.message === 'Script error.') { return t.stackTraceUnavailable; }
               const lines = stack.split('\n'); const shortStack = lines.slice(0, maxLines).join('\n');
               return shortStack || t.stackTraceEmpty;
-          } catch (e: any) { console.error("[DevErrorOverlay] Error getting/formatting stack trace:", e); return `${t.stackTraceError}: ${e?.message ?? 'Unknown'}`; }
+          } catch (e: any) { logger.error("[DevErrorOverlay] Error getting/formatting stack trace:", e); return `${t.stackTraceError}: ${e?.message ?? 'Unknown'}`; }
       };
 
        // --- Helper to prepare data with TRUNCATION for GitHub URL ---
       const prepareIssueAndCopyDataSafe = (logLimit = 10, toastLimit = 5, maxLogChars = 1000, maxToastChars = 300, maxStackLines = 7) => {
+          logger.debug("[DevErrorOverlay] prepareIssueAndCopyDataSafe START");
           try {
-             const safeErrorInfo = errorInfo as ErrorInfo;
+             const safeErrorInfo = errorInfo as ErrorInfo; // Assuming errorInfo is not null here
              const errorType = safeErrorInfo.type?.toUpperCase() || 'UNKNOWN';
              const message = safeErrorInfo.message || t.unknownError;
              // Get slightly shorter stack for body
@@ -188,27 +189,34 @@ const DevErrorOverlay: React.FC = () => {
              const repoName = process.env.NEXT_PUBLIC_GITHUB_REPO || 'carTest';
              const issueTitleOptions = [ `Сбой: ${message.substring(0, 40)}...`, `Баг: ${errorType} ${message.substring(0, 35)}...`, `Аномалия: ${message.substring(0, 45)}...`, `Помощь: ${errorType} (${source || 'N/A'})`, `Глитч! ${errorType}: ${source || 'N/A'}`, ];
              const issueTitle = encodeURIComponent(issueTitleOptions[Math.floor(Math.random() * issueTitleOptions.length)]);
+             logger.debug(`[DevErrorOverlay] Issue Details: Type=${errorType}, Source=${source}, Title=${decodeURIComponent(issueTitle)}`);
+
 
              // --- Truncate Logs and Toasts for GitHub URL ---
              const formatHistoryForUrl = (history: any[], limit: number, maxChars: number, type: 'log' | 'toast') => {
-                if (!history || history.length === 0) return type === 'log' ? t.noRecentLogs : t.noRecentToasts;
-                let charCount = 0;
-                const limitedHistory = history.slice().reverse().slice(0, limit);
-                const formattedLines: string[] = [];
-                for (const item of limitedHistory) {
-                    const prefix = type === 'log' ? `[${item.level.toUpperCase()}] ${new Date(item.timestamp).toLocaleTimeString('ru-RU',{hour12:false})} |` : `[${item.type.toUpperCase()}]`;
-                    // Limit message length within the line as well
-                    const itemMsg = String(item.message).substring(0, 100) + (String(item.message).length > 100 ? '...' : '');
-                    const line = `${prefix} ${itemMsg}`;
-                    if (charCount + line.length > maxChars) break;
-                    formattedLines.push(`- ${line}`);
-                    charCount += line.length + 1;
-                }
-                 if (history.length > limit || charCount >= maxChars) {
-                     formattedLines.push("- ...(еще больше записей опущено)...");
+                 logger.debug(`[DevErrorOverlay] Formatting history for URL: type=${type}, count=${history?.length ?? 0}, limit=${limit}, maxChars=${maxChars}`);
+                 if (!history || history.length === 0) return type === 'log' ? t.noRecentLogs : t.noRecentToasts;
+                 let charCount = 0;
+                 const limitedHistory = history.slice().reverse().slice(0, limit);
+                 const formattedLines: string[] = [];
+                 for (const item of limitedHistory) {
+                     // Add extra checks for item properties
+                     const itemType = item?.type || (type === 'log' ? item?.level : 'unknown');
+                     const itemTimestamp = item?.timestamp ? new Date(item.timestamp).toLocaleTimeString('ru-RU',{hour12:false}) : 'N/A';
+                     const prefix = type === 'log' ? `[${(itemType || 'UNKNOWN').toUpperCase()}] ${itemTimestamp} |` : `[${(itemType || 'UNKNOWN').toUpperCase()}]`;
+                     const itemMsg = String(item?.message || '[No Message]').substring(0, 100) + (String(item?.message || '').length > 100 ? '...' : '');
+                     const line = `${prefix} ${itemMsg}`;
+                     if (charCount + line.length > maxChars) { logger.debug(`[DevErrorOverlay] History URL limit reached for ${type}.`); break; }
+                     formattedLines.push(`- ${line}`);
+                     charCount += line.length + 1; // +1 for newline
                  }
-                return formattedLines.join('\n');
-             };
+                  if (history.length > limit || charCount >= maxChars) {
+                      formattedLines.push("- ...(еще больше записей опущено)...");
+                  }
+                 logger.debug(`[DevErrorOverlay] Formatted ${type} history for URL: ${formattedLines.length} lines.`);
+                 return formattedLines.join('\n');
+              };
+
 
              const formattedLogHistoryForUrl = formatHistoryForUrl(logHistory, logLimit, maxLogChars, 'log');
              const formattedToastHistoryForUrl = formatHistoryForUrl(toastHistory, toastLimit, maxToastChars, 'toast');
@@ -219,15 +227,16 @@ const DevErrorOverlay: React.FC = () => {
              const gitHubIssueUrl = `https://github.com/${repoOrg}/${repoName}/issues/new?title=${issueTitle}&body=${issueBody}`;
 
              // --- Prepare FULL history for Copy Prompt (less strict limits) ---
-             const fullFormattedLogHistory = formatHistoryForUrl(logHistory, 50, 8000, 'log');
-             const fullFormattedToastHistory = formatHistoryForUrl(toastHistory, 20, 2000, 'toast');
-             const fullStackTrace = getTruncatedStackTrace(safeErrorInfo.error, 30); // More lines for copy
+             const fullFormattedLogHistory = formatHistoryForUrl(logHistory, 50, 8000, 'log'); // More logs for copy
+             const fullFormattedToastHistory = formatHistoryForUrl(toastHistory, 20, 2000, 'toast'); // More toasts for copy
+             const fullStackTrace = getTruncatedStackTrace(safeErrorInfo.error, 30); // More stack lines for copy
              // --- End Full history prep ---
 
              const copyPrompt = `Йоу! Поймал ошибку в ${repoName}, помоги разгрести!\n\nОшибка (${errorType}) Источник: ${source}\n${message}\n\nСтек (начало):\n\`\`\`\n${fullStackTrace}\n\`\`\`${componentStackInfo}\n\nПоследние События (Логи):\n${fullFormattedLogHistory}\n\nНедавние уведомления (Тосты):\n${fullFormattedToastHistory}\n\nЗадача: Проанализируй ошибку, стек, логи и уведомления. Предложи исправления кода или объясни причину.`;
+             logger.info("[DevErrorOverlay] Prepared GitHub URL and Copy Prompt.", { ghUrlLength: gitHubIssueUrl.length, promptLength: copyPrompt.length });
              return { gitHubIssueUrl, copyPrompt };
          } catch (e: any) {
-             console.error("[DevErrorOverlay] Error preparing issue/copy data:", e);
+             logger.error("[DevErrorOverlay] Error preparing issue/copy data:", e);
              sonnerToast.error(`${t.copyDataErrorToast}: ${e?.message ?? 'Unknown'}`);
              return { gitHubIssueUrl: `https://github.com/${process.env.NEXT_PUBLIC_GITHUB_ORG || 'salavey13'}/${process.env.NEXT_PUBLIC_GITHUB_REPO || 'carTest'}/issues/new`, copyPrompt: `Error generating copy data: ${e?.message}` };
          }
@@ -235,14 +244,20 @@ const DevErrorOverlay: React.FC = () => {
       const { gitHubIssueUrl, copyPrompt } = prepareIssueAndCopyDataSafe();
 
       const handleCopyVibeRequest = () => {
-         console.debug("[DevErrorOverlay] handleCopyVibeRequest called.");
+         logger.debug("[Flow 3 - Error Fix] DevErrorOverlay: handleCopyVibeRequest called.", { promptLength: copyPrompt?.length });
          try {
              if (!navigator.clipboard) { throw new Error("Clipboard API not available."); }
              navigator.clipboard.writeText(copyPrompt)
-               .then(() => { sonnerToast.success(t.copySuccessToast); })
-               .catch(err => { console.error("[DevErrorOverlay] Failed to copy vibe request:", err); sonnerToast.error(t.copyErrorToast); });
+               .then(() => {
+                   logger.info("[Flow 3 - Error Fix] DevErrorOverlay: Vibe request copied.");
+                   sonnerToast.success(t.copySuccessToast);
+               })
+               .catch(err => {
+                   logger.error("[Flow 3 - Error Fix] DevErrorOverlay: Failed to copy vibe request:", err);
+                   sonnerToast.error(t.copyErrorToast);
+               });
          } catch (e: any) {
-             console.error("[DevErrorOverlay] Error during copy action setup:", e);
+             logger.error("[Flow 3 - Error Fix] DevErrorOverlay: Error during copy action setup:", e);
              sonnerToast.error(`${t.copyGenericError}: ${e?.message ?? 'Unknown'}`);
          }
       };
@@ -250,7 +265,7 @@ const DevErrorOverlay: React.FC = () => {
       // --- Safe Render Helper ---
       const RenderSection: React.FC<{ title: string; children: () => React.ReactNode }> = ({ title, children }) => {
           try { return <>{children()}</>; }
-          catch (e: any) { console.error(`[DevErrorOverlay] Error rendering section "${title}":`, e); setInternalRenderError(new Error(`Failed to render section "${title}": ${e.message}`)); return <div className="text-red-500 p-2 bg-red-900/30 rounded">Ошибка рендера секции: {title}</div>; }
+          catch (e: any) { logger.error(`[DevErrorOverlay] Error rendering section "${title}":`, e); setInternalRenderError(new Error(`Failed to render section "${title}": ${e.message}`)); return <div className="text-red-500 p-2 bg-red-900/30 rounded">Ошибка рендера секции: {title}</div>; }
       };
 
       // --- JSX Return ---
@@ -384,11 +399,11 @@ const DevErrorOverlay: React.FC = () => {
 
   } catch (renderError: any) {
       const fatalMsg = "[DevErrorOverlay] CRITICAL: Failed during main UI render execution!";
-      console.error(fatalMsg, renderError);
+      logger.fatal(fatalMsg, renderError);
       setInternalRenderError(renderError);
       return null; // Fallback will be rendered on next cycle
   } finally {
-       console.log("[DevErrorOverlay] END Render (via console)"); // Safe logging
+       logger.debug("[DevErrorOverlay] END Render"); // Use debug
   }
 };
 
