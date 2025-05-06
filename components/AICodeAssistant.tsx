@@ -3,7 +3,7 @@
 import React, { useMemo, useState, useEffect, useImperativeHandle, forwardRef, MutableRefObject, useCallback, useRef } from "react";
 // Context & Actions
 import {
-    useRepoXmlPageContext, AICodeAssistantRef, SimplePullRequest, ImageReplaceTask, FileNode, RepoXmlPageContextType
+    useRepoXmlPageContext, AICodeAssistantRef, SimplePullRequest, ImageReplaceTask, FileNode, RepoXmlPageContextType, PendingFlowDetails // Added PendingFlowDetails
 } from "@/contexts/RepoXmlPageContext";
 import { supabaseAdmin } from "@/hooks/supabase";
 import { useAppContext } from "@/contexts/AppContext";
@@ -92,6 +92,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         fetchStatus, allFetchedFiles, repoUrlEntered,
         repoUrl: repoUrlFromContext,
         setRequestCopied,
+        pendingFlowDetails // <<< Destructure pendingFlowDetails
     } = pageContext;
     logger.debug("[AICodeAssistant] After Destructuring");
 
@@ -160,11 +161,19 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     useEffect(() => { // Initial PR fetch
         logger.debug("[Effect Mount] AICodeAssistant Mounted");
         const initialRepoUrl = repoUrlStateLocal || repoUrlFromContext;
+        // --- FIX: Check for active flows before fetching PRs ---
+        const isSpecialFlowActive = !!imageReplaceTask || !!pendingFlowDetails;
+        if (isSpecialFlowActive) {
+            logger.info(`[Effect Mount] Skipping initial PR fetch because a special flow (ImageSwap/ErrorFix) is active.`);
+            return;
+        }
+        // --- END FIX ---
         if (initialRepoUrl && initialRepoUrl.includes("github.com")) {
             logger.info(`[Effect Mount] Triggering initial PRs for ${initialRepoUrl}`);
             triggerGetOpenPRs(initialRepoUrl);
         } else { logger.debug(`[Effect Mount] Skipping initial PRs (no valid URL yet)`); }
-    }, [triggerGetOpenPRs, repoUrlStateLocal, repoUrlFromContext, logger]); // Minimal dependencies
+    }, [triggerGetOpenPRs, repoUrlStateLocal, repoUrlFromContext, imageReplaceTask, pendingFlowDetails, logger]); // Added imageReplaceTask and pendingFlowDetails
+
 
     useEffect(() => { // Update context filesParsed based on local state
         logger.debug(`[Effect FilesParsed] Update based on componentParsedFiles: ${componentParsedFiles.length > 0}`);
