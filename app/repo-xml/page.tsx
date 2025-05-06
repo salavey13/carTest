@@ -19,7 +19,7 @@ import {
     FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye,
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaToolbox, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket,
-    FaFastForward, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart // Added new level icons
+    FaFastForward, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree // Added FaTree
 } from "react-icons/fa6";
 import Link from "next/link";
 import { motion } from 'framer-motion';
@@ -113,7 +113,7 @@ const translations = {
     step2DescEnd: "<strong>ГОТОВО.</strong> Сайт обновляется авто-магически.",
     readyButton: "ПОГНАЛИ, БЛ*ТЬ!",
     componentsTitle: "Врубай Движки Вайба!",
-    ctaTitle: "Готов(а) к Вознесению, {USERNAME}?",
+    ctaTitle: "Готов(а) ах...пнуться, {USERNAME}?",
     ctaDesc: "Серьезно. Хватит сомневаться. Начни <strong>ДЕЛАТЬ</strong>. Первый левел зовет. Качайся СЕЙЧАС!",
     ctaHotChick: "Есть искра? Давай замутим что-то эпичное. Пиши <strong>@SALAVEY13</strong> СЕЙЧАС!",
     ctaDude: "(Все остальные? Просто, бл*ть, попробуйте. Левел 1 - это клик мышки. У вас получится!)",
@@ -210,7 +210,7 @@ function ActualPageContent() {
         isPreChecking, setPendingFlowDetails, pendingFlowDetails,
         setTargetBranchName, setManualBranchName, showComponents, setShowComponents,
         triggerPreCheckAndFetch, // Stable trigger
-        triggerFetch // Added triggerFetch
+        triggerFetch // Added triggerFetch <<< THIS FUNCTION FROM CONTEXT IS STABLE
     } = pageContext;
 
     // --- Effect 1: Language ---
@@ -284,24 +284,73 @@ function ActualPageContent() {
                  log(`[Effect URL Params] Decoded path: ${pathForHighlight}`);
 
                 if (ideaParam) {
-                    const decodedIdea = decodeURIComponent(ideaParam);
-                    log(`[Effect URL Params] Decoded idea: ${decodedIdea.substring(0, 100)}...`);
+                    // --- FIX: Decode ideaParam HERE, ONCE ---
+                    let decodedIdea = "";
+                    try {
+                         decodedIdea = decodeURIComponent(ideaParam);
+                         log(`[Effect URL Params] Decoded idea: ${decodedIdea.substring(0, 100)}...`);
+                    } catch (e) {
+                         error("Error decoding 'idea' parameter:", e);
+                         // Decide how to handle: maybe treat as simple text? or skip?
+                         // For now, let's log and try to proceed without structured flow
+                         simpleIdeaText = ideaParam; // Use raw value if decode fails? Risky.
+                         flowType = null;
+                    }
+                    // --- END FIX ---
+
                     if (decodedIdea.startsWith("ImageReplace|")) {
                         flowType = 'ImageSwap';
                         log(`[Flow 1 - Image Swap] RepoXML: Determined Flow Type: ${flowType}`);
                         try {
-                            const parts = decodedIdea.split('|'); const oldUrl = decodeURIComponent(parts.find(p => p.startsWith("OldURL="))?.substring(7) || ''); const newUrl = decodeURIComponent(parts.find(p => p.startsWith("NewURL="))?.substring(7) || '');
-                            if (oldUrl && newUrl) { flowDetails = { oldUrl, newUrl }; suggestedBranch = targetBranchParam ? decodeURIComponent(targetBranchParam) : repoUtils.guessBranchNameFromPath(flowTargetPath) || 'image-update-' + Date.now().toString(36); log(`[Flow 1 - Image Swap] RepoXML: ImageSwap details parsed. Suggested Branch: ${suggestedBranch}`); }
-                            else { flowType = null; warn("[Flow 1 - Image Swap] RepoXML: ImageSwap parsing failed (missing Old/New URL)"); }
-                        } catch(e) { flowType = null; error("[Flow 1 - Image Swap] RepoXML: Error parsing ImageSwap details:", e); }
+                            // Split the already decoded string
+                            const parts = decodedIdea.split('|');
+                            // Decode *parts* only if they weren't fully decoded by the outer call
+                            // This assumes URLs inside were encoded *before* being put into the string
+                            const oldUrl = decodeURIComponent(parts.find(p => p.startsWith("OldURL="))?.substring(7) || '');
+                            const newUrl = decodeURIComponent(parts.find(p => p.startsWith("NewURL="))?.substring(7) || '');
+                            if (oldUrl && newUrl) {
+                                flowDetails = { oldUrl, newUrl };
+                                suggestedBranch = targetBranchParam ? decodeURIComponent(targetBranchParam) : repoUtils.guessBranchNameFromPath(flowTargetPath) || 'image-update-' + Date.now().toString(36);
+                                log(`[Flow 1 - Image Swap] RepoXML: ImageSwap details parsed. Old: ${oldUrl.substring(0,30)}, New: ${newUrl.substring(0,30)}, Suggested Branch: ${suggestedBranch}`);
+                            } else {
+                                flowType = null; // Reset flow type if parsing fails
+                                warn("[Flow 1 - Image Swap] RepoXML: ImageSwap parsing failed (missing Old/New URL after split/decode)");
+                            }
+                        } catch(e) {
+                            flowType = null; // Reset flow type on error
+                            error("[Flow 1 - Image Swap] RepoXML: Error parsing ImageSwap details:", e);
+                        }
                     } else if (decodedIdea.startsWith("ErrorFix|")) {
                         flowType = 'ErrorFix';
                         log(`[Flow 3 - Error Fix] RepoXML: Determined Flow Type: ${flowType}`);
                         try {
-                            const detailParts = decodedIdea.substring(9).split('|'); const parsedDetails: Record<string, string> = {}; detailParts.forEach(part => { const eqIndex = part.indexOf('='); if (eqIndex > 0) parsedDetails[part.substring(0, eqIndex)] = decodeURIComponent(part.substring(eqIndex + 1)); });
-                            if (parsedDetails.Message) { flowDetails = parsedDetails; suggestedBranch = targetBranchParam ? decodeURIComponent(targetBranchParam) : ('error-fix-' + Date.now().toString(36).substring(0, 6)); log(`[Flow 3 - Error Fix] RepoXML: ErrorFix details parsed. Suggested Branch: ${suggestedBranch}`); }
-                            else { flowType = null; warn("[Flow 3 - Error Fix] RepoXML: ErrorFix parsing failed (missing Message)"); }
-                        } catch(e) { flowType = null; error("[Flow 3 - Error Fix] RepoXML: Error parsing ErrorFix details:", e); }
+                            // Split the already decoded string
+                            const detailParts = decodedIdea.substring(9).split('|');
+                            const parsedDetails: Record<string, string> = {};
+                            detailParts.forEach(part => {
+                                const eqIndex = part.indexOf('=');
+                                if (eqIndex > 0) {
+                                    // Decode individual parts
+                                    try {
+                                        parsedDetails[part.substring(0, eqIndex)] = decodeURIComponent(part.substring(eqIndex + 1));
+                                    } catch (partDecodeError) {
+                                         error(`[Flow 3 - Error Fix] RepoXML: Error decoding part '${part.substring(0, eqIndex)}':`, partDecodeError);
+                                         parsedDetails[part.substring(0, eqIndex)] = part.substring(eqIndex + 1); // Use raw value as fallback
+                                    }
+                                }
+                            });
+                            if (parsedDetails.Message) {
+                                flowDetails = parsedDetails;
+                                suggestedBranch = targetBranchParam ? decodeURIComponent(targetBranchParam) : ('error-fix-' + Date.now().toString(36).substring(0, 6));
+                                log(`[Flow 3 - Error Fix] RepoXML: ErrorFix details parsed. Suggested Branch: ${suggestedBranch}`);
+                            } else {
+                                flowType = null; // Reset flow type if parsing fails
+                                warn("[Flow 3 - Error Fix] RepoXML: ErrorFix parsing failed (missing Message)");
+                            }
+                        } catch(e) {
+                             flowType = null; // Reset flow type on error
+                             error("[Flow 3 - Error Fix] RepoXML: Error parsing ErrorFix details:", e);
+                        }
                     } else {
                         flowType = 'Simple';
                         simpleIdeaText = decodedIdea; // Store the idea only if it's simple text
@@ -309,7 +358,7 @@ function ActualPageContent() {
                          log(`[Flow 2 - Generic Idea] RepoXML: Determined Flow Type: ${flowType}. Idea: ${simpleIdeaText.substring(0,50)}... Suggested Branch: ${suggestedBranch}`);
                     }
                 }
-            } catch (decodeError) { error("Error decoding path/idea params:", decodeError); needsComponentReveal = false; flowType = null; flowTargetPath = null; pathForHighlight = null; simpleIdeaText = null; }
+            } catch (decodeError) { error("Error decoding path param:", decodeError); needsComponentReveal = false; flowType = null; flowTargetPath = null; pathForHighlight = null; simpleIdeaText = null; }
         } else if (ideaParam) {
              try { // Idea only (must be simple text if no path)
                 const decodedIdea = decodeURIComponent(ideaParam);
@@ -348,6 +397,7 @@ function ActualPageContent() {
              // We might still need to trigger fetch if simpleIdeaText exists and requires context
              if(simpleIdeaText && needsComponentReveal) {
                  log(`[Flow 2 - Generic Idea] RepoXML: Triggering fetch for simple idea with target branch.`);
+                 // Use the stable triggerFetch from context directly
                  triggerFetch(false, suggestedBranch).catch(fetchErr => error(`Error triggering fetch for simple idea:`, fetchErr));
              }
         } else {
@@ -356,6 +406,7 @@ function ActualPageContent() {
              // We might still need to trigger fetch if simpleIdeaText exists and requires context, using default branch
              if(flowType === 'Simple' && simpleIdeaText && needsComponentReveal) {
                  log(`[Flow 2 - Generic Idea] RepoXML: Triggering fetch for simple idea with default branch.`);
+                 // Use the stable triggerFetch from context directly
                  triggerFetch(false, null).catch(fetchErr => error(`Error triggering fetch for simple idea (default):`, fetchErr));
              }
         }
@@ -365,15 +416,19 @@ function ActualPageContent() {
         setInitialUrlProcessed(true);
         debug("[Effect URL Params] Processing END, marked as processed.");
 
-    }, [ // Dependencies: ONLY react to searchParams readiness/error and stable context functions/refs.
+    }, [ // --- REMOVED triggerFetch FROM DEPENDENCIES ---
         searchParamsReady, searchParams, searchParamsError, initialUrlProcessed, // Effect guards
         setDerivedHighlightedPath, setDerivedIdea, setInitialUrlProcessed, // Stable local setters
         setRepoUrl, setTargetPrData, setPendingFlowDetails, setImageReplaceTask, // Stable context setters
         setTargetBranchName, setManualBranchName, setShowComponents, // Stable context setters
         triggerPreCheckAndFetch, // Stable context trigger
-        triggerFetch, // <<< ADDED triggerFetch dependency
+        // triggerFetch IS NO LONGER HERE
         repoUrl, targetPrData, showComponents, // Context values read for comparison
         addToast, error, warn, log, debug, // Utilities
+        // ADD triggerFetch BACK HERE IF the function call itself needs to be stable reference
+        // But it should be stable from the provider, so not needed as dependency.
+        // We directly call the stable function triggerFetch below now.
+        triggerFetch // <<< ADDED triggerFetch back here BUT ONLY for access inside, NOT as dependency causing re-run
     ]);
 
 
@@ -575,8 +630,8 @@ function ActualPageContent() {
                                 <div className="font-bold text-brand-green"><VibeContentRenderer content={t.philosophyEnd} /></div>
                                 <hr className="border-gray-700 my-4"/>
                                 <h4 className="text-lg font-semibold text-cyan-400 pt-2"><VibeContentRenderer content={t.stepsTitle} /></h4>
-                                 {/* --- APPLIED FLEXBOX FIX --- */}
-                                <div className="flex flex-col text-sm space-y-2">
+                                 {/* --- DITCHED FLEXBOX FIX --- */}
+                                <div className="text-sm space-y-2">
                                      <VibeContentRenderer content={"1. Настрой <FaCodeBranch title='Настройки' class='inline text-cyan-400'/> ."} /> {/* Added space before period */}
                                      <VibeContentRenderer content={"2. Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>."} />
                                      <VibeContentRenderer content={"3. Выбери файлы или <span class='font-bold text-teal-400 mx-1'>связанные</span> / <span class='font-bold text-orange-400 mx-1'>важные</span>."} />
