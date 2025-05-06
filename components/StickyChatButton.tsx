@@ -169,8 +169,12 @@ const StickyChatButton: React.FC = () => {
     const handleReplaceConfirmed = (newImageUrl: string) => {
         if (!potentialOldImageUrl) { logger.error("[Flow 1 - Image Swap] StickyChat: handleReplaceConfirmed called but old URL is missing!"); toastError("Ошибка: Старый URL не найден."); return; } // Используем logger
         logger.info("[Flow 1 - Image Swap] StickyChat: Replace confirmed.", { oldUrl: potentialOldImageUrl, newUrl: newImageUrl }); // Используем logger
+        // --- FIX: REMOVE OUTER encodeURIComponent ---
         const structuredIdea = `ImageReplace|OldURL=${encodeURIComponent(potentialOldImageUrl)}|NewURL=${encodeURIComponent(newImageUrl)}`;
-        const cleanPath = currentPath.split('?')[0]; let targetPath = cleanPath === "/" ? "app/page.tsx" : `app${cleanPath}`; if (!targetPath.match(/\.(tsx|jsx|js|ts)$/)) { targetPath = targetPath.endsWith('/') ? targetPath + 'page.tsx' : targetPath + '/page.tsx'; } if (!targetPath.startsWith('app/')) targetPath = 'app/' + targetPath; const encodedTargetPath = encodeURIComponent(targetPath); const encodedIdea = encodeURIComponent(structuredIdea); const redirectUrl = `/repo-xml?path=${encodedTargetPath}&idea=${encodedIdea}`;
+        const cleanPath = currentPath.split('?')[0]; let targetPath = cleanPath === "/" ? "app/page.tsx" : `app${cleanPath}`; if (!targetPath.match(/\.(tsx|jsx|js|ts)$/)) { targetPath = targetPath.endsWith('/') ? targetPath + 'page.tsx' : targetPath + '/page.tsx'; } if (!targetPath.startsWith('app/')) targetPath = 'app/' + targetPath; const encodedTargetPath = encodeURIComponent(targetPath);
+        // const encodedIdea = encodeURIComponent(structuredIdea); // <<< REMOVED THIS LINE
+        const redirectUrl = `/repo-xml?path=${encodedTargetPath}&idea=${structuredIdea}`; // <<< USE structuredIdea DIRECTLY
+        // --- END FIX ---
         logger.info(`[Flow 1 - Image Swap] StickyChat: Constructed redirect URL: ${redirectUrl}`); // Используем logger
         toastInfo("🚀 Перехожу в Студию для замены..."); router.push(redirectUrl); setIsOpen(false); setShowReplaceTool(false);
     };
