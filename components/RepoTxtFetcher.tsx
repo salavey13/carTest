@@ -90,13 +90,76 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         (!!highlightedPathFromUrl || !!ideaFromUrl)
     , [imageReplaceTask, highlightedPathFromUrl, ideaFromUrl]);
 
+    // --- ОБНОВЛЕННЫЙ СПИСОК ВАЖНЫХ ФАЙЛОВ (без конфигов) ---
     const importantFiles = useMemo(() => [
-        "contexts/AppContext.tsx", "contexts/RepoXmlPageContext.tsx", "hooks/useTelegram.ts", "app/layout.tsx",
-        "app/repo-xml/page.tsx", "components/RepoTxtFetcher.tsx", "components/AICodeAssistant.tsx", "components/AutomationBuddy.tsx",
-        "components/repo/prompt.ts", "hooks/supabase.ts", "app/actions.ts", "app/actions_github/actions.ts",
-        "app/webhook-handlers/proxy.ts", "package.json", "tailwind.config.ts",
-        "lib/debugLogger.ts", "contexts/ErrorOverlayContext.tsx", "components/DevErrorOverlay.tsx", "components/ErrorBoundaryForOverlay.tsx"
-    ], []);
+        // --- Core App Structure ---
+        "app/layout.tsx",
+        "app/globals.css", // Глобальные стили важны для UI
+        "app/page.tsx", // Главная страница (если есть)
+
+        // --- Main Feature Page & Components ---
+        "app/repo-xml/page.tsx", // Ключевая страница фичи
+        "components/RepoTxtFetcher.tsx", // Сам этот компонент
+        "components/AICodeAssistant.tsx", // Ассистент AI
+        "components/AutomationBuddy.tsx", // Бадди
+        "components/StickyChatButton.tsx", // Кнопка помощи/чата
+
+        // --- Key Contexts ---
+        "contexts/AppContext.tsx",
+        "contexts/RepoXmlPageContext.tsx",
+        "contexts/ErrorOverlayContext.tsx",
+
+        // --- Core Hooks for this feature ---
+        "hooks/useRepoFetcher.ts",
+        "hooks/useFileSelection.ts",
+        "hooks/useKworkInput.ts",
+        "hooks/useCodeParsingAndValidation.ts",
+
+        // --- Shared Hooks & Utilities ---
+        "hooks/useTelegram.ts", // Основа интеграции TG
+        "hooks/useAppToast.ts", // Уведомления
+        "hooks/supabase.ts",    // Работа с БД
+        "lib/utils.ts",         // Общие утилиты
+        "lib/debugLogger.ts",   // Логирование
+        "lib/repoUtils.ts",     // Утилиты репозитория
+        "lib/telegram.ts",      // Утилиты Telegram (если есть специфичные)
+        "lib/auth.ts",          // Логика аутентификации (если есть)
+
+        // --- Backend Logic ---
+        "app/actions.ts", // Основные серверные экшены
+        "app/actions_github/actions.ts", // Экшены GitHub
+        "app/ai_actions/actions.ts", // Экшены AI
+        "app/webhook-handlers/proxy.ts", // Ключевой вебхук
+
+        // --- UI Components for this feature ---
+        "components/repo/FileList.tsx",
+        "components/repo/ProgressBar.tsx",
+        "components/repo/RequestInput.tsx",
+        "components/repo/SelectedFilesPreview.tsx",
+        "components/repo/SettingsModal.tsx",
+        "components/assistant_components/ParsedFilesList.tsx",
+        "components/assistant_components/PullRequestForm.tsx",
+        "components/assistant_components/ValidationStatus.tsx",
+        "components/assistant_components/TextAreaUtilities.tsx",
+        "components/assistant_components/ToolsMenu.tsx",
+        // Добавь другие ключевые компоненты ассистента, если нужно
+
+        // --- Error Handling UI ---
+        "components/DevErrorOverlay.tsx",
+        "components/ErrorBoundaryForOverlay.tsx",
+        "components/ErrorBoundary.tsx", // Общий Error Boundary (если используется)
+
+        // --- Prompts ---
+        "components/repo/prompt.ts", // Системный промпт для Экстрактора/Ассистента
+
+        // --- Types ---
+        "types/database.types.ts", // Типы БД Supabase
+        "types/telegram.d.ts", // Типы Telegram API
+        "types/ai.types.ts", // Типы для AI
+
+    ].filter(Boolean), []); // filter(Boolean) на случай, если какие-то файлы не существуют
+    // --- КОНЕЦ ОБНОВЛЕННОГО СПИСКА ---
+
     logger.debug("[RepoTxtFetcher] After Derived State/Memo");
 
     // === Custom Hooks ===
@@ -113,7 +176,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     } = useRepoFetcher({
         repoUrl, token, targetBranchName, manualBranchName, imageReplaceTask,
         highlightedPathFromUrl,
-        importantFiles,
+        importantFiles, // Передаем обновленный список
         autoFetch,
         ideaFromUrl,
         isSettingsModalOpen,
@@ -133,7 +196,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         files: fetchedFiles,
         primaryHighlightedPath,
         secondaryHighlightedPaths,
-        importantFiles,
+        importantFiles, // Передаем обновленный список
         imageReplaceTaskActive: !!imageReplaceTask,
     });
     logger.debug("[RepoTxtFetcher] After useFileSelection Hook");
@@ -143,7 +206,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         handleAddSelected,
         handleCopyToClipboard,
         handleClearAll,
-        handleAddFullTree,
+        handleAddFullTree, // Используем уже исправленную версию
     } = useKworkInput({
         selectedFetcherFiles,
         allFetchedFiles,
@@ -226,16 +289,16 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         },
         handleAddSelected: (filesToAdd: Set<string>, allFiles: FileNode[]) => {
             logger.debug(`[Imperative] handleAddSelected called.`);
-            handleAddSelected();
+            handleAddSelected(); // Вызываем локальный обработчик (из useKworkInput)
             return Promise.resolve();
         },
         handleCopyToClipboard: (text?: string, scroll?: boolean) => {
              logger.debug(`[Imperative] handleCopyToClipboard called.`);
-             return handleCopyToClipboard(text, scroll);
+             return handleCopyToClipboard(text, scroll); // Вызываем локальный обработчик
         },
         clearAll: () => {
              logger.debug(`[Imperative] clearAll called.`);
-             handleClearAll();
+             handleClearAll(); // Вызываем локальный обработчик
         },
         getKworkInputValue: () => {
              logger.debug(`[Imperative] getKworkInputValue called.`);
@@ -243,19 +306,19 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         },
         handleAddImportantFiles: () => {
              logger.debug(`[Imperative] handleAddImportantFiles called.`);
-             handleAddImportantFiles();
+             handleAddImportantFiles(); // Вызываем локальный обработчик (из useFileSelection)
         },
         handleAddFullTree: () => {
              logger.debug(`[Imperative] handleAddFullTree called.`);
-             handleAddFullTree();
+             handleAddFullTree(); // Вызываем локальный обработчик (из useKworkInput)
         },
         selectAllFiles: () => {
              logger.debug(`[Imperative] selectAllFiles called.`);
-             handleSelectAll();
+             handleSelectAll(); // Вызываем локальный обработчик (из useFileSelection)
         },
         deselectAllFiles: () => {
             logger.debug(`[Imperative] deselectAllFiles called.`);
-            handleDeselectAll();
+            handleDeselectAll(); // Вызываем локальный обработчик (из useFileSelection)
         },
     }), [
         handleFetchManual, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll,
@@ -449,7 +512,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                              selectedFiles={selectedFetcherFiles}
                              primaryHighlightedPath={primaryHighlightedPath}
                              secondaryHighlightedPaths={secondaryHighlightedPaths}
-                             importantFiles={importantFiles}
+                             importantFiles={importantFiles} // Передаем обновленный список
                              isLoading={isFetchLoading}
                              isActionDisabled={isActionDisabled}
                              toggleFileSelection={toggleFileSelection}
@@ -458,7 +521,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                              onSelectAll={handleSelectAll}
                              onDeselectAll={handleDeselectAll}
                              onAddSelected={handleAddSelected} // Pass hook handler
-                             onAddTree={handleAddFullTree}     // Pass hook handler
+                             onAddTree={handleAddFullTree}     // Pass hook handler (исправленная версия)
                           />
                       </div>
                  )}
