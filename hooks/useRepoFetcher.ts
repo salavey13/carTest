@@ -196,20 +196,33 @@ export const useRepoFetcher = ({
         finally {
              logger.info("[Fetch Manual CB] FINALLY block executing...");
              stopProgressSimulation();
-             setFiles(fetchedFilesData);
-             setPrimaryHighlightedPathState(primaryHighlightPathInternal);
-             setSecondaryHighlightedPathsState(secondaryHighlightPathsDataInternal);
-             logger.debug(`[Fetch Manual CB] Finally - Calling handleSetFilesFetched. Success=${fetchAttemptSucceeded}`);
-             handleSetFilesFetched( fetchAttemptSucceeded, fetchedFilesData, primaryHighlightPathInternal, secondaryHighlightPathsDataInternal );
-             if (fetchAttemptSucceeded && filesToAutoSelect.size > 0) { logger.debug(`[Fetch Manual CB] Finally - Setting selected files in *CONTEXT*: ${filesToAutoSelect.size} items`); setSelectedFetcherFiles(filesToAutoSelect); }
+             setFiles(fetchedFilesData); // Update local state
+             setPrimaryHighlightedPathState(primaryHighlightPathInternal); // Update local state
+             setSecondaryHighlightedPathsState(secondaryHighlightPathsDataInternal); // Update local state
+             logger.debug(`[Fetch Manual CB] Finally - Calling handleSetFilesFetched in Context. Success=${fetchAttemptSucceeded}`);
+             // Call context handler to update shared state (including fetchStatus)
+             handleSetFilesFetched(
+                 fetchAttemptSucceeded,
+                 fetchedFilesData,
+                 primaryHighlightPathInternal,
+                 secondaryHighlightPathsDataInternal
+             );
+             // Auto-select files in context AFTER fetch status is likely updated
+             if (fetchAttemptSucceeded && filesToAutoSelect.size > 0) {
+                 logger.debug(`[Fetch Manual CB] Finally - Setting selected files in *CONTEXT*: ${filesToAutoSelect.size} items`);
+                 setSelectedFetcherFiles(filesToAutoSelect);
+             }
+             // Set local progress (visual only)
              setProgress(fetchAttemptSucceeded ? 100 : 0);
              isFetchInitiatedRef.current = false;
-             if(isSettingsModalOpen && fetchAttemptSucceeded) { logger.info("[Fetch Manual CB] Finally - Fetch successful, closing settings modal."); triggerToggleSettingsModal(); }
-             logger.info(`[Fetch Manual CB] FINISHED. Final Status via Ref: ${fetchStatusRef.current}`);
+             if(isSettingsModalOpen && fetchAttemptSucceeded) {
+                 logger.info("[Fetch Manual CB] Finally - Fetch successful, closing settings modal.");
+                 triggerToggleSettingsModal();
+             }
+             logger.info(`[Fetch Manual CB] FINISHED. Final Status via Ref (might be slightly delayed): ${fetchStatusRef.current}`);
         }
     }, [ // Dependencies - Read context values needed inside
         repoUrl, token, targetBranchName, manualBranchName, // Context state values (for determining final branch)
-        // imageReplaceTask, pendingFlowDetails, // Removed: Now read from refs inside
         highlightedPathFromUrl, importantFiles, // Props
         isSettingsModalOpen, loadingPrs, assistantLoading, isParsing, aiActionLoading, // Context state flags
         setFetchStatus, handleSetFilesFetched, setSelectedFetcherFiles, // Context setters
