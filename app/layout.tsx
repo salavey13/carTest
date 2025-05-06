@@ -1,4 +1,5 @@
-// /app/layout.tsx
+"use client";
+
 import type React from "react";
 import Script from "next/script";
 import Header from "@/components/Header";
@@ -10,8 +11,8 @@ import "./globals.css";
 import { cn } from "@/lib/utils"; // Utility for class names
 
 export const metadata = {
-  title: "V0 Car Test App", // Add a default title
-  description: "Find your perfect V0 car.", // Add a default description
+  title: "Fit10min PREMIUM", // Updated title
+  description: "Твоя 10-минутная фитнес-революция. Тренировки, питание, прогресс.", // Updated description
   // Add viewport settings for responsiveness and disabling zoom
   viewport: "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no",
 };
