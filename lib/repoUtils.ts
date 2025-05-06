@@ -299,3 +299,48 @@ export const getPageFilePath = (
 
     return null; // No matching page file found
 };
+
+/**
+ * Guesses a suitable branch name from a file path.
+ * Example: app/components/MyComponent.tsx -> feat/my-component
+ * Example: lib/utils/helpers.ts -> fix/helpers-utils
+ */
+ export const guessBranchNameFromPath = (filePath: string): string | null => {
+    if (!filePath) return null;
+
+    // Remove common prefixes and extensions
+    let name = filePath
+      .replace(/^app\//, '')
+      .replace(/^components\//, '')
+      .replace(/^lib\//, '')
+      .replace(/^hooks\//, '')
+      .replace(/^contexts\//, '')
+      .replace(/\.(ts|tsx|js|jsx|css|scss|md|json|png|jpg|jpeg|gif|svg|webp)$/, '');
+
+    // Replace slashes and special characters with hyphens, convert to lowercase
+    name = name
+      .replace(/[\\/._]/g, '-') // Replace path separators and dots with hyphens
+      .replace(/[^a-zA-Z0-9-]/g, '') // Remove any remaining non-alphanumeric characters except hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with a single one
+      .replace(/^-|-$/g, '') // Trim leading/trailing hyphens
+      .toLowerCase();
+
+    if (!name) return 'update'; // Fallback if the name becomes empty
+
+    // Simple prefix logic (can be expanded)
+    let prefix = 'feat'; // Default to 'feat'
+    if (name.includes('fix') || name.includes('bug')) prefix = 'fix';
+    if (name.includes('refactor')) prefix = 'refactor';
+    if (name.includes('style') || name.includes('ui')) prefix = 'style';
+    if (name.includes('docs')) prefix = 'docs';
+
+    // Limit length to avoid overly long branch names
+    const maxLength = 40;
+    if (name.length > maxLength - prefix.length - 1) {
+      name = name.substring(0, maxLength - prefix.length - 1);
+      // Ensure it doesn't end with a hyphen after truncation
+      name = name.replace(/-$/, '');
+    }
+
+    return `${prefix}/${name}`;
+  };
