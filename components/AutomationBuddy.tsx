@@ -131,12 +131,12 @@ const AutomationBuddy: React.FC = () => {
                 if (condition) {
                     let isDisabled = disabled || isAnyLoading;
                     // Specific overrides based on ID and current state
-                    if (['fetch', 'retry-fetch', 'retry-fetch-img'].includes(id)) isDisabled = disabled || isFetcherLoading || isAssistantProcessing || isAiGenerating || prsLoading;
-                    if (['add-selected', 'copy-kwork', 'clear-all'].includes(id)) isDisabled = disabled || isFetcherLoading || isAssistantProcessing || isAiGenerating || prsLoading;
+                    if (['fetch', 'retry-fetch', 'retry-fetch-img'].includes(id)) isDisabled = disabled || isFetcherLoading || isAssistantProcessing || isAiGenerating || loadingPrs;
+                    if (['add-selected', 'copy-kwork', 'clear-all'].includes(id)) isDisabled = disabled || isFetcherLoading || isAssistantProcessing || isAiGenerating || loadingPrs;
                     if (id.includes('ask-ai')) isDisabled = disabled || isAiGenerating;
                     if (id === 'parse-response') isDisabled = disabled || isParsing || isAiGenerating || !aiResponseHasContent;
                     if (id === 'create-pr' || id === 'update-branch') isDisabled = disabled || isAssistantProcessing || selectedAssistantFiles.size === 0;
-                    if (id.includes('toggle-settings')) isDisabled = disabled || isAssistantProcessing || isAiGenerating || prsLoading;
+                    if (id.includes('toggle-settings')) isDisabled = disabled || isAssistantProcessing || isAiGenerating || loadingPrs;
                     if (id === 'select-highlighted') { isDisabled = disabled || isFetcherLoading || isAssistantProcessing || isAiGenerating || !hasAnyHighlights; if (!hasAnyHighlights) tooltip = "Нет связанных файлов для выбора"; }
                     if (id === 'add-selected') isDisabled = disabled || selectedFetcherFiles.size === 0;
                     if (id === 'copy-kwork') isDisabled = disabled || !kworkInputHasContent; // Disable copy if no content based on boolean flag
