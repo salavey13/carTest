@@ -24,7 +24,7 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import * as repoUtils from "@/lib/repoUtils";
 import { useRepoFetcher } from "@/hooks/useRepoFetcher";
 import { useFileSelection } from "@/hooks/useFileSelection";
-import { useKworkInput } from "@/hooks/useKworkInput";
+import { useKworkInput } from "@/hooks/useKworkInput"; // Используем исправленный хук
 import { useAppToast } from "@/hooks/useAppToast";
 
 // --- Sub-components ---
@@ -90,72 +90,37 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         (!!highlightedPathFromUrl || !!ideaFromUrl)
     , [imageReplaceTask, highlightedPathFromUrl, ideaFromUrl]);
 
-    // --- ОБНОВЛЕННЫЙ СПИСОК ВАЖНЫХ ФАЙЛОВ (без конфигов) ---
+    // --- ОБНОВЛЕННЫЙ и УРЕЗАННЫЙ СПИСОК ВАЖНЫХ ФАЙЛОВ ---
     const importantFiles = useMemo(() => [
-        // --- Core App Structure ---
-        "app/layout.tsx",
-        "app/globals.css", // Глобальные стили важны для UI
-        "app/page.tsx", // Главная страница (если есть)
+        // --- Структура и главная страница фичи ---
+        "app/layout.tsx",           // Общий layout важен
+        "app/repo-xml/page.tsx",    // Сама страница, где мы сейчас
+        "components/RepoTxtFetcher.tsx", // Этот компонент
+        "components/AICodeAssistant.tsx",// Компонент Ассистента
+        "components/AutomationBuddy.tsx", // Компонент Бадди
 
-        // --- Main Feature Page & Components ---
-        "app/repo-xml/page.tsx", // Ключевая страница фичи
-        "components/RepoTxtFetcher.tsx", // Сам этот компонент
-        "components/AICodeAssistant.tsx", // Ассистент AI
-        "components/AutomationBuddy.tsx", // Бадди
-        "components/StickyChatButton.tsx", // Кнопка помощи/чата
+        // --- Ключевой Контекст ---
+        "contexts/RepoXmlPageContext.tsx", // Контекст ЭТОЙ страницы
 
-        // --- Key Contexts ---
-        "contexts/AppContext.tsx",
-        "contexts/RepoXmlPageContext.tsx",
-        "contexts/ErrorOverlayContext.tsx",
-
-        // --- Core Hooks for this feature ---
+        // --- Основные Хуки для этой страницы ---
         "hooks/useRepoFetcher.ts",
         "hooks/useFileSelection.ts",
         "hooks/useKworkInput.ts",
         "hooks/useCodeParsingAndValidation.ts",
+        "hooks/supabase.ts", // Часто нужен для работы с данными
 
-        // --- Shared Hooks & Utilities ---
-        "hooks/useTelegram.ts", // Основа интеграции TG
-        "hooks/useAppToast.ts", // Уведомления
-        "hooks/supabase.ts",    // Работа с БД
-        "lib/utils.ts",         // Общие утилиты
-        "lib/debugLogger.ts",   // Логирование
-        "lib/repoUtils.ts",     // Утилиты репозитория
-        "lib/telegram.ts",      // Утилиты Telegram (если есть специфичные)
-        "lib/auth.ts",          // Логика аутентификации (если есть)
+        // --- Основные Экшены ---
+        "app/actions.ts",
+        "app/actions_github/actions.ts",
+        // "app/ai_actions/actions.ts", // Опционально, если AI часто используется в новых страницах
 
-        // --- Backend Logic ---
-        "app/actions.ts", // Основные серверные экшены
-        "app/actions_github/actions.ts", // Экшены GitHub
-        "app/ai_actions/actions.ts", // Экшены AI
-        "app/webhook-handlers/proxy.ts", // Ключевой вебхук
+        // --- Базовые Утилиты и Типы ---
+        "lib/utils.ts",
+        "lib/repoUtils.ts", // Утилиты для работы с файлами/путями
+        "types/database.types.ts", // Типы БД важны для экшенов
 
-        // --- UI Components for this feature ---
-        "components/repo/FileList.tsx",
-        "components/repo/ProgressBar.tsx",
-        "components/repo/RequestInput.tsx",
-        "components/repo/SelectedFilesPreview.tsx",
-        "components/repo/SettingsModal.tsx",
-        "components/assistant_components/ParsedFilesList.tsx",
-        "components/assistant_components/PullRequestForm.tsx",
-        "components/assistant_components/ValidationStatus.tsx",
-        "components/assistant_components/TextAreaUtilities.tsx",
-        "components/assistant_components/ToolsMenu.tsx",
-        // Добавь другие ключевые компоненты ассистента, если нужно
-
-        // --- Error Handling UI ---
-        "components/DevErrorOverlay.tsx",
-        "components/ErrorBoundaryForOverlay.tsx",
-        "components/ErrorBoundary.tsx", // Общий Error Boundary (если используется)
-
-        // --- Prompts ---
-        "components/repo/prompt.ts", // Системный промпт для Экстрактора/Ассистента
-
-        // --- Types ---
-        "types/database.types.ts", // Типы БД Supabase
-        "types/telegram.d.ts", // Типы Telegram API
-        "types/ai.types.ts", // Типы для AI
+        // --- Промпт (если AI должен понимать, как с ним работать) ---
+         "components/repo/prompt.ts",
 
     ].filter(Boolean), []); // filter(Boolean) на случай, если какие-то файлы не существуют
     // --- КОНЕЦ ОБНОВЛЕННОГО СПИСКА ---
@@ -211,7 +176,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         selectedFetcherFiles,
         allFetchedFiles,
         imageReplaceTaskActive: !!imageReplaceTask,
-        files: fetchedFiles,
+        files: fetchedFiles, // Передаем текущий список файлов для handleAddFullTree
     });
     logger.debug("[RepoTxtFetcher] After useKworkInput Hook");
 
@@ -388,8 +353,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                         {currentImageTask ? "Задача: Замена Картинки" : "Кибер-Экстрактор Кода"}
                      </h2>
                       {!currentImageTask && (
-                         <div className="text-yellow-300/80 text-xs md:text-sm space-y-1 mb-2">
-                            <VibeContentRenderer content={"1. Настрой (<FaCodeBranch title='Настройки' class='inline text-cyan-400'/>)."} />
+                         <div className="flex flex-col text-yellow-300/80 text-xs md:text-sm space-y-1 mb-2">
+                            <VibeContentRenderer content={"1. Настрой <FaCodeBranch title='Настройки' class='inline text-cyan-400'/>."} />
                             <VibeContentRenderer content={"2. Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>."} />
                             <VibeContentRenderer content={"3. Выбери файлы или <span class='font-bold text-teal-400 mx-1'>связанные</span> / <span class='font-bold text-orange-400 mx-1'>важные</span>."} />
                             {/* Removed brackets around icons */}
