@@ -21,9 +21,8 @@ import { toast } from "sonner";
 // Import Context & Actions
 import { useAppContext } from "@/contexts/AppContext";
 import { getGitHubUserProfile } from "@/app/actions_github/actions";
-// --- ИСПРАВЛЕНИЕ ИМПОРТА ЛОГГЕРА ---
-// Убедимся, что импортируем именно ИНСТАНС логгера
-import { debugLogger, type LogRecord } from "@/lib/debugLogger"; // Импортируем инстанс и тип
+// --- ИСПРАВЛЕНИЕ ИМПОРТА ЛОГГЕРА (ТЕПЕРЬ ТОЧНО!) ---
+import { debugLogger as logger, type LogRecord } from "@/lib/debugLogger"; // Добавлен алиас as logger
 // --- КОНЕЦ ИСПРАВЛЕНИЯ ИМПОРТА ---
 import { useAppToast } from "@/hooks/useAppToast"; // Use our toast hook
 
@@ -65,23 +64,23 @@ const StickyChatButton: React.FC = () => {
     // --- Copy Logs Handler ---
     const handleCopyLogs = useCallback(async () => {
         const plannedAction = "[StickyChat] Plan: Copy internal logs to clipboard.";
-        // --- ИСПРАВЛЕНИЕ: Проверяем, что логгер доступен ---
-        if (typeof debugLogger === 'undefined' || typeof debugLogger.getInternalLogRecords !== 'function') {
-             console.error("[StickyChat] Error: debugLogger is not defined or not initialized!");
+        // --- Проверка логгера (остается) ---
+        if (typeof logger === 'undefined' || typeof logger.getInternalLogRecords !== 'function') {
+             console.error("[StickyChat] Error: logger is not defined or not initialized!");
              toastError("Ошибка: Логгер недоступен для копирования.");
              return;
         }
-        // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+        // --- КОНЕЦ Проверки логгера ---
 
-        logger.info(plannedAction); // Используем уже импортированный 'logger'
+        logger.info(plannedAction); // Используем logger (теперь корректно определен через алиас)
         let success = false;
         try {
             if (!navigator?.clipboard?.writeText) {
                 throw new Error("Clipboard API (writeText) not available or not permitted in this context.");
             }
-            const logRecords: ReadonlyArray<LogRecord> = debugLogger.getInternalLogRecords();
+            const logRecords: ReadonlyArray<LogRecord> = logger.getInternalLogRecords(); // Используем logger
             if (logRecords.length === 0) {
-                logger.warn("[StickyChat] HasBeenPlanter: Copy logs failed - No logs found.");
+                logger.warn("[StickyChat] HasBeenPlanter: Copy logs failed - No logs found."); // Используем logger
                 toastInfo("Нет логов для копирования.");
                 return; // No need to proceed
             }
@@ -92,14 +91,14 @@ const StickyChatButton: React.FC = () => {
 
             await navigator.clipboard.writeText(formattedLogs);
             success = true; // Mark success only after writeText resolves
-            logger.info(`[StickyChat] HasBeenPlanter: Copy logs SUCCESS - Copied ${logRecords.length} records.`);
+            logger.info(`[StickyChat] HasBeenPlanter: Copy logs SUCCESS - Copied ${logRecords.length} records.`); // Используем logger
             toastSuccess("Логи скопированы в буфер обмена!");
             setLogsCopied(true);
             setTimeout(() => setLogsCopied(false), 2000); // Reset button text after 2s
 
         } catch (err: any) {
             success = false;
-            logger.error("[StickyChat] HasBeenPlanter: Copy logs FAILED.", { plannedAction, error: err?.message ?? err });
+            logger.error("[StickyChat] HasBeenPlanter: Copy logs FAILED.", { plannedAction, error: err?.message ?? err }); // Используем logger
             toastError(`Не удалось скопировать логи: ${err?.message ?? 'Unknown error'}`);
         }
     }, [toastSuccess, toastError, toastInfo]); // Dependencies for toast functions
@@ -113,7 +112,7 @@ const StickyChatButton: React.FC = () => {
             else { baseSuggestions.push({ id: ADD_NEW_ID, text: "Создать Новое с Нуля ✨", link: "/repo-xml", icon: <FaWandMagicSparkles className="mr-1.5" />, tooltip: "Перейти в СуперВайб Студию без контекста" }); }
         }
         baseSuggestions.push({ id: HIRE_ME_ID, text: HIRE_ME_TEXT, link: "/selfdev", isHireMe: true, icon: <FaStar className="mr-1.5" />, tooltip: "Узнать о SelfDev пути и заказать консультацию" });
-        if (potentialOldImageUrl && !isToolPage && !showReplaceTool) { baseSuggestions.unshift({ id: REPLACE_IMAGE_ID, text: "Заменить Картинку? 🖼️", action: () => { logger.debug("[Flow 1 - Image Swap] StickyChat: Replace Image suggestion clicked."); setShowReplaceTool(true); }, icon: <FaImages className="mr-1.5 text-blue-400" />, tooltip: `Начать процесс замены картинки: ${potentialOldImageUrl.substring(0, 30)}...` }); }
+        if (potentialOldImageUrl && !isToolPage && !showReplaceTool) { baseSuggestions.unshift({ id: REPLACE_IMAGE_ID, text: "Заменить Картинку? 🖼️", action: () => { logger.debug("[Flow 1 - Image Swap] StickyChat: Replace Image suggestion clicked."); setShowReplaceTool(true); }, icon: <FaImages className="mr-1.5 text-blue-400" />, tooltip: `Начать процесс замены картинки: ${potentialOldImageUrl.substring(0, 30)}...` }); } // Используем logger
 
         // Add "Copy Logs" button
         baseSuggestions.push({ id: COPY_LOGS_ID, text: logsCopied ? "Логи скопированы!" : "Скопировать Логи", action: handleCopyLogs, icon: logsCopied ? <FaCircleCheck className="mr-1.5 text-green-400"/> : <FaClipboardList className="mr-1.5" />, tooltip: "Скопировать историю системных логов в буфер обмена для отладки" });
@@ -130,19 +129,19 @@ const StickyChatButton: React.FC = () => {
     }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading, prevGithubLoading, currentPath, potentialOldImageUrl, showReplaceTool, customIdea]);
 
     // --- Auto-open Timer ---
-    useEffect(() => { let t: NodeJS.Timeout | null = null; if (!hasAutoOpened && !isOpen) { const hasParams = searchParams.has("path") || searchParams.has("idea"); const delayMs = hasParams ? AUTO_OPEN_DELAY_MS : AUTO_OPEN_DELAY_MS_SIMPLE_CASE; logger.debug(`StickyChat: Setting auto-open timer for ${delayMs}ms (hasParams: ${hasParams})`); t = setTimeout(() => { setIsOpen(true); setHasAutoOpened(true); logger.debug(`StickyChat: Auto-opened after ${delayMs}ms`); }, delayMs); return () => { if (t) clearTimeout(t); }; } }, [hasAutoOpened, isOpen, searchParams]);
+    useEffect(() => { let t: NodeJS.Timeout | null = null; if (!hasAutoOpened && !isOpen) { const hasParams = searchParams.has("path") || searchParams.has("idea"); const delayMs = hasParams ? AUTO_OPEN_DELAY_MS : AUTO_OPEN_DELAY_MS_SIMPLE_CASE; logger.debug(`StickyChat: Setting auto-open timer for ${delayMs}ms (hasParams: ${hasParams})`); t = setTimeout(() => { setIsOpen(true); setHasAutoOpened(true); logger.debug(`StickyChat: Auto-opened after ${delayMs}ms`); }, delayMs); return () => { if (t) clearTimeout(t); }; } }, [hasAutoOpened, isOpen, searchParams]); // Используем logger
     // --- Handle Escape Key ---
     const handleEscKey = useCallback((event: KeyboardEvent) => { if (event.key === 'Escape' && isOpen) { setIsOpen(false); setShowReplaceTool(false); } }, [isOpen]);
     useEffect(() => { if (isOpen) { document.addEventListener('keydown', handleEscKey); } else { document.removeEventListener('keydown', handleEscKey); } return () => { document.removeEventListener('keydown', handleEscKey); }; }, [isOpen, handleEscKey]);
     // --- Reset state on path change ---
     useEffect(() => { setCustomIdea(""); setPotentialOldImageUrl(null); setShowReplaceTool(false); setIsOpen(false); setHasAutoOpened(false); setLogsCopied(false); }, [currentPath]);
     // --- Detect Image URL in Custom Input ---
-    useEffect(() => { const trimmedIdea = customIdea.trim(); if (trimmedIdea && isImageUrl(trimmedIdea)) { logger.debug(`[Flow 1 - Image Swap] StickyChat: Detected image URL in input: ${trimmedIdea}`); setPotentialOldImageUrl(trimmedIdea); } else { if(potentialOldImageUrl) logger.debug(`[StickyChat] Input changed, clearing potential image URL.`); setPotentialOldImageUrl(null); if (showReplaceTool) { setShowReplaceTool(false); } } }, [customIdea, showReplaceTool, potentialOldImageUrl]); // Added potentialOldImageUrl
+    useEffect(() => { const trimmedIdea = customIdea.trim(); if (trimmedIdea && isImageUrl(trimmedIdea)) { logger.debug(`[Flow 1 - Image Swap] StickyChat: Detected image URL in input: ${trimmedIdea}`); setPotentialOldImageUrl(trimmedIdea); } else { if(potentialOldImageUrl) logger.debug(`[StickyChat] Input changed, clearing potential image URL.`); setPotentialOldImageUrl(null); if (showReplaceTool) { setShowReplaceTool(false); } } }, [customIdea, showReplaceTool, potentialOldImageUrl]); // Используем logger
 
 
     // --- Event Handlers ---
     const handleSuggestionClick = (suggestion: Suggestion) => {
-        if (suggestion.disabled) return; logger.debug("(StickyChat) Suggestion Clicked:", suggestion.id);
+        if (suggestion.disabled) return; logger.debug("(StickyChat) Suggestion Clicked:", suggestion.id); // Используем logger
         if (suggestion.action) { suggestion.action(); }
         else if (suggestion.link) {
             let finalLink = suggestion.link; const trimmedCustomIdea = customIdea.trim();
@@ -154,10 +153,10 @@ const StickyChatButton: React.FC = () => {
                  const encodedTargetPath = encodeURIComponent(targetPath);
                  const encodedIdea = encodeURIComponent(trimmedCustomIdea); // The idea is the user input
                  finalLink = `/repo-xml?path=${encodedTargetPath}&idea=${encodedIdea}`;
-                 logger.info(`[Flow 2/3 - Generic/Error Idea] StickyChat: Constructed URL: ${finalLink}`);
+                 logger.info(`[Flow 2/3 - Generic/Error Idea] StickyChat: Constructed URL: ${finalLink}`); // Используем logger
                  toast.info("🚀 Отправляю идею в Студию!");
             } else {
-                 logger.debug(`[StickyChat] Navigating to simple link: ${finalLink}`);
+                 logger.debug(`[StickyChat] Navigating to simple link: ${finalLink}`); // Используем logger
                  toast.info("🚀 Перехожу...");
             }
             router.push(finalLink); setIsOpen(false);
@@ -168,21 +167,21 @@ const StickyChatButton: React.FC = () => {
         }
     };
     const handleReplaceConfirmed = (newImageUrl: string) => {
-        if (!potentialOldImageUrl) { logger.error("[Flow 1 - Image Swap] StickyChat: handleReplaceConfirmed called but old URL is missing!"); toastError("Ошибка: Старый URL не найден."); return; }
-        logger.info("[Flow 1 - Image Swap] StickyChat: Replace confirmed.", { oldUrl: potentialOldImageUrl, newUrl: newImageUrl });
+        if (!potentialOldImageUrl) { logger.error("[Flow 1 - Image Swap] StickyChat: handleReplaceConfirmed called but old URL is missing!"); toastError("Ошибка: Старый URL не найден."); return; } // Используем logger
+        logger.info("[Flow 1 - Image Swap] StickyChat: Replace confirmed.", { oldUrl: potentialOldImageUrl, newUrl: newImageUrl }); // Используем logger
         const structuredIdea = `ImageReplace|OldURL=${encodeURIComponent(potentialOldImageUrl)}|NewURL=${encodeURIComponent(newImageUrl)}`;
         const cleanPath = currentPath.split('?')[0]; let targetPath = cleanPath === "/" ? "app/page.tsx" : `app${cleanPath}`; if (!targetPath.match(/\.(tsx|jsx|js|ts)$/)) { targetPath = targetPath.endsWith('/') ? targetPath + 'page.tsx' : targetPath + '/page.tsx'; } if (!targetPath.startsWith('app/')) targetPath = 'app/' + targetPath; const encodedTargetPath = encodeURIComponent(targetPath); const encodedIdea = encodeURIComponent(structuredIdea); const redirectUrl = `/repo-xml?path=${encodedTargetPath}&idea=${encodedIdea}`;
-        logger.info(`[Flow 1 - Image Swap] StickyChat: Constructed redirect URL: ${redirectUrl}`);
+        logger.info(`[Flow 1 - Image Swap] StickyChat: Constructed redirect URL: ${redirectUrl}`); // Используем logger
         toastInfo("🚀 Перехожу в Студию для замены..."); router.push(redirectUrl); setIsOpen(false); setShowReplaceTool(false);
     };
-    const handleCancelReplace = () => { logger.debug("[Flow 1 - Image Swap] StickyChat: Replace cancelled."); setShowReplaceTool(false); };
-    const handleOverlayClick = () => { logger.debug("[StickyChat] Overlay clicked, closing."); setIsOpen(false); setShowReplaceTool(false); requestAnimationFrame(() => document.body.focus()); };
+    const handleCancelReplace = () => { logger.debug("[Flow 1 - Image Swap] StickyChat: Replace cancelled."); setShowReplaceTool(false); }; // Используем logger
+    const handleOverlayClick = () => { logger.debug("[StickyChat] Overlay clicked, closing."); setIsOpen(false); setShowReplaceTool(false); requestAnimationFrame(() => document.body.focus()); }; // Используем logger
     const handleDialogClick = (e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
-    const handleFabClick = () => { const willOpen = !isOpen; logger.debug(`[StickyChat] FAB clicked. Will open: ${willOpen}`); setIsOpen(willOpen); if (willOpen) { setHasAutoOpened(true); setShowReplaceTool(false); setCustomIdea(""); setPotentialOldImageUrl(null); setLogsCopied(false); } else { setShowReplaceTool(false); requestAnimationFrame(() => document.body.focus()); } };
+    const handleFabClick = () => { const willOpen = !isOpen; logger.debug(`[StickyChat] FAB clicked. Will open: ${willOpen}`); setIsOpen(willOpen); if (willOpen) { setHasAutoOpened(true); setShowReplaceTool(false); setCustomIdea(""); setPotentialOldImageUrl(null); setLogsCopied(false); } else { setShowReplaceTool(false); requestAnimationFrame(() => document.body.focus()); } }; // Используем logger
 
     // --- Render Logic ---
     const showInputArea = isOpen && !showReplaceTool && currentPath !== '/repo-xml';
-    logger.debug("[StickyChat] Rendering...", { isOpen, showInputArea, showReplaceTool, potentialOldImageUrl });
+    logger.debug("[StickyChat] Rendering...", { isOpen, showInputArea, showReplaceTool, potentialOldImageUrl }); // Используем logger
 
     return (
         <AnimatePresence>
