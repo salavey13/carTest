@@ -19,7 +19,7 @@ import {
     FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye,
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaToolbox, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket,
-    FaFastForward, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree // Added FaTree
+    FaFastForward, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye // Added FaEye, FaMagnifyingGlass
 } from "react-icons/fa6";
 import Link from "next/link";
 import { motion } from 'framer-motion';
@@ -51,11 +51,11 @@ const translations = {
     philosophyLvl5_6: "<strong>Lv.5 -> 6 <FaMicrophone/>/<FaVideo/> (+Multimedia):</strong> Use audio commands! Attach videos! Watch them turn into page content automatically. +1 Perk: Multi-modal Input.",
     philosophyLvl6_7: "<strong>Lv.6 -> 7 <FaDatabase/> (+SQL/DB):</strong> Discover new file types! AI generates SQL -> Paste into Supabase (1 click) -> <strong>DONE.</strong> Same flow, different context. +1 Perk: Data Handling.",
     philosophyLvl8_10: "<strong>Lv.8-10+ <FaServer/>/<FaRocket/> (+Independence):</strong> Deploy your OWN CyberVibe! Use/steal my Supabase! Set your own Bot Token! Build your own XTRs! <strong>UNLIMITED POWER!</strong>",
-    philosophyLvl11: "<strong>Lv.11 <FaFastForward/> (Speedrunner):</strong> Instantly notice omissions/flaws when quickly scrolling large amounts of text/code.",
-    philosophyLvl12: "<strong>Lv.12 <FaMemory/> (Context Guru):</strong> Not afraid of 65k+ tokens in AI response, easily manage large code snippets and context.",
-    philosophyLvl13: "<strong>Lv.13 <FaKeyboard/> (Marathoner):</strong> Type/dictate detailed requests and edits non-stop for >10 minutes, maintaining focus.",
-    philosophyLvl14: "<strong>Lv.14 <FaBriefcase/> (Side-Hustler):</strong> Add small, unrelated tasks 'on the side' to a single AI request to optimize workflow.",
-    philosophyLvl15: "<strong>Lv.15 <FaMagnifyingGlassChart/> (Log Detective):</strong> Use logs (`HasBeenPlanter`) to see the difference between *what was planned* by the system and *what actually happened*, finding root causes of bugs.",
+    philosophyLvl11: "<strong>Lv.11 <FaMagnifyingGlass/> (Code Scanner):</strong> Your eyes <FaEye /> become <em>code scanners</em>. Instantly spot missing imports, typos, or logic flaws just by scrolling. You see the matrix.",
+    philosophyLvl12: "<strong>Lv.12 <FaMemory/> (Context Commander):</strong> 65k tokens? <em class='text-purple-300'>Pfft, child's play.</em> You effortlessly juggle massive code context, guiding the AI through complex refactors like a <FaUserAstronaut /> surfing a nebula.",
+    philosophyLvl13: "<strong>Lv.13 <FaKeyboard/> (Vibe Channeler):</strong> Forget typing; you <em>channel</em> the vibe <FaHeart className='text-pink-400' />. Detailed prompts, intricate edits, non-stop creation for 10+ minutes. You're not working; you're in <em>flow</em>, bending the digital world to your will.",
+    philosophyLvl14: "<strong>Lv.14 <FaBriefcase/> (Efficiency Ninja):</strong> Why make two trips? You seamlessly weave small, unrelated tasks into larger AI requests. <em class='text-cyan-300'>Maximum efficiency, minimum context switching.</em> Your workflow is a finely tuned engine.",
+    philosophyLvl15: "<strong>Lv.15 <FaMagnifyingGlassChart/> (Log Whisperer <FaBrain/>):</strong> WITH AI! You don't just read logs; you <em class='text-yellow-300'>interrogate</em> them. Spotting the delta between the *plan* (HasBeenPlanter logs) and the *reality* becomes second nature. Root causes reveal themselves.",
     philosophyEnd: "Step-by-step, level-up is <strong>inevitable</strong>. You're too lazy for the old shit. One extra click, one new skill, and you're automatically stronger. Welcome, <strong>Neo</strong>.",
     stepsTitle: "Quick Start Guide:",
     step1Title: "1. Grab Repo / Point Wish:",
@@ -66,7 +66,7 @@ const translations = {
     step2DescEnd: "<strong>DONE.</strong> Site updates automagically.",
     readyButton: "LET'S F*CKING GO!",
     componentsTitle: "Engage Vibe Engines!",
-    ctaTitle: "Ready to Ascend, {USERNAME}?",
+    ctaTitle: "Ready to Level Up, {USERNAME}?",
     ctaDesc: "Seriously. Stop doubting. Start <strong>DOING</strong>. That first level is calling. Level up NOW!",
     ctaHotChick: "Got the fire? Let's build something epic. Hit me up <strong>@SALAVEY13</strong> NOW!",
     ctaDude: "(Everyone else? Just f*cking try it. Level 1 is a button click away. You got this!)",
@@ -98,11 +98,11 @@ const translations = {
     philosophyLvl5_6: "<strong>Лв.5 -> 6 <FaMicrophone/>/<FaVideo/> (+Мультимедиа):</strong> Используй аудио-команды! Прикрепляй видосы! Смотри, как они автоматом становятся контентом страницы. +1 Перк: Мультимодальный Ввод.",
     philosophyLvl6_7: "<strong>Лв.6 -> 7 <FaDatabase/> (+SQL/БД):</strong> Открой новые типы файлов! AI генерит SQL -> Вставь в Supabase (1 клик) -> <strong>ГОТОВО.</strong> Тот же флоу, другой контекст. +1 Перк: Работа с Данными.",
     philosophyLvl8_10: "<strong>Лв.8-10+ <FaServer/>/<FaRocket/> (+Независимость):</strong> Разверни свой CyberVibe! Юзай/спи*ди мою Supabase! Поставь свой Токен Бота! Строй свои XTR-ы! <strong>БЕЗГРАНИЧНАЯ МОЩЬ!</strong>",
-    philosophyLvl11: "<strong>Лв.11 <FaFastForward/> (Спидраннер):</strong> Мгновенно замечаешь пропуски/недочеты при быстрой прокрутке больших объемов текста/кода. +1 Перк: Детекция Пропусков.",
-    philosophyLvl12: "<strong>Лв.12 <FaMemory/> (Гуру Контекста):</strong> Не боишься 65k+ токенов в ответе AI, легко управляешь большими фрагментами кода и контекста. +1 Перк: Управление Большим Контекстом.",
-    philosophyLvl13: "<strong>Лв.13 <FaKeyboard/> (Марафонец):</strong> Печатаешь/диктуешь развернутые запросы и правки без остановки >10 минут, поддерживая фокус. +1 Перк: Фокус Потока.",
-    philosophyLvl14: "<strong>Лв.14 <FaBriefcase/> (Сайд-Хастлер):</strong> В один запрос к AI добавляешь мелкие, не связанные задачи 'заодно', чтобы оптимизировать поток. +1 Перк: Оптимизация Запросов.",
-    philosophyLvl15: "<strong>Лв.15 <FaMagnifyingGlassChart/> (Лог-Детектив):</strong> По логам (`HasBeenPlanter`) видишь разницу между тем, *что было запланировано* системой, и тем, *что реально произошло*, находя корневые причины багов. +1 Перк: Продвинутый Дебаг.",
+    philosophyLvl11: "<strong>Лв.11 <FaMagnifyingGlass/> (Сканер Кода):</strong> Твои глаза <FaEye /> становятся <em>сканерами кода</em>. Мгновенно видишь пропущенные импорты, опечатки, логические дыры, просто скролля. Ты видишь матрицу.",
+    philosophyLvl12: "<strong>Лв.12 <FaMemory/> (Коммандер Контекста):</strong> 65к токенов? <em class='text-purple-300'>Пфф, детский сад.</em> Ты легко жонглируешь гигантским контекстом кода, ведя AI через сложнейшие рефакторинги, как <FaUserAstronaut /> на серфе по небуле.",
+    philosophyLvl13: "<strong>Лв.13 <FaKeyboard/> (Ченнелер Вайба):</strong> Забудь про 'печатать', ты <em>ченнелишь</em> вайб <FaHeart className='text-pink-400' />. Детальные промпты, сложные правки, непрерывное творение >10 минут. Ты не работаешь, ты в <em>потоке</em>, изменяя цифровую реальность под себя.",
+    philosophyLvl14: "<strong>Лв.14 <FaBriefcase/> (Ниндзя Эффективности):</strong> Зачем ходить дважды? Ты легко вплетаешь мелкие, несвязанные задачи в крупные запросы к AI. <em class='text-cyan-300'>Максимум эффективности, минимум переключений.</em> Твой воркфлоу - идеально настроенный движок.",
+    philosophyLvl15: "<strong>Лв.15 <FaMagnifyingGlassChart/> (Шепчущий с Логами <FaBrain/>):</strong> С ПОМОЩЬЮ AI! Ты не читаешь логи, ты их <em class='text-yellow-300'>допрашиваешь</em>. Увидеть разницу между *планом* (логи HasBeenPlanter) и *реальностью* становится второй натурой. Корневые причины сами себя выдают.",
     philosophyEnd: "Шаг за шагом, левел-ап <strong>неизбежен</strong>. Тебе слишком лень для старой х*йни. Один лишний клик, один новый скилл - и ты автоматом сильнее. Добро пожаловать, <strong>Нео</strong>.",
     stepsTitle: "Краткий Гайд:",
     step1Title: "1. Хватай Репу / Укажи Желание:",
@@ -113,7 +113,7 @@ const translations = {
     step2DescEnd: "<strong>ГОТОВО.</strong> Сайт обновляется авто-магически.",
     readyButton: "ПОГНАЛИ, БЛ*ТЬ!",
     componentsTitle: "Врубай Движки Вайба!",
-    ctaTitle: "Готов(а) ах...пнуться, {USERNAME}?",
+    ctaTitle: "Готов(а) Апнуться, {USERNAME}?", // Изменено здесь
     ctaDesc: "Серьезно. Хватит сомневаться. Начни <strong>ДЕЛАТЬ</strong>. Первый левел зовет. Качайся СЕЙЧАС!",
     ctaHotChick: "Есть искра? Давай замутим что-то эпичное. Пиши <strong>@SALAVEY13</strong> СЕЙЧАС!",
     ctaDude: "(Все остальные? Просто, бл*ть, попробуйте. Левел 1 - это клик мышки. У вас получится!)",
@@ -284,19 +284,17 @@ function ActualPageContent() {
                  log(`[Effect URL Params] Decoded path: ${pathForHighlight}`);
 
                 if (ideaParam) {
-                    // --- FIX: Decode ideaParam HERE, ONCE ---
+                    // --- Decode ideaParam HERE, ONCE ---
                     let decodedIdea = "";
                     try {
                          decodedIdea = decodeURIComponent(ideaParam);
                          log(`[Effect URL Params] Decoded idea: ${decodedIdea.substring(0, 100)}...`);
                     } catch (e) {
                          error("Error decoding 'idea' parameter:", e);
-                         // Decide how to handle: maybe treat as simple text? or skip?
-                         // For now, let's log and try to proceed without structured flow
                          simpleIdeaText = ideaParam; // Use raw value if decode fails? Risky.
                          flowType = null;
                     }
-                    // --- END FIX ---
+                    // --- END DECODE ---
 
                     if (decodedIdea.startsWith("ImageReplace|")) {
                         flowType = 'ImageSwap';
@@ -304,18 +302,28 @@ function ActualPageContent() {
                         try {
                             // Split the already decoded string
                             const parts = decodedIdea.split('|');
-                            // Decode *parts* only if they weren't fully decoded by the outer call
-                            // This assumes URLs inside were encoded *before* being put into the string
-                            const oldUrl = decodeURIComponent(parts.find(p => p.startsWith("OldURL="))?.substring(7) || '');
-                            const newUrl = decodeURIComponent(parts.find(p => p.startsWith("NewURL="))?.substring(7) || '');
-                            if (oldUrl && newUrl) {
-                                flowDetails = { oldUrl, newUrl };
-                                suggestedBranch = targetBranchParam ? decodeURIComponent(targetBranchParam) : repoUtils.guessBranchNameFromPath(flowTargetPath) || 'image-update-' + Date.now().toString(36);
-                                log(`[Flow 1 - Image Swap] RepoXML: ImageSwap details parsed. Old: ${oldUrl.substring(0,30)}, New: ${newUrl.substring(0,30)}, Suggested Branch: ${suggestedBranch}`);
+                            // --- Get the values directly, they should be decoded by the initial decodeURIComponent ---
+                            const oldUrlPart = parts.find(p => p.startsWith("OldURL="));
+                            const newUrlPart = parts.find(p => p.startsWith("NewURL="));
+
+                            // Check if parts were found before trying to extract value
+                            if (oldUrlPart && newUrlPart) {
+                                const oldUrl = oldUrlPart.substring(7); // No decodeURIComponent needed
+                                const newUrl = newUrlPart.substring(7); // No decodeURIComponent needed
+
+                                if (oldUrl && newUrl) {
+                                    flowDetails = { oldUrl, newUrl };
+                                    suggestedBranch = targetBranchParam ? decodeURIComponent(targetBranchParam) : repoUtils.guessBranchNameFromPath(flowTargetPath) || 'image-update-' + Date.now().toString(36);
+                                    log(`[Flow 1 - Image Swap] RepoXML: ImageSwap details parsed. Old: ${oldUrl.substring(0,30)}, New: ${newUrl.substring(0,30)}, Suggested Branch: ${suggestedBranch}`);
+                                } else {
+                                    flowType = null; // Reset flow type if parsing fails
+                                    warn("[Flow 1 - Image Swap] RepoXML: ImageSwap parsing failed (missing Old/New URL value after substring)");
+                                }
                             } else {
-                                flowType = null; // Reset flow type if parsing fails
-                                warn("[Flow 1 - Image Swap] RepoXML: ImageSwap parsing failed (missing Old/New URL after split/decode)");
+                                 flowType = null; // Reset flow type if parts not found
+                                 warn("[Flow 1 - Image Swap] RepoXML: ImageSwap parsing failed (could not find OldURL= or NewURL= parts)");
                             }
+                             // --- END FIX ---
                         } catch(e) {
                             flowType = null; // Reset flow type on error
                             error("[Flow 1 - Image Swap] RepoXML: Error parsing ImageSwap details:", e);
@@ -386,7 +394,18 @@ function ActualPageContent() {
              const flowLogPrefix = flowType === 'ImageSwap' ? '[Flow 1 - Image Swap]' : '[Flow 3 - Error Fix]';
              log(`${flowLogPrefix} RepoXML: Setting Pending Flow: ${flowType}, Branch Suggestion: ${suggestedBranch}. Triggering PreCheck.`);
              setPendingFlowDetails({ type: flowType, targetPath: flowTargetPath, details: flowDetails });
-             setImageReplaceTask(null); // Ensure no direct image task conflicts
+             // --- FIX: Set imageReplaceTask ONLY for ImageSwap Flow ---
+             if (flowType === 'ImageSwap') {
+                 setImageReplaceTask({
+                     targetPath: flowTargetPath,
+                     oldUrl: flowDetails.oldUrl,
+                     newUrl: flowDetails.newUrl
+                 });
+                 log(`${flowLogPrefix} setImageReplaceTask called with:`, flowDetails);
+             } else {
+                  setImageReplaceTask(null); // Ensure it's null for other flows
+             }
+             // --- END FIX ---
              // Trigger pre-check which will then trigger fetch with the right branch
              triggerPreCheckAndFetch(newRepoUrl || repoUrl, suggestedBranch, flowType, flowDetails, flowTargetPath)
                  .then(() => log(`${flowLogPrefix} RepoXML: PreCheck for ${flowType} completed.`))
@@ -416,19 +435,15 @@ function ActualPageContent() {
         setInitialUrlProcessed(true);
         debug("[Effect URL Params] Processing END, marked as processed.");
 
-    }, [ // --- REMOVED triggerFetch FROM DEPENDENCIES ---
+    }, [ // Dependencies remain the same
         searchParamsReady, searchParams, searchParamsError, initialUrlProcessed, // Effect guards
         setDerivedHighlightedPath, setDerivedIdea, setInitialUrlProcessed, // Stable local setters
         setRepoUrl, setTargetPrData, setPendingFlowDetails, setImageReplaceTask, // Stable context setters
         setTargetBranchName, setManualBranchName, setShowComponents, // Stable context setters
         triggerPreCheckAndFetch, // Stable context trigger
-        // triggerFetch IS NO LONGER HERE
         repoUrl, targetPrData, showComponents, // Context values read for comparison
         addToast, error, warn, log, debug, // Utilities
-        // ADD triggerFetch BACK HERE IF the function call itself needs to be stable reference
-        // But it should be stable from the provider, so not needed as dependency.
-        // We directly call the stable function triggerFetch below now.
-        triggerFetch // <<< ADDED triggerFetch back here BUT ONLY for access inside, NOT as dependency causing re-run
+        triggerFetch // Still needed for access inside, not as dependency causing re-run
     ]);
 
 
@@ -443,9 +458,19 @@ function ActualPageContent() {
             }
             return;
         }
-        // Removed kworkInputRef check - setter should work regardless
+        // --- FIX: Skip if imageReplaceTask IS active ---
+        if (imageReplaceTask) {
+             debug("[Effect Populate Kwork] Skipping: ImageReplaceTask is active.");
+             // Mark as processed even if skipped due to image task
+             if (!hasProcessedInitialIdea.current) {
+                 hasProcessedInitialIdea.current = true;
+                 log("[Effect Populate Kwork] Marked idea as processed (skipped due to image task).");
+             }
+             return;
+        }
+        // --- END FIX ---
 
-        debug("[Effect Populate Kwork] Conditions met, checking derived idea...");
+        debug("[Effect Populate Kwork] Conditions met (no image task), checking derived idea...");
 
         // Only populate if a 'Simple' idea was derived from URL params
         if (typeof derivedIdea === 'string' && derivedIdea.trim() !== '') {
@@ -453,18 +478,17 @@ function ActualPageContent() {
              log(`${flowLogPrefix} RepoXML: Populating kwork with simple idea: ${derivedIdea.substring(0, 30)}...`);
 
             setKworkInputValue(prev => {
-                // Robust check for prev being undefined or null
-                const currentVal = prev ?? ''; // <<< THE FIX FOR TRIM() ERROR
-                const ideaToAdd = derivedIdea || ""; // derivedIdea is already guaranteed string if we got here
+                const currentVal = prev ?? '';
+                const ideaToAdd = derivedIdea || "";
                 const valueToSet = currentVal.includes(ideaToAdd)
-                    ? currentVal // Already contains, return unchanged
-                    : currentVal + (currentVal.trim() ? "\n\n" : "") + ideaToAdd; // Add with separator if currentVal has content
+                    ? currentVal
+                    : currentVal + (currentVal.trim() ? "\n\n" : "") + ideaToAdd;
 
                  log(`${flowLogPrefix} RepoXML: [Effect Populate Kwork - Setter] Prev: '${prev?.substring(0,20)}...', Idea: '${ideaToAdd.substring(0,20)}...', Setting: '${valueToSet.substring(0,40)}...'`);
                  return valueToSet;
             });
 
-            // Auto-add highlighted file context (no changes needed here)
+            // Auto-add highlighted file context
             if (derivedHighlightedPath && fetcherRef?.current && allFetchedFiles.some(f => f.path === derivedHighlightedPath)) {
                 if (!selectedFetcherFiles.has(derivedHighlightedPath)) {
                     log(`${flowLogPrefix} RepoXML: [Effect Populate Kwork] Auto-adding highlighted file context:`, derivedHighlightedPath);
@@ -472,7 +496,7 @@ function ActualPageContent() {
                 } else { log(`${flowLogPrefix} RepoXML: [Effect Populate Kwork] Highlighted file already selected, skipping auto-add context.`); }
             } else if (derivedHighlightedPath) { warn(`${flowLogPrefix} RepoXML: [Effect Populate Kwork] Highlighted path exists, but file/ref not found for auto-add context.`); }
 
-            // Scroll to input (no changes needed here)
+            // Scroll to input
             const kworkElement = document.getElementById('kwork-input-section');
             if (kworkElement) { setTimeout(() => { try { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e){ error("Scroll error:", e); } }, 250); }
 
@@ -487,6 +511,7 @@ function ActualPageContent() {
     }, [ // Dependencies: React to fetch status, pre-check status, the derived idea/path, and URL processing completion.
         fetchStatus, isPreChecking, initialUrlProcessed, derivedIdea, derivedHighlightedPath, // Core triggers
         fetcherRef, allFetchedFiles, selectedFetcherFiles, // Refs/state needed *inside*
+        imageReplaceTask, // <<< ADD imageReplaceTask dependency to skip population when active
         setKworkInputValue, // Stable context setter
         // DO NOT add kworkInputValue here - prevents infinite loop
         error, warn, log, debug, // Utilities
@@ -618,28 +643,27 @@ function ActualPageContent() {
                                     <li><VibeContentRenderer content={t.philosophyLvl5_6} /></li>
                                     <li><VibeContentRenderer content={t.philosophyLvl6_7} /></li>
                                     <li><VibeContentRenderer content={t.philosophyLvl8_10} /></li>
-                                    {/* --- ADDED META LEVELS --- */}
+                                    {/* --- UPDATED META LEVELS --- */}
                                     <li><VibeContentRenderer content={t.philosophyLvl11} /></li>
                                     <li><VibeContentRenderer content={t.philosophyLvl12} /></li>
                                     <li><VibeContentRenderer content={t.philosophyLvl13} /></li>
                                     <li><VibeContentRenderer content={t.philosophyLvl14} /></li>
                                     <li><VibeContentRenderer content={t.philosophyLvl15} /></li>
-                                    {/* --- END META LEVELS --- */}
+                                    {/* --- END UPDATED META LEVELS --- */}
                                 </ul>
                                 <hr className="border-gray-700 my-3"/>
                                 <div className="font-bold text-brand-green"><VibeContentRenderer content={t.philosophyEnd} /></div>
                                 <hr className="border-gray-700 my-4"/>
                                 <h4 className="text-lg font-semibold text-cyan-400 pt-2"><VibeContentRenderer content={t.stepsTitle} /></h4>
-                                 {/* --- DITCHED FLEXBOX FIX --- */}
-                                <div className="text-sm space-y-2">
-                                     <VibeContentRenderer content={"1. Настрой <FaCodeBranch title='Настройки' class='inline text-cyan-400'/> ."} /> {/* Added space before period */}
-                                     <VibeContentRenderer content={"2. Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>."} />
-                                     <VibeContentRenderer content={"3. Выбери файлы или <span class='font-bold text-teal-400 mx-1'>связанные</span> / <span class='font-bold text-orange-400 mx-1'>важные</span>."} />
-                                     {/* Removed brackets around icons */}
-                                     <VibeContentRenderer content={"4. Опиши задачу ИЛИ добавь файлы <FaPlus title='Добавить выбранные в запрос' class='inline text-sm'/> / все <FaTree title='Добавить все файлы в запрос' class='inline text-sm'/>."} />
-                                     <VibeContentRenderer content={"5. Скопируй <FaCopy title='Скопировать запрос' class='inline text-sm mx-px'/> или передай дальше."} />
-                                </div>
-                                 {/* --- END FLEXBOX FIX --- */}
+                                 {/* --- Quick Start Guide: Reverted to <ol> for proper numbering --- */}
+                                <ol className="list-decimal list-inside text-sm space-y-1">
+                                     <li><VibeContentRenderer content={"Настрой <FaCodeBranch title='Настройки' class='inline text-cyan-400'/>"} /></li>
+                                     <li><VibeContentRenderer content={"Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>"} /></li>
+                                     <li><VibeContentRenderer content={"Выбери файлы или <span class='font-bold text-teal-400 mx-1'>связанные</span> / <span class='font-bold text-orange-400 mx-1'>важные</span>"} /></li>
+                                     <li><VibeContentRenderer content={"Опиши задачу ИЛИ добавь файлы <FaPlus title='Добавить выбранные в запрос' class='inline text-sm'/> / все <FaTree title='Добавить все файлы в запрос' class='inline text-sm'/>"} /></li>
+                                     <li><VibeContentRenderer content={"Скопируй <FaCopy title='Скопировать запрос' class='inline text-sm mx-px'/> или передай дальше"} /></li>
+                                </ol>
+                                 {/* --- END Quick Start Guide Fix --- */}
                             </div>
                         </details>
                     </section>
@@ -755,7 +779,7 @@ export default function RepoXmlPage() {
      log("[RepoXmlPage] START Render (Exported Component)");
     const fallbackLoadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
     const fallbackLoadingText = translations[fallbackLoadingLang]?.loading ?? translations.en.loading;
-    const fallbackLoading = ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{fallbackLoadingText}</p> </div> );
+    const fallbackLoading = ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
 
     try {
         return (
