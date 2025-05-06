@@ -21,7 +21,10 @@ import { toast } from "sonner";
 // Import Context & Actions
 import { useAppContext } from "@/contexts/AppContext";
 import { getGitHubUserProfile } from "@/app/actions_github/actions";
-import { debugLogger as logger, LogRecord } from "@/lib/debugLogger"; // Import logger and type
+// --- ИСПРАВЛЕНИЕ ИМПОРТА ЛОГГЕРА ---
+// Убедимся, что импортируем именно ИНСТАНС логгера
+import { debugLogger, type LogRecord } from "@/lib/debugLogger"; // Импортируем инстанс и тип
+// --- КОНЕЦ ИСПРАВЛЕНИЯ ИМПОРТА ---
 import { useAppToast } from "@/hooks/useAppToast"; // Use our toast hook
 
 // --- Constants & Types ---
@@ -62,7 +65,15 @@ const StickyChatButton: React.FC = () => {
     // --- Copy Logs Handler ---
     const handleCopyLogs = useCallback(async () => {
         const plannedAction = "[StickyChat] Plan: Copy internal logs to clipboard.";
-        logger.info(plannedAction);
+        // --- ИСПРАВЛЕНИЕ: Проверяем, что логгер доступен ---
+        if (typeof debugLogger === 'undefined' || typeof debugLogger.getInternalLogRecords !== 'function') {
+             console.error("[StickyChat] Error: debugLogger is not defined or not initialized!");
+             toastError("Ошибка: Логгер недоступен для копирования.");
+             return;
+        }
+        // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+
+        logger.info(plannedAction); // Используем уже импортированный 'logger'
         let success = false;
         try {
             if (!navigator?.clipboard?.writeText) {

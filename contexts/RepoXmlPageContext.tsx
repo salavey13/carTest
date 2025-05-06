@@ -299,22 +299,29 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
            } else { logger.warn(`Scroll target not found: ${sectionId}`); }
         }, []); // No dependencies, uses browser APIs
 
-        // --- Stable Callback: handleSetFilesFetchedStable ---
-        // (Continuation from previous response)
-        const handleSetFilesFetchedStable = useCallback(( fetched: boolean, allFiles: FileNode[], primaryHighlight: string | null, secondaryHighlights: Record<ImportCategory, string[]> ) => {
-             const flowLogPrefix = currentTask ? '[Flow 1 - Image Swap]' : (currentPendingFlow?.type === 'ErrorFix' ? '[Flow 3 - Error Fix]' : '[Flow 2 - Generic Idea]');
-             logger.debug(`${flowLogPrefix} Context: handleSetFilesFetchedStable called. fetched=${fetched}, allFiles=${allFiles?.length}, primary=${primaryHighlight}`);
-             const currentTask = imageReplaceTaskStateRef.current; // Use ref for latest value
-             const currentPendingFlow = pendingFlowDetailsRef.current; // Use ref for pending flow
+        // --- Stable Callback: handleSetFilesFetchedStable (FIXED) ---
+        const handleSetFilesFetchedStable = useCallback((
+            fetched: boolean,
+            allFiles: FileNode[],
+            primaryHighlight: string | null,
+            secondaryHighlights: Record<ImportCategory, string[]>
+        ) => {
+            const currentTask = imageReplaceTaskStateRef.current; // Use ref for latest value
+            const currentPendingFlow = pendingFlowDetailsRef.current; // Use ref for pending flow
+            const flowLogPrefix = currentTask ? '[Flow 1 - Image Swap]' : (currentPendingFlow?.type === 'ErrorFix' ? '[Flow 3 - Error Fix]' : '[Flow 2 - Generic Idea]');
 
+            logger.debug(`${flowLogPrefix} Context: handleSetFilesFetchedStable called. fetched=${fetched}, allFiles=${allFiles?.length}, primary=${primaryHighlight}`);
+
+            // Update file-related state first
             setFilesFetchedState(fetched);
             if (fetched) { logger.log(`[Context] Setting allFetchedFilesState: ${allFiles?.length} files`); setAllFetchedFilesStateStable(allFiles ?? []); }
             else { logger.log(`[Context] Clearing allFetchedFilesState because fetched=${fetched}`); setAllFetchedFilesStateStable([]); }
             setPrimaryHighlightPathState(primaryHighlight);
             setSecondaryHighlightPathsState(secondaryHighlights ?? { component: [], context: [], hook: [], lib: [], other: [] });
 
-            let finalFetchStatus: FetchStatus = fetched ? 'success' : 'error';
+            let finalFetchStatus: FetchStatus = 'idle'; // <<< Initialize final status
 
+            // Process flows (Image Swap, Error Fix, Standard)
             if (currentTask) {
                 // --- Image Task Handling ---
                 logger.info(`${flowLogPrefix} Context: handleSetFilesFetchedStable - Processing Image Task`);
@@ -322,24 +329,26 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     const targetFileExists = (allFiles ?? []).some(f => f.path === currentTask.targetPath);
                     if (!targetFileExists) {
                        logger.error(`${flowLogPrefix} Context: Image Task Failure: Target file ${currentTask.targetPath} not found!`);
-                       finalFetchStatus = 'error'; addToastStable(`Ошибка Задачи Изображения: Целевой файл ${currentTask.targetPath} не найден!`, 'error', 5000);
-                       setImageReplaceTaskStateStable(null); setAssistantLoadingStateStable(false);
+                       finalFetchStatus = 'error'; // <<< Set final status
+                       addToastStable(`Ошибка Задачи Изображения: Целевой файл ${currentTask.targetPath} не найден!`, 'error', 5000);
+                       setImageReplaceTaskStateStable(null);
+                       setAssistantLoadingStateStable(false);
                     } else {
                        logger.info(`${flowLogPrefix} Context: Image Task: Target file ${currentTask.targetPath} found. Triggering replacement.`);
-                       finalFetchStatus = 'success';
+                       finalFetchStatus = 'success'; // <<< Set final status (initially)
                        if (assistantRef.current?.handleDirectImageReplace) {
                            logger.log(`${flowLogPrefix} Context: Calling assistantRef.handleDirectImageReplace for task:`, currentTask);
                            setAssistantLoadingStateStable(true);
-                           // Call the handler and wait for its result (which includes success/error)
                            assistantRef.current.handleDirectImageReplace(currentTask, allFiles ?? [])
                                .then(({ success: replaceSuccess, error: replaceError }) => {
                                    logger.log(`${flowLogPrefix} Context: handleDirectImageReplace promise resolved. Success: ${replaceSuccess}`);
                                    if (!replaceSuccess) {
                                        addToastStable(`Ошибка замены/PR: ${replaceError || 'Неизвестно'}`, 'error');
+                                       // Don't change finalFetchStatus here, it was already 'success' from finding the file
                                        setImageReplaceTaskStateStable(null); // Clear task on failure too
                                    } else {
-                                       // Success case - task already cleared in handler
                                         logger.info(`${flowLogPrefix} Context: Image replacement process finished successfully.`);
+                                       // Task cleared in handler on success
                                    }
                                })
                                .catch(replaceError => { logger.error(`${flowLogPrefix} Context: Issue calling handleDirectImageReplace:`, replaceError); addToastStable(`Проблема при вызове замены изображения: ${replaceError?.message ?? 'Неизвестно'}`, 'error', 6000); setImageReplaceTaskStateStable(null); })
@@ -347,18 +356,21 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                        } else {
                             logger.fatal(`${flowLogPrefix} Context: CRITICAL PROBLEM: Cannot call handleDirectImageReplace.`, { hasRef: !!assistantRef.current, hasMethod: typeof assistantRef.current?.handleDirectImageReplace });
                             addToastStable(`КРИТИЧЕСКАЯ ПРОБЛЕМА: Не удалось вызвать замену изображения.`, 'error', 7000);
-                            finalFetchStatus = 'error'; setImageReplaceTaskStateStable(null); setAssistantLoadingStateStable(false);
+                            finalFetchStatus = 'error'; // <<< Set final status
+                            setImageReplaceTaskStateStable(null);
+                            setAssistantLoadingStateStable(false);
                        }
                     }
                 } else {
-                    logger.error(`${flowLogPrefix} Context: Image Task Failure: Failed to fetch any files.`); finalFetchStatus = 'error';
+                    logger.error(`${flowLogPrefix} Context: Image Task Failure: Failed to fetch any files.`);
+                    finalFetchStatus = 'error'; // <<< Set final status
                     addToastStable(`Ошибка Задачи Изображения: Не удалось загрузить файлы.`, 'error', 5000);
-                    setImageReplaceTaskStateStable(null); setAssistantLoadingStateStable(false);
+                    setImageReplaceTaskStateStable(null);
+                    setAssistantLoadingStateStable(false);
                 }
-                // Ensure pending flow is cleared if an image task was active
                 if (currentPendingFlow) { logger.debug(`${flowLogPrefix} Context: Clearing pending flow after image task.`); setPendingFlowDetailsStateStable(null); }
 
-           } else if (currentPendingFlow?.type === 'ErrorFix' && fetched) {
+            } else if (currentPendingFlow?.type === 'ErrorFix' && fetched) {
                 // --- Error Fix Handling ---
                  const errorFixLogPrefix = '[Flow 3 - Error Fix]';
                  logger.info(`${errorFixLogPrefix} Context: handleSetFilesFetchedStable - Processing ErrorFix flow for: ${currentPendingFlow.targetPath}`);
@@ -366,12 +378,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                  if (targetFileExists) {
                      logger.debug(`${errorFixLogPrefix} Context: ErrorFix target file found. Populating kwork.`);
                      const { Message, Stack, Logs, Source } = currentPendingFlow.details;
-                     // Construct prompt with specific details
                      const prompt = `Fix error in ${currentPendingFlow.targetPath}:\n\nMessage: ${Message}\nSource: ${Source || 'N/A'}\n\nStack:\n\`\`\`\n${Stack || 'N/A'}\n\`\`\`\n\nLogs:\n${Logs || 'N/A'}\n\nProvide ONLY the corrected code block or full file content.`;
                      logger.info(`${errorFixLogPrefix} Context: Setting kworkInputValue with ErrorFix prompt:`, prompt.substring(0, 100) + "...");
-                     setKworkInputValueStateStable(prompt); // Call the guaranteed string setter
-                     finalFetchStatus = 'success';
-                     // Try to auto-select the file and scroll
+                     setKworkInputValueStateStable(prompt);
+                     finalFetchStatus = 'success'; // <<< Set final status
+                     // Auto-select file and scroll
                      if (fetcherRef?.current?.handleAddSelected) {
                          logger.debug(`${errorFixLogPrefix} Context: Triggering handleAddSelected for ErrorFix target file.`);
                          setTimeout(() => {
@@ -379,9 +390,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                                  fetcherRef.current?.handleAddSelected?.(new Set([currentPendingFlow.targetPath]), allFiles);
                                  logger.info(`${errorFixLogPrefix} Context: ErrorFix target file added to kwork via imperative handle.`);
                                  scrollToSectionStable('executor');
-                             } catch (addErr) {
-                                 logger.error(`${errorFixLogPrefix} Context: Error calling handleAddSelected for ErrorFix:`, addErr);
-                             }
+                             } catch (addErr) { logger.error(`${errorFixLogPrefix} Context: Error calling handleAddSelected for ErrorFix:`, addErr); }
                          }, 100);
                      } else {
                          logger.warn(`${errorFixLogPrefix} Context: Fetcher ref or handleAddSelected missing for ErrorFix auto-add.`);
@@ -391,7 +400,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                  } else {
                      logger.error(`${errorFixLogPrefix} Context: ErrorFix target file NOT FOUND: ${currentPendingFlow.targetPath}`);
                      addToastStable(`Ошибка Исправления: Целевой файл ${currentPendingFlow.targetPath} не найден!`, 'error', 5000);
-                     finalFetchStatus = 'error';
+                     finalFetchStatus = 'error'; // <<< Set final status
                      setPendingFlowDetailsStateStable(null); // Clear flow on error
                  }
             } else {
@@ -406,8 +415,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                      logger.warn(`${standardLogPrefix} Context: Clearing potentially stale image task after standard fetch success.`);
                      setImageReplaceTaskStateStable(null);
                   }
+                  // <<< FIX: Explicitly set final status for standard flow >>>
+                  finalFetchStatus = fetched ? 'success' : 'error';
             }
 
+           // --- Ensure final status is always set ---
            setFetchStatusStateStable(finalFetchStatus);
            logger.log(`[Context] handleSetFilesFetchedStable finished. Final Status: ${finalFetchStatus}, Files Fetched Flag: ${fetched}`);
         }, [ // Dependencies MUST include all stable setters/triggers used inside

@@ -353,7 +353,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                         {currentImageTask ? "Задача: Замена Картинки" : "Кибер-Экстрактор Кода"}
                      </h2>
                       {!currentImageTask && (
-                         <div className="flex flex-col text-yellow-300/80 text-xs md:text-sm space-y-1 mb-2">
+                         <div className="text-yellow-300/80 text-xs md:text-sm space-y-1 mb-2">
                             <VibeContentRenderer content={"1. Настрой <FaCodeBranch title='Настройки' class='inline text-cyan-400'/>."} />
                             <VibeContentRenderer content={"2. Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>."} />
                             <VibeContentRenderer content={"3. Выбери файлы или <span class='font-bold text-teal-400 mx-1'>связанные</span> / <span class='font-bold text-orange-400 mx-1'>важные</span>."} />
