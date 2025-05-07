@@ -175,10 +175,6 @@ export default function Header() {
     }
   }, [user?.language_code, currentLang]);
 
-  const t = useCallback((key: string): string => {
-    return translations[currentLang]?.[key] || translations['en']?.[key] || key;
-  }, [currentLang]);
-
   const toggleLang = useCallback(() => {
     setCurrentLang(prevLang => prevLang === 'en' ? 'ru' : 'en');
   }, []);
