@@ -175,10 +175,6 @@ export default function Header() {
     }
   }, [user?.language_code, currentLang]);
 
-  const toggleLang = useCallback(() => {
-    setCurrentLang(prevLang => prevLang === 'en' ? 'ru' : 'en');
-  }, []);
-
   const currentLogoText = useMemo(() => {
     const currentPage = allPages.find(p => p.path === pathname);
     if (pathname?.startsWith('/vpr')) {
