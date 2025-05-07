@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FaPlay, FaPause, FaForward, FaStop, FaFlagCheckered } from "react-icons/fa";
+import { FaPlay, FaPause, FaForward, FaStop, FaFlagCheckered, FaDumbbell } from "react-icons/fa";
 import { toast } from "sonner";
 
 export default function StartTrainingPage() {
