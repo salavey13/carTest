@@ -94,33 +94,29 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const importantFiles = useMemo(() => [
         // --- Структура и главная страница фичи ---
         "app/layout.tsx",           // Общий layout важен
-        "app/repo-xml/page.tsx",    // Сама страница, где мы сейчас
-        "components/RepoTxtFetcher.tsx", // Этот компонент
-        "components/AICodeAssistant.tsx",// Компонент Ассистента
-        "components/AutomationBuddy.tsx", // Компонент Бадди
-
+ "tailwind.config.ts",
+"app/globals.css”,
+"app/style-guide/page.tsx",       
         // --- Ключевой Контекст ---
-        "contexts/RepoXmlPageContext.tsx", // Контекст ЭТОЙ страницы
+"contexts/AppContext.tsx,"
 
         // --- Основные Хуки для этой страницы ---
-        "hooks/useRepoFetcher.ts",
-        "hooks/useFileSelection.ts",
-        "hooks/useKworkInput.ts",
-        "hooks/useCodeParsingAndValidation.ts",
+        "hooks/useAppToast.ts",
+
         "hooks/supabase.ts", // Часто нужен для работы с данными
 
         // --- Основные Экшены ---
         "app/actions.ts",
-        "app/actions_github/actions.ts",
-        // "app/ai_actions/actions.ts", // Опционально, если AI часто используется в новых страницах
+"lib/debugLogger.ts",
+
 
         // --- Базовые Утилиты и Типы ---
-        "lib/utils.ts",
-        "lib/repoUtils.ts", // Утилиты для работы с файлами/путями
-        "types/database.types.ts", // Типы БД важны для экшенов
+"components/VibeContentRenderer.tsx",
+
+"components/Header.tsx",        "types/database.types.ts", // Типы БД важны для экшенов
 
         // --- Промпт (если AI должен понимать, как с ним работать) ---
-         "components/repo/prompt.ts",
+         //"components/repo/prompt.ts",
 
     ].filter(Boolean), []); // filter(Boolean) на случай, если какие-то файлы не существуют
     // --- КОНЕЦ ОБНОВЛЕННОГО СПИСКА ---
