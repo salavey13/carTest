@@ -9,7 +9,7 @@ import { usePathname } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
 import {
-  FaCar, FaCircleUser, FaWandMagicSparkles, FaRocket, FaRoad, FaBookOpen,
+  FaDumbbell, FaCircleUser, FaWandMagicSparkles, FaRocket, FaRoad, FaBookOpen,
   FaBrain, FaRobot, FaMagnifyingGlass, FaGift, FaUserShield, FaCarOn,
   FaYoutube, FaFileInvoiceDollar, FaCreditCard, FaHeart, FaPalette,
   FaCircleInfo, FaListCheck, FaNetworkWired, FaRegLightbulb, FaUpload,
@@ -31,7 +31,8 @@ interface PageInfo {
 
 const allPages: PageInfo[] = [
   // --- Важные ссылки ---
-  { path: "/", name: "Cyber Garage", icon: FaCar, isImportant: true, color: "cyan" },
+  { path: "/", name: "Fix13min", icon: FaDumbbell, isImportant: true, color: "cyan" },
+{ path: "/cartest", name: "Cyber Garage", icon: FaCarOn, isImportant: true, color: "cyan" },
   { path: "/about", name: "About Me", icon: FaCircleUser, isImportant: true, color: "blue" },
   { path: "/repo-xml", name: "SUPERVIBE Studio", icon: FaWandMagicSparkles, isImportant: true, color: "yellow" },
   { path: "/jumpstart", name: "Jumpstart Kit", icon: FaRocket, isImportant: true, color: "lime" },
