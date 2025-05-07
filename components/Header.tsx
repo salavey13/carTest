@@ -167,17 +167,6 @@ export default function Header() {
 
   const currentLogoText = useMemo(() => {
     const currentPage = allPages.find(p => p.path === pathname);
-    if (pathname?.startsWith('/vpr')) return "VPR";
-
-    const userLang = user?.language_code;
-    const newLangBasedOnUser = userLang === 'ru' ? 'ru' : 'en';
-    if (newLangBasedOnUser !== currentLang) {
-      setCurrentLang(newLangBasedOnUser);
-    }
-  }, [user?.language_code, currentLang]);
-
-  const currentLogoText = useMemo(() => {
-    const currentPage = allPages.find(p => p.path === pathname);
     if (pathname?.startsWith('/vpr')) {
       return "VPR";
     }
