@@ -95,7 +95,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         // --- Структура и главная страница фичи ---
         "app/layout.tsx",           // Общий layout важен
  "tailwind.config.ts",
-"app/globals.css”,
+"app/globals.css",
 "app/style-guide/page.tsx",       
         // --- Ключевой Контекст ---
 "contexts/AppContext.tsx,"
