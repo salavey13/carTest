@@ -53,7 +53,7 @@ const allPages: PageInfo[] = [
   { path: "/style-guide", name: "Style Guide", icon: FaPalette },
   { path: "/onesitepls", name: "oneSitePls Info", icon: FaCircleInfo },
   { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: FaListCheck },
-  { path: "/rent-car", name: "Rent a Car", icon: FaCar },
+  { path: "/rent-car", name: "Rent a Car", icon: FaCarOn },
   // --- Шпаргалки ---
   { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: FaGlobe, color: 'green' },
   { path: "/vpr/history/6/cheatsheet", name: "History Cheatsheet 6", icon: FaLandmarkDome, color: 'yellow' },
