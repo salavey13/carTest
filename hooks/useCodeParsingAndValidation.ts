@@ -200,7 +200,7 @@ export function useCodeParsingAndValidation() {
             if (/\.(tsx|jsx)$/.test(filePath)) {
                  const firstRealLineIndex = lines.findIndex(line => line.trim() !== '');
                  const firstRealLine = firstRealLineIndex !== -1 ? lines[firstRealLineIndex].trim() : null;
-                 const hasUseClient = firstRealLine === '"use client";' || firstRealLine === "'use client';";
+                 const hasUseClient = firstRealLine === '"use client";' || firstRealLine === "'use client';" || firstRealLine === '"use client"' || firstRealLine === "'use client'";
                  const usesClientFeatures = clientHookPatterns.test(file.content) || /on[A-Z][a-zA-Z]*\s*=\s*{/.test(file.content);
                  logger.debug(`[Validation Logic - ${filePath}] useClient check: hasDirective=${hasUseClient}, usesFeatures=${usesClientFeatures}`);
 
