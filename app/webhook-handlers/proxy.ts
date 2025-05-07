@@ -1,6 +1,6 @@
 import { WebhookHandler } from "./types";
 import { subscriptionHandler } from "./subscription";
-// import { carRentalHandler } from "./car-rental"; // Removed car rental handler
+import { carRentalHandler } from "./car-rental"; // Restored car rental handler
 import { supportHandler } from "./support";
 import { donationHandler } from "./donation";
 import { scriptAccessHandler } from "./script-access";
@@ -19,7 +19,7 @@ const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID!;
 // Ensure all required handlers are in this array
 const handlers: WebhookHandler[] = [
   subscriptionHandler,
-  // carRentalHandler, // Removed
+  carRentalHandler, // Restored
   supportHandler,
   donationHandler,
   scriptAccessHandler,
@@ -66,7 +66,7 @@ export async function handleWebhookProxy(update: any) {
 
       if (!invoice) {
         logger.error(`Webhook Proxy: Invoice not found in DB for payload: ${invoice_payload}. Payment amount: ${total_amount}, User: ${userId}`);
-        // Use the sendTelegramMessage from actions.ts which now correctly handles missing token
+        // Using correct sendTelegramMessage call from new version
         await sendTelegramMessage(
           `🚨 ВНИМАНИЕ: Получен платеж (${total_amount / 100} XTR) с неизвестным payload: ${invoice_payload} от пользователя ${userId}. Инвойс не найден в базе!`,
           [],
@@ -96,9 +96,9 @@ export async function handleWebhookProxy(update: any) {
         .from("users")
         .select("*") 
         .eq("user_id", userId)
-        .single(); 
+        .single(); // Using single as per new version, old was also single.
 
-      if (userError && userError.code !== 'PGRST116') { // PGRST116 means no rows found, which is fine for userData to be null
+      if (userError && userError.code !== 'PGRST116') { 
          logger.error(`Webhook Proxy: Error fetching user ${userId} for invoice ${invoice_payload}:`, userError);
       }
       if (!userData) {
@@ -122,8 +122,8 @@ export async function handleWebhookProxy(update: any) {
         await handler.handle(
           invoice,
           userId,
-          userData || { user_id: userId, metadata: {}, id: parseInt(userId,10) }, // Provide a default structure if userData is null
-          total_amount / 100, // Assuming XTR uses whole units, divide by 100 if it uses cents/kopecks
+          userData || { user_id: userId, metadata: {}, id: parseInt(userId,10) }, 
+          total_amount / 100, 
           supabaseAdmin,
           TELEGRAM_BOT_TOKEN, 
           ADMIN_CHAT_ID,
@@ -132,7 +132,7 @@ export async function handleWebhookProxy(update: any) {
         logger.log(`Webhook Proxy: Handler for invoice ${invoice_payload} executed successfully.`);
       } else {
         logger.warn(`Webhook Proxy: No handler found for invoice type "${invoice.type || 'unknown'}" with payload ${invoice_payload}.`);
-        await sendTelegramMessage(
+        await sendTelegramMessage( // Using correct sendTelegramMessage call
           `⚠️ Необработанный платеж! Тип: ${invoice.type || 'Неизвестен (из payload?)'}, Payload: ${invoice_payload}, Сумма: ${total_amount / 100} XTR, Пользователь: ${userId}`,
           [],
           undefined,
@@ -141,7 +141,7 @@ export async function handleWebhookProxy(update: any) {
       }
     } catch (error) {
       logger.error("Webhook Proxy: Error processing successful_payment:", error);
-      await sendTelegramMessage(
+      await sendTelegramMessage( // Using correct sendTelegramMessage call
         `🚨 Ошибка обработки успешного платежа! Payload: ${update.message?.successful_payment?.invoice_payload || 'N/A'}, User: ${update.message?.chat?.id || 'N/A'}. Ошибка: ${error instanceof Error ? error.message : String(error)}`,
         [],
         undefined,

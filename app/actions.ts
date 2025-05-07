@@ -1,7 +1,7 @@
 "use server";
 
 import {
-  // generateCarEmbedding, // Removed
+  generateCarEmbedding, // Restored for car functionality
   supabaseAdmin,
   fetchUserData as dbFetchUserData,
   createOrUpdateUser as dbCreateOrUpdateUser,
@@ -84,8 +84,8 @@ export async function sendTelegramMessage(
   message: string,
   buttons: InlineButton[] = [],
   imageUrl?: string,
-  chatId?: string
-  // carId parameter removed
+  chatId?: string,
+  carId?: string // Restored carId parameter
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   if (!TELEGRAM_BOT_TOKEN) {
     return { success: false, error: "Telegram bot token not configured" };
@@ -93,15 +93,31 @@ export async function sendTelegramMessage(
   const finalChatId = chatId || ADMIN_CHAT_ID;
 
   try {
+    let finalMessage = message;
+    // Restored logic to fetch car details if carId is provided
+    if (carId) {
+      const { data: car, error } = await supabaseAdmin
+        .from("cars")
+        .select("make, model, daily_price")
+        .eq("id", carId)
+        .single();
+      if (error) {
+        logger.error(`Failed to fetch car ${carId} for message: ${error.message}`);
+      } else if (car) {
+        finalMessage += `\n\nCar: ${car.make} ${car.model}\nDaily Price: ${car.daily_price} XTR`;
+      }
+    }
+
     const payload: SendPayload = imageUrl
       ? { 
           chat_id: finalChatId,
           photo: imageUrl,
-          caption: message,
+          caption: finalMessage, // Use finalMessage which might include car details
+          parse_mode: "Markdown", // Explicitly set for caption as well
       }
       : { 
           chat_id: finalChatId,
-          text: message,
+          text: finalMessage, // Use finalMessage
           parse_mode: "Markdown", 
         };
 
@@ -317,10 +333,93 @@ export async function notifyAdmins(message: string): Promise<{ success: boolean;
   }
 }
 
-// notifyCarAdmin function removed
+// Restored notifyCarAdmin function
+export async function notifyCarAdmin(carId: string, message: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: car, error } = await supabaseAdmin
+      .from("cars")
+      .select("owner_id, image_url, make, model")
+      .eq("id", carId)
+      .maybeSingle();
 
-// superNotification function removed (was car-specific)
-// Consider a new generic superNotification if needed for all users or specific roles.
+    if (error) {
+      logger.error(`Error fetching car ${carId} for notification:`, error);
+      return { success: false, error: `Failed to fetch car: ${error.message}` };
+    }
+
+    if (!car) {
+       logger.warn(`Car ${carId} not found for notification.`);
+       return { success: false, error: `Car with ID ${carId} not found.` };
+    }
+     if (!car.owner_id) {
+       logger.warn(`Car ${carId} has no owner_id set for notification.`);
+       return { success: true }; 
+    }
+
+    const adminId = car.owner_id;
+    const baseUrl = getBaseUrl();
+    const fullMessage = `${message}\nCar: ${car.make || 'N/A'} ${car.model || 'N/A'}`;
+    const buttons = [{ text: "View Car", url: `${baseUrl}/rent/${carId}` }];
+
+    const result = await sendTelegramMessage(
+      fullMessage,
+      buttons,
+      car.image_url,
+      adminId
+      // carId is now part of sendTelegramMessage's signature if needed, but here it's used to compose the message.
+      // If sendTelegramMessage uses carId internally, we might pass it: , carId
+    );
+
+    if (!result.success) {
+      logger.error(`Failed to notify car admin ${adminId} for car ${carId}: ${result.error}`);
+    }
+    return { success: result.success, error: result.error };
+  } catch (error) {
+      logger.error(`Unexpected error in notifyCarAdmin for car ${carId}:`, error);
+       return { success: false, error: error instanceof Error ? error.message : "Unexpected error notifying car admin" };
+  }
+}
+
+// Restored superNotification function
+export async function superNotification(message: string): Promise<{ success: boolean; error?: string }> {
+   try {
+    const { data: owners, error } = await supabaseAdmin
+      .from("cars")
+      .select("owner_id", { count: 'exact', head: false })
+      .neq("owner_id", null)
+      .then(response => {
+          if (response.error) return response;
+          const distinctOwners = Array.from(new Set(response.data?.map(o => o.owner_id)));
+          return { data: distinctOwners.map(id => ({ owner_id: id })), error: null };
+      });
+
+    if (error) {
+      logger.error("Error fetching distinct car owners for super notification:", error);
+      throw error;
+    }
+
+     if (!owners || owners.length === 0) {
+      logger.warn("No car owners found for super notification.");
+      return { success: true };
+    }
+
+    logger.info(`Sending super notification to ${owners.length} owners.`);
+
+    let allSuccessful = true;
+    for (const owner of owners) {
+       if (!owner.owner_id) continue;
+      const result = await sendTelegramMessage(message, [], undefined, owner.owner_id);
+       if (!result.success) {
+        allSuccessful = false;
+        logger.error(`Failed to send super notification to owner ${owner.owner_id}: ${result.error}`);
+      }
+    }
+    return { success: allSuccessful, error: allSuccessful ? undefined : "Failed to send super notification to one or more owners" };
+   } catch(error) {
+       logger.error("Error sending super notification:", error);
+       return { success: false, error: error instanceof Error ? error.message : "Failed to send super notification" };
+   }
+}
 
 export async function broadcastMessage(message: string, role?: string): Promise<{ success: boolean; error?: string }> {
   try {
@@ -365,7 +464,7 @@ export async function notifyCaptchaSuccess(userId: string, username?: string | n
   return notifyAdmins(message);
 }
 
-export async function notifySuccessfulUsers(userIds: string[]) { // Renamed from notifySuccessfullUsers to match standard casing
+export async function notifySuccessfulUsers(userIds: string[]) {
   try {
     const message = `🎉 Поздравляем! Вы успешно прошли CAPTCHA и можете продолжить. 🚀`
 
@@ -377,7 +476,7 @@ export async function notifySuccessfulUsers(userIds: string[]) { // Renamed from
         userId
       )
       if (!result.success) {
-        console.error(`Failed to notify user ${userId}:`, result.error) // Kept console.error as per original
+        console.error(`Failed to notify user ${userId}:`, result.error)
       }
     }
 
@@ -654,8 +753,68 @@ export async function analyzeMessage(content: string): Promise<{
     }
 }
 
-// generateEmbeddings function removed (was car-specific)
-// findSimilarCars function removed (was car-specific)
+// Restored generateEmbeddings function
+export const generateEmbeddings = async (): Promise<{ success: boolean; message?: string; error?: string }> => {
+  try {
+    const { data: cars, error: fetchError, count } = await supabaseAdmin
+      .from("cars")
+      .select("id", { count: 'exact', head: true })
+      .is("embedding", null);
+
+    if (fetchError) {
+       logger.error("Error fetching count of cars needing embeddings:", fetchError);
+      throw fetchError;
+    }
+
+    if (!count || count === 0) {
+      logger.info("No cars found needing embedding generation.");
+      return { success: true, message: "No cars needed embeddings." };
+    }
+
+    logger.info(`Found ${count} cars needing embeddings. Triggering batch generation...`);
+    // This calls the generateCarEmbedding from hooks/supabase.ts
+    // which itself calls the Edge Function.
+    const result = await generateCarEmbedding('batch'); 
+
+    logger.info(`Triggered embedding generation for ${count} cars. Result:`, result);
+    return { success: true, message: `Triggered embedding generation for ${count} cars. ${result.message}` };
+
+  } catch (error) {
+     logger.error("Error in generateEmbeddings action:", error);
+     return { success: false, error: error instanceof Error ? error.message : "Failed to trigger embedding generation" };
+  }
+};
+
+// Restored findSimilarCars function
+export async function findSimilarCars(
+    embedding: number[],
+    limit: number = 3
+): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    if (!embedding || embedding.length === 0) {
+        return { success: false, error: "Invalid embedding provided" };
+    }
+    try {
+        const { data, error } = await supabaseAdmin.rpc("search_cars", {
+            query_embedding: embedding,
+            match_count: limit,
+        });
+
+        if (error) {
+            logger.error("Error searching for similar cars:", error);
+            throw error;
+        }
+
+        const formattedData = data?.map((car: any) => ({
+            ...car,
+            similarity: car.similarity ? Math.round(car.similarity * 100) : 0,
+        })) || [];
+
+        return { success: true, data: formattedData };
+    } catch (error) {
+         logger.error("Error in findSimilarCars action:", error);
+        return { success: false, error: error instanceof Error ? error.message : "Failed to find similar cars" };
+    }
+}
 
 export async function createOrUpdateUser(userInfo: WebAppUser): Promise<{ success: boolean; data?: User; error?: string }> {
     if (!userInfo?.id) {
@@ -856,7 +1015,37 @@ export async function sendDonationInvoice(chatId: string, amount: number, messag
     }
 }
 
-// updateCarStatus function removed
+// Restored updateCarStatus function
+export async function updateCarStatus(carId: string, newStatus: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        const allowedStatuses = ["available", "rented", "maintenance", "unavailable"];
+        if (!allowedStatuses.includes(newStatus)) {
+            return { success: false, error: `Invalid car status: ${newStatus}` };
+        }
+
+        const { error: updateError } = await supabaseAdmin
+            .from("cars")
+            .update({ status: newStatus, updated_at: new Date().toISOString() })
+            .eq("id", carId);
+
+        if (updateError) {
+            logger.error(`Error updating status for car ${carId}:`, updateError);
+            throw updateError;
+        }
+
+         logger.info(`Car ${carId} status updated to ${newStatus}. Notifying owner...`);
+        const notifyResult = await notifyCarAdmin(carId, `🚗 Your car status has been updated to: ${newStatus}`);
+
+         if (!notifyResult.success) {
+             logger.warn(`Failed to notify owner after updating status for car ${carId}: ${notifyResult.error}`);
+         }
+
+        return { success: true };
+    } catch (error) {
+         logger.error(`Failed to update status for car ${carId}:`, error);
+        return { success: false, error: error instanceof Error ? error.message : "Failed to update car status" };
+    }
+}
 
 export async function checkInvoiceStatus(token: string, invoiceId: string): Promise<{ success: boolean; status?: string; error?: string }> {
     try {
@@ -864,7 +1053,7 @@ export async function checkInvoiceStatus(token: string, invoiceId: string): Prom
         if (!validationResult.success || !validationResult.user) {
             return { success: false, error: validationResult.error || "Unauthorized", status: undefined };
         }
-        const userId = validationResult.user.user_id;
+        // const userId = validationResult.user.user_id; // Not strictly needed if using admin client for fetch
 
         const { data, error } = await supabaseAdmin
             .from("invoices")
