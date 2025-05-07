@@ -12,9 +12,9 @@ import {
 } from "@/components/ui/tooltip";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-    FaGlobeAmericas, // Keep for World Map section title
+    FaGlobe, // Keep for World Map section title
     FaWater, FaCompass, FaRulerCombined, FaMountain, FaUserSecret,
-    FaThermometerHalf, FaCloudSunRain, FaWind, FaTree, FaPaw, FaGlobeEurope, // Use GlobeEurope for оболочки
+    FaThermometerHalf, FaCloudSunRain, FaWind, FaTree, FaPaw, FaGlobe, // Use GlobeEurope for оболочки
     FaTable, FaRegCompass, FaImage, FaMapLocationDot,
     FaBookOpen, FaMap, FaUsers, FaBookAtlas // Replaced FaAtlas with FaBookAtlas
 } from "react-icons/fa6";
@@ -95,7 +95,7 @@ const VprGeographyCheatsheet6: NextPage = () => {
                             {/* Section: Карта Мира */}
                             <section className="space-y-6">
                                 <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-cyan-400 mb-4 border-b-2 border-cyan-500/40 pb-3">
-                                    <FontAwesomeIcon icon={FaGlobeAmericas} className="mr-3 text-cyan-400/80 fa-fw" /> Карта Мира: Основы
+                                    <FontAwesomeIcon icon={FaGlobe} className="mr-3 text-cyan-400/80 fa-fw" /> Карта Мира: Основы
                                 </h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                                     {/* Subsection: Материки и Океаны */}
@@ -174,12 +174,12 @@ const VprGeographyCheatsheet6: NextPage = () => {
                             {/* Section: Географические Оболочки и Природа Земли */}
                             <section className="space-y-6 border-t-2 border-green-500/30 pt-8">
                                 <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-green-400 mb-4 border-b-2 border-green-500/40 pb-3">
-                                    <FontAwesomeIcon icon={FaGlobeEurope} className="mr-3 text-green-400/80 fa-fw" /> Оболочки Земли и Природа
+                                    <FontAwesomeIcon icon={FaGlobe} className="mr-3 text-green-400/80 fa-fw" /> Оболочки Земли и Природа
                                 </h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                                     {/* Subsection: Оболочки */}
                                     <div className="border-l-4 border-green-700 pl-4">
-                                        <h3 className="flex items-center text-xl font-semibold text-green-300 mb-3"> <FontAwesomeIcon icon={FaGlobeEurope} className="mr-2 text-green-300/80 fa-fw" /> Оболочки Земли </h3>
+                                        <h3 className="flex items-center text-xl font-semibold text-green-300 mb-3"> <FontAwesomeIcon icon={FaGlobe} className="mr-2 text-green-300/80 fa-fw" /> Оболочки Земли </h3>
                                         <ul className="list-disc list-inside space-y-1.5 text-gray-300 pl-4 text-base md:text-lg mb-4">
                                             <li><strong>Литосфера:</strong> Твердая оболочка (земная кора, верхняя мантия). Включает рельеф (горы, равнины). Процессы: землетрясения, вулканизм, выветривание, движение литосферных плит.</li>
                                             <li><strong>Гидросфера:</strong> Водная оболочка (океаны, моря, реки, озера, ледники, подземные воды, вода в атмосфере). Процессы: круговорот воды, течения, волны, приливы/отливы, замерзание/таяние.</li>
