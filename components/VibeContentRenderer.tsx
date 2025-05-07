@@ -2034,6 +2034,7 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   faregwindowrestore: "FaRegWindowRestore",
   // --- Added FaToolbox ---
   fatoolbox: "FaToolbox",
+  fatools: "FaToolbox", // <-- ADDED for robustness when parsing <FaTools />
 };
 // --- End Icon Name Map ---
 
