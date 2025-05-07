@@ -27,9 +27,11 @@ function LoadingChatButtonFallback() {
 }
 
 // Static metadata and viewport exports are now safe again
-export const metadata: Metadata = {
-  title: "V0 Car Test App",
-  description: "Find your perfect V0 car.",
+export const metadata = {
+  title: "Fit10min PREMIUM", // Updated title
+  description: "Твоя 10-минутная фитнес-революция. Тренировки, питание, прогресс.", // Updated description
+  // Add viewport settings for responsiveness and disabling zoom
+  viewport: "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
 };
 export const viewport: Viewport = {
   width: 'device-width',

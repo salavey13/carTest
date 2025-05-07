@@ -28,7 +28,7 @@ interface PageInfo {
   color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red';
 }
 
-// --- FULL allPages array ---
+
 const allPages: PageInfo[] = [
   // --- Важные ссылки ---
   { path: "/", name: "Cyber Garage", icon: FaCar, isImportant: true, color: "cyan" },
@@ -167,6 +167,27 @@ export default function Header() {
   const currentLogoText = useMemo(() => {
     const currentPage = allPages.find(p => p.path === pathname);
     if (pathname?.startsWith('/vpr')) return "VPR";
+
+    const userLang = user?.language_code;
+    const newLangBasedOnUser = userLang === 'ru' ? 'ru' : 'en';
+    if (newLangBasedOnUser !== currentLang) {
+      setCurrentLang(newLangBasedOnUser);
+    }
+  }, [user?.language_code, currentLang]);
+
+  const t = useCallback((key: string): string => {
+    return translations[currentLang]?.[key] || translations['en']?.[key] || key;
+  }, [currentLang]);
+
+  const toggleLang = useCallback(() => {
+    setCurrentLang(prevLang => prevLang === 'en' ? 'ru' : 'en');
+  }, []);
+
+  const currentLogoText = useMemo(() => {
+    const currentPage = allPages.find(p => p.path === pathname);
+    if (pathname?.startsWith('/vpr')) {
+      return "VPR";
+    }
     const baseName = currentPage?.name || "VIBE";
     const translatedFirstName = t(baseName)?.split(' ')[0];
     return translatedFirstName || baseName.split(' ')[0] || "VIBE";
@@ -177,6 +198,7 @@ export default function Header() {
     return allPages
       .filter(page => !(page.isAdminOnly && !isAdmin))
       .map(page => ({ ...page, translatedName: t(page.name) }))
+
       .filter(page => page.translatedName.toLowerCase().includes(lowerSearchTerm));
   }, [searchTerm, isAdmin, t]);
 
@@ -266,6 +288,7 @@ export default function Header() {
                 onClick={toggleLang}
                 className="p-1 sm:p-2 text-xs sm:text-sm font-semibold text-brand-cyan hover:text-brand-cyan/80 transition-colors focus:outline-none focus:ring-1 focus:ring-brand-cyan focus:ring-offset-2 focus:ring-offset-black rounded-md"
                 aria-label={t("Toggle Language")} title={t("Toggle Language")}
+
               >
                 {currentLang === 'en' ? 'RU' : 'EN'}
               </button>
@@ -343,6 +366,7 @@ export default function Header() {
                         {/* --- FULL Icon/Text Rendering --- */}
                         {page.isHot && (
                           <span title={t("Hot")} className="absolute top-0.5 left-0.5 text-[0.5rem] bg-red-500/80 text-white rounded-full px-1 py-0 leading-none animate-pulse" aria-label={t("Hot")}>
+
                             🔥
                           </span>
                         )}
@@ -363,6 +387,7 @@ export default function Header() {
                           <span title={t("Admin Only")} className="absolute top-0.5 right-0.5 text-[0.5rem] text-red-400 bg-black/60 rounded-full px-1 py-0 leading-none">
                             🛡️
                           </span>
+
                         )}
                         {/* --- End FULL Icon/Text Rendering --- */}
                       </Link>
