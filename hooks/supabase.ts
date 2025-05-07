@@ -1,27 +1,22 @@
-// (Restored Type Aliases section using reference)
-
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { generateJwtToken } from "@/lib/auth";
 import type { WebAppUser } from "@/types/telegram";
 import { debugLogger } from "@/lib/debugLogger";
-import { logger } from "@/lib/logger"; // Use standard logger for errors/warnings
+import { logger } from "@/lib/logger"; 
 import type { Database } from "@/types/database.types";
 
 // --- Type Aliases ---
-// (Restored and merged from reference and new additions)
 type DbUser = Database["public"]["Tables"]["users"]["Row"];
-type DbCar = Database["public"]["Tables"]["cars"]["Row"];
+type DbCar = Database["public"]["Tables"]["cars"]["Row"]; // Restored
 type DbInvoice = Database["public"]["Tables"]["invoices"]["Row"];
-type DbRental = Database["public"]["Tables"]["rentals"]["Row"];
-type DbTask = Database["public"]["Tables"]["tasks"]["Row"]; // From reference
-type DbCharacter = Database["public"]["Tables"]["characters"]["Row"]; // From reference
-type DbVideo = Database["public"]["Tables"]["videos"]["Row"]; // From reference
-type DbSubscription = Database["public"]["Tables"]["subscriptions"]["Row"]; // Assuming you have a subscriptions table (from reference)
-type DbArticle = Database["public"]["Tables"]["articles"]["Row"]; // Added for Articles
-type DbArticleSection = Database["public"]["Tables"]["article_sections"]["Row"]; // Added for Article Sections
-// Add other types if needed, e.g., VPR types if used in this hook file
-// type DbVprSubject = Database["public"]["Tables"]["subjects"]["Row"];
-// ... etc.
+type DbRental = Database["public"]["Tables"]["rentals"]["Row"]; 
+type DbTask = Database["public"]["Tables"]["tasks"]["Row"]; 
+type DbCharacter = Database["public"]["Tables"]["characters"]["Row"]; 
+type DbVideo = Database["public"]["Tables"]["videos"]["Row"]; 
+type DbSubscription = Database["public"]["Tables"]["subscriptions"]["Row"]; 
+type DbArticle = Database["public"]["Tables"]["articles"]["Row"]; 
+type DbArticleSection = Database["public"]["Tables"]["article_sections"]["Row"]; 
+type DbUserResult = Database["public"]["Tables"]["user_results"]["Row"]; // Restored
 
 
 // --- Supabase Client Initialization ---
@@ -35,33 +30,24 @@ const serviceRoleKey =
 
 if (!supabaseUrl || !supabaseAnonKey) {
     logger.error("Supabase URL or Anon Key is missing from environment variables.");
-    // Consider throwing an error here if essential
-    // throw new Error("Supabase URL or Anon Key is missing from environment variables.");
 }
 if (!serviceRoleKey) {
-    // Log warning but don't throw, admin client might not be needed everywhere immediately
     logger.warn("SUPABASE_SERVICE_ROLE_KEY is missing. Admin operations might fail.");
 }
 
-// Public client (for anonymous access or RLS-protected user access with JWT)
 export const supabaseAnon: SupabaseClient<Database> = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
-// Admin client (for server-side operations requiring elevated privileges)
-// Ensure this is ONLY used on the server and never exposed to the client.
 export const supabaseAdmin: SupabaseClient<Database> = serviceRoleKey
     ? createClient<Database>(supabaseUrl, serviceRoleKey, {
         auth: {
-            // Prevent client-side persistence/auth state management for admin client
             persistSession: false,
             autoRefreshToken: false,
             detectSessionInUrl: false,
         }
     })
-    : (()=>{ logger.error("Admin client creation failed due to missing service role key."); return null as any; })(); // Handle missing key
+    : (()=>{ logger.error("Admin client creation failed due to missing service role key."); return null as any; })(); 
 
 
-// Function to create an authenticated client for a specific user (respects RLS)
-// Used for user-specific actions where RLS is enforced.
 export const createAuthenticatedClient = async (userId: string): Promise<SupabaseClient<Database> | null> => {
     if (!userId) {
         logger.warn("Attempted to create authenticated client without a user ID.");
@@ -79,7 +65,7 @@ export const createAuthenticatedClient = async (userId: string): Promise<Supabas
         }
         return createClient<Database>(supabaseUrl, supabaseAnonKey, {
             global: { headers: { Authorization: `Bearer ${token}` } },
-            auth: { persistSession: false } // Usually don't persist session for server-side authenticated clients
+            auth: { persistSession: false } 
         });
     } catch (error) {
         logger.error(`Error creating authenticated client for user ${userId}:`, error);
@@ -89,23 +75,22 @@ export const createAuthenticatedClient = async (userId: string): Promise<Supabas
 
 // --- User Management ---
 
-/** Fetches user data by user ID. Uses admin client. */
 export const fetchUserData = async (userId: string): Promise<DbUser | null> => {
     if (!userId) {
         debugLogger.warn("fetchUserData called with empty userId");
         return null;
     }
     debugLogger.log(`Fetching user data for userId: ${userId}`);
-    if (!supabaseAdmin) { // Use admin to ensure metadata is always fetched regardless of user RLS on select
+    if (!supabaseAdmin) { 
         logger.error("Admin client unavailable for fetchUserData.");
         return null;
     }
 
     try {
         const { data, error } = await supabaseAdmin
-            .from("users") // Adjust table name if needed (e.g., auth.users)
-            .select("*, metadata") // Explicitly select metadata
-            .eq("user_id", userId) // Adjust column name if needed
+            .from("users") 
+            .select("*, metadata") 
+            .eq("user_id", userId) 
             .maybeSingle();
 
         if (error) {
@@ -121,7 +106,6 @@ export const fetchUserData = async (userId: string): Promise<DbUser | null> => {
     }
 };
 
-/** Creates or updates a user in the database. Uses admin client. */
 export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAppUser & { role?: string; status?: string; metadata?: Record<string, any> }>): Promise<DbUser | null> => {
      if (!userId) {
         debugLogger.error("createOrUpdateUser called with empty userId");
@@ -135,19 +119,17 @@ export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAp
     debugLogger.log("Attempting to create or update user:", { userId, username: userInfo.username });
 
     try {
-        const userData: Partial<DbUser> = { // Use Partial<DbUser> for upsert flexibility
-            user_id: userId, // Adjust column name if needed
+        const userData: Partial<DbUser> = { 
+            user_id: userId, 
             username: userInfo.username || null,
             full_name: `${userInfo.first_name || ""} ${userInfo.last_name || ""}`.trim() || null,
             avatar_url: userInfo.photo_url || null,
             language_code: userInfo.language_code || null,
             ...(userInfo.role && { role: userInfo.role }),
             ...(userInfo.status && { status: userInfo.status }),
-            // Ensure metadata is included/updated correctly
             ...(userInfo.metadata !== undefined && { metadata: userInfo.metadata }),
             updated_at: new Date().toISOString(),
         };
-        // Remove undefined keys specifically, except for metadata if intentionally set to null
         Object.keys(userData).forEach(key => {
             const k = key as keyof typeof userData;
             if (userData[k] === undefined && k !== 'metadata') {
@@ -157,11 +139,11 @@ export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAp
 
 
         const { data, error } = await supabaseAdmin
-            .from("users") // Adjust table name if needed
+            .from("users") 
             .upsert(userData, {
-                onConflict: 'user_id', // Adjust conflict target column if needed
+                onConflict: 'user_id', 
             })
-            .select("*, metadata") // Ensure metadata is selected back
+            .select("*, metadata") 
             .single();
 
         if (error) {
@@ -182,25 +164,22 @@ export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAp
     }
 };
 
-
-/** Updates only the metadata field for a specific user. Uses authenticated client for RLS. */
 export const updateUserMetadata = async (
   userId: string,
-  metadata: Record<string, any> | null // Pass null to clear metadata or specific object to set/update
+  metadata: Record<string, any> | null 
 ): Promise<{ success: boolean; data?: DbUser; error?: string }> => {
   if (!userId) return { success: false, error: "User ID is required." };
 
-  // Use authenticated client to respect RLS policy allowing user to update own metadata
   const client = await createAuthenticatedClient(userId);
   if (!client) return { success: false, error: "Failed to create authenticated client." };
 
   debugLogger.log(`Updating metadata for user ${userId}`, metadata);
   try {
     const { data, error } = await client
-      .from("users") // Adjust table name if needed
+      .from("users") 
       .update({ metadata: metadata, updated_at: new Date().toISOString() })
-      .eq("user_id", userId) // Adjust column name if needed
-      .select("*, metadata") // Select the updated user row including metadata
+      .eq("user_id", userId) 
+      .select("*, metadata") 
       .single();
 
     if (error) {
@@ -219,41 +198,32 @@ export const updateUserMetadata = async (
   }
 };
 
-// --- Embeddings & Car Search ---
-// Match the vector dimensions defined in the database function/column
-const VECTOR_DIMENSIONS = 384; // Make sure this is correct
+// --- Embeddings & Car Search (Restored from OLD file) ---
+const VECTOR_DIMENSIONS = 384; // Restored
 
 // Simplified local embedding generator (FALLBACK ONLY)
-// This is likely not semantically meaningful. Use the Edge Function primarily.
 function generateSimplifiedFallbackEmbedding(text: string): number[] {
    logger.warn("Generating simplified FALLBACK embedding for text:", text.substring(0, 50) + "...");
-   // Basic hashing/distribution - replace with a more robust method if needed
    const embedding = new Array(VECTOR_DIMENSIONS).fill(0);
    if (!text) return embedding;
    const words = text.toLowerCase().split(/\W+/).filter(Boolean);
    words.forEach((word, i) => {
        let hash = 0;
        for (let j = 0; j < word.length; j++) {
-           hash = (hash * 31 + word.charCodeAt(j)) | 0; // Simple hash
+           hash = (hash * 31 + word.charCodeAt(j)) | 0;
        }
        embedding[Math.abs(hash + i) % VECTOR_DIMENSIONS] += 1;
    });
-    // Normalize (optional, depends on similarity metric used)
     const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
     return magnitude > 0 ? embedding.map(val => val / magnitude) : embedding;
 }
 
-/**
- * Generates car embedding using Supabase Edge Function. Handles single, batch, and create modes.
- * Falls back to simplified local embedding on Edge Function failure.
- */
 export async function generateCarEmbedding(
-  mode: 'single' | 'batch' | 'create' = 'batch', // Default to batch
+  mode: 'single' | 'batch' | 'create' = 'batch',
   payload?: {
-    carId?: string; // For single mode
-    carData?: { // For create mode
+    carId?: string;
+    carData?: {
         make: string; model: string; description: string; specs: Record<string, any>;
-        // Optional fields to update *after* creation if Edge Function only returns ID
         owner_id?: string; daily_price?: number; image_url?: string; rent_link?: string;
     };
   }
@@ -276,13 +246,12 @@ export async function generateCarEmbedding(
         switch (mode) {
             case 'single':
                 if (!payload?.carId) throw new Error("carId is required for single mode");
-                endpoint = `${supabaseUrl}/functions/v1/generate-embeddings`; // Assuming single entry point handles mode via payload
+                endpoint = `${supabaseUrl}/functions/v1/generate-embeddings`;
                 requestBody = { mode: 'single', carId: payload.carId };
                 break;
             case 'create':
                 if (!payload?.carData) throw new Error("carData is required for create mode");
-                 // Pass only data needed for embedding generation to the function
-                endpoint = `${supabaseUrl}/functions/v1/generate-embeddings`; // Assuming single entry point
+                endpoint = `${supabaseUrl}/functions/v1/generate-embeddings`;
                 requestBody = {
                     mode: 'create',
                     make: payload.carData.make,
@@ -293,8 +262,8 @@ export async function generateCarEmbedding(
                 break;
             case 'batch':
             default:
-                endpoint = `${supabaseUrl}/functions/v1/generate-embeddings`; // Assuming single entry point
-                requestBody = { mode: 'batch' }; // Send mode indicator
+                endpoint = `${supabaseUrl}/functions/v1/generate-embeddings`;
+                requestBody = { mode: 'batch' };
                 break;
         }
 
@@ -305,17 +274,16 @@ export async function generateCarEmbedding(
             body: JSON.stringify(requestBody),
         });
 
-        const responseText = await response.text(); // Get text first for better error reporting
+        const responseText = await response.text();
         if (!response.ok) {
             logger.error(`Edge Function 'generate-embeddings' (${mode}) failed (${response.status}): ${responseText}`);
             throw new Error(`Edge Function failed (${response.status}): ${responseText}`);
         }
 
-        const result = JSON.parse(responseText); // Parse JSON only if response is ok
+        const result = JSON.parse(responseText);
         logger.info(`Edge Function 'generate-embeddings' (${mode}) success: ${result.message}`);
 
-        // Handle post-creation updates for 'create' mode if necessary
-        let createdCarId = result.carId; // Function should return carId on create
+        let createdCarId = result.carId;
         if (mode === 'create' && createdCarId && payload?.carData) {
             const { owner_id, daily_price, image_url, rent_link } = payload.carData;
             const fieldsToUpdate: Partial<DbCar> = {};
@@ -341,13 +309,10 @@ export async function generateCarEmbedding(
                  }
             }
         }
-
         return { success: true, message: result.message, carId: createdCarId };
 
     } catch (error) {
         logger.error(`generateCarEmbedding (${mode}) failed, attempting fallback:`, error);
-
-        // --- Fallback Logic ---
         try {
             let combinedText: string | null = null;
             let carIdToUpdate: string | undefined = undefined;
@@ -368,19 +333,19 @@ export async function generateCarEmbedding(
             }
             const embedding = generateSimplifiedFallbackEmbedding(combinedText);
 
-            if (carIdToUpdate) { // Update existing car (single mode fallback)
+            if (carIdToUpdate) {
                  const { error: updateError } = await supabaseAdmin.from("cars").update({ embedding, updated_at: new Date().toISOString() }).eq("id", carIdToUpdate);
                  if (updateError) throw new Error(`Fallback failed: Cannot update embedding for ${carIdToUpdate}. ${updateError.message}`);
                  logger.info(`Successfully updated car ${carIdToUpdate} with fallback embedding.`);
                  return { success: true, message: "Edge function failed, fallback embedding generated and updated.", carId: carIdToUpdate };
-            } else if (mode === 'create' && payload?.carData) { // Create car with fallback embedding
+            } else if (mode === 'create' && payload?.carData) {
                  const { data: newCar, error: insertError } = await supabaseAdmin
                     .from("cars")
                     .insert({
                         make: payload.carData.make, model: payload.carData.model, description: payload.carData.description,
                         specs: payload.carData.specs, owner_id: payload.carData.owner_id, daily_price: payload.carData.daily_price,
                         image_url: payload.carData.image_url, rent_link: payload.carData.rent_link,
-                        embedding, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), status: 'new', // Default status?
+                        embedding, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), status: 'available', // default status
                     })
                     .select("id")
                     .single();
@@ -396,20 +361,18 @@ export async function generateCarEmbedding(
     }
 }
 
-
-/** Searches for cars using vector similarity via RPC */
-export interface CarResult {
+export interface CarResult { // Restored
   id: string;
   make: string;
   model: string;
   similarity: number;
-  description?: string | null; // Make optional fields explicitly nullable
+  description?: string | null;
   image_url?: string | null;
   rent_link?: string | null;
-  daily_price?: number | null; // Add price if available from RPC
+  daily_price?: number | null;
 }
 
-export const searchCars = async (embedding: number[], limit: number = 5): Promise<{ success: boolean; data?: CarResult[]; error?: string }> => {
+export const searchCars = async (embedding: number[], limit: number = 5): Promise<{ success: boolean; data?: CarResult[]; error?: string }> => { // Restored
     if (!embedding || embedding.length !== VECTOR_DIMENSIONS) {
         return { success: false, error: `Invalid embedding provided (length ${embedding?.length}, expected ${VECTOR_DIMENSIONS})` };
     }
@@ -417,7 +380,6 @@ export const searchCars = async (embedding: number[], limit: number = 5): Promis
         return { success: false, error: "Anon client is not available for search." };
     }
     try {
-        // Ensure the RPC function name and parameters match your DB definition
         const { data, error } = await supabaseAnon.rpc("search_cars", {
             query_embedding: embedding,
             match_count: limit,
@@ -427,19 +389,16 @@ export const searchCars = async (embedding: number[], limit: number = 5): Promis
             logger.error("Error calling search_cars RPC:", error);
             throw error;
         }
-
-        // Map the RPC result (data structure depends on your RPC definition)
-        const formattedData: CarResult[] = (data || []).map((item: any) => ({ // Use a more specific type if RPC output is known
+        const formattedData: CarResult[] = (data || []).map((item: any) => ({
             id: item.id,
             make: item.make,
             model: item.model,
             similarity: item.similarity,
-            description: item.description, // Pass through fields returned by RPC
+            description: item.description,
             image_url: item.image_url,
-            daily_price: item.daily_price, // Pass through price if returned
-            rent_link: item.rent_link || `/rent/${item.id}`, // Construct default link if not present
+            daily_price: item.daily_price,
+            rent_link: item.rent_link || `/rent/${item.id}`,
         }));
-
         return { success: true, data: formattedData };
     } catch (error) {
         logger.error("Error searching cars:", error);
@@ -447,13 +406,10 @@ export const searchCars = async (embedding: number[], limit: number = 5): Promis
     }
 };
 
-/** Gets similar cars based on a car ID via RPC */
-export const getSimilarCars = async (carId: string, matchCount: number = 3): Promise<{ success: boolean; data?: DbCar[]; error?: string }> => {
+export const getSimilarCars = async (carId: string, matchCount: number = 3): Promise<{ success: boolean; data?: DbCar[]; error?: string }> => { // Restored
      if (!carId) return { success: false, error: "Car ID is required." };
      if (!supabaseAnon) return { success: false, error: "Anon client not available."};
-
      try {
-         // Ensure RPC name and parameter names match DB
         const { data, error } = await supabaseAnon.rpc("similar_cars", {
             p_car_id: carId,
             p_match_count: matchCount,
@@ -462,7 +418,6 @@ export const getSimilarCars = async (carId: string, matchCount: number = 3): Pro
              logger.error(`Error calling similar_cars RPC for car ${carId}:`, error);
             throw error;
         }
-         // Assuming RPC returns data matching DbCar structure
          return { success: true, data: data || [] };
     } catch (error) {
          logger.error(`Error finding similar cars for ${carId}:`, error);
@@ -472,15 +427,13 @@ export const getSimilarCars = async (carId: string, matchCount: number = 3): Pro
 
 // --- Advice Articles & Sections ---
 
-/** Fetches all advice articles. Uses anon client based on RLS policy. */
 export const fetchArticles = async (): Promise<{ success: boolean; data?: DbArticle[]; error?: string }> => {
   if (!supabaseAnon) return { success: false, error: "Anon client not available." };
   try {
-    // Fetch from the 'articles' table
     const { data, error } = await supabaseAnon
       .from("articles")
       .select("*")
-      .order("title", { ascending: true }); // Order alphabetically by title
+      .order("title", { ascending: true }); 
 
     if (error) throw error;
     debugLogger.log(`Fetched ${data?.length || 0} articles.`);
@@ -491,18 +444,16 @@ export const fetchArticles = async (): Promise<{ success: boolean; data?: DbArti
   }
 };
 
-/** Fetches all sections for a specific article ID. Uses anon client based on RLS policy. */
 export const fetchArticleSections = async (articleId: string): Promise<{ success: boolean; data?: DbArticleSection[]; error?: string }> => {
   if (!articleId) return { success: false, error: "Article ID is required." };
   if (!supabaseAnon) return { success: false, error: "Anon client not available." };
 
   try {
-    // Fetch from the 'article_sections' table
     const { data, error } = await supabaseAnon
       .from("article_sections")
       .select("*")
       .eq("article_id", articleId)
-      .order("section_order", { ascending: true }); // **Crucial for correct sequence**
+      .order("section_order", { ascending: true }); 
 
     if (error) throw error;
     debugLogger.log(`Fetched ${data?.length || 0} sections for article ${articleId}.`);
@@ -520,11 +471,10 @@ export const saveTestProgress = async (userId: string, progress: any): Promise<{
     if (!client) return { success: false, error: "Failed to create authenticated client." };
 
     try {
-        // Assuming 'test_progress' column exists on the 'users' table
         const { error } = await client
-            .from("users") // Adjust table name if needed
+            .from("users") 
             .update({ test_progress: progress, updated_at: new Date().toISOString() })
-            .eq("user_id", userId); // Adjust column name if needed
+            .eq("user_id", userId); 
 
         if (error) throw error;
         debugLogger.log(`Saved test progress for user ${userId}.`);
@@ -540,21 +490,19 @@ export const loadTestProgress = async (userId: string): Promise<{ success: boole
     if (!client) return { success: false, error: "Failed to create authenticated client." };
 
     try {
-         // Assuming 'test_progress' column exists on the 'users' table
         const { data, error } = await client
-            .from("users") // Adjust table name if needed
+            .from("users") 
             .select("test_progress")
-            .eq("user_id", userId) // Adjust column name if needed
+            .eq("user_id", userId) 
             .maybeSingle();
 
         if (error) {
             logger.error(`Error loading test progress for user ${userId}:`, error);
-             if (error.code === 'PGRST116') return { success: true, data: null }; // Not found is not an error here
+             if (error.code === 'PGRST116') return { success: true, data: null }; 
             throw error;
         }
 
         debugLogger.log(`Loaded test progress for user ${userId}.`);
-        // Return null if test_progress is null in DB or user not found
         return { success: true, data: data?.test_progress ?? null };
     } catch (error) {
         logger.error(`Exception loading test progress for user ${userId}:`, error);
@@ -564,10 +512,9 @@ export const loadTestProgress = async (userId: string): Promise<{ success: boole
 
 
 // --- Subscriptions ---
-// (Assuming 'subscription_id' column exists on 'users' table)
 export const updateUserSubscription = async (
   userId: string,
-  subscriptionId: string | number | null // Allow null to remove subscription
+  subscriptionId: string | number | null 
 ): Promise<{ success: boolean; data?: DbUser; error?: string }> => {
     if (!userId) return { success: false, error: "User ID is required." };
     if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
@@ -575,10 +522,10 @@ export const updateUserSubscription = async (
     debugLogger.log(`Updating subscription for user ${userId} to ${subscriptionId}`);
     try {
         const { data, error } = await supabaseAdmin
-            .from("users") // Adjust table name if needed
+            .from("users") 
             .update({ subscription_id: subscriptionId, updated_at: new Date().toISOString() })
-            .eq("user_id", userId) // Adjust column name if needed
-            .select("*, metadata") // Select updated user data
+            .eq("user_id", userId) 
+            .select("*, metadata") 
             .single();
 
         if (error) {
@@ -600,29 +547,26 @@ export const getUserSubscription = async (
   userId: string
 ): Promise<{ success: boolean; data?: number | string | null; error?: string }> => {
     if (!userId) return { success: false, error: "User ID is required." };
-    // Use authenticated client respecting RLS, or admin client if needed
-    // Using admin client for broader access possibility:
     if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
 
     debugLogger.log(`Fetching subscription for user ${userId}`);
     try {
         const { data, error } = await supabaseAdmin
-            .from("users") // Adjust table name if needed
+            .from("users") 
             .select("subscription_id")
-            .eq("user_id", userId) // Adjust column name if needed
+            .eq("user_id", userId) 
             .maybeSingle();
 
         if (error) {
             logger.error(`Error fetching user ${userId} subscription:`, error);
             if (error.code === 'PGRST116') {
                  debugLogger.log(`User ${userId} not found when fetching subscription.`);
-                return { success: true, data: null }; // User found, but no subscription is not an error
+                return { success: true, data: null }; 
             }
             throw error;
         }
 
         debugLogger.log(`Found subscription ID ${data?.subscription_id ?? 'null'} for user ${userId}.`);
-        // Return null if subscription_id is null in DB or user not found
         return { success: true, data: data?.subscription_id ?? null };
 
     } catch (error) {
@@ -635,17 +579,16 @@ export const getUserSubscription = async (
 // --- Invoice Management ---
 export const createInvoice = async (
     type: string,
-    id: string, // Invoice ID (e.g., from payment provider or generated)
+    id: string, 
     userId: string,
     amount: number,
-    subscriptionId?: number | string | null, // Optional subscription link
+    subscriptionId?: number | string | null, 
     metadata: Record<string, any> = {}
 ): Promise<{ success: boolean; data?: DbInvoice; error?: string }> => {
     if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
     if (!id || !userId || amount == null || !type) return { success: false, error: "Missing required parameters for invoice creation." };
 
     try {
-        // Resolve subscription ID if not provided explicitly
         let finalSubscriptionId = subscriptionId;
         if (finalSubscriptionId === undefined) {
             const subResult = await getUserSubscription(userId);
@@ -659,26 +602,24 @@ export const createInvoice = async (
                 id: id,
                 user_id: userId,
                 type: type,
-                amount: amount, // Store the amount as provided
-                status: 'pending', // Default status
-                subscription_id: finalSubscriptionId, // Store resolved ID
+                amount: amount, 
+                status: 'pending', 
+                subscription_id: finalSubscriptionId, 
                 metadata: metadata,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
              })
-            .select() // Select the newly created row
-            .single(); // Expect only one row
+            .select() 
+            .single(); 
 
         if (error) {
-            // Handle potential unique constraint violation (invoice ID already exists)
-            if (error.code === '23505') { // PostgreSQL unique violation code
+            if (error.code === '23505') { 
                  logger.warn(`Invoice with ID ${id} already exists.`);
-                 // Optionally fetch and return the existing invoice
                  const existing = await getInvoiceById(id);
                  if (existing.success && existing.data) return { success: true, data: existing.data };
                  return { success: false, error: `Invoice ID ${id} already exists, but failed to retrieve it.` };
             }
-            throw error; // Re-throw other errors
+            throw error; 
         }
         if (!data) return { success: false, error: "Invoice creation returned no data." };
 
@@ -692,7 +633,7 @@ export const createInvoice = async (
 
 export const updateInvoiceStatus = async (
     invoiceId: string,
-    status: DbInvoice['status'] // Use the type from DbInvoice for status
+    status: DbInvoice['status'] 
 ): Promise<{ success: boolean; data?: DbInvoice; error?: string }> => {
      if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
      if (!invoiceId || !status) return { success: false, error: "Invoice ID and status are required." };
@@ -702,11 +643,11 @@ export const updateInvoiceStatus = async (
             .from("invoices")
             .update({ status: status, updated_at: new Date().toISOString() })
             .eq("id", invoiceId)
-            .select() // Select the updated row
-            .single(); // Expect one row
+            .select() 
+            .single(); 
 
         if (error) {
-            if (error.code === 'PGRST116') return { success: false, error: `Invoice ${invoiceId} not found.` }; // Row not found
+            if (error.code === 'PGRST116') return { success: false, error: `Invoice ${invoiceId} not found.` }; 
             throw error;
         }
         if (!data) return { success: false, error: "Invoice not found after update attempt." };
@@ -728,14 +669,11 @@ export const getInvoiceById = async (invoiceId: string): Promise<{ success: bool
             .from("invoices")
             .select("*")
             .eq("id", invoiceId)
-            .maybeSingle(); // Use maybeSingle to return null if not found
+            .maybeSingle(); 
 
         if (error) {
-            // Note: PGRST116 (not found) isn't thrown by maybeSingle, data will be null instead.
-            // Handle other potential errors (like connection issues)
             throw error;
         }
-        // Check if data is null (invoice not found)
         if (!data) {
             return { success: false, error: `Invoice ${invoiceId} not found.` };
         }
@@ -749,8 +687,6 @@ export const getInvoiceById = async (invoiceId: string): Promise<{ success: bool
 };
 
 export const getUserInvoices = async (userId: string): Promise<{ success: boolean; data?: DbInvoice[]; error?: string }> => {
-    // Decide if this needs admin or authenticated client based on RLS
-    // Using admin client for potential broader access needs:
     if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
     const client = supabaseAdmin;
 
@@ -761,7 +697,7 @@ export const getUserInvoices = async (userId: string): Promise<{ success: boolea
             .from("invoices")
             .select("*")
             .eq("user_id", userId)
-            .order("created_at", { ascending: false }); // Order by most recent
+            .order("created_at", { ascending: false }); 
 
         if (error) throw error;
 
@@ -774,19 +710,18 @@ export const getUserInvoices = async (userId: string): Promise<{ success: boolea
 };
 
 
-// --- Rental Management ---
-// Interface combining DB type with potential joined fields for convenience
-export interface RentalWithCarDetails extends DbRental {
+// --- Rental Management (Restored to be car-specific as per OLD file) ---
+export interface RentalWithCarDetails extends DbRental { // Restored from OLD file
   car_make?: string | null;
   car_model?: string | null;
-  car_image_url?: string | null; // Add other car details if needed
+  car_image_url?: string | null;
 }
 
-export const createRental = async (
+export const createRental = async ( // Restored from OLD logic, uses carId
     userId: string,
-    carId: string,
-    startDate: string, // ISO date string format recommended (YYYY-MM-DD)
-    endDate: string,   // ISO date string format recommended (YYYY-MM-DD)
+    carId: string, // Changed back from itemId to carId
+    startDate: string, 
+    endDate: string,   
     totalCost: number
 ): Promise<{ success: boolean; data?: DbRental; error?: string }> => {
      if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
@@ -795,27 +730,24 @@ export const createRental = async (
      }
 
     try {
-        // Optional: Add check here to ensure car exists and is available?
-
         const { data, error } = await supabaseAdmin
             .from("rentals")
             .insert({
                 user_id: userId,
-                car_id: carId,
+                car_id: carId, // Uses car_id
                 start_date: startDate,
                 end_date: endDate,
                 total_cost: totalCost,
-                status: 'pending', // Default status (e.g., needs confirmation or payment)
-                payment_status: 'pending', // Default payment status
+                status: 'pending', 
+                payment_status: 'pending', 
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
             })
-            .select() // Select the newly created rental
-            .single(); // Expect one row
+            .select() 
+            .single(); 
 
         if (error) {
-            // Handle foreign key constraint violation (e.g., user_id or car_id doesn't exist)
-            if (error.code === '23503') { // PostgreSQL foreign key violation
+            if (error.code === '23503') { 
                  return { success: false, error: "Invalid user ID or car ID provided." };
             }
             throw error;
@@ -829,34 +761,30 @@ export const createRental = async (
     }
 };
 
-export const getUserRentals = async (userId: string): Promise<{ success: boolean; data?: RentalWithCarDetails[]; error?: string }> => {
-     // Decide if this needs admin or authenticated client based on RLS
-     // Using admin client for potential broader access needs:
+export const getUserRentals = async (userId: string): Promise<{ success: boolean; data?: RentalWithCarDetails[]; error?: string }> => { // Restored from OLD logic
      if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
      const client = supabaseAdmin;
 
      if (!userId) return { success: false, error: "User ID is required." };
 
       try {
-        // Select rental details and join with cars table for make and model
         const { data, error } = await client
             .from("rentals")
             .select(`
                 *,
-                cars ( make, model, image_url )
-            `) // Select all rental fields and specific car fields
+                cars ( make, model, image_url ) 
+            `) // Explicitly joins with cars table
             .eq("user_id", userId)
-            .order("start_date", { ascending: false }); // Order by most recent start date
+            .order("start_date", { ascending: false }); 
 
         if (error) throw error;
-
-        // Map the result to the desired flat structure
-        const formattedData: RentalWithCarDetails[] = (data || []).map((rental: any) => ({ // Use 'any' carefully, define type if possible
-            ...rental, // Spread all fields from the rentals table
-            car_make: rental.cars?.make || null, // Access nested car data safely
+        
+        const formattedData: RentalWithCarDetails[] = (data || []).map((rental: any) => ({ 
+            ...rental, 
+            car_make: rental.cars?.make || null,
             car_model: rental.cars?.model || null,
             car_image_url: rental.cars?.image_url || null,
-            cars: undefined, // Remove the nested 'cars' object to flatten the structure
+            cars: undefined, // Remove nested cars object
         }));
 
         debugLogger.log(`Fetched ${formattedData.length} rentals for user ${userId}.`);
@@ -867,9 +795,9 @@ export const getUserRentals = async (userId: string): Promise<{ success: boolean
     }
 };
 
-export const updateRentalPaymentStatus = async (
-    rentalId: string, // Use rental_id (assuming it's the PK, adjust if different)
-    paymentStatus: DbRental['payment_status'] // Use type from DbRental
+export const updateRentalPaymentStatus = async ( // Restored from OLD logic
+    rentalId: string, 
+    paymentStatus: DbRental['payment_status'] 
 ): Promise<{ success: boolean; data?: DbRental; error?: string }> => {
      if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
      if (!rentalId || !paymentStatus) return { success: false, error: "Rental ID and payment status are required." };
@@ -878,12 +806,12 @@ export const updateRentalPaymentStatus = async (
         const { data, error } = await supabaseAdmin
             .from("rentals")
             .update({ payment_status: paymentStatus, updated_at: new Date().toISOString() })
-            .eq("rental_id", rentalId) // Use the primary key column name
-            .select() // Select the updated row
-            .single(); // Expect one row
+            .eq("rental_id", rentalId) 
+            .select() 
+            .single(); 
 
         if (error) {
-             if (error.code === 'PGRST116') return { success: false, error: `Rental ${rentalId} not found.` }; // Row not found
+             if (error.code === 'PGRST116') return { success: false, error: `Rental ${rentalId} not found.` }; 
             throw error;
         }
          if (!data) return { success: false, error: "Rental not found after update attempt." };
@@ -907,34 +835,29 @@ export const uploadImage = async (bucketName: string, file: File, fileName?: str
         if (!fileExt) {
             return { success: false, error: "Invalid file name (no extension)." };
         }
-        // Use provided fileName or generate a unique one (e.g., using UUID)
         const finalFileName = fileName || `${crypto.randomUUID()}.${fileExt}`;
-        const filePath = `${finalFileName}`; // Store in bucket root or specify a folder path e.g., `public/${finalFileName}`
+        const filePath = `${finalFileName}`; 
 
         debugLogger.log(`Uploading file '${file.name}' to bucket '${bucketName}' as '${filePath}'...`);
 
-        // Upload the file using admin client
         const { error: uploadError } = await supabaseAdmin.storage
             .from(bucketName)
             .upload(filePath, file, {
-                cacheControl: '3600', // Optional: Cache for 1 hour
-                upsert: false         // Optional: false = don't overwrite, true = overwrite
+                cacheControl: '3600', 
+                upsert: false         
             });
 
         if (uploadError) {
-            // Handle specific errors? e.g., file already exists if upsert: false
             logger.error(`Error uploading image to ${bucketName}/${filePath}:`, uploadError);
             throw uploadError;
         }
 
-        // Get the public URL for the uploaded file
         const { data: urlData } = supabaseAdmin.storage
             .from(bucketName)
             .getPublicUrl(filePath);
 
         if (!urlData?.publicUrl) {
              logger.error(`Failed to get public URL for ${bucketName}/${filePath} after upload.`);
-            // Optional: Attempt to delete the uploaded file if URL retrieval fails?
             throw new Error("Failed to get public URL after upload");
         }
 
@@ -948,8 +871,7 @@ export const uploadImage = async (bucketName: string, file: File, fileName?: str
 };
 
 
-// --- Generic Data Fetching (Examples from Reference) ---
-// Ensure these tables ('questions', 'answers') exist if you use these functions
+// --- Generic Data Fetching ---
 export const fetchQuestions = async () => {
     if (!supabaseAnon) throw new Error("Anon client not available.");
     const { data, error } = await supabaseAnon.from("questions").select("*");
@@ -964,14 +886,14 @@ export const fetchAnswers = async () => {
     return data;
 };
 
-// Fetch all cars (publicly accessible)
+// Restored fetchCars function
 export const fetchCars = async (): Promise<{ success: boolean; data?: DbCar[]; error?: string }> => {
   if (!supabaseAnon) return { success: false, error: "Anon client not available." };
   try {
     const { data, error } = await supabaseAnon
         .from("cars")
         .select("*")
-        .order("created_at", { ascending: false }); // Example order
+        .order("created_at", { ascending: false });
     if (error) throw error;
     return { success: true, data: data || [] };
   } catch (error) {
@@ -980,7 +902,7 @@ export const fetchCars = async (): Promise<{ success: boolean; data?: DbCar[]; e
   }
 }
 
-// Fetch a single car by ID (publicly accessible)
+// Restored fetchCarById function
 export const fetchCarById = async (id: string): Promise<{ success: boolean; data?: DbCar; error?: string }> => {
   if (!id) return { success: false, error: "Car ID is required." };
   if (!supabaseAnon) return { success: false, error: "Anon client not available." };
@@ -989,14 +911,12 @@ export const fetchCarById = async (id: string): Promise<{ success: boolean; data
         .from("cars")
         .select("*")
         .eq("id", id)
-        .maybeSingle(); // Use maybeSingle for single record fetch
+        .maybeSingle();
 
     if (error) {
-        // maybeSingle returns null data, not error code PGRST116 if not found
-        throw error; // Throw other errors
+        throw error;
     }
     if (!data) {
-        // Handle not found case explicitly
         return { success: false, error: `Car with ID ${id} not found.` };
     }
     return { success: true, data };
@@ -1006,33 +926,25 @@ export const fetchCarById = async (id: string): Promise<{ success: boolean; data
   }
 }
 
-
-// --- User Results (Saving/Fetching user choices/matches - from Reference) ---
-// Ensure 'user_results' table exists with appropriate columns (user_id, car_id, created_at)
-// Define the type if not already in database.types.ts
-type DbUserResult = Database["public"]["Tables"]["user_results"]["Row"];
-
+// Restored saveUserResult function
 export const saveUserResult = async (userId: string, carId: string): Promise<{ success: boolean; error?: string }> => {
     const client = await createAuthenticatedClient(userId);
     if (!client) return { success: false, error: "Failed to create authenticated client." };
 
     try {
-        // Insert into user_results table
         const { error } = await client
             .from("user_results")
-            .insert({ user_id: userId, car_id: carId }); // Assumes created_at defaults in DB
+            .insert({ user_id: userId, car_id: carId });
 
         if (error) {
-             // Handle unique constraint violation (user already has this result)
              if (error.code === '23505') {
                  debugLogger.warn(`User ${userId} already has a result for car ${carId}. Ignoring duplicate.`);
-                 return { success: true }; // Treat as success if already exists
+                 return { success: true };
              }
-             // Handle foreign key violation (invalid user or car ID)
              if (error.code === '23503') {
                   return { success: false, error: "Invalid user ID or car ID." };
              }
-             throw error; // Re-throw other errors
+             throw error;
         }
         debugLogger.log(`Saved user result for user ${userId}, car ${carId}.`);
         return { success: true };
@@ -1042,7 +954,7 @@ export const saveUserResult = async (userId: string, carId: string): Promise<{ s
     }
 };
 
-
+// Restored getUserResults function
 export const getUserResults = async (userId: string): Promise<{ success: boolean; data?: DbUserResult[]; error?: string }> => {
     const client = await createAuthenticatedClient(userId);
     if (!client) return { success: false, error: "Failed to create authenticated client." };
@@ -1050,9 +962,9 @@ export const getUserResults = async (userId: string): Promise<{ success: boolean
     try {
         const { data, error } = await client
             .from("user_results")
-            .select("car_id, created_at") // Select necessary columns
+            .select("car_id, created_at")
             .eq("user_id", userId)
-            .order("created_at", { ascending: false }); // Order by most recent
+            .order("created_at", { ascending: false });
 
         if (error) throw error;
         debugLogger.log(`Fetched ${data?.length || 0} results for user ${userId}.`);
