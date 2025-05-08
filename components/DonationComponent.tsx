@@ -4,7 +4,7 @@ import { useState, useEffect, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { sendDonationInvoice } from "@/app/actions";
 import { useAppContext } from "@/contexts/AppContext";
-import { FaStar, FaGithub, FaTelegram, FaCode, FaSpinner } from "react-icons/fa"; // Keep existing imports
+import { FaStar, FaGithub, FaTelegram, FaCode, FaSpinner, FaCreditCard, FaGift, FaRocket, FaThumbsUp } from "react-icons/fa6"; // Keep existing imports, added FaCreditCard, FaGift
 import { toast } from "sonner";
 import Confetti from 'react-dom-confetti';
 import { donationTranslations, donationBenefits } from "@/components/translations_donate";
@@ -22,6 +22,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils"; // Import cn utility
+import { VibeContentRenderer } from '@/components/VibeContentRenderer'; // Added import
 
 const confettiConfig = {
   angle: 90,
@@ -63,11 +64,13 @@ export default function DonationComponent() {
   }));
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveTestimonial(prev => (prev + 1) % t.testimonials.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [t.testimonials.length]);
+    if (t.testimonials && t.testimonials.length > 0) {
+      const interval = setInterval(() => {
+        setActiveTestimonial(prev => (prev + 1) % t.testimonials.length);
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [t.testimonials]);
 
   const handleDoubleIt = () => {
     setStarAmount(prev => {
@@ -392,35 +395,40 @@ export default function DonationComponent() {
           </Card>
 
           {/* Testimonials */}
-          <Card className="bg-dark-card border-brand-green/30 shadow-[0_0_20px_rgba(0,255,157,0.25)] rounded-2xl"> {/* Consistent rounding & shadow */}
-             <CardHeader>
-                <CardTitle className="text-2xl font-bold text-brand-green font-orbitron">{t.whatCreatorsSay}</CardTitle>
-             </CardHeader>
-             <CardContent>
-                <AnimatePresence mode="wait">
-                  <motion.blockquote /* Use blockquote for semantic meaning */
-                    key={activeTestimonial}
-                    initial={{ opacity: 0, y: 20, filter: "blur(5px)" }} // Add blur effect
-                    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                    exit={{ opacity: 0, y: -20, filter: "blur(5px)" }}
-                    transition={{ duration: 0.5, ease: "circOut" }} // Smoother ease
-                    className="relative min-h-[180px] p-6 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl border border-gray-700 shadow-inner" // Gradient, rounded, inner shadow
-                  >
-                    <p className="text-gray-200 italic mb-5 text-lg leading-relaxed">"{t.testimonials[activeTestimonial].text}"</p>
-                    <footer className="flex justify-between items-center pt-4 border-t border-gray-600/50"> {/* Use footer, lighter border */}
-                      <cite className="font-medium text-yellow-400 not-italic text-sm"> {/* Use cite, smaller text */}
-                        — {t.testimonials[activeTestimonial].author}
-                      </cite>
-                      <div className="flex items-center space-x-1">
-                        {[...Array(5)].map((_, i) => (
-                          <FaStar key={i} className="text-yellow-400 text-sm" /> // Smaller stars
-                        ))}
-                      </div>
-                    </footer>
-                  </motion.blockquote>
-                </AnimatePresence>
-             </CardContent>
-          </Card>
+          {t.testimonials && t.testimonials.length > 0 && (
+            <Card className="bg-dark-card border-brand-green/30 shadow-[0_0_20px_rgba(0,255,157,0.25)] rounded-2xl"> {/* Consistent rounding & shadow */}
+              <CardHeader>
+                  <CardTitle className="text-2xl font-bold text-brand-green font-orbitron">{t.whatCreatorsSay}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                  <AnimatePresence mode="wait">
+                    <motion.blockquote /* Use blockquote for semantic meaning */
+                      key={activeTestimonial}
+                      initial={{ opacity: 0, y: 20, filter: "blur(5px)" }} // Add blur effect
+                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                      exit={{ opacity: 0, y: -20, filter: "blur(5px)" }}
+                      transition={{ duration: 0.5, ease: "circOut" }} // Smoother ease
+                      className="relative min-h-[180px] p-6 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl border border-gray-700 shadow-inner" // Gradient, rounded, inner shadow
+                    >
+                      <VibeContentRenderer 
+                        content={`"${t.testimonials[activeTestimonial].text}"`} 
+                        className="text-gray-200 italic mb-5 text-lg leading-relaxed"
+                      />
+                      <footer className="flex justify-between items-center pt-4 border-t border-gray-600/50"> {/* Use footer, lighter border */}
+                        <cite className="font-medium text-yellow-400 not-italic text-sm"> {/* Use cite, smaller text */}
+                          — {t.testimonials[activeTestimonial].author}
+                        </cite>
+                        <div className="flex items-center space-x-1">
+                          {[...Array(5)].map((_, i) => (
+                            <FaStar key={i} className="text-yellow-400 text-sm" /> // Smaller stars
+                          ))}
+                        </div>
+                      </footer>
+                    </motion.blockquote>
+                  </AnimatePresence>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
