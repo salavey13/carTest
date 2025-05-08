@@ -62,7 +62,7 @@ const RequestInput: React.FC<RequestInputProps> = ({
     return (
         <TooltipProvider>
             <div className="flex flex-col gap-3">
-                <div className="relative group">
+                <div className="relative"> {/* Удален класс 'group' т.к. hover/focus эффекты для кнопок убраны */}
                     <Textarea
                         ref={kworkInputRef}
                         id="kworkInput"
@@ -74,7 +74,8 @@ const RequestInput: React.FC<RequestInputProps> = ({
                         disabled={isActionDisabled}
                     />
                     {/* --- Блок кнопок утилиты --- */}
-                    <div className="absolute top-2 right-2 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+                    {/* Удалены классы opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200 */}
+                    <div className="absolute top-2 right-2 flex flex-col gap-1.5">
                         {/* НОВАЯ КНОПКА: Копировать Системный Промпт */}
                         <Tooltip delayDuration={100}>
                             <TooltipTrigger asChild>
