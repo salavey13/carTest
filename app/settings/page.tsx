@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch"; // Assuming you have a Switch component
 import { Label } from "@/components/ui/label"; // Assuming you have a Label component
-import { FaBell, FaTint, FaMoon, FaQuestionCircle, FaEnvelope } from "react-icons/fa";
+import { FaBell, FaTint, FaMoon, FaQuestionCircle, FaEnvelope, FaTools } from "react-icons/fa"; // Added FaTools here
 import Modal from "@/components/ui/Modal"; // Import the Modal component
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
@@ -56,7 +56,7 @@ export default function SettingsPage() {
       >
         <Card className="bg-card/80 backdrop-blur-md border-border shadow-xl">
           <CardHeader className="text-center">
-            <FaCog className="text-5xl text-brand-purple mx-auto mb-3 drop-shadow-lg" />
+            <FaTools className="text-5xl text-brand-purple mx-auto mb-3 drop-shadow-lg" />
             <CardTitle className="text-3xl font-bold text-brand-purple cyber-text">
               Настройки
             </CardTitle>
