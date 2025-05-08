@@ -1,3 +1,4 @@
+// /app/settings/page.tsx
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
@@ -56,7 +57,7 @@ export default function SettingsPage() {
       >
         <Card className="bg-card/80 backdrop-blur-md border-border shadow-xl">
           <CardHeader className="text-center">
-            <FaCog className="text-5xl text-brand-purple mx-auto mb-3 drop-shadow-lg" />
+            <FaTools className="text-5xl text-brand-purple mx-auto mb-3 drop-shadow-lg" />
             <CardTitle className="text-3xl font-bold text-brand-purple cyber-text">
               Настройки
             </CardTitle>
