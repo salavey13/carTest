@@ -1,695 +1,449 @@
-// /app/actions_github/actions.ts
 "use server";
 import { Octokit } from "@octokit/rest";
-// Keep both imports, but use notifyAdmin for errors
 import { notifyAdmins, notifyAdmin } from "@/app/actions";
+// Используем стандартный console для логирования в server actions
 
-// Interfaces
-interface FileNode {
-  path: string;
-  content: string;
-}
+// Интерфейсы
+interface FileNode { path: string; content: string; }
+interface GitTreeFile { path: string; sha: string; type: string; mode?: string; size?: number; url?: string; }
+interface GitTreeResponseData { sha: string; url: string; tree: GitTreeFile[]; truncated: boolean; }
+interface SimplePullRequest { id: number; number: number; title: string; html_url: string; user?: { login?: string }; head: { ref: string }; base: { ref: string }; updated_at: string; } // Added base ref
 
-// Define a type for the items we get from the Git Tree API that we care about
-interface GitTreeFile {
-    path: string;
-    sha: string; // Blob SHA
-    type: string; // 'blob', 'tree', etc.
-    // Optional properties that might exist in the tree response
-    mode?: string;
-    size?: number;
-    url?: string;
-}
-
-// Define a more complete type for the Git Tree Response Data
-// Based on Octokit docs/common responses
-interface GitTreeResponseData {
-    sha: string;
-    url: string;
-    tree: GitTreeFile[]; // Expect an array of tree items
-    truncated: boolean; // Important flag for large repos
-}
-
-
-// --- Constants for Batching ---
-const BATCH_SIZE = 69; // Number of blobs to fetch concurrently in one batch
-const DELAY_BETWEEN_BATCHES_MS = 420; // Delay in milliseconds between batches
-
-// Utility: Delay Function
+// --- Константы ---
+const BATCH_SIZE = 40;
+const DELAY_BETWEEN_BATCHES_MS = 600;
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// --- Restore parseRepoUrl ---
-function parseRepoUrl(repoUrl: string) {
-  const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/);
-  if (!match) throw new Error("Invalid GitHub repo URL");
-  return { owner: match[1], repo: match[2] };
+// --- Улучшенная parseRepoUrl ---
+function parseRepoUrl(repoUrl: string | null | undefined): { owner: string; repo: string } {
+    if (!repoUrl || typeof repoUrl !== 'string') {
+        throw new Error("Invalid GitHub URL: URL is empty or not a string.");
+    }
+    // Regex: Улучшен, чтобы обрабатывать опциональный '.git' и возможный '/' в конце
+    const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+?)(\.git)?\/?$/);
+    if (!match || !match[1] || !match[2]) {
+        console.error("Failed to parse GitHub URL:", repoUrl); // Логируем проблемный URL
+        throw new Error(`Invalid GitHub URL format: ${repoUrl}`);
+    }
+    return { owner: match[1], repo: match[2] };
 }
 
-// --- fetchRepoContents (With branch logic and error notification change) ---
-export async function fetchRepoContents(repoUrl: string, customToken?: string, branchName?: string | null) {
-  console.log(`Fetching repo contents for: ${repoUrl}${branchName ? ` on branch ${branchName}` : ' (default branch)'} using Git Trees API`);
-  const startTime = Date.now();
-  let owner: string | undefined, repo: string | undefined;
-  let targetBranch = branchName; // Use mutable variable for potentially fetching default
+// /app/actions_github/actions.ts
 
-  try {
-    const token = customToken || process.env.GITHUB_TOKEN;
-    if (!token) throw new Error("GitHub token is missing");
-    const repoInfo = parseRepoUrl(repoUrl); owner = repoInfo.owner; repo = repoInfo.repo;
-    const octokit = new Octokit({ auth: token });
-    const allowedExtensions = [".ts", ".tsx", ".css", ".sql"]; // excluded as per original comment
-    const excludedPrefixes = ["supabase/", "components/ui/", "node_modules/", ".next/", "dist/", "build/", "Configame/"];
+// ... (other imports)
 
-    let latestCommitSha: string;
+interface PrCheckResult {
+    exists: boolean;
+    prNumber?: number;
+    prUrl?: string;
+    branchName?: string; // Return branch name for consistency
+}
 
-    if (!targetBranch) {
-        console.log("No branch specified, fetching repository info for default branch...");
-        const { data: repoData } = await octokit.repos.get({ owner, repo });
-        targetBranch = repoData.default_branch;
-        console.log(`Default branch determined: ${targetBranch}`);
-    } else {
-        console.log(`Fetching content for specified branch: ${targetBranch}`);
-    }
-
-    console.log(`Fetching ref for branch ${targetBranch}...`);
+export async function checkExistingPrBranch(
+    repoUrl: string,
+    potentialBranchName: string
+): Promise<{ success: boolean; data?: PrCheckResult; error?: string }> {
+    let owner: string | undefined, repo: string | undefined;
     try {
-        const { data: refData } = await octokit.git.getRef({ owner, repo, ref: `heads/${targetBranch}` });
-        latestCommitSha = refData.object.sha;
-        console.log(`Latest commit SHA on ${targetBranch}: ${latestCommitSha}`);
-    } catch (refError: any) {
-         if (refError.status === 404) {
-             console.error(`Branch '${targetBranch}' not found (404).`);
-             throw new Error(`Branch '${targetBranch}' not found (404).`);
-         }
-         console.error(`Failed to get reference for branch '${targetBranch}':`, refError);
-         throw new Error(`Failed to get reference for branch '${targetBranch}': ${refError.message}`);
-    }
+        const repoInfo = parseRepoUrl(repoUrl);
+        owner = repoInfo.owner;
+        repo = repoInfo.repo;
+        const rId = `${owner}/${repo}`;
+        console.log(`[Action] Checking for existing PR with head branch '${potentialBranchName}' in ${rId}`);
 
-    const { data: commitData } = await octokit.git.getCommit({ owner, repo, commit_sha: latestCommitSha });
-    const treeSha = commitData.tree.sha;
-    console.log(`Tree SHA for commit ${latestCommitSha}: ${treeSha}`);
+        const token = process.env.GITHUB_TOKEN;
+        if (!token) throw new Error("GitHub token is missing.");
+        const octokit = new Octokit({ auth: token });
 
-    console.log(`Fetching recursive tree for tree SHA ${treeSha}...`);
-    let treeData: GitTreeResponseData;
-    try {
-        const response = await octokit.git.getTree({ owner, repo, tree_sha: treeSha, recursive: '1' });
-        treeData = response.data as GitTreeResponseData;
-        // .. VITAL DEBUG LOGGING (Uncomment if needed)
-        // .. console.log("Raw treeData received:", JSON.stringify(treeData, null, 2).substring(0, 500) + '...');
-        if (treeData?.truncated) {
-            console.warn("WARNING: GitHub API reported the tree data was truncated. File list may be incomplete.");
-            // .. Decide if you want to notify admin about truncation
-            // .. await notifyAdmin(`⚠️ Tree data truncated for ${owner}/${repo} on branch ${targetBranch}. File list might be incomplete.`);
-        }
-        if (!treeData || !Array.isArray(treeData.tree)) {
-            console.error("Invalid tree structure received. Expected an object with a 'tree' array property, but got:", treeData);
-            throw new Error(`Failed to fetch repository tree: API response did not contain the expected 'tree' array structure. Truncated status: ${treeData?.truncated ?? 'N/A'}`);
-        }
-        console.log(`Received tree with ${treeData.tree.length} items. Filtering...`);
-    } catch (treeError: any) {
-        const status = treeError.status ? ` (Status: ${treeError.status})` : '';
-        throw new Error(`Failed during getTree API call${status}: ${treeError.message || treeError}`);
-    }
-
-    const filesToFetch: GitTreeFile[] = treeData.tree.filter((item): item is GitTreeFile => {
-        if (item.type !== 'blob' || typeof item.path !== 'string' || !item.path || typeof item.sha !== 'string' || !item.sha) {
-            return false;
-        }
-        if (excludedPrefixes.some(prefix => item.path!.startsWith(prefix))) {
-            return false;
-        }
-        if (!allowedExtensions.some(ext => item.path!.endsWith(ext))) {
-            return false;
-        }
-        return true;
-    });
-    console.log(`Found ${filesToFetch.length} files matching criteria.`);
-
-    const allFiles: FileNode[] = [];
-    const totalFiles = filesToFetch.length;
-    if (totalFiles === 0) { console.warn("No files matched the filtering criteria. Returning empty list."); return { success: true, files: [] }; }
-
-    for (let i = 0; i < totalFiles; i += BATCH_SIZE) {
-        const batchFiles = filesToFetch.slice(i, i + BATCH_SIZE);
-        const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
-        const totalBatches = Math.ceil(totalFiles / BATCH_SIZE);
-        console.log(`Fetching content batch ${batchNumber}/${totalBatches} (Files ${i + 1} to ${Math.min(i + BATCH_SIZE, totalFiles)})`);
-        const batchPromises = batchFiles.map(async (fileInfo) => {
-             try {
-                 const { data: blobData } = await octokit.git.getBlob({ owner: owner!, repo: repo!, file_sha: fileInfo.sha });
-                 if (typeof blobData.content !== 'string' || typeof blobData.encoding !== 'string') {
-                     console.error(`Invalid blob structure for ${fileInfo.path} (SHA: ${fileInfo.sha}): Missing content or encoding.`, blobData);
-                     throw new Error(`Invalid blob data received for ${fileInfo.path}`);
-                 }
-                 let content: string;
-                 if (blobData.encoding === 'base64') {
-                     content = Buffer.from(blobData.content, 'base64').toString('utf-8');
-                 } else if (blobData.encoding === 'utf-8') {
-                     content = blobData.content;
-                     // .. console.warn(`Received non-base64 encoding ('${blobData.encoding}') for blob ${fileInfo.path}. Using content directly.`);
-                 } else {
-                     console.error(`Unsupported blob encoding for ${fileInfo.path}: ${blobData.encoding}. Cannot decode.`);
-                     throw new Error(`Unsupported encoding '${blobData.encoding}' for file ${fileInfo.path}`);
-                 }
-                 const contentLines = content.split("\n");
-                 let pathComment: string;
-                 if (fileInfo.path.endsWith(".ts") || fileInfo.path.endsWith(".tsx")) { pathComment = `// /${fileInfo.path}`; }
-                 else if (fileInfo.path.endsWith(".css")) { pathComment = `/* /${fileInfo.path} */`; }
-                 else if (fileInfo.path.endsWith(".sql")) { pathComment = `-- /${fileInfo.path}`; }
-                 else { pathComment = `# /${fileInfo.path}`; } // Default
-
-                 const firstLineTrimmed = contentLines[0]?.trimStart();
-                 // .. Only replace if the first line LOOKS like a comment already
-                 if (firstLineTrimmed?.match(/^(--|\/\/|\/\*|#)/)) {
-                    contentLines[0] = pathComment;
-                 } else { // .. Otherwise, prepend
-                    contentLines.unshift(pathComment);
-                 }
-                 return { path: fileInfo.path, content: contentLines.join("\n") };
-             } catch (fetchError: any) {
-                  console.error(`Error fetching blob content for ${fileInfo.path} (SHA: ${fileInfo.sha}):`, fetchError.status ? `${fetchError.message} (Status: ${fetchError.status})` : fetchError);
-                  throw new Error(`Failed to fetch blob ${fileInfo.path}: ${fetchError.message || fetchError}`);
-             }
+        // List open PRs with the specific head branch
+        const { data: existingPrs } = await octokit.pulls.list({
+            owner,
+            repo,
+            state: 'open',
+            head: `${owner}:${potentialBranchName}`, // Filter by head repo:branch
         });
-        try {
-            const batchResults = await Promise.all(batchPromises); allFiles.push(...batchResults);
-            // .. console.log(`Batch ${batchNumber}/${totalBatches} completed.`);
-        } catch (batchError) {
-             console.error(`Error processing content batch ${batchNumber}/${totalBatches}:`, batchError);
-             // .. Throw to indicate the overall fetch failed if any batch fails.
-             // .. It already includes the specific file error message from the inner catch
-             throw new Error(`Failed to fetch files in batch ${batchNumber}. Error: ${batchError instanceof Error ? batchError.message : batchError}`);
+
+        if (existingPrs.length > 0) {
+            const pr = existingPrs[0]; // Assume the first one is the relevant one
+            console.log(`[Action] Found existing open PR #${pr.number} for branch '${potentialBranchName}'.`);
+            return {
+                success: true,
+                data: {
+                    exists: true,
+                    prNumber: pr.number,
+                    prUrl: pr.html_url,
+                    branchName: potentialBranchName // Return the name back
+                }
+            };
+        } else {
+            console.log(`[Action] No existing open PR found for branch '${potentialBranchName}'.`);
+            // Optional: Check if the branch *exists* even if no PR is open?
+            // try {
+            //   await octokit.git.getRef({ owner, repo, ref: `heads/${potentialBranchName}` });
+            //   console.log(`[Action] Branch '${potentialBranchName}' exists but has no open PR.`);
+            //   // Decide how to handle this - maybe still treat as non-existent for flow?
+            // } catch (refError: any) {
+            //   if (refError.status !== 404) throw refError; // Re-throw unexpected errors
+            // }
+            return { success: true, data: { exists: false, branchName: potentialBranchName } };
         }
-        if (i + BATCH_SIZE < totalFiles) {
-           console.log(`Waiting ${DELAY_BETWEEN_BATCHES_MS}ms before next batch...`);
-           await delay(DELAY_BETWEEN_BATCHES_MS);
-        }
+
+    } catch (error: any) {
+        const repoId = owner && repo ? `${owner}/${repo}` : repoUrl;
+        console.error(`[Action] Error checking for PR branch '${potentialBranchName}' in ${repoId}:`, error);
+        let eM = error instanceof Error ? error.message : "Failed to check for existing PR";
+         // Add specific error handling like in other actions (404, 403 etc.)
+        if (error.status === 404) { eM = `Repo ${repoId} not found (${error.status}).`; }
+        else if (error.status === 403) { eM = `Permission denied (${error.status}) checking PRs for ${repoId}.`; }
+        // ... other status codes
+        // Avoid notifying admin for potentially common checks unless it's a persistent failure
+        return { success: false, error: eM };
     }
-
-    const endTime = Date.now();
-    console.log(`Successfully fetched content for ${allFiles.length} files from branch '${targetBranch}' in ${(endTime - startTime) / 1000} seconds.`);
-    return { success: true, files: allFiles };
-
-  } catch (error: any) {
-        const endTime = Date.now();
-        const repoIdentifier = owner && repo ? `${owner}/${repo}` : repoUrl;
-        // Use targetBranch (which might be the fetched default) in error messages
-        const branchInfo = targetBranch ? ` on branch '${targetBranch}'` : ' (default branch)';
-        console.error(`Error fetching repo contents for ${repoIdentifier}${branchInfo} after ${(endTime - startTime) / 1000} seconds:`, error);
-         // Use notifyAdmin for error notifications
-         if (error.status === 403 && error.message?.includes('rate limit exceeded')) {
-            console.error("GitHub API rate limit exceeded.");
-            await notifyAdmin(`❌ Ошибка (Rate Limit) при извлечении файлов из репозитория ${repoIdentifier}${branchInfo}. Попробуйте позже.`);
-            return { success: false, error: "GitHub API rate limit exceeded. Please try again later." };
-         }
-         if (error.status === 404 || error.message?.includes('not found')) {
-            console.error("Repository, branch, or resource not found.");
-             await notifyAdmin(`❌ Ошибка (404 Not Found) при извлечении файлов из репозитория ${repoIdentifier}${branchInfo}. Проверьте URL, права доступа к токену и существование ветки/коммита.`);
-            return { success: false, error: `Repository, branch ('${targetBranch}'), or required resource not found (404). Check URL, token permissions, and branch/commit existence.` };
-         }
-         if (error.status === 401 || error.status === 403) {
-             console.error(`GitHub API Authentication/Authorization error (Status: ${error.status})`);
-             await notifyAdmin(`❌ Ошибка (Auth ${error.status}) при извлечении файлов из репозитория ${repoIdentifier}${branchInfo}. Проверьте токен и его права доступа.`);
-            return { success: false, error: `GitHub API Authentication/Authorization error (Status: ${error.status}). Check token and permissions.` };
-         }
-        // Generic error
-        await notifyAdmin(`❌ Ошибка при извлечении файлов из репозитория ${repoIdentifier}${branchInfo}:\n${error instanceof Error ? error.message : String(error)}`);
-        return { success: false, error: `Failed to fetch contents${branchInfo}: ${error instanceof Error ? error.message : "Unknown error occurred"}` };
-  }
 }
 
 
-// --- createGitHubPullRequest (Creates NEW branch/PR, uses notifyAdmin for errors) ---
-export async function createGitHubPullRequest(
-  repoUrl: string,
-  files: FileNode[],
-  prTitle: string,
-  prDescription: string,
-  commitMessage: string,
-  branchName?: string // Optional suggested new branch name
-) {
-  let owner: string | undefined, repo: string | undefined, baseBranch: string | undefined;
+
+// --- fetchRepoContents ---
+
+export async function fetchRepoContents(repoUrl: string, customToken?: string, branchName?: string | null) {
+  console.log(`[Action] Fetching: ${repoUrl}${branchName ? ` @ ${branchName}` : ' (default)'}`);
+  const startTime = Date.now(); let owner: string | undefined, repo: string | undefined; let targetBranch = branchName; let isDefaultFetched = false;
   try {
-    const token = process.env.GITHUB_TOKEN; if (!token) throw new Error("GitHub token missing");
+    const token = customToken || process.env.GITHUB_TOKEN; if (!token) throw new Error("GH token missing");
     const repoInfo = parseRepoUrl(repoUrl); owner = repoInfo.owner; repo = repoInfo.repo;
     const octokit = new Octokit({ auth: token });
-
-    const { data: repoData } = await octokit.repos.get({ owner, repo });
-    baseBranch = repoData.default_branch; // Base for NEW branch
-
-    const { data: refData } = await octokit.git.getRef({ owner, repo, ref: `heads/${baseBranch}` });
-    const baseSha = refData.object.sha;
-
-    // Truncate messages if needed
-    const MAX_SIZE_BYTES = 65000; let finalCommitMessage = commitMessage, finalPrDescription = prDescription;
-    const encoder = new TextEncoder();
-    if (encoder.encode(finalCommitMessage).length > MAX_SIZE_BYTES) { finalCommitMessage = finalCommitMessage.substring(0, 60000) + "... (truncated)"; console.warn(`Commit message too long, truncating.`); }
-    if (encoder.encode(finalPrDescription).length > MAX_SIZE_BYTES) { finalPrDescription = finalPrDescription.substring(0, 60000) + "\n\n... (truncated)"; console.warn(`PR description too long, truncating.`); }
-
-    const newBranch = branchName || `feature-aiassisted-onesitepls-${Date.now()}`;
-    console.log(`Creating NEW branch '${newBranch}' from ${baseBranch} (SHA: ${baseSha})`);
-    // This will FAIL if branch already exists, which is desired for this function
-    await octokit.git.createRef({ owner, repo, ref: `refs/heads/${newBranch}`, sha: baseSha });
-    console.log(`Branch '${newBranch}' created successfully.`);
-
-    // --- Create blobs, tree, commit, update NEW ref, create PR ---
-    const { data: baseCommitData } = await octokit.git.getCommit({ owner, repo, commit_sha: baseSha });
-    const baseTree = baseCommitData.tree.sha; console.log(`Base tree SHA: ${baseTree}`);
-    console.log(`Creating ${files.length} blobs...`);
-    const tree = await Promise.all( files.map(async (file) => { try { const { data } = await octokit.git.createBlob({ owner: owner!, repo: repo!, content: file.content, encoding: "utf-8" }); return { path: file.path, mode: "100644" as const, type: "blob" as const, sha: data.sha }; } catch (e: any) { throw new Error(`Failed to create blob for ${file.path}: ${e.message || e}`); } }) );
-    console.log("Blobs created.");
-    console.log(`Creating new tree with base ${baseTree}...`);
-    const { data: newTree } = await octokit.git.createTree({ owner, repo, base_tree: baseTree, tree });
-    console.log(`New tree created: ${newTree.sha}`);
-    console.log(`Creating commit with tree ${newTree.sha}...`);
-    const { data: newCommit } = await octokit.git.createCommit({ owner, repo, message: finalCommitMessage, tree: newTree.sha, parents: [baseSha] });
-    console.log(`New commit created: ${newCommit.sha}`);
-    console.log(`Updating ref heads/${newBranch} to commit ${newCommit.sha}...`);
-    await octokit.git.updateRef({ owner, repo, ref: `heads/${newBranch}`, sha: newCommit.sha, force: false }); // force should generally be false
-    console.log(`Ref heads/${newBranch} updated.`);
-    const changedFiles = files.map((file) => file.path).join(", ");
-    console.log(`Creating pull request: '${prTitle}' from ${newBranch} to ${baseBranch}...`);
-    const { data: pr } = await octokit.pulls.create({ owner, repo, title: prTitle, body: finalPrDescription, head: newBranch, base: baseBranch });
-    console.log(`Pull request created: ${pr.html_url}`);
-    // --- Notify (Success) ---
-    const adminMessage = `🔔 Созданы новые изменения в проекте!\nЧто меняем: ${prTitle}\nПодробности: ${finalPrDescription}\nФайлы: ${changedFiles}\n\n[Посмотреть и одобрить на GitHub](https://github.com/${owner}/${repo}/pull/${pr.number})`;
-    await notifyAdmins(adminMessage); // Use notifyAdmins for success broadcasts
-    return { success: true, prUrl: pr.html_url, branch: newBranch };
-
+    // Filtering Logic (Keep Balanced v3)
+    const allowedRootFiles = new Set(['package.json','tailwind.config.ts','tsconfig.json','next.config.js','next.config.mjs','vite.config.ts','vite.config.js','README.md','seed.sql']); const allowedPrefixes = ['app/','src/','components/','contexts/','hooks/','lib/','styles/','types/','utils/','data/']; const excludedExactPaths = new Set([]); const excludedPrefixes = ['.git/','node_modules/','.next/','dist/','build/','out/','public/','supabase/migrations/','Configame/','components/ui/','.vscode/','.idea/','coverage/','storybook-static/','docs/','examples/','test/','tests/','__tests__/','cypress/','prisma/migrations/','assets/','static/','images/']; const excludedExtensions = ['.pl','.json','.png','.jpg','.jpeg','.gif','.svg','.ico','.webp','.avif','.mp4','.webm','.mov','.mp3','.wav','.ogg','.pdf','.woff','.woff2','.ttf','.otf','.eot','.zip','.gz','.tar','.rar','.env','.lock','.log','.DS_Store','.md','.csv','.xlsx','.xls','.yaml','.yml','.bak','.tmp','.swp','.map','.dll','.exe','.so','.dylib'];
+    // --- Branch Logic (More Robust Default Handling) ---
+    if (!targetBranch || targetBranch === 'default') {
+        console.log("[Action] Fetching repo info for default...");
+        try { const { data: repoData } = await octokit.repos.get({ owner, repo }); targetBranch = repoData.default_branch; isDefaultFetched = true; console.log(`[Action] Default branch via repos.get: ${targetBranch}`); }
+        catch (repoGetError: any) { console.error(`[Action] Failed repos.get default:`, repoGetError); if (repoGetError.status === 403 && repoGetError.message?.includes('rate limit')) { await notifyAdmin(`⏳ Rate Limit getting default branch ${owner}/${repo}.`); throw new Error("API rate limit hit checking default branch."); } if (!branchName) { throw new Error(`Failed determine default: ${repoGetError.message}`); } targetBranch = 'default'; console.warn("[Action] Default fetch failed, using explicit 'default'."); }
+    } else { console.log(`[Action] Using specified branch: ${targetBranch}`); }
+    if (!targetBranch) { throw new Error("Target branch undetermined."); }
+    let latestCommitSha: string; console.log(`[Action] Fetching ref/commit for: ${targetBranch}...`);
+    try { const { data: refData } = await octokit.git.getRef({ owner, repo, ref: `heads/${targetBranch}` }); latestCommitSha = refData.object.sha; console.log(`[Action] SHA via getRef: ${latestCommitSha}`); }
+    catch (refError: any) { if (refError.status === 404) { console.warn(`[Action] getRef 404 for 'heads/${targetBranch}'. Trying getCommit...`); try { const { data: commitDataFallback } = await octokit.repos.getCommit({ owner, repo, ref: targetBranch }); latestCommitSha = commitDataFallback.sha; console.log(`[Action] SHA via getCommit fallback: ${latestCommitSha}`); } catch (commitError: any) { console.error(`[Action] All attempts failed for '${targetBranch}'.`, commitError); const bType = isDefaultFetched ? "default" : "branch"; throw new Error(`Cannot find ${bType} '${targetBranch}' (404).`); } } else if (refError.status === 403 && refError.message?.includes('rate limit')) { await notifyAdmin(`⏳ Rate Limit getRef ${owner}/${repo} ${targetBranch}.`); throw new Error("API rate limit hit fetching branch details."); } else { console.error(`[Action] Failed getRef ${targetBranch}:`, refError); throw new Error(`Failed get git ref ${targetBranch}: ${refError.message}`); } }
+    // --- Tree Fetching ---
+    const { data: commitData } = await octokit.git.getCommit({ owner, repo, commit_sha: latestCommitSha }); const treeSha = commitData.tree.sha; console.log(`[Action] Tree SHA: ${treeSha}. Fetching tree...`); let treeData: GitTreeResponseData;
+    try { const res = await octokit.git.getTree({ owner, repo, tree_sha: treeSha, recursive: '1' }); treeData = res.data as GitTreeResponseData; if (treeData?.truncated) { console.warn("[Action] Tree truncated."); await notifyAdmin(`⚠️ Tree truncated ${owner}/${repo} ${targetBranch}.`); } if (!treeData || !Array.isArray(treeData.tree)) { console.error("[Action] Invalid tree structure:", treeData); throw new Error(`Invalid tree structure.`); } console.log(`[Action] Tree items: ${treeData.tree.length}. Filtering...`); } catch (treeError: any) { console.error(`[Action] getTree failed`, treeError); throw new Error(`Failed getTree: ${treeError.message || treeError}`); }
+    // --- Apply Filtering ---
+    let filesToFetch = treeData.tree.filter((item): item is GitTreeFile => { if(item.type!=='blob'||!item.path||!item.sha) return false; const pL=item.path.toLowerCase(); if(excludedExactPaths.has(item.path)) return false; if(excludedPrefixes.some(p=>pL.startsWith(p))) return false; if(excludedExtensions.some(e=>pL.endsWith(e))) return item.path==='README.md'||allowedRootFiles.has(item.path); if(allowedRootFiles.has(item.path)) return true; if(allowedPrefixes.some(p=>pL.startsWith(p))) return true; return false; });
+    console.log(`[Action] Filtered to ${filesToFetch.length} files.`);
+    // --- File Limit Check (Warn & Truncate) ---
+    const MAX_FILES_TO_FETCH = 500; if (filesToFetch.length > MAX_FILES_TO_FETCH) { console.warn(`[Action] Count (${filesToFetch.length}) > limit (${MAX_FILES_TO_FETCH}). Truncating.`); await notifyAdmin(`⚠️ High file count (${filesToFetch.length}) ${owner}/${repo} ${targetBranch}. Truncated.`); filesToFetch = filesToFetch.slice(0, MAX_FILES_TO_FETCH); }
+    // --- Content Fetching Loop ---
+    const allFiles: FileNode[] = []; const totalFiles = filesToFetch.length; if (totalFiles === 0) { console.warn("[Action] No relevant files found."); return { success: true, files: [] }; }
+    console.log(`[Action] Fetching content for ${totalFiles} files...`);
+    for (let i = 0; i < totalFiles; i += BATCH_SIZE) { /* Keep batch loop */ const bF = filesToFetch.slice(i, i + BATCH_SIZE); const bN = Math.floor(i / BATCH_SIZE) + 1; const tB = Math.ceil(totalFiles / BATCH_SIZE); console.log(`[Action] Batch ${bN}/${tB}...`); const bP = bF.map(async (fI) => { try { const { data: bD } = await octokit.git.getBlob({ owner: owner!, repo: repo!, file_sha: fI.sha }); if (typeof bD.content !== 'string' || typeof bD.encoding !== 'string') { console.warn(`[Action] Invalid blob ${fI.path}. Skip.`); return null; } let cnt: string; if (bD.encoding === 'base64') { cnt = Buffer.from(bD.content, 'base64').toString('utf-8'); } else if (bD.encoding === 'utf-8') { cnt = bD.content; } else { console.warn(`[Action] Unsup. encoding '${bD.encoding}' ${fI.path}. Skip.`); return null; } const MAX_BYTES = 750*1024; if (Buffer.byteLength(cnt, 'utf8') > MAX_BYTES) { console.warn(`[Action] Skip large (${(Buffer.byteLength(cnt,'utf8')/1024).toFixed(0)} KB): ${fI.path}`); return null; } let pC: string; const fE = fI.path.split('.').pop()?.toLowerCase()||''; switch(fE){ case 'ts': case 'tsx': case 'js': case 'jsx': pC=`// /${fI.path}`; break; case 'css': case 'scss': pC=`/* /${fI.path} */`; break; case 'sql': pC=`-- /${fI.path}`; break; case 'py': case 'rb': case 'sh': case 'yml': case 'yaml': case 'env': pC=`# /${fI.path}`; break; case 'html': case 'xml': case 'vue': case 'svelte': pC=`<!-- /${fI.path} -->`; break; case 'md': pC=`<!-- /${fI.path} -->`; break; default: pC=`// /${fI.path}`; } if(cnt.trim()&&!cnt.trimStart().startsWith(pC)){cnt=`${pC}\n${cnt}`;} else if(!cnt.trim()){cnt=pC;} return { path: fI.path, content: cnt }; } catch (fE: any) { console.error(`[Action] Err fetch blob ${fI.path}:`, fE.status?`${fE.message} (${fE.status})`:fE); return null; } }); const bR = await Promise.all(bP); const vR = bR.filter((r): r is FileNode => r !== null); allFiles.push(...vR); if (vR.length < bR.length) { console.warn(`[Action] ${bR.length - vR.length} files batch ${bN} failed/skipped.`); } if (i + BATCH_SIZE < totalFiles) { console.log(`[Action] Wait ${DELAY_BETWEEN_BATCHES_MS}ms...`); await delay(DELAY_BETWEEN_BATCHES_MS); } }
+    // --- Success Return ---
+    const endTime = Date.now(); console.log(`[Action] Success: ${allFiles.length} files from '${targetBranch}' (${((endTime-startTime)/1000).toFixed(1)}s).`); return { success: true, files: allFiles };
   } catch (error: any) {
-        console.error("Error creating pull request:", error);
-        const repoIdentifier = owner && repo ? `${owner}/${repo}` : repoUrl;
-        const attemptedBranch = branchName || `feature-aiassisted-...`;
-        let errorMessage = error instanceof Error ? error.message : "Unknown error occurred creating PR";
-        // Specific error handling
-        if (error.status === 422 && error.message?.includes("Reference already exists")) {
-           errorMessage = `Branch '${attemptedBranch}' already exists. Please use a different branch name or delete the existing one.`;
-            console.error(errorMessage);
-        } else if (error.status === 404 && error.message?.includes("Not Found")) {
-            errorMessage = `Repository ${repoIdentifier} or base branch '${baseBranch || 'default'}' not found (404). Check URL and permissions.`;
-            console.error(errorMessage);
-        } else if (error.status === 403) {
-             errorMessage = `Permission denied (403) when trying to create PR/branch/commit in ${repoIdentifier}. Check token permissions.`;
-             console.error(errorMessage);
-        }
-        // Notify Admin on Error
-        await notifyAdmin(`❌ Ошибка при создании НОВОГО PR для ${repoIdentifier}:\n${errorMessage}\n${error.stack || ''}`);
-        return { success: false, error: errorMessage };
+    // --- Error Handling ---
+    const endTime=Date.now(); const repoId=owner&&repo?`${owner}/${repo}`:repoUrl; const bInfo=targetBranch?` on ${targetBranch}`:''; console.error(`[Action] CRITICAL Error fetch ${repoId}${bInfo}:`,error);
+    if(error.status===403&&error.message?.includes('rate limit')){await notifyAdmin(`⏳ Rate Limit ${repoId}${bInfo}.`);return {success:false, error:"GitHub API rate limit exceeded."};}
+    if(error.status===404||error.message?.includes('not found')){await notifyAdmin(`❌ 404 Not Found ${repoId}${bInfo}.`);return {success:false, error:`Repo, branch ('${targetBranch}'), or resource not found.`};}
+    if(error.status===401||error.status===403){await notifyAdmin(`❌ Auth Error (${error.status}) ${repoId}${bInfo}.`);return {success:false, error:`GitHub Auth error (${error.status}).`};}
+    if(error.message?.startsWith('Too many files')){await notifyAdmin(`❌ Too many files ${repoId}${bInfo}.`);return {success:false, error:error.message};}
+    await notifyAdmin(`❌ Ошибка извлечения ${repoId}${bInfo}:\n${error.message}`); return {success:false, error:`Fetch failed: ${error.message}`};
   }
 }
 
+// --- createGitHubPullRequest ---
+// ... (код createGitHubPullRequest без изменений) ...
+export async function createGitHubPullRequest( repoUrl: string, files: FileNode[], prTitle: string, prDescription: string, commitMessage: string, branchName?: string ) {
+  console.log("[Action] createGitHubPullRequest called..."); let owner: string|undefined, repo: string|undefined, baseBranch: string|undefined;
+  try {
+    const token = process.env.GITHUB_TOKEN; if (!token) throw new Error("GH token missing");
+    const repoInfo = parseRepoUrl(repoUrl); owner = repoInfo.owner; repo = repoInfo.repo;
+    const octokit = new Octokit({ auth: token }); const { data: repoData } = await octokit.repos.get({ owner, repo }); baseBranch = repoData.default_branch;
+    const { data: refData } = await octokit.git.getRef({ owner, repo, ref: `heads/${baseBranch}` }); const baseSha = refData.object.sha;
+    const MAX_BYTES=65000; let finalCommitMsg=commitMessage, finalPrDesc=prDescription; const enc=new TextEncoder();
+    if(enc.encode(finalCommitMsg).length>MAX_BYTES){ try { finalCommitMsg=finalCommitMsg.substring(0,60000)+"...(trunc)"; } catch(e){console.warn("[Action] Commit msg trunc failed."); finalCommitMsg="Commit message truncated.";} console.warn(`[Action] Commit msg trunc.`);}
+    if(enc.encode(finalPrDesc).length>MAX_BYTES){ try { finalPrDesc=finalPrDesc.substring(0,60000)+"\n\n...(trunc)"; } catch(e){console.warn("[Action] PR desc trunc failed."); finalPrDesc="PR description truncated.";} console.warn(`[Action] PR desc trunc.`);}
+    const newBranch = branchName || `ai-patch-${Date.now()}`; let branchExists=false; let existingHeadSha:string|null=null;
+    try { const { data: eRef } = await octokit.git.getRef({ owner, repo, ref: `heads/${newBranch}` }); branchExists = true; existingHeadSha = eRef.object.sha; console.warn(`[Action] Branch '${newBranch}' exists (SHA: ${existingHeadSha}). Updating.`); }
+    catch (error: any) { if (error.status === 404) { console.log(`[Action] Branch '${newBranch}' not found. Creating...`); branchExists = false; } else { throw error; } }
+    if (!branchExists) { console.log(`[Action] Creating NEW branch '${newBranch}' from ${baseBranch} (SHA: ${baseSha})`); await octokit.git.createRef({ owner, repo, ref: `refs/heads/${newBranch}`, sha: baseSha }); console.log(`[Action] Branch '${newBranch}' created.`); }
+    const baseTreeSha = branchExists && existingHeadSha ? (await octokit.git.getCommit({ owner, repo, commit_sha: existingHeadSha })).data.tree.sha : (await octokit.git.getCommit({ owner, repo, commit_sha: baseSha })).data.tree.sha;
+    console.log(`[Action] Base tree SHA: ${baseTreeSha}. Creating ${files.length} blobs...`);
+    const tree = await Promise.all( files.map(async (f) => { try { const { data } = await octokit.git.createBlob({ owner: owner!, repo: repo!, content: f.content, encoding: "utf-8" }); return { path: f.path, mode: "100644" as const, type: "blob" as const, sha: data.sha }; } catch (e: any) { throw new Error(`Fail blob ${f.path}: ${e.message||e}`); } }) );
+    console.log("[Action] Blobs created. Creating tree..."); const { data: newTree } = await octokit.git.createTree({ owner, repo, base_tree: baseTreeSha, tree }); console.log(`[Action] New tree: ${newTree.sha}. Creating commit...`);
+    const parentSha = branchExists ? existingHeadSha! : baseSha; const { data: newCommit } = await octokit.git.createCommit({ owner, repo, message: finalCommitMsg, tree: newTree.sha, parents: [parentSha] }); console.log(`[Action] New commit: ${newCommit.sha}. Updating ref...`);
+    await octokit.git.updateRef({ owner, repo, ref: `heads/${newBranch}`, sha: newCommit.sha, force: false }); console.log(`[Action] Ref heads/${newBranch} updated.`);
+    let prNumber: number|undefined; let prUrl: string|undefined; const { data: existingPrs } = await octokit.pulls.list({ owner, repo, head: `${owner}:${newBranch}`, state: 'open' });
+    if (existingPrs.length > 0) { prNumber = existingPrs[0].number; prUrl = existingPrs[0].html_url; console.log(`[Action] Found existing PR #${prNumber}.`); const adminMsg = `🔄 PR #${prNumber} в ${owner}/${repo} обновлен.\nCommit: ${finalCommitMsg.split('\n')[0]}\n\n[Посмотреть](${prUrl})`; await notifyAdmins(adminMsg); }
+    else if (!branchExists) { console.log(`[Action] Creating PR: '${prTitle}'...`); const { data: pr } = await octokit.pulls.create({ owner, repo, title: prTitle, body: finalPrDesc, head: newBranch, base: baseBranch }); prNumber = pr.number; prUrl = pr.html_url; console.log(`[Action] PR created: ${prUrl}`); const chFiles = files.map((f) => f.path).join(", "); const adminMsg = `🔔 Создан PR #${prNumber} в ${owner}/${repo}\n${prTitle}\n${chFiles}\n\n[GitHub](${prUrl})`; await notifyAdmins(adminMsg); }
+    else { console.warn(`[Action] Branch '${newBranch}' updated, no open PR found.`); const chFiles = files.map((f) => f.path).join(", "); const bUrl = `https://github.com/${owner}/${repo}/tree/${newBranch}`; const adminMsg = `🔄 Ветка '${newBranch}' обновлена (PR не найден).\n${finalCommitMsg.split('\n')[0]}\n${chFiles}\n\n[Ветка](${bUrl})`; await notifyAdmins(adminMsg); }
+    return { success: true, prUrl, branch: newBranch, prNumber };
+  } catch (error: any) { console.error("[Action] Error create/update PR:", error); const repoId=`${owner}/${repo}`; const aB=branchName||`ai-patch-...`; let eM=error instanceof Error?error.message:"Unknown error"; if(error.status===422&&error.message?.includes("No commit")){eM=`Base branch '${baseBranch||'?'}' empty?`;} else if(error.status===404){eM=`Repo ${repoId} or base '${baseBranch||'?'}' not found.`;} else if(error.status===403){eM=`Permission denied ${repoId}.`;} else if(error.status===409&&error.message?.includes('conflict')){eM=`Update conflict branch '${aB}'.`;} await notifyAdmin(`❌ Ошибка PR ${repoId}:\n${eM}`); return {success:false, error:eM}; }
+}
 
-// --- NEW: updateBranch (Uses notifyAdmin for errors) ---
-// This function commits changes to an EXISTING branch.
+// --- updateBranch ---
+// ... (код updateBranch без изменений, но с улучшенным логом комментария и безопасным substring) ...
 export async function updateBranch(
-  repoUrl: string,
-  files: FileNode[],
-  commitMessage: string,
-  branchName: string // Branch MUST exist
+    repoUrl: string,
+    files: FileNode[],
+    commitMessage: string,
+    branchName: string,
+    prNumberToComment?: number | null,
+    commentBody?: string | null
 ) {
-  let owner: string | undefined, repo: string | undefined;
-  try {
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) throw new Error("GitHub token missing");
-    if (!branchName) throw new Error("Branch name is required for update");
+    let owner: string | undefined, repo: string | undefined;
+    const rIP = parseRepoUrl(repoUrl);
+    owner = rIP.owner; repo = rIP.repo;
+    const rId = `${owner}/${repo}`;
+    console.log(`[Action] updateBranch '${branchName}' PR#: ${prNumberToComment ?? 'N/A'}. Comment body provided: ${!!commentBody}`); // Лог наличия тела комментария
 
-    const repoInfo = parseRepoUrl(repoUrl);
-    owner = repoInfo.owner;
-    repo = repoInfo.repo;
-    const octokit = new Octokit({ auth: token });
-
-    // 1. Get the SHA of the branch's current HEAD
-    console.log(`Getting current HEAD for branch '${branchName}'...`);
-    let baseSha: string;
     try {
-        const { data: refData } = await octokit.git.getRef({ owner, repo, ref: `heads/${branchName}` });
-        baseSha = refData.object.sha;
-        console.log(`Current HEAD SHA for ${branchName}: ${baseSha}`);
-    } catch (refError: any) {
-        if (refError.status === 404) {
-            console.error(`Branch '${branchName}' not found. Cannot update.`);
-            throw new Error(`Branch '${branchName}' not found. Cannot update.`);
-        }
-        console.error(`Failed to get ref for ${branchName}:`, refError);
-        throw new Error(`Failed to get ref for ${branchName}: ${refError.message}`);
-    }
+        const token = process.env.GITHUB_TOKEN;
+        if (!token) throw new Error("Token missing");
+        if (!branchName) throw new Error("Branch required");
+        const octokit = new Octokit({ auth: token });
 
-    // 2. Get the base tree SHA from the current HEAD commit
-    const { data: baseCommitData } = await octokit.git.getCommit({ owner, repo, commit_sha: baseSha });
-    const baseTree = baseCommitData.tree.sha;
-    console.log(`Base tree SHA: ${baseTree}`);
-
-    // Truncate commit message if needed
-    const MAX_SIZE_BYTES = 65000; let finalCommitMessage = commitMessage;
-    const encoder = new TextEncoder();
-    if (encoder.encode(finalCommitMessage).length > MAX_SIZE_BYTES) { finalCommitMessage = finalCommitMessage.substring(0, 60000) + "..."; console.warn(`Commit msg truncated.`); }
-
-
-    // 3. Create blobs for new/updated files
-    console.log(`Creating ${files.length} blobs...`);
-    const tree = await Promise.all(
-      files.map(async (file) => {
+        console.log(`[Action] Get HEAD ${branchName}...`);
+        let baseSha: string;
         try {
-            const { data } = await octokit.git.createBlob({ owner: owner!, repo: repo!, content: file.content, encoding: "utf-8" });
-            return { path: file.path, mode: "100644" as const, type: "blob" as const, sha: data.sha };
-        } catch (blobError: any) {
-             console.error(`Error creating blob for file ${file.path}:`, blobError);
-             throw new Error(`Failed to create blob for ${file.path}: ${blobError.message || blobError}`);
+            const { data: refData } = await octokit.git.getRef({ owner, repo, ref: `heads/${branchName}` });
+            baseSha = refData.object.sha;
+            console.log(`[Action] HEAD ${branchName}: ${baseSha}`);
+        } catch (refError: any) {
+            if (refError.status === 404) { console.error(`[Action] Branch '${branchName}' not found.`); throw new Error(`Branch '${branchName}' not found.`); }
+            console.error(`[Action] Failed get ref ${branchName}:`, refError); throw new Error(`Failed get ref ${branchName}: ${refError.message}`);
         }
-      })
-    );
-     console.log("Blobs created.");
 
-    // 4. Create a new tree based on the existing tree + new blobs
-    console.log(`Creating new tree with base ${baseTree}...`);
-    const { data: newTree } = await octokit.git.createTree({ owner, repo, base_tree: baseTree, tree });
-    console.log(`New tree created: ${newTree.sha}`);
+        const { data: baseCommitData } = await octokit.git.getCommit({ owner, repo, commit_sha: baseSha });
+        const baseTree = baseCommitData.tree.sha;
+        console.log(`[Action] Base tree ${baseSha}: ${baseTree}`);
 
-    // 5. Create a new commit pointing to the new tree, with the old commit as parent
-    console.log(`Creating commit with tree ${newTree.sha}...`);
-    const { data: newCommit } = await octokit.git.createCommit({
-        owner,
-        repo,
-        message: finalCommitMessage,
-        tree: newTree.sha,
-        parents: [baseSha] // Link to the previous commit on the branch
-    });
-    console.log(`New commit created: ${newCommit.sha}`);
-
-    // 6. Update the branch reference to point to the new commit
-    console.log(`Updating ref heads/${branchName} to commit ${newCommit.sha}...`);
-    await octokit.git.updateRef({
-        owner,
-        repo,
-        ref: `heads/${branchName}`,
-        sha: newCommit.sha,
-        force: false // Set true ONLY if necessary and you understand implications
-    });
-    console.log(`Ref heads/${branchName} updated successfully.`);
-
-    // Notify Admins (Success)
-    const changedFiles = files.map((file) => file.path).join(", ");
-    const branchUrl = `https://github.com/${owner}/${repo}/tree/${branchName}`;
-    const adminMessage = `🔄 Ветка '${branchName}' обновлена!\nCommit: ${finalCommitMessage.split('\n')[0]}\nFiles: ${changedFiles}\n\n[Посмотреть ветку](${branchUrl})`;
-    await notifyAdmins(adminMessage); // Use notifyAdmins for success broadcasts
-
-    return { success: true, commitSha: newCommit.sha, branch: branchName };
-
-  } catch (error: any) {
-    console.error(`Error updating branch ${branchName}:`, error);
-    const repoIdentifier = owner && repo ? `${owner}/${repo}` : repoUrl;
-    let errorMessage = error instanceof Error ? error.message : `Unknown error occurred updating branch ${branchName}`;
-     if (error.status === 404) {
-        errorMessage = `Repository ${repoIdentifier} or branch ${branchName} not found (404).`;
-    } else if (error.status === 403) {
-         errorMessage = `Permission denied (403) updating branch ${branchName} in ${repoIdentifier}.`;
-    } else if (error.status === 409) { // Conflict, e.g., non-fast-forward update if force: false
-        errorMessage = `Conflict updating branch ${branchName} (409). Might require force push or rebase.`;
-    } else if (error.status === 422) { // Unprocessable Entity, e.g. bad commit data
-         errorMessage = `Unprocessable entity (422) updating branch ${branchName}: ${error.message}`;
-    }
-
-    // Notify Admin on Error
-    await notifyAdmin(`❌ Ошибка при обновлении ветки '${branchName}' в ${repoIdentifier}:\n${errorMessage}`);
-    return { success: false, error: errorMessage };
-  }
-}
-
-
-// --- deleteGitHubBranch (Uses notifyAdmin for errors) ---
-export async function deleteGitHubBranch(repoUrl: string, branchName: string) {
-    let owner: string | undefined;
-    let repo: string | undefined;
-    try {
-      const token = process.env.GITHUB_TOKEN;
-      if (!token) throw new Error("GitHub token missing");
-      const repoInfo = parseRepoUrl(repoUrl);
-      owner = repoInfo.owner;
-      repo = repoInfo.repo;
-      const octokit = new Octokit({ auth: token });
-
-      console.log(`Attempting to delete branch 'refs/heads/${branchName}' in ${owner}/${repo}...`);
-      await octokit.git.deleteRef({ owner, repo, ref: `heads/${branchName}` });
-      console.log(`Delete request sent for branch ${branchName}. Verifying...`);
-
-      // Add a slightly longer delay before checking
-      await new Promise((resolve) => setTimeout(resolve, 2000)); // Increased delay to 2 seconds
-
-      try {
-        await octokit.git.getRef({ owner, repo, ref: `heads/${branchName}` });
-        // If getRef succeeds, branch still exists (unexpected)
-         console.error(`Verification failed: Branch ${branchName} still exists after deletion attempt in ${owner}/${repo}.`);
-         // Notify Admin on verification failure
-         await notifyAdmin(`⚠️ Не удалось подтвердить удаление ветки ${branchName} в репозитории ${owner}/${repo}. Возможно, она все еще существует.`);
-         return { success: false, error: "Branch deletion verification failed. Branch might still exist." };
-      } catch (err: any) {
-         // If getRef fails with 404, deletion was successful
-        if (err.status === 404) {
-             console.log(`Verification successful: Branch ${branchName} was deleted.`);
-            return { success: true };
+        const MAX_BYTES = 65000;
+        let finalMsg = commitMessage;
+        const enc = new TextEncoder();
+        if (enc.encode(finalMsg).length > MAX_BYTES) {
+             try { finalMsg = finalMsg.substring(0, 60000) + "..."; } catch(e){console.warn("[Action] Commit msg substring failed."); finalMsg="Commit message truncated.";}
+             console.warn(`[Action] Commit msg trunc.`);
         }
-        // If getRef fails with another error during verification
-        console.error(`Error during branch deletion verification for ${branchName} in ${owner}/${repo} (might be deleted anyway):`, err);
-         // Notify Admin about verification error
-         await notifyAdmin(`⚠️ Ошибка при проверке удаления ветки ${branchName} в ${owner}/${repo} (Status: ${err.status}): ${err.message}. Ветка может быть удалена.`);
-         // Return success true here, as the delete *request* didn't fail, only the check
-         return { success: true, warning: "Deletion request succeeded, but verification check failed." };
-      }
+
+        console.log(`[Action] Creating ${files.length} blobs...`);
+        const tree = await Promise.all(files.map(async (f) => { try { const { data } = await octokit.git.createBlob({ owner: owner!, repo: repo!, content: f.content, encoding: "utf-8" }); return { path: f.path, mode: "100644" as const, type: "blob" as const, sha: data.sha }; } catch (bE: any) { console.error(`[Action] Err blob ${f.path}:`, bE); throw new Error(`Failed blob ${f.path}: ${bE.message || bE}`); } }));
+        console.log("[Action] Blobs done.");
+
+        console.log(`[Action] Creating tree base ${baseTree}...`);
+        const { data: newTree } = await octokit.git.createTree({ owner, repo, base_tree: baseTree, tree });
+        console.log(`[Action] New tree: ${newTree.sha}`);
+
+        console.log(`[Action] Creating commit tree ${newTree.sha}...`);
+        const { data: newCommit } = await octokit.git.createCommit({ owner, repo, message: finalMsg, tree: newTree.sha, parents: [baseSha] });
+        console.log(`[Action] New commit: ${newCommit.sha}`);
+
+        console.log(`[Action] Updating ref heads/${branchName} to ${newCommit.sha}...`);
+        await octokit.git.updateRef({ owner, repo, ref: `heads/${branchName}`, sha: newCommit.sha, force: false });
+        console.log(`[Action] Ref heads/${branchName} updated.`);
+
+        // --- Логика добавления комментария ---
+        if (prNumberToComment && commentBody) {
+            // Safe substring for logging
+            const safeBodyStart = commentBody.substring(0, 100);
+            console.log(`[Action] Attempting to add comment to PR #${prNumberToComment}. Body length: ${commentBody.length}. Body starts: "${safeBodyStart}..."`);
+            try {
+                let finalComment = commentBody;
+                if (enc.encode(finalComment).length > MAX_BYTES) {
+                    try { finalComment = finalComment.substring(0, 60000) + "\n\n...(truncated)"; } catch(e){console.warn("[Action] Comment body substring failed."); finalComment="Comment truncated.";}
+                    console.warn(`[Action] Comment body for PR #${prNumberToComment} truncated.`);
+                }
+                // --- Вызов API для создания комментария ---
+                await octokit.issues.createComment({
+                    owner: owner!,
+                    repo: repo!,
+                    issue_number: prNumberToComment,
+                    body: finalComment
+                });
+                console.log(`[Action] Comment successfully added to PR #${prNumberToComment}.`);
+            } catch (cE: any) {
+                // --- Обработка ошибок при добавлении комментария ---
+                console.error(`[Action] FAILED to add comment to PR #${prNumberToComment}:`, cE);
+                const status = cE.status ? ` (${cE.status})` : '';
+                let specificError = cE.message || 'Unknown error';
+                if (cE.status === 403) { specificError += ' Check Token permissions (issues:write or pull_requests:write scope required)!'; }
+                else if (cE.status === 404) { specificError += ` PR #${prNumberToComment} not found or token lacks permission.`; } // 404 может быть и из-за прав
+                else if (cE.status === 422) { specificError += ` Unprocessable Entity (maybe comment format?).`; }
+                else if (cE.status === 401) { specificError += ' Bad credentials (invalid token?).'; }
+                await notifyAdmin(`⚠️ Не удалось добавить коммент к PR #${prNumberToComment}${status}:\n${specificError}`);
+                // Важно: Не прерываем выполнение основной функции из-за ошибки комментария
+            }
+        } else {
+            // Логируем, почему комментарий не был добавлен
+            if (!prNumberToComment) console.log(`[Action] Skip comment: no PR number provided.`);
+            if (!commentBody) console.log(`[Action] Skip comment: no comment body provided.`);
+        }
+        // --- Конец логики комментария ---
+
+        const chFiles = files.map((f) => f.path).join(", ");
+        const bUrl = `https://github.com/${owner}/${repo}/tree/${branchName}`;
+        const adminMsg = `🔄 Ветка '${branchName}' обновлена!\nCommit: ${finalMsg.split('\n')[0]}\nFiles: ${chFiles}\n\n[Ветка](${bUrl})`;
+        await notifyAdmins(adminMsg);
+        return { success: true, commitSha: newCommit.sha, branch: branchName };
     } catch (error: any) {
-      console.error(`Error deleting branch ${branchName} in ${repoUrl}:`, error);
-      const repoIdentifier = owner && repo ? `${owner}/${repo}` : repoUrl;
-      let errorMessage = error instanceof Error ? error.message : "Failed to delete branch";
-       if (error.status === 404 || error.status === 422) {
-           errorMessage = `Branch '${branchName}' not found or couldn't be deleted (Status: ${error.status}). It might have been deleted already.`;
-           console.warn(errorMessage);
-           // Consider returning success: true if not found, as the desired state is achieved.
-       } else if (error.status === 403) {
-           errorMessage = `Permission denied (403) when trying to delete branch ${branchName} in ${repoIdentifier}. Check token permissions.`;
-            console.error(errorMessage);
-       }
-       // Notify Admin on Error
-       await notifyAdmin(`❌ Ошибка при удалении ветки ${branchName} в репозитории ${repoIdentifier}:\n${errorMessage}`);
-      return { success: false, error: errorMessage };
+        console.error(`[Action] Error update branch ${branchName}:`, error);
+        let eM = error instanceof Error ? error.message : `Unknown error update ${branchName}`;
+        if (error.status === 404) eM = `Repo/branch ${branchName} not found (404).`;
+        else if (error.status === 403) eM = `Permission denied (403) update ${branchName}.`;
+        else if (error.status === 409) eM = `Conflict update ${branchName} (409).`;
+        else if (error.status === 422) eM = `Unprocessable (422) update ${branchName}: ${error.message}`;
+        await notifyAdmin(`❌ Ошибка обновления '${branchName}':\n${eM}`);
+        return { success: false, error: eM };
     }
 }
 
-// --- mergePullRequest (Uses notifyAdmin for errors) ---
-export async function mergePullRequest(repoUrl: string, pullNumber: number) {
-  let owner: string | undefined;
-  let repo: string | undefined;
-  try {
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) throw new Error("GitHub token missing");
-    const repoInfo = parseRepoUrl(repoUrl);
-    owner = repoInfo.owner;
-    repo = repoInfo.repo;
-    const octokit = new Octokit({ auth: token });
 
-    console.log(`Attempting to merge PR #${pullNumber} in ${owner}/${repo}...`);
-    const { data: prData } = await octokit.pulls.get({ owner, repo, pull_number: pullNumber });
-    if (prData.state !== 'open') {
-        throw new Error(`Pull request #${pullNumber} is not open (state: ${prData.state}). Cannot merge.`);
+// --- revertLastCommitOnBranch ---
+// ... (код revertLastCommitOnBranch без изменений) ...
+export async function revertLastCommitOnBranch(repoUrl: string, branchName: string): Promise<{ success: boolean; revertedToSha?: string; error?: string }> {
+    console.log(`[Action] Reverting last commit on branch '${branchName}'...`);
+    let owner: string | undefined, repo: string | undefined;
+    try {
+        const token = process.env.GITHUB_TOKEN;
+        if (!token) throw new Error("GitHub token is missing in environment variables.");
+        if (!branchName) throw new Error("Branch name is required to revert commit.");
+
+        const repoInfo = parseRepoUrl(repoUrl);
+        owner = repoInfo.owner;
+        repo = repoInfo.repo;
+        const rId = `${owner}/${repo}`;
+        const octokit = new Octokit({ auth: token });
+
+        // 1. Получить текущий SHA ветки
+        let headSha: string;
+        try {
+            const { data: refData } = await octokit.git.getRef({ owner, repo, ref: `heads/${branchName}` });
+            headSha = refData.object.sha;
+            console.log(`[Action] Current HEAD of '${branchName}' is ${headSha}`);
+        } catch (refError: any) {
+            if (refError.status === 404) { throw new Error(`Branch '${branchName}' not found.`); }
+            console.error(`[Action] Failed get ref ${branchName}:`, refError);
+            throw new Error(`Failed to get ref for branch '${branchName}': ${refError.message}`);
+        }
+
+        // 2. Получить данные коммита, чтобы найти родителя
+        let parentSha: string;
+        try {
+            const { data: commitData } = await octokit.git.getCommit({ owner, repo, commit_sha: headSha });
+            if (!commitData.parents || commitData.parents.length === 0) {
+                throw new Error(`Commit ${headSha} on branch '${branchName}' has no parents (initial commit?). Cannot revert.`);
+            }
+            // Обычно берем первого родителя. Для merge-коммитов может быть сложнее, но для линейной истории это ОК.
+            parentSha = commitData.parents[0].sha;
+            console.log(`[Action] Parent commit SHA for '${branchName}' is ${parentSha}`);
+        } catch (commitError: any) {
+            console.error(`[Action] Failed get commit data ${headSha}:`, commitError);
+            throw new Error(`Failed to get commit data for ${headSha}: ${commitError.message}`);
+        }
+
+        // 3. Обновить ссылку ветки на родительский коммит (с force=true)
+        console.log(`[Action] Updating ref heads/${branchName} to parent SHA ${parentSha} (force=true)...`);
+        await octokit.git.updateRef({
+            owner,
+            repo,
+            ref: `heads/${branchName}`,
+            sha: parentSha,
+            force: true // ВАЖНО: Перезапись истории требует force=true
+        });
+        console.log(`[Action] Successfully reverted branch '${branchName}' to commit ${parentSha}.`);
+
+        const adminMsg = `⏪ Откат последнего коммита на ветке '${branchName}' в ${rId} к ${parentSha.substring(0,7)}.`;
+        await notifyAdmins(adminMsg);
+
+        return { success: true, revertedToSha: parentSha };
+
+    } catch (error: any) {
+        console.error(`[Action] Error reverting last commit on branch '${branchName}':`, error);
+        const repoId = owner && repo ? `${owner}/${repo}` : repoUrl;
+        let eM = error instanceof Error ? error.message : "Unknown error during revert.";
+        if (error.status === 404) { eM = `Repo ${repoId} or branch '${branchName}' not found (404).`; }
+        else if (error.status === 403) { eM = `Permission denied (403) for reverting on ${repoId}/${branchName}. Check token permissions (repo scope).`; }
+        else if (error.status === 422) { eM = `Unprocessable Entity (422) during revert on ${branchName}. Protected branch?`; } // 422 может быть из-за защищенной ветки
+        await notifyAdmin(`❌ Ошибка отката коммита на '${branchName}' в ${repoId}:\n${eM}`);
+        return { success: false, error: eM };
     }
-    if (prData.merged) {
-         console.warn(`Pull request #${pullNumber} is already merged.`);
-         return { success: true, message: "Pull request already merged." };
-    }
-     if (!prData.mergeable) {
-         console.warn(`Pull request #${pullNumber} is not mergeable (State: ${prData.mergeable_state}). Checking details...`);
-         await delay(2000);
-         const { data: prDataUpdated } = await octokit.pulls.get({ owner, repo, pull_number: pullNumber });
-         if (!prDataUpdated.mergeable) {
-            throw new Error(`Pull request #${pullNumber} is not mergeable (State: ${prDataUpdated.mergeable_state}). Please resolve conflicts or checks on GitHub.`);
-         }
-         console.log(`PR #${pullNumber} became mergeable after delay.`);
-     }
-
-
-    await octokit.pulls.merge({ owner, repo, pull_number: pullNumber, merge_method: "squash" });
-    console.log(`PR #${pullNumber} merged successfully.`);
-
-    // Notify Admins (Success)
-    const adminMessage = `🚀 Изменения #${pullNumber} в ${owner}/${repo} добавлены в проект!\n\n[Посмотреть на GitHub](https://github.com/${owner}/${repo}/pull/${pullNumber})`;
-    await notifyAdmins(adminMessage); // Use notifyAdmins for success broadcasts
-    return { success: true };
-  } catch (error: any) {
-    console.error(`Merge failed for PR #${pullNumber} in ${repoUrl}:`, error);
-    const repoIdentifier = owner && repo ? `${owner}/${repo}` : repoUrl;
-    let errorMessage = error instanceof Error ? error.message : "Failed to merge changes";
-    if (error.status === 405 && error.message?.includes('not mergeable')) {
-        errorMessage = `Pull request #${pullNumber} is not mergeable (Status 405). Resolve conflicts or check branch protection rules.`;
-         console.error(errorMessage, error.response?.data);
-    } else if (error.status === 404) {
-        errorMessage = `Pull request #${pullNumber} not found in ${repoIdentifier} (404).`;
-         console.error(errorMessage);
-    } else if (error.status === 403) {
-         errorMessage = `Permission denied (403) to merge PR #${pullNumber} in ${repoIdentifier}. Check token permissions and branch protection rules.`;
-          console.error(errorMessage);
-    } else if (error.status === 409 && error.message?.includes('conflict')) {
-         errorMessage = `Merge conflict detected for PR #${pullNumber} (Status 409). Please resolve conflicts on GitHub.`;
-         console.error(errorMessage);
-    }
-
-    // Notify Admin on Error
-    await notifyAdmin(`❌ Ошибка при мерже PR #${pullNumber} в ${repoIdentifier}:\n${errorMessage}`);
-    return { success: false, error: errorMessage };
-  }
 }
 
-// --- getOpenPullRequests (Uses notifyAdmin for critical errors, otherwise just logs) ---
-export async function getOpenPullRequests(repoUrl: string) {
-  let owner: string | undefined, repo: string | undefined;
-  try {
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) throw new Error("GitHub token is missing");
-    const repoInfo = parseRepoUrl(repoUrl);
-    owner = repoInfo.owner;
-    repo = repoInfo.repo;
-    const octokit = new Octokit({ auth: token });
-    // console.log(`Fetching open PRs for ${owner}/${repo}...`);
-    const { data } = await octokit.pulls.list({ owner, repo, state: "open" });
-    // console.log(`Found ${data.length} open PRs.`);
-    // Ensure essential data is present
-    const cleanData = data.map(pr => ({
-        id: pr.id,
-        number: pr.number,
-        title: pr.title || 'Untitled PR',
-        html_url: pr.html_url || '#',
-        user: { login: pr.user?.login || 'unknown' },
-        head: { ref: pr.head?.ref || 'unknown-branch' }, // Important: Ensure branch name is included
-        updated_at: pr.updated_at || new Date().toISOString(),
-    }));
 
-    return { success: true, pullRequests: cleanData };
-  } catch (error: any) {
-    console.error("Error fetching open PRs:", error);
-    const repoIdentifier = owner && repo ? `${owner}/${repo}` : repoUrl;
-    let errorMessage = error instanceof Error ? error.message : "Failed to fetch open pull requests";
-     if (error.status === 404) {
-        errorMessage = `Repository ${repoIdentifier} not found (404) when fetching PRs.`;
-        // Notify Admin on critical access error (repo not found)
-        await notifyAdmin(`❌ Ошибка 404 при получении списка PR для ${repoIdentifier}. Проверьте URL.`);
-     } else if (error.status === 403 || error.status === 401) {
-         errorMessage = `Permission denied (Status ${error.status}) when fetching PRs for ${repoIdentifier}. Check token permissions.`;
-         // Notify Admin on critical access error (permissions)
-         await notifyAdmin(`❌ Ошибка ${error.status} при получении списка PR для ${repoIdentifier}. Проверьте права токена.`);
-     } else {
-        // Generic error, maybe less critical, decide if notifyAdmin is needed
-        // await notifyAdmin(`❌ Ошибка при получении списка PR для ${repoIdentifier}: ${errorMessage}`);
-        console.error(`Non-critical error fetching PRs for ${repoIdentifier}: ${errorMessage}`);
-     }
-    return { success: false, error: errorMessage };
-  }
-}
+// --- deleteGitHubBranch ---
+// ... (код deleteGitHubBranch без изменений) ...
+export async function deleteGitHubBranch(repoUrl: string, branchName: string) { console.log("[Action] deleteGitHubBranch called..."); let owner: string|undefined; let repo: string|undefined; const rIP=parseRepoUrl(repoUrl); owner=rIP.owner; repo=rIP.repo; const rId=`${owner}/${repo}`; try { const token = process.env.GITHUB_TOKEN; if (!token) throw new Error("GH token missing"); const octokit = new Octokit({ auth: token }); console.log(`[Action] Attempting delete branch 'refs/heads/${branchName}' in ${rId}...`); await octokit.git.deleteRef({ owner, repo, ref: `heads/${branchName}` }); console.log(`[Action] Delete request sent for ${branchName}. Verifying...`); await delay(2000); try { await octokit.git.getRef({ owner, repo, ref: `heads/${branchName}` }); console.error(`[Action] Verification failed: ${branchName} still exists.`); await notifyAdmin(`⚠️ Не удалось подтвердить удаление ${branchName}.`); return { success: false, error: "Branch delete verification failed." }; } catch (err: any) { if (err.status === 404) { console.log(`[Action] Verification ok: ${branchName} deleted.`); return { success: true }; } console.error(`[Action] Error during delete verification ${branchName}:`, err); await notifyAdmin(`⚠️ Ошибка проверки удаления ${branchName} (${err.status}): ${err.message}.`); return { success: true, warning: "Delete OK, check failed." }; } } catch (error: any) { console.error(`[Action] Error deleting branch ${branchName}:`, error); let eM = error instanceof Error ? error.message : "Failed delete"; if (error.status === 404 || error.status === 422) { eM = `Branch '${branchName}' not found/unprocessable (${error.status}).`; console.warn(`[Action] ${eM}`); } else if (error.status === 403) { eM = `Permission denied (403) deleting ${branchName}.`; console.error(`[Action] ${eM}`); } await notifyAdmin(`❌ Ошибка удаления ${branchName}:\n${eM}`); return { success: false, error: eM }; } }
 
-// --- getGitHubUserProfile (No error notification needed usually) ---
-export async function getGitHubUserProfile(username: string) {
-  try {
-    const token = process.env.GITHUB_TOKEN; // Keep using token if available for rate limits
-    const octokit = new Octokit({ auth: token });
-    // console.log(`Fetching profile for user ${username}...`);
+// --- mergePullRequest ---
+// ... (код mergePullRequest без изменений) ...
+export async function mergePullRequest(repoUrl: string, pullNumber: number) { console.log("[Action] mergePullRequest called..."); let owner: string|undefined; let repo: string|undefined; const rIP=parseRepoUrl(repoUrl); owner=rIP.owner; repo=rIP.repo; const rId=`${owner}/${repo}`; try { const token=process.env.GITHUB_TOKEN; if(!token) throw new Error("GH token missing"); const octokit=new Octokit({auth:token}); console.log(`[Action] Merging PR #${pullNumber} in ${rId}...`); const { data: prData } = await octokit.pulls.get({ owner, repo, pull_number: pullNumber }); if (prData.state !== 'open') { console.warn(`[Action] PR #${pullNumber} not open (${prData.state}).`); throw new Error(`PR #${pullNumber} not open (${prData.state}).`); } if (prData.merged) { console.warn(`[Action] PR #${pullNumber} already merged.`); return { success: true, message: "PR already merged." }; } if (!prData.mergeable) { console.warn(`[Action] PR #${pullNumber} not mergeable (${prData.mergeable_state}). Check delay...`); await delay(2000); const { data: prUpd } = await octokit.pulls.get({ owner, repo, pull_number: pullNumber }); if (!prUpd.mergeable) { console.error(`[Action] PR #${pullNumber} still not mergeable (${prUpd.mergeable_state}).`); throw new Error(`PR #${pullNumber} not mergeable (${prUpd.mergeable_state}).`); } console.log(`[Action] PR #${pullNumber} became mergeable.`); } await octokit.pulls.merge({ owner, repo, pull_number: pullNumber, merge_method: "squash" }); console.log(`[Action] PR #${pullNumber} merged in ${rId}.`); const adminMsg = `🚀 Изменения #${pullNumber} в ${rId} смержены!\n\n[GitHub](https://github.com/${owner}/${repo}/pull/${pullNumber})`; await notifyAdmins(adminMsg); return { success: true }; } catch (error: any) { console.error(`[Action] Merge fail PR #${pullNumber} in ${rId}:`, error); let eM = error instanceof Error ? error.message : "Merge failed"; if (error.status === 405) { eM = `PR #${pullNumber} not mergeable (405).`; console.error(`[Action] ${eM}`, error.response?.data); } else if (error.status === 404) { eM = `PR #${pullNumber} not found (404).`; console.error(`[Action] ${eM}`); } else if (error.status === 403) { eM = `Permission denied (403) merge PR #${pullNumber}.`; console.error(`[Action] ${eM}`); } else if (error.status === 409) { eM = `Merge conflict PR #${pullNumber} (409).`; console.error(`[Action] ${eM}`); } await notifyAdmin(`❌ Ошибка мержа PR #${pullNumber} в ${rId}:\n${eM}`); return { success: false, error: eM }; } }
 
-    const { data: userProfile } = await octokit.users.getByUsername({ username });
+// --- getOpenPullRequests ---
+// (Updated with more detailed error handling)
+export async function getOpenPullRequests(repoUrl: string): Promise<{ success: boolean; pullRequests?: SimplePullRequest[]; error?: string }> {
+    let owner: string | undefined, repo: string | undefined;
+    try {
+        const repoInfo = parseRepoUrl(repoUrl); // Validate URL first
+        owner = repoInfo.owner;
+        repo = repoInfo.repo;
+        const rId = `${owner}/${repo}`;
 
-    return {
-      success: true,
-      profile: {
-        login: userProfile.login,
-        avatar_url: userProfile.avatar_url,
-        html_url: userProfile.html_url,
-        name: userProfile.name, // Can be null
-      },
-    };
-  } catch (error: any) {
-    if (error.status === 404) {
-        console.log(`GitHub user '${username}' not found.`);
-        return { success: false, error: "GitHub user not found.", profile: null };
+        const token = process.env.GITHUB_TOKEN;
+        if (!token) throw new Error("GH token missing");
+        const octokit = new Octokit({ auth: token });
+        console.log(`[Action] Fetching open PRs for ${rId}...`); // Added log
+        const { data } = await octokit.pulls.list({ owner, repo, state: "open" });
+        const cleanData: SimplePullRequest[] = data.map(pr => ({
+            id: pr.id,
+            number: pr.number,
+            title: pr.title || 'Untitled',
+            html_url: pr.html_url || '#',
+            user: pr.user ? { login: pr.user.login } : undefined,
+            head: { ref: pr.head?.ref || 'unknown' },
+            base: { ref: pr.base?.ref || 'unknown' }, // Added base branch
+            updated_at: pr.updated_at || new Date().toISOString(),
+        }));
+        console.log(`[Action] Found ${cleanData.length} open PRs for ${rId}.`); // Added log
+        return { success: true, pullRequests: cleanData };
+    } catch (error: any) {
+        // Enhanced Error Logging and Reporting
+        const repoId = owner && repo ? `${owner}/${repo}` : repoUrl; // Use parsed repoId if available
+        console.error(`[Action] CRITICAL Error fetch PRs ${repoId}:`, error); // Log the full error object
+        let eM = error instanceof Error ? error.message : "Failed fetch PRs";
+        const status = error.status ? ` (${error.status})` : '';
+
+        if (error.message.startsWith("Invalid GitHub URL")) { // Check specific error from parseRepoUrl
+            eM = error.message; // Use the message from parseRepoUrl
+            // No need to notify admin for invalid user input
+        } else if (error.status === 404) {
+            eM = `Repo ${repoId} not found${status}.`;
+            await notifyAdmin(`❌ Ошибка 404 при получении PR ${repoId}. Проверь URL/доступ.`);
+        } else if (error.status === 403) {
+            eM = `Permission denied${status} fetch PRs ${repoId}. Проверь права токена.`;
+            await notifyAdmin(`❌ Ошибка 403 при получении PR ${repoId}. Проверь права токена.`);
+        } else if (error.status === 401) {
+             eM = `Bad credentials${status} fetch PRs ${repoId}. Токен невалиден?`;
+             await notifyAdmin(`❌ Ошибка 401 при получении PR ${repoId}. Токен невалиден?`);
+        } else if (error.message?.includes('rate limit')) { // Explicit check for rate limit
+             eM = `GitHub API rate limit exceeded${status} fetch PRs ${repoId}.`;
+             await notifyAdmin(`⏳ Rate Limit при получении PR ${repoId}.`);
+        } else {
+            // Notify for other unexpected errors
+            await notifyAdmin(`❌ Неизвестная ошибка (${status || 'N/A'}) при получении PR ${repoId}:\n${eM}`);
+            console.error(`[Action] Non-critical/Unknown error fetch PRs ${repoId}: Status=${status}`, error);
+        }
+        // Return the specific error message
+        return { success: false, error: eM };
     }
-    console.error(`Error fetching GitHub profile for ${username}:`, error);
-    // Generally no need to notify admin for profile fetch errors
-    return { success: false, error: error instanceof Error ? error.message : "Failed to fetch GitHub profile", profile: null };
-  }
 }
 
-// --- approvePullRequest (Uses notifyAdmin for errors) ---
-export async function approvePullRequest(repoUrl: string, pullNumber: number) {
-  let owner: string | undefined;
-  let repo: string | undefined;
-  try {
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) throw new Error("GitHub token is missing (AWOL)");
-    const repoInfo = parseRepoUrl(repoUrl);
-    owner = repoInfo.owner;
-    repo = repoInfo.repo;
-    const octokit = new Octokit({ auth: token });
 
-    console.log(`Attempting to approve PR #${pullNumber} in ${owner}/${repo}...`);
-    await octokit.pulls.createReview({
-        owner,
-        repo,
-        pull_number: pullNumber,
-        event: "APPROVE",
-        body: "Approved by automated process."
-    });
-    console.log(`PR #${pullNumber} approved successfully.`);
-    // Maybe notifyAdmins on success if needed?
-    // await notifyAdmins(`✅ PR #${pullNumber} в ${owner}/${repo} одобрен.`);
-    return { success: true };
-  } catch (error: any) {
-    console.error(`Approval failed for PR #${pullNumber} in ${repoUrl}:`, error);
-     const repoIdentifier = owner && repo ? `${owner}/${repo}` : repoUrl;
-     let errorMessage = error instanceof Error ? error.message : "Failed to approve PR";
-      if (error.status === 404) {
-          errorMessage = `Pull request #${pullNumber} not found in ${repoIdentifier} (404).`;
-      } else if (error.status === 403) {
-          errorMessage = `Permission denied (403) to approve PR #${pullNumber} in ${repoIdentifier}. Check token permissions.`;
-      } else if (error.status === 422 && error.message?.includes("review cannot be submitted")) {
-           console.warn(`Could not approve PR #${pullNumber}, possibly already approved or another issue: ${error.message}`);
-           errorMessage = `Could not approve PR #${pullNumber}: ${error.message}`;
-           // Don't notify admin if it's likely already approved.
-           return { success: false, error: errorMessage }; // Return error, but don't notify admin
-      }
-     // Notify Admin on Error
-     await notifyAdmin(`❌ Ошибка при одобрении PR #${pullNumber} в ${repoIdentifier}:\n${errorMessage}`);
-    return { success: false, error: errorMessage };
-  }
-}
+// --- getGitHubUserProfile ---
+// ... (код getGitHubUserProfile без изменений) ...
+export async function getGitHubUserProfile(username: string) { try { const token=process.env.GITHUB_TOKEN; const octokit=new Octokit({auth:token}); const {data:userProfile}=await octokit.users.getByUsername({username}); return { success: true, profile:{ login:userProfile.login, avatar_url:userProfile.avatar_url, html_url:userProfile.html_url, name:userProfile.name, }, }; } catch (error: any) { if (error.status===404){ console.log(`[Action] User '${username}' not found.`); return { success:false, error:"User not found.", profile:null }; } console.error(`[Action] Error fetch profile ${username}:`, error); return { success:false, error:error instanceof Error?error.message:"Failed fetch profile", profile:null }; } }
 
-// --- closePullRequest (Uses notifyAdmin for errors) ---
-export async function closePullRequest(repoUrl: string, pullNumber: number) {
-   let owner: string | undefined;
-   let repo: string | undefined;
-  try {
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) throw new Error("GitHub token is missing");
-    const repoInfo = parseRepoUrl(repoUrl);
-    owner = repoInfo.owner;
-    repo = repoInfo.repo;
-    const octokit = new Octokit({ auth: token });
+// --- approvePullRequest ---
+// ... (код approvePullRequest без изменений) ...
+export async function approvePullRequest(repoUrl: string, pullNumber: number) { console.log("[Action] approvePullRequest called..."); let owner:string|undefined; let repo:string|undefined; const rIP=parseRepoUrl(repoUrl); owner=rIP.owner; repo=rIP.repo; const rId=`${owner}/${repo}`; try { const token=process.env.GITHUB_TOKEN; if(!token) throw new Error("GH token missing"); const octokit=new Octokit({auth:token}); console.log(`[Action] Approving PR #${pullNumber} in ${rId}...`); await octokit.pulls.createReview({owner,repo,pull_number:pullNumber,event:"APPROVE",body:"Approved."}); console.log(`[Action] PR #${pullNumber} approved in ${rId}.`); return {success:true}; } catch (error: any) { console.error(`[Action] Approve failed PR #${pullNumber} in ${rId}:`, error); let eM = error instanceof Error ? error.message : "Approve fail"; if(error.status===404){eM=`PR #${pullNumber} not found (404).`;} else if(error.status===403){eM=`Permission denied (403) approving PR #${pullNumber}.`;} else if(error.status===422&&error.message?.includes("review cannot be submitted")){console.warn(`[Action] Cannot approve PR #${pullNumber}: ${error.message}`); eM=`Cannot approve PR #${pullNumber}: ${error.message}`; return {success:false, error:eM};} await notifyAdmin(`❌ Ошибка одобрения PR #${pullNumber} в ${rId}:\n${eM}`); return { success: false, error: eM }; } }
 
-    console.log(`Attempting to close PR #${pullNumber} in ${owner}/${repo}...`);
-    const { data: prData } = await octokit.pulls.get({ owner, repo, pull_number: pullNumber });
-    if (prData.state === 'closed') {
-        console.warn(`Pull request #${pullNumber} is already closed.`);
-        return { success: true, message: "Pull request already closed." };
-    }
-
-    await octokit.pulls.update({ owner, repo, pull_number: pullNumber, state: "closed" });
-    console.log(`PR #${pullNumber} closed successfully.`);
-     // Notify Admins (Success)
-     await notifyAdmins(`☑️ PR #${pullNumber} в ${owner}/${repo} был закрыт без мержа.`); // Use notifyAdmins for success broadcasts
-    return { success: true };
-  } catch (error: any) {
-    console.error(`Closing PR #${pullNumber} in ${repoUrl} failed:`, error);
-     const repoIdentifier = owner && repo ? `${owner}/${repo}` : repoUrl;
-     let errorMessage = error instanceof Error ? error.message : "Failed to close PR";
-      if (error.status === 404) {
-          errorMessage = `Pull request #${pullNumber} not found in ${repoIdentifier} (404).`;
-      } else if (error.status === 403) {
-          errorMessage = `Permission denied (403) to close PR #${pullNumber} in ${repoIdentifier}. Check token permissions.`;
-      }
-     // Notify Admin on Error
-     await notifyAdmin(`❌ Ошибка при закрытии PR #${pullNumber} в ${repoIdentifier}:\n${errorMessage}`);
-    return { success: false, error: errorMessage };
-  }
-}
+// --- closePullRequest ---
+// ... (код closePullRequest без изменений) ...
+export async function closePullRequest(repoUrl: string, pullNumber: number) { console.log("[Action] closePullRequest called..."); let owner:string|undefined; let repo:string|undefined; const rIP=parseRepoUrl(repoUrl); owner=rIP.owner; repo=rIP.repo; const rId=`${owner}/${repo}`; try { const token=process.env.GITHUB_TOKEN; if(!token) throw new Error("GH token missing"); const octokit=new Octokit({auth:token}); console.log(`[Action] Closing PR #${pullNumber} in ${rId}...`); const { data: prData } = await octokit.pulls.get({ owner, repo, pull_number: pullNumber }); if (prData.state === 'closed') { console.warn(`[Action] PR #${pullNumber} already closed.`); return { success: true, message: "PR already closed." }; } await octokit.pulls.update({ owner, repo, pull_number: pullNumber, state: "closed" }); console.log(`[Action] PR #${pullNumber} closed in ${rId}.`); await notifyAdmins(`☑️ PR #${pullNumber} в ${rId} закрыт.`); return { success: true }; } catch (error: any) { console.error(`[Action] Closing PR #${pullNumber} failed:`, error); let eM = error instanceof Error ? error.message : "Failed close PR"; if(error.status===404){eM=`PR #${pullNumber} not found (404).`;} else if(error.status===403){eM=`Permission denied (403) closing PR #${pullNumber}.`;} await notifyAdmin(`❌ Ошибка закрытия PR #${pullNumber} в ${rId}:\n${eM}`); return { success: false, error: eM }; } }

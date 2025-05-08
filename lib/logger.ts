@@ -1,4 +1,3 @@
-// /lib/logger.ts
 type LogLevel = "info" | "warn" | "error"
 
 type LogMessage = {
@@ -17,7 +16,14 @@ class Logger {
     const timestamp = new Date().toISOString()
     const logMessage: LogMessage = { level, message, args, timestamp }
 
-    console[level](`[${timestamp}] [${level.toUpperCase()}] ${message}`, ...args)
+    // Use the correct console method based on level
+    if (console[level]) {
+        console[level](`[${timestamp}] [${level.toUpperCase()}] ${message}`, ...args);
+    } else {
+        // Fallback to console.log if the level method doesn't exist (shouldn't happen for info/warn/error)
+        console.log(`[${timestamp}] [${level.toUpperCase()}] ${message}`, ...args);
+    }
+
 
     // Notify all subscribed listeners
     this.listeners.forEach((listener) => listener(logMessage))
@@ -28,7 +34,7 @@ class Logger {
   }
 
   warn(message: string, ...args: any[]) {
-    this.log("warn", message, ...args)
+    this.log("warn", message, ...args) // Correctly logs with "warn" level now
   }
 
   error(message: string, ...args: any[]) {
@@ -48,4 +54,3 @@ class Logger {
 }
 
 export const logger = new Logger()
-

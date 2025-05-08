@@ -1,187 +1,46 @@
 "use client";
 
-"use client"
-import React from "react"; // Import React if using JSX elements like icons
-import { FaCode, FaRobot, FaLock, FaShieldCat, FaTelegram } from "react-icons/fa6"; // Corrected import, added FaShieldCat
+import React from "react";
+import { FaCode, FaRobot, FaLock, FaShieldCat, FaTelegram, FaAtom, FaBrain, FaGithub } from "react-icons/fa6";
 
 export const donationTranslations = {
   en: {
     title: "Fuel Our Mission",
-    subtitle: "Support our open-source tools and get <span class='highlight'>exclusive access</span> to our premium templates and guides",
-    sendStars: "Send Stars",
-    customAmount: "Custom Amount",
-    yourMessage: "Your Message (Optional)",
-    messagePlaceholder: "What would you like to say to our team?",
-    donateButton: "Donate {amount} Stars",
-    loginToDonate: "Login with Telegram to Donate",
-    createOwn: "Want to create your own donation system like this?",
-    whyDonate: "Why Donate?",
-    whatCreatorsSay: "What Creators Say",
-    createYourOwn: "Create Your Own Donation System",
-    quickStart: "Quick Start",
-    fullGuide: "Full Guide",
-    premiumSupport: "Premium Support",
-    contactUs: "Contact Us on Telegram",
-    getTemplate: "Get the Template",
-    invalidAmount: "Please enter a valid donation amount!",
-    minimumDonation: "Minimum donation is 10 stars",
-    invoiceSent: "Invoice sent! Check your Telegram to complete payment",
-    invoiceError: "Failed to send invoice. Please try again.",
-    error: "Error",
+    subtitle: "Support our open-source tools and get <span class='highlight'>exclusive access</span> to premium templates & guides",
+    sendStars: "Send Stars", customAmount: "Custom Amount", yourMessage: "Your Message (Optional)", messagePlaceholder: "What would you like to say?", donateButton: "Donate {amount} Stars", loginToDonate: "Login with Telegram to Donate", createOwn: "Want your own donation system?", whyDonate: "Why Donate?", whatCreatorsSay: "What Creators Say", createYourOwn: "Create Your Donation System", quickStart: "Quick Start", fullGuide: "Full Guide", premiumSupport: "Premium Support", contactUs: "Contact Us (TG)", getTemplate: "Get Template", invalidAmount: "Invalid amount!", minimumDonation: "Min 10 stars", invoiceSent: "Invoice sent! Check Telegram", invoiceError: "Failed to send invoice", error: "Error",
     testimonials: [
+      { text: "Launched my project in days! Clear guide.", author: "Alex, Indie Dev" },
+      { text: "Payments setup was easy. TG integration rocks!", author: "Maria, Content Creator" },
+      { text: "Got first donation in hours. Templates saved weeks.", author: "Sam, OS Maintainer" },
+      // --- CyberVibe Testimonial ---
       {
-        text: "This donation system helped me launch my project in days! The guide is crystal clear.",
-        author: "Alex, Indie Developer"
-      },
-      {
-        text: "Never thought setting up payments could be this easy. The Telegram integration is genius!",
-        author: "Maria, Content Creator"
-      },
-      {
-        text: "Got my first donation within hours of setting this up. The templates saved me weeks of work.",
-        author: "Sam, Open Source Maintainer"
-      },
-      // --- NEW TESTIMONIAL ADDED ---
-      {
-        text: "This feels exactly like Tony Stark building his suit with Jarvis – the complex engineering is done, now it's time to customize, fly, and kick ass. The Supervibe Studio is the Jarvis for this generation of makers.",
+        text: "<FaAtom class='inline text-purple-400 mr-1'/>Feels like Tony Stark building his suit – complex engineering done, now customize & fly. Supervibe Studio is the Jarvis for this generation. Pure **CyberVibe!**<FaBrain class='inline text-purple-400 ml-1'/>",
         author: "AI Bot Assistant"
       }
-      // --- END NEW TESTIMONIAL ---
+      // --- END CyberVibe Testimonial ---
     ],
-    guide: {
-      step1: "Fork our GitHub template repository",
-      step2: "Deploy to Vercel with one click",
-      step3: "Configure your Telegram bot",
-      step4: "Start accepting donations!",
-      githubSetup: "1. GitHub Setup",
-      githubSetupDesc: "Create a new repository from our template. No coding experience needed.",
-      vercelDeploy: "2. Vercel Deployment",
-      vercelDeployDesc: "Connect your GitHub account to Vercel for instant hosting.",
-      telegramConfig: "3. Telegram Configuration",
-      telegramConfigDesc: "Set up your bot with @BotFather and enable payments.",
-      customization: "4. Customization",
-      customizationDesc: "Easily change colors, text, and images to match your brand.",
-      supportText: "Get personalized help from our team to set up your donation system."
-    }
+    guide: { step1: "Fork GitHub template", step2: "Deploy to Vercel (1-click)", step3: "Configure Telegram bot", step4: "Accept donations!", githubSetup: "1. GitHub Setup", githubSetupDesc: "Create repo from template. No code needed.", vercelDeploy: "2. Vercel Deployment", vercelDeployDesc: "Connect GitHub to Vercel.", telegramConfig: "3. Telegram Config", telegramConfigDesc: "Setup bot with @BotFather, enable payments.", customization: "4. Customize", customizationDesc: "Change colors, text, images easily.", supportText: "Get personalized setup help." }
   },
   ru: {
-    title: "Поддержите Нашу Миссию",
-    subtitle: "Поддержите наши open-source инструменты и получите <span class='highlight'>эксклюзивный доступ</span> к премиум шаблонам и руководствам",
-    sendStars: "Отправить Звёзды",
-    customAmount: "Своя Сумма",
-    yourMessage: "Ваше Сообщение (Необязательно)",
-    messagePlaceholder: "Что вы хотите сказать нашей команде?",
-    donateButton: "Пожертвовать {amount} Звёзд",
-    loginToDonate: "Войдите через Telegram чтобы пожертвовать",
-    createOwn: "Хотите создать свою систему пожертвований как эта?",
-    whyDonate: "Зачем Жертвовать?",
-    whatCreatorsSay: "Что Говорят Создатели",
-    createYourOwn: "Создайте Свою Систему Пожертвований",
-    quickStart: "Быстрый Старт",
-    fullGuide: "Полное Руководство",
-    premiumSupport: "Премиум Поддержка",
-    contactUs: "Связаться в Telegram",
-    getTemplate: "Получить Шаблон",
-    invalidAmount: "Пожалуйста, введите корректную сумму пожертвования!",
-    minimumDonation: "Минимальное пожертвование - 10 звёзд",
-    invoiceSent: "Счёт отправлен! Проверьте Telegram для оплаты",
-    invoiceError: "Не удалось отправить счёт. Пожалуйста, попробуйте снова.",
-    error: "Ошибка",
+    title: "Поддержите Миссию",
+    subtitle: "Поддержите open-source и получите <span class='highlight'>эксклюзивный доступ</span> к премиум шаблонам",
+    sendStars: "Отправить Звёзды", customAmount: "Своя Сумма", yourMessage: "Сообщение (опц.)", messagePlaceholder: "Что хотите сказать команде?", donateButton: "Донат {amount} Звёзд", loginToDonate: "Войдите через Telegram", createOwn: "Хотите свою систему донатов?", whyDonate: "Зачем?", whatCreatorsSay: "Отзывы", createYourOwn: "Создайте Свою Систему", quickStart: "Быстрый Старт", fullGuide: "Гайд", premiumSupport: "Поддержка", contactUs: "Связь (TG)", getTemplate: "Шаблон", invalidAmount: "Неверная сумма!", minimumDonation: "Мин 10 звёзд", invoiceSent: "Счёт в Telegram!", invoiceError: "Ошибка отправки счёта", error: "Ошибка",
     testimonials: [
-      {
-        text: "Эта система пожертвований помогла мне запустить проект за час!",
-        author: "Алекс, Независимый Разработчик"
-      },
-      {
-        text: "Никогда не думала, что настройка платежей может быть такой простой. Интеграция с Telegram - гениально!",
-        author: "Мария, Создатель Контента"
-      },
-      {
-        text: "Получил первое пожертвование через несколько часов после настройки. Шаблоны сэкономили мне недели работы.",
-        author: "Сэм, Разработчик Open-Source"
-      },
-      // --- NEW TESTIMONIAL ADDED ---
-      {
-        text: "Это как Тони Старк, собирающий свой костюм с Джарвисом – сложная инженерия уже сделана, теперь время кастомизировать, летать и надирать задницы. Supervibe Studio – это Джарвис для этого поколения мейкеров.",
+      { text: "Запустил проект за час!", author: "Алекс, Разраб" },
+      { text: "Настройка платежей - изи. TG - гениально!", author: "Мария, Контент" },
+      { text: "Первый донат за часы. Шаблоны = -недели.", author: "Сэм, Open-Source" },
+      // --- CyberVibe Testimonial ---
+       {
+        text: "<FaAtom class='inline text-purple-400 mr-1'/>Как Тони Старк костюм собирает – инженерия сделана, теперь кастом, полёт, экшн! Supervibe Studio – Джарвис для мейкеров. Чистый **CyberVibe!**<FaBrain class='inline text-purple-400 ml-1'/>",
         author: "AI Bot Assistant"
       }
-      // --- END NEW TESTIMONIAL ---
+      // --- END CyberVibe Testimonial ---
     ],
-    guide: {
-      step1: "Сделайте форк нашего шаблона на GitHub",
-      step2: "Разверните на Vercel в один клик",
-      step3: "Настройте своего Telegram бота",
-      step4: "Начинайте принимать пожертвования!",
-      githubSetup: "1. Настройка GitHub",
-      githubSetupDesc: "Создайте новый репозиторий из нашего шаблона. Без опыта программирования.",
-      vercelDeploy: "2. Развертывание на Vercel",
-      vercelDeployDesc: "Подключите ваш GitHub аккаунт к Vercel для мгновенного хостинга.",
-      telegramConfig: "3. Настройка Telegram",
-      telegramConfigDesc: "Настройте бота через @BotFather и включите платежи.",
-      customization: "4. Кастомизация",
-      customizationDesc: "Легко меняйте цвета, текст и изображения под ваш бренд.",
-      supportText: "Получите персональную помощь от нашей команды для настройки вашей системы пожертвований."
-    }
+    guide: { step1: "Форк шаблона GitHub", step2: "Деплой на Vercel (1 клик)", step3: "Настройка Telegram бота", step4: "Принимайте донаты!", githubSetup: "1. GitHub", githubSetupDesc: "Создайте репо из шаблона. Код не нужен.", vercelDeploy: "2. Vercel", vercelDeployDesc: "Подключите GitHub к Vercel.", telegramConfig: "3. Telegram", telegramConfigDesc: "Настройте бота, включите платежи.", customization: "4. Кастом", customizationDesc: "Меняйте цвета, текст, картинки.", supportText: "Персональная помощь в настройке." }
   }
 };
 
-export const donationBenefits = [
-   {
-    title: {
-      en: "Instant Setup",
-      ru: "Мгновенная Настройка"
-    },
-    description: {
-      en: "Get your donation page live in minutes, not days",
-      ru: "Запустите страницу пожертвований за минуты, а не дни"
-    },
-    icon: <FaCode className="text-2xl" />
-  },
-  {
-    title: {
-      en: "Zero Fees",
-      ru: "Без Комиссий"
-    },
-    description: {
-      en: "No payment processing fees eating into your donations",
-      ru: "Никаких комиссий за обработку платежей"
-    },
-    icon: <FaLock className="text-2xl" />
-  },
-  {
-    title: {
-      en: "Telegram Integration",
-      ru: "Интеграция с Telegram"
-    },
-    description: {
-      en: "Seamless payments through Telegram Web Apps",
-      ru: "Бесперебойные платежи через Telegram Web Apps"
-    },
-    icon: <FaTelegram className="text-2xl" />
-  },
-  {
-    title: {
-      en: "Secure & Reliable",
-      ru: "Безопасно и Надёжно"
-    },
-    description: {
-      en: "Bank-grade security for all transactions",
-      ru: "Банковский уровень безопасности для всех транзакций"
-    },
-    icon: <FaShieldCat className="text-2xl" /> // Using FaShieldCat from fa6
-  },
-  {
-    title: {
-      en: "AI Assistant",
-      ru: "AI Помощник"
-    },
-    description: {
-      en: "Get help from our AI to customize your page",
-      ru: "Получите помощь от нашего ИИ для настройки страницы"
-    },
-    icon: <FaRobot className="text-2xl" />
-  }
-];
-
+// Export benefits and types as before...
+export const donationBenefits = [ { title: { en: "Instant Setup", ru: "Мгновенная Настройка" }, description: { en: "Live in minutes", ru: "Запуск за минуты" }, icon: <FaCode className="text-2xl" /> }, { title: { en: "Zero Fees", ru: "Без Комиссий" }, description: { en: "No processing fees", ru: "Нет комиссий" }, icon: <FaLock className="text-2xl" /> }, { title: { en: "Telegram Integration", ru: "Интеграция Telegram" }, description: { en: "Seamless payments via Web Apps", ru: "Платежи через Web Apps" }, icon: <FaTelegram className="text-2xl" /> }, { title: { en: "Secure & Reliable", ru: "Безопасно" }, description: { en: "Bank-grade security", ru: "Банковский уровень" }, icon: <FaShieldCat className="text-2xl" /> }, { title: { en: "AI Assistant", ru: "AI Помощник" }, description: { en: "AI help for customization", ru: "AI поможет настроить" }, icon: <FaRobot className="text-2xl" /> } ];
 export type DonationTranslations = typeof donationTranslations;
 export type LanguageKey = keyof DonationTranslations;

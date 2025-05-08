@@ -1,5 +1,5 @@
-// /app/api/users/route.ts
-"use server"
+// Explicitly mark the route as dynamic because it uses headers
+export const dynamic = 'force-dynamic';
 import { type NextRequest, NextResponse } from "next/server"
 import jwt from "jsonwebtoken"
 import { supabaseAdmin } from "@/hooks/supabase"
@@ -49,4 +49,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
-

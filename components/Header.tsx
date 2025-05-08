@@ -9,12 +9,13 @@ import { usePathname } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
 import {
-  FaCar, FaCircleUser, FaWandMagicSparkles, FaRocket, FaRoad, FaBookOpen,
+  FaDumbbell, FaCircleUser, FaWandMagicSparkles, FaRocket, FaRoad, FaBookOpen,
   FaBrain, FaRobot, FaMagnifyingGlass, FaGift, FaUserShield, FaCarOn,
   FaYoutube, FaFileInvoiceDollar, FaCreditCard, FaHeart, FaPalette,
   FaCircleInfo, FaListCheck, FaNetworkWired, FaRegLightbulb, FaUpload,
   FaUserNinja, FaGlobe, FaLandmarkDome, FaLeaf
 } from "react-icons/fa6";
+import { debugLogger as logger } from "@/lib/debugLogger";
 
 // --- Page Definitions ---
 interface PageInfo {
@@ -27,9 +28,11 @@ interface PageInfo {
   color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red';
 }
 
+
 const allPages: PageInfo[] = [
   // --- Важные ссылки ---
-  { path: "/", name: "Cyber Garage", icon: FaCar, isImportant: true, color: "cyan" },
+  { path: "/", name: "Fix13min", icon: FaDumbbell, isImportant: true, color: "cyan" },
+{ path: "/cartest", name: "Cyber Garage", icon: FaCarOn, isImportant: true, color: "cyan" },
   { path: "/about", name: "About Me", icon: FaCircleUser, isImportant: true, color: "blue" },
   { path: "/repo-xml", name: "SUPERVIBE Studio", icon: FaWandMagicSparkles, isImportant: true, color: "yellow" },
   { path: "/jumpstart", name: "Jumpstart Kit", icon: FaRocket, isImportant: true, color: "lime" },
@@ -50,7 +53,7 @@ const allPages: PageInfo[] = [
   { path: "/style-guide", name: "Style Guide", icon: FaPalette },
   { path: "/onesitepls", name: "oneSitePls Info", icon: FaCircleInfo },
   { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: FaListCheck },
-  { path: "/rent-car", name: "Rent a Car", icon: FaCar },
+  { path: "/rent-car", name: "Rent a Car", icon: FaCarOn },
   // --- Шпаргалки ---
   { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: FaGlobe, color: 'green' },
   { path: "/vpr/history/6/cheatsheet", name: "History Cheatsheet 6", icon: FaLandmarkDome, color: 'yellow' },
@@ -62,7 +65,7 @@ const allPages: PageInfo[] = [
   { path: "/youtubeAdmin", name: "YT Admin", icon: FaYoutube, isAdminOnly: true, color: "red" },
 ];
 
-// --- Translations ---
+// --- FULL Translations (Pin related removed) ---
 const translations: Record<string, Record<string, string>> = {
   en: {
     "Cyber Garage": "Cyber Garage",
@@ -79,10 +82,6 @@ const translations: Record<string, Record<string, string>> = {
     "Bot Busters": "Bot Busters",
     "BS Detector": "BS Detector",
     "Wheel of Fortune": "Wheel of Fortune",
-    "Upload Advice": "Upload Advice",
-    "Admin Panel": "Admin Panel",
-    "Fleet Admin": "Fleet Admin",
-    "YT Admin": "YT Admin",
     "My Invoices": "My Invoices",
     "Subscribe": "Subscribe",
     "Donate": "Donate",
@@ -93,6 +92,10 @@ const translations: Record<string, Record<string, string>> = {
     "Geo Cheatsheet 6": "Geo Cheatsheet 6",
     "History Cheatsheet 6": "History Cheatsheet 6",
     "Biology Cheatsheet 6": "Biology Cheatsheet 6",
+    "Upload Advice": "Upload Advice",
+    "Admin Panel": "Admin Panel",
+    "Fleet Admin": "Fleet Admin",
+    "YT Admin": "YT Admin",
     "Search pages...": "Search pages...",
     "No pages found matching": "No pages found matching",
     "Admin Only": "Admin Only",
@@ -116,10 +119,6 @@ const translations: Record<string, Record<string, string>> = {
     "Bot Busters": "Охотники за Ботами",
     "BS Detector": "Детектор Чуши",
     "Wheel of Fortune": "Колесо Фортуны",
-    "Upload Advice": "Загрузить Совет",
-    "Admin Panel": "Админ Панель",
-    "Fleet Admin": "Админ Автопарка",
-    "YT Admin": "Админ YT",
     "My Invoices": "Мои Счета",
     "Subscribe": "Подписаться",
     "Donate": "Поддержать",
@@ -130,6 +129,10 @@ const translations: Record<string, Record<string, string>> = {
     "Geo Cheatsheet 6": "Шпаргалка Гео 6",
     "History Cheatsheet 6": "Шпаргалка Ист 6",
     "Biology Cheatsheet 6": "Шпаргалка Био 6",
+    "Upload Advice": "Загрузить Совет",
+    "Admin Panel": "Админ Панель",
+    "Fleet Admin": "Админ Автопарка",
+    "YT Admin": "Админ YT",
     "Search pages...": "Поиск страниц...",
     "No pages found matching": "Страницы не найдены по запросу",
     "Admin Only": "Только для админа",
@@ -144,32 +147,23 @@ const translations: Record<string, Record<string, string>> = {
 export default function Header() {
   const { isAdmin, user } = useAppContext();
   const [isNavOpen, setIsNavOpen] = useState(false);
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true); // Default to true
   const [lastScrollY, setLastScrollY] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const pathname = usePathname();
+  logger.log(`[Header] Render start. Path: ${pathname}, NavOpen: ${isNavOpen}`);
 
-  const initialLang = useMemo(() => {
-    const userLang = user?.language_code;
-    return userLang === 'ru' ? 'ru' : 'en';
-  }, [user?.language_code]);
+  const initialLang = useMemo(() => (user?.language_code === 'ru' ? 'ru' : 'en'), [user?.language_code]);
   const [currentLang, setCurrentLang] = useState<'en' | 'ru'>(initialLang);
-
   useEffect(() => {
-    const userLang = user?.language_code;
-    const newLangBasedOnUser = userLang === 'ru' ? 'ru' : 'en';
+    const newLangBasedOnUser = user?.language_code === 'ru' ? 'ru' : 'en';
     if (newLangBasedOnUser !== currentLang) {
-      setCurrentLang(newLangBasedOnUser);
+       logger.log(`[Header Effect Lang] Updating language based on user: ${newLangBasedOnUser}`);
+       setCurrentLang(newLangBasedOnUser);
     }
   }, [user?.language_code, currentLang]);
-
-  const t = useCallback((key: string): string => {
-    return translations[currentLang]?.[key] || translations['en']?.[key] || key;
-  }, [currentLang]);
-
-  const toggleLang = useCallback(() => {
-    setCurrentLang(prevLang => prevLang === 'en' ? 'ru' : 'en');
-  }, []);
+  const t = useCallback((key: string): string => translations[currentLang]?.[key] || translations['en']?.[key] || key, [currentLang]);
+  const toggleLang = useCallback(() => setCurrentLang(prevLang => prevLang === 'en' ? 'ru' : 'en'), []);
 
   const currentLogoText = useMemo(() => {
     const currentPage = allPages.find(p => p.path === pathname);
@@ -185,52 +179,62 @@ export default function Header() {
     const lowerSearchTerm = searchTerm.toLowerCase();
     return allPages
       .filter(page => !(page.isAdminOnly && !isAdmin))
-      .map(page => ({
-        ...page,
-        translatedName: t(page.name)
-      }))
+      .map(page => ({ ...page, translatedName: t(page.name) }))
+
       .filter(page => page.translatedName.toLowerCase().includes(lowerSearchTerm));
   }, [searchTerm, isAdmin, t]);
 
+  // --- SCROLL HANDLING ---
   const handleScroll = useCallback(() => {
     const currentScrollY = window.scrollY;
     if (isNavOpen) {
-      setIsHeaderVisible(true);
+      if (!isHeaderVisible) setIsHeaderVisible(true);
       setLastScrollY(currentScrollY);
       return;
     }
     if (currentScrollY > lastScrollY && currentScrollY > 50) {
-      setIsHeaderVisible(false);
-    } else if (currentScrollY < lastScrollY) {
-      setIsHeaderVisible(true);
+      if (isHeaderVisible) setIsHeaderVisible(false);
+    } else if (currentScrollY < lastScrollY || currentScrollY <= 50) {
+      if (!isHeaderVisible) setIsHeaderVisible(true);
     }
     setLastScrollY(currentScrollY);
-  }, [lastScrollY, isNavOpen]);
+  }, [lastScrollY, isNavOpen, isHeaderVisible]);
 
   useEffect(() => {
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
+    return () => window.removeEventListener("scroll", handleScroll);
   }, [handleScroll]);
 
+  // --- PATH CHANGE -> CLOSE NAV ---
   useEffect(() => {
-    setIsNavOpen(false);
-    setSearchTerm("");
+    if (isNavOpen) {
+      logger.log(`[Header Effect Path] Path changed to ${pathname}, closing nav.`);
+      setIsNavOpen(false);
+      setSearchTerm("");
+    }
   }, [pathname]);
 
+  // --- NAV OPEN -> BODY OVERFLOW ---
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
     if (isNavOpen) {
+      logger.log("[Header Effect Nav Overflow] Nav open, hiding body overflow.");
       document.body.style.overflow = 'hidden';
     } else {
-      document.body.style.overflow = originalStyle;
+      if (document.body.style.overflow === 'hidden') {
+         logger.log("[Header Effect Nav Overflow] Nav closed, restoring body overflow.");
+         document.body.style.overflow = originalStyle;
+      }
     }
     return () => {
-      document.body.style.overflow = originalStyle;
+      if (document.body.style.overflow === 'hidden') {
+        logger.log("[Header Effect Nav Overflow Cleanup] Restoring body overflow on unmount/close.");
+        document.body.style.overflow = originalStyle;
+      }
     };
   }, [isNavOpen]);
 
+  // --- FULL tileColorClasses ---
   const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> = {
     purple: "border-brand-purple/50 hover:border-brand-purple hover:shadow-[0_0_15px_rgba(157,0,255,0.5)] text-brand-purple",
     blue: "border-brand-blue/50 hover:border-brand-blue hover:shadow-[0_0_15px_rgba(0,194,255,0.5)] text-brand-blue",
@@ -254,33 +258,36 @@ export default function Header() {
       >
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
+            {/* Logo */}
             <Link href="/" className="text-2xl md:text-3xl font-bold text-brand-purple cyber-text glitch hover:text-glow" data-text={currentLogoText}>
               {currentLogoText}
             </Link>
-            <div className="flex items-center gap-3 md:gap-4">
+
+            {/* Right side controls */}
+            <div className="flex items-center gap-2 md:gap-3">
               {/* Language Toggle Button */}
               <button
                 onClick={toggleLang}
                 className="p-1 sm:p-2 text-xs sm:text-sm font-semibold text-brand-cyan hover:text-brand-cyan/80 transition-colors focus:outline-none focus:ring-1 focus:ring-brand-cyan focus:ring-offset-2 focus:ring-offset-black rounded-md"
-                aria-label={t("Toggle Language")}
-                title={t("Toggle Language")}
+                aria-label={t("Toggle Language")} title={t("Toggle Language")}
+
               >
                 {currentLang === 'en' ? 'RU' : 'EN'}
               </button>
 
-              {/* Navigation Toggle Button */}
+              {/* User Info */}
+              <UserInfo />
+
+              {/* Navigation Toggle Button (Only shows when nav is closed) */}
               {!isNavOpen && (
                 <button
                   onClick={() => setIsNavOpen(true)}
                   className="p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md"
-                  aria-label={t("Open navigation")}
-                  aria-expanded={isNavOpen}
+                  aria-label={t("Open navigation")} aria-expanded={isNavOpen}
                 >
                   <LayoutGrid className="h-6 w-6" />
                 </button>
               )}
-              {/* User Info */}
-              <UserInfo />
             </div>
           </div>
         </div>
@@ -297,10 +304,10 @@ export default function Header() {
             transition={{ type: "spring", stiffness: 260, damping: 30 }}
             className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto pt-20 pb-10 px-4 md:pt-24"
           >
-            {/* Close Button */}
+            {/* Close Button (Inside Overlay) */}
             <button
               onClick={() => setIsNavOpen(false)}
-              className="fixed top-4 right-4 z-60 p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md"
+              className="fixed top-4 right-4 z-[51] p-2 text-brand-green hover:text-brand-green/80 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-green focus:ring-offset-2 focus:ring-offset-black rounded-md"
               aria-label={t("Close navigation")}
             >
               <X className="h-6 w-6" />
@@ -310,9 +317,7 @@ export default function Header() {
               {/* Search Input */}
               <div className="relative mb-6 md:mb-8">
                 <input
-                  type="search"
-                  placeholder={t("Search pages...")}
-                  value={searchTerm}
+                  type="search" placeholder={t("Search pages...")} value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 bg-gray-800/60 border border-brand-green/40 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-green focus:border-transparent text-sm md:text-base"
                   aria-label={t("Search pages...")}
@@ -330,9 +335,8 @@ export default function Header() {
 
                     return (
                       <Link
-                        key={page.path}
-                        href={page.path}
-                        onClick={() => setIsNavOpen(false)}
+                        key={page.path} href={page.path}
+                        onClick={() => setIsNavOpen(false)} // Ensure click closes nav
                         className={cn(
                           "group relative flex flex-col items-center justify-center rounded-md border transition-all duration-300 aspect-square text-center hover:scale-[1.03]",
                           "p-1.5 sm:p-2 md:p-1.5",
@@ -341,17 +345,13 @@ export default function Header() {
                           isCurrentPage ? 'ring-1 ring-offset-1 ring-offset-black ring-brand-green' : ''
                         )}
                       >
-                        {/* --- Иконка Новинки (Hot) --- */}
+                        {/* --- FULL Icon/Text Rendering --- */}
                         {page.isHot && (
-                          <span
-                            title={t("Hot")}
-                            className="absolute top-0.5 left-0.5 text-[0.5rem] bg-red-500/80 text-white rounded-full px-1 py-0 leading-none animate-pulse"
-                            aria-label={t("Hot")}
-                          >
+                          <span title={t("Hot")} className="absolute top-0.5 left-0.5 text-[0.5rem] bg-red-500/80 text-white rounded-full px-1 py-0 leading-none animate-pulse" aria-label={t("Hot")}>
+
                             🔥
                           </span>
                         )}
-                        {/* ---------------------------- */}
                         {PageIcon && (
                           <PageIcon className={cn(
                             "h-4 w-4 sm:h-5 sm:w-5 md:h-4 md:w-4 mb-0.5 transition-transform duration-300 group-hover:scale-110",
@@ -365,10 +365,13 @@ export default function Header() {
                         )}>
                           {page.translatedName}
                         </span>
-                        {/* Иконка Админа */}
                         {page.isAdminOnly && (
-                          <span title={t("Admin Only")} className="absolute top-0.5 right-0.5 text-[0.5rem] text-red-400 bg-black/60 rounded-full px-1 py-0 leading-none">🛡️</span>
+                          <span title={t("Admin Only")} className="absolute top-0.5 right-0.5 text-[0.5rem] text-red-400 bg-black/60 rounded-full px-1 py-0 leading-none">
+                            🛡️
+                          </span>
+
                         )}
+                        {/* --- End FULL Icon/Text Rendering --- */}
                       </Link>
                     );
                   })}
