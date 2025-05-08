@@ -98,7 +98,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
 "app/globals.css",
 "app/style-guide/page.tsx",       
         // --- Ключевой Контекст ---
-"contexts/AppContext.tsx,"
+"contexts/AppContext.tsx",
 
         // --- Основные Хуки для этой страницы ---
         "hooks/useAppToast.ts",
