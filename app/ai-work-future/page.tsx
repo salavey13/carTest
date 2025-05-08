@@ -4,12 +4,18 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"; // Added Tooltip components
 
 import {
   FaBrain, FaTriangleExclamation, FaChartLine, FaScaleBalanced, FaBriefcase,
   FaToolbox, FaUsers, FaUserGear, FaCubes, FaUserGraduate, FaBullseye, // FaTools -> FaToolbox, FaBalanceScale -> FaScaleBalanced, FaExclamationTriangle -> FaTriangleExclamation, FaUserCog -> FaUserGear
   FaLightbulb, FaRoad, FaNetworkWired, FaComments, FaRecycle, FaUsersCog,
-  FaDiagramProject, FaHistory, FaQuestionCircle, FaWind // FaProjectDiagram -> FaDiagramProject
+  FaDiagramProject, FaHistory, FaQuestionCircle, FaWind, FaGamepad // FaProjectDiagram -> FaDiagramProject, Added FaGamepad for link
 } from "react-icons/fa6"; // Using FontAwesome 6 icons
 
 import { debugLogger } from "@/lib/debugLogger";
@@ -392,7 +398,6 @@ const sections = [
   },
 ];
 
-
 // --- Component ---
 export default function AiWorkFuturePage() {
   const { user } = useAppContext();
@@ -432,7 +437,7 @@ export default function AiWorkFuturePage() {
         }}
       ></div>
 
-      
+      <TooltipProvider delayDuration={150}> {/* Added TooltipProvider */}
         <div className="relative z-10 container mx-auto px-4">
           <Card className={cn(
               "max-w-4xl mx-auto bg-black/85 backdrop-blur-lg text-white rounded-2xl border",
@@ -486,9 +491,9 @@ export default function AiWorkFuturePage() {
                 const themeColor = ["text-brand-pink", "text-brand-orange", "text-neon-lime", "text-brand-blue", "text-brand-green", "text-brand-purple"][index % 6];
                 const borderColor = themeColor.replace("text-", "border-");
                 const currentTitle = selectedLang === 'en' ? section.titleEn : section.titleRu;
-                const currentPoints = section.pointsEn && section.pointsRu ? (selectedLang === 'en' ? section.pointsEn : section.pointsRu) : [];
-                const currentImageAlt = section.imageAltEn && section.imageAltRu ? (selectedLang === 'en' ? section.imageAltEn : section.imageAltRu) : "";
-                const currentImageUrl = section.imageUrlEn && section.imageUrlRu ? (selectedLang === 'en' ? section.imageUrlEn : section.imageUrlRu) : null;
+                const currentPoints = selectedLang === 'en' ? section.pointsEn : section.pointsRu; // Fixed points logic
+                const currentImageAlt = selectedLang === 'en' ? section.imageAltEn : section.imageAltRu; // Fixed alt logic
+                const currentImageUrl = selectedLang === 'en' ? section.imageUrlEn : section.imageUrlRu; // Fixed URL logic
                 const currentTooltip = selectedLang === 'ru' ? section.tooltipRu : null;
 
                 return (
@@ -540,14 +545,14 @@ export default function AiWorkFuturePage() {
                    {selectedLang === 'ru' ? "Резюме основано на беседе с Иэном Бикрафтом. Будущее требует адаптации и смелости." : "Summary based on the conversation with Ian Beacraft. The future requires adaptation and courage."}
                  </p>
                  <p className="mt-4 text-gray-300">
-                   Explore related concepts in <Link href="/expmind" className="text-brand-green hover:underline font-semibold">Experimental Mindset</Link> and <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>.
+                   Explore related concepts in <Link href="/selfdev" className="text-brand-green hover:underline font-semibold">Experimental Mindset</Link>, <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>, {selectedLang === 'ru' ? 'и геймифицируй свой путь на' : 'and gamify your path at'} <Link href="/selfdev/gamified" className="text-brand-yellow hover:underline font-semibold">Gamified SelfDev <FaGamepad className="inline ml-1"/></Link>.
                  </p>
               </section>
 
             </CardContent>
           </Card>
         </div>
-      
+      </TooltipProvider> {/* Added TooltipProvider */}
     </div>
   );
 }
