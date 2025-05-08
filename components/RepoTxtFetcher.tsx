@@ -1,3 +1,4 @@
+// /components/RepoTxtFetcher.tsx
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useMemo, useCallback } from "react";
@@ -95,7 +96,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     // --- ОБНОВЛЕННЫЙ и УРЕЗАННЫЙ СПИСОК ВАЖНЫХ ФАЙЛОВ ---
     const importantFiles = useMemo(() => [
         // --- Структура и главная страница фичи ---
-        "app/layout.tsx",           // Общий layout важен
+        "package.json", "app/layout.tsx",           // Общий layout важен
  "tailwind.config.ts",
 "app/globals.css",
 "app/style-guide/page.tsx",       
@@ -111,7 +112,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "app/actions.ts",
 "lib/debugLogger.ts",
 
-
         // --- Базовые Утилиты и Типы ---
 "components/VibeContentRenderer.tsx",
 
@@ -124,7 +124,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     // --- КОНЕЦ ОБНОВЛЕННОГО СПИСКА ---
 
     const effectiveBranchDisplay = useMemo(() => targetBranchName || manualBranchName || "default", [targetBranchName, manualBranchName]);
-
 
     logger.debug("[RepoTxtFetcher] After Derived State/Memo");
 
@@ -240,7 +239,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         }
     }, [fetchStatus, primaryHighlightedPath, imageReplaceTask, autoFetch, fetchedFiles.length, scrollToSection, toastInfo, logger]);
 
-
     useEffect(() => {
         if (prevEffectiveBranch && prevEffectiveBranch !== effectiveBranchDisplay) {
             // Branch has changed
@@ -255,7 +253,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         }
         setPrevEffectiveBranch(effectiveBranchDisplay);
     }, [effectiveBranchDisplay, fetchStatus, setFetchStatus, prevEffectiveBranch, logger]);
-
 
     // === Imperative Handle ===
     logger.debug("[RepoTxtFetcher] Before useImperativeHandle");
@@ -353,7 +350,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const imageTaskTargetFileReady = currentImageTask && fetchStatus === 'success' && fetchedFiles.some(f => f.path === currentImageTask.targetPath);
     logger.debug(`[Render State] isActionDisabled=${isActionDisabled}, isFetchLoading=${isFetchLoading}, showProgressBar=${showProgressBar}`);
 
-
     // --- Log before return ---
     logger.debug("[RepoTxtFetcher] Preparing to render JSX...");
 
@@ -417,7 +413,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                   onLoadPrs={handleLoadPrs}
                   loading={isFetchLoading || loadingPrs || assistantLoading || aiActionLoading || isParsing}
               />
-
 
              {/* Fetch Button */}
              <div className="mb-4 flex justify-center">
