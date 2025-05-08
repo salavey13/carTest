@@ -28,7 +28,6 @@ interface PageInfo {
   color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red';
 }
 
-
 const allPages: PageInfo[] = [
   // --- Важные ссылки ---
   { path: "/", name: "Fix13min", icon: FaDumbbell, isImportant: true, color: "cyan" },
@@ -275,9 +274,6 @@ export default function Header() {
                 {currentLang === 'en' ? 'RU' : 'EN'}
               </button>
 
-              {/* User Info */}
-              <UserInfo />
-
               {/* Navigation Toggle Button (Only shows when nav is closed) */}
               {!isNavOpen && (
                 <button
@@ -288,6 +284,9 @@ export default function Header() {
                   <LayoutGrid className="h-6 w-6" />
                 </button>
               )}
+
+              {/* User Info */}
+              <UserInfo />
             </div>
           </div>
         </div>
