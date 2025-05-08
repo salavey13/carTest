@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useAppToast } from '@/hooks/useAppToast'; // Use toast hook
 import { debugLogger as logger } from '@/lib/debugLogger'; // Use logger
 import { detectFilePaths, getFileExtension } from '@/lib/codeUtils';
-import * as Fa6Icons from "react-icons/fa6"; // <-- ADDED IMPORT
+import * as Fa6Icons from "react-icons/fa6"; 
 
 // --- Types ---
 export type ValidationStatus = 'idle' | 'validating' | 'success' | 'warning' | 'error';
@@ -178,8 +178,12 @@ export function useCodeParsingAndValidation() {
                   logger.debug(`[Validation Logic - ${filePath}] Found Fa6 import line ${importLineNumber}: ${importedFa6IconsRaw.join(', ')}`);
 
                  importedFa6IconsRaw.forEach(rawImport => {
-                     const iconName = rawImport.split(/\s+as\s+/)[0].trim(); // This is FaPascalCase
+                     const cleanedImportName = rawImport.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '').trim(); // Clean comments
+                     if (!cleanedImportName) return; // Skip if only comment was present
+
+                     const iconName = cleanedImportName.split(/\s+as\s+/)[0].trim(); // Get the actual name (before 'as')
                      if (!iconName) return;
+
 
                      if (knownIncorrectFa6Names.includes(iconName)) {
                          const correctName = fa6IconCorrectionMap[iconName];
@@ -190,7 +194,7 @@ export function useCodeParsingAndValidation() {
                      else if (!(iconName in Fa6Icons)) {
                      // --- END MODIFIED VALIDATION ---
                          logger.error(`[Validation Logic - ${filePath}] Found unknown/invalid Fa6 icon name: ${iconName}`);
-                         issues.push({ id: generateId(), fileId, filePath, type: 'unknownFa6IconName', message: `Неизвестная/несуществующая иконка Fa6: '${iconName}'. Проверьте имя или импортируйте из правильного пакета (например, 'react-icons/fa' вместо 'react-icons/fa6', или наоборот).`, details: { lineNumber: importLineNumber, unknownName: iconName, importStatement: fa6Match[0] }, fixable: false, severity: 'error', restorable: false });
+                         issues.push({ id: generateId(), fileId, filePath, type: 'unknownFa6IconName', message: `Неизвестная/несуществующая иконка Fa6: '${iconName}'. Проверьте имя или импортируйте из правильного пакета (например, 'react-icons/fa' вместо 'react-icons/fa6', или наоборот).`, details: { lineNumber: importLineNumber, unknownName: iconName, importStatement: fa6Match[0] }, fixable: false, severity: 'warning', restorable: false }); // Severity changed to 'warning'
                      }
                  });
              }

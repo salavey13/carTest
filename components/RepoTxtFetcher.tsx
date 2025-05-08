@@ -50,7 +50,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
 
     // === Context ===
     const { addToast: addToastContext,
-        fetchStatus, filesFetched,
+        fetchStatus, setFetchStatus, // Added setFetchStatus
+        filesFetched,
         repoUrl: repoUrlFromContext, setRepoUrl: setRepoUrlInContext, repoUrlEntered,
         selectedFetcherFiles,
         kworkInputHasContent, // Keep reading this boolean flag if needed for quick checks
@@ -74,6 +75,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
 
     // === Basic Component State ===
     const [token, setToken] = useState<string>("");
+    const [prevEffectiveBranch, setPrevEffectiveBranch] = useState<string | null>(null); // For branch change detection
     logger.debug("[RepoTxtFetcher] After useState");
 
     // === Context ===
@@ -120,6 +122,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
 
     ].filter(Boolean), []); // filter(Boolean) на случай, если какие-то файлы не существуют
     // --- КОНЕЦ ОБНОВЛЕННОГО СПИСКА ---
+
+    const effectiveBranchDisplay = useMemo(() => targetBranchName || manualBranchName || "default", [targetBranchName, manualBranchName]);
+
 
     logger.debug("[RepoTxtFetcher] After Derived State/Memo");
 
@@ -233,7 +238,23 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
             logger.debug("[Effect Scroll] No primary highlight and no fetched files, doing nothing.");
             return () => {};
         }
-    }, [fetchStatus, primaryHighlightedPath, imageReplaceTask, autoFetch, fetchedFiles.length, scrollToSection, toastInfo]);
+    }, [fetchStatus, primaryHighlightedPath, imageReplaceTask, autoFetch, fetchedFiles.length, scrollToSection, toastInfo, logger]);
+
+
+    useEffect(() => {
+        if (prevEffectiveBranch && prevEffectiveBranch !== effectiveBranchDisplay) {
+            // Branch has changed
+            if (fetchStatus === 'success') {
+                logger.info(`[RepoTxtFetcher Branch Change] Effective branch changed from '${prevEffectiveBranch}' to '${effectiveBranchDisplay}'. Resetting fetchStatus from 'success' to 'idle'.`);
+                setFetchStatus('idle');
+            } else if (fetchStatus !== 'idle' && fetchStatus !== 'loading' && fetchStatus !== 'retrying') {
+                // If branch changed and status is some other terminal state (e.g. error from old branch), also reset to idle
+                 logger.info(`[RepoTxtFetcher Branch Change] Effective branch changed from '${prevEffectiveBranch}' to '${effectiveBranchDisplay}'. Resetting fetchStatus from '${fetchStatus}' to 'idle'.`);
+                 setFetchStatus('idle');
+            }
+        }
+        setPrevEffectiveBranch(effectiveBranchDisplay);
+    }, [effectiveBranchDisplay, fetchStatus, setFetchStatus, prevEffectiveBranch, logger]);
 
 
     // === Imperative Handle ===
@@ -284,7 +305,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     }), [
         handleFetchManual, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll,
         kworkInputValue, // Need state value for getter
-        imageReplaceTask, handleAddImportantFiles, handleAddFullTree, handleSelectAll, handleDeselectAll
+        imageReplaceTask, handleAddImportantFiles, handleAddFullTree, handleSelectAll, handleDeselectAll, logger // Added logger
     ]);
     logger.debug("[RepoTxtFetcher] After useImperativeHandle");
 
@@ -296,7 +317,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
             logger.info(`[CB ManualBranchChange] Clearing targetBranchName`);
             setTargetBranchName(null);
           }
-     }, [setManualBranchName, targetBranchName, setTargetBranchName]);
+     }, [setManualBranchName, targetBranchName, setTargetBranchName, logger]);
 
       const handleSelectPrBranch = useCallback((branch: string | null) => {
           logger.info(`[CB SelectPrBranch] Setting target branch: ${branch}`);
@@ -305,7 +326,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
               logger.info(`[CB SelectPrBranch] Clearing manualBranchName`);
               setManualBranchName("");
           }
-      }, [setTargetBranchName, setManualBranchName]);
+      }, [setTargetBranchName, setManualBranchName, logger]);
 
       const handleLoadPrs = useCallback(() => {
           logger.info(`[CB LoadPrs] Triggering PR load for URL: ${repoUrl}`);
@@ -315,7 +336,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
               toastError("Введите URL репозитория для загрузки PR.");
               logger.warn("[CB LoadPrs] Cannot load PRs, repo URL is empty.");
           }
-      }, [repoUrl, triggerGetOpenPRs, toastError]);
+      }, [repoUrl, triggerGetOpenPRs, toastError, logger]);
 
     // --- Derived States for Rendering ---
     logger.debug("[RepoTxtFetcher] Calculate Derived State");
@@ -327,7 +348,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const isCopyDisabled = !kworkValueForCheck.trim() || isActionDisabled;
     const isClearDisabled = (!kworkValueForCheck.trim() && selectedFetcherFiles.size === 0 && !filesFetched) || isActionDisabled;
     const isAddSelectedDisabled = selectedFetcherFiles.size === 0 || isActionDisabled;
-    const effectiveBranchDisplay = targetBranchName || manualBranchName || "default";
+    // const effectiveBranchDisplay = targetBranchName || manualBranchName || "default"; // Now a useMemo
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
     const imageTaskTargetFileReady = currentImageTask && fetchStatus === 'success' && fetchedFiles.some(f => f.path === currentImageTask.targetPath);
     logger.debug(`[Render State] isActionDisabled=${isActionDisabled}, isFetchLoading=${isFetchLoading}, showProgressBar=${showProgressBar}`);
