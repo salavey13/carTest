@@ -13,11 +13,13 @@ import {
     FaFileCode, FaRobot, FaWandMagicSparkles, FaBullseye, FaEnvelopeOpenText,
     FaMagnifyingGlass, FaChartLine, FaRegLightbulb, FaListCheck, FaArrowUpRightFromSquare,
     FaSkullCrossbones, // Icon for negative framing
-    FaShieldCat      // Icon for protection/validation
+    FaShieldCat,      // Icon for protection/validation
+    FaGamepad // Added for link
 } from "react-icons/fa6";
 import { debugLogger } from "@/lib/debugLogger";
 import Link from "next/link";
 import Image from "next/image";
+import { cn } from "@/lib/utils"; // Import cn utility
 
 // --- Component ---
 export default function SelfDevLandingPage() {
@@ -78,6 +80,10 @@ export default function SelfDevLandingPage() {
                 <p className="text-md md:text-lg text-gray-300 mt-4 font-mono tracking-wide">
                   Забудь модели. <strong className="text-brand-cyan font-semibold">ТЫ — лучшая бизнес-модель</strong>. Усиленная AI.
                 </p>
+                 {/* Added link to Gamified SelfDev */}
+                 <p className="mt-3 text-sm text-gray-400">
+                    Хочешь геймифицировать этот путь? Загляни сюда: <Link href="/selfdev/gamified" className="text-brand-yellow hover:underline font-semibold">Gamify Your Life <FaGamepad className="inline ml-1"/></Link>
+                 </p>
               </CardHeader>
 
               <CardContent className="space-y-16 p-5 md:p-10"> {/* Increased spacing */}
