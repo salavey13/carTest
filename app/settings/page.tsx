@@ -1,4 +1,3 @@
-// /app/settings/page.tsx
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
@@ -6,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch"; // Assuming you have a Switch component
 import { Label } from "@/components/ui/label"; // Assuming you have a Label component
-import { FaBell, FaTint, FaMoon, FaQuestionCircle, FaEnvelope } from "react-icons/fa";
+import { FaBell, FaTint, FaMoon, FaQuestionCircle, FaEnvelope, FaTools } from "react-icons/fa"; // Added FaTools here
 import Modal from "@/components/ui/Modal"; // Import the Modal component
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
