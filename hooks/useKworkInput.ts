@@ -18,19 +18,56 @@ interface UseKworkInputReturn {
     handleAddFullTree: () => void; // Add *all* currently listed file *paths* to input
 }
 
+// Helper function to determine language for Markdown code block
+const getFileLanguage = (filePath: string): string => {
+    const extension = filePath.split('.').pop()?.toLowerCase() || '';
+    switch (extension) {
+        case 'ts': return 'typescript';
+        case 'tsx': return 'tsx';
+        case 'js': return 'javascript';
+        case 'jsx': return 'jsx';
+        case 'json': return 'json';
+        case 'py': return 'python';
+        case 'md': return 'markdown';
+        case 'css': return 'css';
+        case 'html': return 'html';
+        case 'scss': return 'scss';
+        case 'less': return 'less';
+        case 'java': return 'java';
+        case 'kt': return 'kotlin';
+        case 'go': return 'go';
+        case 'rb': return 'ruby';
+        case 'php': return 'php';
+        case 'sql': return 'sql';
+        case 'yaml':
+        case 'yml': return 'yaml';
+        case 'sh': return 'bash';
+        case 'ps1': return 'powershell';
+        case 'xml': return 'xml';
+        case 'swift': return 'swift';
+        case 'c':
+        case 'h': return 'c'; 
+        case 'cpp':
+        case 'hpp': return 'cpp';
+        case 'cs': return 'csharp';
+        case 'txt': return 'plaintext';
+        default: return 'plaintext'; // Fallback for unknown extensions
+    }
+};
+
 export const useKworkInput = ({
     selectedFetcherFiles,
     allFetchedFiles,
     imageReplaceTaskActive,
-    files, // Этот `files` приходит из useRepoFetcher и содержит *текущий* список файлов
+    files, 
 }: UseKworkInputProps): UseKworkInputReturn => {
     logger.debug("[useKworkInput] Hook initialized");
     const { success: toastSuccess, error: toastError, warning: toastWarning } = useAppToast();
 
     const {
-        kworkInputRef,          // Keep ref for focus/scroll if needed
-        kworkInputValue,        // <<< USE new state value
-        setKworkInputValue,     // <<< USE new state setter
+        kworkInputRef,       
+        kworkInputValue,     
+        setKworkInputValue,  
         setRequestCopied,
         setSelectedFetcherFiles,
         setAiResponseHasContent,
@@ -39,7 +76,7 @@ export const useKworkInput = ({
         scrollToSection,
     } = useRepoXmlPageContext();
 
-    /** Adds the content of the currently selected files into the Kwork input textarea. */
+    /** Adds the content of the currently selected files into the Kwork input textarea as individual code blocks. */
     const handleAddSelected = useCallback(() => {
         if (imageReplaceTaskActive) {
             logger.warn("[Kwork Input] Add Selected skipped: Image replace task active.");
@@ -51,51 +88,90 @@ export const useKworkInput = ({
             logger.warn("[Kwork Input] Add Selected skipped: No files selected.");
             return;
         }
-        logger.info(`[Kwork Input] Adding ${selectedFetcherFiles.size} selected files to input...`);
+        logger.info(`[Kwork Input] Adding ${selectedFetcherFiles.size} selected files to input as individual code blocks...`);
 
-        const currentKworkValue = kworkInputValue; // <<< READ from state
-        // Regex to find either code context or file structure context blocks
-        const contextRegex = /(Контекст кода для анализа|Структура файлов проекта):\s*```([\s\S]*?)(\n?```)/im;
-        const fileSeparator = "\n\n// ---- FILE SEPARATOR ----\n\n";
-        let newContextContent = "";
+        const fileBlocksContent = Array.from(selectedFetcherFiles).map(path => {
+            const fileNode = allFetchedFiles.find(f => f.path === path);
+            let contentToDisplay: string;
 
-        newContextContent = Array.from(selectedFetcherFiles).map(path => {
-            const file = allFetchedFiles.find(f => f.path === path);
+            if (!fileNode) {
+                contentToDisplay = `// Error: File /${path} not found in allFetchedFiles.`;
+                logger.warn(`[Kwork Input] File /${path} not found in allFetchedFiles during AddSelected.`);
+            } else if (typeof fileNode.content === 'string') {
+                contentToDisplay = fileNode.content;
+            } else if (fileNode.content === null) {
+                contentToDisplay = `// Info: Content for /${path} is null (e.g., empty file).`;
+                logger.info(`[Kwork Input] Content for file /${path} is null during AddSelected.`);
+            } else {
+                // This case should ideally not happen based on FileNode type { content: string | null }
+                contentToDisplay = `// Warning: Content for /${path} is of unexpected type (${typeof fileNode.content}). Displaying as empty.`;
+                logger.warn(`[Kwork Input] Content for /${path} is of unexpected type: ${typeof fileNode.content} during AddSelected. Defaulting to empty string.`);
+                contentToDisplay = ""; 
+            }
+
+            const language = getFileLanguage(path);
             const pathComment = `// /${path}`;
-            const fileContent = file?.content ?? `// Error: Content for ${path} not found in allFetchedFiles`;
-            // Check if the existing content already starts with the correct path comment
-            const contentAlreadyHasComment = fileContent.trimStart().startsWith(pathComment);
-            logger.debug(`[Kwork Input] Adding file content: ${path} (Found: ${!!file}, HasComment: ${contentAlreadyHasComment})`);
-            return contentAlreadyHasComment ? fileContent : `${pathComment}\n${fileContent}`;
-        }).join(fileSeparator);
+            logger.debug(`[Kwork Input] Formatting file for AddSelected: ${path} (Lang: ${language})`);
+            return `${pathComment}\n\`\`\`${language}\n${contentToDisplay.trim()}\n\`\`\``;
+        }).join("\n\n// ---- FILE SEPARATOR ----\n\n");
 
-        // Use a generic prefix for the code block
-        const fullContextBlock = `Контекст кода для анализа:\n\`\`\`plaintext\n${newContextContent}\n\`\`\``;
+        const codeContextMarker = "Контекст кода для анализа:";
+        const structureMarker = "Структура файлов проекта:";
+        const newCodeContextSection = `${codeContextMarker}\n\n${fileBlocksContent}`;
+
+        const currentKworkValue = kworkInputValue || "";
         let finalKworkValue = "";
 
-        // Replace existing context block (either code or structure) or add new
-        if (contextRegex.test(currentKworkValue)) {
-             logger.debug("[Kwork Input] Replacing existing context block.");
-             finalKworkValue = currentKworkValue.replace(contextRegex, fullContextBlock);
-        } else {
-             logger.debug("[Kwork Input] No existing context block found, adding new.");
-             const separator = currentKworkValue.trim() ? "\n\n" : "";
-             finalKworkValue = currentKworkValue + separator + fullContextBlock;
-        }
+        const idxCode = currentKworkValue.indexOf(codeContextMarker);
+        const idxStructure = currentKworkValue.indexOf(structureMarker);
 
-        setKworkInputValue(finalKworkValue); // <<< UPDATE state
-        toastSuccess(`${selectedFetcherFiles.size} файлов добавлено в запрос.`);
+        if (idxCode !== -1) {
+            // Code context exists, replace it.
+            // Find where the old code context ends: either before structure marker or EOF.
+            let endOfOldCodeSection = currentKworkValue.length;
+            if (idxStructure !== -1 && idxStructure > idxCode) {
+                endOfOldCodeSection = idxStructure;
+            }
+            const textBefore = currentKworkValue.substring(0, idxCode);
+            const textAfter = currentKworkValue.substring(endOfOldCodeSection);
+            finalKworkValue = (textBefore.trimEnd() + 
+                               (textBefore.trimEnd() ? "\n\n" : "") + 
+                               newCodeContextSection.trimEnd() + 
+                               (textAfter.trimStart() ? "\n\n" : "") + 
+                               textAfter.trimStart());
+            logger.debug("[Kwork Input] Replacing existing code context section.");
+        } else if (idxStructure !== -1) {
+            // No code context, but structure context exists. Insert code context before structure.
+            const textBeforeStructure = currentKworkValue.substring(0, idxStructure);
+            const structureAndAfter = currentKworkValue.substring(idxStructure);
+            finalKworkValue = (textBeforeStructure.trimEnd() + 
+                               (textBeforeStructure.trimEnd() ? "\n\n" : "") + 
+                               newCodeContextSection.trimEnd() + 
+                               "\n\n" + 
+                               structureAndAfter.trimStart());
+            logger.debug("[Kwork Input] Adding code context section before file structure section.");
+        } else {
+            // Neither exists, append new code context.
+            finalKworkValue = (currentKworkValue.trimEnd() + 
+                               (currentKworkValue.trimEnd() ? "\n\n" : "") + 
+                               newCodeContextSection.trimEnd());
+            logger.debug("[Kwork Input] Appending new code context section.");
+        }
+        
+        finalKworkValue = finalKworkValue.replace(/\n{3,}/g, '\n\n').trim();
+
+        setKworkInputValue(finalKworkValue);
+        toastSuccess(`${selectedFetcherFiles.size} файлов добавлено в запрос как отдельные блоки кода.`);
         scrollToSection('kworkInput');
 
     }, [
         selectedFetcherFiles, allFetchedFiles, imageReplaceTaskActive, toastSuccess, toastWarning,
-        kworkInputValue, setKworkInputValue, // <<< USE state and setter
+        kworkInputValue, setKworkInputValue, 
         scrollToSection, logger
     ]);
 
-    /** Copies text (defaults to Kwork input) to the clipboard. */
     const handleCopyToClipboard = useCallback((textToCopy?: string, shouldScroll = true): boolean => {
-        const content = textToCopy ?? kworkInputValue; // <<< READ from state
+        const content = textToCopy ?? kworkInputValue; 
         if (!content.trim()) {
             toastWarning("Нет текста для копирования");
             logger.warn("[Kwork Input] Copy skipped: Input is empty.");
@@ -106,16 +182,15 @@ export const useKworkInput = ({
             toastSuccess("Текст запроса скопирован!");
             setRequestCopied(true);
             logger.info("[Kwork Input] Copied request to clipboard.");
-            if (shouldScroll) scrollToSection('executor'); // Assuming 'executor' is the ID of the next section (e.g., AI Assistant)
+            if (shouldScroll) scrollToSection('executor'); 
             return true;
         } catch (e) {
             logger.error("[Kwork Input] Clipboard write error:", e);
             toastError("Ошибка копирования в буфер обмена");
             return false;
         }
-    }, [kworkInputValue, toastSuccess, toastWarning, toastError, setRequestCopied, scrollToSection, logger]); // <<< ADD state dependency
+    }, [kworkInputValue, toastSuccess, toastWarning, toastError, setRequestCopied, scrollToSection, logger]); 
 
-    /** Clears Kwork input, file selection, and related AI/parsing states. */
     const handleClearAll = useCallback(() => {
         if (imageReplaceTaskActive) {
              logger.warn("[Kwork Input] Clear All skipped: Image replace task active.");
@@ -124,30 +199,25 @@ export const useKworkInput = ({
         }
         logger.info("[Kwork Input] Clearing input, selection, and related states.");
         setSelectedFetcherFiles(new Set());
-        setKworkInputValue(""); // <<< UPDATE state
+        setKworkInputValue(""); 
         setAiResponseHasContent(false);
         setFilesParsed(false);
         setSelectedAssistantFiles(new Set());
         setRequestCopied(false);
         toastSuccess("Форма очищена ✨");
-        if (kworkInputRef.current) kworkInputRef.current.focus(); // Ref still useful for focus
+        if (kworkInputRef.current) kworkInputRef.current.focus(); 
     }, [
-        imageReplaceTaskActive, setSelectedFetcherFiles, setKworkInputValue, // <<< USE state setter
+        imageReplaceTaskActive, setSelectedFetcherFiles, setKworkInputValue, 
         setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setRequestCopied,
         toastSuccess, toastWarning, logger, kworkInputRef
     ]);
 
-    /**
-     * Adds the file structure (paths only) of *all* currently listed files
-     * (from useRepoFetcher's `files` prop) to the Kwork input.
-     */
      const handleAddFullTree = useCallback(() => {
          if (imageReplaceTaskActive) {
              logger.warn("[Kwork Input] Add Tree skipped: Image replace task active.");
              toastWarning("Добавление дерева файлов недоступно во время задачи замены картинки.");
              return;
          }
-         // Используем `files`, который содержит текущий список файлов из useRepoFetcher
          if (files.length === 0) {
              toastWarning("Нет загруженных файлов для добавления дерева.");
              logger.warn("[Kwork Input] Add Tree skipped: No files loaded.");
@@ -155,36 +225,73 @@ export const useKworkInput = ({
          }
 
          logger.info(`[Kwork Input] Adding full file tree (PATHS ONLY) (${files.length} files) to input...`);
-
-         // --- ИЗМЕНЕНИЕ ЗДЕСЬ: Мапим только пути ---
          const treeStructure = files
-             .map(f => `- /${f.path}`) // Просто берем путь и добавляем префикс
-             .sort() // Сортируем для красивого вида
+             .map(f => `- /${f.path}`) 
+             .sort() 
              .join("\n");
-         // --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
-         const prefix = "Структура файлов проекта:\n```\n"; // Используем ``` без языка
-         const suffix = "\n```";
-         const currentKworkValue = kworkInputValue; // Читаем текущее значение из контекста
-         // Regex to find either code context or file structure context blocks
-         const contextRegex = /(Контекст кода для анализа|Структура файлов проекта):\s*```([\s\S]*?)(\n?```)/im;
-         // Remove any existing context block before adding the new structure
-         const textWithoutContext = currentKworkValue.replace(contextRegex, '').trim();
-         const separator = textWithoutContext ? '\n\n' : '';
+        const codeContextMarker = "Контекст кода для анализа:";
+        const structureMarker = "Структура файлов проекта:";
+        const newStructureSection = `${structureMarker}\n\`\`\`\n${treeStructure.trim()}\n\`\`\``;
 
-         // Construct the new content with the text (if any) and the file structure
-         const newContent = `${textWithoutContext}${separator}${prefix}${treeStructure}${suffix}`;
+        const currentKworkValue = kworkInputValue || "";
+        let finalKworkValue = "";
+        
+        const idxCode = currentKworkValue.indexOf(codeContextMarker);
+        const idxStructure = currentKworkValue.indexOf(structureMarker);
 
-         setKworkInputValue(newContent); // Обновляем значение через контекст
-         toastSuccess(`Структура (${files.length} файлов) добавлена в запрос.`);
-         scrollToSection('kworkInput'); // Прокручиваем к полю ввода
-     }, [files, imageReplaceTaskActive, kworkInputValue, setKworkInputValue, toastSuccess, toastWarning, scrollToSection, logger]); // Зависимости
+        if (idxStructure !== -1) {
+            // Structure context exists, replace it.
+            // Regex to find the existing structure block precisely
+            const oldStructureBlockRegex = new RegExp(
+                structureMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + // Escape marker for regex
+                "\\s*```([\\s\\S]*?)```" // Match ``` block content
+            , "im"); // m for multiline, i for case-insensitive (though markers are fixed)
+            
+            const match = oldStructureBlockRegex.exec(currentKworkValue);
+
+            // Ensure the match found is the one starting at idxStructure
+            if (match && match.index === idxStructure) {
+                const textBefore = currentKworkValue.substring(0, idxStructure);
+                const textAfter = currentKworkValue.substring(idxStructure + match[0].length);
+                finalKworkValue = (textBefore.trimEnd() +
+                                   (textBefore.trimEnd() ? "\n\n" : "") +
+                                   newStructureSection.trimEnd() +
+                                   (textAfter.trimStart() ? "\n\n" : "") +
+                                   textAfter.trimStart());
+                logger.debug("[Kwork Input] Replacing existing file structure section using regex match.");
+            } else {
+                // Fallback: if regex fails or marker is present but not as a block.
+                // This could happen if the ``` block is malformed or missing.
+                // A safe fallback is to append, to avoid data loss or complex recovery.
+                logger.warn(`[Kwork Input] Structure marker found at index ${idxStructure}, but regex match failed or was misplaced. Appending new structure section to current content.`);
+                finalKworkValue = (currentKworkValue.trimEnd() +
+                                   (currentKworkValue.trimEnd() ? "\n\n" : "") +
+                                   newStructureSection.trimEnd());
+            }
+        } else if (idxCode !== -1) {
+            // Code context exists, but no structure. Append structure after code.
+            finalKworkValue = (currentKworkValue.trimEnd() + "\n\n" + newStructureSection.trimEnd());
+            logger.debug("[Kwork Input] Appending file structure section after code context.");
+        } else {
+            // Neither code nor structure context exists. Append new structure.
+            finalKworkValue = (currentKworkValue.trimEnd() +
+                               (currentKworkValue.trimEnd() ? "\n\n" : "") +
+                               newStructureSection.trimEnd());
+            logger.debug("[Kwork Input] Appending new file structure section.");
+        }
+
+        finalKworkValue = finalKworkValue.replace(/\n{3,}/g, '\n\n').trim();
+        setKworkInputValue(finalKworkValue);
+        toastSuccess(`Структура (${files.length} файлов) добавлена в запрос.`);
+        scrollToSection('kworkInput'); 
+     }, [files, imageReplaceTaskActive, kworkInputValue, setKworkInputValue, toastSuccess, toastWarning, scrollToSection, logger]); 
 
      logger.debug("[useKworkInput] Hook setup complete.");
     return {
         handleAddSelected,
         handleCopyToClipboard,
         handleClearAll,
-        handleAddFullTree, // Возвращаем обновленную функцию
+        handleAddFullTree, 
     };
 };
