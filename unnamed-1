@@ -1,1 +1,53 @@
-import { FaRightLeft, FaMagnifyingGlass, FaTimes } from 'react-icons/fa6'; // Use Fa6 consistently
+const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((props, ref) => {
+    // ... Контекст и тосты ...
+
+    // --- State ---
+    const [isMounted, setIsMounted] = useState(false); // <- Hook called
+    const [response, setResponse] = useState<string>(""); // <- Hook called
+    // ... другие useState ... // <- Hooks called
+
+    // --- Hooks ---
+    const appContext = useAppContext(); // <- Hook called
+    const codeParserHook = useCodeParsingAndValidation(); // <- Hook called
+    const pageContext = pageContextForToast; // OK
+    const { /* ... */ } = useAppToast(); // <- Hook called
+    // ... Деструктуризация ...
+
+    // --- USE THE NEW HANDLERS HOOK ---
+    const handlers = useAICodeAssistantHandlers({ /* ... */ }); // <- Hook called
+
+    // --- Callback Hooks ---
+    const setResponseValue = useCallback((value: string) => { /* ... */ }, [ /* ... */ ]); // <- Hook called
+    const updateRepoUrl = useCallback((url: string) => { /* ... */ }, [ /* ... */ ]); // <- Hook called
+    const handleResetImageError = useCallback(() => { /* ... */ }, [ /* ... */ ]); // <- Hook called
+
+    // --- Refs ---
+    const processingImageReplace = useRef(false); // <- Hook called
+    const imageReplaceTaskRef = useRef(imageReplaceTask); // <- Hook called
+
+    // --- DERIVED STATE NEEDED BY HOOKS ---
+    const derivedRepoUrlForHooks = repoUrlStateLocal || repoUrlFromContext || ""; // OK
+
+    // --- Effects ---
+    useEffect(() => { addToastDirect("[DEBUG] AICodeAssistant Mounted Effect", 'info', 1000); setIsMounted(true); }, [addToastDirect]); // <- Hook called
+    // ... другие useEffect ... // <- Hooks called
+
+    // --- Imperative Handle ---
+    useImperativeHandle(ref, () => ({ /* ... */ }), [ /* ... */ ]); // <- Hook called
+
+    // --- <<< EARLY RETURN CHECK >>> ---
+    if (!isMounted) { // <-- ПРОВЕРКА СЛИШКОМ ПОЗДНО
+        addToastDirect("[DEBUG] AICodeAssistant Render: Early return (!isMounted)", 'info', 1000);
+        return ( // <-- РАННИЙ ВОЗВРАТ ПОСЛЕ ХУКОВ
+             <div id="executor-loading" /* ... */>
+                {/* ... loading state ... */}
+             </div>
+         );
+    }
+
+    // --- Derived State for Rendering ---
+    // ...
+
+    // --- FINAL RENDER ---
+    // ...
+});

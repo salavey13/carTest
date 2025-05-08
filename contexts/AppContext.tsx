@@ -1,72 +1,83 @@
 "use client";
 
 import type React from "react";
-import { createContext, useContext, useEffect, useMemo } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useTelegram } from "@/hooks/useTelegram";
-import { debugLogger } from "@/lib/debugLogger";
-import { toast } from "sonner";
+import { debugLogger as logger } from "@/lib/debugLogger";
+import { toast } from "sonner"; // Keep for auth toasts
 
 // Define the shape of the context data
-// Infer the type from the hook's return value for robustness
-type AppContextType = ReturnType<typeof useTelegram>;
+// .. REMOVED debugToastsEnabled ---
+interface AppContextData extends ReturnType<typeof useTelegram> {}
 
 // Create the context with an initial undefined value
-const AppContext = createContext<AppContextType | undefined>(undefined);
+const AppContext = createContext<Partial<AppContextData>>({});
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Get data from the useTelegram hook
   const telegramData = useTelegram();
 
-  // Memoize the context value to prevent unnecessary re-renders of consumers
-  // if telegramData object reference changes but values are the same.
-  const contextValue = useMemo(() => telegramData, [telegramData]);
+  // .. REMOVED debugToastsEnabled state ---
 
-  // Log context changes for debugging (only when contextValue actually changes)
+  // Context value now only contains telegram data
+  const contextValue = useMemo(() => ({
+    ...telegramData,
+  }), [telegramData]); // Dependency only on telegramData
+
+  // Log context changes for debugging
   useEffect(() => {
-    debugLogger.log("AppContext updated:", {
+    logger.log("AppContext updated:", {
       isAuthenticated: contextValue.isAuthenticated,
       isLoading: contextValue.isLoading,
       userId: contextValue.dbUser?.user_id ?? contextValue.user?.id,
       dbUserStatus: contextValue.dbUser?.status,
       error: contextValue.error?.message,
       isInTelegram: contextValue.isInTelegramContext,
+      // .. REMOVED debugToastsEnabled log ---
     });
   }, [contextValue]);
 
 
   // Centralize the "User Authorized" toast notification
+  // This logic remains the same as it doesn't depend on the removed flag
   useEffect(() => {
     let currentToastId: string | number | undefined;
+    let loadingTimer: NodeJS.Timeout | null = null;
+    const LOADING_TOAST_DELAY = 300;
 
-    // Show loading toast only if loading takes a noticeable amount of time
     if (contextValue.isLoading) {
-       // Optionally, delay the loading toast slightly
-       // const loadingTimer = setTimeout(() => {
-       //    currentToastId = toast.loading("Авторизация...", { id: "auth-loading-toast" });
-       // }, 300); // e.g., wait 300ms
-       // return () => clearTimeout(loadingTimer); // Clear timer if component unmounts or deps change
+       loadingTimer = setTimeout(() => {
+          if (contextValue.isLoading && document.visibilityState === 'visible') {
+             logger.debug("[AppContext] Showing auth loading toast...");
+             currentToastId = toast.loading("Авторизация...", { id: "auth-loading-toast" });
+          }
+       }, LOADING_TOAST_DELAY);
     } else {
-        toast.dismiss("auth-loading-toast"); // Dismiss loading if no longer loading
+        if (loadingTimer) clearTimeout(loadingTimer);
+        toast.dismiss("auth-loading-toast");
 
-        // Show success toast only once when authentication completes successfully
         if (contextValue.isAuthenticated && !contextValue.error) {
-            // Use a unique ID to prevent the toast from showing multiple times on rapid updates
-            currentToastId = toast.success("Пользователь авторизован", { id: "auth-success-toast", duration: 2000 });
+             if (document.visibilityState === 'visible') {
+                 logger.debug("[AppContext] Showing auth success toast...");
+                 currentToastId = toast.success("Пользователь авторизован", { id: "auth-success-toast", duration: 2000 });
+             }
         }
-        // Optional: Show error toast if authentication fails
         else if (contextValue.error) {
-             currentToastId = toast.error("Ошибка авторизации", { id: "auth-error-toast", description: contextValue.error.message });
+            if (document.visibilityState === 'visible') {
+                 logger.error("[AppContext] Showing auth error toast:", contextValue.error);
+                 // Show a more generic error, details might be sensitive or confusing
+                 currentToastId = toast.error("Ошибка авторизации", { id: "auth-error-toast", description: "Не удалось войти. Попробуйте позже." });
+            }
         }
     }
 
-    // Cleanup function to dismiss the toast if the component unmounts
-    // or the dependencies change before the toast auto-dismisses
     return () => {
-        if (currentToastId) {
-            // toast.dismiss(currentToastId); // Optional: dismiss immediately on change/unmount
+        if (loadingTimer) {
+            clearTimeout(loadingTimer);
         }
+        // Do not dismiss persistent error toasts here on unmount
+        // toast.dismiss(currentToastId);
     };
-
   }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.error]);
 
   // Provide the memoized value to the context consumers
@@ -74,11 +85,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 };
 
 // Custom hook for consuming the context
-export const useAppContext = (): AppContextType => {
+export const useAppContext = (): AppContextData => {
   const context = useContext(AppContext);
-  // Ensure the hook is used within a provider
-  if (context === undefined) {
-    throw new Error("useAppContext must be used within an AppProvider");
+  // .. REMOVED hasOwnProperty check for debugToastsEnabled ---
+  if (!context || Object.keys(context).length === 0) { // Check if context is empty (initial state)
+     const error = new Error("useAppContext must be used within an AppProvider and after its initialization");
+     logger.fatal("useAppContext Error: Context is empty or undefined.", error);
+     // Throw error only if context is truly undefined (Provider missing)
+     if (context === undefined) throw error;
+      // If context exists but is empty, return a safe default or log warning
+      logger.warn("useAppContext: Context appears to be empty (potentially during initialization). Returning partial default.");
+      return { /* return minimal safe defaults or cast Partial<AppContextData> */ } as AppContextData;
   }
-  return context;
+  // Cast to full type once checks pass
+  return context as AppContextData;
 };

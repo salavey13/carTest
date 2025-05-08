@@ -955,6 +955,7 @@ export async function generateCaptcha(settings: CaptchaSettings): Promise<{
             const charColor = adjustColor(settings.text_color, Math.random() * 40 - 20); 
             svg += `<text x="${x}" y="${textY}" font-family="monospace" font-size="${settings.font_size}" fill="${charColor}" transform="rotate(${rotation}, ${x}, ${textY})">${captchaText[i]}</text>`;
         }
+
         svg += `</svg>`;
         const image = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
         const referenceHash = createHash("sha256")

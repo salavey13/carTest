@@ -1,8 +1,10 @@
+"use client";
+
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Tooltip } from '../AICodeAssistant'; // Adjust path
-import { FileEntry, ValidationIssue } from '../../hooks/useCodeParsingAndValidation'; // Adjust path
-import { FaEllipsisVertical, FaSquareCheck, FaPaperPlane, FaCircleExclamation, FaFileZipper, FaFloppyDisk } from 'react-icons/fa6';
+// REMOVED Tooltip Imports
+import { FileEntry, ValidationIssue } from '../../hooks/useCodeParsingAndValidation'; // Adjust path if necessary
+import { FaEllipsisVertical, FaSquareCheck, FaRegSquare, FaPaperPlane, FaCircleExclamation, FaFileZipper, FaFloppyDisk } from 'react-icons/fa6'; // Corrected FaRegSquare, FaPaperPlane
 import clsx from 'clsx';
 
 interface ParsedFilesListProps {
@@ -43,27 +45,25 @@ export const ParsedFilesList: React.FC<ParsedFilesListProps> = ({
             <div className="flex justify-between items-center mb-3">
                 <h2 className="text-lg font-semibold text-cyan-400">Разобранные файлы ({parsedFiles.length})</h2>
                 <div className="relative">
-                    <Tooltip text="Опции для файлов" position="left">
-                        <button className="p-1 text-gray-400 hover:text-white" onClick={() => setShowFileMenu(!showFileMenu)}>
-                            <FaEllipsisVertical />
-                        </button>
-                    </Tooltip>
+                    <button className="p-1 text-gray-400 hover:text-white" onClick={() => setShowFileMenu(!showFileMenu)} title="Опции для файлов">
+                        <FaEllipsisVertical />
+                    </button>
                     {showFileMenu && (
                         <motion.div
                             initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
                             className="absolute right-0 mt-2 w-48 bg-gray-700 rounded shadow-lg z-30 border border-gray-600 overflow-hidden" // Increased z-index
+                            onMouseLeave={() => setShowFileMenu(false)} // Close on mouse leave
                         >
-                            <button className="flex items-center gap-2 w-full text-left px-4 py-2 hover:bg-gray-600 text-sm transition text-white disabled:opacity-50 disabled:cursor-not-allowed" onClick={() => { onSaveFiles(); setShowFileMenu(false); }} disabled={!isUserLoggedIn || isLoading}>
+                            <button className="flex items-center gap-2 w-full text-left px-4 py-2 hover:bg-gray-600 text-sm transition text-white disabled:opacity-50 disabled:cursor-not-allowed" onClick={() => { onSaveFiles(); setShowFileMenu(false); }} disabled={!isUserLoggedIn || isLoading || selectedFileIds.size === 0} title={!isUserLoggedIn ? "Нужна авторизация" : (selectedFileIds.size === 0 ? "Выберите файлы" : "Сохранить выбранное в профиль")}>
                                 <FaFloppyDisk size={14}/> Сохранить/Обновить
                             </button>
-                            <button className="flex items-center gap-2 w-full text-left px-4 py-2 hover:bg-gray-600 text-sm transition text-white disabled:opacity-50" onClick={() => { onDownloadZip(); setShowFileMenu(false); }} disabled={isLoading}>
+                            <button className="flex items-center gap-2 w-full text-left px-4 py-2 hover:bg-gray-600 text-sm transition text-white disabled:opacity-50" onClick={() => { onDownloadZip(); setShowFileMenu(false); }} disabled={isLoading || selectedFileIds.size === 0} title={selectedFileIds.size === 0 ? "Выберите файлы" : "Скачать выбранное архивом"}>
                                 <FaFileZipper size={14}/> Скачать ZIP
                             </button>
-                            <button className="flex items-center gap-2 w-full text-left px-4 py-2 hover:bg-gray-600 text-sm transition text-white disabled:opacity-50" onClick={() => { onSelectAll(); setShowFileMenu(false); }} disabled={isLoading}>
+                            <button className="flex items-center gap-2 w-full text-left px-4 py-2 hover:bg-gray-600 text-sm transition text-white disabled:opacity-50" onClick={() => { onSelectAll(); setShowFileMenu(false); }} disabled={isLoading || parsedFiles.length === 0}>
                                 <FaSquareCheck size={14}/> Выбрать все
                             </button>
-                            <button className="flex items-center gap-2 w-full text-left px-4 py-2 hover:bg-gray-600 text-sm transition text-white disabled:opacity-50" onClick={() => { onDeselectAll(); setShowFileMenu(false); }} disabled={isLoading}>
-                                {/* Icon for deselect? Maybe just text is fine */}
+                            <button className="flex items-center gap-2 w-full text-left px-4 py-2 hover:bg-gray-600 text-sm transition text-white disabled:opacity-50" onClick={() => { onDeselectAll(); setShowFileMenu(false); }} disabled={isLoading || selectedFileIds.size === 0}>
                                  Снять выделение
                             </button>
                         </motion.div>
@@ -91,7 +91,7 @@ export const ParsedFilesList: React.FC<ParsedFilesListProps> = ({
                                 type="checkbox"
                                 checked={isSelected}
                                 onChange={(e) => { e.stopPropagation(); onToggleSelection(file.id); }}
-                                className="w-3.5 h-3.5 accent-cyan-500 cursor-pointer flex-shrink-0"
+                                className="w-3.5 h-3.5 accent-cyan-500 cursor-pointer flex-shrink-0 bg-gray-600 border-gray-500 rounded focus:ring-cyan-500 focus:ring-offset-gray-800"
                             />
                             <span className={clsx(
                                 "truncate text-sm flex-grow",
@@ -101,17 +101,16 @@ export const ParsedFilesList: React.FC<ParsedFilesListProps> = ({
                                 {file.path}
                             </span>
                             {hasError && (
-                                <FaCircleExclamation className="text-red-500 flex-shrink-0" size={12} />
+                                <FaCircleExclamation className="text-red-500 flex-shrink-0" size={12} title={tooltipText} /> // Add title here too
                             )}
-                            <Tooltip text={`Отправить ${file.path.split('/').pop()} в Telegram`} position="left">
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); onSendToTelegram(file); }}
-                                    disabled={isLoading || !isUserLoggedIn}
-                                    className="ml-auto text-purple-500 hover:text-purple-400 disabled:opacity-50 disabled:cursor-not-allowed transition p-0.5"
-                                >
-                                    <FaPaperPlane size={14}/>
-                                </button>
-                            </Tooltip>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onSendToTelegram(file); }}
+                                disabled={isLoading || !isUserLoggedIn}
+                                className="ml-auto text-purple-500 hover:text-purple-400 disabled:opacity-50 disabled:cursor-not-allowed transition p-0.5"
+                                title={`Отправить ${file.path.split('/').pop()} в Telegram`}
+                            >
+                                <FaPaperPlane size={14}/>
+                            </button>
                         </div>
                     )
                 })}

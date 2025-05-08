@@ -6,9 +6,7 @@ import React, { useState, useEffect } from "react"; // Import React explicitly i
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
-import {
-  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
-} from "@/components/ui/tooltip";
+
 import {
   FaRocket, FaGamepad, FaBoxOpen, FaBullseye, FaHandHoldingDollar, FaBrain, FaCubes, FaUsers, FaChartLine, FaRobot, FaMoneyBillWave, FaArrowUpRightFromSquare, FaLightbulb, FaRoad, FaFileCode, FaEye, FaArrowsSpin, FaNetworkWired, FaComments, FaWandMagicSparkles, FaListCheck, FaEnvelopeOpenText, FaPlay, FaInfinity, FaBolt, FaGift, FaGithub, FaCode, FaTelegram, FaShieldHalved // Added missing FaShieldHalved
 } from "react-icons/fa6";
@@ -61,7 +59,7 @@ export default function JumpstartPage() {
          }}
        ></div>
 
-      <TooltipProvider delayDuration={150}>
+ 
         <div className="relative z-10 container mx-auto px-4">
          {/* Language Switcher */}
          <div className="mb-8 flex justify-center md:justify-end">
@@ -221,7 +219,7 @@ export default function JumpstartPage() {
             </CardContent>
           </Card>
         </div>
-      </TooltipProvider>
+      
     </div>
   );
 }

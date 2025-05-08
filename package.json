@@ -11,6 +11,8 @@
   "dependencies": {
     "@emotion/is-prop-valid": "latest",
     "@google/genai": "latest",
+    "google-it": "latest",
+    "cheerio": "latest",
     "@hookform/resolvers": "^3.9.1",
     "@huggingface/transformers": "latest",
     "@octokit/rest": "latest",
@@ -80,7 +82,8 @@
     "vaul": "^0.9.6",
     "worker-loader": "^3.0.8",
     "zod": "^3.24.1",
-    "papaparse": "latest"
+    "papaparse": "latest",
+    "html-react-parser": "latest"
   },
   "devDependencies": {
     "@types/file-saver": "^2.0.7",

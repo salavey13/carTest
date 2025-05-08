@@ -9,14 +9,15 @@ import type { Database } from "@/types/database.types";
 type DbUser = Database["public"]["Tables"]["users"]["Row"];
 type DbCar = Database["public"]["Tables"]["cars"]["Row"]; // Restored
 type DbInvoice = Database["public"]["Tables"]["invoices"]["Row"];
-type DbRental = Database["public"]["Tables"]["rentals"]["Row"]; 
-type DbTask = Database["public"]["Tables"]["tasks"]["Row"]; 
-type DbCharacter = Database["public"]["Tables"]["characters"]["Row"]; 
-type DbVideo = Database["public"]["Tables"]["videos"]["Row"]; 
-type DbSubscription = Database["public"]["Tables"]["subscriptions"]["Row"]; 
-type DbArticle = Database["public"]["Tables"]["articles"]["Row"]; 
-type DbArticleSection = Database["public"]["Tables"]["article_sections"]["Row"]; 
+type DbRental = Database["public"]["Tables"]["rentals"]["Row"];
+type DbTask = Database["public"]["Tables"]["tasks"]["Row"]; // From reference
+type DbCharacter = Database["public"]["Tables"]["characters"]["Row"]; // From reference
+type DbVideo = Database["public"]["Tables"]["videos"]["Row"]; // From reference
+type DbSubscription = Database["public"]["Tables"]["subscriptions"]["Row"]; // Assuming you have a subscriptions table (from reference)
+type DbArticle = Database["public"]["Tables"]["articles"]["Row"]; // Added for Articles
+type DbArticleSection = Database["public"]["Tables"]["article_sections"]["Row"]; // Added for Article Sections
 type DbUserResult = Database["public"]["Tables"]["user_results"]["Row"]; // Restored
+ 
 
 
 // --- Supabase Client Initialization ---
