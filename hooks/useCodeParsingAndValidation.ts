@@ -44,7 +44,7 @@ export interface FileEntry {
 }
 
 // --- Constants ---
-const CODE_BLOCK_REGEX = /```(?:[a-z]+)?\s*\n([\s\S]*?)\n```/g;
+// CODE_BLOCK_REGEX is defined and used locally in parseFilesFromText
 const FILE_PATH_REGEX = /^(?:[\w-]+\/)*[\w-]+\.\w+/; // Basic path check
 const USE_CLIENT_REGEX = /^\s*['"]use client['"]\s*;?\s*$/;
 const IMPORT_REACT_REGEX = /import\s+(?:React(?:,\s*{[^}]*})?|{[^}]*\s+React\s*,\s*[^}]*})\s+from\s+['"]react['"]/;
@@ -135,10 +135,11 @@ export function useCodeParsingAndValidation() {
             }
             if (path !== '/') path = path.replace(/^[\/\\]+/, '');
 
-            if (content.includes('```')) {
+            // MODIFIED CHECK: Look for ``` at the BEGINNING of any line within the content
+            if (/^\s*```/m.test(content)) {
                  const fileId = generateId();
-                 logger.warn(`[Parse Logic] Nested code block detected in potential file: ${path}. Adding parse error.`);
-                 parseErrors.push({ id: generateId(), fileId: fileId, filePath: path || `parse-error-${fileId}`, type: 'parseError', message: `Обнаружен вложенный блок кода (\`\`\`). Разбор может быть некорректным.`, details: { lineNumber: -1 }, fixable: false, restorable: false, severity: 'error' });
+                 logger.warn(`[Parse Logic] Nested code block marker (\`\`\`) found at the start of a line within the content of potential file: ${path}. Adding parse error.`);
+                 parseErrors.push({ id: generateId(), fileId: fileId, filePath: path || `parse-error-${fileId}`, type: 'parseError', message: `Обнаружен маркер начала/конца блока кода (\`\`\`) внутри другого блока кода. Разбор может быть некорректным.`, details: { lineNumber: -1 }, fixable: false, restorable: false, severity: 'error' });
             }
             files.push({ id: generateId(), path, content, extension });
              logger.debug(`[Parse Logic] Parsed file ${fileCounter}: Path=${path}, Ext=${extension}, Content Length=${content.length}`);
@@ -196,27 +197,36 @@ export function useCodeParsingAndValidation() {
 
 
             // .. 2. "use client" Check
-             logger.debug(`[Validation Logic - ${filePath}] Checking for "use client"...`);
+            logger.debug(`[Validation Logic - ${filePath}] Checking for "use client"...`);
             if (/\.(tsx|jsx)$/.test(filePath)) {
-                 const firstRealLineIndex = lines.findIndex(line => line.trim() !== '');
-                 const firstRealLine = firstRealLineIndex !== -1 ? lines[firstRealLineIndex].trim() : null;
-                 const hasUseClient = firstRealLine === '"use client";' || firstRealLine === "'use client';" || firstRealLine === '"use client"' || firstRealLine === "'use client'";
-                 const usesClientFeatures = clientHookPatterns.test(file.content) || /on[A-Z][a-zA-Z]*\s*=\s*{/.test(file.content);
-                 logger.debug(`[Validation Logic - ${filePath}] useClient check: hasDirective=${hasUseClient}, usesFeatures=${usesClientFeatures}`);
+                // START ADDED EXCEPTION for app/layout.tsx files
+                const isAppLayoutFile = /^app\/.*layout\.(tsx|jsx)$/.test(filePath);
+                if (isAppLayoutFile) {
+                    logger.info(`[Validation Logic - ${filePath}] Skipping "use client" check for App Router layout file.`);
+                } else {
+                // END ADDED EXCEPTION
+                    const firstRealLineIndex = lines.findIndex(line => line.trim() !== '');
+                    const firstRealLine = firstRealLineIndex !== -1 ? lines[firstRealLineIndex].trim() : null;
+                    const hasUseClient = firstRealLine === '"use client";' || firstRealLine === "'use client';" || firstRealLine === '"use client"' || firstRealLine === "'use client'";
+                    const usesClientFeatures = clientHookPatterns.test(file.content) || /on[A-Z][a-zA-Z]*\s*=\s*{/.test(file.content);
+                    logger.debug(`[Validation Logic - ${filePath}] useClient check: hasDirective=${hasUseClient}, usesFeatures=${usesClientFeatures}`);
 
-                 if (!hasUseClient && usesClientFeatures) {
-                      let firstUsageLine = -1;
-                      const hookMatch = clientHookPatterns.exec(file.content);
-                      const eventMatch = /on[A-Z][a-zA-Z]*\s*=\s*{/.exec(file.content);
-                      if (hookMatch || eventMatch) {
-                          const searchIndex = Math.min(hookMatch?.index ?? Infinity, eventMatch?.index ?? Infinity);
-                          if (searchIndex !== Infinity) { firstUsageLine = (file.content.substring(0, searchIndex).match(/\n/g) || []).length + 1; }
-                      }
-                      const featureName = hookMatch?.[1] ?? (eventMatch ? 'event handler' : 'client feature');
-                      logger.warn(`[Validation Logic - ${filePath}] Missing "use client" detected. First usage: ${featureName} around line ${firstUsageLine}`);
-                     issues.push({ id: generateId(), fileId, filePath, type: 'useClientMissing', message: `Found ${featureName} without "use client".`, details: { lineNumber: firstUsageLine > 0 ? firstUsageLine : undefined }, fixable: true, severity: 'warning', restorable: false });
-                 }
-             }
+                    if (!hasUseClient && usesClientFeatures) {
+                        let firstUsageLine = -1;
+                        const hookMatch = clientHookPatterns.exec(file.content);
+                        const eventMatch = /on[A-Z][a-zA-Z]*\s*=\s*{/.exec(file.content);
+                        if (hookMatch || eventMatch) {
+                            const searchIndex = Math.min(hookMatch?.index ?? Infinity, eventMatch?.index ?? Infinity);
+                            if (searchIndex !== Infinity) { firstUsageLine = (file.content.substring(0, searchIndex).match(/\n/g) || []).length + 1; }
+                        }
+                        const featureName = hookMatch?.[1] ?? (eventMatch ? 'event handler' : 'client feature');
+                        logger.warn(`[Validation Logic - ${filePath}] Missing "use client" detected. First usage: ${featureName} around line ${firstUsageLine}`);
+                        issues.push({ id: generateId(), fileId, filePath, type: 'useClientMissing', message: `Found ${featureName} without "use client".`, details: { lineNumber: firstUsageLine > 0 ? firstUsageLine : undefined }, fixable: true, severity: 'warning', restorable: false });
+                    }
+                // START ADDED EXCEPTION
+                }
+                // END ADDED EXCEPTION
+            }
 
             // .. 3. Skipped Code Block Check ('/* ... */')
              logger.debug(`[Validation Logic - ${filePath}] Checking for skipped code blocks...`);
