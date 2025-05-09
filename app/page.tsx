@@ -92,7 +92,7 @@ export default function Home() {
         <motion.div
           animate={{ rotate: [0, 360, 0], scale: [1, 1.2, 1, 1.2, 1] }}
           transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-          className="loading-spinner-cyber w-24 h-24 mb-6" // Replaced with CSS class
+          className="loading-spinner-cyber w-24 h-24 mb-6" 
         />
         <p className="text-brand-cyan font-orbitron text-xl animate-pulse tracking-widest">
           {appLoading ? "CONNECTING TO CYBERVIBE GRID..." : "DECRYPTING COGNITIVE DATA..."}
@@ -130,10 +130,10 @@ export default function Home() {
   const nextLevelTarget = (currentLevel + 1) * 1000; 
   
   return ( 
-    <div className="homepage-wrapper"> {/* Replaced with CSS class */}
-       <div className="homepage-bg-effects-container"> {/* Replaced with CSS class */}
-         <div className="homepage-bg-pulse-fast" /> {/* Replaced with CSS class */}
-         <div className="homepage-bg-pulse-slow" /> {/* Replaced with CSS class */}
+    <div className="homepage-wrapper">
+       <div className="homepage-bg-effects-container">
+         <div className="homepage-bg-pulse-fast" />
+         <div className="homepage-bg-pulse-slow" />
          <div className="absolute inset-0 bg-grid-pattern opacity-[0.04] animate-[drift_30s_linear_infinite]"></div>
        </div>
 
@@ -156,7 +156,7 @@ export default function Home() {
               src={dbUser?.avatar_url || telegramUser?.photo_url || PLACEHOLDER_AVATAR}
               alt={`${userName}'s Cybernetic Avatar`}
               width={52} height={52}
-              className="avatar-cyber w-11 h-11 sm:w-13 sm:h-13" // Replaced with CSS class, kept responsive size classes
+              className="avatar-cyber w-11 h-11 sm:w-13 sm:h-13"
               priority
             />
           </Link>
@@ -164,17 +164,17 @@ export default function Home() {
 
         {/* 2. Featured "Quests/Missions" Section */}
         <motion.div variants={itemVariants}>
-          <Card className="featured-quest-card group"> {/* Replaced with CSS class */}
+          <Card className="featured-quest-card group">
             <CardHeader className="flex flex-row items-center justify-between pb-2 pt-3 px-4 md:px-5">
               <div>
                 <CardTitle className="text-lg sm:text-xl font-orbitron text-brand-yellow">Priority Directives</CardTitle>
                 <CardDescription className="text-muted-foreground font-mono text-xs">Current Level {currentLevel}+ Challenges</CardDescription>
               </div>
-              <Link href="/selfdev/gamified" passHref legacyBehavior>
-                <Button variant="outline" size="xs" className="border-brand-yellow text-brand-yellow hover:bg-brand-yellow/10 hover:text-white font-mono text-xs px-2 py-1 h-auto group-hover:border-brand-pink group-hover:text-brand-pink">
+              <Button asChild variant="outline" size="xs" className="border-brand-yellow text-brand-yellow hover:bg-brand-yellow/10 hover:text-white font-mono text-xs px-2 py-1 h-auto group-hover:border-brand-pink group-hover:text-brand-pink">
+                <Link href="/selfdev/gamified">
                   All Directives <FaArrowRight className="ml-1 h-2.5 w-2.5 group-hover:animate-[wiggle_0.5s_ease-in-out_infinite] group-hover:text-glow-effect"/>
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               <Link href="/selfdev/gamified#levelup_fitness" className="block relative aspect-[16/5] sm:aspect-[16/4.5] w-full">
@@ -185,7 +185,7 @@ export default function Home() {
                     className="opacity-50 group-hover:opacity-70 group-hover:scale-105 transition-all duration-400 ease-in-out"
                     priority
                   />
-                 <div className="featured-quest-image-overlay"></div> {/* Replaced with CSS class */}
+                 <div className="featured-quest-image-overlay"></div>
                  <div className="absolute bottom-2 left-3 sm:bottom-3 sm:left-4 text-white z-10 p-1">
                     <h3 className="text-md sm:text-lg font-bold font-orbitron text-shadow-[0_0_8px_theme(colors.brand-cyan)]">
                       <VibeContentRenderer content="<FaGamepad className='inline text-brand-pink/90 mr-2 text-2xl sm:text-3xl'/>INITIATE: CyberDev OS Training Program" />
@@ -204,7 +204,7 @@ export default function Home() {
 
         {/* 3. "Activity/Vibe Output" Section */}
         <motion.div variants={itemVariants}>
-          <Card className="activity-card-cyber"> {/* Replaced with CSS class */}
+          <Card className="activity-card-cyber">
             <CardHeader className="pb-1 pt-3 px-4 md:px-5">
               <CardTitle className="text-md sm:text-lg font-orbitron text-black/95 font-bold uppercase tracking-wider flex items-center">
                 <FaFire className="inline mr-1.5 text-orange-300/90 drop-shadow-sm"/>Cognitive Throughput <span className="text-xs ml-auto text-black/70">(Weekly Cycle)</span>
@@ -257,7 +257,7 @@ export default function Home() {
         {/* Bottom Navigation */}
         <motion.div
             variants={bottomNavVariants} initial="hidden" animate="visible"
-            className="bottom-nav-cyber" // Replaced with CSS class
+            className="bottom-nav-cyber" 
           >
             <div className="container mx-auto flex justify-around items-center max-w-xs sm:max-w-sm">
               {[
@@ -268,18 +268,18 @@ export default function Home() {
                 { href: "/profile", icon: FaUserNinja, label: "AgentOS", color: "text-brand-yellow" },
               ].map(item => (
                  item.isCentral ? (
-                    <Link href={item.href} passHref legacyBehavior key={item.label}>
-                        <Button size="icon" className={`bottom-nav-item-central bg-gradient-to-br ${item.centralColor}`}> {/* Replaced with CSS class */}
+                    <Button asChild size="icon" className={`bottom-nav-item-central bg-gradient-to-br ${item.centralColor}`} key={item.label}>
+                        <Link href={item.href}>
                             <item.icon className="w-6 h-6 sm:w-7 sm:h-7"/>
-                        </Button>
-                    </Link>
+                        </Link>
+                    </Button>
                  ) : (
-                    <Link href={item.href} passHref legacyBehavior key={item.label}>
-                        <Button variant="ghost" className={`bottom-nav-item ${item.color}`}> {/* Replaced with CSS class */}
-                        <item.icon className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" />
-                        <span className="text-[0.6rem] sm:text-xs font-orbitron tracking-tighter leading-none">{item.label}</span>
-                        </Button>
-                    </Link>
+                    <Button asChild variant="ghost" className={`bottom-nav-item ${item.color}`} key={item.label}>
+                        <Link href={item.href}>
+                            <item.icon className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" />
+                            <span className="text-[0.6rem] sm:text-xs font-orbitron tracking-tighter leading-none">{item.label}</span>
+                        </Link>
+                    </Button>
                  )
               ))}
             </div>
@@ -291,15 +291,17 @@ export default function Home() {
             initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1, type: "spring", stiffness: 100 }}
             className="fixed bottom-20 md:bottom-24 right-3 sm:right-4 z-50"
           >
-             <Link href="/admin" passHref legacyBehavior>
-               <Button
-                 variant="outline" size="icon"
-                 className="bg-dark-card/80 border-brand-red/70 text-brand-red hover:bg-brand-red/20 hover:text-white rounded-full w-10 h-10 sm:w-11 sm:h-11 shadow-lg backdrop-blur-sm"
-                 aria-label="Admin Override Terminal"
-               >
+             <Button
+                asChild
+                variant="outline" 
+                size="icon"
+                className="bg-dark-card/80 border-brand-red/70 text-brand-red hover:bg-brand-red/20 hover:text-white rounded-full w-10 h-10 sm:w-11 sm:h-11 shadow-lg backdrop-blur-sm"
+                aria-label="Admin Override Terminal"
+              >
+               <Link href="/admin">
                  <FaUserNinja className="h-5 w-5 sm:h-6 sm:h-6" />
-               </Button>
-             </Link>
+               </Link>
+             </Button>
           </motion.div>
         )}
       </div>
