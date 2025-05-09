@@ -7,9 +7,8 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppContext } from "@/contexts/AppContext";
 import { motion } from "framer-motion";
 import {
-  FaBrain, FaGamepad, FaBolt, FaChartLine, FaCodeBranch, FaUserNinja,
-  FaWandMagicSparkles, FaArrowRight, FaPlus, FaEye, FaUpLong, FaFire, FaUsers, FaGithub,
-  FaLightbulb, 
+  FaBrain, FaGamepad, FaBolt, FaChartLine, FaUserNinja,
+  FaArrowRight, FaEye, FaUpLong, FaFire, FaGithub,
 } from "react-icons/fa6";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -20,7 +19,7 @@ import {
   CyberFitnessProfile,
 } from "@/hooks/cyberFitnessSupabase"; 
 
-// --- Constants & Config ---
+// --- Constants & Config - Moved outside the component ---
 const DEFAULT_WEEKLY_ACTIVITY = [
   { name: 'MO', value: 0, label: 'System Idle' }, { name: 'TU', value: 0, label: 'System Idle' },
   { name: 'WE', value: 0, label: 'System Idle' }, { name: 'TH', value: 0, label: 'System Idle' },
@@ -35,7 +34,7 @@ const CHART_COLORS = [
 const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png"; 
 const FEATURED_QUEST_IMAGE = "/placeholders/cyber-brain-network.jpg"; 
 
-// --- Framer Motion Variants ---
+// --- Framer Motion Variants - Moved outside the component ---
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -93,7 +92,7 @@ export default function Home() {
         <motion.div
           animate={{ rotate: [0, 360, 0], scale: [1, 1.2, 1, 1.2, 1] }}
           transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-          className="w-24 h-24 border-4 border-t-brand-cyan border-x-brand-pink border-b-brand-purple border-opacity-50 rounded-full shadow-[0_0_25px_theme(colors.brand-cyan),0_0_15px_theme(colors.brand-pink)] mb-6"
+          className="loading-spinner-cyber w-24 h-24 mb-6" // Replaced with CSS class
         />
         <p className="text-brand-cyan font-orbitron text-xl animate-pulse tracking-widest">
           {appLoading ? "CONNECTING TO CYBERVIBE GRID..." : "DECRYPTING COGNITIVE DATA..."}
@@ -128,16 +127,13 @@ export default function Home() {
   const skillsLeveled = cyberProfile?.skillsLeveled || 0;
   const currentLevel = cyberProfile?.level || 0;
   const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || "v0.1 Alpha";
-  // The syntax error was likely here if any invisible character or misplaced comment existed
-  // before the 'return (' line or before the first div.
-  // Ensuring the return statement starts clean.
   const nextLevelTarget = (currentLevel + 1) * 1000; 
   
   return ( 
-    <div className="min-h-screen bg-dark-bg text-light-text relative overflow-x-hidden pt-20 pb-28">
-       <div className="absolute inset-0 z-0 overflow-hidden">
-         <div className="absolute top-[-15%] left-[-15%] w-3/5 h-3/5 bg-brand-purple/20 rounded-full blur-[150px] opacity-50 animate-[pulse_8s_cubic-bezier(0.4,0,0.6,1)_infinite] pointer-events-none" />
-         <div className="absolute bottom-[-25%] right-[-25%] w-4/5 h-4/5 bg-brand-pink/15 rounded-full blur-[180px] opacity-40 animate-[pulse_10s_cubic-bezier(0.4,0,0.6,1)_infinite_1s] pointer-events-none" />
+    <div className="homepage-wrapper"> {/* Replaced with CSS class */}
+       <div className="homepage-bg-effects-container"> {/* Replaced with CSS class */}
+         <div className="homepage-bg-pulse-fast" /> {/* Replaced with CSS class */}
+         <div className="homepage-bg-pulse-slow" /> {/* Replaced with CSS class */}
          <div className="absolute inset-0 bg-grid-pattern opacity-[0.04] animate-[drift_30s_linear_infinite]"></div>
        </div>
 
@@ -160,7 +156,7 @@ export default function Home() {
               src={dbUser?.avatar_url || telegramUser?.photo_url || PLACEHOLDER_AVATAR}
               alt={`${userName}'s Cybernetic Avatar`}
               width={52} height={52}
-              className="w-11 h-11 sm:w-13 sm:h-13 rounded-full border-2 border-brand-pink/80 shadow-[0_0_10px_theme(colors.brand-pink/50%)] object-cover"
+              className="avatar-cyber w-11 h-11 sm:w-13 sm:h-13" // Replaced with CSS class, kept responsive size classes
               priority
             />
           </Link>
@@ -168,7 +164,7 @@ export default function Home() {
 
         {/* 2. Featured "Quests/Missions" Section */}
         <motion.div variants={itemVariants}>
-          <Card className="bg-dark-card/90 backdrop-blur-md border border-brand-purple/50 shadow-xl overflow-hidden hover:border-brand-pink/70 transition-all duration-300 group">
+          <Card className="featured-quest-card group"> {/* Replaced with CSS class */}
             <CardHeader className="flex flex-row items-center justify-between pb-2 pt-3 px-4 md:px-5">
               <div>
                 <CardTitle className="text-lg sm:text-xl font-orbitron text-brand-yellow">Priority Directives</CardTitle>
@@ -189,7 +185,7 @@ export default function Home() {
                     className="opacity-50 group-hover:opacity-70 group-hover:scale-105 transition-all duration-400 ease-in-out"
                     priority
                   />
-                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none"></div>
+                 <div className="featured-quest-image-overlay"></div> {/* Replaced with CSS class */}
                  <div className="absolute bottom-2 left-3 sm:bottom-3 sm:left-4 text-white z-10 p-1">
                     <h3 className="text-md sm:text-lg font-bold font-orbitron text-shadow-[0_0_8px_theme(colors.brand-cyan)]">
                       <VibeContentRenderer content="<FaGamepad className='inline text-brand-pink/90 mr-2 text-2xl sm:text-3xl'/>INITIATE: CyberDev OS Training Program" />
@@ -208,7 +204,7 @@ export default function Home() {
 
         {/* 3. "Activity/Vibe Output" Section */}
         <motion.div variants={itemVariants}>
-          <Card className="bg-gradient-to-br from-brand-pink/95 via-pink-600/90 to-purple-600/90 backdrop-blur-sm border border-brand-pink/70 shadow-2xl shadow-brand-pink/30 text-black rounded-xl md:rounded-2xl">
+          <Card className="activity-card-cyber"> {/* Replaced with CSS class */}
             <CardHeader className="pb-1 pt-3 px-4 md:px-5">
               <CardTitle className="text-md sm:text-lg font-orbitron text-black/95 font-bold uppercase tracking-wider flex items-center">
                 <FaFire className="inline mr-1.5 text-orange-300/90 drop-shadow-sm"/>Cognitive Throughput <span className="text-xs ml-auto text-black/70">(Weekly Cycle)</span>
@@ -261,7 +257,7 @@ export default function Home() {
         {/* Bottom Navigation */}
         <motion.div
             variants={bottomNavVariants} initial="hidden" animate="visible"
-            className="fixed bottom-0 left-0 right-0 bg-dark-bg/90 backdrop-blur-xl border-t-2 border-brand-purple/60 z-40 py-1.5 px-1 shadow-[0_-8px_30px_rgba(0,0,0,0.5)]"
+            className="bottom-nav-cyber" // Replaced with CSS class
           >
             <div className="container mx-auto flex justify-around items-center max-w-xs sm:max-w-sm">
               {[
@@ -273,13 +269,13 @@ export default function Home() {
               ].map(item => (
                  item.isCentral ? (
                     <Link href={item.href} passHref legacyBehavior key={item.label}>
-                        <Button size="icon" className={`bg-gradient-to-br ${item.centralColor} text-black rounded-full w-14 h-14 sm:w-16 sm:h-16 shadow-lg transform hover:scale-110 active:scale-95 transition-transform -translate-y-3 sm:-translate-y-4 border-4 border-dark-bg hover:border-brand-pink focus:ring-4 focus:ring-brand-pink/50`}>
+                        <Button size="icon" className={`bottom-nav-item-central bg-gradient-to-br ${item.centralColor}`}> {/* Replaced with CSS class */}
                             <item.icon className="w-6 h-6 sm:w-7 sm:h-7"/>
                         </Button>
                     </Link>
                  ) : (
                     <Link href={item.href} passHref legacyBehavior key={item.label}>
-                        <Button variant="ghost" className={`flex flex-col items-center h-auto px-0.5 py-1 sm:px-1.5 rounded-md hover:bg-slate-700/60 active:bg-slate-600/70 ${item.color} transition-colors focus:bg-slate-700/70`}>
+                        <Button variant="ghost" className={`bottom-nav-item ${item.color}`}> {/* Replaced with CSS class */}
                         <item.icon className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" />
                         <span className="text-[0.6rem] sm:text-xs font-orbitron tracking-tighter leading-none">{item.label}</span>
                         </Button>
