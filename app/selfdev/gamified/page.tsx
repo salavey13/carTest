@@ -1,3 +1,4 @@
+// /app/selfdev/gamified/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -7,7 +8,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { FaMapLocation } from "react-icons/fa6"; // Isolated import
+import { FaLocationArrow } from "react-icons/fa6"; // Isolated import
 import {
   FaGlasses, FaBrain, FaTriangleExclamation, FaPlay, FaForward,
   FaPuzzlePiece, FaGears, FaRoad, FaQuestionCircle, FaEye, FaBullseye, FaRulerCombined,

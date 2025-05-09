@@ -36,7 +36,6 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
    as string} style={style as React.CSSProperties} title={title as string} 
 
-
 interface VibeContentRendererProps {
   content: string | null | undefined;
   className?: string;
