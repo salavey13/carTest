@@ -27,19 +27,19 @@ const PLACEHOLDER_BLUR_URL = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVp
 
 const imagePlaceholders = {
   placeholder1: {
-    url: "https://placehold.co/600x338/0D0221/FF00FF?text=CyberSight+AR", // Updated colors
+    url: "https://placehold.co/600x338/0D0221/FF00FF?text=CyberSight+AR", 
     altEn: "Augmented reality glasses symbolizing clarity and cybernetic vision",
     altRu: "Очки дополненной реальности, символизирующие кибер-ясность и видение",
     tooltipRu: "Визуализация 'Кибер-Линз Ясности', помогающих взломать туман и спроектировать будущее.",
   },
   placeholder2: {
-    url: "https://placehold.co/600x338/1A0A3D/00FFFF?text=LifeOS+Interface", // Updated colors
+    url: "https://placehold.co/600x338/1A0A3D/00FFFF?text=LifeOS+Interface", 
     altEn: "Life path transforming into a futuristic OS interface",
     altRu: "Жизненный путь, трансформирующийся в футуристический интерфейс ОС",
     tooltipRu: "Концепция LifeOS: уровни, квесты, перки и нейро-обратная связь для ускоренной эволюции.",
   },
   placeholder3: {
-    url: "https://placehold.co/600x338/6A0DAD/FFA500?text=AI+Co-Pilot", // Updated colors
+    url: "https://placehold.co/600x338/6A0DAD/FFA500?text=AI+Co-Pilot", 
     altEn: "AI co-pilot assisting user in navigating digital challenges",
     altRu: "ИИ-второй пилот, помогающий пользователю навигировать цифровые вызовы",
     tooltipRu: "ИИ как твой нейро-усилитель для самопознания, валидации идей и экспоненциального обучения в CyberDev.",
@@ -52,7 +52,6 @@ const imagePlaceholders = {
   }
 };
 
-// --- Level Up System Data (Aligned with repo-xml page) ---
 const levelUpSystem = [
   { level: "0 → 1", icon: FaBolt, perk: "Instant Win / Image Swap", descriptionEn: "Fix a broken image. Copy URL -> Paste -> Upload new -> <strong>DONE</strong>. System auto-PRs. <strong>ANYONE</strong> can do this <em>NOW</em>. Your entry to the matrix.", descriptionRu: "Починить битую картинку. Скопируй URL -> Вставь -> Загрузи новую -> <strong>ГОТОВО</strong>. Система сама создаст PR! <strong>ЛЮБОЙ</strong> может это <em>ПРЯМО СЕЙЧАС</em>. Твой вход в матрицу.", color: "text-brand-green" },
   { level: "1 → 2", icon: FaToolbox, perk: "Simple Idea / Generic Idea Flow", descriptionEn: "Simple idea? Change text/button? Give AI the idea + 1 file context -> PR. <strong>DONE.</strong> You command, AI executes.", descriptionRu: "Простая идея? Текст/кнопку поменять? Дай AI идею + 1 файл контекста -> PR. <strong>ГОТОВО.</strong> Ты сказал - AI сделал.", color: "text-brand-cyan" },
@@ -69,11 +68,10 @@ const levelUpSystem = [
   { level: "15", icon: FaMagnifyingGlassChart, perk: "Log Whisperer <FaBrain/>", descriptionEn: "WITH AI! You don't just read logs; you <em class='text-yellow-400'>interrogate</em> them. Spotting the delta between the *plan* (HasBeenPlanter logs) and the *reality* becomes second nature. Root causes reveal themselves.", descriptionRu: "С ПОМОЩЬЮ AI! Ты не читаешь логи, ты их <em class='text-yellow-400'>допрашиваешь</em>. Увидеть разницу между *планом* (логи HasBeenPlanter) и *реальностью* становится второй натурой. Корневые причины сами себя выдают.", color: "text-brand-yellow" },
 ];
 
-// --- Section Data ---
 const sections = [
   {
     id: "intro",
-    icon: FaMapSigns, // Valid Fa6 icon
+    icon: FaMapSigns,
     titleEn: "Lost in the Fog? Activate Your CyberSight OS",
     titleRu: "Потерян в Тумане? Активируй CyberSight OS",
     pointsEn: [
@@ -139,14 +137,14 @@ const sections = [
       "<strong class='text-gray-400'>Level 1: Limbo <FaQuestionCircle className='inline mx-1'/></strong> - You don't know what to do or what you want. Feeling lost, stuck.",
       "<strong class='text-brand-cyan'>Level 2: Vision <FaEye className='inline mx-1'/></strong> - An image for the future forms. You start acting on a new path, momentum builds.",
       "<strong class='text-brand-green'>Level 3: Flow <FaPlay className='inline mx-1'/></strong> - You're deeply engaged, can't pull yourself away from the goal.",
-      "<strong class='text-brand-orange'>Level 4: Resistance <FaTriangleExclamation className='inline mx-1'/></strong> - Exponential progress plateaus. You cling to past success, avoiding the next 'Limbo'.", // Corrected Icon
+      "<strong class='text-brand-orange'>Level 4: Resistance <FaTriangleExclamation className='inline mx-1'/></strong> - Exponential progress plateaus. You cling to past success, avoiding the next 'Limbo'.",
       "Most get trapped in Limbo because they're trained to follow scripts and wait for external certainty, interpreting 'feeling lost' as a bad sign instead of a <strong class='font-semibold text-brand-yellow'>necessary starting point</strong>.",
     ],
     pointsRu: [
       "<strong class='text-gray-400'>Уровень 1: Лимбо <FaQuestionCircle className='inline mx-1'/></strong> - Ты не знаешь, что делать или чего хочешь. Чувство потерянности, застоя.",
       "<strong class='text-brand-cyan'>Уровень 2: Видение <FaEye className='inline mx-1'/></strong> - Формируется образ будущего. Ты начинаешь действовать на новом пути, набирается импульс.",
       "<strong class='text-brand-green'>Уровень 3: Поток <FaPlay className='inline mx-1'/></strong> - Ты глубоко вовлечен, не можешь оторваться от цели.",
-      "<strong class='text-brand-orange'>Уровень 4: Сопротивление <FaTriangleExclamation className='inline mx-1'/></strong> - Экспоненциальный прогресс замедляется. Ты цепляешься за прошлый успех, избегая следующего 'Лимбо'.", // Corrected Icon
+      "<strong class='text-brand-orange'>Уровень 4: Сопротивление <FaTriangleExclamation className='inline mx-1'/></strong> - Экспоненциальный прогресс замедляется. Ты цепляешься за прошлый успех, избегая следующего 'Лимбо'.",
       "Большинство застревают в Лимбо, потому что их научили следовать сценариям и ждать внешней уверенности, интерпретируя 'чувство потерянности' как плохой знак, а не как <strong class='font-semibold text-brand-yellow'>необходимую отправную точку</strong>.",
     ],
   },
@@ -194,7 +192,7 @@ const sections = [
   },
   {
     id: "gamify",
-    icon: FaGamepad, // Original icon
+    icon: FaGamepad, 
     titleEn: "Step 3: Gamify Your Life - Design the Game",
     titleRu: "Шаг 3: Геймифицируй Жизнь - Спроектируй Игру",
     pointsEn: [
@@ -202,7 +200,7 @@ const sections = [
       "Replicate game mechanics in your life:",
       "<strong class='text-brand-green'>1. Clear Hierarchy of Goals <FaBullseye className='inline mx-1'/>:</strong> Define your end goal (long-term vision), break it down into long-term (e.g., 1 year) and short-term (e.g., 1 month, 1 week) goals. These are directions, not rigid destinations.",
       "<strong class='text-brand-green'>2. Create the Rules <FaRulerCombined className='inline mx-1'/>:</strong> What are you *not* willing to sacrifice (health, relationships, ethics)? These constraints foster creativity.",
-      "<strong class='text-brand-green'>3. Quantifiable Feedback Loops <FaGears className='inline mx-1'/>:</strong> Define daily/weekly priority tasks (e.g., write 1000 words, read 10 pages, reach out to 5 clients). Completing these provides direct feedback on progress.", // Changed FaCogs to FaGears
+      "<strong class='text-brand-green'>3. Quantifiable Feedback Loops <FaGears className='inline mx-1'/>:</strong> Define daily/weekly priority tasks (e.g., write 1000 words, read 10 pages, reach out to 5 clients). Completing these provides direct feedback on progress.", 
       "This structure turns vague aspirations into an actionable game.",
       "Start playing! You figure out the specifics by <strong class='font-semibold text-brand-green'>doing and error-correcting</strong>.",
     ],
@@ -211,7 +209,7 @@ const sections = [
       "Воспроизведи игровые механики в своей жизни:",
       "<strong class='text-brand-green'>1. Четкая Иерархия Целей <FaBullseye className='inline mx-1'/>:</strong> Определи конечную цель (долгосрочное видение), разбей ее на долгосрочные (например, 1 год) и краткосрочные (например, 1 месяц, 1 неделя) цели. Это направления, а не жесткие пункты назначения.",
       "<strong class='text-brand-green'>2. Создай Правила <FaRulerCombined className='inline mx-1'/>:</strong> Чем ты *не* готов пожертвовать (здоровье, отношения, этика)? Эти ограничения стимулируют креативность.",
-      "<strong class='text-brand-green'>3. Измеримые Петли Обратной Связи <FaGears className='inline mx-1'/>:</strong> Определи ежедневные/еженедельные приоритетные задачи (напр., написать 1000 слов, прочитать 10 страниц, связаться с 5 клиентами). Их выполнение дает прямую обратную связь о прогрессе.", // Changed FaCogs to FaGears
+      "<strong class='text-brand-green'>3. Измеримые Петли Обратной Связи <FaGears className='inline mx-1'/>:</strong> Определи ежедневные/еженедельные приоритетные задачи (напр., написать 1000 слов, прочитать 10 страниц, связаться с 5 клиентами). Их выполнение дает прямую обратную связь о прогрессе.", 
       "Эта структура превращает расплывчатые стремления в действенную игру.",
       "Начни играть! Ты разберешься в деталях <strong class='font-semibold text-brand-green'>в процессе делания и исправления ошибок</strong>.",
     ],
@@ -400,8 +398,14 @@ export default function GamifiedSelfDevPage() {
                             </h3>
                             {section.levelSystem.map(lvl => {
                                 const LvlIcon = lvl.icon;
+                                const isMetaLevel = parseInt(lvl.level.split(' ')[0], 10) >= 11;
                                 return (
-                                <div key={lvl.level} className={`p-3 border-l-4 ${lvl.color.replace('text-', 'border-')} bg-dark-bg/50 rounded-md shadow-sm`}>
+                                <div key={lvl.level} className={cn(
+                                    `p-3 border-l-4 ${lvl.color.replace('text-', 'border-')} rounded-md shadow-sm`,
+                                    isMetaLevel 
+                                      ? 'bg-purple-900/30 border-purple-500/60 ring-1 ring-purple-400/40' 
+                                      : 'bg-dark-bg/50'
+                                )}>
                                     <h4 className={`font-orbitron ${lvl.color} flex items-center`}>
                                         <LvlIcon className="mr-2" />
                                         {selectedLang === 'ru' ? 'Лв.' : 'Lv.'}{lvl.level} - <VibeContentRenderer content={lvl.perk} />
