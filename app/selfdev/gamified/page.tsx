@@ -44,7 +44,7 @@ const imagePlaceholders = {
     tooltipRu: "Концепция LifeOS: уровни, квесты, перки и нейро-обратная связь для ускоренной эволюции.",
   },
   placeholder3: {
-    url: "https://placehold.co/600x338/6A0DAD/FFA500?text=AI+Co-Pilot", 
+    url: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250510_024254-35c88ae7-0907-495f-98cd-f660d32d5e84.jpg", 
     altEn: "AI co-pilot assisting user in navigating digital challenges",
     altRu: "ИИ-второй пилот, помогающий пользователю навигировать цифровые вызовы",
     tooltipRu: "ИИ как твой нейро-усилитель для самопознания, валидации идей и экспоненциального обучения в CyberDev.",
