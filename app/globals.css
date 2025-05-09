@@ -52,15 +52,19 @@
   --sidebar-border: 270 60% 25%;
   --sidebar-ring: 300 100% 65%;
 
-  /* --- FIX 1: Added missing brand color variables for charts --- */
-  --brand-green: 145 63% 49%; /* Example: Adjust to your green */
-  --brand-orange: 28 100% 50%; /* Example: Adjust to your orange */
-  /* --- End of FIX 1 --- */
+  /* Brand colors defined as CSS variables */
+  --brand-orange: 28 100% 50%;
+  --brand-blue: 210 100% 50%; /* Example, adjust */
+  --brand-green: 145 63% 49%;
+  --brand-pink: 330 100% 70%;
+  --brand-purple: 270 80% 60%;
+  --brand-cyan: 180 100% 50%;
+  --brand-yellow: 50 100% 50%; /* Example, adjust */
+  --neon-lime: 80 100% 50%; /* Example, adjust */
 
-  /* Assuming these are defined somewhere, if not, they need to be for the spinner fix */
-  --brand-cyan: 180 100% 50%; /* Example value, adjust if already defined elsewhere */
-  --brand-pink: 330 100% 70%; /* Example value, adjust if already defined elsewhere */
-  --brand-purple: 270 80% 60%; /* Example value, adjust if already defined elsewhere */
+  /* ShadCN compatible text colors (taken from default dark theme, adjust if needed) */
+  --light-text: 0 0% 94%; /* Matches --foreground */
+  --accent-text: 300 100% 50%; /* Matches --primary, or use a different accent if needed */
 }
 
 .dark {
@@ -87,8 +91,7 @@
   --dark-card-rgb: 26, 10, 61;
   --glow-color-rgb: 255, 0, 255;
 
-  /* Consider adding --brand-green and --brand-orange here too if they differ in dark mode */
-  /* For now, they will inherit from :root */
+  /* Ensure brand colors are consistent or specifically defined for dark mode if they differ */
 }
 
 @layer base {
@@ -159,7 +162,7 @@
 /* Avatar on Homepage */
 .avatar-cyber {
   @apply rounded-full border-2 border-brand-pink/80 object-cover;
-  box-shadow: 0 0 10px theme('colors.brand-pink / 50%');
+  box-shadow: 0 0 10px hsla(var(--brand-pink), 0.5); /* Use hsla for opacity with CSS var */
 }
 
 /* Featured Quest Card on Homepage */
@@ -232,13 +235,14 @@
 
 .text-shadow-neon {
   text-shadow:
-    0 0 5px var(--brand-pink),
-    0 0 10px var(--brand-pink),
-    0 0 15px var(--brand-purple),
-    0 0 20px var(--brand-purple);
+    0 0 5px hsl(var(--brand-pink)),
+    0 0 10px hsl(var(--brand-pink)),
+    0 0 15px hsl(var(--brand-purple)),
+    0 0 20px hsl(var(--brand-purple));
 }
 .text-shadow-cyber {
-  text-shadow: 0 0 4px theme('colors.brand-cyan'), 0 0 10px theme('colors.brand-pink');
+  /* Corrected to use CSS variables directly for colors */
+  text-shadow: 0 0 4px hsl(var(--brand-cyan)), 0 0 10px hsl(var(--brand-pink));
 }
 
 .animate-gradient-shift {
@@ -254,14 +258,14 @@
 .bg-grid-pattern {
   background-size: 60px 60px;
   background-image:
-    linear-gradient(to right, theme('colors.brand-purple / 10%') 1px, transparent 1px),
-    linear-gradient(to bottom, theme('colors.brand-purple / 10%') 1px, transparent 1px);
+    linear-gradient(to right, hsla(var(--brand-purple), 0.1) 1px, transparent 1px),
+    linear-gradient(to bottom, hsla(var(--brand-purple), 0.1) 1px, transparent 1px);
 }
 .bg-grid-pattern-pink {
   background-size: 50px 50px;
   background-image:
-    linear-gradient(to right, theme('colors.brand-pink / 8%') 1px, transparent 1px),
-    linear-gradient(to bottom, theme('colors.brand-pink / 8%') 1px, transparent 1px);
+    linear-gradient(to right, hsla(var(--brand-pink), 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, hsla(var(--brand-pink), 0.08) 1px, transparent 1px);
 }
 
 .simple-scrollbar::-webkit-scrollbar {
@@ -272,43 +276,43 @@
   background: transparent;
 }
 .simple-scrollbar::-webkit-scrollbar-thumb {
-  background-color: theme('colors.brand-purple / 60%');
+  background-color: hsla(var(--brand-purple), 0.6);
   border-radius: 4px;
-  border: 1px solid theme('colors.brand-pink / 40%');
+  border: 1px solid hsla(var(--brand-pink), 0.4);
 }
 .simple-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: theme('colors.brand-pink / 70%');
+  background-color: hsla(var(--brand-pink), 0.7);
 }
 .simple-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: theme('colors.brand-purple / 60%') transparent;
+  scrollbar-color: hsla(var(--brand-purple), 0.6) transparent;
 }
 
 .cyber-text {
   font-family: "Orbitron", sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: theme('colors.brand-cyan');
+  color: hsl(var(--brand-cyan)); /* Use CSS var */
   text-shadow:
-    0 0 3px theme('colors.brand-cyan / 70%'),
-    0 0 5px theme('colors.brand-cyan / 50%'),
-    0 0 8px theme('colors.brand-pink / 60%');
+    0 0 3px hsla(var(--brand-cyan), 0.7),
+    0 0 5px hsla(var(--brand-cyan), 0.5),
+    0 0 8px hsla(var(--brand-pink), 0.6);
 }
 .cyber-text.glitch-heavy {
     text-shadow:
-        0.05em 0 0 theme('colors.brand-pink / 75%'),
-        -0.025em -0.025em 0 theme('colors.brand-green / 75%'),
-        -0.01em 0.025em 0 theme('colors.brand-cyan / 75%');
+        0.05em 0 0 hsla(var(--brand-pink), 0.75),
+        -0.025em -0.025em 0 hsla(var(--brand-green), 0.75),
+        -0.01em 0.025em 0 hsla(var(--brand-cyan), 0.75);
 }
 
 @keyframes glitch {
-  0% { text-shadow: 0.05em 0 0 theme('colors.brand-pink / 75%'), -0.05em -0.025em 0 theme('colors.brand-green / 75%'), -0.025em 0.05em 0 theme('colors.brand-cyan / 75%'); }
-  14% { text-shadow: 0.05em 0 0 theme('colors.brand-pink / 75%'), -0.05em -0.025em 0 theme('colors.brand-green / 75%'), -0.025em 0.05em 0 theme('colors.brand-cyan / 75%'); }
-  15% { text-shadow: -0.05em -0.025em 0 theme('colors.brand-pink / 75%'), 0.025em 0.025em 0 theme('colors.brand-green / 75%'), -0.05em -0.05em 0 theme('colors.brand-cyan / 75%'); }
-  49% { text-shadow: -0.05em -0.025em 0 theme('colors.brand-pink / 75%'), 0.025em 0.025em 0 theme('colors.brand-green / 75%'), -0.05em -0.05em 0 theme('colors.brand-cyan / 75%'); }
-  50% { text-shadow: 0.025em 0.05em 0 theme('colors.brand-pink / 75%'), 0.05em 0 0 theme('colors.brand-green / 75%'), 0 -0.05em 0 theme('colors.brand-cyan / 75%'); }
-  99% { text-shadow: 0.025em 0.05em 0 theme('colors.brand-pink / 75%'), 0.05em 0 0 theme('colors.brand-green / 75%'), 0 -0.05em 0 theme('colors.brand-cyan / 75%'); }
-  100% { text-shadow: -0.025em 0 0 theme('colors.brand-pink / 75%'), -0.025em -0.025em 0 theme('colors.brand-green / 75%'), -0.025em -0.05em 0 theme('colors.brand-cyan / 75%'); }
+  0% { text-shadow: 0.05em 0 0 hsla(var(--brand-pink), 0.75), -0.05em -0.025em 0 hsla(var(--brand-green), 0.75), -0.025em 0.05em 0 hsla(var(--brand-cyan), 0.75); }
+  14% { text-shadow: 0.05em 0 0 hsla(var(--brand-pink), 0.75), -0.05em -0.025em 0 hsla(var(--brand-green), 0.75), -0.025em 0.05em 0 hsla(var(--brand-cyan), 0.75); }
+  15% { text-shadow: -0.05em -0.025em 0 hsla(var(--brand-pink), 0.75), 0.025em 0.025em 0 hsla(var(--brand-green), 0.75), -0.05em -0.05em 0 hsla(var(--brand-cyan), 0.75); }
+  49% { text-shadow: -0.05em -0.025em 0 hsla(var(--brand-pink), 0.75), 0.025em 0.025em 0 hsla(var(--brand-green), 0.75), -0.05em -0.05em 0 hsla(var(--brand-cyan), 0.75); }
+  50% { text-shadow: 0.025em 0.05em 0 hsla(var(--brand-pink), 0.75), 0.05em 0 0 hsla(var(--brand-green), 0.75), 0 -0.05em 0 hsla(var(--brand-cyan), 0.75); }
+  99% { text-shadow: 0.025em 0.05em 0 hsla(var(--brand-pink), 0.75), 0.05em 0 0 hsla(var(--brand-green), 0.75), 0 -0.05em 0 hsla(var(--brand-cyan), 0.75); }
+  100% { text-shadow: -0.025em 0 0 hsla(var(--brand-pink), 0.75), -0.025em -0.025em 0 hsla(var(--brand-green), 0.75), -0.025em -0.05em 0 hsla(var(--brand-cyan), 0.75); }
 }
 
 .glitch {
@@ -331,13 +335,13 @@
 
 .glitch::before {
   left: 2px;
-  text-shadow: -1px 0 theme('colors.brand-purple / 70%');
+  text-shadow: -1px 0 hsla(var(--brand-purple), 0.7);
   animation: glitch-anim-1 2s infinite linear alternate-reverse;
 }
 
 .glitch::after {
   left: -2px;
-  text-shadow: -1px 0 theme('colors.brand-cyan / 70%');
+  text-shadow: -1px 0 hsla(var(--brand-cyan), 0.7);
   animation: glitch-anim-2 2s infinite linear alternate-reverse;
 }
 
@@ -345,15 +349,15 @@
 @keyframes glitch-anim-2 { 0% { clip: rect(6px, 9999px, 94px, 0); } 5% { clip: rect(88px, 9999px, 12px, 0); } 10% { clip: rect(38px, 9999px, 68px, 0); } 15% { clip: rect(20px, 9999px, 85px, 0); } 20% { clip: rect(72px, 9999px, 18px, 0); } 25% { clip: rect(10px, 9999px, 90px, 0); } 30% { clip: rect(58px, 9999px, 32px, 0); } 35% { clip: rect(80px, 9999px, 8px, 0); } 40% { clip: rect(28px, 9999px, 78px, 0); } 45% { clip: rect(42px, 9999px, 52px, 0); } 50% { clip: rect(92px, 9999px, 25px, 0); } 55% { clip: rect(15px, 9999px, 82px, 0); } 60% { clip: rect(62px, 9999px, 42px, 0); } 65% { clip: rect(4px, 9999px, 70px, 0); } 70% { clip: rect(77px, 9999px, 10px, 0); } 75% { clip: rect(22px, 9999px, 88px, 0); } 80% { clip: rect(50px, 9999px, 48px, 0); } 85% { clip: rect(95px, 9999px, 38px, 0); } 90% { clip: rect(30px, 9999px, 60px, 0); } 95% { clip: rect(65px, 9999px, 15px, 0); } 100% { clip: rect(8px, 9999px, 98px, 0); } }
 
 .text-gradient {
-  background: linear-gradient(to right, theme('colors.brand-pink'), theme('colors.brand-cyan'), theme('colors.brand-orange'));
+  background: linear-gradient(to right, hsl(var(--brand-pink)), hsl(var(--brand-cyan)), hsl(var(--brand-orange)));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 @keyframes glow {
-  0% { text-shadow: 0 0 5px theme('colors.brand-pink / 50%'); }
-  50% { text-shadow: 0 0 20px theme('colors.brand-pink / 80%'), 0 0 30px theme('colors.brand-purple / 50%'); }
-  100% { text-shadow: 0 0 5px theme('colors.brand-pink / 50%'); }
+  0% { text-shadow: 0 0 5px hsla(var(--brand-pink), 0.5); }
+  50% { text-shadow: 0 0 20px hsla(var(--brand-pink), 0.8), 0 0 30px hsla(var(--brand-purple), 0.5); }
+  100% { text-shadow: 0 0 5px hsla(var(--brand-pink), 0.5); }
 }
 .text-glow {
   animation: glow 2.5s infinite ease-in-out;
@@ -374,20 +378,20 @@ input[type="search"]::-ms-clear {
 
 .comic-bubble {
   position: relative;
-  background: theme('colors.dark-card');
-  border: 2px solid theme('colors.brand-pink');
+  background: hsl(var(--card)); /* Use CSS var */
+  border: 2px solid hsl(var(--brand-pink));
   border-radius: 15px;
-  color: hsl(var(--foreground)); /* Replaced text-light-text with CSS var */
+  color: hsl(var(--foreground));
 }
 
 @keyframes neon-border-glow {
   0%, 100% {
-    border-color: theme('colors.brand-cyan / 70%');
-    box-shadow: 0 0 5px theme('colors.brand-cyan / 50%'), 0 0 10px theme('colors.brand-cyan / 30%');
+    border-color: hsla(var(--brand-cyan), 0.7);
+    box-shadow: 0 0 5px hsla(var(--brand-cyan), 0.5), 0 0 10px hsla(var(--brand-cyan), 0.3);
   }
   50% {
-    border-color: theme('colors.brand-pink / 70%');
-    box-shadow: 0 0 8px theme('colors.brand-pink / 50%'), 0 0 15px theme('colors.brand-pink / 30%'), 0 0 5px theme('colors.brand-purple / 20%');
+    border-color: hsla(var(--brand-pink), 0.7);
+    box-shadow: 0 0 8px hsla(var(--brand-pink), 0.5), 0 0 15px hsla(var(--brand-pink), 0.3), 0 0 5px hsla(var(--brand-purple), 0.2);
   }
 }
 .border-neon-glow {
@@ -400,18 +404,19 @@ input[type="search"]::-ms-clear {
 }
 
 .shadow-glow {
-  box-shadow: 0 0 10px theme('colors.brand-cyan / 50%');
+  box-shadow: 0 0 10px hsla(var(--brand-cyan), 0.5);
 }
 .shadow-glow:hover {
-  box-shadow: 0 0 15px theme('colors.brand-cyan / 70%'), 0 0 5px theme('colors.brand-pink / 30%');
+  box-shadow: 0 0 15px hsla(var(--brand-cyan), 0.7), 0 0 5px hsla(var(--brand-pink), 0.3);
 }
 
 @keyframes glitch-border {
-  0% { border-color: theme('colors.brand-cyan / 30%'); box-shadow: 0 0 5px theme('colors.brand-cyan / 20%'); }
-  25% { border-color: theme('colors.brand-pink / 30%'); box-shadow: 0 0 8px theme('colors.brand-pink / 30%'); }
-  50% { border-color: theme('colors.brand-yellow / 30%'); box-shadow: 0 0 5px theme('colors.brand-yellow / 20%'); }
-  75% { border-color: theme('colors.brand-green / 30%'); box-shadow: 0 0 8px theme('colors.brand-green / 30%'); }
-  100% { border-color: theme('colors.brand-cyan / 30%'); box-shadow: 0 0 5px theme('colors.brand-cyan / 20%'); }
+  /* Corrected to use hsla for opacity with CSS variables */
+  0% { border-color: hsla(var(--brand-cyan), 0.3); box-shadow: 0 0 5px hsla(var(--brand-cyan), 0.2); }
+  25% { border-color: hsla(var(--brand-pink), 0.3); box-shadow: 0 0 8px hsla(var(--brand-pink), 0.3); }
+  50% { border-color: hsla(var(--brand-yellow), 0.3); box-shadow: 0 0 5px hsla(var(--brand-yellow), 0.2); }
+  75% { border-color: hsla(var(--brand-green), 0.3); box-shadow: 0 0 8px hsla(var(--brand-green), 0.3); }
+  100% { border-color: hsla(var(--brand-cyan), 0.3); box-shadow: 0 0 5px hsla(var(--brand-cyan), 0.2); }
 }
 .glitch-border-animate {
   animation: glitch-border 2s linear infinite;
@@ -419,13 +424,15 @@ input[type="search"]::-ms-clear {
 
 .highlight-scroll {
   transition: outline 0.5s ease-out;
-  outline: 2px solid theme('colors.brand-green / 70%');
+  outline: 2px solid hsla(var(--brand-green), 0.7);
   outline-offset: 2px;
-  box-shadow: 0 0 15px theme('colors.brand-green / 50%');
+  box-shadow: 0 0 15px hsla(var(--brand-green), 0.5);
 }
 
 .text-animated-gradient {
   @apply text-transparent bg-clip-text bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange;
+  /* Ensure brand-purple, brand-pink, brand-orange are valid Tailwind colors or use CSS vars */
+  /* Example if using CSS vars: from-[hsl(var(--brand-purple))] via-[hsl(var(--brand-pink))] to-[hsl(var(--brand-orange))] */
   background-size: 200% auto;
   animation: gradient-text-flow 3s linear infinite;
 }
@@ -441,7 +448,6 @@ input[type="search"]::-ms-clear {
     @apply bg-dark-card border border-brand-purple/50 text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm
            focus:outline-none focus:ring-2 focus:ring-brand-pink focus:border-brand-pink
            transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
-           /* Replaced text-light-text with text-foreground */
   }
   .input-cyber:disabled {
       @apply opacity-50 cursor-not-allowed;
@@ -450,21 +456,20 @@ input[type="search"]::-ms-clear {
       @apply bg-dark-card border border-brand-purple/50 text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm min-h-[80px]
              focus:outline-none focus:ring-2 focus:ring-brand-pink focus:border-brand-pink
              transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
-             /* Replaced text-light-text with text-foreground */
   }
 }
 
 /* --- FIX 3: Removed problematic CSS rule for group-hover:text-glow-effect --- */
 /*
 .group-hover\:text-glow-effect:hover > svg {
-  text-shadow: 0 0 8px theme('colors.brand-pink');
+  text-shadow: 0 0 8px hsl(var(--brand-pink));
 }
 */
 /* --- End of FIX 3 --- */
 /* If you need a text-glow-effect utility for group-hover, define it in @layer utilities like:
 @layer utilities {
   .text-glow-effect {
-    text-shadow: 0 0 8px theme('colors.brand-pink');
+    text-shadow: 0 0 8px hsl(var(--brand-pink));
   }
 }
 Then use `group-hover:text-glow-effect` in your TSX.

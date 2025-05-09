@@ -8,7 +8,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
-import { FaGear, FaTools } from "react-icons/fa6"; // Isolated imports
+import { 
+  FaCog, // Replaced FaGear
+  FaScrewdriverWrench // Replaced FaTools
+} from "react-icons/fa6"; 
 import {
   FaDumbbell, FaCircleUser, FaWandMagicSparkles, FaRocket, FaRoad, FaBookOpen,
   FaBrain, FaRobot, FaMagnifyingGlass, FaGift, FaUserShield, FaCarOn,
@@ -25,8 +28,8 @@ interface PageInfo {
   isImportant?: boolean;
   isAdminOnly?: boolean;
   isHot?: boolean;
-  color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red' | 'orange' | 'gray'; // Added gray
-  group?: string; // For grouping links
+  color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red' | 'orange' | 'gray'; 
+  group?: string; 
 }
 
 const allPages: PageInfo[] = [
@@ -41,8 +44,8 @@ const allPages: PageInfo[] = [
   { path: "/profile", name: "Agent Profile", icon: FaCircleUser, group: "CyberFitness", color: "pink" },
   { path: "/buy-subscription", name: "OS Upgrades", icon: FaCreditCard, group: "CyberFitness", color: "green" },
   { path: "/premium", name: "Premium Modules", icon: FaStar, group: "CyberFitness", color: "yellow" }, 
-  { path: "/nutrition", name: "Cognitive Fuel", icon: FaTools, group: "CyberFitness", color: "orange"}, 
-  { path: "/settings", name: "System Config", icon: FaCog, group: "CyberFitness", color: "blue" }, 
+  { path: "/nutrition", name: "Cognitive Fuel", icon: FaScrewdriverWrench, group: "CyberFitness", color: "orange"}, // Icon changed
+  { path: "/settings", name: "System Config", icon: FaCog, group: "CyberFitness", color: "blue" },  // Icon changed
   { path: "/partner", name: "Alliance Perks", icon: Users, group: "CyberFitness", color: "purple"}, 
 
   // --- Content & Tools ---
@@ -300,7 +303,7 @@ export default function Header() {
                               <span className={cn(
                                 "font-orbitron font-medium transition-colors leading-tight text-center",
                                 "text-[0.55rem] xs:text-[0.6rem] sm:text-[0.65rem]", 
-                                page.isImportant ? "text-white text-[0.65rem] sm:text-[0.7rem]" : "text-gray-300 group-hover:text-inherit" // Changed text-light-text to text-white for important
+                                page.isImportant ? "text-white text-[0.65rem] sm:text-[0.7rem]" : "text-gray-300 group-hover:text-inherit"
                               )}>
                                 {page.translatedName}
                               </span>
