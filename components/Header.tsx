@@ -9,8 +9,8 @@ import { usePathname } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
 import { 
-  FaGears, 
-  FaScrewdriverWrench 
+  FaGears, // Replaced FaGear
+  FaScrewdriverWrench // Replaced FaTools
 } from "react-icons/fa6"; 
 import {
   FaDumbbell, FaCircleUser, FaWandMagicSparkles, FaRocket, FaRoad, FaBookOpen,
@@ -44,8 +44,8 @@ const allPages: PageInfo[] = [
   { path: "/profile", name: "Agent Profile", icon: FaCircleUser, group: "CyberFitness", color: "pink" },
   { path: "/buy-subscription", name: "OS Upgrades", icon: FaCreditCard, group: "CyberFitness", color: "green" },
   { path: "/premium", name: "Premium Modules", icon: FaStar, group: "CyberFitness", color: "yellow" }, 
-  { path: "/nutrition", name: "Cognitive Fuel", icon: FaScrewdriverWrench, group: "CyberFitness", color: "orange"}, 
-  { path: "/settings", name: "System Config", icon: FaGears, group: "CyberFitness", color: "blue" },  
+  { path: "/nutrition", name: "Cognitive Fuel", icon: FaScrewdriverWrench, group: "CyberFitness", color: "orange"}, // Icon changed
+  { path: "/settings", name: "System Config", icon: FaGears, group: "CyberFitness", color: "blue" },  // Icon changed
   { path: "/partner", name: "Alliance Perks", icon: Users, group: "CyberFitness", color: "purple"}, 
 
   // --- Content & Tools ---
@@ -280,7 +280,7 @@ export default function Header() {
                               onClick={() => setIsNavOpen(false)}
                               className={cn(
                                 "group relative flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 aspect-[3/2.5] text-center hover:scale-[1.03] hover:-translate-y-0.5",
-                                "p-1.5", // Updated padding
+                                "p-1.5 sm:p-2",
                                 page.isImportant 
                                   ? "bg-gradient-to-br from-purple-800/30 via-black/50 to-blue-800/30 col-span-2 shadow-md" 
                                   : "bg-dark-card/60 hover:bg-dark-card/80 col-span-1",
@@ -296,18 +296,14 @@ export default function Header() {
                               )}
                               {PageIcon && (
                                 <PageIcon className={cn(
-                                  "mb-0.5 transition-transform duration-200 group-hover:scale-110", // Common style, updated mb
-                                  page.isImportant 
-                                      ? "text-inherit h-[1.3rem] w-[1.3rem] sm:h-[1.45rem] sm:w-[1.45rem]" // Size for important
-                                      : "h-[1.05rem] w-[1.05rem] sm:h-[1.3rem] sm:w-[1.3rem]" // Size for non-important
+                                  "h-4 w-4 sm:h-5 sm:w-5 mb-1 transition-transform duration-200 group-hover:scale-110",
+                                  page.isImportant ? "text-inherit h-5 w-5 sm:h-6 sm:w-6" : "inherit"
                                 )} />
                               )}
                               <span className={cn(
                                 "font-orbitron font-medium transition-colors leading-tight text-center",
-                                "text-[0.6rem] xs:text-[0.625rem] sm:text-[0.675rem]", // Base sizes
-                                page.isImportant 
-                                    ? "text-white text-[0.675rem] sm:text-[0.725rem] md:text-[0.75rem]" // Important overrides
-                                    : "text-gray-300 group-hover:text-inherit" // Color for non-important
+                                "text-[0.55rem] xs:text-[0.6rem] sm:text-[0.65rem]", 
+                                page.isImportant ? "text-white text-[0.65rem] sm:text-[0.7rem]" : "text-gray-300 group-hover:text-inherit"
                               )}>
                                 {page.translatedName}
                               </span>
