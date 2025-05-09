@@ -1,3 +1,4 @@
+// /app/partner/page.tsx
 "use client";
 import { useAppContext } from "@/contexts/AppContext";
 import { motion } from "framer-motion";

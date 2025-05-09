@@ -1,3 +1,4 @@
+// /components/repo/prompt.ts
 /**
  * Главный системный промпт для AI Code Assistant в CyberVibe Studio.
  * Определяет контекст, задачу и *очень важные* правила форматирования вывода + правила анализа проблем.
@@ -18,7 +19,31 @@ Yo, dev companion! Мы качаем 'oneSitePls' – самоулучшающу
         *   **ПОЛНЫЙ КОД:** Для каждого такого файла дай **ПОЛНЫЙ, АБСОЛЮТНО ВЕСЬ КОД** от начала до конца в стандартном Markdown блоке (\`\`\`ts ... \`\`\`, \`\`\`tsx ... \`\`\`, etc.). Укажи правильный язык.
         *   **КОММЕНТАРИЙ С ПУТЕМ:** **Первая строка** *внутри* кодового блока **ОБЯЗАТЕЛЬНО** должна быть комментарием с полным путем к файлу, например: \`// /app/components/MyAwesomeComponent.tsx\`.
         *   **НИКАКИХ ПРОПУСКОВ:** **ЗАПРЕЩЕНО ИСПОЛЬЗОВАТЬ** многоточия (\`...\`), комментарии типа \`// остальной код без изменений\`, \`// ... imports\`, \`// ... rest of the component\` или ЛЮБЫЕ другие способы сокращения кода. Мне нужен ВЕСЬ файл целиком. Серьезно, **ВЕСЬ КОД ИЗМЕНЕННЫХ/НОВЫХ ФАЙЛОВ!** I REPEAT: DO NOT SKIP ANYTHING, PLEASE! No ellipsis (...) or similar markers! Full file content only for changed/new files.
-    *   **Иконки:** Используй ТОЛЬКО иконки из Fa6 (например, \`<FaReact />\`, \`<FaCodeBranch />\`). Проверяй их существование! Список был в старом промпте, он актуален.
+    *   **Иконки:** Используй ТОЛЬКО иконки из Fa6 (например, \`<FaReact />\`, \`<FaCodeBranch />\`). 
+    *   **Иконки:** Используй ТОЛЬКО иконки из Fa6 (например, \`<FaReact />\`, \`<FaCodeBranch />\`). Чтобы не проверять используй специалтный компонент  VibeContentRenderer (конвертирует текст в иконку), в него встроена проверка;)
+
+// /components/VibeContentRenderer.tsx
+"use client";
+
+import React from 'react';
+import parse, { domToReact, HTMLReactParserOptions, Element, attributesToProps } from 'html-react-parser';
+import Link from 'next/link';
+import * as Fa6Icons from "react-icons/fa6";
+import { debugLogger as logger } from "@/lib/debugLogger";
+
+// --- Full Icon Name Map (Lowercase to PascalCase) ---
+// Corrected FaTools -> FaToolbox
+const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
+   as string} style={style as React.CSSProperties} title={title as string} 
+
+interface VibeContentRendererProps {
+  content: string | null | undefined;
+  className?: string;
+}
+
+export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ content, className }) => {
+    if (typeof content !== 'string' || !content.trim()) {
+        ...
 
 **Глубокий Анализ и Дебаг (Если дали ошибку/логи):**
 
