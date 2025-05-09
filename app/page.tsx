@@ -9,17 +9,16 @@ import { motion } from "framer-motion";
 import {
   FaBrain, FaGamepad, FaBolt, FaChartLine, FaCodeBranch, FaUserNinja,
   FaWandMagicSparkles, FaArrowRight, FaPlus, FaEye, FaUpLong, FaFire, FaUsers, FaGithub,
-  FaLightbulb, // For "Insights" or "Tips"
+  FaLightbulb, 
 } from "react-icons/fa6";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts'; // Added RechartsTooltip
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Image from "next/image";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import {
   fetchUserCyberFitnessProfile,
   CyberFitnessProfile,
-  // logCyberFitnessActivity // We'll call this from specific actions, not just page load
-} from "@/hooks/cyberFitnessSupabase"; // Path based on your structure
+} from "@/hooks/cyberFitnessSupabase"; 
 
 // --- Constants & Config ---
 const DEFAULT_WEEKLY_ACTIVITY = [
@@ -28,13 +27,13 @@ const DEFAULT_WEEKLY_ACTIVITY = [
   { name: 'FRI', value: 0, label: 'System Idle' }, { name: 'SA', value: 0, label: 'System Idle' },
   { name: 'SU', value: 0, label: 'System Idle' },
 ];
-const CHART_COLORS = [ // Using HSL vars for consistency with Tailwind theme
+const CHART_COLORS = [ 
   'hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))',
-  'hsl(var(--chart-5))', 'hsl(var(--chart-4))', 'hsl(var(--brand-green))', // Direct color for green
-  'hsl(var(--brand-orange))' // Direct color for orange
+  'hsl(var(--chart-5))', 'hsl(var(--chart-4))', 'hsl(var(--brand-green))', 
+  'hsl(var(--brand-orange))' 
 ];
-const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png"; // Generic cyber avatar
-const FEATURED_QUEST_IMAGE = "/placeholders/cyber-brain-network.jpg"; // Thematic image
+const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png"; 
+const FEATURED_QUEST_IMAGE = "/placeholders/cyber-brain-network.jpg"; 
 
 // --- Framer Motion Variants ---
 const containerVariants = {
@@ -54,14 +53,14 @@ const bottomNavVariants = {
 };
 
 export default function Home() {
-  const { dbUser, isAuthenticated, isLoading, error } = useAppContext();
-  const userName = dbUser?.first_name || 'Agent';
+  const { user: telegramUser, dbUser, isAuthenticated, isLoading: appLoading, error: appContextError } = useAppContext(); // Renamed user to telegramUser for clarity
+  const userName = dbUser?.first_name || telegramUser?.first_name || 'Agent';
 
   const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    logger.log("Home: Mount | Auth Loading:", isLoading, "| User:", dbUser ? dbUser.id : "None");
+    logger.log("Home: Mount | App Loading:", appLoading, "| User:", dbUser ? dbUser.id : "None");
     const loadProfile = async () => {
       if (dbUser?.id) {
         logger.log(`Home: Fetching CyberFitness profile for ${dbUser.id}`);
@@ -75,18 +74,20 @@ export default function Home() {
           setCyberProfile({ level: 0, kiloVibes: 0, weeklyActivity: [...DEFAULT_WEEKLY_ACTIVITY], cognitiveOSVersion: "v0.1 Alpha" });
         }
         setProfileLoading(false);
-      } else if (!isLoading) { // Only if auth is done and no user
+      } else if (!appLoading) { 
         setProfileLoading(false);
         setCyberProfile({ level: 0, kiloVibes: 0, weeklyActivity: [...DEFAULT_WEEKLY_ACTIVITY], cognitiveOSVersion: "v0.1 Guest Mode"});
         logger.log("Home: No dbUser ID, using default/guest CyberFitness profile.");
       }
     };
 
-    if (!isLoading) loadProfile();
+    if (!appLoading) loadProfile();
 
-  }, [dbUser, isLoading]);
+  }, [dbUser, appLoading]);
 
-  if (isLoading || profileLoading) {
+  const isLoading = appLoading || profileLoading;
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-dark-bg to-dark-card flex flex-col items-center justify-center p-4 text-center">
         <motion.div
@@ -95,14 +96,14 @@ export default function Home() {
           className="w-24 h-24 border-4 border-t-brand-cyan border-x-brand-pink border-b-brand-purple border-opacity-50 rounded-full shadow-[0_0_25px_theme(colors.brand-cyan),0_0_15px_theme(colors.brand-pink)] mb-6"
         />
         <p className="text-brand-cyan font-orbitron text-xl animate-pulse tracking-widest">
-          {isLoading ? "CONNECTING TO CYBERVIBE GRID..." : "DECRYPTING COGNITIVE DATA..."}
+          {appLoading ? "CONNECTING TO CYBERVIBE GRID..." : "DECRYPTING COGNITIVE DATA..."}
         </p>
         <p className="text-muted-foreground text-sm font-mono animate-pulse mt-1">Please wait, Agent...</p>
       </div>
     );
   }
 
-  if (error) {
+  if (appContextError) { // Use appContextError here
     return (
       <motion.div
         initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 0 }}
@@ -110,7 +111,7 @@ export default function Home() {
       >
         <FaBolt className="text-8xl text-red-500 mb-6 animate-ping opacity-80"/>
         <p className="text-4xl mb-3 uppercase text-shadow-neon">CRITICAL SYSTEM FAILURE</p>
-        <p className="text-lg text-red-200 font-mono mb-6">ERROR PAYLOAD: {error.message}</p>
+        <p className="text-lg text-red-200 font-mono mb-6">ERROR PAYLOAD: {appContextError.message}</p>
         <p className="text-md text-gray-400 font-mono">The CyberVibe core has encountered an anomaly. Your cognitive link may be unstable.</p>
         <Button variant="destructive" className="mt-8 font-mono text-lg px-6 py-3" onClick={() => window.location.reload()}>
           ATTEMPT HARD REBOOT
@@ -127,10 +128,10 @@ export default function Home() {
   const skillsLeveled = cyberProfile?.skillsLeveled || 0;
   const currentLevel = cyberProfile?.level || 0;
   const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || "v0.1 Alpha";
-  const nextLevelTarget = (currentLevel + 1) * 1000; // Example target for next level
+  const nextLevelTarget = (currentLevel + 1) * 1000; 
 
   return (
-    <div className="min-h-screen bg-dark-bg text-light-text relative overflow-x-hidden pt-20 pb-28"> {/* Increased pb for bottom nav */}
+    <div className="min-h-screen bg-dark-bg text-light-text relative overflow-x-hidden pt-20 pb-28">
        <div className="absolute inset-0 z-0 overflow-hidden">
          <div className="absolute top-[-15%] left-[-15%] w-3/5 h-3/5 bg-brand-purple/20 rounded-full blur-[150px] opacity-50 animate-[pulse_8s_cubic-bezier(0.4,0,0.6,1)_infinite] pointer-events-none" />
          <div className="absolute bottom-[-25%] right-[-25%] w-4/5 h-4/5 bg-brand-pink/15 rounded-full blur-[180px] opacity-40 animate-[pulse_10s_cubic-bezier(0.4,0,0.6,1)_infinite_1s] pointer-events-none" />
@@ -153,7 +154,7 @@ export default function Home() {
           </div>
           <Link href="/profile" className="transition-transform duration-200 hover:scale-110">
             <Image
-              src={dbUser?.avatar_url || user?.photo_url || PLACEHOLDER_AVATAR}
+              src={dbUser?.avatar_url || telegramUser?.photo_url || PLACEHOLDER_AVATAR}
               alt={`${userName}'s Cybernetic Avatar`}
               width={52} height={52}
               className="w-11 h-11 sm:w-13 sm:h-13 rounded-full border-2 border-brand-pink/80 shadow-[0_0_10px_theme(colors.brand-pink/50%)] object-cover"
@@ -172,7 +173,7 @@ export default function Home() {
               </div>
               <Link href="/selfdev/gamified" passHref legacyBehavior>
                 <Button variant="outline" size="xs" className="border-brand-yellow text-brand-yellow hover:bg-brand-yellow/10 hover:text-white font-mono text-xs px-2 py-1 h-auto group-hover:border-brand-pink group-hover:text-brand-pink">
-                  All Directives <FaArrowRight className="ml-1 h-2.5 w-2.5"/>
+                  All Directives <FaArrowRight className="ml-1 h-2.5 w-2.5 group-hover:animate-[wiggle_0.5s_ease-in-out_infinite]"/>
                 </Button>
               </Link>
             </CardHeader>
@@ -188,7 +189,7 @@ export default function Home() {
                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none"></div>
                  <div className="absolute bottom-2 left-3 sm:bottom-3 sm:left-4 text-white z-10 p-1">
                     <h3 className="text-md sm:text-lg font-bold font-orbitron text-shadow-[0_0_8px_theme(colors.brand-cyan)]">
-                      <VibeContentRenderer content="<FaGamepad className='inline text-brand-pink/90 mr-1.5 text-xl'/>INITIATE: CyberDev OS Training Program" />
+                      <VibeContentRenderer content="<FaGamepad className='inline text-brand-pink/90 mr-2 text-2xl'/>INITIATE: CyberDev OS Training Program" />
                     </h3>
                     <p className="text-xs sm:text-sm font-mono text-gray-300">
                       <VibeContentRenderer content="Your journey from Level 0: <FaEye className='inline mx-0.5'/> See the Code, <FaBolt className='inline mx-0.5'/> Become the Vibe." />
@@ -231,7 +232,7 @@ export default function Home() {
                      <RechartsTooltip
                         cursor={{ fill: 'rgba(255,255,255,0.1)' }}
                         contentStyle={{
-                            backgroundColor: 'rgba(13, 2, 33, 0.85)', // dark-bg with opacity
+                            backgroundColor: 'rgba(13, 2, 33, 0.85)', 
                             borderColor: 'hsl(var(--brand-purple))',
                             borderRadius: '0.5rem',
                             color: 'hsl(var(--light-text))',
@@ -240,7 +241,7 @@ export default function Home() {
                         }}
                         itemStyle={{ color: 'hsl(var(--brand-yellow))' }}
                         labelStyle={{ color: 'hsl(var(--brand-cyan))', fontWeight: 'bold' }}
-                        formatter={(value, name, props) => [`${value} KV`, props.payload.label || 'Activity']}
+                        formatter={(value: number, name, props) => [`${value} KV`, props.payload.label || 'Activity']}
                     />
                     <Bar dataKey="value" radius={[2, 2, 0, 0]} barSize={18} minPointSize={2}>
                       {displayWeeklyActivity.map((entry, index) => (
