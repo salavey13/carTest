@@ -9,7 +9,7 @@ import { usePathname } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
 import { 
-  FaCog, // Replaced FaGear
+  FaGears, // Replaced FaGear
   FaScrewdriverWrench // Replaced FaTools
 } from "react-icons/fa6"; 
 import {
@@ -45,7 +45,7 @@ const allPages: PageInfo[] = [
   { path: "/buy-subscription", name: "OS Upgrades", icon: FaCreditCard, group: "CyberFitness", color: "green" },
   { path: "/premium", name: "Premium Modules", icon: FaStar, group: "CyberFitness", color: "yellow" }, 
   { path: "/nutrition", name: "Cognitive Fuel", icon: FaScrewdriverWrench, group: "CyberFitness", color: "orange"}, // Icon changed
-  { path: "/settings", name: "System Config", icon: FaCog, group: "CyberFitness", color: "blue" },  // Icon changed
+  { path: "/settings", name: "System Config", icon: FaGears, group: "CyberFitness", color: "blue" },  // Icon changed
   { path: "/partner", name: "Alliance Perks", icon: Users, group: "CyberFitness", color: "purple"}, 
 
   // --- Content & Tools ---
