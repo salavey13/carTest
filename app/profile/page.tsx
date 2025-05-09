@@ -7,7 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import {
   FaBrain, FaBolt, FaChartLine, FaWandMagicSparkles,
   FaPenToSquare, 
-  FaSignOutAlt, FaChevronRight, FaSpinner, FaTasks, FaShieldHalved
+  FaRightFromBracket, // Replaced FaSignOutAlt
+  FaChevronRight, FaSpinner, 
+  FaListCheck, // Replaced FaTasks
+  FaShieldHalved
 } from "react-icons/fa6";
 import { useState, useEffect } from "react";
 import Modal from "@/components/ui/Modal";
@@ -155,7 +158,7 @@ export default function ProfilePage() {
             {/* Weekly Activity Chart */}
             <section>
                 <h2 className="text-xl font-orbitron text-brand-green mb-3 flex items-center">
-                    <FaTasks className="mr-2" />Недельная Активность (KiloVibes)
+                    <FaListCheck className="mr-2" />Недельная Активность (KiloVibes) {/* Replaced FaTasks */}
                 </h2>
                 <Card className="bg-dark-bg/70 p-3 border border-brand-green/30 rounded-lg">
                     <div className="h-[120px] w-full">
@@ -164,9 +167,9 @@ export default function ProfilePage() {
                             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} dy={5}/>
                             <YAxis hide={true} domain={[0, 'dataMax + 100']} />
                             <RechartsTooltip
-                                cursor={{ fill: 'hsla(var(--brand-purple-hsl), 0.1)' }}
+                                cursor={{ fill: 'hsla(var(--brand-purple), 0.1)' }} /* Corrected: --brand-purple-hsl to --brand-purple */
                                 contentStyle={{
-                                    backgroundColor: 'rgba(13, 2, 33, 0.85)',
+                                    backgroundColor: 'rgba(13, 2, 33, 0.85)', /* Use var(--dark-bg-rgb) if possible or keep as is */
                                     borderColor: 'hsl(var(--brand-purple))',
                                     borderRadius: '0.5rem',
                                     color: 'hsl(var(--light-text))',
@@ -229,7 +232,7 @@ export default function ProfilePage() {
                 variant="outline" 
                 className="flex-1 border-brand-red text-brand-red hover:bg-brand-red/20 hover:text-white font-orbitron shadow-md hover:shadow-brand-red/40 transition-all"
               >
-                <FaSignOutAlt className="mr-2" /> Деавторизация
+                <FaRightFromBracket className="mr-2" /> Деавторизация {/* Replaced FaSignOutAlt */}
               </Button>
             </section>
           </CardContent>
