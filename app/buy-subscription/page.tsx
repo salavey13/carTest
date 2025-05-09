@@ -5,8 +5,9 @@ import { sendTelegramInvoice } from "@/app/actions";
 import { createInvoice, getUserSubscription } from "@/hooks/supabase";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { FaBrain, FaBolt, FaMicrochip, FaRocket, FaUserNinja, FaStar, FaLockOpen } from "react-icons/fa"; // FaLockOpen is not Fa6
-import { FaShieldHalved, FaInfinity, FaUsers } from "react-icons/fa6"; // FaLockOpen -> FaShieldHalved, FaInfinity, FaUsers for features
+import { Button } from "@/components/ui/button"; // Added import for Button
+import { FaBrain, FaBolt, FaMicrochip, FaRocket, FaUserNinja, FaStar } from "react-icons/fa"; // Removed FaLockOpen as it's not Fa6
+import { FaShieldHalved, FaInfinity, FaUsers } from "react-icons/fa6"; 
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 
 const SUBSCRIPTION_PLANS = [
@@ -191,7 +192,7 @@ export default function BuySubscriptionPage() {
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: SUBSCRIPTION_PLANS.indexOf(sub) * 0.1 }}
-                whileHover={{ scale: 1.03, boxShadow: "0 0 25px hsla(var(--brand-cyan-hsl), 0.5)" }}
+                whileHover={{ scale: 1.03, boxShadow: "0 0 25px hsla(var(--brand-cyan), 0.5)" }} // Corrected hsla for brand-cyan
                 className={`p-5 md:p-6 rounded-xl border shadow-xl flex flex-col justify-between bg-gradient-to-br ${sub.color} ${sub.id === "basic_neural_net" ? 'opacity-70' : ''} transition-all duration-300`}
               >
                 <div>
