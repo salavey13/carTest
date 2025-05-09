@@ -127,7 +127,7 @@ export default function Home() {
   const skillsLeveled = cyberProfile?.skillsLeveled || 0;
   const currentLevel = cyberProfile?.level || 0;
   const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || "v0.1 Alpha";
-  const nextLevelTarget = (currentLevel + 1) * 1000; 
+  const nextLevelTarget = (currentLevel + 1) * 1000; // Added semicolon here
   
   return ( 
     <div className="homepage-wrapper">
