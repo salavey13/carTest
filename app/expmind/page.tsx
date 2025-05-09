@@ -1,3 +1,4 @@
+// /app/expmind/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -268,7 +269,6 @@ const sections = [
   },
 ];
 
-
 // --- Component ---
 export default function ExperimentalMindsetPage() {
   const { user } = useAppContext();
@@ -495,7 +495,6 @@ export default function ExperimentalMindsetPage() {
                           </div>
                      </div>
                   )}
-
 
                   {/* Image (if exists and no subsections/grid) */}
                   {currentImageUrl && !section.subSections && !section.gridItems && (
