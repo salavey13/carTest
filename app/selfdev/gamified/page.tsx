@@ -7,8 +7,9 @@ import { useAppContext } from "@/contexts/AppContext";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { FaMapLocation } from "react-icons/fa6"; // Isolated import
 import {
-  FaGlasses, FaMapSigns, FaBrain, FaTriangleExclamation, FaPlay, FaForward,
+  FaGlasses, FaBrain, FaTriangleExclamation, FaPlay, FaForward,
   FaPuzzlePiece, FaGears, FaRoad, FaQuestionCircle, FaEye, FaBullseye, FaRulerCombined,
   FaArrowsSpin, FaDumbbell, FaGamepad, FaLightbulb, FaRobot, FaRocket, FaBookOpen,
   FaBolt, FaToolbox, FaCode, FaBug, FaLink, FaMicrophone, FaVideo, FaDatabase, FaServer,
