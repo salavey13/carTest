@@ -128,8 +128,7 @@ export default function Home() {
   const currentLevel = cyberProfile?.level || 0;
   const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || "v0.1 Alpha";
   const nextLevelTarget = (currentLevel + 1) * 1000;
-  // Ensure this is the VERY LAST line of JS code before the return statement.
-  // No comments, no empty lines between this and return.
+
   return ( 
     <div className="homepage-wrapper">
        <div className="homepage-bg-effects-container">
