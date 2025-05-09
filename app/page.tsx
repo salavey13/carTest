@@ -11,7 +11,7 @@ import {
   FaArrowRight, FaEye, FaUpLong, FaFire, FaGithub,
 } from "react-icons/fa6";
 // import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts'; // Tooltip import commented out
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts'; // Tooltip removed from imports
+//import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts'; // Tooltip removed from imports
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Image from "next/image";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
@@ -308,6 +308,6 @@ export default function Home() {
           </motion.div>
         )}
       </div>
-    </div>
+    
   );
 }
