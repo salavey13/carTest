@@ -15,21 +15,21 @@
 
 :root {
   /* CyberVice Theme - Dark Mode Default */
-  --background: 263 80% 7%; 
-  --foreground: 0 0% 94%;   
-  --card: 264 65% 13%;      
-  --card-foreground: 0 0% 94%; 
-  --popover: 264 70% 10%;   
+  --background: 263 80% 7%;
+  --foreground: 0 0% 94%;
+  --card: 264 65% 13%;
+  --card-foreground: 0 0% 94%;
+  --popover: 264 70% 10%;
   --popover-foreground: 0 0% 94%;
-  --primary: 300 100% 50%; 
-  --primary-foreground: 0 0% 10%; 
-  --secondary: 180 100% 50%; 
-  --secondary-foreground: 0 0% 10%; 
-  --muted: 263 30% 25%;    
-  --muted-foreground: 0 0% 65%; 
-  --accent: 30 100% 50%;    
-  --accent-foreground: 0 0% 10%; 
-  --destructive: 0 100% 55%; 
+  --primary: 300 100% 50%;
+  --primary-foreground: 0 0% 10%;
+  --secondary: 180 100% 50%;
+  --secondary-foreground: 0 0% 10%;
+  --muted: 263 30% 25%;
+  --muted-foreground: 0 0% 65%;
+  --accent: 30 100% 50%;
+  --accent-foreground: 0 0% 10%;
+  --destructive: 0 100% 55%;
   --destructive-foreground: 0 0% 95%;
   --border: 270 70% 35%;
   --input: 270 70% 30%;
@@ -51,24 +51,29 @@
   --sidebar-accent-foreground: 0 0% 10%;
   --sidebar-border: 270 60% 25%;
   --sidebar-ring: 300 100% 65%;
+
+  /* --- FIX 1: Added missing brand color variables for charts --- */
+  --brand-green: 145 63% 49%; /* Example: Adjust to your green */
+  --brand-orange: 28 100% 50%; /* Example: Adjust to your orange */
+  /* --- End of FIX 1 --- */
 }
 
 .dark {
-  --background: 263 80% 7%; 
-  --foreground: 0 0% 94%;   
-  --card: 264 65% 13%;      
-  --card-foreground: 0 0% 94%; 
-  --popover: 264 70% 10%;   
+  --background: 263 80% 7%;
+  --foreground: 0 0% 94%;
+  --card: 264 65% 13%;
+  --card-foreground: 0 0% 94%;
+  --popover: 264 70% 10%;
   --popover-foreground: 0 0% 94%;
-  --primary: 300 100% 50%; 
-  --primary-foreground: 0 0% 10%; 
-  --secondary: 180 100% 50%; 
-  --secondary-foreground: 0 0% 10%; 
-  --muted: 263 30% 25%;    
-  --muted-foreground: 0 0% 65%; 
-  --accent: 30 100% 50%;    
-  --accent-foreground: 0 0% 10%; 
-  --destructive: 0 100% 55%; 
+  --primary: 300 100% 50%;
+  --primary-foreground: 0 0% 10%;
+  --secondary: 180 100% 50%;
+  --secondary-foreground: 0 0% 10%;
+  --muted: 263 30% 25%;
+  --muted-foreground: 0 0% 65%;
+  --accent: 30 100% 50%;
+  --accent-foreground: 0 0% 10%;
+  --destructive: 0 100% 55%;
   --destructive-foreground: 0 0% 95%;
   --border: 270 70% 35%;
   --input: 270 70% 30%;
@@ -76,12 +81,15 @@
   --dark-bg-rgb: 13, 2, 33;
   --dark-card-rgb: 26, 10, 61;
   --glow-color-rgb: 255, 0, 255;
+
+  /* Consider adding --brand-green and --brand-orange here too if they differ in dark mode */
+  /* For now, they will inherit from :root */
 }
 
 @layer base {
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif; 
+    font-family: 'Inter', sans-serif;
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -89,11 +97,11 @@
     -moz-osx-font-smoothing: grayscale;
   }
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Orbitron', sans-serif; 
+    font-family: 'Orbitron', sans-serif;
     @apply tracking-wide;
   }
   section {
-    scroll-margin-top: 96px; 
+    scroll-margin-top: 96px;
   }
   *, *::before, *::after {
     box-sizing: border-box;
@@ -104,7 +112,9 @@
 
 /* Homepage Wrapper */
 .homepage-wrapper {
-  @apply min-h-screen bg-dark-bg text-light-text relative overflow-x-hidden pt-20 pb-28;
+  /* --- FIX 2: Changed text-light-text to text-foreground --- */
+  @apply min-h-screen bg-dark-bg text-foreground relative overflow-x-hidden pt-20 pb-28;
+  /* --- End of FIX 2 --- */
 }
 
 /* Homepage Background Effects Container */
@@ -129,7 +139,6 @@
   0%, 100% { opacity: 0.4; transform: scale(1); }
   50% { opacity: 0.25; transform: scale(1.03); }
 }
-
 
 /* Loading Spinner on Homepage */
 .loading-spinner-cyber {
@@ -188,7 +197,6 @@
 
 /* === End of Styles moved from /app/page.tsx === */
 
-
 .repo-xml-content-wrapper {
   width: 100%;
   overflow-x: auto;
@@ -213,7 +221,7 @@
 }
 
 .text-shadow-neon {
-  text-shadow: 
+  text-shadow:
     0 0 5px var(--brand-pink),
     0 0 10px var(--brand-pink),
     0 0 15px var(--brand-purple),
@@ -235,13 +243,13 @@
 
 .bg-grid-pattern {
   background-size: 60px 60px;
-  background-image: 
+  background-image:
     linear-gradient(to right, theme('colors.brand-purple / 10%') 1px, transparent 1px),
     linear-gradient(to bottom, theme('colors.brand-purple / 10%') 1px, transparent 1px);
 }
 .bg-grid-pattern-pink {
   background-size: 50px 50px;
-  background-image: 
+  background-image:
     linear-gradient(to right, theme('colors.brand-pink / 8%') 1px, transparent 1px),
     linear-gradient(to bottom, theme('colors.brand-pink / 8%') 1px, transparent 1px);
 }
@@ -251,7 +259,7 @@
   height: 8px;
 }
 .simple-scrollbar::-webkit-scrollbar-track {
-  background: transparent; 
+  background: transparent;
 }
 .simple-scrollbar::-webkit-scrollbar-thumb {
   background-color: theme('colors.brand-purple / 60%');
@@ -270,13 +278,13 @@
   font-family: "Orbitron", sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: theme('colors.brand-cyan'); 
-  text-shadow: 
+  color: theme('colors.brand-cyan');
+  text-shadow:
     0 0 3px theme('colors.brand-cyan / 70%'),
     0 0 5px theme('colors.brand-cyan / 50%'),
     0 0 8px theme('colors.brand-pink / 60%');
 }
-.cyber-text.glitch-heavy { 
+.cyber-text.glitch-heavy {
     text-shadow:
         0.05em 0 0 theme('colors.brand-pink / 75%'),
         -0.025em -0.025em 0 theme('colors.brand-green / 75%'),
@@ -306,39 +314,39 @@
   top: 0;
   width: 100%;
   height: 100%;
-  background: inherit; 
+  background: inherit;
   overflow: hidden;
   clip: rect(0, 900px, 0, 0);
 }
 
 .glitch::before {
   left: 2px;
-  text-shadow: -1px 0 theme('colors.brand-purple / 70%'); 
+  text-shadow: -1px 0 theme('colors.brand-purple / 70%');
   animation: glitch-anim-1 2s infinite linear alternate-reverse;
 }
 
 .glitch::after {
   left: -2px;
-  text-shadow: -1px 0 theme('colors.brand-cyan / 70%'); 
+  text-shadow: -1px 0 theme('colors.brand-cyan / 70%');
   animation: glitch-anim-2 2s infinite linear alternate-reverse;
 }
 
 @keyframes glitch-anim-1 { 0% { clip: rect(44px, 9999px, 49px, 0); } 5% { clip: rect(5px, 9999px, 100px, 0); } 10% { clip: rect(13px, 9999px, 60px, 0); } 15% { clip: rect(80px, 9999px, 40px, 0); } 20% { clip: rect(22px, 9999px, 75px, 0); } 25% { clip: rect(90px, 9999px, 15px, 0); } 30% { clip: rect(50px, 9999px, 88px, 0); } 35% { clip: rect(10px, 9999px, 45px, 0); } 40% { clip: rect(70px, 9999px, 30px, 0); } 45% { clip: rect(25px, 9999px, 95px, 0); } 50% { clip: rect(60px, 9999px, 20px, 0); } 55% { clip: rect(5px, 9999px, 55px, 0); } 60% { clip: rect(75px, 9999px, 35px, 0); } 65% { clip: rect(18px, 9999px, 80px, 0); } 70% { clip: rect(85px, 9999px, 22px, 0); } 75% { clip: rect(40px, 9999px, 65px, 0); } 80% { clip: rect(3px, 9999px, 90px, 0); } 85% { clip: rect(68px, 9999px, 28px, 0); } 90% { clip: rect(33px, 9999px, 77px, 0); } 95% { clip: rect(98px, 9999px, 10px, 0); } 100% { clip: rect(52px, 9999px, 58px, 0); } }
 @keyframes glitch-anim-2 { 0% { clip: rect(6px, 9999px, 94px, 0); } 5% { clip: rect(88px, 9999px, 12px, 0); } 10% { clip: rect(38px, 9999px, 68px, 0); } 15% { clip: rect(20px, 9999px, 85px, 0); } 20% { clip: rect(72px, 9999px, 18px, 0); } 25% { clip: rect(10px, 9999px, 90px, 0); } 30% { clip: rect(58px, 9999px, 32px, 0); } 35% { clip: rect(80px, 9999px, 8px, 0); } 40% { clip: rect(28px, 9999px, 78px, 0); } 45% { clip: rect(42px, 9999px, 52px, 0); } 50% { clip: rect(92px, 9999px, 25px, 0); } 55% { clip: rect(15px, 9999px, 82px, 0); } 60% { clip: rect(62px, 9999px, 42px, 0); } 65% { clip: rect(4px, 9999px, 70px, 0); } 70% { clip: rect(77px, 9999px, 10px, 0); } 75% { clip: rect(22px, 9999px, 88px, 0); } 80% { clip: rect(50px, 9999px, 48px, 0); } 85% { clip: rect(95px, 9999px, 38px, 0); } 90% { clip: rect(30px, 9999px, 60px, 0); } 95% { clip: rect(65px, 9999px, 15px, 0); } 100% { clip: rect(8px, 9999px, 98px, 0); } }
 
-.text-gradient { 
+.text-gradient {
   background: linear-gradient(to right, theme('colors.brand-pink'), theme('colors.brand-cyan'), theme('colors.brand-orange'));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-@keyframes glow { 
+@keyframes glow {
   0% { text-shadow: 0 0 5px theme('colors.brand-pink / 50%'); }
   50% { text-shadow: 0 0 20px theme('colors.brand-pink / 80%'), 0 0 30px theme('colors.brand-purple / 50%'); }
   100% { text-shadow: 0 0 5px theme('colors.brand-pink / 50%'); }
 }
 .text-glow {
-  animation: glow 2.5s infinite ease-in-out; 
+  animation: glow 2.5s infinite ease-in-out;
 }
 
 @keyframes pulse-slow {
@@ -351,18 +359,18 @@
 
 input[type="search"]::-webkit-search-cancel-button,
 input[type="search"]::-ms-clear {
-  display: none; 
+  display: none;
 }
 
 .comic-bubble {
   position: relative;
-  background: theme('colors.dark-card'); 
-  border: 2px solid theme('colors.brand-pink'); 
+  background: theme('colors.dark-card');
+  border: 2px solid theme('colors.brand-pink');
   border-radius: 15px;
-  color: theme('colors.light-text');
+  color: theme('colors.light-text'); /* Note: light-text is not defined, consider theme('colors.foreground') or similar */
 }
 
-@keyframes neon-border-glow { 
+@keyframes neon-border-glow {
   0%, 100% {
     border-color: theme('colors.brand-cyan / 70%');
     box-shadow: 0 0 5px theme('colors.brand-cyan / 50%'), 0 0 10px theme('colors.brand-cyan / 30%');
@@ -372,7 +380,7 @@ input[type="search"]::-ms-clear {
     box-shadow: 0 0 8px theme('colors.brand-pink / 50%'), 0 0 15px theme('colors.brand-pink / 30%'), 0 0 5px theme('colors.brand-purple / 20%');
   }
 }
-.border-neon-glow { 
+.border-neon-glow {
   animation: neon-border-glow 2.5s infinite alternate;
 }
 
@@ -381,7 +389,7 @@ input[type="search"]::-ms-clear {
   100% { background-position: 200px 200px; }
 }
 
-.shadow-glow { 
+.shadow-glow {
   box-shadow: 0 0 10px theme('colors.brand-cyan / 50%');
 }
 .shadow-glow:hover {
@@ -401,7 +409,7 @@ input[type="search"]::-ms-clear {
 
 .highlight-scroll {
   transition: outline 0.5s ease-out;
-  outline: 2px solid theme('colors.brand-green / 70%'); 
+  outline: 2px solid theme('colors.brand-green / 70%');
   outline-offset: 2px;
   box-shadow: 0 0 15px theme('colors.brand-green / 50%');
 }
@@ -423,6 +431,7 @@ input[type="search"]::-ms-clear {
     @apply bg-dark-card border border-brand-purple/50 text-light-text placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm
            focus:outline-none focus:ring-2 focus:ring-brand-pink focus:border-brand-pink
            transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
+           /* Note: text-light-text is not defined, consider text-foreground */
   }
   .input-cyber:disabled {
       @apply opacity-50 cursor-not-allowed;
@@ -431,13 +440,25 @@ input[type="search"]::-ms-clear {
       @apply bg-dark-card border border-brand-purple/50 text-light-text placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm min-h-[80px]
              focus:outline-none focus:ring-2 focus:ring-brand-pink focus:border-brand-pink
              transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
+             /* Note: text-light-text is not defined, consider text-foreground */
   }
 }
 
-/* Custom class for wiggly arrow on hover for "All Directives" button */
+/* --- FIX 3: Removed problematic CSS rule for group-hover:text-glow-effect --- */
+/*
 .group-hover\:text-glow-effect:hover > svg {
   text-shadow: 0 0 8px theme('colors.brand-pink');
 }
+*/
+/* --- End of FIX 3 --- */
+/* If you need a text-glow-effect utility for group-hover, define it in @layer utilities like:
+@layer utilities {
+  .text-glow-effect {
+    text-shadow: 0 0 8px theme('colors.brand-pink');
+  }
+}
+Then use `group-hover:text-glow-effect` in your TSX.
+*/
 
 /* Animation for wiggle effect */
 @keyframes wiggle {
