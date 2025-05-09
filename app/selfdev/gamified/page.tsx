@@ -1,3 +1,4 @@
+// /app/selfdev/gamified/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -31,7 +32,7 @@ const PLACEHOLDER_BLUR_URL = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVp
 
 const imagePlaceholders = {
   placeholder1: {
-    url: "https://placehold.co/600x338/0D0221/FF00FF?text=CyberSight+AR", 
+    url: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250510_015212-8fda7ca7-9a43-471e-a4f1-9423ee736859.jpg", 
     altEn: "Augmented reality glasses symbolizing clarity and cybernetic vision",
     altRu: "Очки дополненной реальности, символизирующие кибер-ясность и видение",
     tooltipRu: "Визуализация 'Кибер-Линз Ясности', помогающих взломать туман и спроектировать будущее.",
