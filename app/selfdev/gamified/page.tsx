@@ -278,7 +278,6 @@ const sections = [
   },
 ];
 
-// --- Component ---
 export default function GamifiedSelfDevPage() {
   const { user } = useAppContext();
   const [isMounted, setIsMounted] = useState(false);
@@ -401,10 +400,10 @@ export default function GamifiedSelfDevPage() {
                                 const isMetaLevel = parseInt(lvl.level.split(' ')[0], 10) >= 11;
                                 return (
                                 <div key={lvl.level} className={cn(
-                                    `p-3 border-l-4 ${lvl.color.replace('text-', 'border-')} rounded-md shadow-sm`,
+                                    `p-3 border-l-4 ${lvl.color.replace('text-', 'border-')} rounded-md shadow-sm transition-all hover:shadow-lg`,
                                     isMetaLevel 
-                                      ? 'bg-purple-900/30 border-purple-500/60 ring-1 ring-purple-400/40' 
-                                      : 'bg-dark-bg/50'
+                                      ? 'bg-gradient-to-r from-purple-900/30 via-black/50 to-purple-900/30 border-purple-400/70 ring-1 ring-purple-300/50 hover:ring-purple-200/70' 
+                                      : 'bg-dark-bg/50 hover:bg-dark-bg/70'
                                 )}>
                                     <h4 className={`font-orbitron ${lvl.color} flex items-center`}>
                                         <LvlIcon className="mr-2" />
