@@ -19,12 +19,13 @@ import {
     FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye,
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaToolbox, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket,
-    FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye // Corrected Icon list
+    FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye
 } from "react-icons/fa6";
 import Link from "next/link";
 import { motion } from 'framer-motion';
 import VibeContentRenderer from '@/components/VibeContentRenderer';
 import * as repoUtils from "@/lib/repoUtils";
+import { cn } from "@/lib/utils";
 
 // --- I18N Translations (Full) ---
 const translations = {
@@ -94,7 +95,7 @@ const translations = {
     philosophyLvl1_2: "<strong>Лв.1 -> 2 <FaToolbox/> (Простая Идея / Generic Idea Flow):</strong> Простая идея? Текст/кнопку поменять? Дай AI идею + 1 файл контекста -> PR. <strong>ГОТОВО.</strong> Ты сказал - AI сделал.",
     philosophyLvl2_3: "<strong>Лв.2 -> 3 <FaCode/> (+Мульти-Файл / Generic Idea Flow):</strong> Чуть сложнее? 2-5 файлов? Дай AI идею + контекст -> Проверь ответ AI в Ассистенте -> PR. <strong>ГОТОВО.</strong> Ты контролируешь больше.",
     philosophyLvl3_4: "<strong>Лв.3 -> 4 <FaBug/> (Дебаг Логов / Error Fix Flow):</strong> Упала сборка? Ошибка в рантайме? Используй Оверлей Ошибки (<FaBug/> иконка вверху справа при ошибке), чтобы скопировать ошибку и логи -> Скорми AI + <strong>контекст файла</strong> -> <strong>ПОЧИНЕНО.</strong> +1 Вайб Перк: Дебаггинг.",
-    philosophyLvl4_5: "<strong>Лв.4 -> 5 <FaLink/> (Проактивный Дебаг / Icon Hunt):</strong> Проверяй логи Vercel (ссылка в комменте PR!) даже *без* ошибок. Ищи варнинги, странности. Устал от ошибок иконок? Найди <em>идеальную</em> Fa6 иконку сам! Юзай <a href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-blue hover:underline font-semibold px-1'>Поиск FontAwesome <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/></a> -> Добавь в Быстрые Ссылки -> Фикси проактивно. +1 Перк: Находчивость/Предусмотрительность.",
+    philosophyLvl4_5: "<strong>Лв.4 -> 5 <FaLink/> (+Icon Hunt / Proactive Log Check):</strong> Проверяй логи Vercel (ссылка в комменте PR!) даже *без* ошибок. Ищи варнинги, странности. Устал от ошибок иконок? Найди <em>идеальную</em> Fa6 иконку сам! Юзай <a href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-blue hover:underline font-semibold px-1'>Поиск FontAwesome <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/></a> -> Добавь в Быстрые Ссылки -> Фикси проактивно. +1 Перк: Находчивость/Предусмотрительность.",
     philosophyLvl5_6: "<strong>Лв.5 -> 6 <FaMicrophone/>/<FaVideo/> (+Мультимедиа):</strong> Используй аудио-команды! Прикрепляй видосы! Смотри, как они автоматом становятся контентом страницы. +1 Перк: Мультимодальный Ввод.",
     philosophyLvl6_7: "<strong>Лв.6 -> 7 <FaDatabase/> (+SQL/БД):</strong> Открой новые типы файлов! AI генерит SQL -> Вставь в Supabase (1 клик) -> <strong>ГОТОВО.</strong> Тот же флоу, другой контекст. +1 Перк: Работа с Данными.",
     philosophyLvl8_10: "<strong>Лв.8-10+ <FaServer/>/<FaRocket/> (+Независимость):</strong> Разверни свой CyberVibe! Юзай/спи*ди мою Supabase! Поставь свой Токен Бота! Строй свои XTR-ы! <strong>БЕЗГРАНИЧНАЯ МОЩЬ!</strong>",
@@ -113,7 +114,7 @@ const translations = {
     step2DescEnd: "<strong>ГОТОВО.</strong> Сайт обновляется авто-магически.",
     readyButton: "ПОГНАЛИ, БЛ*ТЬ!",
     componentsTitle: "Врубай Движки Вайба!",
-    ctaTitle: "Готов(а) Апнуться, {USERNAME}?", // Изменено здесь
+    ctaTitle: "Готов(а) Апнуться, {USERNAME}?",
     ctaDesc: "Серьезно. Хватит сомневаться. Начни <strong>ДЕЛАТЬ</strong>. Первый левел зовет. Качайся СЕЙЧАС!",
     ctaHotChick: "Есть искра? Давай замутим что-то эпичное. Пиши <strong>@SALAVEY13</strong> СЕЙЧАС!",
     ctaDude: "(Все остальные? Просто, бл*ть, попробуйте. Левел 1 - это клик мышки. У вас получится!)",
@@ -145,7 +146,6 @@ const getPlainText = (htmlString: string | null | undefined): string => {
     }
 };
 
-
 // --- ActualPageContent Component ---
 function ActualPageContent() {
     const log = logger.log;
@@ -165,8 +165,8 @@ function ActualPageContent() {
 
     // --- State Initialization ---
     log("[ActualPageContent] Initializing State...");
-    const [lang, setLang] = useState<keyof typeof translations>('en'); // Use keyof for Language type
-    const [t, setT] = useState<typeof translations.en | null>(null); // Use typeof for TranslationSet type
+    const [lang, setLang] = useState<keyof typeof translations>('en'); 
+    const [t, setT] = useState<typeof translations.en | null>(null); 
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
     const [searchParamsReady, setSearchParamsReady] = useState(false);
     const [searchParamsError, setSearchParamsError] = useState<Error | null>(null);
@@ -175,7 +175,6 @@ function ActualPageContent() {
     const [initialUrlProcessed, setInitialUrlProcessed] = useState<boolean>(false);
     const hasProcessedInitialIdea = useRef(false);
     log("[ActualPageContent] useState DONE");
-
 
     // --- useSearchParams Hook Call ---
     let searchParams: URLSearchParams | null = null;
@@ -202,15 +201,15 @@ function ActualPageContent() {
 
     // --- Destructure context ---
     const {
-        fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef, // Refs
-        setImageReplaceTask, setKworkInputValue, fetchStatus, setKworkInputHasContent, // State setters
-        imageReplaceTask, allFetchedFiles, selectedFetcherFiles, kworkInputValue, // State values
+        fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef, 
+        setImageReplaceTask, setKworkInputValue, fetchStatus, 
+        imageReplaceTask, allFetchedFiles, selectedFetcherFiles, kworkInputValue, 
         repoUrl, setRepoUrl, addToast,
         targetPrData, setTargetPrData,
         isPreChecking, setPendingFlowDetails, pendingFlowDetails,
         setTargetBranchName, setManualBranchName, showComponents, setShowComponents,
-        triggerPreCheckAndFetch, // Stable trigger
-        triggerFetch // Added triggerFetch <<< THIS FUNCTION FROM CONTEXT IS STABLE
+        triggerPreCheckAndFetch, 
+        triggerFetch 
     } = pageContext;
 
     // --- Effect 1: Language ---
@@ -223,7 +222,7 @@ function ActualPageContent() {
       const newTranslations = translations[resolvedLang] ?? translations.en;
       setT(newTranslations);
       log(`[Effect Lang] Language set to: ${resolvedLang}. Translations loaded.`);
-    }, [user]); // Only depends on user
+    }, [user]); 
 
     // --- Effect 2: Page Loading Status ---
     useEffect(() => {
@@ -235,7 +234,6 @@ function ActualPageContent() {
 
     // --- Effect 3: Process URL Params (sets intermediate state) ---
     useEffect(() => {
-        // Guards
         if (!searchParamsReady && !searchParamsError) { log("[Effect URL Params] Skipping, searchParams not ready and no error."); return; }
         if (searchParamsError) { warn("[Effect URL Params] Skipping, searchParams hook failed."); setInitialUrlProcessed(true); return; }
         if (!searchParams) { error("[Effect URL Params] Skipping, searchParams object is null despite readiness signal."); setInitialUrlProcessed(true); return; }
@@ -244,7 +242,7 @@ function ActualPageContent() {
         debug("[Effect URL Params] Processing START (searchParams ready, valid, and not processed yet)");
 
         const pathParam = searchParams.get("path");
-        const ideaParam = searchParams.get("idea"); // This holds the structured 'ImageReplace|...' or 'ErrorFix|...' or simple text
+        const ideaParam = searchParams.get("idea"); 
         const repoParam = searchParams.get("repo");
         const targetBranchParam = searchParams.get("targetBranch");
         const prNumberParam = searchParams.get("prNumber");
@@ -252,99 +250,86 @@ function ActualPageContent() {
 
         log(`[Effect URL Params] Raw Params: path=${pathParam}, idea=${ideaParam?.substring(0, 50)}..., repo=${repoParam}, targetBranch=${targetBranchParam}, prNum=${prNumberParam}, prUrl=${prUrlParam}`);
 
-
         let needsComponentReveal = false;
         let newRepoUrl: string | null = null;
         let flowType: 'ImageSwap' | 'ErrorFix' | 'Simple' | null = null;
         let flowTargetPath: string | null = null;
         let flowDetails: any = null;
         let suggestedBranch: string | null = null;
-        let simpleIdeaText: string | null = null; // Will only be set if flowType is 'Simple'
+        let simpleIdeaText: string | null = null; 
         let pathForHighlight: string | null = null;
         let newTargetPrData: TargetPrData | null = null;
 
-        // Repo URL
         if (repoParam) {
             try { const decodedRepoUrl = decodeURIComponent(repoParam); if (decodedRepoUrl?.includes("github.com")) newRepoUrl = decodedRepoUrl; }
             catch (e) { error("Error decoding repo URL param:", e); }
         }
 
-        // PR Data
         if (prNumberParam && prUrlParam) {
             try { const prNum = parseInt(decodeURIComponent(prNumberParam), 10); const prUrl = decodeURIComponent(prUrlParam); if (!isNaN(prNum) && prUrl) newTargetPrData = { number: prNum, url: prUrl }; }
             catch (e) { error("Error parsing PR data from URL params", e); }
         }
 
-        // Path / Idea / Flow Type Determination
         if (pathParam) {
             try {
                  pathForHighlight = decodeURIComponent(pathParam);
                  flowTargetPath = pathForHighlight;
-                 needsComponentReveal = true; // Assume reveal if path exists
+                 needsComponentReveal = true; 
                  log(`[Effect URL Params] Decoded path: ${pathForHighlight}`);
 
                 if (ideaParam) {
-                    // --- Decode ideaParam HERE, ONCE ---
                     let decodedIdea = "";
                     try {
                          decodedIdea = decodeURIComponent(ideaParam);
                          log(`[Effect URL Params] Decoded idea: ${decodedIdea.substring(0, 100)}...`);
                     } catch (e) {
                          error("Error decoding 'idea' parameter:", e);
-                         simpleIdeaText = ideaParam; // Use raw value if decode fails? Risky.
+                         simpleIdeaText = ideaParam; 
                          flowType = null;
                     }
-                    // --- END DECODE ---
 
                     if (decodedIdea.startsWith("ImageReplace|")) {
                         flowType = 'ImageSwap';
                         log(`[Flow 1 - Image Swap] RepoXML: Determined Flow Type: ${flowType}`);
                         try {
-                            // Split the already decoded string
                             const parts = decodedIdea.split('|');
-                            // --- Get the values directly, they should be decoded by the initial decodeURIComponent ---
                             const oldUrlPart = parts.find(p => p.startsWith("OldURL="));
                             const newUrlPart = parts.find(p => p.startsWith("NewURL="));
 
-                            // Check if parts were found before trying to extract value
                             if (oldUrlPart && newUrlPart) {
-                                const oldUrl = oldUrlPart.substring(7); // No decodeURIComponent needed
-                                const newUrl = newUrlPart.substring(7); // No decodeURIComponent needed
+                                const oldUrl = oldUrlPart.substring(7); 
+                                const newUrl = newUrlPart.substring(7); 
 
                                 if (oldUrl && newUrl) {
                                     flowDetails = { oldUrl, newUrl };
-                                    // Call the exported function from repoUtils
                                     suggestedBranch = targetBranchParam ? decodeURIComponent(targetBranchParam) : repoUtils.guessBranchNameFromPath(flowTargetPath) || 'image-update-' + Date.now().toString(36);
                                     log(`[Flow 1 - Image Swap] RepoXML: ImageSwap details parsed. Old: ${oldUrl.substring(0,30)}, New: ${newUrl.substring(0,30)}, Suggested Branch: ${suggestedBranch}`);
                                 } else {
-                                    flowType = null; // Reset flow type if parsing fails
+                                    flowType = null; 
                                     warn("[Flow 1 - Image Swap] RepoXML: ImageSwap parsing failed (missing Old/New URL value after substring)");
                                 }
                             } else {
-                                 flowType = null; // Reset flow type if parts not found
+                                 flowType = null; 
                                  warn("[Flow 1 - Image Swap] RepoXML: ImageSwap parsing failed (could not find OldURL= or NewURL= parts)");
                             }
-                             // --- END FIX ---
                         } catch(e) {
-                            flowType = null; // Reset flow type on error
+                            flowType = null; 
                             error("[Flow 1 - Image Swap] RepoXML: Error parsing ImageSwap details:", e);
                         }
                     } else if (decodedIdea.startsWith("ErrorFix|")) {
                         flowType = 'ErrorFix';
                         log(`[Flow 3 - Error Fix] RepoXML: Determined Flow Type: ${flowType}`);
                         try {
-                            // Split the already decoded string
                             const detailParts = decodedIdea.substring(9).split('|');
                             const parsedDetails: Record<string, string> = {};
                             detailParts.forEach(part => {
                                 const eqIndex = part.indexOf('=');
                                 if (eqIndex > 0) {
-                                    // Decode individual parts
                                     try {
                                         parsedDetails[part.substring(0, eqIndex)] = decodeURIComponent(part.substring(eqIndex + 1));
                                     } catch (partDecodeError) {
                                          error(`[Flow 3 - Error Fix] RepoXML: Error decoding part '${part.substring(0, eqIndex)}':`, partDecodeError);
-                                         parsedDetails[part.substring(0, eqIndex)] = part.substring(eqIndex + 1); // Use raw value as fallback
+                                         parsedDetails[part.substring(0, eqIndex)] = part.substring(eqIndex + 1); 
                                     }
                                 }
                             });
@@ -353,28 +338,28 @@ function ActualPageContent() {
                                 suggestedBranch = targetBranchParam ? decodeURIComponent(targetBranchParam) : ('error-fix-' + Date.now().toString(36).substring(0, 6));
                                 log(`[Flow 3 - Error Fix] RepoXML: ErrorFix details parsed. Suggested Branch: ${suggestedBranch}`);
                             } else {
-                                flowType = null; // Reset flow type if parsing fails
+                                flowType = null; 
                                 warn("[Flow 3 - Error Fix] RepoXML: ErrorFix parsing failed (missing Message)");
                             }
                         } catch(e) {
-                             flowType = null; // Reset flow type on error
+                             flowType = null; 
                              error("[Flow 3 - Error Fix] RepoXML: Error parsing ErrorFix details:", e);
                         }
                     } else {
                         flowType = 'Simple';
-                        simpleIdeaText = decodedIdea; // Store the idea only if it's simple text
+                        simpleIdeaText = decodedIdea; 
                         suggestedBranch = targetBranchParam ? decodeURIComponent(targetBranchParam) : null;
                          log(`[Flow 2 - Generic Idea] RepoXML: Determined Flow Type: ${flowType}. Idea: ${simpleIdeaText.substring(0,50)}... Suggested Branch: ${suggestedBranch}`);
                     }
                 }
             } catch (decodeError) { error("Error decoding path param:", decodeError); needsComponentReveal = false; flowType = null; flowTargetPath = null; pathForHighlight = null; simpleIdeaText = null; }
         } else if (ideaParam) {
-             try { // Idea only (must be simple text if no path)
+             try { 
                 const decodedIdea = decodeURIComponent(ideaParam);
                  log(`[Effect URL Params] Decoded idea (no path): ${decodedIdea.substring(0, 100)}...`);
                  if (!decodedIdea.startsWith("ImageReplace|") && !decodedIdea.startsWith("ErrorFix|")) {
                     simpleIdeaText = decodedIdea;
-                    flowType = 'Simple'; // Set flow type here as well
+                    flowType = 'Simple'; 
                     needsComponentReveal = true;
                     log(`[Flow 2 - Generic Idea] RepoXML: Determined Flow Type (no path): ${flowType}. Idea: ${simpleIdeaText.substring(0,50)}...`);
                  } else {
@@ -383,19 +368,17 @@ function ActualPageContent() {
              } catch (e) { error("Error decoding idea param:", e); }
         }
 
-        // --- ACTIONS based on processed params ---
         if (newRepoUrl && repoUrl !== newRepoUrl) { debug(`[Effect URL Params] Setting Repo URL: ${newRepoUrl}`); setRepoUrl(newRepoUrl); }
         if (JSON.stringify(targetPrData) !== JSON.stringify(newTargetPrData)) { debug(`[Effect URL Params] Setting Target PR Data:`, newTargetPrData); setTargetPrData(newTargetPrData); }
 
         debug(`[Effect URL Params] Setting derived props: path=${pathForHighlight}, simpleIdea=${simpleIdeaText ? simpleIdeaText.substring(0,20)+'...' : null}`);
         setDerivedHighlightedPath(pathForHighlight);
-        setDerivedIdea(simpleIdeaText); // Only set the simple text idea derived from the URL
+        setDerivedIdea(simpleIdeaText); 
 
         if ((flowType === 'ImageSwap' || flowType === 'ErrorFix') && flowTargetPath && flowDetails && suggestedBranch && (newRepoUrl || repoUrl)) {
              const flowLogPrefix = flowType === 'ImageSwap' ? '[Flow 1 - Image Swap]' : '[Flow 3 - Error Fix]';
              log(`${flowLogPrefix} RepoXML: Setting Pending Flow: ${flowType}, Branch Suggestion: ${suggestedBranch}. Triggering PreCheck.`);
              setPendingFlowDetails({ type: flowType, targetPath: flowTargetPath, details: flowDetails });
-             // --- FIX: Set imageReplaceTask ONLY for ImageSwap Flow ---
              if (flowType === 'ImageSwap') {
                  setImageReplaceTask({
                      targetPath: flowTargetPath,
@@ -404,29 +387,23 @@ function ActualPageContent() {
                  });
                  log(`${flowLogPrefix} setImageReplaceTask called with:`, flowDetails);
              } else {
-                  setImageReplaceTask(null); // Ensure it's null for other flows
+                  setImageReplaceTask(null); 
              }
-             // --- END FIX ---
-             // Trigger pre-check which will then trigger fetch with the right branch
              triggerPreCheckAndFetch(newRepoUrl || repoUrl, suggestedBranch, flowType, flowDetails, flowTargetPath)
                  .then(() => log(`${flowLogPrefix} RepoXML: PreCheck for ${flowType} completed.`))
                  .catch(preCheckErr => error(`${flowLogPrefix} RepoXML: Error during ${flowType} pre-check trigger:`, preCheckErr));
         } else if (flowType === 'Simple' && suggestedBranch) {
              log(`[Flow 2 - Generic Idea] RepoXML: Simple flow with specific branch target: ${suggestedBranch}. Clearing pending flow.`);
              setTargetBranchName(suggestedBranch); setManualBranchName(''); setPendingFlowDetails(null); setImageReplaceTask(null);
-             // We might still need to trigger fetch if simpleIdeaText exists and requires context
              if(simpleIdeaText && needsComponentReveal) {
                  log(`[Flow 2 - Generic Idea] RepoXML: Triggering fetch for simple idea with target branch.`);
-                 // Use the stable triggerFetch from context directly
                  triggerFetch(false, suggestedBranch).catch(fetchErr => error(`Error triggering fetch for simple idea:`, fetchErr));
              }
         } else {
             log(`[Effect URL Params] No specific flow trigger or no branch specified for simple flow. Clearing pending flow.`);
             setPendingFlowDetails(null); setImageReplaceTask(null);
-             // We might still need to trigger fetch if simpleIdeaText exists and requires context, using default branch
              if(flowType === 'Simple' && simpleIdeaText && needsComponentReveal) {
                  log(`[Flow 2 - Generic Idea] RepoXML: Triggering fetch for simple idea with default branch.`);
-                 // Use the stable triggerFetch from context directly
                  triggerFetch(false, null).catch(fetchErr => error(`Error triggering fetch for simple idea (default):`, fetchErr));
              }
         }
@@ -436,21 +413,19 @@ function ActualPageContent() {
         setInitialUrlProcessed(true);
         debug("[Effect URL Params] Processing END, marked as processed.");
 
-    }, [ // Dependencies remain the same
-        searchParamsReady, searchParams, searchParamsError, initialUrlProcessed, // Effect guards
-        setDerivedHighlightedPath, setDerivedIdea, setInitialUrlProcessed, // Stable local setters
-        setRepoUrl, setTargetPrData, setPendingFlowDetails, setImageReplaceTask, // Stable context setters
-        setTargetBranchName, setManualBranchName, setShowComponents, // Stable context setters
-        triggerPreCheckAndFetch, // Stable context trigger
-        repoUrl, targetPrData, showComponents, // Context values read for comparison
-        addToast, error, warn, log, debug, // Utilities
-        triggerFetch // Still needed for access inside, not as dependency causing re-run
+    }, [ 
+        searchParamsReady, searchParams, searchParamsError, initialUrlProcessed, 
+        setDerivedHighlightedPath, setDerivedIdea, setInitialUrlProcessed, 
+        setRepoUrl, setTargetPrData, setPendingFlowDetails, setImageReplaceTask, 
+        setTargetBranchName, setManualBranchName, setShowComponents, 
+        triggerPreCheckAndFetch, 
+        repoUrl, targetPrData, showComponents, 
+        addToast, error, warn, log, debug, 
+        triggerFetch 
     ]);
-
 
     // --- Effect 4: Populate Kwork Input ---
     useEffect(() => {
-        // Guards
         if (!initialUrlProcessed || hasProcessedInitialIdea.current || fetchStatus !== 'success' || isPreChecking) {
             debug("[Effect Populate Kwork] Skipping:", { initialUrlProcessed, hasProcessed: hasProcessedInitialIdea.current, fetchStatus, isPreChecking });
             if (initialUrlProcessed && !hasProcessedInitialIdea.current && (fetchStatus === 'error' || fetchStatus === 'failed_retries')) {
@@ -459,21 +434,17 @@ function ActualPageContent() {
             }
             return;
         }
-        // --- FIX: Skip if imageReplaceTask IS active ---
         if (imageReplaceTask) {
              debug("[Effect Populate Kwork] Skipping: ImageReplaceTask is active.");
-             // Mark as processed even if skipped due to image task
              if (!hasProcessedInitialIdea.current) {
                  hasProcessedInitialIdea.current = true;
                  log("[Effect Populate Kwork] Marked idea as processed (skipped due to image task).");
              }
              return;
         }
-        // --- END FIX ---
 
         debug("[Effect Populate Kwork] Conditions met (no image task), checking derived idea...");
 
-        // Only populate if a 'Simple' idea was derived from URL params
         if (typeof derivedIdea === 'string' && derivedIdea.trim() !== '') {
              const flowLogPrefix = derivedIdea.startsWith("Fix error in") ? '[Flow 3 - Error Fix]' : '[Flow 2 - Generic Idea]';
              log(`${flowLogPrefix} RepoXML: Populating kwork with simple idea: ${derivedIdea.substring(0, 30)}...`);
@@ -489,7 +460,6 @@ function ActualPageContent() {
                  return valueToSet;
             });
 
-            // Auto-add highlighted file context
             if (derivedHighlightedPath && fetcherRef?.current && allFetchedFiles.some(f => f.path === derivedHighlightedPath)) {
                 if (!selectedFetcherFiles.has(derivedHighlightedPath)) {
                     log(`${flowLogPrefix} RepoXML: [Effect Populate Kwork] Auto-adding highlighted file context:`, derivedHighlightedPath);
@@ -497,27 +467,24 @@ function ActualPageContent() {
                 } else { log(`${flowLogPrefix} RepoXML: [Effect Populate Kwork] Highlighted file already selected, skipping auto-add context.`); }
             } else if (derivedHighlightedPath) { warn(`${flowLogPrefix} RepoXML: [Effect Populate Kwork] Highlighted path exists, but file/ref not found for auto-add context.`); }
 
-            // Scroll to input
             const kworkElement = document.getElementById('kwork-input-section');
             if (kworkElement) { setTimeout(() => { try { kworkElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e){ error("Scroll error:", e); } }, 250); }
 
-            hasProcessedInitialIdea.current = true; // Mark as processed AFTER attempt
+            hasProcessedInitialIdea.current = true; 
             log(`${flowLogPrefix} RepoXML: [Effect Populate Kwork] Simple idea processed.`);
         } else {
              log("[Effect Populate Kwork] Fetch successful, but no simple idea to populate.");
-             hasProcessedInitialIdea.current = true; // Mark as processed anyway
+             hasProcessedInitialIdea.current = true; 
         }
         debug("[Effect Populate Kwork] END");
 
-    }, [ // Dependencies: React to fetch status, pre-check status, the derived idea/path, and URL processing completion.
-        fetchStatus, isPreChecking, initialUrlProcessed, derivedIdea, derivedHighlightedPath, // Core triggers
-        fetcherRef, allFetchedFiles, selectedFetcherFiles, // Refs/state needed *inside*
-        imageReplaceTask, // <<< ADD imageReplaceTask dependency to skip population when active
-        setKworkInputValue, // Stable context setter
-        // DO NOT add kworkInputValue here - prevents infinite loop
-        error, warn, log, debug, // Utilities
+    }, [ 
+        fetchStatus, isPreChecking, initialUrlProcessed, derivedIdea, derivedHighlightedPath, 
+        fetcherRef, allFetchedFiles, selectedFetcherFiles, 
+        imageReplaceTask, 
+        setKworkInputValue, 
+        error, warn, log, debug, 
     ]);
-
 
     // --- Callbacks ---
     const memoizedGetPlainText = useCallback(getPlainText, []);
@@ -528,7 +495,7 @@ function ActualPageContent() {
         if (sectionsRequiringReveal.includes(id) && !showComponents) {
             log(`[CB ScrollNav] Revealing components for "${id}"`);
             setShowComponents(true);
-            requestAnimationFrame(() => { // Wait for next frame after state update
+            requestAnimationFrame(() => { 
                 const el = document.getElementById(id);
                 if (el) {
                     try { const offsetTop = window.scrollY + el.getBoundingClientRect().top - 80; window.scrollTo({ top: offsetTop, behavior: 'smooth' }); }
@@ -546,7 +513,6 @@ function ActualPageContent() {
         setShowComponents(true);
         toastInfo("Компоненты загружены!", { duration: 1500 });
     }, [setShowComponents, toastInfo, log]);
-
 
     // --- Loading / Error States ---
      if (searchParamsError) {
@@ -572,7 +538,6 @@ function ActualPageContent() {
     const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe);
     const navTitleGrabber = memoizedGetPlainText(t.navGrabber);
     const navTitleAssistant = memoizedGetPlainText(t.navAssistant);
-
 
     // --- Log before return ---
     log("[ActualPageContent] Preparing to render JSX...");
@@ -636,27 +601,23 @@ function ActualPageContent() {
                                  <hr className="border-gray-700 my-3"/>
                                 <h4 className="text-lg font-semibold text-cyan-400 pt-1">Level Progression (+1 Vibe Perk):</h4>
                                 <ul className="list-none space-y-2 pl-2 text-sm md:text-base">
-                                    <li><VibeContentRenderer content={t.philosophyLvl0_1} /></li>
-                                    <li><VibeContentRenderer content={t.philosophyLvl1_2} /></li>
-                                    <li><VibeContentRenderer content={t.philosophyLvl2_3} /></li>
-                                    <li><VibeContentRenderer content={t.philosophyLvl3_4} /></li>
-                                    <li><VibeContentRenderer content={t.philosophyLvl4_5} /></li>
-                                    <li><VibeContentRenderer content={t.philosophyLvl5_6} /></li>
-                                    <li><VibeContentRenderer content={t.philosophyLvl6_7} /></li>
-                                    <li><VibeContentRenderer content={t.philosophyLvl8_10} /></li>
-                                    {/* --- UPDATED META LEVELS --- */}
-                                    <li><VibeContentRenderer content={t.philosophyLvl11} /></li>
-                                    <li><VibeContentRenderer content={t.philosophyLvl12} /></li>
-                                    <li><VibeContentRenderer content={t.philosophyLvl13} /></li>
-                                    <li><VibeContentRenderer content={t.philosophyLvl14} /></li>
-                                    <li><VibeContentRenderer content={t.philosophyLvl15} /></li>
-                                    {/* --- END UPDATED META LEVELS --- */}
+                                    {/* Standard Levels */}
+                                    {[t.philosophyLvl0_1, t.philosophyLvl1_2, t.philosophyLvl2_3, t.philosophyLvl3_4, t.philosophyLvl4_5, t.philosophyLvl5_6, t.philosophyLvl6_7, t.philosophyLvl8_10].map((levelContent, index) => (
+                                        <li key={`std-lvl-${index}`}><VibeContentRenderer content={levelContent} /></li>
+                                    ))}
+                                    {/* Meta Levels (11-15) with special styling */}
+                                    {[t.philosophyLvl11, t.philosophyLvl12, t.philosophyLvl13, t.philosophyLvl14, t.philosophyLvl15].map((levelContent, index) => (
+                                        <li key={`meta-lvl-${index}`}>
+                                            <div className="p-2 rounded-md border border-purple-600/40 bg-purple-900/20 my-1 shadow-inner shadow-purple-950/50">
+                                                <VibeContentRenderer content={levelContent} />
+                                            </div>
+                                        </li>
+                                    ))}
                                 </ul>
                                 <hr className="border-gray-700 my-3"/>
                                 <div className="font-bold text-brand-green"><VibeContentRenderer content={t.philosophyEnd} /></div>
                                 <hr className="border-gray-700 my-4"/>
                                 <h4 className="text-lg font-semibold text-cyan-400 pt-2"><VibeContentRenderer content={t.stepsTitle} /></h4>
-                                 {/* --- Quick Start Guide: Reverted to <ol> for proper numbering --- */}
                                 <ol className="list-decimal list-inside text-sm space-y-1">
                                      <li><VibeContentRenderer content={"Настрой <FaCodeBranch title='Настройки' class='inline text-cyan-400'/>"} /></li>
                                      <li><VibeContentRenderer content={"Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>"} /></li>
@@ -664,7 +625,6 @@ function ActualPageContent() {
                                      <li><VibeContentRenderer content={"Опиши задачу ИЛИ добавь файлы <FaPlus title='Добавить выбранные в запрос' class='inline text-sm'/> / все <FaTree title='Добавить все файлы в запрос' class='inline text-sm'/>"} /></li>
                                      <li><VibeContentRenderer content={"Скопируй <FaCopy title='Скопировать запрос' class='inline text-sm mx-px'/> или передай дальше"} /></li>
                                 </ol>
-                                 {/* --- END Quick Start Guide Fix --- */}
                             </div>
                         </details>
                     </section>
@@ -688,7 +648,6 @@ function ActualPageContent() {
                                {(() => { debug("[Render] Rendering RepoTxtFetcher Component Wrapper..."); return null; })()}
                                  <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg backdrop-blur-sm">
                                      <CardContent className="p-4">
-                                         {/* Pass derived state from URL effect */}
                                          <RepoTxtFetcher
                                              ref={fetcherRef}
                                              highlightedPathProp={derivedHighlightedPath}
@@ -780,13 +739,10 @@ export default function RepoXmlPage() {
      log("[RepoXmlPage] START Render (Exported Component)");
     const fallbackLoadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
     const fallbackLoadingText = translations[fallbackLoadingLang]?.loading ?? translations.en.loading;
-    // --- FIX: Use fallbackLoadingText here ---
     const fallbackLoading = ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{fallbackLoadingText}</p> </div> );
-    // --- END FIX ---
 
     try {
         return (
-            // Wrap Layout in Suspense for useSearchParams
             <Suspense fallback={fallbackLoading}>
                 <RepoXmlPageLayout />
             </Suspense>
