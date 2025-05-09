@@ -8,8 +8,8 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  FaGlasses, FaMapSigns, FaBrain, FaExclamationTriangle, FaPlay, FaForward,
-  FaPuzzlePiece, FaCogs, FaRoad, FaQuestionCircle, FaEye, FaBullseye, FaRulerCombined,
+  FaGlasses, FaMapSigns, FaBrain, FaTriangleExclamation, FaPlay, FaForward,
+  FaPuzzlePiece, FaGears, FaRoad, FaQuestionCircle, FaEye, FaBullseye, FaRulerCombined,
   FaArrowsSpin, FaDumbbell, FaGamepad, FaLightbulb, FaRobot, FaRocket, FaBookOpen,
   FaBolt, FaToolbox, FaCode, FaBug, FaLink, FaMicrophone, FaVideo, FaDatabase, FaServer,
   FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart,
@@ -44,15 +44,15 @@ const imagePlaceholders = {
     altRu: "ИИ-второй пилот, помогающий пользователю навигировать цифровые вызовы",
     tooltipRu: "ИИ как твой нейро-усилитель для самопознания, валидации идей и экспоненциального обучения в CyberDev.",
   },
-  fitnessAppBrain: { // New placeholder based on user's image
-    url: "https://user-images.githubusercontent.com/19603209/289173111-ccb3b3d6-c16d-44f0-b873-3217b674622e.png", // Actual image URL
+  fitnessAppBrain: {
+    url: "https://user-images.githubusercontent.com/19603209/289173111-ccb3b3d6-c16d-44f0-b873-3217b674622e.png",
     altEn: "Fitness app interface for brain training and skill leveling",
     altRu: "Интерфейс фитнес-приложения для тренировки мозга и прокачки навыков",
     tooltipRu: "Концепт 'CyberFitness': твои скиллы - мышцы, задачи - упражнения, AI - персональный тренер.",
   }
 };
 
-// --- Level Up System Data ---
+// --- Level Up System Data (Aligned with repo-xml page) ---
 const levelUpSystem = [
   { level: "0 → 1", icon: FaBolt, perk: "Instant Win / Image Swap", descriptionEn: "Fix a broken image. Copy URL -> Paste -> Upload new -> <strong>DONE</strong>. System auto-PRs. <strong>ANYONE</strong> can do this <em>NOW</em>. Your entry to the matrix.", descriptionRu: "Починить битую картинку. Скопируй URL -> Вставь -> Загрузи новую -> <strong>ГОТОВО</strong>. Система сама создаст PR! <strong>ЛЮБОЙ</strong> может это <em>ПРЯМО СЕЙЧАС</em>. Твой вход в матрицу.", color: "text-brand-green" },
   { level: "1 → 2", icon: FaToolbox, perk: "Simple Idea / Generic Idea Flow", descriptionEn: "Simple idea? Change text/button? Give AI the idea + 1 file context -> PR. <strong>DONE.</strong> You command, AI executes.", descriptionRu: "Простая идея? Текст/кнопку поменять? Дай AI идею + 1 файл контекста -> PR. <strong>ГОТОВО.</strong> Ты сказал - AI сделал.", color: "text-brand-cyan" },
@@ -69,12 +69,11 @@ const levelUpSystem = [
   { level: "15", icon: FaMagnifyingGlassChart, perk: "Log Whisperer <FaBrain/>", descriptionEn: "WITH AI! You don't just read logs; you <em class='text-yellow-400'>interrogate</em> them. Spotting the delta between the *plan* (HasBeenPlanter logs) and the *reality* becomes second nature. Root causes reveal themselves.", descriptionRu: "С ПОМОЩЬЮ AI! Ты не читаешь логи, ты их <em class='text-yellow-400'>допрашиваешь</em>. Увидеть разницу между *планом* (логи HasBeenPlanter) и *реальностью* становится второй натурой. Корневые причины сами себя выдают.", color: "text-brand-yellow" },
 ];
 
-
-// --- Section Data (Combined from original page and user's audio) ---
+// --- Section Data ---
 const sections = [
   {
-    id: "intro", // Dan Koe inspired
-    icon: FaMapSigns,
+    id: "intro",
+    icon: FaMapSigns, // Valid Fa6 icon
     titleEn: "Lost in the Fog? Activate Your CyberSight OS",
     titleRu: "Потерян в Тумане? Активируй CyberSight OS",
     pointsEn: [
@@ -89,9 +88,9 @@ const sections = [
     ],
     imageUrlKey: "placeholder1",
   },
-  { // New section for CyberStudio & "Anti-Glasses"
+  {
     id: "cyberstudio_intro",
-    icon: FaGlasses, // Using FaGlasses for "anti-glasses" concept
+    icon: FaGlasses,
     titleEn: "CyberStudio: Your Anti-Glasses for the Matrix",
     titleRu: "CyberStudio: Твои Анти-Очки для Матрицы",
     pointsEn: [
@@ -109,7 +108,7 @@ const sections = [
         "Петля Вайба (<FaUpLong class='inline text-purple-400'/> <Link href='/repo-xml#cybervibe-section' class='text-brand-purple hover:underline'>смотри на RepoXML</Link>) — твой накопительный движок обратной связи: каждое действие качает тебя."
     ],
   },
-  { // Section for Level Up system, Fitness App for Brain
+  { 
     id: "levelup_fitness",
     icon: FaDumbbell,
     titleEn: "CyberFitness: Level Up Your Brain OS",
@@ -129,9 +128,9 @@ const sections = [
         "Вместо подсчета калорий ты отслеживаешь <strong class='font-semibold text-brand-cyan'>'КилоВайбы' или 'Токены Контекста'</strong>. Вместо планов питания — <strong class='font-semibold text-brand-cyan'>Чертежи AI Промптов</strong>."
     ],
     imageUrlKey: "fitnessAppBrain",
-    levelSystem: levelUpSystem, // Attach the level system here
+    levelSystem: levelUpSystem,
   },
-  { // Dan Koe phases
+  {
     id: "phases",
     icon: FaArrowsSpin,
     titleEn: "The 4 Phases of Your Life's Game Levels",
@@ -140,19 +139,17 @@ const sections = [
       "<strong class='text-gray-400'>Level 1: Limbo <FaQuestionCircle className='inline mx-1'/></strong> - You don't know what to do or what you want. Feeling lost, stuck.",
       "<strong class='text-brand-cyan'>Level 2: Vision <FaEye className='inline mx-1'/></strong> - An image for the future forms. You start acting on a new path, momentum builds.",
       "<strong class='text-brand-green'>Level 3: Flow <FaPlay className='inline mx-1'/></strong> - You're deeply engaged, can't pull yourself away from the goal.",
-      "<strong class='text-brand-orange'>Level 4: Resistance <FaExclamationTriangle className='inline mx-1'/></strong> - Exponential progress plateaus. You cling to past success, avoiding the next 'Limbo'.",
+      "<strong class='text-brand-orange'>Level 4: Resistance <FaTriangleExclamation className='inline mx-1'/></strong> - Exponential progress plateaus. You cling to past success, avoiding the next 'Limbo'.", // Corrected Icon
       "Most get trapped in Limbo because they're trained to follow scripts and wait for external certainty, interpreting 'feeling lost' as a bad sign instead of a <strong class='font-semibold text-brand-yellow'>necessary starting point</strong>.",
     ],
     pointsRu: [
       "<strong class='text-gray-400'>Уровень 1: Лимбо <FaQuestionCircle className='inline mx-1'/></strong> - Ты не знаешь, что делать или чего хочешь. Чувство потерянности, застоя.",
       "<strong class='text-brand-cyan'>Уровень 2: Видение <FaEye className='inline mx-1'/></strong> - Формируется образ будущего. Ты начинаешь действовать на новом пути, набирается импульс.",
       "<strong class='text-brand-green'>Уровень 3: Поток <FaPlay className='inline mx-1'/></strong> - Ты глубоко вовлечен, не можешь оторваться от цели.",
-      "<strong class='text-brand-orange'>Уровень 4: Сопротивление <FaExclamationTriangle className='inline mx-1'/></strong> - Экспоненциальный прогресс замедляется. Ты цепляешься за прошлый успех, избегая следующего 'Лимбо'.",
+      "<strong class='text-brand-orange'>Уровень 4: Сопротивление <FaTriangleExclamation className='inline mx-1'/></strong> - Экспоненциальный прогресс замедляется. Ты цепляешься за прошлый успех, избегая следующего 'Лимбо'.", // Corrected Icon
       "Большинство застревают в Лимбо, потому что их научили следовать сценариям и ждать внешней уверенности, интерпретируя 'чувство потерянности' как плохой знак, а не как <strong class='font-semibold text-brand-yellow'>необходимую отправную точку</strong>.",
     ],
   },
-    // ... (Rest of Dan Koe inspired sections: escape_limbo, build_vision, gamify, stay_edge, tools, conclusion)
-    // These are kept from your original structure, I'll just ensure VibeContentRenderer is used
    {
     id: "escape_limbo",
     icon: FaRoad,
@@ -197,7 +194,7 @@ const sections = [
   },
   {
     id: "gamify",
-    icon: FaGamepad,
+    icon: FaGamepad, // Original icon
     titleEn: "Step 3: Gamify Your Life - Design the Game",
     titleRu: "Шаг 3: Геймифицируй Жизнь - Спроектируй Игру",
     pointsEn: [
@@ -205,7 +202,7 @@ const sections = [
       "Replicate game mechanics in your life:",
       "<strong class='text-brand-green'>1. Clear Hierarchy of Goals <FaBullseye className='inline mx-1'/>:</strong> Define your end goal (long-term vision), break it down into long-term (e.g., 1 year) and short-term (e.g., 1 month, 1 week) goals. These are directions, not rigid destinations.",
       "<strong class='text-brand-green'>2. Create the Rules <FaRulerCombined className='inline mx-1'/>:</strong> What are you *not* willing to sacrifice (health, relationships, ethics)? These constraints foster creativity.",
-      "<strong class='text-brand-green'>3. Quantifiable Feedback Loops <FaListCheck className='inline mx-1'/>:</strong> Define daily/weekly priority tasks (e.g., write 1000 words, read 10 pages, reach out to 5 clients). Completing these provides direct feedback on progress.",
+      "<strong class='text-brand-green'>3. Quantifiable Feedback Loops <FaGears className='inline mx-1'/>:</strong> Define daily/weekly priority tasks (e.g., write 1000 words, read 10 pages, reach out to 5 clients). Completing these provides direct feedback on progress.", // Changed FaCogs to FaGears
       "This structure turns vague aspirations into an actionable game.",
       "Start playing! You figure out the specifics by <strong class='font-semibold text-brand-green'>doing and error-correcting</strong>.",
     ],
@@ -214,7 +211,7 @@ const sections = [
       "Воспроизведи игровые механики в своей жизни:",
       "<strong class='text-brand-green'>1. Четкая Иерархия Целей <FaBullseye className='inline mx-1'/>:</strong> Определи конечную цель (долгосрочное видение), разбей ее на долгосрочные (например, 1 год) и краткосрочные (например, 1 месяц, 1 неделя) цели. Это направления, а не жесткие пункты назначения.",
       "<strong class='text-brand-green'>2. Создай Правила <FaRulerCombined className='inline mx-1'/>:</strong> Чем ты *не* готов пожертвовать (здоровье, отношения, этика)? Эти ограничения стимулируют креативность.",
-      "<strong class='text-brand-green'>3. Измеримые Петли Обратной Связи <FaListCheck className='inline mx-1'/>:</strong> Определи ежедневные/еженедельные приоритетные задачи (напр., написать 1000 слов, прочитать 10 страниц, связаться с 5 клиентами). Их выполнение дает прямую обратную связь о прогрессе.",
+      "<strong class='text-brand-green'>3. Измеримые Петли Обратной Связи <FaGears className='inline mx-1'/>:</strong> Определи ежедневные/еженедельные приоритетные задачи (напр., написать 1000 слов, прочитать 10 страниц, связаться с 5 клиентами). Их выполнение дает прямую обратную связь о прогрессе.", // Changed FaCogs to FaGears
       "Эта структура превращает расплывчатые стремления в действенную игру.",
       "Начни играть! Ты разберешься в деталях <strong class='font-semibold text-brand-green'>в процессе делания и исправления ошибок</strong>.",
     ],
@@ -222,7 +219,7 @@ const sections = [
   },
   {
     id: "stay_edge",
-    icon: FaDumbbell, // Keep dumbbell for consistency with previous level section
+    icon: FaDumbbell, 
     titleEn: "Bonus Level: Stay at the Edge (Flow & Growth)",
     titleRu: "Бонусный Уровень: Оставайся на Грани (Поток и Рост)",
     pointsEn: [
@@ -297,10 +294,10 @@ export default function GamifiedSelfDevPage() {
     debugLogger.log(`[GamifiedSelfDevPage] Mounted. Initial selected: ${initialLang}`);
   }, [user?.language_code]);
 
-  const pageThemeColor = "brand-pink"; // Main theme for this page
-  const pageBorderColor = `border-${pageThemeColor}/40`; // Slightly more visible border
+  const pageThemeColor = "brand-pink"; 
+  const pageBorderColor = `border-${pageThemeColor}/40`; 
   const pageTextColor = `text-${pageThemeColor}`;
-  const pageShadowColor = `shadow-[0_0_35px_theme(colors.brand-pink / 0.5)]`; // Use Tailwind's theme()
+  const pageShadowColor = `shadow-[0_0_35px_theme(colors.brand-pink/0.5)]`;
 
   if (!isMounted) {
     return (
@@ -317,7 +314,7 @@ export default function GamifiedSelfDevPage() {
         style={{
           backgroundImage: `linear-gradient(to right, theme(colors.brand-pink / 0.3) 1px, transparent 1px),
                             linear-gradient(to bottom, theme(colors.brand-pink / 0.3) 1px, transparent 1px)`,
-          backgroundSize: '70px 70px', // Larger grid for more "digital" feel
+          backgroundSize: '70px 70px',
         }}
       ></div>
 
@@ -343,7 +340,7 @@ export default function GamifiedSelfDevPage() {
                </div>
             </CardHeader>
 
-            <CardContent className="space-y-16 p-5 md:p-8"> {/* Increased spacing */}
+            <CardContent className="space-y-16 p-5 md:p-8">
               <div className="flex justify-center space-x-3 mb-10">
                  <Button
                    variant={selectedLang === 'ru' ? 'secondary' : 'outline'}
@@ -396,7 +393,6 @@ export default function GamifiedSelfDevPage() {
                       </div>
                     )}
                     
-                    {/* Render Level System if present */}
                     {section.id === "levelup_fitness" && section.levelSystem && (
                         <div className="mt-6 space-y-4">
                             <h3 className="text-xl font-orbitron text-center text-brand-yellow mb-4">
@@ -421,7 +417,6 @@ export default function GamifiedSelfDevPage() {
                              </p>
                         </div>
                     )}
-
 
                     {currentImageUrl && currentImageAlt && (
                       <div className={`my-6 p-2 border ${currentBorderColor}/30 rounded-lg bg-black/50 max-w-md mx-auto shadow-lg`}>
