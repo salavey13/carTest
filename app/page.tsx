@@ -129,9 +129,7 @@ export default function Home() {
   const currentLevel = cyberProfile?.level || 0;
   const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || "v0.1 Alpha";
   const nextLevelTarget = (currentLevel + 1) * 1000; 
-  // The syntax error was likely here if any invisible character or misplaced comment existed
-  // before the 'return (' line or before the first div.
-  // Ensuring the return statement starts clean.
+  
   return ( 
     <div className="min-h-screen bg-dark-bg text-light-text relative overflow-x-hidden pt-20 pb-28">
        <div className="absolute inset-0 z-0 overflow-hidden">
@@ -305,7 +303,7 @@ export default function Home() {
              </Link>
           </motion.div>
         )}
-      
+      </div>
     </div>
   );
 }
