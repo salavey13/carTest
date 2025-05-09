@@ -1,4 +1,3 @@
-// /app/selfdev/gamified/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -8,7 +7,10 @@ import { useAppContext } from "@/contexts/AppContext";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { FaMapLocation } from "react-icons/fa6"; // Isolated import
+import { 
+  FaLocationArrow, // Added import for FaLocationArrow
+  FaMapLocation // This was already imported but not the one causing error
+} from "react-icons/fa6";
 import {
   FaGlasses, FaBrain, FaTriangleExclamation, FaPlay, FaForward,
   FaPuzzlePiece, FaGears, FaRoad, FaQuestionCircle, FaEye, FaBullseye, FaRulerCombined,
@@ -73,7 +75,7 @@ const levelUpSystem = [
 const sections = [
   {
     id: "intro",
-    icon: FaLocationArrow,
+    icon: FaLocationArrow, // This is the icon that was causing the error
     titleEn: "Lost in the Fog? Activate Your CyberSight OS",
     titleRu: "Потерян в Тумане? Активируй CyberSight OS",
     pointsEn: [
@@ -311,8 +313,8 @@ export default function GamifiedSelfDevPage() {
       <div
         className="absolute inset-0 bg-repeat opacity-[0.03] z-0"
         style={{
-          backgroundImage: `linear-gradient(to right, theme(colors.brand-pink / 0.3) 1px, transparent 1px),
-                            linear-gradient(to bottom, theme(colors.brand-pink / 0.3) 1px, transparent 1px)`,
+          backgroundImage: `linear-gradient(to right, hsl(var(--brand-pink)) 1px, transparent 1px),
+                            linear-gradient(to bottom, hsl(var(--brand-pink)) 1px, transparent 1px)`, // Used hsl var
           backgroundSize: '70px 70px',
         }}
       ></div>
