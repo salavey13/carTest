@@ -53,7 +53,7 @@ const bottomNavVariants = {
 };
 
 export default function Home() {
-  const { user: telegramUser, dbUser, isAuthenticated, isLoading: appLoading, error: appContextError } = useAppContext(); // Renamed user to telegramUser for clarity
+  const { user: telegramUser, dbUser, isAuthenticated, isLoading: appLoading, error: appContextError } = useAppContext(); 
   const userName = dbUser?.first_name || telegramUser?.first_name || 'Agent';
 
   const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
@@ -103,7 +103,7 @@ export default function Home() {
     );
   }
 
-  if (appContextError) { // Use appContextError here
+  if (appContextError) { 
     return (
       <motion.div
         initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 0 }}
@@ -129,8 +129,10 @@ export default function Home() {
   const currentLevel = cyberProfile?.level || 0;
   const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || "v0.1 Alpha";
   const nextLevelTarget = (currentLevel + 1) * 1000; 
-
-  return (
+  // The syntax error was likely here if any invisible character or misplaced comment existed
+  // before the 'return (' line or before the first div.
+  // Ensuring the return statement starts clean.
+  return ( 
     <div className="min-h-screen bg-dark-bg text-light-text relative overflow-x-hidden pt-20 pb-28">
        <div className="absolute inset-0 z-0 overflow-hidden">
          <div className="absolute top-[-15%] left-[-15%] w-3/5 h-3/5 bg-brand-purple/20 rounded-full blur-[150px] opacity-50 animate-[pulse_8s_cubic-bezier(0.4,0,0.6,1)_infinite] pointer-events-none" />
@@ -173,7 +175,7 @@ export default function Home() {
               </div>
               <Link href="/selfdev/gamified" passHref legacyBehavior>
                 <Button variant="outline" size="xs" className="border-brand-yellow text-brand-yellow hover:bg-brand-yellow/10 hover:text-white font-mono text-xs px-2 py-1 h-auto group-hover:border-brand-pink group-hover:text-brand-pink">
-                  All Directives <FaArrowRight className="ml-1 h-2.5 w-2.5 group-hover:animate-[wiggle_0.5s_ease-in-out_infinite]"/>
+                  All Directives <FaArrowRight className="ml-1 h-2.5 w-2.5 group-hover:animate-[wiggle_0.5s_ease-in-out_infinite] group-hover:text-glow-effect"/>
                 </Button>
               </Link>
             </CardHeader>
@@ -189,7 +191,7 @@ export default function Home() {
                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none"></div>
                  <div className="absolute bottom-2 left-3 sm:bottom-3 sm:left-4 text-white z-10 p-1">
                     <h3 className="text-md sm:text-lg font-bold font-orbitron text-shadow-[0_0_8px_theme(colors.brand-cyan)]">
-                      <VibeContentRenderer content="<FaGamepad className='inline text-brand-pink/90 mr-2 text-2xl'/>INITIATE: CyberDev OS Training Program" />
+                      <VibeContentRenderer content="<FaGamepad className='inline text-brand-pink/90 mr-2 text-2xl sm:text-3xl'/>INITIATE: CyberDev OS Training Program" />
                     </h3>
                     <p className="text-xs sm:text-sm font-mono text-gray-300">
                       <VibeContentRenderer content="Your journey from Level 0: <FaEye className='inline mx-0.5'/> See the Code, <FaBolt className='inline mx-0.5'/> Become the Vibe." />
