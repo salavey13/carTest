@@ -186,23 +186,23 @@ export default function Header() {
   }, [isNavOpen]);
 
   const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> = {
-    purple: "border-brand-purple/60 hover:border-brand-purple hover:shadow-[0_0_15px_theme(colors.brand-purple/50%)] text-brand-purple",
-    blue: "border-brand-blue/60 hover:border-brand-blue hover:shadow-[0_0_15px_theme(colors.brand-blue/50%)] text-brand-blue",
-    yellow: "border-brand-yellow/60 hover:border-brand-yellow hover:shadow-[0_0_15px_theme(colors.brand-yellow/50%)] text-brand-yellow",
-    lime: "border-neon-lime/60 hover:border-neon-lime hover:shadow-[0_0_15px_theme(colors.neon-lime/50%)] text-neon-lime",
-    green: "border-brand-green/60 hover:border-brand-green hover:shadow-[0_0_15px_theme(colors.brand-green/50%)] text-brand-green",
-    pink: "border-brand-pink/60 hover:border-brand-pink hover:shadow-[0_0_15px_theme(colors.brand-pink/50%)] text-brand-pink",
-    cyan: "border-brand-cyan/60 hover:border-brand-cyan hover:shadow-[0_0_15px_theme(colors.brand-cyan/50%)] text-brand-cyan",
-    red: "border-red-500/60 hover:border-red-500 hover:shadow-[0_0_15px_theme(colors.red.500/50%)] text-red-500",
-    orange: "border-brand-orange/60 hover:border-brand-orange hover:shadow-[0_0_15px_theme(colors.brand-orange/50%)] text-brand-orange",
-    gray: "border-gray-600/60 hover:border-gray-500 hover:shadow-[0_0_15px_theme(colors.gray.500/50%)] text-gray-400",
+    purple: "border-brand-purple/60 hover:border-brand-purple hover:shadow-[0_0_10px_theme(colors.brand-purple/30%)] text-brand-purple",
+    blue: "border-brand-blue/60 hover:border-brand-blue hover:shadow-[0_0_10px_theme(colors.brand-blue/30%)] text-brand-blue",
+    yellow: "border-brand-yellow/60 hover:border-brand-yellow hover:shadow-[0_0_10px_theme(colors.brand-yellow/30%)] text-brand-yellow",
+    lime: "border-neon-lime/60 hover:border-neon-lime hover:shadow-[0_0_10px_theme(colors.neon-lime/30%)] text-neon-lime",
+    green: "border-brand-green/60 hover:border-brand-green hover:shadow-[0_0_10px_theme(colors.brand-green/30%)] text-brand-green",
+    pink: "border-brand-pink/60 hover:border-brand-pink hover:shadow-[0_0_10px_theme(colors.brand-pink/30%)] text-brand-pink",
+    cyan: "border-brand-cyan/60 hover:border-brand-cyan hover:shadow-[0_0_10px_theme(colors.brand-cyan/30%)] text-brand-cyan",
+    red: "border-red-500/60 hover:border-red-500 hover:shadow-[0_0_10px_theme(colors.red.500/30%)] text-red-500",
+    orange: "border-brand-orange/60 hover:border-brand-orange hover:shadow-[0_0_10px_theme(colors.brand-orange/30%)] text-brand-orange",
+    gray: "border-gray-600/60 hover:border-gray-500 hover:shadow-[0_0_10px_theme(colors.gray.500/30%)] text-gray-400",
     default: "border-gray-700 hover:border-brand-green/80 text-gray-400 hover:text-brand-green"
   };
 
   return (
     <>
       <motion.header
-        className={cn("fixed top-0 left-0 right-0 z-40 bg-black/80 border-b border-brand-purple/40 shadow-lg backdrop-blur-lg", "transition-transform duration-300 ease-in-out")}
+        className={cn("fixed top-0 left-0 right-0 z-40 bg-black/80 border-b border-brand-purple/40 shadow-md backdrop-blur-md", "transition-transform duration-300 ease-in-out")}
         initial={{ y: 0 }} animate={{ y: isHeaderVisible ? 0 : "-100%" }} transition={{ type: "tween", duration: 0.3 }}
       >
         <div className="container mx-auto px-4 py-2.5 sm:py-3">
@@ -236,8 +236,8 @@ export default function Header() {
             initial={{ opacity: 0, clipPath: 'circle(0% at calc(100% - 3rem) 3rem)' }}
             animate={{ opacity: 1, clipPath: 'circle(150% at calc(100% - 3rem) 3rem)' }}
             exit={{ opacity: 0, clipPath: 'circle(0% at calc(100% - 3rem) 3rem)' }}
-            transition={{ type: "spring", stiffness: 300, damping: 35, duration: 0.5 }}
-            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl overflow-y-auto pt-20 pb-10 px-4 md:pt-24 simple-scrollbar"
+            transition={{ type: "tween", ease: "easeOut", duration: 0.3 }}
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-lg overflow-y-auto pt-20 pb-10 px-4 md:pt-24 simple-scrollbar"
           >
             <button
               onClick={() => setIsNavOpen(false)}
@@ -250,7 +250,7 @@ export default function Header() {
                 <input
                   type="search" placeholder={t("Search pages...")} value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-dark-card/80 border-2 border-brand-cyan/50 rounded-lg text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:border-transparent text-base font-mono shadow-lg"
+                  className="w-full pl-12 pr-4 py-3 bg-dark-card/80 border-2 border-brand-cyan/50 rounded-lg text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:border-transparent text-base font-mono shadow-md"
                   aria-label={t("Search pages...")}
                 />
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-brand-cyan/70 pointer-events-none" />
@@ -279,10 +279,10 @@ export default function Header() {
                               key={page.path} href={page.path}
                               onClick={() => setIsNavOpen(false)}
                               className={cn(
-                                "group relative flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 aspect-square text-center hover:scale-[1.03] hover:-translate-y-0.5",
+                                "group relative flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 aspect-square text-center hover:scale-[1.01] hover:-translate-y-px",
                                 "p-1", 
                                 page.isImportant 
-                                  ? "bg-gradient-to-br from-purple-800/30 via-black/50 to-blue-800/30 col-span-2 shadow-md" 
+                                  ? "bg-gradient-to-br from-purple-800/30 via-black/50 to-blue-800/30 col-span-1 sm:col-span-2 shadow-sm" 
                                   : "bg-dark-card/60 hover:bg-dark-card/80 col-span-1",
                                 tileColorClass,
                                 isCurrentPage ? `ring-2 ring-offset-2 ring-offset-black ${page.color === 'lime' || page.color === 'yellow' || page.color === 'orange' ? 'ring-black/70' : 'ring-white/90'}` : 'ring-transparent'
@@ -296,14 +296,14 @@ export default function Header() {
                               )}
                               {PageIcon && (
                                 <PageIcon className={cn(
-                                  "mb-1 transition-transform duration-200 group-hover:scale-110", 
+                                  "transition-transform duration-200 group-hover:scale-105", 
                                   page.isImportant 
-                                      ? "h-6 w-6 sm:h-7 sm:w-7" 
-                                      : "h-4 w-4"             
+                                      ? "h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:h-9 mb-1.5" // Larger icons for important, more margin
+                                      : "h-5 w-5 sm:h-6 sm:w-6 mb-1"             // Larger icons for normal, default margin
                                 )} />
                               )}
                               <span className={cn(
-                                "font-orbitron font-medium transition-colors leading-tight text-center",
+                                "font-orbitron font-medium transition-colors leading-tight text-center block w-1/2 mx-auto", // Text takes 50% width and is centered
                                 page.isImportant 
                                     ? "text-white text-[1.6rem] xs:text-[1.65rem] sm:text-[1.7rem] md:text-[1.75rem] lg:text-[1.8rem]" 
                                     : "text-gray-300 group-hover:text-inherit text-[1.1rem] xs:text-[1.1rem] sm:text-[1.125rem] md:text-[1.15rem] lg:text-[1.175rem]"
