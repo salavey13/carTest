@@ -15,62 +15,35 @@
 
 :root {
   /* CyberVice Theme - Dark Mode Default */
-  /* Inspired by GTA VI logo and general Cyberpunk aesthetics */
-  /* HSL format for ShadCN compatibility */
-
-  /* Core Backgrounds & Foregrounds */
-  --background: 263 80% 7%; /* Dark Purple-Blue: hsl(263, 80%, 7%) -> #0D0221 */
-  --foreground: 0 0% 94%;   /* Light Gray / Off-White: hsl(0, 0%, 94%) -> #F0F0F0 */
-  
-  /* Cards & Popovers */
-  --card: 264 65% 13%;      /* Darker Purple for Cards: hsl(264, 65%, 13%) -> #1A0A3D */
-  --card-foreground: 0 0% 94%; /* Light Gray for Card Text */
-  --popover: 264 70% 10%;   /* Even Darker for Popovers: hsl(264, 70%, 10%) */
+  --background: 263 80% 7%; 
+  --foreground: 0 0% 94%;   
+  --card: 264 65% 13%;      
+  --card-foreground: 0 0% 94%; 
+  --popover: 264 70% 10%;   
   --popover-foreground: 0 0% 94%;
-
-  /* Primary Actions - Vibrant Pink/Magenta */
-  --primary: 300 100% 50%; /* hsl(300, 100%, 50%) -> #FF00FF */
-  --primary-foreground: 0 0% 10%; /* Dark for contrast on Pink: hsl(0, 0%, 10%) -> #1A1A1A */
-
-  /* Secondary Actions / Info - Bright Cyan */
-  --secondary: 180 100% 50%; /* hsl(180, 100%, 50%) -> #00FFFF */
-  --secondary-foreground: 0 0% 10%; /* Dark for contrast on Cyan */
-
-  /* Muted States */
-  --muted: 263 30% 25%;    /* Muted Purple-Gray: hsl(263, 30%, 25%) */
-  --muted-foreground: 0 0% 65%; /* Lighter Gray for Muted Text: hsl(0, 0%, 65%) */
-
-  /* Accent - Sunset Orange */
-  --accent: 30 100% 50%;    /* hsl(30, 100%, 50%) -> #FFA500 */
-  --accent-foreground: 0 0% 10%; /* Dark for contrast on Orange */
-
-  /* Destructive Actions - Bright Red */
-  --destructive: 0 100% 55%; /* hsl(0, 100%, 55%) */
-  --destructive-foreground: 0 0% 95%; /* White/Off-White */
-
-  /* Borders & Inputs */
-  --border: 270 70% 35%;   /* Accent Purple Border: hsl(270, 70%, 35%) -> #6A0DAD but a bit lighter for visibility */
-  --input: 270 70% 30%;    /* Darker version for input background, or use --card */
-                           /* For input border, can use --border or --accent */
-  --ring: 300 100% 60%;    /* Focus Ring Color (Primary variant): hsl(300, 100%, 60%) */
-
-  /* Radius (shadcn-ui default is 0.5rem) - can be adjusted */
-  --radius: 0.75rem; /* Slightly more rounded for a modern feel */
-
-  /* RGB values for gradients/shadows if needed directly */
-  --dark-bg-rgb: 13, 2, 33;      /* For #0D0221 */
-  --dark-card-rgb: 26, 10, 61;   /* For #1A0A3D */
-  --glow-color-rgb: 255, 0, 255; /* For Magenta Glow (brand-pink) */
-
-  /* Chart colors - can be updated to match new theme */
-  --chart-1: 300 100% 50%; /* Primary */
-  --chart-2: 180 100% 50%; /* Secondary */
-  --chart-3: 30 100% 50%;  /* Accent */
-  --chart-4: 270 80% 60%; /* Purple variant */
-  --chart-5: 39 100% 50%; /* Gold/Yellow */
-
-  /* Sidebar colors - if sidebar has distinct styling */
-  --sidebar-background: 263 75% 10%; /* Slightly different dark bg */
+  --primary: 300 100% 50%; 
+  --primary-foreground: 0 0% 10%; 
+  --secondary: 180 100% 50%; 
+  --secondary-foreground: 0 0% 10%; 
+  --muted: 263 30% 25%;    
+  --muted-foreground: 0 0% 65%; 
+  --accent: 30 100% 50%;    
+  --accent-foreground: 0 0% 10%; 
+  --destructive: 0 100% 55%; 
+  --destructive-foreground: 0 0% 95%;
+  --border: 270 70% 35%;
+  --input: 270 70% 30%;
+  --ring: 300 100% 60%;
+  --radius: 0.75rem;
+  --dark-bg-rgb: 13, 2, 33;
+  --dark-card-rgb: 26, 10, 61;
+  --glow-color-rgb: 255, 0, 255;
+  --chart-1: 300 100% 50%;
+  --chart-2: 180 100% 50%;
+  --chart-3: 30 100% 50%;
+  --chart-4: 270 80% 60%;
+  --chart-5: 39 100% 50%;
+  --sidebar-background: 263 75% 10%;
   --sidebar-foreground: 0 0% 85%;
   --sidebar-primary: 300 100% 55%;
   --sidebar-primary-foreground: 0 0% 10%;
@@ -81,9 +54,6 @@
 }
 
 .dark {
-  /* Dark mode is the default, so .dark specific overrides might not be needed if :root is already dark.
-     However, if you plan a light mode, these would be the dark mode values.
-     For now, assuming :root IS the dark mode. */
   --background: 263 80% 7%; 
   --foreground: 0 0% 94%;   
   --card: 264 65% 13%;      
@@ -111,7 +81,7 @@
 @layer base {
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif; /* Base font */
+    font-family: 'Inter', sans-serif; 
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -119,17 +89,105 @@
     -moz-osx-font-smoothing: grayscale;
   }
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Orbitron', sans-serif; /* Headings font */
+    font-family: 'Orbitron', sans-serif; 
     @apply tracking-wide;
   }
   section {
-    scroll-margin-top: 96px; /* Matches pt-24 */
+    scroll-margin-top: 96px; 
   }
-  /* More aggressive reset for consistency */
   *, *::before, *::after {
     box-sizing: border-box;
   }
 }
+
+/* === Styles moved from /app/page.tsx === */
+
+/* Homepage Wrapper */
+.homepage-wrapper {
+  @apply min-h-screen bg-dark-bg text-light-text relative overflow-x-hidden pt-20 pb-28;
+}
+
+/* Homepage Background Effects Container */
+.homepage-bg-effects-container {
+  @apply absolute inset-0 z-0 overflow-hidden pointer-events-none;
+}
+
+/* Homepage Background Pulse Animations */
+.homepage-bg-pulse-fast {
+  @apply absolute top-[-15%] left-[-15%] w-3/5 h-3/5 bg-brand-purple/20 rounded-full blur-[150px] opacity-50;
+  animation: bg_pulse_fast 8s cubic-bezier(0.4,0,0.6,1) infinite;
+}
+.homepage-bg-pulse-slow {
+  @apply absolute bottom-[-25%] right-[-25%] w-4/5 h-4/5 bg-brand-pink/15 rounded-full blur-[180px] opacity-40;
+  animation: bg_pulse_slow 10s cubic-bezier(0.4,0,0.6,1) infinite 1s;
+}
+@keyframes bg_pulse_fast { /* Corresponds to animate-[pulse_8s_cubic-bezier(0.4,0,0.6,1)_infinite] */
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(1.05); }
+}
+@keyframes bg_pulse_slow { /* Corresponds to animate-[pulse_10s_cubic-bezier(0.4,0,0.6,1)_infinite_1s] */
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.25; transform: scale(1.03); }
+}
+
+
+/* Loading Spinner on Homepage */
+.loading-spinner-cyber {
+  @apply border-4 border-t-brand-cyan border-x-brand-pink border-b-brand-purple border-opacity-50 rounded-full;
+  box-shadow: 0 0 25px theme('colors.brand-cyan'), 0 0 15px theme('colors.brand-pink');
+}
+
+/* Avatar on Homepage */
+.avatar-cyber {
+  @apply rounded-full border-2 border-brand-pink/80 object-cover;
+  box-shadow: 0 0 10px theme('colors.brand-pink / 50%');
+}
+
+/* Featured Quest Card on Homepage */
+.featured-quest-card {
+  @apply bg-dark-card/90 backdrop-blur-md border border-brand-purple/50 shadow-xl overflow-hidden transition-all duration-300;
+}
+.featured-quest-card:hover {
+  @apply border-brand-pink/70;
+}
+.featured-quest-image-overlay {
+  @apply absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none;
+}
+
+/* Activity Card on Homepage */
+.activity-card-cyber {
+  @apply bg-gradient-to-br from-brand-pink/95 via-pink-600/90 to-purple-600/90 backdrop-blur-sm border border-brand-pink/70 shadow-2xl shadow-brand-pink/30 text-black rounded-xl md:rounded-2xl;
+}
+
+/* Bottom Navigation on Homepage */
+.bottom-nav-cyber {
+  @apply fixed bottom-0 left-0 right-0 bg-dark-bg/90 backdrop-blur-xl border-t-2 border-brand-purple/60 z-40 py-1.5 px-1;
+  box-shadow: 0 -8px 30px rgba(0,0,0,0.5);
+}
+.bottom-nav-item {
+  @apply flex flex-col items-center h-auto px-0.5 py-1 sm:px-1.5 rounded-md transition-colors;
+}
+.bottom-nav-item:hover {
+  @apply bg-slate-700/60;
+}
+.bottom-nav-item:active {
+  @apply bg-slate-600/70;
+}
+.bottom-nav-item:focus {
+  @apply bg-slate-700/70;
+}
+.bottom-nav-item-central {
+  @apply text-black rounded-full w-14 h-14 sm:w-16 sm:h-16 shadow-lg transform hover:scale-110 active:scale-95 transition-transform -translate-y-3 sm:-translate-y-4 border-4 border-dark-bg;
+}
+.bottom-nav-item-central:hover {
+  @apply border-brand-pink;
+}
+.bottom-nav-item-central:focus {
+  @apply ring-4 ring-brand-pink/50;
+}
+
+/* === End of Styles moved from /app/page.tsx === */
+
 
 .repo-xml-content-wrapper {
   width: 100%;
@@ -146,7 +204,6 @@
   }
 }
 
-/* Ticker animation */
 @keyframes ticker {
   0% { transform: translateX(100%); }
   100% { transform: translateX(-100%); }
@@ -155,19 +212,16 @@
   animation: ticker 20s linear infinite;
 }
 
-/* Neon Text Shadow using new theme colors */
 .text-shadow-neon {
-  /* Example using brand-pink and brand-purple */
   text-shadow: 
     0 0 5px var(--brand-pink),
     0 0 10px var(--brand-pink),
     0 0 15px var(--brand-purple),
     0 0 20px var(--brand-purple);
 }
-.text-shadow-cyber { /* another variant */
+.text-shadow-cyber {
   text-shadow: 0 0 4px theme('colors.brand-cyan'), 0 0 10px theme('colors.brand-pink');
 }
-
 
 .animate-gradient-shift {
   animation: gradientShift 10s infinite linear;
@@ -179,9 +233,8 @@
   100% { background-position: 0% 0%; }
 }
 
-/* Grid pattern with new theme accent */
 .bg-grid-pattern {
-  background-size: 60px 60px; /* Slightly larger grid */
+  background-size: 60px 60px;
   background-image: 
     linear-gradient(to right, theme('colors.brand-purple / 10%') 1px, transparent 1px),
     linear-gradient(to bottom, theme('colors.brand-purple / 10%') 1px, transparent 1px);
@@ -193,13 +246,12 @@
     linear-gradient(to bottom, theme('colors.brand-pink / 8%') 1px, transparent 1px);
 }
 
-/* Simple Scrollbar Styling - Themed */
 .simple-scrollbar::-webkit-scrollbar {
-  width: 8px; /* Slightly thicker */
+  width: 8px;
   height: 8px;
 }
 .simple-scrollbar::-webkit-scrollbar-track {
-  background: transparent; /* Or theme('colors.dark-bg / 50%') */
+  background: transparent; 
 }
 .simple-scrollbar::-webkit-scrollbar-thumb {
   background-color: theme('colors.brand-purple / 60%');
@@ -209,32 +261,28 @@
 .simple-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: theme('colors.brand-pink / 70%');
 }
-/* Firefox scrollbar */
 .simple-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: theme('colors.brand-purple / 60%') transparent;
 }
 
-/* --- Cyber/Glitch Styles - Themed --- */
 .cyber-text {
   font-family: "Orbitron", sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: theme('colors.brand-cyan'); /* Default cyber text color */
-  text-shadow: /* Use theme colors */
+  color: theme('colors.brand-cyan'); 
+  text-shadow: 
     0 0 3px theme('colors.brand-cyan / 70%'),
     0 0 5px theme('colors.brand-cyan / 50%'),
     0 0 8px theme('colors.brand-pink / 60%');
 }
-.cyber-text.glitch-heavy { /* For more intense glitch effect */
+.cyber-text.glitch-heavy { 
     text-shadow:
         0.05em 0 0 theme('colors.brand-pink / 75%'),
         -0.025em -0.025em 0 theme('colors.brand-green / 75%'),
         -0.01em 0.025em 0 theme('colors.brand-cyan / 75%');
 }
 
-
-/* Glitch text-shadow animation keyframes (themed) */
 @keyframes glitch {
   0% { text-shadow: 0.05em 0 0 theme('colors.brand-pink / 75%'), -0.05em -0.025em 0 theme('colors.brand-green / 75%'), -0.025em 0.05em 0 theme('colors.brand-cyan / 75%'); }
   14% { text-shadow: 0.05em 0 0 theme('colors.brand-pink / 75%'), -0.05em -0.025em 0 theme('colors.brand-green / 75%'), -0.025em 0.05em 0 theme('colors.brand-cyan / 75%'); }
@@ -265,34 +313,32 @@
 
 .glitch::before {
   left: 2px;
-  text-shadow: -1px 0 theme('colors.brand-purple / 70%'); /* Themed shadow */
+  text-shadow: -1px 0 theme('colors.brand-purple / 70%'); 
   animation: glitch-anim-1 2s infinite linear alternate-reverse;
 }
 
 .glitch::after {
   left: -2px;
-  text-shadow: -1px 0 theme('colors.brand-cyan / 70%'); /* Themed shadow */
+  text-shadow: -1px 0 theme('colors.brand-cyan / 70%'); 
   animation: glitch-anim-2 2s infinite linear alternate-reverse;
 }
 
-/* Keyframes for the glitch clip animations (glitch-anim-1, glitch-anim-2) remain unchanged as they define the clipping behavior, not color */
 @keyframes glitch-anim-1 { 0% { clip: rect(44px, 9999px, 49px, 0); } 5% { clip: rect(5px, 9999px, 100px, 0); } 10% { clip: rect(13px, 9999px, 60px, 0); } 15% { clip: rect(80px, 9999px, 40px, 0); } 20% { clip: rect(22px, 9999px, 75px, 0); } 25% { clip: rect(90px, 9999px, 15px, 0); } 30% { clip: rect(50px, 9999px, 88px, 0); } 35% { clip: rect(10px, 9999px, 45px, 0); } 40% { clip: rect(70px, 9999px, 30px, 0); } 45% { clip: rect(25px, 9999px, 95px, 0); } 50% { clip: rect(60px, 9999px, 20px, 0); } 55% { clip: rect(5px, 9999px, 55px, 0); } 60% { clip: rect(75px, 9999px, 35px, 0); } 65% { clip: rect(18px, 9999px, 80px, 0); } 70% { clip: rect(85px, 9999px, 22px, 0); } 75% { clip: rect(40px, 9999px, 65px, 0); } 80% { clip: rect(3px, 9999px, 90px, 0); } 85% { clip: rect(68px, 9999px, 28px, 0); } 90% { clip: rect(33px, 9999px, 77px, 0); } 95% { clip: rect(98px, 9999px, 10px, 0); } 100% { clip: rect(52px, 9999px, 58px, 0); } }
 @keyframes glitch-anim-2 { 0% { clip: rect(6px, 9999px, 94px, 0); } 5% { clip: rect(88px, 9999px, 12px, 0); } 10% { clip: rect(38px, 9999px, 68px, 0); } 15% { clip: rect(20px, 9999px, 85px, 0); } 20% { clip: rect(72px, 9999px, 18px, 0); } 25% { clip: rect(10px, 9999px, 90px, 0); } 30% { clip: rect(58px, 9999px, 32px, 0); } 35% { clip: rect(80px, 9999px, 8px, 0); } 40% { clip: rect(28px, 9999px, 78px, 0); } 45% { clip: rect(42px, 9999px, 52px, 0); } 50% { clip: rect(92px, 9999px, 25px, 0); } 55% { clip: rect(15px, 9999px, 82px, 0); } 60% { clip: rect(62px, 9999px, 42px, 0); } 65% { clip: rect(4px, 9999px, 70px, 0); } 70% { clip: rect(77px, 9999px, 10px, 0); } 75% { clip: rect(22px, 9999px, 88px, 0); } 80% { clip: rect(50px, 9999px, 48px, 0); } 85% { clip: rect(95px, 9999px, 38px, 0); } 90% { clip: rect(30px, 9999px, 60px, 0); } 95% { clip: rect(65px, 9999px, 15px, 0); } 100% { clip: rect(8px, 9999px, 98px, 0); } }
-/* --- End Cyber/Glitch Styles --- */
 
-.text-gradient { /* Themed gradient */
+.text-gradient { 
   background: linear-gradient(to right, theme('colors.brand-pink'), theme('colors.brand-cyan'), theme('colors.brand-orange'));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-@keyframes glow { /* Themed glow */
+@keyframes glow { 
   0% { text-shadow: 0 0 5px theme('colors.brand-pink / 50%'); }
   50% { text-shadow: 0 0 20px theme('colors.brand-pink / 80%'), 0 0 30px theme('colors.brand-purple / 50%'); }
   100% { text-shadow: 0 0 5px theme('colors.brand-pink / 50%'); }
 }
 .text-glow {
-  animation: glow 2.5s infinite ease-in-out; /* Adjusted timing */
+  animation: glow 2.5s infinite ease-in-out; 
 }
 
 @keyframes pulse-slow {
@@ -305,19 +351,18 @@
 
 input[type="search"]::-webkit-search-cancel-button,
 input[type="search"]::-ms-clear {
-  display: none; /* Keep this */
+  display: none; 
 }
 
-/* Comic bubble can be kept for specific use cases if desired, but generally won't fit the CyberVice theme */
 .comic-bubble {
   position: relative;
-  background: theme('colors.dark-card'); /* Themed background */
-  border: 2px solid theme('colors.brand-pink'); /* Themed border */
+  background: theme('colors.dark-card'); 
+  border: 2px solid theme('colors.brand-pink'); 
   border-radius: 15px;
   color: theme('colors.light-text');
 }
 
-@keyframes neon-border-glow { /* Renamed and themed */
+@keyframes neon-border-glow { 
   0%, 100% {
     border-color: theme('colors.brand-cyan / 70%');
     box-shadow: 0 0 5px theme('colors.brand-cyan / 50%'), 0 0 10px theme('colors.brand-cyan / 30%');
@@ -327,26 +372,22 @@ input[type="search"]::-ms-clear {
     box-shadow: 0 0 8px theme('colors.brand-pink / 50%'), 0 0 15px theme('colors.brand-pink / 30%'), 0 0 5px theme('colors.brand-purple / 20%');
   }
 }
-.border-neon-glow { /* New class for applying this effect */
+.border-neon-glow { 
   animation: neon-border-glow 2.5s infinite alternate;
 }
-
 
 @keyframes drift {
   0% { background-position: 0 0; }
   100% { background-position: 200px 200px; }
 }
 
-/* Removed duplicate @font-face for Orbitron, it's at the top */
-
-.shadow-glow { /* Themed box shadow glow */
+.shadow-glow { 
   box-shadow: 0 0 10px theme('colors.brand-cyan / 50%');
 }
 .shadow-glow:hover {
   box-shadow: 0 0 15px theme('colors.brand-cyan / 70%'), 0 0 5px theme('colors.brand-pink / 30%');
 }
 
-/* New Glitch Border Animation - Themed */
 @keyframes glitch-border {
   0% { border-color: theme('colors.brand-cyan / 30%'); box-shadow: 0 0 5px theme('colors.brand-cyan / 20%'); }
   25% { border-color: theme('colors.brand-pink / 30%'); box-shadow: 0 0 8px theme('colors.brand-pink / 30%'); }
@@ -358,15 +399,13 @@ input[type="search"]::-ms-clear {
   animation: glitch-border 2s linear infinite;
 }
 
-/* Highlight scroll target - Themed */
 .highlight-scroll {
   transition: outline 0.5s ease-out;
-  outline: 2px solid theme('colors.brand-green / 70%'); /* brand-green glow */
+  outline: 2px solid theme('colors.brand-green / 70%'); 
   outline-offset: 2px;
   box-shadow: 0 0 15px theme('colors.brand-green / 50%');
 }
 
-/* Utility for animated gradient text */
 .text-animated-gradient {
   @apply text-transparent bg-clip-text bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange;
   background-size: 200% auto;
@@ -379,7 +418,6 @@ input[type="search"]::-ms-clear {
   }
 }
 
-/* Input field styling for CyberVice */
 @layer components {
   .input-cyber {
     @apply bg-dark-card border border-brand-purple/50 text-light-text placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm
@@ -394,4 +432,15 @@ input[type="search"]::-ms-clear {
              focus:outline-none focus:ring-2 focus:ring-brand-pink focus:border-brand-pink
              transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
   }
+}
+
+/* Custom class for wiggly arrow on hover for "All Directives" button */
+.group-hover\:text-glow-effect:hover > svg {
+  text-shadow: 0 0 8px theme('colors.brand-pink');
+}
+
+/* Animation for wiggle effect */
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
 }
