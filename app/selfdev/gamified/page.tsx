@@ -1,3 +1,4 @@
+// /app/selfdev/gamified/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -37,7 +38,7 @@ const imagePlaceholders = {
     tooltipRu: "Визуализация 'Кибер-Линз Ясности', помогающих взломать туман и спроектировать будущее.",
   },
   placeholder2: {
-    url: "https://placehold.co/600x338/1A0A3D/00FFFF?text=LifeOS+Interface", 
+    url: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250510_021544-6218da3b-0b75-4627-8d4a-c237f45bcb0e.jpg", 
     altEn: "Life path transforming into a futuristic OS interface",
     altRu: "Жизненный путь, трансформирующийся в футуристический интерфейс ОС",
     tooltipRu: "Концепция LifeOS: уровни, квесты, перки и нейро-обратная связь для ускоренной эволюции.",
