@@ -1,190 +1,201 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { debugLogger } from "@/lib/debugLogger";
+import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppContext } from "@/contexts/AppContext";
 import { motion } from "framer-motion";
 import {
-  FaBrain,         // Core "Brain" icon
-  FaGamepad,       // Gamification, Quests
-  FaBolt,          // Speed, Efficiency, Level Up
-  FaChartLine,     // Progress Tracking
-  FaCodeBranch,    // Skills / Tasks
-  FaUserNinja,     // Admin icon / Mastery
-  FaWandMagicSparkles, // AI Magic
-  FaArrowRight,    // CTA
-  FaPlus,          // Add/Start Action
-  FaEye,           // Vision, Seeing the Matrix
-  FaUpLong,        // Level Up / Vibe Loop
-  FaFire,          // Intensity / KiloVibes
-  FaUsers,         // Community / Alliance
-  FaGithub,        // Code / Studio
+  FaBrain, FaGamepad, FaBolt, FaChartLine, FaCodeBranch, FaUserNinja,
+  FaWandMagicSparkles, FaArrowRight, FaPlus, FaEye, FaUpLong, FaFire, FaUsers, FaGithub,
+  FaLightbulb, // For "Insights" or "Tips"
 } from "react-icons/fa6";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
-import TopNavButtons from "@/components/TopNavButtons";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts'; // Added RechartsTooltip
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Image from "next/image";
-import VibeContentRenderer from "@/components/VibeContentRenderer"; // Import the renderer
+import VibeContentRenderer from "@/components/VibeContentRenderer";
+import {
+  fetchUserCyberFitnessProfile,
+  CyberFitnessProfile,
+  // logCyberFitnessActivity // We'll call this from specific actions, not just page load
+} from "@/hooks/cyberFitnessSupabase"; // Path based on your structure
 
-// --- Placeholder Data & Theme Colors ---
-const weeklyActivityData = [ // Simulate weekly cognitive output
-  { name: 'MO', value: 1500, label: 'Task Automation' },
-  { name: 'TU', value: 2800, label: 'AI Prompting Lvl 2' },
-  { name: 'WE', value: 2000, label: 'Content Remixing' },
-  { name: 'TH', value: 3500, label: 'Code Generation' },
-  { name: 'FRI', value: 3100, label: 'System Debug (Lvl 4 Prep)' },
-  { name: 'SA', value: 4200, label: 'Vibe Channeling Practice' },
-  { name: 'SU', value: 1800, label: 'Experimental Mindset PACT' },
+// --- Constants & Config ---
+const DEFAULT_WEEKLY_ACTIVITY = [
+  { name: 'MO', value: 0, label: 'System Idle' }, { name: 'TU', value: 0, label: 'System Idle' },
+  { name: 'WE', value: 0, label: 'System Idle' }, { name: 'TH', value: 0, label: 'System Idle' },
+  { name: 'FRI', value: 0, label: 'System Idle' }, { name: 'SA', value: 0, label: 'System Idle' },
+  { name: 'SU', value: 0, label: 'System Idle' },
 ];
-// Use theme colors directly for Cells
-const chartColors = [
-    'hsl(var(--primary))',    // Pink
-    'hsl(var(--secondary))',  // Cyan
-    'hsl(var(--accent))',     // Orange
-    'hsl(var(--chart-5))',    // Yellow/Gold
-    'hsl(var(--chart-4))',    // Purple Variant
-    'hsl(var(--destructive))',// Red (less frequent use)
-    'hsl(var(--brand-green))' // Neon Green (from tailwind config)
+const CHART_COLORS = [ // Using HSL vars for consistency with Tailwind theme
+  'hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))',
+  'hsl(var(--chart-5))', 'hsl(var(--chart-4))', 'hsl(var(--brand-green))', // Direct color for green
+  'hsl(var(--brand-orange))' // Direct color for orange
 ];
+const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png"; // Generic cyber avatar
+const FEATURED_QUEST_IMAGE = "/placeholders/cyber-brain-network.jpg"; // Thematic image
 
-// Variants for Framer Motion
-const cardVariants = {
-  hidden: { opacity: 0, y: 20, scale: 0.98 },
-  visible: (i: number) => ({
+// --- Framer Motion Variants ---
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
     opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { delay: i * 0.1 + 0.1, duration: 0.6, ease: "easeOut" },
-  }),
+    transition: { staggerChildren: 0.1, delayChildren: 0.2 },
+  },
 };
-const titleVariants = {
-    hidden: { opacity: 0, y: -20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5, delay: 0.1 } },
+const itemVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.5, ease: "easeOut" } },
 };
-const buttonVariants = {
-    hidden: { opacity: 0, scale: 0.8 },
-    visible: { opacity: 1, scale: 1, transition: { type: "spring", stiffness: 150, damping: 15, delay: 0.5 } },
-    hover: { scale: 1.08, transition: { type: "spring", stiffness: 300 }}
+const bottomNavVariants = {
+    hidden: { y: 100, opacity: 0 },
+    visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 120, damping: 25, delay: 0.5 } },
 };
-
 
 export default function Home() {
-  const { dbUser, isAuthenticated, isLoading, error, isInTelegramContext } = useAppContext();
-  const userName = dbUser?.first_name || 'Agent'; // Use Agent as default
+  const { dbUser, isAuthenticated, isLoading, error } = useAppContext();
+  const userName = dbUser?.first_name || 'Agent';
+
+  const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    debugLogger.log("Home component mounted (CyberFitness Training Program)", { isLoading, dbUser, error });
-  }, [isLoading, dbUser, error]);
+    logger.log("Home: Mount | Auth Loading:", isLoading, "| User:", dbUser ? dbUser.id : "None");
+    const loadProfile = async () => {
+      if (dbUser?.id) {
+        logger.log(`Home: Fetching CyberFitness profile for ${dbUser.id}`);
+        setProfileLoading(true);
+        const result = await fetchUserCyberFitnessProfile(dbUser.id);
+        if (result.success && result.data) {
+          setCyberProfile(result.data);
+          logger.log("Home: CyberFitness profile loaded:", result.data);
+        } else {
+          logger.warn(`Home: Failed to load CyberFitness profile for ${dbUser.id}. Error: ${result.error}. Initializing default.`);
+          setCyberProfile({ level: 0, kiloVibes: 0, weeklyActivity: [...DEFAULT_WEEKLY_ACTIVITY], cognitiveOSVersion: "v0.1 Alpha" });
+        }
+        setProfileLoading(false);
+      } else if (!isLoading) { // Only if auth is done and no user
+        setProfileLoading(false);
+        setCyberProfile({ level: 0, kiloVibes: 0, weeklyActivity: [...DEFAULT_WEEKLY_ACTIVITY], cognitiveOSVersion: "v0.1 Guest Mode"});
+        logger.log("Home: No dbUser ID, using default/guest CyberFitness profile.");
+      }
+    };
 
-  // --- Loading State ---
-  if (isLoading) {
+    if (!isLoading) loadProfile();
+
+  }, [dbUser, isLoading]);
+
+  if (isLoading || profileLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-dark-bg to-dark-card flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-dark-bg to-dark-card flex flex-col items-center justify-center p-4 text-center">
         <motion.div
-          animate={{ rotate: [0, 360], scale: [1, 1.1, 1] }}
-          transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-          className="w-20 h-20 border-4 border-t-brand-cyan border-brand-cyan/30 rounded-full shadow-[0_0_20px_theme(colors.brand-cyan)] mb-5"
+          animate={{ rotate: [0, 360, 0], scale: [1, 1.2, 1, 1.2, 1] }}
+          transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+          className="w-24 h-24 border-4 border-t-brand-cyan border-x-brand-pink border-b-brand-purple border-opacity-50 rounded-full shadow-[0_0_25px_theme(colors.brand-cyan),0_0_15px_theme(colors.brand-pink)] mb-6"
         />
-        <p className="text-brand-cyan font-orbitron text-lg animate-pulse tracking-widest">SYNAPSES FIRING...</p>
-        <p className="text-muted-foreground text-xs font-mono animate-pulse">Loading Cognitive Enhancements...</p>
+        <p className="text-brand-cyan font-orbitron text-xl animate-pulse tracking-widest">
+          {isLoading ? "CONNECTING TO CYBERVIBE GRID..." : "DECRYPTING COGNITIVE DATA..."}
+        </p>
+        <p className="text-muted-foreground text-sm font-mono animate-pulse mt-1">Please wait, Agent...</p>
       </div>
     );
   }
 
-  // --- Error State ---
   if (error) {
-    debugLogger.error("Error in Home component (CyberFitness Theme):", error);
     return (
       <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-red-900/60 text-red-400 font-orbitron flex flex-col items-center justify-center p-6 text-center"
+        initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 0 }}
+        className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-red-900/70 text-red-300 font-orbitron flex flex-col items-center justify-center p-6 text-center"
       >
-        <FaBolt className="text-7xl text-red-500 mb-6 animate-ping opacity-75"/>
-        <p className="text-3xl mb-3 uppercase text-shadow-neon">KERNEL PANIC</p>
-        <p className="text-lg text-red-300 font-mono mb-5">Error: {error.message}</p>
-        <p className="text-md text-gray-500 font-mono">Matrix connection unstable. Cognitive reboot sequence initiated.</p>
-        <Button variant="destructive" className="mt-6 font-mono" onClick={() => window.location.reload()}>
-          FORCE REBOOT
+        <FaBolt className="text-8xl text-red-500 mb-6 animate-ping opacity-80"/>
+        <p className="text-4xl mb-3 uppercase text-shadow-neon">CRITICAL SYSTEM FAILURE</p>
+        <p className="text-lg text-red-200 font-mono mb-6">ERROR PAYLOAD: {error.message}</p>
+        <p className="text-md text-gray-400 font-mono">The CyberVibe core has encountered an anomaly. Your cognitive link may be unstable.</p>
+        <Button variant="destructive" className="mt-8 font-mono text-lg px-6 py-3" onClick={() => window.location.reload()}>
+          ATTEMPT HARD REBOOT
         </Button>
       </motion.div>
     );
   }
 
-  // --- Main Content ---
-  const totalKiloVibes = weeklyActivityData.reduce((sum, day) => sum + day.value, 0);
-  // Example dynamic metrics based on KiloVibes
-  const focusTimeHours = Math.round(totalKiloVibes / 1000); // Arbitrary calculation
-  const skillsLeveled = Math.floor(totalKiloVibes / 2500); // Arbitrary calculation
-  const currentLevel = dbUser?.metadata?.cyber_level || 0; // Example: Get level from user data
+  const displayWeeklyActivity = cyberProfile?.weeklyActivity && cyberProfile.weeklyActivity.length > 0
+                                  ? cyberProfile.weeklyActivity
+                                  : DEFAULT_WEEKLY_ACTIVITY;
+  const totalKiloVibes = cyberProfile?.kiloVibes || 0;
+  const focusTimeHours = cyberProfile?.focusTimeHours || 0;
+  const skillsLeveled = cyberProfile?.skillsLeveled || 0;
+  const currentLevel = cyberProfile?.level || 0;
+  const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || "v0.1 Alpha";
+  const nextLevelTarget = (currentLevel + 1) * 1000; // Example target for next level
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text relative overflow-hidden pt-20 pb-10">
-       {/* Background Effects */}
+    <div className="min-h-screen bg-dark-bg text-light-text relative overflow-x-hidden pt-20 pb-28"> {/* Increased pb for bottom nav */}
        <div className="absolute inset-0 z-0 overflow-hidden">
-         <div className="absolute top-[-10%] left-[-10%] w-1/2 h-1/2 bg-brand-purple/25 rounded-full blur-[120px] opacity-40 animate-pulse pointer-events-none" />
-         <div className="absolute bottom-[-20%] right-[-20%] w-2/3 h-2/3 bg-brand-pink/20 rounded-full blur-[150px] opacity-35 animate-pulse pointer-events-none delay-2000" />
-         <div className="absolute inset-0 bg-grid-pattern opacity-[0.03] animate-[drift_25s_linear_infinite]"></div>
+         <div className="absolute top-[-15%] left-[-15%] w-3/5 h-3/5 bg-brand-purple/20 rounded-full blur-[150px] opacity-50 animate-[pulse_8s_cubic-bezier(0.4,0,0.6,1)_infinite] pointer-events-none" />
+         <div className="absolute bottom-[-25%] right-[-25%] w-4/5 h-4/5 bg-brand-pink/15 rounded-full blur-[180px] opacity-40 animate-[pulse_10s_cubic-bezier(0.4,0,0.6,1)_infinite_1s] pointer-events-none" />
+         <div className="absolute inset-0 bg-grid-pattern opacity-[0.04] animate-[drift_30s_linear_infinite]"></div>
        </div>
 
-      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 space-y-6 md:space-y-10">
-
+      <motion.div
+        variants={containerVariants} initial="hidden" animate="visible"
+        className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 space-y-5 md:space-y-8"
+      >
         {/* 1. Top Bar / Greeting */}
-        <motion.div
-          variants={titleVariants} initial="hidden" animate="visible"
-          className="flex justify-between items-center"
-        >
+        <motion.div variants={itemVariants} className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-orbitron font-bold text-brand-cyan cyber-text" data-text={`Agent: ${userName}`}>
+            <h1 className="text-xl sm:text-2xl font-orbitron font-bold text-brand-cyan cyber-text" data-text={`Agent: ${userName}`}>
               Agent: <span className="text-brand-pink glitch" data-text={userName}>{userName}</span>
             </h1>
-            <p className="text-muted-foreground font-mono text-xs sm:text-sm mt-1">Cognitive OS v2.0 | Level: <span className="text-brand-yellow">{currentLevel}</span></p>
+            <p className="text-muted-foreground font-mono text-xs sm:text-sm mt-0.5">
+              Cognitive OS {cognitiveOSVersion} | Level: <span className="text-brand-yellow font-semibold">{currentLevel}</span>
+            </p>
           </div>
-          {/* Optional: User avatar like in the screenshot */}
-          <Link href="/profile">
+          <Link href="/profile" className="transition-transform duration-200 hover:scale-110">
             <Image
-              src={dbUser?.avatar_url || user?.photo_url || "/placeholders/avatar.png"}
-              alt={`${userName}'s Avatar`}
-              width={48}
-              height={48}
-              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 border-brand-pink/70 shadow-lg hover:border-brand-cyan transition-colors cursor-pointer"
+              src={dbUser?.avatar_url || user?.photo_url || PLACEHOLDER_AVATAR}
+              alt={`${userName}'s Cybernetic Avatar`}
+              width={52} height={52}
+              className="w-11 h-11 sm:w-13 sm:h-13 rounded-full border-2 border-brand-pink/80 shadow-[0_0_10px_theme(colors.brand-pink/50%)] object-cover"
+              priority
             />
           </Link>
         </motion.div>
 
         {/* 2. Featured "Quests/Missions" Section */}
-        <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={0}>
-          <Card className="bg-dark-card/85 backdrop-blur-sm border border-brand-purple/40 shadow-xl overflow-hidden hover:shadow-brand-purple/30 hover:border-brand-purple/60 transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-4 px-4 md:px-6">
+        <motion.div variants={itemVariants}>
+          <Card className="bg-dark-card/90 backdrop-blur-md border border-brand-purple/50 shadow-xl overflow-hidden hover:border-brand-pink/70 transition-all duration-300 group">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 pt-3 px-4 md:px-5">
               <div>
-                <CardTitle className="text-xl sm:text-2xl font-orbitron text-brand-yellow">Active Quests</CardTitle>
-                <CardDescription className="text-muted-foreground font-mono text-xs">Level {currentLevel}+ Challenges Available</CardDescription>
+                <CardTitle className="text-lg sm:text-xl font-orbitron text-brand-yellow">Priority Directives</CardTitle>
+                <CardDescription className="text-muted-foreground font-mono text-xs">Current Level {currentLevel}+ Challenges</CardDescription>
               </div>
               <Link href="/selfdev/gamified" passHref legacyBehavior>
-                <Button variant="outline" size="sm" className="border-brand-yellow text-brand-yellow hover:bg-brand-yellow/10 hover:text-white font-mono text-xs">
-                  View All <FaArrowRight className="ml-1.5 h-3 w-3"/>
+                <Button variant="outline" size="xs" className="border-brand-yellow text-brand-yellow hover:bg-brand-yellow/10 hover:text-white font-mono text-xs px-2 py-1 h-auto group-hover:border-brand-pink group-hover:text-brand-pink">
+                  All Directives <FaArrowRight className="ml-1 h-2.5 w-2.5"/>
                 </Button>
               </Link>
             </CardHeader>
             <CardContent className="p-0">
-              {/* Image Placeholder - Replace with dynamic/relevant quest image */}
-              <Link href="/selfdev/gamified" className="block relative aspect-[16/6] w-full group">
+              <Link href="/selfdev/gamified#levelup_fitness" className="block relative aspect-[16/5] sm:aspect-[16/4.5] w-full">
                  <Image
-                    src="https://placehold.co/1200x450/0D0221/FF00FF/png?text=Quest:+Master+CyberVibe+Studio+(Lvl+1-5)" // More relevant placeholder
-                    alt="Featured CyberFitness Quest"
-                    layout="fill"
-                    objectFit="cover"
-                    className="opacity-60 group-hover:opacity-80 transition-opacity duration-300"
+                    src={FEATURED_QUEST_IMAGE}
+                    alt="Featured Quest: Enhance Cognitive Matrix"
+                    layout="fill" objectFit="cover"
+                    className="opacity-50 group-hover:opacity-70 group-hover:scale-105 transition-all duration-400 ease-in-out"
+                    priority
                   />
-                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none"></div>
-                 <div className="absolute bottom-3 left-4 md:bottom-4 md:left-6 text-white z-10 transition-transform duration-300 group-hover:translate-y-[-4px]">
-                    <h3 className="text-lg sm:text-xl font-bold font-orbitron text-shadow-neon">Start Your Ascension</h3>
-                    <p className="text-xs sm:text-sm font-mono text-gray-300">Begin with Level 0 → 1: The Image Swap</p>
+                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none"></div>
+                 <div className="absolute bottom-2 left-3 sm:bottom-3 sm:left-4 text-white z-10 p-1">
+                    <h3 className="text-md sm:text-lg font-bold font-orbitron text-shadow-[0_0_8px_theme(colors.brand-cyan)]">
+                      <VibeContentRenderer content="<FaGamepad className='inline text-brand-pink/90 mr-1.5 text-xl'/>INITIATE: CyberDev OS Training Program" />
+                    </h3>
+                    <p className="text-xs sm:text-sm font-mono text-gray-300">
+                      <VibeContentRenderer content="Your journey from Level 0: <FaEye className='inline mx-0.5'/> See the Code, <FaBolt className='inline mx-0.5'/> Become the Vibe." />
+                    </p>
                   </div>
-                 <div className="absolute top-3 right-4 md:top-4 md:right-6 text-white z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <FaArrowRight className="w-5 h-5 text-brand-pink animate-pulse"/>
+                 <div className="absolute top-2 right-3 sm:top-3 sm:right-4 text-white z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <FaArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-brand-pink animate-[pulse_1.5s_infinite]"/>
                  </div>
               </Link>
             </CardContent>
@@ -192,37 +203,48 @@ export default function Home() {
         </motion.div>
 
         {/* 3. "Activity/Vibe Output" Section */}
-        <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={1}>
-          {/* Apply the bright pink bg and specific styling from screenshot */}
-          <Card className="bg-gradient-to-br from-brand-pink via-pink-600 to-purple-600 backdrop-blur-sm border border-brand-pink/60 shadow-lg text-black rounded-xl md:rounded-2xl">
-            <CardHeader className="pb-2 pt-4 px-4 md:px-6">
-              <CardTitle className="text-lg sm:text-xl font-orbitron text-black/95 font-bold uppercase tracking-wider">Cognitive Output</CardTitle>
-              {/* Main Metrics */}
-              <div className="flex items-end justify-between gap-2 mt-1 sm:mt-2">
+        <motion.div variants={itemVariants}>
+          <Card className="bg-gradient-to-br from-brand-pink/95 via-pink-600/90 to-purple-600/90 backdrop-blur-sm border border-brand-pink/70 shadow-2xl shadow-brand-pink/30 text-black rounded-xl md:rounded-2xl">
+            <CardHeader className="pb-1 pt-3 px-4 md:px-5">
+              <CardTitle className="text-md sm:text-lg font-orbitron text-black/95 font-bold uppercase tracking-wider flex items-center">
+                <FaFire className="inline mr-1.5 text-orange-300/90 drop-shadow-sm"/>Cognitive Throughput <span className="text-xs ml-auto text-black/70">(Weekly Cycle)</span>
+              </CardTitle>
+              <div className="flex items-end justify-between gap-2 mt-1">
                   <div>
-                      <p className="text-4xl sm:text-5xl font-bold text-white drop-shadow-md leading-none">{totalKiloVibes.toLocaleString()}</p>
-                      <p className="text-xs sm:text-sm font-mono uppercase tracking-wider text-black/80 font-semibold">KiloVibes <span className="hidden sm:inline">Generated</span></p>
+                      <p className="text-3xl sm:text-4xl font-bold text-white drop-shadow-md leading-none">{totalKiloVibes.toLocaleString()}</p>
+                      <p className="text-2xs sm:text-xs font-mono uppercase tracking-wider text-black/85 font-semibold">KiloVibes</p>
                   </div>
                   <div className="text-right space-y-0">
-                      <p className="text-md sm:text-lg font-semibold text-white/95 leading-tight">{focusTimeHours} <span className="text-xs font-mono">hrs</span></p>
-                      <p className="text-xs font-mono uppercase text-black/80">Focus Time</p>
-                      <p className="text-md sm:text-lg font-semibold text-white/95 leading-tight">{skillsLeveled} <span className="text-xs font-mono">Skills</span></p>
-                       <p className="text-xs font-mono uppercase text-black/80">Leveled Up</p>
+                      <p className="text-sm sm:text-md font-semibold text-white/95 leading-tight">{focusTimeHours} <span className="text-2xs font-mono">hrs</span></p>
+                      <p className="text-2xs font-mono uppercase text-black/85">Deep Work</p>
+                      <p className="text-sm sm:text-md font-semibold text-white/95 leading-tight">{skillsLeveled} <span className="text-2xs font-mono">Perks</span></p>
+                       <p className="text-2xs font-mono uppercase text-black/85">Unlocked</p>
                   </div>
               </div>
             </CardHeader>
-            <CardContent className="px-2 pb-3 pt-1 md:px-4 md:pb-4">
-              {/* Weekly Chart */}
-              <div className="h-[80px] sm:h-[100px] w-full">
+            <CardContent className="px-1 pb-2 pt-0 md:px-2 md:pb-3">
+              <div className="h-[70px] sm:h-[90px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={weeklyActivityData} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
-                    {/* Customize axis ticks to match screenshot */}
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'rgba(0,0,0,0.8)', fontWeight: 600 }} dy={5}/>
-                    <YAxis hide={true} domain={[0, 'dataMax + 500']} />{/* Add domain for better scaling */}
-                    <Bar dataKey="value" radius={[3, 3, 0, 0]} barSize={20}>
-                      {weeklyActivityData.map((entry, index) => (
-                        // Use theme colors for bars, slightly transparent
-                        <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} fillOpacity={0.75}/>
+                  <BarChart data={displayWeeklyActivity} margin={{ top: 10, right: 5, left: 5, bottom: 0 }}>
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'rgba(0,0,0,0.85)', fontWeight: 700 }} dy={4}/>
+                    <YAxis hide={true} domain={[0, 'dataMax + 500']} />
+                     <RechartsTooltip
+                        cursor={{ fill: 'rgba(255,255,255,0.1)' }}
+                        contentStyle={{
+                            backgroundColor: 'rgba(13, 2, 33, 0.85)', // dark-bg with opacity
+                            borderColor: 'hsl(var(--brand-purple))',
+                            borderRadius: '0.5rem',
+                            color: 'hsl(var(--light-text))',
+                            fontSize: '0.75rem',
+                            fontFamily: 'monospace',
+                        }}
+                        itemStyle={{ color: 'hsl(var(--brand-yellow))' }}
+                        labelStyle={{ color: 'hsl(var(--brand-cyan))', fontWeight: 'bold' }}
+                        formatter={(value, name, props) => [`${value} KV`, props.payload.label || 'Activity']}
+                    />
+                    <Bar dataKey="value" radius={[2, 2, 0, 0]} barSize={18} minPointSize={2}>
+                      {displayWeeklyActivity.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} fillOpacity={0.85}/>
                       ))}
                     </Bar>
                   </BarChart>
@@ -232,73 +254,55 @@ export default function Home() {
           </Card>
         </motion.div>
 
-        {/* 4. Bottom Nav / Main Actions (Inspired by Screenshot) */}
+        {/* Bottom Navigation */}
         <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5, duration: 0.8 }}
-            className="fixed bottom-0 left-0 right-0 bg-dark-bg/90 backdrop-blur-md border-t border-brand-purple/30 z-30 p-2 shadow-2xl shadow-black" // Adjusted padding
-            // Or use sticky positioning if preferred: className="sticky bottom-0 z-30 ..."
+            variants={bottomNavVariants} initial="hidden" animate="visible"
+            className="fixed bottom-0 left-0 right-0 bg-dark-bg/90 backdrop-blur-xl border-t-2 border-brand-purple/60 z-40 py-1.5 px-1 shadow-[0_-8px_30px_rgba(0,0,0,0.5)]"
           >
-            <div className="container mx-auto flex justify-around items-center max-w-md">
-              <Link href="/" passHref legacyBehavior>
-                <Button variant="ghost" className="flex flex-col items-center h-auto px-2 py-1 text-brand-pink hover:bg-brand-pink/10 rounded-md">
-                  <FaBrain className="w-5 h-5 mb-0.5" />
-                  <span className="text-xs font-mono">Dashboard</span>
-                </Button>
-              </Link>
-              <Link href="/selfdev/gamified" passHref legacyBehavior>
-                <Button variant="ghost" className="flex flex-col items-center h-auto px-2 py-1 text-light-text hover:bg-light-text/10 rounded-md">
-                  <FaCodeBranch className="w-5 h-5 mb-0.5" />
-                  <span className="text-xs font-mono">Level Up</span>
-                </Button>
-              </Link>
-              {/* Central Action Button */}
-              <Link href="/repo-xml" passHref legacyBehavior>
-                  <Button size="icon" className="bg-gradient-to-br from-brand-orange to-brand-yellow text-black rounded-full w-14 h-14 shadow-lg transform hover:scale-110 transition-transform -translate-y-2 border-2 border-dark-bg">
-                      <FaPlus className="w-6 h-6"/>
-                  </Button>
-              </Link>
-              <Link href="/p-plan" passHref legacyBehavior> {/* Example link */}
-                <Button variant="ghost" className="flex flex-col items-center h-auto px-2 py-1 text-light-text hover:bg-light-text/10 rounded-md">
-                  <FaChartLine className="w-5 h-5 mb-0.5" />
-                  <span className="text-xs font-mono">Stats</span>
-                </Button>
-              </Link>
-              <Link href="/profile" passHref legacyBehavior>
-                <Button variant="ghost" className="flex flex-col items-center h-auto px-2 py-1 text-light-text hover:bg-light-text/10 rounded-md">
-                  <FaUserNinja className="w-5 h-5 mb-0.5" />
-                  <span className="text-xs font-mono">Profile</span>
-                </Button>
-              </Link>
+            <div className="container mx-auto flex justify-around items-center max-w-xs sm:max-w-sm">
+              {[
+                { href: "/", icon: FaBrain, label: "OS Home", color: "text-brand-pink" },
+                { href: "/selfdev/gamified", icon: FaUpLong, label: "LevelUp", color: "text-brand-green" },
+                { href: "/repo-xml", icon: FaGithub, label: "Studio", isCentral: true, centralColor: "from-brand-orange to-brand-yellow"},
+                { href: "/p-plan", icon: FaChartLine, label: "VibePlan", color: "text-brand-cyan" },
+                { href: "/profile", icon: FaUserNinja, label: "AgentOS", color: "text-brand-yellow" },
+              ].map(item => (
+                 item.isCentral ? (
+                    <Link href={item.href} passHref legacyBehavior key={item.label}>
+                        <Button size="icon" className={`bg-gradient-to-br ${item.centralColor} text-black rounded-full w-14 h-14 sm:w-16 sm:h-16 shadow-lg transform hover:scale-110 active:scale-95 transition-transform -translate-y-3 sm:-translate-y-4 border-4 border-dark-bg hover:border-brand-pink focus:ring-4 focus:ring-brand-pink/50`}>
+                            <item.icon className="w-6 h-6 sm:w-7 sm:h-7"/>
+                        </Button>
+                    </Link>
+                 ) : (
+                    <Link href={item.href} passHref legacyBehavior key={item.label}>
+                        <Button variant="ghost" className={`flex flex-col items-center h-auto px-0.5 py-1 sm:px-1.5 rounded-md hover:bg-slate-700/60 active:bg-slate-600/70 ${item.color} transition-colors focus:bg-slate-700/70`}>
+                        <item.icon className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" />
+                        <span className="text-[0.6rem] sm:text-xs font-orbitron tracking-tighter leading-none">{item.label}</span>
+                        </Button>
+                    </Link>
+                 )
+              ))}
             </div>
         </motion.div>
 
-        {/* Spacer to prevent content overlap with fixed bottom nav */}
-         <div className="h-20"></div> {/* Adjust height based on the bottom nav height */}
-
+        {/* Admin Icon */}
+        {dbUser?.status === "admin" && (
+          <motion.div
+            initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1, type: "spring", stiffness: 100 }}
+            className="fixed bottom-20 md:bottom-24 right-3 sm:right-4 z-50"
+          >
+             <Link href="/admin" passHref legacyBehavior>
+               <Button
+                 variant="outline" size="icon"
+                 className="bg-dark-card/80 border-brand-red/70 text-brand-red hover:bg-brand-red/20 hover:text-white rounded-full w-10 h-10 sm:w-11 sm:h-11 shadow-lg backdrop-blur-sm"
+                 aria-label="Admin Override Terminal"
+               >
+                 <FaUserNinja className="h-5 w-5 sm:h-6 sm:h-6" />
+               </Button>
+             </Link>
+          </motion.div>
+        )}
       </div>
-
-      {/* Admin Icon - Adjusted position slightly due to bottom nav */}
-      {dbUser?.status === "admin" && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 1.0 }}
-          className="fixed bottom-24 right-5 z-50" // Moved up
-        >
-           {/* Tooltip can be added back here if needed */}
-           <Link href="/admin" legacyBehavior>
-             <Button
-               variant="ghost"
-               className="bg-brand-purple/80 text-light-text hover:bg-brand-pink/90 rounded-full w-12 h-12 flex items-center justify-center shadow-cyber-shadow border-2 border-brand-cyan/60 hover:border-brand-pink transition-all"
-               aria-label="Admin Control Deck"
-             >
-               <FaUserNinja className="h-6 w-6" />
-             </Button>
-           </Link>
-        </motion.div>
-      )}
     </div>
   );
 }
