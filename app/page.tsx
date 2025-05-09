@@ -10,7 +10,8 @@ import {
   FaBrain, FaGamepad, FaBolt, FaChartLine, FaUserNinja,
   FaArrowRight, FaEye, FaUpLong, FaFire, FaGithub,
 } from "react-icons/fa6";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts';
+// import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts'; // Tooltip import commented out
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts'; // Tooltip removed from imports
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Image from "next/image";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
@@ -127,7 +128,7 @@ export default function Home() {
   const skillsLeveled = cyberProfile?.skillsLeveled || 0;
   const currentLevel = cyberProfile?.level || 0;
   const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || "v0.1 Alpha";
-  const nextLevelTarget = (currentLevel + 1) * 1000; // Added semicolon here
+  const nextLevelTarget = (currentLevel + 1) * 1000;
   
   return ( 
     <div className="homepage-wrapper">
@@ -228,6 +229,7 @@ export default function Home() {
                   <BarChart data={displayWeeklyActivity} margin={{ top: 10, right: 5, left: 5, bottom: 0 }}>
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'rgba(0,0,0,0.85)', fontWeight: 700 }} dy={4}/>
                     <YAxis hide={true} domain={[0, 'dataMax + 500']} />
+                    {/* 
                      <RechartsTooltip
                         cursor={{ fill: 'rgba(255,255,255,0.1)' }}
                         contentStyle={{
@@ -241,7 +243,8 @@ export default function Home() {
                         itemStyle={{ color: 'hsl(var(--brand-yellow))' }}
                         labelStyle={{ color: 'hsl(var(--brand-cyan))', fontWeight: 'bold' }}
                         formatter={(value: number, name, props) => [`${value} KV`, props.payload.label || 'Activity']}
-                    />
+                    /> 
+                    */}
                     <Bar dataKey="value" radius={[2, 2, 0, 0]} barSize={18} minPointSize={2}>
                       {displayWeeklyActivity.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} fillOpacity={0.85}/>
@@ -299,7 +302,7 @@ export default function Home() {
                 aria-label="Admin Override Terminal"
               >
                <Link href="/admin">
-                 <FaUserNinja className="h-5 w-5 sm:h-6 sm:h-6" />
+                 <FaUserNinja className="h-5 w-5 sm:w-6 sm:h-6" />
                </Link>
              </Button>
           </motion.div>
