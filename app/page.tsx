@@ -10,8 +10,7 @@ import {
   FaBrain, FaGamepad, FaBolt, FaChartLine, FaUserNinja,
   FaArrowRight, FaEye, FaUpLong, FaFire, FaGithub,
 } from "react-icons/fa6";
-// import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts'; // Tooltip import commented out
-//import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts'; // Tooltip removed from imports
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts'; // Tooltip removed from imports
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Image from "next/image";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
@@ -129,7 +128,8 @@ export default function Home() {
   const currentLevel = cyberProfile?.level || 0;
   const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || "v0.1 Alpha";
   const nextLevelTarget = (currentLevel + 1) * 1000;
-  
+  // Ensure this is the VERY LAST line of JS code before the return statement.
+  // No comments, no empty lines between this and return.
   return ( 
     <div className="homepage-wrapper">
        <div className="homepage-bg-effects-container">
@@ -229,22 +229,7 @@ export default function Home() {
                   <BarChart data={displayWeeklyActivity} margin={{ top: 10, right: 5, left: 5, bottom: 0 }}>
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'rgba(0,0,0,0.85)', fontWeight: 700 }} dy={4}/>
                     <YAxis hide={true} domain={[0, 'dataMax + 500']} />
-                    {/* 
-                     <RechartsTooltip
-                        cursor={{ fill: 'rgba(255,255,255,0.1)' }}
-                        contentStyle={{
-                            backgroundColor: 'rgba(13, 2, 33, 0.85)', 
-                            borderColor: 'hsl(var(--brand-purple))',
-                            borderRadius: '0.5rem',
-                            color: 'hsl(var(--light-text))',
-                            fontSize: '0.75rem',
-                            fontFamily: 'monospace',
-                        }}
-                        itemStyle={{ color: 'hsl(var(--brand-yellow))' }}
-                        labelStyle={{ color: 'hsl(var(--brand-cyan))', fontWeight: 'bold' }}
-                        formatter={(value: number, name, props) => [`${value} KV`, props.payload.label || 'Activity']}
-                    /> 
-                    */}
+                    {/* Tooltip is commented out as per previous step to isolate the build error */}
                     <Bar dataKey="value" radius={[2, 2, 0, 0]} barSize={18} minPointSize={2}>
                       {displayWeeklyActivity.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} fillOpacity={0.85}/>
@@ -302,12 +287,12 @@ export default function Home() {
                 aria-label="Admin Override Terminal"
               >
                <Link href="/admin">
-                 <FaUserNinja className="h-5 w-5 sm:w-6 sm:h-6" />
+                 <FaUserNinja className="h-5 w-5 sm:h-6 sm:h-6" />
                </Link>
              </Button>
           </motion.div>
         )}
       </div>
-    
+    </div>
   );
 }
