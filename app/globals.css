@@ -1,70 +1,134 @@
-/* /app/globals.css */
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Orbitron Font Import - Moved to top for clarity */
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&display=swap");
+/* Inter Font Import (if not loaded elsewhere and needed for base sans) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/* Comic Neue for specific use cases, keep it if needed, but not for main theme */
 @import url('https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&display=swap');
+
 .font-comic {
   font-family: 'Comic Neue', cursive;
 }
-/* Orbitron Font Import - Correctly placed at the end */
-@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap");
+
 :root {
-  --background: 0 0% 0%;
-  --foreground: 0 0% 100%;
-  --card: 0 0% 0%;
-  --card-foreground: 0 0% 100%;
-  --popover: 0 0% 0%;
-  --popover-foreground: 0 0% 100%;
-  --primary: 0 85% 70%;
-  --primary-foreground: 0 0% 0%;
-  --secondary: 173 71% 55%;
-  --secondary-foreground: 0 0% 0%;
-  --muted: 0 0% 20%;
-  --muted-foreground: 0 0% 60%;
-  --accent: 45 100% 62%;
-  --accent-foreground: 0 0% 0%;
-  --destructive: 0 100% 50%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 0 85% 70%;
-  --input: 0 85% 70%;
-  --ring: 0 85% 70%;
-  --dark-bg-rgb: 26, 26, 46;  /* RGB for #1a1a2e */
-  --dark-card-rgb: 22, 33, 62; /* RGB for #16213e */
+  /* CyberVice Theme - Dark Mode Default */
+  /* Inspired by GTA VI logo and general Cyberpunk aesthetics */
+  /* HSL format for ShadCN compatibility */
+
+  /* Core Backgrounds & Foregrounds */
+  --background: 263 80% 7%; /* Dark Purple-Blue: hsl(263, 80%, 7%) -> #0D0221 */
+  --foreground: 0 0% 94%;   /* Light Gray / Off-White: hsl(0, 0%, 94%) -> #F0F0F0 */
+  
+  /* Cards & Popovers */
+  --card: 264 65% 13%;      /* Darker Purple for Cards: hsl(264, 65%, 13%) -> #1A0A3D */
+  --card-foreground: 0 0% 94%; /* Light Gray for Card Text */
+  --popover: 264 70% 10%;   /* Even Darker for Popovers: hsl(264, 70%, 10%) */
+  --popover-foreground: 0 0% 94%;
+
+  /* Primary Actions - Vibrant Pink/Magenta */
+  --primary: 300 100% 50%; /* hsl(300, 100%, 50%) -> #FF00FF */
+  --primary-foreground: 0 0% 10%; /* Dark for contrast on Pink: hsl(0, 0%, 10%) -> #1A1A1A */
+
+  /* Secondary Actions / Info - Bright Cyan */
+  --secondary: 180 100% 50%; /* hsl(180, 100%, 50%) -> #00FFFF */
+  --secondary-foreground: 0 0% 10%; /* Dark for contrast on Cyan */
+
+  /* Muted States */
+  --muted: 263 30% 25%;    /* Muted Purple-Gray: hsl(263, 30%, 25%) */
+  --muted-foreground: 0 0% 65%; /* Lighter Gray for Muted Text: hsl(0, 0%, 65%) */
+
+  /* Accent - Sunset Orange */
+  --accent: 30 100% 50%;    /* hsl(30, 100%, 50%) -> #FFA500 */
+  --accent-foreground: 0 0% 10%; /* Dark for contrast on Orange */
+
+  /* Destructive Actions - Bright Red */
+  --destructive: 0 100% 55%; /* hsl(0, 100%, 55%) */
+  --destructive-foreground: 0 0% 95%; /* White/Off-White */
+
+  /* Borders & Inputs */
+  --border: 270 70% 35%;   /* Accent Purple Border: hsl(270, 70%, 35%) -> #6A0DAD but a bit lighter for visibility */
+  --input: 270 70% 30%;    /* Darker version for input background, or use --card */
+                           /* For input border, can use --border or --accent */
+  --ring: 300 100% 60%;    /* Focus Ring Color (Primary variant): hsl(300, 100%, 60%) */
+
+  /* Radius (shadcn-ui default is 0.5rem) - can be adjusted */
+  --radius: 0.75rem; /* Slightly more rounded for a modern feel */
+
+  /* RGB values for gradients/shadows if needed directly */
+  --dark-bg-rgb: 13, 2, 33;      /* For #0D0221 */
+  --dark-card-rgb: 26, 10, 61;   /* For #1A0A3D */
+  --glow-color-rgb: 255, 0, 255; /* For Magenta Glow (brand-pink) */
+
+  /* Chart colors - can be updated to match new theme */
+  --chart-1: 300 100% 50%; /* Primary */
+  --chart-2: 180 100% 50%; /* Secondary */
+  --chart-3: 30 100% 50%;  /* Accent */
+  --chart-4: 270 80% 60%; /* Purple variant */
+  --chart-5: 39 100% 50%; /* Gold/Yellow */
+
+  /* Sidebar colors - if sidebar has distinct styling */
+  --sidebar-background: 263 75% 10%; /* Slightly different dark bg */
+  --sidebar-foreground: 0 0% 85%;
+  --sidebar-primary: 300 100% 55%;
+  --sidebar-primary-foreground: 0 0% 10%;
+  --sidebar-accent: 180 100% 55%;
+  --sidebar-accent-foreground: 0 0% 10%;
+  --sidebar-border: 270 60% 25%;
+  --sidebar-ring: 300 100% 65%;
 }
 
 .dark {
-  --background: 0 0% 0%;
-  --foreground: 0 0% 100%;
-  --card: 0 0% 3%;
-  --card-foreground: 0 0% 100%;
-  --popover: 0 0% 3%;
-  --popover-foreground: 0 0% 100%;
-  --primary: 0 85% 70%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 173 71% 55%;
-  --secondary-foreground: 0 0% 100%;
-  --muted: 0 0% 20%;
-  --muted-foreground: 0 0% 60%;
-  --accent: 45 100% 62%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 100% 50%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 0 0% 20%;
-  --input: 0 0% 20%;
-  --ring: 0 85% 70%;
-  --dark-bg-rgb: 26, 26, 46;  /* RGB for #1a1a2e */
-  --dark-card-rgb: 22, 33, 62; /* RGB for #16213e */
+  /* Dark mode is the default, so .dark specific overrides might not be needed if :root is already dark.
+     However, if you plan a light mode, these would be the dark mode values.
+     For now, assuming :root IS the dark mode. */
+  --background: 263 80% 7%; 
+  --foreground: 0 0% 94%;   
+  --card: 264 65% 13%;      
+  --card-foreground: 0 0% 94%; 
+  --popover: 264 70% 10%;   
+  --popover-foreground: 0 0% 94%;
+  --primary: 300 100% 50%; 
+  --primary-foreground: 0 0% 10%; 
+  --secondary: 180 100% 50%; 
+  --secondary-foreground: 0 0% 10%; 
+  --muted: 263 30% 25%;    
+  --muted-foreground: 0 0% 65%; 
+  --accent: 30 100% 50%;    
+  --accent-foreground: 0 0% 10%; 
+  --destructive: 0 100% 55%; 
+  --destructive-foreground: 0 0% 95%;
+  --border: 270 70% 35%;
+  --input: 270 70% 30%;
+  --ring: 300 100% 60%;
+  --dark-bg-rgb: 13, 2, 33;
+  --dark-card-rgb: 26, 10, 61;
+  --glow-color-rgb: 255, 0, 255;
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-section {
-  scroll-margin-top: 96px; /* Matches pt-24 */
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif; /* Base font */
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Orbitron', sans-serif; /* Headings font */
+    @apply tracking-wide;
+  }
+  section {
+    scroll-margin-top: 96px; /* Matches pt-24 */
+  }
+  /* More aggressive reset for consistency */
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
 }
 
 .repo-xml-content-wrapper {
@@ -82,7 +146,6 @@ section {
   }
 }
 
-
 /* Ticker animation */
 @keyframes ticker {
   0% { transform: translateX(100%); }
@@ -91,9 +154,20 @@ section {
 .animate-ticker {
   animation: ticker 20s linear infinite;
 }
+
+/* Neon Text Shadow using new theme colors */
 .text-shadow-neon {
-  text-shadow: 0 0 5px rgba(255, 107, 107, 0.8), 0 0 10px rgba(255, 107, 107, 0.6), 0 0 15px rgba(255, 107, 107, 0.4);
+  /* Example using brand-pink and brand-purple */
+  text-shadow: 
+    0 0 5px var(--brand-pink),
+    0 0 10px var(--brand-pink),
+    0 0 15px var(--brand-purple),
+    0 0 20px var(--brand-purple);
 }
+.text-shadow-cyber { /* another variant */
+  text-shadow: 0 0 4px theme('colors.brand-cyan'), 0 0 10px theme('colors.brand-pink');
+}
+
 
 .animate-gradient-shift {
   animation: gradientShift 10s infinite linear;
@@ -104,62 +178,78 @@ section {
   50% { background-position: 100% 100%; }
   100% { background-position: 0% 0%; }
 }
+
+/* Grid pattern with new theme accent */
 .bg-grid-pattern {
-  background-size: 50px 50px;
-  background-image: linear-gradient(to right, rgba(255, 107, 107, 0.1) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 107, 107, 0.1) 1px, transparent 1px);
+  background-size: 60px 60px; /* Slightly larger grid */
+  background-image: 
+    linear-gradient(to right, theme('colors.brand-purple / 10%') 1px, transparent 1px),
+    linear-gradient(to bottom, theme('colors.brand-purple / 10%') 1px, transparent 1px);
 }
-/* Simple Scrollbar Styling */
+.bg-grid-pattern-pink {
+  background-size: 50px 50px;
+  background-image: 
+    linear-gradient(to right, theme('colors.brand-pink / 8%') 1px, transparent 1px),
+    linear-gradient(to bottom, theme('colors.brand-pink / 8%') 1px, transparent 1px);
+}
+
+/* Simple Scrollbar Styling - Themed */
 .simple-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px; /* Slightly thicker */
+  height: 8px;
 }
 .simple-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+  background: transparent; /* Or theme('colors.dark-bg / 50%') */
 }
 .simple-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(107, 114, 128, 0.5); /* gray-500 with opacity */
-  border-radius: 3px;
+  background-color: theme('colors.brand-purple / 60%');
+  border-radius: 4px;
+  border: 1px solid theme('colors.brand-pink / 40%');
 }
 .simple-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(107, 114, 128, 0.7); /* Darker on hover */
+  background-color: theme('colors.brand-pink / 70%');
 }
 /* Firefox scrollbar */
 .simple-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(107, 114, 128, 0.5) transparent;
+  scrollbar-color: theme('colors.brand-purple / 60%') transparent;
 }
 
-
-/* --- Restored Cyber/Glitch Styles --- */
-/* Cyber-text style for that futuristic feel */
+/* --- Cyber/Glitch Styles - Themed --- */
 .cyber-text {
-  font-family: "Orbitron", sans-serif; /* Ensure Orbitron is applied */
+  font-family: "Orbitron", sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  /* Use a specific color or inherit - changed from #0ff */
-  /* color: #0ff; */ /* Example: Cyan */
-  text-shadow: 0 0 5px rgba(0, 255, 157, 0.7), 0 0 10px rgba(0, 255, 157, 0.5); /* Use brand-green */
+  color: theme('colors.brand-cyan'); /* Default cyber text color */
+  text-shadow: /* Use theme colors */
+    0 0 3px theme('colors.brand-cyan / 70%'),
+    0 0 5px theme('colors.brand-cyan / 50%'),
+    0 0 8px theme('colors.brand-pink / 60%');
+}
+.cyber-text.glitch-heavy { /* For more intense glitch effect */
+    text-shadow:
+        0.05em 0 0 theme('colors.brand-pink / 75%'),
+        -0.025em -0.025em 0 theme('colors.brand-green / 75%'),
+        -0.01em 0.025em 0 theme('colors.brand-cyan / 75%');
 }
 
-/* Glitch text-shadow animation keyframes (simple version) */
+
+/* Glitch text-shadow animation keyframes (themed) */
 @keyframes glitch {
-  0% { text-shadow: 0.05em 0 0 rgba(255,0,0,.75), -0.05em -0.025em 0 rgba(0,255,0,.75), -0.025em 0.05em 0 rgba(0,0,255,.75); }
-  14% { text-shadow: 0.05em 0 0 rgba(255,0,0,.75), -0.05em -0.025em 0 rgba(0,255,0,.75), -0.025em 0.05em 0 rgba(0,0,255,.75); }
-  15% { text-shadow: -0.05em -0.025em 0 rgba(255,0,0,.75), 0.025em 0.025em 0 rgba(0,255,0,.75), -0.05em -0.05em 0 rgba(0,0,255,.75); }
-  49% { text-shadow: -0.05em -0.025em 0 rgba(255,0,0,.75), 0.025em 0.025em 0 rgba(0,255,0,.75), -0.05em -0.05em 0 rgba(0,0,255,.75); }
-  50% { text-shadow: 0.025em 0.05em 0 rgba(255,0,0,.75), 0.05em 0 0 rgba(0,255,0,.75), 0 -0.05em 0 rgba(0,0,255,.75); }
-  99% { text-shadow: 0.025em 0.05em 0 rgba(255,0,0,.75), 0.05em 0 0 rgba(0,255,0,.75), 0 -0.05em 0 rgba(0,0,255,.75); }
-  100% { text-shadow: -0.025em 0 0 rgba(255,0,0,.75), -0.025em -0.025em 0 rgba(0,255,0,.75), -0.025em -0.05em 0 rgba(0,0,255,.75); }
+  0% { text-shadow: 0.05em 0 0 theme('colors.brand-pink / 75%'), -0.05em -0.025em 0 theme('colors.brand-green / 75%'), -0.025em 0.05em 0 theme('colors.brand-cyan / 75%'); }
+  14% { text-shadow: 0.05em 0 0 theme('colors.brand-pink / 75%'), -0.05em -0.025em 0 theme('colors.brand-green / 75%'), -0.025em 0.05em 0 theme('colors.brand-cyan / 75%'); }
+  15% { text-shadow: -0.05em -0.025em 0 theme('colors.brand-pink / 75%'), 0.025em 0.025em 0 theme('colors.brand-green / 75%'), -0.05em -0.05em 0 theme('colors.brand-cyan / 75%'); }
+  49% { text-shadow: -0.05em -0.025em 0 theme('colors.brand-pink / 75%'), 0.025em 0.025em 0 theme('colors.brand-green / 75%'), -0.05em -0.05em 0 theme('colors.brand-cyan / 75%'); }
+  50% { text-shadow: 0.025em 0.05em 0 theme('colors.brand-pink / 75%'), 0.05em 0 0 theme('colors.brand-green / 75%'), 0 -0.05em 0 theme('colors.brand-cyan / 75%'); }
+  99% { text-shadow: 0.025em 0.05em 0 theme('colors.brand-pink / 75%'), 0.05em 0 0 theme('colors.brand-green / 75%'), 0 -0.05em 0 theme('colors.brand-cyan / 75%'); }
+  100% { text-shadow: -0.025em 0 0 theme('colors.brand-pink / 75%'), -0.025em -0.025em 0 theme('colors.brand-green / 75%'), -0.025em -0.05em 0 theme('colors.brand-cyan / 75%'); }
 }
 
-/* Glitch effect base class */
 .glitch {
   position: relative;
   animation: glitch 1s linear infinite;
 }
 
-/* Glitch effect pseudo-elements for color separation */
 .glitch::before,
 .glitch::after {
   content: attr(data-text);
@@ -168,130 +258,140 @@ section {
   top: 0;
   width: 100%;
   height: 100%;
-  background: inherit; /* Or set explicitly if needed */
+  background: inherit; 
   overflow: hidden;
   clip: rect(0, 900px, 0, 0);
 }
 
 .glitch::before {
   left: 2px;
-  text-shadow: -1px 0 rgba(255, 0, 255, 0.7); /* Magenta */
+  text-shadow: -1px 0 theme('colors.brand-purple / 70%'); /* Themed shadow */
   animation: glitch-anim-1 2s infinite linear alternate-reverse;
 }
 
 .glitch::after {
   left: -2px;
-  text-shadow: -1px 0 rgba(0, 255, 255, 0.7); /* Cyan */
+  text-shadow: -1px 0 theme('colors.brand-cyan / 70%'); /* Themed shadow */
   animation: glitch-anim-2 2s infinite linear alternate-reverse;
 }
 
-/* Keyframes for the glitch clip animations */
+/* Keyframes for the glitch clip animations (glitch-anim-1, glitch-anim-2) remain unchanged as they define the clipping behavior, not color */
 @keyframes glitch-anim-1 { 0% { clip: rect(44px, 9999px, 49px, 0); } 5% { clip: rect(5px, 9999px, 100px, 0); } 10% { clip: rect(13px, 9999px, 60px, 0); } 15% { clip: rect(80px, 9999px, 40px, 0); } 20% { clip: rect(22px, 9999px, 75px, 0); } 25% { clip: rect(90px, 9999px, 15px, 0); } 30% { clip: rect(50px, 9999px, 88px, 0); } 35% { clip: rect(10px, 9999px, 45px, 0); } 40% { clip: rect(70px, 9999px, 30px, 0); } 45% { clip: rect(25px, 9999px, 95px, 0); } 50% { clip: rect(60px, 9999px, 20px, 0); } 55% { clip: rect(5px, 9999px, 55px, 0); } 60% { clip: rect(75px, 9999px, 35px, 0); } 65% { clip: rect(18px, 9999px, 80px, 0); } 70% { clip: rect(85px, 9999px, 22px, 0); } 75% { clip: rect(40px, 9999px, 65px, 0); } 80% { clip: rect(3px, 9999px, 90px, 0); } 85% { clip: rect(68px, 9999px, 28px, 0); } 90% { clip: rect(33px, 9999px, 77px, 0); } 95% { clip: rect(98px, 9999px, 10px, 0); } 100% { clip: rect(52px, 9999px, 58px, 0); } }
 @keyframes glitch-anim-2 { 0% { clip: rect(6px, 9999px, 94px, 0); } 5% { clip: rect(88px, 9999px, 12px, 0); } 10% { clip: rect(38px, 9999px, 68px, 0); } 15% { clip: rect(20px, 9999px, 85px, 0); } 20% { clip: rect(72px, 9999px, 18px, 0); } 25% { clip: rect(10px, 9999px, 90px, 0); } 30% { clip: rect(58px, 9999px, 32px, 0); } 35% { clip: rect(80px, 9999px, 8px, 0); } 40% { clip: rect(28px, 9999px, 78px, 0); } 45% { clip: rect(42px, 9999px, 52px, 0); } 50% { clip: rect(92px, 9999px, 25px, 0); } 55% { clip: rect(15px, 9999px, 82px, 0); } 60% { clip: rect(62px, 9999px, 42px, 0); } 65% { clip: rect(4px, 9999px, 70px, 0); } 70% { clip: rect(77px, 9999px, 10px, 0); } 75% { clip: rect(22px, 9999px, 88px, 0); } 80% { clip: rect(50px, 9999px, 48px, 0); } 85% { clip: rect(95px, 9999px, 38px, 0); } 90% { clip: rect(30px, 9999px, 60px, 0); } 95% { clip: rect(65px, 9999px, 15px, 0); } 100% { clip: rect(8px, 9999px, 98px, 0); } }
-/* --- End Restored Styles --- */
+/* --- End Cyber/Glitch Styles --- */
 
-.text-gradient {
-  background: linear-gradient(to right, #FF6B6B, #4ECDC4);
+.text-gradient { /* Themed gradient */
+  background: linear-gradient(to right, theme('colors.brand-pink'), theme('colors.brand-cyan'), theme('colors.brand-orange'));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-@keyframes glow {
-  0% {
-    text-shadow: 0 0 5px rgba(255, 107, 107, 0.5);
-  }
-  50% {
-    text-shadow: 0 0 20px rgba(255, 107, 107, 0.8);
-  }
-  100% {
-    text-shadow: 0 0 5px rgba(255, 107, 107, 0.5);
-  }
+@keyframes glow { /* Themed glow */
+  0% { text-shadow: 0 0 5px theme('colors.brand-pink / 50%'); }
+  50% { text-shadow: 0 0 20px theme('colors.brand-pink / 80%'), 0 0 30px theme('colors.brand-purple / 50%'); }
+  100% { text-shadow: 0 0 5px theme('colors.brand-pink / 50%'); }
 }
-
 .text-glow {
-  animation: glow 2s infinite;
+  animation: glow 2.5s infinite ease-in-out; /* Adjusted timing */
 }
-
 
 @keyframes pulse-slow {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 0.9; }
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.02); }
 }
 .animate-pulse-slow {
-  animation: pulse-slow 4s infinite;
+  animation: pulse-slow 3s infinite ease-in-out;
 }
+
 input[type="search"]::-webkit-search-cancel-button,
 input[type="search"]::-ms-clear {
-  display: none;
+  display: none; /* Keep this */
 }
 
+/* Comic bubble can be kept for specific use cases if desired, but generally won't fit the CyberVice theme */
 .comic-bubble {
   position: relative;
-  background: white;
-  border: 2px solid black;
+  background: theme('colors.dark-card'); /* Themed background */
+  border: 2px solid theme('colors.brand-pink'); /* Themed border */
   border-radius: 15px;
-}
-.font-comic {
-  font-family: "Comic Sans MS", "Chalkboard", sans-serif;
+  color: theme('colors.light-text');
 }
 
-/* Duplicated pulse-slow removed */
-/* @keyframes pulse-slow {
-    0%, 100% { opacity: 0.7; }
-    50% { opacity: 0.9; }
-  }
-.animate-pulse-slow {
-    animation: pulse-slow 4s infinite;
-  } */
-
-@keyframes neon {
-  0%,
-  100% {
-    text-shadow: 0 0 5px #00ffff, 0 0 10px #00ffff, 0 0 20px #00ffff;
+@keyframes neon-border-glow { /* Renamed and themed */
+  0%, 100% {
+    border-color: theme('colors.brand-cyan / 70%');
+    box-shadow: 0 0 5px theme('colors.brand-cyan / 50%'), 0 0 10px theme('colors.brand-cyan / 30%');
   }
   50% {
-    text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff;
+    border-color: theme('colors.brand-pink / 70%');
+    box-shadow: 0 0 8px theme('colors.brand-pink / 50%'), 0 0 15px theme('colors.brand-pink / 30%'), 0 0 5px theme('colors.brand-purple / 20%');
   }
 }
+.border-neon-glow { /* New class for applying this effect */
+  animation: neon-border-glow 2.5s infinite alternate;
+}
+
 
 @keyframes drift {
-  0% {
-    background-position: 0 0;
-  }
-  100% {
-    background-position: 200px 200px;
-  }
+  0% { background-position: 0 0; }
+  100% { background-position: 200px 200px; }
 }
 
-@font-face {
-  font-family: 'Orbitron';
-  src: url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
-}
+/* Removed duplicate @font-face for Orbitron, it's at the top */
 
-.shadow-glow {
-  box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+.shadow-glow { /* Themed box shadow glow */
+  box-shadow: 0 0 10px theme('colors.brand-cyan / 50%');
 }
-
 .shadow-glow:hover {
-  box-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
+  box-shadow: 0 0 15px theme('colors.brand-cyan / 70%'), 0 0 5px theme('colors.brand-pink / 30%');
 }
 
-/* New Glitch Border Animation */
+/* New Glitch Border Animation - Themed */
 @keyframes glitch-border {
-  0% { border-color: rgba(0, 255, 255, 0.3); box-shadow: 0 0 5px rgba(0, 255, 255, 0.2); }
-  25% { border-color: rgba(255, 0, 255, 0.3); box-shadow: 0 0 8px rgba(255, 0, 255, 0.3); }
-  50% { border-color: rgba(255, 255, 0, 0.3); box-shadow: 0 0 5px rgba(255, 255, 0, 0.2); }
-  75% { border-color: rgba(0, 255, 157, 0.3); box-shadow: 0 0 8px rgba(0, 255, 157, 0.3); }
-  100% { border-color: rgba(0, 255, 255, 0.3); box-shadow: 0 0 5px rgba(0, 255, 255, 0.2); }
+  0% { border-color: theme('colors.brand-cyan / 30%'); box-shadow: 0 0 5px theme('colors.brand-cyan / 20%'); }
+  25% { border-color: theme('colors.brand-pink / 30%'); box-shadow: 0 0 8px theme('colors.brand-pink / 30%'); }
+  50% { border-color: theme('colors.brand-yellow / 30%'); box-shadow: 0 0 5px theme('colors.brand-yellow / 20%'); }
+  75% { border-color: theme('colors.brand-green / 30%'); box-shadow: 0 0 8px theme('colors.brand-green / 30%'); }
+  100% { border-color: theme('colors.brand-cyan / 30%'); box-shadow: 0 0 5px theme('colors.brand-cyan / 20%'); }
 }
 .glitch-border-animate {
   animation: glitch-border 2s linear infinite;
 }
 
-/* Highlight scroll target */
+/* Highlight scroll target - Themed */
 .highlight-scroll {
   transition: outline 0.5s ease-out;
-  outline: 2px solid rgba(0, 255, 157, 0.7); /* brand-green glow */
+  outline: 2px solid theme('colors.brand-green / 70%'); /* brand-green glow */
   outline-offset: 2px;
-  box-shadow: 0 0 15px rgba(0, 255, 157, 0.5);
+  box-shadow: 0 0 15px theme('colors.brand-green / 50%');
+}
+
+/* Utility for animated gradient text */
+.text-animated-gradient {
+  @apply text-transparent bg-clip-text bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange;
+  background-size: 200% auto;
+  animation: gradient-text-flow 3s linear infinite;
+}
+
+@keyframes gradient-text-flow {
+  to {
+    background-position: 200% center;
+  }
+}
+
+/* Input field styling for CyberVice */
+@layer components {
+  .input-cyber {
+    @apply bg-dark-card border border-brand-purple/50 text-light-text placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm
+           focus:outline-none focus:ring-2 focus:ring-brand-pink focus:border-brand-pink
+           transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
+  }
+  .input-cyber:disabled {
+      @apply opacity-50 cursor-not-allowed;
+  }
+  .textarea-cyber {
+      @apply bg-dark-card border border-brand-purple/50 text-light-text placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm min-h-[80px]
+             focus:outline-none focus:ring-2 focus:ring-brand-pink focus:border-brand-pink
+             transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
+  }
 }

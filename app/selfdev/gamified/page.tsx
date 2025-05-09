@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
@@ -10,60 +10,128 @@ import {
 import {
   FaGlasses, FaMapSigns, FaBrain, FaExclamationTriangle, FaPlay, FaForward,
   FaPuzzlePiece, FaCogs, FaRoad, FaQuestionCircle, FaEye, FaBullseye, FaRulerCombined,
-  FaArrowsSpin, FaDumbbell, FaGamepad, FaLightbulb, FaRobot, FaRocket, FaBookOpen
-} from "react-icons/fa6"; // Use FaGlasses for the 'Sight' theme
+  FaArrowsSpin, FaDumbbell, FaGamepad, FaLightbulb, FaRobot, FaRocket, FaBookOpen,
+  FaBolt, FaToolbox, FaCode, FaBug, FaLink, FaMicrophone, FaVideo, FaDatabase, FaServer,
+  FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart,
+  FaUserAstronaut, FaHeart, FaUpLong, FaGithub, FaArrowUpRightFromSquare
+} from "react-icons/fa6";
 import { debugLogger } from "@/lib/debugLogger";
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import VibeContentRenderer from "@/components/VibeContentRenderer";
 
 type Language = 'en' | 'ru';
 
-// Generic, small, transparent placeholder for image blur
 const PLACEHOLDER_BLUR_URL = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMwMDAiIGZpbGwtb3BhY2l0eT0iMC4xIi8+PC9zdmc+";
 
-// Image Placeholders & Prompts (as described in the markdown)
 const imagePlaceholders = {
   placeholder1: {
-    url: "https://placehold.co/600x338/0d0d1a/FFF?text=Clarity+Lenses",
-    altEn: "Augmented reality glasses symbolizing clarity and vision",
-    altRu: "Очки дополненной реальности, символизирующие ясность и видение",
-    tooltipRu: "Визуализация 'линз ясности', помогающих преодолеть замешательство и обрести видение будущего.",
+    url: "https://placehold.co/600x338/0D0221/FF00FF?text=CyberSight+AR", // Updated colors
+    altEn: "Augmented reality glasses symbolizing clarity and cybernetic vision",
+    altRu: "Очки дополненной реальности, символизирующие кибер-ясность и видение",
+    tooltipRu: "Визуализация 'Кибер-Линз Ясности', помогающих взломать туман и спроектировать будущее.",
   },
   placeholder2: {
-    url: "https://placehold.co/600x338/0d0d1a/FFF?text=Gamified+Path",
-    altEn: "Life path transforming into a video game interface",
-    altRu: "Жизненный путь, превращающийся в интерфейс видеоигры",
-    tooltipRu: "Концепция геймификации жизни: уровни, цели, правила и обратная связь для направленного прогресса.",
+    url: "https://placehold.co/600x338/1A0A3D/00FFFF?text=LifeOS+Interface", // Updated colors
+    altEn: "Life path transforming into a futuristic OS interface",
+    altRu: "Жизненный путь, трансформирующийся в футуристический интерфейс ОС",
+    tooltipRu: "Концепция LifeOS: уровни, квесты, перки и нейро-обратная связь для ускоренной эволюции.",
   },
   placeholder3: {
-    url: "https://placehold.co/600x338/0d0d1a/FFF?text=AI+Sparring+Partner",
-    altEn: "AI assistant helping user navigate challenges",
-    altRu: "ИИ-ассистент, помогающий пользователю преодолевать вызовы",
-    tooltipRu: "ИИ как инструмент для самопознания, валидации идей и ускорения обучения на пути SelfDev.",
+    url: "https://placehold.co/600x338/6A0DAD/FFA500?text=AI+Co-Pilot", // Updated colors
+    altEn: "AI co-pilot assisting user in navigating digital challenges",
+    altRu: "ИИ-второй пилот, помогающий пользователю навигировать цифровые вызовы",
+    tooltipRu: "ИИ как твой нейро-усилитель для самопознания, валидации идей и экспоненциального обучения в CyberDev.",
   },
+  fitnessAppBrain: { // New placeholder based on user's image
+    url: "https://user-images.githubusercontent.com/19603209/289173111-ccb3b3d6-c16d-44f0-b873-3217b674622e.png", // Actual image URL
+    altEn: "Fitness app interface for brain training and skill leveling",
+    altRu: "Интерфейс фитнес-приложения для тренировки мозга и прокачки навыков",
+    tooltipRu: "Концепт 'CyberFitness': твои скиллы - мышцы, задачи - упражнения, AI - персональный тренер.",
+  }
 };
 
-// --- Section Data (Based on Video + Sight Theme) ---
+// --- Level Up System Data ---
+const levelUpSystem = [
+  { level: "0 → 1", icon: FaBolt, perk: "Instant Win / Image Swap", descriptionEn: "Fix a broken image. Copy URL -> Paste -> Upload new -> <strong>DONE</strong>. System auto-PRs. <strong>ANYONE</strong> can do this <em>NOW</em>. Your entry to the matrix.", descriptionRu: "Починить битую картинку. Скопируй URL -> Вставь -> Загрузи новую -> <strong>ГОТОВО</strong>. Система сама создаст PR! <strong>ЛЮБОЙ</strong> может это <em>ПРЯМО СЕЙЧАС</em>. Твой вход в матрицу.", color: "text-brand-green" },
+  { level: "1 → 2", icon: FaToolbox, perk: "Simple Idea / Generic Idea Flow", descriptionEn: "Simple idea? Change text/button? Give AI the idea + 1 file context -> PR. <strong>DONE.</strong> You command, AI executes.", descriptionRu: "Простая идея? Текст/кнопку поменять? Дай AI идею + 1 файл контекста -> PR. <strong>ГОТОВО.</strong> Ты сказал - AI сделал.", color: "text-brand-cyan" },
+  { level: "2 → 3", icon: FaCode, perk: "+Multi-File Context", descriptionEn: "Slightly complex? 2-5 files? Give AI idea + context -> Check AI's response in Assistant -> PR. <strong>DONE.</strong> You control more.", descriptionRu: "Чуть сложнее? 2-5 файлов? Дай AI идею + контекст -> Проверь ответ AI в Ассистенте -> PR. <strong>ГОТОВО.</strong> Ты контролируешь больше.", color: "text-brand-blue" },
+  { level: "3 → 4", icon: FaBug, perk: "Log Debugging / Error Fix Flow", descriptionEn: "Build failed? Runtime error? Use Error Overlay (<FaBug /> icon top-right on error) to copy error + logs -> Feed to AI with <strong>file context</strong> -> <strong>FIXED.</strong> +1 Vibe Perk: Debugging.", descriptionRu: "Упала сборка? Ошибка в рантайме? Используй Оверлей Ошибки (<FaBug /> иконка вверху справа при ошибке), чтобы скопировать ошибку и логи -> Скорми AI + <strong>контекст файла</strong> -> <strong>ПОЧИНЕНО.</strong> +1 Вайб Перк: Дебаггинг.", color: "text-brand-orange" },
+  { level: "4 → 5", icon: FaLink, perk: "Proactive Debug / Icon Hunt", descriptionEn: "Check Vercel logs (link in PR comment!) even *without* errors. Hunt for warnings. Tired of icon errors? Find the <em>perfect</em> Fa6 icon! Use <a href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-pink hover:underline font-semibold px-1'>FontAwesome Search <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/></a> -> Add to Quick Links -> Fix proactively. +1 Perk: Resourcefulness.", descriptionRu: "Проверяй логи Vercel (ссылка в комменте PR!) даже *без* ошибок. Ищи варнинги. Устал от ошибок иконок? Найди <em>идеальную</em> Fa6 иконку сам! Юзай <a href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-pink hover:underline font-semibold px-1'>Поиск FontAwesome <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/></a> -> Добавь в Быстрые Ссылки -> Фикси проактивно. +1 Перк: Находчивость.", color: "text-brand-yellow" },
+  { level: "5 → 6", icon: FaMicrophone, perk: "+Multimedia Input", descriptionEn: "Use audio commands! Attach videos! Watch them turn into page content automatically. +1 Perk: Multi-modal Input.", descriptionRu: "Используй аудио-команды! Прикрепляй видосы! Смотри, как они автоматом становятся контентом страницы. +1 Перк: Мультимодальный Ввод.", color: "text-brand-purple" },
+  { level: "6 → 7", icon: FaDatabase, perk: "+SQL/DB Interaction", descriptionEn: "Discover new file types! AI generates SQL -> Paste into Supabase (1 click) -> <strong>DONE.</strong> Same flow, different context. +1 Perk: Data Handling.", descriptionRu: "Открой новые типы файлов! AI генерит SQL -> Вставь в Supabase (1 клик) -> <strong>ГОТОВО.</strong> Тот же флоу, другой контекст. +1 Перк: Работа с Данными.", color: "text-neon-lime" },
+  { level: "8-10+", icon: FaServer, perk: "+Independence / Full Stack Vibe", descriptionEn: "Deploy your OWN CyberVibe! Use/steal my Supabase! Set your own Bot Token! Build your own XTRs! <strong>UNLIMITED POWER!</strong>", descriptionRu: "Разверни свой CyberVibe! Юзай/спи*ди мою Supabase! Поставь свой Токен Бота! Строй свои XTR-ы! <strong>БЕЗГРАНИЧНАЯ МОЩЬ!</strong>", color: "text-brand-pink" },
+  { level: "11", icon: FaMagnifyingGlass, perk: "Code Scanner Vision", descriptionEn: "Your eyes <FaEye /> become <em>code scanners</em>. Instantly spot missing imports, typos, or logic flaws just by scrolling. You see the matrix.", descriptionRu: "Твои глаза <FaEye /> становятся <em>сканерами кода</em>. Мгновенно видишь пропущенные импорты, опечатки, логические дыры, просто скролля. Ты видишь матрицу.", color: "text-brand-cyan" },
+  { level: "12", icon: FaMemory, perk: "Context Commander", descriptionEn: "65k tokens? <em class='text-purple-400'>Pfft, child's play.</em> You effortlessly juggle massive code context, guiding the AI through complex refactors like a <FaUserAstronaut /> surfing a nebula.", descriptionRu: "65к токенов? <em class='text-purple-400'>Пфф, детский сад.</em> Ты легко жонглируешь гигантским контекстом кода, ведя AI через сложнейшие рефакторинги, как <FaUserAstronaut /> на серфе по небуле.", color: "text-brand-purple" },
+  { level: "13", icon: FaKeyboard, perk: "Vibe Channeler", descriptionEn: "Forget typing; you <em>channel</em> the vibe <FaHeart className='text-pink-400' />. Detailed prompts, intricate edits, non-stop creation for 10+ minutes. You're not working; you're in <em>flow</em>, bending the digital world to your will.", descriptionRu: "Забудь про 'печатать', ты <em>ченнелишь</em> вайб <FaHeart className='text-pink-400' />. Детальные промпты, сложные правки, непрерывное творение >10 минут. Ты не работаешь, ты в <em>потоке</em>, изменяя цифровую реальность под себя.", color: "text-brand-pink" },
+  { level: "14", icon: FaBriefcase, perk: "Efficiency Ninja", descriptionEn: "Why make two trips? You seamlessly weave small, unrelated tasks into larger AI requests. <em class='text-cyan-400'>Maximum efficiency, minimum context switching.</em> Your workflow is a finely tuned engine.", descriptionRu: "Зачем ходить дважды? Ты легко вплетаешь мелкие, несвязанные задачи в крупные запросы к AI. <em class='text-cyan-400'>Максимум эффективности, минимум переключений.</em> Твой воркфлоу - идеально настроенный движок.", color: "text-brand-blue" },
+  { level: "15", icon: FaMagnifyingGlassChart, perk: "Log Whisperer <FaBrain/>", descriptionEn: "WITH AI! You don't just read logs; you <em class='text-yellow-400'>interrogate</em> them. Spotting the delta between the *plan* (HasBeenPlanter logs) and the *reality* becomes second nature. Root causes reveal themselves.", descriptionRu: "С ПОМОЩЬЮ AI! Ты не читаешь логи, ты их <em class='text-yellow-400'>допрашиваешь</em>. Увидеть разницу между *планом* (логи HasBeenPlanter) и *реальностью* становится второй натурой. Корневые причины сами себя выдают.", color: "text-brand-yellow" },
+];
+
+
+// --- Section Data (Combined from original page and user's audio) ---
 const sections = [
   {
-    id: "intro",
+    id: "intro", // Dan Koe inspired
     icon: FaMapSigns,
-    titleEn: "Lost in the Fog? Put On Your 'Sight' Lenses",
-    titleRu: "Потерян в Тумане? Надень 'Линзы Ясности'",
+    titleEn: "Lost in the Fog? Activate Your CyberSight OS",
+    titleRu: "Потерян в Тумане? Активируй CyberSight OS",
     pointsEn: [
       "Feeling confused, lost, or on the verge of giving up is normal. It often takes <strong class='font-semibold text-brand-yellow'>1-2 months</strong> of this 'Limbo' phase for true vision to form.",
-      "Like wearing new AR glasses, we need a <strong class='font-semibold text-brand-yellow'>new perspective</strong> to turn life into an engaging game instead of a confusing struggle.",
-      "This isn't about finding a pre-made path, but <strong class='font-semibold text-brand-yellow'>designing YOUR game</strong> based on YOUR desired reality.",
+      "Like upgrading to CyberSight OS, we need a <strong class='font-semibold text-brand-yellow'>new perspective</strong> to turn life into an engaging game instead of a confusing struggle.",
+      "This isn't about finding a pre-made path, but <strong class='font-semibold text-brand-yellow'>designing YOUR game</strong> based on YOUR desired reality. This is your CyberDev journey.",
     ],
     pointsRu: [
       "Чувство замешательства, потерянности или желание все бросить – это нормально. Часто требуется <strong class='font-semibold text-brand-yellow'>1-2 месяца</strong> этой фазы 'Лимбо', чтобы сформировалось истинное видение.",
-      "Словно надевая новые AR-очки, нам нужна <strong class='font-semibold text-brand-yellow'>новая перспектива</strong>, чтобы превратить жизнь в увлекательную игру вместо запутанной борьбы.",
-      "Речь не о поиске готового пути, а о <strong class='font-semibold text-brand-yellow'>создании ТВОЕЙ игры</strong>, основанной на ТВОЕЙ желаемой реальности.",
+      "Словно обновляясь до CyberSight OS, нам нужна <strong class='font-semibold text-brand-yellow'>новая перспектива</strong>, чтобы превратить жизнь в увлекательную игру вместо запутанной борьбы.",
+      "Речь не о поиске готового пути, а о <strong class='font-semibold text-brand-yellow'>создании ТВОЕЙ игры</strong>, основанной на ТВОЕЙ желаемой реальности. Это твой CyberDev путь.",
     ],
     imageUrlKey: "placeholder1",
   },
-  {
+  { // New section for CyberStudio & "Anti-Glasses"
+    id: "cyberstudio_intro",
+    icon: FaGlasses, // Using FaGlasses for "anti-glasses" concept
+    titleEn: "CyberStudio: Your Anti-Glasses for the Matrix",
+    titleRu: "CyberStudio: Твои Анти-Очки для Матрицы",
+    pointsEn: [
+        "If the virtual world seems daunting, CyberStudio (this platform!) acts as your 'anti-glasses'.",
+        "Instead of overlaying complexity, it <strong class='font-semibold text-brand-green'>simplifies interaction</strong>, making you fearless in the digital realm.",
+        "Every 'small task', like registering on <FaGithub class='inline mx-1 text-gray-400 align-baseline'/>, isn't a hurdle but a <strong class='font-semibold text-brand-green'>micro-level-up</strong>. Each click is a skill gained.",
+        "This studio is your <strong class='font-semibold text-brand-green'>training dojo</strong> to co-create with AI, remix knowledge, and transmute ideas into reality instantly.",
+        "The Vibe Loop (<FaUpLong class='inline text-purple-400'/> <Link href='/repo-xml#cybervibe-section' class='text-brand-purple hover:underline'>see on RepoXML</Link>) is your compounding feedback engine: every action levels you up."
+    ],
+    pointsRu: [
+        "Если виртуальный мир кажется пугающим, CyberStudio (эта платформа!) — твои 'анти-очки'.",
+        "Вместо наложения сложности, она <strong class='font-semibold text-brand-green'>упрощает взаимодействие</strong>, делая тебя бесстрашным в цифровом мире.",
+        "Каждая 'мелочь', типа регистрации на <FaGithub class='inline mx-1 text-gray-400 align-baseline'/>, — не преграда, а <strong class='font-semibold text-brand-green'>микро-level-up</strong>. Каждый клик — это полученный навык.",
+        "Эта студия — твое <strong class='font-semibold text-brand-green'>тренировочное додзё</strong> для со-творчества с AI, ремикса знаний и мгновенной трансмутации идей в реальность.",
+        "Петля Вайба (<FaUpLong class='inline text-purple-400'/> <Link href='/repo-xml#cybervibe-section' class='text-brand-purple hover:underline'>смотри на RepoXML</Link>) — твой накопительный движок обратной связи: каждое действие качает тебя."
+    ],
+  },
+  { // Section for Level Up system, Fitness App for Brain
+    id: "levelup_fitness",
+    icon: FaDumbbell,
+    titleEn: "CyberFitness: Level Up Your Brain OS",
+    titleRu: "КиберФитнес: Прокачай ОС Своего Мозга",
+    pointsEn: [
+        "Think of this as your <strong class='font-semibold text-brand-cyan'>fitness app for the brain</strong>. Your skills are muscles, tasks are exercises, and AI is your personal trainer.",
+        "The secret: <strong class='font-semibold text-brand-cyan'>You're not asking the bot for help, YOU are helping the BOT guide its power.</strong>",
+        "Each level up is <strong class='font-semibold text-brand-cyan'>inevitable</strong> because you get too lazy for the old way. One extra click, one new skill, and you're automatically stronger. There's <strong>NO GOING BACK!</strong>",
+        "Your 'Bandwidth' (context capacity, problem-solving speed) increases with each level. Aim to expand it!",
+        "Instead of calorie tracking, you track <strong class='font-semibold text-brand-cyan'>'KiloVibes' or 'Context Tokens'</strong> processed. Instead of meal plans, you get <strong class='font-semibold text-brand-cyan'>AI Prompt Blueprints</strong>."
+    ],
+    pointsRu: [
+        "Думай об этом как о <strong class='font-semibold text-brand-cyan'>фитнес-приложении для мозга</strong>. Твои навыки — мышцы, задачи — упражнения, а AI — твой персональный тренер.",
+        "Секрет: <strong class='font-semibold text-brand-cyan'>Не ты просишь бота помочь, а ТЫ помогаешь БОТУ направлять его мощь.</strong>",
+        "Каждый левел-ап <strong class='font-semibold text-brand-cyan'>неизбежен</strong>, потому что тебе становится лень делать по-старому. Один лишний клик, один новый скилл — и ты автоматом сильнее. И <strong>НАЗАД ДОРОГИ НЕТ!</strong>",
+        "Твой 'Bandwidth' (объем контекста, скорость решения проблем) растет с каждым уровнем. Цель — расширять его!",
+        "Вместо подсчета калорий ты отслеживаешь <strong class='font-semibold text-brand-cyan'>'КилоВайбы' или 'Токены Контекста'</strong>. Вместо планов питания — <strong class='font-semibold text-brand-cyan'>Чертежи AI Промптов</strong>."
+    ],
+    imageUrlKey: "fitnessAppBrain",
+    levelSystem: levelUpSystem, // Attach the level system here
+  },
+  { // Dan Koe phases
     id: "phases",
     icon: FaArrowsSpin,
     titleEn: "The 4 Phases of Your Life's Game Levels",
@@ -83,7 +151,9 @@ const sections = [
       "Большинство застревают в Лимбо, потому что их научили следовать сценариям и ждать внешней уверенности, интерпретируя 'чувство потерянности' как плохой знак, а не как <strong class='font-semibold text-brand-yellow'>необходимую отправную точку</strong>.",
     ],
   },
-  {
+    // ... (Rest of Dan Koe inspired sections: escape_limbo, build_vision, gamify, stay_edge, tools, conclusion)
+    // These are kept from your original structure, I'll just ensure VibeContentRenderer is used
+   {
     id: "escape_limbo",
     icon: FaRoad,
     titleEn: "Step 1: Escape Limbo - Define Your Anti-Vision",
@@ -152,7 +222,7 @@ const sections = [
   },
   {
     id: "stay_edge",
-    icon: FaDumbbell,
+    icon: FaDumbbell, // Keep dumbbell for consistency with previous level section
     titleEn: "Bonus Level: Stay at the Edge (Flow & Growth)",
     titleRu: "Бонусный Уровень: Оставайся на Грани (Поток и Рост)",
     pointsEn: [
@@ -173,8 +243,8 @@ const sections = [
    {
     id: "tools",
     icon: FaRobot,
-    titleEn: "Power-Ups: AI Coach & Resources",
-    titleRu: "Усиления: AI-Коуч и Ресурсы",
+    titleEn: "Power-Ups: AI Co-Pilot & Resources",
+    titleRu: "Усиления: AI-Второй Пилот и Ресурсы",
     pointsEn: [
       "Dan Koe created an AI prompt designed to act as a <strong class='font-semibold text-brand-yellow'>LifeQuest AI coach</strong>.",
       "This prompt helps you identify your current life phase, discover potential directions, and structures your findings into a game format (Main Quest, Side Quests, Character Stats, Level System, Rules, Tutorial Phase, etc.).",
@@ -194,21 +264,21 @@ const sections = [
   {
     id: "conclusion",
     icon: FaRocket,
-    titleEn: "Launch Your Game!",
-    titleRu: "Запусти Свою Игру!",
+    titleEn: "Launch Your CyberLife Game!",
+    titleRu: "Запусти Свою КиберЖизнь Игру!",
     pointsEn: [
       "Stop waiting for perfect clarity or external permission.",
-      "Use these frameworks (Anti-Vision, Vision, Game Design) to <strong class='font-semibold text-neon-lime'>start now</strong>.",
-      "Embrace the 'Limbo' as the start line, collect your vision pieces, design your initial game rules, and <strong class='font-semibold text-neon-lime'>start playing</strong>.",
-      "Your path will become clearer as you move, learn, and adapt. The 'Sight' lenses get clearer with use.",
-      "Explore related concepts in <Link href='/selfdev' class='text-brand-green hover:underline font-semibold'>SelfDev</Link> and <Link href='/p-plan' class='text-brand-purple hover:underline font-semibold'>P-Plan</Link> for practical application.",
+      "Use these frameworks (Anti-Vision, Vision, Game Design, CyberStudio Levels) to <strong class='font-semibold text-neon-lime'>start now</strong>.",
+      "Embrace 'Limbo' as the start line, collect your vision pieces, design your initial game rules, and <strong class='font-semibold text-neon-lime'>start playing and leveling up</strong>.",
+      "Your path will become clearer as you move, learn, and adapt. The 'CyberSight OS' gets clearer with use.",
+      "Explore related concepts in <Link href='/selfdev' class='text-brand-green hover:underline font-semibold'>SelfDev Intro</Link> and <Link href='/p-plan' class='text-brand-purple hover:underline font-semibold'>P-Plan (Cyber Alchemist's Grimoire)</Link> for practical application.",
     ],
     pointsRu: [
       "Перестань ждать идеальной ясности или внешнего разрешения.",
-      "Используй эти фреймворки (Анти-Видение, Видение, Дизайн Игры), чтобы <strong class='font-semibold text-neon-lime'>начать сейчас</strong>.",
-      "Прими 'Лимбо' как стартовую линию, собери кусочки своего видения, спроектируй начальные правила игры и <strong class='font-semibold text-neon-lime'>начни играть</strong>.",
-      "Твой путь прояснится по мере движения, обучения и адаптации. 'Линзы Ясности' становятся четче с использованием.",
-      "Изучи связанные концепции в <Link href='/selfdev' class='text-brand-green hover:underline font-semibold'>SelfDev</Link> и <Link href='/p-plan' class='text-brand-purple hover:underline font-semibold'>P-Plan</Link> для практического применения.",
+      "Используй эти фреймворки (Анти-Видение, Видение, Дизайн Игры, Уровни CyberStudio), чтобы <strong class='font-semibold text-neon-lime'>начать сейчас</strong>.",
+      "Прими 'Лимбо' как стартовую линию, собери кусочки своего видения, спроектируй начальные правила игры и <strong class='font-semibold text-neon-lime'>начни играть и прокачиваться</strong>.",
+      "Твой путь прояснится по мере движения, обучения и адаптации. 'CyberSight OS' становится четче с использованием.",
+      "Изучи связанные концепции во <Link href='/selfdev' class='text-brand-green hover:underline font-semibold'>Введении в SelfDev</Link> и <Link href='/p-plan' class='text-brand-purple hover:underline font-semibold'>P-Plan (Гримуар Кибер-Алхимика)</Link> для практического применения.",
     ],
   },
 ];
@@ -224,66 +294,64 @@ export default function GamifiedSelfDevPage() {
     const browserLang = typeof navigator !== 'undefined' ? navigator.language.split('-')[0] : 'ru';
     const initialLang = user?.language_code === 'ru' || (!user?.language_code && browserLang === 'ru') ? 'ru' : 'en';
     setSelectedLang(initialLang);
-    debugLogger.log(`[GamifiedSelfDevPage] Mounted. Browser lang: ${browserLang}, User lang: ${user?.language_code}, Initial selected: ${initialLang}`);
+    debugLogger.log(`[GamifiedSelfDevPage] Mounted. Initial selected: ${initialLang}`);
   }, [user?.language_code]);
+
+  const pageThemeColor = "brand-pink"; // Main theme for this page
+  const pageBorderColor = `border-${pageThemeColor}/40`; // Slightly more visible border
+  const pageTextColor = `text-${pageThemeColor}`;
+  const pageShadowColor = `shadow-[0_0_35px_theme(colors.brand-pink / 0.5)]`; // Use Tailwind's theme()
 
   if (!isMounted) {
     return (
-      <div className="flex justify-center items-center min-h-screen pt-20 bg-gradient-to-br from-gray-900 via-black to-gray-800">
-        <p className="text-brand-yellow animate-pulse text-xl font-mono">Загрузка геймификации SelfDev...</p>
+      <div className="flex justify-center items-center min-h-screen pt-20 bg-gradient-to-br from-dark-bg via-black to-dark-card">
+        <p className={`${pageTextColor} animate-pulse text-xl font-orbitron`}>Загрузка CyberDev OS...</p>
       </div>
     );
   }
 
-  const pageThemeColor = "brand-yellow"; // Yellow theme for clarity/gamification
-  const pageBorderColor = `border-${pageThemeColor}/30`;
-  const pageTextColor = `text-${pageThemeColor}`;
-  const pageShadowColor = `shadow-[0_0_30px_rgba(255,193,7,0.4)]`; // Yellow shadow
-
   return (
-    <div className="relative min-h-screen overflow-hidden pt-20 pb-10 bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200">
-      {/* .. Background Grid */}
+    <div className="relative min-h-screen overflow-hidden pt-20 pb-10 bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text">
       <div
         className="absolute inset-0 bg-repeat opacity-[0.03] z-0"
         style={{
-          backgroundImage: `linear-gradient(to right, rgba(255, 193, 7, 0.4) 1px, transparent 1px),
-                            linear-gradient(to bottom, rgba(255, 193, 7, 0.4) 1px, transparent 1px)`,
-          backgroundSize: '60px 60px',
+          backgroundImage: `linear-gradient(to right, theme(colors.brand-pink / 0.3) 1px, transparent 1px),
+                            linear-gradient(to bottom, theme(colors.brand-pink / 0.3) 1px, transparent 1px)`,
+          backgroundSize: '70px 70px', // Larger grid for more "digital" feel
         }}
       ></div>
 
-      <TooltipProvider delayDuration={150}>
+      <TooltipProvider delayDuration={100}>
         <div className="relative z-10 container mx-auto px-4">
           <Card className={cn(
-              "max-w-4xl mx-auto bg-black/85 backdrop-blur-lg text-white rounded-2xl border",
+              "max-w-4xl mx-auto bg-black/90 backdrop-blur-xl text-white rounded-2xl border-2",
               pageBorderColor,
               pageShadowColor
           )}>
-            <CardHeader className={cn("text-center border-b pb-4", `border-${pageThemeColor}/20`)}>
-              <FaGlasses className={`mx-auto text-5xl mb-4 ${pageTextColor} animate-pulse`} />
-              <CardTitle className={cn("text-3xl md:text-5xl font-bold cyber-text glitch", pageTextColor)} data-text="Gamify Your Life: The 'Sight' Method">
-                 Gamify Your Life: The 'Sight' Method
+            <CardHeader className={cn("text-center border-b pb-6 pt-8", `border-${pageThemeColor}/30`)}>
+              <FaGamepad className={`mx-auto text-6xl mb-4 ${pageTextColor} animate-neon-flicker`} />
+              <CardTitle className={cn("text-4xl md:text-5xl font-bold font-orbitron glitch", pageTextColor)} data-text="CyberDev OS: Твой Level Up">
+                 CyberDev OS: Твой Level Up
               </CardTitle>
-              <p className="text-md md:text-lg text-gray-300 mt-3 font-mono">
-                 {selectedLang === 'ru'
-                    ? "Преврати замешательство в ясность и действие, используя игровую механику."
-                    : "Turn confusion into clarity and action using game mechanics."}
-              </p>
-               <p className="text-sm text-gray-400 mt-1">
-                 {selectedLang === 'ru' ? "По мотивам Дэна Ко и фильма 'Sight - Extended'" : "Inspired by Dan Koe & 'Sight - Extended'"}
-               </p>
+              <div className="text-md md:text-lg text-gray-300 mt-4 font-mono">
+                 <VibeContentRenderer content={selectedLang === 'ru'
+                    ? "Преврати жизнь в игру с <strong class='text-brand-cyan'>CyberSight OS</strong>. Прокачивай <strong class='text-brand-green'>мозг</strong>, взламывай <strong class='text-brand-yellow'>реальность</strong>."
+                    : "Turn life into a game with <strong class='text-brand-cyan'>CyberSight OS</strong>. Level up your <strong class='text-brand-green'>brain</strong>, hack <strong class='text-brand-yellow'>reality</strong>."} />
+              </div>
+               <div className="text-sm text-gray-400 mt-2 font-mono">
+                 <VibeContentRenderer content={selectedLang === 'ru' ? "Вдохновлено: <strong class='text-gray-200'>Дэн Ко + Sight (фильм) + Твои Аудио-Промпты</strong>" : "Inspired by: <strong class='text-gray-200'>Dan Koe + Sight (movie) + Your Audio Prompts</strong>"} />
+               </div>
             </CardHeader>
 
-            <CardContent className="space-y-12 p-4 md:p-8">
-              {/* .. Language Toggle */}
-              <div className="flex justify-center space-x-2 mb-8">
+            <CardContent className="space-y-16 p-5 md:p-8"> {/* Increased spacing */}
+              <div className="flex justify-center space-x-3 mb-10">
                  <Button
                    variant={selectedLang === 'ru' ? 'secondary' : 'outline'}
                    size="sm"
                    onClick={() => setSelectedLang('ru')}
                    className={cn(
-                       `border-${pageThemeColor}/50`,
-                       selectedLang === 'ru' ? `bg-${pageThemeColor}/20 ${pageTextColor} hover:bg-${pageThemeColor}/30` : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                       `border-brand-pink/60 font-semibold font-orbitron text-xs py-2 px-4 rounded-md transition-all duration-200 hover:shadow-lg`,
+                       selectedLang === 'ru' ? `bg-brand-pink/80 text-black hover:bg-brand-pink shadow-brand-pink/30` : `text-brand-pink hover:bg-brand-pink/20 hover:text-white`
                    )}
                  >
                    🇷🇺 Русский
@@ -293,21 +361,19 @@ export default function GamifiedSelfDevPage() {
                     size="sm"
                     onClick={() => setSelectedLang('en')}
                     className={cn(
-                       "border-brand-green/50",
-                       selectedLang === 'en' ? 'bg-brand-green/20 text-brand-green hover:bg-brand-green/30' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                       "border-brand-cyan/60 font-semibold font-orbitron text-xs py-2 px-4 rounded-md transition-all duration-200 hover:shadow-lg",
+                       selectedLang === 'en' ? 'bg-brand-cyan/80 text-black hover:bg-brand-cyan shadow-brand-cyan/30' : `text-brand-cyan hover:bg-brand-cyan/20 hover:text-white`
                     )}
                  >
                    🇬🇧 English
                  </Button>
               </div>
 
-              {/* .. Sections Rendering */}
               {sections.map((section, index) => {
                 const IconComponent = section.icon;
-                // Cycle through a palette including the main theme color
-                const themePalette = ["text-brand-yellow", "text-brand-cyan", "text-brand-pink", "text-brand-green", "text-brand-purple", "text-brand-orange"];
-                const themeColor = themePalette[index % themePalette.length];
-                const borderColor = themeColor.replace("text-", "border-");
+                const themePalette = ["text-brand-pink", "text-brand-cyan", "text-brand-green", "text-brand-yellow", "text-brand-purple", "text-brand-orange"];
+                const currentThemeColor = themePalette[index % themePalette.length];
+                const currentBorderColor = currentThemeColor.replace("text-", "border-");
                 const currentTitle = selectedLang === 'en' ? section.titleEn : section.titleRu;
                 const currentPoints = selectedLang === 'en' ? section.pointsEn : section.pointsRu;
                 const imageInfo = section.imageUrlKey ? imagePlaceholders[section.imageUrlKey as keyof typeof imagePlaceholders] : null;
@@ -316,60 +382,79 @@ export default function GamifiedSelfDevPage() {
                 const currentTooltip = selectedLang === 'ru' ? imageInfo?.tooltipRu : null;
 
                 return (
-                  <section key={section.id} className={`space-y-4 border-l-4 pl-4 md:pl-6 ${borderColor}`}>
-                    <h2 className={`flex items-center text-2xl md:text-3xl font-semibold ${themeColor} mb-4 font-orbitron`}>
-                      <IconComponent className={`mr-3 ${themeColor}/80 flex-shrink-0`} /> {currentTitle}
+                  <section key={section.id} className={cn(`space-y-5 border-l-4 pl-4 md:pl-6 py-4 rounded-r-md bg-dark-card/30`, `${currentBorderColor}/70`, `hover:shadow-md hover:shadow-${currentBorderColor.split('-')[1]}/20 transition-shadow`)}>
+                    <h2 className={`flex items-center text-2xl md:text-3xl font-semibold ${currentThemeColor} mb-3 font-orbitron`}>
+                      <IconComponent className={`mr-3 ${currentThemeColor}/80 flex-shrink-0 text-2xl`} />
+                       <VibeContentRenderer content={currentTitle} />
                     </h2>
 
                     {currentPoints.length > 0 && (
-                      <ul className="list-disc list-outside space-y-2 text-gray-300 pl-5 text-base md:text-lg leading-relaxed">
+                      <div className="prose prose-sm md:prose-base prose-invert max-w-none prose-strong:font-orbitron prose-strong:tracking-wide prose-a:text-brand-blue hover:prose-a:text-brand-cyan prose-li:marker:text-currentThemeColor/70">
                         {currentPoints.map((point, i) => (
-                          <li key={`${selectedLang}-${section.id}-${i}`} dangerouslySetInnerHTML={{ __html: point }}></li>
+                          <VibeContentRenderer key={`${selectedLang}-${section.id}-point-${i}`} content={`<li>${point}</li>`} />
                         ))}
-                      </ul>
+                      </div>
+                    )}
+                    
+                    {/* Render Level System if present */}
+                    {section.id === "levelup_fitness" && section.levelSystem && (
+                        <div className="mt-6 space-y-4">
+                            <h3 className="text-xl font-orbitron text-center text-brand-yellow mb-4">
+                                {selectedLang === 'ru' ? 'Система Прокачки CyberStudio:' : 'CyberStudio Level Up System:'}
+                            </h3>
+                            {section.levelSystem.map(lvl => {
+                                const LvlIcon = lvl.icon;
+                                return (
+                                <div key={lvl.level} className={`p-3 border-l-4 ${lvl.color.replace('text-', 'border-')} bg-dark-bg/50 rounded-md shadow-sm`}>
+                                    <h4 className={`font-orbitron ${lvl.color} flex items-center`}>
+                                        <LvlIcon className="mr-2" />
+                                        {selectedLang === 'ru' ? 'Лв.' : 'Lv.'}{lvl.level} - <VibeContentRenderer content={lvl.perk} />
+                                    </h4>
+                                    <div className="text-xs text-gray-400 mt-1 pl-6">
+                                        <VibeContentRenderer content={selectedLang === 'ru' ? lvl.descriptionRu : lvl.descriptionEn} />
+                                    </div>
+                                </div>
+                                );
+                            })}
+                             <p className="text-xs text-gray-500 text-center mt-4">
+                               <VibeContentRenderer content={selectedLang === 'ru' ? "Детальное описание системы уровней и прогрессии смотри на <Link href='/repo-xml#philosophy-steps' class='text-brand-purple hover:underline'>SuperVibe Studio</Link>!" : "See detailed level system and progression on the <Link href='/repo-xml#philosophy-steps' class='text-brand-purple hover:underline'>SuperVibe Studio</Link> page!"} />
+                             </p>
+                        </div>
                     )}
 
+
                     {currentImageUrl && currentImageAlt && (
-                      <div className={`my-6 p-2 border ${borderColor}/30 rounded-lg bg-black/30 max-w-md mx-auto`}>
+                      <div className={`my-6 p-2 border ${currentBorderColor}/30 rounded-lg bg-black/50 max-w-md mx-auto shadow-lg`}>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-800/50 cursor-help relative">
+                            <div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-900/60 cursor-help relative">
                               <Image
                                 src={currentImageUrl} alt={currentImageAlt} width={600} height={338}
-                                className="w-full h-full object-contain opacity-90 hover:opacity-100 transition-opacity duration-300"
+                                className="w-full h-full object-contain opacity-80 hover:opacity-100 transition-all duration-300 ease-in-out transform hover:scale-105"
                                 loading="lazy" placeholder="blur" blurDataURL={PLACEHOLDER_BLUR_URL}
                                 onError={(e) => {
                                   debugLogger.error(`Failed to load image: ${currentImageUrl}`);
-                                  e.currentTarget.style.display = 'none';
+                                  (e.target as HTMLImageElement).style.display = 'none';
                                 }}
                               />
                             </div>
                           </TooltipTrigger>
                           {currentTooltip && (
-                            <TooltipContent side="bottom" className={`max-w-[300px] text-center bg-gray-950 ${borderColor}/60 text-white p-3 shadow-lg border`}>
-                              <p className="text-sm whitespace-pre-wrap">{currentTooltip}</p>
+                            <TooltipContent side="bottom" className={`max-w-xs text-center bg-dark-bg ${currentBorderColor}/60 text-white p-3 shadow-2xl border`}>
+                              <p className="text-sm whitespace-pre-wrap font-mono">{currentTooltip}</p>
                             </TooltipContent>
                           )}
                         </Tooltip>
-                        <p className="text-xs text-center text-gray-400 mt-1 italic">{currentImageAlt}</p>
+                        <p className="text-xs text-center text-gray-500 mt-2 italic font-mono">{currentImageAlt}</p>
                       </div>
                     )}
-                     {/* Specific links related to AI Coach */}
                      {section.id === 'tools' && (
-                        <div className="mt-4 text-sm text-center">
+                        <div className="mt-6 text-sm text-center space-y-2">
                             <p className="text-gray-400">
-                                {selectedLang === 'ru' ? 'Найди AI-промпт в ' : 'Find the AI prompt in the '}
-                                <a href="https://docs.google.com/document/d/1n_8py56cYMLsv_QEgK7JjHjVp4Uep037cGwnsYdkQ7c/edit?usp=sharing" target="_blank" rel="noopener noreferrer" className={`font-semibold hover:underline ${pageTextColor}`}>
-                                    Digital Economics Stack
-                                </a>
-                                {selectedLang === 'ru' ? ' (скоро будет локализован).' : '.'}
+                                <VibeContentRenderer content={selectedLang === 'ru' ? 'Найди AI-промпт (LifeQuest AI Coach от Dan Koe) в <a href="https://docs.google.com/document/d/1n_8py56cYMLsv_QEgK7JjHjVp4Uep037cGwnsYdkQ7c/edit?usp=sharing" target="_blank" rel="noopener noreferrer" class="font-semibold hover:underline text-brand-yellow">Digital Economics Stack</a> (скоро будет локализован).' : 'Find the AI prompt (LifeQuest AI Coach by Dan Koe) in the <a href="https://docs.google.com/document/d/1n_8py56cYMLsv_QEgK7JjHjVp4Uep037cGwnsYdkQ7c/edit?usp=sharing" target="_blank" rel="noopener noreferrer" class="font-semibold hover:underline text-brand-yellow">Digital Economics Stack</a>.'} />
                             </p>
-                             <p className="text-gray-400 mt-1">
-                                {selectedLang === 'ru' ? 'Или изучи ' : 'Or explore the '}
-                                <a href="https://thedankoe.com/ai-content-systems/" target="_blank" rel="noopener noreferrer" className={`font-semibold hover:underline ${pageTextColor}`}>
-                                    AI Content Systems Mini-Course
-                                </a>
-                                {selectedLang === 'ru' ? '.' : '.'}
+                             <p className="text-gray-400">
+                               <VibeContentRenderer content={selectedLang === 'ru' ? 'Или изучи <a href="https://thedankoe.com/ai-content-systems/" target="_blank" rel="noopener noreferrer" class="font-semibold hover:underline text-brand-yellow">AI Content Systems Mini-Course</a>.' : 'Or explore the <a href="https://thedankoe.com/ai-content-systems/" target="_blank" rel="noopener noreferrer" class="font-semibold hover:underline text-brand-yellow">AI Content Systems Mini-Course</a>.'} />
                             </p>
                         </div>
                     )}
@@ -377,16 +462,14 @@ export default function GamifiedSelfDevPage() {
                 );
               })}
 
-              {/* .. Concluding section */}
-              <section className="text-center pt-8 border-t border-brand-yellow/20 mt-10">
-                 <p className="text-gray-400 italic">
-                   {selectedLang === 'ru' ? "Геймификация — мощный инструмент для SelfDev. Начни проектировать свою игру сегодня!" : "Gamification is a powerful tool for SelfDev. Start designing your game today!"}
-                 </p>
-                 <p className="mt-4 text-gray-300">
-                   {selectedLang === 'ru' ? "Примени эти принципы к своему пути на" : "Apply these principles to your journey in"} <Link href="/selfdev" className="text-brand-green hover:underline font-semibold">SelfDev</Link>, {selectedLang === 'ru' ? "спланируй с помощью" : "plan with"} <Link href="/p-plan" className="text-brand-purple hover:underline font-semibold">P-Plan</Link>, {selectedLang === 'ru' ? "и начни быстро с" : "and"} <Link href="/jumpstart" className="text-neon-lime hover:underline font-semibold">Jumpstart</Link>.
-                 </p>
+              <section className="text-center pt-10 border-t border-brand-pink/30 mt-16">
+                 <div className="text-lg text-gray-300 prose prose-invert max-w-none prose-a:text-brand-blue">
+                   <VibeContentRenderer content={selectedLang === 'ru' ? "Геймификация — мощный инструмент для CyberDev. Начни проектировать свою игру и <strong class='text-neon-lime'>прокачивать свой мозг</strong> сегодня!" : "Gamification is a powerful tool for CyberDev. Start designing your game and <strong class='text-neon-lime'>leveling up your brain</strong> today!"} />
+                 </div>
+                 <div className="mt-6 text-gray-300 prose prose-invert max-w-none prose-a:text-brand-blue">
+                    <VibeContentRenderer content={selectedLang === 'ru' ? "Примени эти принципы к своему пути во <Link href='/selfdev' class='text-brand-green hover:underline font-semibold'>Введении в SelfDev</Link>, спланируй с помощью <Link href='/p-plan' class='text-brand-purple hover:underline font-semibold'>P-Plan</Link>, и начни быстро с <Link href='/jumpstart' class='text-neon-lime hover:underline font-semibold'>Jumpstart Kit</Link>." : "Apply these principles to your journey in the <Link href='/selfdev' class='text-brand-green hover:underline font-semibold'>SelfDev Intro</Link>, plan with the <Link href='/p-plan' class='text-brand-purple hover:underline font-semibold'>P-Plan</Link>, and get a quick start with the <Link href='/jumpstart' class='text-neon-lime hover:underline font-semibold'>Jumpstart Kit</Link>."} />
+                 </div>
               </section>
-
             </CardContent>
           </Card>
         </div>
