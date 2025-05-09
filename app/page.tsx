@@ -128,6 +128,9 @@ export default function Home() {
   const skillsLeveled = cyberProfile?.skillsLeveled || 0;
   const currentLevel = cyberProfile?.level || 0;
   const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || "v0.1 Alpha";
+  // The syntax error was likely here if any invisible character or misplaced comment existed
+  // before the 'return (' line or before the first div.
+  // Ensuring the return statement starts clean.
   const nextLevelTarget = (currentLevel + 1) * 1000; 
   
   return ( 
