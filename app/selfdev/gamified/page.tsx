@@ -8,7 +8,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { FaLocationArrow } from "react-icons/fa6"; // Isolated import
+import { FaMapLocation } from "react-icons/fa6"; // Isolated import
 import {
   FaGlasses, FaBrain, FaTriangleExclamation, FaPlay, FaForward,
   FaPuzzlePiece, FaGears, FaRoad, FaQuestionCircle, FaEye, FaBullseye, FaRulerCombined,
@@ -73,7 +73,7 @@ const levelUpSystem = [
 const sections = [
   {
     id: "intro",
-    icon: FaMapSigns,
+    icon: FaLocationArrow,
     titleEn: "Lost in the Fog? Activate Your CyberSight OS",
     titleRu: "Потерян в Тумане? Активируй CyberSight OS",
     pointsEn: [
