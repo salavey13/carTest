@@ -265,7 +265,7 @@ export default function Header() {
                   return (
                     <div key={groupName}>
                       <h3 className="text-lg font-orbitron text-brand-purple mb-3 flex items-center gap-2">
-                        {GroupIcon && <GroupIcon className="w-5 h-5 opacity-80" />}
+                        {GroupIcon && <GroupIcon className="w-6 h-6 opacity-80" />} 
                         {t(groupName)}
                       </h3>
                       <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-2.5">
@@ -279,8 +279,8 @@ export default function Header() {
                               key={page.path} href={page.path}
                               onClick={() => setIsNavOpen(false)}
                               className={cn(
-                                "group relative flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 aspect-[3/2.5] text-center hover:scale-[1.03] hover:-translate-y-0.5",
-                                "p-1.5", // Updated padding
+                                "group relative flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 aspect-square text-center hover:scale-[1.03] hover:-translate-y-0.5",
+                                "p-1", 
                                 page.isImportant 
                                   ? "bg-gradient-to-br from-purple-800/30 via-black/50 to-blue-800/30 col-span-2 shadow-md" 
                                   : "bg-dark-card/60 hover:bg-dark-card/80 col-span-1",
@@ -290,29 +290,26 @@ export default function Header() {
                               title={page.translatedName}
                             >
                               {page.isHot && (
-                                <span title={t("Hot")} className="absolute top-1.5 right-1.5 text-xs text-brand-red animate-pulse" aria-label={t("Hot")}>
+                                <span title={t("Hot")} className="absolute top-1 right-1 text-sm text-brand-red animate-pulse" aria-label={t("Hot")}>
                                   <FaFire/>
                                 </span>
                               )}
                               {PageIcon && (
                                 <PageIcon className={cn(
-                                  "mb-0.5 transition-transform duration-200 group-hover:scale-110", // Common style, updated mb
-                                  page.isImportant 
-                                      ? "text-inherit h-[1.3rem] w-[1.3rem] sm:h-[1.45rem] sm:w-[1.45rem]" // Size for important
-                                      : "h-[1.05rem] w-[1.05rem] sm:h-[1.3rem] sm:w-[1.3rem]" // Size for non-important
+                                  "mb-1 transition-transform duration-200 group-hover:scale-110", 
+                                  page.isImportant ? "h-5 w-5" : "h-4 w-4" 
                                 )} />
                               )}
                               <span className={cn(
                                 "font-orbitron font-medium transition-colors leading-tight text-center",
-                                "text-[0.6rem] xs:text-[0.625rem] sm:text-[0.675rem]", // Base sizes
                                 page.isImportant 
-                                    ? "text-white text-[0.675rem] sm:text-[0.725rem] md:text-[0.75rem]" // Important overrides
-                                    : "text-gray-300 group-hover:text-inherit" // Color for non-important
+                                    ? "text-white text-[1.15rem] xs:text-[1.15rem] sm:text-[1.175rem] md:text-[1.2rem] lg:text-[1.225rem]" 
+                                    : "text-gray-300 group-hover:text-inherit text-[1.1rem] xs:text-[1.1rem] sm:text-[1.125rem] md:text-[1.15rem] lg:text-[1.175rem]"
                               )}>
                                 {page.translatedName}
                               </span>
                               {page.isAdminOnly && (
-                                <span title={t("Admin Only")} className="absolute bottom-1 right-1 text-[0.5rem] text-red-400/80 bg-black/60 rounded-full px-1 py-0.5 leading-none">
+                                <span title={t("Admin Only")} className="absolute bottom-1 right-1 text-[0.65rem] text-red-400/80 bg-black/60 rounded-full px-1 py-0.5 leading-none">
                                   ADMIN
                                 </span>
                               )}
