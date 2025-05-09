@@ -7,7 +7,7 @@ import {
     FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
     FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard,
     FaCopy, FaListCheck, FaBug, FaArrowRotateRight, FaPlus, FaPaperPlane, FaBroom, FaCheck,
-    FaRobot, FaArrowRotateRight, FaArrowsRotate, FaAngrycreative, FaPoo,
+    FaRobot, FaArrowsRotate, FaAngrycreative, FaPoo,
     FaList, FaCodeBranch, FaExclamation, FaImages, FaSpinner, FaUpLong
 } from "react-icons/fa6";
 
