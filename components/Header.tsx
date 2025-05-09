@@ -268,7 +268,7 @@ export default function Header() {
                         {GroupIcon && <GroupIcon className="w-6 h-6 opacity-80" />} 
                         {t(groupName)}
                       </h3>
-                      <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-2.5">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-2.5">
                         {pagesInGroup.map((page) => {
                           const PageIcon = page.icon;
                           const isCurrentPage = page.path === pathname;
@@ -297,13 +297,15 @@ export default function Header() {
                               {PageIcon && (
                                 <PageIcon className={cn(
                                   "mb-1 transition-transform duration-200 group-hover:scale-110", 
-                                  page.isImportant ? "h-5 w-5" : "h-4 w-4" 
+                                  page.isImportant 
+                                      ? "h-6 w-6 sm:h-7 sm:w-7" 
+                                      : "h-4 w-4"             
                                 )} />
                               )}
                               <span className={cn(
                                 "font-orbitron font-medium transition-colors leading-tight text-center",
                                 page.isImportant 
-                                    ? "text-white text-[1.15rem] xs:text-[1.15rem] sm:text-[1.175rem] md:text-[1.2rem] lg:text-[1.225rem]" 
+                                    ? "text-white text-[1.6rem] xs:text-[1.65rem] sm:text-[1.7rem] md:text-[1.75rem] lg:text-[1.8rem]" 
                                     : "text-gray-300 group-hover:text-inherit text-[1.1rem] xs:text-[1.1rem] sm:text-[1.125rem] md:text-[1.15rem] lg:text-[1.175rem]"
                               )}>
                                 {page.translatedName}
