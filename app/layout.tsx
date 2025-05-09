@@ -1,6 +1,6 @@
 import type React from "react";
 import Script from "next/script";
-import { Suspense } from 'react'; // Removed useEffect
+import { Suspense } from 'react';
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import StickyChatButton from "@/components/StickyChatButton";
@@ -10,13 +10,10 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import type { Metadata, Viewport } from 'next';
 import { TooltipProvider } from "@/components/ui/tooltip";
-// Import ErrorOverlayProvider FIRST
 import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext";
 import ErrorBoundaryForOverlay from "@/components/ErrorBoundaryForOverlay";
 import DevErrorOverlay from "@/components/DevErrorOverlay";
-// Removed logger import as useEffect is removed
 
-// Fallback component remains the same
 function LoadingChatButtonFallback() {
   return (
     <div
@@ -26,29 +23,26 @@ function LoadingChatButtonFallback() {
   );
 }
 
-// Static metadata and viewport exports are now safe again
-export const metadata = {
-  title: "Fit10min PREMIUM", // Updated title
-  description: "Твоя 10-минутная фитнес-революция. Тренировки, питание, прогресс.", // Updated description
-  // Add viewport settings for responsiveness and disabling zoom
-  viewport: "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+export const metadata: Metadata = { // Corrected type to Metadata
+  title: "Fit10min PREMIUM", 
+  description: "Твоя 10-минутная фитнес-революция. Тренировки, питание, прогресс.", 
+  // Viewport settings moved to the viewport export below
 };
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // themeColor: string | ThemeColorDescriptor[]; // Example if you had theme color here
 };
 
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // Removed logger call from here
-
   return (
     <html lang="en" className="h-full">
       <head>
         <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* viewport meta tag is handled by Next.js viewport export, no need to repeat here */}
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
         <Script
@@ -60,7 +54,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={cn(
           "flex min-h-screen flex-col bg-gray-900 text-white antialiased",
       )}>
-        {/* Wrap everything including AppProvider in ErrorOverlayProvider */}
         <ErrorOverlayProvider>
           <AppProvider>
             <TooltipProvider>
@@ -69,7 +62,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <main className="flex-1">
                   {children}
                 </main>
-                {/* StickyChatButton now uses AppContext and ErrorOverlayContext */}
                 <Suspense fallback={<LoadingChatButtonFallback />}>
                   <StickyChatButton />
                 </Suspense>
@@ -90,7 +82,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   className: 'text-sm',
                 }}
               />
-              {/* DevErrorOverlay uses ErrorOverlayContext */}
               <DevErrorOverlay />
             </TooltipProvider>
           </AppProvider>
