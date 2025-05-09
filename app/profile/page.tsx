@@ -5,10 +5,10 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
-  FaUserNinja, FaBrain, FaBolt, FaChartLine, FaWandMagicSparkles, FaTrophy,
-  FaEdit, FaSignOutAlt, FaChevronRight, FaSpinner, FaTasks, FaShieldAlt
-} from "react-icons/fa"; // FaShieldAlt is not in Fa6, will replace with FaShieldHalved
-import { FaShieldHalved } from "react-icons/fa6";
+  FaBrain, FaBolt, FaChartLine, FaWandMagicSparkles,
+  FaPenToSquare, 
+  FaSignOutAlt, FaChevronRight, FaSpinner, FaTasks, FaShieldHalved
+} from "react-icons/fa6";
 import { useState, useEffect } from "react";
 import Modal from "@/components/ui/Modal";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ import {
 import { debugLogger } from "@/lib/debugLogger";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts';
 import VibeContentRenderer from "@/components/VibeContentRenderer";
+import Link from "next/link"; // Added Link for Modal
 
 const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png";
 const DEFAULT_WEEKLY_ACTIVITY = [
@@ -221,7 +222,7 @@ export default function ProfilePage() {
                 onClick={() => setIsEditModalOpen(true)}
                 className="flex-1 bg-brand-cyan text-black hover:bg-brand-cyan/80 font-orbitron shadow-md hover:shadow-brand-cyan/40 transition-all"
               >
-                <FaEdit className="mr-2" /> Изменить Профиль Агента
+                <FaPenToSquare className="mr-2" /> Изменить Профиль Агента
               </Button>
               <Button 
                 onClick={handleLogout}
@@ -267,7 +268,7 @@ export default function ProfilePage() {
                 ))}
                 </ul>
             ) : (
-                <p className="font-mono text-sm text-muted-foreground">Банк перков пуст. Отправляйся в <Link href="/selfdev/gamified" className="text-brand-green hover:underline">CyberDev OS</Link> за апгрейдами!</p>
+                <p className="font-mono text-sm text-muted-foreground">Банк перков пуст. Отправляйся в <Link href="/selfdev/gamified" className="text-brand-green hover:underline" onClick={() => setIsPerksModalOpen(false)}>CyberDev OS</Link> за апгрейдами!</p>
             )}
         </div>
         <p className="mt-3 text-xs text-brand-yellow font-mono animate-pulse">Синхронизация с банком перков...</p>

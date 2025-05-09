@@ -1,19 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutGrid, X, Search, Globe, Layers, Zap, Puzzle, BookUser, Settings2, ShieldCheck } from "lucide-react"; 
+import { LayoutGrid, X, Search, Globe, Layers, Zap, Puzzle, BookUser, Settings2, ShieldCheck, Users, Star as LucideStar } from "lucide-react"; 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import UserInfo from "@/components/user-info";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
+import { FaGear, FaTools } from "react-icons/fa6"; // Isolated imports
 import {
   FaDumbbell, FaCircleUser, FaWandMagicSparkles, FaRocket, FaRoad, FaBookOpen,
   FaBrain, FaRobot, FaMagnifyingGlass, FaGift, FaUserShield, FaCarOn,
   FaYoutube, FaFileInvoiceDollar, FaCreditCard, FaHeart, FaPalette,
   FaCircleInfo, FaListCheck, FaNetworkWired, FaRegLightbulb, FaUpload,
-  FaUserNinja, FaLandmarkDome, FaLeaf, FaFire, FaChartLine, FaDollarSign, FaCog, FaShieldVirus, FaTools // FaTools for "Nutrition" (Cognitive Fuel)
+  FaUserNinja, FaLandmarkDome, FaLeaf, FaFire, FaChartLine, FaDollarSign, FaShieldVirus, FaStar, FaGamepad
 } from "react-icons/fa6";
 import { debugLogger as logger } from "@/lib/debugLogger";
 
@@ -39,10 +40,10 @@ const allPages: PageInfo[] = [
   // --- CyberFitness ---
   { path: "/profile", name: "Agent Profile", icon: FaCircleUser, group: "CyberFitness", color: "pink" },
   { path: "/buy-subscription", name: "OS Upgrades", icon: FaCreditCard, group: "CyberFitness", color: "green" },
-  { path: "/premium", name: "Premium Modules", icon: FaStar, group: "CyberFitness", color: "yellow" }, // FaStar is not Fa6, will use lucide equivalent
-  { path: "/nutrition", name: "Cognitive Fuel", icon: FaTools, group: "CyberFitness", color: "orange"}, // Renamed & new icon
-  { path: "/settings", name: "System Config", icon: FaCog, group: "CyberFitness", color: "blue" }, // Added Settings
-  { path: "/partner", name: "Alliance Perks", icon: FaUsers, group: "CyberFitness", color: "purple"}, // Added Partner
+  { path: "/premium", name: "Premium Modules", icon: FaStar, group: "CyberFitness", color: "yellow" }, 
+  { path: "/nutrition", name: "Cognitive Fuel", icon: FaTools, group: "CyberFitness", color: "orange"}, 
+  { path: "/settings", name: "System Config", icon: FaCog, group: "CyberFitness", color: "blue" }, 
+  { path: "/partner", name: "Alliance Perks", icon: Users, group: "CyberFitness", color: "purple"}, 
 
   // --- Content & Tools ---
   { path: "/jumpstart", name: "Jumpstart Kit", icon: FaRocket, group: "Content & Tools", isImportant: true, color: "lime" },
@@ -77,7 +78,7 @@ const allPages: PageInfo[] = [
 const groupOrder = ["Core Vibe", "CyberFitness", "Content & Tools", "Misc", "Admin Zone"];
 const groupIcons: Record<string, React.ComponentType<{className?: string}>> = {
     "Core Vibe": Zap,
-    "CyberFitness": BookUser, // Using BookUser for "user manual" / profile related things
+    "CyberFitness": BookUser, 
     "Content & Tools": Puzzle,
     "Misc": Layers,
     "Admin Zone": ShieldCheck,
@@ -246,7 +247,7 @@ export default function Header() {
                 <input
                   type="search" placeholder={t("Search pages...")} value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-dark-card/80 border-2 border-brand-cyan/50 rounded-lg text-light-text placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:border-transparent text-base font-mono shadow-lg"
+                  className="w-full pl-12 pr-4 py-3 bg-dark-card/80 border-2 border-brand-cyan/50 rounded-lg text-foreground placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand-cyan focus:border-transparent text-base font-mono shadow-lg"
                   aria-label={t("Search pages...")}
                 />
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-brand-cyan/70 pointer-events-none" />
@@ -298,8 +299,8 @@ export default function Header() {
                               )}
                               <span className={cn(
                                 "font-orbitron font-medium transition-colors leading-tight text-center",
-                                "text-[0.55rem] xs:text-[0.6rem] sm:text-[0.65rem]", // Smaller text overall
-                                page.isImportant ? "text-light-text text-[0.65rem] sm:text-[0.7rem]" : "text-gray-300 group-hover:text-inherit"
+                                "text-[0.55rem] xs:text-[0.6rem] sm:text-[0.65rem]", 
+                                page.isImportant ? "text-white text-[0.65rem] sm:text-[0.7rem]" : "text-gray-300 group-hover:text-inherit" // Changed text-light-text to text-white for important
                               )}>
                                 {page.translatedName}
                               </span>

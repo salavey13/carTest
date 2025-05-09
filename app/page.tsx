@@ -1,4 +1,3 @@
-// /app/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -173,7 +172,7 @@ export default function Home() {
               </div>
               <Button asChild variant="outline" size="xs" className="border-brand-yellow text-brand-yellow hover:bg-brand-yellow/10 hover:text-white font-mono text-xs px-2 py-1 h-auto group-hover:border-brand-pink group-hover:text-brand-pink">
                 <Link href="/selfdev/gamified">
-                  All Directives <FaArrowRight className="ml-1 h-2.5 w-2.5 group-hover:animate-[wiggle_0.5s_ease-in-out_infinite] group-hover:text-glow-effect"/>
+                  All Directives <FaArrowRight className="ml-1 h-2.5 w-2.5 group-hover:animate-[wiggle_0.5s_ease-in-out_infinite]"/>
                 </Link>
               </Button>
             </CardHeader>
