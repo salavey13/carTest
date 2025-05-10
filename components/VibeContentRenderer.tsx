@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import parse, { domToReact, HTMLReactParserOptions, Element, attributesToProps } from 'html-react-parser';
+import parse, { domToReact, HTMLReactParserOptions, Element, attributesToProps, Text } from 'html-react-parser';
 import Link from 'next/link';
 import * as Fa6Icons from "react-icons/fa6";
 import { debugLogger as logger } from "@/lib/debugLogger";
@@ -15,6 +15,8 @@ function isValidFa6Icon(iconName: string): iconName is keyof typeof Fa6Icons {
 // Preprocess content to convert ::FaIcon:: syntax to <FaIcon />
 function preprocessIconSyntax(content: string): string {
     if (!content) return '';
+    // This regex handles ::FaIconName className="..."옵션:: or ::FaIconName::
+    // It correctly captures the icon name and optional className (with double or single quotes)
     const processed = content.replace(
         /::(Fa\w+)(?:\s+className=(?:"([^"]*)"|'([^']*)'))?::/g,
         (_match, iconName, classValDouble, classValSingle) => {
@@ -31,21 +33,22 @@ function preprocessIconSyntax(content: string): string {
 // Robust Parser Options - Centralized Logic
 const robustParserOptions: HTMLReactParserOptions = {
     replace: (domNode) => {
-        // CRITICAL: Handle text nodes first and let the parser render them by default.
-        if (domNode.type === 'text') { 
+        // CRITICAL: Handle text nodes first. Let the parser render them by default.
+        if (domNode.type === 'text' || domNode instanceof Text) { 
+            // html-react-parser might pass Text nodes directly, or domNode.type might be 'text'.
+            // In either case, we don't want to interfere with simple text rendering.
             return undefined;
         }
 
-        if (domNode instanceof Element && domNode.attribs) {
-            const { name, attribs, children } = domNode;
+        if (domNode instanceof Element && domNode.name) { // Ensure domNode.name exists
             // attributesToProps converts HTML attributes (e.g., 'class', 'style' string)
             // to React props (e.g., 'className', style object).
-            const mutableAttribs = attributesToProps(attribs); 
-            let lowerCaseName = name?.toLowerCase();
+            const mutableAttribs = attributesToProps(domNode.attribs || {}); 
+            const lowerCaseName = domNode.name.toLowerCase();
 
             try {
                 // --- Icon Handling ---
-                if (lowerCaseName?.startsWith('fa')) {
+                if (lowerCaseName.startsWith('fa')) {
                     const correctPascalCaseName = iconNameMap[lowerCaseName];
                     if (correctPascalCaseName && isValidFa6Icon(correctPascalCaseName)) {
                          const IconComponent = Fa6Icons[correctPascalCaseName];
@@ -59,8 +62,7 @@ const robustParserOptions: HTMLReactParserOptions = {
                                 return acc;
                             }, {} as Record<string, any>);
 
-                            // Recursively parse children with the same options
-                            const parsedChildren = children && domNode.children.length > 0 ? domToReact(children, robustParserOptions) : null;
+                            const parsedChildren = domNode.children && domNode.children.length > 0 ? domToReact(domNode.children, robustParserOptions) : null;
                             
                             const finalProps: Record<string, any> = {
                                 ...safeProps,
@@ -73,27 +75,30 @@ const robustParserOptions: HTMLReactParserOptions = {
                             return <span title={`Err: ${correctPascalCaseName}`} className="text-red-500">[ICON!]</span>;
                          }
                     } else {
-                        logger.warn(`[VCR] Unknown Icon: <${name}> (lc: <${lowerCaseName}>). Attribs:`, mutableAttribs);
-                        return <span title={`Unknown: ${name}`} className="text-yellow-500">[?]</span>;
+                        logger.warn(`[VCR] Unknown Icon: <${domNode.name}> (lc: <${lowerCaseName}>). Attribs:`, mutableAttribs);
+                        return <span title={`Unknown: ${domNode.name}`} className="text-yellow-500">[?]</span>;
                     }
                 }
                 // --- Link Handling ---
                 if (lowerCaseName === 'a') {
-                    const isInternal = mutableAttribs.href && (typeof mutableAttribs.href === 'string' && (mutableAttribs.href.startsWith('/') || mutableAttribs.href.startsWith('#')));
-                    const parsedChildren = children ? domToReact(children, robustParserOptions) : null;
+                    const hrefVal = mutableAttribs.href; // href should be a string
+                    const isInternal = hrefVal && typeof hrefVal === 'string' && (hrefVal.startsWith('/') || hrefVal.startsWith('#'));
+                    const parsedChildren = domNode.children ? domToReact(domNode.children, robustParserOptions) : null;
                     
                     let linkClassName = mutableAttribs.className || '';
                     mutableAttribs.className = `${linkClassName} mx-1 px-0.5`.trim();
 
-                    if (isInternal && !mutableAttribs.target && mutableAttribs.href) {
+                    if (isInternal && !mutableAttribs.target && hrefVal) {
                         try {
                            const { href, className: finalLinkClassName, style: linkStyle, title: linkTitle, ...restLinkProps } = mutableAttribs;
                            return <Link href={href as string} className={finalLinkClassName as string} style={linkStyle as React.CSSProperties} title={linkTitle as string} {...restLinkProps}>{parsedChildren}</Link>;
                         } catch (linkError) {
                             logger.error("[VCR] Next Link Err:", linkError, mutableAttribs);
+                            // Fallback to regular 'a' tag if NextLink creation fails
                             return React.createElement('a', mutableAttribs, parsedChildren); 
                         }
                     } else {
+                         // For external links or links with a target, use a regular 'a' tag
                          return React.createElement('a', mutableAttribs, parsedChildren);
                     }
                 }
@@ -104,11 +109,12 @@ const robustParserOptions: HTMLReactParserOptions = {
                 return undefined; 
 
             } catch (replaceError: any) {
-                 logger.error("[VCR] Replace Err:", replaceError, { name, attribs });
-                 return <span title={`Process Err: ${name}`} className="text-red-500">[ERR]</span>;
+                 logger.error("[VCR] Replace Err:", replaceError, { name: domNode.name, attribs: domNode.attribs });
+                 return <span title={`Process Err: ${domNode.name}`} className="text-red-500">[ERR]</span>;
             }
         }
-        // For any other node type not handled above (e.g., comments), let the parser do its default action.
+        // For any other node type not handled above (e.g., comments), or if it's not an Element with a name,
+        // let the parser do its default action.
         return undefined; 
     },
 };
@@ -130,6 +136,8 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
       if (className) {
         return <div className={className}>{parsedContent}</div>;
       }
+      // If no className for the wrapper, return the parsed content directly.
+      // It might be a string, a React element, or an array of them (ReactFragment).
       return <>{parsedContent}</>;
 
     } catch (error) {
