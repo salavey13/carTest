@@ -219,7 +219,7 @@ export default function Home() {
                   </div>
               </div>
             </CardHeader>
-            <CardContent className="px-1 pb-2 pt-2 md:px-2 md:pb-3"> {/* Increased pt slightly */}
+            <CardContent className="px-1 pb-2 pt-2 md:px-2 md:pb-3"> 
               <div className="h-[70px] sm:h-[90px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={displayWeeklyActivity} margin={{ top: 10, right: 5, left: 5, bottom: 0 }}>
