@@ -30,6 +30,7 @@ interface PageInfo {
   isHot?: boolean;
   color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red' | 'orange' | 'gray'; 
   group?: string; 
+  translatedName?: string; // Added for filtering/sorting pre-translated names
 }
 
 const allPages: PageInfo[] = [
@@ -108,6 +109,21 @@ const translations: Record<string, Record<string, string>> = {
   }
 };
 
+// Helper for color classes to avoid Tailwind JIT issues with dynamic class generation.
+// Maps color names to their corresponding CSS variable names for RGB values.
+const colorVarMap: Record<string, string> = {
+  purple: "var(--brand-purple-rgb)",
+  blue: "var(--brand-blue-rgb)",
+  yellow: "var(--brand-yellow-rgb)",
+  lime: "var(--neon-lime-rgb)",
+  green: "var(--brand-green-rgb)",
+  pink: "var(--brand-pink-rgb)",
+  cyan: "var(--brand-cyan-rgb)",
+  red: "var(--red-500-rgb)", // Standard Tailwind red-500
+  orange: "var(--brand-orange-rgb)",
+  gray: "var(--gray-500-rgb)", // Standard Tailwind gray-500
+};
+
 export default function Header() {
   const { isAdmin, user } = useAppContext();
   const [isNavOpen, setIsNavOpen] = useState(false);
@@ -140,9 +156,9 @@ export default function Header() {
   const groupedAndFilteredPages = useMemo(() => {
     const lowerSearchTerm = searchTerm.toLowerCase();
     const filtered = allPages
-      .filter(page => !(page.isAdminOnly && !isAdmin))
+      .filter(page => !(page.isAdminOnly && !isAdmin())) // Call isAdmin as a function
       .map(page => ({ ...page, translatedName: t(page.name) }))
-      .filter(page => page.translatedName.toLowerCase().includes(lowerSearchTerm));
+      .filter(page => page.translatedName!.toLowerCase().includes(lowerSearchTerm));
 
     const groups: Record<string, PageInfo[]> = {};
     groupOrder.forEach(groupName => groups[groupName] = []);
@@ -186,16 +202,16 @@ export default function Header() {
   }, [isNavOpen]);
 
   const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> = {
-    purple: "border-brand-purple/60 hover:border-brand-purple hover:shadow-[0_0_10px_theme(colors.brand-purple/30%)] text-brand-purple",
-    blue: "border-brand-blue/60 hover:border-brand-blue hover:shadow-[0_0_10px_theme(colors.brand-blue/30%)] text-brand-blue",
-    yellow: "border-brand-yellow/60 hover:border-brand-yellow hover:shadow-[0_0_10px_theme(colors.brand-yellow/30%)] text-brand-yellow",
-    lime: "border-neon-lime/60 hover:border-neon-lime hover:shadow-[0_0_10px_theme(colors.neon-lime/30%)] text-neon-lime",
-    green: "border-brand-green/60 hover:border-brand-green hover:shadow-[0_0_10px_theme(colors.brand-green/30%)] text-brand-green",
-    pink: "border-brand-pink/60 hover:border-brand-pink hover:shadow-[0_0_10px_theme(colors.brand-pink/30%)] text-brand-pink",
-    cyan: "border-brand-cyan/60 hover:border-brand-cyan hover:shadow-[0_0_10px_theme(colors.brand-cyan/30%)] text-brand-cyan",
-    red: "border-red-500/60 hover:border-red-500 hover:shadow-[0_0_10px_theme(colors.red.500/30%)] text-red-500",
-    orange: "border-brand-orange/60 hover:border-brand-orange hover:shadow-[0_0_10px_theme(colors.brand-orange/30%)] text-brand-orange",
-    gray: "border-gray-600/60 hover:border-gray-500 hover:shadow-[0_0_10px_theme(colors.gray.500/30%)] text-gray-400",
+    purple: "border-brand-purple/60 hover:border-brand-purple text-brand-purple",
+    blue: "border-brand-blue/60 hover:border-brand-blue text-brand-blue",
+    yellow: "border-brand-yellow/60 hover:border-brand-yellow text-brand-yellow",
+    lime: "border-neon-lime/60 hover:border-neon-lime text-neon-lime",
+    green: "border-brand-green/60 hover:border-brand-green text-brand-green",
+    pink: "border-brand-pink/60 hover:border-brand-pink text-brand-pink",
+    cyan: "border-brand-cyan/60 hover:border-brand-cyan text-brand-cyan",
+    red: "border-red-500/60 hover:border-red-500 text-red-500",
+    orange: "border-brand-orange/60 hover:border-brand-orange text-brand-orange",
+    gray: "border-gray-600/60 hover:border-gray-500 text-gray-400",
     default: "border-gray-700 hover:border-brand-green/80 text-gray-400 hover:text-brand-green"
   };
 
@@ -272,19 +288,22 @@ export default function Header() {
                         {pagesInGroup.map((page) => {
                           const PageIcon = page.icon;
                           const isCurrentPage = page.path === pathname;
-                          const tileColorClass = tileColorClasses[page.color || 'default'];
-
+                          const tileBaseColorClass = tileColorClasses[page.color || 'default'];
+                          const rgbVar = colorVarMap[page.color || 'default'];
+                          const shadowClass = rgbVar ? `hover:shadow-[0_0_10px_rgba(${rgbVar},0.3)]` : 'hover:shadow-lg';
+                          
                           return (
                             <Link
                               key={page.path} href={page.path}
                               onClick={() => setIsNavOpen(false)}
                               className={cn(
                                 "group relative flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 aspect-square text-center hover:scale-[1.01] hover:-translate-y-px",
-                                "p-1", 
+                                "p-1.5", // Slightly increased padding
                                 page.isImportant 
                                   ? "bg-gradient-to-br from-purple-800/30 via-black/50 to-blue-800/30 col-span-1 sm:col-span-2 shadow-sm" 
                                   : "bg-dark-card/60 hover:bg-dark-card/80 col-span-1",
-                                tileColorClass,
+                                tileBaseColorClass,
+                                shadowClass,
                                 isCurrentPage ? `ring-2 ring-offset-2 ring-offset-black ${page.color === 'lime' || page.color === 'yellow' || page.color === 'orange' ? 'ring-black/70' : 'ring-white/90'}` : 'ring-transparent'
                               )}
                               title={page.translatedName}
@@ -296,17 +315,17 @@ export default function Header() {
                               )}
                               {PageIcon && (
                                 <PageIcon className={cn(
-                                  "transition-transform duration-200 group-hover:scale-105", 
+                                  "transition-transform duration-200 group-hover:scale-105 mb-1", 
                                   page.isImportant 
-                                      ? "h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:h-9 mb-1.5" // Larger icons for important, more margin
-                                      : "h-5 w-5 sm:h-6 sm:w-6 mb-1"             // Larger icons for normal, default margin
+                                      ? "h-6 w-6 sm:h-7 sm:w-7" // Adjusted icon size
+                                      : "h-5 w-5 sm:h-6 sm:w-6" // Adjusted icon size
                                 )} />
                               )}
                               <span className={cn(
-                                "font-orbitron font-medium transition-colors leading-tight text-center block w-1/2 mx-auto", // Text takes 50% width and is centered
+                                "font-orbitron font-medium transition-colors leading-tight text-center block",
                                 page.isImportant 
-                                    ? "text-white text-[1.6rem] xs:text-[1.65rem] sm:text-[1.7rem] md:text-[1.75rem] lg:text-[1.8rem]" 
-                                    : "text-gray-300 group-hover:text-inherit text-[1.1rem] xs:text-[1.1rem] sm:text-[1.125rem] md:text-[1.15rem] lg:text-[1.175rem]"
+                                    ? "text-white text-sm md:text-base" // Adjusted text size
+                                    : "text-gray-300 group-hover:text-inherit text-xs md:text-sm" // Adjusted text size
                               )}>
                                 {page.translatedName}
                               </span>
