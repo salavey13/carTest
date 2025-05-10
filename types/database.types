@@ -3,693 +3,657 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export interface Database {
   public: {
     Tables: {
-      users: {
-        Row: {
-          user_id: string
-          username: string | null
-          full_name: string | null
-          avatar_url: string | null
-          website: string | null
-          status: "free" | "pro" | "admin"
-          role: "attendee" | "admin" | "user"
-          created_at: string
-          updated_at: string
-          active_organizer_id: string | null
-          metadata: {
-            debugToastsEnabled?: boolean;
-            notifications_enabled?: boolean;
-            water_reminders_enabled?: boolean;
-            dark_mode_enabled?: boolean;
-            promotional_messages_enabled?: boolean;
-            customLinks?: { name: string; url: string }[];
-            cyberFitness?: {
-              level?: number;
-              kiloVibes?: number;
-              focusTimeHours?: number;
-              skillsLeveled?: number;
-              activeQuests?: string[];
-              completedQuests?: string[];
-              unlockedPerks?: string[];
-              achievements?: string[]; // Added achievements array
-              cognitiveOSVersion?: string;
-              lastActivityTimestamp?: string;
-              dailyActivityLog?: {
-                date: string; // YYYY-MM-DD
-                filesExtracted: number; // Files added to KWork
-                tokensProcessed: number; // Tokens from AI response
-                kworkRequestsSent?: number; // Number of "Copy to KWork & Go to AI"
-                prsCreated?: number;
-                branchesUpdated?: number;
-              }[];
-              // Cumulative counters for achievements (optional, can be derived or explicit)
-              totalKworkRequestsSent?: number;
-              totalPrsCreated?: number;
-              totalBranchesUpdated?: number;
-              featuresUsed?: Record<string, boolean>; // e.g., { usedAddFullTree: true }
-            };
-            last_login_ip?: string;
-            preferences?: Json;
-            subscription_id?: string | number | null;
-            generated_files?: { path: string; code: string; extension: string; }[];
-          } | null
-          description: string | null
-          badges: Json | null
-          test_progress: Json | null
-          subscription_id: string | number | null
-          language_code: string | null
-          first_name: string | null
-          last_name: string | null
-        }
-        Insert: {
-          user_id: string
-          username?: string | null
-          full_name?: string | null
-          avatar_url?: string | null
-          website?: string | null
-          status?: "free" | "pro" | "admin"
-          role?: "attendee" | "admin" | "user"
-          created_at?: string
-          updated_at?: string
-          active_organizer_id?: string | null
-          metadata?: {
-            debugToastsEnabled?: boolean;
-            notifications_enabled?: boolean;
-            water_reminders_enabled?: boolean;
-            dark_mode_enabled?: boolean;
-            promotional_messages_enabled?: boolean;
-            customLinks?: { name: string; url: string }[];
-            cyberFitness?: {
-              level?: number;
-              kiloVibes?: number;
-              focusTimeHours?: number;
-              skillsLeveled?: number;
-              activeQuests?: string[];
-              completedQuests?: string[];
-              unlockedPerks?: string[];
-              achievements?: string[];
-              cognitiveOSVersion?: string;
-              lastActivityTimestamp?: string;
-              dailyActivityLog?: {
-                date: string;
-                filesExtracted: number;
-                tokensProcessed: number;
-                kworkRequestsSent?: number;
-                prsCreated?: number;
-                branchesUpdated?: number;
-              }[];
-              totalKworkRequestsSent?: number;
-              totalPrsCreated?: number;
-              totalBranchesUpdated?: number;
-              featuresUsed?: Record<string, boolean>;
-            };
-            last_login_ip?: string;
-            preferences?: Json;
-            subscription_id?: string | number | null;
-            generated_files?: { path: string; code: string; extension: string; }[];
-          } | null
-          description?: string | null
-          badges?: Json | null
-          test_progress?: Json | null
-          subscription_id?: string | number | null
-          language_code?: string | null
-          first_name?: string | null
-          last_name?: string | null
-        }
-        Update: {
-          user_id?: string
-          username?: string | null
-          full_name?: string | null
-          avatar_url?: string | null
-          website?: string | null
-          status?: "free" | "pro" | "admin"
-          role?: "attendee" | "admin" | "user"
-          created_at?: string
-          updated_at?: string
-          active_organizer_id?: string | null
-          metadata?: {
-            debugToastsEnabled?: boolean;
-            notifications_enabled?: boolean;
-            water_reminders_enabled?: boolean;
-            dark_mode_enabled?: boolean;
-            promotional_messages_enabled?: boolean;
-            customLinks?: { name: string; url: string }[];
-            cyberFitness?: {
-              level?: number;
-              kiloVibes?: number;
-              focusTimeHours?: number;
-              skillsLeveled?: number;
-              activeQuests?: string[];
-              completedQuests?: string[];
-              unlockedPerks?: string[];
-              achievements?: string[];
-              cognitiveOSVersion?: string;
-              lastActivityTimestamp?: string;
-              dailyActivityLog?: {
-                date: string;
-                filesExtracted: number;
-                tokensProcessed: number;
-                kworkRequestsSent?: number;
-                prsCreated?: number;
-                branchesUpdated?: number;
-              }[];
-              totalKworkRequestsSent?: number;
-              totalPrsCreated?: number;
-              totalBranchesUpdated?: number;
-              featuresUsed?: Record<string, boolean>;
-            };
-            last_login_ip?: string;
-            preferences?: Json;
-            subscription_id?: string | number | null;
-            generated_files?: { path: string; code: string; extension: string; }[];
-          } | null
-          description?: string | null
-          badges?: Json | null
-          test_progress?: Json | null
-          subscription_id?: string | number | null
-          language_code?: string | null
-          first_name?: string | null
-          last_name?: string | null
-        }
-      }
-      questions: {
-        Row: {
-          id: number
-          text: string
-          theme: string
-          position: number
-          created_at?: string
-        }
-        Insert: {
-          id?: number
-          text: string
-          theme: string
-          position: number
-          created_at?: string
-        }
-        Update: {
-          id?: number
-          text?: string
-          theme?: string
-          position?: number
-          created_at?: string
-        }
-      }
-      cars: {
-        Row: {
-          id: string
-          make: string
-          model: string
-          description: string | null
-          embedding: number[] | null
-          daily_price: number | null
-          image_url: string | null
-          rent_link: string | null
-          is_test_result: boolean
-          owner_id: string | null
-          status: string | null
-          created_at: string
-          updated_at: string
-          specs: Json | null
-        }
-        Insert: {
-          id?: string
-          make: string
-          model: string
-          description?: string | null
-          embedding?: number[] | null
-          daily_price?: number | null
-          image_url?: string | null
-          rent_link?: string | null
-          is_test_result?: boolean
-          owner_id?: string | null
-          status?: string | null
-          created_at?: string
-          updated_at?: string
-          specs?: Json | null
-        }
-        Update: {
-          id?: string
-          make?: string
-          model?: string
-          description?: string | null
-          embedding?: number[] | null
-          daily_price?: number | null
-          image_url?: string | null
-          rent_link?: string | null
-          is_test_result?: boolean
-          owner_id?: string | null
-          status?: string | null
-          created_at?: string
-          updated_at?: string
-          specs?: Json | null
-        }
-      }
       answers: {
         Row: {
           id: number
           question_id: number | null
+          result: string | null // text, FK to cars.id
           text: string
-          result: string | null
-          created_at?: string
         }
         Insert: {
           id?: number
           question_id?: number | null
-          text: string
           result?: string | null
-          created_at?: string
+          text: string
         }
         Update: {
           id?: number
           question_id?: number | null
-          text?: string
           result?: string | null
-          created_at?: string
+          text?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "answers_result_fkey"
+            columns: ["result"]
+            isOneToOne: false
+            referencedRelation: "cars"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      article_sections: {
+        Row: {
+          article_id: string
+          content: string
+          created_at: string
+          id: string
+          image_url: string | null
+          section_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          article_id: string
+          content: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          section_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          article_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          section_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "article_sections_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      articles: {
+        Row: {
+          author_id: string | null
+          category: string | null
+          created_at: string
+          id: string
+          image_url: string | null
+          is_premium: boolean
+          published_at: string | null
+          slug: string
+          status: string
+          summary: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          author_id?: string | null
+          category?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_premium?: boolean
+          published_at?: string | null
+          slug: string
+          status?: string
+          summary?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string | null
+          category?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          is_premium?: boolean
+          published_at?: string | null
+          slug?: string
+          status?: string
+          summary?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "articles_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      cars: {
+        Row: {
+          daily_price: number | null
+          description: string | null
+          embedding: number[] | null 
+          id: string 
+          image_url: string | null
+          is_test_result: boolean
+          make: string | null
+          model: string | null
+          owner_id: string | null
+          rent_link: string | null
+          specs: Json | null
+          status: string | null 
+        }
+        Insert: {
+          daily_price?: number | null
+          description?: string | null
+          embedding?: number[] | null
+          id?: string 
+          image_url?: string | null
+          is_test_result?: boolean
+          make?: string | null
+          model?: string | null
+          owner_id?: string | null
+          rent_link?: string | null
+          specs?: Json | null
+          status?: string | null
+        }
+        Update: {
+          daily_price?: number | null
+          description?: string | null
+          embedding?: number[] | null
+          id?: string
+          image_url?: string | null
+          is_test_result?: boolean
+          make?: string | null
+          model?: string | null
+          owner_id?: string | null
+          rent_link?: string | null
+          specs?: Json | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cars_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      characters: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          metadata: Json | null
+          name: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          metadata?: Json | null
+          name: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          metadata?: Json | null
+          name?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "characters_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      coze_responses: {
+        Row: {
+          bot_id: string | null
+          coze_chat_id: string | null
+          coze_conversation_id: string | null
+          created_at: string
+          id: number
+          metadata: Json | null
+          request_content: string | null
+          response_content: string | null
+          user_id: string | null
+        }
+        Insert: {
+          bot_id?: string | null
+          coze_chat_id?: string | null
+          coze_conversation_id?: string | null
+          created_at?: string
+          id?: number
+          metadata?: Json | null
+          request_content?: string | null
+          response_content?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          bot_id?: string | null
+          coze_chat_id?: string | null
+          coze_conversation_id?: string | null
+          created_at?: string
+          id?: number
+          metadata?: Json | null
+          request_content?: string | null
+          response_content?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      invoices: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          id: string 
+          metadata: Json | null
+          status: "pending" | "paid" | "failed" | "cancelled"
+          subscription_id: number | null // integer, FK to subscriptions.id
+          type: string 
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          id: string
+          metadata?: Json | null
+          status?: "pending" | "paid" | "failed" | "cancelled"
+          subscription_id?: number | null
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          metadata?: Json | null
+          status?: "pending" | "paid" | "failed" | "cancelled"
+          subscription_id?: number | null
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      questions: {
+        Row: {
+          id: number
+          position: number
+          text: string
+          theme: string
+        }
+        Insert: {
+          id?: number
+          position: number
+          text: string
+          theme: string
+        }
+        Update: {
+          id?: number
+          position?: number
+          text?: string
+          theme?: string
+        }
+        Relationships: []
+      }
+      rentals: {
+        Row: {
+          car_id: string 
+          created_at: string
+          end_date: string
+          metadata: Json | null
+          payment_status: "pending" | "paid" | "failed" | "refunded"
+          rental_id: number 
+          start_date: string
+          status: "pending" | "confirmed" | "active" | "completed" | "cancelled"
+          total_cost: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          car_id: string
+          created_at?: string
+          end_date: string
+          metadata?: Json | null
+          payment_status?: "pending" | "paid" | "failed" | "refunded"
+          rental_id?: number
+          start_date: string
+          status?: "pending" | "confirmed" | "active" | "completed" | "cancelled"
+          total_cost: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          car_id?: string
+          created_at?: string
+          end_date?: string
+          metadata?: Json | null
+          payment_status?: "pending" | "paid" | "failed" | "refunded"
+          rental_id?: number
+          start_date?: string
+          status?: "pending" | "confirmed" | "active" | "completed" | "cancelled"
+          total_cost?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rentals_car_id_fkey"
+            columns: ["car_id"]
+            isOneToOne: false
+            referencedRelation: "cars"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rentals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: number 
+          name: string
+          price_monthly: number | null
+          price_yearly: number | null
+          status: "active" | "inactive" | "archived"
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: number
+          name: string
+          price_monthly?: number | null
+          price_yearly?: number | null
+          status?: "active" | "inactive" | "archived"
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: number
+          name?: string
+          price_monthly?: number | null
+          price_yearly?: number | null
+          status?: "active" | "inactive" | "archived"
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          metadata: Json | null
+          priority: number
+          project_id: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          metadata?: Json | null
+          priority?: number
+          project_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          metadata?: Json | null
+          priority?: number
+          project_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       user_results: {
         Row: {
-          id: number
-          user_id: string | null
-          car_id: string | null
+          car_id: string 
           created_at: string
+          user_id: string 
         }
         Insert: {
-          id?: number
-          user_id?: string | null
-          car_id?: string | null
+          car_id: string
           created_at?: string
+          user_id: string
         }
         Update: {
-          id?: number
-          user_id?: string | null
-          car_id?: string | null
+          car_id?: string
           created_at?: string
+          user_id?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "user_results_car_id_fkey"
+            columns: ["car_id"]
+            isOneToOne: false
+            referencedRelation: "cars"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_results_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
-      invoices: {
-          Row: {
-              id: string;
-              user_id: string;
-              type: string;
-              amount: number;
-              status: "pending" | "paid" | "failed" | "cancelled";
-              subscription_id: string | number | null;
-              metadata: Json | null;
-              created_at: string;
-              updated_at: string;
-              telegram_payment_charge_id: string | null;
-          };
-          Insert: {
-              id: string;
-              user_id: string;
-              type: string;
-              amount: number;
-              status?: "pending" | "paid" | "failed" | "cancelled";
-              subscription_id?: string | number | null;
-              metadata?: Json | null;
-              created_at?: string;
-              updated_at?: string;
-              telegram_payment_charge_id?: string | null;
-          };
-          Update: {
-              id?: string;
-              user_id?: string;
-              type?: string;
-              amount?: number;
-              status?: "pending" | "paid" | "failed" | "cancelled";
-              subscription_id?: string | number | null;
-              metadata?: Json | null;
-              created_at?: string;
-              updated_at?: string;
-              telegram_payment_charge_id?: string | null;
-          };
-      };
-      rentals: {
-          Row: {
-              rental_id: string;
-              user_id: string;
-              car_id: string;
-              start_date: string;
-              end_date: string;
-              total_cost: number;
-              status: "pending" | "confirmed" | "active" | "completed" | "cancelled";
-              payment_status: "pending" | "paid" | "failed";
-              created_at: string;
-              updated_at: string;
-              metadata: Json | null;
-          };
-          Insert: {
-              rental_id?: string;
-              user_id: string;
-              car_id: string;
-              start_date: string;
-              end_date: string;
-              total_cost: number;
-              status?: "pending" | "confirmed" | "active" | "completed" | "cancelled";
-              payment_status?: "pending" | "paid" | "failed";
-              created_at?: string;
-              updated_at?: string;
-              metadata?: Json | null;
-          };
-          Update: {
-              rental_id?: string;
-              user_id?: string;
-              car_id?: string;
-              start_date?: string;
-              end_date?: string;
-              total_cost?: number;
-              status?: "pending" | "confirmed" | "active" | "completed" | "cancelled";
-              payment_status?: "pending" | "paid" | "failed";
-              created_at?: string;
-              updated_at?: string;
-              metadata?: Json | null;
-          };
-      };
-      articles: {
+      users: {
         Row: {
-          id: string;
-          title: string;
-          slug: string;
-          summary: string | null;
-          content: string;
-          author_id: string | null;
-          tags: string[] | null;
-          category: string | null;
-          published_at: string | null;
-          created_at: string;
-          updated_at: string;
-          views: number | null;
-          image_url: string | null;
-        };
-        Insert: {
-          id?: string;
-          title: string;
-          slug: string;
-          summary?: string | null;
-          content: string;
-          author_id?: string | null;
-          tags?: string[] | null;
-          category?: string | null;
-          published_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-          views?: number | null;
-          image_url?: string | null;
-        };
-        Update: {
-          id?: string;
-          title?: string;
-          slug?: string;
-          summary?: string | null;
-          content?: string;
-          author_id?: string | null;
-          tags?: string[] | null;
-          category?: string | null;
-          published_at?: string | null;
-          created_at?: string;
-          updated_at?: string;
-          views?: number | null;
-          image_url?: string | null;
+          active_organizer_id: string | null
+          avatar_url: string | null
+          badges: Json | null
+          created_at: string
+          description: string | null
+          full_name: string | null
+          language_code: string | null
+          metadata: Json | null
+          role: "attendee" | "admin" | "user" 
+          status: "free" | "pro" | "admin" | "pending_approval" | "verified" 
+          test_progress: Json | null
+          updated_at: string
+          user_id: string 
+          username: string | null
+          website: string | null
+          // subscription_id is NOT present in this definition
         }
-      };
-      article_sections: {
-        Row: {
-          id: string;
-          article_id: string;
-          title: string | null;
-          content: string;
-          section_order: number;
-          metadata: Json | null;
-          created_at: string;
-          updated_at: string;
-        };
         Insert: {
-          id?: string;
-          article_id: string;
-          title?: string | null;
-          content: string;
-          section_order: number;
-          metadata?: Json | null;
-          created_at?: string;
-          updated_at?: string;
-        };
+          active_organizer_id?: string | null
+          avatar_url?: string | null
+          badges?: Json | null
+          created_at?: string
+          description?: string | null
+          full_name?: string | null
+          language_code?: string | null
+          metadata?: Json | null
+          role?: "attendee" | "admin" | "user"
+          status?: "free" | "pro" | "admin" | "pending_approval" | "verified"
+          test_progress?: Json | null
+          updated_at?: string
+          user_id: string
+          username?: string | null
+          website?: string | null
+        }
         Update: {
-          id?: string;
-          article_id?: string;
-          title?: string | null;
-          content?: string;
-          section_order?: number;
-          metadata?: Json | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-      };
-      coze_responses: {
-        Row: {
-            id: number;
-            bot_id: string;
-            user_id: string;
-            request_content: string;
-            response_content: string;
-            metadata: Json | null;
-            coze_conversation_id: string;
-            coze_chat_id: string;
-            created_at: string;
-        };
-        Insert: {
-            id?: number;
-            bot_id: string;
-            user_id: string;
-            request_content: string;
-            response_content: string;
-            metadata?: Json | null;
-            coze_conversation_id: string;
-            coze_chat_id: string;
-            created_at?: string;
-        };
-        Update: {
-            id?: number;
-            bot_id?: string;
-            user_id?: string;
-            request_content?: string;
-            response_content?: string;
-            metadata?: Json | null;
-            coze_conversation_id?: string;
-            coze_chat_id?: string;
-            created_at?: string;
-        };
-      };
-      subscriptions: {
-          Row: {
-              id: string;
-              name: string;
-              price_xtr: number;
-              price_usd: number | null;
-              features: string[];
-              duration_days: number | null;
-              is_active: boolean;
-              sort_order: number | null;
-              created_at: string;
-              updated_at: string;
-          };
-          Insert: {
-              id: string;
-              name: string;
-              price_xtr: number;
-              price_usd?: number | null;
-              features: string[];
-              duration_days?: number | null;
-              is_active?: boolean;
-              sort_order?: number | null;
-              created_at?: string;
-              updated_at?: string;
-          };
-          Update: {
-              id?: string;
-              name?: string;
-              price_xtr?: number;
-              price_usd?: number | null;
-              features?: string[];
-              duration_days?: number | null;
-              is_active?: boolean;
-              sort_order?: number | null;
-              created_at?: string;
-              updated_at?: string;
-          };
-      };
+          active_organizer_id?: string | null
+          avatar_url?: string | null
+          badges?: Json | null
+          created_at?: string
+          description?: string | null
+          full_name?: string | null
+          language_code?: string | null
+          metadata?: Json | null
+          role?: "attendee" | "admin" | "user"
+          status?: "free" | "pro" | "admin" | "pending_approval" | "verified"
+          test_progress?: Json | null
+          updated_at?: string
+          user_id?: string
+          username?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
       videos: {
         Row: {
-            id: string;
-            title: string;
-            description: string | null;
-            published_at: string;
-            thumbnail_url: string | null;
-            channel_id: string;
-            channel_title: string;
-            duration_seconds: number | null;
-            tags: string[] | null;
-            category_id: string | null;
-            view_count: number | null;
-            like_count: number | null;
-            comment_count: number | null;
-            created_at: string;
-            updated_at: string;
-            metadata: Json | null;
-        };
+          channel_id: string | null
+          created_at: string
+          description: string | null
+          duration_seconds: number | null
+          id: string
+          metadata: Json | null
+          published_at: string | null
+          tags: string[] | null
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+          view_count: number | null
+          youtube_video_id: string
+        }
         Insert: {
-            id: string;
-            title: string;
-            description?: string | null;
-            published_at: string;
-            thumbnail_url?: string | null;
-            channel_id: string;
-            channel_title: string;
-            duration_seconds?: number | null;
-            tags?: string[] | null;
-            category_id?: string | null;
-            view_count?: number | null;
-            like_count?: number | null;
-            comment_count?: number | null;
-            created_at?: string;
-            updated_at?: string;
-            metadata?: Json | null;
-        };
+          channel_id?: string | null
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          metadata?: Json | null
+          published_at?: string | null
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string
+          view_count?: number | null
+          youtube_video_id: string
+        }
         Update: {
-            id?: string;
-            title?: string;
-            description?: string | null;
-            published_at?: string;
-            thumbnail_url?: string | null;
-            channel_id?: string;
-            channel_title?: string;
-            duration_seconds?: number | null;
-            tags?: string[] | null;
-            category_id?: string | null;
-            view_count?: number | null;
-            like_count?: number | null;
-            comment_count?: number | null;
-            created_at?: string;
-            updated_at?: string;
-            metadata?: Json | null;
-        };
-      };
-      characters: {
-        Row: {
-            id: string;
-            name: string;
-            description: string | null;
-            image_url: string | null;
-            type: string;
-            metadata: Json | null;
-            created_at: string;
-            updated_at: string;
-        };
-        Insert: {
-            id?: string;
-            name: string;
-            description?: string | null;
-            image_url?: string | null;
-            type: string;
-            metadata?: Json | null;
-            created_at?: string;
-            updated_at?: string;
-        };
-        Update: {
-            id?: string;
-            name?: string;
-            description?: string | null;
-            image_url?: string | null;
-            type?: string;
-            metadata?: Json | null;
-            created_at?: string;
-            updated_at?: string;
-        };
-      };
-      tasks: {
-        Row: {
-          id: string;
-          user_id: string | null;
-          title: string;
-          description: string | null;
-          status: "pending" | "in_progress" | "completed" | "archived";
-          priority: "low" | "medium" | "high" | null;
-          due_date: string | null;
-          project_id: string | null;
-          tags: string[] | null;
-          estimated_duration_minutes: number | null;
-          actual_duration_minutes: number | null;
-          created_at: string;
-          updated_at: string;
-          metadata: Json | null;
-        };
-        Insert: {
-          id?: string;
-          user_id?: string | null;
-          title: string;
-          description?: string | null;
-          status?: "pending" | "in_progress" | "completed" | "archived";
-          priority?: "low" | "medium" | "high" | null;
-          due_date?: string | null;
-          project_id?: string | null;
-          tags?: string[] | null;
-          estimated_duration_minutes?: number | null;
-          actual_duration_minutes?: number | null;
-          created_at?: string;
-          updated_at?: string;
-          metadata?: Json | null;
-        };
-        Update: {
-          id?: string;
-          user_id?: string | null;
-          title?: string;
-          description?: string | null;
-          status?: "pending" | "in_progress" | "completed" | "archived";
-          priority?: "low" | "medium" | "high" | null;
-          due_date?: string | null;
-          project_id?: string | null;
-          tags?: string[] | null;
-          estimated_duration_minutes?: number | null;
-          actual_duration_minutes?: number | null;
-          created_at?: string;
-          updated_at?: string;
-          metadata?: Json | null;
-        };
-      };
+          channel_id?: string | null
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          id?: string
+          metadata?: Json | null
+          published_at?: string | null
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+          view_count?: number | null
+          youtube_video_id?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
     }
     Functions: {
-      search_cars: {
-        Args: { query_embedding: number[]; match_count: number }
+      search_cars: { 
+        Args: {
+          query_embedding: number[] 
+          match_count: number
+        }
         Returns: {
-            id: string;
-            make: string;
-            model: string;
-            similarity: number;
-            description: string | null;
-            image_url: string | null;
-            rent_link: string | null;
-            daily_price: number | null;
+          id: string 
+          make: string
+          model: string
+          similarity: number
+          description?: string 
+          image_url?: string
+          daily_price?: number
+          rent_link?: string
         }[]
       }
       similar_cars: {
-        Args: { p_car_id: string; p_match_count?: number }
-        Returns: {
-          id: string
-          make: string
-          model: string
-          description: string | null
-          embedding: number[] | null
-          daily_price: number | null
-          image_url: string | null
-          rent_link: string | null
-          is_test_result: boolean
-          owner_id: string | null;
-          status: string | null;
-          created_at: string;
-          updated_at: string;
-          specs: Json | null;
-        }[]
+        Args: {
+          p_car_id: string 
+          p_match_count?: number
+        }
+        Returns: Database["public"]["Tables"]["cars"]["Row"][]
       }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
     }
   }
 }

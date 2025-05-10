@@ -53,14 +53,27 @@
   --sidebar-ring: 300 100% 65%;
 
   /* Brand colors defined as CSS variables */
-  --brand-orange: 28 100% 50%;
-  --brand-blue: 210 100% 50%; /* Example, adjust */
-  --brand-green: 145 63% 49%;
-  --brand-pink: 330 100% 70%;
-  --brand-purple: 270 80% 60%;
-  --brand-cyan: 180 100% 50%;
-  --brand-yellow: 50 100% 50%; /* Example, adjust */
-  --neon-lime: 80 100% 50%; /* Example, adjust */
+  --brand-orange: 28 100% 50%; /* #FF6B00 */
+  --brand-orange-rgb: 255, 107, 0;
+  --brand-blue: 210 100% 50%; /* #00C2FF */ /* HSL in config might be different */
+  --brand-blue-rgb: 0, 194, 255;
+  --brand-green: 145 63% 49%; /* #00FF9D */
+  --brand-green-rgb: 0, 255, 157;
+  --brand-pink: 330 100% 70%; /* #FF007A */
+  --brand-pink-rgb: 255, 0, 122;
+  --brand-purple: 270 80% 60%; /* #9D00FF */
+  --brand-purple-rgb: 157, 0, 255;
+  --brand-cyan: 180 100% 50%; /* #00FFFF */
+  --brand-cyan-rgb: 0, 255, 255;
+  --brand-yellow: 50 100% 50%; /* #FFC300 */
+  --brand-yellow-rgb: 255, 195, 0;
+  --neon-lime: 80 100% 50%; /* #AEFF00 */
+  --neon-lime-rgb: 174, 255, 0;
+
+  /* Standard colors RGB for shadows */
+  --red-500-rgb: 239, 68, 68; /* From #EF4444 */
+  --gray-500-rgb: 107, 114, 128; /* From #6B7280 */
+
 
   /* ShadCN compatible text colors (taken from default dark theme, adjust if needed) */
   --light-text: 0 0% 94%; /* Matches --foreground */
