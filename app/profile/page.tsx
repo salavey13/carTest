@@ -7,40 +7,64 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import {
   FaBrain, FaBolt, FaChartLine, FaWandMagicSparkles,
   FaPenToSquare, 
-  FaRightFromBracket, // Replaced FaSignOutAlt
+  FaRightFromBracket,
   FaChevronRight, FaSpinner, 
-  FaListCheck, // Replaced FaTasks
-  FaShieldHalved
+  FaListCheck, 
+  FaShieldHalved, FaStar, FaMedal, FaPaperPlane, FaCodeBranch, FaGithub, FaTree, FaCrosshairs, FaSearch, FaRobot, FaVial, FaPlus
 } from "react-icons/fa6";
 import { useState, useEffect } from "react";
 import Modal from "@/components/ui/Modal";
 import { toast } from "sonner";
 import {
   fetchUserCyberFitnessProfile,
-  CyberFitnessProfile
+  CyberFitnessProfile,
+  getAchievementDetails 
 } from "@/hooks/cyberFitnessSupabase";
 import { debugLogger } from "@/lib/debugLogger";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts';
 import VibeContentRenderer from "@/components/VibeContentRenderer";
-import Link from "next/link"; // Added Link for Modal
+import Link from "next/link";
+import { format } from 'date-fns'; // For formatting dates in chart
+import { ru } from 'date-fns/locale'; // For Russian day names
 
 const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png";
-const DEFAULT_WEEKLY_ACTIVITY = [
-  { name: 'MO', value: 0, label: 'System Idle' }, { name: 'TU', value: 0, label: 'System Idle' },
-  { name: 'WE', value: 0, label: 'System Idle' }, { name: 'TH', value: 0, label: 'System Idle' },
-  { name: 'FRI', value: 0, label: 'System Idle' }, { name: 'SA', value: 0, label: 'System Idle' },
-  { name: 'SU', value: 0, label: 'System Idle' },
-];
+const DEFAULT_WEEKLY_ACTIVITY = Array.from({ length: 7 }).map((_, i) => {
+    const day = format(new Date(new Date().setDate(new Date().getDate() - 6 + i)), 'EE', { locale: ru });
+    return { name: day.toUpperCase(), value: 0, label: 'System Idle', filesExtracted: 0, tokensProcessed: 0 };
+});
 const CHART_COLORS = [
   'hsl(var(--brand-cyan))', 'hsl(var(--brand-pink))', 'hsl(var(--brand-yellow))',
   'hsl(var(--brand-green))', 'hsl(var(--brand-orange))', 'hsl(var(--brand-purple))',
   'hsl(var(--neon-lime))'
 ];
 
+// Helper to get an icon for an achievement ID
+const getAchievementIconComponent = (iconName: string | undefined): React.ReactNode => {
+    if (!iconName) return <FaMedal className="text-brand-yellow" />;
+    const iconsMap: Record<string, React.ReactElement> = {
+        "FaVial": <FaVial className="text-brand-green" />,
+        "FaPaperPlane": <FaPaperPlane className="text-brand-cyan" />,
+        "FaCodeBranch": <FaCodeBranch className="text-brand-purple" />,
+        "FaGithub": <FaGithub className="text-light-text" />, // Assuming light-text is defined
+        "FaTree": <FaTree className="text-brand-green" />,
+        "FaCrosshairs": <FaCrosshairs className="text-red-500" />, // Direct color
+        "FaSearch": <FaSearch className="text-brand-blue" />,
+        "FaRobot": <FaRobot className="text-brand-pink" />,
+        "FaStar": <FaStar className="text-brand-yellow" />,
+        "FaPlus": <FaPlus className="text-neon-lime" />, // For Files Extracted
+        "FaBolt": <FaBolt className="text-orange-500" />, // For Tokens Processed
+        // Add more mappings as needed
+    };
+    return iconsMap[iconName] || <FaMedal className="text-brand-yellow" />;
+};
+
+
 export default function ProfilePage() {
   const { user: telegramUser, dbUser, isLoading: appLoading } = useAppContext();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPerksModalOpen, setIsPerksModalOpen] = useState(false);
+  const [isAchievementsModalOpen, setIsAchievementsModalOpen] = useState(false);
+
 
   const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState<boolean>(true);
@@ -60,12 +84,24 @@ export default function ProfilePage() {
           debugLogger.log("[ProfilePage] CyberFitness profile loaded:", result.data);
         } else {
           debugLogger.warn(`[ProfilePage] Failed to load CyberFitness profile for ${dbUser.id}. Error: ${result.error}. Initializing default.`);
-          setCyberProfile({ level: 0, kiloVibes: 0, weeklyActivity: [...DEFAULT_WEEKLY_ACTIVITY], cognitiveOSVersion: "v0.1 Alpha", unlockedPerks: [], activeQuests: [] });
+          setCyberProfile({ 
+            level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Alpha", 
+            unlockedPerks: [], activeQuests: [], achievements: [],
+            dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0,
+            totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0,
+            featuresUsed: {}
+          });
         }
         setProfileLoading(false);
-      } else if (!appLoading) { // Only if auth is done and no user
+      } else if (!appLoading) { 
         debugLogger.log("[ProfilePage] No dbUser ID, using default/guest CyberFitness profile.");
-        setCyberProfile({ level: 0, kiloVibes: 0, weeklyActivity: [...DEFAULT_WEEKLY_ACTIVITY], cognitiveOSVersion: "v0.1 Guest Mode", unlockedPerks: ["Basic Interface"], activeQuests: ["Explore CyberVibe Studio"] });
+        setCyberProfile({ 
+            level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Guest Mode", 
+            unlockedPerks: ["Basic Interface"], activeQuests: ["Explore CyberVibe Studio"], 
+            achievements: [], dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0,
+            totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0,
+            featuresUsed: {}
+        });
         setProfileLoading(false);
       }
     };
@@ -90,21 +126,38 @@ export default function ProfilePage() {
   const kiloVibes = cyberProfile?.kiloVibes || 0;
   const cognitiveOS = cyberProfile?.cognitiveOSVersion || "v1.0 Genesis";
   const unlockedPerks = cyberProfile?.unlockedPerks || ["Core Systems Online"];
+  const achievements = cyberProfile?.achievements || [];
   const focusTime = cyberProfile?.focusTimeHours || 0;
-  const skillsLeveled = cyberProfile?.skillsLeveled || unlockedPerks.length;
-  const displayWeeklyActivity = cyberProfile?.weeklyActivity && cyberProfile.weeklyActivity.length > 0
-                                  ? cyberProfile.weeklyActivity
-                                  : DEFAULT_WEEKLY_ACTIVITY;
+  
+  const displayWeeklyActivity = cyberProfile?.dailyActivityLog && cyberProfile.dailyActivityLog.length > 0
+    ? cyberProfile.dailyActivityLog.map(log => {
+        const date = new Date(log.date + "T00:00:00"); // Ensure date is parsed as local
+        return {
+            name: format(date, 'EE', { locale: ru }).toUpperCase(),
+            value: (log.filesExtracted * 50) + (log.tokensProcessed * 0.1) + (log.kworkRequestsSent || 0) * 10 + (log.prsCreated || 0) * 200 + (log.branchesUpdated || 0) * 100,
+            label: `${log.filesExtracted}f, ${log.tokensProcessed}t, ${log.kworkRequestsSent || 0}req`,
+            filesExtracted: log.filesExtracted,
+            tokensProcessed: log.tokensProcessed,
+            kworkRequestsSent: log.kworkRequestsSent || 0,
+            prsCreated: log.prsCreated || 0,
+            branchesUpdated: log.branchesUpdated || 0,
+        };
+      }).slice(0,7).reverse()
+    : DEFAULT_WEEKLY_ACTIVITY;
 
   const stats = [
     { label: "KiloVibes", value: kiloVibes.toLocaleString(), icon: <FaBolt className="text-brand-yellow" /> },
     { label: "Deep Work (ч)", value: focusTime, icon: <FaBrain className="text-brand-pink" /> },
-    { label: "Перков", value: skillsLeveled, icon: <FaWandMagicSparkles className="text-brand-green" /> },
+    { label: "Достижений", value: achievements.length, icon: <FaStar className="text-neon-lime" /> },
+    { label: "Запросов к AI", value: cyberProfile?.totalKworkRequestsSent || 0, icon: <FaPaperPlane className="text-brand-cyan" /> },
+    { label: "PR Создано", value: cyberProfile?.totalPrsCreated || 0, icon: <FaGithub className="text-light-text" /> },
+    { label: "Веток Обновлено", value: cyberProfile?.totalBranchesUpdated || 0, icon: <FaCodeBranch className="text-brand-purple" /> },
+    { label: "Извлечено Файлов (в KWork)", value: cyberProfile?.totalFilesExtracted || 0, icon: <FaPlus className="text-brand-green" /> },
+    { label: "Токенов AI (обработано)", value: (cyberProfile?.totalTokensProcessed || 0).toLocaleString(), icon: <FaRobot className="text-brand-pink" /> },
   ];
 
   const handleLogout = () => {
     toast.info("Функция выхода из системы в разработке.");
-    // Future: supabase.auth.signOut();
   };
 
   return (
@@ -139,26 +192,24 @@ export default function ProfilePage() {
           </CardHeader>
 
           <CardContent className="space-y-6 p-6">
-            {/* CyberFitness Stats Section */}
             <section>
               <h2 className="text-xl font-orbitron text-brand-pink mb-3 flex items-center">
-                <FaChartLine className="mr-2"/>Кибер-Метрики
+                <FaChartLine className="mr-2"/>Кибер-Метрики Агента
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {stats.map((stat) => (
-                  <Card key={stat.label} className="bg-dark-bg/70 p-4 text-center border border-brand-cyan/30 hover:shadow-brand-cyan/20 hover:shadow-md transition-shadow rounded-lg">
-                    <div className="text-3xl mb-1 mx-auto">{stat.icon}</div>
-                    <p className="text-2xl font-orbitron font-bold text-light-text">{stat.value}</p>
-                    <p className="text-xs text-muted-foreground font-mono uppercase">{stat.label}</p>
+                  <Card key={stat.label} className="bg-dark-bg/70 p-3 text-center border border-brand-cyan/30 hover:shadow-brand-cyan/20 hover:shadow-md transition-shadow rounded-lg">
+                    <div className="text-2xl mb-1 mx-auto">{stat.icon}</div>
+                    <p className="text-xl font-orbitron font-bold text-light-text">{stat.value}</p>
+                    <p className="text-[0.6rem] text-muted-foreground font-mono uppercase leading-tight">{stat.label}</p>
                   </Card>
                 ))}
               </div>
             </section>
 
-            {/* Weekly Activity Chart */}
             <section>
                 <h2 className="text-xl font-orbitron text-brand-green mb-3 flex items-center">
-                    <FaListCheck className="mr-2" />Недельная Активность (KiloVibes) {/* Replaced FaTasks */}
+                    <FaListCheck className="mr-2" />Недельная Активность (Vibe Points)
                 </h2>
                 <Card className="bg-dark-bg/70 p-3 border border-brand-green/30 rounded-lg">
                     <div className="h-[120px] w-full">
@@ -167,9 +218,9 @@ export default function ProfilePage() {
                             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} dy={5}/>
                             <YAxis hide={true} domain={[0, 'dataMax + 100']} />
                             <RechartsTooltip
-                                cursor={{ fill: 'hsla(var(--brand-purple), 0.1)' }} /* Corrected: --brand-purple-hsl to --brand-purple */
+                                cursor={{ fill: 'hsla(var(--brand-purple), 0.1)' }}
                                 contentStyle={{
-                                    backgroundColor: 'rgba(13, 2, 33, 0.85)', /* Use var(--dark-bg-rgb) if possible or keep as is */
+                                    backgroundColor: 'rgba(13, 2, 33, 0.85)',
                                     borderColor: 'hsl(var(--brand-purple))',
                                     borderRadius: '0.5rem',
                                     color: 'hsl(var(--light-text))',
@@ -178,7 +229,16 @@ export default function ProfilePage() {
                                 }}
                                 itemStyle={{ color: 'hsl(var(--brand-yellow))' }}
                                 labelStyle={{ color: 'hsl(var(--brand-cyan))', fontWeight: 'bold' }}
-                                formatter={(value: number, name, props) => [`${value} KV`, props.payload.label || 'Активность']}
+                                formatter={(value: number, name, props) => {
+                                    const payload = props.payload as typeof displayWeeklyActivity[0];
+                                    const details = [];
+                                    if (payload.filesExtracted > 0) details.push(`${payload.filesExtracted}f`);
+                                    if (payload.tokensProcessed > 0) details.push(`${payload.tokensProcessed}t`);
+                                    if (payload.kworkRequestsSent > 0) details.push(`${payload.kworkRequestsSent}req`);
+                                    if (payload.prsCreated > 0) details.push(`${payload.prsCreated}PR`);
+                                    if (payload.branchesUpdated > 0) details.push(`${payload.branchesUpdated}Br`);
+                                    return [`${value} VP`, details.join(', ') || 'Простой'];
+                                }}
                             />
                             <Bar dataKey="value" radius={[3, 3, 0, 0]} barSize={20} minPointSize={3}>
                             {displayWeeklyActivity.map((entry, index) => (
@@ -191,7 +251,6 @@ export default function ProfilePage() {
                 </Card>
             </section>
 
-            {/* Unlocked Perks Section */}
             <section>
               <h2 className="text-xl font-orbitron text-brand-yellow mb-3 flex items-center">
                 <FaWandMagicSparkles className="mr-2"/>Разблокированные Перки
@@ -206,20 +265,39 @@ export default function ProfilePage() {
                 ) : (
                   <p className="text-sm text-muted-foreground font-mono">Нет активных перков. Время прокачиваться!</p>
                 )}
-                {unlockedPerks.length > 3 && (
+                {(unlockedPerks.length > 3 || unlockedPerks.length === 0) && (
                   <Button variant="link" size="sm" className="text-brand-yellow p-0 h-auto font-mono text-xs" onClick={() => setIsPerksModalOpen(true)}>
-                    Показать все ({unlockedPerks.length}) <FaChevronRight className="ml-1 w-3 h-3"/>
+                    {unlockedPerks.length > 3 ? `Показать все (${unlockedPerks.length})` : "Узнать о Перках"} <FaChevronRight className="ml-1 w-3 h-3"/>
                   </Button>
                 )}
-                 {unlockedPerks.length === 0 && (
-                     <Button variant="link" size="sm" className="text-brand-yellow p-0 h-auto font-mono text-xs" onClick={() => setIsPerksModalOpen(true)}>
-                        Узнать о Перках <FaChevronRight className="ml-1 w-3 h-3"/>
-                    </Button>
-                 )}
               </div>
             </section>
 
-            {/* Actions Section */}
+            <section>
+              <h2 className="text-xl font-orbitron text-neon-lime mb-3 flex items-center">
+                <FaStar className="mr-2"/>Достижения Агента
+              </h2>
+              <div className="p-4 bg-dark-bg/70 rounded-lg border border-neon-lime/30 space-y-2">
+                {achievements.length > 0 ? (
+                  achievements.slice(0, 3).map((achId) => {
+                    const achievement = getAchievementDetails(achId);
+                    return (
+                      <div key={achId} className="flex items-center text-sm text-light-text font-mono" title={achievement?.description}>
+                        {getAchievementIconComponent(achievement?.icon)} <span className="ml-2">{achievement?.name || achId}</span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="text-sm text-muted-foreground font-mono">Зал славы пока пуст. Верши великие дела!</p>
+                )}
+                {(achievements.length > 3 || achievements.length === 0) && (
+                   <Button variant="link" size="sm" className="text-neon-lime p-0 h-auto font-mono text-xs" onClick={() => setIsAchievementsModalOpen(true)}>
+                     {achievements.length > 3 ? `Показать все (${achievements.length})` : "Мои Достижения"} <FaChevronRight className="ml-1 w-3 h-3"/>
+                   </Button>
+                )}
+              </div>
+            </section>
+
             <section className="flex flex-col sm:flex-row gap-3 mt-6">
               <Button 
                 onClick={() => setIsEditModalOpen(true)}
@@ -232,7 +310,7 @@ export default function ProfilePage() {
                 variant="outline" 
                 className="flex-1 border-brand-red text-brand-red hover:bg-brand-red/20 hover:text-white font-orbitron shadow-md hover:shadow-brand-red/40 transition-all"
               >
-                <FaRightFromBracket className="mr-2" /> Деавторизация {/* Replaced FaSignOutAlt */}
+                <FaRightFromBracket className="mr-2" /> Деавторизация
               </Button>
             </section>
           </CardContent>
@@ -275,6 +353,35 @@ export default function ProfilePage() {
             )}
         </div>
         <p className="mt-3 text-xs text-brand-yellow font-mono animate-pulse">Синхронизация с банком перков...</p>
+      </Modal>
+
+      <Modal
+        isOpen={isAchievementsModalOpen}
+        onClose={() => setIsAchievementsModalOpen(false)}
+        title="Зал Славы Агента"
+        showConfirmButton={false}
+        cancelText="Закрыть Витрину"
+      >
+        <div className="max-h-80 overflow-y-auto simple-scrollbar pr-2 space-y-3">
+            {achievements.length > 0 ? (
+                achievements.map((achId) => {
+                    const achievement = getAchievementDetails(achId);
+                    if (!achievement) return <div key={achId} className="p-3 bg-dark-bg/70 border border-muted rounded-lg text-sm text-muted-foreground">Неизвестное достижение: {achId}</div>;
+                    return (
+                        <div key={achievement.id} className="p-3 bg-dark-bg/70 border border-neon-lime/50 rounded-lg transform hover:scale-[1.02] transition-transform">
+                            <div className="flex items-center mb-1">
+                                <span className="text-2xl mr-3">{getAchievementIconComponent(achievement.icon)}</span>
+                                <h4 className="text-md font-orbitron font-semibold text-neon-lime">{achievement.name}</h4>
+                            </div>
+                            <p className="text-xs text-muted-foreground font-mono ml-9">{achievement.description}</p>
+                        </div>
+                    );
+                })
+            ) : (
+                 <p className="font-mono text-sm text-muted-foreground text-center py-4">Твой путь к легенде только начался! Завершай задачи, используй инструменты CyberVibe Studio, и этот зал наполнится твоими трофеями!</p>
+            )}
+        </div>
+         <p className="mt-3 text-xs text-brand-yellow font-mono animate-pulse text-center">Каждая строка кода, каждый коммит — шаг к величию...</p>
       </Modal>
     </div>
   );
