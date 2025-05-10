@@ -1,0 +1,695 @@
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+
+export interface Database {
+  public: {
+    Tables: {
+      users: {
+        Row: {
+          user_id: string
+          username: string | null
+          full_name: string | null
+          avatar_url: string | null
+          website: string | null
+          status: "free" | "pro" | "admin"
+          role: "attendee" | "admin" | "user"
+          created_at: string
+          updated_at: string
+          active_organizer_id: string | null
+          metadata: {
+            debugToastsEnabled?: boolean;
+            notifications_enabled?: boolean;
+            water_reminders_enabled?: boolean;
+            dark_mode_enabled?: boolean;
+            promotional_messages_enabled?: boolean;
+            customLinks?: { name: string; url: string }[];
+            cyberFitness?: {
+              level?: number;
+              kiloVibes?: number;
+              focusTimeHours?: number;
+              skillsLeveled?: number;
+              activeQuests?: string[];
+              completedQuests?: string[];
+              unlockedPerks?: string[];
+              achievements?: string[]; // Added achievements array
+              cognitiveOSVersion?: string;
+              lastActivityTimestamp?: string;
+              dailyActivityLog?: {
+                date: string; // YYYY-MM-DD
+                filesExtracted: number; // Files added to KWork
+                tokensProcessed: number; // Tokens from AI response
+                kworkRequestsSent?: number; // Number of "Copy to KWork & Go to AI"
+                prsCreated?: number;
+                branchesUpdated?: number;
+              }[];
+              // Cumulative counters for achievements (optional, can be derived or explicit)
+              totalKworkRequestsSent?: number;
+              totalPrsCreated?: number;
+              totalBranchesUpdated?: number;
+              featuresUsed?: Record<string, boolean>; // e.g., { usedAddFullTree: true }
+            };
+            last_login_ip?: string;
+            preferences?: Json;
+            subscription_id?: string | number | null;
+            generated_files?: { path: string; code: string; extension: string; }[];
+          } | null
+          description: string | null
+          badges: Json | null
+          test_progress: Json | null
+          subscription_id: string | number | null
+          language_code: string | null
+          first_name: string | null
+          last_name: string | null
+        }
+        Insert: {
+          user_id: string
+          username?: string | null
+          full_name?: string | null
+          avatar_url?: string | null
+          website?: string | null
+          status?: "free" | "pro" | "admin"
+          role?: "attendee" | "admin" | "user"
+          created_at?: string
+          updated_at?: string
+          active_organizer_id?: string | null
+          metadata?: {
+            debugToastsEnabled?: boolean;
+            notifications_enabled?: boolean;
+            water_reminders_enabled?: boolean;
+            dark_mode_enabled?: boolean;
+            promotional_messages_enabled?: boolean;
+            customLinks?: { name: string; url: string }[];
+            cyberFitness?: {
+              level?: number;
+              kiloVibes?: number;
+              focusTimeHours?: number;
+              skillsLeveled?: number;
+              activeQuests?: string[];
+              completedQuests?: string[];
+              unlockedPerks?: string[];
+              achievements?: string[];
+              cognitiveOSVersion?: string;
+              lastActivityTimestamp?: string;
+              dailyActivityLog?: {
+                date: string;
+                filesExtracted: number;
+                tokensProcessed: number;
+                kworkRequestsSent?: number;
+                prsCreated?: number;
+                branchesUpdated?: number;
+              }[];
+              totalKworkRequestsSent?: number;
+              totalPrsCreated?: number;
+              totalBranchesUpdated?: number;
+              featuresUsed?: Record<string, boolean>;
+            };
+            last_login_ip?: string;
+            preferences?: Json;
+            subscription_id?: string | number | null;
+            generated_files?: { path: string; code: string; extension: string; }[];
+          } | null
+          description?: string | null
+          badges?: Json | null
+          test_progress?: Json | null
+          subscription_id?: string | number | null
+          language_code?: string | null
+          first_name?: string | null
+          last_name?: string | null
+        }
+        Update: {
+          user_id?: string
+          username?: string | null
+          full_name?: string | null
+          avatar_url?: string | null
+          website?: string | null
+          status?: "free" | "pro" | "admin"
+          role?: "attendee" | "admin" | "user"
+          created_at?: string
+          updated_at?: string
+          active_organizer_id?: string | null
+          metadata?: {
+            debugToastsEnabled?: boolean;
+            notifications_enabled?: boolean;
+            water_reminders_enabled?: boolean;
+            dark_mode_enabled?: boolean;
+            promotional_messages_enabled?: boolean;
+            customLinks?: { name: string; url: string }[];
+            cyberFitness?: {
+              level?: number;
+              kiloVibes?: number;
+              focusTimeHours?: number;
+              skillsLeveled?: number;
+              activeQuests?: string[];
+              completedQuests?: string[];
+              unlockedPerks?: string[];
+              achievements?: string[];
+              cognitiveOSVersion?: string;
+              lastActivityTimestamp?: string;
+              dailyActivityLog?: {
+                date: string;
+                filesExtracted: number;
+                tokensProcessed: number;
+                kworkRequestsSent?: number;
+                prsCreated?: number;
+                branchesUpdated?: number;
+              }[];
+              totalKworkRequestsSent?: number;
+              totalPrsCreated?: number;
+              totalBranchesUpdated?: number;
+              featuresUsed?: Record<string, boolean>;
+            };
+            last_login_ip?: string;
+            preferences?: Json;
+            subscription_id?: string | number | null;
+            generated_files?: { path: string; code: string; extension: string; }[];
+          } | null
+          description?: string | null
+          badges?: Json | null
+          test_progress?: Json | null
+          subscription_id?: string | number | null
+          language_code?: string | null
+          first_name?: string | null
+          last_name?: string | null
+        }
+      }
+      questions: {
+        Row: {
+          id: number
+          text: string
+          theme: string
+          position: number
+          created_at?: string
+        }
+        Insert: {
+          id?: number
+          text: string
+          theme: string
+          position: number
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          text?: string
+          theme?: string
+          position?: number
+          created_at?: string
+        }
+      }
+      cars: {
+        Row: {
+          id: string
+          make: string
+          model: string
+          description: string | null
+          embedding: number[] | null
+          daily_price: number | null
+          image_url: string | null
+          rent_link: string | null
+          is_test_result: boolean
+          owner_id: string | null
+          status: string | null
+          created_at: string
+          updated_at: string
+          specs: Json | null
+        }
+        Insert: {
+          id?: string
+          make: string
+          model: string
+          description?: string | null
+          embedding?: number[] | null
+          daily_price?: number | null
+          image_url?: string | null
+          rent_link?: string | null
+          is_test_result?: boolean
+          owner_id?: string | null
+          status?: string | null
+          created_at?: string
+          updated_at?: string
+          specs?: Json | null
+        }
+        Update: {
+          id?: string
+          make?: string
+          model?: string
+          description?: string | null
+          embedding?: number[] | null
+          daily_price?: number | null
+          image_url?: string | null
+          rent_link?: string | null
+          is_test_result?: boolean
+          owner_id?: string | null
+          status?: string | null
+          created_at?: string
+          updated_at?: string
+          specs?: Json | null
+        }
+      }
+      answers: {
+        Row: {
+          id: number
+          question_id: number | null
+          text: string
+          result: string | null
+          created_at?: string
+        }
+        Insert: {
+          id?: number
+          question_id?: number | null
+          text: string
+          result?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          question_id?: number | null
+          text?: string
+          result?: string | null
+          created_at?: string
+        }
+      }
+      user_results: {
+        Row: {
+          id: number
+          user_id: string | null
+          car_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          user_id?: string | null
+          car_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          user_id?: string | null
+          car_id?: string | null
+          created_at?: string
+        }
+      }
+      invoices: {
+          Row: {
+              id: string;
+              user_id: string;
+              type: string;
+              amount: number;
+              status: "pending" | "paid" | "failed" | "cancelled";
+              subscription_id: string | number | null;
+              metadata: Json | null;
+              created_at: string;
+              updated_at: string;
+              telegram_payment_charge_id: string | null;
+          };
+          Insert: {
+              id: string;
+              user_id: string;
+              type: string;
+              amount: number;
+              status?: "pending" | "paid" | "failed" | "cancelled";
+              subscription_id?: string | number | null;
+              metadata?: Json | null;
+              created_at?: string;
+              updated_at?: string;
+              telegram_payment_charge_id?: string | null;
+          };
+          Update: {
+              id?: string;
+              user_id?: string;
+              type?: string;
+              amount?: number;
+              status?: "pending" | "paid" | "failed" | "cancelled";
+              subscription_id?: string | number | null;
+              metadata?: Json | null;
+              created_at?: string;
+              updated_at?: string;
+              telegram_payment_charge_id?: string | null;
+          };
+      };
+      rentals: {
+          Row: {
+              rental_id: string;
+              user_id: string;
+              car_id: string;
+              start_date: string;
+              end_date: string;
+              total_cost: number;
+              status: "pending" | "confirmed" | "active" | "completed" | "cancelled";
+              payment_status: "pending" | "paid" | "failed";
+              created_at: string;
+              updated_at: string;
+              metadata: Json | null;
+          };
+          Insert: {
+              rental_id?: string;
+              user_id: string;
+              car_id: string;
+              start_date: string;
+              end_date: string;
+              total_cost: number;
+              status?: "pending" | "confirmed" | "active" | "completed" | "cancelled";
+              payment_status?: "pending" | "paid" | "failed";
+              created_at?: string;
+              updated_at?: string;
+              metadata?: Json | null;
+          };
+          Update: {
+              rental_id?: string;
+              user_id?: string;
+              car_id?: string;
+              start_date?: string;
+              end_date?: string;
+              total_cost?: number;
+              status?: "pending" | "confirmed" | "active" | "completed" | "cancelled";
+              payment_status?: "pending" | "paid" | "failed";
+              created_at?: string;
+              updated_at?: string;
+              metadata?: Json | null;
+          };
+      };
+      articles: {
+        Row: {
+          id: string;
+          title: string;
+          slug: string;
+          summary: string | null;
+          content: string;
+          author_id: string | null;
+          tags: string[] | null;
+          category: string | null;
+          published_at: string | null;
+          created_at: string;
+          updated_at: string;
+          views: number | null;
+          image_url: string | null;
+        };
+        Insert: {
+          id?: string;
+          title: string;
+          slug: string;
+          summary?: string | null;
+          content: string;
+          author_id?: string | null;
+          tags?: string[] | null;
+          category?: string | null;
+          published_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          views?: number | null;
+          image_url?: string | null;
+        };
+        Update: {
+          id?: string;
+          title?: string;
+          slug?: string;
+          summary?: string | null;
+          content?: string;
+          author_id?: string | null;
+          tags?: string[] | null;
+          category?: string | null;
+          published_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          views?: number | null;
+          image_url?: string | null;
+        }
+      };
+      article_sections: {
+        Row: {
+          id: string;
+          article_id: string;
+          title: string | null;
+          content: string;
+          section_order: number;
+          metadata: Json | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          article_id: string;
+          title?: string | null;
+          content: string;
+          section_order: number;
+          metadata?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          article_id?: string;
+          title?: string | null;
+          content?: string;
+          section_order?: number;
+          metadata?: Json | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      coze_responses: {
+        Row: {
+            id: number;
+            bot_id: string;
+            user_id: string;
+            request_content: string;
+            response_content: string;
+            metadata: Json | null;
+            coze_conversation_id: string;
+            coze_chat_id: string;
+            created_at: string;
+        };
+        Insert: {
+            id?: number;
+            bot_id: string;
+            user_id: string;
+            request_content: string;
+            response_content: string;
+            metadata?: Json | null;
+            coze_conversation_id: string;
+            coze_chat_id: string;
+            created_at?: string;
+        };
+        Update: {
+            id?: number;
+            bot_id?: string;
+            user_id?: string;
+            request_content?: string;
+            response_content?: string;
+            metadata?: Json | null;
+            coze_conversation_id?: string;
+            coze_chat_id?: string;
+            created_at?: string;
+        };
+      };
+      subscriptions: {
+          Row: {
+              id: string;
+              name: string;
+              price_xtr: number;
+              price_usd: number | null;
+              features: string[];
+              duration_days: number | null;
+              is_active: boolean;
+              sort_order: number | null;
+              created_at: string;
+              updated_at: string;
+          };
+          Insert: {
+              id: string;
+              name: string;
+              price_xtr: number;
+              price_usd?: number | null;
+              features: string[];
+              duration_days?: number | null;
+              is_active?: boolean;
+              sort_order?: number | null;
+              created_at?: string;
+              updated_at?: string;
+          };
+          Update: {
+              id?: string;
+              name?: string;
+              price_xtr?: number;
+              price_usd?: number | null;
+              features?: string[];
+              duration_days?: number | null;
+              is_active?: boolean;
+              sort_order?: number | null;
+              created_at?: string;
+              updated_at?: string;
+          };
+      };
+      videos: {
+        Row: {
+            id: string;
+            title: string;
+            description: string | null;
+            published_at: string;
+            thumbnail_url: string | null;
+            channel_id: string;
+            channel_title: string;
+            duration_seconds: number | null;
+            tags: string[] | null;
+            category_id: string | null;
+            view_count: number | null;
+            like_count: number | null;
+            comment_count: number | null;
+            created_at: string;
+            updated_at: string;
+            metadata: Json | null;
+        };
+        Insert: {
+            id: string;
+            title: string;
+            description?: string | null;
+            published_at: string;
+            thumbnail_url?: string | null;
+            channel_id: string;
+            channel_title: string;
+            duration_seconds?: number | null;
+            tags?: string[] | null;
+            category_id?: string | null;
+            view_count?: number | null;
+            like_count?: number | null;
+            comment_count?: number | null;
+            created_at?: string;
+            updated_at?: string;
+            metadata?: Json | null;
+        };
+        Update: {
+            id?: string;
+            title?: string;
+            description?: string | null;
+            published_at?: string;
+            thumbnail_url?: string | null;
+            channel_id?: string;
+            channel_title?: string;
+            duration_seconds?: number | null;
+            tags?: string[] | null;
+            category_id?: string | null;
+            view_count?: number | null;
+            like_count?: number | null;
+            comment_count?: number | null;
+            created_at?: string;
+            updated_at?: string;
+            metadata?: Json | null;
+        };
+      };
+      characters: {
+        Row: {
+            id: string;
+            name: string;
+            description: string | null;
+            image_url: string | null;
+            type: string;
+            metadata: Json | null;
+            created_at: string;
+            updated_at: string;
+        };
+        Insert: {
+            id?: string;
+            name: string;
+            description?: string | null;
+            image_url?: string | null;
+            type: string;
+            metadata?: Json | null;
+            created_at?: string;
+            updated_at?: string;
+        };
+        Update: {
+            id?: string;
+            name?: string;
+            description?: string | null;
+            image_url?: string | null;
+            type?: string;
+            metadata?: Json | null;
+            created_at?: string;
+            updated_at?: string;
+        };
+      };
+      tasks: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          title: string;
+          description: string | null;
+          status: "pending" | "in_progress" | "completed" | "archived";
+          priority: "low" | "medium" | "high" | null;
+          due_date: string | null;
+          project_id: string | null;
+          tags: string[] | null;
+          estimated_duration_minutes: number | null;
+          actual_duration_minutes: number | null;
+          created_at: string;
+          updated_at: string;
+          metadata: Json | null;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          title: string;
+          description?: string | null;
+          status?: "pending" | "in_progress" | "completed" | "archived";
+          priority?: "low" | "medium" | "high" | null;
+          due_date?: string | null;
+          project_id?: string | null;
+          tags?: string[] | null;
+          estimated_duration_minutes?: number | null;
+          actual_duration_minutes?: number | null;
+          created_at?: string;
+          updated_at?: string;
+          metadata?: Json | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          title?: string;
+          description?: string | null;
+          status?: "pending" | "in_progress" | "completed" | "archived";
+          priority?: "low" | "medium" | "high" | null;
+          due_date?: string | null;
+          project_id?: string | null;
+          tags?: string[] | null;
+          estimated_duration_minutes?: number | null;
+          actual_duration_minutes?: number | null;
+          created_at?: string;
+          updated_at?: string;
+          metadata?: Json | null;
+        };
+      };
+    }
+    Functions: {
+      search_cars: {
+        Args: { query_embedding: number[]; match_count: number }
+        Returns: {
+            id: string;
+            make: string;
+            model: string;
+            similarity: number;
+            description: string | null;
+            image_url: string | null;
+            rent_link: string | null;
+            daily_price: number | null;
+        }[]
+      }
+      similar_cars: {
+        Args: { p_car_id: string; p_match_count?: number }
+        Returns: {
+          id: string
+          make: string
+          model: string
+          description: string | null
+          embedding: number[] | null
+          daily_price: number | null
+          image_url: string | null
+          rent_link: string | null
+          is_test_result: boolean
+          owner_id: string | null;
+          status: string | null;
+          created_at: string;
+          updated_at: string;
+          specs: Json | null;
+        }[]
+      }
+    }
+  }
+}
