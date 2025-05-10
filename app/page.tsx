@@ -21,7 +21,6 @@ import {
 import { format } from 'date-fns'; 
 import { ru } from 'date-fns/locale'; 
 
-// --- Constants & Config - Moved outside the component ---
 const DEFAULT_WEEKLY_ACTIVITY = [
   { name: 'MO', value: 0, label: 'System Idle' }, { name: 'TU', value: 0, label: 'System Idle' },
   { name: 'WE', value: 0, label: 'System Idle' }, { name: 'TH', value: 0, label: 'System Idle' },
@@ -36,7 +35,6 @@ const CHART_COLORS = [
 const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png"; 
 const FEATURED_QUEST_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250510_035401-e6d0b2d8-9f28-4516-a5c7-fe729b31f736.jpg"; 
 
-// --- Framer Motion Variants - Moved outside the component ---
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } },
@@ -54,38 +52,19 @@ export default function Home() {
   const [profileLoading, setProfileLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // logger.log("Home: Mount | App Loading:", appLoading, "| User:", dbUser ? dbUser.id : "None");
     const loadProfile = async () => {
       if (dbUser?.id) {
-        // logger.log(`Home: Fetching CyberFitness profile for ${dbUser.id}`);
         setProfileLoading(true);
         const result = await fetchUserCyberFitnessProfile(dbUser.id);
         if (result.success && result.data) setCyberProfile(result.data);
         else {
           logger.warn(`Home: Failed to load profile for ${dbUser.id}. Error: ${result.error}. Defaulting.`);
-          setCyberProfile({ 
-            level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
-            activeQuests: [], completedQuests: [], unlockedPerks: [],
-            achievements: [], cognitiveOSVersion: "v0.1 Alpha", 
-            lastActivityTimestamp: new Date(0).toISOString(),
-            dailyActivityLog: [], 
-            totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0,
-            totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {}
-          });
+          setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Alpha", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
         }
         setProfileLoading(false);
       } else if (!appLoading) { 
         setProfileLoading(false);
-        setCyberProfile({ 
-            level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
-            activeQuests: [], completedQuests: [], unlockedPerks: [],
-            achievements: [], cognitiveOSVersion: "v0.1 Guest Mode", 
-            lastActivityTimestamp: new Date(0).toISOString(),
-            dailyActivityLog: [], 
-            totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0,
-            totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {}
-        });
-        // logger.log("Home: No dbUser ID, using default/guest profile.");
+        setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Guest Mode", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
       }
     };
     if (!appLoading) loadProfile();
@@ -143,14 +122,13 @@ export default function Home() {
                     <h3 className="text-md sm:text-lg font-bold font-orbitron text-shadow-[0_0_8px_theme(colors.brand-cyan)]">
                       <VibeContentRenderer content="<FaGamepad className='inline text-brand-pink/90 mr-2 text-2xl sm:text-3xl align-middle'/>INITIATE: CyberDev OS Training Program" />
                     </h3>
-                    {/* Разбиваем строку на части для корректного рендеринга и переноса */}
-                    <p className="text-xs sm:text-sm font-mono text-gray-300">
+                    <div className="text-xs sm:text-sm font-mono text-gray-300">
                         <span>Your journey from Level 0:&nbsp;</span>
-                        <VibeContentRenderer content="<FaEye className='inline mx-0.5 align-middle'/> See the Code," />
-                        {/* Добавляем пробел через span или неразрывный пробел для лучшего контроля */}
-                        <span className="ml-1"> </span> 
-                        <VibeContentRenderer content="<FaBolt className='inline mx-0.5 align-middle'/> Become the Vibe." />
-                    </p>
+                        <FaEye className='inline mx-0.5 align-middle'/>
+                        <span>&nbsp;See the Code,&nbsp;</span>
+                        <FaBolt className='inline mx-0.5 align-middle'/>
+                        <span>&nbsp;Become the Vibe.</span>
+                    </div>
                   </div>
                  <div className="absolute top-2 right-3 sm:top-3 sm:right-4 text-white z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <FaArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-brand-pink animate-[pulse_1.5s_infinite]"/>
