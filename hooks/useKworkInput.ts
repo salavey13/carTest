@@ -4,7 +4,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { logCyberFitnessAction, checkAndUnlockFeatureAchievement, getAchievementDetails } from "@/hooks/cyberFitnessSupabase";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppToast } from "@/hooks/useAppToast";
-import * as repoUtils from "@/lib/repoUtils";
+import * as repoUtils from "@/lib/repoUtils"; // Keep this for getLanguage if needed elsewhere
 
 interface UseKworkInputProps {
     selectedFetcherFiles: Set<string>;
@@ -76,7 +76,7 @@ export const useKworkInput = ({
         setFilesParsed,
         setSelectedAssistantFiles,
         scrollToSection,
-        addToast, // Use addToast from context for achievement notifications
+        addToast, 
     } = useRepoXmlPageContext();
 
     const handleAddSelected = useCallback(() => {
@@ -119,7 +119,6 @@ export const useKworkInput = ({
             }
             return null;
         }).filter(block => block !== null).join("\n\n// ---- FILE SEPARATOR ----\n\n");
-
 
         if (!fileBlocksContent.trim() && filesAddedCount === 0) {
             toastWarning("Выбранные файлы пусты или не содержат полезного контента для добавления.");
@@ -190,14 +189,14 @@ export const useKworkInput = ({
     ]);
 
     const handleCopyToClipboard = useCallback((textToCopy?: string, shouldScroll = true): boolean => {
-        const content = textToCopy ?? kworkInputValue; 
-        if (!content.trim()) {
+        const contentToUse = textToCopy ?? (kworkInputValue || ""); 
+        if (!contentToUse.trim()) {
             toastWarning("Нет текста для копирования");
             logger.warn("[Kwork Input] Copy skipped: Input is empty.");
             return false;
         }
         try {
-            navigator.clipboard.writeText(content);
+            navigator.clipboard.writeText(contentToUse);
             toastSuccess("Текст запроса скопирован!");
             setRequestCopied(true);
             logger.info("[Kwork Input] Copied request to clipboard.");
@@ -259,7 +258,12 @@ export const useKworkInput = ({
          }
 
          logger.info(`[Kwork Input] Adding full file tree structure and content for ${files.length} files to input...`);
-         const treeStructure = repoUtils.generateTreeStructure(files.map(f => f.path));
+         
+         // --- ЗАКОММЕНТИРОВАНО ИСПОЛЬЗОВАНИЕ ОТСУТСТВУЮЩЕЙ ФУНКЦИИ ---
+         // const treeStructure = repoUtils.generateTreeStructure(files.map(f => f.path));
+         const treeStructure = "Структура дерева файлов временно недоступна (generateTreeStructure отсутствует)."; 
+         // --- КОНЕЦ ЗАКОММЕНТИРОВАННОЙ ЧАСТИ ---
+
          const structureMarker = "Структура файлов проекта:";
          const newStructureSection = `${structureMarker}\n\`\`\`\n${treeStructure.trim()}\n\`\`\``;
          
