@@ -2,7 +2,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { FaBrain, FaBolt, FaLightbulb } from "react-icons/fa6"; // FaAtom removed as it's now only in strings
+import { FaBrain, FaBolt, FaLightbulb } from "react-icons/fa6"; 
 import { useState } from "react";
 import Modal from "@/components/ui/Modal"; 
 import { toast } from "sonner";
@@ -17,7 +17,6 @@ const cognitiveProtocols = [
     details: [
       "Цель: Завершение критической задачи, генерация контента.",
       "Метод: 2x(40 мин фокус + 5 мин отдых).",
-      // String now includes the <FaAtom /> for VibeContentRenderer to parse
       "Инструменты: <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI-ассистент (Perplexity, ChatGPT), шумоподавляющие наушники, трекер времени.", 
       "Топливо: Вода, зеленый чай. Избегать сахара."
     ],
@@ -94,15 +93,14 @@ export default function CognitiveFuelPage() {
                 <p className="text-sm text-muted-foreground mb-3 font-mono">{protocol.description}</p>
                 
                 <div className="space-y-1 text-xs text-gray-400 font-mono">
-                  {protocol.details.map((detail, index) => {
-                    // Prepend the list item icon directly to the detail string before passing to VibeContentRenderer
-                    const detailContentWithMarker = `<FaBolt className='text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5 align-middle'/> ${detail}`;
-                    return (
-                      <div key={index} className="flex items-start">
-                        <VibeContentRenderer content={detailContentWithMarker} />
-                      </div>
-                    );
-                  })}
+                  {protocol.details.map((detail, index) => (
+                    <div key={index} className="flex items-start">
+                      {/* Render list item marker directly */}
+                      <FaBolt className="text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5 align-middle" /> 
+                      {/* VibeContentRenderer handles the rest of the detail string, which might contain its own icons */}
+                      <VibeContentRenderer content={detail.substring(detail.indexOf("/>") + 2).trim()} /> 
+                    </div>
+                  ))}
                 </div>
               </motion.section>
             ))}
