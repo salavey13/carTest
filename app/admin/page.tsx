@@ -14,8 +14,6 @@ export default function AdminPage() {
   const { dbUser, isAdmin, isLoading: appContextLoading } = useAppContext();
   const router = useRouter();
   const [isAdminChecked, setIsAdminChecked] = useState<boolean | null>(null);
-  // isCheckingAdmin can be removed if appContextLoading is solely relied upon
-  // const [isCheckingAdmin, setIsCheckingAdmin] = useState(true); 
 
   useEffect(() => {
     logger.debug("[AdminPage] useEffect triggered", { 
@@ -26,20 +24,19 @@ export default function AdminPage() {
 
     if (appContextLoading) {
       logger.debug("[AdminPage] AppContext is loading, admin check deferred.");
-      // setIsCheckingAdmin(true); // Keep in loading state
-      return;
+      return; // Wait for context to load
     }
 
-    // AppContext is now loaded
+    // AppContext is now loaded, proceed with admin check
     logger.debug("[AdminPage] AppContext loaded. Proceeding with admin check.");
     
     const adminStatus = typeof isAdmin === 'function' ? isAdmin() : false;
     logger.debug("[AdminPage] isAdmin function called, status:", adminStatus);
-    setIsAdminChecked(adminStatus);
-    // setIsCheckingAdmin(false); // Mark check as complete
+    setIsAdminChecked(adminStatus); // Set the determined admin status
 
     if (adminStatus) {
-      if (dbUser) { // Show welcome toast only if dbUser is also loaded
+      // Only show toast if user is confirmed admin and dbUser is available (implies auth flow completed)
+      if (dbUser) {
           toast.success("Добро пожаловать в Центр Управления, командир!");
       } else {
           logger.warn("[AdminPage] Admin status true, but dbUser not yet available for welcome toast.");
@@ -51,7 +48,7 @@ export default function AdminPage() {
       router.push("/");
     }
 
-  }, [dbUser, isAdmin, router, appContextLoading]); // appContextLoading is crucial here
+  }, [dbUser, isAdmin, router, appContextLoading]);
 
   // Show loading spinner if AppContext is loading OR if admin status hasn't been determined yet
   if (appContextLoading || isAdminChecked === null) { 
@@ -67,7 +64,7 @@ export default function AdminPage() {
     );
   }
 
-  // If checks are done and user is not admin, render null (should have been redirected)
+  // If checks are done and user is not admin, render null (should have been redirected by useEffect)
   if (!isAdminChecked) {
     logger.debug("[AdminPage] Not admin after checks, rendering null (should have been redirected by useEffect).");
     return null; 

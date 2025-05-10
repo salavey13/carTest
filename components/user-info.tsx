@@ -1,11 +1,11 @@
-// /components/user-info.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { User, Bot, Trophy, Car, Lock } from "lucide-react";
+import { User, Bot, Trophy, Car, Lock } from "lucide-react"; // Changed from FaUser, FaRobot etc. to Lucide icons
 import Image from "next/image";
 import Link from "next/link";
 import { useAppContext } from "@/contexts/AppContext";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 export default function UserInfo() {
   const { dbUser, user, isInTelegramContext, isMockUser, isLoading, error } = useAppContext();
@@ -18,7 +18,7 @@ export default function UserInfo() {
 
   if (isLoading) {
     return (
-      <div className="w-12 h-12 bg-muted rounded-full animate-pulse shadow-[0_0_15px_rgba(255,107,107,0.3)]" />
+      <div className="w-11 h-11 bg-muted rounded-full animate-pulse shadow-[0_0_15px_rgba(var(--brand-orange-rgb),0.3)]" />
     );
   }
 
@@ -29,7 +29,7 @@ export default function UserInfo() {
         animate={{ opacity: 1, scale: 1 }}
         className="text-destructive font-mono text-sm animate-[neon_2s_infinite]"
       >
-        Ошибка, пиздец!
+        Auth Error!
       </motion.div>
     );
   }
@@ -38,7 +38,7 @@ export default function UserInfo() {
   if (!telegramUser) {
     return (
       <button
-        className="p-2 rounded-full text-primary hover:text-primary/80 bg-muted/20 hover:bg-muted/40 transition-all shadow-[0_0_10px_rgba(255,107,107,0.3)]"
+        className="p-2 rounded-full text-primary hover:text-primary/80 bg-muted/20 hover:bg-muted/40 transition-all shadow-[0_0_10px_rgba(var(--brand-orange-rgb),0.3)]"
       >
         <User className="h-6 w-6" />
       </button>
@@ -46,40 +46,43 @@ export default function UserInfo() {
   }
 
   const displayName = telegramUser.username || telegramUser.full_name || telegramUser.first_name || "Юзер";
+  const avatarUrl = dbUser?.avatar_url || user?.photo_url;
 
   return (
     <motion.div
-      className="relative flex items-center gap-2 p-2 rounded-xl hover:shadow-[0_0_20px_rgba(255,107,107,0.5)] transition-all"
+      className="relative flex items-center gap-2 p-1 rounded-full hover:bg-gray-800/50 transition-all duration-200" // Adjusted padding and hover effect
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.5 }}
     >
       <div
-        className="relative group cursor-pointer"
+        className="relative group cursor-pointer w-9 h-9 sm:w-10 sm:h-10" // Standardized size
         onClick={() => setIsModalOpen(true)}
       >
-        {dbUser?.avatar_url ? (
-          <Image
-            src={dbUser.avatar_url}
-            alt="Аватар"
-            width={44}
-            height={44}
-            className="rounded-full border-2 border-primary shadow-[0_0_12px_rgba(255,107,107,0.5)] group-hover:scale-105 transition-transform duration-300"
-          />
+        {avatarUrl ? (
+          <div className="relative w-full h-full rounded-full overflow-hidden border-2 border-primary shadow-[0_0_12px_rgba(var(--brand-orange-rgb),0.5)] group-hover:scale-105 transition-transform duration-300">
+            <Image
+              src={avatarUrl}
+              alt="Аватар"
+              layout="fill"
+              objectFit="cover" // Crucial for ensuring the image covers the circle
+              className="rounded-full" // Ensures image itself is rounded, helps with potential border radius issues on Image directly
+            />
+          </div>
         ) : (
-          <div className="w-11 h-11 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center text-primary-foreground font-mono text-lg shadow-[0_0_15px_rgba(255,107,107,0.5)] group-hover:scale-105 transition-transform duration-300">
+          <div className="w-full h-full bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center text-primary-foreground font-mono text-base sm:text-lg shadow-[0_0_15px_rgba(var(--brand-orange-rgb),0.5)] group-hover:scale-105 transition-transform duration-300">
             {getInitials(displayName)}
           </div>
         )}
         {isInTelegramContext && (
-          <span className="absolute -top-1 -right-1 bg-accent text-accent-foreground text-[10px] px-1 rounded-full shadow-sm">TG</span>
+          <span className="absolute -top-0.5 -right-0.5 bg-accent text-accent-foreground text-[9px] px-1 rounded-full shadow-sm">TG</span>
         )}
         {isMockUser && (
-          <Bot className="absolute -bottom-1 -right-1 h-4 w-4 text-accent shadow-[0_0_6px_rgba(255,215,0,0.5)]" />
+          <Bot className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 text-accent shadow-[0_0_6px_rgba(var(--brand-yellow-rgb),0.5)]" />
         )}
       </div>
 
-      <span className="text-primary font-mono text-sm md:text-base truncate max-w-[120px] md:max-w-[160px] text-glow">
+      <span className="hidden md:block text-primary font-mono text-sm truncate max-w-[120px] text-glow">
         {isFirstLoad ? (
           Array.from(displayName).map((char, i) => (
             <motion.span
@@ -96,8 +99,8 @@ export default function UserInfo() {
         )}
       </span>
 
-      {/* Modal */}
-      {isModalOpen && false && (
+      {/* Modal (conditionally rendered but logic exists if needed) */}
+      {isModalOpen && false && ( // Kept the modal logic, but it's currently disabled by `false`
         <motion.div
           className="fixed inset-0 top-[69%] z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
           initial={{ opacity: 0 }}
@@ -106,7 +109,7 @@ export default function UserInfo() {
           onClick={() => setIsModalOpen(false)}
         >
           <motion.div
-            className="bg-card p-6 rounded-2xl shadow-[0_0_25px_rgba(255,107,107,0.5)] border border-muted max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-primary scrollbar-track-muted"
+            className="bg-card p-6 rounded-2xl shadow-[0_0_25px_rgba(var(--brand-orange-rgb),0.5)] border border-muted max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-primary scrollbar-track-muted"
             initial={{ scale: 0.8, y: 50 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.8, y: 50 }}
@@ -157,6 +160,6 @@ export default function UserInfo() {
 };
 
 function getInitials(name: string): string {
+  if (!name || typeof name !== 'string') return "?";
   return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
 }
-
