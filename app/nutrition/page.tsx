@@ -11,40 +11,40 @@ import VibeContentRenderer from "@/components/VibeContentRenderer";
 const cognitiveProtocols = [
   {
     id: "deep_work_sprint",
-    name: "Протокол: Deep Work Sprint (90 мин)",
+    name: "Протокол 'ТУРБО-МОЗГ'", // Hormozi style title
     icon: <FaBolt className="text-brand-orange" />, 
-    description: "Концентрированный блок работы с использованием техники Pomodoro и AI-ассистента для максимальной продуктивности.",
+    description: "Вруби нитро для своих идей и кода! Этот 90-минутный спринт выжмет из тебя максимум.",
     details: [
-      "Цель: Завершение критической задачи, генерация контента.",
-      "Метод: 2x(40 мин фокус + 5 мин отдых).",
-      "Инструменты: <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI-ассистент (Perplexity, ChatGPT), шумоподавляющие наушники, трекер времени.", 
-      "Топливо: Вода, зеленый чай. Избегать сахара."
+      "**ВЫГОДА:** Молниеносное завершение задач, генерация контента как из пулемета.",
+      "**МЕХАНИКА:** 2x(40 мин чистейшего фокуса + 5 мин перезарядки). Безжалостно к прокрастинации.",
+      "**АРСЕНАЛ:** <FaAtom className='inline text-brand-purple mr-1 align-middle'/> Твой личный AI-Джарвис (Perplexity, ChatGPT), глушители реальности (наушники), таймер-контроллер.", 
+      "**ТОПЛИВО:** Кристальная вода, эликсир зеленого чая. Сахар – ЯД для кибер-воина."
     ],
     color: "border-brand-orange/50 bg-dark-card hover:shadow-brand-orange/20"
   },
   {
     id: "skill_acquisition_module",
-    name: "Протокол: Skill Acquisition Module (SAM)",
+    name: "Протокол 'VIBE-АПГРЕЙД'",
     icon: <FaLightbulb className="text-brand-yellow" />, 
-    description: "Целевая сессия для изучения нового Vibe Perk или навыка с применением техник активного обучения.",
+    description: "Загрузи новый скилл или Vibe Perk в свою нейросеть. Стань машиной обучения.",
     details: [
-      "Цель: Освоение нового навыка, расширение Vibe-арсенала.",
-      "Метод: Объяснение концепции (AI), практика, интервальное повторение.",
-      "Инструменты: <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI для объяснений/квизов (ChatGPT), Anki/Quizlet, релевантные туториалы.", 
-      "Топливо: Сложные углеводы для энергии (гречка, овсянка)."
+      "**ВЫГОДА:** Мгновенное расширение твоего Vibe-арсенала, доминация в новой нише.",
+      "**МЕХАНИКА:** AI объясняет суть -> Ты практикуешь как одержимый -> Интервальное вбивание в мозг.",
+      "**АРСЕНАЛ:** <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI-сенсей для квизов и разжевывания (ChatGPT), Anki/Quizlet для нейронных связей, сверхсекретные туториалы.", 
+      "**ТОПЛИВО:** Высокооктановые углеводы для процессора (гречка, овсянка, киноа)."
     ],
     color: "border-brand-yellow/50 bg-dark-card hover:shadow-brand-yellow/20"
   },
   {
     id: "mind_recharge_cycle",
-    name: "Протокол: Mind Recharge & Ideation",
+    name: "Протокол 'НЕЙРО-ДЕТОКС'",
     icon: <FaBrain className="text-brand-cyan" />, 
-    description: "Восстановление когнитивной энергии через медитацию или легкую активность, стимулирование генерации идей.",
+    description: "Перезагрузи матрицу сознания. Очисти кэш. Сгенерируй идеи, которые взорвут рынок.",
     details: [
-      "Цель: Снижение умственной усталости, генерация новых идей.",
-      "Метод: 15-20 мин медитации осознанности или прогулка на свежем воздухе. После – 10 мин фрирайтинга идей.",
-      "Инструменты: Приложение для медитации (Calm, Headspace), блокнот или цифровые заметки.",
-      "Топливо: Травяной чай, орехи."
+      "**ВЫГОДА:** Сброс умственной усталости, кристальная ясность, поток гениальных (и прибыльных) идей.",
+      "**МЕХАНИКА:** 15-20 мин медитации 'Нулевой Канал' или прогулка 'Альфа-Волны'. Затем – 10 мин 'Взрыв Идей' фрирайтингом.",
+      "**АРСЕНАЛ:** Приложения-ноотропы (Calm, Headspace), священный манускрипт (блокнот) или цифровые скрижали.",
+      "**ТОПЛИВО:** Эликсир травяного чая, орехи мудрости."
     ],
     color: "border-brand-cyan/50 bg-dark-card hover:shadow-brand-cyan/20"
   },
@@ -56,7 +56,7 @@ export default function CognitiveFuelPage() {
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   
   const handleAction = (actionName: string) => {
-    toast.info(`Функция "${actionName}" находится в разработке в лаборатории CyberVibe.`);
+    toast.info(`Функция "${actionName}" в разработке в лаборатории CyberVibe.`);
   };
 
   return (
@@ -70,11 +70,11 @@ export default function CognitiveFuelPage() {
         <Card className="bg-dark-card/80 backdrop-blur-md border border-brand-green/50 shadow-xl shadow-brand-green/20">
           <CardHeader className="text-center p-6 border-b border-brand-green/30">
             <FaBrain className="text-5xl text-brand-green mx-auto mb-3 drop-shadow-[0_0_10px_theme(colors.brand-green)] animate-pulse" />
-            <CardTitle className="text-3xl font-orbitron font-bold text-brand-green cyber-text glitch" data-text="COGNITIVE FUEL">
-              COGNITIVE FUEL
+            <CardTitle className="text-3xl font-orbitron font-bold text-brand-green cyber-text glitch" data-text="КОГНИТИВНОЕ ТОПЛИВО">
+              КОГНИТИВНОЕ ТОПЛИВО
             </CardTitle>
             <CardDescription className="text-muted-foreground font-mono mt-1">
-              Протоколы для оптимизации твоей нейросети.
+              Протоколы Зарядки Твоей Нейросети для Максимального ПРОФИТА.
             </CardDescription>
           </CardHeader>
 
@@ -82,7 +82,7 @@ export default function CognitiveFuelPage() {
             {cognitiveProtocols.map(protocol => (
               <motion.section 
                 key={protocol.id} 
-                className={`p-4 rounded-lg border ${protocol.color} shadow-md transition-all duration-300 hover:scale-[1.02]`}
+                className={`p-4 rounded-lg border ${protocol.color} shadow-md transition-all duration-300 hover:scale-[1.01] hover:shadow-lg ${protocol.color.replace('border-','shadow-')}/40`}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.2 + cognitiveProtocols.indexOf(protocol) * 0.1 }}
@@ -92,28 +92,29 @@ export default function CognitiveFuelPage() {
                 </h2>
                 <p className="text-sm text-muted-foreground mb-3 font-mono">{protocol.description}</p>
                 
-                <div className="space-y-1 text-xs text-gray-400 font-mono">
-                  {protocol.details.map((detail, index) => (
-                    <div key={index} className="flex items-start">
-                      {/* Render list item marker directly as JSX */}
-                      <FaBolt className="text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5 align-middle" /> 
-                      {/* VibeContentRenderer handles the rest of the detail string */}
-                      <VibeContentRenderer content={detail} /> 
-                    </div>
-                  ))}
+                <div className="space-y-1.5 text-xs text-gray-300 font-mono"> {/* Increased space for readability */}
+                  {protocol.details.map((detail, index) => {
+                    // Prepend the list item icon as a string part for VibeContentRenderer
+                    const detailContentWithMarker = `<FaBolt className='text-xs mr-2 text-gray-400 flex-shrink-0 mt-0.5 align-middle'/> ${detail}`;
+                    return (
+                      <div key={index} className="flex items-start"> {/* Ensures icon and text align well if text wraps */}
+                        <VibeContentRenderer content={detailContentWithMarker} />
+                      </div>
+                    );
+                  })}
                 </div>
               </motion.section>
             ))}
             
-            <section className="flex flex-col sm:flex-row gap-3 justify-center pt-4 border-t border-brand-green/20">
-              <Button onClick={() => { setIsSaveModalOpen(true); }} className="bg-brand-green text-black hover:bg-brand-green/90 font-orbitron flex-1">
-                <VibeContentRenderer content="<FaFloppyDisk className='mr-2 align-middle'/> Сохранить Стек Протоколов" />
+            <section className="flex flex-col sm:flex-row gap-3 justify-center pt-6 border-t border-brand-green/20 mt-6">
+              <Button onClick={() => { setIsSaveModalOpen(true); }} className="bg-brand-green text-black hover:bg-brand-green/80 font-orbitron flex-1 py-3 text-base transform hover:scale-105 transition-transform">
+                <VibeContentRenderer content="<FaFloppyDisk className='mr-2 align-middle text-lg'/> СОХРАНИТЬ МОЙ СТЕК!" />
               </Button>
-              <Button onClick={() => { setIsSuggestModalOpen(true); }} variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/20 hover:text-white font-orbitron flex-1">
-                <VibeContentRenderer content="<FaCirclePlus className='mr-2 align-middle'/> Предложить Протокол" />
+              <Button onClick={() => { setIsSuggestModalOpen(true); }} variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/20 hover:text-white font-orbitron flex-1 py-3 text-base transform hover:scale-105 transition-transform">
+                <VibeContentRenderer content="<FaCirclePlus className='mr-2 align-middle text-lg'/> ПРЕДЛОЖИТЬ ПРОТОКОЛ" />
               </Button>
-              <Button onClick={() => { setIsLogModalOpen(true); }} variant="outline" className="border-brand-purple text-brand-purple hover:bg-brand-purple/20 hover:text-white font-orbitron flex-1">
-                <VibeContentRenderer content="<FaListCheck className='mr-2 align-middle'/> Залогировать Активность" />
+              <Button onClick={() => { setIsLogModalOpen(true); }} variant="outline" className="border-brand-purple text-brand-purple hover:bg-brand-purple/20 hover:text-white font-orbitron flex-1 py-3 text-base transform hover:scale-105 transition-transform">
+                <VibeContentRenderer content="<FaListCheck className='mr-2 align-middle text-lg'/> АКТИВИРОВАТЬ & ЛОГИРОВАТЬ" />
               </Button>
             </section>
           </CardContent>
