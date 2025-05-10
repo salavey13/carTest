@@ -176,8 +176,8 @@ export default function Home() {
                  <Image
                     src={FEATURED_QUEST_IMAGE}
                     alt="Featured Quest: Enhance Cognitive Matrix"
-                    fill // Changed from layout="fill" objectFit="cover" for Next 13+
-                    sizes="(max-width: 640px) 100vw, 50vw" // Example sizes, adjust as needed
+                    fill 
+                    sizes="(max-width: 640px) 100vw, 50vw" 
                     style={{ objectFit: 'cover' }}
                     className="opacity-50 group-hover:opacity-70 group-hover:scale-105 transition-all duration-400 ease-in-out"
                     priority
@@ -185,10 +185,10 @@ export default function Home() {
                  <div className="featured-quest-image-overlay"></div>
                  <div className="absolute bottom-2 left-3 sm:bottom-3 sm:left-4 text-white z-10 p-1">
                     <h3 className="text-md sm:text-lg font-bold font-orbitron text-shadow-[0_0_8px_theme(colors.brand-cyan)]">
-                      <VibeContentRenderer content="<FaGamepad className='inline text-brand-pink/90 mr-2 text-2xl sm:text-3xl'/>INITIATE: CyberDev OS Training Program" />
+                      <VibeContentRenderer content="<FaGamepad className='inline text-brand-pink/90 mr-2 text-2xl sm:text-3xl align-middle'/>INITIATE: CyberDev OS Training Program" />
                     </h3>
                     <p className="text-xs sm:text-sm font-mono text-gray-300">
-                      <VibeContentRenderer content="Your journey from Level 0: <FaEye className='inline mx-0.5'/> See the Code, <FaBolt className='inline mx-0.5'/> Become the Vibe." />
+                      <VibeContentRenderer content="Your journey from Level 0: <FaEye className='inline mx-0.5 align-middle'/> See the Code, <FaBolt className='inline mx-0.5 align-middle'/> Become the Vibe." />
                     </p>
                   </div>
                  <div className="absolute top-2 right-3 sm:top-3 sm:right-4 text-white z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -211,7 +211,7 @@ export default function Home() {
                       <p className="text-3xl sm:text-4xl font-bold text-white drop-shadow-md leading-none">{totalKiloVibes.toLocaleString()}</p>
                       <p className="text-2xs sm:text-xs font-mono uppercase tracking-wider text-black/85 font-semibold">KiloVibes</p>
                   </div>
-                  <div className="text-right"> {/* Removed space-y-0 to allow mb */}
+                  <div className="text-right"> 
                       <p className="text-sm sm:text-md font-semibold text-white/95 leading-tight mb-0.5">{focusTimeHours} <span className="text-2xs font-mono">hrs</span></p>
                       <p className="text-2xs font-mono uppercase text-black/85 mb-1">Deep Work</p>
                       <p className="text-sm sm:text-md font-semibold text-white/95 leading-tight mb-0.5">{skillsLeveled} <span className="text-2xs font-mono">Perks</span></p>
@@ -219,7 +219,7 @@ export default function Home() {
                   </div>
               </div>
             </CardHeader>
-            <CardContent className="px-1 pb-2 pt-1 md:px-2 md:pb-3"> {/* Added pt-1 for slight top padding */}
+            <CardContent className="px-1 pb-2 pt-2 md:px-2 md:pb-3"> {/* Increased pt slightly */}
               <div className="h-[70px] sm:h-[90px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={displayWeeklyActivity} margin={{ top: 10, right: 5, left: 5, bottom: 0 }}>
@@ -241,7 +241,7 @@ export default function Home() {
         {dbUser?.status === "admin" && (
           <motion.div
             initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1, type: "spring", stiffness: 100 }}
-            className="fixed bottom-20 md:bottom-24 right-3 sm:right-4 z-50" // Adjusted bottom based on BottomNav presence
+            className="fixed bottom-20 md:bottom-24 right-3 sm:right-4 z-50" 
           >
              <Button
                 asChild

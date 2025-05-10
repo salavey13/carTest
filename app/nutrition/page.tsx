@@ -2,7 +2,8 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-// Удалены прямые импорты FaSave, FaPlusCircle, FaTasks. FaAtom оставлен, т.к. используется в JSX напрямую.
+// Removed direct icon imports that will be handled by VibeContentRenderer (FaSave, FaPlusCircle, FaTasks)
+// FaAtom is used in details, FaBrain, FaBolt, FaLightbulb are used directly as JSX for protocol icons
 import { FaBrain, FaBolt, FaLightbulb, FaAtom } from "react-icons/fa6"; 
 import { useState } from "react";
 import Modal from "@/components/ui/Modal"; 
@@ -13,12 +14,12 @@ const cognitiveProtocols = [
   {
     id: "deep_work_sprint",
     name: "Протокол: Deep Work Sprint (90 мин)",
-    icon: <FaBolt className="text-brand-orange" />, // JSX icon for direct render
+    icon: <FaBolt className="text-brand-orange" />, // JSX icon for direct render in h2
     description: "Концентрированный блок работы с использованием техники Pomodoro и AI-ассистента для максимальной продуктивности.",
     details: [
       "Цель: Завершение критической задачи, генерация контента.",
       "Метод: 2x(40 мин фокус + 5 мин отдых).",
-      "Инструменты: <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI-ассистент (Perplexity, ChatGPT), шумоподавляющие наушники, трекер времени.",
+      "Инструменты: <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI-ассистент (Perplexity, ChatGPT), шумоподавляющие наушники, трекер времени.", // Icon in string
       "Топливо: Вода, зеленый чай. Избегать сахара."
     ],
     color: "border-brand-orange/50 bg-dark-card hover:shadow-brand-orange/20"
@@ -31,7 +32,7 @@ const cognitiveProtocols = [
     details: [
       "Цель: Освоение нового навыка, расширение Vibe-арсенала.",
       "Метод: Объяснение концепции (AI), практика, интервальное повторение.",
-      "Инструменты: <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI для объяснений/квизов (ChatGPT), Anki/Quizlet, релевантные туториалы.",
+      "Инструменты: <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI для объяснений/квизов (ChatGPT), Anki/Quizlet, релевантные туториалы.", // Icon in string
       "Топливо: Сложные углеводы для энергии (гречка, овсянка)."
     ],
     color: "border-brand-yellow/50 bg-dark-card hover:shadow-brand-yellow/20"
@@ -95,9 +96,8 @@ export default function CognitiveFuelPage() {
                 
                 <div className="space-y-1 text-xs text-gray-400 font-mono">
                   {protocol.details.map((detail, index) => (
-                    <div key={index} className="flex items-center">
-                      <FaBolt className="text-xs mr-1.5 text-gray-500 flex-shrink-0" />
-                      <VibeContentRenderer content={detail} />
+                    <div key={index} className="flex items-start"> {/* Changed to items-start for better multi-line text alignment with icon */}
+                      <VibeContentRenderer content={`<FaBolt className="text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-1"/> ${detail}`} /> {/* Added mt-1 to FaBolt for better alignment if detail is multiline */}
                     </div>
                   ))}
                 </div>
