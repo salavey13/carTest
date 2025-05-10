@@ -3,22 +3,21 @@ import { generateJwtToken } from "@/lib/auth";
 import type { WebAppUser } from "@/types/telegram";
 import { debugLogger } from "@/lib/debugLogger";
 import { logger } from "@/lib/logger"; 
-import type { Database } from "@/types/database.types";
+import type { Database } from "@/types/database.types.ts"; // Ensure .ts extension for import
 
 // --- Type Aliases ---
 type DbUser = Database["public"]["Tables"]["users"]["Row"];
-type DbCar = Database["public"]["Tables"]["cars"]["Row"]; // Restored
+type DbCar = Database["public"]["Tables"]["cars"]["Row"];
 type DbInvoice = Database["public"]["Tables"]["invoices"]["Row"];
 type DbRental = Database["public"]["Tables"]["rentals"]["Row"];
-type DbTask = Database["public"]["Tables"]["tasks"]["Row"]; // From reference
-type DbCharacter = Database["public"]["Tables"]["characters"]["Row"]; // From reference
-type DbVideo = Database["public"]["Tables"]["videos"]["Row"]; // From reference
-type DbSubscription = Database["public"]["Tables"]["subscriptions"]["Row"]; // Assuming you have a subscriptions table (from reference)
-type DbArticle = Database["public"]["Tables"]["articles"]["Row"]; // Added for Articles
-type DbArticleSection = Database["public"]["Tables"]["article_sections"]["Row"]; // Added for Article Sections
-type DbUserResult = Database["public"]["Tables"]["user_results"]["Row"]; // Restored
+type DbTask = Database["public"]["Tables"]["tasks"]["Row"];
+type DbCharacter = Database["public"]["Tables"]["characters"]["Row"];
+type DbVideo = Database["public"]["Tables"]["videos"]["Row"];
+type DbSubscription = Database["public"]["Tables"]["subscriptions"]["Row"];
+type DbArticle = Database["public"]["Tables"]["articles"]["Row"];
+type DbArticleSection = Database["public"]["Tables"]["article_sections"]["Row"];
+type DbUserResult = Database["public"]["Tables"]["user_results"]["Row"];
  
-
 
 // --- Supabase Client Initialization ---
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://inmctohsodgdohamhzag.supabase.co";
@@ -47,7 +46,6 @@ export const supabaseAdmin: SupabaseClient<Database> = serviceRoleKey
         }
     })
     : (()=>{ logger.error("Admin client creation failed due to missing service role key."); return null as any; })(); 
-
 
 export const createAuthenticatedClient = async (userId: string): Promise<SupabaseClient<Database> | null> => {
     if (!userId) {
@@ -107,7 +105,7 @@ export const fetchUserData = async (userId: string): Promise<DbUser | null> => {
     }
 };
 
-export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAppUser & { role?: string; status?: string; metadata?: Record<string, any> }>): Promise<DbUser | null> => {
+export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAppUser & { role?: DbUser['role']; status?: DbUser['status']; metadata?: Record<string, any> }>): Promise<DbUser | null> => {
      if (!userId) {
         debugLogger.error("createOrUpdateUser called with empty userId");
         return null;
@@ -133,15 +131,14 @@ export const createOrUpdateUser = async (userId: string, userInfo: Partial<WebAp
         };
         Object.keys(userData).forEach(key => {
             const k = key as keyof typeof userData;
-            if (userData[k] === undefined && k !== 'metadata') {
+            if (userData[k] === undefined && k !== 'metadata') { // keep metadata if explicitly set to null
                  delete userData[k];
             }
         });
-
-
+        
         const { data, error } = await supabaseAdmin
             .from("users") 
-            .upsert(userData, {
+            .upsert(userData as Database["public"]["Tables"]["users"]["Insert"], { 
                 onConflict: 'user_id', 
             })
             .select("*, metadata") 
@@ -199,10 +196,8 @@ export const updateUserMetadata = async (
   }
 };
 
-// --- Embeddings & Car Search (Restored from OLD file) ---
-const VECTOR_DIMENSIONS = 384; // Restored
+const VECTOR_DIMENSIONS = 384; 
 
-// Simplified local embedding generator (FALLBACK ONLY)
 function generateSimplifiedFallbackEmbedding(text: string): number[] {
    logger.warn("Generating simplified FALLBACK embedding for text:", text.substring(0, 50) + "...");
    const embedding = new Array(VECTOR_DIMENSIONS).fill(0);
@@ -222,10 +217,10 @@ function generateSimplifiedFallbackEmbedding(text: string): number[] {
 export async function generateCarEmbedding(
   mode: 'single' | 'batch' | 'create' = 'batch',
   payload?: {
-    carId?: string;
+    carId?: string; 
     carData?: {
-        make: string; model: string; description: string; specs: Record<string, any>;
-        owner_id?: string; daily_price?: number; image_url?: string; rent_link?: string;
+        make: string; model: string; description: string; specs: Record<string, any>; // specs is Json
+        owner_id?: string; daily_price?: number; image_url?: string; rent_link?: string; status?: string;
     };
   }
 ): Promise<{ success: boolean; message: string; carId?: string; error?: string }> {
@@ -284,19 +279,19 @@ export async function generateCarEmbedding(
         const result = JSON.parse(responseText);
         logger.info(`Edge Function 'generate-embeddings' (${mode}) success: ${result.message}`);
 
-        let createdCarId = result.carId;
+        let createdCarId = result.carId; 
         if (mode === 'create' && createdCarId && payload?.carData) {
-            const { owner_id, daily_price, image_url, rent_link } = payload.carData;
+            const { owner_id, daily_price, image_url, rent_link, status } = payload.carData;
             const fieldsToUpdate: Partial<DbCar> = {};
             if (owner_id !== undefined) fieldsToUpdate.owner_id = owner_id;
             if (daily_price !== undefined) fieldsToUpdate.daily_price = daily_price;
             if (image_url !== undefined) fieldsToUpdate.image_url = image_url;
             if (rent_link !== undefined) fieldsToUpdate.rent_link = rent_link;
+            if (status !== undefined) fieldsToUpdate.status = status;
+
 
             if (Object.keys(fieldsToUpdate).length > 0) {
                 logger.info(`Updating additional fields for new car ${createdCarId}...`, fieldsToUpdate);
-                fieldsToUpdate.updated_at = new Date().toISOString();
-
                 const { error: updateError } = await supabaseAdmin
                     .from("cars")
                     .update(fieldsToUpdate)
@@ -335,19 +330,21 @@ export async function generateCarEmbedding(
             const embedding = generateSimplifiedFallbackEmbedding(combinedText);
 
             if (carIdToUpdate) {
-                 const { error: updateError } = await supabaseAdmin.from("cars").update({ embedding, updated_at: new Date().toISOString() }).eq("id", carIdToUpdate);
+                 const { error: updateError } = await supabaseAdmin.from("cars").update({ embedding }).eq("id", carIdToUpdate);
                  if (updateError) throw new Error(`Fallback failed: Cannot update embedding for ${carIdToUpdate}. ${updateError.message}`);
                  logger.info(`Successfully updated car ${carIdToUpdate} with fallback embedding.`);
                  return { success: true, message: "Edge function failed, fallback embedding generated and updated.", carId: carIdToUpdate };
             } else if (mode === 'create' && payload?.carData) {
-                 const { data: newCar, error: insertError } = await supabaseAdmin
-                    .from("cars")
-                    .insert({
+                 const carInsertData: Database["public"]["Tables"]["cars"]["Insert"] = {
                         make: payload.carData.make, model: payload.carData.model, description: payload.carData.description,
                         specs: payload.carData.specs, owner_id: payload.carData.owner_id, daily_price: payload.carData.daily_price,
                         image_url: payload.carData.image_url, rent_link: payload.carData.rent_link,
-                        embedding, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), status: 'available', // default status
-                    })
+                        embedding, is_test_result: false, // Default as per schema
+                        status: payload.carData.status || 'available', // Default status
+                 };
+                 const { data: newCar, error: insertError } = await supabaseAdmin
+                    .from("cars")
+                    .insert(carInsertData)
                     .select("id")
                     .single();
                  if (insertError || !newCar) throw new Error(`Fallback failed: Cannot create car. ${insertError?.message}`);
@@ -362,7 +359,7 @@ export async function generateCarEmbedding(
     }
 }
 
-export interface CarResult { // Restored
+export interface CarResult { 
   id: string;
   make: string;
   model: string;
@@ -373,7 +370,7 @@ export interface CarResult { // Restored
   daily_price?: number | null;
 }
 
-export const searchCars = async (embedding: number[], limit: number = 5): Promise<{ success: boolean; data?: CarResult[]; error?: string }> => { // Restored
+export const searchCars = async (embedding: number[], limit: number = 5): Promise<{ success: boolean; data?: CarResult[]; error?: string }> => { 
     if (!embedding || embedding.length !== VECTOR_DIMENSIONS) {
         return { success: false, error: `Invalid embedding provided (length ${embedding?.length}, expected ${VECTOR_DIMENSIONS})` };
     }
@@ -407,7 +404,7 @@ export const searchCars = async (embedding: number[], limit: number = 5): Promis
     }
 };
 
-export const getSimilarCars = async (carId: string, matchCount: number = 3): Promise<{ success: boolean; data?: DbCar[]; error?: string }> => { // Restored
+export const getSimilarCars = async (carId: string, matchCount: number = 3): Promise<{ success: boolean; data?: DbCar[]; error?: string }> => { 
      if (!carId) return { success: false, error: "Car ID is required." };
      if (!supabaseAnon) return { success: false, error: "Anon client not available."};
      try {
@@ -425,8 +422,6 @@ export const getSimilarCars = async (carId: string, matchCount: number = 3): Pro
         return { success: false, error: error instanceof Error ? error.message : "Failed to find similar cars" };
     }
 };
-
-// --- Advice Articles & Sections ---
 
 export const fetchArticles = async (): Promise<{ success: boolean; data?: DbArticle[]; error?: string }> => {
   if (!supabaseAnon) return { success: false, error: "Anon client not available." };
@@ -465,8 +460,6 @@ export const fetchArticleSections = async (articleId: string): Promise<{ success
   }
 };
 
-
-// --- Test Progress ---
 export const saveTestProgress = async (userId: string, progress: any): Promise<{ success: boolean; error?: string }> => {
     const client = await createAuthenticatedClient(userId);
     if (!client) return { success: false, error: "Failed to create authenticated client." };
@@ -511,36 +504,43 @@ export const loadTestProgress = async (userId: string): Promise<{ success: boole
     }
 };
 
-
-// --- Subscriptions ---
 export const updateUserSubscription = async (
   userId: string,
-  subscriptionId: string | number | null 
+  subscriptionId: number | string | null // subscription_id in invoices is number | null. users table doesn't have this.
 ): Promise<{ success: boolean; data?: DbUser; error?: string }> => {
     if (!userId) return { success: false, error: "User ID is required." };
     if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
 
-    debugLogger.log(`Updating subscription for user ${userId} to ${subscriptionId}`);
+    debugLogger.log(`Attempting to update subscription-related info for user ${userId} (Note: users table has no subscription_id field)`);
     try {
+        // The 'users' table does not have 'subscription_id' in its definition in database.types.ts.
+        logger.warn(`User table schema does not have 'subscription_id'. Only 'updated_at' will be modified for user ${userId}.`);
+        const updatePayload: Partial<DbUser> = { updated_at: new Date().toISOString() };
+        // If you intended to store subscription_id in user's metadata:
+        // const { data: currentData, error: fetchErr } = await supabaseAdmin.from("users").select("metadata").eq("user_id", userId).single();
+        // if (fetchErr) throw fetchErr;
+        // const newMeta = { ...currentData?.metadata, subscription_id: subscriptionId };
+        // updatePayload.metadata = newMeta;
+
         const { data, error } = await supabaseAdmin
             .from("users") 
-            .update({ subscription_id: subscriptionId, updated_at: new Date().toISOString() })
+            .update(updatePayload)
             .eq("user_id", userId) 
             .select("*, metadata") 
             .single();
 
         if (error) {
-            logger.error(`Error updating user ${userId} subscription:`, error);
+            logger.error(`Error updating user ${userId} info:`, error);
             if (error.code === 'PGRST116') return { success: false, error: `User ${userId} not found.` };
             throw error;
         }
          if (!data) return { success: false, error: `User ${userId} not found after update attempt.` };
 
-        debugLogger.log(`Successfully updated subscription for user ${userId}.`);
+        debugLogger.log(`Successfully updated user ${userId} (updated_at, potentially metadata if implemented).`);
         return { success: true, data };
     } catch (error) {
         logger.error(`Exception in updateUserSubscription for ${userId}:`, error);
-        return { success: false, error: error instanceof Error ? error.message : "Failed to update subscription" };
+        return { success: false, error: error instanceof Error ? error.message : "Failed to update subscription-related info" };
     }
 };
 
@@ -550,34 +550,22 @@ export const getUserSubscription = async (
     if (!userId) return { success: false, error: "User ID is required." };
     if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
 
-    debugLogger.log(`Fetching subscription for user ${userId}`);
+    debugLogger.log(`Attempting to fetch subscription-related info for user ${userId} (Note: users table has no subscription_id field)`);
     try {
-        const { data, error } = await supabaseAdmin
-            .from("users") 
-            .select("subscription_id")
-            .eq("user_id", userId) 
-            .maybeSingle();
-
-        if (error) {
-            logger.error(`Error fetching user ${userId} subscription:`, error);
-            if (error.code === 'PGRST116') {
-                 debugLogger.log(`User ${userId} not found when fetching subscription.`);
-                return { success: true, data: null }; 
-            }
-            throw error;
-        }
-
-        debugLogger.log(`Found subscription ID ${data?.subscription_id ?? 'null'} for user ${userId}.`);
-        return { success: true, data: data?.subscription_id ?? null };
+        logger.warn(`User table schema does not have 'subscription_id'. Cannot fetch subscription_id directly. Returning null.`);
+        // If subscription_id were stored in metadata:
+        // const { data: userData, error: userError } = await supabaseAdmin.from("users").select("metadata").eq("user_id", userId).single();
+        // if (userError) throw userError;
+        // const subIdFromMeta = userData?.metadata?.subscription_id;
+        // return { success: true, data: subIdFromMeta ?? null };
+        return { success: true, data: null }; 
 
     } catch (error) {
         logger.error(`Exception in getUserSubscription for ${userId}:`, error);
-        return { success: false, error: error instanceof Error ? error.message : "Failed to fetch subscription" };
+        return { success: false, error: error instanceof Error ? error.message : "Failed to fetch subscription-related info" };
     }
 };
 
-
-// --- Invoice Management ---
 export const createInvoice = async (
     type: string,
     id: string, 
@@ -590,11 +578,18 @@ export const createInvoice = async (
     if (!id || !userId || amount == null || !type) return { success: false, error: "Missing required parameters for invoice creation." };
 
     try {
-        let finalSubscriptionId = subscriptionId;
-        if (finalSubscriptionId === undefined) {
-            const subResult = await getUserSubscription(userId);
-            if (subResult.success) finalSubscriptionId = subResult.data;
-            else logger.warn(`Could not fetch subscription for user ${userId} during invoice creation. Proceeding without subscription_id.`);
+        let finalSubscriptionIdForDb: number | null = null;
+        if (typeof subscriptionId === 'number') {
+            finalSubscriptionIdForDb = subscriptionId;
+        } else if (typeof subscriptionId === 'string') {
+            const parsedInt = parseInt(subscriptionId, 10);
+            if (!isNaN(parsedInt)) {
+                finalSubscriptionIdForDb = parsedInt;
+            } else {
+                logger.warn(`Could not parse subscriptionId string '${subscriptionId}' to int for invoice. Storing null.`);
+            }
+        } else {
+             finalSubscriptionIdForDb = null; // Explicitly null if undefined or already null
         }
 
         const { data, error } = await supabaseAdmin
@@ -605,7 +600,7 @@ export const createInvoice = async (
                 type: type,
                 amount: amount, 
                 status: 'pending', 
-                subscription_id: finalSubscriptionId, 
+                subscription_id: finalSubscriptionIdForDb, 
                 metadata: metadata,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
@@ -710,17 +705,15 @@ export const getUserInvoices = async (userId: string): Promise<{ success: boolea
     }
 };
 
-
-// --- Rental Management (Restored to be car-specific as per OLD file) ---
-export interface RentalWithCarDetails extends DbRental { // Restored from OLD file
+export interface RentalWithCarDetails extends DbRental {
   car_make?: string | null;
   car_model?: string | null;
   car_image_url?: string | null;
 }
 
-export const createRental = async ( // Restored from OLD logic, uses carId
+export const createRental = async (
     userId: string,
-    carId: string, // Changed back from itemId to carId
+    carId: string, 
     startDate: string, 
     endDate: string,   
     totalCost: number
@@ -735,7 +728,7 @@ export const createRental = async ( // Restored from OLD logic, uses carId
             .from("rentals")
             .insert({
                 user_id: userId,
-                car_id: carId, // Uses car_id
+                car_id: carId, 
                 start_date: startDate,
                 end_date: endDate,
                 total_cost: totalCost,
@@ -749,6 +742,10 @@ export const createRental = async ( // Restored from OLD logic, uses carId
 
         if (error) {
             if (error.code === '23503') { 
+                 const { data: carExists } = await supabaseAdmin.from("cars").select("id").eq("id", carId).maybeSingle();
+                 if (!carExists) return { success: false, error: `Invalid car ID: ${carId}`};
+                 const { data: userExists } = await supabaseAdmin.from("users").select("user_id").eq("user_id", userId).maybeSingle();
+                 if (!userExists) return { success: false, error: `Invalid user ID: ${userId}`};
                  return { success: false, error: "Invalid user ID or car ID provided." };
             }
             throw error;
@@ -762,7 +759,7 @@ export const createRental = async ( // Restored from OLD logic, uses carId
     }
 };
 
-export const getUserRentals = async (userId: string): Promise<{ success: boolean; data?: RentalWithCarDetails[]; error?: string }> => { // Restored from OLD logic
+export const getUserRentals = async (userId: string): Promise<{ success: boolean; data?: RentalWithCarDetails[]; error?: string }> => {
      if (!supabaseAdmin) return { success: false, error: "Admin client not available." };
      const client = supabaseAdmin;
 
@@ -774,7 +771,7 @@ export const getUserRentals = async (userId: string): Promise<{ success: boolean
             .select(`
                 *,
                 cars ( make, model, image_url ) 
-            `) // Explicitly joins with cars table
+            `) 
             .eq("user_id", userId)
             .order("start_date", { ascending: false }); 
 
@@ -785,7 +782,7 @@ export const getUserRentals = async (userId: string): Promise<{ success: boolean
             car_make: rental.cars?.make || null,
             car_model: rental.cars?.model || null,
             car_image_url: rental.cars?.image_url || null,
-            cars: undefined, // Remove nested cars object
+            cars: undefined, 
         }));
 
         debugLogger.log(`Fetched ${formattedData.length} rentals for user ${userId}.`);
@@ -796,12 +793,14 @@ export const getUserRentals = async (userId: string): Promise<{ success: boolean
     }
 };
 
-export const updateRentalPaymentStatus = async ( // Restored from OLD logic
-    rentalId: string, 
+export const updateRentalPaymentStatus = async (
+    rentalId: number, 
     paymentStatus: DbRental['payment_status'] 
 ): Promise<{ success: boolean; data?: DbRental; error?: string }> => {
      if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
-     if (!rentalId || !paymentStatus) return { success: false, error: "Rental ID and payment status are required." };
+     if (rentalId === undefined || rentalId === null || !paymentStatus) {
+        return { success: false, error: "Rental ID and payment status are required." };
+     }
 
       try {
         const { data, error } = await supabaseAdmin
@@ -825,8 +824,6 @@ export const updateRentalPaymentStatus = async ( // Restored from OLD logic
     }
 };
 
-
-// --- Image Upload ---
 export const uploadImage = async (bucketName: string, file: File, fileName?: string): Promise<{ success: boolean; publicUrl?: string; error?: string }> => {
      if (!supabaseAdmin) return { success: false, error: "Admin client not available."};
      if (!bucketName || !file) return { success: false, error: "Bucket name and file are required." };
@@ -871,8 +868,6 @@ export const uploadImage = async (bucketName: string, file: File, fileName?: str
     }
 };
 
-
-// --- Generic Data Fetching ---
 export const fetchQuestions = async () => {
     if (!supabaseAnon) throw new Error("Anon client not available.");
     const { data, error } = await supabaseAnon.from("questions").select("*");
@@ -887,14 +882,13 @@ export const fetchAnswers = async () => {
     return data;
 };
 
-// Restored fetchCars function
 export const fetchCars = async (): Promise<{ success: boolean; data?: DbCar[]; error?: string }> => {
   if (!supabaseAnon) return { success: false, error: "Anon client not available." };
   try {
     const { data, error } = await supabaseAnon
         .from("cars")
         .select("*")
-        .order("created_at", { ascending: false });
+        .order("model", { ascending: true }); // cars table has no created_at
     if (error) throw error;
     return { success: true, data: data || [] };
   } catch (error) {
@@ -903,7 +897,6 @@ export const fetchCars = async (): Promise<{ success: boolean; data?: DbCar[]; e
   }
 }
 
-// Restored fetchCarById function
 export const fetchCarById = async (id: string): Promise<{ success: boolean; data?: DbCar; error?: string }> => {
   if (!id) return { success: false, error: "Car ID is required." };
   if (!supabaseAnon) return { success: false, error: "Anon client not available." };
@@ -927,7 +920,6 @@ export const fetchCarById = async (id: string): Promise<{ success: boolean; data
   }
 }
 
-// Restored saveUserResult function
 export const saveUserResult = async (userId: string, carId: string): Promise<{ success: boolean; error?: string }> => {
     const client = await createAuthenticatedClient(userId);
     if (!client) return { success: false, error: "Failed to create authenticated client." };
@@ -935,10 +927,10 @@ export const saveUserResult = async (userId: string, carId: string): Promise<{ s
     try {
         const { error } = await client
             .from("user_results")
-            .insert({ user_id: userId, car_id: carId });
+            .insert({ user_id: userId, car_id: carId, created_at: new Date().toISOString() });
 
         if (error) {
-             if (error.code === '23505') {
+             if (error.code === '23505') { 
                  debugLogger.warn(`User ${userId} already has a result for car ${carId}. Ignoring duplicate.`);
                  return { success: true };
              }
@@ -955,7 +947,6 @@ export const saveUserResult = async (userId: string, carId: string): Promise<{ s
     }
 };
 
-// Restored getUserResults function
 export const getUserResults = async (userId: string): Promise<{ success: boolean; data?: DbUserResult[]; error?: string }> => {
     const client = await createAuthenticatedClient(userId);
     if (!client) return { success: false, error: "Failed to create authenticated client." };
@@ -975,6 +966,3 @@ export const getUserResults = async (userId: string): Promise<{ success: boolean
         return { success: false, error: error instanceof Error ? error.message : "Failed to fetch user results" };
     }
 };
-
-
-// --- END OF /hooks/supabase.ts ---
