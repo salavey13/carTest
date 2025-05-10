@@ -212,13 +212,13 @@ export default function Home() {
                     <h3 className="text-md sm:text-lg font-bold font-orbitron text-shadow-[0_0_8px_theme(colors.brand-cyan)]">
                       <VibeContentRenderer content="<FaGamepad className='inline text-brand-pink/90 mr-2 text-2xl sm:text-3xl align-middle'/>INITIATE: CyberDev OS Training Program" />
                     </h3>
-                    {/* Разделяем строку на части для VibeContentRenderer */}
-                    <p className="text-xs sm:text-sm font-mono text-gray-300">
-                        <span>Your journey from Level 0: </span>
+                    {/* Разделяем строку на части для корректного рендеринга */}
+                    <p className="text-xs sm:text-sm font-mono text-gray-300 flex flex-wrap items-baseline">
+                        <span className="mr-1">Your journey from Level 0:</span>
                         <VibeContentRenderer content="<FaEye className='inline mx-0.5 align-middle'/>" />
-                        <span> See the Code, </span>
+                        <span className="mx-1">See the Code,</span>
                         <VibeContentRenderer content="<FaBolt className='inline mx-0.5 align-middle'/>" />
-                        <span> Become the Vibe.</span>
+                        <span className="ml-1">Become the Vibe.</span>
                     </p>
                   </div>
                  <div className="absolute top-2 right-3 sm:top-3 sm:right-4 text-white z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">

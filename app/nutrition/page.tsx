@@ -95,10 +95,10 @@ export default function CognitiveFuelPage() {
                 <div className="space-y-1 text-xs text-gray-400 font-mono">
                   {protocol.details.map((detail, index) => (
                     <div key={index} className="flex items-start">
-                      {/* Render list item marker directly */}
+                      {/* Render list item marker directly as JSX */}
                       <FaBolt className="text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5 align-middle" /> 
-                      {/* VibeContentRenderer handles the rest of the detail string, which might contain its own icons */}
-                      <VibeContentRenderer content={detail.substring(detail.indexOf("/>") + 2).trim()} /> 
+                      {/* VibeContentRenderer handles the rest of the detail string */}
+                      <VibeContentRenderer content={detail} /> 
                     </div>
                   ))}
                 </div>
