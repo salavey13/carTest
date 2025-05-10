@@ -30,7 +30,7 @@ interface PageInfo {
   isHot?: boolean;
   color?: 'purple' | 'blue' | 'yellow' | 'lime' | 'green' | 'pink' | 'cyan' | 'red' | 'orange' | 'gray'; 
   group?: string; 
-  translatedName?: string; // Added for filtering/sorting pre-translated names
+  translatedName?: string; 
 }
 
 const allPages: PageInfo[] = [
@@ -123,7 +123,7 @@ const colorVarMap: Record<string, string> = {
 };
 
 export default function Header() {
-  const { isAdmin, user } = useAppContext();
+  const { isAdmin, user, isLoading: appContextLoading } = useAppContext(); // Added appContextLoading
   const [isNavOpen, setIsNavOpen] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
@@ -153,24 +153,33 @@ export default function Header() {
 
   const groupedAndFilteredPages = useMemo(() => {
     const lowerSearchTerm = searchTerm.toLowerCase();
+    
+    // Check admin status only when context is not loading
+    let currentIsAdmin = false;
+    if (!appContextLoading && typeof isAdmin === 'function') {
+      currentIsAdmin = isAdmin();
+    }
+    
     const filtered = allPages
-      .filter(page => {
-        const adminCheck = typeof isAdmin === 'function' ? isAdmin() : false;
-        return !(page.isAdminOnly && !adminCheck);
-      })
+      .filter(page => !(page.isAdminOnly && !currentIsAdmin)) 
       .map(page => ({ ...page, translatedName: t(page.name) }))
       .filter(page => page.translatedName!.toLowerCase().includes(lowerSearchTerm));
 
     const groups: Record<string, PageInfo[]> = {};
-    groupOrder.forEach(groupName => groups[groupName] = []);
+    groupOrder.forEach(groupName => {
+        if (groupName === "Admin Zone" && !currentIsAdmin) return; // Skip Admin Zone if not admin
+        groups[groupName] = [];
+    });
 
     filtered.forEach(page => {
       const groupName = page.group || "Misc";
-      if (!groups[groupName]) groups[groupName] = [];
-      groups[groupName].push(page);
+      // Ensure group exists before pushing (it should, unless Admin Zone was skipped)
+      if (groups[groupName]) {
+        groups[groupName].push(page);
+      }
     });
     return groups;
-  }, [searchTerm, isAdmin, t]);
+  }, [searchTerm, isAdmin, t, appContextLoading]); // Added appContextLoading to dependencies
 
   const handleScroll = useCallback(() => {
     const currentScrollY = window.scrollY;
@@ -240,7 +249,9 @@ export default function Header() {
                   aria-label={t("Open navigation")} aria-expanded={isNavOpen}
                 ><LayoutGrid className="h-5 w-5 sm:h-6 sm:w-6" /></button>
               )}
-              <UserInfo />
+              <div className="rounded-full overflow-hidden"> {/* Added for guaranteed rounding */}
+                <UserInfo />
+              </div>
             </div>
           </div>
         </div>
@@ -276,7 +287,9 @@ export default function Header() {
               <div className="space-y-6">
                 {groupOrder.map(groupName => {
                   const pagesInGroup = groupedAndFilteredPages[groupName];
-                  if (!pagesInGroup || pagesInGroup.length === 0) return null;
+                  // Also check if the group itself exists (e.g., Admin Zone might be filtered out)
+                  if (!pagesInGroup || pagesInGroup.length === 0) return null; 
+                  
                   const GroupIcon = groupIcons[groupName];
 
                   return (
