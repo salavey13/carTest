@@ -18,8 +18,8 @@ import {
   fetchUserCyberFitnessProfile,
   CyberFitnessProfile,
 } from "@/hooks/cyberFitnessSupabase"; 
-import { format } from 'date-fns'; // <--- ДОБАВЛЕН ИМПОРТ
-import { ru } from 'date-fns/locale'; // <--- ДОБАВЛЕН ИМПОРТ
+import { format } from 'date-fns'; 
+import { ru } from 'date-fns/locale'; 
 
 // --- Constants & Config - Moved outside the component ---
 const DEFAULT_WEEKLY_ACTIVITY = [
@@ -73,7 +73,7 @@ export default function Home() {
             activeQuests: [], completedQuests: [], unlockedPerks: [],
             achievements: [], cognitiveOSVersion: "v0.1 Alpha", 
             lastActivityTimestamp: new Date(0).toISOString(),
-            dailyActivityLog: [], // Initialize as empty, chart will use DEFAULT_WEEKLY_ACTIVITY
+            dailyActivityLog: [], 
             totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0,
             totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {}
           });
@@ -86,7 +86,7 @@ export default function Home() {
             activeQuests: [], completedQuests: [], unlockedPerks: [],
             achievements: [], cognitiveOSVersion: "v0.1 Guest Mode", 
             lastActivityTimestamp: new Date(0).toISOString(),
-            dailyActivityLog: [], // Initialize as empty
+            dailyActivityLog: [], 
             totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0,
             totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {}
         });
@@ -136,10 +136,10 @@ export default function Home() {
   const chartReadyWeeklyActivity = (cyberProfile?.dailyActivityLog && cyberProfile.dailyActivityLog.length > 0 
     ? cyberProfile.dailyActivityLog.map(d => ({ 
         name: format(new Date(d.date), 'EEE', {locale: ru}).substring(0,2).toUpperCase(), 
-        value: d.kworkRequestsSent || 0, // Assuming you want to show kworkRequestsSent or similar
+        value: d.kworkRequestsSent || 0, 
         label: `${d.kworkRequestsSent || 0} req` 
       }))
-    : DEFAULT_WEEKLY_ACTIVITY // Fallback to default structure if no daily log
+    : DEFAULT_WEEKLY_ACTIVITY
   ).slice(0,7);
 
 
@@ -212,8 +212,11 @@ export default function Home() {
                     <h3 className="text-md sm:text-lg font-bold font-orbitron text-shadow-[0_0_8px_theme(colors.brand-cyan)]">
                       <VibeContentRenderer content="<FaGamepad className='inline text-brand-pink/90 mr-2 text-2xl sm:text-3xl align-middle'/>INITIATE: CyberDev OS Training Program" />
                     </h3>
+                    {/* Split the problematic paragraph into multiple VibeContentRenderer calls or spans */}
                     <p className="text-xs sm:text-sm font-mono text-gray-300">
-                      <VibeContentRenderer content="Your journey from Level 0: <FaEye className='inline mx-0.5 align-middle'/> See the Code, <FaBolt className='inline mx-0.5 align-middle'/> Become the Vibe." />
+                        <span>Your journey from Level 0: </span>
+                        <VibeContentRenderer content="<FaEye className='inline mx-0.5 align-middle'/> See the Code, " />
+                        <VibeContentRenderer content="<FaBolt className='inline mx-0.5 align-middle'/> Become the Vibe." />
                     </p>
                   </div>
                  <div className="absolute top-2 right-3 sm:top-3 sm:right-4 text-white z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
