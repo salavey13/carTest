@@ -1,10 +1,11 @@
 "use server";
 
 import {
-  generateCarEmbedding, // Restored for car functionality
+  generateCarEmbedding, 
   supabaseAdmin,
   fetchUserData as dbFetchUserData,
   createOrUpdateUser as dbCreateOrUpdateUser,
+  updateUserMetadata as dbUpdateUserMetadata, // Renamed for clarity
   uploadImage,
 } from "@/hooks/supabase";
 import axios from "axios";
@@ -19,6 +20,7 @@ import { Bucket } from '@supabase/storage-js';
 import { v4 as uuidv4 } from 'uuid';
 
 type User = Database["public"]["Tables"]["users"]["Row"];
+type UserSettings = User['metadata']; // Assuming settings are stored in metadata
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const DEFAULT_CHAT_ID = "413553377"; 
@@ -79,13 +81,12 @@ type SendTextPayload = SendPayloadBase & { text: string; parse_mode?: 'Markdown'
 type SendPhotoPayload = SendPayloadBase & { photo: string; caption: string; parse_mode?: 'Markdown' | 'MarkdownV2' | 'HTML' };
 type SendPayload = SendTextPayload | SendPhotoPayload;
 
-
 export async function sendTelegramMessage(
   message: string,
   buttons: InlineButton[] = [],
   imageUrl?: string,
   chatId?: string,
-  carId?: string // Restored carId parameter
+  carId?: string 
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   if (!TELEGRAM_BOT_TOKEN) {
     return { success: false, error: "Telegram bot token not configured" };
@@ -94,7 +95,6 @@ export async function sendTelegramMessage(
 
   try {
     let finalMessage = message;
-    // Restored logic to fetch car details if carId is provided
     if (carId) {
       const { data: car, error } = await supabaseAdmin
         .from("cars")
@@ -112,12 +112,12 @@ export async function sendTelegramMessage(
       ? { 
           chat_id: finalChatId,
           photo: imageUrl,
-          caption: finalMessage, // Use finalMessage which might include car details
-          parse_mode: "Markdown", // Explicitly set for caption as well
+          caption: finalMessage, 
+          parse_mode: "Markdown", 
       }
       : { 
           chat_id: finalChatId,
-          text: finalMessage, // Use finalMessage
+          text: finalMessage, 
           parse_mode: "Markdown", 
         };
 
@@ -247,7 +247,7 @@ export async function sendTelegramInvoice(
                 type: payload.split("_")[0], 
                 status: "pending",
                 metadata: { description, title }, 
-                subscription_id: subscription_id || null, // Use null for DB if 0 means no subscription
+                subscription_id: subscription_id || null, 
             });
 
         if (insertError) {
@@ -256,7 +256,6 @@ export async function sendTelegramInvoice(
     } catch (dbError) {
          logger.error(`Exception saving invoice ${payload} to DB after sending:`, dbError);
     }
-
 
     return { success: true, data: data.result };
   } catch (error) {
@@ -333,7 +332,6 @@ export async function notifyAdmins(message: string): Promise<{ success: boolean;
   }
 }
 
-// Restored notifyCarAdmin function
 export async function notifyCarAdmin(carId: string, message: string): Promise<{ success: boolean; error?: string }> {
   try {
     const { data: car, error } = await supabaseAdmin
@@ -366,8 +364,6 @@ export async function notifyCarAdmin(carId: string, message: string): Promise<{ 
       buttons,
       car.image_url,
       adminId
-      // carId is now part of sendTelegramMessage's signature if needed, but here it's used to compose the message.
-      // If sendTelegramMessage uses carId internally, we might pass it: , carId
     );
 
     if (!result.success) {
@@ -380,7 +376,6 @@ export async function notifyCarAdmin(carId: string, message: string): Promise<{ 
   }
 }
 
-// Restored superNotification function
 export async function superNotification(message: string): Promise<{ success: boolean; error?: string }> {
    try {
     const { data: owners, error } = await supabaseAdmin
@@ -421,7 +416,7 @@ export async function superNotification(message: string): Promise<{ success: boo
    }
 }
 
-export async function broadcastMessage(message: string, role?: string): Promise<{ success: boolean; error?: string }> {
+export async function broadcastMessage(message: string, role?: User['role']): Promise<{ success: boolean; error?: string }> {
   try {
     let query = supabaseAdmin.from("users").select("user_id");
     if (role) {
@@ -637,7 +632,7 @@ export async function executeCozeAgent(
 
         if (insertError) {
              logger.error("Failed to save Coze response to DB:", insertError);
-            throw new Error(`Failed to save Coze response: ${insertError.message}`);
+            // Do not throw error, proceed with returning Coze response
         }
 
         return { success: true, data: assistantAnswer }; 
@@ -707,7 +702,6 @@ export async function analyzeMessage(content: string): Promise<{
     }
      if (!COZE_API_KEY) return { success: false, error: "Coze API Key not configured" };
 
-
     try {
         logger.info(`Analyzing message with Coze Bot ${botId}...`);
         const agentResult = await runCozeAgent(botId, userId, content);
@@ -753,7 +747,6 @@ export async function analyzeMessage(content: string): Promise<{
     }
 }
 
-// Restored generateEmbeddings function
 export const generateEmbeddings = async (): Promise<{ success: boolean; message?: string; error?: string }> => {
   try {
     const { data: cars, error: fetchError, count } = await supabaseAdmin
@@ -772,8 +765,6 @@ export const generateEmbeddings = async (): Promise<{ success: boolean; message?
     }
 
     logger.info(`Found ${count} cars needing embeddings. Triggering batch generation...`);
-    // This calls the generateCarEmbedding from hooks/supabase.ts
-    // which itself calls the Edge Function.
     const result = await generateCarEmbedding('batch'); 
 
     logger.info(`Triggered embedding generation for ${count} cars. Result:`, result);
@@ -785,7 +776,6 @@ export const generateEmbeddings = async (): Promise<{ success: boolean; message?
   }
 };
 
-// Restored findSimilarCars function
 export async function findSimilarCars(
     embedding: number[],
     limit: number = 3
@@ -1016,7 +1006,6 @@ export async function sendDonationInvoice(chatId: string, amount: number, messag
     }
 }
 
-// Restored updateCarStatus function
 export async function updateCarStatus(carId: string, newStatus: string): Promise<{ success: boolean; error?: string }> {
     try {
         const allowedStatuses = ["available", "rented", "maintenance", "unavailable"];
@@ -1026,7 +1015,7 @@ export async function updateCarStatus(carId: string, newStatus: string): Promise
 
         const { error: updateError } = await supabaseAdmin
             .from("cars")
-            .update({ status: newStatus, updated_at: new Date().toISOString() })
+            .update({ status: newStatus }) // removed updated_at
             .eq("id", carId);
 
         if (updateError) {
@@ -1054,8 +1043,7 @@ export async function checkInvoiceStatus(token: string, invoiceId: string): Prom
         if (!validationResult.success || !validationResult.user) {
             return { success: false, error: validationResult.error || "Unauthorized", status: undefined };
         }
-        // const userId = validationResult.user.user_id; // Not strictly needed if using admin client for fetch
-
+        
         const { data, error } = await supabaseAdmin
             .from("invoices")
             .select("status, user_id")
@@ -1172,7 +1160,6 @@ export async function uploadBatchImages(
         const successfulUploads = results.filter(r => r && 'url' in r) as { name: string; url: string }[];
         const uploadErrors = results.filter(r => r && 'error' in r) as { name: string; error: string }[];
 
-
         if (successfulUploads.length === 0 && uploadErrors.length > 0) {
              return {
                  success: false,
@@ -1209,4 +1196,45 @@ export async function listPublicBuckets(): Promise<{ success: boolean; data?: Bu
         const errorMsg = error instanceof Error ? error.message : "Could not fetch public buckets";
         return { success: false, error: errorMsg };
     }
+}
+
+// --- New Server Action for User Settings ---
+export async function updateUserSettings(
+  userId: string,
+  newSettings: Partial<UserSettings> // newSettings here should be an object like { settings_profile: { ... } }
+): Promise<{ success: boolean; error?: string }> {
+  if (!userId) {
+    return { success: false, error: "User ID is required." };
+  }
+  
+  // Directly use dbUpdateUserMetadata which handles authenticated client creation
+  // dbUpdateUserMetadata expects the full metadata object or null.
+  // We need to fetch existing metadata, merge, then update.
+
+  try {
+    const userData = await dbFetchUserData(userId); // Fetches user data including metadata
+    if (!userData) {
+      return { success: false, error: "User not found." };
+    }
+
+    const currentMetadata = userData.metadata || {};
+    // newSettings is expected to be like { settings_profile: { ... actual settings ... } }
+    // or { advice_broadcast: { ... } } etc.
+    // So we merge at the top level of metadata
+    const updatedMetadata = { ...currentMetadata, ...newSettings };
+
+    const result = await dbUpdateUserMetadata(userId, updatedMetadata);
+    
+    if (result.success) {
+      logger.info(`User settings updated successfully for user ${userId}`);
+      return { success: true };
+    } else {
+      logger.error(`Failed to update user settings for ${userId}: ${result.error}`);
+      return { success: false, error: result.error || "Failed to update settings." };
+    }
+  } catch (e) {
+    const errorMsg = e instanceof Error ? e.message : "Unknown error during settings update.";
+    logger.error(`Exception in updateUserSettings for ${userId}:`, e);
+    return { success: false, error: errorMsg };
+  }
 }
