@@ -1,3 +1,4 @@
+// /app/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -32,7 +33,7 @@ const CHART_COLORS = [
   'hsl(var(--brand-orange))' 
 ];
 const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png"; 
-const FEATURED_QUEST_IMAGE = "/placeholders/cyber-brain-network.jpg"; 
+const FEATURED_QUEST_IMAGE = "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250510_035401-e6d0b2d8-9f28-4516-a5c7-fe729b31f736.jpg"; 
 
 // --- Framer Motion Variants - Moved outside the component ---
 const containerVariants = {
