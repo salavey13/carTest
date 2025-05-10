@@ -8,13 +8,14 @@ import { Label } from "@/components/ui/label";
 import {
   FaBrain, FaBell, FaBed, FaCalendarCheck, FaToolbox, FaEnvelope,
   FaComments, FaShieldVirus, FaSliders, FaUserGear, FaQuestionCircle
-} from "react-icons/fa6"; // Corrected icons: FaTools -> FaToolbox, FaUserCog -> FaUserGear, FaSlidersH -> FaSliders
+} from "react-icons/fa6"; 
 import Modal from "@/components/ui/Modal"; 
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
 import { updateUserSettings } from "@/app/actions"; 
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { debugLogger as logger } from "@/lib/debugLogger";
+import { cn } from "@/lib/utils"; // <--- ДОБАВЛЕН ИМПОРТ
 
 interface SettingConfig {
   key: string; 
@@ -89,7 +90,6 @@ export default function SettingsPage() {
       document.documentElement.classList.toggle('dark', value);
     }
     
-    // Find title for toast, default to key if not in definitions (e.g. for dark_mode_enabled)
     const settingDef = settingDefinitions.find(s => s.key === settingKey);
     const settingTitleForToast = settingDef ? settingDef.title : (settingKey === 'dark_mode_enabled' ? "Темная тема" : settingKey);
     const toastMessage = `Настройка "${settingTitleForToast}" ${value ? "включена" : "выключена"}`;
@@ -136,7 +136,7 @@ export default function SettingsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-dark-bg p-4">
         <div className="flex flex-col items-center">
-            <FaSliders className="text-5xl text-brand-purple animate-pulse mb-4" /> {/* Corrected Icon */}
+            <FaSliders className="text-5xl text-brand-purple animate-pulse mb-4" />
             <p className="text-brand-purple animate-pulse font-orbitron">КАЛИБРОВКА НЕЙРО-ИНТЕРФЕЙСА...</p>
             {pageError && <p className="text-red-500 mt-2">{pageError}</p>}
         </div>
@@ -154,7 +154,7 @@ export default function SettingsPage() {
       >
         <Card className="bg-dark-card/80 backdrop-blur-md border border-brand-purple/50 shadow-xl shadow-brand-purple/20">
           <CardHeader className="text-center p-6 border-b border-brand-purple/30">
-            <FaUserGear className="text-5xl text-brand-purple mx-auto mb-3 drop-shadow-[0_0_10px_theme(colors.brand-purple)]" /> {/* Corrected Icon */}
+            <FaUserGear className="text-5xl text-brand-purple mx-auto mb-3 drop-shadow-[0_0_10px_theme(colors.brand-purple)]" />
             <CardTitle className="text-3xl font-orbitron font-bold text-brand-purple cyber-text glitch" data-text="НЕЙРО-ИНТЕРФЕЙС">
               НЕЙРО-ИНТЕРФЕЙС
             </CardTitle>
@@ -179,7 +179,7 @@ export default function SettingsPage() {
             
              <div className="flex items-center justify-between p-3 bg-dark-bg/40 rounded-lg border border-gray-700 hover:border-brand-purple/50 transition-colors">
               <Label htmlFor="dark-mode-switch" className="flex items-center text-md flex-grow cursor-pointer">
-                <span className="text-xl mr-3 text-brand-purple"><FaToolbox/></span> {/* Corrected Icon */}
+                <span className="text-xl mr-3 text-brand-purple"><FaToolbox/></span>
                 <div>
                     <VibeContentRenderer content="**Системная Тема (::FaMoon::):** Темный Интерфейс" className="font-orbitron text-light-text" />
                     <p className="text-xs text-muted-foreground font-mono mt-0.5">Активация протокола 'Вечная Ночь' для комфорта глаз.</p>
@@ -214,7 +214,7 @@ export default function SettingsPage() {
         title="Форма Нейро-Обратной Связи"
         confirmText="Отправить Сигнал"
         onConfirm={handleSendFeedback}
-        icon={<FaQuestionCircle className="text-brand-pink" />} // Corrected Fa6 icon usage
+        icon={<FaQuestionCircle className="text-brand-pink" />} 
       >
         <p className="mb-3 font-mono text-sm text-muted-foreground">Твои мысли – топливо для эволюции VIBE OS. Делись идеями, сообщай о сбоях в Матрице.</p>
         <textarea
