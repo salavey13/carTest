@@ -11,13 +11,13 @@ import VibeContentRenderer from "@/components/VibeContentRenderer";
 const cognitiveProtocols = [
   {
     id: "deep_work_sprint",
-    name: "Протокол 'ТУРБО-МОЗГ'", // Hormozi style title
+    name: "Протокол 'ТУРБО-МОЗГ'",
     icon: <FaBolt className="text-brand-orange" />, 
     description: "Вруби нитро для своих идей и кода! Этот 90-минутный спринт выжмет из тебя максимум.",
     details: [
       "**ВЫГОДА:** Молниеносное завершение задач, генерация контента как из пулемета.",
       "**МЕХАНИКА:** 2x(40 мин чистейшего фокуса + 5 мин перезарядки). Безжалостно к прокрастинации.",
-      "**АРСЕНАЛ:** <FaAtom className='inline text-brand-purple mr-1 align-middle'/> Твой личный AI-Джарвис (Perplexity, ChatGPT), глушители реальности (наушники), таймер-контроллер.", 
+      "**АРСЕНАЛ:** <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI-ассистент (Perplexity, ChatGPT), глушители реальности (наушники), таймер-контроллер.", 
       "**ТОПЛИВО:** Кристальная вода, эликсир зеленого чая. Сахар – ЯД для кибер-воина."
     ],
     color: "border-brand-orange/50 bg-dark-card hover:shadow-brand-orange/20"
@@ -42,8 +42,8 @@ const cognitiveProtocols = [
     description: "Перезагрузи матрицу сознания. Очисти кэш. Сгенерируй идеи, которые взорвут рынок.",
     details: [
       "**ВЫГОДА:** Сброс умственной усталости, кристальная ясность, поток гениальных (и прибыльных) идей.",
-      "**МЕХАНИКА:** 15-20 мин медитации 'Нулевой Канал' или прогулка 'Альфа-Волны'. Затем – 10 мин 'Взрыв Идей' фрирайтингом.",
-      "**АРСЕНАЛ:** Приложения-ноотропы (Calm, Headspace), священный манускрипт (блокнот) или цифровые скрижали.",
+      "**МЕХАНИКА:** 15-20 мин медитации 'Нулевой Канал' или прогулка 'Альфа-Волны'. После – 10 мин 'Взрыв Идей' фрирайтингом.",
+      "**АРСЕНАЛ:** Приложение для медитации (Calm, Headspace), священный манускрипт (блокнот) или цифровые скрижали.",
       "**ТОПЛИВО:** Эликсир травяного чая, орехи мудрости."
     ],
     color: "border-brand-cyan/50 bg-dark-card hover:shadow-brand-cyan/20"
@@ -92,17 +92,14 @@ export default function CognitiveFuelPage() {
                 </h2>
                 <p className="text-sm text-muted-foreground mb-3 font-mono">{protocol.description}</p>
                 
-                <div className="space-y-1.5 text-xs text-gray-300 font-mono"> {/* Increased space for readability */}
-                  {protocol.details.map((detail, index) => {
-                    // Prepend the list item icon as a string part for VibeContentRenderer
-                    const detailContentWithMarker = `<FaBolt className='text-xs mr-2 text-gray-400 flex-shrink-0 mt-0.5 align-middle'/> ${detail}`;
-                    return (
-                      <div key={index} className="flex items-start"> {/* Ensures icon and text align well if text wraps */}
-                        <VibeContentRenderer content={detailContentWithMarker} />
-                      </div>
-                    );
-                  })}
-                </div>
+                <ul className="space-y-1.5 text-xs text-gray-300 font-mono list-none pl-0"> {/* Use ul for semantic list */}
+                  {protocol.details.map((detail, index) => (
+                    <li key={index} className="flex items-start"> {/* Each detail is a list item */}
+                      <FaBolt className="text-xs mr-2 text-gray-400 flex-shrink-0 mt-[3px] align-middle" /> 
+                      <VibeContentRenderer content={detail} /> 
+                    </li>
+                  ))}
+                </ul>
               </motion.section>
             ))}
             
