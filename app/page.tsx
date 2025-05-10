@@ -18,6 +18,8 @@ import {
   fetchUserCyberFitnessProfile,
   CyberFitnessProfile,
 } from "@/hooks/cyberFitnessSupabase"; 
+import { format } from 'date-fns'; // <--- ДОБАВЛЕН ИМПОРТ
+import { ru } from 'date-fns/locale'; // <--- ДОБАВЛЕН ИМПОРТ
 
 // --- Constants & Config - Moved outside the component ---
 const DEFAULT_WEEKLY_ACTIVITY = [
@@ -66,13 +68,12 @@ export default function Home() {
           logger.log("Home: CyberFitness profile loaded:", result.data);
         } else {
           logger.warn(`Home: Failed to load CyberFitness profile for ${dbUser.id}. Error: ${result.error}. Initializing default.`);
-          // Initialize with defaults from CyberFitnessProfile type for consistency
           setCyberProfile({ 
             level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
             activeQuests: [], completedQuests: [], unlockedPerks: [],
             achievements: [], cognitiveOSVersion: "v0.1 Alpha", 
             lastActivityTimestamp: new Date(0).toISOString(),
-            dailyActivityLog: [...DEFAULT_WEEKLY_ACTIVITY], // Assuming DEFAULT_WEEKLY_ACTIVITY matches DailyActivityRecord structure (it doesn't fully)
+            dailyActivityLog: [], // Initialize as empty, chart will use DEFAULT_WEEKLY_ACTIVITY
             totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0,
             totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {}
           });
@@ -85,7 +86,7 @@ export default function Home() {
             activeQuests: [], completedQuests: [], unlockedPerks: [],
             achievements: [], cognitiveOSVersion: "v0.1 Guest Mode", 
             lastActivityTimestamp: new Date(0).toISOString(),
-            dailyActivityLog: [...DEFAULT_WEEKLY_ACTIVITY], // Same assumption as above
+            dailyActivityLog: [], // Initialize as empty
             totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0,
             totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {}
         });
@@ -132,11 +133,14 @@ export default function Home() {
     );
   }
 
-  // Ensure weeklyActivity structure matches BarChart expectations
   const chartReadyWeeklyActivity = (cyberProfile?.dailyActivityLog && cyberProfile.dailyActivityLog.length > 0 
-    ? cyberProfile.dailyActivityLog.map(d => ({ name: format(new Date(d.date), 'EEE', {locale: ru}).substring(0,2).toUpperCase(), value: d.kworkRequestsSent || 0, label: `${d.kworkRequestsSent || 0} req` }))
-    : DEFAULT_WEEKLY_ACTIVITY
-  ).slice(0,7); // Ensure only 7 days for chart
+    ? cyberProfile.dailyActivityLog.map(d => ({ 
+        name: format(new Date(d.date), 'EEE', {locale: ru}).substring(0,2).toUpperCase(), 
+        value: d.kworkRequestsSent || 0, // Assuming you want to show kworkRequestsSent or similar
+        label: `${d.kworkRequestsSent || 0} req` 
+      }))
+    : DEFAULT_WEEKLY_ACTIVITY // Fallback to default structure if no daily log
+  ).slice(0,7);
 
 
   const totalKiloVibes = cyberProfile?.kiloVibes || 0;
