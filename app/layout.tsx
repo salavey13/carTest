@@ -1,3 +1,5 @@
+"use client"; // Making RootLayout a client component to use usePathname
+
 import type React from "react";
 import Script from "next/script";
 import { Suspense } from 'react';
@@ -13,6 +15,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext";
 import ErrorBoundaryForOverlay from "@/components/ErrorBoundaryForOverlay";
 import DevErrorOverlay from "@/components/DevErrorOverlay";
+import { usePathname } from 'next/navigation'; // Added
+import BottomNavigation from "@/components/layout/BottomNavigation"; // Added
 
 function LoadingChatButtonFallback() {
   return (
@@ -23,10 +27,12 @@ function LoadingChatButtonFallback() {
   );
 }
 
-export const metadata: Metadata = { // Corrected type to Metadata
-  title: "Fit10min PREMIUM", 
-  description: "Твоя 10-минутная фитнес-революция. Тренировки, питание, прогресс.", 
-  // Viewport settings moved to the viewport export below
+// Metadata should be static or generated via generateMetadata if RootLayout is server component
+// Since we made it client, keep it simple or move to generateMetadata if possible.
+// For now, we'll keep the static export for metadata and viewport as Next.js can still pick it up.
+export const metadata: Metadata = {
+  title: "Fix13min PREMIUM", 
+  description: "Твоя 13-минутная фитнес-революция. Level UP", 
 };
 
 export const viewport: Viewport = {
@@ -34,15 +40,17 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  // themeColor: string | ThemeColorDescriptor[]; // Example if you had theme color here
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const pathsToShowBottomNav = ["/", "/selfdev/gamified", "/repo-xml", "/p-plan", "/profile"];
+  const showBottomNav = pathsToShowBottomNav.includes(pathname);
+
   return (
     <html lang="en" className="h-full">
       <head>
         <meta charSet="utf-8" />
-        {/* viewport meta tag is handled by Next.js viewport export, no need to repeat here */}
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
         <Script
@@ -62,6 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <main className="flex-1">
                   {children}
                 </main>
+                {showBottomNav && <BottomNavigation />} {/* Conditionally render BottomNavigation */}
                 <Suspense fallback={<LoadingChatButtonFallback />}>
                   <StickyChatButton />
                 </Suspense>
