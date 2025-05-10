@@ -2,7 +2,6 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-// FaAtom is used in details strings, FaBrain, FaBolt, FaLightbulb are used directly as JSX for protocol icons
 import { FaBrain, FaBolt, FaLightbulb } from "react-icons/fa6"; 
 import { useState } from "react";
 import Modal from "@/components/ui/Modal"; 
@@ -16,10 +15,10 @@ const cognitiveProtocols = [
     icon: <FaBolt className="text-brand-orange" />, 
     description: "Концентрированный блок работы с использованием техники Pomodoro и AI-ассистента для максимальной продуктивности.",
     details: [
-      "Цель: Завершение критической задачи, генерация контента.",
-      "Метод: 2x(40 мин фокус + 5 мин отдых).",
-      "Инструменты: <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI-ассистент (Perplexity, ChatGPT), шумоподавляющие наушники, трекер времени.", 
-      "Топливо: Вода, зеленый чай. Избегать сахара."
+      "<FaBolt className='text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5'/> Цель: Завершение критической задачи, генерация контента.",
+      "<FaBolt className='text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5'/> Метод: 2x(40 мин фокус + 5 мин отдых).",
+      "<FaBolt className='text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5'/> Инструменты: <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI-ассистент (Perplexity, ChatGPT), шумоподавляющие наушники, трекер времени.", 
+      "<FaBolt className='text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5'/> Топливо: Вода, зеленый чай. Избегать сахара."
     ],
     color: "border-brand-orange/50 bg-dark-card hover:shadow-brand-orange/20"
   },
@@ -29,10 +28,10 @@ const cognitiveProtocols = [
     icon: <FaLightbulb className="text-brand-yellow" />, 
     description: "Целевая сессия для изучения нового Vibe Perk или навыка с применением техник активного обучения.",
     details: [
-      "Цель: Освоение нового навыка, расширение Vibe-арсенала.",
-      "Метод: Объяснение концепции (AI), практика, интервальное повторение.",
-      "Инструменты: <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI для объяснений/квизов (ChatGPT), Anki/Quizlet, релевантные туториалы.", 
-      "Топливо: Сложные углеводы для энергии (гречка, овсянка)."
+      "<FaBolt className='text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5'/> Цель: Освоение нового навыка, расширение Vibe-арсенала.",
+      "<FaBolt className='text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5'/> Метод: Объяснение концепции (AI), практика, интервальное повторение.",
+      "<FaBolt className='text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5'/> Инструменты: <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI для объяснений/квизов (ChatGPT), Anki/Quizlet, релевантные туториалы.", 
+      "<FaBolt className='text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5'/> Топливо: Сложные углеводы для энергии (гречка, овсянка)."
     ],
     color: "border-brand-yellow/50 bg-dark-card hover:shadow-brand-yellow/20"
   },
@@ -42,10 +41,10 @@ const cognitiveProtocols = [
     icon: <FaBrain className="text-brand-cyan" />, 
     description: "Восстановление когнитивной энергии через медитацию или легкую активность, стимулирование генерации идей.",
     details: [
-      "Цель: Снижение умственной усталости, генерация новых идей.",
-      "Метод: 15-20 мин медитации осознанности или прогулка на свежем воздухе. После – 10 мин фрирайтинга идей.",
-      "Инструменты: Приложение для медитации (Calm, Headspace), блокнот или цифровые заметки.",
-      "Топливо: Травяной чай, орехи."
+      "<FaBolt className='text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5'/> Цель: Снижение умственной усталости, генерация новых идей.",
+      "<FaBolt className='text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5'/> Метод: 15-20 мин медитации осознанности или прогулка на свежем воздухе. После – 10 мин фрирайтинга идей.",
+      "<FaBolt className='text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5'/> Инструменты: Приложение для медитации (Calm, Headspace), блокнот или цифровые заметки.",
+      "<FaBolt className='text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5'/> Топливо: Травяной чай, орехи."
     ],
     color: "border-brand-cyan/50 bg-dark-card hover:shadow-brand-cyan/20"
   },
@@ -96,7 +95,8 @@ export default function CognitiveFuelPage() {
                 <div className="space-y-1 text-xs text-gray-400 font-mono">
                   {protocol.details.map((detail, index) => (
                     <div key={index} className="flex items-start">
-                      <VibeContentRenderer content={`<FaBolt className="text-xs mr-1.5 text-gray-500 flex-shrink-0 mt-0.5"/> ${detail}`} />
+                       {/* VibeContentRenderer now handles the entire string including the leading icon */}
+                      <VibeContentRenderer content={detail} />
                     </div>
                   ))}
                 </div>
