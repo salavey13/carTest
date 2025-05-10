@@ -109,8 +109,6 @@ const translations: Record<string, Record<string, string>> = {
   }
 };
 
-// Helper for color classes to avoid Tailwind JIT issues with dynamic class generation.
-// Maps color names to their corresponding CSS variable names for RGB values.
 const colorVarMap: Record<string, string> = {
   purple: "var(--brand-purple-rgb)",
   blue: "var(--brand-blue-rgb)",
@@ -119,9 +117,9 @@ const colorVarMap: Record<string, string> = {
   green: "var(--brand-green-rgb)",
   pink: "var(--brand-pink-rgb)",
   cyan: "var(--brand-cyan-rgb)",
-  red: "var(--red-500-rgb)", // Standard Tailwind red-500
+  red: "var(--red-500-rgb)", 
   orange: "var(--brand-orange-rgb)",
-  gray: "var(--gray-500-rgb)", // Standard Tailwind gray-500
+  gray: "var(--gray-500-rgb)", 
 };
 
 export default function Header() {
@@ -156,7 +154,10 @@ export default function Header() {
   const groupedAndFilteredPages = useMemo(() => {
     const lowerSearchTerm = searchTerm.toLowerCase();
     const filtered = allPages
-      .filter(page => !(page.isAdminOnly && !isAdmin())) // Call isAdmin as a function
+      .filter(page => {
+        const adminCheck = typeof isAdmin === 'function' ? isAdmin() : false;
+        return !(page.isAdminOnly && !adminCheck);
+      })
       .map(page => ({ ...page, translatedName: t(page.name) }))
       .filter(page => page.translatedName!.toLowerCase().includes(lowerSearchTerm));
 
@@ -298,7 +299,7 @@ export default function Header() {
                               onClick={() => setIsNavOpen(false)}
                               className={cn(
                                 "group relative flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 aspect-square text-center hover:scale-[1.01] hover:-translate-y-px",
-                                "p-1.5", // Slightly increased padding
+                                "p-1.5", 
                                 page.isImportant 
                                   ? "bg-gradient-to-br from-purple-800/30 via-black/50 to-blue-800/30 col-span-1 sm:col-span-2 shadow-sm" 
                                   : "bg-dark-card/60 hover:bg-dark-card/80 col-span-1",
@@ -317,15 +318,15 @@ export default function Header() {
                                 <PageIcon className={cn(
                                   "transition-transform duration-200 group-hover:scale-105 mb-1", 
                                   page.isImportant 
-                                      ? "h-6 w-6 sm:h-7 sm:w-7" // Adjusted icon size
-                                      : "h-5 w-5 sm:h-6 sm:w-6" // Adjusted icon size
+                                      ? "h-6 w-6 sm:h-7 sm:w-7" 
+                                      : "h-5 w-5 sm:h-6 sm:w-6" 
                                 )} />
                               )}
                               <span className={cn(
                                 "font-orbitron font-medium transition-colors leading-tight text-center block",
                                 page.isImportant 
-                                    ? "text-white text-sm md:text-base" // Adjusted text size
-                                    : "text-gray-300 group-hover:text-inherit text-xs md:text-sm" // Adjusted text size
+                                    ? "text-white text-sm md:text-base" 
+                                    : "text-gray-300 group-hover:text-inherit text-xs md:text-sm" 
                               )}>
                                 {page.translatedName}
                               </span>

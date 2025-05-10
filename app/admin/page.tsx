@@ -1,64 +1,83 @@
-// /app/admin/page.tsx
 "use client";
 import { useEffect, useState } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { useRouter } from "next/navigation";
 import { CarSubmissionForm } from "@/components/CarSubmissionForm";
-import { QuickSetWebhookButton } from "@/components/QuickSetWebhookButton"; // New import
+import { QuickSetWebhookButton } from "@/components/QuickSetWebhookButton";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Car, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { debugLogger as logger } from "@/lib/debugLogger";
 
 export default function AdminPage() {
-  const { dbUser, isAdmin } = useAppContext();
+  const { dbUser, isAdmin, isLoading: appContextLoading } = useAppContext();
   const router = useRouter();
   const [isAdminChecked, setIsAdminChecked] = useState<boolean | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
 
   useEffect(() => {
-    if (dbUser) {
-      const adminStatus = isAdmin();
-      setIsAdminChecked(adminStatus);
-      setIsLoading(false);
-      if (adminStatus) {
-        toast.success("Добро пожаловать в Центр Управления, командир!");
-      } else {
-        toast.error("Доступ запрещён. Перенаправляю в Матрицу...");
-        router.push("/");
-      }
-    }
-  }, [dbUser, isAdmin, router]);
+    logger.debug("[AdminPage] useEffect triggered", { dbUserExists: !!dbUser, appContextLoading });
 
-  if (isLoading) {
+    if (appContextLoading) {
+      logger.debug("[AdminPage] AppContext is loading, waiting...");
+      setIsCheckingAdmin(true);
+      return;
+    }
+
+    // appContextLoading is false here
+    setIsCheckingAdmin(true); // Start check
+    
+    const adminStatus = typeof isAdmin === 'function' ? isAdmin() : false;
+    logger.debug("[AdminPage] isAdmin function called, status:", adminStatus);
+    setIsAdminChecked(adminStatus);
+    setIsCheckingAdmin(false); // End check
+
+    if (adminStatus) {
+      // Only show toast if user is confirmed admin and dbUser is available (implies auth flow completed)
+      if (dbUser) {
+          toast.success("Добро пожаловать в Центр Управления, командир!");
+      } else {
+          // This case might occur if isAdmin is true based on mock user but dbUser isn't loaded yet
+          // Or if context is still in a flux.
+          logger.warn("[AdminPage] Admin status true, but dbUser not yet available for toast.");
+      }
+    } else {
+      // If not admin, always redirect.
+      // Toast can be shown before redirect.
+      toast.error("Доступ запрещён. Перенаправляю в Матрицу...");
+      logger.warn("[AdminPage] Access denied, redirecting to /");
+      router.push("/");
+    }
+
+  }, [dbUser, isAdmin, router, appContextLoading]);
+
+  if (isCheckingAdmin || appContextLoading) {
+    logger.debug("[AdminPage] Rendering loading state", { isCheckingAdmin, appContextLoading });
     return (
       <div className="min-h-screen bg-background bg-grid-pattern flex items-center justify-center">
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-          className="w-12 h-12 border-4 border-t-primary border-muted rounded-full shadow-[0_0_15px_rgba(255,107,107,0.8)]"
+          className="w-12 h-12 border-4 border-t-primary border-muted rounded-full shadow-[0_0_15px_rgba(var(--brand-orange-rgb),0.8)]"
         />
       </div>
     );
   }
 
-  if (!isAdminChecked) return null;
-
+  if (!isAdminChecked) {
+    logger.debug("[AdminPage] Not admin or check failed, rendering null (should have redirected).");
+    return null; // Should be redirected by useEffect
+  }
+  
+  logger.debug("[AdminPage] Rendering admin content.");
   return (
     <div className="min-h-screen pt-24 bg-background bg-grid-pattern animate-[drift_30s_infinite]">
-      {/*<header className="fixed top-0 left-0 right-0 bg-card shadow-md p-6 z-10 border-b border-muted">
-        <h1
-          className="text-4xl font-bold text-gradient cyber-text glitch"
-          data-text="ЦЕНТР УПРАВЛЕНИЯ"
-        >
-          ЦЕНТР УПРАВЛЕНИЯ
-        </h1>
-      </header>*/}
       <main className="container mx-auto pt-10 px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-4xl mx-auto p-8 bg-card rounded-2xl shadow-[0_0_20px_rgba(255,107,107,0.3)] border border-muted"
+          className="max-w-4xl mx-auto p-8 bg-card rounded-2xl shadow-[0_0_20px_rgba(var(--brand-orange-rgb),0.3)] border border-muted"
         >
           <h2
             className="text-3xl font-semibold text-secondary mb-6 cyber-text glitch flex items-center justify-center gap-3"
@@ -71,7 +90,6 @@ export default function AdminPage() {
           </p>
           <CarSubmissionForm ownerId={dbUser?.user_id} />
 
-          {/* New Quick Actions Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -108,7 +126,7 @@ export default function AdminPage() {
               onClick={() =>
                 toast.success("Система на полной мощности, командир!")
               }
-              className="bg-primary text-primary-foreground hover:bg-secondary rounded-full w-14 h-14 flex items-center justify-center shadow-[0_0_15px_rgba(255,107,107,0.7)] transition-all hover:shadow-[0_0_25px_rgba(255,107,107,0.9)]"
+              className="bg-primary text-primary-foreground hover:bg-secondary rounded-full w-14 h-14 flex items-center justify-center shadow-[0_0_15px_rgba(var(--brand-orange-rgb),0.7)] transition-all hover:shadow-[0_0_25px_rgba(var(--brand-orange-rgb),0.9)]"
             >
               <Zap className="h-7 w-7" />
             </button>
