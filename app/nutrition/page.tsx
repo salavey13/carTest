@@ -2,7 +2,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { FaBrain, FaBolt, FaLightbulb } from "react-icons/fa6"; 
+import { FaBrain, FaBolt, FaLightbulb, FaAtom, FaFloppyDisk, FaCirclePlus, FaListCheck } from "react-icons/fa6"; 
 import { useState } from "react";
 import Modal from "@/components/ui/Modal"; 
 import { toast } from "sonner";
@@ -50,6 +50,25 @@ const cognitiveProtocols = [
   },
 ];
 
+// Helper function to split detail string for rendering
+const renderDetailWithInternalIcon = (detail: string) => {
+  const iconMatch = detail.match(/(<Fa\w+\s+className='[^']+'\s*\/>)/);
+  if (iconMatch && iconMatch.index !== undefined) {
+    const textBefore = detail.substring(0, iconMatch.index);
+    const iconTag = iconMatch[0];
+    const textAfter = detail.substring(iconMatch.index + iconTag.length);
+    return (
+      <>
+        {textBefore.trim() && <span className="mr-1">{textBefore.trim()}</span>}
+        <VibeContentRenderer content={iconTag} />
+        {textAfter.trim() && <span className="ml-1">{textAfter.trim()}</span>}
+      </>
+    );
+  }
+  return <span>{detail}</span>; // Fallback if no icon or unexpected format
+};
+
+
 export default function CognitiveFuelPage() {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isSuggestModalOpen, setIsSuggestModalOpen] = useState(false);
@@ -92,11 +111,11 @@ export default function CognitiveFuelPage() {
                 </h2>
                 <p className="text-sm text-muted-foreground mb-3 font-mono">{protocol.description}</p>
                 
-                <ul className="space-y-1.5 text-xs text-gray-300 font-mono list-none pl-0"> {/* Use ul for semantic list */}
+                <ul className="space-y-1.5 text-xs text-gray-300 font-mono list-none pl-0">
                   {protocol.details.map((detail, index) => (
-                    <li key={index} className="flex items-start"> {/* Each detail is a list item */}
-                      <FaBolt className="text-xs mr-2 text-gray-400 flex-shrink-0 mt-[3px] align-middle" /> 
-                      <VibeContentRenderer content={detail} /> 
+                    <li key={index} className="flex items-start">
+                      <FaBolt className="text-xs mr-2 text-gray-400 flex-shrink-0 mt-[3px] align-middle" />
+                      {renderDetailWithInternalIcon(detail)}
                     </li>
                   ))}
                 </ul>
@@ -104,14 +123,14 @@ export default function CognitiveFuelPage() {
             ))}
             
             <section className="flex flex-col sm:flex-row gap-3 justify-center pt-6 border-t border-brand-green/20 mt-6">
-              <Button onClick={() => { setIsSaveModalOpen(true); }} className="bg-brand-green text-black hover:bg-brand-green/80 font-orbitron flex-1 py-3 text-base transform hover:scale-105 transition-transform">
-                <VibeContentRenderer content="<FaFloppyDisk className='mr-2 align-middle text-lg'/> СОХРАНИТЬ МОЙ СТЕК!" />
+              <Button onClick={() => { setIsSaveModalOpen(true); }} className="bg-brand-green text-black hover:bg-brand-green/80 font-orbitron flex-1 py-3 text-base transform hover:scale-105 transition-transform flex items-center justify-center">
+                <FaFloppyDisk className='mr-2 align-middle text-lg'/> <span>СОХРАНИТЬ МОЙ СТЕК!</span>
               </Button>
-              <Button onClick={() => { setIsSuggestModalOpen(true); }} variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/20 hover:text-white font-orbitron flex-1 py-3 text-base transform hover:scale-105 transition-transform">
-                <VibeContentRenderer content="<FaCirclePlus className='mr-2 align-middle text-lg'/> ПРЕДЛОЖИТЬ ПРОТОКОЛ" />
+              <Button onClick={() => { setIsSuggestModalOpen(true); }} variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/20 hover:text-white font-orbitron flex-1 py-3 text-base transform hover:scale-105 transition-transform flex items-center justify-center">
+                <FaCirclePlus className='mr-2 align-middle text-lg'/> <span>ПРЕДЛОЖИТЬ ПРОТОКОЛ</span>
               </Button>
-              <Button onClick={() => { setIsLogModalOpen(true); }} variant="outline" className="border-brand-purple text-brand-purple hover:bg-brand-purple/20 hover:text-white font-orbitron flex-1 py-3 text-base transform hover:scale-105 transition-transform">
-                <VibeContentRenderer content="<FaListCheck className='mr-2 align-middle text-lg'/> АКТИВИРОВАТЬ & ЛОГИРОВАТЬ" />
+              <Button onClick={() => { setIsLogModalOpen(true); }} variant="outline" className="border-brand-purple text-brand-purple hover:bg-brand-purple/20 hover:text-white font-orbitron flex-1 py-3 text-base transform hover:scale-105 transition-transform flex items-center justify-center">
+                <FaListCheck className='mr-2 align-middle text-lg'/> <span>АКТИВИРОВАТЬ & ЛОГИРОВАТЬ</span>
               </Button>
             </section>
           </CardContent>
