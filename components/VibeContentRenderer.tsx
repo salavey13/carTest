@@ -2067,34 +2067,27 @@ function preprocessIconSyntax(content: string): string {
 // Robust Parser Options - Centralized Logic
 const robustParserOptions: HTMLReactParserOptions = {
     replace: (domNode) => {
-        if (domNode.type === 'text') { // Let text nodes be handled by the parser by default
+        // Handle text nodes: let the parser render them by default.
+        if (domNode.type === 'text') { 
             return undefined;
         }
 
         if (domNode instanceof Element && domNode.attribs) {
             const { name, attribs, children } = domNode;
-            const mutableAttribs = { ...attributesToProps(attribs) }; // Converts HTML attribs to React props (e.g. class to className)
+            // Convert HTML attributes to React props (e.g., class to className, style string to object)
+            // This is a crucial first step.
+            const mutableAttribs = attributesToProps(attribs); 
             let lowerCaseName = name?.toLowerCase();
 
-            // Handle cases where 'class' might come as 'classname' from attributesToProps or direct HTML
-            if (mutableAttribs.hasOwnProperty('classname')) {
-                mutableAttribs.className = mutableAttribs.classname;
-                delete mutableAttribs.classname;
-            }
-            if (mutableAttribs.hasOwnProperty('class') && !mutableAttribs.hasOwnProperty('className')) {
-                 mutableAttribs.className = mutableAttribs.class;
-                 delete mutableAttribs.class;
-            }
-
-
             try {
-                // --- Icon Handling (Use Map Lookup) ---
+                // --- Icon Handling ---
                 if (lowerCaseName?.startsWith('fa')) {
                     const correctPascalCaseName = iconNameMap[lowerCaseName];
                     if (correctPascalCaseName && isValidFa6Icon(correctPascalCaseName)) {
                          const IconComponent = Fa6Icons[correctPascalCaseName];
                          try {
-                            const { className, style, ...restProps } = mutableAttribs; // className should be correct now
+                            // mutableAttribs already has 'className' if 'class' was in HTML
+                            const { className, style, ...restProps } = mutableAttribs; 
                             
                             const safeProps = Object.entries(restProps).reduce((acc, [key, value]) => {
                                 if (key.startsWith('aria-') || key.startsWith('data-') || key === 'title' || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
@@ -2107,39 +2100,24 @@ const robustParserOptions: HTMLReactParserOptions = {
                             const finalProps: Record<string, any> = {
                                 ...safeProps,
                                 className: `${className || ''} inline align-baseline mx-px`.trim(),
+                                style: style, // Style is already an object from attributesToProps if it was a string
                             };
-                            if (typeof style === 'string') {
-                               try {
-                                  const styleObject = style.split(';').reduce((acc, stylePart) => {
-                                    const [key, value] = stylePart.split(':');
-                                    if (key && value) {
-                                      const camelCaseKey = key.trim().replace(/-([a-z])/g, (g) => g[1].toUpperCase());
-                                      acc[camelCaseKey] = value.trim();
-                                    }
-                                    return acc;
-                                  }, {} as React.CSSProperties);
-                                  finalProps.style = styleObject;
-                                } catch (styleParseError){ logger.error(`[VibeContentRenderer] Error parsing inline style string for <${lowerCaseName}>:`, style, styleParseError); }
-                            } else if (typeof style === 'object' && style !== null) { finalProps.style = style; }
-
                             return React.createElement(IconComponent, finalProps, parsedChildren);
                          } catch (iconRenderError: any) {
-                            logger.error(`[VibeContentRenderer] Error rendering icon <${correctPascalCaseName}> via map!`, iconRenderError, { attribs: mutableAttribs });
-                            return <span title={`Error rendering icon: ${correctPascalCaseName}`} className="text-red-500 font-bold">[ICON ERR!]</span>;
+                            logger.error(`[VCR] Icon Render Err <${correctPascalCaseName}>:`, iconRenderError, { mutableAttribs });
+                            return <span title={`Err: ${correctPascalCaseName}`} className="text-red-500">[ICON!]</span>;
                          }
                     } else {
-                        logger.warn(`[VibeContentRenderer] Unknown/Invalid icon tag: <${name}> (lc: <${lowerCaseName}>). Not in map. Attribs:`, mutableAttribs);
-                        return <span title={`Unknown icon: ${name}`} className="text-yellow-500 font-bold">[?]</span>;
+                        logger.warn(`[VCR] Unknown Icon: <${name}> (lc: <${lowerCaseName}>). Attribs:`, mutableAttribs);
+                        return <span title={`Unknown: ${name}`} className="text-yellow-500">[?]</span>;
                     }
                 }
-                // --- End Icon Handling ---
-
                 // --- Link Handling ---
                 if (lowerCaseName === 'a') {
-                    const isInternal = mutableAttribs.href && (mutableAttribs.href.startsWith('/') || mutableAttribs.href.startsWith('#'));
+                    const isInternal = mutableAttribs.href && (typeof mutableAttribs.href === 'string' && (mutableAttribs.href.startsWith('/') || mutableAttribs.href.startsWith('#')));
                     const parsedChildren = children ? domToReact(children, robustParserOptions) : null;
                     
-                    let linkClassName = mutableAttribs.className || ''; // className should be correct from attributesToProps
+                    let linkClassName = mutableAttribs.className || '';
                     mutableAttribs.className = `${linkClassName} mx-1 px-0.5`.trim();
 
                     if (isInternal && !mutableAttribs.target && mutableAttribs.href) {
@@ -2147,38 +2125,26 @@ const robustParserOptions: HTMLReactParserOptions = {
                            const { href, className: finalLinkClassName, style: linkStyle, title: linkTitle, ...restLinkProps } = mutableAttribs;
                            return <Link href={href as string} className={finalLinkClassName as string} style={linkStyle as React.CSSProperties} title={linkTitle as string} {...restLinkProps}>{parsedChildren}</Link>;
                         } catch (linkError) {
-                            logger.error("[VibeContentRenderer] Error creating Next Link:", linkError, mutableAttribs);
+                            logger.error("[VCR] Next Link Err:", linkError, mutableAttribs);
                             return React.createElement('a', mutableAttribs, parsedChildren); 
                         }
                     } else {
                          return React.createElement('a', mutableAttribs, parsedChildren);
                     }
                 }
-                // --- End Link Handling ---
-
                 // --- Standard HTML Elements ---
-                const knownTags = /^(p|div|span|ul|ol|li|h[1-6]|strong|em|b|i|u|s|code|pre|blockquote|hr|br|img|table|thead|tbody|tr|th|td)$/;
-                if (typeof lowerCaseName === 'string' && knownTags.test(lowerCaseName)) {
-                   // mutableAttribs already has 'className' from attributesToProps if 'class' was present
-                   // No need to convert 'class' to 'className' again here.
-                   // We just need to pass the react-ified props to a new element OR return undefined if we want default handling.
-                   
-                   // For standard tags, we mostly want html-react-parser to do its default thing.
-                   // If we've modified attributes (like converting class to className, or style string to object),
-                   // we need to ensure those modified attributes are on the domNode if we return undefined.
-                   // However, attributesToProps already gives us React-style props.
-                   // So, if we are not creating a custom React element, we let the parser handle it.
-                   // The crucial part is returning undefined for default processing of the tag and its children.
-                   return undefined; 
-               }
-                // --- End Standard HTML Elements ---
+                // For standard HTML elements, we generally want html-react-parser to handle them.
+                // attributesToProps already converted 'class' to 'className' and 'style' string to object.
+                // So, we return undefined to let the default parsing continue for the element and its children.
+                return undefined; 
 
             } catch (replaceError: any) {
-                 logger.error("[VibeContentRenderer] Error in replace function:", replaceError, { name, attribs });
-                 return <span title={`Error processing element: ${name}`} className="text-red-500">[PROCESS ERR]</span>;
+                 logger.error("[VCR] Replace Err:", replaceError, { name, attribs });
+                 return <span title={`Process Err: ${name}`} className="text-red-500">[ERR]</span>;
             }
         }
-        return undefined; // Default for other node types or if not an Element with attribs
+        // For any other node type not handled above, let the parser do its default action.
+        return undefined; 
     },
 };
 
@@ -2199,10 +2165,10 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
       if (className) {
         return <div className={className}>{parsedContent}</div>;
       }
-      return <>{parsedContent}</>; // Return as fragment if no wrapper class needed
+      return <>{parsedContent}</>;
 
     } catch (error) {
-      logger.error("[VibeContentRenderer] Error during parse:", error, "Input:", content);
+      logger.error("[VCR] Parse Err:", error, "Input:", content);
       const ErrorSpan = () => <span className="text-red-500">[Parse Error]</span>;
       if (className) {
         return <div className={className}><ErrorSpan /></div>;
