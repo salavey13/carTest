@@ -1,10 +1,8 @@
-"use client"; // Added "use client" as it uses hooks like useAppToast
+"use client"; 
 import { supabaseAdmin, createAuthenticatedClient } from './supabase';
 import type { Database } from "@/types/database.types";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { format } from 'date-fns';
-// Removed useAppToast import as it's a hook and can't be used in non-component files directly.
-// If toasts are needed here, they should be passed as arguments or handled by the calling component.
 
 type DbUser = Database["public"]["Tables"]["users"]["Row"];
 type UserMetadata = DbUser['metadata'];
@@ -19,29 +17,29 @@ export interface DailyActivityRecord {
 }
 
 export interface CyberFitnessProfile {
-  level?: number;
-  kiloVibes?: number;
-  focusTimeHours?: number;
-  skillsLeveled?: number;
-  activeQuests?: string[];
-  completedQuests?: string[];
-  unlockedPerks?: string[];
-  achievements?: string[]; 
-  cognitiveOSVersion?: string;
-  lastActivityTimestamp?: string;
-  dailyActivityLog?: DailyActivityRecord[];
-  totalFilesExtracted?: number;
-  totalTokensProcessed?: number;
-  totalKworkRequestsSent?: number;
-  totalPrsCreated?: number;
-  totalBranchesUpdated?: number;
-  featuresUsed?: Record<string, boolean | number>; 
+  level: number; // Defaulted to 0
+  kiloVibes: number; // Defaulted to 0
+  focusTimeHours: number; // Defaulted to 0
+  skillsLeveled: number; // Defaulted to 0
+  activeQuests: string[]; // Defaulted to []
+  completedQuests: string[]; // Defaulted to []
+  unlockedPerks: string[]; // Defaulted to []
+  achievements: string[]; 
+  cognitiveOSVersion: string; // Defaulted
+  lastActivityTimestamp: string; // Defaulted
+  dailyActivityLog: DailyActivityRecord[];
+  totalFilesExtracted: number; // Defaulted to 0
+  totalTokensProcessed: number; // Defaulted to 0
+  totalKworkRequestsSent: number; // Defaulted to 0
+  totalPrsCreated: number; // Defaulted to 0
+  totalBranchesUpdated: number; // Defaulted to 0
+  featuresUsed: Record<string, boolean | number>; 
 }
 
 const CYBERFIT_METADATA_KEY = "cyberFitness";
 const MAX_DAILY_LOG_ENTRIES = 7;
 
-export interface Achievement { // Exporting Achievement type
+export interface Achievement { 
     id: string;
     name: string;
     description: string;
@@ -49,7 +47,6 @@ export interface Achievement { // Exporting Achievement type
     checkCondition: (profile: CyberFitnessProfile) => boolean;
 }
 
-// Exporting ALL_ACHIEVEMENTS to be accessible by other modules if needed for UI, etc.
 export const ALL_ACHIEVEMENTS: Achievement[] = [
     { id: "first_blood", name: "Первая Кровь", description: "Первая залогированная активность в CyberFitness.", icon: "FaVial", checkCondition: (p) => (p.dailyActivityLog?.length ?? 0) > 0 || (p.totalFilesExtracted ?? 0) > 0 || (p.totalTokensProcessed ?? 0) > 0 || (p.totalKworkRequestsSent ?? 0) > 0 },
     { id: "prompt_engineer_1", name: "Инженер Промптов I", description: "Отправлено 10 запросов к AI.", icon: "FaPaperPlane", checkCondition: (p) => (p.totalKworkRequestsSent ?? 0) >= 10 },
@@ -63,15 +60,15 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
 
 const getCyberFitnessProfile = (metadata: UserMetadata | null | undefined): CyberFitnessProfile => {
   const defaultProfile: CyberFitnessProfile = { 
-      level: 0, // Initialize level
-      kiloVibes: 0, // Initialize kiloVibes
+      level: 0,
+      kiloVibes: 0,
       focusTimeHours: 0,
       skillsLeveled: 0,
       activeQuests: [],
       completedQuests: [],
       unlockedPerks: [],
-      cognitiveOSVersion: "v0.1 Initializing",
-      lastActivityTimestamp: new Date(0).toISOString(), // Use a very old date for initial
+      cognitiveOSVersion: "v0.1 Genesis", // More thematic default
+      lastActivityTimestamp: new Date(0).toISOString(), 
       dailyActivityLog: [], 
       achievements: [],
       totalFilesExtracted: 0,
@@ -83,19 +80,28 @@ const getCyberFitnessProfile = (metadata: UserMetadata | null | undefined): Cybe
   };
   if (metadata && typeof metadata === 'object' && metadata[CYBERFIT_METADATA_KEY] && typeof metadata[CYBERFIT_METADATA_KEY] === 'object') {
     const existingProfile = metadata[CYBERFIT_METADATA_KEY] as Partial<CyberFitnessProfile>;
-    // Ensure all fields from defaultProfile are present if missing in existingProfile
     return {
-        ...defaultProfile,
-        ...existingProfile,
+        ...defaultProfile, // Start with defaults
+        ...existingProfile, // Override with existing data
+        // Ensure arrays and objects are initialized if they were missing in existingProfile
         dailyActivityLog: Array.isArray(existingProfile.dailyActivityLog) ? existingProfile.dailyActivityLog : defaultProfile.dailyActivityLog,
         achievements: Array.isArray(existingProfile.achievements) ? existingProfile.achievements : defaultProfile.achievements,
+        activeQuests: Array.isArray(existingProfile.activeQuests) ? existingProfile.activeQuests : defaultProfile.activeQuests,
+        completedQuests: Array.isArray(existingProfile.completedQuests) ? existingProfile.completedQuests : defaultProfile.completedQuests,
+        unlockedPerks: Array.isArray(existingProfile.unlockedPerks) ? existingProfile.unlockedPerks : defaultProfile.unlockedPerks,
         featuresUsed: typeof existingProfile.featuresUsed === 'object' && existingProfile.featuresUsed !== null ? existingProfile.featuresUsed : defaultProfile.featuresUsed,
-        // Ensure cumulative counters are numbers
-        totalFilesExtracted: typeof existingProfile.totalFilesExtracted === 'number' ? existingProfile.totalFilesExtracted : 0,
-        totalTokensProcessed: typeof existingProfile.totalTokensProcessed === 'number' ? existingProfile.totalTokensProcessed : 0,
-        totalKworkRequestsSent: typeof existingProfile.totalKworkRequestsSent === 'number' ? existingProfile.totalKworkRequestsSent : 0,
-        totalPrsCreated: typeof existingProfile.totalPrsCreated === 'number' ? existingProfile.totalPrsCreated : 0,
-        totalBranchesUpdated: typeof existingProfile.totalBranchesUpdated === 'number' ? existingProfile.totalBranchesUpdated : 0,
+        // Ensure all numeric fields have a fallback to their default (usually 0)
+        level: typeof existingProfile.level === 'number' ? existingProfile.level : defaultProfile.level,
+        kiloVibes: typeof existingProfile.kiloVibes === 'number' ? existingProfile.kiloVibes : defaultProfile.kiloVibes,
+        focusTimeHours: typeof existingProfile.focusTimeHours === 'number' ? existingProfile.focusTimeHours : defaultProfile.focusTimeHours,
+        skillsLeveled: typeof existingProfile.skillsLeveled === 'number' ? existingProfile.skillsLeveled : defaultProfile.skillsLeveled,
+        totalFilesExtracted: typeof existingProfile.totalFilesExtracted === 'number' ? existingProfile.totalFilesExtracted : defaultProfile.totalFilesExtracted,
+        totalTokensProcessed: typeof existingProfile.totalTokensProcessed === 'number' ? existingProfile.totalTokensProcessed : defaultProfile.totalTokensProcessed,
+        totalKworkRequestsSent: typeof existingProfile.totalKworkRequestsSent === 'number' ? existingProfile.totalKworkRequestsSent : defaultProfile.totalKworkRequestsSent,
+        totalPrsCreated: typeof existingProfile.totalPrsCreated === 'number' ? existingProfile.totalPrsCreated : defaultProfile.totalPrsCreated,
+        totalBranchesUpdated: typeof existingProfile.totalBranchesUpdated === 'number' ? existingProfile.totalBranchesUpdated : defaultProfile.totalBranchesUpdated,
+        cognitiveOSVersion: typeof existingProfile.cognitiveOSVersion === 'string' ? existingProfile.cognitiveOSVersion : defaultProfile.cognitiveOSVersion,
+        lastActivityTimestamp: typeof existingProfile.lastActivityTimestamp === 'string' ? existingProfile.lastActivityTimestamp : defaultProfile.lastActivityTimestamp,
     };
   }
   return defaultProfile;
@@ -156,29 +162,31 @@ export const updateUserCyberFitnessProfile = async (
     const existingOverallMetadata = currentUserData.metadata || {};
     let existingCyberFitnessProfile = getCyberFitnessProfile(existingOverallMetadata);
 
-    // Merge updates into the cyberFitness profile
+    // Carefully merge updates, ensuring cumulative fields are incremented, not overwritten
     const newCyberFitnessProfile: CyberFitnessProfile = {
       ...existingCyberFitnessProfile, // Start with the full existing profile (with defaults)
-      ...updates,                   // Apply incoming updates
       lastActivityTimestamp: new Date().toISOString(), // Always update timestamp
     };
 
-    // Specific handling for arrays and objects to ensure proper merging, not replacement
-    if (updates.dailyActivityLog) newCyberFitnessProfile.dailyActivityLog = updates.dailyActivityLog; // If updates provide full log, use it
-    if (updates.achievements) newCyberFitnessProfile.achievements = Array.from(new Set([...(existingCyberFitnessProfile.achievements || []), ...updates.achievements])); // Merge achievements
-    if (updates.featuresUsed) newCyberFitnessProfile.featuresUsed = {...existingCyberFitnessProfile.featuresUsed, ...updates.featuresUsed};
+    // Apply non-cumulative updates
+    if (updates.level !== undefined) newCyberFitnessProfile.level = updates.level;
+    if (updates.kiloVibes !== undefined) newCyberFitnessProfile.kiloVibes = (existingCyberFitnessProfile.kiloVibes || 0) + updates.kiloVibes; // Increment
+    if (updates.focusTimeHours !== undefined) newCyberFitnessProfile.focusTimeHours = (existingCyberFitnessProfile.focusTimeHours || 0) + updates.focusTimeHours; // Increment
+    if (updates.skillsLeveled !== undefined) newCyberFitnessProfile.skillsLeveled = (existingCyberFitnessProfile.skillsLeveled || 0) + updates.skillsLeveled; // Increment
+
     if (updates.activeQuests) newCyberFitnessProfile.activeQuests = Array.from(new Set([...(existingCyberFitnessProfile.activeQuests || []), ...updates.activeQuests]));
     if (updates.completedQuests) newCyberFitnessProfile.completedQuests = Array.from(new Set([...(existingCyberFitnessProfile.completedQuests || []), ...updates.completedQuests]));
     if (updates.unlockedPerks) newCyberFitnessProfile.unlockedPerks = Array.from(new Set([...(existingCyberFitnessProfile.unlockedPerks || []), ...updates.unlockedPerks]));
+    if (updates.cognitiveOSVersion) newCyberFitnessProfile.cognitiveOSVersion = updates.cognitiveOSVersion;
+    if (updates.dailyActivityLog) newCyberFitnessProfile.dailyActivityLog = updates.dailyActivityLog; 
+    if (updates.featuresUsed) newCyberFitnessProfile.featuresUsed = {...existingCyberFitnessProfile.featuresUsed, ...updates.featuresUsed};
     
-    // Ensure cumulative counters are correctly incremented if they are part of `updates`
-    // (This should ideally be handled by logCyberFitnessAction, but as a safeguard:)
+    // Increment cumulative counters passed in `updates`
     if (typeof updates.totalFilesExtracted === 'number') newCyberFitnessProfile.totalFilesExtracted = (existingCyberFitnessProfile.totalFilesExtracted || 0) + updates.totalFilesExtracted;
     if (typeof updates.totalTokensProcessed === 'number') newCyberFitnessProfile.totalTokensProcessed = (existingCyberFitnessProfile.totalTokensProcessed || 0) + updates.totalTokensProcessed;
     if (typeof updates.totalKworkRequestsSent === 'number') newCyberFitnessProfile.totalKworkRequestsSent = (existingCyberFitnessProfile.totalKworkRequestsSent || 0) + updates.totalKworkRequestsSent;
     if (typeof updates.totalPrsCreated === 'number') newCyberFitnessProfile.totalPrsCreated = (existingCyberFitnessProfile.totalPrsCreated || 0) + updates.totalPrsCreated;
     if (typeof updates.totalBranchesUpdated === 'number') newCyberFitnessProfile.totalBranchesUpdated = (existingCyberFitnessProfile.totalBranchesUpdated || 0) + updates.totalBranchesUpdated;
-
 
     // Check for new achievements based on the fully merged profile
     const newlyUnlockedAchievements: Achievement[] = [];
@@ -189,7 +197,7 @@ export const updateUserCyberFitnessProfile = async (
             newlyUnlockedAchievements.push(ach);
         }
     }
-    newCyberFitnessProfile.achievements = Array.from(currentAchievements); // Update achievements list
+    newCyberFitnessProfile.achievements = Array.from(currentAchievements);
 
     if (newlyUnlockedAchievements.length > 0) {
         logger.info(`[CyberFitness] User ${userId} unlocked new achievements:`, newlyUnlockedAchievements.map(a => a.name));
@@ -204,7 +212,7 @@ export const updateUserCyberFitnessProfile = async (
       .from("users")
       .update({ metadata: newOverallMetadata, updated_at: new Date().toISOString() })
       .eq("user_id", userId)
-      .select("*, metadata") // Ensure metadata is returned
+      .select("*, metadata") 
       .single();
 
     if (updateError) {
@@ -234,7 +242,12 @@ export const logCyberFitnessAction = async (
   if (typeof countOrDetails === 'number') {
       count = countOrDetails;
   }
-  if (count < 0 && actionType !== 'featureUsed') return { success: false, error: "Count must be non-negative." };
+  // Allow negative counts for tokensProcessed if, for example, an action is undone (though not implemented)
+  // For others, ensure non-negative
+  if (count < 0 && actionType !== 'featureUsed' && actionType !== 'tokensProcessed') {
+      return { success: false, error: "Count must be non-negative for this action type." };
+  }
+
 
   logger.log(`[CyberFitness] Logging action for user ${userId}: ${actionType}, value:`, countOrDetails);
 
@@ -244,7 +257,7 @@ export const logCyberFitnessAction = async (
       return { success: false, error: profileResult.error || "Failed to fetch current profile." };
     }
     
-    let currentProfile = profileResult.data; // This is a complete profile with defaults
+    let currentProfile = profileResult.data; 
     let dailyLog = currentProfile.dailyActivityLog ? [...currentProfile.dailyActivityLog] : [];
     const todayStr = format(new Date(), 'yyyy-MM-dd');
 
@@ -255,9 +268,8 @@ export const logCyberFitnessAction = async (
       dailyLog.push(todayEntry);
     }
     
-    // Prepare updates object
     const profileUpdates: Partial<CyberFitnessProfile> = {
-        featuresUsed: { ...currentProfile.featuresUsed } // Start with existing featuresUsed
+        featuresUsed: { ...currentProfile.featuresUsed } 
     };
 
     // Update daily log entry
@@ -267,8 +279,8 @@ export const logCyberFitnessAction = async (
     else if (actionType === 'prCreated' && typeof countOrDetails === 'number') todayEntry.prsCreated = (todayEntry.prsCreated || 0) + countOrDetails;
     else if (actionType === 'branchUpdated' && typeof countOrDetails === 'number') todayEntry.branchesUpdated = (todayEntry.branchesUpdated || 0) + countOrDetails;
 
-    // Update cumulative counters in the profileUpdates object
-    if (actionType === 'filesExtracted' && typeof countOrDetails === 'number') profileUpdates.totalFilesExtracted = countOrDetails; // Pass delta for updateUser to handle
+    // Pass DELTAs for cumulative counters to updateUserCyberFitnessProfile
+    if (actionType === 'filesExtracted' && typeof countOrDetails === 'number') profileUpdates.totalFilesExtracted = countOrDetails;
     if (actionType === 'tokensProcessed' && typeof countOrDetails === 'number') profileUpdates.totalTokensProcessed = countOrDetails;
     if (actionType === 'kworkRequestSent' && typeof countOrDetails === 'number') profileUpdates.totalKworkRequestsSent = countOrDetails;
     if (actionType === 'prCreated' && typeof countOrDetails === 'number') profileUpdates.totalPrsCreated = countOrDetails;
@@ -278,15 +290,12 @@ export const logCyberFitnessAction = async (
         profileUpdates.featuresUsed![countOrDetails.featureName] = true;
     }
 
-    // Sort and trim dailyLog
-    dailyLog.sort((a, b) => b.date.localeCompare(a.date)); // Sort by date descending
+    dailyLog.sort((a, b) => b.date.localeCompare(a.date)); 
     if (dailyLog.length > MAX_DAILY_LOG_ENTRIES) {
       dailyLog = dailyLog.slice(0, MAX_DAILY_LOG_ENTRIES);
     }
     profileUpdates.dailyActivityLog = dailyLog;
 
-    // Pass the collected updates to updateUserCyberFitnessProfile
-    // It will handle merging cumulative counters correctly and achievement checking.
     const updateResult = await updateUserCyberFitnessProfile(userId, profileUpdates);
     
     if (!updateResult.success) {
@@ -308,8 +317,6 @@ export const checkAndUnlockFeatureAchievement = async (
 ): Promise<{ success: boolean; newAchievements?: Achievement[], error?: string }> => {
     if (!userId || !featureName) return { success: false, error: "User ID and feature name required."};
     logger.log(`[CyberFitness] Checking feature achievement for user ${userId}, feature: ${featureName}`);
-    
-    // This will fetch the profile, set the feature as used, and then updateUser... will check all achievements
     return logCyberFitnessAction(userId, 'featureUsed', { featureName });
 };
 
@@ -329,17 +336,17 @@ export const completeQuestAndUpdateProfile = async (
   const currentProfile = currentProfileResult.data;
 
   const updates: Partial<CyberFitnessProfile> = {
-    kiloVibes: (currentProfile.kiloVibes || 0) + kiloVibesAwarded, // Correctly increment KiloVibes
-    completedQuests: [questId], // Pass as delta for updateUserCyberFitnessProfile to merge
-    activeQuests: (currentProfile.activeQuests || []).filter(q => q !== questId), // Remove from active
+    kiloVibes: kiloVibesAwarded, // Pass delta to updateUser...
+    completedQuests: [questId], 
+    activeQuests: (currentProfile.activeQuests || []).filter(q => q !== questId), 
   };
 
   if (newLevel !== undefined && newLevel > (currentProfile.level || 0)) {
-    updates.level = newLevel;
+    updates.level = newLevel; // Pass the new level directly
     logger.log(`[CyberFitness] User ${userId} leveled up to ${newLevel}!`);
   }
   if (newPerks && newPerks.length > 0) {
-    updates.unlockedPerks = newPerks; // Pass as delta for updateUserCyberFitnessProfile to merge
+    updates.unlockedPerks = newPerks; 
     logger.log(`[CyberFitness] User ${userId} unlocked perks:`, newPerks);
   }
   
@@ -352,7 +359,7 @@ export const setCognitiveOSVersion = async (userId: string, version: string): Pr
 
 export const getUserCyberLevel = async (userId: string): Promise<{ success: boolean; level?: number; error?: string }> => {
   const profileResult = await fetchUserCyberFitnessProfile(userId);
-  if (!profileResult.success || typeof profileResult.data?.level !== 'number') { // check data.level explicitly
+  if (!profileResult.success || typeof profileResult.data?.level !== 'number') { 
     return { success: false, level: 0, error: profileResult.error || "Level not found" };
   }
   return { success: true, level: profileResult.data.level };

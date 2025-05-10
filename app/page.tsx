@@ -66,12 +66,29 @@ export default function Home() {
           logger.log("Home: CyberFitness profile loaded:", result.data);
         } else {
           logger.warn(`Home: Failed to load CyberFitness profile for ${dbUser.id}. Error: ${result.error}. Initializing default.`);
-          setCyberProfile({ level: 0, kiloVibes: 0, weeklyActivity: [...DEFAULT_WEEKLY_ACTIVITY], cognitiveOSVersion: "v0.1 Alpha" });
+          // Initialize with defaults from CyberFitnessProfile type for consistency
+          setCyberProfile({ 
+            level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
+            activeQuests: [], completedQuests: [], unlockedPerks: [],
+            achievements: [], cognitiveOSVersion: "v0.1 Alpha", 
+            lastActivityTimestamp: new Date(0).toISOString(),
+            dailyActivityLog: [...DEFAULT_WEEKLY_ACTIVITY], // Assuming DEFAULT_WEEKLY_ACTIVITY matches DailyActivityRecord structure (it doesn't fully)
+            totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0,
+            totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {}
+          });
         }
         setProfileLoading(false);
       } else if (!appLoading) { 
         setProfileLoading(false);
-        setCyberProfile({ level: 0, kiloVibes: 0, weeklyActivity: [...DEFAULT_WEEKLY_ACTIVITY], cognitiveOSVersion: "v0.1 Guest Mode"});
+        setCyberProfile({ 
+            level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
+            activeQuests: [], completedQuests: [], unlockedPerks: [],
+            achievements: [], cognitiveOSVersion: "v0.1 Guest Mode", 
+            lastActivityTimestamp: new Date(0).toISOString(),
+            dailyActivityLog: [...DEFAULT_WEEKLY_ACTIVITY], // Same assumption as above
+            totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0,
+            totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {}
+        });
         logger.log("Home: No dbUser ID, using default/guest CyberFitness profile.");
       }
     };
@@ -115,9 +132,13 @@ export default function Home() {
     );
   }
 
-  const displayWeeklyActivity = cyberProfile?.weeklyActivity && cyberProfile.weeklyActivity.length > 0
-                                  ? cyberProfile.weeklyActivity
-                                  : DEFAULT_WEEKLY_ACTIVITY;
+  // Ensure weeklyActivity structure matches BarChart expectations
+  const chartReadyWeeklyActivity = (cyberProfile?.dailyActivityLog && cyberProfile.dailyActivityLog.length > 0 
+    ? cyberProfile.dailyActivityLog.map(d => ({ name: format(new Date(d.date), 'EEE', {locale: ru}).substring(0,2).toUpperCase(), value: d.kworkRequestsSent || 0, label: `${d.kworkRequestsSent || 0} req` }))
+    : DEFAULT_WEEKLY_ACTIVITY
+  ).slice(0,7); // Ensure only 7 days for chart
+
+
   const totalKiloVibes = cyberProfile?.kiloVibes || 0;
   const focusTimeHours = cyberProfile?.focusTimeHours || 0;
   const skillsLeveled = cyberProfile?.skillsLeveled || 0;
@@ -222,11 +243,11 @@ export default function Home() {
             <CardContent className="px-1 pb-2 pt-2 md:px-2 md:pb-3"> 
               <div className="h-[70px] sm:h-[90px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={displayWeeklyActivity} margin={{ top: 10, right: 5, left: 5, bottom: 0 }}>
+                  <BarChart data={chartReadyWeeklyActivity} margin={{ top: 10, right: 5, left: 5, bottom: 0 }}>
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'rgba(0,0,0,0.85)', fontWeight: 700 }} dy={4}/>
                     <YAxis hide={true} domain={[0, 'dataMax + 500']} />
                     <Bar dataKey="value" radius={[2, 2, 0, 0]} barSize={18} minPointSize={2}>
-                      {displayWeeklyActivity.map((entry, index) => (
+                      {chartReadyWeeklyActivity.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} fillOpacity={0.85}/>
                       ))}
                     </Bar>
