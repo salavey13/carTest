@@ -2,19 +2,18 @@
 import { useState, useEffect } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { sendTelegramInvoice } from "@/app/actions";
-import { createInvoice, getUserSubscription } from "@/hooks/supabase";
+import { createInvoice } from "@/hooks/supabase"; // Removed getUserSubscription, handled by dbUser
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button"; // Added import for Button
-import { FaBrain, FaBolt, FaMicrochip, FaRocket, FaUserNinja, FaStar } from "react-icons/fa"; // Removed FaLockOpen as it's not Fa6
-import { FaShieldHalved, FaInfinity, FaUsers } from "react-icons/fa6"; 
+import { Button } from "@/components/ui/button";
+import { FaBrain, FaBolt, FaMicrochip, FaRocket, FaUserNinja, FaStar, FaShieldHalved, FaInfinity, FaUsers } from "react-icons/fa6"; 
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 
 const SUBSCRIPTION_PLANS = [
   {
     id: "basic_neural_net",
     name: "Basic Neural Net",
-    price: 0, // Assuming a free/basic tier
+    price: 0, 
     xtrPrice: "0 XTR",
     features: [
       "<FaBrain className='text-brand-cyan'/> Доступ к CyberDev OS (Lvl 0-1)",
@@ -24,7 +23,6 @@ const SUBSCRIPTION_PLANS = [
     color: "from-gray-700/50 to-gray-800/50 border-gray-600",
     icon: <FaBrain className="inline mr-2 text-brand-cyan" />,
     cta: "Текущий Уровень",
-    isCurrent: true, // Example, logic needed
   },
   {
     id: "epu_tier",
@@ -55,7 +53,7 @@ const SUBSCRIPTION_PLANS = [
       "<FaStar className='text-neon-lime'/> Эксклюзивные Vibe Perks & Альфа-дропы",
     ],
     color: "from-brand-purple/80 to-brand-pink/80 border-brand-purple",
-    icon: <FaBolt className="inline mr-2 text-brand-yellow" />,
+    icon: <FaBolt className="inline mr-2 text-brand-yellow" />, // Changed to FaBolt for variety
     cta: "Активировать QBI"
   },
 ];
@@ -66,25 +64,16 @@ export default function BuySubscriptionPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeSubscriptionId, setActiveSubscriptionId] = useState<string | null>(null);
+  const [activeSubscriptionId, setActiveSubscriptionId] = useState<string>("basic_neural_net"); // Default to basic
 
   useEffect(() => {
-    const checkSubscription = async () => {
-      if (dbUser?.id) {
-        // Assuming subscription_id on dbUser stores the ID like "epu_tier" or "qbi_tier"
-        const currentSubId = dbUser.subscription_id as string | null;
-        if (currentSubId && SUBSCRIPTION_PLANS.find(s => s.id === currentSubId && s.id !== "basic_neural_net")) {
-          setActiveSubscriptionId(currentSubId);
-          const currentSub = SUBSCRIPTION_PLANS.find(s => s.id === currentSubId);
-          toast.success(`Активна подписка: "${currentSub?.name}"`);
-        } else {
-          setActiveSubscriptionId("basic_neural_net"); // Default to basic if no premium active
-        }
-      } else {
-        setActiveSubscriptionId("basic_neural_net"); // Default for non-logged-in users
-      }
-    };
-    checkSubscription();
+    if (dbUser?.subscription_id && SUBSCRIPTION_PLANS.find(s => s.id === dbUser.subscription_id)) {
+      setActiveSubscriptionId(dbUser.subscription_id as string);
+      // No toast here to avoid spamming on every load if already subscribed. 
+      // Toast can be shown when subscription state *changes*.
+    } else {
+      setActiveSubscriptionId("basic_neural_net");
+    }
   }, [dbUser]);
 
   const handlePurchase = async () => {
@@ -96,11 +85,12 @@ export default function BuySubscriptionPage() {
     setError(null);
     setSuccess(false);
 
-    if (!isInTelegramContext) {
+    if (!isInTelegramContext && process.env.NODE_ENV === 'development') { // Demo mode only in dev
       toast.success(`Демо-режим: Счет для "${selectedSubscription.name}" создан!`);
       setLoading(false);
       setSuccess(true);
-      setActiveSubscriptionId(selectedSubscription.id); // Simulate activation
+      setActiveSubscriptionId(selectedSubscription.id); 
+      // In a real scenario, you'd update dbUser context or re-fetch
       return;
     }
 
@@ -130,7 +120,7 @@ export default function BuySubscriptionPage() {
       const response = await sendTelegramInvoice(
         user.id.toString(),
         `Апгрейд CyberDev OS: ${selectedSubscription.name}`,
-        `Разблокируй ${selectedSubscription.name} для доступа к: ${selectedSubscription.features.map((f: string) => f.replace(/<[^>]*>/g, '')).join(', ')}.`,
+        `Разблокируй ${selectedSubscription.name} для доступа к: ${selectedSubscription.features.map((f: string) => f.replace(/<Fa\w+\s*className='[^']*'\s*\/>\s*/, '')).join(', ')}.`, // Clean feature text
         payload,
         selectedSubscription.price
       );
@@ -177,7 +167,8 @@ export default function BuySubscriptionPage() {
                 <ul className="space-y-1.5 mb-4 text-left max-w-md mx-auto text-sm">
                     {activePlan.features.map((feature: string, i: number) => (
                       <li key={i} className="text-gray-200 font-mono flex items-start gap-2">
-                        <VibeContentRenderer content={feature.replace(/className='[^']*'/, "className='text-xl text-current'")} />
+                         {/* Ensure VibeContentRenderer handles the string directly and applies necessary styling via its own logic if needed */}
+                        <VibeContentRenderer content={feature.replace(/className='[^']*'/, "className='text-xl text-current mr-1 align-middle'")} />
                       </li>
                     ))}
                 </ul>
@@ -192,8 +183,8 @@ export default function BuySubscriptionPage() {
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: SUBSCRIPTION_PLANS.indexOf(sub) * 0.1 }}
-                whileHover={{ scale: 1.03, boxShadow: "0 0 25px hsla(var(--brand-cyan), 0.5)" }} // Corrected hsla for brand-cyan
-                className={`p-5 md:p-6 rounded-xl border shadow-xl flex flex-col justify-between bg-gradient-to-br ${sub.color} ${sub.id === "basic_neural_net" ? 'opacity-70' : ''} transition-all duration-300`}
+                whileHover={{ scale: 1.03, boxShadow: "0 0 25px hsla(var(--brand-cyan-hsl), 0.5)" }} // Use HSL variable for brand-cyan
+                className={`p-5 md:p-6 rounded-xl border shadow-xl flex flex-col justify-between bg-gradient-to-br ${sub.color} ${sub.id === "basic_neural_net" ? 'opacity-70 cursor-not-allowed' : ''} transition-all duration-300`}
               >
                 <div>
                   <h3 className="text-2xl font-orbitron font-semibold text-light-text mb-3 flex items-center">{sub.icon} {sub.name}</h3>
@@ -201,13 +192,13 @@ export default function BuySubscriptionPage() {
                   <ul className="space-y-1.5 mb-6 text-xs">
                     {sub.features.map((feature, i) => (
                       <li key={i} className="text-gray-200 font-mono flex items-start gap-2">
-                        <VibeContentRenderer content={feature.replace(/className='[^']*'/, "className='text-lg text-current'")} />
+                        <VibeContentRenderer content={feature.replace(/className='[^']*'/, "className='text-lg text-current mr-1 align-middle'")} />
                       </li>
                     ))}
                   </ul>
                 </div>
                 <Button
-                  onClick={() => setSelectedSubscription(sub)}
+                  onClick={() => sub.id !== "basic_neural_net" && setSelectedSubscription(sub)}
                   disabled={loading || sub.id === activeSubscriptionId || sub.id === "basic_neural_net"}
                   className={`w-full mt-auto py-2.5 rounded-lg font-orbitron text-md transition-all duration-200 ease-in-out
                     ${selectedSubscription?.id === sub.id && sub.id !== "basic_neural_net" ? "bg-brand-green text-black ring-2 ring-offset-2 ring-offset-current ring-brand-yellow shadow-lg" 
@@ -248,7 +239,7 @@ export default function BuySubscriptionPage() {
               )}
             </motion.div>
           )}
-           {success && activeSubscriptionId === "basic_neural_net" && (
+           {success && activeSubscriptionId === "basic_neural_net" && ( // Show only if user was basic before trying to upgrade
              <motion.p 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

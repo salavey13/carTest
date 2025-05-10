@@ -2,7 +2,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { FaBrain, FaBolt, FaLightbulb, FaPlusCircle, FaSave, FaTasks, FaAtom } from "react-icons/fa";
+import { FaBrain, FaBolt, FaLightbulb, FaPlusCircle, FaSave, FaTasks, FaAtom } from "react-icons/fa6"; // Corrected FaAtom import
 import { useState } from "react";
 import Modal from "@/components/ui/Modal"; 
 import { toast } from "sonner";
@@ -17,7 +17,7 @@ const cognitiveProtocols = [
     details: [
       "Цель: Завершение критической задачи, генерация контента.",
       "Метод: 2x(40 мин фокус + 5 мин отдых).",
-      "Инструменты: <FaAtom className='inline text-brand-purple'/> AI-ассистент (Perplexity, ChatGPT), шумоподавляющие наушники, трекер времени.",
+      "Инструменты: <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI-ассистент (Perplexity, ChatGPT), шумоподавляющие наушники, трекер времени.",
       "Топливо: Вода, зеленый чай. Избегать сахара."
     ],
     color: "border-brand-orange/50 bg-dark-card hover:shadow-brand-orange/20"
@@ -30,7 +30,7 @@ const cognitiveProtocols = [
     details: [
       "Цель: Освоение нового навыка, расширение Vibe-арсенала.",
       "Метод: Объяснение концепции (AI), практика, интервальное повторение.",
-      "Инструменты: <FaAtom className='inline text-brand-purple'/> AI для объяснений/квизов (ChatGPT), Anki/Quizlet, релевантные туториалы.",
+      "Инструменты: <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI для объяснений/квизов (ChatGPT), Anki/Quizlet, релевантные туториалы.",
       "Топливо: Сложные углеводы для энергии (гречка, овсянка)."
     ],
     color: "border-brand-yellow/50 bg-dark-card hover:shadow-brand-yellow/20"
@@ -49,7 +49,6 @@ const cognitiveProtocols = [
     color: "border-brand-cyan/50 bg-dark-card hover:shadow-brand-cyan/20"
   },
 ];
-
 
 export default function CognitiveFuelPage() {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -95,13 +94,16 @@ export default function CognitiveFuelPage() {
                 
                 <div className="space-y-1 text-xs text-gray-400 font-mono">
                   {protocol.details.map((detail, index) => (
-                    <VibeContentRenderer key={index} content={`<p class="flex items-center"><FaBolt class="text-xs mr-1.5 text-gray-500"/>${detail}</p>`} />
+                     // Using a wrapper div or paragraph for VibeContentRenderer if needed for consistent styling or structure
+                    <div key={index} className="flex items-center">
+                      <FaBolt className="text-xs mr-1.5 text-gray-500 flex-shrink-0" /> {/* Icon outside VCR for consistent styling */}
+                      <VibeContentRenderer content={detail} />
+                    </div>
                   ))}
                 </div>
               </motion.section>
             ))}
             
-
             <section className="flex flex-col sm:flex-row gap-3 justify-center pt-4 border-t border-brand-green/20">
               <Button onClick={() => { setIsSaveModalOpen(true); }} className="bg-brand-green text-black hover:bg-brand-green/90 font-orbitron flex-1">
                 <FaSave className="mr-2" /> Сохранить Стек Протоколов
