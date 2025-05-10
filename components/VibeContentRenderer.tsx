@@ -7,7 +7,6 @@ import * as Fa6Icons from "react-icons/fa6";
 import { debugLogger as logger } from "@/lib/debugLogger";
 
 // --- Full Icon Name Map (Lowercase to PascalCase) ---
-// Corrected FaTools -> FaToolbox
 const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   fa42group: "Fa42Group",
   fa500px: "Fa500Px",
@@ -2034,17 +2033,16 @@ const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   faregwindowrestore: "FaRegWindowRestore",
   fatoolbox: "FaToolbox",
   fatools: "FaToolbox", 
-  // Added correct mappings for previously missing icons
-  fasave: "FaFloppyDisk", // Alias for save
-  fapluscircle: "FaCirclePlus", // Alias for plus circle
-  fatasks: "FaListCheck", // Alias for tasks
-  falistcheck: "FaListCheck", // Ensure direct name is also present
-  facircleplus: "FaCirclePlus", // Ensure direct name is also present
-  fafloppydisk: "FaFloppyDisk", // Ensure direct name is also present
+  fasave: "FaFloppyDisk", 
+  fapluscircle: "FaCirclePlus", 
+  fatasks: "FaListCheck", 
+  falistcheck: "FaListCheck", 
+  facircleplus: "FaCirclePlus", 
+  fafloppydisk: "FaFloppyDisk", 
 };
 // --- End Icon Name Map ---
 
-// Type guard (Unchanged)
+// Type guard
 function isValidFa6Icon(iconName: string): iconName is keyof typeof Fa6Icons {
     return typeof iconName === 'string' && iconName.startsWith('Fa') && iconName in Fa6Icons;
 }
@@ -2069,32 +2067,35 @@ function preprocessIconSyntax(content: string): string {
 // Robust Parser Options - Centralized Logic
 const robustParserOptions: HTMLReactParserOptions = {
     replace: (domNode) => {
+        if (domNode.type === 'text') { // Let text nodes be handled by the parser by default
+            return undefined;
+        }
+
         if (domNode instanceof Element && domNode.attribs) {
             const { name, attribs, children } = domNode;
-            const mutableAttribs = { ...attributesToProps(attribs) };
+            const mutableAttribs = { ...attributesToProps(attribs) }; // Converts HTML attribs to React props (e.g. class to className)
             let lowerCaseName = name?.toLowerCase();
 
-            // If name contains "classname", parser might lowercase it to "classname"
-            // We need to ensure it's treated as "class" for HTML attribute mapping later
+            // Handle cases where 'class' might come as 'classname' from attributesToProps or direct HTML
             if (mutableAttribs.hasOwnProperty('classname')) {
-                mutableAttribs.class = mutableAttribs.classname;
+                mutableAttribs.className = mutableAttribs.classname;
                 delete mutableAttribs.classname;
             }
-            // Also, if it's already 'class', ensure it's not processed as React 'className' yet by html-react-parser's default
-            // but we will handle it correctly for React elements.
+            if (mutableAttribs.hasOwnProperty('class') && !mutableAttribs.hasOwnProperty('className')) {
+                 mutableAttribs.className = mutableAttribs.class;
+                 delete mutableAttribs.class;
+            }
 
 
             try {
                 // --- Icon Handling (Use Map Lookup) ---
                 if (lowerCaseName?.startsWith('fa')) {
-                    const correctPascalCaseName = iconNameMap[lowerCaseName]; // uses the map for resolving
+                    const correctPascalCaseName = iconNameMap[lowerCaseName];
                     if (correctPascalCaseName && isValidFa6Icon(correctPascalCaseName)) {
                          const IconComponent = Fa6Icons[correctPascalCaseName];
                          try {
-                            // Prioritize 'className' from mutableAttribs if it exists (from JSX), else use 'class' (from HTML string)
-                            const classNameProp = mutableAttribs.className || mutableAttribs.class;
-                            const { class: classHtml, className: classNameReact, style, onClick, ...restProps } = mutableAttribs;
-
+                            const { className, style, ...restProps } = mutableAttribs; // className should be correct now
+                            
                             const safeProps = Object.entries(restProps).reduce((acc, [key, value]) => {
                                 if (key.startsWith('aria-') || key.startsWith('data-') || key === 'title' || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
                                      acc[key] = value;
@@ -2105,8 +2106,7 @@ const robustParserOptions: HTMLReactParserOptions = {
                             const parsedChildren = children && domNode.children.length > 0 ? domToReact(children, robustParserOptions) : null;
                             const finalProps: Record<string, any> = {
                                 ...safeProps,
-                                // Use the determined classNameProp, default to empty string if none
-                                className: `${classNameProp || ''} inline align-baseline mx-px`.trim(),
+                                className: `${className || ''} inline align-baseline mx-px`.trim(),
                             };
                             if (typeof style === 'string') {
                                try {
@@ -2124,12 +2124,12 @@ const robustParserOptions: HTMLReactParserOptions = {
 
                             return React.createElement(IconComponent, finalProps, parsedChildren);
                          } catch (iconRenderError: any) {
-                            logger.error(`[VibeContentRenderer] Error rendering icon <${correctPascalCaseName}> found via map!`, iconRenderError, { attribs: mutableAttribs });
+                            logger.error(`[VibeContentRenderer] Error rendering icon <${correctPascalCaseName}> via map!`, iconRenderError, { attribs: mutableAttribs });
                             return <span title={`Error rendering icon: ${correctPascalCaseName}`} className="text-red-500 font-bold">[ICON ERR!]</span>;
                          }
                     } else {
                         logger.warn(`[VibeContentRenderer] Unknown/Invalid icon tag: <${name}> (lc: <${lowerCaseName}>). Not in map. Attribs:`, mutableAttribs);
-                        return <span title={`Unknown or invalid icon: ${name}`} className="text-yellow-500 font-bold">[?]</span>;
+                        return <span title={`Unknown icon: ${name}`} className="text-yellow-500 font-bold">[?]</span>;
                     }
                 }
                 // --- End Icon Handling ---
@@ -2139,9 +2139,8 @@ const robustParserOptions: HTMLReactParserOptions = {
                     const isInternal = mutableAttribs.href && (mutableAttribs.href.startsWith('/') || mutableAttribs.href.startsWith('#'));
                     const parsedChildren = children ? domToReact(children, robustParserOptions) : null;
                     
-                    const linkClassName = mutableAttribs.class || mutableAttribs.className || '';
-                    mutableAttribs.className = `${linkClassName} mx-1 px-0.5`.trim(); // Apply new class logic
-                    if(mutableAttribs.class) delete mutableAttribs.class; 
+                    let linkClassName = mutableAttribs.className || ''; // className should be correct from attributesToProps
+                    mutableAttribs.className = `${linkClassName} mx-1 px-0.5`.trim();
 
                     if (isInternal && !mutableAttribs.target && mutableAttribs.href) {
                         try {
@@ -2160,30 +2159,17 @@ const robustParserOptions: HTMLReactParserOptions = {
                 // --- Standard HTML Elements ---
                 const knownTags = /^(p|div|span|ul|ol|li|h[1-6]|strong|em|b|i|u|s|code|pre|blockquote|hr|br|img|table|thead|tbody|tr|th|td)$/;
                 if (typeof lowerCaseName === 'string' && knownTags.test(lowerCaseName)) {
-                   // If 'class' exists, convert it to 'className' for React
-                   if (mutableAttribs.hasOwnProperty('class')) {
-                       mutableAttribs.className = mutableAttribs.class;
-                       delete mutableAttribs.class;
-                   }
-                   // domNode.attribs might have been modified by attributesToProps if it contained style objects etc.
-                   // We rebuild attribs for the parser, ensuring 'class' is used for HTML attributes if 'className' was set.
-                   const finalHtmlAttribs: Record<string, string> = {};
-                   for (const key in mutableAttribs) {
-                       if (Object.prototype.hasOwnProperty.call(mutableAttribs, key)) {
-                           const attributeKey = key === 'className' ? 'class' : key;
-                           // Ensure value is string for HTML attributes
-                           if (typeof mutableAttribs[key] === 'string' || typeof mutableAttribs[key] === 'number' || typeof mutableAttribs[key] === 'boolean') {
-                               finalHtmlAttribs[attributeKey] = String(mutableAttribs[key]);
-                           } else if (key === 'style' && typeof mutableAttribs[key] === 'object' && mutableAttribs[key] !== null) {
-                               // Convert style object back to string for HTML
-                               finalHtmlAttribs[attributeKey] = Object.entries(mutableAttribs[key] as React.CSSProperties)
-                                   .map(([prop, val]) => `${prop.replace(/([A-Z])/g, '-$1').toLowerCase()}:${val}`)
-                                   .join(';');
-                           }
-                       }
-                   }
-                   domNode.attribs = finalHtmlAttribs;
-                   return undefined; // IMPORTANT: Let html-react-parser handle default rendering with modified attribs
+                   // mutableAttribs already has 'className' from attributesToProps if 'class' was present
+                   // No need to convert 'class' to 'className' again here.
+                   // We just need to pass the react-ified props to a new element OR return undefined if we want default handling.
+                   
+                   // For standard tags, we mostly want html-react-parser to do its default thing.
+                   // If we've modified attributes (like converting class to className, or style string to object),
+                   // we need to ensure those modified attributes are on the domNode if we return undefined.
+                   // However, attributesToProps already gives us React-style props.
+                   // So, if we are not creating a custom React element, we let the parser handle it.
+                   // The crucial part is returning undefined for default processing of the tag and its children.
+                   return undefined; 
                }
                 // --- End Standard HTML Elements ---
 
@@ -2192,13 +2178,13 @@ const robustParserOptions: HTMLReactParserOptions = {
                  return <span title={`Error processing element: ${name}`} className="text-red-500">[PROCESS ERR]</span>;
             }
         }
-        return undefined;
+        return undefined; // Default for other node types or if not an Element with attribs
     },
 };
 
 interface VibeContentRendererProps {
   content: string | null | undefined;
-  className?: string; // ClassName for the wrapper div, if provided
+  className?: string; 
 }
 
 export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ content, className }) => {
@@ -2210,12 +2196,10 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
       const preprocessedContent = preprocessIconSyntax(contentToParse);
       const parsedContent = parse(preprocessedContent, robustParserOptions);
       
-      // If a className prop is provided for VibeContentRenderer itself, wrap the output.
-      // Otherwise, return the parsed content directly (possibly as a React.Fragment by the parser).
       if (className) {
         return <div className={className}>{parsedContent}</div>;
       }
-      return <>{parsedContent}</>;
+      return <>{parsedContent}</>; // Return as fragment if no wrapper class needed
 
     } catch (error) {
       logger.error("[VibeContentRenderer] Error during parse:", error, "Input:", content);
