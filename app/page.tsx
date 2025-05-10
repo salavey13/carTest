@@ -1,4 +1,3 @@
-// /app/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -11,7 +10,7 @@ import {
   FaBrain, FaGamepad, FaBolt, FaChartLine, FaUserNinja,
   FaArrowRight, FaEye, FaUpLong, FaFire, FaGithub,
 } from "react-icons/fa6";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts'; // Tooltip removed from imports
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts'; 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Image from "next/image";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
@@ -47,7 +46,6 @@ const itemVariants = {
   hidden: { opacity: 0, y: 20, scale: 0.95 },
   visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.5, ease: "easeOut" } },
 };
-// bottomNavVariants removed as the navigation is now in a separate component
 
 export default function Home() {
   const { user: telegramUser, dbUser, isAuthenticated, isLoading: appLoading, error: appContextError } = useAppContext(); 
@@ -125,7 +123,6 @@ export default function Home() {
   const skillsLeveled = cyberProfile?.skillsLeveled || 0;
   const currentLevel = cyberProfile?.level || 0;
   const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || "v0.1 Alpha";
-  const nextLevelTarget = (currentLevel + 1) * 1000;
 
   return ( 
     <div className="homepage-wrapper">
@@ -179,7 +176,9 @@ export default function Home() {
                  <Image
                     src={FEATURED_QUEST_IMAGE}
                     alt="Featured Quest: Enhance Cognitive Matrix"
-                    layout="fill" objectFit="cover"
+                    fill // Changed from layout="fill" objectFit="cover" for Next 13+
+                    sizes="(max-width: 640px) 100vw, 50vw" // Example sizes, adjust as needed
+                    style={{ objectFit: 'cover' }}
                     className="opacity-50 group-hover:opacity-70 group-hover:scale-105 transition-all duration-400 ease-in-out"
                     priority
                   />
@@ -212,21 +211,20 @@ export default function Home() {
                       <p className="text-3xl sm:text-4xl font-bold text-white drop-shadow-md leading-none">{totalKiloVibes.toLocaleString()}</p>
                       <p className="text-2xs sm:text-xs font-mono uppercase tracking-wider text-black/85 font-semibold">KiloVibes</p>
                   </div>
-                  <div className="text-right space-y-0">
-                      <p className="text-sm sm:text-md font-semibold text-white/95 leading-tight">{focusTimeHours} <span className="text-2xs font-mono">hrs</span></p>
-                      <p className="text-2xs font-mono uppercase text-black/85">Deep Work</p>
-                      <p className="text-sm sm:text-md font-semibold text-white/95 leading-tight">{skillsLeveled} <span className="text-2xs font-mono">Perks</span></p>
+                  <div className="text-right"> {/* Removed space-y-0 to allow mb */}
+                      <p className="text-sm sm:text-md font-semibold text-white/95 leading-tight mb-0.5">{focusTimeHours} <span className="text-2xs font-mono">hrs</span></p>
+                      <p className="text-2xs font-mono uppercase text-black/85 mb-1">Deep Work</p>
+                      <p className="text-sm sm:text-md font-semibold text-white/95 leading-tight mb-0.5">{skillsLeveled} <span className="text-2xs font-mono">Perks</span></p>
                        <p className="text-2xs font-mono uppercase text-black/85">Unlocked</p>
                   </div>
               </div>
             </CardHeader>
-            <CardContent className="px-1 pb-2 pt-0 md:px-2 md:pb-3">
+            <CardContent className="px-1 pb-2 pt-1 md:px-2 md:pb-3"> {/* Added pt-1 for slight top padding */}
               <div className="h-[70px] sm:h-[90px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={displayWeeklyActivity} margin={{ top: 10, right: 5, left: 5, bottom: 0 }}>
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: 'rgba(0,0,0,0.85)', fontWeight: 700 }} dy={4}/>
                     <YAxis hide={true} domain={[0, 'dataMax + 500']} />
-                    {/* Tooltip is commented out as per previous step to isolate the build error */}
                     <Bar dataKey="value" radius={[2, 2, 0, 0]} barSize={18} minPointSize={2}>
                       {displayWeeklyActivity.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} fillOpacity={0.85}/>
@@ -239,13 +237,11 @@ export default function Home() {
           </Card>
         </motion.div>
 
-        {/* Bottom Navigation - REMOVED FROM HERE, MOVED TO LAYOUT */}
-
         {/* Admin Icon */}
         {dbUser?.status === "admin" && (
           <motion.div
             initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1, type: "spring", stiffness: 100 }}
-            className="fixed bottom-20 md:bottom-24 right-3 sm:right-4 z-50"
+            className="fixed bottom-20 md:bottom-24 right-3 sm:right-4 z-50" // Adjusted bottom based on BottomNav presence
           >
              <Button
                 asChild

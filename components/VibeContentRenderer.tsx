@@ -2063,7 +2063,6 @@ function preprocessIconSyntax(content: string): string {
     return processed;
 }
 
-
 // Robust Parser Options - Centralized Logic
 const robustParserOptions: HTMLReactParserOptions = {
     replace: (domNode) => {
@@ -2075,7 +2074,6 @@ const robustParserOptions: HTMLReactParserOptions = {
         if (domNode instanceof Element && domNode.attribs) {
             const { name, attribs, children } = domNode;
             // Convert HTML attributes to React props (e.g., class to className, style string to object)
-            // This is a crucial first step.
             const mutableAttribs = attributesToProps(attribs); 
             let lowerCaseName = name?.toLowerCase();
 
@@ -2086,7 +2084,6 @@ const robustParserOptions: HTMLReactParserOptions = {
                     if (correctPascalCaseName && isValidFa6Icon(correctPascalCaseName)) {
                          const IconComponent = Fa6Icons[correctPascalCaseName];
                          try {
-                            // mutableAttribs already has 'className' if 'class' was in HTML
                             const { className, style, ...restProps } = mutableAttribs; 
                             
                             const safeProps = Object.entries(restProps).reduce((acc, [key, value]) => {
@@ -2100,7 +2097,7 @@ const robustParserOptions: HTMLReactParserOptions = {
                             const finalProps: Record<string, any> = {
                                 ...safeProps,
                                 className: `${className || ''} inline align-baseline mx-px`.trim(),
-                                style: style, // Style is already an object from attributesToProps if it was a string
+                                style: style, 
                             };
                             return React.createElement(IconComponent, finalProps, parsedChildren);
                          } catch (iconRenderError: any) {
@@ -2132,10 +2129,10 @@ const robustParserOptions: HTMLReactParserOptions = {
                          return React.createElement('a', mutableAttribs, parsedChildren);
                     }
                 }
-                // --- Standard HTML Elements ---
-                // For standard HTML elements, we generally want html-react-parser to handle them.
-                // attributesToProps already converted 'class' to 'className' and 'style' string to object.
-                // So, we return undefined to let the default parsing continue for the element and its children.
+                
+                // For any other HTML element, attributesToProps has already converted 'class' to 'className'
+                // and 'style' string to an object. We return undefined to let html-react-parser
+                // render it normally with these React-ified props, along with its children.
                 return undefined; 
 
             } catch (replaceError: any) {
@@ -2143,7 +2140,6 @@ const robustParserOptions: HTMLReactParserOptions = {
                  return <span title={`Process Err: ${name}`} className="text-red-500">[ERR]</span>;
             }
         }
-        // For any other node type not handled above, let the parser do its default action.
         return undefined; 
     },
 };
