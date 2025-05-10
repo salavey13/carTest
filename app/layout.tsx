@@ -15,8 +15,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext";
 import ErrorBoundaryForOverlay from "@/components/ErrorBoundaryForOverlay";
 import DevErrorOverlay from "@/components/DevErrorOverlay";
-import { usePathname } from 'next/navigation'; // Added
-import BottomNavigation from "@/components/layout/BottomNavigation"; // Added
+import { usePathname } from 'next/navigation';
+import BottomNavigation from "@/components/layout/BottomNavigation";
 
 function LoadingChatButtonFallback() {
   return (
@@ -27,25 +27,36 @@ function LoadingChatButtonFallback() {
   );
 }
 
-// Metadata should be static or generated via generateMetadata if RootLayout is server component
-// Since we made it client, keep it simple or move to generateMetadata if possible.
-// For now, we'll keep the static export for metadata and viewport as Next.js can still pick it up.
-export const metadata: Metadata = {
-  title: "Fix13min PREMIUM", 
-  description: "Твоя 13-минутная фитнес-революция. Level UP", 
+// Static metadata content to be used by generateMetadata
+const pageMetadataContent = {
+  title: "Fix13min PREMIUM",
+  description: "Твоя 13-минутная фитнес-революция. Level UP",
 };
 
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-};
+// Server-only function to generate metadata
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: pageMetadataContent.title,
+    description: pageMetadataContent.description,
+    // Add other metadata like openGraph, icons etc. here if needed
+    // e.g., openGraph: { title: pageMetadataContent.title, description: pageMetadataContent.description, ... }
+  };
+}
+
+// Server-only function to generate viewport
+export async function generateViewport(): Promise<Viewport> {
+  return {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  };
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const pathsToShowBottomNav = ["/", "/selfdev/gamified", "/repo-xml", "/p-plan", "/profile"];
-  const showBottomNav = pathsToShowBottomNav.includes(pathname);
+  const showBottomNav = pathsToShowBottomNav.includes(pathname) || pathsToShowBottomNav.some(p => p !== "/" && pathname.startsWith(p));
 
   return (
     <html lang="en" className="h-full">
@@ -70,7 +81,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <main className="flex-1">
                   {children}
                 </main>
-                {showBottomNav && <BottomNavigation />} {/* Conditionally render BottomNavigation */}
+                {showBottomNav && <BottomNavigation pathname={pathname} />} {/* Conditionally render BottomNavigation */}
                 <Suspense fallback={<LoadingChatButtonFallback />}>
                   <StickyChatButton />
                 </Suspense>
