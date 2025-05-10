@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useAppContext } from "@/contexts/AppContext";
 import { sendTelegramInvoice } from "@/app/actions";
-import { createInvoice } from "@/hooks/supabase"; // Removed getUserSubscription, handled by dbUser
+import { createInvoice } from "@/hooks/supabase"; 
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -16,12 +16,12 @@ const SUBSCRIPTION_PLANS = [
     price: 0, 
     xtrPrice: "0 XTR",
     features: [
-      "<FaBrain className='text-brand-cyan'/> Доступ к CyberDev OS (Lvl 0-1)",
-      "<FaBolt className='text-brand-yellow'/> Базовый генератор KiloVibes",
-      "<FaMicrochip className='text-brand-green'/> Ограниченный банк промптов",
+      "<FaBrain className='text-brand-cyan mr-2 align-middle text-xl'/> Доступ к CyberDev OS (Lvl 0-1)",
+      "<FaBolt className='text-brand-yellow mr-2 align-middle text-xl'/> Базовый генератор KiloVibes",
+      "<FaMicrochip className='text-brand-green mr-2 align-middle text-xl'/> Ограниченный банк промптов",
     ],
     color: "from-gray-700/50 to-gray-800/50 border-gray-600",
-    icon: <FaBrain className="inline mr-2 text-brand-cyan" />,
+    icon: <FaBrain className="inline mr-2 text-brand-cyan" />, // This icon is for the plan card header, not features list
     cta: "Текущий Уровень",
   },
   {
@@ -30,11 +30,11 @@ const SUBSCRIPTION_PLANS = [
     price: 13,
     xtrPrice: "13 XTR",
     features: [
-      "<FaBrain className='text-brand-cyan'/> Все из Basic Neural Net",
-      "<FaRocket className='text-brand-orange'/> Ускоренный генератор KiloVibes",
-      "<FaInfinity className='text-brand-green'/> Расширенный Prompt Matrix",
-      "<FaUserNinja className='text-brand-pink'/> Доступ к квестам CyberDev (Lvl 1-5)",
-      "<FaShieldHalved className='text-brand-blue'/> Стандартная AI-поддержка",
+      "<FaBrain className='text-brand-cyan mr-2 align-middle text-xl'/> Все из Basic Neural Net",
+      "<FaRocket className='text-brand-orange mr-2 align-middle text-xl'/> Ускоренный генератор KiloVibes",
+      "<FaInfinity className='text-brand-green mr-2 align-middle text-xl'/> Расширенный Prompt Matrix",
+      "<FaUserNinja className='text-brand-pink mr-2 align-middle text-xl'/> Доступ к квестам CyberDev (Lvl 1-5)",
+      "<FaShieldHalved className='text-brand-blue mr-2 align-middle text-xl'/> Стандартная AI-поддержка",
     ],
     color: "from-brand-blue/80 to-brand-cyan/80 border-brand-blue",
     icon: <FaMicrochip className="inline mr-2 text-brand-blue" />,
@@ -46,14 +46,14 @@ const SUBSCRIPTION_PLANS = [
     price: 69,
     xtrPrice: "69 XTR",
     features: [
-      "<FaBrain className='text-brand-cyan'/> Все из EPU Tier",
-      "<FaBolt className='text-brand-yellow'/> Максимальный поток KiloVibes",
-      "<FaUserNinja className='text-brand-pink'/> Доступ ко всем уровням и квестам CyberDev",
-      "<FaUsers className='text-brand-purple'/> Приоритетный AI Co-Pilot Support",
-      "<FaStar className='text-neon-lime'/> Эксклюзивные Vibe Perks & Альфа-дропы",
+      "<FaBrain className='text-brand-cyan mr-2 align-middle text-xl'/> Все из EPU Tier",
+      "<FaBolt className='text-brand-yellow mr-2 align-middle text-xl'/> Максимальный поток KiloVibes",
+      "<FaUserNinja className='text-brand-pink mr-2 align-middle text-xl'/> Доступ ко всем уровням и квестам CyberDev",
+      "<FaUsers className='text-brand-purple mr-2 align-middle text-xl'/> Приоритетный AI Co-Pilot Support",
+      "<FaStar className='text-neon-lime mr-2 align-middle text-xl'/> Эксклюзивные Vibe Perks & Альфа-дропы",
     ],
     color: "from-brand-purple/80 to-brand-pink/80 border-brand-purple",
-    icon: <FaBolt className="inline mr-2 text-brand-yellow" />, // Changed to FaBolt for variety
+    icon: <FaBolt className="inline mr-2 text-brand-yellow" />,
     cta: "Активировать QBI"
   },
 ];
@@ -64,13 +64,11 @@ export default function BuySubscriptionPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeSubscriptionId, setActiveSubscriptionId] = useState<string>("basic_neural_net"); // Default to basic
+  const [activeSubscriptionId, setActiveSubscriptionId] = useState<string>("basic_neural_net"); 
 
   useEffect(() => {
     if (dbUser?.subscription_id && SUBSCRIPTION_PLANS.find(s => s.id === dbUser.subscription_id)) {
       setActiveSubscriptionId(dbUser.subscription_id as string);
-      // No toast here to avoid spamming on every load if already subscribed. 
-      // Toast can be shown when subscription state *changes*.
     } else {
       setActiveSubscriptionId("basic_neural_net");
     }
@@ -85,12 +83,11 @@ export default function BuySubscriptionPage() {
     setError(null);
     setSuccess(false);
 
-    if (!isInTelegramContext && process.env.NODE_ENV === 'development') { // Demo mode only in dev
+    if (!isInTelegramContext && process.env.NODE_ENV === 'development') { 
       toast.success(`Демо-режим: Счет для "${selectedSubscription.name}" создан!`);
       setLoading(false);
       setSuccess(true);
       setActiveSubscriptionId(selectedSubscription.id); 
-      // In a real scenario, you'd update dbUser context or re-fetch
       return;
     }
 
@@ -117,10 +114,15 @@ export default function BuySubscriptionPage() {
         throw new Error(invoiceCreateResult.error || "Не удалось создать запись о счете в CyberVibe БД");
       }
       
+      // Clean feature text for invoice description
+      const cleanFeaturesForInvoice = selectedSubscription.features.map((f: string) => 
+        f.replace(/<Fa\w+\s*className='[^']*'\s*\/>\s*/, '').trim()
+      ).join(', ');
+
       const response = await sendTelegramInvoice(
         user.id.toString(),
         `Апгрейд CyberDev OS: ${selectedSubscription.name}`,
-        `Разблокируй ${selectedSubscription.name} для доступа к: ${selectedSubscription.features.map((f: string) => f.replace(/<Fa\w+\s*className='[^']*'\s*\/>\s*/, '')).join(', ')}.`, // Clean feature text
+        `Разблокируй ${selectedSubscription.name} для доступа к: ${cleanFeaturesForInvoice}.`,
         payload,
         selectedSubscription.price
       );
@@ -166,9 +168,8 @@ export default function BuySubscriptionPage() {
                 <p className="text-xl font-bold text-white mb-3 font-mono">{activePlan.xtrPrice} / цикл</p>
                 <ul className="space-y-1.5 mb-4 text-left max-w-md mx-auto text-sm">
                     {activePlan.features.map((feature: string, i: number) => (
-                      <li key={i} className="text-gray-200 font-mono flex items-start gap-2">
-                         {/* Ensure VibeContentRenderer handles the string directly and applies necessary styling via its own logic if needed */}
-                        <VibeContentRenderer content={feature.replace(/className='[^']*'/, "className='text-xl text-current mr-1 align-middle'")} />
+                      <li key={i} className="text-gray-200 font-mono"> {/* Removed flex, VibeContentRenderer will handle inline icon */}
+                        <VibeContentRenderer content={feature} />
                       </li>
                     ))}
                 </ul>
@@ -183,7 +184,7 @@ export default function BuySubscriptionPage() {
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: SUBSCRIPTION_PLANS.indexOf(sub) * 0.1 }}
-                whileHover={{ scale: 1.03, boxShadow: "0 0 25px hsla(var(--brand-cyan-hsl), 0.5)" }} // Use HSL variable for brand-cyan
+                whileHover={{ scale: 1.03, boxShadow: "0 0 25px hsla(var(--brand-cyan-hsl), 0.5)" }}
                 className={`p-5 md:p-6 rounded-xl border shadow-xl flex flex-col justify-between bg-gradient-to-br ${sub.color} ${sub.id === "basic_neural_net" ? 'opacity-70 cursor-not-allowed' : ''} transition-all duration-300`}
               >
                 <div>
@@ -191,8 +192,8 @@ export default function BuySubscriptionPage() {
                   <p className="text-3xl font-bold text-white mb-4 font-mono">{sub.xtrPrice}</p>
                   <ul className="space-y-1.5 mb-6 text-xs">
                     {sub.features.map((feature, i) => (
-                      <li key={i} className="text-gray-200 font-mono flex items-start gap-2">
-                        <VibeContentRenderer content={feature.replace(/className='[^']*'/, "className='text-lg text-current mr-1 align-middle'")} />
+                      <li key={i} className="text-gray-200 font-mono">
+                        <VibeContentRenderer content={feature} />
                       </li>
                     ))}
                   </ul>
@@ -239,7 +240,7 @@ export default function BuySubscriptionPage() {
               )}
             </motion.div>
           )}
-           {success && activeSubscriptionId === "basic_neural_net" && ( // Show only if user was basic before trying to upgrade
+           {success && activeSubscriptionId === "basic_neural_net" && ( 
              <motion.p 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
