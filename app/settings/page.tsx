@@ -6,22 +6,22 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
-  FaBrain, FaBell, FaBed, FaCalendarCheck, FaTools, FaEnvelope,
-  FaComments, FaShieldVirus, FaSlidersH, FaUserCog, FaCircleQuestion
-} from "react-icons/fa6";
-import Modal from "@/components/ui/Modal";
+  FaBrain, FaBell, FaBed, FaCalendarCheck, FaToolbox, FaEnvelope,
+  FaComments, FaShieldVirus, FaSliders, FaUserGear, FaQuestionCircle
+} from "react-icons/fa6"; // Corrected icons: FaTools -> FaToolbox, FaUserCog -> FaUserGear, FaSlidersH -> FaSliders
+import Modal from "@/components/ui/Modal"; 
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
-import { updateUserSettings } from "@/app/actions"; // Server action
+import { updateUserSettings } from "@/app/actions"; 
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { debugLogger as logger } from "@/lib/debugLogger";
 
 interface SettingConfig {
-  key: string; // Matches key in settingsProfile object
+  key: string; 
   icon: React.ReactNode;
   title: string;
   description: string;
-  colorClass: string; // Tailwind color class for the switch
+  colorClass: string; 
 }
 
 const settingDefinitions: SettingConfig[] = [
@@ -38,10 +38,9 @@ type SettingsProfile = Record<string, boolean>;
 const getDefaultSettings = (): SettingsProfile => {
   const defaults: SettingsProfile = {};
   settingDefinitions.forEach(s => {
-    // Example default logic: enable most, disable promo & experimental
     defaults[s.key] = !(s.key === 'promotional_messages_enabled' || s.key === 'experimental_alpha_protocols');
   });
-  defaults['dark_mode_enabled'] = true; // Specific default for dark mode
+  defaults['dark_mode_enabled'] = true; 
   return defaults;
 };
 
@@ -63,7 +62,6 @@ export default function SettingsPage() {
       setSettingsProfile(mergedSettings);
       logger.debug("[SettingsPage] Settings profile initialized:", mergedSettings);
       
-      // Apply dark mode from settings
       if (typeof mergedSettings.dark_mode_enabled === 'boolean') {
         document.documentElement.classList.toggle('dark', mergedSettings.dark_mode_enabled);
       }
@@ -85,14 +83,16 @@ export default function SettingsPage() {
     }
 
     const newSettings = { ...settingsProfile, [settingKey]: value };
-    setSettingsProfile(newSettings); // Optimistic UI update
+    setSettingsProfile(newSettings); 
 
     if (settingKey === 'dark_mode_enabled') {
       document.documentElement.classList.toggle('dark', value);
     }
     
-    const settingDef = settingDefinitions.find(s => s.key === settingKey) || { title: settingKey };
-    const toastMessage = `Настройка "${settingDef.title}" ${value ? "включена" : "выключена"}`;
+    // Find title for toast, default to key if not in definitions (e.g. for dark_mode_enabled)
+    const settingDef = settingDefinitions.find(s => s.key === settingKey);
+    const settingTitleForToast = settingDef ? settingDef.title : (settingKey === 'dark_mode_enabled' ? "Темная тема" : settingKey);
+    const toastMessage = `Настройка "${settingTitleForToast}" ${value ? "включена" : "выключена"}`;
 
     setIsSaving(true);
     try {
@@ -103,7 +103,6 @@ export default function SettingsPage() {
       } else {
         toast.error(`Ошибка сохранения: ${result.error || "Неизвестная ошибка"}`);
         logger.error(`[SettingsPage] Failed to save setting ${settingKey}:`, result.error);
-        // Revert UI on failure
         setSettingsProfile(prev => ({ ...prev!, [settingKey]: !value }));
         if (settingKey === 'dark_mode_enabled') {
           document.documentElement.classList.toggle('dark', !value);
@@ -127,7 +126,6 @@ export default function SettingsPage() {
         toast.error("Сообщение обратной связи не может быть пустым.");
         return;
     }
-    // TODO: Implement actual feedback submission (e.g., call a server action)
     logger.log("Feedback submitted (client-side):", { userId: dbUser?.id, message: feedbackMessage });
     toast.success("Спасибо за ваш VIBE-отзыв! Мы его изучим.");
     setFeedbackMessage("");
@@ -138,7 +136,7 @@ export default function SettingsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-dark-bg p-4">
         <div className="flex flex-col items-center">
-            <FaSlidersH className="text-5xl text-brand-purple animate-pulse mb-4" />
+            <FaSliders className="text-5xl text-brand-purple animate-pulse mb-4" /> {/* Corrected Icon */}
             <p className="text-brand-purple animate-pulse font-orbitron">КАЛИБРОВКА НЕЙРО-ИНТЕРФЕЙСА...</p>
             {pageError && <p className="text-red-500 mt-2">{pageError}</p>}
         </div>
@@ -156,7 +154,7 @@ export default function SettingsPage() {
       >
         <Card className="bg-dark-card/80 backdrop-blur-md border border-brand-purple/50 shadow-xl shadow-brand-purple/20">
           <CardHeader className="text-center p-6 border-b border-brand-purple/30">
-            <FaUserCog className="text-5xl text-brand-purple mx-auto mb-3 drop-shadow-[0_0_10px_theme(colors.brand-purple)]" />
+            <FaUserGear className="text-5xl text-brand-purple mx-auto mb-3 drop-shadow-[0_0_10px_theme(colors.brand-purple)]" /> {/* Corrected Icon */}
             <CardTitle className="text-3xl font-orbitron font-bold text-brand-purple cyber-text glitch" data-text="НЕЙРО-ИНТЕРФЕЙС">
               НЕЙРО-ИНТЕРФЕЙС
             </CardTitle>
@@ -179,10 +177,9 @@ export default function SettingsPage() {
               />
             ))}
             
-            {/* Dark Mode specific toggle - kept separate as it has direct DOM manipulation */}
              <div className="flex items-center justify-between p-3 bg-dark-bg/40 rounded-lg border border-gray-700 hover:border-brand-purple/50 transition-colors">
-              <Label htmlFor="dark-mode-switch" className="flex items-center text-md flex-grow">
-                <span className="text-xl mr-3 text-brand-purple"><FaTools/></span>
+              <Label htmlFor="dark-mode-switch" className="flex items-center text-md flex-grow cursor-pointer">
+                <span className="text-xl mr-3 text-brand-purple"><FaToolbox/></span> {/* Corrected Icon */}
                 <div>
                     <VibeContentRenderer content="**Системная Тема (::FaMoon::):** Темный Интерфейс" className="font-orbitron text-light-text" />
                     <p className="text-xs text-muted-foreground font-mono mt-0.5">Активация протокола 'Вечная Ночь' для комфорта глаз.</p>
@@ -217,7 +214,7 @@ export default function SettingsPage() {
         title="Форма Нейро-Обратной Связи"
         confirmText="Отправить Сигнал"
         onConfirm={handleSendFeedback}
-        icon={<FaCircleQuestion className="text-brand-pink" />}
+        icon={<FaQuestionCircle className="text-brand-pink" />} // Corrected Fa6 icon usage
       >
         <p className="mb-3 font-mono text-sm text-muted-foreground">Твои мысли – топливо для эволюции VIBE OS. Делись идеями, сообщай о сбоях в Матрице.</p>
         <textarea
