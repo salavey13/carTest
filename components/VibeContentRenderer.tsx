@@ -31,7 +31,7 @@ function preprocessIconSyntax(content: string): string {
 // Simplified Parser Options
 const simplifiedParserOptions: HTMLReactParserOptions = {
     replace: (domNode) => {
-        // 1. Handle text nodes by letting the parser render them by default.
+        // 1. Handle text nodes first by letting the parser render them by default.
         if (domNode.type === 'text' || domNode instanceof Text) { 
             return undefined;
         }
@@ -59,7 +59,8 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                          return React.createElement(IconComponent, finalProps, children);
                     } else {
                         logger.warn(`[VCR Simple] Unknown Icon Tag: <${domNode.name}> (lc: ${lowerCaseName})`);
-                        return <span title={`Unknown Icon: ${domNode.name}`} className="text-yellow-500">[?]</span>;
+                        // Return the original tag as text if it's an unknown Fa icon, so it's visible for debugging
+                        return <span title={`Unknown Fa Icon: ${domNode.name}`} className="text-orange-500 font-bold">{`<${domNode.name} .../>`}</span>;
                     }
                 }
 
@@ -69,20 +70,18 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                     const isInternal = hrefVal && typeof hrefVal === 'string' && (hrefVal.startsWith('/') || hrefVal.startsWith('#'));
                     
                     let linkClassName = mutableAttribs.className || '';
-                    mutableAttribs.className = `${linkClassName} mx-1 px-0.5`.trim();
+                    mutableAttribs.className = `${linkClassName} mx-1 px-0.5`.trim(); // Basic spacing for links
 
                     if (isInternal && !mutableAttribs.target && hrefVal) {
                         const { href, className: finalLinkClassName, style: linkStyle, title: linkTitle, ...restLinkProps } = mutableAttribs;
                         return <Link href={href as string} className={finalLinkClassName as string} style={linkStyle as React.CSSProperties} title={linkTitle as string} {...restLinkProps}>{children}</Link>;
                     }
-                    // For external links or links with a target, or if NextLink creation fails, use regular 'a'
                     return React.createElement('a', mutableAttribs, children);
                 }
                 
                 // For any other standard HTML element (p, span, div, b, strong, em, br, etc.),
-                // html-react-parser will handle them with their default behavior and process their children.
-                // `attributesToProps` already converted 'class' to 'className' and 'style' string to an object.
-                // Returning undefined lets the parser continue its default processing.
+                // return undefined to let html-react-parser handle its default rendering.
+                // `attributesToProps` has already converted 'class' to 'className' and 'style' string to an object.
                 return undefined; 
 
             } catch (replaceError: any) {
@@ -91,7 +90,6 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
             }
         }
         
-        // For any other node type not explicitly handled, let the parser do its default action.
         return undefined; 
     },
 };
@@ -108,7 +106,6 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
     try {
       const contentToParse = String(content);
       const preprocessedContent = preprocessIconSyntax(contentToParse);
-      // Use the simplified parser options
       const parsedContent = parse(preprocessedContent, simplifiedParserOptions); 
       
       if (className) {
