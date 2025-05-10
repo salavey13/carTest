@@ -2,7 +2,8 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { FaBrain, FaBolt, FaLightbulb, FaPlusCircle, FaSave, FaTasks, FaAtom } from "react-icons/fa6"; // Corrected FaAtom import
+// Удалены прямые импорты FaSave, FaPlusCircle, FaTasks. FaAtom оставлен, т.к. используется в JSX напрямую.
+import { FaBrain, FaBolt, FaLightbulb, FaAtom } from "react-icons/fa6"; 
 import { useState } from "react";
 import Modal from "@/components/ui/Modal"; 
 import { toast } from "sonner";
@@ -12,7 +13,7 @@ const cognitiveProtocols = [
   {
     id: "deep_work_sprint",
     name: "Протокол: Deep Work Sprint (90 мин)",
-    icon: <FaBolt className="text-brand-orange" />,
+    icon: <FaBolt className="text-brand-orange" />, // JSX icon for direct render
     description: "Концентрированный блок работы с использованием техники Pomodoro и AI-ассистента для максимальной продуктивности.",
     details: [
       "Цель: Завершение критической задачи, генерация контента.",
@@ -25,7 +26,7 @@ const cognitiveProtocols = [
   {
     id: "skill_acquisition_module",
     name: "Протокол: Skill Acquisition Module (SAM)",
-    icon: <FaLightbulb className="text-brand-yellow" />,
+    icon: <FaLightbulb className="text-brand-yellow" />, // JSX icon
     description: "Целевая сессия для изучения нового Vibe Perk или навыка с применением техник активного обучения.",
     details: [
       "Цель: Освоение нового навыка, расширение Vibe-арсенала.",
@@ -38,7 +39,7 @@ const cognitiveProtocols = [
   {
     id: "mind_recharge_cycle",
     name: "Протокол: Mind Recharge & Ideation",
-    icon: <FaBrain className="text-brand-cyan" />,
+    icon: <FaBrain className="text-brand-cyan" />, // JSX icon
     description: "Восстановление когнитивной энергии через медитацию или легкую активность, стимулирование генерации идей.",
     details: [
       "Цель: Снижение умственной усталости, генерация новых идей.",
@@ -94,9 +95,8 @@ export default function CognitiveFuelPage() {
                 
                 <div className="space-y-1 text-xs text-gray-400 font-mono">
                   {protocol.details.map((detail, index) => (
-                     // Using a wrapper div or paragraph for VibeContentRenderer if needed for consistent styling or structure
                     <div key={index} className="flex items-center">
-                      <FaBolt className="text-xs mr-1.5 text-gray-500 flex-shrink-0" /> {/* Icon outside VCR for consistent styling */}
+                      <FaBolt className="text-xs mr-1.5 text-gray-500 flex-shrink-0" />
                       <VibeContentRenderer content={detail} />
                     </div>
                   ))}
@@ -106,13 +106,13 @@ export default function CognitiveFuelPage() {
             
             <section className="flex flex-col sm:flex-row gap-3 justify-center pt-4 border-t border-brand-green/20">
               <Button onClick={() => { setIsSaveModalOpen(true); }} className="bg-brand-green text-black hover:bg-brand-green/90 font-orbitron flex-1">
-                <FaSave className="mr-2" /> Сохранить Стек Протоколов
+                <VibeContentRenderer content="<FaFloppyDisk className='mr-2'/> Сохранить Стек Протоколов" />
               </Button>
               <Button onClick={() => { setIsSuggestModalOpen(true); }} variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/20 hover:text-white font-orbitron flex-1">
-                <FaPlusCircle className="mr-2" /> Предложить Протокол
+                <VibeContentRenderer content="<FaCirclePlus className='mr-2'/> Предложить Протокол" />
               </Button>
               <Button onClick={() => { setIsLogModalOpen(true); }} variant="outline" className="border-brand-purple text-brand-purple hover:bg-brand-purple/20 hover:text-white font-orbitron flex-1">
-                <FaTasks className="mr-2" /> Залогировать Активность
+                <VibeContentRenderer content="<FaListCheck className='mr-2'/> Залогировать Активность" />
               </Button>
             </section>
           </CardContent>
