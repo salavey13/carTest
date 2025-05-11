@@ -56,7 +56,7 @@ export default function Home() {
       logger.log(`[HomePage] loadProfile triggered. appLoading: ${appLoading}, dbUser.id: ${dbUser?.id}`);
       if (appLoading) { 
         logger.log(`[HomePage] AppContext is still loading. Waiting to fetch profile.`);
-        setProfileLoading(true); // Keep profileLoading true while app context is busy
+        setProfileLoading(true);
         return;
       }
 

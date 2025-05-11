@@ -36,6 +36,12 @@ export function useTelegram() {
   const [isLoading, setIsLoading] = useState(true); 
   const [error, setError] = useState<Error | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false); 
+  const [, setForceUpdate] = useState(false); // For explicitly triggering re-render
+
+  const forceUpdateApp = useCallback(() => {
+    setForceUpdate(p => !p);
+    logger.debug("[useTelegram] forceUpdateApp called, triggering re-memoization of context value.");
+  }, []);
 
   const handleAuthentication = useCallback(
     async (telegramUserToAuth: WebAppUser): Promise<AuthResult> => {
@@ -128,7 +134,7 @@ export function useTelegram() {
              if (MOCK_USER) {
                  logger.warn("[useTelegram Initialize] No user data in Telegram context, will use MOCK_USER.");
                  authCandidate = MOCK_USER;
-                 inTgContextReal = false; // Explicitly false as we are using mock
+                 inTgContextReal = false; 
              }
           }
         } else {
@@ -153,6 +159,7 @@ export function useTelegram() {
               setDbUser(authData.dbUserToSet); 
               setIsAuthenticated(authData.isAuthenticatedToSet);
               logger.log(`[useTelegram Initialize] Auth success, dbUser set with ID: ${authData.dbUserToSet?.id}`);
+              forceUpdateApp(); // Force a re-render to propagate new dbUser to context before isLoading changes
             }
         } else {
            if (isMounted) {
@@ -177,7 +184,7 @@ export function useTelegram() {
       debugLogger.log("[useTelegram Effect Cleanup] Setting isMounted=false");
       isMounted = false;
     };
-  }, [handleAuthentication]); 
+  }, [handleAuthentication, forceUpdateApp]); // Added forceUpdateApp
 
   const isAdmin = useCallback(() => {
     if (!dbUser) return false;
@@ -212,6 +219,7 @@ export function useTelegram() {
         isAdmin, 
         isLoading, 
         error,
+        forceUpdateApp, // Expose forceUpdateApp
         openLink: (url: string) => safeWebAppCall('openLink', url),
         close: () => safeWebAppCall('close'),
         showPopup: (params: any) => safeWebAppCall('showPopup', params), 
@@ -229,6 +237,6 @@ export function useTelegram() {
     return baseData;
   }, [
       tgWebApp, tgUser, dbUser, isInTelegramContext, isAuthenticated, isAdmin, 
-      isLoading, error, safeWebAppCall
+      isLoading, error, safeWebAppCall, forceUpdateApp // Added forceUpdateApp
   ]);
 }

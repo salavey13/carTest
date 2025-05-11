@@ -11,7 +11,7 @@ import {
   FaChevronRight, FaSpinner, 
   FaListCheck, 
   FaShieldHalved, FaStar, FaMedal, FaPaperPlane, FaCodeBranch, FaGithub, FaTree, FaCrosshairs, FaSearchengin, FaRobot, FaVial, FaPlus, FaDownload, FaCode,
-  FaCommentDots, FaGears, FaBroom, FaScroll, FaImages 
+  FaCommentDots, FaGears, FaBroom, FaScroll, FaImages, FaKiwiBird 
 } from "react-icons/fa6";
 import { useState, useEffect } from "react";
 import Modal from "@/components/ui/Modal";
@@ -61,6 +61,7 @@ const getAchievementIconComponent = (iconName: string | undefined): React.ReactN
         "FaBroom": <FaBroom className="text-orange-400" />,
         "FaScroll": <FaScroll className="text-yellow-600" />,
         "FaImages": <FaImages className="text-indigo-400" />,
+        "FaKiwiBird": <FaKiwiBird className="text-lime-500" />,
     };
     return iconsMap[iconName] || <FaMedal className="text-brand-yellow" />;
 };
