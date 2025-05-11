@@ -74,6 +74,13 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const loadProfile = async () => {
+      logger.log(`[ProfilePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticated: ${isAuthenticated}, dbUser.id: ${dbUser?.id}`);
+      if (appLoading) {
+        logger.log(`[ProfilePage] AppContext is still loading. Waiting to fetch profile.`);
+        setProfileLoading(true); 
+        return;
+      }
+
       if (dbUser?.id) {
         setProfileLoading(true);
         logger.log(`[ProfilePage] Context loaded, dbUser.id available. Fetching profile for user ${dbUser.id}`);
@@ -92,8 +99,8 @@ export default function ProfilePage() {
           });
         }
         setProfileLoading(false);
-      } else if (!appLoading && !isAuthenticated) {
-        logger.log(`[ProfilePage] Context loaded, user not authenticated. Using guest profile.`);
+      } else {
+        logger.log(`[ProfilePage] Context loaded, but no dbUser.id (isAuthenticated: ${isAuthenticated}). Using guest profile.`);
         setCyberProfile({ 
             level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Guest Mode", 
             unlockedPerks: ["Basic Interface"], activeQuests: ["Explore CyberVibe Studio"], 
@@ -102,24 +109,14 @@ export default function ProfilePage() {
             featuresUsed: {}
         });
         setProfileLoading(false);
-      } else if (!appLoading && isAuthenticated && !dbUser?.id) {
-        logger.warn(`[ProfilePage] Context loaded, authenticated, but dbUser.id still missing. Using 'Syncing...' profile.`);
-        setCyberProfile({ 
-            level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Syncing...", 
-            unlockedPerks: [], activeQuests: [], achievements: [],
-            dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0,
-            totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0,
-            featuresUsed: {}
-        });
-        setProfileLoading(false);
-      } else if (appLoading) {
-        logger.log(`[ProfilePage] AppContext is still loading. Waiting to fetch profile.`);
       }
     };
+
     loadProfile();
   }, [dbUser, appLoading, isAuthenticated]);
 
   const isLoadingDisplay = appLoading || profileLoading || !cyberProfile;
+
 
   if (isLoadingDisplay) {
     return (
@@ -141,7 +138,7 @@ export default function ProfilePage() {
   
   const displayWeeklyActivity = cyberProfile?.dailyActivityLog && cyberProfile.dailyActivityLog.length > 0
     ? cyberProfile.dailyActivityLog.map(log => {
-        const date = new Date(log.date + "T00:00:00Z"); // Ensure date is parsed as UTC then formatted to local
+        const date = new Date(log.date + "T00:00:00Z"); 
         return {
             name: format(date, 'EE', { locale: ru }).toUpperCase(),
             value: (log.filesExtracted * 50) + (log.tokensProcessed * 0.1) + (log.kworkRequestsSent || 0) * 10 + (log.prsCreated || 0) * 200 + (log.branchesUpdated || 0) * 100,
@@ -152,7 +149,7 @@ export default function ProfilePage() {
             prsCreated: log.prsCreated || 0,
             branchesUpdated: log.branchesUpdated || 0,
         };
-      }).slice(-7) // Show last 7 days
+      }).slice(-7) 
     : DEFAULT_WEEKLY_ACTIVITY;
 
   const stats = [

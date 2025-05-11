@@ -25,11 +25,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         "[AppContext Provider] Memoizing contextValue. telegramData props:", 
         { 
             isLoading: telegramData.isLoading, 
-            // Check actual type of isAdmin from telegramData
             isAdminIsFunction: typeof telegramData.isAdmin === 'function', 
             dbUserStatus: telegramData.dbUser?.status,
             dbUserRole: telegramData.dbUser?.role,
             isAuthenticated: telegramData.isAuthenticated,
+            isMockUser: process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' // For mock user toast
         }
     );
     return {
@@ -41,10 +41,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     telegramData.dbUser, 
     telegramData.isInTelegramContext, 
     telegramData.isAuthenticated, 
-    telegramData.isAdmin, // Crucial: include the function reference itself
+    telegramData.isAdmin, 
     telegramData.isLoading, 
     telegramData.error,
-    telegramData.openLink, // Assuming these methods from useTelegram are stable (wrapped in useCallback)
+    telegramData.openLink, 
     telegramData.close,
     telegramData.showPopup,
     telegramData.sendData,
@@ -71,6 +71,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let currentToastId: string | number | undefined;
     let loadingTimer: NodeJS.Timeout | null = null;
     const LOADING_TOAST_DELAY = 300;
+    let mockUserToastId: string | number | undefined;
 
     if (contextValue.isLoading) {
        loadingTimer = setTimeout(() => {
@@ -82,6 +83,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else {
         if (loadingTimer) clearTimeout(loadingTimer);
         toast.dismiss("auth-loading-toast");
+
+        // Show Mock User Toast only once after loading is complete
+        if (process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && !toast.customToast && document.visibilityState === 'visible') {
+             logger.info("[AppContext] Using MOCK_USER. Displaying info toast.");
+             mockUserToastId = toast.info("Внимание: используется тестовый пользователь!", {
+                 description: "Данные могут не сохраняться или вести себя иначе, чем в Telegram.",
+                 duration: 5000,
+                 id: "mock-user-info-toast"
+             });
+        }
 
         if (contextValue.isAuthenticated && !contextValue.error) {
              if (document.visibilityState === 'visible') {
@@ -101,10 +112,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (loadingTimer) {
             clearTimeout(loadingTimer);
         }
-        // Do not dismiss toasts here generally, let them self-dismiss or be dismissed by other logic
-        // toast.dismiss(currentToastId); // Avoid this unless specifically needed for this effect's lifecycle
+        // Only dismiss toasts managed by this effect if needed, e.g., loading toast.
+        // Mock user toast and auth success/error toasts should self-dismiss or be manually dismissed.
     };
   }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.error]);
+
 
   return <AppContext.Provider value={contextValue as AppContextData}>{children}</AppContext.Provider>;
 };
@@ -112,15 +124,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 export const useAppContext = (): AppContextData => {
   const context = useContext(AppContext);
   
-  // Default loading state if context is not yet fully initialized
   if (!context || Object.keys(context).length === 0 || context.isLoading === undefined ) {
      logger.warn("useAppContext: Context is empty or `isLoading` is undefined. Returning loading defaults.");
      return {
-        // Default values from useTelegram structure
         tg: null, user: null, dbUser: null, isInTelegramContext: false, isAuthenticated: false, 
         isLoading: true, error: null, 
-        isAdmin: () => false, // Default isAdmin function
-        // Default implementations for other methods from useTelegram
+        isAdmin: () => false, 
         openLink: (url: string) => logger.warn(`openLink(${url}) called on loading context`),
         close: () => logger.warn('close() called on loading context'),
         showPopup: (params: any) => logger.warn('showPopup() called on loading context', params),
@@ -129,18 +138,15 @@ export const useAppContext = (): AppContextData => {
         expand: () => logger.warn('expand() called on loading context'),
         setHeaderColor: (color: string) => logger.warn(`setHeaderColor(${color}) called on loading context`),
         setBackgroundColor: (color: string) => logger.warn(`setBackgroundColor(${color}) called on loading context`),
-        // Ensure all properties of AppContextData are present
-        platform: 'unknown', // Example: if platform is part of AppContextData
-        themeParams: { bg_color: '#000000', text_color: '#ffffff', hint_color: '#888888', link_color: '#007aff', button_color: '#007aff', button_text_color: '#ffffff', secondary_bg_color: '#1c1c1d', header_bg_color: '#000000', accent_text_color: '#007aff', section_bg_color: '#1c1c1d', section_header_text_color: '#8e8e93', subtitle_text_color: '#8e8e93', destructive_text_color: '#ff3b30' },
-        initData: undefined,
-        initDataUnsafe: { query_id: undefined, user: undefined, receiver: undefined, chat: undefined, chat_type: undefined, chat_instance: undefined, start_param: undefined, can_send_after: undefined, auth_date: 0, hash: '' },
-        colorScheme: 'dark',
+        // Defaulting other fields as per their types or from an initial state object if useTelegram provides one
+        platform: undefined, 
+        themeParams: undefined,
+        initData: undefined, 
+        initDataUnsafe: undefined,
+        colorScheme: undefined,
      } as AppContextData; 
   }
 
-  // CRITICAL: Context is loaded (isLoading: false) but isAdmin is STILL not a function.
-  // This signifies a deeper issue in useTelegram or AppProvider's memoization.
-  // This check should only happen if dbUser is actually available, otherwise isAdmin might legitimately not be ready.
   if (context.isLoading === false && typeof context.isAdmin !== 'function') {
     logger.error(
         "useAppContext: CRITICAL - Context is loaded (isLoading: false) but context.isAdmin is NOT a function. This suggests an issue in useTelegram or AppProvider's provision of isAdmin.", 
@@ -152,12 +158,9 @@ export const useAppContext = (): AppContextData => {
             contextKeys: Object.keys(context)
         }
     );
-    // Fallback: provide a default isAdmin that checks the dbUser if available, otherwise false.
-    // This prevents crashes but masks the underlying problem that isAdmin wasn't correctly passed from useTelegram.
     const fallbackIsAdmin = () => {
         if (context.dbUser) {
             const statusIsAdmin = context.dbUser.status === 'admin';
-            // Adjust role check as per your actual admin role names
             const roleIsAdmin = context.dbUser.role === 'vprAdmin' || context.dbUser.role === 'admin'; 
             logger.warn(`[useAppContext Fallback isAdmin] Using direct dbUser check. Status: ${context.dbUser.status}, Role: ${context.dbUser.role}. Determined isAdmin: ${statusIsAdmin || roleIsAdmin}`);
             return statusIsAdmin || roleIsAdmin;
@@ -166,8 +169,8 @@ export const useAppContext = (): AppContextData => {
         return false;
     };
     return {
-        ...(context as AppContextData), // Spread what we have
-        isAdmin: fallbackIsAdmin, // Override with the fallback
+        ...(context as AppContextData), 
+        isAdmin: fallbackIsAdmin, 
     } as AppContextData;
   }
 
