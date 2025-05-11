@@ -10,7 +10,8 @@ import {
   FaRightFromBracket,
   FaChevronRight, FaSpinner, 
   FaListCheck, 
-  FaShieldHalved, FaStar, FaMedal, FaPaperPlane, FaCodeBranch, FaGithub, FaTree, FaCrosshairs, FaSearchengin, FaRobot, FaVial, FaPlus, FaDownload, FaCode
+  FaShieldHalved, FaStar, FaMedal, FaPaperPlane, FaCodeBranch, FaGithub, FaTree, FaCrosshairs, FaSearchengin, FaRobot, FaVial, FaPlus, FaDownload, FaCode,
+  FaCommentDots, FaGears, FaBroom, FaScroll, FaImages 
 } from "react-icons/fa6";
 import { useState, useEffect } from "react";
 import Modal from "@/components/ui/Modal";
@@ -55,12 +56,18 @@ const getAchievementIconComponent = (iconName: string | undefined): React.ReactN
         "FaBolt": <FaBolt className="text-orange-500" />, 
         "FaDownload": <FaDownload className="text-blue-400" />,
         "FaCode": <FaCode className="text-purple-400" />,
+        "FaCommentDots": <FaCommentDots className="text-teal-400" />,
+        "FaGears": <FaGears className="text-gray-400" />,
+        "FaBroom": <FaBroom className="text-orange-400" />,
+        "FaScroll": <FaScroll className="text-yellow-600" />,
+        "FaImages": <FaImages className="text-indigo-400" />,
     };
     return iconsMap[iconName] || <FaMedal className="text-brand-yellow" />;
 };
 
 export default function ProfilePage() {
-  const { user: telegramUser, dbUser, isLoading: appLoading } = useAppContext(); 
+  const appContext = useAppContext();
+  const { user: telegramUser, dbUser, isLoading: appLoading, isAuthenticating } = appContext;
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPerksModalOpen, setIsPerksModalOpen] = useState(false);
   const [isAchievementsModalOpen, setIsAchievementsModalOpen] = useState(false);
@@ -74,16 +81,16 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const loadProfile = async () => {
-      logger.log(`[ProfilePage] loadProfile triggered. appLoading: ${appLoading}, dbUser.id: ${dbUser?.id}`);
-      if (appLoading) {
-        logger.log(`[ProfilePage] AppContext is still loading. Waiting to fetch profile.`);
+      logger.log(`[ProfilePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticating: ${isAuthenticating}, dbUser.id: ${dbUser?.id}`);
+      if (appLoading || isAuthenticating) {
+        logger.log(`[ProfilePage] AppContext is still loading or authenticating. Waiting to fetch profile.`);
         setProfileLoading(true);
         return;
       }
 
       if (dbUser?.id) {
         setProfileLoading(true);
-        logger.log(`[ProfilePage] Context loaded, dbUser.id available. Fetching profile for user ${dbUser.id}`);
+        logger.log(`[ProfilePage] Context fully loaded, dbUser.id available. Fetching profile for user ${dbUser.id}`);
         const result = await fetchUserCyberFitnessProfile(dbUser.id);
         if (result.success && result.data) {
           setCyberProfile(result.data);
@@ -100,7 +107,7 @@ export default function ProfilePage() {
         }
         setProfileLoading(false);
       } else { 
-        logger.log(`[ProfilePage] Context loaded, but no dbUser.id. Using guest profile.`);
+        logger.log(`[ProfilePage] Context fully loaded, but no dbUser.id. Using guest profile.`);
         setCyberProfile({ 
             level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Guest Mode", 
             unlockedPerks: ["Basic Interface"], activeQuests: ["Explore CyberVibe Studio"], 
@@ -113,9 +120,9 @@ export default function ProfilePage() {
     };
 
     loadProfile();
-  }, [dbUser, appLoading]);
+  }, [dbUser, appLoading, isAuthenticating]); // Added isAuthenticating
 
-  const isLoadingDisplay = appLoading || profileLoading;
+  const isLoadingDisplay = appLoading || isAuthenticating || profileLoading;
 
 
   if (isLoadingDisplay) {
