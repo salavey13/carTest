@@ -1,13 +1,12 @@
 "use client";
 
-import React from 'react'; // Explicit import for older setups
+import React from 'react'; 
 import { FaLightbulb, FaUsers, FaGlasses, FaBolt, FaRobot, FaBrain, FaCode, FaTools, FaChartLine, FaHandshake, FaNetworkWired, FaFilm, FaGamepad } from 'react-icons/fa6';
 import { FaMoneyBillWave, FaKey, FaRocket, FaBomb, FaUserAstronaut, FaSignature, FaMobile, FaEye, FaCarBurst, FaUpLong } from 'react-icons/fa6';
 
-
 const GamePlanPage = () => {
   const pageTitle = "Supervibe Game Plan: Взломай Матрицу";
-  const userName = "Павел"; // Можно будет сделать динамическим, если нужно
+  const userName = "Павел"; 
 
   const acts = [
     {
@@ -36,12 +35,9 @@ const GamePlanPage = () => {
           text: "<strong>Зов к Приключениям:</strong> «Ты всю жизнь это чувствовал, Нео… что с этим миром что-то не так». Мы играем на этом чувстве неудовлетворенности. Supervibe OS предлагает «красную таблетку» – шанс увидеть, как всё *могло бы* быть."
         },
         {
-          type: "image_prompt_heading",
-          text: "Промпт для Изображения (Акт I):"
-        },
-        {
-          type: "image_prompt",
-          prompt: "A lone figure in a dark, chaotic digital landscape of glitching code and tangled data streams, reaching towards a pair of sleek, glowing cybernetic glasses that emit a clear, focused beam of light, piercing through the noise. Cyberpunk aesthetic, neon blues and purples, dramatic lighting, sense of revelation. --ar 16:9 --style raw --v 6.0"
+          type: "image_display",
+          imageUrl: "https://picsum.photos/seed/matrix_glases_vibe/1280/720",
+          altText: "Визуализация для Акта I: ПРОБУЖДЕНИЕ КОДА. Фигура в цифровом хаосе тянется к светящимся кибер-очкам."
         }
       ]
     },
@@ -71,12 +67,9 @@ const GamePlanPage = () => {
           text: "<strong>Первый Полёт:</strong> Ты запускаешь свой первый *реальный* проект с Supervibe OS. Это быстрее, легче и мощнее всего, что ты испытывал. Ты *чувствуешь* ВАЙБ."
         },
         {
-          type: "image_prompt_heading",
-          text: "Промпт для Изображения (Акт II):"
-        },
-        {
-          type: "image_prompt",
-          prompt: "Dynamic scene of an individual in a high-tech workshop, surrounded by holographic blueprints and assisted by sleek AI robotic arms, constructing a personalized, glowing digital interface that forms around them like an Iron Man suit. Cyberpunk, vibrant energy, focused intensity, workshop clutter with advanced tech. --ar 16:9 --style raw --v 6.0"
+          type: "image_display",
+          imageUrl: "https://picsum.photos/seed/iron_man_workshop_vibe/1280/720",
+          altText: "Визуализация для Акта II: КОВКА ЖЕЛЕЗНОГО ЧЕЛОВЕКА. Человек в мастерской создает цифровой интерфейс."
         }
       ]
     },
@@ -111,12 +104,9 @@ const GamePlanPage = () => {
           text: "<strong>Митинг «Я НИКУДА НЕ УХОЖУ!»:</strong> Сообщество видит результаты, свободу, *деньги*. Они полностью в теме. ВАЙБ заразителен."
         },
         {
-          type: "image_prompt_heading",
-          text: "Промпт для Изображения (Акт III):"
-        },
-        {
-          type: "image_prompt",
-          prompt: "Energetic scene of a charismatic figure orchestrating a 'VIBE trading floor,' digital screens showing rapidly validated ideas and launching projects as branching light trails that multiply exponentially. Upbeat, ethical high-tech finance, controlled chaos, network growth visualization, cyberpunk office. --ar 16:9 --style raw --v 6.0"
+          type: "image_display",
+          imageUrl: "https://picsum.photos/seed/wolf_wallstreet_vibe_floor/1280/720",
+          altText: "Визуализация для Акта III: МЕТОД ВОЛКА С УОЛЛ-СТРИТ. Энергичная сцена на 'VIBE торговом этаже'."
         }
       ]
     },
@@ -158,12 +148,9 @@ const GamePlanPage = () => {
           text: "<strong>«Нельзя завести 500 миллионов друзей, не нажив несколько врагов»:</strong> По мере того как Supervibe OS будет подрывать старые индустрии (веб-студии, традиционный маркетинг), будет и сопротивление. Мы отвечаем на это прозрачностью, результатами и неустанным фокусом на расширении возможностей пользователей."
         },
         {
-          type: "image_prompt_heading",
-          text: "Промпт для Изображения (Акт IV):"
-        },
-        {
-          type: "image_prompt",
-          prompt: "A stunning wide shot of a glowing, interconnected global network. Diverse user avatars as nodes of light, linked by vibrant data streams, collaborating on a shared digital platform that pulses with creative energy. Sense of community, innovation, and global scale. Cosmic cyberpunk. --ar 16:9 --style raw --v 6.0"
+          type: "image_display",
+          imageUrl: "https://picsum.photos/seed/social_network_global_vibe/1280/720",
+          altText: "Визуализация для Акта IV: ЭФФЕКТ СОЦИАЛЬНОЙ СЕТИ. Светящаяся глобальная сеть пользователей."
         }
       ]
     },
@@ -203,12 +190,9 @@ const GamePlanPage = () => {
           text: "<strong>Финальный Кадр:</strong> Ты смотришь на процветающую глобальную сеть пользователей Supervibe OS, все творят, все растут, все свободны. Экран гаснет, когда новый пользователь входит в систему, его глаза расширяются от открывающихся возможностей… «Ого»."
         },
         {
-          type: "image_prompt_heading",
-          text: "Промпт для Изображения (Акт V):"
-        },
-        {
-          type: "image_prompt",
-          prompt: "A visionary figure, seen from behind or in profile, calmly overlooking a vast and intricate digital cityscape representing the Supervibe OS ecosystem. Clean lines, organized complexity, flowing data rivers, a sense of immense scale and future potential. Sophisticated cyberpunk, serene but powerful. --ar 16:9 --style raw --v 6.0"
+          type: "image_display",
+          imageUrl: "https://picsum.photos/seed/architect_digital_city_vibe/1280/720",
+          altText: "Визуализация для Акта V: АРХИТЕКТОР. Фигура с видом на сложный цифровой городской пейзаж."
         }
       ]
     }
@@ -238,7 +222,6 @@ const GamePlanPage = () => {
       "<strong>«Франшиза Школы Кунг-Фу» (Multiplier Program):</strong> Обучай других, получай процент. Масштабирование."
     ]
   };
-
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-4 md:p-8 pt-24 font-mono">
@@ -273,13 +256,15 @@ const GamePlanPage = () => {
                     </ul>
                   );
                 }
-                if (item.type === "image_prompt_heading") {
-                  return <h4 key={itemIndex} className="text-lg font-semibold mt-6 mb-1 text-yellow-400" dangerouslySetInnerHTML={{ __html: item.text }} />;
-                }
-                if (item.type === "image_prompt") {
+                if (item.type === "image_display") {
                   return (
-                    <div key={itemIndex} className="bg-gray-800 p-3 rounded-md border border-gray-600 text-sm text-gray-400 italic">
-                      <p className="font-courier">{item.prompt}</p>
+                    <div key={itemIndex} className="my-6 rounded-lg overflow-hidden border-2 border-purple-500/30 shadow-xl hover:shadow-purple-500/20 transition-all duration-300 ease-in-out">
+                      <img 
+                        src={item.imageUrl} 
+                        alt={item.altText} 
+                        className="w-full h-auto object-cover aspect-video" 
+                        loading="lazy"
+                      />
                     </div>
                   );
                 }
