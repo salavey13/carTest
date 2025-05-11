@@ -10,7 +10,8 @@ import {
   FaRightFromBracket,
   FaChevronRight, FaSpinner, 
   FaListCheck, 
-  FaShieldHalved, FaStar, FaMedal, FaPaperPlane, FaCodeBranch, FaGithub, FaTree, FaCrosshairs, FaSearchengin, FaRobot, FaVial, FaPlus
+  FaShieldHalved, FaStar, FaMedal, FaPaperPlane, FaCodeBranch, FaGithub, FaTree, FaCrosshairs, FaSearchengin, FaRobot, FaVial, FaPlus, FaDownload, FaCode,
+  FaCommentDots, FaGears, FaBroom, FaScroll, FaImages, FaKiwiBird 
 } from "react-icons/fa6";
 import { useState, useEffect } from "react";
 import Modal from "@/components/ui/Modal";
@@ -18,14 +19,15 @@ import { toast } from "sonner";
 import {
   fetchUserCyberFitnessProfile,
   CyberFitnessProfile,
-  getAchievementDetails 
+  getAchievementDetails,
+  Achievement 
 } from "@/hooks/cyberFitnessSupabase";
-import { debugLogger } from "@/lib/debugLogger";
+import { debugLogger as logger } from "@/lib/debugLogger";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts';
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import Link from "next/link";
-import { format } from 'date-fns'; // For formatting dates in chart
-import { ru } from 'date-fns/locale'; // For Russian day names
+import { format } from 'date-fns'; 
+import { ru } from 'date-fns/locale'; 
 
 const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png";
 const DEFAULT_WEEKLY_ACTIVITY = Array.from({ length: 7 }).map((_, i) => {
@@ -38,33 +40,38 @@ const CHART_COLORS = [
   'hsl(var(--neon-lime))'
 ];
 
-// Helper to get an icon for an achievement ID
 const getAchievementIconComponent = (iconName: string | undefined): React.ReactNode => {
     if (!iconName) return <FaMedal className="text-brand-yellow" />;
     const iconsMap: Record<string, React.ReactElement> = {
         "FaVial": <FaVial className="text-brand-green" />,
         "FaPaperPlane": <FaPaperPlane className="text-brand-cyan" />,
         "FaCodeBranch": <FaCodeBranch className="text-brand-purple" />,
-        "FaGithub": <FaGithub className="text-light-text" />, // Assuming light-text is defined
+        "FaGithub": <FaGithub className="text-light-text" />, 
         "FaTree": <FaTree className="text-brand-green" />,
-        "FaCrosshairs": <FaCrosshairs className="text-red-500" />, // Direct color
+        "FaCrosshairs": <FaCrosshairs className="text-red-500" />, 
         "FaSearchengin": <FaSearchengin className="text-brand-blue" />,
         "FaRobot": <FaRobot className="text-brand-pink" />,
         "FaStar": <FaStar className="text-brand-yellow" />,
-        "FaPlus": <FaPlus className="text-neon-lime" />, // For Files Extracted
-        "FaBolt": <FaBolt className="text-orange-500" />, // For Tokens Processed
-        // Add more mappings as needed
+        "FaPlus": <FaPlus className="text-neon-lime" />, 
+        "FaBolt": <FaBolt className="text-orange-500" />, 
+        "FaDownload": <FaDownload className="text-blue-400" />,
+        "FaCode": <FaCode className="text-purple-400" />,
+        "FaCommentDots": <FaCommentDots className="text-teal-400" />,
+        "FaGears": <FaGears className="text-gray-400" />,
+        "FaBroom": <FaBroom className="text-orange-400" />,
+        "FaScroll": <FaScroll className="text-yellow-600" />,
+        "FaImages": <FaImages className="text-indigo-400" />,
+        "FaKiwiBird": <FaKiwiBird className="text-lime-500" />,
     };
     return iconsMap[iconName] || <FaMedal className="text-brand-yellow" />;
 };
 
-
 export default function ProfilePage() {
-  const { user: telegramUser, dbUser, isLoading: appLoading } = useAppContext();
+  const appContext = useAppContext();
+  const { user: telegramUser, dbUser, isLoading: appLoading, isAuthenticating } = appContext; 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPerksModalOpen, setIsPerksModalOpen] = useState(false);
   const [isAchievementsModalOpen, setIsAchievementsModalOpen] = useState(false);
-
 
   const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState<boolean>(true);
@@ -75,17 +82,24 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const loadProfile = async () => {
-      if (dbUser?.id) {
-        debugLogger.log(`[ProfilePage] Fetching CyberFitness profile for ${dbUser.id}`);
+      logger.log(`[ProfilePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticating: ${isAuthenticating}, dbUser.id: ${dbUser?.id}`);
+      if (appLoading || isAuthenticating) {
+        logger.log(`[ProfilePage] AppContext is still loading or authenticating. Waiting to fetch profile.`);
         setProfileLoading(true);
+        return;
+      }
+
+      if (dbUser?.id) {
+        setProfileLoading(true);
+        logger.log(`[ProfilePage] Context fully loaded and authenticated, dbUser.id available. Fetching profile for user ${dbUser.id}`);
         const result = await fetchUserCyberFitnessProfile(dbUser.id);
         if (result.success && result.data) {
           setCyberProfile(result.data);
-          debugLogger.log("[ProfilePage] CyberFitness profile loaded:", result.data);
+          logger.log("[ProfilePage] CyberFitness profile loaded:", result.data);
         } else {
-          debugLogger.warn(`[ProfilePage] Failed to load CyberFitness profile for ${dbUser.id}. Error: ${result.error}. Initializing default.`);
+          logger.warn(`[ProfilePage] Failed to load CyberFitness profile for ${dbUser.id}. Error: ${result.error}. Initializing default.`);
           setCyberProfile({ 
-            level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Alpha", 
+            level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Alpha Error", 
             unlockedPerks: [], activeQuests: [], achievements: [],
             dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0,
             totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0,
@@ -93,8 +107,8 @@ export default function ProfilePage() {
           });
         }
         setProfileLoading(false);
-      } else if (!appLoading) { 
-        debugLogger.log("[ProfilePage] No dbUser ID, using default/guest CyberFitness profile.");
+      } else { 
+        logger.log(`[ProfilePage] Context fully loaded and auth complete, but no dbUser.id. Using guest profile.`);
         setCyberProfile({ 
             level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Guest Mode", 
             unlockedPerks: ["Basic Interface"], activeQuests: ["Explore CyberVibe Studio"], 
@@ -106,12 +120,13 @@ export default function ProfilePage() {
       }
     };
 
-    if (!appLoading) loadProfile();
-  }, [dbUser, appLoading]);
+    loadProfile();
+  }, [dbUser, appLoading, isAuthenticating]); 
 
-  const isLoading = appLoading || profileLoading;
+  const isLoadingDisplay = appLoading || isAuthenticating || profileLoading;
 
-  if (isLoading) {
+
+  if (isLoadingDisplay) {
     return (
       <div className="min-h-screen bg-dark-bg flex flex-col items-center justify-center p-4 text-center">
         <FaSpinner className="text-5xl text-brand-cyan animate-spin mb-6" />
@@ -131,7 +146,7 @@ export default function ProfilePage() {
   
   const displayWeeklyActivity = cyberProfile?.dailyActivityLog && cyberProfile.dailyActivityLog.length > 0
     ? cyberProfile.dailyActivityLog.map(log => {
-        const date = new Date(log.date + "T00:00:00"); // Ensure date is parsed as local
+        const date = new Date(log.date + "T00:00:00Z"); 
         return {
             name: format(date, 'EE', { locale: ru }).toUpperCase(),
             value: (log.filesExtracted * 50) + (log.tokensProcessed * 0.1) + (log.kworkRequestsSent || 0) * 10 + (log.prsCreated || 0) * 200 + (log.branchesUpdated || 0) * 100,
@@ -142,7 +157,7 @@ export default function ProfilePage() {
             prsCreated: log.prsCreated || 0,
             branchesUpdated: log.branchesUpdated || 0,
         };
-      }).slice(0,7).reverse()
+      }).slice(-7) 
     : DEFAULT_WEEKLY_ACTIVITY;
 
   const stats = [
@@ -237,7 +252,7 @@ export default function ProfilePage() {
                                     if (payload.kworkRequestsSent > 0) details.push(`${payload.kworkRequestsSent}req`);
                                     if (payload.prsCreated > 0) details.push(`${payload.prsCreated}PR`);
                                     if (payload.branchesUpdated > 0) details.push(`${payload.branchesUpdated}Br`);
-                                    return [`${value} VP`, details.join(', ') || 'Простой'];
+                                    return [`${value.toFixed(0)} VP`, details.join(', ') || 'Простой'];
                                 }}
                             />
                             <Bar dataKey="value" radius={[3, 3, 0, 0]} barSize={20} minPointSize={3}>

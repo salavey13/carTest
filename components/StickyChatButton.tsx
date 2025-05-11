@@ -1,3 +1,4 @@
+// /components/StickyChatButton.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -7,7 +8,7 @@ import {
     FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
     FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard,
     FaPaperPlane, FaLightbulb, FaImages, FaSquareArrowUpRight, FaFileImport,
-    FaClipboardList, FaCircleCheck
+    FaClipboardList, FaCircleCheck, FaCommentDots // Added FaCommentDots
 } from "react-icons/fa6";
 
 // Import Subcomponents
@@ -23,7 +24,9 @@ import { useAppContext } from "@/contexts/AppContext";
 import { getGitHubUserProfile } from "@/app/actions_github/actions";
 import { debugLogger as logger, type LogRecord } from "@/lib/debugLogger";
 import { useAppToast } from "@/hooks/useAppToast";
-import useInactivityTimer from "@/hooks/useInactivityTimer"; // Import the new hook
+import useInactivityTimer from "@/hooks/useInactivityTimer"; 
+import { checkAndUnlockFeatureAchievement } from "@/hooks/cyberFitnessSupabase"; // For achievements
+
 
 // --- Constants & Types ---
 const INACTIVITY_TIMEOUT_MS = 60000; // 1 minute
@@ -61,7 +64,7 @@ const isImageUrl = (url: string): boolean => { if (!url || !isValidUrl(url)) { r
 const StickyChatButton: React.FC = () => {
     // --- State ---
     const [isOpen, setIsOpen] = useState(false); 
-    const hasOpenedDueToInactivityRef = useRef(false); // Tracks if opened by inactivity for current path
+    const hasOpenedDueToInactivityRef = useRef(false); 
     const [activeMessage, setActiveMessage] = useState<string>("Загрузка..."); 
     const [githubProfile, setGithubProfile] = useState<GitHubProfile | null>(null); 
     const [githubLoading, setGithubLoading] = useState<boolean>(false); 
@@ -75,29 +78,25 @@ const StickyChatButton: React.FC = () => {
     const currentPath = usePathname(); 
     const router = useRouter(); 
     const searchParams = useSearchParams(); 
-    const { user: appContextUser, isLoading: isAppLoading } = useAppContext();
-    const { success: toastSuccess, error: toastError, info: toastInfo } = useAppToast();
+    const { user: appContextUser, isLoading: isAppLoading, dbUser } = useAppContext(); // Added dbUser for achievement check
+    const { success: toastSuccess, error: toastError, info: toastInfo, addToast } = useAppToast();
 
-    // --- Inactivity Timer ---
-    // Enable inactivity-based opening only if not on /repo-xml page (to avoid conflict with AutomationBuddy)
     const enableInactivityOpen = currentPath !== '/repo-xml';
     useInactivityTimer(
         INACTIVITY_TIMEOUT_MS,
-        () => { // onInactive
+        () => { 
             if (enableInactivityOpen && !isOpen && !hasOpenedDueToInactivityRef.current) {
                 logger.log("[StickyChatButton] Inactivity detected, auto-opening.");
                 setIsOpen(true);
                 hasOpenedDueToInactivityRef.current = true;
             }
         },
-        undefined, // onActive (optional)
+        undefined, 
         "StickyChatButton"
     );
 
-    // --- Fetch GitHub Profile ---
     useEffect(() => { setPrevGithubLoading(githubLoading); if (isOpen && !isAppLoading && appContextUser?.username && !githubProfile && !githubLoading) { const fetchProfile = async () => { setGithubLoading(true); const result = await getGitHubUserProfile(appContextUser.username!); if (result.success && result.profile) { setGithubProfile(result.profile); } else { console.warn("(StickyChat) GitHub fetch failed:", result.error); setGithubProfile(null); } setGithubLoading(false); }; fetchProfile(); } if (!appContextUser) { setGithubProfile(null); setGithubLoading(false); } }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading]);
 
-    // --- Copy Logs Handler ---
     const handleCopyLogs = useCallback(async () => {
         const plannedAction = "[StickyChat] Plan: Copy internal logs to clipboard.";
         if (typeof logger === 'undefined' || typeof logger.getInternalLogRecords !== 'function') {
@@ -135,7 +134,6 @@ const StickyChatButton: React.FC = () => {
         }
     }, [toastSuccess, toastError, toastInfo]);
 
-    // --- Suggestion Logic ---
     const suggestions = useMemo((): Suggestion[] => {
         const baseSuggestions: Suggestion[] = []; const isToolPage = currentPath === '/repo-xml'; const cleanPath = currentPath.split('?')[0]; const trimmedCustomIdea = customIdea.trim(); const hasCustomIdea = trimmedCustomIdea.length > 0 && !potentialOldImageUrl;
         if (!isToolPage) {
@@ -148,7 +146,6 @@ const StickyChatButton: React.FC = () => {
         return baseSuggestions;
     }, [currentPath, potentialOldImageUrl, showReplaceTool, customIdea, logsCopied, handleCopyLogs]);
 
-    // --- Update Active Message Logic ---
     useEffect(() => {
         if (isAppLoading || githubLoading) { let loadingMsg = "Подключаюсь..."; if (githubLoading) loadingMsg = `Ищу твой профиль GitHub... 🧐`; setActiveMessage(loadingMsg); return; } let userIdentifier = githubProfile?.name || appContextUser?.first_name || appContextUser?.username || null; const baseGreeting = userIdentifier ? `Здарова, ${userIdentifier}!` : "Эй, Кодер!"; const justLoadedProfile = prevGithubLoading && !githubLoading && githubProfile; const cleanPath = currentPath.split('?')[0]; const isToolPage = cleanPath === '/repo-xml'; let message = "";
         if (isToolPage) { message = `${baseGreeting} Ты в СуперВайб Студии! ✨ Используй Бадди справа для помощи.`; }
@@ -156,26 +153,20 @@ const StickyChatButton: React.FC = () => {
         setActiveMessage(message);
     }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading, prevGithubLoading, currentPath, potentialOldImageUrl, showReplaceTool, customIdea]);
 
-    // Removed old auto-open timer logic, now handled by useInactivityTimer
-
-    // --- Handle Escape Key ---
     const handleEscKey = useCallback((event: KeyboardEvent) => { if (event.key === 'Escape' && isOpen) { setIsOpen(false); setShowReplaceTool(false); } }, [isOpen]);
     useEffect(() => { if (isOpen) { document.addEventListener('keydown', handleEscKey); } else { document.removeEventListener('keydown', handleEscKey); } return () => { document.removeEventListener('keydown', handleEscKey); }; }, [isOpen, handleEscKey]);
     
-    // --- Reset state on path change ---
     useEffect(() => { 
         setCustomIdea(""); 
         setPotentialOldImageUrl(null); 
         setShowReplaceTool(false); 
-        setIsOpen(false); 
-        hasOpenedDueToInactivityRef.current = false; // Reset inactivity open flag for the new page
+        // setIsOpen(false); // Do not close on path change, user might want to keep it open
+        hasOpenedDueToInactivityRef.current = false; 
         setLogsCopied(false); 
     }, [currentPath]);
     
-    // --- Detect Image URL in Custom Input ---
     useEffect(() => { const trimmedIdea = customIdea.trim(); if (trimmedIdea && isImageUrl(trimmedIdea)) { logger.debug(`[Flow 1 - Image Swap] StickyChat: Detected image URL in input: ${trimmedIdea}`); setPotentialOldImageUrl(trimmedIdea); } else { if(potentialOldImageUrl) logger.debug(`[StickyChat] Input changed, clearing potential image URL.`); setPotentialOldImageUrl(null); if (showReplaceTool) { setShowReplaceTool(false); } } }, [customIdea, showReplaceTool, potentialOldImageUrl]); 
 
-    // --- Event Handlers ---
     const handleSuggestionClick = (suggestion: Suggestion) => {
         if (suggestion.disabled) return; logger.debug("(StickyChat) Suggestion Clicked:", suggestion.id); 
         if (suggestion.action) { suggestion.action(); }
@@ -212,23 +203,26 @@ const StickyChatButton: React.FC = () => {
     const handleCancelReplace = () => { logger.debug("[Flow 1 - Image Swap] StickyChat: Replace cancelled."); setShowReplaceTool(false); }; 
     const handleOverlayClick = () => { logger.debug("[StickyChat] Overlay clicked, closing."); setIsOpen(false); setShowReplaceTool(false); requestAnimationFrame(() => document.body.focus()); }; 
     const handleDialogClick = (e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
-    const handleFabClick = () => { 
+    const handleFabClick = async () => { 
         const newIsOpenState = !isOpen;
         logger.debug(`[StickyChat] FAB clicked. Will open: ${newIsOpenState}`); 
         setIsOpen(newIsOpenState); 
-        if (newIsOpenState) { // If opening
-            hasOpenedDueToInactivityRef.current = true; // Manual open should prevent inactivity open for this path session
+        if (newIsOpenState) { 
+            hasOpenedDueToInactivityRef.current = true; 
             setShowReplaceTool(false); 
             setCustomIdea(""); 
             setPotentialOldImageUrl(null); 
             setLogsCopied(false); 
-        } else { // If closing
+            if(dbUser?.id){
+                const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'sticky_chat_opened');
+                newAchievements?.forEach(ach => addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
+            }
+        } else { 
             setShowReplaceTool(false); 
             requestAnimationFrame(() => document.body.focus()); 
         }
     }; 
 
-    // --- Render Logic ---
     const showInputArea = isOpen && !showReplaceTool && currentPath !== '/repo-xml';
     logger.debug("[StickyChat] Rendering...", { isOpen, showInputArea, showReplaceTool, potentialOldImageUrl }); 
 
@@ -250,8 +244,7 @@ const StickyChatButton: React.FC = () => {
                     </motion.div>
                 </motion.div>
             ) : ( 
-                // Adjusted FAB position: more bottom padding
-                !isAppLoading && <div className="fixed bottom-12 left-4 z-40"> 
+                !isAppLoading && <div className="fixed bottom-16 left-4 z-40 sm:bottom-4"> 
                     <FloatingActionButton onClick={handleFabClick} variants={fabVariants} /> 
                 </div> 
             )}

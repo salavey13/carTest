@@ -45,46 +45,85 @@ const itemVariants = {
 };
 
 export default function Home() {
-  const { user: telegramUser, dbUser, isAuthenticated, isLoading: appLoading, error: appContextError } = useAppContext(); 
-  const userName = dbUser?.first_name || telegramUser?.first_name || 'Agent';
-
+  const appContext = useAppContext(); 
+  const { user: telegramUser, dbUser, isLoading: appLoading, error: appContextError, isAuthenticating } = appContext;
+  
   const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const loadProfile = async () => {
+      logger.log(`[HomePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticating: ${isAuthenticating}, dbUser.id: ${dbUser?.id}`);
+      if (appLoading || isAuthenticating) { 
+        logger.log(`[HomePage] AppContext is still loading or authenticating. Waiting to fetch profile.`);
+        setProfileLoading(true);
+        return;
+      }
+
+      // AppContext is loaded (appLoading is false) and authentication process is complete (isAuthenticating is false)
       if (dbUser?.id) {
         setProfileLoading(true);
+        logger.log(`[HomePage] Context fully loaded and authenticated, dbUser.id available. Fetching profile for user ${dbUser.id}`);
         const result = await fetchUserCyberFitnessProfile(dbUser.id);
-        if (result.success && result.data) setCyberProfile(result.data);
-        else {
-          logger.warn(`Home: Failed to load profile for ${dbUser.id}. Error: ${result.error}. Defaulting.`);
-          setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Alpha", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
+        if (result.success && result.data) {
+          setCyberProfile(result.data);
+          logger.log(`[HomePage] Profile loaded for ${dbUser.id}:`, result.data);
+        } else {
+          logger.warn(`[HomePage] Failed to load profile for ${dbUser.id}. Error: ${result.error}. Defaulting.`);
+          setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Alpha Error", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
         }
         setProfileLoading(false);
-      } else if (!appLoading) { 
-        setProfileLoading(false);
+      } else { 
+        logger.log(`[HomePage] Context fully loaded and auth complete, but no dbUser.id. Using guest profile.`);
         setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Guest Mode", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
+        setProfileLoading(false);
       }
     };
-    if (!appLoading) loadProfile();
-  }, [dbUser, appLoading]);
 
-  const isLoading = appLoading || profileLoading;
+    loadProfile();
 
-  if (isLoading) { /* Loading state UI */ }
-  if (appContextError) { /* Error state UI */ }
+  }, [dbUser, appLoading, isAuthenticating]); 
+
+  const isLoadingDisplay = appLoading || isAuthenticating || profileLoading; 
+
+  const userName = cyberProfile?.cognitiveOSVersion?.includes("Guest")
+    ? 'Agent' 
+    : dbUser?.first_name || telegramUser?.first_name || 'Agent';
+  
+  const currentLevel = cyberProfile?.level ?? 0;
+  const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || (isLoadingDisplay ? "Загрузка ОС..." : "v0.1 Alpha");
+
+
+  if (isLoadingDisplay && !cyberProfile) { 
+      return (
+         <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-4 text-center">
+            <FaBrain className="text-5xl text-brand-pink animate-pulse mb-6" />
+            <p className="text-brand-pink font-orbitron text-xl animate-pulse tracking-widest">
+              ЗАГРУЗКА ИНТЕРФЕЙСА АГЕНТА...
+            </p>
+         </div>
+      );
+  }
+  if (appContextError) { 
+      return (
+         <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-4 text-center">
+            <FaUserNinja className="text-5xl text-red-500 mb-6" />
+            <p className="text-red-500 font-orbitron text-xl">
+              Ошибка загрузки контекста: {appContextError.message}
+            </p>
+         </div>
+      );
+  }
 
   const chartReadyWeeklyActivity = (cyberProfile?.dailyActivityLog && cyberProfile.dailyActivityLog.length > 0 
-    ? cyberProfile.dailyActivityLog.map(d => ({ name: format(new Date(d.date), 'EEE', {locale: ru}).substring(0,2).toUpperCase(), value: d.kworkRequestsSent || 0, label: `${d.kworkRequestsSent || 0} req` }))
+    ? cyberProfile.dailyActivityLog.map(d => ({ name: format(new Date(d.date + "T00:00:00Z"), 'EEE', {locale: ru}).substring(0,2).toUpperCase(), value: d.kworkRequestsSent || 0, label: `${d.kworkRequestsSent || 0} req` }))
     : DEFAULT_WEEKLY_ACTIVITY
-  ).slice(0,7);
+  ).slice(-7); 
 
   const totalKiloVibes = cyberProfile?.kiloVibes || 0;
   const focusTimeHours = cyberProfile?.focusTimeHours || 0;
   const skillsLeveled = cyberProfile?.skillsLeveled || 0;
-  const currentLevel = cyberProfile?.level || 0;
-  const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || "v0.1 Alpha";
+
 
   return ( 
     <div className="homepage-wrapper">
@@ -120,13 +159,13 @@ export default function Home() {
                  <div className="featured-quest-image-overlay"></div>
                  <div className="absolute bottom-2 left-3 sm:bottom-3 sm:left-4 text-white z-10 p-1">
                     <h3 className="text-md sm:text-lg font-bold font-orbitron text-shadow-[0_0_8px_theme(colors.brand-cyan)]">
-                      <VibeContentRenderer content="<FaGamepad className='inline text-brand-pink/90 mr-2 text-2xl sm:text-3xl align-middle'/>INITIATE: CyberDev OS Training Program" />
+                      <VibeContentRenderer content="::FaGamepad className='inline text-brand-pink/90 mr-2 text-2xl sm:text-3xl align-middle'::INITIATE: CyberDev OS Training Program" />
                     </h3>
                     <div className="text-xs sm:text-sm font-mono text-gray-300">
                         <span>Your journey from Level 0:&nbsp;</span>
-                        <FaEye className='inline mx-0.5 align-middle'/>
+                        <VibeContentRenderer content="::FaEye className='inline mx-0.5 align-middle'::" />
                         <span>&nbsp;See the Code,&nbsp;</span>
-                        <FaBolt className='inline mx-0.5 align-middle'/>
+                        <VibeContentRenderer content="::FaBolt className='inline mx-0.5 align-middle'::" />
                         <span>&nbsp;Become the Vibe.</span>
                     </div>
                   </div>
