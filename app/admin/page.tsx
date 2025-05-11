@@ -19,30 +19,40 @@ export default function AdminPage() {
     logger.debug("[AdminPage] useEffect triggered", { 
       dbUserExists: !!dbUser, 
       appContextLoading, 
-      isAdminFunctionExists: typeof isAdmin === 'function' 
+      isAdminFunctionExistsOnLoad: typeof isAdmin === 'function' // Log initial state of isAdmin
     });
 
     if (appContextLoading) {
       logger.debug("[AdminPage] AppContext is loading, admin check deferred.");
-      return; // Wait for context to load
+      setIsAdminChecked(null); 
+      return; 
     }
 
-    // AppContext is now loaded, proceed with admin check
+    // AppContext is now loaded (appContextLoading is false)
     logger.debug("[AdminPage] AppContext loaded. Proceeding with admin check.");
     
-    const adminStatus = typeof isAdmin === 'function' ? isAdmin() : false;
-    logger.debug("[AdminPage] isAdmin function called, status:", adminStatus);
-    setIsAdminChecked(adminStatus); // Set the determined admin status
+    if (typeof isAdmin !== 'function') {
+        // This case should ideally be handled by useAppContext returning a default if isAdmin is still undefined post-load
+        logger.error("[AdminPage] isAdmin is STILL not a function in AppContext after loading. This indicates a deeper issue in context setup. Defaulting to non-admin.");
+        setIsAdminChecked(false); 
+        // Redirect immediately if isAdmin is fundamentally missing after load
+        toast.error("Ошибка проверки прав доступа. Перенаправление...");
+        router.push("/");
+        return;
+    }
+    
+    const adminStatus = isAdmin(); // Now it's safe to call
+    logger.debug("[AdminPage] isAdmin() function called, status:", adminStatus);
+    setIsAdminChecked(adminStatus);
 
     if (adminStatus) {
-      // Only show toast if user is confirmed admin and dbUser is available (implies auth flow completed)
       if (dbUser) {
           toast.success("Добро пожаловать в Центр Управления, командир!");
       } else {
-          logger.warn("[AdminPage] Admin status true, but dbUser not yet available for welcome toast.");
+          logger.warn("[AdminPage] Admin status true, but dbUser not yet available for welcome toast (might be mock user context).");
       }
     } else {
-      // This block will now only execute if appContextLoading is false AND adminStatus is false
+      // This block will execute if appContextLoading is false AND adminStatus is false
       toast.error("Доступ запрещён. Перенаправляю в Матрицу...");
       logger.warn("[AdminPage] Access denied (appContextLoaded: true, adminStatus: false). Redirecting to /");
       router.push("/");
@@ -50,7 +60,6 @@ export default function AdminPage() {
 
   }, [dbUser, isAdmin, router, appContextLoading]);
 
-  // Show loading spinner if AppContext is loading OR if admin status hasn't been determined yet
   if (appContextLoading || isAdminChecked === null) { 
     logger.debug("[AdminPage] Rendering loading state", { appContextLoading, isAdminChecked });
     return (
@@ -64,13 +73,15 @@ export default function AdminPage() {
     );
   }
 
-  // If checks are done and user is not admin, render null (should have been redirected by useEffect)
   if (!isAdminChecked) {
-    logger.debug("[AdminPage] Not admin after checks, rendering null (should have been redirected by useEffect).");
-    return null; 
+    logger.debug("[AdminPage] Not admin after checks, rendering null (redirection should have occurred).");
+    return (
+        <div className="min-h-screen bg-background flex items-center justify-center">
+            <p className="text-red-500">Перенаправление...</p>
+        </div>
+    ); 
   }
   
-  // If all checks passed and user is admin, render admin content
   logger.debug("[AdminPage] Rendering admin content.");
   return (
     <div className="min-h-screen pt-24 bg-background bg-grid-pattern animate-[drift_30s_infinite]">
