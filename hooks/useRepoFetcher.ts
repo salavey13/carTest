@@ -10,7 +10,7 @@ interface RepoContentResult {
     error?: string;
 }
 
-const MAX_RETRIES = 2; // Reduced from 3 to 2 (total 3 attempts: initial + 2 retries)
+const MAX_RETRIES = 2; 
 const RETRY_DELAY_MS = 3000;
 
 export const useRepoFetcher = (
@@ -35,10 +35,10 @@ export const useRepoFetcher = (
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [progress, setProgress] = useState<number>(0);
-    const [isFetchDisabled, setIsFetchDisabled] = useState<boolean>(false); // New state for disabling fetch
+    const [isFetchDisabled, setIsFetchDisabled] = useState<boolean>(false); 
     const [retryCount, setRetryCount] = useState<number>(0);
-    const isFetchingRef = useRef(false); // Ref to track ongoing fetch, prevents multiple triggers
-    const isAutoFetchingRef = useRef(false); // Ref for auto-fetch logic
+    const isFetchingRef = useRef(false); 
+    const isAutoFetchingRef = useRef(false); 
     logger.debug("[useRepoFetcher] Before useState");
 
     const currentBranchName = initialManualBranchName.trim() || initialTargetBranchName || 'default';
@@ -46,7 +46,7 @@ export const useRepoFetcher = (
 
 
     useEffect(() => {
-        setRepoUrl(initialRepoUrl); // Sync local repoUrl if initialRepoUrl prop changes
+        setRepoUrl(initialRepoUrl); 
     }, [initialRepoUrl]);
     logger.debug("[useRepoFetcher] Before useRef");
 
@@ -73,27 +73,25 @@ export const useRepoFetcher = (
         setError(null);
         setProgress(0);
         setFetchStatus(isRetry ? 'retrying' : 'loading');
-        activeImageTaskRef.current = imageTask || null; // Store the active task for this fetch operation
+        activeImageTaskRef.current = imageTask || null; 
 
-        // Determine the actual branch to use for this fetch
         const branchForFetch = branch || currentBranchName;
         logger.debug(`[useRepoFetcher fetchRepoContents] Effective branch for fetch: ${branchForFetch}`);
 
         let result: RepoContentResult = { files: [], primaryHighlightedPath: null, secondaryHighlightedPaths: { component: [], context: [], hook: [], lib: [], other: [] } };
+        let currentFetchOpStatus: FetchStatus = 'loading'; // Local status for this operation
 
         try {
-            // Use the GitHub action for fetching
             const actionResult = await fetchRepoContentsAction(
                 repoUrl,
                 branchForFetch,
                 (p: number) => setProgress(p),
-                activeImageTaskRef.current // Pass the specific task for this fetch
+                activeImageTaskRef.current 
             );
 
             if (actionResult.success && actionResult.data) {
                 logger.info(`[useRepoFetcher fetchRepoContents] Fetch successful. Files: ${actionResult.data.length}`);
                 setFiles(actionResult.data);
-                // If pathForInitialSelection is provided, use it as primary. Otherwise, let actionResult's primary logic dictate.
                 const primaryHighlight = pathForInitialSelection ?? actionResult.primaryHighlightedPath ?? null;
                 result = {
                     files: actionResult.data,
@@ -102,8 +100,9 @@ export const useRepoFetcher = (
                 };
                 onSetFilesFetched(true, result.files, result.primaryHighlightedPath, result.secondaryHighlightedPaths);
                 setFetchStatus('success');
-                setRetryCount(0); // Reset retry count on success
-                setError(null); // Clear any previous error
+                currentFetchOpStatus = 'success';
+                setRetryCount(0); 
+                setError(null); 
             } else {
                 throw new Error(actionResult.error || "Unknown error fetching repository contents from action.");
             }
@@ -115,43 +114,41 @@ export const useRepoFetcher = (
             setFiles([]);
             onSetFilesFetched(false, [], null, { component: [], context: [], hook: [], lib: [], other: [] });
 
-            if (isRetry && retryCount >= MAX_RETRIES -1) { // MAX_RETRIES-1 because retryCount is 0-indexed for attempts
+            if (isRetry && retryCount >= MAX_RETRIES -1) { 
                 logger.warn(`[useRepoFetcher fetchRepoContents] Max retries (${MAX_RETRIES}) reached for ${repoUrl}.`);
                 setFetchStatus('failed_retries');
+                currentFetchOpStatus = 'failed_retries';
                 addToast(`Достигнуто макс. попыток загрузки для ${repoUrl.split('/').pop()}.`, "error");
             } else {
-                setFetchStatus('error'); // Keep as 'error' if retries are still possible
-                // Auto-retry logic is handled by the caller (e.g., useEffect in RepoTxtFetcher) or manual button
+                setFetchStatus('error'); 
+                currentFetchOpStatus = 'error';
             }
         } finally {
             setLoading(false);
             isFetchingRef.current = false;
-            setProgress(100); // Ensure progress bar completes visually
-            activeImageTaskRef.current = null; // Clear the task after fetch attempt
-            logger.info(`[useRepoFetcher fetchRepoContents] Finished. Status: ${fetchStatus}`);
+            setProgress(100); 
+            activeImageTaskRef.current = null; 
+            logger.info(`[useRepoFetcher fetchRepoContents] Finished. Operation Status: ${currentFetchOpStatus}`); // Use local op status
         }
         return result;
-    }, [repoUrl, onSetFilesFetched, setFetchStatus, addToast, currentBranchName, retryCount]); // Added retryCount
+    }, [repoUrl, onSetFilesFetched, setFetchStatus, addToast, currentBranchName, retryCount, fetchStatus]); // Added fetchStatus to dependencies
 
     logger.debug("[useRepoFetcher] Before Callbacks");
 
-    // --- Auto-retry logic (optional, can be handled by UI too) ---
     useEffect(() => {
-        if (fetchStatus === 'error' && retryCount < MAX_RETRIES) {
+        if (fetchStatus === 'error' && retryCount < MAX_RETRIES && !isFetchingRef.current) { // Added !isFetchingRef.current
             const timeoutId = setTimeout(() => {
                 logger.info(`[useRepoFetcher AutoRetry] Retrying fetch (${retryCount + 1}/${MAX_RETRIES})...`);
                 setRetryCount(prev => prev + 1);
-                fetchRepoContents(true, currentBranchName, activeImageTaskRef.current) // Pass current image task for retry
+                fetchRepoContents(true, currentBranchName, activeImageTaskRef.current) 
                     .catch(e => logger.error("[useRepoFetcher AutoRetry] Error in scheduled retry:", e));
             }, RETRY_DELAY_MS);
             return () => clearTimeout(timeoutId);
         }
-    }, [fetchStatus, retryCount, fetchRepoContents, currentBranchName]); // Removed activeImageTaskRef from deps, it's handled by being passed directly.
+    }, [fetchStatus, retryCount, fetchRepoContents, currentBranchName]); 
     logger.debug("[useRepoFetcher] After Callbacks and Effects");
 
     const derivedIsLoading = loading || fetchStatus === 'loading' || fetchStatus === 'retrying';
-    // isFetchDisabled remains an independent state, controlled by specific UI/logic needs
-    // rather than just derived from loading state.
     logger.debug(`[useRepoFetcher Derived State] isLoading=${derivedIsLoading}, isFetchDisabled=${isFetchDisabled}`);
 
 
@@ -160,17 +157,17 @@ export const useRepoFetcher = (
         repoUrl,
         setRepoUrl,
         files,
-        setFiles, // Expose setFiles if direct manipulation is needed elsewhere (use with caution)
-        loading: derivedIsLoading, // Use derived loading state
+        setFiles, 
+        loading: derivedIsLoading, 
         error,
-        setError, // Expose setError for manual error setting if needed
+        setError, 
         progress,
-        isFetchDisabled, // Use the state variable
-        setIsFetchDisabled, // Expose setter for isFetchDisabled
+        isFetchDisabled, 
+        setIsFetchDisabled, 
         retryCount,
         maxRetries,
-        triggerFetch: fetchRepoContents, // Expose the main fetch function directly
-        isFetchingRef, // Expose ref for external checks if needed
-        isAutoFetchingRef // Expose ref for auto-fetch logic
+        triggerFetch: fetchRepoContents, 
+        isFetchingRef, 
+        isAutoFetchingRef 
     };
 };
