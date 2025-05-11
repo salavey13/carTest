@@ -12,11 +12,15 @@ import {
     FaLightbulb, FaRoad, FaUsers, FaRocket, FaCodeBranch,
     FaArrowsSpin, FaNetworkWired, FaBookOpen, FaComments, FaBrain, FaEye,
     FaFileCode, FaRobot, FaWandMagicSparkles, FaBullseye, FaEnvelopeOpenText,
-    FaMagnifyingGlass, FaChartLine, FaRegLightbulb, FaListCheck, FaArrowUpRightFromSquare // Added FaArrowUpRightFromSquare
+    FaMagnifyingGlass, FaChartLine, FaRegLightbulb, FaListCheck, FaArrowUpRightFromSquare,
+    FaSkullCrossbones, // Icon for negative framing
+    FaShieldCat,      // Icon for protection/validation
+    FaGamepad // Added for link
 } from "react-icons/fa6";
 import { debugLogger } from "@/lib/debugLogger";
 import Link from "next/link";
 import Image from "next/image";
+import { cn } from "@/lib/utils"; // Import cn utility
 
 // --- Component ---
 export default function SelfDevLandingPage() {
@@ -28,21 +32,21 @@ export default function SelfDevLandingPage() {
     debugLogger.log("[SelfDevPage] Mounted. Auth loading:", isAuthLoading, "Is Authenticated:", isAuthenticated);
   }, [isAuthLoading, isAuthenticated]);
 
-  // Tooltip descriptions (kept existing, added new placeholders)
+  // Tooltip descriptions (Refined for clarity and impact)
   const tooltipDescriptions: Record<string, string> = {
-      's101.png': "Визуализация ловушки традиционного подхода к карьере (поиск 'работы', следование чужим правилам) в сравнении с путём SelfDev, ориентированным на создание жизни и бизнеса вокруг своей аутентичности и решения собственных проблем.",
-      's201.png': "Майнд-карта, иллюстрирующая концепцию 'стать нишей': как ваши личные интересы, уникальные навыки, решенные проблемы и жизненный опыт становятся фундаментом для построения аутентичного и осмысленного бизнеса.",
-      's301.png': "Схематическое изображение воронки контент-маркетинга в парадигме SelfDev: как регулярное создание ценного, резонирующего с вами контента приводит к органическому построению доверия, росту лояльной аудитории и, как следствие, к возможностям монетизации без агрессивных продаж.",
-      's401.png': "Диаграмма, показывающая стратегию эволюции ваших предложений по мере роста вашей экспертизы и аудитории: начиная с высокочековых услуг (фриланс, консалтинг) для небольшой аудитории и постепенно переходя к созданию масштабируемых продуктов (курсы, ПО, шаблоны) для более широкого охвата.",
-      's501.png': "Инфографика, описывающая практические шаги метода 'интеллектуальной имитации' для обучения и старта: наблюдение за успешными примерами в вашей сфере, деконструкция их ключевых элементов, имитация отдельных частей (не копирование!) и постепенное формирование собственного уникального стиля и подхода.",
-      's601.png': "Визуальная метафора: создание основополагающего 'контента Почему' (ваша история, философия, основы темы) как прочного фундамента. Этот контент необходим для того, чтобы аудитория поняла вашу ценность и начала вам доверять, прежде чем покупать 'контент Как' (продукты/услуги).",
-      's701.png': "Визуализация того, как AI-инструменты (чат-боты, код, автоматизация, анализ данных) усиливают возможности человека, а не заменяют его. Это симбиоз, где человек задает направление, а AI ускоряет процесс.",
-      's801.png': "Инфографика показывает, как AI позволяет перейти от массовых рассылок к созданию уникальных, персонализированных сообщений для каждого потенциального клиента, используя обогащенные данные и автоматизацию.",
-      // NEW Tooltips for Validation Framework
-      'validation-problem.png': "AI (Perplexity, ChatGPT) анализирует форумы и соцсети, выявляя реальные 'боли' пользователей, связанные с вашей идеей. Нет боли = нет идеи.",
-      'validation-market.png': "AI оценивает размер потенциального рынка, анализируя Google Trends, объем поисковых запросов и данные TAM. Слишком маленький рынок = не стоит усилий.",
-      'validation-competitors.png': "AI изучает сайты и отзывы конкурентов, чтобы найти незакрытые потребности и 'голубые океаны' на рынке. Нет явного преимущества = подумай еще раз.",
-      'validation-mvp.png': "Вместо долгой разработки, AI помогает быстро создать 'fake door' MVP - реалистичный лендинг для проверки спроса без реального продукта.",
+      's101.png': "Визуализация ловушки: Старый путь - поиск 'работы', следование чужим правилам, риск стать ненужным 'динозавром'. Новый путь (SelfDev) - создание жизни и дела вокруг ТЕБЯ.",
+      's201.png': "Концепция 'Ты - Ниша': Как твои уникальные интересы, навыки, решенные проблемы и опыт становятся фундаментом аутентичного и осмысленного дела.",
+      's301.png': "SelfDev Контент-Маркетинг: Регулярное создание ценного контента строит доверие и аудиторию органически, ведя к монетизации без агрессивных продаж.",
+      's401.png': "Стратегия Роста: Начни с высокочековых услуг для узкой аудитории, затем, усиленный AI, создавай масштабируемые продукты (курсы, ПО) для широкого охвата.",
+      's501.png': "Метод 'Интеллектуальной Имитации': Наблюдай -> Разбирай -> Имитируй элементы (не копируй!) -> Формируй свой уникальный стиль.",
+      's601.png': "Фундамент Доверия: 'Контент Почему' (твоя история, философия) необходим, чтобы аудитория поняла твою ценность ДО покупки 'Контента Как' (продуктов/услуг).",
+      's701.png': "AI - Твой Усилитель: Не замена, а симбиоз. Ты задаешь направление, AI многократно ускоряет процесс. Сила одного = сила команды.",
+      's801.png': "AI Персонализация: Переход от безликих рассылок к созданию уникальных, релевантных сообщений для каждого, используя данные и автоматизацию. Ключ к Outbound.",
+      // NEW Tooltips for Validation Framework (More benefit-focused)
+      'validation-problem.png': "AI Находит Реальную Боль: Анализ форумов/соцсетей выявляет, действительно ли твоя идея решает чью-то проблему. Нет боли = сэкономленное время.",
+      'validation-market.png': "AI Оценивает Рынок: Анализ трендов и запросов показывает, достаточно ли людей с этой болью. Маленький рынок = избегаешь пустой траты ресурсов.",
+      'validation-competitors.png': "AI Ищет Преимущество: Изучение конкурентов помогает найти незакрытые ниши и 'голубые океаны'. Нет УТП = вовремя меняешь курс.",
+      'validation-mvp.png': "AI-Тест Спроса (Fake Door): Быстро создай реалистичный лендинг для проверки интереса БЕЗ разработки продукта. Нет спроса = идея убита до затрат.",
   };
 
   if (!isMounted || isAuthLoading) {
@@ -53,8 +57,10 @@ export default function SelfDevLandingPage() {
     );
   }
 
+  // --- Component Render ---
   return (
     <div className="relative min-h-screen overflow-hidden pt-20 pb-10 bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200">
+      {/* Background Grid */}
       <div
         className="absolute inset-0 bg-repeat opacity-5 z-0"
         style={{
@@ -64,236 +70,292 @@ export default function SelfDevLandingPage() {
         }}
       ></div>
 
-      <TooltipProvider delayDuration={200}>
+      <TooltipProvider delayDuration={150}> {/* Slightly faster tooltips */}
           <div className="relative z-10 container mx-auto px-4">
-            <Card className="max-w-5xl mx-auto bg-black/80 backdrop-blur-md text-white rounded-2xl border border-brand-green/30 shadow-[0_0_25px_rgba(0,255,157,0.4)]">
-              <CardHeader className="text-center border-b border-brand-green/20 pb-4">
-                <CardTitle className="text-3xl md:text-5xl font-bold text-brand-green cyber-text glitch" data-text="SelfDev: Путь к Себе">
-                  SelfDev: Путь к Себе
+            <Card className="max-w-5xl mx-auto bg-black/85 backdrop-blur-lg text-white rounded-2xl border border-brand-green/40 shadow-[0_0_30px_rgba(0,255,157,0.5)]">
+              {/* Header - Stronger Identity Statement */}
+              <CardHeader className="text-center border-b border-brand-green/25 pb-6">
+                <CardTitle className="text-3xl md:text-5xl font-bold text-brand-green cyber-text glitch" data-text="SelfDev: Стань Бизнесом">
+                  SelfDev: Стань Бизнесом
                 </CardTitle>
-                <p className="text-md md:text-lg text-gray-300 mt-3 font-mono">
-                  Лучшая бизнес-модель — это не модель. Это ТЫ. Усиленный AI.
+                <p className="text-md md:text-lg text-gray-300 mt-4 font-mono tracking-wide">
+                  Забудь модели. <strong className="text-brand-cyan font-semibold">ТЫ — лучшая бизнес-модель</strong>. Усиленная AI.
                 </p>
+                 {/* Added link to Gamified SelfDev */}
+                 <p className="mt-3 text-sm text-gray-400">
+                    Хочешь геймифицировать этот путь? Загляни сюда: <Link href="/selfdev/gamified" className="text-brand-yellow hover:underline font-semibold">Gamify Your Life <FaGamepad className="inline ml-1"/></Link>
+                 </p>
               </CardHeader>
 
-              <CardContent className="space-y-12 p-4 md:p-8">
+              <CardContent className="space-y-16 p-5 md:p-10"> {/* Increased spacing */}
 
-                {/* Sections 1 & 2 (Old vs New Paradigm) */}
-                <section className="space-y-4">
-                  <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-pink mb-4">
-                    <FaRoad className="mr-3 text-brand-pink/80" /> Ловушка Старой Парадигмы
+                {/* Section 1: The Trap (Negative Dissociation) */}
+                <section className="space-y-5">
+                  <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-pink mb-5">
+                    <FaSkullCrossbones className="mr-3 text-brand-pink/80" /> Ловушка Старой Парадигмы: Путь Динозавра
                   </h2>
                   <p className="text-gray-300 text-base md:text-lg leading-relaxed">
-                    Многие ищут "лучшие" навыки/модели, чтобы заработать. Они учатся по чужим правилам, действуя из нужды. Это путь <strong className="text-brand-pink font-semibold">Динозавра</strong> — специалиста, который рискует вымереть. Фокус только на деньгах уводит от главного.
+                    <strong className="text-brand-pink">Многие попадают в эту ловушку:</strong> ищут "лучшие" навыки, гонятся за чужими моделями, действуют из нужды. Они учатся по правилам системы, которая делает их <strong className="text-brand-pink font-semibold">заменяемыми специалистами, рискующими вымереть</strong>. Фокус только на деньгах <strong className="text-brand-pink">уводит от главного</strong> — от себя.
                   </p>
-                  <div className="my-6 p-2 border border-brand-pink/30 rounded-lg bg-black/30">
+                  {/* Image with clearer negative framing */}
+                  <div className="my-8 p-3 border border-brand-pink/40 rounded-xl bg-black/40">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        {/* Added span wrapper */}
                         <span>
-                          <div className="aspect-square w-full h-auto overflow-hidden rounded-md bg-gray-800/50 cursor-help">
-                            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s101.png" alt="Инфографика: Старый путь (ловушка) против Нового пути (свобода)" width={800} height={800} className="w-full h-full object-cover" loading="lazy" />
+                          <div className="aspect-video w-full h-auto overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-pink-900/30">
+                            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s101.png" alt="Старый путь (ловушка) против Нового пути (свобода)" width={800} height={450} className="w-full h-full object-contain" loading="lazy" />
                           </div>
                         </span>
                       </TooltipTrigger>
                       <TooltipContent side="bottom" className="max-w-[300px] text-center bg-gray-950 border border-brand-pink/60 text-white p-3 shadow-lg"> <p className="text-sm whitespace-pre-wrap">{tooltipDescriptions['s101.png']}</p> </TooltipContent>
                     </Tooltip>
-                    <p className="text-xs text-center text-gray-400 mt-1 italic">Старый путь ведет в ловушку, Новый - к свободе.</p>
+                    <p className="text-xs text-center text-gray-400 mt-2 italic font-mono">Старый путь ведет в тупик. Есть другой.</p>
                   </div>
                 </section>
-                <section className="space-y-4">
-                  <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-blue mb-4">
-                    <FaLightbulb className="mr-3 text-brand-blue/80" /> Новый Путь: Стань Нишей (Путь Черепахи)
+
+                {/* Section 2: The Solution (Identity Framing - You are the Niche) */}
+                <section className="space-y-5">
+                  <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-blue mb-5">
+                    <FaLightbulb className="mr-3 text-brand-blue/80" /> Новый Путь: Ты — Ниша (Путь Черепахи)
                   </h2>
                   <p className="text-gray-300 text-base md:text-lg leading-relaxed">
-                    Настоящий путь: "Какую жизнь я хочу?". Ты <strong className="text-brand-blue font-semibold">становишься нишей</strong>. Решаешь <strong className="text-brand-blue font-semibold">свои</strong> проблемы, помогаешь <strong className="text-brand-blue font-semibold">себе прошлому</strong>, строишь бизнес вокруг <strong className="text-brand-blue font-semibold">аутентичности</strong>. Это путь <strong className="text-brand-blue font-semibold">Черепахи</strong> — адаптивного генералиста. Деньги — <strong className="text-brand-blue font-semibold">ресурс</strong>, не <strong className="text-brand-blue font-semibold">цель</strong>. Адаптивность — ключ.
+                    Настоящий вопрос: "Какую жизнь <strong className="text-brand-blue font-semibold">ТЫ</strong> хочешь?". Вместо поиска ниши, <strong className="text-brand-blue font-semibold">ТЫ становишься нишей</strong>. Ты решаешь <strong className="text-brand-blue font-semibold">СВОИ</strong> проблемы, помогаешь <strong className="text-brand-blue font-semibold">себе прошлому</strong>, строишь дело вокруг своей <strong className="text-brand-blue font-semibold">аутентичности</strong>. Это путь <strong className="text-brand-blue font-semibold">Черепахи</strong> — адаптивного генералиста, который <strong className="text-brand-blue">выживает и процветает</strong>. Деньги — <strong className="text-brand-blue font-semibold">ресурс</strong> для твоей жизни, не <strong className="text-brand-blue font-semibold">цель</strong>. <strong className="text-brand-blue">Адаптивность — твоя суперсила.</strong>
                   </p>
-                   <div className="my-6 p-2 border border-brand-blue/30 rounded-lg bg-black/30">
+                   <div className="my-8 p-3 border border-brand-blue/40 rounded-xl bg-black/40">
                     <Tooltip>
                        <TooltipTrigger asChild>
-                         {/* Added span wrapper */}
                          <span>
-                           <div className="aspect-square w-full h-auto overflow-hidden rounded-md bg-gray-800/50 cursor-help">
-                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s201.png" alt="Майнд-карта: Построение бизнеса вокруг себя" width={800} height={800} className="w-full h-full object-cover" loading="lazy" />
+                           <div className="aspect-video w-full h-auto overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-blue-900/30">
+                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s201.png" alt="Майнд-карта: Построение бизнеса вокруг себя" width={800} height={450} className="w-full h-full object-contain" loading="lazy" />
                            </div>
                          </span>
                        </TooltipTrigger>
                        <TooltipContent side="bottom" className="max-w-[300px] text-center bg-gray-950 border border-brand-blue/60 text-white p-3 shadow-lg"> <p className="text-sm whitespace-pre-wrap">{tooltipDescriptions['s201.png']}</p> </TooltipContent>
                     </Tooltip>
-                     <p className="text-xs text-center text-gray-400 mt-1 italic">Твои интересы, навыки и решенные проблемы - основа бизнеса.</p>
+                     <p className="text-xs text-center text-gray-400 mt-2 italic font-mono">Твои интересы, навыки и решенные проблемы - твоя уникальная основа.</p>
                   </div>
                 </section>
 
-                {/* Section: AI как Усилитель */}
-                 <section className="space-y-4"> <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-cyan mb-4"> <FaRobot className="mr-3 text-brand-cyan/80" /> AI как Усилитель: Соло-Основатель 2.0 </h2> <p className="text-gray-300 text-base md:text-lg leading-relaxed"> <strong className="text-brand-cyan font-semibold">AI не заменит тебя</strong>. Тебя заменит <strong className="text-brand-cyan font-semibold">человек, использующий AI</strong>. Это твой ко-пилот, твой усилитель, позволяющий одному делать работу команды. </p> <div className="my-6 p-2 border border-brand-cyan/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                   {/* Added span wrapper */}
-                   <span>
-                     <div className="aspect-square w-full h-auto overflow-hidden rounded-md bg-gray-800/50 cursor-help">
-                       <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/agmOpmq_700b-24dabc36-ae9b-4a70-bd3b-9a2037cd805d.jpg" alt="Инфографика: AI как усилитель человеческих возможностей" width={800} height={800} className="w-full h-full object-cover" loading="lazy" />
-                     </div>
-                   </span>
-                   </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[300px] text-center bg-gray-950 border border-brand-cyan/60 text-white p-3 shadow-lg"> <p className="text-sm whitespace-pre-wrap">{tooltipDescriptions['s701.png']}</p> </TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">AI - твой партнер, а не конкурент.</p> </div> <p className="text-gray-300 text-base md:text-lg leading-relaxed font-semibold text-brand-cyan mb-2">Примеры AI-Усиления:</p> <ul className="list-disc list-inside space-y-2 text-gray-300 pl-4 text-base md:text-lg leading-relaxed"> <li><FaListCheck className="inline mr-1 text-cyan-400"/> <strong className="text-brand-cyan font-semibold">Мультипликация Контента:</strong> Одно интервью -&gt; 15 клипов (OpusClip), обложки (Canva), перевод (Claude), статьи (CastMagic). 1 контент = 50 ассетов.</li> <li><FaComments className="inline mr-1 text-cyan-400"/> <strong className="text-brand-cyan font-semibold">Ускорение Коммуникаций:</strong> Персональные email (ChatGPT), адаптивные sales-цепочки, голос бренда, авто-документация.</li> <li><FaWandMagicSparkles className="inline mr-1 text-cyan-400"/> <strong className="text-brand-cyan font-semibold">Визуальное Создание:</strong> 20 концептов за 20 минут (Midjourney, Leonardo), вместо 3 дней ожидания дизайнера.</li> <li><FaRocket className="inline mr-1 text-cyan-400"/> <strong className="text-brand-cyan font-semibold">E-commerce Ускорение:</strong> AI пишет описания, email-маркетинг, оптимизирует логистику (Shopify AI).</li> <li><FaArrowsSpin className="inline mr-1 text-cyan-400"/> <strong className="text-brand-cyan font-semibold">AI-Автоматизация (Zapier, Make):</strong> Связывай приложения, автоматизируй рутину.</li> <li><FaRobot className="inline mr-1 text-cyan-400"/> <strong className="text-brand-cyan font-semibold">AI-Агенты (Lindy, n8n):</strong> Автономные задачи (research, email).</li> <li><FaBrain className="inline mr-1 text-cyan-400"/> <strong className="text-brand-cyan font-semibold">Критическое Мышление с AI:</strong> Используй как советника для анализа идей.</li> </ul> </section>
-
-                {/* Section: AI Validation Framework */}
-                <section id="validation" className="space-y-4 border-t border-yellow-500/30 pt-8 mt-10"> <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-yellow mb-4"> <FaBullseye className="mr-3 text-brand-yellow/80" /> AI-Валидация: Убей Плохие Идеи Быстро </h2> <p className="text-gray-300 text-base md:text-lg leading-relaxed"> 90% бизнесов проваливаются, потому что основатели строят то, что никому не нужно. <strong className="text-brand-yellow font-semibold">AI меняет правила игры.</strong> Вместо месяцев разработки — 72 часа на валидацию. Хватит тратить время и деньги на мертвые идеи! </p> <p className="text-gray-300 text-base md:text-lg leading-relaxed font-semibold text-brand-yellow mb-2">5 Шагов AI-Валидации (Метод Тома Билью):</p> <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                 <div className="p-4 bg-gray-800/50 border border-yellow-600/40 rounded-lg"> <h3 className="flex items-center text-lg font-semibold text-yellow-400 mb-2"><FaMagnifyingGlass className="mr-2"/>1. Проверка Проблемы</h3> <p className="text-sm text-gray-300 mb-3">Есть ли реальная боль? Скорми AI (Perplexity, ChatGPT) треды Reddit, форумы, отзывы. Пусть найдет паттерны жалоб. Нет боли = мертвая идея.</p> <Tooltip> <TooltipTrigger asChild>
-                   {/* Added span wrapper */}
-                   <span>
-                     <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
-                       <Image src="/placeholders/validation-problem.png" alt="AI ищет боль пользователей" width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/>
-                     </div>
-                   </span>
-                   </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-yellow-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['validation-problem.png']}</p></TooltipContent> </Tooltip> </div>
-                 <div className="p-4 bg-gray-800/50 border border-yellow-600/40 rounded-lg"> <h3 className="flex items-center text-lg font-semibold text-yellow-400 mb-2"><FaChartLine className="mr-2"/>2. Анализ Рынка</h3> <p className="text-sm text-gray-300 mb-3">Если боль есть, достаточно ли людей ее испытывают? Пусть AI проанализирует Google Trends, объем поиска, TAM. Создаст таблицы потенциальных юзеров. Слишком мало = мертвая идея.</p> <Tooltip> <TooltipTrigger asChild>
-                   {/* Added span wrapper */}
-                   <span>
-                     <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
-                       <Image src="/placeholders/validation-market.png" alt="AI анализирует размер рынка" width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/>
-                     </div>
-                   </span>
-                   </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-yellow-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['validation-market.png']}</p></TooltipContent> </Tooltip> </div>
-                 <div className="p-4 bg-gray-800/50 border border-yellow-600/40 rounded-lg"> <h3 className="flex items-center text-lg font-semibold text-yellow-400 mb-2"><FaEye className="mr-2"/>3. Оценка Конкурентов</h3> <p className="text-sm text-gray-300 mb-3">Скорми AI топ-5 сайтов конкурентов, прайсинг, отзывы. Попроси найти пробелы и перенасыщенность. Создай карту того, чего не хватает. Нет явного преимущества = мертвая идея.</p> <Tooltip> <TooltipTrigger asChild>
-                   {/* Added span wrapper */}
-                   <span>
-                     <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
-                       <Image src="/placeholders/validation-competitors.png" alt="AI анализирует конкурентов" width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/>
-                     </div>
-                   </span>
-                   </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-yellow-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['validation-competitors.png']}</p></TooltipContent> </Tooltip> </div>
-                 <div className="p-4 bg-gray-800/50 border border-yellow-600/40 rounded-lg"> <h3 className="flex items-center text-lg font-semibold text-yellow-400 mb-2"><FaRegLightbulb className="mr-2"/>4. MVP за 0 Рублей</h3> <p className="text-sm text-gray-300 mb-3">Не строй продукт до валидации! С AI создай "fake door" тест: лендинг, который выглядит реальным. Собирай email/предоплаты. Нет интереса = мертвая идея.</p> <Tooltip> <TooltipTrigger asChild>
-                   {/* Added span wrapper */}
-                   <span>
-                     <div className="aspect-video w-full h-auto overflow-hidden rounded bg-gray-700/30 cursor-help">
-                       <Image src="/placeholders/validation-mvp.png" alt="AI создает 'fake door' MVP" width={400} height={225} className="w-full h-full object-cover opacity-50" loading="lazy"/>
-                     </div>
-                   </span>
-                   </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-yellow-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['validation-mvp.png']}</p></TooltipContent> </Tooltip> </div>
-                 </div> <p className="text-gray-300 text-base md:text-lg leading-relaxed mt-6"> <strong className="text-brand-yellow font-semibold">Шаг 5:</strong> Только если валидация пройдена — <strong className="text-brand-yellow font-semibold">строй то, что люди уже хотят</strong>. Используй AI для ускорения разработки (см. <Link href="/repo-xml" className="text-brand-blue hover:underline">СуперВайб Студию</Link>). </p> </section>
-
-                {/* Section: Персонализация в Масштабе */}
-                <section className="space-y-4"> <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-neon-lime mb-4"> <FaEnvelopeOpenText className="mr-3 text-neon-lime/80" /> Персонализация в Масштабе: AI Outbound </h2> <p className="text-gray-300 text-base md:text-lg leading-relaxed"> Забудь безликие рассылки. AI позволяет создавать <strong className="text-neon-lime font-semibold">глубоко персонализированный</strong> аутрич для тысяч людей, увеличивая конверсию в разы. Ключ к <strong className="text-neon-lime font-semibold">Outbound Sales</strong>. </p> <div className="my-6 p-2 border border-neon-lime/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                  {/* Added span wrapper */}
-                  <span>
-                    <div className="aspect-square w-full h-auto overflow-hidden rounded-md bg-gray-800/50 cursor-help">
-                      <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s801.png" alt="Инфографика: Персонализация аутрича с помощью AI" width={800} height={800} className="w-full h-full object-cover" loading="lazy" />
-                    </div>
-                  </span>
-                  </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[300px] text-center bg-gray-950 border border-neon-lime/60 text-white p-3 shadow-lg"> <p className="text-sm whitespace-pre-wrap">{tooltipDescriptions['s801.png']}</p> </TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">От массовости к точному попаданию в цель.</p> </div> <p className="text-gray-300 text-base md:text-lg leading-relaxed font-semibold text-neon-lime mb-2">Как это работает:</p> <ol className="list-decimal list-inside space-y-3 text-gray-300 pl-4 text-base md:text-lg leading-relaxed"> <li><strong className="text-neon-lime font-semibold">Сбор Лидов:</strong> AI ищет потенциальных клиентов.</li> <li><strong className="text-neon-lime font-semibold">Обогащение Данных:</strong> AI (<strong className="text-neon-lime font-semibold">Clay</strong>) находит доп. инфу о каждом (посты, новости, tech stack).</li> <li><strong className="text-neon-lime font-semibold">AI-Копирайтинг:</strong> AI (ChatGPT, Claude) пишет <strong className="text-neon-lime font-semibold">уникальные письма</strong>, ссылаясь на инфу ("Видел твой пост...", "Заметил, вы используете...").</li> <li><strong className="text-neon-lime font-semibold">Авто-Отправка:</strong> Секвенсеры (<strong className="text-neon-lime font-semibold">Outbond, HeyReach</strong>) отправляют персонализированные цепочки.</li> </ol> </section>
-
-                {/* Section: Evolving Your Offers */}
-                <section className="space-y-4"> <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-orange mb-4"> <FaArrowsSpin className="mr-3 text-brand-orange/80" /> Эволюция Предложений с AI </h2> <p className="text-gray-300 text-base md:text-lg leading-relaxed"> Твой бизнес растет с тобой. AI помогает масштабироваться. </p> <div className="my-6 p-2 border border-brand-orange/30 rounded-lg bg-black/30"> <Tooltip> <TooltipTrigger asChild>
-                  {/* Added span wrapper */}
-                  <span>
-                    <div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-800/50 cursor-help">
-                      <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/4-9a800381-390b-4153-a1a8-dae1f8850088.png" alt="Схема: Эволюция предложений с ростом аудитории" width={800} height={800} className="w-full h-full object-cover" loading="lazy" />
-                    </div>
-                  </span>
-                  </TooltipTrigger> <TooltipContent side="bottom" className="max-w-[300px] text-center bg-gray-950 border border-brand-orange/60 text-white p-3 shadow-lg"> <p className="text-sm whitespace-pre-wrap">{tooltipDescriptions['s401.png']}</p> </TooltipContent> </Tooltip> <p className="text-xs text-center text-gray-400 mt-1 italic">От услуг к продуктам по мере роста.</p> </div> <ul className="list-disc list-inside space-y-2 text-gray-300 pl-4 text-base md:text-lg leading-relaxed"> <li><strong className="text-brand-orange font-semibold">Начало:</strong> <strong className="text-brand-orange font-semibold">Высокочековые услуги</strong> (фриланс, коучинг).</li> <li><strong className="text-brand-orange font-semibold">Рост:</strong> <strong className="text-brand-orange font-semibold">Масштабируемые продукты</strong>. Используй AI для разработки (курсы, ПО, шаблоны).</li> </ul> <p className="text-gray-300 text-base md:text-lg leading-relaxed"> AI позволяет <strong className="text-brand-orange font-semibold">уменьшать время</strong>, <strong className="text-brand-orange font-semibold">увеличивать доход</strong> и <strong className="text-brand-orange font-semibold">контроль</strong>. </p> </section>
-
-                {/* Section 5: How to Learn & Start */}
-                <section className="space-y-4">
-                  <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-purple mb-4">
-                     <FaWandMagicSparkles className="mr-3 text-brand-purple/80" /> Как Начать: Изучай и Имитируй
-                  </h2>
-                  <p className="text-gray-300 text-base md:text-lg leading-relaxed">
-                    Учись как художник: наблюдай, <strong className="text-brand-purple font-semibold">изучай методологию</strong>, экспериментируй. Будь <strong className="text-brand-purple font-semibold">продакт-менеджером</strong> своего пути.
-                  </p>
-                   <div className="my-6 p-2 border border-brand-purple/30 rounded-lg bg-black/30">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        {/* Added span wrapper */}
-                        <span>
-                          <div className="aspect-square w-full h-auto overflow-hidden rounded-md bg-gray-800/50 cursor-help">
-                            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s501.png" alt="Инфографика: Процесс Интеллектуальной Имитации" width={800} height={800} className="w-full h-full object-cover" loading="lazy" />
-                          </div>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-[300px] text-center bg-gray-950 border border-brand-purple/60 text-white p-3 shadow-lg"> <p className="text-sm whitespace-pre-wrap">{tooltipDescriptions['s501.png']}</p> </TooltipContent>
-                    </Tooltip>
-                     <p className="text-xs text-center text-gray-400 mt-1 italic">Учись, наблюдая, разбирая и пробуя.</p>
-                   </div>
-                  <ol className="list-decimal list-inside space-y-3 text-gray-300 pl-4 text-base md:text-lg leading-relaxed">
-                    <li><strong className="text-brand-purple font-semibold">Собери Вдохновение:</strong> <FaEye className="inline mr-1 mb-1 text-brand-purple/80"/> Найди 3-5 примеров.</li>
-                    <li><strong className="text-brand-purple font-semibold">Разбери на Части:</strong> <FaFileCode className="inline mr-1 mb-1 text-brand-purple/80"/> Проанализируй структуру, стиль. Изучи <strong className="text-brand-purple font-semibold">методологию</strong>.</li>
-                    <li><strong className="text-brand-purple font-semibold">Имитируй Кусочек:</strong> <FaCodeBranch className="inline mr-1 mb-1 text-brand-purple/80"/> Возьми <strong className="text-brand-purple font-semibold">один</strong> элемент и примени. Используй AI{" "}
-                      <Link href="/repo-xml" className="text-brand-blue hover:underline font-semibold inline-flex items-center">
-                         (СуперВайб Студию <FaArrowUpRightFromSquare className="inline h-3 w-3 ml-1"/>)
-                      </Link>{" "}
-                      для ускорения.
-                    </li>
-                    <li><strong className="text-brand-purple font-semibold">Повторяй и Сочетай:</strong> <FaArrowsSpin className="inline mr-1 mb-1 text-brand-purple/80"/> Постепенно создашь <strong className="text-brand-purple font-semibold">свой стиль</strong>.</li>
-                    <li><strong className="text-brand-purple font-semibold">Дополняй Знаниями:</strong> <FaBrain className="inline mr-1 mb-1 text-brand-purple/80"/> Изучай теорию, чтобы понимать <strong className="text-brand-purple font-semibold">"почему"</strong>. Используй AI для поиска.</li>
-                  </ol>
-                   <h3 className="flex items-center text-xl font-semibold text-brand-purple mt-6 mb-2">
-                     <FaNetworkWired className="mr-2 text-brand-purple/80" /> Внедряйся в "Племя"
-                   </h3>
-                   <p className="text-gray-300 text-base md:text-lg leading-relaxed"> Найди 5-10 людей в нише. Комментируй осмысленно (AI поможет), вступай в сообщества, делись контентом, пиши в ЛС (без продаж!). </p>
-                   <h3 className="flex items-center text-xl font-semibold text-brand-purple mt-6 mb-2">
-                      <FaComments className="mr-2 text-brand-purple/80" /> Пиши Хорошие Комментарии
-                   </h3>
-                   <p className="text-gray-300 text-base md:text-lg leading-relaxed"> Забудь "Отличный пост!". Начни с <strong className="text-brand-purple font-semibold">"Я помню, когда..."</strong> и расскажи короткую <strong className="text-brand-purple font-semibold">релевантную</strong> историю. Это вызывает любопытство. AI поможет. </p>
-                </section>
-
-                 {/* Section 6: Cornerstone Content */}
-                <section className="space-y-4">
-                  <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-green mb-4">
-                    <FaBookOpen className="mr-3 text-brand-green/80" /> Фундамент: Контент "Почему"
-                  </h2>
-                  <p className="text-gray-300 text-base md:text-lg leading-relaxed">
-                    Создай <strong className="text-brand-green font-semibold">базовый уровень информации</strong> (кто ты, чем полезен), чтобы люди доверились <strong className="text-brand-green font-semibold">прежде чем</strong> покупать. AI помогает.
-                  </p>
-                   <div className="my-6 p-2 border border-brand-green/30 rounded-lg bg-black/30">
-                    <Tooltip>
+                {/* Section: AI as YOUR Amplifier */}
+                 <section className="space-y-5">
+                   <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-cyan mb-5">
+                     <FaRobot className="mr-3 text-brand-cyan/80" /> AI — Твой Персональный Усилитель
+                   </h2>
+                   <p className="text-gray-300 text-base md:text-lg leading-relaxed">
+                     Ключевая мысль: <strong className="text-brand-cyan font-semibold">AI не заменит ТЕБЯ</strong>. Тебя заменит <strong className="text-brand-cyan font-semibold">человек, использующий AI эффективнее</strong>. Представь AI как твоего ко-пилота, твой экзоскелет, позволяющий <strong className="text-brand-cyan">ТЕБЕ одному</strong> делать работу целой команды. Это <strong className="text-brand-cyan">освобождает твое время</strong> для главного — стратегии и творчества.
+                   </p>
+                   <div className="my-8 p-3 border border-brand-cyan/40 rounded-xl bg-black/40">
+                     <Tooltip>
                        <TooltipTrigger asChild>
-                         {/* Added span wrapper */}
                          <span>
-                           <div className="aspect-square w-full h-auto overflow-hidden rounded-md bg-gray-800/50 cursor-help">
-                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about//6-f7ea171b-8d11-4ca0-bb81-1b4965ea03ad.png" alt="Визуализация: Фундаментальный контент как основа" width={800} height={800} className="w-full h-full object-cover" loading="lazy" />
+                           <div className="aspect-video w-full h-auto overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-cyan-900/30">
+                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250511_223650-b874485f-4d99-4c4e-973e-603cf8b6b78a.jpg" alt="AI как усилитель человеческих возможностей" width={800} height={450} className="w-full h-full object-contain" loading="lazy" />
                            </div>
                          </span>
                        </TooltipTrigger>
-                       <TooltipContent side="bottom" className="max-w-[300px] text-center bg-gray-950 border border-brand-green/60 text-white p-3 shadow-lg"> <p className="text-sm whitespace-pre-wrap">{tooltipDescriptions['s601.png']}</p> </TooltipContent>
-                    </Tooltip>
-                     <p className="text-xs text-center text-gray-400 mt-1 italic">Создай основу, на которую можно опереться.</p>
+                       <TooltipContent side="bottom" className="max-w-[300px] text-center bg-gray-950 border border-brand-cyan/60 text-white p-3 shadow-lg"> <p className="text-sm whitespace-pre-wrap">{tooltipDescriptions['s701.png']}</p> </TooltipContent>
+                     </Tooltip>
+                     <p className="text-xs text-center text-gray-400 mt-2 italic font-mono">AI - твой партнер в достижении ТВОИХ целей.</p>
                    </div>
+                   <p className="text-gray-300 text-base md:text-lg leading-relaxed font-semibold text-brand-cyan mb-3">Вот как AI УСИЛИВАЕТ ТЕБЯ:</p>
+                   {/* Updated list with stronger framing */}
+                   <ul className="list-none space-y-3 text-gray-300 pl-2 text-base md:text-lg leading-relaxed">
+                      <li className="flex items-start"><FaListCheck className="flex-shrink-0 mr-3 mt-1 text-cyan-400"/><strong className="text-brand-cyan font-semibold mr-2">Контент х50:</strong> Преврати одно интервью в 50+ активов (клипы, статьи, визуал) — OpusClip, Canva, Claude, CastMagic.</li>
+                      <li className="flex items-start"><FaComments className="flex-shrink-0 mr-3 mt-1 text-cyan-400"/><strong className="text-brand-cyan font-semibold mr-2">Твоя Коммуникация:</strong> Создавай уникальные email (ChatGPT), адаптивные sales-цепочки, сохраняй твой голос бренда, автоматизируй документацию.</li>
+                      <li className="flex items-start"><FaWandMagicSparkles className="flex-shrink-0 mr-3 mt-1 text-cyan-400"/><strong className="text-brand-cyan font-semibold mr-2">Визуал за Минуты:</strong> Получи 20 концептов за 20 минут (Midjourney) вместо дней ожидания дизайнера.</li>
+                      <li className="flex items-start"><FaRocket className="flex-shrink-0 mr-3 mt-1 text-cyan-400"/><strong className="text-brand-cyan font-semibold mr-2">Твой E-commerce:</strong> Доверь AI описания, email-маркетинг, оптимизацию логистики (Shopify AI).</li>
+                      <li className="flex items-start"><FaArrowsSpin className="flex-shrink-0 mr-3 mt-1 text-cyan-400"/><strong className="text-brand-cyan font-semibold mr-2">Автоматизация Рутины:</strong> Освободи время, связав приложения через AI (Zapier, Make).</li>
+                      <li className="flex items-start"><FaRobot className="flex-shrink-0 mr-3 mt-1 text-cyan-400"/><strong className="text-brand-cyan font-semibold mr-2">AI-Агенты для Тебя:</strong> Поручи автономные задачи (research, email) умным агентам (Lindy, n8n).</li>
+                      <li className="flex items-start"><FaBrain className="flex-shrink-0 mr-3 mt-1 text-cyan-400"/><strong className="text-brand-cyan font-semibold mr-2">Твой AI-Советник:</strong> Используй AI для критического анализа СВОИХ идей, получай второе мнение.</li>
+                   </ul>
+                 </section>
+
+                 {/* Section: AI Validation (Framed as Protection/Control) */}
+                <section id="validation" className="space-y-5 border-t border-yellow-500/40 pt-10 mt-12">
+                  <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-yellow mb-5">
+                    <FaShieldCat className="mr-3 text-brand-yellow/80" /> AI-Валидация: Убей Провальные Идеи ДО Старта
+                  </h2>
                   <p className="text-gray-300 text-base md:text-lg leading-relaxed">
-                    <strong className="text-brand-green font-semibold">Контент "Почему" (80%):</strong> Твоя <strong className="text-brand-green font-semibold">история, основы темы, важность</strong>, связь с жизнью. Для новичков и среднего уровня. AI поможет с брейнштормом и черновиками.
-                  </p>
-                  <p className="text-gray-300 text-base md:text-lg leading-relaxed">
-                    <strong className="text-brand-green font-semibold">Продукты "Как":</strong> Платные/бесплатные <strong className="text-brand-green font-semibold">конкретные инструкции</strong>. Для среднего/продвинутого уровня. AI поможет структурировать.
-                  </p>
+                     <strong className="text-brand-yellow">9 из 10 бизнесов проваливаются.</strong> Почему? Строят то, что <strong className="text-brand-yellow font-semibold">никому не нужно</strong>. Это слив времени и денег. <strong className="text-brand-yellow font-semibold">AI — твой щит от этого.</strong> Вместо месяцев слепой разработки — 72 часа на жесткую проверку реальности. <strong className="text-brand-yellow">Хватит гадать — пора знать.</strong>
+                   </p>
+                   <p className="text-gray-300 text-base md:text-lg leading-relaxed font-semibold text-brand-yellow mb-4">Твой 5-Шаговый AI-Фильтр (Метод Тома Билью):</p>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
+                     {/* Step 1 */}
+                     <div className="p-5 bg-gray-800/60 border border-yellow-600/50 rounded-xl shadow-lg shadow-yellow-900/20">
+                       <h3 className="flex items-center text-lg font-semibold text-yellow-400 mb-3"><span className="text-2xl mr-3">1</span><FaMagnifyingGlass className="mr-2"/> Проверка Реальной Боли</h3>
+                       <p className="text-sm text-gray-300 mb-4">Скорми AI (Perplexity, ChatGPT) треды Reddit, форумы, отзывы по твоей теме. <strong className="text-yellow-300">Задача:</strong> найти повторяющиеся жалобы, неудовлетворенность. <strong className="text-brand-yellow">Вердикт:</strong> Нет четкой боли = УБИТЬ ИДЕЮ.</p>
+                       <Tooltip> <TooltipTrigger asChild><span><div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-700/40 cursor-help border border-yellow-700/30"><Image src="/placeholders/validation-problem.png" alt="AI ищет боль пользователей" width={400} height={225} className="w-full h-full object-cover opacity-60 hover:opacity-90 transition-opacity" loading="lazy"/></div></span></TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-yellow-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['validation-problem.png']}</p></TooltipContent> </Tooltip>
+                     </div>
+                      {/* Step 2 */}
+                     <div className="p-5 bg-gray-800/60 border border-yellow-600/50 rounded-xl shadow-lg shadow-yellow-900/20">
+                       <h3 className="flex items-center text-lg font-semibold text-yellow-400 mb-3"><span className="text-2xl mr-3">2</span><FaChartLine className="mr-2"/> Оценка Объема Рынка</h3>
+                       <p className="text-sm text-gray-300 mb-4">Боль есть? Отлично. Теперь: <strong className="text-yellow-300">достаточно ли людей</strong> готовы платить за решение? AI анализирует Google Trends, объем поиска, TAM. <strong className="text-brand-yellow">Вердикт:</strong> Рынок микроскопический = УБИТЬ ИДЕЮ.</p>
+                       <Tooltip> <TooltipTrigger asChild><span><div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-700/40 cursor-help border border-yellow-700/30"><Image src="/placeholders/validation-market.png" alt="AI анализирует размер рынка" width={400} height={225} className="w-full h-full object-cover opacity-60 hover:opacity-90 transition-opacity" loading="lazy"/></div></span></TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-yellow-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['validation-market.png']}</p></TooltipContent> </Tooltip>
+                     </div>
+                      {/* Step 3 */}
+                     <div className="p-5 bg-gray-800/60 border border-yellow-600/50 rounded-xl shadow-lg shadow-yellow-900/20">
+                       <h3 className="flex items-center text-lg font-semibold text-yellow-400 mb-3"><span className="text-2xl mr-3">3</span><FaEye className="mr-2"/> Анализ Конкурентов</h3>
+                       <p className="text-sm text-gray-300 mb-4">Скорми AI сайты, цены, отзывы <strong className="text-yellow-300">топ-5 конкурентов</strong>. <strong className="text-yellow-300">Задача:</strong> найти их слабые места, неудовлетворенные потребности клиентов, возможности для тебя. <strong className="text-brand-yellow">Вердикт:</strong> Нет явного УТП = УБИТЬ ИДЕЮ.</p>
+                       <Tooltip> <TooltipTrigger asChild><span><div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-700/40 cursor-help border border-yellow-700/30"><Image src="/placeholders/validation-competitors.png" alt="AI анализирует конкурентов" width={400} height={225} className="w-full h-full object-cover opacity-60 hover:opacity-90 transition-opacity" loading="lazy"/></div></span></TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-yellow-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['validation-competitors.png']}</p></TooltipContent> </Tooltip>
+                     </div>
+                     {/* Step 4 */}
+                     <div className="p-5 bg-gray-800/60 border border-yellow-600/50 rounded-xl shadow-lg shadow-yellow-900/20">
+                       <h3 className="flex items-center text-lg font-semibold text-yellow-400 mb-3"><span className="text-2xl mr-3">4</span><FaRegLightbulb className="mr-2"/> MVP Тест ('Fake Door')</h3>
+                       <p className="text-sm text-gray-300 mb-4"><strong className="text-brand-yellow">Не строй продукт!</strong> Используй AI, чтобы <strong className="text-yellow-300">за 1 час</strong> создать лендинг, описывающий твое решение как <strong className="text-yellow-300">уже готовое</strong>. Запусти трафик, собирай email/предоплаты. <strong className="text-brand-yellow">Вердикт:</strong> Нет интереса = УБИТЬ ИДЕЮ.</p>
+                       <Tooltip> <TooltipTrigger asChild><span><div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-700/40 cursor-help border border-yellow-700/30"><Image src="/placeholders/validation-mvp.png" alt="AI создает 'fake door' MVP" width={400} height={225} className="w-full h-full object-cover opacity-60 hover:opacity-90 transition-opacity" loading="lazy"/></div></span></TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-yellow-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['validation-mvp.png']}</p></TooltipContent> </Tooltip>
+                     </div>
+                   </div>
+                   <p className="text-gray-300 text-base md:text-lg leading-relaxed mt-8 text-center">
+                     <strong className="text-brand-yellow font-semibold text-xl">Шаг 5: Строй Только То, Что Прошло Фильтр.</strong><br />
+                     Если идея выжила — <strong className="text-brand-yellow font-semibold">поздравляю, ты нашел то, что нужно людям</strong>. Теперь используй AI для ускорения разработки (см. <Link href="/repo-xml" className="text-brand-blue hover:underline">СуперВайб Студию</Link>).
+                   </p>
                 </section>
 
-                {/* Call to Action */}
-                <section className="space-y-4 border-t border-brand-green/20 pt-8 mt-10">
-                  <h2 className="flex items-center justify-center text-2xl md:text-3xl font-semibold text-brand-green mb-4">
-                    <FaRocket className="mr-3 text-brand-green/80" /> Готов Начать Свой Путь?
+                {/* Section: AI Outbound */}
+                <section className="space-y-5">
+                  <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-neon-lime mb-5">
+                    <FaEnvelopeOpenText className="mr-3 text-neon-lime/80" /> Твой AI Outbound: Персонализация в Масштабе
                   </h2>
-                  <p className="text-gray-300 text-base md:text-lg text-center leading-relaxed">
-                     Этот новый путь — это марафон, а не спринт. Он требует работы, но это работа над <strong className="text-brand-green font-semibold">собой</strong> и <strong className="text-brand-green font-semibold">своей жизнью</strong>. Платформа <strong className="text-brand-green font-semibold">oneSitePls</strong> и инструменты вроде{" "}
-                     <Link href="/repo-xml" className="text-brand-blue hover:underline font-semibold inline-flex items-center">
-                         СуперВайб Студии <FaArrowUpRightFromSquare className="inline h-3 w-3 ml-1"/>
-                     </Link>{" "}
-                     созданы, чтобы <strong className="text-brand-green font-semibold">ускорить</strong> этот процесс, используя AI как помощника. Глубже погрузиться в философию можно на странице{" "}
-                     <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold inline-flex items-center">
-                         Purpose & Profit <FaArrowUpRightFromSquare className="inline h-3 w-3 ml-1"/>
-                     </Link>.
-                  </p>
-                   <p className="text-gray-300 text-base md:text-lg text-center leading-relaxed mt-4">
-                     Изучи{" "}
-                     <Link href="/about" className="text-brand-blue hover:underline font-semibold inline-flex items-center">
-                         мою историю <FaArrowUpRightFromSquare className="inline h-3 w-3 ml-1"/>
-                     </Link>, посмотри на{" "}
-                     <a href="https://github.com/salavey13/carTest" target="_blank" rel="noopener noreferrer" className="text-brand-blue hover:underline font-semibold inline-flex items-center">
-                         репозиторий oneSitePls <FaArrowUpRightFromSquare className="inline h-3 w-3 ml-1"/>
-                     </a>{" "}
-                     как на пример VIBE-разработки, или свяжись со мной для менторства или консультации через форму ниже.
+                  <p className="text-gray-300 text-base md:text-lg leading-relaxed">
+                     Забудь безликие, раздражающие рассылки, которые никто не читает. AI позволяет тебе создавать <strong className="text-neon-lime font-semibold">глубоко персонализированные</strong>, релевантные сообщения для тысяч потенциальных клиентов, <strong className="text-neon-lime">многократно увеличивая конверсию</strong>. Это твой ключ к <strong className="text-neon-lime font-semibold">эффективному Outbound Sales</strong>, даже если ты работаешь один.
                    </p>
-                   <div className="mt-8 max-w-md mx-auto">
-                      <h3 className="text-xl font-semibold text-brand-green mb-4 text-center">Нужна Помощь или Консультация?</h3>
-                      <SupportForm />
+                   <div className="my-8 p-3 border border-neon-lime/40 rounded-xl bg-black/40">
+                     <Tooltip>
+                       <TooltipTrigger asChild>
+                         <span>
+                           <div className="aspect-video w-full h-auto overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-lime-900/30">
+                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s801.png" alt="Персонализация аутрича с помощью AI" width={800} height={450} className="w-full h-full object-contain" loading="lazy" />
+                           </div>
+                         </span>
+                       </TooltipTrigger>
+                       <TooltipContent side="bottom" className="max-w-[300px] text-center bg-gray-950 border border-neon-lime/60 text-white p-3 shadow-lg"> <p className="text-sm whitespace-pre-wrap">{tooltipDescriptions['s801.png']}</p> </TooltipContent>
+                     </Tooltip>
+                     <p className="text-xs text-center text-gray-400 mt-2 italic font-mono">От спама к точечным, ценным контактам.</p>
                    </div>
+                   <p className="text-gray-300 text-base md:text-lg leading-relaxed font-semibold text-neon-lime mb-3">Как ТЫ это делаешь с AI:</p>
+                   <ol className="list-decimal list-inside space-y-3 text-gray-300 pl-4 text-base md:text-lg leading-relaxed">
+                      <li><strong className="text-neon-lime font-semibold">Находишь Лидов:</strong> AI помогает найти твоих идеальных клиентов.</li>
+                      <li><strong className="text-neon-lime font-semibold">Обогащаешь Данные:</strong> AI (<strong className="text-neon-lime font-semibold">Clay</strong>) собирает контекст: посты, новости, технологии, которые они используют.</li>
+                      <li><strong className="text-neon-lime font-semibold">AI Пишет за Тебя:</strong> ChatGPT/Claude создают <strong className="text-neon-lime font-semibold">уникальные, релевантные письма</strong> для КАЖДОГО ("Видел твой пост о...", "Заметил, вы внедрили...", "Поздравляю с...").</li>
+                      <li><strong className="text-neon-lime font-semibold">Автоматизируешь Отправку:</strong> Инструменты (<strong className="text-neon-lime font-semibold">Outbond, HeyReach</strong>) отправляют эти персонализированные цепочки писем.</li>
+                   </ol>
+                 </section>
+
+                {/* Section: Evolving Offers */}
+                <section className="space-y-5">
+                   <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-orange mb-5">
+                     <FaArrowsSpin className="mr-3 text-brand-orange/80" /> Твоя Эволюция: От Услуг к Продуктам с AI
+                   </h2>
+                   <p className="text-gray-300 text-base md:text-lg leading-relaxed">
+                     Твой бизнес <strong className="text-brand-orange">растет вместе с тобой</strong>. AI — твой катализатор масштабирования, позволяющий перейти от продажи времени к созданию активов.
+                   </p>
+                   <div className="my-8 p-3 border border-brand-orange/40 rounded-xl bg-black/40">
+                     <Tooltip>
+                       <TooltipTrigger asChild>
+                         <span>
+                           <div className="aspect-video w-full h-auto overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-orange-900/30">
+                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/4-9a800381-390b-4153-a1a8-dae1f8850088.png" alt="Эволюция предложений с ростом аудитории" width={800} height={450} className="w-full h-full object-contain" loading="lazy" />
+                           </div>
+                         </span>
+                       </TooltipTrigger>
+                       <TooltipContent side="bottom" className="max-w-[300px] text-center bg-gray-950 border border-brand-orange/60 text-white p-3 shadow-lg"> <p className="text-sm whitespace-pre-wrap">{tooltipDescriptions['s401.png']}</p> </TooltipContent>
+                     </Tooltip>
+                     <p className="text-xs text-center text-gray-400 mt-2 italic font-mono">Твой путь: от индивидуальной работы к масштабируемым активам.</p>
+                   </div>
+                   <ul className="list-disc list-inside space-y-2 text-gray-300 pl-4 text-base md:text-lg leading-relaxed">
+                      <li><strong className="text-brand-orange font-semibold">Старт:</strong> Фокусируйся на <strong className="text-brand-orange font-semibold">высокочековых услугах</strong> (фриланс, коучинг, консалтинг). Быстрый кэшфлоу, глубокое понимание рынка.</li>
+                      <li><strong className="text-brand-orange font-semibold">Рост:</strong> Создавай <strong className="text-brand-orange font-semibold">масштабируемые продукты</strong>. Используй AI для <strong className="text-brand-orange">ускорения разработки</strong> курсов, ПО, шаблонов, сообществ.</li>
+                   </ul>
+                   <p className="text-gray-300 text-base md:text-lg leading-relaxed">
+                     AI помогает <strong className="text-brand-orange font-semibold">сократить время</strong> на создание продуктов, <strong className="text-brand-orange font-semibold">увеличить доход</strong> и вернуть <strong className="text-brand-orange font-semibold">ТЕБЕ контроль</strong> над твоим временем.
+                   </p>
+                 </section>
+
+                {/* Section 5: How to Start (Actionable & Identity-Based) */}
+                <section className="space-y-5">
+                   <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-purple mb-5">
+                      <FaWandMagicSparkles className="mr-3 text-brand-purple/80" /> Как Тебе Начать: Стань Продакт-Менеджером Себя
+                   </h2>
+                   <p className="text-gray-300 text-base md:text-lg leading-relaxed">
+                     Забудь о пассивном обучении. Учись как <strong className="text-brand-purple font-semibold">продвинутый практик</strong>: наблюдай за лучшими, <strong className="text-brand-purple font-semibold">разбирай их методологию</strong> (а не только результат), быстро экспериментируй с отдельными элементами. <strong className="text-brand-purple font-semibold">Ты — продакт-менеджер</strong> своего пути.
+                   </p>
+                   <div className="my-8 p-3 border border-brand-purple/40 rounded-xl bg-black/40">
+                     <Tooltip>
+                       <TooltipTrigger asChild>
+                         <span>
+                           <div className="aspect-video w-full h-auto overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-purple-900/30">
+                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s501.png" alt="Процесс Интеллектуальной Имитации" width={800} height={450} className="w-full h-full object-contain" loading="lazy" />
+                           </div>
+                         </span>
+                       </TooltipTrigger>
+                       <TooltipContent side="bottom" className="max-w-[300px] text-center bg-gray-950 border border-brand-purple/60 text-white p-3 shadow-lg"> <p className="text-sm whitespace-pre-wrap">{tooltipDescriptions['s501.png']}</p> </TooltipContent>
+                     </Tooltip>
+                      <p className="text-xs text-center text-gray-400 mt-2 italic font-mono">Учись через наблюдение, деконструкцию и быструю имитацию.</p>
+                   </div>
+                   <ol className="list-decimal list-inside space-y-4 text-gray-300 pl-4 text-base md:text-lg leading-relaxed">
+                     <li><strong className="text-brand-purple font-semibold">Собери Референсы:</strong> <FaEye className="inline mr-1 mb-1 text-brand-purple/80"/> Найди 3-5 человек/продуктов, которые тебя <strong className="text-brand-purple">вдохновляют</strong> в твоей сфере.</li>
+                     <li><strong className="text-brand-purple font-semibold">Разбери Их Систему:</strong> <FaFileCode className="inline mr-1 mb-1 text-brand-purple/80"/> Не просто смотри, а <strong className="text-brand-purple">анализируй</strong>: как они строят контент? Какая структура? Какой стиль? Какая <strong className="text-brand-purple font-semibold">методология</strong> за этим стоит?</li>
+                     <li><strong className="text-brand-purple font-semibold">Имитируй Маленький Кусочек:</strong> <FaCodeBranch className="inline mr-1 mb-1 text-brand-purple/80"/> <strong className="text-brand-purple">Не копируй всё!</strong> Возьми <strong className="text-brand-purple font-semibold">один</strong> элемент (структуру поста, тип визуала, подход к заголовку) и <strong className="text-brand-purple">попробуй применить</strong> в своем контексте. Используй AI <Link href="/repo-xml" className="text-brand-blue hover:underline font-semibold inline-flex items-center">(СуперВайб Студию <FaArrowUpRightFromSquare className="inline h-3 w-3 ml-1"/>)</Link> для <strong className="text-brand-purple">мгновенной</strong> генерации вариантов.</li>
+                     <li><strong className="text-brand-purple font-semibold">Повторяй и Комбинируй:</strong> <FaArrowsSpin className="inline mr-1 mb-1 text-brand-purple/80"/> Пробуй разные элементы от разных референсов. Постепенно ты <strong className="text-brand-purple font-semibold">сформируешь свой уникальный, аутентичный стиль</strong>.</li>
+                     <li><strong className="text-brand-purple font-semibold">Углубляй Понимание:</strong> <FaBrain className="inline mr-1 mb-1 text-brand-purple/80"/> Параллельно изучай теорию (маркетинг, психология, дизайн), чтобы понимать <strong className="text-brand-purple font-semibold">"почему"</strong> это работает. Используй AI для быстрого поиска и суммирования информации.</li>
+                   </ol>
+                   {/* Subsections with stronger call to action */}
+                   <h3 className="flex items-center text-xl font-semibold text-brand-purple mt-8 mb-3">
+                     <FaNetworkWired className="mr-2 text-brand-purple/80" /> Стань Частью "Племени"
+                   </h3>
+                   <p className="text-gray-300 text-base md:text-lg leading-relaxed"> Найди 5-10 ключевых людей/сообществ в твоей нише. <strong className="text-brand-purple">Не будь невидимкой!</strong> Комментируй их контент <strong className="text-brand-purple font-semibold">осмысленно</strong> (AI поможет сформулировать), делись <strong className="text-brand-purple">своим</strong> релевантным контентом, пиши в ЛС <strong className="text-brand-purple">(цель - контакт, а не продажа!)</strong>. </p>
+                   <h3 className="flex items-center text-xl font-semibold text-brand-purple mt-8 mb-3">
+                      <FaComments className="mr-2 text-brand-purple/80" /> Пиши Комментарии, Которые Замечают
+                   </h3>
+                   <p className="text-gray-300 text-base md:text-lg leading-relaxed"> Забудь про "Классный пост!". Это шум. <strong className="text-brand-purple font-semibold">Чтобы тебя заметили,</strong> начни комментарий с <strong className="text-brand-purple font-semibold">"Я помню, когда..."</strong> или <strong className="text-brand-purple font-semibold">"Это напомнило мне..."</strong> и расскажи <strong className="text-brand-purple font-semibold">короткую, релевантную историю</strong> или поделись наблюдением. Это вызывает <strong className="text-brand-purple">любопытство и создает связь</strong>. AI может помочь найти такие истории в твоем опыте. </p>
                 </section>
+
+                {/* Section 6: Cornerstone Content (Framed as Foundation of Trust) */}
+                <section className="space-y-5">
+                   <h2 className="flex items-center text-2xl md:text-3xl font-semibold text-brand-green mb-5">
+                     <FaBookOpen className="mr-3 text-brand-green/80" /> Твой Фундамент: Контент, Строящий Доверие
+                   </h2>
+                   <p className="text-gray-300 text-base md:text-lg leading-relaxed">
+                     Прежде чем люди <strong className="text-brand-green">купят у тебя</strong>, они должны <strong className="text-brand-green font-semibold">понять тебя и довериться тебе</strong>. Создай <strong className="text-brand-green font-semibold">"Контент Почему"</strong> — твой информационный фундамент. AI поможет тебе его структурировать и написать.
+                   </p>
+                   <div className="my-8 p-3 border border-brand-green/40 rounded-xl bg-black/40">
+                     <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <div className="aspect-video w-full h-auto overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-green-900/30">
+                              <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about//6-f7ea171b-8d11-4ca0-bb81-1b4965ea03ad.png" alt="Фундаментальный контент как основа доверия" width={800} height={450} className="w-full h-full object-contain" loading="lazy" />
+                            </div>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-[300px] text-center bg-gray-950 border border-brand-green/60 text-white p-3 shadow-lg"> <p className="text-sm whitespace-pre-wrap">{tooltipDescriptions['s601.png']}</p> </TooltipContent>
+                     </Tooltip>
+                      <p className="text-xs text-center text-gray-400 mt-2 italic font-mono">Сначала доверие и понимание, потом продажа.</p>
+                   </div>
+                   <p className="text-gray-300 text-base md:text-lg leading-relaxed">
+                     <strong className="text-brand-green font-semibold">Контент "Почему" (Твой фундамент, ~80% усилий):</strong> Твоя <strong className="text-brand-green font-semibold">история</strong> (почему ты этим занимаешься?), <strong className="text-brand-green font-semibold">основы твоей темы</strong> (простыми словами), <strong className="text-brand-green font-semibold">важность</strong> проблемы, которую ты решаешь, <strong className="text-brand-green">связь</strong> с реальной жизнью твоей аудитории. Рассчитан на новичков и средний уровень. <strong className="text-brand-green">Цель:</strong> Построить доверие, показать твою экспертизу и уникальность. AI поможет с идеями, структурой, черновиками.
+                   </p>
+                   <p className="text-gray-300 text-base md:text-lg leading-relaxed">
+                     <strong className="text-brand-green font-semibold">Продукты "Как" (Твои предложения, ~20%):</strong> Платные (или лид-магниты) <strong className="text-brand-green font-semibold">конкретные инструкции, инструменты, решения</strong>. Рассчитаны на тех, кто уже <strong className="text-brand-green">тебе доверяет</strong> и готов идти дальше (средний/продвинутый уровень). AI поможет с разработкой и структурированием.
+                   </p>
+                 </section>
+
+                {/* Call to Action (More Engaging) */}
+                <section className="space-y-6 border-t border-brand-green/30 pt-10 mt-12 text-center">
+                   <h2 className="flex items-center justify-center text-2xl md:text-3xl font-semibold text-brand-green mb-5">
+                     <FaRocket className="mr-3 text-brand-green/80" /> Твой Путь Начинается Сейчас.
+                   </h2>
+                   <p className="text-gray-300 text-base md:text-lg leading-relaxed max-w-3xl mx-auto">
+                      Путь SelfDev — это марафон по созданию <strong className="text-brand-green font-semibold">твоей идеальной жизни и дела</strong>. Да, это требует усилий, но это <strong className="text-brand-green font-semibold">инвестиции в себя</strong>. Платформа <strong className="text-brand-green font-semibold">oneSitePls</strong> и инструменты вроде <Link href="/repo-xml" className="text-brand-blue hover:underline font-semibold inline-flex items-center">СуперВайб Студии <FaArrowUpRightFromSquare className="inline h-3 w-3 ml-1"/></Link> созданы, чтобы <strong className="text-brand-green font-semibold">драматически ускорить</strong> твой прогресс, используя AI как твоего личного помощника. Глубже понять философию можно на странице <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold inline-flex items-center">Purpose & Profit <FaArrowUpRightFromSquare className="inline h-3 w-3 ml-1"/></Link>.
+                   </p>
+                    <p className="text-gray-300 text-base md:text-lg leading-relaxed max-w-3xl mx-auto mt-5">
+                      Изучи <Link href="/about" className="text-brand-blue hover:underline font-semibold inline-flex items-center">мою историю <FaArrowUpRightFromSquare className="inline h-3 w-3 ml-1"/></Link> как пример SelfDev пути. Взгляни на <a href="https://github.com/salavey13/carTest" target="_blank" rel="noopener noreferrer" className="text-brand-blue hover:underline font-semibold inline-flex items-center">репозиторий oneSitePls <FaArrowUpRightFromSquare className="inline h-3 w-3 ml-1"/></a> как на пример VIBE-разработки. <strong className="text-brand-green">Если ты готов действовать и нужна помощь</strong> — свяжись для менторства или консультации через форму ниже.
+                    </p>
+                    {/* Support Form Section */}
+                    <div className="mt-10 max-w-md mx-auto border border-brand-green/20 p-6 rounded-xl bg-black/50">
+                       <h3 className="text-xl font-semibold text-brand-green mb-5">Нужна Помощь или Ускорение?</h3>
+                       <SupportForm />
+                    </div>
+                 </section>
 
               </CardContent>
             </Card>
