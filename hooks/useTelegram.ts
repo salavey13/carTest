@@ -140,6 +140,7 @@ export function useTelegram() {
           }
         }
         
+        // Set tgWebApp and isInTelegramContext before async auth, but after determining context
         if (isMounted) {
           setTgWebApp(tempTgWebApp);
           setIsInTelegramContext(inTgContextReal);
@@ -148,11 +149,15 @@ export function useTelegram() {
         if (authCandidate) {
             debugLogger.log(`[useTelegram Initialize] Calling handleAuthentication for user: ${authCandidate.id}`);
             const authData = await handleAuthentication(authCandidate);
+            // Ensure component is still mounted before setting state from async operation
             if (isMounted) {
               setTgUser(authData.tgUserToSet);
               setDbUser(authData.dbUserToSet); 
               setIsAuthenticated(authData.isAuthenticatedToSet);
               logger.log(`[useTelegram Initialize] Auth success, dbUser set for ID: ${authData.dbUserToSet?.id}`);
+              // Explicitly set dbUser again right before isLoading is set to false,
+              // to try and force React to acknowledge the update sooner for dependent contexts.
+              setDbUser(authData.dbUserToSet); 
             }
         } else {
            // No auth candidate (not in TG and no mock user)
@@ -162,7 +167,6 @@ export function useTelegram() {
            }
         }
       } catch (authProcessError: any) {
-        // Catch any error from the try block above (e.g. handleAuthentication throwing)
         debugLogger.error("[useTelegram Initialize] Error during auth process:", authProcessError.message);
         if (isMounted) setError(authProcessError);
       } finally {
