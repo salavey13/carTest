@@ -10,16 +10,12 @@ import type { Database } from "@/types/database.types";
 
 type User = Database["public"]["Tables"]["users"]["Row"];
 
-// Define the shape of the context data
 interface AppContextData extends ReturnType<typeof useTelegram> {
-  // Ensure all expected fields are here, even if from useTelegram
-  // For this fix, specifically ensure isAdmin is present.
-  isAdmin?: () => boolean; // Made optional for initial loading state
+  isAdmin?: () => boolean; 
   isAuthenticated: boolean;
   isLoading: boolean;
   dbUser: User | null;
   error: Error | null;
-  // Add other known properties from useTelegram if necessary for the default
   webApp?: WebApp;
   user?: WebAppUser | null;
   platform?: string;
@@ -30,21 +26,20 @@ interface AppContextData extends ReturnType<typeof useTelegram> {
   isInTelegramContext: boolean;
 }
 
-// Create the context with an initial undefined value
 const AppContext = createContext<Partial<AppContextData>>({});
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Get data from the useTelegram hook
   const telegramData = useTelegram();
 
-  // Context value now only contains telegram data
-  const contextValue = useMemo(() => ({
-    ...telegramData,
-  }), [telegramData]);
+  const contextValue = useMemo(() => {
+    logger.debug("[AppContext Provider] Memoizing contextValue. isLoading from telegramData:", telegramData.isLoading, "isAdmin function exists:", typeof telegramData.isAdmin === 'function');
+    return {
+      ...telegramData,
+    };
+  }, [telegramData, telegramData.dbUser, telegramData.isLoading, telegramData.isAuthenticated, telegramData.isAdmin]); // Added telegramData.dbUser and other key fields to dependencies
 
-  // Log context changes for debugging
   useEffect(() => {
-    logger.log("AppContext updated:", {
+    logger.log("AppContext updated (state from contextValue):", {
       isAuthenticated: contextValue.isAuthenticated,
       isLoading: contextValue.isLoading,
       userId: contextValue.dbUser?.user_id ?? contextValue.user?.id,
@@ -55,7 +50,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [contextValue]);
 
-  // Centralize the "User Authorized" toast notification
   useEffect(() => {
     let currentToastId: string | number | undefined;
     let loadingTimer: NodeJS.Timeout | null = null;
@@ -93,44 +87,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.error]);
 
-  // Provide the memoized value to the context consumers
   return <AppContext.Provider value={contextValue as AppContextData}>{children}</AppContext.Provider>;
 };
 
-// Custom hook for consuming the context
 export const useAppContext = (): AppContextData => {
   const context = useContext(AppContext);
   
-  if (!context || Object.keys(context).length === 0 || context.isLoading === undefined) { // Added check for isLoading
-     const errorMsg = "useAppContext: Context is empty or not fully initialized (isLoading undefined), possibly during initial render or AppProvider not wrapping the component tree.";
-     logger.warn(errorMsg);
-     // Return a default, fully-formed AppContextData object for safe destructuring
+  // Check if context is truly uninitialized (still loading) or if isAdmin is missing post-load
+  if (!context || Object.keys(context).length === 0 || context.isLoading === undefined) {
+     logger.warn("useAppContext: Context is empty or `isLoading` is undefined. Returning loading defaults.");
      return {
-        webApp: undefined,
-        user: null,
-        platform: 'unknown',
-        themeParams: {
-            bg_color: '#000000', text_color: '#ffffff', hint_color: '#888888', link_color: '#007aff',
-            button_color: '#007aff', button_text_color: '#ffffff', secondary_bg_color: '#1c1c1d',
-            header_bg_color: '#000000', accent_text_color: '#007aff', section_bg_color: '#1c1c1d',
-            section_header_text_color: '#8e8e93', subtitle_text_color: '#8e8e93', destructive_text_color: '#ff3b30',
-        },
-        initData: undefined,
-        initDataUnsafe: {
-            query_id: undefined, user: undefined, receiver: undefined, chat: undefined,
-            chat_type: undefined, chat_instance: undefined, start_param: undefined,
-            can_send_after: undefined, auth_date: 0, hash: '',
-        },
-        colorScheme: 'dark',
-        isInTelegramContext: false,
-        isAuthenticated: false,
+        webApp: undefined, user: null, platform: 'unknown',
+        themeParams: { bg_color: '#000000', text_color: '#ffffff', hint_color: '#888888', link_color: '#007aff', button_color: '#007aff', button_text_color: '#ffffff', secondary_bg_color: '#1c1c1d', header_bg_color: '#000000', accent_text_color: '#007aff', section_bg_color: '#1c1c1d', section_header_text_color: '#8e8e93', subtitle_text_color: '#8e8e93', destructive_text_color: '#ff3b30' },
+        initData: undefined, initDataUnsafe: { query_id: undefined, user: undefined, receiver: undefined, chat: undefined, chat_type: undefined, chat_instance: undefined, start_param: undefined, can_send_after: undefined, auth_date: 0, hash: '' },
+        colorScheme: 'dark', isInTelegramContext: false, isAuthenticated: false,
         isLoading: true, 
-        dbUser: null,
-        error: null, 
-        // isAdmin is intentionally left undefined here. Components should check for its existence.
-        // isAdmin: undefined 
+        dbUser: null, error: null, 
+        isAdmin: undefined // Explicitly undefined during initial loading phase
      } as AppContextData; 
   }
-  // Cast to full type once checks pass
+
+  // If context is loaded but isAdmin is STILL not a function, this is an issue with useTelegram hook.
+  if (context.isLoading === false && typeof context.isAdmin !== 'function') {
+    logger.error("useAppContext: CRITICAL - Context is loaded (isLoading: false) but isAdmin is NOT a function. AppContext/useTelegram issue.", context);
+    // Return a safe default that indicates non-admin status to prevent crashes
+    return {
+        ...context, // Spread what we have
+        isAdmin: () => false, // Provide a default non-admin function
+    } as AppContextData;
+  }
+
   return context as AppContextData;
 };
