@@ -47,7 +47,7 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
         {navItems.map((item) => {
           // For exact match on "/", otherwise startsWith for nested routes
           const isActive = item.href === "/" ? pathname === item.href : pathname.startsWith(item.href);
-          logger.debug(`[BottomNavigation] Item: ${item.label}, href: ${item.href}, isActive: ${isActive}`);
+          // logger.debug(`[BottomNavigation] Item: ${item.label}, href: ${item.href}, isActive: ${isActive}`); // Reduced verbosity
           
           return item.isCentral ? (
             <Button
