@@ -106,7 +106,7 @@ const GamePlanPage = () => {
         },
         {
           type: "image_display",
-          imageUrl: "https://picsum.photos/seed/wolf_wallstreet_vibe_floor/1280/720",
+          imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250512_005704-43faf64f-ff7c-4f95-8ccc-09b385f49b95.jpg",
           altText: "Визуализация для Акта III: МЕТОД ВОЛКА С УОЛЛ-СТРИТ. Энергичная сцена на 'VIBE торговом этаже'."
         }
       ]
@@ -150,7 +150,7 @@ const GamePlanPage = () => {
         },
         {
           type: "image_display",
-          imageUrl: "https://picsum.photos/seed/social_network_global_vibe/1280/720",
+          imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250512_004325-0ff477de-126c-45e2-b148-c743af661811.jpg",
           altText: "Визуализация для Акта IV: ЭФФЕКТ СОЦИАЛЬНОЙ СЕТИ. Светящаяся глобальная сеть пользователей."
         }
       ]
@@ -192,7 +192,7 @@ const GamePlanPage = () => {
         },
         {
           type: "image_display",
-          imageUrl: "https://picsum.photos/seed/architect_digital_city_vibe/1280/720",
+          imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250512_004454-ece6f952-104b-413e-af01-b77c4c4f4f28.jpg",
           altText: "Визуализация для Акта V: АРХИТЕКТОР. Фигура с видом на сложный цифровой городской пейзаж."
         }
       ]
