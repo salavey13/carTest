@@ -45,21 +45,20 @@ const itemVariants = {
 };
 
 export default function Home() {
-  const { user: telegramUser, dbUser, isAuthenticated, isLoading: appLoading, error: appContextError } = useAppContext(); 
+  const { user: telegramUser, dbUser, isLoading: appLoading, error: appContextError } = useAppContext(); 
   
   const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const loadProfile = async () => {
-      logger.log(`[HomePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticated: ${isAuthenticated}, dbUser.id: ${dbUser?.id}`);
+      logger.log(`[HomePage] loadProfile triggered. appLoading: ${appLoading}, dbUser.id: ${dbUser?.id}`);
       if (appLoading) {
         logger.log(`[HomePage] AppContext is still loading. Waiting to fetch profile.`);
-        setProfileLoading(true); // Ensure loading state is true while app context loads
+        setProfileLoading(true);
         return;
       }
 
-      // Scenario 1: dbUser.id is available (user fully loaded from DB)
       if (dbUser?.id) {
         setProfileLoading(true);
         logger.log(`[HomePage] Context loaded, dbUser.id available. Fetching profile for user ${dbUser.id}`);
@@ -72,10 +71,8 @@ export default function Home() {
           setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Alpha Error", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
         }
         setProfileLoading(false);
-      } 
-      // Scenario 2: App context is done loading, but no dbUser.id (e.g., not authenticated or error fetching dbUser)
-      else { 
-        logger.log(`[HomePage] Context loaded, but no dbUser.id (isAuthenticated: ${isAuthenticated}). Using guest profile.`);
+      } else { 
+        logger.log(`[HomePage] Context loaded, but no dbUser.id. Using guest profile.`);
         setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Guest Mode", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
         setProfileLoading(false);
       }
@@ -83,7 +80,7 @@ export default function Home() {
 
     loadProfile();
 
-  }, [dbUser, appLoading, isAuthenticated]); // Key dependencies
+  }, [dbUser, appLoading]); // Removed isAuthenticated, dbUser check is primary
 
   const isLoadingDisplay = appLoading || profileLoading; 
 

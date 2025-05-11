@@ -60,7 +60,7 @@ const getAchievementIconComponent = (iconName: string | undefined): React.ReactN
 };
 
 export default function ProfilePage() {
-  const { user: telegramUser, dbUser, isAuthenticated, isLoading: appLoading } = useAppContext();
+  const { user: telegramUser, dbUser, isLoading: appLoading } = useAppContext(); 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPerksModalOpen, setIsPerksModalOpen] = useState(false);
   const [isAchievementsModalOpen, setIsAchievementsModalOpen] = useState(false);
@@ -74,10 +74,10 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const loadProfile = async () => {
-      logger.log(`[ProfilePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticated: ${isAuthenticated}, dbUser.id: ${dbUser?.id}`);
+      logger.log(`[ProfilePage] loadProfile triggered. appLoading: ${appLoading}, dbUser.id: ${dbUser?.id}`);
       if (appLoading) {
         logger.log(`[ProfilePage] AppContext is still loading. Waiting to fetch profile.`);
-        setProfileLoading(true); 
+        setProfileLoading(true);
         return;
       }
 
@@ -99,8 +99,8 @@ export default function ProfilePage() {
           });
         }
         setProfileLoading(false);
-      } else {
-        logger.log(`[ProfilePage] Context loaded, but no dbUser.id (isAuthenticated: ${isAuthenticated}). Using guest profile.`);
+      } else { 
+        logger.log(`[ProfilePage] Context loaded, but no dbUser.id. Using guest profile.`);
         setCyberProfile({ 
             level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Guest Mode", 
             unlockedPerks: ["Basic Interface"], activeQuests: ["Explore CyberVibe Studio"], 
@@ -113,9 +113,9 @@ export default function ProfilePage() {
     };
 
     loadProfile();
-  }, [dbUser, appLoading, isAuthenticated]);
+  }, [dbUser, appLoading]);
 
-  const isLoadingDisplay = appLoading || profileLoading || !cyberProfile;
+  const isLoadingDisplay = appLoading || profileLoading;
 
 
   if (isLoadingDisplay) {
