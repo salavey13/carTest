@@ -185,7 +185,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const {
         fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef, 
         showComponents, setShowComponents,
-        setRepoUrl: contextSetRepoUrl, // aliased to avoid conflict if needed
+        setRepoUrl: contextSetRepoUrl, 
         setImageReplaceTask: contextSetImageReplaceTask,
         triggerFetch: contextTriggerFetch,
         repoUrl: contextRepoUrl,
@@ -211,41 +211,25 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
         log(`[ActualPageContent Effect] Loading check: translations=${!!t}, resulting isPageLoading=${!t}`);
     }, [t]);
 
-    // --- Effect 3: Process Initial Idea for Image Replacement ---
+    // --- Effect 3: Process Initial Idea ---
     useEffect(() => {
-        if (initialIdea && initialIdea.startsWith('ImageReplace|') && initialPath && fetcherRef.current && contextSetRepoUrl && contextSetImageReplaceTask && contextTriggerFetch && contextAddToast) {
+        const ideaIsImageReplace = initialIdea && initialIdea.startsWith('ImageReplace|');
+        
+        if (ideaIsImageReplace && initialPath && fetcherRef.current && contextSetRepoUrl && contextSetImageReplaceTask && contextTriggerFetch && contextAddToast) {
             logger.info(`[ActualPageContent InitialIdea Effect - IMG] Processing ImageReplace initialIdea: ${initialIdea.substring(0,50)}...`);
-            const parsedTask = repoUtils.parseImageReplaceIdea(initialIdea, initialPath); // Pass initialPath as targetPath
+            const parsedTask = repoUtils.parseImageReplaceIdea(initialIdea, initialPath); 
             
             if (parsedTask && parsedTask.targetPath) {
-                let repoFromPath: string | null = null;
-                const pathParts = initialPath.split('/');
-                if (pathParts.length >= 3 && pathParts[0] === 'app') { // Assuming format "app/owner/repo/..."
-                    //This logic is flawed for GitHub URLs. GitHub URL is owner/repo.
-                    //The path from URL is likely `app/some/page.tsx` if the repo is the current project.
-                    //If `initialPath` contains the full GitHub path, it needs different parsing.
-                    //For now, assume `initialPath` is relative to 'app' or `contextRepoUrl` is primary.
-                } else if (pathParts.length >= 2 && !pathParts[0].includes('.')) { // Heuristic for "owner/repo"
-                     // This might be part of a full GitHub path, but needs care.
-                }
-
-                // Prefer contextRepoUrl if valid, otherwise default. Repo from path is tricky.
-                const defaultRepo = "https://github.com/salavey13/oneSitePls"; // Updated default
-                let finalRepoUrl = contextRepoUrl && contextRepoUrl.includes("github.com") ? contextRepoUrl : defaultRepo;
-                
-                // If initialPath IS a full github path to a file:
+                let finalRepoUrl = contextRepoUrl && contextRepoUrl.includes("github.com") ? contextRepoUrl : "https://github.com/salavey13/oneSitePls";
                 const githubUrlPattern = /^https:\/\/github\.com\/([^\/]+)\/([^\/]+)\/blob\/[^\/]+\/(.+)$/;
                 const match = initialPath.match(githubUrlPattern);
                 if (match) {
                     finalRepoUrl = `https://github.com/${match[1]}/${match[2]}`;
-                    // The actual targetPath for the file inside the repo would be match[3]
-                    // And parsedTask.targetPath should be updated if it's not already match[3]
                     if (parsedTask.targetPath !== match[3]) {
                         logger.warn(`[ActualPageContent InitialIdea Effect - IMG] Mismatch in targetPath from initialPath (${match[3]}) and parsedTask (${parsedTask.targetPath}). Using initialPath's file path.`);
                         parsedTask.targetPath = match[3];
                     }
                 }
-
 
                 if (finalRepoUrl !== contextRepoUrl) {
                     logger.info(`[ActualPageContent InitialIdea Effect - IMG] Setting repoUrl for ImageReplace task: ${finalRepoUrl}`);
@@ -262,6 +246,13 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                 logger.error(`[ActualPageContent InitialIdea Effect - IMG] Failed to parse ImageReplaceTask from initialIdea: ${initialIdea} or missing targetPath from initialPath: ${initialPath}`);
                 contextAddToast("Ошибка: Не удалось обработать задачу замены изображения из URL.", "error");
             }
+        } else if (initialIdea && !ideaIsImageReplace && initialPath && fetcherRef.current?.setKworkInputValue) {
+            // This is for the "normal" flow.
+            // The actual fetch based on highlightedPathProp and setting KWork input
+            // is handled within RepoTxtFetcher's useEffect based on its props.
+            // No direct fetch trigger is needed here for this specific case,
+            // as RepoTxtFetcher will react to its props.
+            logger.info(`[ActualPageContent InitialIdea Effect - NORMAL] Normal idea and path detected. Props will be passed to RepoTxtFetcher. Path: ${initialPath}, Idea: ${initialIdea.substring(0,50)}...`);
         }
     }, [initialIdea, initialPath, fetcherRef, contextSetRepoUrl, contextSetImageReplaceTask, contextTriggerFetch, contextRepoUrl, contextAddToast, logger]);
     
