@@ -13,7 +13,12 @@ import type { RepoTxtFetcherRef } from '@/components/RepoTxtFetcher';
 import type { AICodeAssistantRef } from '@/components/AICodeAssistant';
 import * as repoUtils from "@/lib/repoUtils";
 import { useAppContext } from './AppContext'; // For achievement checking
-import { checkAndUnlockFeatureAchievement, getAchievementDetails } from '@/hooks/cyberFitnessSupabase'; // For achievements
+import { 
+    checkAndUnlockFeatureAchievement, 
+    completeQuestAndUpdateProfile, // For quest completion & level up
+    logCyberFitnessAction, // For general stat updates
+    Achievement // Type for achievements
+} from '@/hooks/cyberFitnessSupabase'; 
 
 export type ImportCategory = 'component' | 'context' | 'hook' | 'lib' | 'other';
 export type FetchStatus = 'idle' | 'loading' | 'success' | 'error' | 'retrying' | 'failed_retries';
@@ -91,7 +96,7 @@ interface RepoXmlPageContextType {
     triggerParseResponse: () => Promise<void>;
     triggerSelectAllParsed: () => void;
     triggerCreateOrUpdatePR: () => Promise<void>;
-    triggerUpdateBranch: ( repoUrl: string, filesToCommit: { path: string; content: string }[], commitMessage: string, branch: string, prNumber?: number | null, prDescription?: string ) => Promise<{ success: boolean; error?: string }>;
+    triggerUpdateBranch: ( repoUrl: string, filesToCommit: { path: string; content: string }[], commitMessage: string, branch: string, prNumber?: number | null, prDescription?: string ) => Promise<{ success: boolean; error?: string; newAchievements?: Achievement[] }>;
     triggerGetOpenPRs: (repoUrl: string) => Promise<void>;
     updateRepoUrlInAssistant: (url: string) => void;
     getXuinityMessage: () => string;
@@ -195,7 +200,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const [pendingFlowDetailsState, setPendingFlowDetailsState] = useState<PendingFlowDetails | null>(null);
         const [showComponentsState, setShowComponentsState] = useState<boolean>(true);
         
-        const { dbUser } = useAppContext(); // For achievement checking
+        const { dbUser } = useAppContext(); 
 
         const fetcherRef = useRef<RepoTxtFetcherRef | null>(null);
         const assistantRef = useRef<AICodeAssistantRef | null>(null);
@@ -264,7 +269,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
            } else { logger.warn(`Scroll target not found: ${sectionId}`); }
         }, []); 
 
-        const handleSetFilesFetchedStable = useCallback((
+        const handleSetFilesFetchedStable = useCallback(async (
             fetched: boolean,
             allFiles: FileNode[],
             primaryHighlight: string | null,
@@ -292,8 +297,15 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                        if (assistantRef.current?.handleDirectImageReplace) {
                            setAssistantLoadingStateStable(true);
                            assistantRef.current.handleDirectImageReplace(currentTask, allFiles ?? [])
-                               .then(({ success: replaceSuccess, error: replaceError }) => {
-                                   if (!replaceSuccess) addToastStable(`Ошибка замены/PR: ${replaceError || 'Неизвестно'}`, 'error');
+                               .then(async ({ success: replaceSuccess, error: replaceError }) => {
+                                   if (!replaceSuccess) {
+                                       addToastStable(`Ошибка замены/PR: ${replaceError || 'Неизвестно'}`, 'error');
+                                   } else if (dbUser?.id) {
+                                       // Level Up for Image Swap
+                                       const questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_fetch_completed', 50, 1); // Level 1, 50 KiloVibes
+                                       if(questResult.success) addToastStable("🚀 Квест 'Первая Загрузка' выполнен! Level 1 достигнут!", "success", 4000);
+                                       questResult.newAchievements?.forEach(ach => addToastStable(`🏆 Достижение: ${ach.name}!`, "success", 5000, { description: ach.description }));
+                                   }
                                    setImageReplaceTaskStateStable(null); 
                                })
                                .catch(replaceError => { addToastStable(`Проблема при вызове замены изображения: ${replaceError?.message ?? 'Неизвестно'}`, 'error', 6000); setImageReplaceTaskStateStable(null); })
@@ -318,9 +330,14 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                      setKworkInputValueStateStable(prompt);
                      finalFetchStatus = 'success'; 
                      if (fetcherRef?.current?.handleAddSelected) {
-                         setTimeout(() => {
+                         setTimeout(async () => { // Make async for achievement
                              try {
                                  fetcherRef.current?.handleAddSelected?.(new Set([currentPendingFlow.targetPath]), allFiles);
+                                 if (dbUser?.id) {
+                                      const questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_fetch_completed', 50, 1); // Level 1 for error fix too
+                                      if(questResult.success) addToastStable("🚀 Квест 'Первая Загрузка (ErrorFix)' выполнен! Level 1 достигнут!", "success", 4000);
+                                      questResult.newAchievements?.forEach(ach => addToastStable(`🏆 Достижение: ${ach.name}!`, "success", 5000, { description: ach.description }));
+                                 }
                                  scrollToSectionStable('executor');
                              } catch (addErr) { logger.error(`${flowLogPrefix} Context: Error calling handleAddSelected for ErrorFix:`, addErr); }
                          }, 100);
@@ -331,14 +348,22 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                      finalFetchStatus = 'error'; 
                      setPendingFlowDetailsStateStable(null); 
                  }
-            } else {
+            } else { // Standard fetch without special flow
                   if (fetched && currentPendingFlow) setPendingFlowDetailsStateStable(null);
                   if (fetched && imageReplaceTaskStateRef.current) setImageReplaceTaskStateStable(null);
                   finalFetchStatus = fetched ? 'success' : 'error';
+                  // Potentially log 'first_fetch_completed' for general successful fetch if no specific flow handled it
+                  if (fetched && !currentTask && !currentPendingFlow && dbUser?.id) {
+                        const questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_fetch_completed', 50, 1);
+                        if(questResult.success && questResult.data?.metadata?.cyberFitness?.level === 1) { // Check if level actually became 1
+                             addToastStable("🚀 Квест 'Первая Загрузка' выполнен! Level 1 достигнут!", "success", 4000);
+                        }
+                        questResult.newAchievements?.forEach(ach => addToastStable(`🏆 Достижение: ${ach.name}!`, "success", 5000, { description: ach.description }));
+                  }
             }
            setFetchStatusStateStable(finalFetchStatus);
         }, [ 
-             addToastStable, assistantRef, fetcherRef, setFetchStatusStateStable, setAllFetchedFilesStateStable,
+             dbUser?.id, addToastStable, assistantRef, fetcherRef, setFetchStatusStateStable, setAllFetchedFilesStateStable,
              setImageReplaceTaskStateStable, setAssistantLoadingStateStable, setPendingFlowDetailsStateStable,
              setKworkInputValueStateStable, scrollToSectionStable, 
              imageReplaceTaskStateRef, pendingFlowDetailsRef,
@@ -365,24 +390,90 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             if (fetcherRef.current?.selectHighlightedFiles) {
                 try {
                     fetcherRef.current.selectHighlightedFiles();
-                    if (dbUser?.id) { // Check achievements after selection
+                    if (dbUser?.id) { 
                         const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'usedSelectHighlighted');
                         newAchievements?.forEach(ach => addToastStable(`🏆 Достижение: ${ach.name}!`, "success", 5000, { description: ach.description }));
                     }
                 } catch (e: any) { logger.error("Error calling fetcherRef.selectHighlightedFiles:", e); addToastStable(`Ошибка выбора связанных файлов: ${e?.message ?? 'Неизвестно'}`, "error"); }
             } else { logger.error("triggerSelectHighlighted: fetcherRef is not set."); }
-        }, [addToastStable, fetcherRef, dbUser?.id]); // dbUser for achievements
+        }, [addToastStable, fetcherRef, dbUser?.id]); 
 
         const triggerAddSelectedToKwork = useCallback(async (clearSelection = false) => { const currentSelected = selectedFetcherFilesRef.current; const currentAllFiles = allFetchedFilesRef.current; if (fetcherRef.current?.handleAddSelected) { if (currentSelected.size === 0) { addToastStable("Сначала выберите файлы в Экстракторе!", "warning"); return; } try { await fetcherRef.current.handleAddSelected(currentSelected, currentAllFiles); if (clearSelection) { setSelectedFetcherFilesStateStable(new Set()); } } catch (e: any) { addToastStable(`Ошибка добавления файлов: ${e?.message ?? 'Неизвестно'}`, "error"); } } else { addToastStable("Ошибка: Компонент Экстрактора недоступен.", "error"); } }, [addToastStable, setSelectedFetcherFilesStateStable, fetcherRef]);
         const selectedFetcherFilesRef = useRef(selectedFetcherFilesState); useEffect(() => { selectedFetcherFilesRef.current = selectedFetcherFilesState; }, [selectedFetcherFilesState]);
         const allFetchedFilesRef = useRef(allFetchedFilesState); useEffect(() => { allFetchedFilesRef.current = allFetchedFilesState; }, [allFetchedFilesState]);
         const triggerCopyKwork = useCallback((): boolean => { if (fetcherRef.current?.handleCopyToClipboard) { try { return fetcherRef.current.handleCopyToClipboard(undefined, true); } catch (e: any) { addToastStable(`Ошибка копирования запроса: ${e?.message ?? 'Неизвестно'}`, "error"); return false; } } else { addToastStable("Ошибка копирования: Компонент Экстрактора недоступен.", "error"); return false; } }, [addToastStable, fetcherRef]);
         const triggerAskAi = useCallback(async () => { addToastStable("Скопируйте запрос и вставьте в AI.", "info"); return { success: false, error: "Ask AI button disabled" }; }, [addToastStable]);
-        const triggerParseResponse = useCallback(async () => { if (assistantRef.current?.handleParse) { try { await assistantRef.current.handleParse(); } catch (e: any) { addToastStable(`Крит. ошибка разбора ответа: ${e?.message ?? 'Неизвестно'}`, "error", 5000); } } else { addToastStable("Ошибка разбора: Компонент Ассистента недоступен.", "error");} }, [addToastStable, assistantRef]);
+        
+        const triggerParseResponse = useCallback(async () => { 
+            if (assistantRef.current?.handleParse) { 
+                try { 
+                    await assistantRef.current.handleParse(); 
+                    if (dbUser?.id) {
+                         const questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_parse_completed', 100, 2); // Level 2, 100 KiloVibes
+                         if (questResult.success && questResult.data?.metadata?.cyberFitness?.level === 2) {
+                             addToastStable("🚀 Квест 'Первый Парсинг' выполнен! Level 2 достигнут!", "success", 4000);
+                         }
+                         questResult.newAchievements?.forEach(ach => addToastStable(`🏆 Достижение: ${ach.name}!`, "success", 5000, { description: ach.description }));
+                    }
+                } catch (e: any) { 
+                    addToastStable(`Крит. ошибка разбора ответа: ${e?.message ?? 'Неизвестно'}`, "error", 5000); 
+                } 
+            } else { 
+                addToastStable("Ошибка разбора: Компонент Ассистента недоступен.", "error");
+            } 
+        }, [addToastStable, assistantRef, dbUser?.id]);
+        
         const triggerSelectAllParsed = useCallback(() => { if (assistantRef.current?.selectAllParsedFiles) { try { assistantRef.current.selectAllParsedFiles(); } catch (e: any) { addToastStable(`Ошибка выбора всех файлов: ${e?.message ?? 'Неизвестно'}`, "error"); } } else { addToastStable("Ошибка выбора: Компонент Ассистента недоступен.", "error");} }, [addToastStable, assistantRef]);
-        const triggerCreateOrUpdatePR = useCallback(async () => { if (assistantRef.current?.handleCreatePR) { try { await assistantRef.current.handleCreatePR(); } catch (e: any) { addToastStable(`Крит. ошибка создания/обновления PR: ${e?.message ?? 'Неизвестно'}`, "error", 5000); } } else { addToastStable("Ошибка PR: Компонент Ассистента недоступен.", "error");} }, [addToastStable, assistantRef]);
+        
+        const triggerCreateOrUpdatePR = useCallback(async () => { 
+            if (assistantRef.current?.handleCreatePR) { 
+                try { 
+                    await assistantRef.current.handleCreatePR(); 
+                     // Assuming handleCreatePR internally calls triggerUpdateBranch which now returns newAchievements
+                } catch (e: any) { 
+                    addToastStable(`Крит. ошибка создания/обновления PR: ${e?.message ?? 'Неизвестно'}`, "error", 5000); 
+                } 
+            } else { 
+                addToastStable("Ошибка PR: Компонент Ассистента недоступен.", "error");
+            } 
+        }, [addToastStable, assistantRef]);
+        
         const triggerGetOpenPRsStable = useCallback(async (url: string) => { const effectiveUrl = url || repoUrlStateRef.current; if (!effectiveUrl || !effectiveUrl.includes('github.com')) { setOpenPrsStateStable([]); setLoadingPrsStateStable(false); return; } setLoadingPrsStateStable(true); try { const result = await getOpenPullRequests(effectiveUrl); if (result.success && result.pullRequests) { setOpenPrsStateStable(result.pullRequests as SimplePullRequest[]); } else { addToastStable("Ошибка загрузки PR: " + (result.error ?? 'Неизвестно'), "error"); setOpenPrsStateStable([]); } } catch (e: any) { addToastStable(`Крит. ошибка загрузки PR: ${e?.message ?? 'Неизвестно'}`, "error", 5000); setOpenPrsStateStable([]); } finally { setLoadingPrsStateStable(false); } }, [addToastStable, setLoadingPrsStateStable, setOpenPrsStateStable]);
-        const triggerUpdateBranchStable = useCallback(async ( repoUrlParam: string, filesToCommit: { path: string; content: string }[], commitMessage: string, branch: string, prNumber?: number | null, prDescription?: string ): Promise<{ success: boolean; error?: string }> => { setAssistantLoadingStateStable(true); try { const result = await updateBranch(repoUrlParam, filesToCommit, commitMessage, branch, prNumber ?? undefined, prDescription); if (result.success) { triggerGetOpenPRsStable(repoUrlParam).catch(err => logger.error("Failed to refresh PRs after branch update:", err)); return { success: true }; } else { addToastStable(`Ошибка обновления ветки: ${result.error}`, 'error', 5000); return { success: false, error: result.error }; } } catch (e: any) { addToastStable(`Крит. ошибка обновления ветки: ${e.message}`, "error", 5000); return { success: false, error: e.message }; } finally { setAssistantLoadingStateStable(false); } }, [addToastStable, triggerGetOpenPRsStable, setAssistantLoadingStateStable]);
+        
+        const triggerUpdateBranchStable = useCallback(async ( repoUrlParam: string, filesToCommit: { path: string; content: string }[], commitMessage: string, branch: string, prNumber?: number | null, prDescription?: string ): Promise<{ success: boolean; error?: string; newAchievements?: Achievement[] }> => { 
+            setAssistantLoadingStateStable(true); 
+            let newAchievements: Achievement[] = [];
+            try { 
+                const result = await updateBranch(repoUrlParam, filesToCommit, commitMessage, branch, prNumber ?? undefined, prDescription); 
+                if (result.success) { 
+                    triggerGetOpenPRsStable(repoUrlParam).catch(err => logger.error("Failed to refresh PRs after branch update:", err));
+                    if (dbUser?.id) {
+                        const action = prNumber ? 'branchUpdated' : 'prCreated'; // If prNumber exists, it's likely an update to an existing PR's branch
+                        const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.id, action, 1);
+                        if(actionAch) newAchievements.push(...actionAch);
+
+                        if (!prNumber) { // Only trigger quest for brand new PR
+                            const questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_pr_created', 200, 3); // Level 3, 200 KiloVibes
+                            if(questResult.success && questResult.data?.metadata?.cyberFitness?.level === 3) {
+                                addToastStable("🚀 Квест 'Первый PR' выполнен! Level 3 достигнут!", "success", 4000);
+                            }
+                            if(questResult.newAchievements) newAchievements.push(...questResult.newAchievements);
+                        }
+                         newAchievements.forEach(ach => addToastStable(`🏆 Достижение: ${ach.name}!`, "success", 5000, { description: ach.description }));
+                    }
+                    return { success: true, newAchievements }; 
+                } else { 
+                    addToastStable(`Ошибка обновления ветки: ${result.error}`, 'error', 5000); 
+                    return { success: false, error: result.error, newAchievements }; 
+                } 
+            } catch (e: any) { 
+                addToastStable(`Крит. ошибка обновления ветки: ${e.message}`, "error", 5000); 
+                return { success: false, error: e.message, newAchievements }; 
+            } finally { 
+                setAssistantLoadingStateStable(false); 
+            } 
+        }, [addToastStable, triggerGetOpenPRsStable, setAssistantLoadingStateStable, dbUser?.id]);
+
         const updateRepoUrlInAssistantStable = useCallback((url: string) => { if (assistantRef.current?.updateRepoUrl) { try { assistantRef.current.updateRepoUrl(url); } catch (e: any) { logger.error(`Error calling assistantRef.updateRepoUrl: ${e?.message ?? 'Неизвестно'}`); } } }, [assistantRef]);
         const triggerAddImportantToKworkStable = useCallback(() => { fetcherRef.current?.handleAddImportantFiles?.(); }, [fetcherRef]);
         const triggerAddTreeToKworkStable = useCallback(() => { fetcherRef.current?.handleAddFullTree?.(); }, [fetcherRef]);
@@ -426,7 +517,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                  if (localFetchStatus === 'error' || localFetchStatus === 'failed_retries') return "Твою ж! Ошибка загрузки файла. URL/ветка верные? Жми 'Попробовать Снова'.";
                  const targetFileExists = allFetchedFilesState?.some(f => f.path === localImageReplaceTask.targetPath);
                  if (localFetchStatus === 'success' && !targetFileExists && localFilesFetched) return "Файл для замены НЕ НАЙДЕН в репе! Проверь путь/ветку!";
-                 if (localFetchStatus === 'success' && targetFileExists) { if (localAssistantLoading) return "Меняю картинку и делаю авто-PR... Магия!"; return "Файл на месте! Ассистент сейчас сам всё заменит и запушит PR. Левел 1 пройден!"; }
+                 if (localFetchStatus === 'success' && targetFileExists) { if (localAssistantLoading) return "Меняю картинку и делаю авто-PR... Магия!"; return "Файл на месте! Ассистент сейчас сам всё заменит и запушит PR. Level 1 пройден!"; }
                  return "Готовлю авто-замену картинки (Level 1)...";
              }
              switch (localCurrentStep) {
