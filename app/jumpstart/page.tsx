@@ -1,14 +1,12 @@
 "use client";
 // Ensure client-side rendering
-"use jumpstart"; // Your custom directive :)
+// "use jumpstart"; // Your custom directive :) <-- Commented out as it's not a standard directive
 
 import React, { useState, useEffect } from "react"; // Import React explicitly if needed by bundler/setup
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
-import {
-  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
-} from "@/components/ui/tooltip";
+
 import {
   FaRocket, FaGamepad, FaBoxOpen, FaBullseye, FaHandHoldingDollar, FaBrain, FaCubes, FaUsers, FaChartLine, FaRobot, FaMoneyBillWave, FaArrowUpRightFromSquare, FaLightbulb, FaRoad, FaFileCode, FaEye, FaArrowsSpin, FaNetworkWired, FaComments, FaWandMagicSparkles, FaListCheck, FaEnvelopeOpenText, FaPlay, FaInfinity, FaBolt, FaGift, FaGithub, FaCode, FaTelegram, FaShieldHalved // Added missing FaShieldHalved
 } from "react-icons/fa6";
@@ -61,7 +59,7 @@ export default function JumpstartPage() {
          }}
        ></div>
 
-      <TooltipProvider delayDuration={150}>
+ 
         <div className="relative z-10 container mx-auto px-4">
          {/* Language Switcher */}
          <div className="mb-8 flex justify-center md:justify-end">
@@ -90,7 +88,7 @@ export default function JumpstartPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                   <div>
                      <p className="text-gray-300 text-lg md:text-xl leading-relaxed">
-                       {t.section1.p1} <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">{t.section1.link1}</Link> {t.section1.p1_cont} <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">PP</Link>
+                       {t.section1.p1} <Link href="/selfdev" className="text-brand-blue hover:underline font-semibold">{t.section1.link1}</Link> {t.section1.p1_cont} <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">PP</Link>. {language === 'ru' ? 'И геймифицируй путь с помощью' : 'And gamify the path using the'} <Link href="/selfdev/gamified" className="text-brand-yellow hover:underline font-semibold">Gamified SelfDev <FaGamepad className="inline ml-1"/></Link> {language === 'ru' ? 'метода!' : 'method!'}
                      </p>
                      <p className="mt-4 text-gray-400 text-base leading-relaxed">
                        {t.section1.p2} (<Link href="/about" className="text-brand-blue hover:underline font-semibold">Pavel</Link>){t.section1.p2_cont} <strong className="text-white">{t.section1.p2_highlight}</strong>{t.section1.p2_end}
@@ -162,6 +160,7 @@ export default function JumpstartPage() {
                 </div>
                  {/* // TODO: Link specific quests to unlocking features in the dashboard or enabling new bot capabilities. */}
                  {/* // TODO: Integrate Configame mention maybe in Level 1 or as a related tool. */}
+                 <p className="text-center text-gray-400 mt-4 text-sm">{language === 'ru' ? "Нужна структура игры? Зацени" : "Need a game structure? Check out"} <Link href="/selfdev/gamified" className="text-brand-yellow hover:underline">Gamified SelfDev</Link>.</p>
               </section>
 
               {/* Section 4: The Engine */}
@@ -221,7 +220,7 @@ export default function JumpstartPage() {
             </CardContent>
           </Card>
         </div>
-      </TooltipProvider>
+      
     </div>
   );
 }

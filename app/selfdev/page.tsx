@@ -150,6 +150,7 @@ export default function SelfDevLandingPage() {
                          <span>
                            <div className="aspect-video w-full h-auto overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-cyan-900/30">
                              <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250511_223650-b874485f-4d99-4c4e-973e-603cf8b6b78a.jpg" alt="AI как усилитель человеческих возможностей" width={800} height={450} className="w-full h-full object-contain" loading="lazy" />
+
                            </div>
                          </span>
                        </TooltipTrigger>

@@ -1,15 +1,11 @@
+// /app/expmind/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAppContext } from "@/contexts/AppContext";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+// Removed Tooltip imports
 import {
   FaBrain, FaUserAstronaut, FaLock, FaFlaskVial, FaClipboardList, FaChartLine,
   FaCheckDouble, FaRegLightbulb, FaRoute, FaBan, FaRocket,
@@ -57,7 +53,7 @@ const sections = [
     imageUrlRu: `${STORAGE_BASE_URL_EXP}/600x338/1a1a2e/00FF9D/png?text=Линза+Мышления`,
     imageAltEn: "Conceptual image: A lens representing a mindset shaping perception",
     imageAltRu: "Концептуальное изображение: Линза, представляющая мышление, формирующее восприятие",
-    tooltipRu: "Мышление как фильтр, через который мы воспринимаем реальность. Осознанность позволяет этот фильтр настроить.",
+    // Removed tooltipRu
   },
   {
     id: "speaker-journey",
@@ -113,7 +109,7 @@ const sections = [
             imageAltRu: "Иллюстрация извилистого, адаптивного пути, ведущего вверх с точками открытий",
         }
     ],
-    tooltipRu: "Сравнение двух подходов к жизни: следование внешним сценариям против пути, основанного на любопытстве и экспериментах.",
+    // Removed tooltipRu
   },
   {
     id: "blocking-mindsets",
@@ -148,7 +144,7 @@ const sections = [
     ],
     outroEn: "Crucially, these mindsets are <strong class='font-semibold text-brand-yellow'>fluid</strong> and not fixed. Awareness is the first step to change.",
     outroRu: "Важно: эти установки <strong class='font-semibold text-brand-yellow'>гибки</strong> и не являются неизменными. Осознанность – первый шаг к изменению.",
-    tooltipRu: "Три ловушки мышления, мешающие росту: Цинизм (апатия), Эскапизм (избегание) и Перфекционизм (страх ошибки).",
+    // Removed tooltipRu
   },
   {
     id: "experimental-mindset",
@@ -177,7 +173,7 @@ const sections = [
     imageUrlRu: `${STORAGE_BASE_URL_EXP}/600x338/1a1a2e/AEFF00/png?text=Цикл+Эксп.+Мышления`,
     imageAltEn: "Diagram showing a cycle: Curiosity -> Experiment -> Data/Learning -> Adapt -> Repeat",
     imageAltRu: "Диаграмма цикла: Любопытство -> Эксперимент -> Данные/Обучение -> Адаптация -> Повтор",
-    tooltipRu: "Экспериментальное мышление как динамичный цикл обучения и адаптации, движимый любопытством и амбициями.",
+    // Removed tooltipRu
   },
   {
     id: "pact-framework",
@@ -195,7 +191,7 @@ const sections = [
     ],
     outroEn: "Different from habits (assumed long-term good) & KPIs (outcome-focused). PACTs prioritize <strong class='font-semibold text-brand-yellow'>learning and exploration</strong> within a defined scope.",
     outroRu: "Отличается от привычек (предполагаемая долгосрочная польза) и KPI (фокус на результате). PACTы ставят в приоритет <strong class='font-semibold text-brand-yellow'>обучение и исследование</strong> в заданных рамках.",
-    tooltipRu: "PACT: Целенаправленный, Действенный, Непрерывный (Ограниченный по времени), Отслеживаемый - структура для управляемых экспериментов.",
+    // Removed tooltipRu
   },
   {
     id: "analyzing-data",
@@ -244,7 +240,7 @@ const sections = [
         { icon: LuPauseCircle, color: "orange", text: "<strong>Пауза:</strong> Сейчас не работает. Остановить этот эксперимент." },
         { icon: LuRotateCcw, color: "blue", text: "<strong>Разворот:</strong> Внести небольшое изменение на основе данных, запустить новый эксперимент." }
     ],
-    tooltipRu: "Анализ эксперимента: Учитывайте и внешние результаты (успех?), и внутренние ощущения (комфорт?). Решите: Продолжать, Пауза или Разворот.",
+    // Removed tooltipRu
   },
   {
     id: "conclusion",
@@ -269,10 +265,9 @@ const sections = [
     imageUrlRu: `${STORAGE_BASE_URL_EXP}/600x338/1a1a2e/9D00FF/png?text=Живи+Осознанно`,
     imageAltEn: "Abstract image representing growth, adaptability, and intentional living",
     imageAltRu: "Абстрактное изображение, представляющее рост, адаптивность и осознанную жизнь",
-    tooltipRu: "Экспериментальное мышление - ключ к осознанной, адаптивной и увлекательной жизни.",
+    // Removed tooltipRu
   },
 ];
-
 
 // --- Component ---
 export default function ExperimentalMindsetPage() {
@@ -309,245 +304,236 @@ export default function ExperimentalMindsetPage() {
         }}
       ></div>
 
-      <TooltipProvider delayDuration={200}>
-        <div className="relative z-10 container mx-auto px-4">
-          <Card className="max-w-4xl mx-auto bg-black/85 backdrop-blur-lg text-white rounded-2xl border border-brand-green/30 shadow-[0_0_30px_rgba(0,255,157,0.3)]">
-            <CardHeader className="text-center border-b border-brand-green/20 pb-4">
-              <CardTitle className="text-3xl md:text-5xl font-bold text-brand-green cyber-text glitch" data-text="The Experimental Mindset">
-                The Experimental Mindset
-              </CardTitle>
-              <p className="text-md md:text-lg text-gray-300 mt-3 font-mono">
-                 {selectedLang === 'ru'
-                    ? "Жить осознанно через любопытство и эксперименты."
-                    : "Living Consciously Through Curiosity & Experimentation."}
-              </p>
-               <p className="text-sm text-gray-400 mt-1">
-                 {selectedLang === 'ru' ? "По мотивам видео с Anne-Laure Le Cunff" : "Based on insights from Anne-Laure Le Cunff"}
-               </p>
-            </CardHeader>
+      {/* Removed TooltipProvider */}
+      <div className="relative z-10 container mx-auto px-4">
+        <Card className="max-w-4xl mx-auto bg-black/85 backdrop-blur-lg text-white rounded-2xl border border-brand-green/30 shadow-[0_0_30px_rgba(0,255,157,0.3)]">
+          <CardHeader className="text-center border-b border-brand-green/20 pb-4">
+            <CardTitle className="text-3xl md:text-5xl font-bold text-brand-green cyber-text glitch" data-text="The Experimental Mindset">
+              The Experimental Mindset
+            </CardTitle>
+            <p className="text-md md:text-lg text-gray-300 mt-3 font-mono">
+               {selectedLang === 'ru'
+                  ? "Жить осознанно через любопытство и эксперименты."
+                  : "Living Consciously Through Curiosity & Experimentation."}
+            </p>
+             <p className="text-sm text-gray-400 mt-1">
+               {selectedLang === 'ru' ? "По мотивам видео с Anne-Laure Le Cunff" : "Based on insights from Anne-Laure Le Cunff"}
+             </p>
+          </CardHeader>
 
-            <CardContent className="space-y-12 p-4 md:p-8">
-              {/* Language Toggle */}
-              <div className="flex justify-center space-x-2 mb-8">
-                 <Button
-                   variant={selectedLang === 'ru' ? 'secondary' : 'outline'}
-                   size="sm"
-                   onClick={() => setSelectedLang('ru')}
-                   className={cn(
-                       "border-brand-green/50", // Use main theme color
-                       selectedLang === 'ru' ? 'bg-brand-green/20 text-brand-green hover:bg-brand-green/30' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+          <CardContent className="space-y-12 p-4 md:p-8">
+            {/* Language Toggle */}
+            <div className="flex justify-center space-x-2 mb-8">
+               <Button
+                 variant={selectedLang === 'ru' ? 'secondary' : 'outline'}
+                 size="sm"
+                 onClick={() => setSelectedLang('ru')}
+                 className={cn(
+                     "border-brand-green/50", // Use main theme color
+                     selectedLang === 'ru' ? 'bg-brand-green/20 text-brand-green hover:bg-brand-green/30' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                 )}
+               >
+                 🇷🇺 Русский
+               </Button>
+               <Button
+                  variant={selectedLang === 'en' ? 'secondary' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedLang('en')}
+                  className={cn(
+                     "border-brand-blue/50", // Keep contrast for EN
+                     selectedLang === 'en' ? 'bg-brand-blue/20 text-brand-blue hover:bg-brand-blue/30' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                  )}
+               >
+                 🇬🇧 English
+               </Button>
+            </div>
+
+            {/* Sections */}
+            {sections.map((section, index) => {
+              const IconComponent = section.icon;
+              // Simple color rotation or assign based on index/theme
+              const themeColor = ["text-brand-green", "text-brand-pink", "text-brand-yellow", "text-neon-lime", "text-brand-blue", "text-brand-orange", "text-brand-purple"][index % 7];
+              const borderColor = themeColor.replace("text-", "border-");
+              const currentTitle = selectedLang === 'en' ? section.titleEn : section.titleRu;
+              const currentPoints = section.pointsEn && section.pointsRu ? (selectedLang === 'en' ? section.pointsEn : section.pointsRu) : [];
+              const currentImageAlt = section.imageAltEn && section.imageAltRu ? (selectedLang === 'en' ? section.imageAltEn : section.imageAltRu) : "";
+              const currentImageUrl = section.imageUrlEn && section.imageUrlRu ? (selectedLang === 'en' ? section.imageUrlEn : section.imageUrlRu) : null;
+              const currentIntro = section.introEn && section.introRu ? (selectedLang === 'en' ? section.introEn : section.introRu) : null;
+              const currentOutro = section.outroEn && section.outroRu ? (selectedLang === 'en' ? section.outroEn : section.outroRu) : null;
+
+              return (
+                <section key={section.id} className={`space-y-4 border-l-4 pl-4 md:pl-6 ${borderColor}`}>
+                  {/* Title */}
+                  <h2 className={`flex items-center text-2xl md:text-3xl font-semibold ${themeColor} mb-4 font-orbitron`}>
+                    <IconComponent className={`mr-3 ${themeColor}/80`} /> {currentTitle}
+                  </h2>
+
+                  {/* Intro Paragraph */}
+                  {currentIntro && <p className="text-gray-300 leading-relaxed mb-4">{currentIntro}</p>}
+
+                   {/* SubSections (e.g., Speaker's Journey) */}
+                   {section.subSections && section.subSections.map((sub, subIndex) => {
+                     const SubIcon = sub.icon;
+                     const subTitle = selectedLang === 'en' ? sub.titleEn : sub.titleRu;
+                     const subPoints = selectedLang === 'en' ? sub.pointsEn : sub.pointsRu;
+                     const subImgUrl = selectedLang === 'en' ? sub.imageUrlEn : sub.imageUrlRu;
+                     const subImgAlt = selectedLang === 'en' ? sub.imageAltEn : sub.imageAltRu;
+
+                     return (
+                       <div key={`${section.id}-sub-${subIndex}`} className={`ml-4 pl-4 border-l-2 ${sub.borderColor} space-y-3 mb-6`}>
+                         <h3 className={`flex items-center text-xl font-semibold ${sub.textColor}`}>
+                           <SubIcon className="mr-2" /> {subTitle}
+                         </h3>
+                         <ul className="list-disc list-outside space-y-2 text-gray-300 pl-5 text-base md:text-lg leading-relaxed">
+                           {subPoints.map((point, i) => (
+                             <li key={`${selectedLang}-${section.id}-sub-${subIndex}-${i}`} dangerouslySetInnerHTML={{ __html: point }}></li>
+                           ))}
+                         </ul>
+                         {subImgUrl && (
+                           <div className={`my-4 p-1 border ${sub.borderColor}/30 rounded-md bg-black/20 max-w-sm mx-auto`}>
+                             <Image
+                               src={subImgUrl} alt={subImgAlt} width={600} height={338}
+                               className="w-full h-auto object-cover rounded opacity-80" loading="lazy" placeholder="blur" blurDataURL={PLACEHOLDER_BLUR_URL}
+                             />
+                             <p className="text-xs text-center text-gray-400 mt-1 italic">{subImgAlt}</p>
+                           </div>
+                         )}
+                       </div>
+                     );
+                   })}
+
+                   {/* Grid Items (e.g., Blocking Mindsets) */}
+                   {section.gridItems && (
+                     <div className="grid md:grid-cols-3 gap-4 my-4">
+                       {section.gridItems.map((item, itemIndex) => {
+                         const ItemIcon = item.icon; // Icon already corrected in section data
+                         const itemTitle = selectedLang === 'en' ? item.titleEn : item.titleRu;
+                         const itemPoints = selectedLang === 'en' ? item.pointsEn : item.pointsRu;
+                         const itemLeadsTo = selectedLang === 'en' ? item.leadsToEn : item.leadsToRu;
+                         const itemColorClass = `text-brand-${item.color}` // Assuming brand colors like brand-gray, brand-blue, brand-red exist
+                         const itemBorderColorClass = `border-brand-${item.color}/40`
+
+                         return (
+                           <div key={`${section.id}-grid-${itemIndex}`} className={`bg-gray-950/50 p-4 rounded-lg border ${itemBorderColorClass}`}>
+                             <h4 className={`flex items-center font-bold ${itemColorClass} mb-2 text-lg`}>
+                               <ItemIcon className="mr-2" /> {itemTitle}
+                             </h4>
+                             <ul className="list-disc list-inside space-y-1 text-sm text-gray-300 mb-2 pl-1">
+                              {itemPoints.map((point, i) => <li key={`${selectedLang}-${section.id}-grid-${itemIndex}-p-${i}`}>{point}</li>)}
+                             </ul>
+                             <p className="text-xs italic text-gray-400">
+                              {selectedLang === 'en' ? 'Leads to: ' : 'Ведет к: '} {itemLeadsTo}
+                             </p>
+                           </div>
+                         );
+                       })}
+                     </div>
                    )}
-                 >
-                   🇷🇺 Русский
-                 </Button>
-                 <Button
-                    variant={selectedLang === 'en' ? 'secondary' : 'outline'}
-                    size="sm"
-                    onClick={() => setSelectedLang('en')}
-                    className={cn(
-                       "border-brand-blue/50", // Keep contrast for EN
-                       selectedLang === 'en' ? 'bg-brand-blue/20 text-brand-blue hover:bg-brand-blue/30' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
-                    )}
-                 >
-                   🇬🇧 English
-                 </Button>
-              </div>
 
-              {/* Sections */}
-              {sections.map((section, index) => {
-                const IconComponent = section.icon;
-                // Simple color rotation or assign based on index/theme
-                const themeColor = ["text-brand-green", "text-brand-pink", "text-brand-yellow", "text-neon-lime", "text-brand-blue", "text-brand-orange", "text-brand-purple"][index % 7];
-                const borderColor = themeColor.replace("text-", "border-");
-                const currentTitle = selectedLang === 'en' ? section.titleEn : section.titleRu;
-                const currentPoints = section.pointsEn && section.pointsRu ? (selectedLang === 'en' ? section.pointsEn : section.pointsRu) : [];
-                const currentImageAlt = section.imageAltEn && section.imageAltRu ? (selectedLang === 'en' ? section.imageAltEn : section.imageAltRu) : "";
-                const currentImageUrl = section.imageUrlEn && section.imageUrlRu ? (selectedLang === 'en' ? section.imageUrlEn : section.imageUrlRu) : null;
-                const currentIntro = section.introEn && section.introRu ? (selectedLang === 'en' ? section.introEn : section.introRu) : null;
-                const currentOutro = section.outroEn && section.outroRu ? (selectedLang === 'en' ? section.outroEn : section.outroRu) : null;
-
-                return (
-                  <section key={section.id} className={`space-y-4 border-l-4 pl-4 md:pl-6 ${borderColor}`}>
-                    {/* Title */}
-                    <h2 className={`flex items-center text-2xl md:text-3xl font-semibold ${themeColor} mb-4 font-orbitron`}>
-                      <IconComponent className={`mr-3 ${themeColor}/80`} /> {currentTitle}
-                    </h2>
-
-                    {/* Intro Paragraph */}
-                    {currentIntro && <p className="text-gray-300 leading-relaxed mb-4">{currentIntro}</p>}
-
-                     {/* SubSections (e.g., Speaker's Journey) */}
-                     {section.subSections && section.subSections.map((sub, subIndex) => {
-                       const SubIcon = sub.icon;
-                       const subTitle = selectedLang === 'en' ? sub.titleEn : sub.titleRu;
-                       const subPoints = selectedLang === 'en' ? sub.pointsEn : sub.pointsRu;
-                       const subImgUrl = selectedLang === 'en' ? sub.imageUrlEn : sub.imageUrlRu;
-                       const subImgAlt = selectedLang === 'en' ? sub.imageAltEn : sub.imageAltRu;
-
-                       return (
-                         <div key={`${section.id}-sub-${subIndex}`} className={`ml-4 pl-4 border-l-2 ${sub.borderColor} space-y-3 mb-6`}>
-                           <h3 className={`flex items-center text-xl font-semibold ${sub.textColor}`}>
-                             <SubIcon className="mr-2" /> {subTitle}
-                           </h3>
-                           <ul className="list-disc list-outside space-y-2 text-gray-300 pl-5 text-base md:text-lg leading-relaxed">
-                             {subPoints.map((point, i) => (
-                               <li key={`${selectedLang}-${section.id}-sub-${subIndex}-${i}`} dangerouslySetInnerHTML={{ __html: point }}></li>
-                             ))}
-                           </ul>
-                           {subImgUrl && (
-                             <div className={`my-4 p-1 border ${sub.borderColor}/30 rounded-md bg-black/20 max-w-sm mx-auto`}>
-                               <Image
-                                 src={subImgUrl} alt={subImgAlt} width={600} height={338}
-                                 className="w-full h-auto object-cover rounded opacity-80" loading="lazy" placeholder="blur" blurDataURL={PLACEHOLDER_BLUR_URL}
-                               />
-                               <p className="text-xs text-center text-gray-400 mt-1 italic">{subImgAlt}</p>
-                             </div>
-                           )}
-                         </div>
-                       );
-                     })}
-
-                     {/* Grid Items (e.g., Blocking Mindsets) */}
-                     {section.gridItems && (
-                       <div className="grid md:grid-cols-3 gap-4 my-4">
-                         {section.gridItems.map((item, itemIndex) => {
-                           const ItemIcon = item.icon; // Icon already corrected in section data
+                   {/* PACT Items */}
+                   {section.pactItems && (
+                      <div className="space-y-5 my-4">
+                        {section.pactItems.map((item, itemIndex) => {
+                           const itemColorClass = `text-brand-${item.color}`; // e.g., text-brand-pink
+                           const itemBorderColorClass = `border-brand-${item.color}/50`;
+                           const itemBgColorClass = `bg-brand-${item.color}/10`;
                            const itemTitle = selectedLang === 'en' ? item.titleEn : item.titleRu;
-                           const itemPoints = selectedLang === 'en' ? item.pointsEn : item.pointsRu;
-                           const itemLeadsTo = selectedLang === 'en' ? item.leadsToEn : item.leadsToRu;
-                           const itemColorClass = `text-brand-${item.color}` // Assuming brand colors like brand-gray, brand-blue, brand-red exist
-                           const itemBorderColorClass = `border-brand-${item.color}/40`
+                           const itemDesc = selectedLang === 'en' ? item.descEn : item.descRu;
 
                            return (
-                             <div key={`${section.id}-grid-${itemIndex}`} className={`bg-gray-950/50 p-4 rounded-lg border ${itemBorderColorClass}`}>
-                               <h4 className={`flex items-center font-bold ${itemColorClass} mb-2 text-lg`}>
-                                 <ItemIcon className="mr-2" /> {itemTitle}
-                               </h4>
-                               <ul className="list-disc list-inside space-y-1 text-sm text-gray-300 mb-2 pl-1">
-                                {itemPoints.map((point, i) => <li key={`${selectedLang}-${section.id}-grid-${itemIndex}-p-${i}`}>{point}</li>)}
-                               </ul>
-                               <p className="text-xs italic text-gray-400">
-                                {selectedLang === 'en' ? 'Leads to: ' : 'Ведет к: '} {itemLeadsTo}
-                               </p>
-                             </div>
+                              <div key={`${section.id}-pact-${itemIndex}`} className={`flex items-start space-x-3 p-3 rounded-md ${itemBgColorClass} border-l-4 ${itemBorderColorClass}`}>
+                                  <div className={`flex-shrink-0 font-bold text-2xl ${itemColorClass}`}>
+                                      {item.letter}
+                                  </div>
+                                  <div>
+                                      <h4 className={`font-semibold ${itemColorClass}`}>{itemTitle}</h4>
+                                      <p className="text-sm text-gray-300">{itemDesc}</p>
+                                  </div>
+                              </div>
                            );
-                         })}
-                       </div>
-                     )}
-
-                     {/* PACT Items */}
-                     {section.pactItems && (
-                        <div className="space-y-5 my-4">
-                          {section.pactItems.map((item, itemIndex) => {
-                             const itemColorClass = `text-brand-${item.color}`; // e.g., text-brand-pink
-                             const itemBorderColorClass = `border-brand-${item.color}/50`;
-                             const itemBgColorClass = `bg-brand-${item.color}/10`;
-                             const itemTitle = selectedLang === 'en' ? item.titleEn : item.titleRu;
-                             const itemDesc = selectedLang === 'en' ? item.descEn : item.descRu;
-
-                             return (
-                                <div key={`${section.id}-pact-${itemIndex}`} className={`flex items-start space-x-3 p-3 rounded-md ${itemBgColorClass} border-l-4 ${itemBorderColorClass}`}>
-                                    <div className={`flex-shrink-0 font-bold text-2xl ${itemColorClass}`}>
-                                        {item.letter}
-                                    </div>
-                                    <div>
-                                        <h4 className={`font-semibold ${itemColorClass}`}>{itemTitle}</h4>
-                                        <p className="text-sm text-gray-300">{itemDesc}</p>
-                                    </div>
-                                </div>
-                             );
-                          })}
-                        </div>
-                     )}
-
-                    {/* Standard Points (only if no subSections or gridItems) */}
-                    {!section.subSections && !section.gridItems && !section.pactItems && currentPoints.length > 0 && (
-                      <ul className="list-disc list-outside space-y-2 text-gray-300 pl-5 text-base md:text-lg leading-relaxed">
-                        {currentPoints.map((point, i) => (
-                          <li key={`${selectedLang}-${section.id}-${i}`} dangerouslySetInnerHTML={{ __html: point }}></li>
-                        ))}
-                      </ul>
-                    )}
-
-                    {/* Example Block (for Analysis section) */}
-                    {section.exampleTitleEn && (
-                       <div className="mt-4 p-3 border border-gray-600/50 rounded-md bg-black/20">
-                           <h4 className="font-semibold text-brand-yellow mb-2">{selectedLang === 'en' ? section.exampleTitleEn : section.exampleTitleRu}</h4>
-                            <ul className="list-disc list-inside space-y-1 text-sm text-gray-300 pl-2">
-                              {(selectedLang === 'en' ? section.examplePointsEn : section.examplePointsRu).map((point, i) => (
-                                  <li key={`${selectedLang}-${section.id}-ex-${i}`} dangerouslySetInnerHTML={{ __html: point }}></li>
-                              ))}
-                            </ul>
-                       </div>
-                    )}
-
-                    {/* Decision Block (for Analysis section) */}
-                    {section.decisionTitleEn && (
-                       <div className="mt-4">
-                           <h4 className="font-semibold text-gray-300 mb-3">{selectedLang === 'en' ? section.decisionTitleEn : section.decisionTitleRu}</h4>
-                            <div className="grid md:grid-cols-3 gap-3">
-                                {(selectedLang === 'en' ? section.decisionPointsEn : section.decisionPointsRu).map((item, i) => {
-                                    const DecisionIcon = item.icon;
-                                    const decisionColorClass = `text-brand-${item.color}`; // Assuming brand colors map
-                                    const decisionBorderColorClass = `border-brand-${item.color}/40`;
-                                    return (
-                                        <div key={`${selectedLang}-${section.id}-dec-${i}`} className={`flex items-center space-x-2 p-2 rounded border ${decisionBorderColorClass} bg-gray-950/60`}>
-                                            <DecisionIcon className={`flex-shrink-0 h-5 w-5 ${decisionColorClass}`} />
-                                            <p className="text-sm text-gray-300" dangerouslySetInnerHTML={{ __html: item.text }}></p>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                       </div>
-                    )}
-
-
-                    {/* Image (if exists and no subsections/grid) */}
-                    {currentImageUrl && !section.subSections && !section.gridItems && (
-                      <div className={`my-6 p-2 border ${borderColor}/30 rounded-lg bg-black/30 max-w-md mx-auto`}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-800/50 cursor-help relative">
-                              <Image
-                                src={currentImageUrl} alt={currentImageAlt} width={600} height={338}
-                                className="w-full h-full object-cover opacity-90 hover:opacity-100 transition-opacity duration-300"
-                                loading="lazy" placeholder="blur" blurDataURL={PLACEHOLDER_BLUR_URL}
-                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                              />
-                            </div>
-                          </TooltipTrigger>
-                          {selectedLang === 'ru' && section.tooltipRu && (
-                            <TooltipContent side="bottom" className={`max-w-[300px] text-center bg-gray-950 ${borderColor}/60 text-white p-3 shadow-lg border`}>
-                              <p className="text-sm whitespace-pre-wrap">{section.tooltipRu}</p>
-                            </TooltipContent>
-                          )}
-                        </Tooltip>
-                        <p className="text-xs text-center text-gray-400 mt-1 italic">{currentImageAlt}</p>
+                        })}
                       </div>
-                    )}
+                   )}
 
-                     {/* Outro Paragraph */}
-                    {currentOutro && <p className="text-gray-300 leading-relaxed mt-4 italic" dangerouslySetInnerHTML={{ __html: currentOutro }}></p>}
+                  {/* Standard Points (only if no subSections or gridItems) */}
+                  {!section.subSections && !section.gridItems && !section.pactItems && currentPoints.length > 0 && (
+                    <ul className="list-disc list-outside space-y-2 text-gray-300 pl-5 text-base md:text-lg leading-relaxed">
+                      {currentPoints.map((point, i) => (
+                        <li key={`${selectedLang}-${section.id}-${i}`} dangerouslySetInnerHTML={{ __html: point }}></li>
+                      ))}
+                    </ul>
+                  )}
 
-                  </section>
-                );
-              })}
+                  {/* Example Block (for Analysis section) */}
+                  {section.exampleTitleEn && (
+                     <div className="mt-4 p-3 border border-gray-600/50 rounded-md bg-black/20">
+                         <h4 className="font-semibold text-brand-yellow mb-2">{selectedLang === 'en' ? section.exampleTitleEn : section.exampleTitleRu}</h4>
+                          <ul className="list-disc list-inside space-y-1 text-sm text-gray-300 pl-2">
+                            {(selectedLang === 'en' ? section.examplePointsEn : section.examplePointsRu).map((point, i) => (
+                                <li key={`${selectedLang}-${section.id}-ex-${i}`} dangerouslySetInnerHTML={{ __html: point }}></li>
+                            ))}
+                          </ul>
+                     </div>
+                  )}
 
-              {/* Concluding section */}
-              <section className="text-center pt-8 border-t border-brand-green/20 mt-10">
-                 <p className="text-gray-400 italic">
-                   {selectedLang === 'ru' ? "Резюме основано на видео. Применение требует практики и саморефлексии." : "Summary based on video insights. Application requires practice and self-reflection."}
-                 </p>
-                 {/* Optional link back to related concepts */}
-                 <p className="mt-4 text-gray-300">
-                   Explore related concepts in <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>.
-                 </p>
-              </section>
+                  {/* Decision Block (for Analysis section) */}
+                  {section.decisionTitleEn && (
+                     <div className="mt-4">
+                         <h4 className="font-semibold text-gray-300 mb-3">{selectedLang === 'en' ? section.decisionTitleEn : section.decisionTitleRu}</h4>
+                          <div className="grid md:grid-cols-3 gap-3">
+                              {(selectedLang === 'en' ? section.decisionPointsEn : section.decisionPointsRu).map((item, i) => {
+                                  const DecisionIcon = item.icon;
+                                  const decisionColorClass = `text-brand-${item.color}`; // Assuming brand colors map
+                                  const decisionBorderColorClass = `border-brand-${item.color}/40`;
+                                  return (
+                                      <div key={`${selectedLang}-${section.id}-dec-${i}`} className={`flex items-center space-x-2 p-2 rounded border ${decisionBorderColorClass} bg-gray-950/60`}>
+                                          <DecisionIcon className={`flex-shrink-0 h-5 w-5 ${decisionColorClass}`} />
+                                          <p className="text-sm text-gray-300" dangerouslySetInnerHTML={{ __html: item.text }}></p>
+                                      </div>
+                                  );
+                              })}
+                          </div>
+                     </div>
+                  )}
 
-            </CardContent>
-          </Card>
-        </div>
-      </TooltipProvider>
+                  {/* Image (if exists and no subsections/grid) */}
+                  {currentImageUrl && !section.subSections && !section.gridItems && (
+                    <div className={`my-6 p-2 border ${borderColor}/30 rounded-lg bg-black/30 max-w-md mx-auto`}>
+                      {/* Removed Tooltip, TooltipTrigger, TooltipContent */}
+                      <div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-800/50 relative">
+                        <Image
+                          src={currentImageUrl} alt={currentImageAlt} width={600} height={338}
+                          className="w-full h-full object-cover opacity-90 hover:opacity-100 transition-opacity duration-300"
+                          loading="lazy" placeholder="blur" blurDataURL={PLACEHOLDER_BLUR_URL}
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        />
+                      </div>
+                      <p className="text-xs text-center text-gray-400 mt-1 italic">{currentImageAlt}</p>
+                    </div>
+                  )}
+
+                   {/* Outro Paragraph */}
+                  {currentOutro && <p className="text-gray-300 leading-relaxed mt-4 italic" dangerouslySetInnerHTML={{ __html: currentOutro }}></p>}
+
+                </section>
+              );
+            })}
+
+            {/* Concluding section */}
+            <section className="text-center pt-8 border-t border-brand-green/20 mt-10">
+               <p className="text-gray-400 italic">
+                 {selectedLang === 'ru' ? "Резюме основано на видео. Применение требует практики и саморефлексии." : "Summary based on video insights. Application requires practice and self-reflection."}
+               </p>
+               {/* Optional link back to related concepts */}
+               <p className="mt-4 text-gray-300">
+                 Explore related concepts in <Link href="/purpose-profit" className="text-brand-purple hover:underline font-semibold">Purpose & Profit</Link>.
+               </p>
+            </section>
+
+          </CardContent>
+        </Card>
+      </div>
+      {/* Removed closing TooltipProvider */}
     </div>
   );
 }

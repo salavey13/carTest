@@ -28,8 +28,6 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 
-
-
 export default function StyleGuide() {
   return (
     <div className="min-h-screen bg-background p-8">

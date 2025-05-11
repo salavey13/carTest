@@ -1,84 +1,184 @@
 "use client";
 
 import type React from "react";
-import { createContext, useContext, useEffect, useMemo } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useTelegram } from "@/hooks/useTelegram";
-import { debugLogger } from "@/lib/debugLogger";
+import { debugLogger as logger } from "@/lib/debugLogger";
 import { toast } from "sonner";
+import type { WebAppUser, WebApp, ThemeParams, WebAppInitData } from "@/types/telegram";
+import type { Database } from "@/types/database.types";
 
-// Define the shape of the context data
-// Infer the type from the hook's return value for robustness
-type AppContextType = ReturnType<typeof useTelegram>;
+type User = Database["public"]["Tables"]["users"]["Row"];
 
-// Create the context with an initial undefined value
-const AppContext = createContext<AppContextType | undefined>(undefined);
+interface AppContextData extends ReturnType<typeof useTelegram> {
+  isAuthenticating: boolean; 
+}
+
+const AppContext = createContext<Partial<AppContextData>>({});
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Get data from the useTelegram hook
   const telegramData = useTelegram();
 
-  // Memoize the context value to prevent unnecessary re-renders of consumers
-  // if telegramData object reference changes but values are the same.
-  const contextValue = useMemo(() => telegramData, [telegramData]);
+  const contextValue = useMemo(() => {
+    logger.debug(
+        "[AppContext Provider] Memoizing contextValue. telegramData props:", 
+        { 
+            isLoading: telegramData.isLoading, 
+            isAuthenticating: telegramData.isAuthenticating,
+            isAdminIsFunction: typeof telegramData.isAdmin === 'function', 
+            dbUserStatus: telegramData.dbUser?.status,
+            dbUserRole: telegramData.dbUser?.role,
+            isAuthenticated: telegramData.isAuthenticated,
+            isMockUser: process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' 
+        }
+    );
+    return {
+      ...telegramData,
+    };
+  }, [ 
+    telegramData.tg, 
+    telegramData.user, 
+    telegramData.dbUser, 
+    telegramData.isInTelegramContext, 
+    telegramData.isAuthenticated, 
+    telegramData.isAuthenticating, 
+    telegramData.isAdmin, 
+    telegramData.isLoading, 
+    telegramData.error,
+    telegramData.openLink, 
+    telegramData.close,
+    telegramData.showPopup,
+    telegramData.sendData,
+    telegramData.getInitData,
+    telegramData.expand,
+    telegramData.setHeaderColor,
+    telegramData.setBackgroundColor,
+    telegramData.platform, 
+    telegramData.themeParams,
+    telegramData.initData,
+    telegramData.initDataUnsafe,
+    telegramData.colorScheme,
+  ]);
 
-  // Log context changes for debugging (only when contextValue actually changes)
   useEffect(() => {
-    debugLogger.log("AppContext updated:", {
+    logger.log("AppContext updated (state from contextValue):", {
       isAuthenticated: contextValue.isAuthenticated,
       isLoading: contextValue.isLoading,
+      isAuthenticating: contextValue.isAuthenticating,
       userId: contextValue.dbUser?.user_id ?? contextValue.user?.id,
       dbUserStatus: contextValue.dbUser?.status,
+      dbUserRole: contextValue.dbUser?.role,
+      isAdminFunctionExists: typeof contextValue.isAdmin === 'function',
       error: contextValue.error?.message,
       isInTelegram: contextValue.isInTelegramContext,
     });
   }, [contextValue]);
 
-
-  // Centralize the "User Authorized" toast notification
   useEffect(() => {
     let currentToastId: string | number | undefined;
+    let loadingTimer: NodeJS.Timeout | null = null;
+    const LOADING_TOAST_DELAY = 300;
+    let mockUserToastId: string | number | undefined;
 
-    // Show loading toast only if loading takes a noticeable amount of time
-    if (contextValue.isLoading) {
-       // Optionally, delay the loading toast slightly
-       // const loadingTimer = setTimeout(() => {
-       //    currentToastId = toast.loading("Авторизация...", { id: "auth-loading-toast" });
-       // }, 300); // e.g., wait 300ms
-       // return () => clearTimeout(loadingTimer); // Clear timer if component unmounts or deps change
-    } else {
-        toast.dismiss("auth-loading-toast"); // Dismiss loading if no longer loading
+    if (contextValue.isLoading || contextValue.isAuthenticating) { 
+       loadingTimer = setTimeout(() => {
+          if ((contextValue.isLoading || contextValue.isAuthenticating) && document.visibilityState === 'visible') {
+             logger.debug("[AppContext] Showing auth loading toast (isLoading or isAuthenticating)...");
+             currentToastId = toast.loading("Авторизация...", { id: "auth-loading-toast" });
+          }
+       }, LOADING_TOAST_DELAY);
+    } else { 
+        if (loadingTimer) clearTimeout(loadingTimer);
+        toast.dismiss("auth-loading-toast");
 
-        // Show success toast only once when authentication completes successfully
-        if (contextValue.isAuthenticated && !contextValue.error) {
-            // Use a unique ID to prevent the toast from showing multiple times on rapid updates
-            currentToastId = toast.success("Пользователь авторизован", { id: "auth-success-toast", duration: 2000 });
+        if (process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && document.visibilityState === 'visible') {
+             const existingMockToast = document.querySelector('[data-sonner-toast][data-toast-id="mock-user-info-toast"]');
+             if (!existingMockToast) {
+                logger.info("[AppContext] Using MOCK_USER. Displaying info toast.");
+                mockUserToastId = toast.info("Внимание: используется тестовый пользователь!", {
+                    description: "Данные могут не сохраняться или вести себя иначе, чем в Telegram.",
+                    duration: 5000,
+                    id: "mock-user-info-toast" 
+                });
+             }
         }
-        // Optional: Show error toast if authentication fails
+
+        if (contextValue.isAuthenticated && !contextValue.error) {
+             if (document.visibilityState === 'visible') {
+                 logger.debug("[AppContext] Showing auth success toast...");
+                 currentToastId = toast.success("Пользователь авторизован", { id: "auth-success-toast", duration: 2000 });
+             }
+        }
         else if (contextValue.error) {
-             currentToastId = toast.error("Ошибка авторизации", { id: "auth-error-toast", description: contextValue.error.message });
+            if (document.visibilityState === 'visible') {
+                 logger.error("[AppContext] Showing auth error toast:", contextValue.error);
+                 currentToastId = toast.error(`Ошибка авторизации: ${contextValue.error.message}`, { id: "auth-error-toast", description: "Не удалось войти. Попробуйте позже." });
+            }
         }
     }
 
-    // Cleanup function to dismiss the toast if the component unmounts
-    // or the dependencies change before the toast auto-dismisses
     return () => {
-        if (currentToastId) {
-            // toast.dismiss(currentToastId); // Optional: dismiss immediately on change/unmount
+        if (loadingTimer) {
+            clearTimeout(loadingTimer);
         }
     };
+  }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.isAuthenticating, contextValue.error]);
 
-  }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.error]);
 
-  // Provide the memoized value to the context consumers
-  return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
+  return <AppContext.Provider value={contextValue as AppContextData}>{children}</AppContext.Provider>;
 };
 
-// Custom hook for consuming the context
-export const useAppContext = (): AppContextType => {
+export const useAppContext = (): AppContextData => {
   const context = useContext(AppContext);
-  // Ensure the hook is used within a provider
-  if (context === undefined) {
-    throw new Error("useAppContext must be used within an AppProvider");
+  
+  if (!context || Object.keys(context).length === 0 || context.isLoading === undefined || context.isAuthenticating === undefined ) { 
+     logger.warn("useAppContext: Context is empty or `isLoading`/`isAuthenticating` is undefined. Returning loading defaults.");
+     return {
+        tg: null, user: null, dbUser: null, isInTelegramContext: false, isAuthenticated: false, 
+        isLoading: true, isAuthenticating: true, error: null, 
+        isAdmin: () => false, 
+        openLink: (url: string) => logger.warn(`openLink(${url}) called on loading context`),
+        close: () => logger.warn('close() called on loading context'),
+        showPopup: (params: any) => logger.warn('showPopup() called on loading context', params),
+        sendData: (data: string) => logger.warn(`sendData(${data}) called on loading context`),
+        getInitData: () => { logger.warn('getInitData() called on loading context'); return null; },
+        expand: () => logger.warn('expand() called on loading context'),
+        setHeaderColor: (color: string) => logger.warn(`setHeaderColor(${color}) called on loading context`),
+        setBackgroundColor: (color: string) => logger.warn(`setBackgroundColor(${color}) called on loading context`),
+        platform: undefined, 
+        themeParams: undefined,
+        initData: undefined, 
+        initDataUnsafe: undefined,
+        colorScheme: undefined,
+     } as AppContextData; 
   }
-  return context;
+
+  if (context.isLoading === false && context.isAuthenticating === false && typeof context.isAdmin !== 'function') {
+    logger.error(
+        "useAppContext: CRITICAL - Context fully loaded (isLoading: false, isAuthenticating: false) but context.isAdmin is NOT a function.", 
+        { 
+            contextDbUserExists: !!context.dbUser,
+            contextDbUserStatus: context.dbUser?.status, 
+            contextDbUserRole: context.dbUser?.role,
+            contextIsAuthenticated: context.isAuthenticated,
+            contextKeys: Object.keys(context)
+        }
+    );
+    const fallbackIsAdmin = () => {
+        if (context.dbUser) {
+            const statusIsAdmin = context.dbUser.status === 'admin';
+            const roleIsAdmin = context.dbUser.role === 'vprAdmin' || context.dbUser.role === 'admin'; 
+            logger.warn(`[useAppContext Fallback isAdmin] Using direct dbUser check. Status: ${context.dbUser.status}, Role: ${context.dbUser.role}. Determined isAdmin: ${statusIsAdmin || roleIsAdmin}`);
+            return statusIsAdmin || roleIsAdmin;
+        }
+        logger.warn("[useAppContext Fallback isAdmin] dbUser not available in context for fallback. Defaulting to false.");
+        return false;
+    };
+    return {
+        ...(context as AppContextData), 
+        isAdmin: fallbackIsAdmin, 
+    } as AppContextData;
+  }
+
+  return context as AppContextData;
 };
