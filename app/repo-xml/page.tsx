@@ -172,14 +172,12 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const [lang, setLang] = useState<keyof typeof translations>('en'); 
     const [t, setT] = useState<typeof translations.en | null>(null); 
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true); // Only for translations now
-    // const [initialUrlProcessed, setInitialUrlProcessed] = useState<boolean>(false); // Managed by useRepoFetcher and prop flow
-    // const hasProcessedInitialIdea = useRef(false); // Managed by useRepoFetcher and prop flow
     log("[ActualPageContent] useState DONE");
     
     // --- CONTEXT VALIDATION ---
-    if (!pageContext || typeof pageContext.addToast !== 'function') {
-         error("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!");
-         return <div className="text-red-500 p-4">Критическая ошибка: Контекст страницы не загружен.</div>;
+    if (!pageContext || typeof pageContext.addToast !== 'function' || typeof pageContext.setRepoUrl !== 'function' || typeof pageContext.setImageReplaceTask !== 'function' || typeof pageContext.triggerFetch !== 'function') {
+         error("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or key functions are invalid!");
+         return <div className="text-red-500 p-4">Критическая ошибка: Контекст страницы не загружен или неполный.</div>;
     }
     log("[ActualPageContent] pageContext check passed.");
 
@@ -187,6 +185,11 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const {
         fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef, 
         showComponents, setShowComponents,
+        setRepoUrl: contextSetRepoUrl, // aliased to avoid conflict if needed
+        setImageReplaceTask: contextSetImageReplaceTask,
+        triggerFetch: contextTriggerFetch,
+        repoUrl: contextRepoUrl,
+        addToast: contextAddToast,
     } = pageContext;
 
     // --- Effect 1: Language ---
@@ -207,6 +210,60 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
         setIsPageLoading(!t);
         log(`[ActualPageContent Effect] Loading check: translations=${!!t}, resulting isPageLoading=${!t}`);
     }, [t]);
+
+    // --- Effect 3: Process Initial Idea for Image Replacement ---
+    useEffect(() => {
+        if (initialIdea && initialIdea.startsWith('ImageReplace|') && initialPath && fetcherRef.current && contextSetRepoUrl && contextSetImageReplaceTask && contextTriggerFetch && contextAddToast) {
+            logger.info(`[ActualPageContent InitialIdea Effect - IMG] Processing ImageReplace initialIdea: ${initialIdea.substring(0,50)}...`);
+            const parsedTask = repoUtils.parseImageReplaceIdea(initialIdea, initialPath); // Pass initialPath as targetPath
+            
+            if (parsedTask && parsedTask.targetPath) {
+                let repoFromPath: string | null = null;
+                const pathParts = initialPath.split('/');
+                if (pathParts.length >= 3 && pathParts[0] === 'app') { // Assuming format "app/owner/repo/..."
+                    //This logic is flawed for GitHub URLs. GitHub URL is owner/repo.
+                    //The path from URL is likely `app/some/page.tsx` if the repo is the current project.
+                    //If `initialPath` contains the full GitHub path, it needs different parsing.
+                    //For now, assume `initialPath` is relative to 'app' or `contextRepoUrl` is primary.
+                } else if (pathParts.length >= 2 && !pathParts[0].includes('.')) { // Heuristic for "owner/repo"
+                     // This might be part of a full GitHub path, but needs care.
+                }
+
+                // Prefer contextRepoUrl if valid, otherwise default. Repo from path is tricky.
+                const defaultRepo = "https://github.com/salavey13/oneSitePls"; // Updated default
+                let finalRepoUrl = contextRepoUrl && contextRepoUrl.includes("github.com") ? contextRepoUrl : defaultRepo;
+                
+                // If initialPath IS a full github path to a file:
+                const githubUrlPattern = /^https:\/\/github\.com\/([^\/]+)\/([^\/]+)\/blob\/[^\/]+\/(.+)$/;
+                const match = initialPath.match(githubUrlPattern);
+                if (match) {
+                    finalRepoUrl = `https://github.com/${match[1]}/${match[2]}`;
+                    // The actual targetPath for the file inside the repo would be match[3]
+                    // And parsedTask.targetPath should be updated if it's not already match[3]
+                    if (parsedTask.targetPath !== match[3]) {
+                        logger.warn(`[ActualPageContent InitialIdea Effect - IMG] Mismatch in targetPath from initialPath (${match[3]}) and parsedTask (${parsedTask.targetPath}). Using initialPath's file path.`);
+                        parsedTask.targetPath = match[3];
+                    }
+                }
+
+
+                if (finalRepoUrl !== contextRepoUrl) {
+                    logger.info(`[ActualPageContent InitialIdea Effect - IMG] Setting repoUrl for ImageReplace task: ${finalRepoUrl}`);
+                    contextSetRepoUrl(finalRepoUrl); 
+                }
+                
+                contextSetImageReplaceTask(parsedTask);
+
+                setTimeout(() => {
+                    logger.info(`[ActualPageContent InitialIdea Effect - IMG] Triggering fetch for parsed task. Repo: ${finalRepoUrl}, Task Path: ${parsedTask.targetPath}`);
+                    contextTriggerFetch(false, null); 
+                }, 100); 
+            } else {
+                logger.error(`[ActualPageContent InitialIdea Effect - IMG] Failed to parse ImageReplaceTask from initialIdea: ${initialIdea} or missing targetPath from initialPath: ${initialPath}`);
+                contextAddToast("Ошибка: Не удалось обработать задачу замены изображения из URL.", "error");
+            }
+        }
+    }, [initialIdea, initialPath, fetcherRef, contextSetRepoUrl, contextSetImageReplaceTask, contextTriggerFetch, contextRepoUrl, contextAddToast, logger]);
     
     // --- Callbacks ---
     const memoizedGetPlainText = useCallback(getPlainText, []);
@@ -436,7 +493,6 @@ function RepoXmlPageInternalContent() {
   logger.log(`[RepoXmlPageInternalContent] Extracted from URL - path: ${path}, idea: ${idea ? idea.substring(0,30)+'...' : null}`);
   return <ActualPageContent initialPath={path} initialIdea={idea} />;
 }
-
 
 // --- Layout Component ---
 function RepoXmlPageLayout() {
