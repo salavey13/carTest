@@ -12,8 +12,8 @@ if (typeof Fa6Icons !== 'object' || Fa6Icons === null || Object.keys(Fa6Icons).l
     logger.error("[VCR Pre-Init] Fa6Icons module from 'react-icons/fa6' appears to be empty or not loaded correctly. This will cause icon rendering failures.");
 } else {
     // Optional: Check for a specific known icon to be more certain
-    if (!Fa6Icons.FaBolt) {
-        logger.warn("[VCR Pre-Init] Fa6Icons.FaBolt is missing. There might be an issue with the 'react-icons/fa6' import or package itself.");
+    if (!Fa6Icons.FaBolt || typeof Fa6Icons.FaBolt !== 'function') {
+        logger.warn("[VCR Pre-Init] Fa6Icons.FaBolt is missing or not a function. There might be an issue with the 'react-icons/fa6' import or package itself.");
     } else {
         // logger.debug("[VCR Pre-Init] Fa6Icons module seems to be loaded with FaBolt available.");
     }
@@ -70,8 +70,8 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                 const IconComponent = Fa6Icons[iconToRender];
                 // Double check IconComponent is a function right before using it
                 if (typeof IconComponent !== 'function') {
-                    logger.error(`[VCR Render] IconComponent for '${iconToRender}' is not a function at render time. Value:`, IconComponent);
-                    return <span title={`Render Error: ${iconToRender} is not a function`} className="text-red-600 font-bold">{`[ICON FN ERR!]`}</span>;
+                    logger.error(`[VCR Render] IconComponent for '${iconToRender}' ('${iconComponentName}') is not a function at render time. Value:`, IconComponent);
+                    return <span title={`Render Error: ${iconToRender} is not a function`} className="text-red-600 font-bold">{`[ICON FN ERR!: ${iconToRender}]`}</span>;
                 }
                 const { className, style, ...restProps } = mutableAttribs;
                 const finalProps: Record<string, any> = {
@@ -83,12 +83,15 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                     return React.createElement(IconComponent, finalProps, children);
                 } catch (e) {
                     logger.error(`[VCR Render] Error during React.createElement for icon <${iconComponentName}>:`, e, "Props:", finalProps);
-                    return <span title={`createElement Error: ${iconComponentName}`} className="text-red-600 font-bold">{`[ICON CREATE ERR!]`}</span>;
+                    return <span title={`createElement Error: ${iconComponentName}`} className="text-red-600 font-bold">{`[ICON CREATE ERR!: ${iconComponentName}]`}</span>;
                 }
             } else if (lowerCaseName.startsWith('fa') || nodeName.startsWith('Fa')) { 
-                logger.warn(`[VCR Render] Unknown/Unmapped Fa Icon Tag: <${nodeName}> (lc: ${lowerCaseName})`);
-                return <span title={`Unknown/Unmapped Fa Icon: ${nodeName}`} className="text-orange-500 font-bold">{`<${nodeName}>`}</span>;
+                // This handles cases like <fa-icon> or <FaNonExistent> that weren't caught by preprocessIconSyntax
+                // and are not valid direct Fa6Icons keys or mapped keys.
+                logger.warn(`[VCR Render] Unknown/Unmapped/Invalid Fa Icon Tag: <${nodeName}> (lc: ${lowerCaseName})`);
+                return <span title={`Unknown/Unmapped/Invalid Fa Icon: ${nodeName}`} className="text-orange-500 font-bold">{`[?${nodeName}?]`}</span>;
             }
+
 
             if (lowerCaseName === 'a') {
                 const hrefVal = mutableAttribs.href;
@@ -103,6 +106,13 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                 return React.createElement('a', mutableAttribs, children);
             }
             
+            // If it's a custom component tag (starts with uppercase) but not an icon, log and return undefined
+            // to let html-react-parser potentially try to render it if it's a known component in scope.
+            // However, for this specific use case, we mostly expect HTML or Fa icons.
+            if (nodeName.match(/^[A-Z]/) && !iconToRender) {
+                logger.warn(`[VCR Render] Encountered unknown uppercase tag <${nodeName}>. Not a recognized icon. Parser will attempt default handling or fail if not a known React component.`);
+            }
+
             return undefined; 
         }
         

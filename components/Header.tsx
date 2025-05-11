@@ -33,6 +33,8 @@ interface PageInfo {
   translatedName?: string; 
 }
 
+const FallbackIcon = LucideStar; // Define a fallback icon
+
 const allPages: PageInfo[] = [
   // --- Core Vibe ---
   { path: "/", name: "Home", icon: FaBrain, group: "Core Vibe", isImportant: true, color: "cyan" },
@@ -297,17 +299,17 @@ export default function Header() {
                   const pagesInGroup = groupedAndFilteredPages[groupName];
                   if (!pagesInGroup || pagesInGroup.length === 0) return null; 
                   
-                  const GroupIcon = groupIcons[groupName];
+                  const GroupIcon = groupIcons[groupName] || FallbackIcon; // Use fallback if specific icon is not found
 
                   return (
                     <div key={groupName}>
                       <h3 className="text-lg font-orbitron text-brand-purple mb-3 flex items-center gap-2">
-                        {GroupIcon && <GroupIcon className="w-6 h-6 opacity-80" />} 
+                        {typeof GroupIcon === 'function' ? <GroupIcon className="w-6 h-6 opacity-80" /> : <FallbackIcon className="w-6 h-6 opacity-80" /> }
                         {t(groupName)}
                       </h3>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-2.5">
                         {pagesInGroup.map((page) => {
-                          const PageIcon = page.icon;
+                          const PageIconComponent = page.icon || FallbackIcon; // Use fallback if specific icon is not defined for the page
                           const isCurrentPage = page.path === pathname;
                           const tileBaseColorClass = tileColorClasses[page.color || 'default'];
                           const rgbVar = colorVarMap[page.color || 'default'];
@@ -334,12 +336,17 @@ export default function Header() {
                                   <FaFire/>
                                 </span>
                               )}
-                              {PageIcon && (
-                                <PageIcon className={cn(
+                              {typeof PageIconComponent === 'function' ? (
+                                <PageIconComponent className={cn(
                                   "transition-transform duration-200 group-hover:scale-105 mb-1", 
                                   page.isImportant 
                                       ? "h-6 w-6 sm:h-7 sm:w-7" 
                                       : "h-5 w-5 sm:h-6 sm:w-6" 
+                                )} />
+                              ) : (
+                                <FallbackIcon className={cn(
+                                    "transition-transform duration-200 group-hover:scale-105 mb-1", 
+                                    page.isImportant ? "h-6 w-6 sm:h-7 sm:w-7" : "h-5 w-5 sm:h-6 sm:w-6"
                                 )} />
                               )}
                               <span className={cn(
