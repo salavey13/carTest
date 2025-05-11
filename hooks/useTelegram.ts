@@ -2,16 +2,19 @@
 
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { debugLogger } from "@/lib/debugLogger";
-import { logger } from "@/lib/logger"; // Use standard logger
-// Import specific DB functions needed, ensure they use admin client correctly ONLY during init/mock setup phase
+import { logger } from "@/lib/logger"; 
 import { createOrUpdateUser as dbCreateOrUpdateUser, fetchUserData as dbFetchUserData } from "@/hooks/supabase";
 import type { TelegramWebApp, WebAppUser } from "@/types/telegram";
 import type { Database } from "@/types/database.types";
-// import { toast } from "sonner"; // Toasts are now handled in AppContext
 
 type DatabaseUser = Database["public"]["Tables"]["users"]["Row"] | null;
+interface AuthResult {
+    tgUserToSet: WebAppUser | null;
+    dbUserToSet: DatabaseUser;
+    isAuthenticatedToSet: boolean;
+}
 
-// Define a more realistic mock user or allow configuration via env vars for dev
+
 const MOCK_USER: WebAppUser | null = process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' ? {
   id: parseInt(process.env.NEXT_PUBLIC_MOCK_USER_ID || "413553377"),
   first_name: process.env.NEXT_PUBLIC_MOCK_USER_FIRST_NAME || "Mock",
@@ -19,155 +22,156 @@ const MOCK_USER: WebAppUser | null = process.env.NEXT_PUBLIC_USE_MOCK_USER === '
   username: process.env.NEXT_PUBLIC_MOCK_USER_USERNAME || "mockuser",
   language_code: process.env.NEXT_PUBLIC_MOCK_USER_LANG || "ru",
   photo_url: process.env.NEXT_PUBLIC_MOCK_USER_PHOTO || "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/bullshitemotions//pooh.png",
-  // Add other fields if needed by your app logic during mock auth
 } : null;
 
 if (MOCK_USER) {
     logger.warn("Using mock Telegram user for development. Ensure NEXT_PUBLIC_USE_MOCK_USER is 'false' or unset in production.");
-    // debugLogger.log("Mock User Details:", MOCK_USER); // Logged from AppContext if needed
 }
 
 export function useTelegram() {
   const [tgWebApp, setTgWebApp] = useState<TelegramWebApp | null>(null);
-  const [tgUser, setTgUser] = useState<WebAppUser | null>(null); // Raw Telegram user
-  const [dbUser, setDbUser] = useState<DatabaseUser>(null); // User data from your DB
+  const [tgUser, setTgUser] = useState<WebAppUser | null>(null); 
+  const [dbUser, setDbUser] = useState<DatabaseUser>(null); 
   const [isInTelegramContext, setIsInTelegramContext] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false); // Derived state
+  const [isAuthenticated, setIsAuthenticated] = useState(false); 
 
-  // --- Authentication Logic ---
   const handleAuthentication = useCallback(
-    async (telegramUser: WebAppUser): Promise<DatabaseUser> => {
-      debugLogger.log("handleAuthentication started for:", telegramUser.id);
-      setError(null); // Clear previous errors
-
-      if (!telegramUser?.id) {
+    async (telegramUserToAuth: WebAppUser): Promise<AuthResult> => {
+      debugLogger.log("[handleAuthentication] Started for:", telegramUserToAuth.id);
+      
+      if (!telegramUserToAuth?.id) {
          throw new Error("Invalid Telegram user data received.");
       }
-      const userIdStr = telegramUser.id.toString();
+      const userIdStr = telegramUserToAuth.id.toString();
 
       try {
          let userFromDb = await dbFetchUserData(userIdStr);
 
          if (!userFromDb) {
-            debugLogger.log(`User ${userIdStr} not found in DB, creating...`);
-            userFromDb = await dbCreateOrUpdateUser(userIdStr, telegramUser);
+            debugLogger.log(`[handleAuthentication] User ${userIdStr} not found in DB, creating...`);
+            userFromDb = await dbCreateOrUpdateUser(userIdStr, telegramUserToAuth);
              if (!userFromDb) {
                  throw new Error(`Failed to create user ${userIdStr} in database.`);
              }
-             logger.info(`New user ${userIdStr} (${telegramUser.username || ''}) created.`);
+             logger.info(`[handleAuthentication] New user ${userIdStr} (${telegramUserToAuth.username || ''}) created.`);
          } else {
-            debugLogger.log(`User ${userIdStr} found in DB. Checking for updates...`);
+            debugLogger.log(`[handleAuthentication] User ${userIdStr} found in DB. Checking for updates...`);
             const needsUpdate = (
-                userFromDb.username !== telegramUser.username ||
-                userFromDb.full_name !== `${telegramUser.first_name || ""} ${telegramUser.last_name || ""}`.trim() ||
-                userFromDb.avatar_url !== telegramUser.photo_url
+                userFromDb.username !== telegramUserToAuth.username ||
+                userFromDb.full_name !== `${telegramUserToAuth.first_name || ""} ${telegramUserToAuth.last_name || ""}`.trim() ||
+                userFromDb.avatar_url !== telegramUserToAuth.photo_url
             );
             if(needsUpdate) {
-                debugLogger.log(`User ${userIdStr} data differs, updating...`);
-                userFromDb = await dbCreateOrUpdateUser(userIdStr, telegramUser);
+                debugLogger.log(`[handleAuthentication] User ${userIdStr} data differs, updating...`);
+                userFromDb = await dbCreateOrUpdateUser(userIdStr, telegramUserToAuth);
                  if (!userFromDb) {
                      throw new Error(`Failed to update user ${userIdStr} in database.`);
                  }
-                 logger.info(`User ${userIdStr} (${telegramUser.username || ''}) updated.`);
+                 logger.info(`[handleAuthentication] User ${userIdStr} (${telegramUserToAuth.username || ''}) updated.`);
             } else {
-                 debugLogger.log(`User ${userIdStr} data is up-to-date.`);
+                 debugLogger.log(`[handleAuthentication] User ${userIdStr} data is up-to-date.`);
             }
          }
-
-         debugLogger.log(`Authentication successful for user ${userIdStr}`);
-         setTgUser(telegramUser); 
-         setDbUser(userFromDb); 
-         setIsAuthenticated(true); 
-         return userFromDb;
+         debugLogger.log(`[handleAuthentication] Successful for user ${userIdStr}. Returning auth data.`);
+         return { 
+            tgUserToSet: telegramUserToAuth, 
+            dbUserToSet: userFromDb, 
+            isAuthenticatedToSet: true 
+        };
 
       } catch (err) {
-         logger.error(`Authentication failed for user ${telegramUser.id}:`, err);
+         logger.error(`[handleAuthentication] Failed for user ${telegramUserToAuth.id}:`, err);
          const authError = err instanceof Error ? err : new Error("Authentication failed due to an unknown error.");
-         setError(authError);
-         setIsAuthenticated(false);
-         setDbUser(null); 
+         // Error will be set by the caller (initialize)
          throw authError; 
       }
     },
     [] 
   );
 
-  // --- Initialization Effect ---
   useEffect(() => {
     let isMounted = true;
-    debugLogger.log("useTelegram effect running, isMounted:", isMounted);
+    debugLogger.log("[useTelegram Effect] Running, isMounted:", isMounted);
 
     const initialize = async () => {
-      debugLogger.log("initialize function started");
+      debugLogger.log("[useTelegram Initialize] Started");
       if (!isMounted) {
-          debugLogger.log("initialize aborted: component unmounted");
+          debugLogger.log("[useTelegram Initialize] Aborted: component unmounted");
           return;
       }
 
+      // Initial reset of states
       setIsLoading(true);
       setError(null);
       setIsAuthenticated(false);
       setDbUser(null);
       setTgUser(null);
-      setIsInTelegramContext(false); // Default to false
+      setTgWebApp(null);
+      setIsInTelegramContext(false); 
+
+      let authCandidate: WebAppUser | null = null;
+      let inTgContext = false;
 
       if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
         const telegram = (window as any).Telegram.WebApp;
-        debugLogger.log("Telegram WebApp context detected", telegram.initData ? 'with initData' : 'without initData');
-
+        debugLogger.log("[useTelegram Initialize] Telegram WebApp context detected", telegram.initDataUnsafe?.user ? 'with user data' : 'without user data');
+        
         if (telegram.initDataUnsafe?.user) {
-          setTgWebApp(telegram);
-          setIsInTelegramContext(true); // Truly in TG context
+          setTgWebApp(telegram); // Set tgWebApp here as it's confirmed
+          inTgContext = true;
+          authCandidate = telegram.initDataUnsafe.user;
           telegram.ready(); 
-          try {
-            await handleAuthentication(telegram.initDataUnsafe.user);
-          } catch (authError) {
-             debugLogger.error("Authentication failed within Telegram context:", authError);
-          } finally {
-             if (isMounted) setIsLoading(false);
-          }
         } else {
-           debugLogger.log("Telegram context found, but no user data in initDataUnsafe.");
-           if (MOCK_USER && isMounted) {
-               logger.warn("No user data in Telegram context, falling back to MOCK_USER.");
-               setIsInTelegramContext(false); // Using mock, so not in real TG context
-               try {
-                   await handleAuthentication(MOCK_USER);
-               } catch (mockAuthError) {
-                  debugLogger.error("Failed to authenticate MOCK_USER:", mockAuthError);
-               } finally {
-                  if (isMounted) setIsLoading(false);
-               }
-           } else if (isMounted) {
-               setError(new Error("Telegram context detected, but user data is missing."));
-               setIsLoading(false);
+           debugLogger.log("[useTelegram Initialize] Telegram context found, but no user data in initDataUnsafe.");
+           if (MOCK_USER) {
+               logger.warn("[useTelegram Initialize] No user data in Telegram context, will use MOCK_USER.");
+               authCandidate = MOCK_USER;
+               inTgContext = false; // Using mock, so not in real TG context
            }
         }
       } else {
-        debugLogger.log("Not running inside Telegram WebApp context.");
-        setIsInTelegramContext(false); // Explicitly false
-        if (MOCK_USER && isMounted) {
-           logger.warn("Not in Telegram context, using MOCK_USER.");
-           try {
-               await handleAuthentication(MOCK_USER);
-           } catch (mockAuthError) {
-               debugLogger.error("Failed to authenticate MOCK_USER:", mockAuthError);
-           } finally {
-              if (isMounted) setIsLoading(false);
-           }
-        } else if (isMounted) {
-           setError(new Error("Application must be run inside Telegram or have mock user enabled."));
-           setIsLoading(false);
+        debugLogger.log("[useTelegram Initialize] Not running inside Telegram WebApp context.");
+        inTgContext = false;
+        if (MOCK_USER) {
+           logger.warn("[useTelegram Initialize] Not in Telegram context, will use MOCK_USER.");
+           authCandidate = MOCK_USER;
         }
+      }
+
+      setIsInTelegramContext(inTgContext);
+
+      if (authCandidate) {
+        try {
+          debugLogger.log(`[useTelegram Initialize] Calling handleAuthentication for user: ${authCandidate.id}`);
+          const authData = await handleAuthentication(authCandidate);
+          if (isMounted) {
+            setTgUser(authData.tgUserToSet);
+            setDbUser(authData.dbUserToSet);
+            setIsAuthenticated(authData.isAuthenticatedToSet);
+            logger.log(`[useTelegram Initialize] Auth success, dbUser set for ID: ${authData.dbUserToSet?.id}`);
+          }
+        } catch (authError: any) {
+          debugLogger.error("[useTelegram Initialize] Authentication failed:", authError.message);
+          if (isMounted) setError(authError);
+        }
+      } else if (isMounted) {
+         // No auth candidate (not in TG and no mock user)
+         setError(new Error("Application must be run inside Telegram or have mock user enabled for authentication."));
+         logger.warn("[useTelegram Initialize] No auth candidate, setting error.");
+      }
+      
+      if (isMounted) {
+        setIsLoading(false);
+        debugLogger.log("[useTelegram Initialize] Finished, isLoading set to false.");
       }
     };
 
     initialize();
 
     return () => {
-      debugLogger.log("useTelegram effect cleanup, setting isMounted=false");
+      debugLogger.log("[useTelegram Effect Cleanup] Setting isMounted=false");
       isMounted = false;
     };
   }, [handleAuthentication]); 
@@ -186,7 +190,6 @@ export function useTelegram() {
                 return (tgWebApp[methodName] as T)(...args);
             } catch (callError) {
                  logger.error(`Error calling tgWebApp.${String(methodName)}:`, callError);
-                 // Toast handled in AppContext or component
                  return undefined;
             }
         } else {
@@ -214,14 +217,13 @@ export function useTelegram() {
         expand: () => safeWebAppCall('expand'),
         setHeaderColor: (color: string) => safeWebAppCall('setHeaderColor', color),
         setBackgroundColor: (color: string) => safeWebAppCall('setBackgroundColor', color),
-        // Defaulting other fields as per their types
         platform: tgWebApp?.platform ?? 'unknown',
         themeParams: tgWebApp?.themeParams ?? { bg_color: '#000000', text_color: '#ffffff', hint_color: '#888888', link_color: '#007aff', button_color: '#007aff', button_text_color: '#ffffff', secondary_bg_color: '#1c1c1d', header_bg_color: '#000000', accent_text_color: '#007aff', section_bg_color: '#1c1c1d', section_header_text_color: '#8e8e93', subtitle_text_color: '#8e8e93', destructive_text_color: '#ff3b30' },
         initData: tgWebApp?.initData,
         initDataUnsafe: tgWebApp?.initDataUnsafe,
         colorScheme: tgWebApp?.colorScheme ?? 'dark',
     };
-    debugLogger.log("[useTelegram] Memoizing context output. isAdmin is function:", typeof baseData.isAdmin === 'function', "dbUser exists:", !!baseData.dbUser);
+    // logger.log("[useTelegram] Memoizing context output. isAdmin is function:", typeof baseData.isAdmin === 'function', "dbUser ID:", baseData.dbUser?.id);
     return baseData;
   }, [
       tgWebApp, tgUser, dbUser, isInTelegramContext, isAuthenticated, isAdmin, 
