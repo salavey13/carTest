@@ -24,7 +24,7 @@ import { debugLogger as logger } from "@/lib/debugLogger";
 import * as repoUtils from "@/lib/repoUtils";
 import { useRepoFetcher } from "@/hooks/useRepoFetcher";
 import { useFileSelection } from "@/hooks/useFileSelection";
-import { useKworkInput } from "@/hooks/useKworkInput"; // Используем исправленный хук
+import { useKworkInput } from "@/hooks/useKworkInput"; 
 import { useAppToast } from "@/hooks/useAppToast";
 
 // --- Sub-components ---
@@ -67,23 +67,23 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         imageReplaceTask,
         allFetchedFiles,
         assistantRef, updateRepoUrlInAssistant,
-        handleSetFilesFetched, // Получаем handleSetFilesFetched из контекста
-        setTargetPrData,      // Получаем setTargetPrData из контекста
-        setSelectedFetcherFiles, // Получаем setSelectedFetcherFiles
-        setRequestCopied, // Получаем setRequestCopied
-        setAiResponseHasContent, // Получаем setAiResponseHasContent
-        setFilesParsed, // Получаем setFilesParsed
-        setSelectedAssistantFiles, // Получаем setSelectedAssistantFiles
-        setContextIsParsing, // Получаем setContextIsParsing
-        pendingFlowDetails, // Получаем pendingFlowDetails
-        setPrimaryHighlightedPath, // Получаем setPrimaryHighlightedPath
+        handleSetFilesFetched, 
+        setTargetPrData,      
+        setSelectedFetcherFiles, 
+        setRequestCopied, 
+        setAiResponseHasContent, 
+        setFilesParsed, 
+        setSelectedAssistantFiles, 
+        setContextIsParsing, 
+        pendingFlowDetails, 
+        setPrimaryHighlightedPath, 
     } = useRepoXmlPageContext();
     const { error: toastError, info: toastInfo } = useAppToast();
     logger.debug("[RepoTxtFetcher] Function Start");
 
     // === Basic Component State ===
     const [token, setToken] = useState<string>("");
-    const [prevEffectiveBranch, setPrevEffectiveBranch] = useState<string | null>(null); // For branch change detection
+    const [prevEffectiveBranch, setPrevEffectiveBranch] = useState<string | null>(null); 
     logger.debug("[RepoTxtFetcher] After useState");
 
     // === Context ===
@@ -100,7 +100,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         (!!highlightedPathFromUrl || !!ideaFromUrl)
     , [imageReplaceTask, highlightedPathFromUrl, ideaFromUrl]);
 
-    // --- ОБНОВЛЕННЫЙ и УРЕЗАННЫЙ СПИСОК ВАЖНЫХ ФАЙЛОВ ---
     const importantFiles = useMemo(() => [
         "package.json", "app/layout.tsx",          
  "tailwind.config.ts",
@@ -114,7 +113,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
 "components/VibeContentRenderer.tsx",
 "components/Header.tsx",        "types/database.types.ts", 
     ].filter(Boolean), []); 
-    // --- КОНЕЦ ОБНОВЛЕННОГО СПИСКА ---
 
     const effectiveBranchDisplay = useMemo(() => targetBranchName || manualBranchName || "default", [targetBranchName, manualBranchName]);
 
@@ -125,12 +123,14 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const {
         files: fetchedFiles,
         progress,
-        error: fetchErrorHook, // Переименовываем, чтобы избежать конфликта с локальным error
-        primaryHighlightedPath: primaryHighlightedPathFromHook, // Переименовываем
-        secondaryHighlightedPaths: secondaryHighlightedPathsFromHook, // Переименовываем
+        error: fetchErrorHook, 
+        primaryHighlightedPath: primaryHighlightedPathFromHook, 
+        secondaryHighlightedPaths: secondaryHighlightedPathsFromHook, 
         handleFetchManual,
         isLoading: isFetchLoading,
-        isFetchDisabled
+        isFetchDisabled,
+        retryCount,      // <<< Извлекаем retryCount
+        maxRetries       // <<< Извлекаем maxRetries
     } = useRepoFetcher(
         repoUrl, 
         setFetchStatus, 
@@ -140,7 +140,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         manualBranchName, 
         setTargetBranchName, 
         setTargetPrData,
-        fetchStatus // Передаем fetchStatus из контекста в хук
+        fetchStatus 
     );
     logger.debug("[RepoTxtFetcher] After useRepoFetcher Hook");
 
@@ -153,8 +153,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         handleDeselectAll,
     } = useFileSelection({
         files: fetchedFiles,
-        primaryHighlightedPath: primaryHighlightedPathFromHook, // Используем значение из хука
-        secondaryHighlightedPaths: secondaryHighlightedPathsFromHook, // Используем значение из хука
+        primaryHighlightedPath: primaryHighlightedPathFromHook, 
+        secondaryHighlightedPaths: secondaryHighlightedPathsFromHook, 
         importantFiles, 
         imageReplaceTaskActive: !!imageReplaceTask,
     });
@@ -215,7 +215,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              }
         };
 
-        if (primaryHighlightedPathFromHook) { // Используем значение из хука
+        if (primaryHighlightedPathFromHook) { 
              logger.debug(`[Effect Scroll] Found primary highlight ${primaryHighlightedPathFromHook}, scheduling scroll.`);
              const timer = setTimeout(() => {
                  cleanupScroll = scrollToFile(primaryHighlightedPathFromHook);
@@ -229,7 +229,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
             logger.debug("[Effect Scroll] No primary highlight and no fetched files, doing nothing.");
             return () => {};
         }
-    }, [fetchStatus, primaryHighlightedPathFromHook, imageReplaceTask, autoFetch, fetchedFiles.length, scrollToSection, toastInfo, logger]); // Используем primaryHighlightedPathFromHook
+    }, [fetchStatus, primaryHighlightedPathFromHook, imageReplaceTask, autoFetch, fetchedFiles.length, scrollToSection, toastInfo, logger]); 
 
     useEffect(() => {
         if (prevEffectiveBranch && prevEffectiveBranch !== effectiveBranchDisplay) {
@@ -386,7 +386,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              {(() => { logger.debug("[Render] Rendering SettingsModal (conditional)"); return null; })()}
              <SettingsModal
                   isOpen={isSettingsModalOpen}
-                  // onClose={triggerToggleSettingsModal} // Removed as per previous update, context handles closure
                   repoUrl={repoUrl}
                   setRepoUrl={handleRepoUrlChange}
                   token={token}
@@ -425,7 +424,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                   <div className="mb-4 min-h-[40px]">
                       {(() => { logger.debug("[Render] Rendering ProgressBar (conditional)"); return null; })()}
                       <ProgressBar status={fetchStatus === 'failed_retries' ? 'error' : fetchStatus} progress={progress} />
-                      {isFetchLoading && <p className="text-cyan-300 text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? '(Повтор)' : ''}</p>}
+                      {isFetchLoading && <p className="text-cyan-300 text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? `(Попытка ${retryCount + 1}/${maxRetries})` : ''}</p>}
                       {isParsing && !currentImageTask && <p className="text-yellow-400 text-xs font-mono mt-1 text-center animate-pulse">Разбор ответа AI...</p>}
                       {fetchStatus === 'success' && !currentImageTask && fetchedFiles.length > 0 && (
                          <div className="text-center text-xs font-mono mt-1 text-green-400 flex items-center justify-center gap-1">
@@ -442,9 +441,11 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                               <FaCircleCheck /> {`Файл ${currentImageTask?.targetPath.split('/').pop()} загружен и готов.`}
                           </div>
                         )}
-                        {(fetchStatus === 'error' || fetchStatus === 'failed_retries') && fetchErrorHook && ( // Используем fetchErrorHook
+                        {(fetchStatus === 'error' || fetchStatus === 'failed_retries') && fetchErrorHook && ( 
                            <div className="text-center text-xs font-mono mt-1 text-red-400 flex items-center justify-center gap-1">
                                <FaXmark /> {fetchErrorHook}
+                               {fetchStatus === 'error' && retryCount < maxRetries && ` (Попытка ${retryCount + 1}/${maxRetries})`}
+                               {fetchStatus === 'failed_retries' && ` (Достигнуто макс. попыток)`}
                            </div>
                         )}
                         {isWaitingForAiResponse && !currentImageTask && (
@@ -459,20 +460,20 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              <div className={`grid grid-cols-1 ${ (fetchedFiles.length > 0 && !currentImageTask) ? 'md:grid-cols-2' : ''} gap-4 md:gap-6`}>
                  {/* --- Column 1: File List & Preview (Standard Mode) --- */}
                  {!currentImageTask && (isFetchLoading || fetchedFiles.length > 0) && (
-                     <div className={`flex flex-col gap-4 ${ (fetchedFiles.length > 0 || (kworkValueForCheck ?? '').trim().length > 0) ? '' : 'md:col-span-2'}`}> {/* Adjusted visibility condition */}
+                     <div className={`flex flex-col gap-4 ${ (fetchedFiles.length > 0 || (kworkValueForCheck ?? '').trim().length > 0) ? '' : 'md:col-span-2'}`}> 
                          {(() => { logger.debug("[Render] Rendering SelectedFilesPreview (conditional)"); return null; })()}
                          <SelectedFilesPreview
-                             selectedFiles={selectedFetcherFiles} // Это selectedFetcherFiles из контекста
+                             selectedFiles={selectedFetcherFiles} 
                              allFiles={fetchedFiles} 
-                             getLanguage={repoUtils.extractFileExtension} // Используем extractFileExtension для getLanguage
+                             getLanguage={repoUtils.extractFileExtension} 
                          />
                          {(() => { logger.debug("[Render] Rendering FileList (conditional)"); return null; })()}
                          <FileList
                              id="file-list-container"
                              files={fetchedFiles}
-                             selectedFiles={selectedFetcherFiles} // Это selectedFetcherFiles из контекста
-                             primaryHighlightedPath={primaryHighlightedPathFromHook} // Используем значение из хука
-                             secondaryHighlightedPaths={secondaryHighlightedPathsFromHook} // Используем значение из хука
+                             selectedFiles={selectedFetcherFiles} 
+                             primaryHighlightedPath={primaryHighlightedPathFromHook} 
+                             secondaryHighlightedPaths={secondaryHighlightedPathsFromHook} 
                              importantFiles={importantFiles} 
                              isLoading={isFetchLoading}
                              isActionDisabled={isActionDisabled}
