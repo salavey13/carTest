@@ -52,54 +52,82 @@ export default function Home() {
 
   useEffect(() => {
     const loadProfile = async () => {
+      // Scenario 1: dbUser.id is available (user fully loaded from DB)
       if (dbUser?.id) {
         setProfileLoading(true);
-        logger.log(`[HomePage] Fetching profile for user ${dbUser.id}`);
+        logger.log(`[HomePage] Context loaded, dbUser.id available. Fetching profile for user ${dbUser.id}`);
         const result = await fetchUserCyberFitnessProfile(dbUser.id);
         if (result.success && result.data) {
           setCyberProfile(result.data);
           logger.log(`[HomePage] Profile loaded for ${dbUser.id}:`, result.data);
         } else {
           logger.warn(`[HomePage] Failed to load profile for ${dbUser.id}. Error: ${result.error}. Defaulting.`);
-          // Set a default structure if fetch fails but user exists
-          setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Alpha", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
+          setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Alpha Error", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
         }
         setProfileLoading(false);
-      } else if (!appLoading && !isAuthenticated) { // If not loading and not authenticated, use guest mode
-        logger.log(`[HomePage] No dbUser or not authenticated, using guest profile.`);
-        setProfileLoading(false);
+      } 
+      // Scenario 2: App context is done loading, but user is NOT authenticated
+      else if (!appLoading && !isAuthenticated) { 
+        logger.log(`[HomePage] Context loaded, user not authenticated. Using guest profile.`);
         setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Guest Mode", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
-      } else if (!appLoading && isAuthenticated && !dbUser?.id) {
-        // This case might indicate a delay in dbUser availability after authentication
-        logger.warn(`[HomePage] Authenticated but dbUser.id not yet available. Waiting or defaulting profile.`);
-        // Optionally, you could implement a short retry here or rely on the default profile
-        setProfileLoading(false); // To avoid infinite loading
+        setProfileLoading(false);
+      } 
+      // Scenario 3: App context done, user IS authenticated, BUT dbUser.id is not yet available (data syncing)
+      else if (!appLoading && isAuthenticated && !dbUser?.id) {
+        logger.warn(`[HomePage] Context loaded, authenticated, but dbUser.id still missing. Using 'Syncing...' profile. Will re-evaluate when dbUser updates.`);
+        // This state allows the UI to render something sensible while waiting for dbUser to fully populate.
+        // The useEffect's dependency on `dbUser` will trigger `loadProfile` again once `dbUser.id` is available.
         setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Syncing...", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
+        setProfileLoading(false); // Important to set to false to avoid blocking UI if dbUser takes a moment
+      }
+      // Scenario 4: App context is still loading (appLoading is true)
+      else if (appLoading) {
+        logger.log(`[HomePage] AppContext is still loading. Waiting to fetch profile.`);
+        // No action here, profileLoading remains true by default.
+        // loadProfile will be called again when appLoading becomes false.
       }
     };
 
-    if (!appLoading) { // Only run if app context is no longer loading
-        loadProfile();
-    }
-  }, [dbUser, appLoading, isAuthenticated]);
+    // Run loadProfile whenever appLoading status changes OR dbUser object reference changes
+    loadProfile();
 
-  const isLoading = appLoading || profileLoading;
+  }, [dbUser, appLoading, isAuthenticated]); // Key dependencies
 
-  const userName = cyberProfile?.cognitiveOSVersion?.includes("Guest") 
+  const isLoadingDisplay = appLoading || profileLoading || !cyberProfile; // Determine overall loading state for UI
+
+  const userName = cyberProfile?.cognitiveOSVersion?.includes("Guest") || cyberProfile?.cognitiveOSVersion?.includes("Syncing...")
     ? 'Agent' 
     : dbUser?.first_name || telegramUser?.first_name || 'Agent';
   
-  const currentLevel = cyberProfile?.level || 0;
-  const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || (isLoading ? "Loading..." : "v0.1 Alpha");
+  const currentLevel = cyberProfile?.level ?? 0;
+  const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || (isLoadingDisplay ? "Loading..." : "v0.1 Alpha");
 
 
-  if (isLoading && !cyberProfile) { /* Loading state UI */ }
-  if (appContextError) { /* Error state UI */ }
+  if (isLoadingDisplay && !cyberProfile) { /* Loading state UI */ 
+      return (
+         <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-4 text-center">
+            <FaBrain className="text-5xl text-brand-pink animate-pulse mb-6" />
+            <p className="text-brand-pink font-orbitron text-xl animate-pulse tracking-widest">
+              ЗАГРУЗКА ИНТЕРФЕЙСА АГЕНТА...
+            </p>
+         </div>
+      );
+  }
+  if (appContextError) { /* Error state UI */ 
+      return (
+         <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-4 text-center">
+            <FaUserNinja className="text-5xl text-red-500 mb-6" />
+            <p className="text-red-500 font-orbitron text-xl">
+              Ошибка загрузки контекста: {appContextError.message}
+            </p>
+         </div>
+      );
+  }
 
   const chartReadyWeeklyActivity = (cyberProfile?.dailyActivityLog && cyberProfile.dailyActivityLog.length > 0 
-    ? cyberProfile.dailyActivityLog.map(d => ({ name: format(new Date(d.date), 'EEE', {locale: ru}).substring(0,2).toUpperCase(), value: d.kworkRequestsSent || 0, label: `${d.kworkRequestsSent || 0} req` }))
+    ? cyberProfile.dailyActivityLog.map(d => ({ name: format(new Date(d.date + "T00:00:00Z"), 'EEE', {locale: ru}).substring(0,2).toUpperCase(), value: d.kworkRequestsSent || 0, label: `${d.kworkRequestsSent || 0} req` }))
     : DEFAULT_WEEKLY_ACTIVITY
-  ).slice(0,7);
+  ).slice(-7); // Ensure we always show the last 7 days, even if fewer are available
 
   const totalKiloVibes = cyberProfile?.kiloVibes || 0;
   const focusTimeHours = cyberProfile?.focusTimeHours || 0;
