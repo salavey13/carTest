@@ -1,3 +1,4 @@
+// /app/game-plan/page.tsx
 "use client";
 
 import React from 'react'; 
@@ -36,7 +37,7 @@ const GamePlanPage = () => {
         },
         {
           type: "image_display",
-          imageUrl: "https://picsum.photos/seed/matrix_glases_vibe/1280/720",
+          imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250511_222308-cd32587f-4754-4fe4-8fe1-d22af8a82e5c.jpg",
           altText: "Визуализация для Акта I: ПРОБУЖДЕНИЕ КОДА. Фигура в цифровом хаосе тянется к светящимся кибер-очкам."
         }
       ]
