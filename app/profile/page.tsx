@@ -67,7 +67,7 @@ const getAchievementIconComponent = (iconName: string | undefined): React.ReactN
 
 export default function ProfilePage() {
   const appContext = useAppContext();
-  const { user: telegramUser, dbUser, isLoading: appLoading, isAuthenticating } = appContext;
+  const { user: telegramUser, dbUser, isLoading: appLoading } = appContext; 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPerksModalOpen, setIsPerksModalOpen] = useState(false);
   const [isAchievementsModalOpen, setIsAchievementsModalOpen] = useState(false);
@@ -81,9 +81,9 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const loadProfile = async () => {
-      logger.log(`[ProfilePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticating: ${isAuthenticating}, dbUser.id: ${dbUser?.id}`);
-      if (appLoading || isAuthenticating) {
-        logger.log(`[ProfilePage] AppContext is still loading or authenticating. Waiting to fetch profile.`);
+      logger.log(`[ProfilePage] loadProfile triggered. appLoading: ${appLoading}, dbUser.id: ${dbUser?.id}`);
+      if (appLoading) {
+        logger.log(`[ProfilePage] AppContext is still loading. Waiting to fetch profile.`);
         setProfileLoading(true);
         return;
       }
@@ -120,9 +120,9 @@ export default function ProfilePage() {
     };
 
     loadProfile();
-  }, [dbUser, appLoading, isAuthenticating]); // Added isAuthenticating
+  }, [dbUser, appLoading]); 
 
-  const isLoadingDisplay = appLoading || isAuthenticating || profileLoading;
+  const isLoadingDisplay = appLoading || profileLoading;
 
 
   if (isLoadingDisplay) {
