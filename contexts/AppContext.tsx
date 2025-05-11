@@ -11,19 +11,8 @@ import type { Database } from "@/types/database.types";
 type User = Database["public"]["Tables"]["users"]["Row"];
 
 interface AppContextData extends ReturnType<typeof useTelegram> {
-  isAdmin?: () => boolean; 
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  dbUser: User | null;
-  error: Error | null;
-  webApp?: WebApp;
-  user?: WebAppUser | null;
-  platform?: string;
-  themeParams?: ThemeParams;
-  initData?: string;
-  initDataUnsafe?: WebAppInitData;
-  colorScheme?: 'light' | 'dark';
-  isInTelegramContext: boolean;
+  // isAdmin is already part of ReturnType<typeof useTelegram> if useTelegram returns it as a function
+  // No need to redefine isAdmin?: () => boolean; if it's consistently a function from useTelegram
 }
 
 const AppContext = createContext<Partial<AppContextData>>({});
@@ -36,17 +25,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         "[AppContext Provider] Memoizing contextValue. telegramData props:", 
         { 
             isLoading: telegramData.isLoading, 
-            isAdminFuncExists: typeof telegramData.isAdmin === 'function', 
+            // Check actual type of isAdmin from telegramData
+            isAdminIsFunction: typeof telegramData.isAdmin === 'function', 
             dbUserStatus: telegramData.dbUser?.status,
             dbUserRole: telegramData.dbUser?.role,
-            isAuthenticated: telegramData.isAuthenticated
+            isAuthenticated: telegramData.isAuthenticated,
         }
     );
     return {
       ...telegramData,
     };
-    // Ensure useMemo re-runs if the isAdmin function reference itself changes in telegramData, or if dbUser (which isAdmin depends on) changes.
-  }, [telegramData]); // Relying on telegramData object reference changing
+  }, [
+    telegramData.tg, 
+    telegramData.user, 
+    telegramData.dbUser, 
+    telegramData.isInTelegramContext, 
+    telegramData.isAuthenticated, 
+    telegramData.isAdmin, // Crucial: include the function reference itself
+    telegramData.isLoading, 
+    telegramData.error,
+    telegramData.openLink, // Assuming these methods from useTelegram are stable (wrapped in useCallback)
+    telegramData.close,
+    telegramData.showPopup,
+    telegramData.sendData,
+    telegramData.getInitData,
+    telegramData.expand,
+    telegramData.setHeaderColor,
+    telegramData.setBackgroundColor,
+  ]);
 
   useEffect(() => {
     logger.log("AppContext updated (state from contextValue):", {
@@ -95,6 +101,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (loadingTimer) {
             clearTimeout(loadingTimer);
         }
+        // Do not dismiss toasts here generally, let them self-dismiss or be dismissed by other logic
+        // toast.dismiss(currentToastId); // Avoid this unless specifically needed for this effect's lifecycle
     };
   }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.error]);
 
@@ -104,25 +112,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 export const useAppContext = (): AppContextData => {
   const context = useContext(AppContext);
   
+  // Default loading state if context is not yet fully initialized
   if (!context || Object.keys(context).length === 0 || context.isLoading === undefined ) {
      logger.warn("useAppContext: Context is empty or `isLoading` is undefined. Returning loading defaults.");
      return {
-        webApp: undefined, user: null, platform: 'unknown',
+        // Default values from useTelegram structure
+        tg: null, user: null, dbUser: null, isInTelegramContext: false, isAuthenticated: false, 
+        isLoading: true, error: null, 
+        isAdmin: () => false, // Default isAdmin function
+        // Default implementations for other methods from useTelegram
+        openLink: (url: string) => logger.warn(`openLink(${url}) called on loading context`),
+        close: () => logger.warn('close() called on loading context'),
+        showPopup: (params: any) => logger.warn('showPopup() called on loading context', params),
+        sendData: (data: string) => logger.warn(`sendData(${data}) called on loading context`),
+        getInitData: () => { logger.warn('getInitData() called on loading context'); return null; },
+        expand: () => logger.warn('expand() called on loading context'),
+        setHeaderColor: (color: string) => logger.warn(`setHeaderColor(${color}) called on loading context`),
+        setBackgroundColor: (color: string) => logger.warn(`setBackgroundColor(${color}) called on loading context`),
+        // Ensure all properties of AppContextData are present
+        platform: 'unknown', // Example: if platform is part of AppContextData
         themeParams: { bg_color: '#000000', text_color: '#ffffff', hint_color: '#888888', link_color: '#007aff', button_color: '#007aff', button_text_color: '#ffffff', secondary_bg_color: '#1c1c1d', header_bg_color: '#000000', accent_text_color: '#007aff', section_bg_color: '#1c1c1d', section_header_text_color: '#8e8e93', subtitle_text_color: '#8e8e93', destructive_text_color: '#ff3b30' },
-        initData: undefined, initDataUnsafe: { query_id: undefined, user: undefined, receiver: undefined, chat: undefined, chat_type: undefined, chat_instance: undefined, start_param: undefined, can_send_after: undefined, auth_date: 0, hash: '' },
-        colorScheme: 'dark', isInTelegramContext: false, isAuthenticated: false,
-        isLoading: true, 
-        dbUser: null, error: null, 
-        isAdmin: undefined // isAdmin is explicitly undefined during initial loading
+        initData: undefined,
+        initDataUnsafe: { query_id: undefined, user: undefined, receiver: undefined, chat: undefined, chat_type: undefined, chat_instance: undefined, start_param: undefined, can_send_after: undefined, auth_date: 0, hash: '' },
+        colorScheme: 'dark',
      } as AppContextData; 
   }
 
-  // If context is NOT loading, BUT isAdmin is STILL not a function, this is a CRITICAL issue.
-  // It means useTelegram (or AppProvider's memoization) is not correctly providing the isAdmin function after dbUser is loaded.
+  // CRITICAL: Context is loaded (isLoading: false) but isAdmin is STILL not a function.
+  // This signifies a deeper issue in useTelegram or AppProvider's memoization.
+  // This check should only happen if dbUser is actually available, otherwise isAdmin might legitimately not be ready.
   if (context.isLoading === false && typeof context.isAdmin !== 'function') {
     logger.error(
-        "useAppContext: CRITICAL - Context is loaded (isLoading: false) but context.isAdmin is NOT a function. This suggests an issue in useTelegram or AppProvider.", 
+        "useAppContext: CRITICAL - Context is loaded (isLoading: false) but context.isAdmin is NOT a function. This suggests an issue in useTelegram or AppProvider's provision of isAdmin.", 
         { 
+            contextDbUserExists: !!context.dbUser,
             contextDbUserStatus: context.dbUser?.status, 
             contextDbUserRole: context.dbUser?.role,
             contextIsAuthenticated: context.isAuthenticated,
@@ -131,18 +154,20 @@ export const useAppContext = (): AppContextData => {
     );
     // Fallback: provide a default isAdmin that checks the dbUser if available, otherwise false.
     // This prevents crashes but masks the underlying problem that isAdmin wasn't correctly passed from useTelegram.
+    const fallbackIsAdmin = () => {
+        if (context.dbUser) {
+            const statusIsAdmin = context.dbUser.status === 'admin';
+            // Adjust role check as per your actual admin role names
+            const roleIsAdmin = context.dbUser.role === 'vprAdmin' || context.dbUser.role === 'admin'; 
+            logger.warn(`[useAppContext Fallback isAdmin] Using direct dbUser check. Status: ${context.dbUser.status}, Role: ${context.dbUser.role}. Determined isAdmin: ${statusIsAdmin || roleIsAdmin}`);
+            return statusIsAdmin || roleIsAdmin;
+        }
+        logger.warn("[useAppContext Fallback isAdmin] dbUser not available in context for fallback. Defaulting to false.");
+        return false;
+    };
     return {
         ...(context as AppContextData), // Spread what we have
-        isAdmin: () => {
-            if (context.dbUser) {
-                const statusIsAdmin = context.dbUser.status === 'admin';
-                const roleIsAdmin = context.dbUser.role === 'admin'; // Or other admin roles
-                logger.warn(`[useAppContext Fallback isAdmin] Using direct dbUser check. Status: ${context.dbUser.status}, Role: ${context.dbUser.role}. Determined isAdmin: ${statusIsAdmin || roleIsAdmin}`);
-                return statusIsAdmin || roleIsAdmin;
-            }
-            logger.warn("[useAppContext Fallback isAdmin] dbUser not available in context for fallback. Defaulting to false.");
-            return false;
-        },
+        isAdmin: fallbackIsAdmin, // Override with the fallback
     } as AppContextData;
   }
 
