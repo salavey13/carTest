@@ -10,17 +10,12 @@ import type { Database } from "@/types/database.types";
 
 type User = Database["public"]["Tables"]["users"]["Row"];
 
-// Define the shape of the context data
 interface AppContextData extends ReturnType<typeof useTelegram> {
-  // Ensure all expected fields are here, even if from useTelegram
-  // For example, if useTelegram returns isAdmin, isAuthenticated, etc.
-  // For this fix, specifically ensure isAdmin is present.
-  isAdmin: () => boolean;
+  isAdmin?: () => boolean; 
   isAuthenticated: boolean;
   isLoading: boolean;
   dbUser: User | null;
   error: Error | null;
-  // Add other known properties from useTelegram if necessary for the default
   webApp?: WebApp;
   user?: WebAppUser | null;
   platform?: string;
@@ -31,31 +26,41 @@ interface AppContextData extends ReturnType<typeof useTelegram> {
   isInTelegramContext: boolean;
 }
 
-// Create the context with an initial undefined value
 const AppContext = createContext<Partial<AppContextData>>({});
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Get data from the useTelegram hook
   const telegramData = useTelegram();
 
-  // Context value now only contains telegram data
-  const contextValue = useMemo(() => ({
-    ...telegramData,
-  }), [telegramData]);
+  const contextValue = useMemo(() => {
+    logger.debug(
+        "[AppContext Provider] Memoizing contextValue. telegramData props:", 
+        { 
+            isLoading: telegramData.isLoading, 
+            isAdminFuncExists: typeof telegramData.isAdmin === 'function', 
+            dbUserStatus: telegramData.dbUser?.status,
+            dbUserRole: telegramData.dbUser?.role,
+            isAuthenticated: telegramData.isAuthenticated
+        }
+    );
+    return {
+      ...telegramData,
+    };
+    // Ensure useMemo re-runs if the isAdmin function reference itself changes in telegramData, or if dbUser (which isAdmin depends on) changes.
+  }, [telegramData]); // Relying on telegramData object reference changing
 
-  // Log context changes for debugging
   useEffect(() => {
-    logger.log("AppContext updated:", {
+    logger.log("AppContext updated (state from contextValue):", {
       isAuthenticated: contextValue.isAuthenticated,
       isLoading: contextValue.isLoading,
       userId: contextValue.dbUser?.user_id ?? contextValue.user?.id,
       dbUserStatus: contextValue.dbUser?.status,
+      dbUserRole: contextValue.dbUser?.role,
+      isAdminFunctionExists: typeof contextValue.isAdmin === 'function',
       error: contextValue.error?.message,
       isInTelegram: contextValue.isInTelegramContext,
     });
   }, [contextValue]);
 
-  // Centralize the "User Authorized" toast notification
   useEffect(() => {
     let currentToastId: string | number | undefined;
     let loadingTimer: NodeJS.Timeout | null = null;
@@ -93,62 +98,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.error]);
 
-  // Provide the memoized value to the context consumers
   return <AppContext.Provider value={contextValue as AppContextData}>{children}</AppContext.Provider>;
 };
 
-// Custom hook for consuming the context
 export const useAppContext = (): AppContextData => {
   const context = useContext(AppContext);
   
-  if (!context || Object.keys(context).length === 0) {
-     const errorMsg = "useAppContext: Context is empty or undefined, possibly during initial render or AppProvider not wrapping the component tree.";
-     logger.warn(errorMsg);
-     // Return a default, fully-formed AppContextData object for safe destructuring
+  if (!context || Object.keys(context).length === 0 || context.isLoading === undefined ) {
+     logger.warn("useAppContext: Context is empty or `isLoading` is undefined. Returning loading defaults.");
      return {
-        // Defaults from useTelegram (guessed)
-        webApp: undefined,
-        user: null,
-        platform: 'unknown',
-        themeParams: {
-            bg_color: '#000000',
-            text_color: '#ffffff',
-            hint_color: '#888888',
-            link_color: '#007aff',
-            button_color: '#007aff',
-            button_text_color: '#ffffff',
-            secondary_bg_color: '#1c1c1d',
-            header_bg_color: '#000000',
-            accent_text_color: '#007aff',
-            section_bg_color: '#1c1c1d',
-            section_header_text_color: '#8e8e93',
-            subtitle_text_color: '#8e8e93',
-            destructive_text_color: '#ff3b30',
-        },
-        initData: undefined,
-        initDataUnsafe: {
-            query_id: undefined,
-            user: undefined,
-            receiver: undefined,
-            chat: undefined,
-            chat_type: undefined,
-            chat_instance: undefined,
-            start_param: undefined,
-            can_send_after: undefined,
-            auth_date: 0,
-            hash: '',
-        },
-        colorScheme: 'dark',
-        isInTelegramContext: false,
-        
-        // Defaults for AppContext specific state
-        isAuthenticated: false,
-        isLoading: true, // Critical: indicate that context is loading
-        dbUser: null,
-        error: null, // Or new Error("Context not initialized")
-        isAdmin: () => false, // CRITICAL FIX: Provide a default callable function
-     } as AppContextData; // Cast is okay here as we are providing a full default structure
+        webApp: undefined, user: null, platform: 'unknown',
+        themeParams: { bg_color: '#000000', text_color: '#ffffff', hint_color: '#888888', link_color: '#007aff', button_color: '#007aff', button_text_color: '#ffffff', secondary_bg_color: '#1c1c1d', header_bg_color: '#000000', accent_text_color: '#007aff', section_bg_color: '#1c1c1d', section_header_text_color: '#8e8e93', subtitle_text_color: '#8e8e93', destructive_text_color: '#ff3b30' },
+        initData: undefined, initDataUnsafe: { query_id: undefined, user: undefined, receiver: undefined, chat: undefined, chat_type: undefined, chat_instance: undefined, start_param: undefined, can_send_after: undefined, auth_date: 0, hash: '' },
+        colorScheme: 'dark', isInTelegramContext: false, isAuthenticated: false,
+        isLoading: true, 
+        dbUser: null, error: null, 
+        isAdmin: undefined // isAdmin is explicitly undefined during initial loading
+     } as AppContextData; 
   }
-  // Cast to full type once checks pass
+
+  // If context is NOT loading, BUT isAdmin is STILL not a function, this is a CRITICAL issue.
+  // It means useTelegram (or AppProvider's memoization) is not correctly providing the isAdmin function after dbUser is loaded.
+  if (context.isLoading === false && typeof context.isAdmin !== 'function') {
+    logger.error(
+        "useAppContext: CRITICAL - Context is loaded (isLoading: false) but context.isAdmin is NOT a function. This suggests an issue in useTelegram or AppProvider.", 
+        { 
+            contextDbUserStatus: context.dbUser?.status, 
+            contextDbUserRole: context.dbUser?.role,
+            contextIsAuthenticated: context.isAuthenticated,
+            contextKeys: Object.keys(context)
+        }
+    );
+    // Fallback: provide a default isAdmin that checks the dbUser if available, otherwise false.
+    // This prevents crashes but masks the underlying problem that isAdmin wasn't correctly passed from useTelegram.
+    return {
+        ...(context as AppContextData), // Spread what we have
+        isAdmin: () => {
+            if (context.dbUser) {
+                const statusIsAdmin = context.dbUser.status === 'admin';
+                const roleIsAdmin = context.dbUser.role === 'admin'; // Or other admin roles
+                logger.warn(`[useAppContext Fallback isAdmin] Using direct dbUser check. Status: ${context.dbUser.status}, Role: ${context.dbUser.role}. Determined isAdmin: ${statusIsAdmin || roleIsAdmin}`);
+                return statusIsAdmin || roleIsAdmin;
+            }
+            logger.warn("[useAppContext Fallback isAdmin] dbUser not available in context for fallback. Defaulting to false.");
+            return false;
+        },
+    } as AppContextData;
+  }
+
   return context as AppContextData;
 };
