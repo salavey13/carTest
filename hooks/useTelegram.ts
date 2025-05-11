@@ -34,7 +34,7 @@ export function useTelegram() {
   const [dbUser, setDbUser] = useState<DatabaseUser>(null); 
   const [isInTelegramContext, setIsInTelegramContext] = useState(false);
   const [isLoading, setIsLoading] = useState(true); 
-  const [isAuthenticating, setIsAuthenticating] = useState(true); // New state
+  const [isAuthenticating, setIsAuthenticating] = useState(true); 
   const [error, setError] = useState<Error | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false); 
 
@@ -103,10 +103,10 @@ export function useTelegram() {
       }
 
       setIsLoading(true); 
-      setIsAuthenticating(true); // Start with authenticating true
+      setIsAuthenticating(true);
       setError(null);
       setIsAuthenticated(false);
-      setDbUser(null);
+      setDbUser(null); // Crucial to reset dbUser here
       setTgUser(null);
       setTgWebApp(null);
       setIsInTelegramContext(false); 
@@ -154,7 +154,7 @@ export function useTelegram() {
               setTgUser(authData.tgUserToSet);
               setDbUser(authData.dbUserToSet); 
               setIsAuthenticated(authData.isAuthenticatedToSet);
-              logger.log(`[useTelegram Initialize] Auth success, dbUser set with ID: ${authData.dbUserToSet?.id}`);
+              logger.log(`[useTelegram Initialize] Auth success, dbUser set with ID: ${authData.dbUserToSet?.id}. isMounted: ${isMounted}`);
             }
         } else {
            if (isMounted) {
@@ -166,10 +166,12 @@ export function useTelegram() {
         debugLogger.error("[useTelegram Initialize] Error during auth process:", authProcessError.message);
         if (isMounted) setError(authProcessError);
       } finally {
+        // This block runs regardless of try/catch outcome for authCandidate processing
         if (isMounted) {
-          setIsAuthenticating(false); // Authentication process (success or fail) is complete
-          setIsLoading(false); // General loading is also complete
-          debugLogger.log("[useTelegram Initialize] Finished, isLoading and isAuthenticating set to false.");
+          setIsAuthenticating(false); 
+          // isLoading will be set to false in the separate effect below,
+          // AFTER dbUser and isAuthenticating have been processed by React.
+          debugLogger.log("[useTelegram Initialize] Auth process finished (setIsAuthenticating(false)). isMounted:", isMounted);
         }
       }
     };
@@ -181,6 +183,15 @@ export function useTelegram() {
       isMounted = false;
     };
   }, [handleAuthentication]); 
+
+  // New useEffect to set isLoading = false AFTER dbUser and isAuthenticating have been updated.
+  useEffect(() => {
+    if (!isAuthenticating) { // Only when authentication process is fully done
+      setIsLoading(false);
+      logger.log(`[useTelegram Effect dbUser/isAuth] isAuthenticating is false. Setting isLoading to false. dbUser ID: ${dbUser?.id}`);
+    }
+  }, [dbUser, isAuthenticating]);
+
 
   const isAdmin = useCallback(() => {
     if (!dbUser) return false;
@@ -212,7 +223,7 @@ export function useTelegram() {
         dbUser,
         isInTelegramContext,
         isAuthenticated,
-        isAuthenticating, // Expose this new state
+        isAuthenticating, 
         isAdmin, 
         isLoading, 
         error,
