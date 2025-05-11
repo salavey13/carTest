@@ -46,7 +46,7 @@ const itemVariants = {
 
 export default function Home() {
   const appContext = useAppContext(); 
-  const { user: telegramUser, dbUser, isLoading: appLoading, error: appContextError } = appContext; // Removed isAuthenticating
+  const { user: telegramUser, dbUser, isLoading: appLoading, error: appContextError } = appContext;
   
   const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState<boolean>(true);

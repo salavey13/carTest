@@ -150,6 +150,7 @@ export function useTelegram() {
         try {
           debugLogger.log(`[useTelegram Initialize] Calling handleAuthentication for user: ${authCandidate.id}`);
           const authData = await handleAuthentication(authCandidate);
+          // Ensure component is still mounted before setting state from async operation
           if (isMounted) {
             setTgUser(authData.tgUserToSet);
             setDbUser(authData.dbUserToSet); // This is crucial
@@ -160,12 +161,12 @@ export function useTelegram() {
           debugLogger.error("[useTelegram Initialize] Authentication failed:", authError.message);
           if (isMounted) setError(authError);
         }
-      } else if (isMounted) {
+      } else if (isMounted) { // Only set error if no auth candidate AND mounted
          setError(new Error("Application must be run inside Telegram or have mock user enabled for authentication."));
          logger.warn("[useTelegram Initialize] No auth candidate, setting error.");
       }
       
-      // Set isLoading to false only after all async operations (like handleAuthentication) are complete
+      // Set isLoading to false only after all operations (including async auth) are done
       if (isMounted) {
         setIsLoading(false); 
         debugLogger.log("[useTelegram Initialize] Finished, isLoading set to false.");
@@ -211,7 +212,7 @@ export function useTelegram() {
         isInTelegramContext,
         isAuthenticated,
         isAdmin, 
-        isLoading, // This isLoading is now more reliable
+        isLoading, 
         error,
         openLink: (url: string) => safeWebAppCall('openLink', url),
         close: () => safeWebAppCall('close'),
