@@ -1,3 +1,4 @@
+// /app/layout.tsx
 import type React from "react";
 import Script from "next/script";
 import "./globals.css";
@@ -7,8 +8,8 @@ import ClientLayout from "@/components/layout/ClientLayout"; // Новый им�
 
 // Static metadata content to be used by generateMetadata
 const pageMetadataContent = {
-  title: "Fix13min PREMIUM",
-  description: "Твоя 13-минутная фитнес-революция. Level UP",
+  title: "oneSitePls | CyberVibe Studio",
+  description: "Твоя dev-платформа для мгновенной прокачки и создания Web/Telegram приложений. Управляй AI, собирай код, становись кибер-магом!",
 };
 
 // Server-only function to generate metadata
@@ -28,16 +29,23 @@ export async function generateViewport(): Promise<Viewport> {
     initialScale: 1,
     maximumScale: 1,
     userScalable: false,
+    themeColor: [ // Add theme color for PWA consistency
+      { media: '(prefers-color-scheme: light)', color: '#f5f5f5' }, // Example light theme color
+      { media: '(prefers-color-scheme: dark)', color: '#0A0A0A' }, // Example dark theme color (matches bg-gray-950)
+    ],
   };
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="ru" className="h-full">
       <head>
         <meta charSet="utf-8" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
+        <link rel="manifest" href="/manifest.json" /> 
+        <link rel="apple-touch-icon" href="/icons/icon-192x192.png"></link>
+        <meta name="msapplication-TileColor" content="#0A0A0A"></meta>
         <Script
           id="telegram-webapp-script"
           src="https://telegram.org/js/telegram-web-app.js"
@@ -45,7 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className={cn(
-          "flex min-h-screen flex-col bg-gray-900 text-white antialiased",
+          "flex min-h-screen flex-col bg-gray-950 text-white antialiased", // Changed to bg-gray-950
       )}>
         <ClientLayout>{children}</ClientLayout>
       </body>

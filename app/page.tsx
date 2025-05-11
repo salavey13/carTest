@@ -46,8 +46,7 @@ const itemVariants = {
 
 export default function Home() {
   const { user: telegramUser, dbUser, isAuthenticated, isLoading: appLoading, error: appContextError } = useAppContext(); 
-  const userName = dbUser?.first_name || telegramUser?.first_name || 'Agent';
-
+  
   const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState<boolean>(true);
 
@@ -55,24 +54,46 @@ export default function Home() {
     const loadProfile = async () => {
       if (dbUser?.id) {
         setProfileLoading(true);
+        logger.log(`[HomePage] Fetching profile for user ${dbUser.id}`);
         const result = await fetchUserCyberFitnessProfile(dbUser.id);
-        if (result.success && result.data) setCyberProfile(result.data);
-        else {
-          logger.warn(`Home: Failed to load profile for ${dbUser.id}. Error: ${result.error}. Defaulting.`);
+        if (result.success && result.data) {
+          setCyberProfile(result.data);
+          logger.log(`[HomePage] Profile loaded for ${dbUser.id}:`, result.data);
+        } else {
+          logger.warn(`[HomePage] Failed to load profile for ${dbUser.id}. Error: ${result.error}. Defaulting.`);
+          // Set a default structure if fetch fails but user exists
           setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Alpha", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
         }
         setProfileLoading(false);
-      } else if (!appLoading) { 
+      } else if (!appLoading && !isAuthenticated) { // If not loading and not authenticated, use guest mode
+        logger.log(`[HomePage] No dbUser or not authenticated, using guest profile.`);
         setProfileLoading(false);
         setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Guest Mode", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
+      } else if (!appLoading && isAuthenticated && !dbUser?.id) {
+        // This case might indicate a delay in dbUser availability after authentication
+        logger.warn(`[HomePage] Authenticated but dbUser.id not yet available. Waiting or defaulting profile.`);
+        // Optionally, you could implement a short retry here or rely on the default profile
+        setProfileLoading(false); // To avoid infinite loading
+        setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Syncing...", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
       }
     };
-    if (!appLoading) loadProfile();
-  }, [dbUser, appLoading]);
+
+    if (!appLoading) { // Only run if app context is no longer loading
+        loadProfile();
+    }
+  }, [dbUser, appLoading, isAuthenticated]);
 
   const isLoading = appLoading || profileLoading;
 
-  if (isLoading) { /* Loading state UI */ }
+  const userName = cyberProfile?.cognitiveOSVersion?.includes("Guest") 
+    ? 'Agent' 
+    : dbUser?.first_name || telegramUser?.first_name || 'Agent';
+  
+  const currentLevel = cyberProfile?.level || 0;
+  const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || (isLoading ? "Loading..." : "v0.1 Alpha");
+
+
+  if (isLoading && !cyberProfile) { /* Loading state UI */ }
   if (appContextError) { /* Error state UI */ }
 
   const chartReadyWeeklyActivity = (cyberProfile?.dailyActivityLog && cyberProfile.dailyActivityLog.length > 0 
@@ -83,8 +104,7 @@ export default function Home() {
   const totalKiloVibes = cyberProfile?.kiloVibes || 0;
   const focusTimeHours = cyberProfile?.focusTimeHours || 0;
   const skillsLeveled = cyberProfile?.skillsLeveled || 0;
-  const currentLevel = cyberProfile?.level || 0;
-  const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || "v0.1 Alpha";
+
 
   return ( 
     <div className="homepage-wrapper">
@@ -120,13 +140,13 @@ export default function Home() {
                  <div className="featured-quest-image-overlay"></div>
                  <div className="absolute bottom-2 left-3 sm:bottom-3 sm:left-4 text-white z-10 p-1">
                     <h3 className="text-md sm:text-lg font-bold font-orbitron text-shadow-[0_0_8px_theme(colors.brand-cyan)]">
-                      <VibeContentRenderer content="<FaGamepad className='inline text-brand-pink/90 mr-2 text-2xl sm:text-3xl align-middle'/>INITIATE: CyberDev OS Training Program" />
+                      <VibeContentRenderer content="::FaGamepad className='inline text-brand-pink/90 mr-2 text-2xl sm:text-3xl align-middle'::INITIATE: CyberDev OS Training Program" />
                     </h3>
                     <div className="text-xs sm:text-sm font-mono text-gray-300">
                         <span>Your journey from Level 0:&nbsp;</span>
-                        <FaEye className='inline mx-0.5 align-middle'/>
+                        <VibeContentRenderer content="::FaEye className='inline mx-0.5 align-middle'::" />
                         <span>&nbsp;See the Code,&nbsp;</span>
-                        <FaBolt className='inline mx-0.5 align-middle'/>
+                        <VibeContentRenderer content="::FaBolt className='inline mx-0.5 align-middle'::" />
                         <span>&nbsp;Become the Vibe.</span>
                     </div>
                   </div>
