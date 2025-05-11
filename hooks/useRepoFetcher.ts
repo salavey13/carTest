@@ -128,15 +128,15 @@ export const useRepoFetcher = (
             isFetchingRef.current = false;
             setProgress(100); 
             activeImageTaskRef.current = null; 
-            logger.info(`[useRepoFetcher fetchRepoContents] Finished. Operation Status: ${currentFetchOpStatus}`); // Use local op status
+            logger.info(`[useRepoFetcher fetchRepoContents] Finished. Operation Status: ${currentFetchOpStatus}. Context FetchStatus: ${fetchStatus}`); 
         }
         return result;
-    }, [repoUrl, onSetFilesFetched, setFetchStatus, addToast, currentBranchName, retryCount, fetchStatus]); // Added fetchStatus to dependencies
+    }, [repoUrl, onSetFilesFetched, setFetchStatus, addToast, currentBranchName, retryCount, fetchStatus]); // fetchStatus added to dependencies
 
     logger.debug("[useRepoFetcher] Before Callbacks");
 
     useEffect(() => {
-        if (fetchStatus === 'error' && retryCount < MAX_RETRIES && !isFetchingRef.current) { // Added !isFetchingRef.current
+        if (fetchStatus === 'error' && retryCount < MAX_RETRIES && !isFetchingRef.current) { 
             const timeoutId = setTimeout(() => {
                 logger.info(`[useRepoFetcher AutoRetry] Retrying fetch (${retryCount + 1}/${MAX_RETRIES})...`);
                 setRetryCount(prev => prev + 1);
