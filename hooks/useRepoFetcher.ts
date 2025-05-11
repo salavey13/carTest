@@ -128,10 +128,11 @@ export const useRepoFetcher = (
             isFetchingRef.current = false;
             setProgress(100); 
             activeImageTaskRef.current = null; 
-            logger.info(`[useRepoFetcher fetchRepoContents] Finished. Operation Status: ${currentFetchOpStatus}. Context FetchStatus: ${fetchStatus}`); 
+            // Use local currentFetchOpStatus for logging to avoid relying on async updated fetchStatus from context
+            logger.info(`[useRepoFetcher fetchRepoContents] Finished. Operation Status: ${currentFetchOpStatus}.`);
         }
         return result;
-    }, [repoUrl, onSetFilesFetched, setFetchStatus, addToast, currentBranchName, retryCount, fetchStatus]); // fetchStatus added to dependencies
+    }, [repoUrl, onSetFilesFetched, setFetchStatus, addToast, currentBranchName, retryCount]); // Removed fetchStatus from dependencies
 
     logger.debug("[useRepoFetcher] Before Callbacks");
 
