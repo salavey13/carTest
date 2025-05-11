@@ -17,7 +17,7 @@ import {
   FaBrain, FaRobot, FaMagnifyingGlass, FaGift, FaUserShield, FaCarOn,
   FaYoutube, FaFileInvoiceDollar, FaCreditCard, FaHeart, FaPalette,
   FaCircleInfo, FaListCheck, FaNetworkWired, FaRegLightbulb, FaUpload,
-  FaUserNinja, FaLandmarkDome, FaLeaf, FaFire, FaChartLine, FaDollarSign, FaShieldVirus, FaStar, FaGamepad
+  FaUserNinja, FaLandmarkDome, FaLeaf, FaFire, FaChartLine, FaDollarSign, FaShieldVirus, FaStar, FaGamepad, FaFilm
 } from "react-icons/fa6";
 import { debugLogger as logger } from "@/lib/debugLogger";
 
@@ -39,6 +39,7 @@ const allPages: PageInfo[] = [
   { path: "/repo-xml", name: "SUPERVIBE Studio", icon: FaWandMagicSparkles, group: "Core Vibe", isImportant: true, color: "purple", isHot: true },
   { path: "/selfdev", name: "SelfDev Path", icon: FaRoad, group: "Core Vibe", isImportant: true, color: "green" },
   { path: "/p-plan", name: "VIBE Plan", icon: FaUserNinja, group: "Core Vibe", isImportant: true, isHot: true, color: "yellow" },
+  { path: "/game-plan", name: "Game Plan", icon: FaFilm, group: "Core Vibe", isImportant: true, color: "orange", isHot: true },
   { path: "/selfdev/gamified", name: "CyberDev OS", icon: FaGamepad, group: "Core Vibe", isImportant: true, color: "pink", isHot: true },
   
   // --- CyberFitness ---
@@ -90,7 +91,7 @@ const groupIcons: Record<string, React.ComponentType<{className?: string}>> = {
 
 const translations: Record<string, Record<string, string>> = {
   en: {
-    "Home": "Home", "SUPERVIBE Studio": "SUPERVIBE Studio", "SelfDev Path": "SelfDev Path", "VIBE Plan": "VIBE Plan", "CyberDev OS": "CyberDev OS", 
+    "Home": "Home", "SUPERVIBE Studio": "SUPERVIBE Studio", "SelfDev Path": "SelfDev Path", "VIBE Plan": "VIBE Plan", "Game Plan": "Game Plan", "CyberDev OS": "CyberDev OS", 
     "Agent Profile": "Agent Profile", "OS Upgrades": "OS Upgrades", "Premium Modules": "Premium Modules", "Cognitive Fuel": "Cognitive Fuel", "System Config": "System Config", "Alliance Perks": "Alliance Perks",
     "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Purpose & Profit", "AI & Future of Work": "AI & Future of Work", "Advice Archive": "Advice Archive", "Experimental Mindset": "Experimental Mindset", "Style Guide": "Style Guide", "oneSitePls Info": "oneSitePls Info",
     "Cyber Garage": "Cyber Garage", "Bot Busters": "Bot Busters", "BS Detector": "BS Detector", "Wheel of Fortune": "Wheel of Fortune", "My Invoices": "My Invoices", "Donate": "Donate", "oneSitePls How-To": "oneSitePls How-To", "Rent a Car": "Rent a Car", "VPR Tests": "VPR Tests", "Geo Cheatsheet 6": "Geo Cheatsheet 6", "History Cheatsheet 6": "History Cheatsheet 6", "Biology Cheatsheet 6": "Biology Cheatsheet 6",
@@ -99,7 +100,7 @@ const translations: Record<string, Record<string, string>> = {
     "Core Vibe": "Core Vibe", "CyberFitness": "CyberFitness", "Content & Tools": "Content & Tools", "Misc": "Misc", "Admin Zone": "Admin Zone"
   },
   ru: {
-    "Home": "Главная", "SUPERVIBE Studio": "SUPERVIBE Studio", "SelfDev Path": "Путь SelfDev", "VIBE Plan": "VIBE План", "CyberDev OS": "CyberDev OS",
+    "Home": "Главная", "SUPERVIBE Studio": "SUPERVIBE Studio", "SelfDev Path": "Путь SelfDev", "VIBE Plan": "VIBE План", "Game Plan": "Гейм План", "CyberDev OS": "CyberDev OS",
     "Agent Profile": "Профиль Агента", "OS Upgrades": "Апгрейды ОС", "Premium Modules": "Премиум Модули", "Cognitive Fuel": "Когнитивное Топливо", "System Config": "Настройки Системы", "Alliance Perks": "Бонусы Альянса",
     "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Цель и Прибыль", "AI & Future of Work": "AI и Будущее Работы", "Advice Archive": "Архив Советов", "Experimental Mindset": "Эксперим. Мышление", "Style Guide": "Гайд по Стилю", "oneSitePls Info": "Инфо oneSitePls",
     "Cyber Garage": "Кибер Гараж", "Bot Busters": "Охотники за Ботами", "BS Detector": "BS Детектор", "Wheel of Fortune": "Колесо Фортуны", "My Invoices": "Мои Счета", "Donate": "Поддержать", "oneSitePls How-To": "Как юзать oneSitePls", "Rent a Car": "Аренда Авто", "VPR Tests": "ВПР Тесты", "Geo Cheatsheet 6": "Шпаргалка Гео 6", "History Cheatsheet 6": "Шпаргалка Ист 6", "Biology Cheatsheet 6": "Шпаргалка Био 6",
@@ -180,6 +181,10 @@ export default function Header() {
       const groupName = page.group || "Misc";
       if (groups[groupName]) { 
         groups[groupName].push(page);
+      } else if (groupName === "Admin Zone" && currentIsAdminReal) { // Ensure Admin Zone is created if not pre-created by filter logic
+        groups[groupName] = [page];
+      } else if (groupName !== "Admin Zone") { // Catch-all for other groups not in groupOrder, though ideally all pages should have a group from groupOrder
+        groups[groupName] = [page];
       }
     });
     logger.debug("[Header] Final groups for nav:", Object.keys(groups).filter(gn => groups[gn]?.length > 0));
