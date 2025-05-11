@@ -1,4 +1,3 @@
-// /hooks/useTelegram.ts
 "use client";
 
 import { useCallback, useEffect, useState, useMemo } from "react";
@@ -189,9 +188,13 @@ export function useTelegram() {
     };
   }, [handleAuthentication]); // Rerun effect if handleAuthentication changes (should be stable)
 
-
   // --- Utility Functions ---
-  const isAdmin = useMemo(() => dbUser?.status === "admin", [dbUser]); // Use status field
+  const isAdmin = useCallback(() => {
+    if (!dbUser) return false;
+    // Using 'vprAdmin' as an example, adjust to your actual admin role name if different
+    return dbUser.status === "admin" || dbUser.role === "vprAdmin";
+  }, [dbUser]);
+
 
   const safeWebAppCall = useCallback(
     <T extends (...args: any[]) => any>(methodName: keyof TelegramWebApp, ...args: Parameters<T>): ReturnType<T> | undefined => {
@@ -206,7 +209,8 @@ export function useTelegram() {
             }
         } else {
             logger.warn(`Attempted to call tgWebApp.${String(methodName)} but WebApp context is not available.`);
-            toast.error("Действие недоступно вне Telegram.");
+            // Consider not showing a toast here for every non-TG call, might be too noisy.
+            // Could be handled by the component attempting the call if feedback is needed.
             return undefined;
         }
     }, [tgWebApp] // Dependency on the webapp object
@@ -219,7 +223,7 @@ export function useTelegram() {
     dbUser,
     isInTelegramContext,
     isAuthenticated,
-    isAdmin, // Use the memoized value
+    isAdmin, // Pass the memoized function
     isLoading,
     error,
     // Wrapped WebApp methods
@@ -233,7 +237,7 @@ export function useTelegram() {
     setBackgroundColor: (color: string) => safeWebAppCall('setBackgroundColor', color),
     // Add other methods as needed...
   }), [
-      tgWebApp, tgUser, dbUser, isInTelegramContext, isAuthenticated, isAdmin,
+      tgWebApp, tgUser, dbUser, isInTelegramContext, isAuthenticated, isAdmin, // Added isAdmin to dependencies
       isLoading, error, safeWebAppCall
   ]);
 }
