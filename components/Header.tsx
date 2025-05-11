@@ -157,11 +157,9 @@ export default function Header() {
     let currentIsAdmin = false;
     if (!appContextLoading && typeof isAdmin === 'function') {
       currentIsAdmin = isAdmin();
-    } else if (appContextLoading && typeof isAdmin === 'function') {
-      // While loading, assume not admin to prevent premature display of admin items
-      // This matches the default `isAdmin: () => false` from useAppContext's loading state.
-      currentIsAdmin = false; 
     }
+    // If appContext is loading, isAdmin might be undefined or the default () => false.
+    // In this case, currentIsAdmin remains false, correctly hiding admin links during load.
     
     const filtered = allPages
       .filter(page => !(page.isAdminOnly && !currentIsAdmin)) 
@@ -170,13 +168,16 @@ export default function Header() {
 
     const groups: Record<string, PageInfo[]> = {};
     groupOrder.forEach(groupName => {
-        if (groupName === "Admin Zone" && !currentIsAdmin) return; 
+        // Only include the Admin Zone group if the user is actually an admin
+        if (groupName === "Admin Zone" && !currentIsAdmin) {
+            return; 
+        }
         groups[groupName] = [];
     });
 
     filtered.forEach(page => {
       const groupName = page.group || "Misc";
-      if (groups[groupName]) { // Check if group exists (it might have been skipped if Admin Zone and not admin)
+      if (groups[groupName]) {
         groups[groupName].push(page);
       }
     });
@@ -251,7 +252,6 @@ export default function Header() {
                   aria-label={t("Open navigation")} aria-expanded={isNavOpen}
                 ><LayoutGrid className="h-5 w-5 sm:h-6 sm:w-6" /></button>
               )}
-              {/* UserInfo component now handles its own avatar styling */}
               <UserInfo />
             </div>
           </div>
@@ -270,11 +270,11 @@ export default function Header() {
           >
             <button
               onClick={() => setIsNavOpen(false)}
-              className="fixed top-5 right-5 z-[51] p-2 text-brand-pink hover:text-brand-pink/80 focus:outline-none focus:ring-2 focus:ring-brand-pink focus:ring-offset-2 focus:ring-offset-black rounded-full transition-all duration-200 hover:bg-brand-pink/10"
+              className="fixed top-4 left-1/2 -translate-x-1/2 z-[51] p-2 text-brand-pink hover:text-brand-pink/80 focus:outline-none focus:ring-2 focus:ring-brand-pink focus:ring-offset-2 focus:ring-offset-black rounded-full transition-all duration-200 hover:bg-brand-pink/10" // Centered horizontally, top-4
               aria-label={t("Close navigation")}
             ><X className="h-6 w-6 sm:h-7 sm:w-7" /></button>
 
-            <div className="container mx-auto max-w-4xl xl:max-w-5xl">
+            <div className="container mx-auto max-w-4xl xl:max-w-5xl mt-8"> {/* Added mt-8 for spacing from new close button position */}
               <div className="relative mb-6">
                 <input
                   type="search" placeholder={t("Search pages...")} value={searchTerm}
