@@ -34,14 +34,9 @@ export function useTelegram() {
   const [dbUser, setDbUser] = useState<DatabaseUser>(null); 
   const [isInTelegramContext, setIsInTelegramContext] = useState(false);
   const [isLoading, setIsLoading] = useState(true); 
+  const [isAuthenticating, setIsAuthenticating] = useState(true); // New state
   const [error, setError] = useState<Error | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false); 
-  const [, setForceUpdate] = useState(false); // For explicitly triggering re-render
-
-  const forceUpdateApp = useCallback(() => {
-    setForceUpdate(p => !p);
-    logger.debug("[useTelegram] forceUpdateApp called, triggering re-memoization of context value.");
-  }, []);
 
   const handleAuthentication = useCallback(
     async (telegramUserToAuth: WebAppUser): Promise<AuthResult> => {
@@ -108,6 +103,7 @@ export function useTelegram() {
       }
 
       setIsLoading(true); 
+      setIsAuthenticating(true); // Start with authenticating true
       setError(null);
       setIsAuthenticated(false);
       setDbUser(null);
@@ -159,7 +155,6 @@ export function useTelegram() {
               setDbUser(authData.dbUserToSet); 
               setIsAuthenticated(authData.isAuthenticatedToSet);
               logger.log(`[useTelegram Initialize] Auth success, dbUser set with ID: ${authData.dbUserToSet?.id}`);
-              forceUpdateApp(); // Force a re-render to propagate new dbUser to context before isLoading changes
             }
         } else {
            if (isMounted) {
@@ -172,8 +167,9 @@ export function useTelegram() {
         if (isMounted) setError(authProcessError);
       } finally {
         if (isMounted) {
-          setIsLoading(false); 
-          debugLogger.log("[useTelegram Initialize] Finished, isLoading set to false.");
+          setIsAuthenticating(false); // Authentication process (success or fail) is complete
+          setIsLoading(false); // General loading is also complete
+          debugLogger.log("[useTelegram Initialize] Finished, isLoading and isAuthenticating set to false.");
         }
       }
     };
@@ -184,7 +180,7 @@ export function useTelegram() {
       debugLogger.log("[useTelegram Effect Cleanup] Setting isMounted=false");
       isMounted = false;
     };
-  }, [handleAuthentication, forceUpdateApp]); // Added forceUpdateApp
+  }, [handleAuthentication]); 
 
   const isAdmin = useCallback(() => {
     if (!dbUser) return false;
@@ -216,10 +212,10 @@ export function useTelegram() {
         dbUser,
         isInTelegramContext,
         isAuthenticated,
+        isAuthenticating, // Expose this new state
         isAdmin, 
         isLoading, 
         error,
-        forceUpdateApp, // Expose forceUpdateApp
         openLink: (url: string) => safeWebAppCall('openLink', url),
         close: () => safeWebAppCall('close'),
         showPopup: (params: any) => safeWebAppCall('showPopup', params), 
@@ -236,7 +232,7 @@ export function useTelegram() {
     };
     return baseData;
   }, [
-      tgWebApp, tgUser, dbUser, isInTelegramContext, isAuthenticated, isAdmin, 
-      isLoading, error, safeWebAppCall, forceUpdateApp // Added forceUpdateApp
+      tgWebApp, tgUser, dbUser, isInTelegramContext, isAuthenticated, isAuthenticating, isAdmin, 
+      isLoading, error, safeWebAppCall
   ]);
 }
