@@ -152,24 +152,31 @@ export default function Header() {
   }, [pathname, t]);
 
   const groupedAndFilteredPages = useMemo(() => {
+    logger.debug("[Header] Recalculating groupedAndFilteredPages. appContextLoading:", appContextLoading, "isAdmin function exists:", typeof isAdmin === 'function');
     const lowerSearchTerm = searchTerm.toLowerCase();
     
     let currentIsAdmin = false;
     if (!appContextLoading && typeof isAdmin === 'function') {
       currentIsAdmin = isAdmin();
+      logger.debug("[Header] Admin status check complete. isAdmin:", currentIsAdmin);
+    } else {
+      logger.debug("[Header] Admin status check deferred or isAdmin not a function. appContextLoading:", appContextLoading, "isAdmin type:", typeof isAdmin);
     }
-    // If appContext is loading, isAdmin might be undefined or the default () => false.
-    // In this case, currentIsAdmin remains false, correctly hiding admin links during load.
     
     const filtered = allPages
-      .filter(page => !(page.isAdminOnly && !currentIsAdmin)) 
+      .filter(page => {
+        if (page.isAdminOnly) {
+          return currentIsAdmin; // Show only if admin
+        }
+        return true; // Show non-admin pages
+      }) 
       .map(page => ({ ...page, translatedName: t(page.name) }))
       .filter(page => page.translatedName!.toLowerCase().includes(lowerSearchTerm));
 
     const groups: Record<string, PageInfo[]> = {};
     groupOrder.forEach(groupName => {
-        // Only include the Admin Zone group if the user is actually an admin
         if (groupName === "Admin Zone" && !currentIsAdmin) {
+            logger.debug("[Header] Skipping 'Admin Zone' group because user is not admin or status not yet determined.");
             return; 
         }
         groups[groupName] = [];
@@ -177,10 +184,11 @@ export default function Header() {
 
     filtered.forEach(page => {
       const groupName = page.group || "Misc";
-      if (groups[groupName]) {
+      if (groups[groupName]) { 
         groups[groupName].push(page);
       }
     });
+    logger.debug("[Header] Final groups for nav:", Object.keys(groups));
     return groups;
   }, [searchTerm, isAdmin, t, appContextLoading]);
 
@@ -270,11 +278,11 @@ export default function Header() {
           >
             <button
               onClick={() => setIsNavOpen(false)}
-              className="fixed top-4 left-1/2 -translate-x-1/2 z-[51] p-2 text-brand-pink hover:text-brand-pink/80 focus:outline-none focus:ring-2 focus:ring-brand-pink focus:ring-offset-2 focus:ring-offset-black rounded-full transition-all duration-200 hover:bg-brand-pink/10" // Centered horizontally, top-4
+              className="fixed top-4 left-1/2 -translate-x-1/2 z-[51] p-2 text-brand-pink hover:text-brand-pink/80 focus:outline-none focus:ring-2 focus:ring-brand-pink focus:ring-offset-2 focus:ring-offset-black rounded-full transition-all duration-200 hover:bg-brand-pink/10"
               aria-label={t("Close navigation")}
             ><X className="h-6 w-6 sm:h-7 sm:w-7" /></button>
 
-            <div className="container mx-auto max-w-4xl xl:max-w-5xl mt-8"> {/* Added mt-8 for spacing from new close button position */}
+            <div className="container mx-auto max-w-4xl xl:max-w-5xl mt-8">
               <div className="relative mb-6">
                 <input
                   type="search" placeholder={t("Search pages...")} value={searchTerm}
