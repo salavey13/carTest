@@ -10,8 +10,9 @@ import type { Database } from "@/types/database.types";
 
 type User = Database["public"]["Tables"]["users"]["Row"];
 
-type AppContextData = ReturnType<typeof useTelegram>;
-
+interface AppContextData extends ReturnType<typeof useTelegram> {
+  isAuthenticating: boolean; 
+}
 
 const AppContext = createContext<Partial<AppContextData>>({});
 
@@ -23,6 +24,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         "[AppContext Provider] Memoizing contextValue. telegramData props:", 
         { 
             isLoading: telegramData.isLoading, 
+            isAuthenticating: telegramData.isAuthenticating,
             isAdminIsFunction: typeof telegramData.isAdmin === 'function', 
             dbUserStatus: telegramData.dbUser?.status,
             dbUserRole: telegramData.dbUser?.role,
@@ -39,10 +41,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     telegramData.dbUser, 
     telegramData.isInTelegramContext, 
     telegramData.isAuthenticated, 
+    telegramData.isAuthenticating, 
     telegramData.isAdmin, 
     telegramData.isLoading, 
     telegramData.error,
-    telegramData.forceUpdateApp, // Added forceUpdateApp
     telegramData.openLink, 
     telegramData.close,
     telegramData.showPopup,
@@ -62,6 +64,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logger.log("AppContext updated (state from contextValue):", {
       isAuthenticated: contextValue.isAuthenticated,
       isLoading: contextValue.isLoading,
+      isAuthenticating: contextValue.isAuthenticating,
       userId: contextValue.dbUser?.user_id ?? contextValue.user?.id,
       dbUserStatus: contextValue.dbUser?.status,
       dbUserRole: contextValue.dbUser?.role,
@@ -77,10 +80,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const LOADING_TOAST_DELAY = 300;
     let mockUserToastId: string | number | undefined;
 
-    if (contextValue.isLoading) { 
+    if (contextValue.isLoading || contextValue.isAuthenticating) { 
        loadingTimer = setTimeout(() => {
-          if (contextValue.isLoading && document.visibilityState === 'visible') {
-             logger.debug("[AppContext] Showing auth loading toast (isLoading=true)...");
+          if ((contextValue.isLoading || contextValue.isAuthenticating) && document.visibilityState === 'visible') {
+             logger.debug("[AppContext] Showing auth loading toast (isLoading or isAuthenticating)...");
              currentToastId = toast.loading("Авторизация...", { id: "auth-loading-toast" });
           }
        }, LOADING_TOAST_DELAY);
@@ -109,7 +112,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         else if (contextValue.error) {
             if (document.visibilityState === 'visible') {
                  logger.error("[AppContext] Showing auth error toast:", contextValue.error);
-                 currentToastId = toast.error("Ошибка авторизации", { id: "auth-error-toast", description: "Не удалось войти. Попробуйте позже." });
+                 currentToastId = toast.error(`Ошибка авторизации: ${contextValue.error.message}`, { id: "auth-error-toast", description: "Не удалось войти. Попробуйте позже." });
             }
         }
     }
@@ -119,7 +122,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             clearTimeout(loadingTimer);
         }
     };
-  }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.error]);
+  }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.isAuthenticating, contextValue.error]);
 
 
   return <AppContext.Provider value={contextValue as AppContextData}>{children}</AppContext.Provider>;
@@ -128,13 +131,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 export const useAppContext = (): AppContextData => {
   const context = useContext(AppContext);
   
-  if (!context || Object.keys(context).length === 0 || context.isLoading === undefined ) { 
-     logger.warn("useAppContext: Context is empty or `isLoading` is undefined. Returning loading defaults.");
+  if (!context || Object.keys(context).length === 0 || context.isLoading === undefined || context.isAuthenticating === undefined ) { 
+     logger.warn("useAppContext: Context is empty or `isLoading`/`isAuthenticating` is undefined. Returning loading defaults.");
      return {
         tg: null, user: null, dbUser: null, isInTelegramContext: false, isAuthenticated: false, 
-        isLoading: true, error: null, 
+        isLoading: true, isAuthenticating: true, error: null, 
         isAdmin: () => false, 
-        forceUpdateApp: () => logger.warn('forceUpdateApp() called on loading context'),
         openLink: (url: string) => logger.warn(`openLink(${url}) called on loading context`),
         close: () => logger.warn('close() called on loading context'),
         showPopup: (params: any) => logger.warn('showPopup() called on loading context', params),
@@ -151,9 +153,9 @@ export const useAppContext = (): AppContextData => {
      } as AppContextData; 
   }
 
-  if (context.isLoading === false && typeof context.isAdmin !== 'function') {
+  if (context.isLoading === false && context.isAuthenticating === false && typeof context.isAdmin !== 'function') {
     logger.error(
-        "useAppContext: CRITICAL - Context fully loaded (isLoading: false) but context.isAdmin is NOT a function.", 
+        "useAppContext: CRITICAL - Context fully loaded (isLoading: false, isAuthenticating: false) but context.isAdmin is NOT a function.", 
         { 
             contextDbUserExists: !!context.dbUser,
             contextDbUserStatus: context.dbUser?.status, 
