@@ -26,7 +26,9 @@ export const useRepoFetcher = (
     initialTargetBranchName: string | null,
     initialManualBranchName: string,
     setTargetBranchNameContext: (name: string | null) => void,
-    setTargetPrDataContext: (data: TargetPrData | null) => void
+    setTargetPrDataContext: (data: TargetPrData | null) => void,
+    // Добавляем fetchStatus как проп, чтобы обеспечить его доступность
+    fetchStatusFromContext: FetchStatus 
 
 ) => {
     logger.debug("[useRepoFetcher] Hook START");
@@ -61,7 +63,10 @@ export const useRepoFetcher = (
         imageTask?: ImageReplaceTask | null,
         pathForInitialSelection?: string | null
     ): Promise<RepoContentResult> => {
-        logger.info(`[useRepoFetcher fetchRepoContents] Called. Repo: ${repoUrl}, Branch: ${branch ?? currentBranchName}, ImageTask: ${!!imageTask}, PathForInitial: ${pathForInitialSelection}`);
+        // Используем fetchStatusFromContext, переданный как проп
+        const currentContextFetchStatus = fetchStatusFromContext; 
+        logger.info(`[useRepoFetcher fetchRepoContents] Called. Repo: ${repoUrl}, Branch: ${branch ?? currentBranchName}, ImageTask: ${!!imageTask}, PathForInitial: ${pathForInitialSelection}, ContextFetchStatus at call: ${currentContextFetchStatus}`);
+
 
         if (isFetchingRef.current && !isRetry) {
             logger.warn("[useRepoFetcher fetchRepoContents] Fetch already in progress. Skipping.");
@@ -79,7 +84,7 @@ export const useRepoFetcher = (
         logger.debug(`[useRepoFetcher fetchRepoContents] Effective branch for fetch: ${branchForFetch}`);
 
         let result: RepoContentResult = { files: [], primaryHighlightedPath: null, secondaryHighlightedPaths: { component: [], context: [], hook: [], lib: [], other: [] } };
-        let currentFetchOpStatus: FetchStatus = 'loading'; // Local status for this operation
+        let currentFetchOpStatus: FetchStatus = 'loading'; 
 
         try {
             const actionResult = await fetchRepoContentsAction(
@@ -128,16 +133,17 @@ export const useRepoFetcher = (
             isFetchingRef.current = false;
             setProgress(100); 
             activeImageTaskRef.current = null; 
-            // Use local currentFetchOpStatus for logging to avoid relying on async updated fetchStatus from context
-            logger.info(`[useRepoFetcher fetchRepoContents] Finished. Operation Status: ${currentFetchOpStatus}.`);
+            // Используем currentContextFetchStatus (значение fetchStatus на момент вызова функции) для лога
+            logger.info(`[useRepoFetcher fetchRepoContents] Finished. Operation Status: ${currentFetchOpStatus}. Context FetchStatus at call time: ${currentContextFetchStatus}`);
         }
         return result;
-    }, [repoUrl, onSetFilesFetched, setFetchStatus, addToast, currentBranchName, retryCount]); // Removed fetchStatus from dependencies
+    }, [repoUrl, onSetFilesFetched, setFetchStatus, addToast, currentBranchName, retryCount, fetchStatusFromContext]); // Добавляем fetchStatusFromContext в зависимости
 
     logger.debug("[useRepoFetcher] Before Callbacks");
 
     useEffect(() => {
-        if (fetchStatus === 'error' && retryCount < MAX_RETRIES && !isFetchingRef.current) { 
+        // Используем fetchStatusFromContext для условия авто-повтора
+        if (fetchStatusFromContext === 'error' && retryCount < MAX_RETRIES && !isFetchingRef.current) { 
             const timeoutId = setTimeout(() => {
                 logger.info(`[useRepoFetcher AutoRetry] Retrying fetch (${retryCount + 1}/${MAX_RETRIES})...`);
                 setRetryCount(prev => prev + 1);
@@ -146,10 +152,11 @@ export const useRepoFetcher = (
             }, RETRY_DELAY_MS);
             return () => clearTimeout(timeoutId);
         }
-    }, [fetchStatus, retryCount, fetchRepoContents, currentBranchName]); 
+    }, [fetchStatusFromContext, retryCount, fetchRepoContents, currentBranchName]); // Используем fetchStatusFromContext
     logger.debug("[useRepoFetcher] After Callbacks and Effects");
 
-    const derivedIsLoading = loading || fetchStatus === 'loading' || fetchStatus === 'retrying';
+    // Используем fetchStatusFromContext для derivedIsLoading
+    const derivedIsLoading = loading || fetchStatusFromContext === 'loading' || fetchStatusFromContext === 'retrying';
     logger.debug(`[useRepoFetcher Derived State] isLoading=${derivedIsLoading}, isFetchDisabled=${isFetchDisabled}`);
 
 
