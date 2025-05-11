@@ -10,10 +10,6 @@ import type { Database } from "@/types/database.types";
 
 type User = Database["public"]["Tables"]["users"]["Row"];
 
-// interface AppContextData extends ReturnType<typeof useTelegram> {
-//   // No longer need isAuthenticating here, isLoading from useTelegram handles the full init cycle.
-// }
-// Use ReturnType directly for simplicity if no additional fields are needed here.
 type AppContextData = ReturnType<typeof useTelegram>;
 
 
@@ -37,7 +33,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return {
       ...telegramData,
     };
-  }, [ // Dependencies should match all fields from telegramData that contextValue spreads
+  }, [ 
     telegramData.tg, 
     telegramData.user, 
     telegramData.dbUser, 
@@ -54,7 +50,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     telegramData.expand,
     telegramData.setHeaderColor,
     telegramData.setBackgroundColor,
-    telegramData.platform, // Added missing dependencies from useTelegram's return type
+    telegramData.platform, 
     telegramData.themeParams,
     telegramData.initData,
     telegramData.initDataUnsafe,
@@ -87,7 +83,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
              currentToastId = toast.loading("Авторизация...", { id: "auth-loading-toast" });
           }
        }, LOADING_TOAST_DELAY);
-    } else { // isLoading is false
+    } else { 
         if (loadingTimer) clearTimeout(loadingTimer);
         toast.dismiss("auth-loading-toast");
 
@@ -131,7 +127,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 export const useAppContext = (): AppContextData => {
   const context = useContext(AppContext);
   
-  if (!context || Object.keys(context).length === 0 || context.isLoading === undefined ) { // Only check isLoading
+  if (!context || Object.keys(context).length === 0 || context.isLoading === undefined ) { 
      logger.warn("useAppContext: Context is empty or `isLoading` is undefined. Returning loading defaults.");
      return {
         tg: null, user: null, dbUser: null, isInTelegramContext: false, isAuthenticated: false, 
