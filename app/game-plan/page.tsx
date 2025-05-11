@@ -69,7 +69,7 @@ const GamePlanPage = () => {
         },
         {
           type: "image_display",
-          imageUrl: "https://picsum.photos/seed/iron_man_workshop_vibe/1280/720",
+          imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250511_223650-b874485f-4d99-4c4e-973e-603cf8b6b78a.jpg",
           altText: "Визуализация для Акта II: КОВКА ЖЕЛЕЗНОГО ЧЕЛОВЕКА. Человек в мастерской создает цифровой интерфейс."
         }
       ]
