@@ -33,8 +33,7 @@ export function useTelegram() {
   const [tgUser, setTgUser] = useState<WebAppUser | null>(null); 
   const [dbUser, setDbUser] = useState<DatabaseUser>(null); 
   const [isInTelegramContext, setIsInTelegramContext] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // General loading of TG SDK etc.
-  const [isAuthenticating, setIsAuthenticating] = useState(true); // Specific to user auth process
+  const [isLoading, setIsLoading] = useState(true); 
   const [error, setError] = useState<Error | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false); 
 
@@ -102,8 +101,8 @@ export function useTelegram() {
           return;
       }
 
-      setIsLoading(true); // For general SDK readiness
-      setIsAuthenticating(true); // For user-specific auth process
+      // Set loading true at the very beginning of initialization
+      setIsLoading(true); 
       setError(null);
       setIsAuthenticated(false);
       setDbUser(null);
@@ -141,7 +140,8 @@ export function useTelegram() {
         }
       }
       
-      if (isMounted) { // Set these relatively quickly
+      // Set these states quickly, but auth is async
+      if (isMounted) {
         setTgWebApp(tempTgWebApp);
         setIsInTelegramContext(inTgContextReal);
       }
@@ -152,32 +152,25 @@ export function useTelegram() {
           const authData = await handleAuthentication(authCandidate);
           if (isMounted) {
             setTgUser(authData.tgUserToSet);
-            setDbUser(authData.dbUserToSet);
+            setDbUser(authData.dbUserToSet); // This is crucial
             setIsAuthenticated(authData.isAuthenticatedToSet);
             logger.log(`[useTelegram Initialize] Auth success, dbUser set for ID: ${authData.dbUserToSet?.id}`);
           }
         } catch (authError: any) {
           debugLogger.error("[useTelegram Initialize] Authentication failed:", authError.message);
           if (isMounted) setError(authError);
-        } finally {
-            if(isMounted) setIsAuthenticating(false); // Auth process finished (success or fail)
         }
-      } else { // No auth candidate
-         if (isMounted) {
-            setError(new Error("Application must be run inside Telegram or have mock user enabled for authentication."));
-            logger.warn("[useTelegram Initialize] No auth candidate, setting error.");
-            setIsAuthenticating(false); // No auth to perform
-         }
+      } else if (isMounted) {
+         setError(new Error("Application must be run inside Telegram or have mock user enabled for authentication."));
+         logger.warn("[useTelegram Initialize] No auth candidate, setting error.");
       }
       
+      // Set isLoading to false only after all async operations (like handleAuthentication) are complete
       if (isMounted) {
-        setIsLoading(false); // General SDK part is done
-        debugLogger.log("[useTelegram Initialize] Finished, isLoading set to false. isAuthenticating is now:", isAuthenticatingRef.current); // Log the ref value
+        setIsLoading(false); 
+        debugLogger.log("[useTelegram Initialize] Finished, isLoading set to false.");
       }
     };
-    const isAuthenticatingRef = useRef(isAuthenticating); // Ref to track isAuthenticating
-    useEffect(() => { isAuthenticatingRef.current = isAuthenticating; }, [isAuthenticating]);
-
 
     initialize();
 
@@ -217,9 +210,8 @@ export function useTelegram() {
         dbUser,
         isInTelegramContext,
         isAuthenticated,
-        isAuthenticating, // Add this new state
         isAdmin, 
-        isLoading,
+        isLoading, // This isLoading is now more reliable
         error,
         openLink: (url: string) => safeWebAppCall('openLink', url),
         close: () => safeWebAppCall('close'),
@@ -235,10 +227,9 @@ export function useTelegram() {
         initDataUnsafe: tgWebApp?.initDataUnsafe,
         colorScheme: tgWebApp?.colorScheme ?? 'dark',
     };
-    // logger.log("[useTelegram] Memoizing context output. isAdmin is function:", typeof baseData.isAdmin === 'function', "dbUser ID:", baseData.dbUser?.id, "isAuthenticating:", baseData.isAuthenticating);
     return baseData;
   }, [
-      tgWebApp, tgUser, dbUser, isInTelegramContext, isAuthenticated, isAuthenticating, isAdmin, 
+      tgWebApp, tgUser, dbUser, isInTelegramContext, isAuthenticated, isAdmin, 
       isLoading, error, safeWebAppCall
   ]);
 }

@@ -46,20 +46,21 @@ const itemVariants = {
 
 export default function Home() {
   const appContext = useAppContext(); 
-  const { user: telegramUser, dbUser, isLoading: appLoading, error: appContextError, isAuthenticating } = appContext;
+  const { user: telegramUser, dbUser, isLoading: appLoading, error: appContextError } = appContext; // Removed isAuthenticating
   
   const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const loadProfile = async () => {
-      logger.log(`[HomePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticating: ${isAuthenticating}, dbUser.id: ${dbUser?.id}`);
-      if (appLoading || isAuthenticating) { // Wait for both general loading and auth process
-        logger.log(`[HomePage] AppContext is still loading or authenticating. Waiting to fetch profile.`);
+      logger.log(`[HomePage] loadProfile triggered. appLoading: ${appLoading}, dbUser.id: ${dbUser?.id}`);
+      if (appLoading) { 
+        logger.log(`[HomePage] AppContext is still loading. Waiting to fetch profile.`);
         setProfileLoading(true);
         return;
       }
 
+      // At this point, appLoading is false. We can now check dbUser.
       if (dbUser?.id) {
         setProfileLoading(true);
         logger.log(`[HomePage] Context fully loaded, dbUser.id available. Fetching profile for user ${dbUser.id}`);
@@ -81,9 +82,9 @@ export default function Home() {
 
     loadProfile();
 
-  }, [dbUser, appLoading, isAuthenticating]); // Added isAuthenticating
+  }, [dbUser, appLoading]); 
 
-  const isLoadingDisplay = appLoading || isAuthenticating || profileLoading; 
+  const isLoadingDisplay = appLoading || profileLoading; 
 
   const userName = cyberProfile?.cognitiveOSVersion?.includes("Guest")
     ? 'Agent' 
