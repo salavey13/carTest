@@ -45,23 +45,24 @@ const itemVariants = {
 };
 
 export default function Home() {
-  const { user: telegramUser, dbUser, isLoading: appLoading, error: appContextError } = useAppContext(); 
+  const appContext = useAppContext(); 
+  const { user: telegramUser, dbUser, isLoading: appLoading, error: appContextError, isAuthenticating } = appContext;
   
   const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const loadProfile = async () => {
-      logger.log(`[HomePage] loadProfile triggered. appLoading: ${appLoading}, dbUser.id: ${dbUser?.id}`);
-      if (appLoading) {
-        logger.log(`[HomePage] AppContext is still loading. Waiting to fetch profile.`);
+      logger.log(`[HomePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticating: ${isAuthenticating}, dbUser.id: ${dbUser?.id}`);
+      if (appLoading || isAuthenticating) { // Wait for both general loading and auth process
+        logger.log(`[HomePage] AppContext is still loading or authenticating. Waiting to fetch profile.`);
         setProfileLoading(true);
         return;
       }
 
       if (dbUser?.id) {
         setProfileLoading(true);
-        logger.log(`[HomePage] Context loaded, dbUser.id available. Fetching profile for user ${dbUser.id}`);
+        logger.log(`[HomePage] Context fully loaded, dbUser.id available. Fetching profile for user ${dbUser.id}`);
         const result = await fetchUserCyberFitnessProfile(dbUser.id);
         if (result.success && result.data) {
           setCyberProfile(result.data);
@@ -72,7 +73,7 @@ export default function Home() {
         }
         setProfileLoading(false);
       } else { 
-        logger.log(`[HomePage] Context loaded, but no dbUser.id. Using guest profile.`);
+        logger.log(`[HomePage] Context fully loaded, but no dbUser.id. Using guest profile.`);
         setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Guest Mode", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
         setProfileLoading(false);
       }
@@ -80,9 +81,9 @@ export default function Home() {
 
     loadProfile();
 
-  }, [dbUser, appLoading]); // Removed isAuthenticated, dbUser check is primary
+  }, [dbUser, appLoading, isAuthenticating]); // Added isAuthenticating
 
-  const isLoadingDisplay = appLoading || profileLoading; 
+  const isLoadingDisplay = appLoading || isAuthenticating || profileLoading; 
 
   const userName = cyberProfile?.cognitiveOSVersion?.includes("Guest")
     ? 'Agent' 

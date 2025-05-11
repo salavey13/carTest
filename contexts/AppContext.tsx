@@ -11,8 +11,7 @@ import type { Database } from "@/types/database.types";
 type User = Database["public"]["Tables"]["users"]["Row"];
 
 interface AppContextData extends ReturnType<typeof useTelegram> {
-  // isAdmin is already part of ReturnType<typeof useTelegram> if useTelegram returns it as a function
-  // No need to redefine isAdmin?: () => boolean; if it's consistently a function from useTelegram
+  isAuthenticating: boolean; // Explicitly add if not already in ReturnType
 }
 
 const AppContext = createContext<Partial<AppContextData>>({});
@@ -25,11 +24,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         "[AppContext Provider] Memoizing contextValue. telegramData props:", 
         { 
             isLoading: telegramData.isLoading, 
+            isAuthenticating: telegramData.isAuthenticating, // Log this new state
             isAdminIsFunction: typeof telegramData.isAdmin === 'function', 
             dbUserStatus: telegramData.dbUser?.status,
             dbUserRole: telegramData.dbUser?.role,
             isAuthenticated: telegramData.isAuthenticated,
-            isMockUser: process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' // For mock user toast
+            isMockUser: process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' 
         }
     );
     return {
@@ -41,6 +41,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     telegramData.dbUser, 
     telegramData.isInTelegramContext, 
     telegramData.isAuthenticated, 
+    telegramData.isAuthenticating, // Add to dependencies
     telegramData.isAdmin, 
     telegramData.isLoading, 
     telegramData.error,
@@ -58,6 +59,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logger.log("AppContext updated (state from contextValue):", {
       isAuthenticated: contextValue.isAuthenticated,
       isLoading: contextValue.isLoading,
+      isAuthenticating: contextValue.isAuthenticating,
       userId: contextValue.dbUser?.user_id ?? contextValue.user?.id,
       dbUserStatus: contextValue.dbUser?.status,
       dbUserRole: contextValue.dbUser?.role,
@@ -73,9 +75,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const LOADING_TOAST_DELAY = 300;
     let mockUserToastId: string | number | undefined;
 
-    if (contextValue.isLoading) {
+    if (contextValue.isLoading || contextValue.isAuthenticating) { // Consider isAuthenticating as part of loading phase for toasts
        loadingTimer = setTimeout(() => {
-          if (contextValue.isLoading && document.visibilityState === 'visible') {
+          if ((contextValue.isLoading || contextValue.isAuthenticating) && document.visibilityState === 'visible') {
              logger.debug("[AppContext] Showing auth loading toast...");
              currentToastId = toast.loading("Авторизация...", { id: "auth-loading-toast" });
           }
@@ -84,14 +86,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (loadingTimer) clearTimeout(loadingTimer);
         toast.dismiss("auth-loading-toast");
 
-        // Show Mock User Toast only once after loading is complete
-        if (process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && !toast.customToast && document.visibilityState === 'visible') {
-             logger.info("[AppContext] Using MOCK_USER. Displaying info toast.");
-             mockUserToastId = toast.info("Внимание: используется тестовый пользователь!", {
-                 description: "Данные могут не сохраняться или вести себя иначе, чем в Telegram.",
-                 duration: 5000,
-                 id: "mock-user-info-toast"
-             });
+        if (process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && document.visibilityState === 'visible') {
+             // Check if toast already exists by ID to prevent duplicates if this effect re-runs
+             const existingMockToast = document.querySelector('[data-sonner-toast][data-toast-id="mock-user-info-toast"]');
+             if (!existingMockToast) {
+                logger.info("[AppContext] Using MOCK_USER. Displaying info toast.");
+                mockUserToastId = toast.info("Внимание: используется тестовый пользователь!", {
+                    description: "Данные могут не сохраняться или вести себя иначе, чем в Telegram.",
+                    duration: 5000,
+                    id: "mock-user-info-toast" // Ensure this ID is unique
+                });
+             }
         }
 
         if (contextValue.isAuthenticated && !contextValue.error) {
@@ -112,10 +117,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (loadingTimer) {
             clearTimeout(loadingTimer);
         }
-        // Only dismiss toasts managed by this effect if needed, e.g., loading toast.
-        // Mock user toast and auth success/error toasts should self-dismiss or be manually dismissed.
     };
-  }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.error]);
+  }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.isAuthenticating, contextValue.error]);
 
 
   return <AppContext.Provider value={contextValue as AppContextData}>{children}</AppContext.Provider>;
@@ -124,11 +127,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 export const useAppContext = (): AppContextData => {
   const context = useContext(AppContext);
   
-  if (!context || Object.keys(context).length === 0 || context.isLoading === undefined ) {
-     logger.warn("useAppContext: Context is empty or `isLoading` is undefined. Returning loading defaults.");
+  if (!context || Object.keys(context).length === 0 || context.isLoading === undefined || context.isAuthenticating === undefined ) {
+     logger.warn("useAppContext: Context is empty or `isLoading`/`isAuthenticating` is undefined. Returning loading defaults.");
      return {
         tg: null, user: null, dbUser: null, isInTelegramContext: false, isAuthenticated: false, 
-        isLoading: true, error: null, 
+        isLoading: true, isAuthenticating: true, error: null, 
         isAdmin: () => false, 
         openLink: (url: string) => logger.warn(`openLink(${url}) called on loading context`),
         close: () => logger.warn('close() called on loading context'),
@@ -138,7 +141,6 @@ export const useAppContext = (): AppContextData => {
         expand: () => logger.warn('expand() called on loading context'),
         setHeaderColor: (color: string) => logger.warn(`setHeaderColor(${color}) called on loading context`),
         setBackgroundColor: (color: string) => logger.warn(`setBackgroundColor(${color}) called on loading context`),
-        // Defaulting other fields as per their types or from an initial state object if useTelegram provides one
         platform: undefined, 
         themeParams: undefined,
         initData: undefined, 
@@ -147,9 +149,9 @@ export const useAppContext = (): AppContextData => {
      } as AppContextData; 
   }
 
-  if (context.isLoading === false && typeof context.isAdmin !== 'function') {
+  if (context.isLoading === false && context.isAuthenticating === false && typeof context.isAdmin !== 'function') {
     logger.error(
-        "useAppContext: CRITICAL - Context is loaded (isLoading: false) but context.isAdmin is NOT a function. This suggests an issue in useTelegram or AppProvider's provision of isAdmin.", 
+        "useAppContext: CRITICAL - Context fully loaded (isLoading: false, isAuthenticating: false) but context.isAdmin is NOT a function.", 
         { 
             contextDbUserExists: !!context.dbUser,
             contextDbUserStatus: context.dbUser?.status, 
