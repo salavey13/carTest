@@ -99,13 +99,18 @@ const getCyberFitnessProfile = (metadata: UserMetadata | null | undefined): Cybe
 };
 
 export const fetchUserCyberFitnessProfile = async (userId: string): Promise<{ success: boolean; data?: CyberFitnessProfile; error?: string }> => {
-  if (!userId) return { success: false, error: "User ID is required." };
+  logger.log(`[CyberFitness FetchProfile ENTRY] Fetching profile for user: ${userId}`);
+  if (!userId) {
+    logger.warn("[CyberFitness FetchProfile] User ID is required.");
+    return { success: false, error: "User ID is required." };
+  }
   if (!supabaseAdmin) { 
-    logger.error("[CyberFitness] Admin client not available for fetchUserCyberFitnessProfile.");
+    logger.error("[CyberFitness FetchProfile] Admin client not available.");
     return { success: false, error: "Admin client unavailable." };
   }
-  logger.log(`[CyberFitness] Fetching profile for user ${userId}`);
+  
   try {
+    logger.debug(`[CyberFitness FetchProfile] Supabase query attempt for user_id: ${userId}`);
     const { data: userData, error: userError } = await supabaseAdmin
       .from("users")
       .select("metadata")
@@ -113,21 +118,21 @@ export const fetchUserCyberFitnessProfile = async (userId: string): Promise<{ su
       .single();
 
     if (userError) {
-        logger.error(`[CyberFitness] Error fetching user data for ${userId} from DB:`, userError);
-        throw userError;
+        logger.error(`[CyberFitness FetchProfile] Supabase error fetching user data for ${userId}:`, userError);
+        return { success: false, error: userError.message, data: getCyberFitnessProfile(null) }; // Return default on DB error
     }
     if (!userData) {
-        logger.warn(`[CyberFitness] User ${userId} not found in DB.`);
-        return { success: false, error: "User not found." };
+        logger.warn(`[CyberFitness FetchProfile] User ${userId} not found in DB. Returning default profile.`);
+        return { success: true, data: getCyberFitnessProfile(null) }; // User not found, so they get a default profile
     }
-    logger.debug(`[CyberFitness] Raw user metadata for ${userId}:`, userData.metadata);
+    logger.debug(`[CyberFitness FetchProfile] Raw user metadata for ${userId}:`, userData.metadata);
     
     const profile = getCyberFitnessProfile(userData.metadata);
-    logger.log(`[CyberFitness] Parsed CyberFitness profile for user ${userId}:`, profile);
+    logger.log(`[CyberFitness FetchProfile EXIT] Parsed CyberFitness profile for user ${userId}:`, profile);
     return { success: true, data: profile };
   } catch (e: any) {
-    logger.error(`[CyberFitness] Exception fetching profile for user ${userId}:`, e);
-    return { success: false, error: e.message || "Failed to fetch CyberFitness profile." };
+    logger.error(`[CyberFitness FetchProfile CATCH] Exception fetching profile for user ${userId}:`, e);
+    return { success: false, error: e.message || "Failed to fetch CyberFitness profile.", data: getCyberFitnessProfile(null) }; // Return default on exception
   }
 };
 
@@ -135,14 +140,20 @@ export const updateUserCyberFitnessProfile = async (
   userId: string,
   updates: Partial<CyberFitnessProfile>
 ): Promise<{ success: boolean; data?: DbUser; error?: string; newAchievements?: Achievement[] }> => {
-  if (!userId) return { success: false, error: "User ID is required." };
+  logger.log(`[CyberFitness UpdateProfile ENTRY] Attempting to update profile for user ${userId} with:`, JSON.parse(JSON.stringify(updates)));
+  if (!userId) {
+    logger.warn("[CyberFitness UpdateProfile] User ID is required.");
+    return { success: false, error: "User ID is required." };
+  }
   
   const client = await createAuthenticatedClient(userId);
-  if (!client) return { success: false, error: "Failed to create authenticated client for profile update." };
-
-  logger.log(`[CyberFitness Update] Attempting to update profile for user ${userId} with:`, updates);
+  if (!client) {
+    logger.error("[CyberFitness UpdateProfile] Failed to create authenticated client for profile update.");
+    return { success: false, error: "Failed to create authenticated client for profile update." };
+  }
 
   try {
+    logger.debug(`[CyberFitness UpdateProfile] Fetching current user metadata for ${userId}.`);
     const { data: currentUserData, error: fetchError } = await client
       .from("users")
       .select("metadata")
@@ -150,19 +161,18 @@ export const updateUserCyberFitnessProfile = async (
       .single();
 
     if (fetchError) {
-      logger.error(`[CyberFitness Update] Failed to fetch current user metadata for ${userId}:`, fetchError);
+      logger.error(`[CyberFitness UpdateProfile] Failed to fetch current user metadata for ${userId}:`, fetchError);
       throw fetchError;
     }
     if (!currentUserData) {
-      logger.warn(`[CyberFitness Update] User ${userId} not found for profile update.`);
+      logger.warn(`[CyberFitness UpdateProfile] User ${userId} not found for profile update.`);
       return { success: false, error: `User ${userId} not found for profile update.` };
     }
 
     const existingOverallMetadata = currentUserData.metadata || {};
-    logger.debug(`[CyberFitness Update] Existing overall metadata for ${userId}:`, existingOverallMetadata);
+    logger.debug(`[CyberFitness UpdateProfile] Existing overall metadata for ${userId}:`, JSON.parse(JSON.stringify(existingOverallMetadata)));
     let existingCyberFitnessProfile = getCyberFitnessProfile(existingOverallMetadata);
-    logger.debug(`[CyberFitness Update] Parsed existing CyberFitnessProfile for ${userId}:`, existingCyberFitnessProfile);
-
+    logger.debug(`[CyberFitness UpdateProfile] Parsed existing CyberFitnessProfile for ${userId}:`, JSON.parse(JSON.stringify(existingCyberFitnessProfile)));
 
     const newCyberFitnessProfile: CyberFitnessProfile = {
       ...existingCyberFitnessProfile, 
@@ -187,7 +197,7 @@ export const updateUserCyberFitnessProfile = async (
     if (typeof updates.totalPrsCreated === 'number') newCyberFitnessProfile.totalPrsCreated = (existingCyberFitnessProfile.totalPrsCreated || 0) + updates.totalPrsCreated;
     if (typeof updates.totalBranchesUpdated === 'number') newCyberFitnessProfile.totalBranchesUpdated = (existingCyberFitnessProfile.totalBranchesUpdated || 0) + updates.totalBranchesUpdated;
     
-    logger.debug(`[CyberFitness Update] Calculated new cumulative totals for ${userId}:`, {
+    logger.debug(`[CyberFitness UpdateProfile] Calculated new cumulative totals for ${userId}:`, {
         totalFilesExtracted: newCyberFitnessProfile.totalFilesExtracted,
         totalTokensProcessed: newCyberFitnessProfile.totalTokensProcessed,
         totalKworkRequestsSent: newCyberFitnessProfile.totalKworkRequestsSent,
@@ -204,17 +214,17 @@ export const updateUserCyberFitnessProfile = async (
     newCyberFitnessProfile.achievements = Array.from(currentAchievements);
 
     if (newlyUnlockedAchievements.length > 0) {
-        logger.info(`[CyberFitness Update] User ${userId} unlocked new achievements:`, newlyUnlockedAchievements.map(a => a.name));
+        logger.info(`[CyberFitness UpdateProfile] User ${userId} unlocked new achievements:`, newlyUnlockedAchievements.map(a => a.name));
     }
-    logger.debug(`[CyberFitness Update] Final new CyberFitnessProfile before saving for ${userId}:`, newCyberFitnessProfile);
+    logger.debug(`[CyberFitness UpdateProfile] Final new CyberFitnessProfile before saving for ${userId}:`, JSON.parse(JSON.stringify(newCyberFitnessProfile)));
 
     const newOverallMetadata: UserMetadata = {
       ...existingOverallMetadata,
       [CYBERFIT_METADATA_KEY]: newCyberFitnessProfile,
     };
-    logger.debug(`[CyberFitness Update] Final overall metadata to be saved for ${userId}:`, newOverallMetadata);
-
-
+    logger.debug(`[CyberFitness UpdateProfile] Final overall metadata to be saved for ${userId}:`, JSON.parse(JSON.stringify(newOverallMetadata)));
+    
+    logger.debug(`[CyberFitness UpdateProfile] Supabase update query attempt for user ${userId}.`);
     const { data: updatedUser, error: updateError } = await client
       .from("users")
       .update({ metadata: newOverallMetadata, updated_at: new Date().toISOString() })
@@ -223,18 +233,18 @@ export const updateUserCyberFitnessProfile = async (
       .single();
 
     if (updateError) {
-      logger.error(`[CyberFitness Update] Error saving updated profile for user ${userId}:`, updateError);
+      logger.error(`[CyberFitness UpdateProfile] Error saving updated profile for user ${userId}:`, updateError);
       throw updateError;
     }
     if (!updatedUser) {
-      logger.warn(`[CyberFitness Update] User ${userId} not found after profile update attempt.`);
+      logger.warn(`[CyberFitness UpdateProfile] User ${userId} not found after profile update attempt.`);
       return { success: false, error: `User ${userId} not found after profile update attempt.` };
     }
 
-    logger.log(`[CyberFitness Update] Successfully updated profile for user ${userId}. Saved profile in DB:`, updatedUser.metadata?.[CYBERFIT_METADATA_KEY]);
+    logger.log(`[CyberFitness UpdateProfile EXIT] Successfully updated profile for user ${userId}. Saved profile in DB:`, JSON.parse(JSON.stringify(updatedUser.metadata?.[CYBERFIT_METADATA_KEY])));
     return { success: true, data: updatedUser, newAchievements: newlyUnlockedAchievements };
   } catch (e: any) {
-    logger.error(`[CyberFitness Update] Exception during profile update for user ${userId}:`, e);
+    logger.error(`[CyberFitness UpdateProfile CATCH] Exception during profile update for user ${userId}:`, e);
     return { success: false, error: e.message || "Failed to update CyberFitness profile." };
   }
 };
@@ -244,7 +254,11 @@ export const logCyberFitnessAction = async (
   actionType: 'filesExtracted' | 'tokensProcessed' | 'kworkRequestSent' | 'prCreated' | 'branchUpdated' | 'featureUsed',
   countOrDetails: number | { featureName: string } 
 ): Promise<{ success: boolean; error?: string; newAchievements?: Achievement[] }> => {
-  if (!userId) return { success: false, error: "User ID is required." };
+  logger.log(`[CyberFitness LogAction ENTRY] Logging action for user ${userId}. Action: ${actionType}, Value/Details:`, countOrDetails);
+  if (!userId) {
+    logger.warn("[CyberFitness LogAction] User ID is required.");
+    return { success: false, error: "User ID is required." };
+  }
   
   let count = 0;
   if (typeof countOrDetails === 'number') {
@@ -252,13 +266,12 @@ export const logCyberFitnessAction = async (
   }
   if (count < 0 && actionType !== 'featureUsed' && actionType !== 'tokensProcessed') {
       logger.warn(`[CyberFitness LogAction] Negative count (${count}) provided for action '${actionType}'. Correcting to 0.`);
-      count = 0; // Correct negative counts for non-token actions
-      if (typeof countOrDetails === 'number') countOrDetails = 0; // Update countOrDetails as well if it was the source
+      count = 0;
+      if (typeof countOrDetails === 'number') countOrDetails = 0;
   }
 
-  logger.log(`[CyberFitness LogAction] Logging action for user ${userId}: ${actionType}, value:`, countOrDetails);
-
   try {
+    logger.debug(`[CyberFitness LogAction] Fetching current profile for user ${userId} before logging action.`);
     const profileResult = await fetchUserCyberFitnessProfile(userId);
     if (!profileResult.success || !profileResult.data) {
       logger.error(`[CyberFitness LogAction] Failed to fetch current profile for user ${userId}. Error: ${profileResult.error}`);
@@ -266,7 +279,7 @@ export const logCyberFitnessAction = async (
     }
     
     let currentProfile = profileResult.data; 
-    logger.debug(`[CyberFitness LogAction] Current profile for user ${userId} before update:`, JSON.parse(JSON.stringify(currentProfile))); // Deep copy for logging
+    logger.debug(`[CyberFitness LogAction] Current profile for user ${userId} before update:`, JSON.parse(JSON.stringify(currentProfile)));
 
     let dailyLog = currentProfile.dailyActivityLog ? [...currentProfile.dailyActivityLog] : [];
     const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -284,7 +297,7 @@ export const logCyberFitnessAction = async (
 
     if (actionType === 'filesExtracted' && typeof countOrDetails === 'number') {
         todayEntry.filesExtracted = (todayEntry.filesExtracted || 0) + countOrDetails;
-        profileUpdates.totalFilesExtracted = countOrDetails;
+        profileUpdates.totalFilesExtracted = countOrDetails; // This is an increment, not total for the day
     } else if (actionType === 'tokensProcessed' && typeof countOrDetails === 'number') {
         todayEntry.tokensProcessed = (todayEntry.tokensProcessed || 0) + countOrDetails;
         profileUpdates.totalTokensProcessed = countOrDetails;
@@ -300,9 +313,8 @@ export const logCyberFitnessAction = async (
     } else if (actionType === 'featureUsed' && typeof countOrDetails === 'object' && countOrDetails.featureName) {
         profileUpdates.featuresUsed![countOrDetails.featureName] = true;
     }
-    logger.debug(`[CyberFitness LogAction] Today's entry for ${userId} after update:`, todayEntry);
-    logger.debug(`[CyberFitness LogAction] Profile updates to be passed for ${userId}:`, profileUpdates);
-
+    logger.debug(`[CyberFitness LogAction] Today's entry for ${userId} after update:`, JSON.parse(JSON.stringify(todayEntry)));
+    logger.debug(`[CyberFitness LogAction] Profile updates to be passed for ${userId}:`, JSON.parse(JSON.stringify(profileUpdates)));
 
     dailyLog.sort((a, b) => b.date.localeCompare(a.date)); 
     if (dailyLog.length > MAX_DAILY_LOG_ENTRIES) {
@@ -310,6 +322,7 @@ export const logCyberFitnessAction = async (
     }
     profileUpdates.dailyActivityLog = dailyLog;
 
+    logger.debug(`[CyberFitness LogAction] Calling updateUserCyberFitnessProfile for ${userId}.`);
     const updateResult = await updateUserCyberFitnessProfile(userId, profileUpdates);
     
     if (!updateResult.success) {
@@ -317,11 +330,11 @@ export const logCyberFitnessAction = async (
       return { success: false, error: updateResult.error || "Failed to save updated profile." };
     }
 
-    logger.log(`[CyberFitness LogAction] Action logged successfully for user ${userId}. New achievements:`, updateResult.newAchievements?.map(a => a.id));
+    logger.log(`[CyberFitness LogAction EXIT] Action logged successfully for user ${userId}. New achievements:`, updateResult.newAchievements?.map(a => a.id));
     return { success: true, newAchievements: updateResult.newAchievements };
 
   } catch (e: any) {
-    logger.error(`[CyberFitness LogAction] Exception logging action for user ${userId}:`, e);
+    logger.error(`[CyberFitness LogAction CATCH] Exception logging action for user ${userId}:`, e);
     return { success: false, error: e.message || "Failed to log CyberFitness action." };
   }
 };
@@ -330,9 +343,14 @@ export const checkAndUnlockFeatureAchievement = async (
     userId: string,
     featureName: keyof Exclude<CyberFitnessProfile['featuresUsed'], undefined> 
 ): Promise<{ success: boolean; newAchievements?: Achievement[], error?: string }> => {
-    if (!userId || !featureName) return { success: false, error: "User ID and feature name required."};
-    logger.log(`[CyberFitness] Checking feature achievement for user ${userId}, feature: ${featureName}`);
-    return logCyberFitnessAction(userId, 'featureUsed', { featureName });
+    logger.log(`[CyberFitness CheckFeatureAchievement ENTRY] User: ${userId}, Feature: ${featureName}`);
+    if (!userId || !featureName) {
+        logger.warn("[CyberFitness CheckFeatureAchievement] User ID and feature name required.");
+        return { success: false, error: "User ID and feature name required."};
+    }
+    const result = await logCyberFitnessAction(userId, 'featureUsed', { featureName });
+    logger.log(`[CyberFitness CheckFeatureAchievement EXIT] Result for ${featureName}:`, result.success, "New achievements:", result.newAchievements?.map(a=>a.id));
+    return result;
 };
 
 export const completeQuestAndUpdateProfile = async (
@@ -342,7 +360,7 @@ export const completeQuestAndUpdateProfile = async (
   newLevel?: number, 
   newPerks?: string[] 
 ): Promise<{ success: boolean; data?: DbUser; error?: string; newAchievements?: Achievement[] }> => {
-  logger.log(`[CyberFitness QuestComplete] User ${userId} completed quest ${questId}, awarded ${kiloVibesAwarded} KiloVibes.`);
+  logger.log(`[CyberFitness QuestComplete ENTRY] User ${userId} completed quest ${questId}, awarded ${kiloVibesAwarded} KiloVibes. New Lvl?: ${newLevel}, New Perks?:`, newPerks);
 
   const currentProfileResult = await fetchUserCyberFitnessProfile(userId);
   if (!currentProfileResult.success || !currentProfileResult.data) {
@@ -350,6 +368,7 @@ export const completeQuestAndUpdateProfile = async (
     return { success: false, error: currentProfileResult.error || "Failed to fetch current profile before quest completion." };
   }
   const currentProfile = currentProfileResult.data;
+  logger.debug(`[CyberFitness QuestComplete] Current profile for ${userId}:`, JSON.parse(JSON.stringify(currentProfile)));
 
   const updates: Partial<CyberFitnessProfile> = {
     kiloVibes: kiloVibesAwarded, 
@@ -365,8 +384,10 @@ export const completeQuestAndUpdateProfile = async (
     updates.unlockedPerks = newPerks; 
     logger.log(`[CyberFitness QuestComplete] User ${userId} unlocked perks:`, newPerks);
   }
-  logger.debug(`[CyberFitness QuestComplete] Profile updates for ${userId}:`, updates);
-  return updateUserCyberFitnessProfile(userId, updates);
+  logger.debug(`[CyberFitness QuestComplete] Profile updates for ${userId}:`, JSON.parse(JSON.stringify(updates)));
+  const result = await updateUserCyberFitnessProfile(userId, updates);
+  logger.log(`[CyberFitness QuestComplete EXIT] Update result for quest ${questId}:`, result.success, "New achievements:", result.newAchievements?.map(a=>a.id));
+  return result;
 };
 
 export const setCognitiveOSVersion = async (userId: string, version: string): Promise<{ success: boolean; data?: DbUser; error?: string; newAchievements?: Achievement[] }> => {
@@ -375,12 +396,13 @@ export const setCognitiveOSVersion = async (userId: string, version: string): Pr
 };
 
 export const getUserCyberLevel = async (userId: string): Promise<{ success: boolean; level?: number; error?: string }> => {
+  logger.log(`[CyberFitness GetLevel ENTRY] Getting level for user: ${userId}`);
   const profileResult = await fetchUserCyberFitnessProfile(userId);
   if (!profileResult.success || typeof profileResult.data?.level !== 'number') { 
     logger.warn(`[CyberFitness GetLevel] Failed to get level for ${userId}. Error: ${profileResult.error}`);
     return { success: false, level: 0, error: profileResult.error || "Level not found" };
   }
-  logger.debug(`[CyberFitness GetLevel] Level for ${userId} is ${profileResult.data.level}`);
+  logger.log(`[CyberFitness GetLevel EXIT] Level for ${userId} is ${profileResult.data.level}`);
   return { success: true, level: profileResult.data.level };
 };
 
