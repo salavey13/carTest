@@ -42,6 +42,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     telegramData.isAdmin, 
     telegramData.isLoading, 
     telegramData.error,
+    telegramData.forceUpdateApp, // Added forceUpdateApp
     telegramData.openLink, 
     telegramData.close,
     telegramData.showPopup,
@@ -133,6 +134,7 @@ export const useAppContext = (): AppContextData => {
         tg: null, user: null, dbUser: null, isInTelegramContext: false, isAuthenticated: false, 
         isLoading: true, error: null, 
         isAdmin: () => false, 
+        forceUpdateApp: () => logger.warn('forceUpdateApp() called on loading context'),
         openLink: (url: string) => logger.warn(`openLink(${url}) called on loading context`),
         close: () => logger.warn('close() called on loading context'),
         showPopup: (params: any) => logger.warn('showPopup() called on loading context', params),
