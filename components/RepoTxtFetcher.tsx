@@ -96,14 +96,14 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     logger.debug("[RepoTxtFetcher] Before useRepoFetcher Hook");
     const repoFetcher = useRepoFetcher(
         repoUrl, 
-        setFetchStatus, 
-        handleSetFilesFetched, 
+        // setFetchStatus, // Removed, now from context
+        handleSetFilesFetched, // This is the callback that context provides, which includes setting fetchStatus
         addToastContext, 
         targetBranchName, 
         manualBranchName, 
-        setTargetBranchName, 
-        setTargetPrData,
-        fetchStatus 
+        // setTargetBranchName, // Removed, context handles this
+        // setTargetPrData, // Removed, context handles this
+        fetchStatus // Pass context's fetchStatus to the hook
     );
     const { 
         files: fetchedFiles, progress, error: fetchErrorHook, 
@@ -259,8 +259,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              handleClearAll(); 
         },
         getKworkInputValue: () => {
-             logger.debug(`[Imperative] getKworkInputValue called, returning context value: "${String(kworkInputValue).substring(0,50)}"`);
-             return kworkInputValue ?? ''; // Ensure string
+             const val = kworkInputValue ?? ''; // Ensure string
+             logger.debug(`[Imperative TRIM_DEBUG] getKworkInputValue called, returning context value (ensured string): "${val.substring(0,50)}"`);
+             return val; 
         },
         handleAddImportantFiles: () => {
              logger.debug(`[Imperative] handleAddImportantFiles called.`);
@@ -326,6 +327,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     logger.debug(`[TRIM_DEBUG RepoTxtFetcher Render] Before kworkValueForCheck: kworkInputValue type: ${typeof kworkInputValue}, value: "${String(kworkInputValue).substring(0,50)}"`);
     const kworkValueForCheck = kworkInputValue ?? ''; // Ensure string before .trim()
     logger.debug(`[TRIM_DEBUG RepoTxtFetcher Render] Before hasContent: kworkValueForCheck type: ${typeof kworkValueForCheck}, value: "${kworkValueForCheck.substring(0,50)}"`);
+    // Ensure .trim() is called on a string. If kworkInputValue is null/undefined, kworkValueForCheck is '', so "".trim() is safe.
     const hasContent = kworkValueForCheck.trim().length > 0;
     
     const isCopyDisabled = !hasContent || isActionDisabled;

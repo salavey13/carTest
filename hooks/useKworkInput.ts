@@ -81,9 +81,7 @@ export const useKworkInput = ({
 
     logger.debug(`[TRIM_DEBUG useKworkInput] Initial kworkInputValue from context: "${String(kworkInputValue).substring(0,50)}", type: ${typeof kworkInputValue}`);
 
-
     const handleAddSelected = useCallback(async () => {
-        // ... (код без изменений, он уже использует kworkInputValue из контекста, который теперь гарантированно строка)
         if (imageReplaceTaskActive) {
             logger.warn("[Kwork Input] Add Selected skipped: Image replace task active.");
             toastWarning("Добавление файлов недоступно во время задачи замены картинки.");
@@ -116,12 +114,16 @@ export const useKworkInput = ({
                 contentToDisplay = ""; 
             }
             
-            // [TRIM_DEBUG]
             logger.debug(`[TRIM_DEBUG useKworkInput handleAddSelected] File: ${path}, contentToDisplay before trim: "${String(contentToDisplay).substring(0,50)}", type: ${typeof contentToDisplay}`);
             const language = getFileLanguage(path);
             const pathComment = `// /${path}`;
-            if (contentToDisplay.startsWith("// Error:") || contentToDisplay.startsWith("// Info:") || contentToDisplay.startsWith("// Warning:") || (typeof contentToDisplay === 'string' && contentToDisplay.trim())) {
-                return `${pathComment}\n\`\`\`${language}\n${contentToDisplay.trim()}\n\`\`\``;
+            
+            // Ensure contentToDisplay is a string before calling .trim()
+            const safeContentToDisplay = contentToDisplay ?? '';
+            logger.debug(`[TRIM_DEBUG useKworkInput handleAddSelected] File: ${path}, safeContentToDisplay before trim: "${safeContentToDisplay.substring(0,50)}", type: ${typeof safeContentToDisplay}`);
+
+            if (safeContentToDisplay.startsWith("// Error:") || safeContentToDisplay.startsWith("// Info:") || safeContentToDisplay.startsWith("// Warning:") || safeContentToDisplay.trim()) {
+                return `${pathComment}\n\`\`\`${language}\n${safeContentToDisplay.trim()}\n\`\`\``;
             }
             return null;
         }).filter(block => block !== null).join("\n\n// ---- FILE SEPARATOR ----\n\n");
@@ -136,8 +138,8 @@ export const useKworkInput = ({
         const structureMarker = "Структура файлов проекта:";
         const newCodeContextSection = `${codeContextMarker}\n\n${fileBlocksContent}`;
 
-        const currentKworkValue = kworkInputValue; // Уже строка из контекста
-        logger.debug(`[TRIM_DEBUG useKworkInput handleAddSelected] currentKworkValue from context: "${currentKworkValue.substring(0,50)}", type: ${typeof currentKworkValue}`);
+        const currentKworkValue = kworkInputValue ?? ''; // Ensure string
+        logger.debug(`[TRIM_DEBUG useKworkInput handleAddSelected] currentKworkValue: "${currentKworkValue.substring(0,50)}", type: ${typeof currentKworkValue}`);
         let finalKworkValue = "";
 
         const idxCode = currentKworkValue.indexOf(codeContextMarker);
@@ -194,7 +196,7 @@ export const useKworkInput = ({
     ]);
 
     const handleCopyToClipboard = useCallback(async (textToCopy?: string, shouldScroll = true): Promise<boolean> => {
-        const contentToUse = textToCopy ?? kworkInputValue;  // kworkInputValue уже строка
+        const contentToUse = textToCopy ?? (kworkInputValue ?? '');  // Ensure string
         logger.debug(`[TRIM_DEBUG useKworkInput handleCopyToClipboard] contentToUse: "${String(contentToUse).substring(0,50)}", type: ${typeof contentToUse}`);
         if (!contentToUse.trim()) { 
             toastWarning("Нет текста для копирования");
@@ -229,7 +231,6 @@ export const useKworkInput = ({
     }, [kworkInputValue, toastSuccess, toastWarning, toastError, setRequestCopied, scrollToSection, logger, dbUser?.id, addToast]); 
 
     const handleClearAll = useCallback(() => {
-        // ... (код без изменений)
         if (imageReplaceTaskActive) {
              logger.warn("[Kwork Input] Clear All skipped: Image replace task active.");
             toastWarning("Очистка недоступна во время задачи замены картинки.");
@@ -251,7 +252,6 @@ export const useKworkInput = ({
     ]);
 
      const handleAddFullTree = useCallback(async () => {
-        // ... (код без изменений, он также использует kworkInputValue из контекста, который теперь гарантированно строка)
          if (imageReplaceTaskActive) {
              logger.warn("[Kwork Input] Add Tree skipped: Image replace task active.");
              toastWarning("Добавление дерева файлов недоступно во время задачи замены картинки.");
@@ -279,18 +279,22 @@ export const useKworkInput = ({
              } else {
                  contentToDisplay = `// Файл /${file.path} пуст или содержит только комментарии.`;
              }
-             // [TRIM_DEBUG]
              logger.debug(`[TRIM_DEBUG useKworkInput handleAddFullTree] File: ${file.path}, contentToDisplay before trim: "${String(contentToDisplay).substring(0,50)}", type: ${typeof contentToDisplay}`);
              const language = getFileLanguage(file.path);
              const pathComment = `// /${file.path}`;
-             return `${pathComment}\n\`\`\`${language}\n${contentToDisplay.trim()}\n\`\`\``;
+             
+             // Ensure contentToDisplay is a string before calling .trim()
+             const safeContentToDisplay = contentToDisplay ?? '';
+             logger.debug(`[TRIM_DEBUG useKworkInput handleAddFullTree] File: ${file.path}, safeContentToDisplay before trim: "${safeContentToDisplay.substring(0,50)}", type: ${typeof safeContentToDisplay}`);
+
+             return `${pathComment}\n\`\`\`${language}\n${safeContentToDisplay.trim()}\n\`\`\``;
          }).join("\n\n// ---- FILE SEPARATOR ----\n\n");
 
         const codeContextMarker = "Контекст кода для анализа:";
         const newCodeContextSection = `${codeContextMarker}\n\n${fileBlocksContent}`;
         
-        const currentKworkValue = kworkInputValue; // Уже строка
-        logger.debug(`[TRIM_DEBUG useKworkInput handleAddFullTree] currentKworkValue from context: "${currentKworkValue.substring(0,50)}", type: ${typeof currentKworkValue}`);
+        const currentKworkValue = kworkInputValue ?? ''; // Ensure string
+        logger.debug(`[TRIM_DEBUG useKworkInput handleAddFullTree] currentKworkValue: "${currentKworkValue.substring(0,50)}", type: ${typeof currentKworkValue}`);
         let finalKworkValue = "";
 
         const idxCurrentStructure = currentKworkValue.indexOf(structureMarker);

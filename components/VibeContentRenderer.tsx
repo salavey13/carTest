@@ -25,8 +25,17 @@ function isValidFa6Icon(iconName: string): iconName is keyof typeof Fa6Icons {
 }
 
 function preprocessIconSyntax(content: string): string {
-    if (!content) return '';
-    return content.replace(
+    // ADDED: Log the content being preprocessed for TRIM_DEBUG
+    logger.debug(`[VCR Preprocessor TRIM_DEBUG] Input content: "${String(content).substring(0,50)}", type: ${typeof content}`);
+    if (typeof content !== 'string' || !content) { // Ensure content is a non-empty string before processing
+        logger.debug("[VCR Preprocessor TRIM_DEBUG] Content is not a non-empty string, returning empty string.");
+        return '';
+    }
+    // Ensure trim is only called on a string.
+    const trimmedContent = content.trim();
+    logger.debug(`[VCR Preprocessor TRIM_DEBUG] Trimmed content for regex: "${trimmedContent.substring(0,50)}"`);
+
+    return trimmedContent.replace(
         /::(Fa\w+)(?:\s+className=(?:"([^"]*)"|'([^']*)'))?::/g,
         (_match, iconName, classValDouble, classValSingle) => {
             const classNameValue = classValDouble || classValSingle;
@@ -68,7 +77,6 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
             
             if (iconToRender) {
                 const IconComponent = Fa6Icons[iconToRender];
-                // Double check IconComponent is a function right before using it
                 if (typeof IconComponent !== 'function') {
                     logger.error(`[VCR Render] IconComponent for '${iconToRender}' ('${iconComponentName}') is not a function at render time. Value:`, IconComponent);
                     return <span title={`Render Error: ${iconToRender} is not a function`} className="text-red-600 font-bold">{`[ICON FN ERR!: ${iconToRender}]`}</span>;
@@ -86,12 +94,9 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                     return <span title={`createElement Error: ${iconComponentName}`} className="text-red-600 font-bold">{`[ICON CREATE ERR!: ${iconComponentName}]`}</span>;
                 }
             } else if (lowerCaseName.startsWith('fa') || nodeName.startsWith('Fa')) { 
-                // This handles cases like <fa-icon> or <FaNonExistent> that weren't caught by preprocessIconSyntax
-                // and are not valid direct Fa6Icons keys or mapped keys.
                 logger.warn(`[VCR Render] Unknown/Unmapped/Invalid Fa Icon Tag: <${nodeName}> (lc: ${lowerCaseName})`);
                 return <span title={`Unknown/Unmapped/Invalid Fa Icon: ${nodeName}`} className="text-orange-500 font-bold">{`[?${nodeName}?]`}</span>;
             }
-
 
             if (lowerCaseName === 'a') {
                 const hrefVal = mutableAttribs.href;
@@ -106,9 +111,6 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                 return React.createElement('a', mutableAttribs, children);
             }
             
-            // If it's a custom component tag (starts with uppercase) but not an icon, log and return undefined
-            // to let html-react-parser potentially try to render it if it's a known component in scope.
-            // However, for this specific use case, we mostly expect HTML or Fa icons.
             if (nodeName.match(/^[A-Z]/) && !iconToRender) {
                 logger.warn(`[VCR Render] Encountered unknown uppercase tag <${nodeName}>. Not a recognized icon. Parser will attempt default handling or fail if not a known React component.`);
             }
@@ -126,11 +128,22 @@ interface VibeContentRendererProps {
 }
 
 export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.memo(({ content, className }) => {
-    if (typeof content !== 'string' || !content.trim()) {
+    // ADDED: Log the raw content prop
+    logger.debug(`[VCR TRIM_DEBUG] Raw content prop: "${String(content).substring(0,50)}", type: ${typeof content}`);
+
+    if (typeof content !== 'string' || !content.trim()) { // Ensures content is a non-empty string
+        logger.debug("[VCR] Content is null, undefined, or empty string after trim. Returning null.");
         return null;
     }
+    
+    // At this point, `content` is guaranteed to be a non-empty string.
+    // `String(content)` is redundant but harmless.
+    // `content.trim()` is safe.
+
     try {
-      const preprocessedContent = preprocessIconSyntax(String(content));
+      // `content` is already confirmed to be a string here.
+      const preprocessedContent = preprocessIconSyntax(content); // Pass the string directly
+      logger.debug(`[VCR TRIM_DEBUG] Content for parse(): "${preprocessedContent.substring(0,50)}"`);
       const parsedContent = parse(preprocessedContent, simplifiedParserOptions); 
       
       if (className) {
