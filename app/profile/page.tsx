@@ -69,7 +69,7 @@ const getAchievementIconComponent = (iconName: string | undefined): React.ReactN
 
 export default function ProfilePage() {
   const appContext = useAppContext();
-  const { user: telegramUser, dbUser, isLoading: appLoading, isAuthenticating } = appContext; 
+  const { user: telegramUser, dbUser, isLoading: appLoading, isAuthenticating, error: appContextError } = appContext; 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPerksModalOpen, setIsPerksModalOpen] = useState(false);
   const [isAchievementsModalOpen, setIsAchievementsModalOpen] = useState(false);
@@ -83,22 +83,39 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const loadProfile = async () => {
-      logger.log(`[ProfilePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticating: ${isAuthenticating}, dbUser.user_id: ${dbUser?.user_id}`);
+      logger.log(`[ProfilePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticating: ${isAuthenticating}, dbUser.user_id: ${dbUser?.user_id}, appContextError: ${appContextError?.message}`);
+      
       if (appLoading || isAuthenticating) {
         logger.log(`[ProfilePage] AppContext is still loading or authenticating. Waiting to fetch profile.`);
-        setProfileLoading(true);
+        setProfileLoading(true); // Keep loading true if context is not ready
         return;
       }
 
-      if (dbUser?.user_id) { // Changed from dbUser?.id to dbUser?.user_id
-        setProfileLoading(true);
-        logger.log(`[ProfilePage] Context fully loaded and authenticated, dbUser.user_id available. Fetching profile for user ${dbUser.user_id}`);
-        const result = await fetchUserCyberFitnessProfile(dbUser.user_id); // Changed from dbUser.id
+      // If there's an error in AppContext after auth attempt, show guest/error state
+      if (appContextError) {
+          logger.error(`[ProfilePage] Error from AppContext: ${appContextError.message}. Displaying guest profile / error state.`);
+          setCyberProfile({ 
+            level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 System Error", 
+            focusTimeHours: 0, skillsLeveled: 0, lastActivityTimestamp: new Date(0).toISOString(),
+            unlockedPerks: [], activeQuests: [], achievements: [],
+            dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0,
+            totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0,
+            featuresUsed: {}
+          });
+          setProfileLoading(false);
+          return;
+      }
+
+      // Context is loaded and authenticated (or mock user is set up)
+      if (dbUser?.user_id) { 
+        setProfileLoading(true); // Set loading true before async fetch
+        logger.log(`[ProfilePage] Context fully loaded and authenticated (dbUser.user_id: ${dbUser.user_id}). Fetching CyberFitness profile...`);
+        const result = await fetchUserCyberFitnessProfile(dbUser.user_id); 
         if (result.success && result.data) {
           setCyberProfile(result.data);
-          logger.log("[ProfilePage] CyberFitness profile loaded:", result.data);
+          logger.log("[ProfilePage] CyberFitness profile loaded successfully:", result.data);
         } else {
-          logger.warn(`[ProfilePage] Failed to load CyberFitness profile for ${dbUser.user_id}. Error: ${result.error}. Initializing default.`);
+          logger.warn(`[ProfilePage] Failed to load CyberFitness profile for ${dbUser.user_id}. Error: ${result.error}. Initializing default profile state.`);
           setCyberProfile({ 
             level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Alpha Error", 
             focusTimeHours: 0, skillsLeveled: 0, lastActivityTimestamp: new Date(0).toISOString(),
@@ -108,9 +125,11 @@ export default function ProfilePage() {
             featuresUsed: {}
           });
         }
-        setProfileLoading(false);
+        setProfileLoading(false); // Set loading false after fetch attempt
       } else { 
-        logger.log(`[ProfilePage] Context loaded, auth complete, but no dbUser.user_id. Using guest profile.`);
+        // This case means appLoading and isAuthenticating are false, no appContextError, but dbUser.user_id is still not available.
+        // This implies MOCK_USER might be disabled and real auth didn't yield a dbUser (e.g., if initData was missing or validation failed and error wasn't propagated correctly)
+        logger.log(`[ProfilePage] Context loaded, auth attempt complete, but no dbUser.user_id. Likely unauthenticated or MOCK_USER disabled & no TG data. Using guest profile.`);
         setCyberProfile({ 
             level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Guest Mode", 
             focusTimeHours: 0, skillsLeveled: 0, lastActivityTimestamp: new Date(0).toISOString(),
@@ -119,16 +138,16 @@ export default function ProfilePage() {
             totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0,
             featuresUsed: {}
         });
-        setProfileLoading(false);
+        setProfileLoading(false); // Done "loading" into guest state
       }
     };
 
     loadProfile();
-  }, [dbUser, appLoading, isAuthenticating]); 
+  }, [dbUser, appLoading, isAuthenticating, appContextError]); // Added appContextError to deps
 
   const isLoadingDisplay = appLoading || isAuthenticating || profileLoading;
 
-  if (isLoadingDisplay && !cyberProfile) { // Added !cyberProfile to ensure loader shows until profile state is set
+  if (isLoadingDisplay && !cyberProfile) { 
     return (
       <div className="min-h-screen bg-dark-bg flex flex-col items-center justify-center p-4 text-center">
         <FaSpinner className="text-5xl text-brand-cyan animate-spin mb-6" />
@@ -139,7 +158,6 @@ export default function ProfilePage() {
     );
   }
 
-  // Use a default profile if cyberProfile is null after loading attempts to prevent errors
   const safeCyberProfile = cyberProfile ?? { 
       level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Error/Guest", 
       focusTimeHours: 0, skillsLeveled: 0, lastActivityTimestamp: new Date(0).toISOString(),
@@ -202,8 +220,8 @@ export default function ProfilePage() {
               <Image
                 src={avatarUrl}
                 alt={`${userName}'s Cybernetic Avatar`}
-                fill // Changed from layout="fill"
-                style={{objectFit:"cover"}} // Added objectFit
+                fill 
+                style={{objectFit:"cover"}} 
                 className="transform hover:scale-110 transition-transform duration-300"
                 priority
               />
@@ -248,7 +266,7 @@ export default function ProfilePage() {
                             <RechartsTooltip
                                 cursor={{ fill: 'hsla(var(--brand-purple), 0.1)' }}
                                 contentStyle={{
-                                    backgroundColor: 'rgba(13, 2, 33, 0.85)', // Using explicit RGB for dark background
+                                    backgroundColor: 'rgba(13, 2, 33, 0.85)', 
                                     borderColor: 'hsl(var(--brand-purple))',
                                     borderRadius: '0.5rem',
                                     color: 'hsl(var(--light-text))',
