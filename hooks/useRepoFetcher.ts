@@ -3,6 +3,7 @@ import { debugLogger as logger } from '@/lib/debugLogger';
 import type { FileNode, ImageReplaceTask, FetchStatus, ImportCategory, SimplePullRequest, TargetPrData } from '@/contexts/RepoXmlPageContext';
 import { useRepoXmlPageContext } from '@/contexts/RepoXmlPageContext';
 import { fetchRepoContents as fetchRepoContentsAction } from '@/app/actions_github/actions'; 
+import * as repoUtils from "@/lib/repoUtils"; // Для вычисления highlights
 
 interface RepoContentResult {
     files: FileNode[];
@@ -35,7 +36,8 @@ export const useRepoFetcher = (
         repoUrl: contextRepoUrl, 
         githubToken, 
         imageReplaceTask, 
-        highlightedPathFromUrl, 
+        highlightedPathFromUrl, // Используем для вычисления primaryHighlight
+        // importantFiles, // importantFiles теперь используется в useFileSelection, а не здесь
         loadingPrs, 
         assistantLoading, 
         isParsing, 
@@ -103,7 +105,7 @@ export const useRepoFetcher = (
         branchNameToFetchOverride?: string | null
     ): Promise<void> => { 
         const currentRepoUrlToFetch = repoUrl; 
-        logger.info(`[useRepoFetcher handleFetchManual] Called. Repo URL: ${currentRepoUrlToFetch}, Branch Override: ${branchNameToFetchOverride ?? 'N/A'}, Current Hook Branch: ${currentBranchName}, isRetry: ${isRetry}, Token provided (first 5 chars): ${githubToken ? githubToken.substring(0, 5) + '...' : 'No token'}`);
+        logger.info(`[useRepoFetcher handleFetchManual] Called. Repo URL: ${currentRepoUrlToFetch}, Branch Override: ${branchNameToFetchOverride ?? 'N/A'}, Current Hook Branch: ${currentBranchName}, isRetry: ${isRetry}, Token provided: ${!!githubToken}`);
 
         if (isFetchingRef.current && !isRetry) {
             logger.warn("[useRepoFetcher handleFetchManual] Fetch already in progress. Skipping.");
@@ -132,34 +134,56 @@ export const useRepoFetcher = (
             const actionResult = await fetchRepoContentsAction(
                 currentRepoUrlToFetch,
                 branchForFetch,
-                githubToken || undefined, // customToken (was previously the progress callback placeholder)
-                activeImageTaskRef.current // imageTask
+                githubToken || undefined, 
+                activeImageTaskRef.current
             );
 
             stopProgressSimulation(); 
 
-            if (actionResult.success && actionResult.data) {
-                logger.info(`[useRepoFetcher handleFetchManual] Fetch successful. Files: ${actionResult.data.length}`);
-                setFilesLocal(actionResult.data);
+            if (actionResult.success && Array.isArray(actionResult.files)) { // Убедимся что files это массив
+                const fetchedFilesData = actionResult.files;
+                logger.info(`[useRepoFetcher handleFetchManual] Fetch successful. Files: ${fetchedFilesData.length}`);
+                setFilesLocal(fetchedFilesData);
                 setProgressLocal(100); 
-                const primaryHighlightToUse = highlightedPathFromUrl || actionResult.primaryHighlightedPath || null;
+
+                let primaryHighlight: string | null = null;
+                let secondaryHighlights: Record<ImportCategory, string[]> = { component: [], context: [], hook: [], lib: [], other: [] };
+
+                if (highlightedPathFromUrl && fetchedFilesData.length > 0) {
+                    const allPaths = fetchedFilesData.map(f => f.path);
+                    // Логика определения primaryHighlightPath (упрощенная, т.к. getPageFilePath нет)
+                    // Предполагаем, что highlightedPathFromUrl - это уже относительный путь в репо
+                    if (allPaths.includes(highlightedPathFromUrl)) {
+                        primaryHighlight = highlightedPathFromUrl;
+                        const primaryFileNode = fetchedFilesData.find(f => f.path === primaryHighlight);
+                        if (primaryFileNode?.content) {
+                            // Тут должна быть логика извлечения импортов и их резолва, как в useFileSelection или RepoTxtFetcher
+                            // Для примера, пока оставим пустыми
+                            // const imports = repoUtils.extractImports(primaryFileNode.content);
+                            // secondaryHighlights = ...
+                        }
+                    }
+                }
                 
                 onSetFilesFetched( 
                     true, 
-                    actionResult.data, 
-                    primaryHighlightToUse, 
-                    actionResult.secondaryHighlightedPaths ?? { component: [], context: [], hook: [], lib: [], other: [] }
+                    fetchedFilesData, 
+                    primaryHighlight, 
+                    secondaryHighlights
                 );
                 setRetryCount(0); 
-                setErrorLocal(null);
+                setErrorLocal(null); // Сбрасываем локальную ошибку при успехе
             } else {
-                throw new Error(actionResult.error || "Unknown error fetching repository contents from action.");
+                // Если actionResult.success === false или actionResult.files не массив
+                const errorMsg = actionResult.error || "Unknown error: Fetched data is not in expected format.";
+                logger.error(`[useRepoFetcher handleFetchManual] Fetch action failed or returned invalid data. Error: ${errorMsg}`);
+                throw new Error(errorMsg);
             }
         } catch (e: any) {
             stopProgressSimulation(); 
-            logger.error("[useRepoFetcher handleFetchManual] Fetch error:", e);
-            const errorMessage = e.message || "Неизвестная ошибка при загрузке файлов.";
-            setErrorLocal(errorMessage);
+            logger.error("[useRepoFetcher handleFetchManual] Catch block error:", e);
+            const errorMessage = e.message || "Неизвестная ошибка при обработке ответа сервера.";
+            setErrorLocal(errorMessage); // Устанавливаем локальную ошибку
             setFilesLocal([]);
             setProgressLocal(0); 
 
@@ -167,10 +191,11 @@ export const useRepoFetcher = (
 
             if (isRetry && retryCount >= MAX_RETRIES - 1) {
                 logger.warn(`[useRepoFetcher handleFetchManual] Max retries (${MAX_RETRIES}) reached for ${currentRepoUrlToFetch}.`);
-                addToast(errorMessage + ` (Попытка ${retryCount + 1}/${MAX_RETRIES})`, "error"); 
+                addToast(errorMessage + ` (Достигнуто макс. попыток: ${MAX_RETRIES})`, "error"); 
                 setFetchStatus('failed_retries'); 
             } else {
                  addToast(errorMessage + (isRetry ? ` (Попытка ${retryCount +1}/${MAX_RETRIES})` : ` (Попытка 1/${MAX_RETRIES})`), "error");
+                 // fetchStatus будет 'error' после вызова onSetFilesFetched(false, ...)
             }
         } finally {
             setLoadingLocal(false); 
@@ -214,7 +239,7 @@ export const useRepoFetcher = (
         setRepoUrl: setRepoUrlLocal, 
         files: files, 
         loading: uiIsLoading, 
-        error: errorLocal, 
+        error: errorLocal, // Возвращаем локальную ошибку для отображения в RepoTxtFetcher
         progress: progressLocal, 
         isFetchDisabled: derivedIsFetchDisabled, 
         retryCount: retryCount, 
