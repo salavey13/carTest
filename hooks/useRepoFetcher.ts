@@ -33,6 +33,7 @@ export const useRepoFetcher = (
         setRetryCount, 
         setFetchStatus, 
         repoUrl: contextRepoUrl, 
+        githubToken, // <<< Получаем githubToken из контекста
         imageReplaceTask, 
         highlightedPathFromUrl, 
         loadingPrs, 
@@ -51,7 +52,7 @@ export const useRepoFetcher = (
     
     const isFetchingRef = useRef(false);
     const activeImageTaskRef = useRef(imageReplaceTask);
-    const progressIntervalRef = useRef<NodeJS.Timeout | null>(null); // For simulation
+    const progressIntervalRef = useRef<NodeJS.Timeout | null>(null); 
 
     useEffect(() => {
         if (initialRepoUrl !== repoUrl) {
@@ -82,27 +83,26 @@ export const useRepoFetcher = (
     const startProgressSimulation = useCallback((estimatedDurationSeconds = 10) => {
         stopProgressSimulation();
         setProgressLocal(0);
-        const ticks = estimatedDurationSeconds * 5; // 5 ticks per second
+        const ticks = estimatedDurationSeconds * 5; 
         const increment = ticks > 0 ? 100 / ticks : 100;
         
         progressIntervalRef.current = setInterval(() => {
             setProgressLocal(prev => {
                 const nextProgress = prev + increment;
-                if (nextProgress >= 95) { // Stop just before 100%
+                if (nextProgress >= 95) { 
                     stopProgressSimulation();
                     return 95;
                 }
                 return nextProgress;
             });
-        }, 200); // Update every 200ms
+        }, 200); 
     }, [stopProgressSimulation]);
-
 
     const handleFetchManual = useCallback(async (
         isRetry: boolean = false,
         branchNameToFetchOverride?: string | null
     ): Promise<void> => { 
-        logger.info(`[useRepoFetcher handleFetchManual] Called. Local Repo: ${repoUrl}, Branch Override: ${branchNameToFetchOverride ?? 'N/A'}, Current Hook Branch: ${currentBranchName}, isRetry: ${isRetry}`);
+        logger.info(`[useRepoFetcher handleFetchManual] Called. Local Repo: ${repoUrl}, Branch Override: ${branchNameToFetchOverride ?? 'N/A'}, Current Hook Branch: ${currentBranchName}, isRetry: ${isRetry}, Token provided: ${!!githubToken}`);
 
         if (isFetchingRef.current && !isRetry) {
             logger.warn("[useRepoFetcher handleFetchManual] Fetch already in progress. Skipping.");
@@ -122,7 +122,7 @@ export const useRepoFetcher = (
         setLoadingLocal(true); 
         setErrorLocal(null);
         setFetchStatus(isRetry ? 'retrying' : 'loading'); 
-        startProgressSimulation(); // Start simulation
+        startProgressSimulation(); 
 
         const branchForFetch = branchNameToFetchOverride ?? currentBranchName;
         logger.debug(`[useRepoFetcher handleFetchManual] Effective branch for server action: ${branchForFetch}`);
@@ -131,17 +131,17 @@ export const useRepoFetcher = (
             const actionResult = await fetchRepoContentsAction(
                 repoUrl,
                 branchForFetch,
-                // REMOVED progress callback: (p: number) => setProgressLocal(p),
-                undefined, // Placeholder for the removed progress callback
+                undefined, 
+                githubToken || undefined, // <<< Передаем токен из контекста
                 activeImageTaskRef.current
             );
 
-            stopProgressSimulation(); // Stop simulation on result
+            stopProgressSimulation(); 
 
             if (actionResult.success && actionResult.data) {
                 logger.info(`[useRepoFetcher handleFetchManual] Fetch successful. Files: ${actionResult.data.length}`);
                 setFilesLocal(actionResult.data);
-                setProgressLocal(100); // Set to 100% on success
+                setProgressLocal(100); 
                 const primaryHighlightToUse = highlightedPathFromUrl || actionResult.primaryHighlightedPath || null;
                 
                 onSetFilesFetched( 
@@ -156,35 +156,33 @@ export const useRepoFetcher = (
                 throw new Error(actionResult.error || "Unknown error fetching repository contents from action.");
             }
         } catch (e: any) {
-            stopProgressSimulation(); // Stop simulation on error
+            stopProgressSimulation(); 
             logger.error("[useRepoFetcher handleFetchManual] Fetch error:", e);
             const errorMessage = e.message || "Неизвестная ошибка при загрузке файлов.";
             setErrorLocal(errorMessage);
             setFilesLocal([]);
-            setProgressLocal(0); // Reset progress on error
+            setProgressLocal(0); 
 
             onSetFilesFetched(false, [], null, { component: [], context: [], hook: [], lib: [], other: [] });
 
             if (isRetry && retryCount >= MAX_RETRIES - 1) {
                 logger.warn(`[useRepoFetcher handleFetchManual] Max retries (${MAX_RETRIES}) reached for ${repoUrl}.`);
-                addToast(errorMessage + ` (Попытка ${retryCount + 1}/${MAX_RETRIES})`, "error"); // Show error with retry count
+                addToast(errorMessage + ` (Попытка ${retryCount + 1}/${MAX_RETRIES})`, "error"); 
                 setFetchStatus('failed_retries'); 
             } else {
-                // For initial failure or non-max retry, onSetFilesFetched will set status to 'error'
-                // which then triggers the auto-retry effect.
                  addToast(errorMessage + (isRetry ? ` (Попытка ${retryCount +1}/${MAX_RETRIES})` : ` (Попытка 1/${MAX_RETRIES})`), "error");
             }
         } finally {
             setLoadingLocal(false); 
             isFetchingRef.current = false;
-            // Ensure progress is 100 on success or 0 on final failure
-            if (fetchStatusFromContext === 'success') setProgressLocal(100);
-            else if (fetchStatusFromContext === 'failed_retries' || (fetchStatusFromContext === 'error' && retryCount >= MAX_RETRIES -1)) setProgressLocal(0);
+            const currentContextStatus = fetchStatusFromContext; 
+            if (currentContextStatus === 'success') setProgressLocal(100);
+            else if (currentContextStatus === 'failed_retries' || (currentContextStatus === 'error' && retryCount >= MAX_RETRIES -1)) setProgressLocal(0);
 
-            logger.info(`[useRepoFetcher handleFetchManual] Finished. Current localLoading: ${loadingLocal}, Context FetchStatus (after onSetFilesFetched likely updated it): ${fetchStatusFromContext}`);
+            logger.info(`[useRepoFetcher handleFetchManual] Finished. Current localLoading: ${loadingLocal}, Context FetchStatus (at finally): ${currentContextStatus}`);
         }
     }, [
-        repoUrl, currentBranchName, addToast, onSetFilesFetched, setFetchStatus, 
+        repoUrl, currentBranchName, githubToken, addToast, onSetFilesFetched, setFetchStatus, 
         retryCount, setRetryCount, highlightedPathFromUrl, logger, startProgressSimulation, stopProgressSimulation 
     ]);
 
@@ -192,7 +190,7 @@ export const useRepoFetcher = (
         if (fetchStatusFromContext === 'error' && retryCount < MAX_RETRIES && !isFetchingRef.current && !loadingLocal) { 
             const timeoutId = setTimeout(() => {
                 logger.info(`[useRepoFetcher AutoRetry Effect] Retrying fetch (${retryCount + 1}/${MAX_RETRIES}). Current Branch: ${currentBranchName}`);
-                setRetryCount(prev => prev + 1); // Increment retry count before calling
+                setRetryCount(prev => prev + 1);
                 handleFetchManual(true, currentBranchName) 
                     .catch(e => logger.error("[useRepoFetcher AutoRetry Effect] Error in scheduled retry:", e));
             }, RETRY_DELAY_MS);
@@ -201,7 +199,6 @@ export const useRepoFetcher = (
     }, [fetchStatusFromContext, retryCount, handleFetchManual, currentBranchName, loadingLocal, setRetryCount, logger]); 
     
     useEffect(() => {
-        // Cleanup interval on unmount
         return () => {
             stopProgressSimulation();
         };
