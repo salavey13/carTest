@@ -61,7 +61,7 @@ interface RepoXmlPageContextType {
     targetPrData: TargetPrData | null;
     pendingFlowDetails: PendingFlowDetails | null;
     kworkInputValue: string; 
-    maxRetries: number; 
+    maxRetries: number; // Restored type
     retryCount: number; 
     setFetchStatus: React.Dispatch<React.SetStateAction<FetchStatus>>;
     setRepoUrlEntered: React.Dispatch<React.SetStateAction<boolean>>;
@@ -88,7 +88,8 @@ interface RepoXmlPageContextType {
     setPendingFlowDetails: React.Dispatch<React.SetStateAction<PendingFlowDetails | null>>;
     setShowComponents: React.Dispatch<React.SetStateAction<boolean>>;
     setKworkInputValue: (value: string | undefined | null | ((prevState: string) => string | undefined | null)) => void; 
-    setRetryCount: React.Dispatch<React.SetStateAction<number>>; 
+    setRetryCount: React.Dispatch<React.SetStateAction<number>>;
+    setMaxRetries: React.Dispatch<React.SetStateAction<number>>; // Added setter for maxRetries
     triggerToggleSettingsModal: () => void;
     triggerPreCheckAndFetch: (repoUrlToCheck: string, potentialBranchName: string, flowType: 'ImageSwap' | 'ErrorFix', flowDetails: any, targetPath: string) => Promise<void>;
     triggerFetch: (isRetry?: boolean, branch?: string | null) => Promise<void>;
@@ -117,9 +118,9 @@ interface RepoXmlPageContextType {
 }
 
 const defaultContextValue: Partial<RepoXmlPageContextType> = {
-    fetchStatus: 'idle', repoUrlEntered: false, filesFetched: false, selectedFetcherFiles: new Set(), kworkInputHasContent: false, requestCopied: false, aiResponseHasContent: false, filesParsed: false, selectedAssistantFiles: new Set(), assistantLoading: false, aiActionLoading: false, loadingPrs: false, targetBranchName: null, manualBranchName: '', openPrs: [], isSettingsModalOpen: false, isParsing: false, currentAiRequestId: null, imageReplaceTask: null, allFetchedFiles: [], currentStep: 'idle', repoUrl: "https://github.com/salavey13/cartest", primaryHighlightedPath: null, secondaryHighlightedPaths: { component: [], context: [], hook: [], lib: [], other: [] }, targetPrData: null, isPreChecking: false, pendingFlowDetails: null, showComponents: true,
+    fetchStatus: 'idle', repoUrlEntered: false, filesFetched: false, selectedFetcherFiles: new Set(), kworkInputHasContent: false, requestCopied: false, aiResponseHasContent: false, filesParsed: false, selectedAssistantFiles: new Set(), assistantLoading: false, aiActionLoading: false, loadingPrs: false, targetBranchName: null, manualBranchName: '', openPrs: [], isSettingsModalOpen: false, isParsing: false, currentAiRequestId: null, imageReplaceTask: null, allFetchedFiles: [], currentStep: 'idle', repoUrl: "https://github.com/salavey13/carTest", primaryHighlightedPath: null, secondaryHighlightedPaths: { component: [], context: [], hook: [], lib: [], other: [] }, targetPrData: null, isPreChecking: false, pendingFlowDetails: null, showComponents: true,
     kworkInputValue: '',
-    maxRetries: 2, 
+    maxRetries: 2, // Default value
     retryCount: 0,  
     setFetchStatus: () => { logger.warn("setFetchStatus called on default context value"); },
     setRepoUrlEntered: () => { logger.warn("setRepoUrlEntered called on default context value"); },
@@ -147,6 +148,7 @@ const defaultContextValue: Partial<RepoXmlPageContextType> = {
     setShowComponents: () => { logger.warn("setShowComponents called on default context value"); },
     setKworkInputValue: () => { logger.warn("setKworkInputValue called on default context value"); },
     setRetryCount: () => { logger.warn("setRetryCount called on default context value"); },
+    setMaxRetries: () => { logger.warn("setMaxRetries called on default context value"); },
     triggerToggleSettingsModal: () => { logger.warn("triggerToggleSettingsModal called on default context value"); },
     triggerPreCheckAndFetch: async () => { logger.warn("triggerPreCheckAndFetch called on default context value"); },
     triggerFetch: async () => { logger.warn("triggerFetch called on default context value"); },
@@ -206,7 +208,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const [pendingFlowDetailsState, setPendingFlowDetailsState] = useState<PendingFlowDetails | null>(null);
         const [showComponentsState, setShowComponentsState] = useState<boolean>(true);
         const [retryCountState, setRetryCountState] = useState<number>(0); 
-        const [maxRetriesState, _setMaxRetriesState_IGNORED] = useState<number>(2); 
+        const [maxRetriesState, setMaxRetriesState] = useState<number>(2); // Initialized to 2
         
         const { dbUser } = useAppContext(); 
 
@@ -236,14 +238,9 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             setKworkInputValueState(prev => {
                 const determinedValue = typeof value === 'function' ? value(prev) : value;
                 logger.debug(`[TRIM_DEBUG Context] setKworkInputValueStateStable - determinedValue: "${String(determinedValue).substring(0,50)}", type: ${typeof determinedValue}`);
-                // Original "OLD" logic: if determinedValue is actual null, finalValue becomes "". If string "null", finalValue remains string "null".
                 const finalValue = typeof determinedValue === 'string' ? determinedValue : ''; 
                 logger.debug(`[TRIM_DEBUG Context] setKworkInputValueStateStable - finalValue for state: "${finalValue.substring(0,50)}" (type: ${typeof finalValue})`);
                 
-                // The .trim() call below is on `finalValue`.
-                // If finalValue is string "null", ("null").trim() is "null", length is 4. hasContent = true.
-                // If finalValue is "", ("").trim() is "", length is 0. hasContent = false.
-                // This is safe.
                 logger.debug(`[TRIM_DEBUG Context] setKworkInputValueStateStable: Value before .trim() for hasContent check. finalValue = "${finalValue}" (type: ${typeof finalValue})`);
                 setKworkInputHasContentStateStable(finalValue.trim().length > 0);
 
@@ -272,6 +269,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const setPendingFlowDetailsStateStable = useCallback((details: PendingFlowDetails | null | ((prevState: PendingFlowDetails | null) => PendingFlowDetails | null)) => setPendingFlowDetailsState(details), []);
         const setShowComponentsStateStable = useCallback((show: boolean | ((prevState: boolean) => boolean)) => setShowComponentsState(show), []);
         const setRetryCountStateStable = useCallback((count: number | ((prevState: number) => number)) => setRetryCountState(count), []); 
+        const setMaxRetriesStateStable = useCallback((count: number | ((prevState: number) => number)) => setMaxRetriesState(count), []); // Added stable setter
 
         useEffect(() => { imageReplaceTaskStateRef.current = imageReplaceTaskState; }, [imageReplaceTaskState]);
         useEffect(() => { pendingFlowDetailsRef.current = pendingFlowDetailsState; }, [pendingFlowDetailsState]);
@@ -589,7 +587,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             fetchStatus: fetchStatusState, repoUrlEntered: repoUrlEnteredState, filesFetched: filesFetchedState, kworkInputHasContent: kworkInputHasContentState, requestCopied: requestCopiedState, aiResponseHasContent: aiResponseHasContentState, filesParsed: filesParsedState, assistantLoading: assistantLoadingState, aiActionLoading: aiActionLoadingState, loadingPrs: loadingPrsState, isSettingsModalOpen: isSettingsModalOpenState, isParsing: isParsingState, isPreChecking: isPreCheckingState, showComponents: showComponentsState, selectedFetcherFiles: selectedFetcherFilesState, selectedAssistantFiles: selectedAssistantFilesState, targetBranchName: targetBranchNameState, manualBranchName: manualBranchNameState, openPrs: openPrsState, currentAiRequestId: currentAiRequestIdState, imageReplaceTask: imageReplaceTaskState, allFetchedFiles: allFetchedFilesState, currentStep, repoUrl: repoUrlState, primaryHighlightedPath: primaryHighlightPathState, secondaryHighlightedPaths: secondaryHighlightPathsState, targetPrData: targetPrDataState, pendingFlowDetails: pendingFlowDetailsState, kworkInputValue: kworkInputValueState,
             maxRetries: maxRetriesState, retryCount: retryCountState, 
             setFetchStatus: setFetchStatusStateStable, setRepoUrlEntered: setRepoUrlEnteredStateStable, handleSetFilesFetched: handleSetFilesFetchedStable, setSelectedFetcherFiles: setSelectedFetcherFilesStateStable, setKworkInputHasContent: setKworkInputHasContentStateStable, setRequestCopied: setRequestCopiedStateStable, setAiResponseHasContent: setAiResponseHasContentStateStable, setFilesParsed: setFilesParsedStateStable, setSelectedAssistantFiles: setSelectedAssistantFilesStateStable, setAssistantLoading: setAssistantLoadingStateStable, setAiActionLoading: setAiActionLoadingStateStable, setLoadingPrs: setLoadingPrsStateStable, setTargetBranchName: setTargetBranchNameStateStable, setManualBranchName: setManualBranchNameStateStable, setOpenPrs: setOpenPrsStateStable, setIsParsing: setIsParsingStateStable, setContextIsParsing: setIsParsingStateStable, setCurrentAiRequestId: setCurrentAiRequestIdStateStable, setImageReplaceTask: setImageReplaceTaskStateStable, setRepoUrl: setRepoUrlStateStable, setTargetPrData: setTargetPrDataStable, setIsPreChecking: setIsPreCheckingStateStable, setPendingFlowDetails: setPendingFlowDetailsStateStable, setShowComponents: setShowComponentsStateStable, setKworkInputValue: setKworkInputValueStateStable,
-            setRetryCount: setRetryCountStateStable, 
+            setRetryCount: setRetryCountStateStable,
+            setMaxRetries: setMaxRetriesStateStable, // Provide setter
             triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR, triggerUpdateBranch: triggerUpdateBranchStable, triggerGetOpenPRs: triggerGetOpenPRsStable, updateRepoUrlInAssistant: updateRepoUrlInAssistantStable, getXuinityMessage: getXuinityMessageStable, scrollToSection: scrollToSectionStable, triggerAddImportantToKwork: triggerAddImportantToKworkStable, triggerAddTreeToKwork: triggerAddTreeToKworkStable, triggerSelectAllFetcherFiles: triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFiles: triggerDeselectAllFetcherFilesStable, triggerClearKworkInput: triggerClearKworkInputStable,
             kworkInputRef, aiResponseInputRef, fetcherRef, assistantRef,
             addToast: addToastStable,
@@ -597,7 +596,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, isPreCheckingState, showComponentsState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, secondaryHighlightPathsState, targetPrDataState, pendingFlowDetailsState, kworkInputValueState,
             maxRetriesState, retryCountState, 
             setFetchStatusStateStable, setRepoUrlEnteredStateStable, handleSetFilesFetchedStable, setSelectedFetcherFilesStateStable, setKworkInputHasContentStateStable, setRequestCopiedStateStable, setAiResponseHasContentStateStable, setFilesParsedStateStable, setSelectedAssistantFilesStateStable, setAssistantLoadingStateStable, setAiActionLoadingStateStable, setLoadingPrsStateStable, setTargetBranchNameStateStable, setManualBranchNameStateStable, setOpenPrsStateStable, setIsParsingStateStable, setCurrentAiRequestIdStateStable, setImageReplaceTaskStateStable, setRepoUrlStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setShowComponentsStateStable, setKworkInputValueStateStable,
-            setRetryCountStateStable, 
+            setRetryCountStateStable, setMaxRetriesStateStable, // Provide setter
             triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR, triggerUpdateBranchStable, triggerGetOpenPRsStable, updateRepoUrlInAssistantStable, getXuinityMessageStable, scrollToSectionStable, triggerAddImportantToKworkStable, triggerAddTreeToKworkStable, triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFilesStable, triggerClearKworkInputStable,
             addToastStable,
         ]);
@@ -614,8 +613,6 @@ export const useRepoXmlPageContext = (): RepoXmlPageContextType => {
     const context = useContext(RepoXmlPageContext);
     if (context === undefined) { logger.fatal("useRepoXmlPageContext used outside RepoXmlPageProvider!"); throw new Error("useRepoXmlPageContext must be used within a RepoXmlPageProvider"); }
     if (context.setKworkInputValue === defaultContextValue.setKworkInputValue && typeof window !== 'undefined') {
-        // This condition might be too sensitive if defaultContextValue.setKworkInputValue is a stable empty function.
-        // Consider checking a more volatile piece of state if this logs too often during normal init.
         // logger.warn("useRepoXmlPageContext: Context might be the default value (check provider setup).");
     }
     return context as RepoXmlPageContextType;
