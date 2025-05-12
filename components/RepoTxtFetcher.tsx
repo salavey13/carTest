@@ -59,8 +59,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         currentAiRequestId, imageReplaceTask, allFetchedFiles, assistantRef, 
         updateRepoUrlInAssistant, handleSetFilesFetched, setTargetPrData, setSelectedFetcherFiles, 
         setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, 
-        setContextIsParsing, pendingFlowDetails, setPrimaryHighlightedPath,
-        maxRetries, retryCount 
+        setContextIsParsing, pendingFlowDetails, primaryHighlightedPath, // Use primaryHighlightedPath from context
+        secondaryHighlightedPaths, // Use secondaryHighlightedPaths from context
+        maxRetries, retryCount // No longer using context maxRetries here, hook has its own
     } = useRepoXmlPageContext();
     const { error: toastError, info: toastInfo } = useAppToast();
     logger.debug("[RepoTxtFetcher] After context destructuring");
@@ -96,23 +97,23 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     logger.debug("[RepoTxtFetcher] Before useRepoFetcher Hook");
     const repoFetcher = useRepoFetcher(
         repoUrl, 
-        // setFetchStatus, // Removed, now from context
-        handleSetFilesFetched, // This is the callback that context provides, which includes setting fetchStatus
+        handleSetFilesFetched, 
         addToastContext, 
         targetBranchName, 
         manualBranchName, 
-        // setTargetBranchName, // Removed, context handles this
-        // setTargetPrData, // Removed, context handles this
-        fetchStatus // Pass context's fetchStatus to the hook
+        fetchStatus 
     );
     const { 
         files: fetchedFiles, progress, error: fetchErrorHook, 
-        // primaryHighlightedPath: primaryHighlightedPathFromHook, // This will come from context now
-        // secondaryHighlightedPaths: secondaryHighlightedPathsFromHook, // This will come from context now
         handleFetchManual, isLoading: isFetchLoading, isFetchDisabled,
+        // primaryHighlightedPath and secondaryHighlightedPaths are now directly from context
+        // maxRetries: hookMaxRetries // maxRetries now internal to useRepoFetcher
+        // retryCount: hookRetryCount // retryCount from context
     } = repoFetcher;
-    const primaryHighlightedPathFromHook = useRepoXmlPageContext().primaryHighlightedPath; // Get from context
-    const secondaryHighlightedPathsFromHook = useRepoXmlPageContext().secondaryHighlightedPaths; // Get from context
+    const primaryHighlightedPathFromHook = primaryHighlightedPath; // Using context value
+    const secondaryHighlightedPathsFromHook = secondaryHighlightedPaths; // Using context value
+    const hookMaxRetries = repoFetcher.maxRetries; // Get from hook return if needed for display
+    
     logger.debug("[RepoTxtFetcher] After useRepoFetcher Hook");
 
     logger.debug("[RepoTxtFetcher] Before useFileSelection Hook");
@@ -259,7 +260,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              handleClearAll(); 
         },
         getKworkInputValue: () => {
-             const val = kworkInputValue ?? ''; // Ensure string
+             const val = kworkInputValue ?? ''; 
              logger.debug(`[Imperative TRIM_DEBUG] getKworkInputValue called, returning context value (ensured string): "${val.substring(0,50)}"`);
              return val; 
         },
@@ -325,9 +326,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const isActionDisabled = isFetchLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing || !!currentImageTask;
     
     logger.debug(`[TRIM_DEBUG RepoTxtFetcher Render] Before kworkValueForCheck: kworkInputValue type: ${typeof kworkInputValue}, value: "${String(kworkInputValue).substring(0,50)}"`);
-    const kworkValueForCheck = kworkInputValue ?? ''; // Ensure string before .trim()
+    const kworkValueForCheck = kworkInputValue ?? ''; 
     logger.debug(`[TRIM_DEBUG RepoTxtFetcher Render] Before hasContent: kworkValueForCheck type: ${typeof kworkValueForCheck}, value: "${kworkValueForCheck.substring(0,50)}"`);
-    // Ensure .trim() is called on a string. If kworkInputValue is null/undefined, kworkValueForCheck is '', so "".trim() is safe.
     const hasContent = kworkValueForCheck.trim().length > 0;
     
     const isCopyDisabled = !hasContent || isActionDisabled;
@@ -414,7 +414,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              {showProgressBar && (
                   <div className="mb-4 min-h-[40px]">
                       <ProgressBar status={fetchStatus === 'failed_retries' ? 'error' : fetchStatus} progress={progress} />
-                      {isFetchLoading && <p className="text-cyan-300 text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? `(Попытка ${retryCount + 1}/${maxRetries})` : ''}</p>}
+                      {isFetchLoading && <p className="text-cyan-300 text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? `(Попытка ${retryCount + 1}/${hookMaxRetries})` : ''}</p>}
                       {isParsing && !currentImageTask && <p className="text-yellow-400 text-xs font-mono mt-1 text-center animate-pulse">Разбор ответа AI...</p>}
                       {fetchStatus === 'success' && !currentImageTask && fetchedFiles.length > 0 && (
                          <div className="text-center text-xs font-mono mt-1 text-green-400 flex items-center justify-center gap-1">
@@ -434,8 +434,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                         {(fetchStatus === 'error' || fetchStatus === 'failed_retries') && fetchErrorHook && ( 
                            <div className="text-center text-xs font-mono mt-1 text-red-400 flex items-center justify-center gap-1">
                                <FaXmark /> {fetchErrorHook}
-                               {fetchStatus === 'error' && retryCount < maxRetries && ` (Попытка ${retryCount + 1}/${maxRetries})`}
-                               {fetchStatus === 'failed_retries' && ` (Достигнуто макс. попыток: ${maxRetries})`}
+                               {fetchStatus === 'error' && retryCount < hookMaxRetries && ` (Попытка ${retryCount + 1}/${hookMaxRetries})`}
+                               {fetchStatus === 'failed_retries' && ` (Достигнуто макс. попыток: ${hookMaxRetries})`}
                            </div>
                         )}
                         {isWaitingForAiResponse && !currentImageTask && (
@@ -479,7 +479,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                           {logger.debug(`[TRIM_DEBUG RepoTxtFetcher Render] Before RequestInput: kworkInputValue type: ${typeof kworkInputValue}, value: "${String(kworkInputValue).substring(0,50)}" `)}
                           <RequestInput
                               kworkInputRef={kworkInputRef} 
-                              kworkInputValue={kworkInputValue ?? ''} // Ensure string
+                              kworkInputValue={kworkInputValue ?? ''} 
                               onValueChange={setKworkInputValue} 
                               onCopyToClipboard={() => { logger.debug("[Input Action] Copy Click"); handleCopyToClipboard(undefined, true); }}
                               onClearAll={() => { logger.debug("[Input Action] Clear Click"); handleClearAll(); }}
