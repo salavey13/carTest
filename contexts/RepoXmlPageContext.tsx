@@ -235,8 +235,12 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             setKworkInputValueState(prev => {
                 const determinedValue = typeof value === 'function' ? value(prev) : value;
                 const finalValue = (typeof determinedValue === 'string' && determinedValue !== 'null') ? determinedValue : '';
+                
+                // [TRIM_DEBUG] Log before potential trim inside setKworkInputHasContentStateStable
+                logger.debug(`[TRIM_DEBUG] Context setKworkInputValueStateStable: Value before setKworkInputHasContentStateStable call. finalValue = "${finalValue}" (type: ${typeof finalValue})`);
+
                 setKworkInputHasContentStateStable(finalValue.trim().length > 0);
-                logger.info(`[Context Setter] kworkInputValue set to: "${finalValue.substring(0, 70)}..." (Original input type: ${typeof value}, determinedValue: ${determinedValue === null ? 'null' : typeof determinedValue === 'undefined' ? 'undefined' : `"${String(determinedValue).substring(0,10)}..."`})`);
+                logger.info(`[Context Setter] kworkInputValue set to: "${finalValue.substring(0, 70)}..." (Original input was: ${value === null ? 'null' : value === undefined ? 'undefined' : typeof value === 'function' ? 'function' : `"${value.substring(0,30)}..."`}, Determined: ${determinedValue === null ? 'null' : typeof determinedValue === 'undefined' ? 'undefined' : `"${String(determinedValue).substring(0,30)}..."`})`);
                 return finalValue;
             });
         }, [setKworkInputHasContentStateStable, logger]);
