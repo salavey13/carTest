@@ -1,7 +1,9 @@
+// /hooks/useRepoFetcher.ts
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { debugLogger as logger } from '@/lib/debugLogger';
-import type { FileNode, ImageReplaceTask, FetchStatus, ImportCategory, SimplePullRequest, TargetPrData } from '@/contexts/RepoXmlPageContext';
-import { fetchRepoContents as fetchRepoContentsAction, checkExistingPrBranch } from '@/app/actions_github/actions'; // Ensure actions are imported
+import type { FileNode, ImageReplaceTask, FetchStatus, ImportCategory, SimplePullRequest, TargetPrData, RepoXmlPageContextType } from '@/contexts/RepoXmlPageContext'; // Import RepoXmlPageContextType
+import { useRepoXmlPageContext } from '@/contexts/RepoXmlPageContext'; // Import context hook
+import { fetchRepoContents as fetchRepoContentsAction, checkExistingPrBranch } from '@/app/actions_github/actions'; 
 
 interface RepoContentResult {
     files: FileNode[];
@@ -10,12 +12,12 @@ interface RepoContentResult {
     error?: string;
 }
 
-const MAX_RETRIES = 2; 
+// const MAX_RETRIES = 2; // Теперь берется из контекста
 const RETRY_DELAY_MS = 3000;
 
 export const useRepoFetcher = (
     initialRepoUrl: string,
-    setFetchStatus: React.Dispatch<React.SetStateAction<FetchStatus>>,
+    // setFetchStatus prop удален, т.к. будет использоваться из контекста
     onSetFilesFetched: (
         fetched: boolean,
         allFiles: FileNode[],
@@ -27,18 +29,23 @@ export const useRepoFetcher = (
     initialManualBranchName: string,
     setTargetBranchNameContext: (name: string | null) => void,
     setTargetPrDataContext: (data: TargetPrData | null) => void,
-    // Добавляем fetchStatus как проп, чтобы обеспечить его доступность
-    fetchStatusFromContext: FetchStatus 
-
+    fetchStatusFromContext: FetchStatus // Передаем напрямую для использования
 ) => {
     logger.debug("[useRepoFetcher] Hook START");
+    const { 
+        maxRetries, 
+        retryCount, 
+        setRetryCount, 
+        setFetchStatus // Получаем setFetchStatus из контекста
+    } = useRepoXmlPageContext(); 
+
     const [repoUrl, setRepoUrl] = useState(initialRepoUrl);
     const [files, setFiles] = useState<FileNode[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [progress, setProgress] = useState<number>(0);
     const [isFetchDisabled, setIsFetchDisabled] = useState<boolean>(false); 
-    const [retryCount, setRetryCount] = useState<number>(0);
+    // retryCount и maxRetries теперь из контекста
     const isFetchingRef = useRef(false); 
     const isAutoFetchingRef = useRef(false); 
     logger.debug("[useRepoFetcher] Before useState");
@@ -46,16 +53,13 @@ export const useRepoFetcher = (
     const currentBranchName = initialManualBranchName.trim() || initialTargetBranchName || 'default';
     logger.debug("[useRepoFetcher] After useState");
 
-
     useEffect(() => {
         setRepoUrl(initialRepoUrl); 
     }, [initialRepoUrl]);
     logger.debug("[useRepoFetcher] Before useRef");
 
-
     const activeImageTaskRef = useRef<ImageReplaceTask | null>(null);
     logger.debug("[useRepoFetcher] After useRef");
-
 
     const fetchRepoContents = useCallback(async (
         isRetry: boolean = false,
@@ -63,10 +67,8 @@ export const useRepoFetcher = (
         imageTask?: ImageReplaceTask | null,
         pathForInitialSelection?: string | null
     ): Promise<RepoContentResult> => {
-        // Используем fetchStatusFromContext, переданный как проп
         const currentContextFetchStatus = fetchStatusFromContext; 
         logger.info(`[useRepoFetcher fetchRepoContents] Called. Repo: ${repoUrl}, Branch: ${branch ?? currentBranchName}, ImageTask: ${!!imageTask}, PathForInitial: ${pathForInitialSelection}, ContextFetchStatus at call: ${currentContextFetchStatus}`);
-
 
         if (isFetchingRef.current && !isRetry) {
             logger.warn("[useRepoFetcher fetchRepoContents] Fetch already in progress. Skipping.");
@@ -77,7 +79,7 @@ export const useRepoFetcher = (
         setLoading(true);
         setError(null);
         setProgress(0);
-        setFetchStatus(isRetry ? 'retrying' : 'loading');
+        setFetchStatus(isRetry ? 'retrying' : 'loading'); // Используем setFetchStatus из контекста
         activeImageTaskRef.current = imageTask || null; 
 
         const branchForFetch = branch || currentBranchName;
@@ -104,9 +106,9 @@ export const useRepoFetcher = (
                     secondaryHighlightedPaths: actionResult.secondaryHighlightedPaths ?? { component: [], context: [], hook: [], lib: [], other: [] },
                 };
                 onSetFilesFetched(true, result.files, result.primaryHighlightedPath, result.secondaryHighlightedPaths);
-                setFetchStatus('success');
+                setFetchStatus('success'); // Используем setFetchStatus из контекста
                 currentFetchOpStatus = 'success';
-                setRetryCount(0); 
+                setRetryCount(0); // Используем setRetryCount из контекста
                 setError(null); 
             } else {
                 throw new Error(actionResult.error || "Unknown error fetching repository contents from action.");
@@ -119,13 +121,13 @@ export const useRepoFetcher = (
             setFiles([]);
             onSetFilesFetched(false, [], null, { component: [], context: [], hook: [], lib: [], other: [] });
 
-            if (isRetry && retryCount >= MAX_RETRIES -1) { 
-                logger.warn(`[useRepoFetcher fetchRepoContents] Max retries (${MAX_RETRIES}) reached for ${repoUrl}.`);
-                setFetchStatus('failed_retries');
+            if (isRetry && retryCount >= maxRetries -1) { // Используем maxRetries из контекста
+                logger.warn(`[useRepoFetcher fetchRepoContents] Max retries (${maxRetries}) reached for ${repoUrl}.`);
+                setFetchStatus('failed_retries'); // Используем setFetchStatus из контекста
                 currentFetchOpStatus = 'failed_retries';
                 addToast(`Достигнуто макс. попыток загрузки для ${repoUrl.split('/').pop()}.`, "error");
             } else {
-                setFetchStatus('error'); 
+                setFetchStatus('error');  // Используем setFetchStatus из контекста
                 currentFetchOpStatus = 'error';
             }
         } finally {
@@ -133,32 +135,31 @@ export const useRepoFetcher = (
             isFetchingRef.current = false;
             setProgress(100); 
             activeImageTaskRef.current = null; 
-            // Используем currentContextFetchStatus (значение fetchStatus на момент вызова функции) для лога
             logger.info(`[useRepoFetcher fetchRepoContents] Finished. Operation Status: ${currentFetchOpStatus}. Context FetchStatus at call time: ${currentContextFetchStatus}`);
         }
         return result;
-    }, [repoUrl, onSetFilesFetched, setFetchStatus, addToast, currentBranchName, retryCount, fetchStatusFromContext]); // Добавляем fetchStatusFromContext в зависимости
+    }, [
+        repoUrl, onSetFilesFetched, setFetchStatus, addToast, currentBranchName, retryCount, 
+        fetchStatusFromContext, maxRetries, setRetryCount // Добавляем зависимости из контекста
+    ]);
 
     logger.debug("[useRepoFetcher] Before Callbacks");
 
     useEffect(() => {
-        // Используем fetchStatusFromContext для условия авто-повтора
-        if (fetchStatusFromContext === 'error' && retryCount < MAX_RETRIES && !isFetchingRef.current) { 
+        if (fetchStatusFromContext === 'error' && retryCount < maxRetries && !isFetchingRef.current) { 
             const timeoutId = setTimeout(() => {
-                logger.info(`[useRepoFetcher AutoRetry] Retrying fetch (${retryCount + 1}/${MAX_RETRIES})...`);
-                setRetryCount(prev => prev + 1);
+                logger.info(`[useRepoFetcher AutoRetry] Retrying fetch (${retryCount + 1}/${maxRetries})...`);
+                setRetryCount(prev => prev + 1); // Используем setRetryCount из контекста
                 fetchRepoContents(true, currentBranchName, activeImageTaskRef.current) 
                     .catch(e => logger.error("[useRepoFetcher AutoRetry] Error in scheduled retry:", e));
             }, RETRY_DELAY_MS);
             return () => clearTimeout(timeoutId);
         }
-    }, [fetchStatusFromContext, retryCount, fetchRepoContents, currentBranchName]); // Используем fetchStatusFromContext
+    }, [fetchStatusFromContext, retryCount, maxRetries, fetchRepoContents, currentBranchName, setRetryCount]); // Добавляем зависимости из контекста
     logger.debug("[useRepoFetcher] After Callbacks and Effects");
 
-    // Используем fetchStatusFromContext для derivedIsLoading
     const derivedIsLoading = loading || fetchStatusFromContext === 'loading' || fetchStatusFromContext === 'retrying';
     logger.debug(`[useRepoFetcher Derived State] isLoading=${derivedIsLoading}, isFetchDisabled=${isFetchDisabled}`);
-
 
     logger.debug("[useRepoFetcher] Hook End - Returning values");
     return {
@@ -172,8 +173,8 @@ export const useRepoFetcher = (
         progress,
         isFetchDisabled, 
         setIsFetchDisabled, 
-        retryCount,
-        maxRetries,
+        retryCount, // Возвращаем из контекста
+        maxRetries, // Возвращаем из контекста
         triggerFetch: fetchRepoContents, 
         isFetchingRef, 
         isAutoFetchingRef 
