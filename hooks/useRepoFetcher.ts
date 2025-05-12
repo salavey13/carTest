@@ -36,8 +36,7 @@ export const useRepoFetcher = (
         repoUrl: contextRepoUrl, 
         githubToken, 
         imageReplaceTask, 
-        highlightedPathFromUrl, // Используем для вычисления primaryHighlight
-        // importantFiles, // importantFiles теперь используется в useFileSelection, а не здесь
+        highlightedPathFromUrl, 
         loadingPrs, 
         assistantLoading, 
         isParsing, 
@@ -105,7 +104,7 @@ export const useRepoFetcher = (
         branchNameToFetchOverride?: string | null
     ): Promise<void> => { 
         const currentRepoUrlToFetch = repoUrl; 
-        logger.info(`[useRepoFetcher handleFetchManual] Called. Repo URL: ${currentRepoUrlToFetch}, Branch Override: ${branchNameToFetchOverride ?? 'N/A'}, Current Hook Branch: ${currentBranchName}, isRetry: ${isRetry}, Token provided: ${!!githubToken}`);
+        logger.info(`[useRepoFetcher handleFetchManual] Called. Repo URL: ${currentRepoUrlToFetch}, Branch Override: ${branchNameToFetchOverride ?? 'N/A'}, Current Hook Branch: ${currentBranchName}, isRetry: ${isRetry}, Token provided (first 5 chars): ${githubToken ? githubToken.substring(0, 5) + '...' : 'No token'}`);
 
         if (isFetchingRef.current && !isRetry) {
             logger.warn("[useRepoFetcher handleFetchManual] Fetch already in progress. Skipping.");
@@ -140,7 +139,7 @@ export const useRepoFetcher = (
 
             stopProgressSimulation(); 
 
-            if (actionResult.success && Array.isArray(actionResult.files)) { // Убедимся что files это массив
+            if (actionResult.success && Array.isArray(actionResult.files)) {
                 const fetchedFilesData = actionResult.files;
                 logger.info(`[useRepoFetcher handleFetchManual] Fetch successful. Files: ${fetchedFilesData.length}`);
                 setFilesLocal(fetchedFilesData);
@@ -151,18 +150,18 @@ export const useRepoFetcher = (
 
                 if (highlightedPathFromUrl && fetchedFilesData.length > 0) {
                     const allPaths = fetchedFilesData.map(f => f.path);
-                    // Логика определения primaryHighlightPath (упрощенная, т.к. getPageFilePath нет)
-                    // Предполагаем, что highlightedPathFromUrl - это уже относительный путь в репо
                     if (allPaths.includes(highlightedPathFromUrl)) {
                         primaryHighlight = highlightedPathFromUrl;
-                        const primaryFileNode = fetchedFilesData.find(f => f.path === primaryHighlight);
-                        if (primaryFileNode?.content) {
-                            // Тут должна быть логика извлечения импортов и их резолва, как в useFileSelection или RepoTxtFetcher
-                            // Для примера, пока оставим пустыми
-                            // const imports = repoUtils.extractImports(primaryFileNode.content);
-                            // secondaryHighlights = ...
-                        }
+                        // Логика для secondaryHighlights (если нужна здесь) должна быть добавлена.
+                        // Например, на основе импортов из primaryHighlight файла.
+                        // Для простоты, сейчас оставляем secondaryHighlights пустыми, если они не приходят с сервера.
+                        // Если actionResult возвращает их, можно использовать actionResult.secondaryHighlightedPaths
                     }
+                } else if (actionResult.primaryHighlightedPath) { // Если сервер вернул основной хайлайт
+                    primaryHighlight = actionResult.primaryHighlightedPath;
+                }
+                if (actionResult.secondaryHighlightedPaths) { // Если сервер вернул вторичные хайлайты
+                    secondaryHighlights = actionResult.secondaryHighlightedPaths;
                 }
                 
                 onSetFilesFetched( 
@@ -172,9 +171,8 @@ export const useRepoFetcher = (
                     secondaryHighlights
                 );
                 setRetryCount(0); 
-                setErrorLocal(null); // Сбрасываем локальную ошибку при успехе
+                setErrorLocal(null);
             } else {
-                // Если actionResult.success === false или actionResult.files не массив
                 const errorMsg = actionResult.error || "Unknown error: Fetched data is not in expected format.";
                 logger.error(`[useRepoFetcher handleFetchManual] Fetch action failed or returned invalid data. Error: ${errorMsg}`);
                 throw new Error(errorMsg);
@@ -183,7 +181,7 @@ export const useRepoFetcher = (
             stopProgressSimulation(); 
             logger.error("[useRepoFetcher handleFetchManual] Catch block error:", e);
             const errorMessage = e.message || "Неизвестная ошибка при обработке ответа сервера.";
-            setErrorLocal(errorMessage); // Устанавливаем локальную ошибку
+            setErrorLocal(errorMessage); 
             setFilesLocal([]);
             setProgressLocal(0); 
 
@@ -195,20 +193,24 @@ export const useRepoFetcher = (
                 setFetchStatus('failed_retries'); 
             } else {
                  addToast(errorMessage + (isRetry ? ` (Попытка ${retryCount +1}/${MAX_RETRIES})` : ` (Попытка 1/${MAX_RETRIES})`), "error");
-                 // fetchStatus будет 'error' после вызова onSetFilesFetched(false, ...)
             }
         } finally {
             setLoadingLocal(false); 
             isFetchingRef.current = false;
-            const currentContextStatus = fetchStatusFromContext; 
-            if (currentContextStatus === 'success') setProgressLocal(100);
-            else if (currentContextStatus === 'failed_retries' || (currentContextStatus === 'error' && retryCount >= MAX_RETRIES -1)) setProgressLocal(0);
+            // Используем актуальный fetchStatusFromContext для установки прогресса
+            // Это значение будет обновлено после вызова onSetFilesFetched
+            const finalContextStatus = fetchStatusFromContext; 
+            if (finalContextStatus === 'success') setProgressLocal(100);
+            else if (finalContextStatus === 'failed_retries' || (finalContextStatus === 'error' && retryCount >= MAX_RETRIES -1)) setProgressLocal(0);
+            else if (finalContextStatus === 'loading' || finalContextStatus === 'retrying') { /*Оставить текущий симулированный прогресс*/ }
+            else { setProgressLocal(0); /* Для других состояний, например idle после ошибки */ }
 
-            logger.info(`[useRepoFetcher handleFetchManual] Finished. Current localLoading: ${loadingLocal}, Context FetchStatus (at finally): ${currentContextStatus}`);
+
+            logger.info(`[useRepoFetcher handleFetchManual] Finished. Current localLoading: ${loadingLocal}, Context FetchStatus (at finally): ${finalContextStatus}`);
         }
     }, [
         repoUrl, currentBranchName, githubToken, addToast, onSetFilesFetched, setFetchStatus, 
-        retryCount, setRetryCount, highlightedPathFromUrl, logger, startProgressSimulation, stopProgressSimulation 
+        retryCount, setRetryCount, highlightedPathFromUrl, logger, startProgressSimulation, stopProgressSimulation, fetchStatusFromContext
     ]);
 
     useEffect(() => {
@@ -229,8 +231,8 @@ export const useRepoFetcher = (
         };
     }, [stopProgressSimulation]);
     
-    const uiIsLoading = loadingLocal; 
-    const derivedIsFetchDisabled = loadingLocal || loadingPrs || !contextRepoUrl || assistantLoading || isParsing || aiActionLoading;
+    const uiIsLoading = loadingLocal || fetchStatusFromContext === 'loading' || fetchStatusFromContext === 'retrying'; 
+    const derivedIsFetchDisabled = uiIsLoading || loadingPrs || !contextRepoUrl || assistantLoading || isParsing || aiActionLoading;
 
     logger.debug(`[useRepoFetcher Render] uiIsLoading=${uiIsLoading}, derivedIsFetchDisabled=${derivedIsFetchDisabled}, localLoading=${loadingLocal}, contextFetchStatus=${fetchStatusFromContext}`);
 
@@ -239,7 +241,7 @@ export const useRepoFetcher = (
         setRepoUrl: setRepoUrlLocal, 
         files: files, 
         loading: uiIsLoading, 
-        error: errorLocal, // Возвращаем локальную ошибку для отображения в RepoTxtFetcher
+        error: errorLocal, 
         progress: progressLocal, 
         isFetchDisabled: derivedIsFetchDisabled, 
         retryCount: retryCount, 

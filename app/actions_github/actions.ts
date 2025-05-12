@@ -101,6 +101,7 @@ export async function checkExistingPrBranch(
 }
 
 // --- fetchRepoContents ---
+// Сигнатура соответствует: repoUrl, branchName?, customToken?, imageTask?
 export async function fetchRepoContents(
     repoUrl: string, 
     branchName?: string | null, 
@@ -124,7 +125,7 @@ export async function fetchRepoContents(
     repo = repoInfo.repo;
     console.log(`[Action fetchRepoContents PARSED] Owner: "${owner}", Repo: "${repo}" from URL: "${repoUrl}"`);
 
-    if (!owner || !repo) { // Дополнительная проверка после парсинга
+    if (!owner || !repo) { 
         console.error(`[Action fetchRepoContents] CRITICAL: Owner or Repo is undefined after parsing. Owner: "${owner}", Repo: "${repo}"`);
         throw new Error(`Critical error: Owner or Repo is undefined after parsing URL "${repoUrl}".`);
     }
