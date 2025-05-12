@@ -11,7 +11,7 @@ import {
   FaChevronRight, FaSpinner, 
   FaListCheck, 
   FaShieldHalved, FaStar, FaMedal, FaPaperPlane, FaCodeBranch, FaGithub, FaTree, FaCrosshairs, FaSearchengin, FaRobot, FaVial, FaPlus, FaDownload, FaCode,
-  FaCommentDots, FaGears, FaBroom, FaScroll, FaImages, FaKiwiBird 
+  FaCommentDots, FaGears, FaBroom, FaScroll, FaImages, FaKiwiBird, FaMobileScreenButton
 } from "react-icons/fa6";
 import { useState, useEffect } from "react";
 import Modal from "@/components/ui/Modal";
@@ -62,13 +62,14 @@ const getAchievementIconComponent = (iconName: string | undefined): React.ReactN
         "FaScroll": <FaScroll className="text-yellow-600" />,
         "FaImages": <FaImages className="text-indigo-400" />,
         "FaKiwiBird": <FaKiwiBird className="text-lime-500" />,
+        "FaMobileScreenButton": <FaMobileScreenButton className="text-brand-cyan" />,
     };
     return iconsMap[iconName] || <FaMedal className="text-brand-yellow" />;
 };
 
 export default function ProfilePage() {
   const appContext = useAppContext();
-  const { user: telegramUser, dbUser, isLoading: appLoading, isAuthenticating } = appContext; 
+  const { user: telegramUser, dbUser, isLoading: appLoading, isAuthenticating, error: appContextError } = appContext; 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPerksModalOpen, setIsPerksModalOpen] = useState(false);
   const [isAchievementsModalOpen, setIsAchievementsModalOpen] = useState(false);
@@ -82,51 +83,71 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const loadProfile = async () => {
-      logger.log(`[ProfilePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticating: ${isAuthenticating}, dbUser.id: ${dbUser?.id}`);
+      logger.log(`[ProfilePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticating: ${isAuthenticating}, dbUser.user_id: ${dbUser?.user_id}, appContextError: ${appContextError?.message}`);
+      
       if (appLoading || isAuthenticating) {
         logger.log(`[ProfilePage] AppContext is still loading or authenticating. Waiting to fetch profile.`);
-        setProfileLoading(true);
+        setProfileLoading(true); // Keep loading true if context is not ready
         return;
       }
 
-      if (dbUser?.id) {
-        setProfileLoading(true);
-        logger.log(`[ProfilePage] Context fully loaded and authenticated, dbUser.id available. Fetching profile for user ${dbUser.id}`);
-        const result = await fetchUserCyberFitnessProfile(dbUser.id);
+      // If there's an error in AppContext after auth attempt, show guest/error state
+      if (appContextError) {
+          logger.error(`[ProfilePage] Error from AppContext: ${appContextError.message}. Displaying guest profile / error state.`);
+          setCyberProfile({ 
+            level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 System Error", 
+            focusTimeHours: 0, skillsLeveled: 0, lastActivityTimestamp: new Date(0).toISOString(),
+            unlockedPerks: [], activeQuests: [], achievements: [],
+            dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0,
+            totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0,
+            featuresUsed: {}
+          });
+          setProfileLoading(false);
+          return;
+      }
+
+      // Context is loaded and authenticated (or mock user is set up)
+      if (dbUser?.user_id) { 
+        setProfileLoading(true); // Set loading true before async fetch
+        logger.log(`[ProfilePage] Context fully loaded and authenticated (dbUser.user_id: ${dbUser.user_id}). Fetching CyberFitness profile...`);
+        const result = await fetchUserCyberFitnessProfile(dbUser.user_id); 
         if (result.success && result.data) {
           setCyberProfile(result.data);
-          logger.log("[ProfilePage] CyberFitness profile loaded:", result.data);
+          logger.log("[ProfilePage] CyberFitness profile loaded successfully:", result.data);
         } else {
-          logger.warn(`[ProfilePage] Failed to load CyberFitness profile for ${dbUser.id}. Error: ${result.error}. Initializing default.`);
+          logger.warn(`[ProfilePage] Failed to load CyberFitness profile for ${dbUser.user_id}. Error: ${result.error}. Initializing default profile state.`);
           setCyberProfile({ 
             level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Alpha Error", 
+            focusTimeHours: 0, skillsLeveled: 0, lastActivityTimestamp: new Date(0).toISOString(),
             unlockedPerks: [], activeQuests: [], achievements: [],
             dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0,
             totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0,
             featuresUsed: {}
           });
         }
-        setProfileLoading(false);
+        setProfileLoading(false); // Set loading false after fetch attempt
       } else { 
-        logger.log(`[ProfilePage] Context fully loaded and auth complete, but no dbUser.id. Using guest profile.`);
+        // This case means appLoading and isAuthenticating are false, no appContextError, but dbUser.user_id is still not available.
+        // This implies MOCK_USER might be disabled and real auth didn't yield a dbUser (e.g., if initData was missing or validation failed and error wasn't propagated correctly)
+        logger.log(`[ProfilePage] Context loaded, auth attempt complete, but no dbUser.user_id. Likely unauthenticated or MOCK_USER disabled & no TG data. Using guest profile.`);
         setCyberProfile({ 
             level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Guest Mode", 
+            focusTimeHours: 0, skillsLeveled: 0, lastActivityTimestamp: new Date(0).toISOString(),
             unlockedPerks: ["Basic Interface"], activeQuests: ["Explore CyberVibe Studio"], 
             achievements: [], dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0,
             totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0,
             featuresUsed: {}
         });
-        setProfileLoading(false);
+        setProfileLoading(false); // Done "loading" into guest state
       }
     };
 
     loadProfile();
-  }, [dbUser, appLoading, isAuthenticating]); 
+  }, [dbUser, appLoading, isAuthenticating, appContextError]); // Added appContextError to deps
 
   const isLoadingDisplay = appLoading || isAuthenticating || profileLoading;
 
-
-  if (isLoadingDisplay) {
+  if (isLoadingDisplay && !cyberProfile) { 
     return (
       <div className="min-h-screen bg-dark-bg flex flex-col items-center justify-center p-4 text-center">
         <FaSpinner className="text-5xl text-brand-cyan animate-spin mb-6" />
@@ -137,15 +158,25 @@ export default function ProfilePage() {
     );
   }
 
-  const currentLevel = cyberProfile?.level || 0;
-  const kiloVibes = cyberProfile?.kiloVibes || 0;
-  const cognitiveOS = cyberProfile?.cognitiveOSVersion || "v1.0 Genesis";
-  const unlockedPerks = cyberProfile?.unlockedPerks || ["Core Systems Online"];
-  const achievements = cyberProfile?.achievements || [];
-  const focusTime = cyberProfile?.focusTimeHours || 0;
+  const safeCyberProfile = cyberProfile ?? { 
+      level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Error/Guest", 
+      focusTimeHours: 0, skillsLeveled: 0, lastActivityTimestamp: new Date(0).toISOString(),
+      unlockedPerks: [], activeQuests: [], achievements: [],
+      dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0,
+      totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0,
+      featuresUsed: {}
+  };
+
+
+  const currentLevel = safeCyberProfile.level;
+  const kiloVibes = safeCyberProfile.kiloVibes;
+  const cognitiveOS = safeCyberProfile.cognitiveOSVersion;
+  const unlockedPerks = safeCyberProfile.unlockedPerks;
+  const achievements = safeCyberProfile.achievements;
+  const focusTime = safeCyberProfile.focusTimeHours || 0;
   
-  const displayWeeklyActivity = cyberProfile?.dailyActivityLog && cyberProfile.dailyActivityLog.length > 0
-    ? cyberProfile.dailyActivityLog.map(log => {
+  const displayWeeklyActivity = safeCyberProfile.dailyActivityLog && safeCyberProfile.dailyActivityLog.length > 0
+    ? safeCyberProfile.dailyActivityLog.map(log => {
         const date = new Date(log.date + "T00:00:00Z"); 
         return {
             name: format(date, 'EE', { locale: ru }).toUpperCase(),
@@ -164,11 +195,11 @@ export default function ProfilePage() {
     { label: "KiloVibes", value: kiloVibes.toLocaleString(), icon: <FaBolt className="text-brand-yellow" /> },
     { label: "Deep Work (ч)", value: focusTime, icon: <FaBrain className="text-brand-pink" /> },
     { label: "Достижений", value: achievements.length, icon: <FaStar className="text-neon-lime" /> },
-    { label: "Запросов к AI", value: cyberProfile?.totalKworkRequestsSent || 0, icon: <FaPaperPlane className="text-brand-cyan" /> },
-    { label: "PR Создано", value: cyberProfile?.totalPrsCreated || 0, icon: <FaGithub className="text-light-text" /> },
-    { label: "Веток Обновлено", value: cyberProfile?.totalBranchesUpdated || 0, icon: <FaCodeBranch className="text-brand-purple" /> },
-    { label: "Извлечено Файлов (в KWork)", value: cyberProfile?.totalFilesExtracted || 0, icon: <FaPlus className="text-brand-green" /> },
-    { label: "Токенов AI (обработано)", value: (cyberProfile?.totalTokensProcessed || 0).toLocaleString(), icon: <FaRobot className="text-brand-pink" /> },
+    { label: "Запросов к AI", value: safeCyberProfile.totalKworkRequestsSent, icon: <FaPaperPlane className="text-brand-cyan" /> },
+    { label: "PR Создано", value: safeCyberProfile.totalPrsCreated, icon: <FaGithub className="text-light-text" /> },
+    { label: "Веток Обновлено", value: safeCyberProfile.totalBranchesUpdated, icon: <FaCodeBranch className="text-brand-purple" /> },
+    { label: "Извлечено Файлов (в KWork)", value: safeCyberProfile.totalFilesExtracted, icon: <FaPlus className="text-brand-green" /> },
+    { label: "Токенов AI (обработано)", value: (safeCyberProfile.totalTokensProcessed).toLocaleString(), icon: <FaRobot className="text-brand-pink" /> },
   ];
 
   const handleLogout = () => {
@@ -189,8 +220,8 @@ export default function ProfilePage() {
               <Image
                 src={avatarUrl}
                 alt={`${userName}'s Cybernetic Avatar`}
-                layout="fill"
-                objectFit="cover"
+                fill 
+                style={{objectFit:"cover"}} 
                 className="transform hover:scale-110 transition-transform duration-300"
                 priority
               />
@@ -235,7 +266,7 @@ export default function ProfilePage() {
                             <RechartsTooltip
                                 cursor={{ fill: 'hsla(var(--brand-purple), 0.1)' }}
                                 contentStyle={{
-                                    backgroundColor: 'rgba(13, 2, 33, 0.85)',
+                                    backgroundColor: 'rgba(13, 2, 33, 0.85)', 
                                     borderColor: 'hsl(var(--brand-purple))',
                                     borderRadius: '0.5rem',
                                     color: 'hsl(var(--light-text))',
