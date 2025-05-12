@@ -58,7 +58,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [componentParsedFiles, setComponentParsedFiles] = useState<ValidationFileEntry[]>([]);
     const [imageReplaceError, setImageReplaceError] = useState<string | null>(null);
-    const [justParsed, setJustParsed] = useState(false); // For scroll fix
+    const [justParsed, setJustParsed] = useState(false); // State to trigger scroll fix effect
 
     // --- Hooks ---
     const appContext = useAppContext();
@@ -145,10 +145,10 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         if (justParsed) {
             aiResponseInputRefPassed.current?.focus();
             // Optional: aiResponseInputRefPassed.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            setJustParsed(false);
+            setJustParsed(false); // Reset the flag immediately
             logger.log("[Effect justParsed] Focused AI response textarea to stabilize scroll.");
         }
-    }, [justParsed, aiResponseInputRefPassed]);
+    }, [justParsed, aiResponseInputRefPassed]); // Depend only on the flag and the ref
 
     useEffect(() => { 
         logger.debug("[Effect Mount] AICodeAssistant Mounted");
@@ -162,7 +162,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             logger.info(`[Effect Mount] Triggering initial PRs for ${initialRepoUrl}`);
             triggerGetOpenPRs(initialRepoUrl);
         } else { logger.debug(`[Effect Mount] Skipping initial PRs (no valid URL yet)`); }
-    }, [triggerGetOpenPRs, repoUrlStateLocal, repoUrlFromContext, imageReplaceTask, pendingFlowDetails]); 
+    }, [triggerGetOpenPRs, repoUrlStateLocal, repoUrlFromContext, imageReplaceTask, pendingFlowDetails]); // Removed redundant dependencies
 
     useEffect(() => { 
         setFilesParsed(componentParsedFiles.length > 0);
@@ -216,7 +216,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         handleDirectImageReplace: (task: ImageReplaceTask, files: FileNode[]) => {
             return handlers.handleDirectImageReplace(task, files);
         },
-    }), [handlers, setResponseValue, updateRepoUrl]);
+    }), [handlers, setResponseValue, updateRepoUrl]); // handlers includes dependencies via useAICodeAssistantHandlers
     
     // --- Derived State for Rendering ---
     const effectiveIsParsing = contextIsParsing ?? hookIsParsing;
@@ -237,10 +237,10 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     
     // --- FINAL RENDER ---
     return (
-        <div id="executor" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(0,255,157,0.3)] relative overflow-hidden flex flex-col gap-4">
+        <div id="executor" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(var(--brand-green-rgb),0.3)] relative overflow-hidden flex flex-col gap-4">
             <header className="flex justify-between items-center gap-2 flex-wrap">
                  <div className="flex items-center gap-2">
-                     <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse">
+                     <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_hsl(var(--brand-yellow))] animate-pulse">
                          {showImageReplaceUI ? (imageTaskFailed ? "🖼️ Ошибка Замены Картинки" : "🖼️ Статус Замены Картинки") : "🤖 AI Code Assistant"}
                      </h1>
                      {showStandardAssistantUI && ( <button className="cursor-help p-1" title={assistantTooltipText}> <FaCircleInfo className="text-blue-400 hover:text-blue-300 transition" /> </button> )}
@@ -257,7 +257,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                               <textarea
                                  id="response-input"
                                  ref={aiResponseInputRefPassed}
-                                 className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(0,255,157,0.3)] text-sm min-h-[180px] resize-y simple-scrollbar"
+                                 className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(var(--brand-green-rgb),0.3)] text-sm min-h-[180px] resize-y simple-scrollbar"
                                  defaultValue={response}
                                  onChange={(e) => setResponseValue(e.target.value)}
                                  placeholder={isWaitingForAiResponse ? "AI думает..." : isProcessingAny ? "Ожидание..." : "Ответ AI здесь..."}
@@ -281,7 +281,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                                   status={validationStatus}
                                   issues={validationIssues}
                                   onAutoFix={handlers.handleAutoFix}
-                                  onCopyPrompt={() => {}} 
+                                  onCopyPrompt={() => {}} // Placeholder, copy prompt logic might be elsewhere
                                   isFixDisabled={fixButtonDisabled}
                                />
                           </div>
@@ -326,7 +326,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                         />
                          <button
                             onClick={() => { setIsImageModalOpen(true); }}
-                            className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(0,255,157,0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50 relative"
+                            className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(var(--brand-green-rgb),0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50 relative"
                             disabled={isProcessingAny}
                             title="Загрузить/Связать Картинки (prompts_imgs.txt)"
                          >
