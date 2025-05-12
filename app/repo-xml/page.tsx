@@ -175,7 +175,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     log("[ActualPageContent] useState DONE");
     
     // --- CONTEXT VALIDATION ---
-    if (!pageContext || typeof pageContext.addToast !== 'function' || typeof pageContext.setRepoUrl !== 'function' || typeof pageContext.setImageReplaceTask !== 'function' || typeof pageContext.triggerFetch !== 'function') {
+    if (!pageContext || typeof pageContext.addToast !== 'function' || typeof pageContext.setRepoUrl !== 'function' || typeof pageContext.setImageReplaceTask !== 'function' || typeof pageContext.triggerFetch !== 'function' || typeof pageContext.setKworkInputValue !== 'function') { 
          error("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or key functions are invalid!");
          return <div className="text-red-500 p-4">Критическая ошибка: Контекст страницы не загружен или неполный.</div>;
     }
@@ -190,6 +190,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
         triggerFetch: contextTriggerFetch,
         repoUrl: contextRepoUrl,
         addToast: contextAddToast,
+        setKworkInputValue: contextSetKworkInputValue, 
     } = pageContext;
 
     // --- Effect 1: Language ---
@@ -246,15 +247,18 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                 logger.error(`[ActualPageContent InitialIdea Effect - IMG] Failed to parse ImageReplaceTask from initialIdea: ${initialIdea} or missing targetPath from initialPath: ${initialPath}`);
                 contextAddToast("Ошибка: Не удалось обработать задачу замены изображения из URL.", "error");
             }
-        } else if (initialIdea && !ideaIsImageReplace && initialPath && fetcherRef.current?.setKworkInputValue) {
-            // This is for the "normal" flow.
-            // The actual fetch based on highlightedPathProp and setting KWork input
-            // is handled within RepoTxtFetcher's useEffect based on its props.
-            // No direct fetch trigger is needed here for this specific case,
-            // as RepoTxtFetcher will react to its props.
-            logger.info(`[ActualPageContent InitialIdea Effect - NORMAL] Normal idea and path detected. Props will be passed to RepoTxtFetcher. Path: ${initialPath}, Idea: ${initialIdea.substring(0,50)}...`);
+        } else if (initialIdea && !ideaIsImageReplace && initialPath) {
+            const ideaToSet = initialIdea === 'null' ? '' : initialIdea; 
+            logger.info(`[ActualPageContent InitialIdea Effect - NORMAL] Normal idea and path detected. Setting KWork to: "${ideaToSet.substring(0,50)}...". Path: ${initialPath}`);
+            contextSetKworkInputValue(ideaToSet);
+        } else if (initialIdea === 'null' && !initialPath && !ideaIsImageReplace) {
+            logger.info(`[ActualPageContent InitialIdea Effect - NORMAL] ideaProp is "null" string and no path. Clearing KWork via context setter.`);
+            contextSetKworkInputValue(""); 
+        } else if (initialIdea === null && !initialPath && !ideaIsImageReplace) { 
+            logger.info(`[ActualPageContent InitialIdea Effect - NORMAL] ideaProp is actual null and no path. Clearing KWork via context setter.`);
+            contextSetKworkInputValue("");
         }
-    }, [initialIdea, initialPath, fetcherRef, contextSetRepoUrl, contextSetImageReplaceTask, contextTriggerFetch, contextRepoUrl, contextAddToast, logger]);
+    }, [initialIdea, initialPath, fetcherRef, contextSetRepoUrl, contextSetImageReplaceTask, contextTriggerFetch, contextRepoUrl, contextAddToast, contextSetKworkInputValue, logger]);
     
     // --- Callbacks ---
     const memoizedGetPlainText = useCallback(getPlainText, []);
@@ -480,8 +484,8 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 function RepoXmlPageInternalContent() {
   const searchParams = useSearchParams();
   const path = searchParams.get('path');
-  const idea = searchParams.get('idea');
-  logger.log(`[RepoXmlPageInternalContent] Extracted from URL - path: ${path}, idea: ${idea ? idea.substring(0,30)+'...' : null}`);
+  const idea = searchParams.get('idea'); // This can be string "null"
+  logger.log(`[RepoXmlPageInternalContent] Extracted from URL - path: ${path}, idea: ${idea}`);
   return <ActualPageContent initialPath={path} initialIdea={idea} />;
 }
 
