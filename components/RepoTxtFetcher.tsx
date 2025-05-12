@@ -49,7 +49,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     logger.log("[RepoTxtFetcher] START Render");
     logger.debug(`[TRIM_DEBUG RepoTxtFetcher Top] Raw Props: ideaProp="${ideaProp}", highlightedPathProp="${highlightedPathProp}"`);
 
-
     const { 
         addToast: addToastContext, fetchStatus, setFetchStatus, filesFetched,
         repoUrl: repoUrlFromContext, setRepoUrl: setRepoUrlInContext, repoUrlEntered,
@@ -67,13 +66,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     logger.debug("[RepoTxtFetcher] After context destructuring");
     logger.debug(`[TRIM_DEBUG RepoTxtFetcher Context Values] kworkInputValue from context: "${String(kworkInputValue).substring(0,50)}", type: ${typeof kworkInputValue}`);
 
-
     const [token, setToken] = useState<string>("");
     const [prevEffectiveBranch, setPrevEffectiveBranch] = useState<string | null>(null); 
-    // Удаляем локальное состояние displayKworkValue, будем полагаться на контекст
-    // const [displayKworkValue, setDisplayKworkValue] = useState<string>('');
     logger.debug("[RepoTxtFetcher] After useState");
-
 
     const repoUrl = repoUrlFromContext;
     const handleRepoUrlChange = setRepoUrlInContext;
@@ -92,7 +87,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "tailwind.config.ts", "app/globals.css", "app/style-guide/page.tsx",       
         "contexts/AppContext.tsx", "hooks/useAppToast.ts", "hooks/supabase.ts", 
         "app/actions.ts", "lib/debugLogger.ts", "components/VibeContentRenderer.tsx",
-        "components/Header.tsx", "types/database.types.ts", 
+        "components/Header.tsx", "types/database.types", 
     ].filter(Boolean), []); 
 
     const effectiveBranchDisplay = useMemo(() => targetBranchName || manualBranchName || "default", [targetBranchName, manualBranchName]);
@@ -112,11 +107,12 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     );
     const { 
         files: fetchedFiles, progress, error: fetchErrorHook, 
-        primaryHighlightedPath: primaryHighlightedPathFromHook, 
-        secondaryHighlightedPaths: secondaryHighlightedPathsFromHook, 
+        // primaryHighlightedPath: primaryHighlightedPathFromHook, // This will come from context now
+        // secondaryHighlightedPaths: secondaryHighlightedPathsFromHook, // This will come from context now
         handleFetchManual, isLoading: isFetchLoading, isFetchDisabled,
-        // retryCount и maxRetries теперь берутся из контекста, а не из этого хука
     } = repoFetcher;
+    const primaryHighlightedPathFromHook = useRepoXmlPageContext().primaryHighlightedPath; // Get from context
+    const secondaryHighlightedPathsFromHook = useRepoXmlPageContext().secondaryHighlightedPaths; // Get from context
     logger.debug("[RepoTxtFetcher] After useRepoFetcher Hook");
 
     logger.debug("[RepoTxtFetcher] Before useFileSelection Hook");
@@ -141,7 +137,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     logger.debug("[RepoTxtFetcher] After useKworkInput Hook");
 
     // === Effects ===
-    // Этот useEffect отвечает за начальную установку kworkInputValue из props и запуск fetch, если нужно
     useEffect(() => {
         logger.debug(`[TRIM_DEBUG RepoTxtFetcher useEffect idea/path] START. ideaProp: "${ideaProp}", type: ${typeof ideaProp}. highlightedPathProp: "${highlightedPathProp}"`);
         
@@ -158,19 +153,18 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
             }
         } else if (ideaToProcess && ideaToProcess.startsWith('ImageReplace|')) {
              logger.info(`[RepoTxtFetcher useEffect idea/path] ImageReplace idea detected. Primary handling in ActualPageContent or context. ideaProp: "${ideaToProcess.substring(0,50)}"`);
-        } else if (ideaProp === 'null' && !imageReplaceTask) { // Строка "null"
+        } else if (ideaProp === 'null' && !imageReplaceTask) { 
              logger.info(`[RepoTxtFetcher useEffect idea/path] ideaProp is string "null". Clearing KWork via context.`);
              setKworkInputValue(""); 
-        } else if (ideaProp === null && !imageReplaceTask) { // Реальный null
+        } else if (ideaProp === null && !imageReplaceTask) { 
             logger.info(`[RepoTxtFetcher useEffect idea/path] ideaProp is actual null. Clearing KWork via context.`);
             setKworkInputValue(""); 
-        } else if (!ideaToProcess && highlightedPathProp && !imageReplaceTask) { // Только путь, нет идеи
+        } else if (!ideaToProcess && highlightedPathProp && !imageReplaceTask) { 
             logger.info(`[RepoTxtFetcher useEffect idea/path] Path prop ONLY: "${highlightedPathProp}". Triggering fetch for initial selection.`);
             handleFetchManual(false, null);
         }
         logger.debug(`[TRIM_DEBUG RepoTxtFetcher useEffect idea/path] END.`);
     }, [ideaProp, highlightedPathProp, imageReplaceTask, setKworkInputValue, handleFetchManual, logger]);
-
 
     useEffect(() => {
         logger.debug("[Effect URL Sync] RepoTxtFetcher: Syncing Assistant URL START");
@@ -266,7 +260,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         },
         getKworkInputValue: () => {
              logger.debug(`[Imperative] getKworkInputValue called, returning context value: "${String(kworkInputValue).substring(0,50)}"`);
-             return kworkInputValue; 
+             return kworkInputValue ?? ''; // Ensure string
         },
         handleAddImportantFiles: () => {
              logger.debug(`[Imperative] handleAddImportantFiles called.`);
@@ -286,7 +280,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         },
         setKworkInputValue: (value: string) => { 
             logger.debug(`[Imperative] setKworkInputValue called with: "${value.substring(0,30)}..."`);
-            setKworkInputValue(value); // Используем сеттер из контекста
+            setKworkInputValue(value); 
         }
     }), [
         handleFetchManual, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll,
@@ -330,7 +324,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const isActionDisabled = isFetchLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing || !!currentImageTask;
     
     logger.debug(`[TRIM_DEBUG RepoTxtFetcher Render] Before kworkValueForCheck: kworkInputValue type: ${typeof kworkInputValue}, value: "${String(kworkInputValue).substring(0,50)}"`);
-    const kworkValueForCheck = kworkInputValue; // Уже гарантированно строка из контекста
+    const kworkValueForCheck = kworkInputValue ?? ''; // Ensure string before .trim()
     logger.debug(`[TRIM_DEBUG RepoTxtFetcher Render] Before hasContent: kworkValueForCheck type: ${typeof kworkValueForCheck}, value: "${kworkValueForCheck.substring(0,50)}"`);
     const hasContent = kworkValueForCheck.trim().length > 0;
     
@@ -483,8 +477,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                           {logger.debug(`[TRIM_DEBUG RepoTxtFetcher Render] Before RequestInput: kworkInputValue type: ${typeof kworkInputValue}, value: "${String(kworkInputValue).substring(0,50)}" `)}
                           <RequestInput
                               kworkInputRef={kworkInputRef} 
-                              kworkInputValue={kworkInputValue} // Передаем значение из контекста (уже должно быть строкой)
-                              onValueChange={setKworkInputValue} // Передаем сеттер из контекста
+                              kworkInputValue={kworkInputValue ?? ''} // Ensure string
+                              onValueChange={setKworkInputValue} 
                               onCopyToClipboard={() => { logger.debug("[Input Action] Copy Click"); handleCopyToClipboard(undefined, true); }}
                               onClearAll={() => { logger.debug("[Input Action] Clear Click"); handleClearAll(); }}
                               onAddSelected={() => { logger.debug("[Input Action] AddSelected Click"); handleAddSelected(); }}
