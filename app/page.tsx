@@ -53,28 +53,34 @@ export default function Home() {
 
   useEffect(() => {
     const loadProfile = async () => {
-      logger.log(`[HomePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticating: ${isAuthenticating}, dbUser.id: ${dbUser?.id}`);
+      logger.log(`[HomePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticating: ${isAuthenticating}, dbUser.user_id: ${dbUser?.user_id}, appContextError: ${appContextError?.message}`);
       if (appLoading || isAuthenticating) { 
         logger.log(`[HomePage] AppContext is still loading or authenticating. Waiting to fetch profile.`);
         setProfileLoading(true);
         return;
       }
 
-      // AppContext is loaded (appLoading is false) and authentication process is complete (isAuthenticating is false)
-      if (dbUser?.id) {
+      if (appContextError) {
+        logger.error(`[HomePage] Error from AppContext: ${appContextError.message}. Cannot load profile. Defaulting to guest state.`);
+         setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: ["investigate_anomaly"], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 System Anomaly", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
+        setProfileLoading(false);
+        return;
+      }
+      
+      if (dbUser?.user_id) {
         setProfileLoading(true);
-        logger.log(`[HomePage] Context fully loaded and authenticated, dbUser.id available. Fetching profile for user ${dbUser.id}`);
-        const result = await fetchUserCyberFitnessProfile(dbUser.id);
+        logger.log(`[HomePage] Context fully loaded and authenticated, dbUser.user_id: ${dbUser.user_id}. Fetching profile...`);
+        const result = await fetchUserCyberFitnessProfile(dbUser.user_id);
         if (result.success && result.data) {
           setCyberProfile(result.data);
-          logger.log(`[HomePage] Profile loaded for ${dbUser.id}:`, result.data);
+          logger.log(`[HomePage] Profile loaded for ${dbUser.user_id}:`, result.data);
         } else {
-          logger.warn(`[HomePage] Failed to load profile for ${dbUser.id}. Error: ${result.error}. Defaulting.`);
+          logger.warn(`[HomePage] Failed to load profile for ${dbUser.user_id}. Error: ${result.error}. Defaulting to Alpha Error state.`);
           setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Alpha Error", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
         }
         setProfileLoading(false);
       } else { 
-        logger.log(`[HomePage] Context fully loaded and auth complete, but no dbUser.id. Using guest profile.`);
+        logger.log(`[HomePage] Context loaded, auth complete, but no dbUser.user_id. Using guest profile.`);
         setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Guest Mode", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
         setProfileLoading(false);
       }
@@ -82,17 +88,22 @@ export default function Home() {
 
     loadProfile();
 
-  }, [dbUser, appLoading, isAuthenticating]); 
+  }, [dbUser, appLoading, isAuthenticating, appContextError]); 
 
   const isLoadingDisplay = appLoading || isAuthenticating || profileLoading; 
 
-  const userName = cyberProfile?.cognitiveOSVersion?.includes("Guest")
-    ? 'Agent' 
-    : dbUser?.first_name || telegramUser?.first_name || 'Agent';
+  const userName = 
+    isLoadingDisplay ? 'Agent' : // Show 'Agent' while loading
+    dbUser?.user_id ? (dbUser.first_name || telegramUser?.first_name || 'Agent') : // If dbUser exists, use its name
+    (telegramUser?.first_name || 'Agent'); // Fallback to telegramUser name, then 'Agent'
+
+  const cognitiveOSVersion = 
+    isLoadingDisplay ? "Загрузка ОС..." :
+    appContextError ? "v0.1 System Anomaly" :
+    dbUser?.user_id && cyberProfile ? (cyberProfile.cognitiveOSVersion || "v0.1 Connected") : 
+    "v0.1 Guest Mode";
   
   const currentLevel = cyberProfile?.level ?? 0;
-  const cognitiveOSVersion = cyberProfile?.cognitiveOSVersion || (isLoadingDisplay ? "Загрузка ОС..." : "v0.1 Alpha");
-
 
   if (isLoadingDisplay && !cyberProfile) { 
       return (
@@ -104,16 +115,8 @@ export default function Home() {
          </div>
       );
   }
-  if (appContextError) { 
-      return (
-         <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-4 text-center">
-            <FaUserNinja className="text-5xl text-red-500 mb-6" />
-            <p className="text-red-500 font-orbitron text-xl">
-              Ошибка загрузки контекста: {appContextError.message}
-            </p>
-         </div>
-      );
-  }
+  // appContextError is now handled by cognitiveOSVersion logic for a more graceful display
+  // if (appContextError && !isLoadingDisplay) { ... } // Removed explicit error screen for main page, rely on guest/anomaly state
 
   const chartReadyWeeklyActivity = (cyberProfile?.dailyActivityLog && cyberProfile.dailyActivityLog.length > 0 
     ? cyberProfile.dailyActivityLog.map(d => ({ name: format(new Date(d.date + "T00:00:00Z"), 'EEE', {locale: ru}).substring(0,2).toUpperCase(), value: d.kworkRequestsSent || 0, label: `${d.kworkRequestsSent || 0} req` }))
@@ -123,7 +126,6 @@ export default function Home() {
   const totalKiloVibes = cyberProfile?.kiloVibes || 0;
   const focusTimeHours = cyberProfile?.focusTimeHours || 0;
   const skillsLeveled = cyberProfile?.skillsLeveled || 0;
-
 
   return ( 
     <div className="homepage-wrapper">
@@ -212,7 +214,7 @@ export default function Home() {
             </CardContent>
           </Card>
         </motion.div>
-        {dbUser?.status === "admin" && (
+        {dbUser?.status === "admin" && ( // This check should use dbUser.status for admin link
           <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1, type: "spring", stiffness: 100 }} className="fixed bottom-20 md:bottom-24 right-3 sm:right-4 z-50">
              <Button asChild variant="outline" size="icon" className="bg-dark-card/80 border-brand-red/70 text-brand-red hover:bg-brand-red/20 hover:text-white rounded-full w-10 h-10 sm:w-11 sm:h-11 shadow-lg backdrop-blur-sm" aria-label="Admin Override Terminal">
                <Link href="/admin"><FaUserNinja className="h-5 w-5 sm:h-6 sm:h-6" /></Link>
