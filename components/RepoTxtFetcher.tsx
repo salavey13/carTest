@@ -52,7 +52,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const { 
         addToast: addToastContext, fetchStatus, setFetchStatus, filesFetched,
         repoUrl: repoUrlFromContext, setRepoUrl: setRepoUrlInContext, repoUrlEntered,
-        githubToken, setGithubToken, // Using githubToken and setGithubToken from context
+        githubToken, setGithubToken, 
         selectedFetcherFiles, kworkInputHasContent, kworkInputValue, setKworkInputValue, kworkInputRef,
         loadingPrs, assistantLoading, isParsing, aiActionLoading, targetBranchName, 
         setTargetBranchName, manualBranchName, setManualBranchName, openPrs, setLoadingPrs, 
@@ -68,7 +68,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     logger.debug("[RepoTxtFetcher] After context destructuring");
     logger.debug(`[TRIM_DEBUG RepoTxtFetcher Context Values] kworkInputValue from context: "${String(kworkInputValue).substring(0,50)}", type: ${typeof kworkInputValue}`);
 
-    // const [token, setToken] = useState<string>(""); // Removed local token state
     const [prevEffectiveBranch, setPrevEffectiveBranch] = useState<string | null>(null); 
     logger.debug("[RepoTxtFetcher] After useState");
 
@@ -107,7 +106,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const { 
         files: fetchedFiles, progress, error: fetchErrorHook, 
         handleFetchManual, 
-        loading: isFetchLoading, 
+        loading: isFetchLoading = false, // Provide default value to prevent undefined
         isFetchDisabled,
         maxRetries: hookMaxRetries 
     } = repoFetcher;
@@ -336,6 +335,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
 
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
     const imageTaskTargetFileReady = currentImageTask && fetchStatus === 'success' && fetchedFiles.some(f => f.path === currentImageTask.targetPath);
+    // Use isFetchLoading (from useRepoFetcher) for the Render State log
     logger.debug(`[Render State] calculatedIsActionDisabled=${calculatedIsActionDisabled}, isFetchLoadingFromHook=${isFetchLoading}, showProgressBar=${showProgressBar}, hasContent=${hasContent}`);
 
     logger.debug("[RepoTxtFetcher] Preparing to render JSX...");
@@ -381,8 +381,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                   isOpen={isSettingsModalOpen}
                   repoUrl={repoUrl}
                   setRepoUrl={handleRepoUrlChange}
-                  token={githubToken} // Use githubToken from context
-                  setToken={setGithubToken} // Use setGithubToken from context
+                  token={githubToken} 
+                  setToken={setGithubToken} 
                   manualBranchName={manualBranchName}
                   setManualBranchName={handleManualBranchChange}
                   currentTargetBranch={targetBranchName}
@@ -399,7 +399,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                           logger.info("[Click] Fetch Button Clicked");
                           handleFetchManual(fetchStatus === 'failed_retries' || fetchStatus === 'error');
                        }}
-                      disabled={isFetchDisabled}
+                      disabled={isFetchDisabled} // This uses derivedIsFetchDisabled from useRepoFetcher
                       className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-white bg-gradient-to-r ${fetchStatus === 'failed_retries' || fetchStatus === 'error' ? 'from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600' : 'from-purple-600 to-cyan-500'} transition-all shadow-lg shadow-purple-500/30 hover:shadow-cyan-500/40 ${isFetchDisabled ? "opacity-60 cursor-not-allowed" : "hover:brightness-110 active:scale-[0.98]"}`}
                       whileHover={{ scale: isFetchDisabled ? 1 : 1.03 }}
                       whileTap={{ scale: isFetchDisabled ? 1 : 0.97 }}

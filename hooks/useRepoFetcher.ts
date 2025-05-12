@@ -33,7 +33,7 @@ export const useRepoFetcher = (
         setRetryCount, 
         setFetchStatus, 
         repoUrl: contextRepoUrl, 
-        githubToken, // <<< Получаем githubToken из контекста
+        githubToken, 
         imageReplaceTask, 
         highlightedPathFromUrl, 
         loadingPrs, 
@@ -102,7 +102,7 @@ export const useRepoFetcher = (
         isRetry: boolean = false,
         branchNameToFetchOverride?: string | null
     ): Promise<void> => { 
-        logger.info(`[useRepoFetcher handleFetchManual] Called. Local Repo: ${repoUrl}, Branch Override: ${branchNameToFetchOverride ?? 'N/A'}, Current Hook Branch: ${currentBranchName}, isRetry: ${isRetry}, Token provided: ${!!githubToken}`);
+        logger.info(`[useRepoFetcher handleFetchManual] Called. Local Repo: ${repoUrl}, Branch Override: ${branchNameToFetchOverride ?? 'N/A'}, Current Hook Branch: ${currentBranchName}, isRetry: ${isRetry}, Token provided (first 5 chars): ${githubToken ? githubToken.substring(0, 5) + '...' : 'No token'}`);
 
         if (isFetchingRef.current && !isRetry) {
             logger.warn("[useRepoFetcher handleFetchManual] Fetch already in progress. Skipping.");
@@ -132,7 +132,7 @@ export const useRepoFetcher = (
                 repoUrl,
                 branchForFetch,
                 undefined, 
-                githubToken || undefined, // <<< Передаем токен из контекста
+                githubToken || undefined, 
                 activeImageTaskRef.current
             );
 
