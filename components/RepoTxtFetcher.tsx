@@ -52,6 +52,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const { 
         addToast: addToastContext, fetchStatus, setFetchStatus, filesFetched,
         repoUrl: repoUrlFromContext, setRepoUrl: setRepoUrlInContext, repoUrlEntered,
+        githubToken, setGithubToken, // Using githubToken and setGithubToken from context
         selectedFetcherFiles, kworkInputHasContent, kworkInputValue, setKworkInputValue, kworkInputRef,
         loadingPrs, assistantLoading, isParsing, aiActionLoading, targetBranchName, 
         setTargetBranchName, manualBranchName, setManualBranchName, openPrs, setLoadingPrs, 
@@ -59,15 +60,15 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         currentAiRequestId, imageReplaceTask, allFetchedFiles, assistantRef, 
         updateRepoUrlInAssistant, handleSetFilesFetched, setTargetPrData, setSelectedFetcherFiles, 
         setRequestCopied, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, 
-        setContextIsParsing, pendingFlowDetails, primaryHighlightedPath, // Use primaryHighlightedPath from context
-        secondaryHighlightedPaths, // Use secondaryHighlightedPaths from context
-        maxRetries, retryCount // No longer using context maxRetries here, hook has its own
+        setContextIsParsing, pendingFlowDetails, primaryHighlightedPath, 
+        secondaryHighlightedPaths, 
+        retryCount 
     } = useRepoXmlPageContext();
     const { error: toastError, info: toastInfo } = useAppToast();
     logger.debug("[RepoTxtFetcher] After context destructuring");
     logger.debug(`[TRIM_DEBUG RepoTxtFetcher Context Values] kworkInputValue from context: "${String(kworkInputValue).substring(0,50)}", type: ${typeof kworkInputValue}`);
 
-    const [token, setToken] = useState<string>("");
+    // const [token, setToken] = useState<string>(""); // Removed local token state
     const [prevEffectiveBranch, setPrevEffectiveBranch] = useState<string | null>(null); 
     logger.debug("[RepoTxtFetcher] After useState");
 
@@ -105,16 +106,15 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     );
     const { 
         files: fetchedFiles, progress, error: fetchErrorHook, 
-        handleFetchManual, isLoading: isFetchLoading, isFetchDisabled,
-        // primaryHighlightedPath and secondaryHighlightedPaths are now directly from context
-        // maxRetries: hookMaxRetries // maxRetries now internal to useRepoFetcher
-        // retryCount: hookRetryCount // retryCount from context
+        handleFetchManual, 
+        loading: isFetchLoading, 
+        isFetchDisabled,
+        maxRetries: hookMaxRetries 
     } = repoFetcher;
-    const primaryHighlightedPathFromHook = primaryHighlightedPath; // Using context value
-    const secondaryHighlightedPathsFromHook = secondaryHighlightedPaths; // Using context value
-    const hookMaxRetries = repoFetcher.maxRetries; // Get from hook return if needed for display
+    const primaryHighlightedPathFromHook = primaryHighlightedPath; 
+    const secondaryHighlightedPathsFromHook = secondaryHighlightedPaths; 
     
-    logger.debug("[RepoTxtFetcher] After useRepoFetcher Hook");
+    logger.debug(`[RepoTxtFetcher] After useRepoFetcher Hook. isFetchLoading: ${isFetchLoading}, isFetchDisabled: ${isFetchDisabled}`);
 
     logger.debug("[RepoTxtFetcher] Before useFileSelection Hook");
     const {
@@ -323,20 +323,20 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     logger.debug("[RepoTxtFetcher] Calculate Derived State");
     const currentImageTask = imageReplaceTask;
     const showProgressBar = fetchStatus !== 'idle';
-    const isActionDisabled = isFetchLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing || !!currentImageTask;
+    const calculatedIsActionDisabled = isFetchLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing || !!currentImageTask;
     
     logger.debug(`[TRIM_DEBUG RepoTxtFetcher Render] Before kworkValueForCheck: kworkInputValue type: ${typeof kworkInputValue}, value: "${String(kworkInputValue).substring(0,50)}"`);
     const kworkValueForCheck = kworkInputValue ?? ''; 
     logger.debug(`[TRIM_DEBUG RepoTxtFetcher Render] Before hasContent: kworkValueForCheck type: ${typeof kworkValueForCheck}, value: "${kworkValueForCheck.substring(0,50)}"`);
     const hasContent = kworkValueForCheck.trim().length > 0;
     
-    const isCopyDisabled = !hasContent || isActionDisabled;
-    const isClearDisabled = (!hasContent && selectedFetcherFiles.size === 0 && !filesFetched) || isActionDisabled;
-    const isAddSelectedDisabledFromLocal = selectedFetcherFiles.size === 0 || isActionDisabled; 
+    const isCopyDisabled = !hasContent || calculatedIsActionDisabled;
+    const isClearDisabled = (!hasContent && selectedFetcherFiles.size === 0 && !filesFetched) || calculatedIsActionDisabled;
+    const isAddSelectedDisabledFromLocal = selectedFetcherFiles.size === 0 || calculatedIsActionDisabled; 
 
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
     const imageTaskTargetFileReady = currentImageTask && fetchStatus === 'success' && fetchedFiles.some(f => f.path === currentImageTask.targetPath);
-    logger.debug(`[Render State] isActionDisabled=${isActionDisabled}, isFetchLoading=${isFetchLoading}, showProgressBar=${showProgressBar}, hasContent=${hasContent}`);
+    logger.debug(`[Render State] calculatedIsActionDisabled=${calculatedIsActionDisabled}, isFetchLoadingFromHook=${isFetchLoading}, showProgressBar=${showProgressBar}, hasContent=${hasContent}`);
 
     logger.debug("[RepoTxtFetcher] Preparing to render JSX...");
     try {
@@ -381,8 +381,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                   isOpen={isSettingsModalOpen}
                   repoUrl={repoUrl}
                   setRepoUrl={handleRepoUrlChange}
-                  token={token}
-                  setToken={setToken}
+                  token={githubToken} // Use githubToken from context
+                  setToken={setGithubToken} // Use setGithubToken from context
                   manualBranchName={manualBranchName}
                   setManualBranchName={handleManualBranchChange}
                   currentTargetBranch={targetBranchName}
@@ -462,7 +462,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                              secondaryHighlightedPaths={secondaryHighlightedPathsFromHook} 
                              importantFiles={importantFiles} 
                              isLoading={isFetchLoading}
-                             isActionDisabled={isActionDisabled}
+                             isActionDisabled={calculatedIsActionDisabled}
                              toggleFileSelection={toggleFileSelection}
                              onAddImportant={handleAddImportantFiles}
                              onSelectHighlighted={selectHighlightedFiles}
@@ -486,7 +486,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                               onAddSelected={() => { logger.debug("[Input Action] AddSelected Click"); handleAddSelected(); }}
                               isAddSelectedDisabled={isAddSelectedDisabledFromLocal} 
                               selectedFetcherFilesCount={selectedFetcherFiles.size}
-                              isActionDisabled={isActionDisabled} 
+                              isActionDisabled={calculatedIsActionDisabled} 
                               filesFetched={filesFetched} 
                           />
                       </div>
