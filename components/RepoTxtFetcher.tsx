@@ -41,6 +41,9 @@ interface RepoTxtFetcherProps {
     ideaProp: string | null;
 }
 
+// --- Constants ---
+const MAX_RETRIES_DISPLAY = 2; // Дублируем константу для отображения
+
 // --- Component Definition ---
 const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     highlightedPathProp,
@@ -129,8 +132,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         handleFetchManual,
         isLoading: isFetchLoading,
         isFetchDisabled,
-        retryCount,      // <<< Извлекаем retryCount
-        maxRetries       // <<< Извлекаем maxRetries
+        retryCount,      
+        maxRetries       // maxRetries из хука (для внутренней логики хука)
     } = useRepoFetcher(
         repoUrl, 
         setFetchStatus, 
@@ -424,7 +427,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                   <div className="mb-4 min-h-[40px]">
                       {(() => { logger.debug("[Render] Rendering ProgressBar (conditional)"); return null; })()}
                       <ProgressBar status={fetchStatus === 'failed_retries' ? 'error' : fetchStatus} progress={progress} />
-                      {isFetchLoading && <p className="text-cyan-300 text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? `(Попытка ${retryCount + 1}/${maxRetries})` : ''}</p>}
+                      {isFetchLoading && <p className="text-cyan-300 text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? `(Попытка ${retryCount + 1}/${MAX_RETRIES_DISPLAY})` : ''}</p>}
                       {isParsing && !currentImageTask && <p className="text-yellow-400 text-xs font-mono mt-1 text-center animate-pulse">Разбор ответа AI...</p>}
                       {fetchStatus === 'success' && !currentImageTask && fetchedFiles.length > 0 && (
                          <div className="text-center text-xs font-mono mt-1 text-green-400 flex items-center justify-center gap-1">
@@ -444,7 +447,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                         {(fetchStatus === 'error' || fetchStatus === 'failed_retries') && fetchErrorHook && ( 
                            <div className="text-center text-xs font-mono mt-1 text-red-400 flex items-center justify-center gap-1">
                                <FaXmark /> {fetchErrorHook}
-                               {fetchStatus === 'error' && retryCount < maxRetries && ` (Попытка ${retryCount + 1}/${maxRetries})`}
+                               {fetchStatus === 'error' && retryCount < MAX_RETRIES_DISPLAY && ` (Попытка ${retryCount + 1}/${MAX_RETRIES_DISPLAY})`}
                                {fetchStatus === 'failed_retries' && ` (Достигнуто макс. попыток)`}
                            </div>
                         )}
