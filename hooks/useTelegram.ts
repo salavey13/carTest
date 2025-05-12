@@ -32,7 +32,6 @@ if (MOCK_USER) {
     globalLogger.warn("Using mock Telegram user for development. Ensure NEXT_PUBLIC_USE_MOCK_USER is 'false' or unset in production.");
 }
 
-// Updated to call Next.js API route
 async function validateTelegramAuthWithApi(initDataString: string): Promise<ValidatedUserData | null> {
   if (!initDataString) {
     debugLogger.warn("[validateTelegramAuthWithApi] initDataString is empty.");
@@ -40,7 +39,7 @@ async function validateTelegramAuthWithApi(initDataString: string): Promise<Vali
   }
   try {
     debugLogger.log("[validateTelegramAuthWithApi] Calling Next.js API route '/api/validate-telegram-auth'");
-    const response = await fetch('/api/validate-telegram-auth', { // Changed endpoint
+    const response = await fetch('/api/validate-telegram-auth', { 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ initData: initDataString }),
@@ -148,20 +147,25 @@ export function useTelegram() {
          throw authError; 
       }
     },
-    [] 
+    [dbCreateOrUpdateUser, dbFetchUserData] 
   );
 
   useEffect(() => {
     let isMounted = true;
     debugLogger.log("[useTelegram Effect Main Init] Running, isMounted:", isMounted);
     
-    // Force reset of auth states at the beginning of this effect's execution
+    // Force reset of auth states at the beginning of THIS effect's execution
+    // This ensures that any previous state (e.g. from a mock run or failed auth) is cleared
+    // before attempting a new authentication flow.
+    debugLogger.log("[useTelegram Effect Main Init] Forcing reset of auth states.");
     setIsLoading(true);
     setIsAuthenticating(true);
     setError(null);
     setIsAuthenticated(false);
     setDbUser(null); 
     setTgUser(null);
+    // tgWebApp and isInTelegramContext can persist as they are less dependent on auth success state
+    // and more on the environment.
 
     const initialize = async () => {
       debugLogger.log("[useTelegram initialize async fn] Started");
@@ -172,11 +176,12 @@ export function useTelegram() {
       
       let authCandidate: WebAppUser | null = null;
       let inTgContextReal = false;
-      let tempTgWebApp: TelegramWebApp | null = null;
+      let tempTgWebApp: TelegramWebApp | null = null; // Keep this local to initialize
 
       if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
         const telegram = (window as any).Telegram.WebApp;
-        tempTgWebApp = telegram;
+        if(isMounted) setTgWebApp(telegram); // Set WebApp object once
+        tempTgWebApp = telegram; // Use local for the rest of this function
         inTgContextReal = !!telegram.initData; 
         
         debugLogger.log("[useTelegram initialize] Telegram WebApp context detected.", {
@@ -188,17 +193,15 @@ export function useTelegram() {
 
         if (telegram.initData && inTgContextReal) {
             debugLogger.log("[useTelegram initialize] Validating Telegram initData via API...");
-            const validatedUser = await validateTelegramAuthWithApi(telegram.initData); // Use API validation
+            const validatedUser = await validateTelegramAuthWithApi(telegram.initData); 
             if (validatedUser) {
                 authCandidate = validatedUser;
                 globalLogger.info("[useTelegram initialize] Telegram auth validated successfully via API. Candidate:", authCandidate.id);
             } else {
                 globalLogger.warn("[useTelegram initialize] Telegram initData validation FAILED via API.");
-                 if (isMounted) setError(new Error("Telegram data validation failed. User data might be compromised."));
+                 if (isMounted && !error) setError(new Error("Telegram data validation failed. User data might be compromised."));
             }
         } else if (telegram.initDataUnsafe?.user?.id && !inTgContextReal && process.env.NODE_ENV === 'development') {
-           // Only use initDataUnsafe if initData is missing AND in development.
-           // Still less secure, but can be useful for local non-Telegram testing IF MOCK_USER is off.
            globalLogger.warn("[useTelegram initialize] Using initDataUnsafe as fallback (initData not present/validated, DEV mode). THIS IS LESS SECURE.");
            authCandidate = telegram.initDataUnsafe.user;
         }
@@ -211,7 +214,6 @@ export function useTelegram() {
       }
       
       if (isMounted) { 
-        setTgWebApp(tempTgWebApp);
         setIsInTelegramContext(inTgContextReal);
       }
       
@@ -223,13 +225,13 @@ export function useTelegram() {
             setTgUser(authData.tgUserToSet);
             setDbUser(authData.dbUserToSet); 
             setIsAuthenticated(authData.isAuthenticatedToSet);
-            if(error) setError(null); // Clear previous errors on success ONLY if an error was set
+            if(error && authData.isAuthenticatedToSet) setError(null); 
             globalLogger.info(`[useTelegram initialize] States set after successful auth. dbUser.user_id: ${authData.dbUserToSet?.user_id}, isAuthenticated: ${authData.isAuthenticatedToSet}`);
           }
         } catch (authProcessError: any) {
           debugLogger.error("[useTelegram initialize] Error during handleAuthentication or state setting:", authProcessError);
           if (isMounted) {
-            setError(authProcessError);
+            if(!error) setError(authProcessError); // Set error if not already set
             setTgUser(authCandidate); 
             setDbUser(null);          
             setIsAuthenticated(false); 
@@ -247,7 +249,6 @@ export function useTelegram() {
              setError(noAuthError);
              globalLogger.warn(`[useTelegram Initialize] ${noAuthError.message}`);
            }
-          // Ensure states are reset if no auth candidate
           setTgUser(null);
           setDbUser(null);
           setIsAuthenticated(false);
@@ -262,9 +263,7 @@ export function useTelegram() {
       debugLogger.log("[useTelegram Effect Main Init Cleanup] Setting isMounted=false");
       isMounted = false;
     };
-  // Added MOCK_USER_ID_STR to dependencies to re-run if MOCK_USER config changes (e.g. via HMR)
-  // handleAuthentication itself has its DB function dependencies.
-  }, [handleAuthentication, MOCK_USER_ID_STR]); 
+  }, [handleAuthentication, MOCK_USER_ID_STR, dbCreateOrUpdateUser, dbFetchUserData]); 
 
   useEffect(() => {
     if (!isAuthenticating) { 
