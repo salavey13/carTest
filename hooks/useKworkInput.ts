@@ -1,23 +1,23 @@
+"use client";
 import { useCallback } from "react";
 import { useRepoXmlPageContext, FileNode } from "@/contexts/RepoXmlPageContext";
 import { useAppContext } from "@/contexts/AppContext";
 import { logCyberFitnessAction, checkAndUnlockFeatureAchievement, Achievement } from "@/hooks/cyberFitnessSupabase";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppToast } from "@/hooks/useAppToast";
-// import * as repoUtils from "@/lib/repoUtils"; // Keep this for getLanguage if needed elsewhere
 
 interface UseKworkInputProps {
-    selectedFetcherFiles: Set<string>;
-    allFetchedFiles: FileNode[];
-    imageReplaceTaskActive: boolean;
-    files: FileNode[];
+    selectedFetcherFiles: Set<string>; 
+    allFetchedFiles: FileNode[]; 
+    imageReplaceTaskActive: boolean; 
+    files: FileNode[]; 
 }
 
 interface UseKworkInputReturn {
-    handleAddSelected: () => void;
-    handleCopyToClipboard: (textToCopy?: string, shouldScroll?: boolean) => boolean;
-    handleClearAll: () => void;
-    handleAddFullTree: () => void;
+    handleAddSelected: () => void; 
+    handleCopyToClipboard: (textToCopy?: string, shouldScroll?: boolean) => boolean; 
+    handleClearAll: () => void; 
+    handleAddFullTree: () => void; 
 }
 
 const getFileLanguage = (filePath: string): string => {
@@ -68,8 +68,8 @@ export const useKworkInput = ({
 
     const {
         kworkInputRef,       
-        kworkInputValue,     
-        setKworkInputValue,  
+        kworkInputValue, // Это значение из контекста, которое теперь всегда строка
+        setKworkInputValue, // Это сеттер контекста, который гарантирует строку  
         setRequestCopied,
         setSelectedFetcherFiles,
         setAiResponseHasContent,
@@ -79,7 +79,11 @@ export const useKworkInput = ({
         addToast, 
     } = useRepoXmlPageContext();
 
+    logger.debug(`[TRIM_DEBUG useKworkInput] Initial kworkInputValue from context: "${String(kworkInputValue).substring(0,50)}", type: ${typeof kworkInputValue}`);
+
+
     const handleAddSelected = useCallback(async () => {
+        // ... (код без изменений, он уже использует kworkInputValue из контекста, который теперь гарантированно строка)
         if (imageReplaceTaskActive) {
             logger.warn("[Kwork Input] Add Selected skipped: Image replace task active.");
             toastWarning("Добавление файлов недоступно во время задачи замены картинки.");
@@ -111,10 +115,12 @@ export const useKworkInput = ({
                 logger.warn(`[Kwork Input] Content for /${path} is of unexpected type: ${typeof fileNode.content} during AddSelected. Defaulting to empty string.`);
                 contentToDisplay = ""; 
             }
-
+            
+            // [TRIM_DEBUG]
+            logger.debug(`[TRIM_DEBUG useKworkInput handleAddSelected] File: ${path}, contentToDisplay before trim: "${String(contentToDisplay).substring(0,50)}", type: ${typeof contentToDisplay}`);
             const language = getFileLanguage(path);
             const pathComment = `// /${path}`;
-            if (contentToDisplay.startsWith("// Error:") || contentToDisplay.startsWith("// Info:") || contentToDisplay.startsWith("// Warning:") || contentToDisplay.trim()) {
+            if (contentToDisplay.startsWith("// Error:") || contentToDisplay.startsWith("// Info:") || contentToDisplay.startsWith("// Warning:") || (typeof contentToDisplay === 'string' && contentToDisplay.trim())) {
                 return `${pathComment}\n\`\`\`${language}\n${contentToDisplay.trim()}\n\`\`\``;
             }
             return null;
@@ -130,7 +136,8 @@ export const useKworkInput = ({
         const structureMarker = "Структура файлов проекта:";
         const newCodeContextSection = `${codeContextMarker}\n\n${fileBlocksContent}`;
 
-        const currentKworkValue = kworkInputValue || "";
+        const currentKworkValue = kworkInputValue; // Уже строка из контекста
+        logger.debug(`[TRIM_DEBUG useKworkInput handleAddSelected] currentKworkValue from context: "${currentKworkValue.substring(0,50)}", type: ${typeof currentKworkValue}`);
         let finalKworkValue = "";
 
         const idxCode = currentKworkValue.indexOf(codeContextMarker);
@@ -187,8 +194,9 @@ export const useKworkInput = ({
     ]);
 
     const handleCopyToClipboard = useCallback(async (textToCopy?: string, shouldScroll = true): Promise<boolean> => {
-        const contentToUse = textToCopy ?? (kworkInputValue || ""); 
-        if (!contentToUse.trim()) {
+        const contentToUse = textToCopy ?? kworkInputValue;  // kworkInputValue уже строка
+        logger.debug(`[TRIM_DEBUG useKworkInput handleCopyToClipboard] contentToUse: "${String(contentToUse).substring(0,50)}", type: ${typeof contentToUse}`);
+        if (!contentToUse.trim()) { 
             toastWarning("Нет текста для копирования");
             logger.warn("[Kwork Input] Copy skipped: Input is empty.");
             return false;
@@ -221,6 +229,7 @@ export const useKworkInput = ({
     }, [kworkInputValue, toastSuccess, toastWarning, toastError, setRequestCopied, scrollToSection, logger, dbUser?.id, addToast]); 
 
     const handleClearAll = useCallback(() => {
+        // ... (код без изменений)
         if (imageReplaceTaskActive) {
              logger.warn("[Kwork Input] Clear All skipped: Image replace task active.");
             toastWarning("Очистка недоступна во время задачи замены картинки.");
@@ -242,6 +251,7 @@ export const useKworkInput = ({
     ]);
 
      const handleAddFullTree = useCallback(async () => {
+        // ... (код без изменений, он также использует kworkInputValue из контекста, который теперь гарантированно строка)
          if (imageReplaceTaskActive) {
              logger.warn("[Kwork Input] Add Tree skipped: Image replace task active.");
              toastWarning("Добавление дерева файлов недоступно во время задачи замены картинки.");
@@ -269,6 +279,8 @@ export const useKworkInput = ({
              } else {
                  contentToDisplay = `// Файл /${file.path} пуст или содержит только комментарии.`;
              }
+             // [TRIM_DEBUG]
+             logger.debug(`[TRIM_DEBUG useKworkInput handleAddFullTree] File: ${file.path}, contentToDisplay before trim: "${String(contentToDisplay).substring(0,50)}", type: ${typeof contentToDisplay}`);
              const language = getFileLanguage(file.path);
              const pathComment = `// /${file.path}`;
              return `${pathComment}\n\`\`\`${language}\n${contentToDisplay.trim()}\n\`\`\``;
@@ -277,7 +289,8 @@ export const useKworkInput = ({
         const codeContextMarker = "Контекст кода для анализа:";
         const newCodeContextSection = `${codeContextMarker}\n\n${fileBlocksContent}`;
         
-        const currentKworkValue = kworkInputValue || "";
+        const currentKworkValue = kworkInputValue; // Уже строка
+        logger.debug(`[TRIM_DEBUG useKworkInput handleAddFullTree] currentKworkValue from context: "${currentKworkValue.substring(0,50)}", type: ${typeof currentKworkValue}`);
         let finalKworkValue = "";
 
         const idxCurrentStructure = currentKworkValue.indexOf(structureMarker);
