@@ -21,7 +21,7 @@ interface SimplePullRequest {
     base: { ref: string }; 
     updated_at: string; 
 }
-interface ImageReplaceTask { targetPath: string; oldUrl: string; newUrl: string; } // Добавил этот интерфейс, если он используется в этом файле
+interface ImageReplaceTask { targetPath: string; oldUrl: string; newUrl: string; } 
 
 // --- Константы ---
 const BATCH_SIZE = 40;
@@ -31,11 +31,12 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // --- Улучшенная parseRepoUrl ---
 function parseRepoUrl(repoUrl: string | null | undefined): { owner: string; repo: string } {
     if (!repoUrl || typeof repoUrl !== 'string') {
+        console.error("[Action parseRepoUrl] Invalid GitHub URL: URL is empty or not a string. Provided:", repoUrl);
         throw new Error("Invalid GitHub URL: URL is empty or not a string.");
     }
     const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+?)(\.git)?\/?$/);
     if (!match || !match[1] || !match[2]) {
-        console.error("Failed to parse GitHub URL:", repoUrl); 
+        console.error("[Action parseRepoUrl] Failed to parse GitHub URL with regex. URL:", repoUrl); 
         throw new Error(`Invalid GitHub URL format: ${repoUrl}`);
     }
     return { owner: match[1], repo: match[2] };
@@ -59,7 +60,7 @@ export async function checkExistingPrBranch(
         owner = repoInfo.owner;
         repo = repoInfo.repo;
         const rId = `${owner}/${repo}`;
-        console.log(`[Action] Checking for existing PR with head branch '${potentialBranchName}' in ${rId}`);
+        console.log(`[Action checkExistingPrBranch] Checking for existing PR with head branch '${potentialBranchName}' in ${rId}`);
 
         const token = process.env.GITHUB_TOKEN;
         if (!token) throw new Error("GitHub token is missing.");
@@ -74,7 +75,7 @@ export async function checkExistingPrBranch(
 
         if (existingPrs.length > 0) {
             const pr = existingPrs[0]; 
-            console.log(`[Action] Found existing open PR #${pr.number} for branch '${potentialBranchName}'.`);
+            console.log(`[Action checkExistingPrBranch] Found existing open PR #${pr.number} for branch '${potentialBranchName}'.`);
             return {
                 success: true,
                 data: {
@@ -85,13 +86,13 @@ export async function checkExistingPrBranch(
                 }
             };
         } else {
-            console.log(`[Action] No existing open PR found for branch '${potentialBranchName}'.`);
+            console.log(`[Action checkExistingPrBranch] No existing open PR found for branch '${potentialBranchName}'.`);
             return { success: true, data: { exists: false, branchName: potentialBranchName } };
         }
 
     } catch (error: any) {
         const repoId = owner && repo ? `${owner}/${repo}` : repoUrl;
-        console.error(`[Action] Error checking for PR branch '${potentialBranchName}' in ${repoId}:`, error);
+        console.error(`[Action checkExistingPrBranch] Error checking for PR branch '${potentialBranchName}' in ${repoId}:`, error);
         let eM = error instanceof Error ? error.message : "Failed to check for existing PR";
         if (error.status === 404) { eM = `Repo ${repoId} not found (${error.status}).`; }
         else if (error.status === 403) { eM = `Permission denied (${error.status}) checking PRs for ${repoId}.`; }
@@ -100,12 +101,11 @@ export async function checkExistingPrBranch(
 }
 
 // --- fetchRepoContents ---
-// Сигнатура соответствует: repoUrl, branchName?, customToken?, imageTask?
 export async function fetchRepoContents(
     repoUrl: string, 
     branchName?: string | null, 
     customToken?: string,
-    imageTask?: ImageReplaceTask | null // imageTask здесь, а не progressCallback
+    imageTask?: ImageReplaceTask | null 
 ) {
   console.log(`[Action fetchRepoContents ENTRY] Fetching: ${repoUrl}, Branch: ${branchName ?? 'default'}, Token Provided: ${!!customToken}, ImageTask: ${!!imageTask}`);
   const startTime = Date.now(); 
@@ -122,35 +122,39 @@ export async function fetchRepoContents(
     const repoInfo = parseRepoUrl(repoUrl); 
     owner = repoInfo.owner; 
     repo = repoInfo.repo;
-    console.log(`[Action fetchRepoContents PARSED] Owner: ${owner}, Repo: ${repo}`);
+    console.log(`[Action fetchRepoContents PARSED] Owner: "${owner}", Repo: "${repo}" from URL: "${repoUrl}"`);
+
+    if (!owner || !repo) { // Дополнительная проверка после парсинга
+        console.error(`[Action fetchRepoContents] CRITICAL: Owner or Repo is undefined after parsing. Owner: "${owner}", Repo: "${repo}"`);
+        throw new Error(`Critical error: Owner or Repo is undefined after parsing URL "${repoUrl}".`);
+    }
 
     const octokit = new Octokit({ auth: token });
     
     const allowedRootFiles = new Set(['package.json','tailwind.config.ts','tsconfig.json','next.config.js','next.config.mjs','vite.config.ts','vite.config.js','README.md','seed.sql']); const allowedPrefixes = ['app/','src/','components/','contexts/','hooks/','lib/','styles/','types/','utils/','data/']; const excludedExactPaths = new Set([]); const excludedPrefixes = ['.git/','node_modules/','.next/','dist/','build/','out/','public/','supabase/migrations/','Configame/','components/ui/','.vscode/','.idea/','coverage/','storybook-static/','docs/','examples/','test/','tests/','__tests__/','cypress/','prisma/migrations/','assets/','static/','images/']; const excludedExtensions = ['.pl','.json','.png','.jpg','.jpeg','.gif','.svg','.ico','.webp','.avif','.mp4','.webm','.mov','.mp3','.wav','.ogg','.pdf','.woff','.woff2','.ttf','.otf','.eot','.zip','.gz','.tar','.rar','.env','.lock','.log','.DS_Store','.md','.csv','.xlsx','.xls','.yaml','.yml','.bak','.tmp','.swp','.map','.dll','.exe','.so','.dylib'];
     
     if (!targetBranch || targetBranch === 'default') {
-        console.log("[Action fetchRepoContents] Branch not specified or 'default'. Fetching repo info for default branch...");
+        console.log(`[Action fetchRepoContents] Branch not specified or 'default'. Attempting to fetch repo info for default branch for ${owner}/${repo}.`);
         try { 
             const { data: repoData } = await octokit.repos.get({ owner, repo }); 
             targetBranch = repoData.default_branch; 
             isDefaultFetched = true; 
-            console.log(`[Action fetchRepoContents] Default branch determined via repos.get: ${targetBranch}`); 
+            console.log(`[Action fetchRepoContents] Default branch determined via repos.get for ${owner}/${repo}: ${targetBranch}`); 
         }
         catch (repoGetError: any) { 
-            console.error(`[Action fetchRepoContents] Failed to get default branch via repos.get:`, repoGetError); 
+            console.error(`[Action fetchRepoContents] Failed to get default branch via repos.get for ${owner}/${repo}:`, repoGetError); 
             if (repoGetError.status === 403 && repoGetError.message?.includes('rate limit')) { 
                 await notifyAdmin(`⏳ Rate Limit getting default branch ${owner}/${repo}.`); 
                 throw new Error("API rate limit hit checking default branch."); 
             } 
-            if (!branchName && !targetBranch) { // Если изначально не было ветки и не смогли определить
+            if (!branchName && !targetBranch) { 
                  throw new Error(`Failed determine default branch for ${owner}/${repo}: ${repoGetError.message}`); 
             }
-            // Если branchName был 'default' или null, но определение не удалось, используем 'default' как строку
             targetBranch = targetBranch || 'default'; 
-            console.warn(`[Action fetchRepoContents] Failed to determine default branch, proceeding with '${targetBranch}'.`);
+            console.warn(`[Action fetchRepoContents] Failed to determine default branch, proceeding with '${targetBranch}' for ${owner}/${repo}.`);
         }
     } else { 
-        console.log(`[Action fetchRepoContents] Using specified branch: ${targetBranch}`); 
+        console.log(`[Action fetchRepoContents] Using specified branch: ${targetBranch} for ${owner}/${repo}`); 
     }
 
     if (!targetBranch) { 
@@ -158,7 +162,7 @@ export async function fetchRepoContents(
         throw new Error("Target branch could not be determined."); 
     }
 
-    let latestCommitSha: string; console.log(`[Action fetchRepoContents] Fetching ref/commit for branch: ${targetBranch}...`);
+    let latestCommitSha: string; console.log(`[Action fetchRepoContents] Fetching ref/commit for branch: ${targetBranch} in ${owner}/${repo}...`);
     try { 
         const { data: refData } = await octokit.git.getRef({ owner, repo, ref: `heads/${targetBranch}` }); 
         latestCommitSha = refData.object.sha; 
@@ -488,7 +492,7 @@ export async function getOpenPullRequests(repoUrl: string): Promise<{ success: b
         const token = process.env.GITHUB_TOKEN;
         if (!token) throw new Error("GH token missing");
         const octokit = new Octokit({ auth: token });
-        console.log(`[Action] Fetching open PRs for ${rId}...`); 
+        console.log(`[Action getOpenPullRequests] Fetching open PRs for ${rId}...`); 
         const { data } = await octokit.pulls.list({ owner, repo, state: "open" });
         const cleanData: SimplePullRequest[] = data.map(pr => ({
             id: pr.id,
@@ -500,11 +504,11 @@ export async function getOpenPullRequests(repoUrl: string): Promise<{ success: b
             base: { ref: pr.base?.ref || 'unknown' }, 
             updated_at: pr.updated_at || new Date().toISOString(),
         }));
-        console.log(`[Action] Found ${cleanData.length} open PRs for ${rId}.`); 
+        console.log(`[Action getOpenPullRequests] Found ${cleanData.length} open PRs for ${rId}.`); 
         return { success: true, pullRequests: cleanData };
     } catch (error: any) {
         const repoId = owner && repo ? `${owner}/${repo}` : repoUrl; 
-        console.error(`[Action] CRITICAL Error fetch PRs ${repoId}:`, error); 
+        console.error(`[Action getOpenPullRequests] CRITICAL Error fetch PRs ${repoId}:`, error); 
         let eM = error instanceof Error ? error.message : "Failed fetch PRs";
         const status = error.status ? ` (${error.status})` : '';
 
@@ -524,7 +528,7 @@ export async function getOpenPullRequests(repoUrl: string): Promise<{ success: b
              await notifyAdmin(`⏳ Rate Limit при получении PR ${repoId}.`);
         } else {
             await notifyAdmin(`❌ Неизвестная ошибка (${status || 'N/A'}) при получении PR ${repoId}:\n${eM}`);
-            console.error(`[Action] Non-critical/Unknown error fetch PRs ${repoId}: Status=${status}`, error);
+            console.error(`[Action getOpenPullRequests] Non-critical/Unknown error fetch PRs ${repoId}: Status=${status}`, error);
         }
         return { success: false, error: eM };
     }
