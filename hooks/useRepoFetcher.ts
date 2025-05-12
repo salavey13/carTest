@@ -102,7 +102,8 @@ export const useRepoFetcher = (
         isRetry: boolean = false,
         branchNameToFetchOverride?: string | null
     ): Promise<void> => { 
-        logger.info(`[useRepoFetcher handleFetchManual] Called. Local Repo: ${repoUrl}, Branch Override: ${branchNameToFetchOverride ?? 'N/A'}, Current Hook Branch: ${currentBranchName}, isRetry: ${isRetry}, Token provided (first 5 chars): ${githubToken ? githubToken.substring(0, 5) + '...' : 'No token'}`);
+        const currentRepoUrlToFetch = repoUrl; // Use the current state value
+        logger.info(`[useRepoFetcher handleFetchManual] Called. Repo URL: ${currentRepoUrlToFetch}, Branch Override: ${branchNameToFetchOverride ?? 'N/A'}, Current Hook Branch: ${currentBranchName}, isRetry: ${isRetry}, Token provided: ${!!githubToken}`);
 
         if (isFetchingRef.current && !isRetry) {
             logger.warn("[useRepoFetcher handleFetchManual] Fetch already in progress. Skipping.");
@@ -110,8 +111,8 @@ export const useRepoFetcher = (
             return;
         }
         
-        if (!repoUrl || !repoUrl.includes("github.com")) {
-            logger.error(`[useRepoFetcher handleFetchManual] Invalid or empty repoUrl: ${repoUrl}. Cannot fetch.`);
+        if (!currentRepoUrlToFetch || !currentRepoUrlToFetch.includes("github.com")) {
+            logger.error(`[useRepoFetcher handleFetchManual] Invalid or empty repoUrl: ${currentRepoUrlToFetch}. Cannot fetch.`);
             addToast("Ошибка: URL репозитория не указан или некорректен.", "error");
             setFetchStatus('error'); 
             setErrorLocal("URL репозитория не указан или некорректен.");
@@ -128,12 +129,12 @@ export const useRepoFetcher = (
         logger.debug(`[useRepoFetcher handleFetchManual] Effective branch for server action: ${branchForFetch}`);
 
         try {
+            // Исправлен порядок аргументов для fetchRepoContentsAction
             const actionResult = await fetchRepoContentsAction(
-                repoUrl,
+                currentRepoUrlToFetch, // Используем актуальный URL
                 branchForFetch,
-                undefined, 
-                githubToken || undefined, 
-                activeImageTaskRef.current
+                githubToken || undefined, // customToken
+                activeImageTaskRef.current // imageTask
             );
 
             stopProgressSimulation(); 
@@ -166,7 +167,7 @@ export const useRepoFetcher = (
             onSetFilesFetched(false, [], null, { component: [], context: [], hook: [], lib: [], other: [] });
 
             if (isRetry && retryCount >= MAX_RETRIES - 1) {
-                logger.warn(`[useRepoFetcher handleFetchManual] Max retries (${MAX_RETRIES}) reached for ${repoUrl}.`);
+                logger.warn(`[useRepoFetcher handleFetchManual] Max retries (${MAX_RETRIES}) reached for ${currentRepoUrlToFetch}.`);
                 addToast(errorMessage + ` (Попытка ${retryCount + 1}/${MAX_RETRIES})`, "error"); 
                 setFetchStatus('failed_retries'); 
             } else {
@@ -182,7 +183,8 @@ export const useRepoFetcher = (
             logger.info(`[useRepoFetcher handleFetchManual] Finished. Current localLoading: ${loadingLocal}, Context FetchStatus (at finally): ${currentContextStatus}`);
         }
     }, [
-        repoUrl, currentBranchName, githubToken, addToast, onSetFilesFetched, setFetchStatus, 
+        repoUrl, // Зависимость от локального состояния repoUrl, которое синхронизируется
+        currentBranchName, githubToken, addToast, onSetFilesFetched, setFetchStatus, 
         retryCount, setRetryCount, highlightedPathFromUrl, logger, startProgressSimulation, stopProgressSimulation 
     ]);
 
