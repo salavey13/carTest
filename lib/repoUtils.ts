@@ -1,234 +1,346 @@
-import type { FileNode, ImageReplaceTask, ImportCategory, FetchedRepoFile } from '@/contexts/RepoXmlPageContext';
-import { debugLogger as logger } from './debugLogger';
+import { FileNode, ImportCategory } from "@/contexts/RepoXmlPageContext"; // Assuming types are moved to context or a types file
 
-// --- Tree Structure Generation ---
-export interface TreeNode {
-  name: string;
-  path: string;
-  type: 'file' | 'folder';
-  children?: TreeNode[];
-}
-
-export function buildFileTree(files: FileNode[] | FetchedRepoFile[]): TreeNode[] {
-  const root: TreeNode = { name: 'root', path: '', type: 'folder', children: [] };
-
-  for (const file of files) {
-    const parts = file.path.split('/');
-    let currentNode = root;
-
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      const isLastPart = i === parts.length - 1;
-
-      let childNode = currentNode.children?.find(child => child.name === part);
-
-      if (!childNode) {
-        childNode = {
-          name: part,
-          path: parts.slice(0, i + 1).join('/'),
-          type: isLastPart ? 'file' : 'folder',
-          children: isLastPart ? undefined : [],
-        };
-        if (!currentNode.children) {
-            currentNode.children = []; // Should not happen if initialized with []
-        }
-        currentNode.children.push(childNode);
-      }
-      // If it's a folder and we thought it was a file, or vice versa (shouldn't happen with clean data)
-      if (!isLastPart && childNode.type === 'file') {
-        childNode.type = 'folder';
-        childNode.children = childNode.children || [];
-      }
-      currentNode = childNode;
-    }
-  }
-  return root.children || [];
-}
-
-export function generateTreeString(nodes: TreeNode[], indent = 0, maxDepth = 10): string {
-  let treeString = '';
-  const indentStr = '  '.repeat(indent); // Two spaces for indentation
-
-  nodes.sort((a, b) => { // Sort: folders first, then by name
-    if (a.type === 'folder' && b.type === 'file') return -1;
-    if (a.type === 'file' && b.type === 'folder') return 1;
-    return a.name.localeCompare(b.name);
-  });
-
-  for (const node of nodes) {
-    treeString += `${indentStr}${node.type === 'folder' ? '📁' : '📄'} ${node.name}\n`;
-    if (node.type === 'folder' && node.children && indent < maxDepth -1) {
-      treeString += generateTreeString(node.children, indent + 1, maxDepth);
-    }
-  }
-  return treeString;
-}
-
-// --- Import Path Classification ---
-const importPatterns: Record<ImportCategory, RegExp[]> = {
-  component: [
-    /\/components?\//i,
-    /\.(?:tsx|jsx)$/i, // More specific to UI components
-  ],
-  context: [
-    /\/contexts?\//i,
-    /Context\.tsx?$/i,
-  ],
-  hook: [
-    /\/hooks?\//i,
-    /^use[A-Z].*\.tsx?$/i, // Starts with 'use' and capital letter
-  ],
-  lib: [
-    /\/lib\//i,
-    /\/utils?\//i,
-    /\/helpers?\//i,
-  ],
-  other: [], // Default category
-};
-
-export function classifyImportPath(path: string): ImportCategory {
-  for (const category in importPatterns) {
-    if (category === 'other') continue; // Skip 'other' for explicit matching
-    const patterns = importPatterns[category as ImportCategory];
-    if (patterns.some(pattern => pattern.test(path))) {
-      return category as ImportCategory;
-    }
-  }
-  return 'other';
-}
-
-// --- GitHub URL Parsing ---
-export interface GitHubRepoInfo {
-  owner: string;
-  repo: string;
-  branch?: string;
-  filePath?: string;
-  error?: string;
-}
-
-export function parseGitHubUrl(url: string): GitHubRepoInfo {
-  if (!url) return { error: "URL is empty", owner: "", repo: "" };
-  try {
-    const parsedUrl = new URL(url);
-    if (parsedUrl.hostname !== "github.com") {
-      return { error: "Not a GitHub URL", owner: "", repo: "" };
-    }
-
-    const pathParts = parsedUrl.pathname.split('/').filter(part => part.length > 0);
-    if (pathParts.length < 2) {
-      return { error: "Invalid GitHub URL path (missing owner/repo)", owner: "", repo: "" };
-    }
-
-    const owner = pathParts[0];
-    const repo = pathParts[1];
-    let branch: string | undefined;
-    let filePath: string | undefined;
-
-    if (pathParts.length > 3 && (pathParts[2] === "blob" || pathParts[2] === "tree")) {
-      branch = pathParts[3];
-      if (pathParts.length > 4) {
-        filePath = pathParts.slice(4).join('/');
-      }
-    }
-    return { owner, repo, branch, filePath };
-  } catch (e: any) {
-    logger.error("Error parsing GitHub URL:", e, "URL:", url);
-    return { error: e.message || "Failed to parse URL", owner: "", repo: "" };
-  }
-}
-
-export function isValidGitHubRepoUrl(url: string): boolean {
-  const info = parseGitHubUrl(url);
-  return !info.error && !!info.owner && !!info.repo;
-}
-
-// --- Text Processing ---
-export function getHumanReadableSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}
-
-export function extractFileExtension(filename: string): string | null {
-    if (!filename || typeof filename !== 'string') return null;
-    const lastDotIndex = filename.lastIndexOf('.');
-    if (lastDotIndex === -1 || lastDotIndex === 0 || lastDotIndex === filename.length - 1) {
-      return null; // No extension or hidden file
-    }
-    return filename.substring(lastDotIndex + 1).toLowerCase();
-}
-
-// --- Image Replace Task Parsing ---
-export function parseImageReplaceIdea(ideaString: string, targetPath: string | null): ImageReplaceTask | null {
-    logger.debug(`[parseImageReplaceIdea] Attempting to parse: "${ideaString}" with targetPath: "${targetPath}"`);
-    if (!ideaString || !ideaString.startsWith('ImageReplace|') || !targetPath) {
-        logger.warn(`[parseImageReplaceIdea] Invalid input: ideaString or targetPath missing/invalid.`);
-        return null;
-    }
-    try {
-        // Remove "ImageReplace|" prefix and replace remaining "|" with "&" for URLSearchParams
-        const paramsString = ideaString.substring('ImageReplace|'.length).replace(/\|/g, '&');
-        const params = new URLSearchParams(paramsString);
-        
-        const oldUrlEncoded = params.get('OldURL');
-        const newUrlEncoded = params.get('NewURL');
-
-        if (!oldUrlEncoded || !newUrlEncoded) {
-            logger.warn(`[parseImageReplaceIdea] Missing OldURL or NewURL in paramsString: "${paramsString}"`);
-            return null;
-        }
-
-        const oldUrl = decodeURIComponent(oldUrlEncoded);
-        const newUrl = decodeURIComponent(newUrlEncoded);
-
-        logger.info(`[parseImageReplaceIdea] Successfully parsed: targetPath=${targetPath}, oldUrl=${oldUrl.substring(0,50)}..., newUrl=${newUrl.substring(0,50)}...`);
-        return {
-            targetPath: targetPath,
-            oldUrl: oldUrl,
-            newUrl: newUrl,
-        };
-    } catch (error) {
-        logger.error(`[parseImageReplaceIdea] Error parsing ideaString: "${ideaString}"`, error);
-        return null;
-    }
-}
+// --- Helper Functions ---
 
 /**
- * Extracts a "repository slug" (e.g., "owner/repo") from a GitHub URL.
- * Handles various GitHub URL formats including blob, tree, and base repo URLs.
+ * Determines the programming language based on file extension.
  */
-export function getRepoSlug(githubUrl: string): string | null {
-  if (!githubUrl) return null;
-  try {
-    const url = new URL(githubUrl);
-    if (url.hostname !== 'github.com') {
-      return null;
+export const getLanguage = (path: string): string => {
+    const ext = path.split('.').pop()?.toLowerCase();
+    switch (ext) {
+        case 'ts': case 'tsx': return 'typescript';
+        case 'js': case 'jsx': return 'javascript';
+        case 'py': return 'python';
+        case 'css': return 'css';
+        case 'scss': case 'sass': return 'scss'; // Added scss/sass
+        case 'html': return 'html';
+        case 'json': return 'json';
+        case 'md': return 'markdown';
+        case 'sql': return 'sql';
+        case 'php': return 'php';
+        case 'rb': return 'ruby';
+        case 'go': return 'go';
+        case 'java': return 'java';
+        case 'cs': return 'csharp';
+        case 'sh': return 'bash';
+        case 'yml': case 'yaml': return 'yaml';
+        case 'toml': return 'toml'; // Added toml
+        case 'xml': return 'xml'; // Added xml
+        case 'env': return 'bash'; // Treat .env like bash for highlighting
+        default: return 'plaintext';
     }
-    const pathParts = url.pathname.split('/').filter(Boolean); // Remove empty parts
-    if (pathParts.length >= 2) {
-      return `${pathParts[0]}/${pathParts[1]}`;
-    }
-    return null;
-  } catch (e) {
-    logger.warn(`[getRepoSlug] Failed to parse URL: ${githubUrl}`, e);
-    return null;
-  }
-}
+};
 
-export function extractRepoName(githubUrl: string): string | null {
-    if (!githubUrl) return null;
-    try {
-        const parsed = new URL(githubUrl);
-        if (parsed.hostname === 'github.com') {
-            const pathParts = parsed.pathname.split('/').filter(part => part.length > 0);
-            if (pathParts.length >= 2) {
-                return pathParts[1]; // The repository name
+/**
+ * Simple delay function.
+ */
+export const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Categorizes a resolved file path based on common directory structures.
+ */
+export const categorizeResolvedPath = (resolvedPath: string): ImportCategory => {
+    if (!resolvedPath) return 'other';
+    const pL = resolvedPath.toLowerCase();
+    // Order matters: more specific first
+    if (pL.includes('/contexts/') || pL.startsWith('contexts/')) return 'context';
+    if (pL.includes('/hooks/') || pL.startsWith('hooks/')) return 'hook';
+    if (pL.includes('/lib/') || pL.startsWith('lib/')) return 'lib';
+    // Ensure it's a component but not a UI primitive if that distinction is needed
+    if ((pL.includes('/components/') || pL.startsWith('components/')) && !pL.includes('/components/ui/')) return 'component';
+    // Add more categories if needed (e.g., 'utils', 'styles', 'services')
+    return 'other';
+};
+
+/**
+ * Extracts import/require paths from JS/TS code content.
+ */
+export const extractImports = (content: string): string[] => {
+    // Regex for standard ES6 imports (covers default, named, namespace, side-effect)
+    const importRegex = /import(?:(?:["'\s]*(?:[\w*{}\n\r\t, ]+)from\s*)?)(["']((?:@[/\w.-]+)|(?:[./]+[\w./-]+))["'])/g;
+    // Regex for require() calls
+    const requireRegex = /require\s*\(\s*(["']((?:@[/\w.-]+)|(?:[./]+[\w./-]+))["'])\s*\)/g;
+    // Regex for dynamic imports import('...')
+    const dynamicImportRegex = /import\s*\(\s*(["']((?:@[/\w.-]+)|(?:[./]+[\w./-]+))["'])\s*\)/g;
+
+    const imports = new Set<string>();
+    let match;
+
+    while ((match = importRegex.exec(content)) !== null) {
+        // match[2] is the path without quotes
+        if (match[2] && match[2] !== '.') {
+            imports.add(match[2]);
+        }
+    }
+
+    while ((match = requireRegex.exec(content)) !== null) {
+        // match[2] is the path without quotes
+        if (match[2] && match[2] !== '.') {
+            imports.add(match[2]);
+        }
+    }
+
+     while ((match = dynamicImportRegex.exec(content)) !== null) {
+        // match[2] is the path without quotes
+        if (match[2] && match[2] !== '.') {
+            imports.add(match[2]);
+        }
+    }
+
+    return Array.from(imports);
+};
+
+/**
+ * Tries to resolve an import path relative to a current file path within a list of all project files.
+ * Handles relative paths, alias paths (@/), and some common root directory patterns.
+ */
+export const resolveImportPath = (
+    importPath: string,
+    currentFilePath: string,
+    allFileNodes: FileNode[] // Expects { path: string; ... } objects
+): string | null => {
+    const allPaths = allFileNodes.map(f => f.path);
+    // Standard extensions to check, order might matter slightly
+    const standardExtensions = ['.ts', '.tsx', '.js', '.jsx', '.json', '.css', '.scss', '.sql', '.md'];
+
+    // --- Internal Helper: tryPath ---
+    // Tries to find a matching file path for a base path, checking extensions and index files.
+    const tryPath = (basePath: string): string | null => {
+        const pathsToTry: string[] = [];
+        const hasExplicitExtension = /\.\w+$/.test(basePath);
+
+        if (hasExplicitExtension) {
+            pathsToTry.push(basePath); // Try the exact path first
+        }
+
+        // Always try adding standard extensions, even if one was provided (e.g., importing './styles.css' should resolve)
+        standardExtensions.forEach(ext => pathsToTry.push(basePath + ext));
+        // Try adding /index with standard extensions (common pattern)
+        standardExtensions.forEach(ext => pathsToTry.push(`${basePath}/index${ext}`));
+
+        // Create a unique set to avoid redundant checks
+        const uniquePathsToTry = Array.from(new Set(pathsToTry));
+
+        // Check if any of the generated paths exist in the project files
+        for (const p of uniquePathsToTry) {
+            if (allPaths.includes(p)) {
+                return p; // Found a match
             }
         }
-    } catch (error) {
-        logger.error("Failed to extract repo name from URL:", githubUrl, error);
+        return null; // No match found
+    };
+
+    // --- 1. Resolve Alias Paths (e.g., @/...) ---
+    if (importPath.startsWith('@/')) {
+        // Define possible base directories for aliases (adjust based on your tsconfig/jsconfig)
+        // No 'src/' prefix assumed
+        const aliasBasePaths = ['app/', './', '']; // Common locations, '' handles root-level alias
+        const pathSegment = importPath.substring(2); // Remove '@/'
+
+        for (const base of aliasBasePaths) {
+            const resolved = tryPath(base + pathSegment);
+            if (resolved) return resolved;
+        }
+        // Fallback check for specific common root directories if not found directly under app/ or root
+        const commonRootDirs = ['components/', 'lib/', 'utils/', 'hooks/', 'contexts/', 'styles/', 'services/'];
+         for (const rootDir of commonRootDirs) {
+             if (pathSegment.startsWith(rootDir)) {
+                  // Try resolving assuming the alias points directly to these roots
+                  const resolved = tryPath(pathSegment);
+                  if (resolved) return resolved;
+             }
+         }
     }
-    return null; // Return null if parsing fails or not a valid GitHub repo URL
-}
+    // --- 2. Resolve Relative Paths (e.g., ./ or ../) ---
+    else if (importPath.startsWith('.')) {
+        const currentDir = currentFilePath.includes('/') ? currentFilePath.substring(0, currentFilePath.lastIndexOf('/')) : '';
+        // Combine current directory with relative path
+        const combinedPath = (currentDir ? currentDir + '/' + importPath : importPath);
+
+        // Normalize the path (handle '.', '..', multiple slashes)
+        const pathParts = combinedPath.split('/');
+        const resolvedParts: string[] = [];
+        for (const part of pathParts) {
+            if (part === '.' || part === '') continue; // Skip current dir refs or empty parts
+            if (part === '..') {
+                if (resolvedParts.length > 0) {
+                    resolvedParts.pop(); // Go up one directory
+                }
+                // else: trying to go above root, ignore '..'
+            } else {
+                resolvedParts.push(part); // Add directory/file name
+            }
+        }
+        const resolvedRelativeBase = resolvedParts.join('/');
+        const resolved = tryPath(resolvedRelativeBase);
+        if (resolved) return resolved;
+    }
+    // --- 3. Resolve Bare Imports (could be node_modules or implicitly root dirs) ---
+    // This is a heuristic approach, as we don't have full node_modules resolution.
+    // We prioritize common source directories within the project structure.
+    else {
+        // Check common source roots relative to the project root (no 'src/' assumed)
+        const commonSourceRoots = ['lib/', 'utils/', 'components/', 'hooks/', 'contexts/', 'styles/', 'services/'];
+        for (const base of commonSourceRoots) {
+            const resolved = tryPath(base + importPath);
+            if (resolved) return resolved;
+        }
+         // Very basic check: if it looks like a file path (has extension or '/'), try resolving from root
+         if (importPath.includes('/') || /\.\w+$/.test(importPath)) {
+             const resolved = tryPath(importPath);
+             if (resolved) return resolved;
+         }
+         // If it doesn't contain '/', doesn't start with '.', and wasn't found in common roots,
+         // it's likely a node_module. We can't resolve that here, so return null.
+    }
+
+    // --- 4. Fallback ---
+    // If no other resolution worked, try resolving directly from the root
+    // (handles cases like importing 'package.json')
+    const resolvedFromRoot = tryPath(importPath);
+    if (resolvedFromRoot) return resolvedFromRoot;
+
+
+    return null; // Path couldn't be resolved within the known project files using these heuristics
+};
+
+
+/**
+ * Finds the corresponding file path (e.g., app/about/page.tsx) for a given Next.js route path (e.g., /about).
+ * Handles static routes, dynamic routes ([slug]), and common file naming conventions (page.js/tsx, index.js/tsx).
+ */
+export const getPageFilePath = (
+    routePath: string, // e.g., "/dashboard/settings", "/users/[id]"
+    allPaths: string[] // List of all file paths in the project
+): string | null => {
+    // Normalize route path: remove leading/trailing slashes, handle root
+    const cleanRoute = routePath.replace(/^\/|\/$/g, '');
+
+    // --- Handle Root Path ---
+    if (!cleanRoute) {
+        // Only check 'app/' since no 'src/'
+        const rootPageFiles = [
+            'app/page.tsx', 'app/page.js',
+             'app/index.tsx', 'app/index.js'
+        ];
+        for (const rp of rootPageFiles) {
+            if (allPaths.includes(rp)) return rp;
+        }
+        return null; // No root page found
+    }
+
+    // --- Search Strategy ---
+    // 1. Check for exact directory match with page.(js|tsx)
+    // 2. Check for exact directory match with index.(js|tsx) (less common for app router pages)
+    // 3. Check for dynamic route matches
+
+    const routeSegments = cleanRoute.split('/');
+
+    // Only search within 'app/' directory
+    const prefix = 'app/';
+    const basePath = prefix + cleanRoute; // e.g., "app/dashboard/settings"
+
+    // --- Check 1 & 2: Static routes (page.* and index.*) ---
+    const possibleStaticFiles = [
+        `${basePath}/page.tsx`, `${basePath}/page.js`,
+        `${basePath}/index.tsx`, `${basePath}/index.js`,
+         // Check if the route itself points to a file directly (e.g., /about.tsx if routes are structured differently)
+         `${prefix}${cleanRoute}.tsx`, `${prefix}${cleanRoute}.js`,
+    ];
+    for (const p of possibleStaticFiles) {
+        if (allPaths.includes(p)) {
+            return p;
+        }
+    }
+
+    // --- Check 3: Dynamic routes ---
+    const potentialDynamicPages = allPaths.filter(p =>
+        p.startsWith(prefix) && // Must be in app/
+        p.includes('[') && // Must contain dynamic segment markers
+        (p.endsWith('/page.tsx') || p.endsWith('/page.js') || p.endsWith('/index.tsx') || p.endsWith('/index.js'))
+    );
+
+    for (const pagePath of potentialDynamicPages) {
+        const suffix = ['/page.tsx', '/page.js', '/index.tsx', '/index.js'].find(s => pagePath.endsWith(s));
+        if (!suffix) continue; // Should not happen based on filter
+
+        // Extract the directory structure part of the potential page file path
+        // e.g., "users/[id]/settings" from "app/users/[id]/settings/page.tsx"
+        const pageDir = pagePath.substring(prefix.length, pagePath.length - suffix.length);
+        const pageSegments = pageDir.split('/');
+
+        // Compare segments count
+        if (pageSegments.length !== routeSegments.length) continue;
+
+        // Compare segments one by one
+        let match = true;
+        for (let i = 0; i < routeSegments.length; i++) {
+            const routeSeg = routeSegments[i];
+            const pageSeg = pageSegments[i];
+
+            // Allow mismatch only if the page segment is a dynamic placeholder
+            if (routeSeg !== pageSeg && !(pageSeg.startsWith('[') && pageSeg.endsWith(']'))) {
+                match = false;
+                break;
+            }
+        }
+
+        if (match) {
+            return pagePath; // Found a matching dynamic route page file
+        }
+    }
+
+
+    // --- Final Fallback (less likely for standard Next.js routing) ---
+    // Check if the routePath directly matches a file path (e.g., if routePath was "app/some/file.tsx")
+    if (allPaths.includes(routePath)) return routePath;
+    // No src/ check needed
+
+
+    return null; // No matching page file found
+};
+
+/**
+ * Guesses a suitable branch name from a file path.
+ * Example: app/components/MyComponent.tsx -> feat/my-component
+ * Example: lib/utils/helpers.ts -> fix/helpers-utils
+ */
+ export const guessBranchNameFromPath = (filePath: string): string | null => {
+    if (!filePath) return null;
+
+    // Remove common prefixes and extensions
+    let name = filePath
+      .replace(/^app\//, '')
+      .replace(/^components\//, '')
+      .replace(/^lib\//, '')
+      .replace(/^hooks\//, '')
+      .replace(/^contexts\//, '')
+      .replace(/\.(ts|tsx|js|jsx|css|scss|md|json|png|jpg|jpeg|gif|svg|webp)$/, '');
+
+    // Replace slashes and special characters with hyphens, convert to lowercase
+    name = name
+      .replace(/[\\/._]/g, '-') // Replace path separators and dots with hyphens
+      .replace(/[^a-zA-Z0-9-]/g, '') // Remove any remaining non-alphanumeric characters except hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with a single one
+      .replace(/^-|-$/g, '') // Trim leading/trailing hyphens
+      .toLowerCase();
+
+    if (!name) return 'update'; // Fallback if the name becomes empty
+
+    // Simple prefix logic (can be expanded)
+    let prefix = 'feat'; // Default to 'feat'
+    if (name.includes('fix') || name.includes('bug')) prefix = 'fix';
+    if (name.includes('refactor')) prefix = 'refactor';
+    if (name.includes('style') || name.includes('ui')) prefix = 'style';
+    if (name.includes('docs')) prefix = 'docs';
+
+    // Limit length to avoid overly long branch names
+    const maxLength = 40;
+    if (name.length > maxLength - prefix.length - 1) {
+      name = name.substring(0, maxLength - prefix.length - 1);
+      // Ensure it doesn't end with a hyphen after truncation
+      name = name.replace(/-$/, '');
+    }
+
+    return `${prefix}/${name}`;
+  };

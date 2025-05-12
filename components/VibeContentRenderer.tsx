@@ -19,10 +19,6 @@ function preprocessIconSyntax(content: string): string {
         /::(Fa\w+)(?:\s+className=(?:"([^"]*)"|'([^']*)'))?::/g,
         (_match, iconName, classValDouble, classValSingle) => {
             const classNameValue = classValDouble || classValSingle;
-            if (!isValidFa6Icon(iconName)) {
-                logger.warn(`[VCR Preprocessor] Encountered invalid icon name in custom syntax: ${iconName}. Rendering as text.`);
-                return `[ICON ERR!: ${iconName}]`;
-            }
             // Convert to a self-closing HTML-like tag for the parser
             return `<${iconName}${classNameValue ? ` class="${classNameValue}"` : ''} />`;
         }
@@ -71,16 +67,12 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                     style: style,
                 };
                 // logger.debug(`[VCR] Rendering <${iconComponentName} /> with props:`, finalProps);
-                try {
-                    return React.createElement(IconComponent, finalProps, children);
-                } catch (e) {
-                    logger.error(`[VCR] Error rendering icon <${iconComponentName}>:`, e, "Props:", finalProps);
-                    return <span title={`Error rendering icon: ${iconComponentName}`} className="text-red-500 font-bold">{`[ICON ERR!]`}</span>;
-                }
-            } else if (lowerCaseName.startsWith('fa') || nodeName.startsWith('Fa')) { // Fallback for unmapped/invalid Fa icons
+                return React.createElement(IconComponent, finalProps, children);
+            } else if (lowerCaseName.startsWith('fa')) { // Fallback for unmapped/invalid Fa icons
                 logger.warn(`[VCR] Unknown Fa Icon Tag or unmapped: <${nodeName}> (lc: ${lowerCaseName})`);
                 return <span title={`Unknown/Unmapped Fa Icon: ${nodeName}`} className="text-orange-500 font-bold">{`<${nodeName}>`}</span>;
             }
+
 
             // --- Link Handling ---
             if (lowerCaseName === 'a') {
