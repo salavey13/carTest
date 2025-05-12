@@ -231,19 +231,20 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const setSelectedFetcherFilesStateStable = useCallback((files: Set<string> | ((prevState: Set<string>) => Set<string>)) => setSelectedFetcherFilesState(files), []);
         const setKworkInputHasContentStateStable = useCallback((hasContent: boolean | ((prevState: boolean) => boolean)) => setKworkInputHasContentState(hasContent), []);
         
+        // Restored "OLD" logic for setKworkInputValueStateStable
         const setKworkInputValueStateStable = useCallback((value: string | undefined | null | ((prevState: string) => string | undefined | null)) => {
-            logger.debug(`[TRIM_DEBUG Context] setKworkInputValueStateStable called with value: "${String(value).substring(0,50)}", type: ${typeof value}`);
             setKworkInputValueState(prev => {
                 const determinedValue = typeof value === 'function' ? value(prev) : value;
-                logger.debug(`[TRIM_DEBUG Context] setKworkInputValueStateStable - determinedValue: "${String(determinedValue).substring(0,50)}", type: ${typeof determinedValue}`);
-                const finalValue = (typeof determinedValue === 'string' && determinedValue !== 'null') ? determinedValue : '';
-                logger.debug(`[TRIM_DEBUG Context] setKworkInputValueStateStable - finalValue for state: "${finalValue.substring(0,50)}" (type: ${typeof finalValue})`);
+                // OLD LOGIC: if determinedValue is actual null, finalValue becomes "". If string "null", finalValue remains string "null".
+                const finalValue = typeof determinedValue === 'string' ? determinedValue : ''; 
                 
-                // [TRIM_DEBUG] Log before potential trim inside setKworkInputHasContentStateStable
-                logger.debug(`[TRIM_DEBUG Context] setKworkInputValueStateStable: Value before setKworkInputHasContentStateStable call. finalValue = "${finalValue}" (type: ${typeof finalValue})`);
-
+                logger.debug(`[Context Setter (Old Logic)] kworkInputValue determinedValue: "${String(determinedValue).substring(0,50)}", finalValue for state: "${finalValue.substring(0,50)}"`);
+                
+                // The .trim() call below is on `finalValue`.
+                // If finalValue is string "null", ("null").trim() is "null", length is 4. hasContent = true.
+                // If finalValue is "", ("").trim() is "", length is 0. hasContent = false.
+                // This is safe.
                 setKworkInputHasContentStateStable(finalValue.trim().length > 0);
-                logger.info(`[Context Setter] kworkInputValue set to: "${finalValue.substring(0, 70)}..." (Original input type: ${typeof value}, determinedValue: ${determinedValue === null ? 'null' : typeof determinedValue === 'undefined' ? 'undefined' : `"${String(determinedValue).substring(0,10)}..."`})`);
                 return finalValue;
             });
         }, [setKworkInputHasContentStateStable, logger]);
@@ -268,7 +269,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const setPendingFlowDetailsStateStable = useCallback((details: PendingFlowDetails | null | ((prevState: PendingFlowDetails | null) => PendingFlowDetails | null)) => setPendingFlowDetailsState(details), []);
         const setShowComponentsStateStable = useCallback((show: boolean | ((prevState: boolean) => boolean)) => setShowComponentsState(show), []);
         const setRetryCountStateStable = useCallback((count: number | ((prevState: number) => number)) => setRetryCountState(count), []); 
-
 
         useEffect(() => { imageReplaceTaskStateRef.current = imageReplaceTaskState; }, [imageReplaceTaskState]);
         useEffect(() => { pendingFlowDetailsRef.current = pendingFlowDetailsState; }, [pendingFlowDetailsState]);
