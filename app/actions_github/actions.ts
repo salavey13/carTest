@@ -14,13 +14,14 @@ interface SimplePullRequest {
     title: string; 
     html_url: string; 
     user?: { 
-        login?: string | null; // Сделал login опциональным и допускающим null
-        avatar_url?: string | null; // Добавил avatar_url
-    } | null; // user может быть null
+        login?: string | null; 
+        avatar_url?: string | null; 
+    } | null; 
     head: { ref: string }; 
     base: { ref: string }; 
     updated_at: string; 
 }
+interface ImageReplaceTask { targetPath: string; oldUrl: string; newUrl: string; } // Добавил этот интерфейс, если он используется в этом файле
 
 // --- Константы ---
 const BATCH_SIZE = 40;
@@ -99,22 +100,30 @@ export async function checkExistingPrBranch(
 }
 
 // --- fetchRepoContents ---
-// Изменена сигнатура: progressCallback удален, customToken и imageTask сдвинуты
+// Сигнатура соответствует: repoUrl, branchName?, customToken?, imageTask?
 export async function fetchRepoContents(
     repoUrl: string, 
     branchName?: string | null, 
-    customToken?: string, // Теперь это третий аргумент
-    imageTask?: ImageReplaceTask | null // Теперь это четвертый аргумент
+    customToken?: string,
+    imageTask?: ImageReplaceTask | null // imageTask здесь, а не progressCallback
 ) {
-  console.log(`[Action fetchRepoContents] Fetching: ${repoUrl}${branchName ? ` @ ${branchName}` : ' (default)'}. Token provided: ${!!customToken}`);
-  const startTime = Date.now(); let owner: string | undefined, repo: string | undefined; let targetBranch = branchName; let isDefaultFetched = false;
+  console.log(`[Action fetchRepoContents ENTRY] Fetching: ${repoUrl}, Branch: ${branchName ?? 'default'}, Token Provided: ${!!customToken}, ImageTask: ${!!imageTask}`);
+  const startTime = Date.now(); 
+  let owner: string | undefined, repo: string | undefined; 
+  let targetBranch = branchName; 
+  let isDefaultFetched = false;
+
   try {
     const token = customToken || process.env.GITHUB_TOKEN; 
     if (!token) {
         console.error("[Action fetchRepoContents] GitHub token is missing. Neither customToken nor process.env.GITHUB_TOKEN are set.");
         throw new Error("GitHub token is missing.");
     }
-    const repoInfo = parseRepoUrl(repoUrl); owner = repoInfo.owner; repo = repoInfo.repo;
+    const repoInfo = parseRepoUrl(repoUrl); 
+    owner = repoInfo.owner; 
+    repo = repoInfo.repo;
+    console.log(`[Action fetchRepoContents PARSED] Owner: ${owner}, Repo: ${repo}`);
+
     const octokit = new Octokit({ auth: token });
     
     const allowedRootFiles = new Set(['package.json','tailwind.config.ts','tsconfig.json','next.config.js','next.config.mjs','vite.config.ts','vite.config.js','README.md','seed.sql']); const allowedPrefixes = ['app/','src/','components/','contexts/','hooks/','lib/','styles/','types/','utils/','data/']; const excludedExactPaths = new Set([]); const excludedPrefixes = ['.git/','node_modules/','.next/','dist/','build/','out/','public/','supabase/migrations/','Configame/','components/ui/','.vscode/','.idea/','coverage/','storybook-static/','docs/','examples/','test/','tests/','__tests__/','cypress/','prisma/migrations/','assets/','static/','images/']; const excludedExtensions = ['.pl','.json','.png','.jpg','.jpeg','.gif','.svg','.ico','.webp','.avif','.mp4','.webm','.mov','.mp3','.wav','.ogg','.pdf','.woff','.woff2','.ttf','.otf','.eot','.zip','.gz','.tar','.rar','.env','.lock','.log','.DS_Store','.md','.csv','.xlsx','.xls','.yaml','.yml','.bak','.tmp','.swp','.map','.dll','.exe','.so','.dylib'];
@@ -133,20 +142,18 @@ export async function fetchRepoContents(
                 await notifyAdmin(`⏳ Rate Limit getting default branch ${owner}/${repo}.`); 
                 throw new Error("API rate limit hit checking default branch."); 
             } 
-            // If branchName was explicitly 'default' or null, and we failed, throw error
-            if (!branchName) { 
+            if (!branchName && !targetBranch) { // Если изначально не было ветки и не смогли определить
                  throw new Error(`Failed determine default branch for ${owner}/${repo}: ${repoGetError.message}`); 
             }
-            // If branchName was something else but failed, we already have targetBranch set to it.
-            // This path (using branchName) should ideally not be hit if branchName was already specific.
-            console.warn(`[Action fetchRepoContents] Failed to determine default branch, but a specific branch '${branchName}' was requested. Proceeding with '${branchName}'.`);
-            targetBranch = branchName; // Fallback to originally passed branchName if it was not null/default
+            // Если branchName был 'default' или null, но определение не удалось, используем 'default' как строку
+            targetBranch = targetBranch || 'default'; 
+            console.warn(`[Action fetchRepoContents] Failed to determine default branch, proceeding with '${targetBranch}'.`);
         }
     } else { 
         console.log(`[Action fetchRepoContents] Using specified branch: ${targetBranch}`); 
     }
 
-    if (!targetBranch) { // Should not happen if logic above is correct
+    if (!targetBranch) { 
         console.error("[Action fetchRepoContents] CRITICAL: Target branch is still undetermined after attempting to find default.");
         throw new Error("Target branch could not be determined."); 
     }
@@ -231,7 +238,6 @@ export async function fetchRepoContents(
                 else { console.warn(`[Action fetchRepoContents] Unsupported encoding '${bD.encoding}' for file ${fI.path}. Skipping.`); return null; } 
                 const MAX_BYTES = 750*1024; 
                 if (Buffer.byteLength(cnt, 'utf8') > MAX_BYTES) { console.warn(`[Action fetchRepoContents] Skipping large file (${(Buffer.byteLength(cnt,'utf8')/1024).toFixed(0)} KB): ${fI.path}`); return null; } 
-                // Path comment logic unchanged
                 let pC: string; const fE=fI.path.split('.').pop()?.toLowerCase()||''; switch(fE){ case 'ts':case 'tsx':case 'js':case 'jsx':pC=`// /${fI.path}`;break; case 'css':case 'scss':pC=`/* /${fI.path} */`;break; case 'sql':pC=`-- /${fI.path}`;break; case 'py':case 'rb':case 'sh':case 'yml':case 'yaml':case 'env':pC=`# /${fI.path}`;break; case 'html':case 'xml':case 'vue':case 'svelte':pC=`<!-- /${fI.path} -->`;break; case 'md':pC=`<!-- /${fI.path} -->`;break; default:pC=`// /${fI.path}`; } if(cnt.trim()&&!cnt.trimStart().startsWith(pC)){cnt=`${pC}\n${cnt}`;}else if(!cnt.trim()){cnt=pC;}
                 return { path: fI.path, content: cnt }; 
             } catch (fE: any) { 
@@ -258,8 +264,8 @@ export async function fetchRepoContents(
     const status = error.status ? ` (${error.status})` : '';
 
     if(error.status===403&&error.message?.includes('rate limit')){await notifyAdmin(`⏳ Rate Limit for ${repoId}${bInfo}.`); eM = `GitHub API rate limit exceeded${status}.`;}
-    else if(error.status===404||error.message?.includes('not found')){await notifyAdmin(`❌ 404 Not Found for ${repoId}${bInfo}.`); eM = `Repository, branch, or resource not found${status}.`;}
-    else if(error.status===401||error.status===403){await notifyAdmin(`❌ Auth Error (${error.status}) for ${repoId}${bInfo}.`); eM = `GitHub Authentication/Authorization error${status}. Check token permissions.`;}
+    else if(error.status===404||error.message?.includes('not found')){await notifyAdmin(`❌ 404 Not Found for ${repoId}${bInfo}.`); eM = `Repo, branch, or resource not found${status}.`;}
+    else if(error.status===401||error.status===403){await notifyAdmin(`❌ Auth Error (${error.status}) for ${repoId}${bInfo}.`); eM = `GitHub Auth error${status}. Check token permissions.`;}
     else if(error.message?.startsWith('Too many files')){await notifyAdmin(`❌ Too many files reported by GitHub API for ${repoId}${bInfo}.`); eM = error.message;}
     else { await notifyAdmin(`❌ Ошибка извлечения файлов из ${repoId}${bInfo}:\n${eM}`); }
     

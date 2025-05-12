@@ -102,8 +102,8 @@ export const useRepoFetcher = (
         isRetry: boolean = false,
         branchNameToFetchOverride?: string | null
     ): Promise<void> => { 
-        const currentRepoUrlToFetch = repoUrl; // Use the current state value
-        logger.info(`[useRepoFetcher handleFetchManual] Called. Repo URL: ${currentRepoUrlToFetch}, Branch Override: ${branchNameToFetchOverride ?? 'N/A'}, Current Hook Branch: ${currentBranchName}, isRetry: ${isRetry}, Token provided: ${!!githubToken}`);
+        const currentRepoUrlToFetch = repoUrl; 
+        logger.info(`[useRepoFetcher handleFetchManual] Called. Repo URL: ${currentRepoUrlToFetch}, Branch Override: ${branchNameToFetchOverride ?? 'N/A'}, Current Hook Branch: ${currentBranchName}, isRetry: ${isRetry}, Token provided (first 5 chars): ${githubToken ? githubToken.substring(0, 5) + '...' : 'No token'}`);
 
         if (isFetchingRef.current && !isRetry) {
             logger.warn("[useRepoFetcher handleFetchManual] Fetch already in progress. Skipping.");
@@ -129,11 +129,10 @@ export const useRepoFetcher = (
         logger.debug(`[useRepoFetcher handleFetchManual] Effective branch for server action: ${branchForFetch}`);
 
         try {
-            // Исправлен порядок аргументов для fetchRepoContentsAction
             const actionResult = await fetchRepoContentsAction(
-                currentRepoUrlToFetch, // Используем актуальный URL
+                currentRepoUrlToFetch,
                 branchForFetch,
-                githubToken || undefined, // customToken
+                githubToken || undefined, // customToken (was previously the progress callback placeholder)
                 activeImageTaskRef.current // imageTask
             );
 
@@ -183,8 +182,7 @@ export const useRepoFetcher = (
             logger.info(`[useRepoFetcher handleFetchManual] Finished. Current localLoading: ${loadingLocal}, Context FetchStatus (at finally): ${currentContextStatus}`);
         }
     }, [
-        repoUrl, // Зависимость от локального состояния repoUrl, которое синхронизируется
-        currentBranchName, githubToken, addToast, onSetFilesFetched, setFetchStatus, 
+        repoUrl, currentBranchName, githubToken, addToast, onSetFilesFetched, setFetchStatus, 
         retryCount, setRetryCount, highlightedPathFromUrl, logger, startProgressSimulation, stopProgressSimulation 
     ]);
 
