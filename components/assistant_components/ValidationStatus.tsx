@@ -49,10 +49,10 @@ export const ValidationStatusIndicator: React.FC<ValidationStatusProps> = ({
 
     const getIndicatorIcon = () => {
          switch (status) {
-            case 'validating': return <FaRotate size={16} className="text-brand-blue animate-spin" />; // Use theme color
-            case 'success': return <FaCircleCheck size={16} className="text-brand-green" />; // Use theme color
-            case 'warning': return <FaTriangleExclamation size={16} className="text-brand-yellow" />; // Use theme color
-            case 'error': return <FaTriangleExclamation size={16} className="text-destructive" />; // Use theme color
+            case 'validating': return <FaRotate size={16} className="text-brand-blue animate-spin" />; 
+            case 'success': return <FaCircleCheck size={16} className="text-brand-green" />; 
+            case 'warning': return <FaTriangleExclamation size={16} className="text-brand-yellow" />; 
+            case 'error': return <FaTriangleExclamation size={16} className="text-destructive" />; 
             default: return null;
         }
     }
@@ -72,7 +72,7 @@ export const ValidationStatusIndicator: React.FC<ValidationStatusProps> = ({
                           <button
                              onClick={onAutoFix}
                              disabled={isFixDisabled}
-                             className="flex items-center justify-center gap-1 px-2 py-1 text-xs rounded bg-brand-green hover:bg-brand-green/80 text-primary-foreground transition shadow text-nowrap disabled:opacity-50 disabled:cursor-not-allowed min-w-[100px]" // Use theme colors
+                             className="flex items-center justify-center gap-1 px-2 py-1 text-xs rounded bg-brand-green hover:bg-brand-green/80 text-primary-foreground transition shadow text-nowrap disabled:opacity-50 disabled:cursor-not-allowed min-w-[100px]" 
                              title="Автоматически исправить (use client, import React, icon names)"
                          >
                              <FaBroom size={12} /> Исправить ({fixableIssues.length})
@@ -80,7 +80,7 @@ export const ValidationStatusIndicator: React.FC<ValidationStatusProps> = ({
                      )}
                      {sneakyEmptyBlockIssues.length > 0 && (
                          <div
-                             className="flex items-center justify-center gap-1 px-2 py-1 text-xs rounded bg-destructive/70 text-destructive-foreground shadow border border-destructive/50 text-nowrap min-w-[100px] cursor-help" // Use theme colors
+                             className="flex items-center justify-center gap-1 px-2 py-1 text-xs rounded bg-destructive/70 text-destructive-foreground shadow border border-destructive/50 text-nowrap min-w-[100px] cursor-help" 
                              title={`Найдены пустые блоки { /* ... */ } (${sneakyEmptyBlockIssues.length}). Это почти наверняка ошибка AI. Удалите их или замените кодом.`}
                          >
                              <FaPoo size={12} /> Пуст. блоки ({sneakyEmptyBlockIssues.length})
