@@ -1,4 +1,5 @@
-"use client"
+"use client"; // <--- ДОБАВЛЕНО ЗДЕСЬ
+
 import React from 'react';
 
 export default function FinanceLiteracyMemoPage() {
