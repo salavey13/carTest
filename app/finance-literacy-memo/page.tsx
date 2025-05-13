@@ -1,40 +1,14 @@
-"use client"; // <--- ДОБАВЛЕНО ЗДЕСЬ
+"use client"; 
 
 import React from 'react';
 
 export default function FinanceLiteracyMemoPage() {
   return (
-    <div className="bg-white text-black min-h-screen p-4 sm:p-6 md:p-8 print:p-0">
-      <style jsx global>{`
-        @media print {
-          body {
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-            margin: 0;
-            padding: 10mm; /* Add some padding for printing */
-          }
-          .no-print {
-            display: none !important;
-          }
-          .printable-content {
-            width: 100% !important;
-            max-width: 100% !important;
-            box-shadow: none !important;
-            border: none !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-          h1, h2, h3, p, li {
-            color: #000 !important; /* Ensure text is black for printing */
-          }
-          .finance-literacy-memo-content {
-             page-break-inside: avoid; /* Try to keep memo sections on one page */
-          }
-        }
-      `}</style>
-      <main className="max-w-4xl mx-auto printable-content">
+    <div className="bg-white text-black min-h-screen p-4 sm:p-6 md:p-8">
+      {/* Global styles removed as per request */}
+      <main className="max-w-4xl mx-auto">
         {/* Finance Literacy Memo Content */}
-        <div className="finance-literacy-memo-content mt-2 sm:mt-4 md:mt-6 pt-2 sm:pt-4"> {/* Reduced top margin/padding as header is gone */}
+        <div className="finance-literacy-memo-content mt-2 sm:mt-4 md:mt-6 pt-2 sm:pt-4">
           <header className="mb-6 text-center">
             <h1 className="text-3xl font-bold text-indigo-700">ПАМЯТКА</h1>
             <h2 className="text-xl font-semibold text-indigo-600 mt-1">Как правильно распоряжаться карманными деньгами?</h2>
