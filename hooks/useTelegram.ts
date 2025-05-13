@@ -44,13 +44,14 @@ async function validateTelegramAuthWithApi(initDataString: string): Promise<Vali
       body: JSON.stringify({ initData: initDataString }),
     });
 
-    if (!response.ok) {
-      const errorBody = await response.text();
+    const result = await response.json(); // Parse JSON regardless of status first
+    
+    if (!response.ok) { // Check response.ok after parsing
+      const errorBody = result?.error || JSON.stringify(result) || response.statusText;
       globalLogger.error(`[validateTelegramAuthWithApi] Validation failed. Status: ${response.status}`, errorBody);
-      throw new Error(`Telegram data validation API failed: ${errorBody || response.statusText}`);
+      throw new Error(`Telegram data validation API failed: ${errorBody}`);
     }
 
-    const result = await response.json();
     if (result.isValid && result.user) {
       debugLogger.log("[validateTelegramAuthWithApi] Telegram data successfully validated via API. User:", {id: result.user?.id, username: result.user?.username});
       const tgUser = result.user as WebAppInitData['user'];
@@ -70,7 +71,14 @@ async function validateTelegramAuthWithApi(initDataString: string): Promise<Vali
           added_to_attachment_menu: tgUser.added_to_attachment_menu,
           allows_write_to_pm: tgUser.allows_write_to_pm,
       };
-    } else {
+    } else if (result.isValid && !result.user) {
+        globalLogger.warn("[validateTelegramAuthWithApi] Validation successful via API but no user data returned. This might be due to hash bypass with missing user param.", result);
+        // If hash validation is bypassed and user param is missing, this path can be hit.
+        // Depending on strictness, this could be an error or a specific handling case.
+        // For now, let's treat it as not fully authenticated if user object isn't there.
+        return null;
+    }
+    else {
       globalLogger.warn("[validateTelegramAuthWithApi] Validation unsuccessful or no user data returned from API.", result);
       return null;
     }
