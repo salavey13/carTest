@@ -216,7 +216,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         handleDirectImageReplace: (task: ImageReplaceTask, files: FileNode[]) => {
             return handlers.handleDirectImageReplace(task, files);
         },
-    }), [handlers, setResponseValue, updateRepoUrl]); // handlers includes dependencies via useAICodeAssistantHandlers
+    })); // FIX: Added explicit return {} for the hook.
     
     // --- Derived State for Rendering ---
     const effectiveIsParsing = contextIsParsing ?? hookIsParsing;
@@ -283,7 +283,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                                   status={validationStatus}
                                   issues={validationIssues}
                                   onAutoFix={handlers.handleAutoFix}
-                                  onCopyPrompt={() => {}} // Placeholder, copy prompt logic might be elsewhere
                                   isFixDisabled={fixButtonDisabled}
                                />
                           </div>

@@ -17,7 +17,6 @@ export type IssueType =
   | 'invalidExtension'
   | 'useClientMissing'
   | 'importReactMissing'
-  // | 'badIconName' // Removed legacy icon check type
   | 'skippedComment' // Found '// ...' - Marker requiring AI restoration
   | 'skippedCodeBlock' // Found '/* ... */' - Marker requiring AI restoration
   | 'sneakyEmptyBlock' // Found '{ /* ... */ }'
@@ -44,17 +43,13 @@ export interface FileEntry {
 }
 
 // --- Constants ---
-// CODE_BLOCK_REGEX is defined and used locally in parseFilesFromText
 const FILE_PATH_REGEX = /^(?:[\w-]+\/)*[\w-]+\.\w+/; // Basic path check
 const USE_CLIENT_REGEX = /^\s*['"]use client['"]\s*;?\s*$/;
 const IMPORT_REACT_REGEX = /import\s+(?:React(?:,\s*{[^}]*})?|{[^}]*\s+React\s*,\s*[^}]*})\s+from\s+['"]react['"]/;
 const FA6_ICON_REGEX = /<Fa[A-Z][a-zA-Z0-9]+(?:\s+[^>]*?)?\s*\/?>/g; // Find potential Fa icons
 const SNEAKY_EMPTY_BLOCK_REGEX = /{[\s\n]*\/\*\s*\.{3}\s*\*\/\s*[\s\n]*}/g;
-// Regex for simple 3-dot marker inside comments or braces
 const SKIPPED_CODE_MARKER_REGEX = /(\/\*\s*\.{3}\s*\*\/)|({\s*\/\*\s*\.{3}\s*\*\/\s*})|(\[\s*\/\*\s*\.{3}\s*\*\/\s*\])/;
-// --- UPDATED REGEX: Matches ONLY lines containing just '// ...' (THREE DOTS) ---
 const SKIPPED_COMMENT_MARKER_REGEX = /^\s*\/\/\s*\.{3}\s*$/;
-// --- End Updated Regex ---
 
 
 // Map for known Fa6 corrections
@@ -63,6 +58,8 @@ const fa6IconCorrectionMap: Record<string, string> = {
     FaBalanceScale: 'FaScaleBalanced',
     FaTools: 'FaToolbox',
     FaUserCog: 'FaUserGear',
+    FaSlidersH: 'FaSliders', // Corrected as per user request
+    FaCheckSquare: 'FaSquareCheck', // Corrected as per user request
     FaProjectDiagram: 'FaDiagramProject',
     FaCog: 'FaGear',
     FaUserCircle: 'FaCircleUser',
@@ -71,10 +68,10 @@ const fa6IconCorrectionMap: Record<string, string> = {
     FaRunning: 'FaPersonRunning',
     FaSadTear: 'FaFaceSadTear',
     FaSearchDollar: 'FaMagnifyingGlassDollar',
+    FaSignOutAlt: 'FaRightFromBracket', // Corrected as per user request in style-guide
 };
 const knownIncorrectFa6Names = Object.keys(fa6IconCorrectionMap);
 
-// REMOVED: const validFa6Icons = new Set<string>([ ... ]);
 
 const importChecks = [
     { name: 'motion', usageRegex: /<motion\./, importRegex: /import .* from ['"]framer-motion['"]/, importStatement: `import { motion } from "framer-motion";` },
@@ -135,7 +132,6 @@ export function useCodeParsingAndValidation() {
             }
             if (path !== '/') path = path.replace(/^[\/\\]+/, '');
 
-            // MODIFIED CHECK: Look for ``` at the BEGINNING of any line within the content
             if (/^\s*```/m.test(content)) {
                  const fileId = generateId();
                  logger.warn(`[Parse Logic] Nested code block marker (\`\`\`) found at the start of a line within the content of potential file: ${path}. Adding parse error.`);
@@ -148,8 +144,7 @@ export function useCodeParsingAndValidation() {
         const description = descriptionParts.filter(Boolean).join('\n\n');
          logger.debug(`[Parse Logic] Finished parsing. Files: ${files.length}, Errors: ${parseErrors.length}, Desc Length: ${description.length}`);
         return { files, description, parseErrors };
-    }, [logger]); // Added logger dependency
-
+    }, [logger]); 
 
     // --- Validation Logic ---
     const validateParsedFiles = useCallback(async (filesToValidate: FileEntry[]): Promise<ValidationIssue[]> => {
@@ -178,37 +173,31 @@ export function useCodeParsingAndValidation() {
                   logger.debug(`[Validation Logic - ${filePath}] Found Fa6 import line ${importLineNumber}: ${importedFa6IconsRaw.join(', ')}`);
 
                  importedFa6IconsRaw.forEach(rawImport => {
-                     const cleanedImportName = rawImport.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '').trim(); // Clean comments
-                     if (!cleanedImportName) return; // Skip if only comment was present
+                     const cleanedImportName = rawImport.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '').trim(); 
+                     if (!cleanedImportName) return; 
 
-                     const iconName = cleanedImportName.split(/\s+as\s+/)[0].trim(); // Get the actual name (before 'as')
+                     const iconName = cleanedImportName.split(/\s+as\s+/)[0].trim(); 
                      if (!iconName) return;
-
 
                      if (knownIncorrectFa6Names.includes(iconName)) {
                          const correctName = fa6IconCorrectionMap[iconName];
                          logger.warn(`[Validation Logic - ${filePath}] Found incorrect Fa6 icon name: ${iconName} -> ${correctName}`);
                          issues.push({ id: generateId(), fileId, filePath, type: 'incorrectFa6IconName', message: `Некорректное имя иконки: '${iconName}'. Исправить на '${correctName}'?`, details: { lineNumber: importLineNumber, incorrectName: iconName, correctName: correctName, importStatement: fa6Match[0] }, fixable: true, severity: 'warning', restorable: false });
                      }
-                     // --- MODIFIED VALIDATION: Check if iconName (FaPascalCase) is a valid key in Fa6Icons ---
                      else if (!(iconName in Fa6Icons)) {
-                     // --- END MODIFIED VALIDATION ---
                          logger.error(`[Validation Logic - ${filePath}] Found unknown/invalid Fa6 icon name: ${iconName}`);
-                         issues.push({ id: generateId(), fileId, filePath, type: 'unknownFa6IconName', message: `Неизвестная/несуществующая иконка Fa6: '${iconName}'. Проверьте имя или импортируйте из правильного пакета (например, 'react-icons/fa' вместо 'react-icons/fa6', или наоборот).`, details: { lineNumber: importLineNumber, unknownName: iconName, importStatement: fa6Match[0] }, fixable: false, severity: 'warning', restorable: false }); // Severity changed to 'warning'
+                         issues.push({ id: generateId(), fileId, filePath, type: 'unknownFa6IconName', message: `Неизвестная/несуществующая иконка Fa6: '${iconName}'. Проверьте имя или импортируйте из правильного пакета (например, 'react-icons/fa' вместо 'react-icons/fa6', или наоборот).`, details: { lineNumber: importLineNumber, unknownName: iconName, importStatement: fa6Match[0] }, fixable: false, severity: 'warning', restorable: false });
                      }
                  });
              }
 
-
             // .. 2. "use client" Check
             logger.debug(`[Validation Logic - ${filePath}] Checking for "use client"...`);
             if (/\.(tsx|jsx)$/.test(filePath)) {
-                // START ADDED EXCEPTION for app/layout.tsx files
                 const isAppLayoutFile = /^app\/.*layout\.(tsx|jsx)$/.test(filePath);
                 if (isAppLayoutFile) {
                     logger.info(`[Validation Logic - ${filePath}] Skipping "use client" check for App Router layout file.`);
                 } else {
-                // END ADDED EXCEPTION
                     const firstRealLineIndex = lines.findIndex(line => line.trim() !== '');
                     const firstRealLine = firstRealLineIndex !== -1 ? lines[firstRealLineIndex].trim() : null;
                     const hasUseClient = firstRealLine === '"use client";' || firstRealLine === "'use client';" || firstRealLine === '"use client"' || firstRealLine === "'use client'";
@@ -227,9 +216,7 @@ export function useCodeParsingAndValidation() {
                         logger.warn(`[Validation Logic - ${filePath}] Missing "use client" detected. First usage: ${featureName} around line ${firstUsageLine}`);
                         issues.push({ id: generateId(), fileId, filePath, type: 'useClientMissing', message: `Found ${featureName} without "use client".`, details: { lineNumber: firstUsageLine > 0 ? firstUsageLine : undefined }, fixable: true, severity: 'warning', restorable: false });
                     }
-                // START ADDED EXCEPTION
                 }
-                // END ADDED EXCEPTION
             }
 
             // .. 3. Skipped Code Block Check ('/* ... */')
@@ -237,17 +224,17 @@ export function useCodeParsingAndValidation() {
             for (let i = 0; i < lines.length; i++) {
                 if (SKIPPED_CODE_MARKER_REGEX.test(lines[i].trimStart())) {
                     logger.warn(`[Validation Logic - ${filePath}] Found skipped code block at line ${i + 1}`);
-                    issues.push({ id: generateId(), fileId, filePath, type: 'skippedCodeBlock', message: `Пропущен блок кода (строка ${i + 1}). Попросите AI восстановить.`, details: { markerLineContent: lines[i], lineNumber: i + 1 }, fixable: false, restorable: false, severity: 'warning' }); // Not restorable anymore
+                    issues.push({ id: generateId(), fileId, filePath, type: 'skippedCodeBlock', message: `Пропущен блок кода (строка ${i + 1}). Попросите AI восстановить.`, details: { markerLineContent: lines[i], lineNumber: i + 1 }, fixable: false, restorable: false, severity: 'warning' });
                 }
             }
 
-            // .. 4. Skipped Comment Check ('// ...') - Using updated regex
+            // .. 4. Skipped Comment Check ('// ...')
              logger.debug(`[Validation Logic - ${filePath}] Checking for skipped comments (// ...)...`);
             for (let i = 0; i < lines.length; i++) {
-                const line = lines[i]; // Check the whole line with the regex
+                const line = lines[i]; 
                 if (SKIPPED_COMMENT_MARKER_REGEX.test(line)) {
                      logger.warn(`[Validation Logic - ${filePath}] Found skipped comment marker at line ${i + 1}`);
-                     issues.push({ id: generateId(), fileId, filePath, type: 'skippedComment', message: `Пропущен комментарий '// ...' (строка ${i + 1}). Попросите AI восстановить.`, details: { lineNumber: i + 1 }, fixable: false, restorable: false, severity: 'warning' }); // Not restorable
+                     issues.push({ id: generateId(), fileId, filePath, type: 'skippedComment', message: `Пропущен комментарий '// ...' (строка ${i + 1}). Попросите AI восстановить.`, details: { lineNumber: i + 1 }, fixable: false, restorable: false, severity: 'warning' });
                  }
             }
 
@@ -265,19 +252,17 @@ export function useCodeParsingAndValidation() {
                 });
             }
 
-            // .. 6. Sneaky Empty Block Check - NEW
+            // .. 6. Sneaky Empty Block Check 
             logger.debug(`[Validation Logic - ${filePath}] Checking for sneaky empty blocks...`);
             let sneakyMatch;
             while((sneakyMatch = SNEAKY_EMPTY_BLOCK_REGEX.exec(file.content)) !== null) {
                  const sneakyLineNum = file.content.substring(0, sneakyMatch.index).split('\n').length;
                  logger.error(`[Validation Logic - ${filePath}] Found sneaky empty block at line ${sneakyLineNum}: ${sneakyMatch[0]}`);
-                 issues.push({ id: generateId(), fileId, filePath, type: 'sneakyEmptyBlock', message: 'Найден пустой блок с маркером пропуска "{ /* ... */ }". Это скорее всего ошибка AI, удалите блок или замените кодом.', details: {lineNumber: sneakyLineNum }, fixable: false, restorable: false, severity: 'error' });
+                 issues.push({ id: generateId(), fileId, filePath, type: 'sneakyEmptyBlock', message: 'Найден пустой блок с маркером пропуска "{ /* ... */ }". Это почти наверняка ошибка AI, удалите блок или замените кодом.', details: {lineNumber: sneakyLineNum }, fixable: false, restorable: false, severity: 'error' });
             }
-            // .. End NEW Check
-
 
              logger.debug(`[Validation Logic] Finished validating file: ${filePath}. Issues found: ${issues.filter(i => i.filePath === filePath).length}`);
-        } // End loop through files
+        } 
 
         // .. Duplicate Path Check
         const pathCounts = new Map<string, number>();
@@ -295,12 +280,11 @@ export function useCodeParsingAndValidation() {
              }
         });
 
-
         setValidationIssues(issues);
         if (issues.length > 0) {
             const hasErrors = issues.some(issue => issue.severity === 'error');
             const hasWarnings = issues.some(issue => issue.severity === 'warning');
-            const finalStatus = hasErrors ? 'error' : (hasWarnings ? 'warning' : 'success'); // Status reflects highest severity
+            const finalStatus = hasErrors ? 'error' : (hasWarnings ? 'warning' : 'success'); 
              logger.info(`[Validation Logic] Validation finished. Total issues: ${issues.length}. Status set to: ${finalStatus}`);
             setValidationStatus(finalStatus);
         } else {
@@ -308,8 +292,7 @@ export function useCodeParsingAndValidation() {
             setValidationStatus('success');
         }
         return issues;
-    }, [logger]); // Added logger dependency
-
+    }, [logger]); 
 
      const parseAndValidateResponse = useCallback(async (response: string) => {
         logger.info("[Parse/Validate Trigger] Starting parseAndValidateResponse...");
@@ -362,8 +345,7 @@ export function useCodeParsingAndValidation() {
              setValidationIssues([genericError]);
              return { files: [], description: rawDescription, issues: [genericError] };
          }
-    }, [parseFilesFromText, validateParsedFiles, rawDescription, toastInfo, toastError, logger]); // Added logger
-
+    }, [parseFilesFromText, validateParsedFiles, rawDescription, toastInfo, toastError, logger]); 
 
     // --- Auto-Fixing Logic ---
     const autoFixIssues = useCallback((filesToFix: FileEntry[], issuesToFix: ValidationIssue[]): FileEntry[] => {
@@ -391,7 +373,6 @@ export function useCodeParsingAndValidation() {
                 try {
                      logger.debug(`[AutoFix Logic - ${file.path}] Attempting to fix issue type: ${issue.type}`);
                     let contentBeforeFix = currentContent;
-                    // .. 1. Fix incorrect Fa6 icon names
                     if (issue.type === 'incorrectFa6IconName' && issue.details?.incorrectName && issue.details?.correctName && issue.details?.importStatement) {
                          const incorrectName = issue.details.incorrectName; const correctName = issue.details.correctName; const importLine = issue.details.importStatement; const lines = currentContent.split('\n'); const importLineIndex = lines.findIndex(line => line.includes(importLine));
                          if (importLineIndex !== -1) {
@@ -399,13 +380,11 @@ export function useCodeParsingAndValidation() {
                              if (modifiedLine !== originalLine) { lines[importLineIndex] = modifiedLine; currentContent = lines.join('\n'); fixedMessages.push(`✅ Fa6 Иконка: ${incorrectName} -> ${correctName} в ${file.path}`); logger.debug(`[AutoFix Logic - ${file.path}] Fixed Fa6 icon: ${incorrectName} -> ${correctName}`); }
                              else { logger.warn(`[AutoFix Logic - ${file.path}] Fa6 icon regex did not match: ${incorrectName} in "${originalLine}"`); }
                          } else { logger.warn(`[AutoFix Logic - ${file.path}] Could not find Fa6 import line: "${importLine}"`); }
-                    // .. 2. Fix "use client"
                     } else if (issue.type === 'useClientMissing') {
                         const lines = currentContent.split('\n'); let firstCodeLineIndex = -1;
                         for (let i = 0; i < lines.length; i++) { const trimmedLine = lines[i].trim(); if (trimmedLine !== '' && !trimmedLine.startsWith('//') && !trimmedLine.startsWith('/*')) { firstCodeLineIndex = i; break; } }
                         const alreadyHasUseClient = firstCodeLineIndex !== -1 && (lines[firstCodeLineIndex] === '"use client";' || lines[firstCodeLineIndex] === "'use client';");
                         if (!alreadyHasUseClient) { const insertIndex = firstCodeLineIndex !== -1 ? firstCodeLineIndex : 0; const newLineChar = insertIndex === 0 || (firstCodeLineIndex !== -1 && lines[insertIndex].trim() !== '') ? '\n' : ''; lines.splice(insertIndex, 0, '"use client";' + newLineChar); currentContent = lines.join('\n'); fixedMessages.push(`✅ Added "use client"; to ${file.path}`); logger.debug(`[AutoFix Logic - ${file.path}] Added "use client"`); }
-                    // .. 3. Fix missing imports
                     } else if (issue.type === 'importReactMissing' && issue.details?.importStatement && issue.details?.importRegex) {
                         const importRegex: RegExp = issue.details.importRegex;
                         if (!importRegex.test(currentContent)) {
@@ -422,7 +401,7 @@ export function useCodeParsingAndValidation() {
                       logger.error(`[AutoFix Logic - ${file.path}] Error auto-fixing issue ${issue.id} (${issue.type}):`, fixError);
                       toastError(`Ошибка исправления ${issue.type} в ${file.path}`);
                  }
-            }); // End forEach issue in file
+            }); 
 
             if (fileChanged) {
                  logger.debug(`[AutoFix Logic - ${file.path}] Content updated.`);
@@ -431,15 +410,14 @@ export function useCodeParsingAndValidation() {
             } else {
                  logger.debug(`[AutoFix Logic - ${file.path}] No changes made for fixable issues.`);
             }
-        }); // End map through filesToFix
+        }); 
 
-        // --- Final Update and Re-validation ---
         if (changesMadeCount > 0) {
              logger.info(`[AutoFix Logic] ${changesMadeCount} file(s) updated. Re-validating...`);
             const updatedFilesArray = filesToFix.map(f => ({ ...f, content: updatedFilesMap.get(f.id) ?? f.content }));
             setParsedFiles(updatedFilesArray);
             fixedMessages.forEach(msg => toastSuccess(msg, { duration: 4000 }));
-            validateParsedFiles(updatedFilesArray); // Re-validate AFTER fixing
+            validateParsedFiles(updatedFilesArray); 
             return updatedFilesArray;
         } else {
             if (fixableIssues.length > 0) {
@@ -448,17 +426,15 @@ export function useCodeParsingAndValidation() {
             } else {
                  logger.info("[AutoFix Logic] No changes made (no fixable issues to address).");
             }
-            // Recalculate status based on remaining issues *AFTER* attempted fix
             const remainingIssues = issuesToFix.filter(issue => !fixableIssues.some(fi => fi.id === issue.id && fi.fixable === true) || !updatedFilesMap.has(issue.fileId));
             const hasRemainingErrors = remainingIssues.some(i => i.severity === 'error');
             const hasRemainingWarnings = remainingIssues.some(i => i.severity === 'warning');
             const finalStatus = hasRemainingErrors ? 'error' : (hasRemainingWarnings ? 'warning' : 'success');
              logger.info(`[AutoFix Logic] No changes applied. Re-evaluated status based on remaining ${remainingIssues.length} issues: ${finalStatus}`);
-            setValidationStatus(finalStatus); // Update status based on remaining
+            setValidationStatus(finalStatus); 
             return filesToFix;
         }
-    }, [validateParsedFiles, setParsedFiles, toastInfo, toastSuccess, toastError, toastWarning, logger]); // Added logger
-
+    }, [validateParsedFiles, setParsedFiles, toastInfo, toastSuccess, toastError, toastWarning, logger]); 
 
      logger.debug("[useCodeParsingAndValidation] Hook setup complete.");
     return {
@@ -469,11 +445,10 @@ export function useCodeParsingAndValidation() {
         isParsing,
         parseAndValidateResponse,
         autoFixIssues,
-        // Expose setters if AICodeAssistant needs to manipulate them directly (less ideal)
-        setHookParsedFiles: setParsedFiles, // Renamed for clarity
+        setHookParsedFiles: setParsedFiles, 
         setValidationStatus,
         setValidationIssues,
-        setIsParsing, // Allow parent to control parsing state if needed externally
+        setIsParsing, 
         setRawDescription
     };
 }
