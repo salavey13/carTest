@@ -75,6 +75,7 @@ const translations = {
     componentsTitle: "Врубай Движки Вайба!",
     ctaTitle: "Ready to Level Up, {USERNAME}?",
     ctaDesc: "Seriously. Stop doubting. Start <strong>DOING</strong>. That first level is calling. Level up NOW!",
+    ctaHotChick: "Got the fire? Let's build something epic. Hit me up <strong>@SALAVEY13</strong> NOW!",
     ctaDude: "(Everyone else? Just f*cking try it. Level 1 is a button click away. You got this!)",
     navGrabber: "Grabber <FaDownload/>",
     navAssistant: "Assistant <FaRobot/>",
@@ -128,6 +129,7 @@ const translations = {
     componentsTitle: "Врубай Движки Вайба!",
     ctaTitle: "Готов(а) Апнуться, {USERNAME}?",
     ctaDesc: "Серьезно. Хватит сомневаться. Начни <strong>ДЕЛАТЬ</strong>. Первый левел зовет. Качайся СЕЙЧАС!",
+    ctaHotChick: "Есть искра? Давай замутим что-то эпичное. Пиши <strong>@SALAVEY13</strong> СЕЙЧАС!",
     ctaDude: "(Все остальные? Просто, бл*ть, попробуйте. Левел 1 - это клик мышки. У вас получится!)",
     navGrabber: "Граббер <FaDownload/>",
     navAssistant: "Ассистент <FaRobot/>",
@@ -518,7 +520,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                             <div className="flex items-center">
                                                 <VibeContentRenderer content="::FaQuoteLeft className='text-current opacity-80 text-xl mr-2 shrink-0'::" />
                                                 <div className="prose prose-sm prose-invert text-center flex-grow max-w-none">
-                                                    <VibeContentRenderer content={t.ctaHotChickQuote} />
+                                                    <VibeContentRenderer content={t.ctaHotChick} />
                                                 </div>
                                                 <VibeContentRenderer content="::FaQuoteRight className='text-current opacity-80 text-xl ml-2 shrink-0'::" />
                                             </div>
