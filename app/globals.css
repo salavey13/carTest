@@ -1,3 +1,4 @@
+/* /app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -324,7 +325,7 @@
     0 0 20px hsl(var(--brand-purple));
 }
 .text-shadow-cyber {
-  text-shadow: 0 0 4px hsl(var(--brand-cyan-rgb), 0.8), 0 0 10px hsla(var(--brand-pink-rgb), 0.6); /* Corrected to use RGB vars */
+  text-shadow: 0 0 4px rgba(var(--brand-cyan-rgb), 0.8), 0 0 10px rgba(var(--brand-pink-rgb), 0.6); /* Corrected to use rgba */
 }
 
 .animate-gradient-shift {
@@ -502,11 +503,11 @@ input[type="search"]::-ms-clear {
 
 /* Glitch border uses adjusted colors */
 @keyframes glitch-border {
-  0% { border-color: hsla(var(--brand-cyan-rgb), 0.3); box-shadow: 0 0 5px hsla(var(--brand-cyan-rgb), 0.2); } /* Corrected to use RGB vars */
-  25% { border-color: hsla(var(--brand-pink-rgb), 0.3); box-shadow: 0 0 8px hsla(var(--brand-pink-rgb), 0.3); } /* Corrected to use RGB vars */
-  50% { border-color: hsla(var(--brand-yellow-rgb), 0.3); box-shadow: 0 0 5px hsla(var(--brand-yellow-rgb), 0.2); } /* Corrected to use RGB vars */
-  75% { border-color: hsla(var(--brand-green-rgb), 0.3); box-shadow: 0 0 8px hsla(var(--brand-green-rgb), 0.3); } /* Corrected to use RGB vars */
-  100% { border-color: hsla(var(--brand-cyan-rgb), 0.3); box-shadow: 0 0 5px hsla(var(--brand-cyan-rgb), 0.2); } /* Corrected to use RGB vars */
+  0% { border-color: rgba(var(--brand-cyan-rgb), 0.3); box-shadow: 0 0 5px rgba(var(--brand-cyan-rgb), 0.2); } /* Corrected to use rgba */
+  25% { border-color: rgba(var(--brand-pink-rgb), 0.3); box-shadow: 0 0 8px rgba(var(--brand-pink-rgb), 0.3); } /* Corrected to use rgba */
+  50% { border-color: rgba(var(--brand-yellow-rgb), 0.3); box-shadow: 0 0 5px rgba(var(--brand-yellow-rgb), 0.2); } /* Corrected to use rgba */
+  75% { border-color: rgba(var(--brand-green-rgb), 0.3); box-shadow: 0 0 8px rgba(var(--brand-green-rgb), 0.3); } /* Corrected to use rgba */
+  100% { border-color: rgba(var(--brand-cyan-rgb), 0.3); box-shadow: 0 0 5px rgba(var(--brand-cyan-rgb), 0.2); } /* Corrected to use rgba */
 }
 .glitch-border-animate {
   animation: glitch-border 2s linear infinite;
