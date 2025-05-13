@@ -25,96 +25,14 @@ export default function FinanceLiteracyMemoPage() {
           h1, h2, h3, p, li {
             color: #000 !important; /* Ensure text is black for printing */
           }
-          img.image-placeholder-style {
-            border: 1px solid #ccc !important;
-            background-color: #f0f0f0 !important; /* Fallback for failed image load */
-          }
-          .railway-safety-memo, .finance-literacy-memo-content {
+          .finance-literacy-memo-content {
              page-break-inside: avoid; /* Try to keep memo sections on one page */
           }
         }
       `}</style>
       <main className="max-w-4xl mx-auto printable-content">
-        {/* Railway Safety Memo Section */}
-        <div className="railway-safety-memo mb-12">
-          <header className="mb-6 text-center">
-            <div className="flex justify-between items-start mb-4">
-              <div className="text-left">
-                <p className="text-sm font-semibold text-gray-600">РЖД (Пример)</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-bold text-red-600">Выигрывая минуту,</p>
-                <p className="text-sm font-bold text-red-600">можете потерять жизнь!</p>
-              </div>
-            </div>
-            <h1 className="text-4xl font-bold text-red-700 border-b-4 border-blue-500 pb-2 inline-block">ПАМЯТКА</h1>
-            <p className="text-blue-600 font-semibold mt-1">для школьников</p>
-            <p className="text-blue-600 font-semibold">по личной безопасности при пользовании средствами железнодорожного транспорта</p>
-            <h2 className="text-2xl font-bold text-red-600 mt-4">Внимание, учащиеся!</h2>
-          </header>
-
-          <section className="mb-4 clearfix">
-            {/* IMAGE_URL_PLACEHOLDER_1_1_TRACKS (e.g., https://via.placeholder.com/150) */}
-            <img
-              src="https://via.placeholder.com/128x128.png?text=1:1+Пути"
-              alt="Иллюстрация: опасно ходить по путям"
-              className="image-placeholder-style float-right ml-3 mb-2 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 aspect-square object-cover bg-gray-200 border border-gray-400 rounded"
-            />
-            <h3 className="text-lg sm:text-xl font-semibold text-green-700 bg-green-100 p-2 rounded mb-2">
-              Не ходите по железнодорожным путям в неустановленных местах — <span className="font-bold">ЭТО ОПАСНО ДЛЯ ЖИЗНИ!</span>
-            </h3>
-          </section>
-
-          <section className="mb-4 clearfix">
-            <h3 className="text-lg sm:text-xl font-semibold text-pink-700 bg-pink-100 p-2 rounded mb-2">
-              Не перебегайте пути перед поездом. Выигрывая минуту, можете потерять жизнь!
-            </h3>
-          </section>
-          
-          <section className="mb-4 clearfix">
-            {/* IMAGE_URL_PLACEHOLDER_9_16_TRAIN_DOOR (e.g., https://via.placeholder.com/112x200) */}
-            <img
-              src="https://via.placeholder.com/112x199.png?text=9:16+Дверь"
-              alt="Иллюстрация: опасность у автоматических дверей поезда"
-              className="image-placeholder-style float-right ml-3 mb-2 w-[4.5rem] h-[8rem] sm:w-[5.0625rem] sm:h-[9rem] md:w-[5.625rem] md:h-[10rem] aspect-[9/16] object-cover bg-gray-200 border border-gray-400 rounded"
-              // w-20 h-[35.5px] sm:w-24 sm:h-[42.6px] md:w-28 md:h-[49.7px] -> this calculation was wrong for aspect-[9/16]
-              // Corrected: width drives height via aspect ratio.
-              // Base: 4.5rem width (72px), height = 72 * 16/9 = 128px (8rem)
-              // SM: 5.0625rem width (81px), height = 81 * 16/9 = 144px (9rem)
-              // MD: 5.625rem width (90px), height = 90 * 16/9 = 160px (10rem)
-            />
-            <p className="mb-2 p-2 bg-yellow-50 rounded border border-yellow-200 text-sm sm:text-base">
-              Находясь в электропоезде, не препятствуйте закрытию автоматических дверей, так как от неожиданного толчка можно упасть под поезд.
-            </p>
-          </section>
-
-          <section className="mb-4 clearfix">
-            <p className="mb-2 p-2 bg-blue-50 rounded border border-blue-200 text-sm sm:text-base">
-              Нельзя бросать снежки и камни в окна поездов. От этого машинист может потерять способность вести поезд и могут пострадать пассажиры.
-            </p>
-          </section>
-          
-          <section className="mb-4 clearfix">
-            {/* IMAGE_URL_PLACEHOLDER_1_1_PLATFORM (e.g., https://via.placeholder.com/150) */}
-            <img
-              src="https://via.placeholder.com/128x128.png?text=1:1+Платформа"
-              alt="Иллюстрация: не играть у жд линии"
-              className="image-placeholder-style float-right ml-3 mb-2 w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 aspect-square object-cover bg-gray-200 border border-gray-400 rounded"
-            />
-            <p className="mb-2 p-2 bg-purple-50 rounded border border-purple-200 text-sm sm:text-base">
-              Не играйте и не катайтесь на санках и лыжах вблизи железнодорожной линии.
-            </p>
-          </section>
-
-          <footer className="mt-6 pt-4 border-t-2 border-gray-300 text-center">
-            <p className="font-bold text-md sm:text-lg">
-              Запомните, что железнодорожный транспорт является источником повышенной опасности, поэтому, находясь на железной дороге и в поезде, не нарушайте сами и не позволяйте другим нарушать <span className="text-red-600">ПРАВИЛА ЛИЧНОЙ БЕЗОПАСНОСТИ!</span>
-            </p>
-          </footer>
-        </div>
-
         {/* Finance Literacy Memo Content */}
-        <div className="finance-literacy-memo-content mt-12 pt-8 border-t-4 border-dashed border-gray-400">
+        <div className="finance-literacy-memo-content mt-2 sm:mt-4 md:mt-6 pt-2 sm:pt-4"> {/* Reduced top margin/padding as header is gone */}
           <header className="mb-6 text-center">
             <h1 className="text-3xl font-bold text-indigo-700">ПАМЯТКА</h1>
             <h2 className="text-xl font-semibold text-indigo-600 mt-1">Как правильно распоряжаться карманными деньгами?</h2>
