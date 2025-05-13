@@ -5,9 +5,16 @@ import { Gift, Heart, ExternalLink, Send, Code, Lock, Sparkles, ShieldQuestion, 
 import { useAppContext } from "@/contexts/AppContext";
 import Link from "next/link";
 import { FaGithub, FaTelegram } from "react-icons/fa6"; 
+import { usePathname } from "next/navigation"; // Added import
 
 export default function Footer() {
   const { tg, isInTelegramContext } = useAppContext();
+  const pathname = usePathname(); // Added to get current path
+
+  // Hide footer on specific pages
+  if (pathname === '/finance-literacy-memo') {
+    return null;
+  }
 
   const handleShare = () => {
     const shareUrl = "https://t.me/share/url?url=" + encodeURIComponent("https://t.me/oneSitePlsBot/app") + "&text=" + encodeURIComponent("Зацени oneSitePls - твой AI-Dev ассистент в Telegram!");
