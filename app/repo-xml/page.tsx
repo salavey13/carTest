@@ -1,4 +1,3 @@
-// /app/repo-xml/page.tsx
 "use client";
 import React, { Suspense, useRef, useState, useEffect, ReactNode, useCallback, useMemo } from "react";
 import { useSearchParams } from 'next/navigation';
@@ -21,7 +20,7 @@ import {
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaToolbox, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket,
     FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye,
-    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark // Added FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark
+    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark // Replaced FaTimesCircle with FaCircleXmark
 } from "react-icons/fa6";
 import Link from "next/link";
 import { motion } from 'framer-motion';
@@ -176,7 +175,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const [lang, setLang] = useState<keyof typeof translations>('en');
     const [t, setT] = useState<typeof translations.en | null>(null);
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
-    const [isCtaVisible, setIsCtaVisible] = useState<boolean>(true); // State for CTA visibility
+    const [isCtaVisible, setIsCtaVisible] = useState<boolean>(true); 
 
     if (!pageContext || typeof pageContext.addToast !== 'function') {
          error("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!");
@@ -304,36 +303,32 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                          </Card>
                      </section>
                     
-                    {/* --- NEW COMMUNITY WISDOM SECTION --- */}
                     <section id="community-wisdom-section" className="mb-12 w-full max-w-3xl">
                         <h3 className="text-2xl md:text-3xl font-orbitron text-brand-cyan mb-6 text-center flex items-center justify-center gap-2">
                            <VibeContentRenderer content={t.communityWisdomTitle} />
                         </h3>
                         <div className="space-y-8">
-                            {/* Video 1 + Quote */}
                             <div>
                                 <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-cyan/50 shadow-lg">
-                                    <iframe className="w-full h-full" src="https://www.youtube.com/embed/ctcMA6chfDY?clip=Ugkx1LAX6-gO4J8hC6HoHbg0_KMlBHcsKX3V&clipt=1201" title="YouTube: Sam Altman's Dream" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                                    <iframe className="w-full h-full" src={`https://www.youtube.com/embed/ctcMA6chfDY?clip=Ugkx1LAX6-gO4J8hC6HoHbg0_KMlBHcsKX3V&t=1201`} title="YouTube: Sam Altman's Dream" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                                 </div>
                                 <div className="mt-3 p-3 bg-dark-card/70 border-l-4 border-brand-cyan rounded-r-md prose prose-sm prose-invert text-muted-foreground max-w-none">
                                     <VibeContentRenderer content={t.quote1} />
                                     <p className="text-xs text-right opacity-70 mt-1">- Inspired by Sam Altman</p>
                                 </div>
                             </div>
-                            {/* Video 2 + Quote */}
                             <div>
                                 <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-pink/50 shadow-lg">
-                                    <iframe className="w-full h-full" src="https://www.youtube.com/embed/dq8MhTFCs80?clip=UgkxZVMHbEo2XwO-sayoxskH89zzrDdN6vsx&clipt=1197" title="YouTube: Do you Vibecode?" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                                    <iframe className="w-full h-full" src={`https://www.youtube.com/embed/dq8MhTFCs80?clip=UgkxZVMHbEo2XwO-sayoxskH89zzrDdN6vsx&t=1197`} title="YouTube: Do you Vibecode?" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                                 </div>
                                  <div className="mt-3 p-3 bg-dark-card/70 border-l-4 border-brand-pink rounded-r-md prose prose-sm prose-invert text-muted-foreground max-w-none">
                                     <VibeContentRenderer content={t.quote2} />
                                     <p className="text-xs text-right opacity-70 mt-1">- Inspired by Vibe Master</p>
                                 </div>
                             </div>
-                            {/* Video 3 + Quote */}
                             <div>
                                 <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-yellow/50 shadow-lg">
-                                    <iframe className="w-full h-full" src="https://www.youtube.com/embed/xlQB_0Nzoog?clip=UgkxvGYsRm3HezCgOyqszCbn5DfDDx7LixPE&clipt=743" title="YouTube: Really F*cking EZ!" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                                    <iframe className="w-full h-full" src={`https://www.youtube.com/embed/xlQB_0Nzoog?clip=UgkxvGYsRm3HezCgOyqszCbn5DfDDx7LixPE&t=743`} title="YouTube: Really F*cking EZ!" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                                 </div>
                                 <div className="mt-3 p-3 bg-dark-card/70 border-l-4 border-brand-yellow rounded-r-md prose prose-sm prose-invert text-muted-foreground max-w-none">
                                     <VibeContentRenderer content={t.quote3} />
@@ -352,7 +347,6 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                             <div className="px-6 pt-2 text-muted-foreground space-y-4 text-base prose prose-invert prose-p:my-2 prose-li:my-1 prose-strong:text-brand-yellow prose-em:text-brand-cyan prose-a:text-brand-blue max-w-none">
                                  <div className="my-4 not-prose">
                                      <h4 className="text-lg font-semibold text-brand-cyan mb-2"><VibeContentRenderer content={t.philosophyVideoTitle} /></h4>
-                                     {/* Existing Video (Now the only one directly under this title) */}
                                      <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
                                          <iframe className="w-full h-full" src="https://www.youtube.com/embed/imxzYWYKCyQ" title="YouTube video player - Vibe Level Explanation by Salavey13" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                                      </div>
@@ -429,7 +423,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                     className="absolute top-2 right-2 text-white/70 hover:text-white z-10 p-1 rounded-full hover:bg-black/20 transition-colors"
                                     aria-label="Close CTA"
                                   >
-                                    <FaCircleXmark className="w-6 h-6" />
+                                    <FaCircleXmark className="w-6 h-6" /> {/* Corrected Icon */}
                                   </button>
                                  <h3 className="text-2xl font-bold text-white mb-3"><VibeContentRenderer content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
                                  <div className="text-white text-lg mb-4"> <VibeContentRenderer content={t.ctaDesc} /> </div>
@@ -462,7 +456,6 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     }
 }
 
-// --- New Internal Component to handle useSearchParams ---
 function RepoXmlPageInternalContent() {
   const searchParams = useSearchParams();
   const path = searchParams.get('path');
@@ -471,7 +464,6 @@ function RepoXmlPageInternalContent() {
   return <ActualPageContent initialPath={path} initialIdea={idea} />;
 }
 
-// --- Layout Component ---
 function RepoXmlPageLayout() {
     const log = logger.log;
     const error = logger.error;
@@ -491,7 +483,6 @@ function RepoXmlPageLayout() {
     }
 }
 
-// --- Exported Page Component ---
 export default function RepoXmlPage() {
      const log = logger.log;
      const error = logger.error;
