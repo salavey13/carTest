@@ -5,13 +5,17 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { toast } from "sonner";
 import Link from "next/link";
 import { motion } from "framer-motion";
-// Using Fa6 icons for consistency
-import { FaYoutube, FaCheckCircle, FaClock, FaCalendarDays, FaPlus, FaPencil, FaTrash } from "react-icons/fa6";
-import { Button } from "@/components/ui/button"; // Use Button component
-import { Input } from "@/components/ui/input"; // Use Input component
-import { Textarea } from "@/components/ui/textarea"; // Use Textarea component
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"; // Use Select component
+// Corrected and added Fa6 icons
+import {
+  FaYoutube, FaCircleCheck, FaClock, FaCalendarDays, FaPlus, FaPencil, FaTrash, FaDumbbell
+} from "react-icons/fa6";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Label } from "@/components/ui/label"; // Added missing Label import
 
+// --- notifyYtTeam function (unchanged) ---
 const notifyYtTeam = async (message: string) => {
   try {
     const { data: ytTeamMembers, error } = await supabaseAdmin
@@ -43,7 +47,7 @@ export default function TasksPage() {
 
   useEffect(() => {
     const fetchTasks = async () => {
-      setLoading(true); // Start loading
+      setLoading(true);
       try {
           const { data, error } = await supabaseAdmin
             .from("tasks")
@@ -59,13 +63,14 @@ export default function TasksPage() {
           toast.error("An unexpected error occurred while fetching tasks.");
           console.error("Task fetch exception:", e);
       } finally {
-         setLoading(false); // End loading regardless of outcome
+         setLoading(false);
       }
     };
     fetchTasks();
   }, []);
 
-  const handleCreateTask = async (e: React.FormEvent) => {
+  // --- handleCreateTask, handleUpdateTask, handleDeleteTask (unchanged) ---
+    const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isAdmin) {
       toast.error("Only admins can create tasks");
@@ -147,34 +152,37 @@ export default function TasksPage() {
     }
   };
 
-  // Using Tailwind classes consistent with the theme (adjust if needed)
+
   const getPriorityClasses = (priority: string) => {
     switch (priority) {
-      case "high": return "bg-destructive/80 border-destructive text-destructive-foreground"; // Use theme colors
+      case "high": return "bg-destructive/80 border-destructive text-destructive-foreground";
       case "medium": return "bg-brand-yellow/80 border-brand-yellow text-accent-foreground";
-      case "low": return "bg-brand-green/80 border-brand-green text-black"; // Adjust text color if needed
+      case "low": return "bg-brand-green/80 border-brand-green text-black";
       default: return "bg-muted border-border text-muted-foreground";
     }
   };
 
+  // Corrected Icon: FaCheckCircle -> FaCircleCheck
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "done": return <FaCheckCircle className="text-brand-green" />;
+      case "done": return <FaCircleCheck className="text-brand-green" />;
       case "in_progress": return <FaClock className="text-brand-yellow animate-pulse" />;
-      default: return <FaClock className="text-muted-foreground" />; // 'todo' or others
+      default: return <FaClock className="text-muted-foreground" />;
     }
   };
 
   return (
-    // Use theme background and text colors
     <div className="pt-24 p-4 bg-dark-bg text-light-text min-h-screen">
       <div className="max-w-4xl mx-auto">
         <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
           <h1 className="text-3xl font-orbitron font-bold text-light-text flex items-center gap-2 cyber-text" data-text="YouTube Tasks">
             <FaYoutube className="text-red-500 text-4xl" /> YouTube Tasks
           </h1>
-          {/* Use Button component */}
           <div className="flex gap-3">
+            {/* Added Training Button */}
+            <Button asChild variant="outline" className="border-brand-green text-brand-green hover:bg-brand-green/10 hover:text-brand-green">
+                <Link href="/start-training"><FaDumbbell className="mr-2 h-4 w-4" /> Начать Тренировку</Link>
+            </Button>
             <Button asChild variant="secondary">
               <Link href="/yt">Characters</Link>
             </Button>
@@ -189,15 +197,15 @@ export default function TasksPage() {
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }} // Added exit animation
+            exit={{ opacity: 0, y: -20 }}
             className="mb-8 bg-dark-card p-6 rounded-lg shadow-lg border border-border"
           >
             <h2 className="text-xl font-semibold text-light-text mb-4 font-orbitron">
               {editingTask ? "Edit Directive" : "Create New Directive"}
             </h2>
-            {/* Use form components */}
             <form onSubmit={editingTask ? handleUpdateTask : handleCreateTask} className="space-y-4">
               <div>
+                {/* Using Label component */}
                 <Label htmlFor="task-title" className="block text-muted-foreground mb-1">Title</Label>
                 <Input
                   id="task-title"
@@ -207,12 +215,13 @@ export default function TasksPage() {
                     ? setEditingTask({...editingTask, title: e.target.value})
                     : setNewTask({...newTask, title: e.target.value})
                   }
-                  className="input-cyber" // Use theme input style
+                  className="input-cyber"
                   required
                   placeholder="Directive Title..."
                 />
               </div>
               <div>
+                 {/* Using Label component */}
                 <Label htmlFor="task-desc" className="block text-muted-foreground mb-1">Description</Label>
                 <Textarea
                   id="task-desc"
@@ -221,20 +230,21 @@ export default function TasksPage() {
                     ? setEditingTask({...editingTask, description: e.target.value})
                     : setNewTask({...newTask, description: e.target.value})
                   }
-                  className="textarea-cyber" // Use theme textarea style
+                  className="textarea-cyber"
                   rows={3}
                   placeholder="Details and objectives..."
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
+                   {/* Using Label component */}
                   <Label htmlFor="task-deadline" className="block text-muted-foreground mb-1">Deadline</Label>
                   <Input
                     id="task-deadline"
                     type="date"
                     value={editingTask?.deadline || newTask.deadline}
                      onChange={(e) => {
-                       const value = e.target.value; // Format YYYY-MM-DD
+                       const value = e.target.value;
                        if (editingTask) {
                          setEditingTask({...editingTask, deadline: value });
                        } else {
@@ -245,6 +255,7 @@ export default function TasksPage() {
                   />
                 </div>
                 <div>
+                   {/* Using Label component */}
                   <Label htmlFor="task-priority" className="block text-muted-foreground mb-1">Priority</Label>
                    <Select
                      value={editingTask?.priority || newTask.priority}
@@ -266,6 +277,7 @@ export default function TasksPage() {
               </div>
               {editingTask && (
                 <div>
+                   {/* Using Label component */}
                   <Label htmlFor="task-status" className="block text-muted-foreground mb-1">Status</Label>
                    <Select
                       value={editingTask.status}
@@ -287,15 +299,12 @@ export default function TasksPage() {
                   <Button
                     type="button"
                     onClick={() => setEditingTask(null)}
-                    variant="ghost" // Use ghost variant for cancel
+                    variant="ghost"
                   >
                     Cancel
                   </Button>
                 )}
-                <Button
-                  type="submit"
-                  variant="default" // Use default variant for submit/update
-                >
+                <Button type="submit" variant="default">
                   <FaPlus className="mr-2 h-4 w-4" /> {editingTask ? "Update Task" : "Add Task"}
                 </Button>
               </div>
@@ -318,19 +327,16 @@ export default function TasksPage() {
             {tasks.map((task) => (
               <motion.div
                 key={task.id}
-                layout // Add layout animation
+                layout
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }} // Added exit animation
+                exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.3 }}
-                // Use theme card style
                 className="bg-dark-card rounded-lg shadow-md overflow-hidden border border-border"
               >
-                 {/* Priority indicator header */}
                  <div className={`px-4 py-2 border-b border-border ${getPriorityClasses(task.priority)}`}>
                    <div className="flex justify-between items-center">
                      <h3 className="text-lg font-semibold font-orbitron">{task.title}</h3>
-                     {/* Use icon buttons for actions */}
                      <div className="flex gap-2">
                        {isAdmin && (
                          <>
@@ -355,7 +361,6 @@ export default function TasksPage() {
                      </div>
                    </div>
                  </div>
-                {/* Task details */}
                 <div className="p-4">
                   <p className="text-light-text mb-4 text-sm">{task.description || <span className="italic text-muted-foreground">No description provided.</span>}</p>
                   <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground font-mono items-center">

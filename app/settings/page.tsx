@@ -7,8 +7,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
   FaBrain, FaBell, FaBed, FaCalendarCheck, FaToolbox, FaEnvelope,
-  FaComments, FaShieldVirus, FaSliders, FaUserGear, FaQuestionCircle,
-  FaMoon // Added FaMoon
+  FaComments, FaShieldVirus, FaSliders, FaUserGear, FaCircleQuestion, // Corrected: FaQuestionCircle -> FaCircleQuestion
+  FaMoon
 } from "react-icons/fa6";
 import Modal from "@/components/ui/Modal";
 import { toast } from "sonner";
@@ -16,7 +16,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { updateUserSettings } from "@/app/actions";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { debugLogger as logger } from "@/lib/debugLogger";
-import { cn } from "@/lib/utils"; // cn import is present
+import { cn } from "@/lib/utils";
 
 interface SettingConfig {
   key: string;
@@ -26,14 +26,13 @@ interface SettingConfig {
   colorClass: string;
 }
 
-// Ensure color classes align with globals.css HSL vars
 const settingDefinitions: SettingConfig[] = [
   { key: 'morning_protocols_enabled', icon: <FaBell className="text-brand-yellow" />, title: "Протоколы Пробуждения", description: "Получать утренние VIBE-настройки и задачи для максимального заряда на день.", colorClass: "data-[state=checked]:bg-brand-yellow" },
   { key: 'deep_work_cycles_enabled', icon: <FaBrain className="text-brand-green" />, title: "Циклы Глубокой Работы", description: "Активировать напоминания для Pomodoro-сессий и периодов гиперфокуса.", colorClass: "data-[state=checked]:bg-brand-green" },
   { key: 'mind_sync_calendar_enabled', icon: <FaCalendarCheck className="text-brand-blue" />, title: "Дата-Синхронизация Разума", description: "Интеграция с календарем для оптимизации когнитивных нагрузок (концепт).", colorClass: "data-[state=checked]:bg-brand-blue" },
   { key: 'neuro_feedback_sleep_focus', icon: <FaBed className="text-brand-cyan" />, title: "Нейро-Обратная Связь", description: "Анализ качества сна и фокуса для адаптации VIBE-протоколов (концепт).", colorClass: "data-[state=checked]:bg-brand-cyan" },
   { key: 'experimental_alpha_protocols', icon: <FaShieldVirus className="text-brand-orange" />, title: "Альфа-Протоколы", description: "Доступ к экспериментальным VIBE-модулям и фичам до их официального релиза.", colorClass: "data-[state=checked]:bg-brand-orange" },
-  { key: 'promotional_messages_enabled', icon: <FaEnvelope className="text-gray-400" />, title: "Партнерские Сообщения", description: "Получать информацию о новых возможностях и коллаборациях в экосистеме CyberVibe.", colorClass: "data-[state=checked]:bg-gray-500" }, // Use gray or muted color
+  { key: 'promotional_messages_enabled', icon: <FaEnvelope className="text-gray-400" />, title: "Партнерские Сообщения", description: "Получать информацию о новых возможностях и коллаборациях в экосистеме CyberVibe.", colorClass: "data-[state=checked]:bg-gray-500" },
 ];
 
 type SettingsProfile = Record<string, boolean>;
@@ -71,7 +70,6 @@ export default function SettingsPage() {
     } else if (!isAppContextLoading && !dbUser) {
       logger.warn("[SettingsPage] AppContext loaded, but no dbUser. Using default settings.");
       setSettingsProfile(getDefaultSettings());
-       // Ensure default dark mode is applied
        document.documentElement.classList.toggle('dark', getDefaultSettings().dark_mode_enabled);
     }
      if(appContextError) {
@@ -100,21 +98,19 @@ export default function SettingsPage() {
 
     setIsSaving(true);
     try {
-      // Ensure settings_profile exists in metadata before updating
       const currentMetadata = dbUser.metadata || {};
       const updatedMetadata = {
           ...currentMetadata,
           settings_profile: newSettings,
       };
 
-      const result = await updateUserSettings(dbUser.id, updatedMetadata); // Pass the whole metadata object
+      const result = await updateUserSettings(dbUser.id, updatedMetadata);
       if (result.success) {
         toast.success(toastMessage);
         logger.log(`[SettingsPage] Setting ${settingKey} changed to ${value} and saved. Full new settings:`, newSettings);
       } else {
         toast.error(`Ошибка сохранения: ${result.error || "Неизвестная ошибка"}`);
         logger.error(`[SettingsPage] Failed to save setting ${settingKey}:`, result.error);
-        // Revert UI state
         setSettingsProfile(prev => ({ ...prev!, [settingKey]: !value }));
         if (settingKey === 'dark_mode_enabled') {
           document.documentElement.classList.toggle('dark', !value);
@@ -124,7 +120,6 @@ export default function SettingsPage() {
     } catch (e) {
       toast.error("Критическая ошибка при сохранении настроек.");
       logger.fatal("[SettingsPage] Critical error saving settings:", e);
-       // Revert UI state
       setSettingsProfile(prev => ({ ...prev!, [settingKey]: !value }));
        if (settingKey === 'dark_mode_enabled') {
           document.documentElement.classList.toggle('dark', !value);
@@ -133,7 +128,7 @@ export default function SettingsPage() {
     } finally {
       setIsSaving(false);
     }
-  }, [settingsProfile, dbUser]); // dbUser includes metadata now
+  }, [settingsProfile, dbUser]);
 
   const handleSendFeedback = async () => {
     if (!feedbackMessage.trim()) {
@@ -141,7 +136,6 @@ export default function SettingsPage() {
         return;
     }
     logger.log("Feedback submitted (client-side):", { userId: dbUser?.id, message: feedbackMessage });
-    // TODO: Implement actual feedback sending mechanism (e.g., API call, Supabase insert)
     toast.success("Спасибо за ваш VIBE-отзыв! Мы его изучим.");
     setFeedbackMessage("");
     setIsFeedbackModalOpen(false);
@@ -167,7 +161,7 @@ export default function SettingsPage() {
         transition={{ duration: 0.5 }}
         className="container mx-auto max-w-2xl"
       >
-        <Card className="bg-dark-card/80 backdrop-blur-md border border-brand-purple/50 shadow-xl shadow-brand-purple/20">
+        <Card className="bg-dark-card/80 backdrop-blur-md border border-brand-purple/50 shadow-xl shadow-purple-glow"> {/* Used custom shadow */}
           <CardHeader className="text-center p-6 border-b border-brand-purple/30">
             <FaUserGear className="text-5xl text-brand-purple mx-auto mb-3 drop-shadow-[0_0_10px_theme(colors.brand-purple)]" />
             <CardTitle className="text-3xl font-orbitron font-bold text-brand-purple cyber-text glitch" data-text="НЕЙРО-ИНТЕРФЕЙС">
@@ -199,7 +193,7 @@ export default function SettingsPage() {
                  description="Активация протокола 'Вечная Ночь' для комфорта глаз."
                  isChecked={settingsProfile.dark_mode_enabled ?? true}
                  onCheckedChange={(value) => handleSettingChange('dark_mode_enabled', value)}
-                 switchColorClass="data-[state=checked]:bg-brand-purple"
+                 switchColorClass="data-[state=checked]:bg-brand-purple" // Or use primary color var
                  isDisabled={isSaving}
              />
 
@@ -207,8 +201,8 @@ export default function SettingsPage() {
               <Button
                 variant="outline"
                 onClick={() => setIsFeedbackModalOpen(true)}
-                className="border-brand-pink text-brand-pink hover:bg-brand-pink/10 hover:text-brand-pink font-mono text-lg px-8 py-3 shadow-md hover:shadow-brand-pink/30 transition-all"
-                disabled={isSaving} // Disable feedback button while saving other settings
+                className="border-brand-pink text-brand-pink hover:bg-brand-pink/10 hover:text-brand-pink font-mono text-lg px-8 py-3 shadow-md hover:shadow-pink-glow transition-all" // Used custom shadow
+                disabled={isSaving}
               >
                 <FaComments className="mr-2" /> VIBE-ОТЗЫВ
               </Button>
@@ -223,7 +217,7 @@ export default function SettingsPage() {
         title="Форма Нейро-Обратной Связи"
         confirmText="Отправить Сигнал"
         onConfirm={handleSendFeedback}
-        icon={<FaQuestionCircle className="text-brand-pink" />} // FaQuestionCircle is Fa6
+        icon={<FaCircleQuestion className="text-brand-pink" />} // Corrected Icon
       >
         <p className="mb-3 font-mono text-sm text-muted-foreground">Твои мысли – топливо для эволюции VIBE OS. Делись идеями, сообщай о сбоях в Матрице.</p>
         <textarea
@@ -231,7 +225,7 @@ export default function SettingsPage() {
           onChange={(e) => setFeedbackMessage(e.target.value)}
           placeholder="Твой сигнал в ноосферу..."
           rows={5}
-          className="w-full p-3 rounded-md bg-input border border-border text-foreground focus:ring-2 focus:ring-brand-pink focus:border-brand-pink font-mono text-sm placeholder-muted-foreground/70 textarea-cyber" // Added textarea-cyber
+          className="w-full p-3 rounded-md bg-input border border-border text-foreground focus:ring-2 focus:ring-ring focus:border-ring font-mono text-sm placeholder-muted-foreground/70 textarea-cyber" // Applied theme class and correct focus
         />
       </Modal>
     </div>
@@ -252,9 +246,9 @@ const SettingToggle: React.FC<SettingToggleProps> = ({ icon, title, description,
   const uniqueId = `switch-${title.replace(/\s+/g, '-')}`;
   return (
     <div className="flex items-center justify-between p-3 bg-dark-bg/40 rounded-lg border border-gray-700 hover:border-brand-purple/50 transition-colors">
-      <Label htmlFor={uniqueId} className="flex items-center text-md flex-grow cursor-pointer pr-4"> {/* Added pr-4 for spacing */}
+      <Label htmlFor={uniqueId} className="flex items-center text-md flex-grow cursor-pointer pr-4">
         <span className="text-xl mr-3 flex-shrink-0">{icon}</span>
-        <div className="flex-grow"> {/* Ensure text div takes remaining space */}
+        <div className="flex-grow">
           <VibeContentRenderer content={`**${title}**`} className="font-orbitron text-light-text" />
           <p className="text-xs text-muted-foreground font-mono mt-0.5">{description}</p>
         </div>
@@ -263,9 +257,9 @@ const SettingToggle: React.FC<SettingToggleProps> = ({ icon, title, description,
         id={uniqueId}
         checked={isChecked}
         onCheckedChange={onCheckedChange}
-        className={cn(switchColorClass, "flex-shrink-0")} // Keep flex-shrink-0
+        className={cn(switchColorClass, "flex-shrink-0")}
         disabled={isDisabled}
-        aria-label={title} // Add aria-label for accessibility
+        aria-label={title}
       />
     </div>
   );
