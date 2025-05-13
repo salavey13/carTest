@@ -19,8 +19,9 @@ import { toast } from "sonner";
 import {
   fetchUserCyberFitnessProfile,
   CyberFitnessProfile,
-  getAchievementDetails,
-  Achievement 
+  getAchievementDetails, // Ensure this is imported
+  Achievement, // Ensure this type is imported
+  ALL_ACHIEVEMENTS // If you need to iterate all possible ones, though profile has achieved ones
 } from "@/hooks/cyberFitnessSupabase";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts';
@@ -64,7 +65,7 @@ const getAchievementIconComponent = (iconName: string | undefined): React.ReactN
         "FaKiwiBird": <FaKiwiBird className="text-lime-500" />,
         "FaMobileScreenButton": <FaMobileScreenButton className="text-brand-cyan" />,
     };
-    return iconsMap[iconName] || <FaMedal className="text-brand-yellow" />;
+    return iconsMap[iconName] || <FaMedal className="text-brand-yellow" />; // Default icon
 };
 
 export default function ProfilePage() {
@@ -87,17 +88,16 @@ export default function ProfilePage() {
       
       if (appLoading || isAuthenticating) {
         logger.log(`[ProfilePage] AppContext is still loading or authenticating. Waiting to fetch profile.`);
-        setProfileLoading(true); // Keep loading true if context is not ready
+        setProfileLoading(true);
         return;
       }
 
-      // If there's an error in AppContext after auth attempt, show guest/error state
       if (appContextError) {
           logger.error(`[ProfilePage] Error from AppContext: ${appContextError.message}. Displaying guest profile / error state.`);
           setCyberProfile({ 
             level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 System Error", 
             focusTimeHours: 0, skillsLeveled: 0, lastActivityTimestamp: new Date(0).toISOString(),
-            unlockedPerks: [], activeQuests: [], achievements: [],
+            unlockedPerks: [], activeQuests:[], completedQuests: [], achievements: [],
             dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0,
             totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0,
             featuresUsed: {}
@@ -106,9 +106,8 @@ export default function ProfilePage() {
           return;
       }
 
-      // Context is loaded and authenticated (or mock user is set up)
       if (dbUser?.user_id) { 
-        setProfileLoading(true); // Set loading true before async fetch
+        setProfileLoading(true); 
         logger.log(`[ProfilePage] Context fully loaded and authenticated (dbUser.user_id: ${dbUser.user_id}). Fetching CyberFitness profile...`);
         const result = await fetchUserCyberFitnessProfile(dbUser.user_id); 
         if (result.success && result.data) {
@@ -119,31 +118,29 @@ export default function ProfilePage() {
           setCyberProfile({ 
             level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Alpha Error", 
             focusTimeHours: 0, skillsLeveled: 0, lastActivityTimestamp: new Date(0).toISOString(),
-            unlockedPerks: [], activeQuests: [], achievements: [],
+            unlockedPerks: [], activeQuests: [], completedQuests: [], achievements: [],
             dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0,
             totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0,
             featuresUsed: {}
           });
         }
-        setProfileLoading(false); // Set loading false after fetch attempt
+        setProfileLoading(false);
       } else { 
-        // This case means appLoading and isAuthenticating are false, no appContextError, but dbUser.user_id is still not available.
-        // This implies MOCK_USER might be disabled and real auth didn't yield a dbUser (e.g., if initData was missing or validation failed and error wasn't propagated correctly)
         logger.log(`[ProfilePage] Context loaded, auth attempt complete, but no dbUser.user_id. Likely unauthenticated or MOCK_USER disabled & no TG data. Using guest profile.`);
         setCyberProfile({ 
             level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Guest Mode", 
             focusTimeHours: 0, skillsLeveled: 0, lastActivityTimestamp: new Date(0).toISOString(),
-            unlockedPerks: ["Basic Interface"], activeQuests: ["Explore CyberVibe Studio"], 
+            unlockedPerks: ["Basic Interface"], activeQuests: ["Explore CyberVibe Studio"], completedQuests: [],
             achievements: [], dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0,
             totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0,
             featuresUsed: {}
         });
-        setProfileLoading(false); // Done "loading" into guest state
+        setProfileLoading(false);
       }
     };
 
     loadProfile();
-  }, [dbUser, appLoading, isAuthenticating, appContextError]); // Added appContextError to deps
+  }, [dbUser, appLoading, isAuthenticating, appContextError]); 
 
   const isLoadingDisplay = appLoading || isAuthenticating || profileLoading;
 
@@ -161,23 +158,22 @@ export default function ProfilePage() {
   const safeCyberProfile = cyberProfile ?? { 
       level: 0, kiloVibes: 0, cognitiveOSVersion: "v0.1 Error/Guest", 
       focusTimeHours: 0, skillsLeveled: 0, lastActivityTimestamp: new Date(0).toISOString(),
-      unlockedPerks: [], activeQuests: [], achievements: [],
+      unlockedPerks: [], activeQuests: [], completedQuests: [], achievements: [],
       dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0,
       totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0,
       featuresUsed: {}
   };
 
-
   const currentLevel = safeCyberProfile.level;
   const kiloVibes = safeCyberProfile.kiloVibes;
   const cognitiveOS = safeCyberProfile.cognitiveOSVersion;
   const unlockedPerks = safeCyberProfile.unlockedPerks;
-  const achievements = safeCyberProfile.achievements;
+  const achievements = safeCyberProfile.achievements; // Array of achievement IDs
   const focusTime = safeCyberProfile.focusTimeHours || 0;
   
   const displayWeeklyActivity = safeCyberProfile.dailyActivityLog && safeCyberProfile.dailyActivityLog.length > 0
     ? safeCyberProfile.dailyActivityLog.map(log => {
-        const date = new Date(log.date + "T00:00:00Z"); 
+        const date = new Date(log.date + "T00:00:00Z"); // Ensure date is parsed as UTC
         return {
             name: format(date, 'EE', { locale: ru }).toUpperCase(),
             value: (log.filesExtracted * 50) + (log.tokensProcessed * 0.1) + (log.kworkRequestsSent || 0) * 10 + (log.prsCreated || 0) * 200 + (log.branchesUpdated || 0) * 100,

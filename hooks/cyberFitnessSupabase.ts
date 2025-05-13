@@ -82,9 +82,9 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
       id: "two_finger_fu", 
       name: "Кунг-фу Двух Пальцев", 
       description: "Продемонстрировал мастерство молниеносного мобильного ввода и навигации в стиле Mortal Kombat.", 
-      icon: "FaMobileScreenButton", // Using FaMobileScreenButton from react-icons/fa6
+      icon: "FaMobileScreenButton", 
       kiloVibesAward: 75, 
-      checkCondition: () => false // Quest-like, awarded manually or via specific future trigger
+      checkCondition: () => false 
     },
 
     // --- Quest Achievements - their checkCondition is false as they are awarded directly ---
@@ -103,7 +103,6 @@ const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({
     totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0,
     totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {},
 });
-
 
 const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | null | undefined): CyberFitnessProfile => {
   const defaultProfile = getDefaultCyberFitnessProfile();
@@ -134,11 +133,11 @@ const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | 
     };
   }
   
-  if (userId && MOCK_USER_ID_NUM !== null && userId === MOCK_USER_ID_NUM.toString()) {
-      logger.debug(`[CyberFitness getProfile] Mock user (${userId}) detected. Resetting achievements and completedQuests for this fetch.`);
-      finalProfile.achievements = [];
-      finalProfile.completedQuests = [];
-  }
+  // IMPORTANT: Removed the logic that resets achievements if userId matches MOCK_USER_ID.
+  // The "mock" nature should be determined by the actual session source (e.g., useTelegram),
+  // not by a simple ID match here. This function should reflect DB state or default.
+  // Mock behavior (like not persisting) should be handled during UPDATE if needed,
+  // or by using a truly separate mock data store/ID.
 
   return finalProfile;
 };
@@ -195,7 +194,11 @@ export const updateUserCyberFitnessProfile = async (
     return { success: false, error: "Admin client is not available for profile update." };
   }
 
-  const isMockCurrentSession = MOCK_USER_ID_NUM !== null && userId === MOCK_USER_ID_NUM.toString();
+  // Determine if this is a mock user session (e.g. based on AppContext state, not just ID match)
+  // For simplicity, we'll assume for now that if NEXT_PUBLIC_USE_MOCK_USER is true, and ID matches, it's a mock session.
+  // A more robust way would be for useTelegram to tag the user object as mock.
+  const isTrueMockSession = process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && MOCK_USER_ID_NUM !== null && userId === MOCK_USER_ID_NUM.toString();
+
 
   try {
     const { data: currentUserData, error: fetchError } = await supabaseAdmin
@@ -211,6 +214,14 @@ export const updateUserCyberFitnessProfile = async (
    
     const existingOverallMetadata = currentUserData?.metadata || {};
     let existingCyberFitnessProfile = getCyberFitnessProfile(userId, existingOverallMetadata);
+
+    // If it's a true mock session and we want to "reset" achievements for testing this particular update run:
+    // This means achievements are not cumulative for the mock user across different test runs of this function.
+    if (isTrueMockSession) {
+        logger.debug(`[CyberFitness UpdateProfile] True mock session for ${userId}. Achievements will be re-evaluated from scratch for this update.`);
+        existingCyberFitnessProfile.achievements = []; // Start fresh for this evaluation if it's a true mock interaction
+    }
+
 
     const newCyberFitnessProfile: CyberFitnessProfile = {
       ...existingCyberFitnessProfile, 
@@ -246,7 +257,8 @@ export const updateUserCyberFitnessProfile = async (
     if (typeof updates.totalBranchesUpdated === 'number') newCyberFitnessProfile.totalBranchesUpdated = (newCyberFitnessProfile.totalBranchesUpdated || 0) + updates.totalBranchesUpdated;
     
     const newlyUnlockedAchievements: Achievement[] = [];
-    let currentAchievementsSet = new Set(isMockCurrentSession ? [] : (newCyberFitnessProfile.achievements || [])); 
+    // Crucial fix: Load from the potentially modified newCyberFitnessProfile.achievements (which might have been reset for true mock session)
+    let currentAchievementsSet = new Set(newCyberFitnessProfile.achievements || []); 
 
     for (const ach of ALL_ACHIEVEMENTS) {
         if (!currentAchievementsSet.has(ach.id) && ach.checkCondition(newCyberFitnessProfile)) {
@@ -318,7 +330,7 @@ export const logCyberFitnessAction = async (
 
   try {
     const profileResult = await fetchUserCyberFitnessProfile(userId);
-    if (!profileResult.data) { // Check if data object itself is missing (implies bigger fetch issue)
+    if (!profileResult.data) { 
       logger.error(`[CyberFitness LogAction] Failed to get profile data for ${userId}. Error: ${profileResult.error}`);
       return { success: false, error: profileResult.error || "Failed to get current profile data." };
     }
@@ -343,7 +355,6 @@ export const logCyberFitnessAction = async (
     const profileUpdates: Partial<CyberFitnessProfile> = {
         featuresUsed: { ...(currentProfile.featuresUsed || {}) } 
     };
-    // KiloVibes for specific actions (like feature use) are now primarily handled by achievement checks in updateUserCyberFitnessProfile
 
     if (actionType === 'filesExtracted' && typeof countOrDetails === 'number') {
         todayEntry.filesExtracted += countOrDetails;
@@ -415,7 +426,7 @@ export const completeQuestAndUpdateProfile = async (
 ): Promise<{ success: boolean; data?: DbUser; error?: string; newAchievements?: Achievement[] }> => {
   logger.log(`[CyberFitness QuestComplete ENTRY] User: ${userId}, Quest: ${questId}, KiloVibes: ${kiloVibesAwarded}, Lvl?: ${newLevel}, Perks?:`, newPerks);
 
-  const isMockCurrentSession = MOCK_USER_ID_NUM !== null && userId === MOCK_USER_ID_NUM.toString();
+  const isTrueMockSession = process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && MOCK_USER_ID_NUM !== null && userId === MOCK_USER_ID_NUM.toString();
 
   const currentProfileResult = await fetchUserCyberFitnessProfile(userId);
   if (!currentProfileResult.success || !currentProfileResult.data) {
@@ -424,7 +435,7 @@ export const completeQuestAndUpdateProfile = async (
   }
   const currentProfile = currentProfileResult.data;
 
-  if (!isMockCurrentSession && currentProfile.completedQuests?.includes(questId)) {
+  if (!isTrueMockSession && currentProfile.completedQuests?.includes(questId)) {
     logger.info(`[CyberFitness QuestComplete] Quest ${questId} already completed by user ${userId}. Checking for new perks only.`);
     let shouldUpdateForPerksOnly = false;
     const updatesForPerks: Partial<CyberFitnessProfile> = {};
