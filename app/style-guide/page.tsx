@@ -1,3 +1,4 @@
+// /app/style-guide/page.tsx
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
-import VibeContentRenderer from "@/components/VibeContentRenderer";
+import VibeContentRenderer from "@/components/VibeContentRenderer"; // Keep this, it's the default export
 import {
   FaPalette, FaFont, FaToggleOn, FaSliders, FaSquare, FaSquareCheck, FaHandPointer, 
   FaKeyboard, FaIdCard, FaDiagramProject, FaTriangleExclamation, FaGears, FaPlus, FaStar, 
@@ -313,7 +314,7 @@ function greet(name: string) {
                  <div className="bg-dark-card p-4 rounded-lg border border-border space-y-2">
                     <VibeContentRenderer content="Это **жирный** текст с иконкой ::FaStar color='gold':: и *курсивом*." className="text-sm"/>
                     <VibeContentRenderer content="Ссылка на [Google](https://google.com) ::FaGoogle:: и FontAwesome ::FaFontAwesome::" className="text-sm"/>
-                    <VibeContentRenderer content="Ошибка: [?] Неизвестная иконка ::FaInvalidIcon::" className="text-sm text-red-500"/>
+                    <VibeContentRenderer content="Ошибка: [?] Неизвестная иконка ::faInvalidIcon::" className="text-sm text-red-500"/>
                  </div>
             </div>
           </div>
