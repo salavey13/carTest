@@ -73,7 +73,6 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                 return <span title={`Unknown/Unmapped Fa Icon: ${nodeName}`} className="text-orange-500 font-bold">{`<${nodeName}>`}</span>;
             }
 
-
             // --- Link Handling ---
             if (lowerCaseName === 'a') {
                 const hrefVal = mutableAttribs.href;
@@ -91,9 +90,38 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                 return React.createElement('a', mutableAttribs, children);
             }
             
-            // For any other standard HTML element, let html-react-parser handle it.
-            // logger.debug(`[VCR] Passing through <${nodeName}> for default parsing.`);
-            return undefined; 
+            // --- Standard HTML Elements Styling ---
+            // Add specific styles for common elements if needed, matching theme
+            if (lowerCaseName === 'strong') {
+                mutableAttribs.className = `${mutableAttribs.className || ''} font-semibold text-brand-yellow`.trim(); // Example using theme color
+            }
+            if (lowerCaseName === 'em') {
+                mutableAttribs.className = `${mutableAttribs.className || ''} italic text-brand-cyan`.trim(); // Example using theme color
+            }
+            if (lowerCaseName === 'code' && domNode.parent?.name !== 'pre') {
+                 mutableAttribs.className = `${mutableAttribs.className || ''} bg-muted px-1 py-0.5 rounded text-sm font-mono text-accent-foreground`.trim(); // Example using theme colors
+            }
+            if (lowerCaseName === 'pre') {
+                 mutableAttribs.className = `${mutableAttribs.className || ''} bg-muted p-4 rounded-md overflow-x-auto simple-scrollbar`.trim(); // Example using theme colors
+            }
+            if (lowerCaseName === 'blockquote') {
+                 mutableAttribs.className = `${mutableAttribs.className || ''} border-l-4 border-brand-purple pl-4 italic text-muted-foreground my-4`.trim(); // Example using theme colors
+            }
+            if (lowerCaseName === 'ul') {
+                 mutableAttribs.className = `${mutableAttribs.className || ''} list-disc list-inside space-y-1 my-2`.trim();
+            }
+            if (lowerCaseName === 'ol') {
+                 mutableAttribs.className = `${mutableAttribs.className || ''} list-decimal list-inside space-y-1 my-2`.trim();
+            }
+            if (lowerCaseName === 'li') {
+                 mutableAttribs.className = `${mutableAttribs.className || ''} my-0.5`.trim();
+            }
+            if (lowerCaseName === 'hr') {
+                 mutableAttribs.className = `${mutableAttribs.className || ''} border-border my-4`.trim(); // Use theme border
+            }
+
+            // Return the element with potentially modified attributes
+            return React.createElement(nodeName, mutableAttribs, children);
         }
         
         // logger.debug("[VCR] Node not processed by custom logic, passing through:", domNode.type);
