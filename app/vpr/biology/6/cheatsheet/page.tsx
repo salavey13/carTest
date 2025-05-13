@@ -9,13 +9,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  FaLeaf, FaDna, FaMicroscope, FaTree, FaPaw, FaBug,
-  FaSeedling, FaWater, FaSun, FaFish,
-  FaBookOpen, FaFlask, FaGlobe, FaBacteria, FaQuestionCircle, FaRecycle, FaBalanceScale,
-  FaBrain, // Icon for Easter Egg
-  FaGrinStars // Icon for Easter Egg
-} from "react-icons/fa";
+import { VibeContentRenderer } from "@/components/VibeContentRenderer"; // Added import
 
 // --- Tooltip Descriptions (Kept the original Russian text) ---
 const tooltipDescriptions: Record<string, string> = {
@@ -79,18 +73,20 @@ const VprBiologyCheatsheet6: NextPage = () => {
   // Easter Egg Component
   const EasterEgg = () => (
       <div className="my-8 flex justify-center items-center space-x-2 text-sm text-amber-700/80 opacity-80 hover:opacity-100 transition-opacity duration-300">
-          <FaBrain className="animate-pulse" />
+          <VibeContentRenderer content="<FaBrain />" className="animate-pulse" />
           <Tooltip>
               <TooltipTrigger asChild>
                   <span className="cursor-help italic">Маленький секрет для самых упорных...</span>
               </TooltipTrigger>
               <TooltipContent side="top" className="bg-amber-100 border border-amber-300 text-amber-800 p-2 rounded-md shadow-md text-xs">
-                  <p className="flex items-center"><FaGrinStars className="mr-1.5 text-lg text-amber-600"/>Ты молодец, что дошел до сюда! Продолжай в том же духе!</p>
+                  <p className="flex items-center">
+                    <VibeContentRenderer content="<FaGrinStars />" className="mr-1.5 text-lg text-amber-600"/>
+                    Ты молодец, что дошел до сюда! Продолжай в том же духе!
+                  </p>
               </TooltipContent>
           </Tooltip>
       </div>
   );
-
 
   return (
     // Light Theme Background
@@ -105,7 +101,7 @@ const VprBiologyCheatsheet6: NextPage = () => {
         <main className="flex-grow container mx-auto px-3 md:px-4 py-10 md:py-12">
           {/* Title */}
           <h1 className="text-2xl md:text-4xl font-bold mb-6 text-center text-emerald-700 flex items-center justify-center">
-            <FaBookOpen className="mr-2 md:mr-3 text-emerald-600" />
+            <VibeContentRenderer content="<FaBookOpen />" className="mr-2 md:mr-3 text-emerald-600" />
             Биология 6 класс: Подробная Шпаргалка к ВПР
           </h1>
 
@@ -122,13 +118,13 @@ const VprBiologyCheatsheet6: NextPage = () => {
               {/* Section 1: Basics of Life */}
               <section className="space-y-5">
                 <h2 className="flex items-center text-xl md:text-2xl font-semibold text-emerald-800 mb-3 border-b-2 border-emerald-300 pb-2">
-                  <FaMicroscope className="mr-2 md:mr-3 text-emerald-600/90 fa-fw" /> Основы Жизни: Клетки и Процессы
+                  <VibeContentRenderer content="<FaMicroscope />" className="mr-2 md:mr-3 text-emerald-600/90 fa-fw" /> Основы Жизни: Клетки и Процессы
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
                    {/* Cell Structure */}
                    <div className="border-l-4 border-emerald-500 pl-3 md:pl-4">
                     <h3 className="flex items-center text-lg md:text-xl font-semibold text-emerald-700 mb-2">
-                      <FaQuestionCircle className="mr-2 text-emerald-600/80 fa-fw" /> Строение Клетки
+                      <VibeContentRenderer content="<FaQuestionCircle />" className="mr-2 text-emerald-600/80 fa-fw" /> Строение Клетки
                     </h3>
                     <p className="text-slate-700 mb-3 text-sm leading-relaxed">
                       Клетка – наименьшая живая система. <strong className="font-semibold">Растительная:</strong> есть <strong className="font-semibold">клеточная стенка</strong> (форма), <strong className="font-semibold">мембрана</strong> (контроль), <strong className="font-semibold">ядро</strong> (ДНК, управление), <strong className="font-semibold">цитоплазма</strong>, <strong className="font-semibold">хлоропласты</strong> (фотосинтез, зеленые), <strong className="font-semibold">вакуоль</strong> (большая, с соком), <strong className="font-semibold">митохондрии</strong> (энергия). <strong className="font-semibold">Животная:</strong> нет стенки, хлоропластов, крупной вакуоли.
@@ -143,7 +139,7 @@ const VprBiologyCheatsheet6: NextPage = () => {
                   {/* Photosynthesis */}
                    <div className="border-l-4 border-emerald-500 pl-3 md:pl-4">
                     <h3 className="flex items-center text-lg md:text-xl font-semibold text-emerald-700 mb-2">
-                      <FaSun className="mr-2 text-yellow-500 fa-fw" /> Фотосинтез: Рецепт Растений
+                      <VibeContentRenderer content="<FaSun />" className="mr-2 text-yellow-500 fa-fw" /> Фотосинтез: Рецепт Растений
                     </h3>
                     <p className="text-slate-700 mb-3 text-sm leading-relaxed">
                       Процесс создания <strong className="font-semibold">органических веществ</strong> (глюкозы) из <strong className="font-semibold">неорганических</strong> (CO₂ и H₂O) с использованием энергии <strong className="font-semibold">света</strong>. Происходит в <strong className="font-semibold">хлоропластах</strong> (содержат <strong className="font-semibold">хлорофилл</strong>). Побочный продукт – <strong className="font-semibold">кислород (O₂)</strong>. Формула: 6CO₂ + 6H₂O + Свет → C₆H₁₂O₆ + 6O₂. Основа питания на Земле.
@@ -158,7 +154,7 @@ const VprBiologyCheatsheet6: NextPage = () => {
                   {/* Classification */}
                    <div className="border-l-4 border-emerald-500 pl-3 md:pl-4">
                     <h3 className="flex items-center text-lg md:text-xl font-semibold text-emerald-700 mb-2">
-                      <FaGlobe className="mr-2 text-sky-600 fa-fw" /> Царства Живой Природы
+                      <VibeContentRenderer content="<FaGlobe />" className="mr-2 text-sky-600 fa-fw" /> Царства Живой Природы
                     </h3>
                     <p className="text-slate-700 mb-3 text-sm leading-relaxed">
                       Основные группы (царства): <strong className="font-semibold">Бактерии</strong> (прокариоты, без ядра), <strong className="font-semibold">Грибы</strong> (эукариоты, гетеротрофы, хитин), <strong className="font-semibold">Растения</strong> (эукариоты, автотрофы/фотосинтез, целлюлоза), <strong className="font-semibold">Животные</strong> (эукариоты, гетеротрофы, подвижные). Важно знать их ключевые отличия.
@@ -176,13 +172,13 @@ const VprBiologyCheatsheet6: NextPage = () => {
               {/* Section 2: Plants */}
               <section className="space-y-5 border-t-2 border-lime-300/80 pt-6">
                 <h2 className="flex items-center text-xl md:text-2xl font-semibold text-lime-800 mb-3 border-b-2 border-lime-300 pb-2">
-                  <FaLeaf className="mr-2 md:mr-3 text-lime-600/90 fa-fw" /> Мир Растений: Строение и Жизнь
+                  <VibeContentRenderer content="<FaLeaf />" className="mr-2 md:mr-3 text-lime-600/90 fa-fw" /> Мир Растений: Строение и Жизнь
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
                    {/* Plant Organs */}
                    <div className="border-l-4 border-lime-500 pl-3 md:pl-4">
                     <h3 className="flex items-center text-lg md:text-xl font-semibold text-lime-700 mb-2">
-                      <FaSeedling className="mr-2 text-lime-600/80 fa-fw" /> Органы Растений
+                      <VibeContentRenderer content="<FaSeedling />" className="mr-2 text-lime-600/80 fa-fw" /> Органы Растений
                     </h3>
                     <ul className="space-y-1 text-slate-700 pl-1 text-sm leading-relaxed">
                       <li><strong className="font-semibold">Вегетативные</strong> (рост, питание):</li>
@@ -205,7 +201,7 @@ const VprBiologyCheatsheet6: NextPage = () => {
                   {/* Life Processes */}
                    <div className="border-l-4 border-lime-500 pl-3 md:pl-4">
                     <h3 className="flex items-center text-lg md:text-xl font-semibold text-lime-700 mb-2">
-                      <FaFlask className="mr-2 text-lime-600/80 fa-fw" /> Жизнедеятельность Растений
+                      <VibeContentRenderer content="<FaFlask />" className="mr-2 text-lime-600/80 fa-fw" /> Жизнедеятельность Растений
                     </h3>
                     <ul className="space-y-1 text-slate-700 pl-1 text-sm leading-relaxed">
                        <li><strong className="font-semibold">Питание:</strong> <strong className="font-semibold">Фотосинтез</strong> (воздушное питание - CO₂) + <strong className="font-semibold">Минеральное</strong> (корневое - H₂O и соли).</li>
@@ -216,7 +212,7 @@ const VprBiologyCheatsheet6: NextPage = () => {
                       <li><strong className="font-semibold">Движение:</strong> Ростовые движения (к свету, к опоре), движения листьев/устьиц.</li>
                     </ul>
                      <div className="mt-4 p-3 bg-lime-50 rounded-lg border border-lime-200 text-center text-lime-700 text-xs">
-                       <FaLeaf size={24} className="mx-auto mb-1" />
+                       <VibeContentRenderer content='<FaLeaf size="24" />' className="mx-auto mb-1" />
                        Растения постоянно активны, хотя мы этого часто не замечаем!
                      </div>
                   </div>
@@ -229,13 +225,13 @@ const VprBiologyCheatsheet6: NextPage = () => {
               {/* Section 3: Ecosystems */}
               <section className="space-y-5 border-t-2 border-teal-300/80 pt-6">
                 <h2 className="flex items-center text-xl md:text-2xl font-semibold text-teal-800 mb-3 border-b-2 border-teal-300 pb-2">
-                  <FaTree className="mr-2 md:mr-3 text-teal-600/90 fa-fw" /> Экосистемы и Взаимосвязи
+                  <VibeContentRenderer content="<FaTree />" className="mr-2 md:mr-3 text-teal-600/90 fa-fw" /> Экосистемы и Взаимосвязи
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
                   {/* Food Chains */}
                    <div className="border-l-4 border-teal-500 pl-3 md:pl-4">
                     <h3 className="flex items-center text-lg md:text-xl font-semibold text-teal-700 mb-2">
-                      <FaPaw className="mr-2 text-orange-600 fa-fw" /> Пищевые Цепи и Сети
+                      <VibeContentRenderer content="<FaPaw />" className="mr-2 text-orange-600 fa-fw" /> Пищевые Цепи и Сети
                     </h3>
                     <p className="text-slate-700 mb-3 text-sm leading-relaxed">
                       Показывают передачу <strong className="font-semibold">энергии</strong> и веществ. Звенья: <strong className="font-semibold">Продуценты</strong> (растения - создают органику), <strong className="font-semibold">Консументы</strong> (потребители: I порядка – травоядные, II, III... – хищники), <strong className="font-semibold">Редуценты</strong> (грибы, бактерии - разлагают мертвые остатки до неорганики). В природе цепи переплетаются в <strong className="font-semibold">пищевые сети</strong>.
@@ -250,7 +246,7 @@ const VprBiologyCheatsheet6: NextPage = () => {
                   {/* Ecosystems */}
                    <div className="border-l-4 border-teal-500 pl-3 md:pl-4">
                     <h3 className="flex items-center text-lg md:text-xl font-semibold text-teal-700 mb-2">
-                      <FaFish className="mr-2 text-blue-600 fa-fw" /> Экосистемы: Живое + Неживое
+                      <VibeContentRenderer content="<FaFish />" className="mr-2 text-blue-600 fa-fw" /> Экосистемы: Живое + Неживое
                     </h3>
                     <p className="text-slate-700 mb-3 text-sm leading-relaxed">
                       Сообщество живых организмов (<strong className="font-semibold">биоценоз</strong>) и среды их обитания (<strong className="font-semibold">биотоп</strong>), связанные <strong className="font-semibold">круговоротом веществ</strong> и потоком энергии. Компоненты: <strong className="font-semibold">биотические</strong> (продуценты, консументы, редуценты) и <strong className="font-semibold">абиотические</strong> (свет, t°, вода, воздух, почва). Примеры: лес, луг, болото, пруд.
@@ -265,7 +261,7 @@ const VprBiologyCheatsheet6: NextPage = () => {
                   {/* Human Impact */}
                    <div className="border-l-4 border-teal-500 pl-3 md:pl-4">
                     <h3 className="flex items-center text-lg md:text-xl font-semibold text-teal-700 mb-2">
-                      <FaBalanceScale className="mr-2 text-gray-600 fa-fw" /> Человек и Природа
+                      <VibeContentRenderer content="<FaBalanceScale />" className="mr-2 text-gray-600 fa-fw" /> Человек и Природа
                     </h3>
                     <p className="text-slate-700 mb-3 text-sm leading-relaxed">
                        Деятельность человека сильно влияет на экосистемы. <strong className="font-semibold">Отрицательное влияние:</strong> загрязнение (воздуха, воды, почвы), вырубка лесов, осушение болот, браконьерство, разрушение озонового слоя. <strong className="font-semibold">Положительное:</strong> заповедники, нац. парки, лесовосстановление, очистные сооружения, Красная книга. Важен <strong className="font-semibold">баланс</strong>.
@@ -283,7 +279,7 @@ const VprBiologyCheatsheet6: NextPage = () => {
               {/* Final Tip */}
               <section className="border-t-2 border-emerald-200/80 pt-6 mt-10 text-center">
                 <h2 className="flex items-center justify-center text-xl md:text-2xl font-semibold text-emerald-700 mb-3">
-                  <FaBookOpen className="mr-2 md:mr-3 text-emerald-600/90 fa-fw" /> Советы для Подготовки
+                  <VibeContentRenderer content="<FaBookOpen />" className="mr-2 md:mr-3 text-emerald-600/90 fa-fw" /> Советы для Подготовки
                 </h2>
                 <p className="text-slate-700 text-sm md:text-base leading-relaxed max-w-4xl mx-auto">
                   Эта шпаргалка - твой конспект! Чтобы закрепить знания: <strong>1)</strong> Решай <strong className="font-semibold text-emerald-700">демоверсии</strong> и <strong className="font-semibold text-emerald-700">задания ВПР</strong> прошлых лет. <strong>2)</strong> Внимательно <strong className="font-semibold">читай вопросы</strong>, обращай внимание на рисунки и схемы. <strong>3)</strong> <strong className="font-semibold">Повторяй термины</strong> (органоиды, продуценты, фотосинтез и т.д.). <strong>4)</strong> Старайся <strong className="font-semibold">объяснить</strong> каждый процесс своими словами.
@@ -293,7 +289,7 @@ const VprBiologyCheatsheet6: NextPage = () => {
                 <div className="mt-8">
                   <Link href="/vpr-tests" legacyBehavior>
                     <a className="inline-block bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-bold py-2.5 px-5 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 text-sm md:text-base">
-                      <FaRecycle className="inline mr-1.5" /> К другим тестам и шпаргалкам ВПР
+                      <VibeContentRenderer content="<FaRecycle />" className="inline mr-1.5" /> К другим тестам и шпаргалкам ВПР
                     </a>
                   </Link>
                 </div>
