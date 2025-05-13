@@ -147,10 +147,10 @@ export default function Header() {
   const [searchTerm, setSearchTerm] = useState("");
   const pathname = usePathname();
   
-  // Hide header on specific pages
-  if (pathname === '/finance-literacy-memo') {
-    return null;
-  }
+  // Логика скрытия хедера на '/finance-literacy-memo' УДАЛЕНА
+  // if (pathname === '/finance-literacy-memo') {
+  //   return null;
+  // }
 
   const initialLang = useMemo(() => (user?.language_code === 'ru' ? 'ru' : 'en'), [user?.language_code]);
   const [currentLang, setCurrentLang] = useState<'en' | 'ru'>(initialLang);
