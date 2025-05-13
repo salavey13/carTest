@@ -16,11 +16,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import {
-  FaPalette, FaFont, FaToggleOn, FaSlidersH, FaSquare, FaCheckSquare, FaHandPointer,
-  FaKeyboard, FaIdCard, FaDiagramProject, FaExclamationTriangle, FaGears, FaPlus, FaStar,
+  FaPalette, FaFont, FaToggleOn, FaSlidersH, FaSquare, FaSquareCheck, FaHandPointer,
+  FaKeyboard, FaIdCard, FaDiagramProject, FaTriangleExclamation, FaGears, FaPlus, FaStar,
   FaPaintbrush, FaCode, FaEyeSlash, FaLink, FaTrash, FaCopy, FaFloppyDisk, FaPaperPlane,
-  FaMoon, FaSun, FaUser, FaCreditCard, FaLifeRing, FaSignOutAlt, FaGoogle, FaFontAwesome,
-  FaSnowflake, FaBrain, FaBolt // Added missing icons used in examples
+  FaMoon, FaSun, FaUser, FaCreditCard, FaLifeRing, FaGoogle, FaFontAwesome,
+  FaSnowflake, FaBrain, FaBolt, FaRightFromBracket // Replaced FaSignOutAlt with FaRightFromBracket
 } from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 
@@ -316,11 +316,11 @@ function greet(name: string) {
                     <Button variant="outline">Открыть Меню <FaGears className="ml-2 h-4 w-4"/></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-56">
-                    {/* Added missing icon imports FaUser, FaCreditCard, FaLifeRing, FaSignOutAlt */}
+                    {/* Added missing icon imports FaUser, FaCreditCard, FaLifeRing, FaRightFromBracket */}
                     <DropdownMenuItem><VibeContentRenderer content="::FaUser:: Профиль"/> </DropdownMenuItem>
                     <DropdownMenuItem><VibeContentRenderer content="::FaCreditCard:: Биллинг"/></DropdownMenuItem>
                     <DropdownMenuItem disabled><VibeContentRenderer content="::FaLifeRing:: Поддержка (Неактивно)"/></DropdownMenuItem>
-                    <DropdownMenuItem><VibeContentRenderer content="::FaSignOutAlt:: Выйти"/></DropdownMenuItem>
+                    <DropdownMenuItem><VibeContentRenderer content="::FaRightFromBracket:: Выйти"/></DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>

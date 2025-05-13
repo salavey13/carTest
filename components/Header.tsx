@@ -110,6 +110,7 @@ const translations: Record<string, Record<string, string>> = {
   }
 };
 
+// Updated color mapping to use theme definitions
 const colorVarMap: Record<string, string> = {
   purple: "var(--brand-purple-rgb)",
   blue: "var(--brand-blue-rgb)",
@@ -118,9 +119,23 @@ const colorVarMap: Record<string, string> = {
   green: "var(--brand-green-rgb)",
   pink: "var(--brand-pink-rgb)",
   cyan: "var(--brand-cyan-rgb)",
-  red: "var(--red-500-rgb)", 
+  red: "var(--red-500-rgb)", // Assuming red-500 is defined in your theme or globals
   orange: "var(--brand-orange-rgb)",
-  gray: "var(--gray-500-rgb)", 
+  gray: "var(--gray-500-rgb)", // Assuming gray-500 is defined in your theme or globals
+};
+
+const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> = {
+  purple: "border-brand-purple/60 hover:border-brand-purple text-brand-purple",
+  blue: "border-brand-blue/60 hover:border-brand-blue text-brand-blue",
+  yellow: "border-brand-yellow/60 hover:border-brand-yellow text-brand-yellow",
+  lime: "border-neon-lime/60 hover:border-neon-lime text-neon-lime",
+  green: "border-brand-green/60 hover:border-brand-green text-brand-green",
+  pink: "border-brand-pink/60 hover:border-brand-pink text-brand-pink",
+  cyan: "border-brand-cyan/60 hover:border-brand-cyan text-brand-cyan",
+  red: "border-destructive/60 hover:border-destructive text-destructive", // Use destructive from theme
+  orange: "border-brand-orange/60 hover:border-brand-orange text-brand-orange",
+  gray: "border-muted/60 hover:border-muted text-muted-foreground", // Use muted from theme
+  default: "border-border hover:border-primary/80 text-muted-foreground hover:text-primary" // Use theme defaults
 };
 
 export default function Header() {
@@ -221,20 +236,6 @@ export default function Header() {
     return () => { document.body.style.overflow = originalStyle; };
   }, [isNavOpen]);
 
-  const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> = {
-    purple: "border-brand-purple/60 hover:border-brand-purple text-brand-purple",
-    blue: "border-brand-blue/60 hover:border-brand-blue text-brand-blue",
-    yellow: "border-brand-yellow/60 hover:border-brand-yellow text-brand-yellow",
-    lime: "border-neon-lime/60 hover:border-neon-lime text-neon-lime",
-    green: "border-brand-green/60 hover:border-brand-green text-brand-green",
-    pink: "border-brand-pink/60 hover:border-brand-pink text-brand-pink",
-    cyan: "border-brand-cyan/60 hover:border-brand-cyan text-brand-cyan",
-    red: "border-red-500/60 hover:border-red-500 text-red-500",
-    orange: "border-brand-orange/60 hover:border-brand-orange text-brand-orange",
-    gray: "border-gray-600/60 hover:border-gray-500 text-gray-400",
-    default: "border-gray-700 hover:border-brand-green/80 text-gray-400 hover:text-brand-green"
-  };
-
   return (
     <>
       <motion.header
@@ -323,8 +324,8 @@ export default function Header() {
                                 page.isImportant 
                                   ? "bg-gradient-to-br from-purple-800/30 via-black/50 to-blue-800/30 col-span-1 sm:col-span-2 shadow-sm" 
                                   : "bg-dark-card/60 hover:bg-dark-card/80 col-span-1",
-                                tileBaseColorClass,
-                                shadowClass,
+                                tileBaseColorClass, // Use updated color classes
+                                shadowClass, // Use updated shadow class based on colorVarMap
                                 isCurrentPage ? `ring-2 ring-offset-2 ring-offset-black ${page.color === 'lime' || page.color === 'yellow' || page.color === 'orange' ? 'ring-black/70' : 'ring-white/90'}` : 'ring-transparent'
                               )}
                               title={page.translatedName}

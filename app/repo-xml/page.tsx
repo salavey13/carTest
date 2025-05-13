@@ -13,7 +13,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppToast } from "@/hooks/useAppToast";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"; // Removed unused CardDescription etc.
 import {
     FaRobot, FaDownload, FaCircleInfo, FaGithub, FaWandMagicSparkles, FaUpLong,
     FaHandSparkles, FaArrowUpRightFromSquare, FaUserAstronaut, FaHeart, FaBullseye,
@@ -58,15 +58,15 @@ const translations = {
     philosophyLvl14: "<strong>Lv.14 <FaBriefcase/> (Efficiency Ninja):</strong> Why make two trips? You seamlessly weave small, unrelated tasks into larger AI requests. <em class='text-cyan-300'>Maximum efficiency, minimum context switching.</em> Your workflow is a finely tuned engine.",
     philosophyLvl15: "<strong>Lv.15 <FaMagnifyingGlassChart/> (Log Whisperer <FaBrain/>):</strong> WITH AI! You don't just read logs; you <em class='text-yellow-300'>interrogate</em> them. Spotting the delta between the *plan* (HasBeenPlanter logs) and the *reality* becomes second nature. Root causes reveal themselves.",
     philosophyEnd: "Step-by-step, level-up is <strong>inevitable</strong>. You're too lazy for the old shit. One extra click, one new skill, and you're automatically stronger. Welcome, <strong>Neo</strong>.",
-    stepsTitle: "Quick Start Guide:",
-    step1Title: "1. Grab Repo / Point Wish:",
-    step1Desc: "Enter GitHub URL -> Hit <FaDownload class='inline mx-1 text-purple-400 align-baseline'/> OR Spot bug/idea -> Activate Buddy <FaRobot class='inline mx-1 text-indigo-400 align-baseline'/> -> Describe.",
-    step1DescEnd: "For images (Lv.1): Copy broken URL, paste in Buddy/Input.",
-    step2Title: "2. AI Magic & Ship:",
+    stepsTitle: "Краткий Гайд:",
+    step1Title: "1. Хватай Репу / Укажи Желание:",
+    step1Desc: "Введи GitHub URL -> Жми <FaDownload class='inline mx-1 text-purple-400 align-baseline'/> OR Spot bug/idea -> Activate Buddy <FaRobot class='inline mx-1 text-indigo-400 align-baseline'/> -> Describe.",
+    step1DescEnd: "Для картинок (Лв.1): Copy broken URL, paste in Buddy/Input.",
+    step2Title: "2. AI Магия & Ship:",
     step2Desc: "If needed (Lv.2+), use <span class='text-blue-400 font-semibold'>\"🤖 Спросить AI\"</span> -> Check Assistant <FaWandMagicSparkles class='inline mx-1 text-yellow-400 align-baseline'/> -> Hit <FaGithub class='inline mx-1 text-green-400 align-baseline'/> PR Button.",
     step2DescEnd: "<strong>DONE.</strong> Site updates automagically.",
     readyButton: "LET'S F*CKING GO!",
-    componentsTitle: "Engage Vibe Engines!",
+    componentsTitle: "Врубай Движки Вайба!",
     ctaTitle: "Ready to Level Up, {USERNAME}?",
     ctaDesc: "Seriously. Stop doubting. Start <strong>DOING</strong>. That first level is calling. Level up NOW!",
     ctaHotChick: "Got the fire? Let's build something epic. Hit me up <strong>@SALAVEY13</strong> NOW!",
@@ -148,7 +148,6 @@ const getPlainText = (htmlString: string | null | undefined): string => {
         return htmlString.replace(/<[^>]*>/g, '').trim();
     }
 };
-
 
 // --- ActualPageContent Component (moved from being default export of page) ---
 interface ActualPageContentProps {
@@ -248,7 +247,6 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
         }
     }, [showComponents, setShowComponents, log, debug, error]);
 
-
     const handleShowComponents = useCallback(() => {
         log("[Button Click] handleShowComponents (Reveal)");
         setShowComponents(true);
@@ -262,7 +260,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
          log(`[Render] ActualPageContent: Rendering Loading State (Waiting for translations)`);
          const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
          const loadingText = translations[loadingLang]?.loading ?? translations.en.loading;
-         return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-dark-bg"> {/* Use bg-dark-bg */} <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
+         return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-dark-bg"> {/* Use theme background */} <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
      }
      if (!t) {
          error("[Render] ActualPageContent: Critical - translations (t) are null after loading.");
@@ -278,7 +276,6 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const navTitleGrabber = memoizedGetPlainText(t.navGrabber);
     const navTitleAssistant = memoizedGetPlainText(t.navAssistant);
 
-
     // --- Log before return ---
     log("[ActualPageContent] Preparing to render JSX...");
 
@@ -292,16 +289,16 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
                     {/* --- FULL INTRO SECTION --- */}
                     <section id="intro" className="mb-12 text-center max-w-3xl w-full">
-                         <div className="flex justify-center mb-4"> <FaBolt className="w-16 h-16 text-brand-yellow text-shadow-[0_0_15px_theme(colors.brand-yellow)] animate-pulse" /> </div>
+                         <div className="flex justify-center mb-4"> <FaBolt className="w-16 h-16 text-brand-yellow text-shadow-[0_0_15px_hsl(var(--brand-yellow))] animate-pulse" /> </div> {/* Adjusted shadow */}
                          {/* Use theme colors */}
-                        <h1 className="text-4xl md:text-5xl font-orbitron font-bold text-brand-yellow text-shadow-[0_0_10px_theme(colors.brand-yellow)] animate-pulse mb-4">
+                        <h1 className="text-4xl md:text-5xl font-orbitron font-bold text-brand-yellow text-shadow-[0_0_10px_hsl(var(--brand-yellow))] mb-4"> {/* Removed pulse, adjusted shadow */}
                            <VibeContentRenderer content={t.pageTitle} />
                         </h1>
                         <p className="text-xl md:text-2xl text-light-text mt-4 font-semibold">
                            <VibeContentRenderer content={t.welcome} /> <span className="text-brand-cyan">{userName}!</span>
                         </p>
                         {/* Use theme text colors and prose styles */}
-                        <div className="text-lg md:text-xl text-gray-300 mt-3 space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-brand-yellow prose-em:text-brand-purple max-w-none">
+                        <div className="text-lg md:text-xl text-muted-foreground mt-3 space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-brand-yellow prose-em:text-brand-purple prose-a:text-brand-blue max-w-none"> {/* Use muted-foreground */}
                             <VibeContentRenderer content={t.intro1} />
                             <VibeContentRenderer content={t.intro2} />
                             <div className="font-semibold text-brand-green"><VibeContentRenderer content={t.intro3} /></div>
@@ -311,14 +308,14 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                     {/* --- FULL VIBE LOOP SECTION --- */}
                     <section id="cybervibe-section" className="mb-12 w-full max-w-3xl">
                          {/* Use theme card styles */}
-                         <Card className="bg-gradient-to-br from-purple-900/40 via-black/60 to-indigo-900/40 border border-purple-600/60 shadow-xl rounded-lg p-6 backdrop-blur-sm bg-dark-card/80">
+                         <Card className="bg-gradient-to-br from-purple-900/40 via-black/60 to-indigo-900/40 border border-purple-600/60 shadow-xl rounded-lg p-6 backdrop-blur-sm bg-dark-card/80"> {/* Use dark-card */}
                              <CardHeader className="p-0 mb-4">
                                  <CardTitle className="text-2xl md:text-3xl font-bold text-center text-brand-purple flex items-center justify-center gap-2">
                                     <FaAtom className="animate-spin-slow"/> <VibeContentRenderer content={t.cyberVibeTitle} /> <FaBrain className="animate-pulse"/>
                                 </CardTitle>
                              </CardHeader>
                              {/* Use theme text colors */}
-                             <CardContent className="p-0 text-gray-300 text-base md:text-lg space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-brand-purple prose-em:text-brand-cyan max-w-none">
+                             <CardContent className="p-0 text-muted-foreground text-base md:text-lg space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-brand-purple prose-em:text-brand-cyan prose-a:text-brand-blue max-w-none"> {/* Use muted-foreground */}
                                 <VibeContentRenderer content={t.cyberVibe1} />
                                 <VibeContentRenderer content={t.cyberVibe2} />
                                 <VibeContentRenderer content={t.cyberVibe3} />
@@ -330,22 +327,32 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                     {/* --- FULL PHILOSOPHY SECTION --- */}
                     <section id="philosophy-steps" className="mb-12 w-full max-w-3xl">
                         {/* Use theme styles for details/summary */}
-                        <details className="bg-dark-card/80 border border-gray-700 rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50">
-                            <summary className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-gray-800/50 rounded-t-lg transition-colors group">
+                        <details className="bg-dark-card/80 border border-border rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50"> {/* Use border */}
+                            <summary className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-card/50 rounded-t-lg transition-colors group"> {/* Use card */}
                                 <span className="flex items-center gap-2"><FaCodeBranch /> <VibeContentRenderer content={t.philosophyTitle} /></span>
                                 <span className="text-xs text-gray-500 group-open:rotate-180 transition-transform duration-300">▼</span>
                             </summary>
                             {/* Use theme text colors */}
-                            <div className="px-6 pt-2 text-gray-300 space-y-4 text-base prose prose-invert prose-p:my-2 prose-li:my-1 prose-strong:text-brand-yellow prose-em:text-brand-cyan prose-a:text-brand-blue max-w-none">
+                            <div className="px-6 pt-2 text-muted-foreground space-y-4 text-base prose prose-invert prose-p:my-2 prose-li:my-1 prose-strong:text-brand-yellow prose-em:text-brand-cyan prose-a:text-brand-blue max-w-none"> {/* Use muted-foreground */}
                                  <div className="my-4 not-prose">
                                      <h4 className="text-lg font-semibold text-brand-cyan mb-2"><VibeContentRenderer content={t.philosophyVideoTitle} /></h4>
+                                     {/* --- NEW YOUTUBE VIDEOS --- */}
+                                     <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg mb-4">
+                                         <iframe className="w-full h-full" src="https://www.youtube.com/embed/jvqFAi7vkBc?clip=Ugkx1LAX6-gO4J8hC6HoHbg0_KMlBHcsKX3V" title="YouTube video player - Clip 1: Sam Altman" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                                     </div>
+                                     <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg mb-4">
+                                         <iframe className="w-full h-full" src="https://www.youtube.com/embed/jvqFAi7vkBc?clip=UgkxZVMHbEo2XwO-sayoxskH89zzrDdN6vsx" title="YouTube video player - Clip 2: Sam Altman 60s" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                                     </div>
+                                     {/* --- END NEW YOUTUBE VIDEOS --- */}
+                                     {/* --- Existing Video (Now 3rd) --- */}
                                      <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
                                          <iframe className="w-full h-full" src="https://www.youtube.com/embed/imxzYWYKCyQ" title="YouTube video player - Vibe Level Explanation" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                                      </div>
+                                     {/* --- End Existing Video --- */}
                                  </div>
-                                <hr className="border-gray-700 my-3"/>
+                                <hr className="border-border my-3"/> {/* Use border */}
                                  <div className="text-purple-300 italic"><VibeContentRenderer content={t.philosophyCore} /></div>
-                                 <hr className="border-gray-700 my-3"/>
+                                 <hr className="border-border my-3"/> {/* Use border */}
                                 <h4 className="text-lg font-semibold text-brand-cyan pt-1">Level Progression (+1 Vibe Perk):</h4>
                                 <ul className="list-none space-y-2 pl-2 text-sm md:text-base">
                                     {/* Standard Levels */}
@@ -356,15 +363,15 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                     {[t.philosophyLvl11, t.philosophyLvl12, t.philosophyLvl13, t.philosophyLvl14, t.philosophyLvl15].map((levelContent, index) => (
                                         <li key={`meta-lvl-${index}`}>
                                             {/* Use theme card styles */}
-                                            <div className="p-2 rounded-md border border-purple-600/40 bg-purple-900/20 my-1 shadow-inner shadow-purple-950/50 bg-dark-card/50">
+                                            <div className="p-2 rounded-md border border-purple-600/40 bg-purple-900/20 my-1 shadow-inner shadow-purple-950/50 bg-dark-card/50"> {/* Use dark-card */}
                                                 <VibeContentRenderer content={levelContent} />
                                             </div>
                                         </li>
                                     ))}
                                 </ul>
-                                <hr className="border-gray-700 my-3"/>
+                                <hr className="border-border my-3"/> {/* Use border */}
                                 <div className="font-bold text-brand-green"><VibeContentRenderer content={t.philosophyEnd} /></div>
-                                <hr className="border-gray-700 my-4"/>
+                                <hr className="border-border my-4"/> {/* Use border */}
                                 <h4 className="text-lg font-semibold text-brand-cyan pt-2"><VibeContentRenderer content={t.stepsTitle} /></h4>
                                 <ol className="list-decimal list-inside text-sm space-y-1">
                                      <li><VibeContentRenderer content={"Настрой <FaCodeBranch title='Настройки' class='inline text-cyan-400'/>"} /></li>
@@ -396,7 +403,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                              <section id="extractor" className="mb-12 w-full max-w-4xl">
                                {(() => { debug("[Render] Rendering RepoTxtFetcher Component Wrapper..."); return null; })()}
                                   {/* Use theme card styles */}
-                                 <Card className="bg-dark-card/80 border border-blue-700/50 shadow-lg backdrop-blur-sm">
+                                 <Card className="bg-dark-card/80 border border-blue-700/50 shadow-lg backdrop-blur-sm"> {/* Use dark-card */}
                                      <CardContent className="p-4">
                                          <RepoTxtFetcher
                                              ref={fetcherRef}
@@ -411,7 +418,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                              <section id="executor" className="mb-12 w-full max-w-4xl pb-16">
                                 {(() => { debug("[Render] Rendering AICodeAssistant Component Wrapper..."); return null; })()}
                                   {/* Use theme card styles */}
-                                 <Card className="bg-dark-card/80 border border-purple-700/50 shadow-lg backdrop-blur-sm">
+                                 <Card className="bg-dark-card/80 border border-purple-700/50 shadow-lg backdrop-blur-sm"> {/* Use dark-card */}
                                      <CardContent className="p-4">
                                          {/* Pass aiResponseInputRef explicitly if needed by AICodeAssistant, otherwise access via context */}
                                          <AICodeAssistant ref={assistantRef} kworkInputRefPassed={kworkInputRef} aiResponseInputRefPassed={pageContext.aiResponseInputRef} />
@@ -428,11 +435,11 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                          <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
                               {(() => { debug("[Render] Rendering Final CTA"); return null; })()}
                                {/* Use theme gradient and text styles */}
-                              <div className="bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange p-6 rounded-lg shadow-lg animate-pulse border-2 border-white/50 prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 max-w-none">
+                              <div className="bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange p-6 rounded-lg shadow-lg animate-pulse border-2 border-white/50 prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 prose-a:text-brand-blue max-w-none"> {/* Applied prose styling */}
                                  <h3 className="text-2xl font-bold text-white mb-3"><VibeContentRenderer content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
                                  <div className="text-white text-lg mb-4"> <VibeContentRenderer content={t.ctaDesc} /> </div>
                                  <div className="text-white text-xl font-semibold mb-4 bg-black/30 p-3 rounded"> <FaRocket className="inline mr-2 text-cyan-300 animate-pulse"/> <VibeContentRenderer content={t.ctaHotChick} /> <FaUserAstronaut className="inline ml-2 text-pink-300"/> </div>
-                                 <div className="text-gray-300 text-base"> <VibeContentRenderer content={t.ctaDude} /> </div>
+                                 <div className="text-muted-foreground text-base"> <VibeContentRenderer content={t.ctaDude} /> </div> {/* Use muted-foreground */}
                              </div>
                          </section>
                      )}
@@ -440,7 +447,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                     {/* --- FULL NAVIGATION ICONS --- */}
                      {/* Use theme colors for nav buttons */}
                      <motion.nav className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40" animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}>
-                         <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700/80 backdrop-blur-sm rounded-full hover:bg-gray-600 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-gray-200" /> </button>
+                         <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-muted/80 backdrop-blur-sm rounded-full hover:bg-muted/60 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-foreground/80" /> </button> {/* Use muted/foreground */}
                          <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-brand-purple/80 backdrop-blur-sm rounded-full hover:bg-brand-purple/70 transition shadow-md" title={navTitleVibeLoop} aria-label={navTitleVibeLoop || "Scroll to Vibe Loop"} > <FaUpLong className="text-lg text-white" /> </button>
                          {showComponents && ( <>
                                 <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-brand-blue/80 backdrop-blur-sm rounded-full hover:bg-brand-blue/70 transition shadow-md" title={navTitleGrabber} aria-label={navTitleGrabber || "Scroll to Grabber"} > <FaDownload className="text-lg text-white" /> </button>

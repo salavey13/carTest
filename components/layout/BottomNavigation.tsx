@@ -54,14 +54,14 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
               asChild
               size="icon"
               className={cn(
-                `bottom-nav-item-central bg-gradient-to-br ${item.centralColor}`,
-                isActive && "ring-4 ring-brand-cyan/80 ring-offset-2 ring-offset-dark-bg shadow-lg shadow-brand-cyan/60"
+                `bottom-nav-item-central bg-gradient-to-br ${item.centralColor}`, // Kept gradient
+                isActive && "ring-4 ring-brand-cyan/80 ring-offset-2 ring-offset-dark-bg shadow-lg shadow-brand-cyan/60" // Use theme color for ring
               )}
               key={item.label}
               aria-current={isActive ? "page" : undefined}
             >
               <Link href={item.href}>
-                <item.icon className="w-6 h-6 sm:w-7 sm:h-7" />
+                <item.icon className="w-6 h-6 sm:w-7 sm:h-7 text-black" /> {/* Ensure icon color is contrast */}
                 <span className="sr-only">{item.label}</span>
               </Link>
             </Button>
@@ -78,7 +78,7 @@ export default function BottomNavigation({ pathname }: BottomNavigationProps) {
             >
               <Link href={item.href} className={cn(
                 "flex flex-col items-center justify-center w-full h-full",
-                 item.color, // Apply color class for text/icon
+                 item.color, // Apply color class for text/icon (e.g., text-brand-pink)
                  isActive ? "opacity-100 current-nav-glow" : "opacity-70 hover:opacity-100"
               )}>
                 <item.icon className="w-5 h-5 sm:w-6 sm:h-6 mb-0.5" />
