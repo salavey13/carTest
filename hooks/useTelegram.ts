@@ -154,18 +154,14 @@ export function useTelegram() {
     let isMounted = true;
     debugLogger.log("[useTelegram Effect Main Init] Running, isMounted:", isMounted);
     
-    // Force reset of auth states at the beginning of THIS effect's execution
-    // This ensures that any previous state (e.g. from a mock run or failed auth) is cleared
-    // before attempting a new authentication flow.
-    debugLogger.log("[useTelegram Effect Main Init] Forcing reset of auth states.");
+    debugLogger.log("[useTelegram Effect Main Init] Forcing reset of auth and context states.");
     setIsLoading(true);
     setIsAuthenticating(true);
     setError(null);
     setIsAuthenticated(false);
     setDbUser(null); 
     setTgUser(null);
-    // tgWebApp and isInTelegramContext can persist as they are less dependent on auth success state
-    // and more on the environment.
+    setIsInTelegramContext(false); // Crucial: reset this to ensure it's correctly set by initialize
 
     const initialize = async () => {
       debugLogger.log("[useTelegram initialize async fn] Started");
@@ -175,13 +171,13 @@ export function useTelegram() {
       }
       
       let authCandidate: WebAppUser | null = null;
-      let inTgContextReal = false;
-      let tempTgWebApp: TelegramWebApp | null = null; // Keep this local to initialize
+      let inTgContextReal = false; // Keep this local for this run of initialize
+      let tempTgWebApp: TelegramWebApp | null = null; 
 
       if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
         const telegram = (window as any).Telegram.WebApp;
-        if(isMounted) setTgWebApp(telegram); // Set WebApp object once
-        tempTgWebApp = telegram; // Use local for the rest of this function
+        if(isMounted) setTgWebApp(telegram); 
+        tempTgWebApp = telegram; 
         inTgContextReal = !!telegram.initData; 
         
         debugLogger.log("[useTelegram initialize] Telegram WebApp context detected.", {
@@ -201,20 +197,26 @@ export function useTelegram() {
                 globalLogger.warn("[useTelegram initialize] Telegram initData validation FAILED via API.");
                  if (isMounted && !error) setError(new Error("Telegram data validation failed. User data might be compromised."));
             }
-        } else if (telegram.initDataUnsafe?.user?.id && !inTgContextReal && process.env.NODE_ENV === 'development') {
-           globalLogger.warn("[useTelegram initialize] Using initDataUnsafe as fallback (initData not present/validated, DEV mode). THIS IS LESS SECURE.");
+        } else if (telegram.initDataUnsafe?.user?.id && process.env.NODE_ENV === 'development' && !inTgContextReal ) {
+           // This branch is less likely to be hit if initData is always present in real TG
+           // It's more for local dev where MOCK_USER is false but we still want to use initDataUnsafe
+           globalLogger.warn("[useTelegram initialize] Using initDataUnsafe as fallback (initData not present, DEV mode). THIS IS LESS SECURE.");
            authCandidate = telegram.initDataUnsafe.user;
         }
       }
 
+      // Fallback to MOCK_USER if no authCandidate from Telegram (or if validation failed and error is not blocking mock use)
+      // AND MOCK_USER is enabled
       if (!authCandidate && MOCK_USER) {
-          globalLogger.warn(`[useTelegram initialize] No auth candidate from Telegram (or validation failed). ${inTgContextReal ? "Falling back to" : "Using"} MOCK_USER.`);
+          globalLogger.warn(`[useTelegram initialize] No auth candidate from Telegram (or validation failed/error occurred). Using MOCK_USER as NEXT_PUBLIC_USE_MOCK_USER is true.`);
           authCandidate = MOCK_USER;
-          inTgContextReal = false; 
+          inTgContextReal = false; // If we use mock, it's not a real TG context for auth purposes
       }
       
       if (isMounted) { 
-        setIsInTelegramContext(inTgContextReal);
+        // This is where isInTelegramContext should be definitively set for the AppContext
+        setIsInTelegramContext(inTgContextReal && !!authCandidate && authCandidate !== MOCK_USER);
+        debugLogger.log(`[useTelegram initialize] Setting isInTelegramContext to: ${isInTelegramContext(inTgContextReal && !!authCandidate && authCandidate !== MOCK_USER)} based on real TG data and non-mock candidate.`);
       }
       
       if (authCandidate) {
@@ -231,7 +233,7 @@ export function useTelegram() {
         } catch (authProcessError: any) {
           debugLogger.error("[useTelegram initialize] Error during handleAuthentication or state setting:", authProcessError);
           if (isMounted) {
-            if(!error) setError(authProcessError); // Set error if not already set
+            if(!error) setError(authProcessError); 
             setTgUser(authCandidate); 
             setDbUser(null);          
             setIsAuthenticated(false); 
@@ -268,9 +270,9 @@ export function useTelegram() {
   useEffect(() => {
     if (!isAuthenticating) { 
       setIsLoading(false);
-      globalLogger.log(`[useTelegram Effect isLoading] isAuthenticating is false. Setting isLoading to false. dbUser.user_id: ${dbUser?.user_id}, isAuthenticated: ${isAuthenticated}, error: ${error?.message}`);
+      globalLogger.log(`[useTelegram Effect isLoading] isAuthenticating is false. Setting isLoading to false. dbUser.user_id: ${dbUser?.user_id}, isAuthenticated: ${isAuthenticated}, isInTelegramContext: ${isInTelegramContext}, error: ${error?.message}`);
     }
-  }, [dbUser, isAuthenticated, isAuthenticating, error]);
+  }, [dbUser, isAuthenticated, isAuthenticating, error, isInTelegramContext]); // Added isInTelegramContext
 
   const isAdmin = useCallback(() => {
     if (!dbUser) return false;
@@ -324,6 +326,7 @@ export function useTelegram() {
         isAuthenticating: baseData.isAuthenticating,
         dbUserId: baseData.dbUser?.user_id,
         isAuthenticated: baseData.isAuthenticated,
+        isInTelegramContext: baseData.isInTelegramContext,
         tgUserId: baseData.user?.id,
         error: baseData.error?.message
     });

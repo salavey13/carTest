@@ -90,22 +90,28 @@ export default function Home() {
 
   }, [dbUser, appLoading, isAuthenticating, appContextError]); 
 
-  const isLoadingDisplay = appLoading || isAuthenticating || profileLoading; 
+  const isLoading = appLoading || isAuthenticating || profileLoading; 
 
-  const userName = 
-    isLoadingDisplay ? 'Agent' : // Show 'Agent' while loading
-    dbUser?.user_id ? (dbUser.first_name || telegramUser?.first_name || 'Agent') : // If dbUser exists, use its name
-    (telegramUser?.first_name || 'Agent'); // Fallback to telegramUser name, then 'Agent'
+  // Determine userName and cognitiveOSVersion based on loading states and data availability
+  let userNameDisplay = 'Agent';
+  let osVersionDisplay = "Загрузка ОС...";
 
-  const cognitiveOSVersion = 
-    isLoadingDisplay ? "Загрузка ОС..." :
-    appContextError ? "v0.1 System Anomaly" :
-    dbUser?.user_id && cyberProfile ? (cyberProfile.cognitiveOSVersion || "v0.1 Connected") : 
-    "v0.1 Guest Mode";
+  if (!isLoading) { // Only determine final names if all loading is complete
+    if (appContextError) {
+      userNameDisplay = 'Agent Anomaly';
+      osVersionDisplay = "v0.1 System Anomaly";
+    } else if (dbUser?.user_id) {
+      userNameDisplay = dbUser.first_name || telegramUser?.first_name || 'Agent';
+      osVersionDisplay = cyberProfile?.cognitiveOSVersion || "v0.1 Connected";
+    } else { // No dbUser.user_id and no error -> Guest
+      userNameDisplay = 'Agent';
+      osVersionDisplay = "v0.1 Guest Mode";
+    }
+  }
   
   const currentLevel = cyberProfile?.level ?? 0;
 
-  if (isLoadingDisplay && !cyberProfile) { 
+  if (isLoading && !cyberProfile) { // Show main loader if still loading AND profile isn't set yet
       return (
          <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-4 text-center">
             <FaBrain className="text-5xl text-brand-pink animate-pulse mb-6" />
@@ -115,9 +121,7 @@ export default function Home() {
          </div>
       );
   }
-  // appContextError is now handled by cognitiveOSVersion logic for a more graceful display
-  // if (appContextError && !isLoadingDisplay) { ... } // Removed explicit error screen for main page, rely on guest/anomaly state
-
+  
   const chartReadyWeeklyActivity = (cyberProfile?.dailyActivityLog && cyberProfile.dailyActivityLog.length > 0 
     ? cyberProfile.dailyActivityLog.map(d => ({ name: format(new Date(d.date + "T00:00:00Z"), 'EEE', {locale: ru}).substring(0,2).toUpperCase(), value: d.kworkRequestsSent || 0, label: `${d.kworkRequestsSent || 0} req` }))
     : DEFAULT_WEEKLY_ACTIVITY
@@ -137,11 +141,11 @@ export default function Home() {
       <motion.div variants={containerVariants} initial="hidden" animate="visible" className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 space-y-5 md:space-y-8">
         <motion.div variants={itemVariants} className="flex justify-between items-center">
           <div>
-            <h1 className="text-xl sm:text-2xl font-orbitron font-bold text-brand-cyan cyber-text" data-text={`Agent: ${userName}`}>Agent: <span className="text-brand-pink glitch" data-text={userName}>{userName}</span></h1>
-            <p className="text-muted-foreground font-mono text-xs sm:text-sm mt-0.5">Cognitive OS {cognitiveOSVersion} | Level: <span className="text-brand-yellow font-semibold">{currentLevel}</span></p>
+            <h1 className="text-xl sm:text-2xl font-orbitron font-bold text-brand-cyan cyber-text" data-text={`Agent: ${userNameDisplay}`}>Agent: <span className="text-brand-pink glitch" data-text={userNameDisplay}>{userNameDisplay}</span></h1>
+            <p className="text-muted-foreground font-mono text-xs sm:text-sm mt-0.5">Cognitive OS {osVersionDisplay} | Level: <span className="text-brand-yellow font-semibold">{currentLevel}</span></p>
           </div>
           <Link href="/profile" className="transition-transform duration-200 hover:scale-110">
-            <Image src={dbUser?.avatar_url || telegramUser?.photo_url || PLACEHOLDER_AVATAR} alt={`${userName}'s Cybernetic Avatar`} width={52} height={52} className="avatar-cyber w-11 h-11 sm:w-13 sm:h-13" priority />
+            <Image src={dbUser?.avatar_url || telegramUser?.photo_url || PLACEHOLDER_AVATAR} alt={`${userNameDisplay}'s Cybernetic Avatar`} width={52} height={52} className="avatar-cyber w-11 h-11 sm:w-13 sm:h-13" priority />
           </Link>
         </motion.div>
         <motion.div variants={itemVariants}>
@@ -214,7 +218,7 @@ export default function Home() {
             </CardContent>
           </Card>
         </motion.div>
-        {dbUser?.status === "admin" && ( // This check should use dbUser.status for admin link
+        {dbUser?.status === "admin" && ( 
           <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1, type: "spring", stiffness: 100 }} className="fixed bottom-20 md:bottom-24 right-3 sm:right-4 z-50">
              <Button asChild variant="outline" size="icon" className="bg-dark-card/80 border-brand-red/70 text-brand-red hover:bg-brand-red/20 hover:text-white rounded-full w-10 h-10 sm:w-11 sm:h-11 shadow-lg backdrop-blur-sm" aria-label="Admin Override Terminal">
                <Link href="/admin"><FaUserNinja className="h-5 w-5 sm:h-6 sm:h-6" /></Link>
