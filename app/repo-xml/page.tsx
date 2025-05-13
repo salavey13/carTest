@@ -20,8 +20,8 @@ import {
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaToolbox, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket,
     FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye,
-    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash,
-    FaUserNinja, FaVialCircleCheck, FaUndo
+    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash, FaCommentDots,
+    FaHistory // Добавлена для иллюстрации отката, но если не используется, будет удалена ниже.
 } from "react-icons/fa6";
 import Link from "next/link";
 import { motion } from 'framer-motion';
@@ -218,38 +218,30 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
         log(`[ActualPageContent Effect] Loading check: translations=${!!t}, resulting isPageLoading=${!t}`);
     }, [t]);
 
-    const toggleAllSections = useCallback(() => {
-        const newCollapsedState = !sectionsCollapsed;
-        setSectionsCollapsed(newCollapsedState);
-        // When using the master toggle, all sections follow this state
-        const newVisibility = !newCollapsedState;
+    // Effect to handle master toggle for info sections
+     useEffect(() => {
+        if (!t) return; 
+        const newVisibility = !sectionsCollapsed;
         setIsIntroVisible(newVisibility);
         setIsCyberVibeVisible(newVisibility);
         setIsCommunityWisdomVisible(newVisibility);
         setIsPhilosophyStepsVisible(newVisibility);
-        // philosophyDetails is NOT directly controlled by master toggle, user controls it.
-        // CTA visibility is also NOT directly controlled here if components are shown.
-        if (showComponents && isCtaVisible !== newVisibility && newCollapsedState === false) {
-            // If expanding all and CTA was hidden, show it.
-            // If collapsing all, CTA is not affected by this button if components are shown.
-            setIsCtaVisible(true); 
-        }
-        log(`[CB MasterToggle] Info sections visibility set to: ${newVisibility}. SectionsCollapsed: ${newCollapsedState}`);
-    }, [sectionsCollapsed, showComponents, isCtaVisible, log]);
+        // isPhilosophyDetailsOpen is controlled by its own summary click or scrollToSectionNav
+        // isCtaVisible is controlled by its own X button or handleShowComponents
+        log(`[Effect SectionsToggle] Info sections visibility set to: ${newVisibility}. CTA controlled separately: ${isCtaVisible}`);
+    }, [sectionsCollapsed, t]); // Removed showComponents and isCtaVisible from deps to simplify
+
+    const toggleAllSections = useCallback(() => {
+        setSectionsCollapsed(prev => !prev);
+    }, []);
     
     const handleShowComponents = useCallback(() => {
         log("[Button Click] handleShowComponents (Reveal)");
         setShowComponents(true);
-        setIsCtaVisible(true); // Explicitly show CTA
+        setIsCtaVisible(true); 
     
-        // If master toggle had collapsed sections, expand them
         if (sectionsCollapsed) {
-            setSectionsCollapsed(false); // This will trigger the effect below to show all sections
-            setIsIntroVisible(true);
-            setIsCyberVibeVisible(true);
-            setIsCommunityWisdomVisible(true);
-            setIsPhilosophyStepsVisible(true);
-            // isPhilosophyDetailsOpen remains user-controlled
+            setSectionsCollapsed(false); 
         }
         
         toastInfo("Компоненты загружены!", { duration: 1500 });
@@ -280,23 +272,22 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
         }
         
         if (targetElement) {
-            // Ensure the specific section is visible if it was individually closed OR master-closed
             if (id === 'intro' && (!isIntroVisible || sectionsCollapsed)) {
-                setIsIntroVisible(true); 
-                if(sectionsCollapsed) setSectionsCollapsed(false);
+                if(sectionsCollapsed) setSectionsCollapsed(false); 
+                else setIsIntroVisible(true); 
             }
             if (id === 'cybervibe-section' && (!isCyberVibeVisible || sectionsCollapsed)) {
-                setIsCyberVibeVisible(true);
-                if(sectionsCollapsed) setSectionsCollapsed(false);
+                 if(sectionsCollapsed) setSectionsCollapsed(false);
+                 else setIsCyberVibeVisible(true);
             }
             if (id === 'community-wisdom-section' && (!isCommunityWisdomVisible || sectionsCollapsed)) {
-                setIsCommunityWisdomVisible(true);
-                if(sectionsCollapsed) setSectionsCollapsed(false);
+                 if(sectionsCollapsed) setSectionsCollapsed(false);
+                 else setIsCommunityWisdomVisible(true);
             }
             if (id === 'philosophy-steps') {
                 if(!isPhilosophyStepsVisible || sectionsCollapsed) setIsPhilosophyStepsVisible(true);
                 if(sectionsCollapsed) setSectionsCollapsed(false);
-                setIsPhilosophyDetailsOpen(true); // Also open details
+                setIsPhilosophyDetailsOpen(true); 
             }
             requestAnimationFrame(() => scroll(targetElement));
         } else {
