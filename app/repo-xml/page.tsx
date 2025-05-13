@@ -21,7 +21,7 @@ import {
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaToolbox, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket,
     FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye,
-    FaUsers, FaQuoteLeft, FaQuoteRight, FaTimesCircle // Added FaUsers, FaQuoteLeft, FaQuoteRight, FaTimesCircle
+    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark // Added FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark
 } from "react-icons/fa6";
 import Link from "next/link";
 import { motion } from 'framer-motion';
@@ -429,7 +429,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                     className="absolute top-2 right-2 text-white/70 hover:text-white z-10 p-1 rounded-full hover:bg-black/20 transition-colors"
                                     aria-label="Close CTA"
                                   >
-                                    <FaTimesCircle className="w-6 h-6" />
+                                    <FaCircleXmark className="w-6 h-6" />
                                   </button>
                                  <h3 className="text-2xl font-bold text-white mb-3"><VibeContentRenderer content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
                                  <div className="text-white text-lg mb-4"> <VibeContentRenderer content={t.ctaDesc} /> </div>
