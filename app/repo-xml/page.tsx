@@ -1,3 +1,4 @@
+// /app/repo-xml/page.tsx
 "use client";
 import React, { Suspense, useRef, useState, useEffect, ReactNode, useCallback, useMemo } from "react";
 import { useSearchParams } from 'next/navigation';
@@ -378,7 +379,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                 ].map(item => (
                                     <div key={item.videoId}>
                                         <div className={`aspect-video w-full rounded-lg overflow-hidden border-2 ${item.borderColor}/50 shadow-lg`}>
-                                            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${item.videoId}?start=${item.start}&mute=1`} title={item.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${item.videoId}?start=${item.start}`} title={item.title} allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                         </div>
                                         <div className={`mt-3 p-3 bg-dark-card/70 border-l-4 ${item.borderColor} rounded-r-md text-muted-foreground max-w-none`}>
                                             <div className="flex items-start">
@@ -408,7 +409,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                      <div className="my-4 not-prose">
                                          <h4 className="text-lg font-semibold text-brand-cyan mb-2"><VibeContentRenderer content={t.philosophyVideoTitle} /></h4>
                                          <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
-                                             <iframe className="w-full h-full" src="https://www.youtube.com/embed/imxzYWYKCyQ?mute=1" title="YouTube video player - Vibe Level Explanation by Salavey13" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                             <iframe className="w-full h-full" src="https://www.youtube.com/embed/imxzYWYKCyQ" title="YouTube video player - Vibe Level Explanation by Salavey13" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                          </div>
                                      </div>
                                     <hr className="border-border my-3"/>
@@ -516,7 +517,6 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                             </div>
                         </section>
                     )}
-
 
                      <motion.nav className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40" animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}>
                          <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-muted/80 backdrop-blur-sm rounded-full hover:bg-muted/60 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-foreground/80" /> </button>
