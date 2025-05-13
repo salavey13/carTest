@@ -373,7 +373,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                             </h3>
                             <div className="space-y-8">
                                 {[
-                                    { videoId: "ctcMA6chfDY", start: 1201, title: "YouTube: Sam Altman's Dream", quote: t.quote1, borderColor: "border-brand-cyan", inspiredBy: "- Inspired by Sam Altman" },
+                                    { videoId: "ctcMA6chfDY", start: 1261, title: "YouTube: Sam Altman's Dream", quote: t.quote1, borderColor: "border-brand-cyan", inspiredBy: "- Inspired by Sam Altman" },
                                     { videoId: "dq8MhTFCs80", start: 1197, title: "YouTube: Do you Vibecode?", quote: t.quote2, borderColor: "border-brand-pink", inspiredBy: "- Inspired by Vibe Master" },
                                     { videoId: "xlQB_0Nzoog", start: 743, title: "YouTube: Really F*cking EZ!", quote: t.quote3, borderColor: "border-brand-yellow", inspiredBy: "- Inspired by Strategic Thinking" }
                                 ].map(item => (
