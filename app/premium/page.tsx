@@ -3,8 +3,11 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FaStar, FaBrain, FaBolt, FaMicrochip, FaUsers, FaRocket, FaGem, FaNetworkWired, FaQuestionCircle } from "react-icons/fa"; // FaQuestionCircle is not Fa6
-import { FaHeadset, FaBookOpen, FaLockOpen } from "react-icons/fa6"; // FaQuestionCircle -> FaHeadset, FaBookOpen, FaLockOpen
+// Corrected icons to Fa6
+import {
+  FaStar, FaBrain, FaBolt, FaMicrochip, FaRocket, FaGem,
+  FaHeadset, FaBookOpen, FaLockOpen
+} from "react-icons/fa6";
 import { useAppContext } from "@/contexts/AppContext";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 
@@ -23,6 +26,7 @@ export default function PremiumPage() {
   ];
 
   return (
+    // Use theme background and text colors
     <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pt-24 pb-10">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -30,6 +34,7 @@ export default function PremiumPage() {
         transition={{ duration: 0.5 }}
         className="container mx-auto max-w-4xl"
       >
+         {/* Use theme card styles */}
         <Card className="bg-dark-card/90 backdrop-blur-md border border-brand-yellow/50 shadow-xl shadow-brand-yellow/20 overflow-hidden">
           <CardHeader className="text-center bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange p-8">
             <FaStar className="text-5xl text-brand-yellow mx-auto mb-3 drop-shadow-[0_0_15px_theme(colors.brand-yellow)] animate-pulse" />
@@ -43,11 +48,13 @@ export default function PremiumPage() {
 
           <CardContent className="p-6 md:p-8 space-y-8">
             {hasActivePremium ? (
+                 // Use theme styles for activated state
                 <div className="text-center p-6 bg-brand-green/10 border border-brand-green rounded-lg">
                     <h2 className="text-2xl font-orbitron font-semibold text-brand-green mb-2">ПРЕМИУМ ПРОТОКОЛЫ АКТИВИРОВАНЫ!</h2>
                     <p className="text-muted-foreground font-mono">Ты уже используешь все мощности CyberVibe OS. Твой путь к сингулярности открыт!</p>
                 </div>
             ) : (
+                 // Use theme text color
                 <p className="text-center text-lg text-muted-foreground font-mono">
                 Получи доступ к эксклюзивным инструментам и протоколам CyberVibe, которые ускорят твою эволюцию и помогут достичь мастерства в цифровой реальности.
                 </p>
@@ -60,10 +67,12 @@ export default function PremiumPage() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.3, delay: index * 0.07 }}
+                   // Use theme styles for feature cards
                   className="flex items-start space-x-4 p-4 bg-dark-bg/50 rounded-lg border border-brand-purple/30 hover:border-brand-cyan/70 transition-colors hover:shadow-md hover:shadow-brand-cyan/20"
                 >
                   <div className="text-3xl mt-1 flex-shrink-0 w-8 text-center">{feature.icon}</div>
                   <div>
+                     {/* Use theme text colors */}
                     <h3 className="text-lg font-orbitron font-semibold text-light-text">{feature.title}</h3>
                     <p className="text-sm text-muted-foreground font-mono">{feature.description}</p>
                   </div>
@@ -74,6 +83,7 @@ export default function PremiumPage() {
             {!hasActivePremium && (
                 <div className="text-center mt-10">
                 <Link href="/buy-subscription" passHref legacyBehavior>
+                     {/* Use theme button styles */}
                     <Button size="lg" className="bg-gradient-to-r from-brand-yellow to-brand-orange text-black hover:shadow-[0_0_20px_theme(colors.brand-yellow)] font-orbitron text-lg px-10 py-3 shadow-lg transform hover:scale-105 transition-all text-glow">
                     <FaGem className="mr-2" /> Активировать Премиум ОС
                     </Button>
