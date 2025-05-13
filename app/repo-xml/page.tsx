@@ -338,7 +338,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                      <h4 className="text-lg font-semibold text-brand-cyan mb-2"><VibeContentRenderer content={t.philosophyVideoTitle} /></h4>
                                      {/* --- NEW YOUTUBE VIDEOS --- */}
                                      <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg mb-4">
-                                         <iframe className="w-full h-full" src="https://www.youtube.com/embed/jvqFAi7vkBc?clip=Ugkx1LAX6-gO4J8hC6HoHbg0_KMlBHcsKX3V" title="YouTube video player - Clip 1: Sam Altman's dream. 60s" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                                         <iframe className="w-full h-full" src="https://www.youtube.com/embed/ctcMA6chfDY?clip=Ugkx1LAX6-gO4J8hC6HoHbg0_KMlBHcsKX3V" title="YouTube video player - Clip 1: Sam Altman's dream. 60s" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                                      </div>
                                      <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg mb-4">
                                          <iframe className="w-full h-full" src="https://www.youtube.com/embed/dq8MhTFCs80?clip=UgkxZVMHbEo2XwO-sayoxskH89zzrDdN6vsx" title="YouTube video player - Clip 2: Do You Vibecode? 60s" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
@@ -346,7 +346,6 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                      <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg mb-4">
                                          <iframe className="w-full h-full" src="https://www.youtube.com/embed/xlQB_0Nzoog?clip=UgkxvGYsRm3HezCgOyqszCbn5DfDDx7LixPE" title="YouTube video player - Clip 3: Really F*ucking EZ! 60s" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                                      </div>
-                                     https://youtube.com/clip/
                                      {/* --- END NEW YOUTUBE VIDEOS --- */}
                                      {/* --- Existing Video (Now 4TH) --- */}
                                      <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
