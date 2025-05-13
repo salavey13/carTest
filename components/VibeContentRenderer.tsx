@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import parse, { domToReact, HTMLReactParserOptions, Element, attributesToProps, Text } from 'html-react-parser';
+import parse, { domToReact, HTMLReactParserOptions, Element, attributesToProps, Text, Comment } from 'html-react-parser';
 import Link from 'next/link';
 import * as Fa6Icons from "react-icons/fa6";
 import { debugLogger as logger } from "@/lib/debugLogger";
@@ -14,13 +14,9 @@ function isValidFa6Icon(iconName: string): iconName is keyof typeof Fa6Icons {
 // Internal function for icon syntax preprocessing
 function preprocessIconSyntaxInternal(content: string): string {
     if (!content) return '';
-    // Regex to capture icon name and any attributes like attr='value' or attr="value" or attr=value
-    // Handles various quoting and unquoted values for attributes if simple
     return content.replace(
         /::(Fa\w+)((?:\s+\w+(?:=(?:(["'])(?:(?!\3).)*\3|\w+)))*)\s*::/g,
         (_match, iconName, attributesString) => {
-            // attributesString will be like " color='gold' size='2em'"
-            // The parser will handle these attributes directly when creating the element
             return `<${iconName}${attributesString} />`;
         }
     );
@@ -30,34 +26,32 @@ function preprocessIconSyntaxInternal(content: string): string {
 function applySimpleMarkdown(content: string): string {
     if (!content) return '';
     let result = content;
-    // **bold** -> <strong>bold</strong>
     result = result.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    // *italic* -> <em>italic</em> (ensure this doesn't conflict with <strong> if more complex markdown were used)
-    // This simple regex should be fine if **bold** is processed first.
     result = result.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    // Optional: _underline_ -> <u>underline</u> (if needed)
-    // result = result.replace(/_(.*?)_/g, '<u>$1</u>');
-    // Optional: `code` -> <code>code</code> (if not handled by main parser adequately or for inline emphasis)
-    // result = result.replace(/`(.*?)`/g, '<code>$1</code>');
     return result;
 }
-
 
 const simplifiedParserOptions: HTMLReactParserOptions = {
     replace: (domNode) => {
         if (domNode.type === 'text' || domNode instanceof Text) {
-            // logger.debug("[VCR] Passing through text node:", (domNode as Text).data?.substring(0, 30) + "...");
-            return undefined; // Let parser handle text nodes
+            // Explicitly return undefined to let the parser handle text nodes as React text nodes
+            // This ensures text content within tags (like <a>text</a>) is preserved.
+            return undefined; 
+        }
+
+        if (domNode.type === 'comment' || domNode instanceof Comment) {
+            // Skip comments entirely
+            return <></>;
         }
 
         if (domNode instanceof Element && domNode.name) {
             const nodeName = domNode.name;
             const lowerCaseName = nodeName.toLowerCase();
-            // logger.debug(`[VCR] Processing Element: <${nodeName}>, Low: <${lowerCaseName}>`, domNode.attribs);
-
+            
             const mutableAttribs = attributesToProps(domNode.attribs || {});
+            // Recursively process children, ensuring text nodes are correctly handled by the parser
             const children = domNode.children && domNode.children.length > 0
-                           ? domToReact(domNode.children, simplifiedParserOptions)
+                           ? domToReact(domNode.children, simplifiedParserOptions) 
                            : null;
 
             // --- Icon Handling ---
@@ -78,17 +72,17 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                 const IconComponent = Fa6Icons[iconToRender];
                 const { className, style, ...restProps } = mutableAttribs;
                 const finalProps: Record<string, any> = {
-                    ...restProps, // this will pass 'color', 'size', etc. from ::FaIcon color='val'::
+                    ...restProps, 
                     className: `${className || ''} inline align-baseline mx-px`.trim(),
-                    style: style, // style can also be passed as an attribute string if needed, but direct props are better
+                    style: style, 
                 };
-                // logger.debug(`[VCR] Rendering <${iconComponentName} /> with props:`, finalProps);
+                // If there are children (e.g. text inside an icon tag which is not typical for Fa), pass them.
+                // Usually Fa icons don't take children this way, but to be robust:
                 return React.createElement(IconComponent, finalProps, children);
-            } else if (lowerCaseName.startsWith('fa') && !isValidFa6Icon(nodeName) && !iconNameMap[lowerCaseName]) { // Fallback for unmapped/invalid Fa icons
+            } else if (lowerCaseName.startsWith('fa') && !isValidFa6Icon(nodeName) && !iconNameMap[lowerCaseName]) {
                 logger.warn(`[VCR] Unknown Fa Icon Tag or unmapped: <${nodeName}> (lc: ${lowerCaseName})`);
                 return <span title={`Unknown/Unmapped Fa Icon: ${nodeName}`} className="text-orange-500 font-bold">{`[?] Неизвестная иконка <${nodeName}>`}</span>;
             }
-
 
             // --- Link Handling ---
             if (lowerCaseName === 'a') {
@@ -99,15 +93,15 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                 mutableAttribs.className = `${linkClassName} mx-1 px-0.5`.trim(); 
 
                 if (isInternal && !mutableAttribs.target && hrefVal) {
-                    // logger.debug("[VCR] Rendering Next Link for:", hrefVal);
                     const { href, className: finalLinkClassName, style: linkStyle, title: linkTitle, ...restLinkProps } = mutableAttribs;
+                    // Pass children to Link component
                     return <Link href={href as string} className={finalLinkClassName as string} style={linkStyle as React.CSSProperties} title={linkTitle as string} {...restLinkProps}>{children}</Link>;
                 }
-                // logger.debug("[VCR] Rendering standard <a> tag for:", hrefVal);
+                // Pass children to standard <a> tag
                 return React.createElement('a', mutableAttribs, children);
             }
             
-            // --- Standard HTML Elements Styling ---
+            // --- Standard HTML Elements Styling & Passing Children ---
             if (lowerCaseName === 'strong') {
                 mutableAttribs.className = `${mutableAttribs.className || ''} font-semibold text-brand-yellow`.trim();
             }
@@ -135,11 +129,10 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
             if (lowerCaseName === 'hr') {
                  mutableAttribs.className = `${mutableAttribs.className || ''} border-border my-4`.trim();
             }
-
+            // Default: create element and pass children
             return React.createElement(nodeName, mutableAttribs, children);
         }
         
-        // logger.debug("[VCR] Node not processed by custom logic, passing through:", domNode.type);
         return undefined; 
     },
 };
@@ -154,10 +147,6 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
         return null;
     }
     try {
-      // Order of operations:
-      // 1. Simple Markdown to HTML (bold, italic)
-      // 2. Custom Icon Syntax to HTML tags
-      // 3. Parse the resulting HTML string
       let processedContent = String(content);
       processedContent = applySimpleMarkdown(processedContent);
       processedContent = preprocessIconSyntaxInternal(processedContent);
