@@ -20,7 +20,7 @@ import {
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaToolbox, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket,
     FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye,
-    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark // Replaced FaTimesCircle with FaCircleXmark
+    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark 
 } from "react-icons/fa6";
 import Link from "next/link";
 import { motion } from 'framer-motion';
@@ -175,7 +175,13 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const [lang, setLang] = useState<keyof typeof translations>('en');
     const [t, setT] = useState<typeof translations.en | null>(null);
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
-    const [isCtaVisible, setIsCtaVisible] = useState<boolean>(true); 
+    
+    // State for sections visibility
+    const [isIntroVisible, setIsIntroVisible] = useState(true);
+    const [isCyberVibeVisible, setIsCyberVibeVisible] = useState(true);
+    const [isCommunityWisdomVisible, setIsCommunityWisdomVisible] = useState(true);
+    const [isPhilosophyStepsVisible, setIsPhilosophyStepsVisible] = useState(true);
+    const [isCtaVisible, setIsCtaVisible] = useState(true); 
 
     if (!pageContext || typeof pageContext.addToast !== 'function') {
          error("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!");
@@ -264,6 +270,16 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const navTitleGrabber = memoizedGetPlainText(t.navGrabber);
     const navTitleAssistant = memoizedGetPlainText(t.navAssistant);
 
+    const CloseButton = ({ onClick, ariaLabel }: { onClick: () => void; ariaLabel: string }) => (
+        <button
+            onClick={onClick}
+            className="absolute top-2 right-2 text-slate-400 hover:text-white z-20 p-1 rounded-full hover:bg-black/30 transition-colors"
+            aria-label={ariaLabel}
+        >
+            <FaCircleXmark className="w-5 h-5" />
+        </button>
+    );
+
     log("[ActualPageContent] Preparing to render JSX...");
 
     try {
@@ -272,115 +288,127 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
                 <div className="min-h-screen bg-dark-bg p-4 sm:p-6 pt-24 text-light-text flex flex-col items-center relative overflow-y-auto">
 
-                    <section id="intro" className="mb-12 text-center max-w-3xl w-full">
-                         <div className="flex justify-center mb-4"> <FaBolt className="w-16 h-16 text-brand-yellow text-shadow-[0_0_15px_hsl(var(--brand-yellow))] animate-pulse" /> </div>
-                        <h1 className="text-4xl md:text-5xl font-orbitron font-bold text-brand-yellow text-shadow-[0_0_10px_hsl(var(--brand-yellow))] mb-4">
-                           <VibeContentRenderer content={t.pageTitle} />
-                        </h1>
-                        <p className="text-xl md:text-2xl text-light-text mt-4 font-semibold">
-                           <VibeContentRenderer content={t.welcome} /> <span className="text-brand-cyan">{userName}!</span>
-                        </p>
-                        <div className="text-lg md:text-xl text-muted-foreground mt-3 space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-brand-yellow prose-em:text-brand-purple prose-a:text-brand-blue max-w-none">
-                            <VibeContentRenderer content={t.intro1} />
-                            <VibeContentRenderer content={t.intro2} />
-                            <div className="font-semibold text-brand-green"><VibeContentRenderer content={t.intro3} /></div>
-                        </div>
-                    </section>
+                    {isIntroVisible && (
+                        <section id="intro" className="mb-12 text-center max-w-3xl w-full relative">
+                            <CloseButton onClick={() => setIsIntroVisible(false)} ariaLabel="Close Intro Section" />
+                            <div className="flex justify-center mb-4"> <FaBolt className="w-16 h-16 text-brand-yellow text-shadow-[0_0_15px_hsl(var(--brand-yellow))] animate-pulse" /> </div>
+                            <h1 className="text-4xl md:text-5xl font-orbitron font-bold text-brand-yellow text-shadow-[0_0_10px_hsl(var(--brand-yellow))] mb-4">
+                               <VibeContentRenderer content={t.pageTitle} />
+                            </h1>
+                            <p className="text-xl md:text-2xl text-light-text mt-4 font-semibold">
+                               <VibeContentRenderer content={t.welcome} /> <span className="text-brand-cyan">{userName}!</span>
+                            </p>
+                            <div className="text-lg md:text-xl text-muted-foreground mt-3 space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-brand-yellow prose-em:text-brand-purple prose-a:text-brand-blue max-w-none">
+                                <VibeContentRenderer content={t.intro1} />
+                                <VibeContentRenderer content={t.intro2} />
+                                <div className="font-semibold text-brand-green"><VibeContentRenderer content={t.intro3} /></div>
+                            </div>
+                        </section>
+                    )}
 
-                    <section id="cybervibe-section" className="mb-12 w-full max-w-3xl">
-                         <Card className="bg-gradient-to-br from-purple-900/40 via-black/60 to-indigo-900/40 border border-purple-600/60 shadow-xl rounded-lg p-6 backdrop-blur-sm bg-dark-card/80">
-                             <CardHeader className="p-0 mb-4">
-                                 <CardTitle className="text-2xl md:text-3xl font-bold text-center text-brand-purple flex items-center justify-center gap-2">
-                                    <FaAtom className="animate-spin-slow"/> <VibeContentRenderer content={t.cyberVibeTitle} /> <FaBrain className="animate-pulse"/>
-                                </CardTitle>
-                             </CardHeader>
-                             <CardContent className="p-0 text-muted-foreground text-base md:text-lg space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-brand-purple prose-em:text-brand-cyan prose-a:text-brand-blue max-w-none">
-                                <VibeContentRenderer content={t.cyberVibe1} />
-                                <VibeContentRenderer content={t.cyberVibe2} />
-                                <VibeContentRenderer content={t.cyberVibe3} />
-                                <div className="text-purple-300 font-semibold"><VibeContentRenderer content={t.cyberVibe4} /></div>
-                             </CardContent>
-                         </Card>
-                     </section>
+                    {isCyberVibeVisible && (
+                        <section id="cybervibe-section" className="mb-12 w-full max-w-3xl relative">
+                            <CloseButton onClick={() => setIsCyberVibeVisible(false)} ariaLabel="Close Vibe Loop Section" />
+                            <Card className="bg-gradient-to-br from-purple-900/40 via-black/60 to-indigo-900/40 border border-purple-600/60 shadow-xl rounded-lg p-6 backdrop-blur-sm bg-dark-card/80">
+                                 <CardHeader className="p-0 mb-4">
+                                     <CardTitle className="text-2xl md:text-3xl font-bold text-center text-brand-purple flex items-center justify-center gap-2">
+                                        <FaAtom className="animate-spin-slow"/> <VibeContentRenderer content={t.cyberVibeTitle} /> <FaBrain className="animate-pulse"/>
+                                    </CardTitle>
+                                 </CardHeader>
+                                 <CardContent className="p-0 text-muted-foreground text-base md:text-lg space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-brand-purple prose-em:text-brand-cyan prose-a:text-brand-blue max-w-none">
+                                    <VibeContentRenderer content={t.cyberVibe1} />
+                                    <VibeContentRenderer content={t.cyberVibe2} />
+                                    <VibeContentRenderer content={t.cyberVibe3} />
+                                    <div className="text-purple-300 font-semibold"><VibeContentRenderer content={t.cyberVibe4} /></div>
+                                 </CardContent>
+                             </Card>
+                         </section>
+                     )}
                     
-                    <section id="community-wisdom-section" className="mb-12 w-full max-w-3xl">
-                        <h3 className="text-2xl md:text-3xl font-orbitron text-brand-cyan mb-6 text-center flex items-center justify-center gap-2">
-                           <VibeContentRenderer content={t.communityWisdomTitle} />
-                        </h3>
-                        <div className="space-y-8">
-                            <div>
-                                <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-cyan/50 shadow-lg">
-                                    <iframe className="w-full h-full" src={`https://www.youtube.com/embed/ctcMA6chfDY?clip=Ugkx1LAX6-gO4J8hC6HoHbg0_KMlBHcsKX3V&t=1201`} title="YouTube: Sam Altman's Dream" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                    {isCommunityWisdomVisible && (
+                        <section id="community-wisdom-section" className="mb-12 w-full max-w-3xl relative">
+                            <CloseButton onClick={() => setIsCommunityWisdomVisible(false)} ariaLabel="Close Community Wisdom Section" />
+                            <h3 className="text-2xl md:text-3xl font-orbitron text-brand-cyan mb-6 text-center flex items-center justify-center gap-2">
+                               <VibeContentRenderer content={t.communityWisdomTitle} />
+                            </h3>
+                            <div className="space-y-8">
+                                <div>
+                                    <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-cyan/50 shadow-lg">
+                                        <iframe className="w-full h-full" src={`https://www.youtube.com/embed/ctcMA6chfDY?t=1201`} title="YouTube: Sam Altman's Dream" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                                    </div>
+                                    <div className="mt-3 p-3 bg-dark-card/70 border-l-4 border-brand-cyan rounded-r-md prose prose-sm prose-invert text-muted-foreground max-w-none">
+                                        <VibeContentRenderer content={t.quote1} />
+                                        <p className="text-xs text-right opacity-70 mt-1">- Inspired by Sam Altman</p>
+                                    </div>
                                 </div>
-                                <div className="mt-3 p-3 bg-dark-card/70 border-l-4 border-brand-cyan rounded-r-md prose prose-sm prose-invert text-muted-foreground max-w-none">
-                                    <VibeContentRenderer content={t.quote1} />
-                                    <p className="text-xs text-right opacity-70 mt-1">- Inspired by Sam Altman</p>
+                                <div>
+                                    <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-pink/50 shadow-lg">
+                                        <iframe className="w-full h-full" src={`https://www.youtube.com/embed/dq8MhTFCs80?t=1197`} title="YouTube: Do you Vibecode?" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                                    </div>
+                                     <div className="mt-3 p-3 bg-dark-card/70 border-l-4 border-brand-pink rounded-r-md prose prose-sm prose-invert text-muted-foreground max-w-none">
+                                        <VibeContentRenderer content={t.quote2} />
+                                        <p className="text-xs text-right opacity-70 mt-1">- Inspired by Vibe Master</p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-yellow/50 shadow-lg">
+                                        <iframe className="w-full h-full" src={`https://www.youtube.com/embed/xlQB_0Nzoog?t=743`} title="YouTube: Really F*cking EZ!" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                                    </div>
+                                    <div className="mt-3 p-3 bg-dark-card/70 border-l-4 border-brand-yellow rounded-r-md prose prose-sm prose-invert text-muted-foreground max-w-none">
+                                        <VibeContentRenderer content={t.quote3} />
+                                        <p className="text-xs text-right opacity-70 mt-1">- Inspired by Strategic Thinking</p>
+                                    </div>
                                 </div>
                             </div>
-                            <div>
-                                <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-pink/50 shadow-lg">
-                                    <iframe className="w-full h-full" src={`https://www.youtube.com/embed/dq8MhTFCs80?clip=UgkxZVMHbEo2XwO-sayoxskH89zzrDdN6vsx&t=1197`} title="YouTube: Do you Vibecode?" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
-                                </div>
-                                 <div className="mt-3 p-3 bg-dark-card/70 border-l-4 border-brand-pink rounded-r-md prose prose-sm prose-invert text-muted-foreground max-w-none">
-                                    <VibeContentRenderer content={t.quote2} />
-                                    <p className="text-xs text-right opacity-70 mt-1">- Inspired by Vibe Master</p>
-                                </div>
-                            </div>
-                            <div>
-                                <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-yellow/50 shadow-lg">
-                                    <iframe className="w-full h-full" src={`https://www.youtube.com/embed/xlQB_0Nzoog?clip=UgkxvGYsRm3HezCgOyqszCbn5DfDDx7LixPE&t=743`} title="YouTube: Really F*cking EZ!" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
-                                </div>
-                                <div className="mt-3 p-3 bg-dark-card/70 border-l-4 border-brand-yellow rounded-r-md prose prose-sm prose-invert text-muted-foreground max-w-none">
-                                    <VibeContentRenderer content={t.quote3} />
-                                    <p className="text-xs text-right opacity-70 mt-1">- Inspired by Strategic Thinking</p>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
+                        </section>
+                    )}
 
-                    <section id="philosophy-steps" className="mb-12 w-full max-w-3xl">
-                        <details className="bg-dark-card/80 border border-border rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50">
-                            <summary className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-card/50 rounded-t-lg transition-colors group">
-                                <span className="flex items-center gap-2"><FaCodeBranch /> <VibeContentRenderer content={t.philosophyTitle} /></span>
-                                <span className="text-xs text-gray-500 group-open:rotate-180 transition-transform duration-300">▼</span>
-                            </summary>
-                            <div className="px-6 pt-2 text-muted-foreground space-y-4 text-base prose prose-invert prose-p:my-2 prose-li:my-1 prose-strong:text-brand-yellow prose-em:text-brand-cyan prose-a:text-brand-blue max-w-none">
-                                 <div className="my-4 not-prose">
-                                     <h4 className="text-lg font-semibold text-brand-cyan mb-2"><VibeContentRenderer content={t.philosophyVideoTitle} /></h4>
-                                     <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
-                                         <iframe className="w-full h-full" src="https://www.youtube.com/embed/imxzYWYKCyQ" title="YouTube video player - Vibe Level Explanation by Salavey13" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                    {isPhilosophyStepsVisible && (
+                        <section id="philosophy-steps" className="mb-12 w-full max-w-3xl relative">
+                            <CloseButton onClick={() => setIsPhilosophyStepsVisible(false)} ariaLabel="Close Philosophy/Steps Section" />
+                            <details className="bg-dark-card/80 border border-border rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50">
+                                <summary className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-card/50 rounded-t-lg transition-colors group">
+                                    <span className="flex items-center gap-2"><FaCodeBranch /> <VibeContentRenderer content={t.philosophyTitle} /></span>
+                                    <span className="text-xs text-gray-500 group-open:rotate-180 transition-transform duration-300">▼</span>
+                                </summary>
+                                <div className="px-6 pt-2 text-muted-foreground space-y-4 text-base prose prose-invert prose-p:my-2 prose-li:my-1 prose-strong:text-brand-yellow prose-em:text-brand-cyan prose-a:text-brand-blue max-w-none">
+                                     <div className="my-4 not-prose">
+                                         <h4 className="text-lg font-semibold text-brand-cyan mb-2"><VibeContentRenderer content={t.philosophyVideoTitle} /></h4>
+                                         <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
+                                             <iframe className="w-full h-full" src="https://www.youtube.com/embed/imxzYWYKCyQ" title="YouTube video player - Vibe Level Explanation by Salavey13" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                                         </div>
                                      </div>
-                                 </div>
-                                <hr className="border-border my-3"/>
-                                 <div className="text-purple-300 italic"><VibeContentRenderer content={t.philosophyCore} /></div>
-                                 <hr className="border-border my-3"/>
-                                <h4 className="text-lg font-semibold text-brand-cyan pt-1">Level Progression (+1 Vibe Perk):</h4>
-                                <ul className="list-none space-y-2 pl-2 text-sm md:text-base">
-                                    {[t.philosophyLvl0_1, t.philosophyLvl1_2, t.philosophyLvl2_3, t.philosophyLvl3_4, t.philosophyLvl4_5, t.philosophyLvl5_6, t.philosophyLvl6_7, t.philosophyLvl8_10].map((levelContent, index) => (
-                                        <li key={`std-lvl-${index}`}><VibeContentRenderer content={levelContent} /></li>
-                                    ))}
-                                    {[t.philosophyLvl11, t.philosophyLvl12, t.philosophyLvl13, t.philosophyLvl14, t.philosophyLvl15].map((levelContent, index) => (
-                                        <li key={`meta-lvl-${index}`}>
-                                            <div className="p-2 rounded-md border border-purple-600/40 bg-purple-900/20 my-1 shadow-inner shadow-purple-950/50 bg-dark-card/50">
-                                                <VibeContentRenderer content={levelContent} />
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                                <hr className="border-border my-3"/>
-                                <div className="font-bold text-brand-green"><VibeContentRenderer content={t.philosophyEnd} /></div>
-                                <hr className="border-border my-4"/>
-                                <h4 className="text-lg font-semibold text-brand-cyan pt-2"><VibeContentRenderer content={t.stepsTitle} /></h4>
-                                <ol className="list-decimal list-inside text-sm space-y-1">
-                                     <li><VibeContentRenderer content={"Настрой <FaCodeBranch title='Настройки' class='inline text-cyan-400'/>"} /></li>
-                                     <li><VibeContentRenderer content={"Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>"} /></li>
-                                     <li><VibeContentRenderer content={"Выбери файлы или <span class='font-bold text-teal-400 mx-1'>связанные</span> / <span class='font-bold text-orange-400 mx-1'>важные</span>"} /></li>
-                                     <li><VibeContentRenderer content={"Опиши задачу ИЛИ добавь файлы <FaPlus title='Добавить выбранные в запрос' class='inline text-sm'/> / все <FaTree title='Добавить все файлы в запрос' class='inline text-sm'/>"} /></li>
-                                     <li><VibeContentRenderer content={"Скопируй <FaCopy title='Скопировать запрос' class='inline text-sm mx-px'/> или передай дальше"} /></li>
-                                </ol>
-                            </div>
-                        </details>
-                    </section>
+                                    <hr className="border-border my-3"/>
+                                     <div className="text-purple-300 italic"><VibeContentRenderer content={t.philosophyCore} /></div>
+                                     <hr className="border-border my-3"/>
+                                    <h4 className="text-lg font-semibold text-brand-cyan pt-1">Level Progression (+1 Vibe Perk):</h4>
+                                    <ul className="list-none space-y-2 pl-2 text-sm md:text-base">
+                                        {[t.philosophyLvl0_1, t.philosophyLvl1_2, t.philosophyLvl2_3, t.philosophyLvl3_4, t.philosophyLvl4_5, t.philosophyLvl5_6, t.philosophyLvl6_7, t.philosophyLvl8_10].map((levelContent, index) => (
+                                            <li key={`std-lvl-${index}`}><VibeContentRenderer content={levelContent} /></li>
+                                        ))}
+                                        {[t.philosophyLvl11, t.philosophyLvl12, t.philosophyLvl13, t.philosophyLvl14, t.philosophyLvl15].map((levelContent, index) => (
+                                            <li key={`meta-lvl-${index}`}>
+                                                <div className="p-2 rounded-md border border-purple-600/40 bg-purple-900/20 my-1 shadow-inner shadow-purple-950/50 bg-dark-card/50">
+                                                    <VibeContentRenderer content={levelContent} />
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    <hr className="border-border my-3"/>
+                                    <div className="font-bold text-brand-green"><VibeContentRenderer content={t.philosophyEnd} /></div>
+                                    <hr className="border-border my-4"/>
+                                    <h4 className="text-lg font-semibold text-brand-cyan pt-2"><VibeContentRenderer content={t.stepsTitle} /></h4>
+                                    <ol className="list-decimal list-inside text-sm space-y-1">
+                                         <li><VibeContentRenderer content={"Настрой <FaCodeBranch title='Настройки' class='inline text-cyan-400'/>"} /></li>
+                                         <li><VibeContentRenderer content={"Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>"} /></li>
+                                         <li><VibeContentRenderer content={"Выбери файлы или <span class='font-bold text-teal-400 mx-1'>связанные</span> / <span class='font-bold text-orange-400 mx-1'>важные</span>"} /></li>
+                                         <li><VibeContentRenderer content={"Опиши задачу ИЛИ добавь файлы <FaPlus title='Добавить выбранные в запрос' class='inline text-sm'/> / все <FaTree title='Добавить все файлы в запрос' class='inline text-sm'/>"} /></li>
+                                         <li><VibeContentRenderer content={"Скопируй <FaCopy title='Скопировать запрос' class='inline text-sm mx-px'/> или передай дальше"} /></li>
+                                    </ol>
+                                </div>
+                            </details>
+                        </section>
+                    )}
 
                     {!showComponents && (
                         <section id="reveal-trigger" className="mb-12 w-full max-w-3xl text-center">
@@ -420,10 +448,10 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                               <div className="relative bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange p-6 rounded-lg shadow-lg animate-pulse border-2 border-white/50 prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 prose-a:text-brand-blue max-w-none">
                                  <button 
                                     onClick={() => setIsCtaVisible(false)} 
-                                    className="absolute top-2 right-2 text-white/70 hover:text-white z-10 p-1 rounded-full hover:bg-black/20 transition-colors"
+                                    className="absolute top-2 right-2 text-white/70 hover:text-white z-20 p-1 rounded-full hover:bg-black/30 transition-colors"
                                     aria-label="Close CTA"
                                   >
-                                    <FaCircleXmark className="w-6 h-6" /> {/* Corrected Icon */}
+                                    <FaCircleXmark className="w-6 h-6" />
                                   </button>
                                  <h3 className="text-2xl font-bold text-white mb-3"><VibeContentRenderer content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
                                  <div className="text-white text-lg mb-4"> <VibeContentRenderer content={t.ctaDesc} /> </div>
