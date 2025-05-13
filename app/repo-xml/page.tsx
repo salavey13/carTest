@@ -25,9 +25,9 @@ import Link from "next/link";
 import { motion } from 'framer-motion';
 import VibeContentRenderer from '@/components/VibeContentRenderer';
 import * as repoUtils from "@/lib/repoUtils";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"; // cn is imported
 
-// --- I18N Translations (Full) ---
+// --- I18N Translations (Full - No changes needed here) ---
 const translations = {
   en: {
     loading: "Booting SUPERVIBE ENGINE...",
@@ -44,10 +44,10 @@ const translations = {
     philosophyTitle: "Your Vibe Path: The Inevitable Level Up (Tap)",
     philosophyVideoTitle: "Watch: The Level System Explained <FaVideo/>:",
     philosophyCore: "The secret? <strong>You're not asking the bot for help, YOU are helping the BOT</strong>. Each level adds <strong>+1 Vibe Perk</strong>, one more click, one more skill to guide the AI. It's not a grind, it's evolution. You get lazy doing the old stuff, so you <em>automatically</em> level up. And there's <strong>NO GOING BACK!</strong>",
-    philosophyLvl0_1: "<strong>Lv.0 -> 1 <FaBolt/> (Instant Win):</strong> Fix a broken image. Copy URL -> Paste -> Upload new -> <strong>DONE</strong>. System auto-PRs. <strong>ANYONE</strong> can do this <em>NOW</em>. This is your entry point.",
-    philosophyLvl1_2: "<strong>Lv.1 -> 2 <FaToolbox/> (+1 File/AI):</strong> Simple idea? Change text/button? Give AI the idea + 1 file context -> PR. <strong>DONE.</strong>",
-    philosophyLvl2_3: "<strong>Lv.2 -> 3 <FaCode/> (+Multi-File):</strong> Slightly complex? 2-5 files? Give AI idea + context -> Check -> PR. <strong>DONE.</strong>",
-    philosophyLvl3_4: "<strong>Lv.3 -> 4 <FaBug/> (+Log Check):</strong> Build failed? Runtime error? Use Dev Overlay (<FaBug /> icon top-right on error) to copy error + logs -> Feed to AI with file context -> <strong>FIXED.</strong> +1 Vibe Perk: Debugging.",
+    philosophyLvl0_1: "<strong>Lv.0 -> 1 <FaBolt/> (Instant Win / Image Swap Flow):</strong> Fix a broken image. Copy URL -> Paste -> Upload new -> <strong>DONE</strong>. System auto-PRs. <strong>ANYONE</strong> can do this <em>NOW</em>. This is your entry point.",
+    philosophyLvl1_2: "<strong>Lv.1 -> 2 <FaToolbox/> (+1 File/AI / Generic Idea Flow):</strong> Simple idea? Change text/button? Give AI the idea + 1 file context -> PR. <strong>DONE.</strong>",
+    philosophyLvl2_3: "<strong>Lv.2 -> 3 <FaCode/> (+Multi-File / Generic Idea Flow):</strong> Slightly complex? 2-5 files? Give AI idea + context -> Check -> PR. <strong>DONE.</strong>",
+    philosophyLvl3_4: "<strong>Lv.3 -> 4 <FaBug/> (+Log Check / Error Fix Flow):</strong> Build failed? Runtime error? Use Dev Overlay (<FaBug /> icon top-right on error) to copy error + logs -> Feed to AI with file context -> <strong>FIXED.</strong> +1 Vibe Perk: Debugging.",
     philosophyLvl4_5: "<strong>Lv.4 -> 5 <FaLink/> (+Icon Hunt / Proactive Log Check):</strong> Tired of icon errors? Find the <em>perfect</em> Fa6 icon yourself! Use <a href='https://fontawesome.com/search?o=r&m=free&f=brands%2Csolid%2Cregular' target='_blank' class='text-brand-blue hover:underline font-semibold px-1'>FontAwesome Search <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/></a> -> Add link to Assistant Quick Links -> Fix icons proactively. Check Vercel logs (link in PR comment!) even without errors. +1 Perk: Resourcefulness.",
     philosophyLvl5_6: "<strong>Lv.5 -> 6 <FaMicrophone/>/<FaVideo/> (+Multimedia):</strong> Use audio commands! Attach videos! Watch them turn into page content automatically. +1 Perk: Multi-modal Input.",
     philosophyLvl6_7: "<strong>Lv.6 -> 7 <FaDatabase/> (+SQL/DB):</strong> Discover new file types! AI generates SQL -> Paste into Supabase (1 click) -> <strong>DONE.</strong> Same flow, different context. +1 Perk: Data Handling.",
@@ -135,16 +135,20 @@ function LoadingBuddyFallback() {
 const getPlainText = (htmlString: string | null | undefined): string => {
     if (typeof htmlString !== 'string' || !htmlString) { return ''; }
     try {
-        let text = htmlString.replace(/<Fa[A-Z][a-zA-Z0-9]+(?:\s+[^>]*?)?\s*\/?>/g, '');
+        // Use VibeContentRenderer's logic implicitly or replicate basic stripping
+        let text = htmlString.replace(/<Fa[A-Z][a-zA-Z0-9]+(?:\s+[^>]*?)?\s*\/?>/g, ''); // Basic icon strip
+        text = text.replace(/::(Fa[A-Z][a-zA-Z0-9]+.*?)::/g, ''); // Strip VibeContentRenderer syntax
         text = text.replace(/\[\?\]/g, '');
         text = text.replace(/\[ICON ERR!\]/g, '');
-        text = text.replace(/<[^>]*>/g, '');
+        text = text.replace(/<[^>]*>/g, ''); // Strip remaining HTML
         return text.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
     } catch (e) {
         console.error("[getPlainText] Error stripping HTML for title:", e, "Input:", htmlString);
-        return htmlString;
+        // Fallback to returning the original string if complex parsing fails
+        return htmlString.replace(/<[^>]*>/g, '').trim();
     }
 };
+
 
 // --- ActualPageContent Component (moved from being default export of page) ---
 interface ActualPageContentProps {
@@ -169,13 +173,11 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
     // --- State Initialization ---
     log("[ActualPageContent] Initializing State...");
-    const [lang, setLang] = useState<keyof typeof translations>('en'); 
-    const [t, setT] = useState<typeof translations.en | null>(null); 
+    const [lang, setLang] = useState<keyof typeof translations>('en');
+    const [t, setT] = useState<typeof translations.en | null>(null);
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true); // Only for translations now
-    // const [initialUrlProcessed, setInitialUrlProcessed] = useState<boolean>(false); // Managed by useRepoFetcher and prop flow
-    // const hasProcessedInitialIdea = useRef(false); // Managed by useRepoFetcher and prop flow
     log("[ActualPageContent] useState DONE");
-    
+
     // --- CONTEXT VALIDATION ---
     if (!pageContext || typeof pageContext.addToast !== 'function') {
          error("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!");
@@ -185,9 +187,9 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
     // --- Destructure context ---
     const {
-        fetcherRef, assistantRef, kworkInputRef, aiResponseInputRef, 
+        fetcherRef, assistantRef, kworkInputRef,
         showComponents, setShowComponents,
-    } = pageContext;
+    } = pageContext; // Removed aiResponseInputRef as it's accessed via pageContext directly now
 
     // --- Effect 1: Language ---
     useEffect(() => {
@@ -199,7 +201,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
       const newTranslations = translations[resolvedLang] ?? translations.en;
       setT(newTranslations);
       log(`[Effect Lang] Language set to: ${resolvedLang}. Translations loaded.`);
-    }, [user]); 
+    }, [user]);
 
     // --- Effect 2: Page Loading Status (Only for translations now) ---
     useEffect(() => {
@@ -207,41 +209,60 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
         setIsPageLoading(!t);
         log(`[ActualPageContent Effect] Loading check: translations=${!!t}, resulting isPageLoading=${!t}`);
     }, [t]);
-    
+
     // --- Callbacks ---
     const memoizedGetPlainText = useCallback(getPlainText, []);
     const scrollToSectionNav = useCallback((id: string) => {
         debug(`[CB ScrollNav] Attempting scroll to: ${id}`);
         const sectionsRequiringReveal = ['extractor', 'executor', 'cybervibe-section', 'philosophy-steps'];
         const targetElement = document.getElementById(id);
+        const headerOffset = 80; // Offset for fixed header
+
+        const scroll = (element: HTMLElement) => {
+             try {
+                const elementTop = element.getBoundingClientRect().top + window.scrollY;
+                const offsetTop = elementTop - headerOffset;
+                window.scrollTo({ top: offsetTop, behavior: 'smooth' });
+                log(`[CB ScrollNav] Scrolled to "${id}" at offsetTop: ${offsetTop}`);
+            } catch (e) {
+                error(`[CB ScrollNav] Error scrolling to "${id}":`, e);
+            }
+        };
+
         if (sectionsRequiringReveal.includes(id) && !showComponents) {
             log(`[CB ScrollNav] Revealing components for "${id}"`);
             setShowComponents(true);
-            requestAnimationFrame(() => { 
+            // Wait for the next frame for components to render before scrolling
+            requestAnimationFrame(() => {
                 const el = document.getElementById(id);
                 if (el) {
-                    try { const offsetTop = window.scrollY + el.getBoundingClientRect().top - 80; window.scrollTo({ top: offsetTop, behavior: 'smooth' }); }
-                    catch (e) { error(`[CB ScrollNav] Error scrolling:`, e); }
-                } else { error(`[CB ScrollNav] Target "${id}" not found after reveal.`); }
+                    scroll(el);
+                } else {
+                    error(`[CB ScrollNav] Target "${id}" not found after reveal and animation frame.`);
+                }
             });
         } else if (targetElement) {
-            try { const offsetTop = window.scrollY + targetElement.getBoundingClientRect().top - 80; window.scrollTo({ top: offsetTop, behavior: 'smooth' }); }
-            catch (e) { error(`[CB ScrollNav] Error scrolling:`, e); }
-        } else { error(`[CB ScrollNav] Target element "${id}" not found.`); }
+            scroll(targetElement);
+        } else {
+            error(`[CB ScrollNav] Target element "${id}" not found.`);
+        }
     }, [showComponents, setShowComponents, log, debug, error]);
+
 
     const handleShowComponents = useCallback(() => {
         log("[Button Click] handleShowComponents (Reveal)");
         setShowComponents(true);
         toastInfo("Компоненты загружены!", { duration: 1500 });
-    }, [setShowComponents, toastInfo, log]);
+        // Optionally scroll to the first revealed component after a short delay
+        setTimeout(() => scrollToSectionNav('extractor'), 100);
+    }, [setShowComponents, toastInfo, log, scrollToSectionNav]);
 
     // --- Loading / Error States ---
      if (isPageLoading) {
          log(`[Render] ActualPageContent: Rendering Loading State (Waiting for translations)`);
          const loadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
          const loadingText = translations[loadingLang]?.loading ?? translations.en.loading;
-         return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
+         return ( <div className="flex justify-center items-center min-h-screen pt-20 bg-dark-bg"> {/* Use bg-dark-bg */} <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{loadingText}</p> </div> );
      }
      if (!t) {
          error("[Render] ActualPageContent: Critical - translations (t) are null after loading.");
@@ -251,10 +272,12 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     // --- Derived State ---
     log("[ActualPageContent] Calculating derived state");
     const userName = user?.first_name || 'Vibe Master';
+    // Use memoized helper for potentially complex HTML stripping
     const navTitleIntro = memoizedGetPlainText(t.navIntro);
     const navTitleVibeLoop = memoizedGetPlainText(t.navCyberVibe);
     const navTitleGrabber = memoizedGetPlainText(t.navGrabber);
     const navTitleAssistant = memoizedGetPlainText(t.navAssistant);
+
 
     // --- Log before return ---
     log("[ActualPageContent] Preparing to render JSX...");
@@ -264,18 +287,21 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
        return (
             <>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-                <div className="min-h-screen bg-gray-950 p-4 sm:p-6 pt-24 text-white flex flex-col items-center relative overflow-y-auto">
+                 {/* Use theme background and text colors */}
+                <div className="min-h-screen bg-dark-bg p-4 sm:p-6 pt-24 text-light-text flex flex-col items-center relative overflow-y-auto">
 
                     {/* --- FULL INTRO SECTION --- */}
                     <section id="intro" className="mb-12 text-center max-w-3xl w-full">
-                         <div className="flex justify-center mb-4"> <FaBolt className="w-16 h-16 text-[#E1FF01] text-shadow-[0_0_15px_#E1FF01] animate-pulse" /> </div>
-                        <h1 className="text-4xl md:text-5xl font-bold text-[#E1FF01] text-shadow-[0_0_10px_#E1FF01] animate-pulse mb-4">
+                         <div className="flex justify-center mb-4"> <FaBolt className="w-16 h-16 text-brand-yellow text-shadow-[0_0_15px_theme(colors.brand-yellow)] animate-pulse" /> </div>
+                         {/* Use theme colors */}
+                        <h1 className="text-4xl md:text-5xl font-orbitron font-bold text-brand-yellow text-shadow-[0_0_10px_theme(colors.brand-yellow)] animate-pulse mb-4">
                            <VibeContentRenderer content={t.pageTitle} />
                         </h1>
-                        <p className="text-xl md:text-2xl text-gray-200 mt-4 font-semibold">
+                        <p className="text-xl md:text-2xl text-light-text mt-4 font-semibold">
                            <VibeContentRenderer content={t.welcome} /> <span className="text-brand-cyan">{userName}!</span>
                         </p>
-                        <div className="text-lg md:text-xl text-gray-300 mt-3 space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-yellow-300 prose-em:text-purple-300 max-w-none">
+                        {/* Use theme text colors and prose styles */}
+                        <div className="text-lg md:text-xl text-gray-300 mt-3 space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-brand-yellow prose-em:text-brand-purple max-w-none">
                             <VibeContentRenderer content={t.intro1} />
                             <VibeContentRenderer content={t.intro2} />
                             <div className="font-semibold text-brand-green"><VibeContentRenderer content={t.intro3} /></div>
@@ -284,13 +310,15 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
                     {/* --- FULL VIBE LOOP SECTION --- */}
                     <section id="cybervibe-section" className="mb-12 w-full max-w-3xl">
-                         <Card className="bg-gradient-to-br from-purple-900/40 via-black/60 to-indigo-900/40 border border-purple-600/60 shadow-xl rounded-lg p-6 backdrop-blur-sm">
+                         {/* Use theme card styles */}
+                         <Card className="bg-gradient-to-br from-purple-900/40 via-black/60 to-indigo-900/40 border border-purple-600/60 shadow-xl rounded-lg p-6 backdrop-blur-sm bg-dark-card/80">
                              <CardHeader className="p-0 mb-4">
                                  <CardTitle className="text-2xl md:text-3xl font-bold text-center text-brand-purple flex items-center justify-center gap-2">
                                     <FaAtom className="animate-spin-slow"/> <VibeContentRenderer content={t.cyberVibeTitle} /> <FaBrain className="animate-pulse"/>
                                 </CardTitle>
                              </CardHeader>
-                             <CardContent className="p-0 text-gray-300 text-base md:text-lg space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-purple-300 prose-em:text-cyan-300 max-w-none">
+                             {/* Use theme text colors */}
+                             <CardContent className="p-0 text-gray-300 text-base md:text-lg space-y-3 prose prose-invert prose-p:my-2 prose-strong:text-brand-purple prose-em:text-brand-cyan max-w-none">
                                 <VibeContentRenderer content={t.cyberVibe1} />
                                 <VibeContentRenderer content={t.cyberVibe2} />
                                 <VibeContentRenderer content={t.cyberVibe3} />
@@ -301,14 +329,16 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
                     {/* --- FULL PHILOSOPHY SECTION --- */}
                     <section id="philosophy-steps" className="mb-12 w-full max-w-3xl">
-                        <details className="bg-gray-900/80 border border-gray-700 rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50">
+                        {/* Use theme styles for details/summary */}
+                        <details className="bg-dark-card/80 border border-gray-700 rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50">
                             <summary className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-gray-800/50 rounded-t-lg transition-colors group">
                                 <span className="flex items-center gap-2"><FaCodeBranch /> <VibeContentRenderer content={t.philosophyTitle} /></span>
                                 <span className="text-xs text-gray-500 group-open:rotate-180 transition-transform duration-300">▼</span>
                             </summary>
-                            <div className="px-6 pt-2 text-gray-300 space-y-4 text-base prose prose-invert prose-p:my-2 prose-li:my-1 prose-strong:text-yellow-300 prose-em:text-cyan-300 prose-a:text-brand-blue max-w-none">
+                            {/* Use theme text colors */}
+                            <div className="px-6 pt-2 text-gray-300 space-y-4 text-base prose prose-invert prose-p:my-2 prose-li:my-1 prose-strong:text-brand-yellow prose-em:text-brand-cyan prose-a:text-brand-blue max-w-none">
                                  <div className="my-4 not-prose">
-                                     <h4 className="text-lg font-semibold text-cyan-400 mb-2"><VibeContentRenderer content={t.philosophyVideoTitle} /></h4>
+                                     <h4 className="text-lg font-semibold text-brand-cyan mb-2"><VibeContentRenderer content={t.philosophyVideoTitle} /></h4>
                                      <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
                                          <iframe className="w-full h-full" src="https://www.youtube.com/embed/imxzYWYKCyQ" title="YouTube video player - Vibe Level Explanation" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                                      </div>
@@ -316,7 +346,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                 <hr className="border-gray-700 my-3"/>
                                  <div className="text-purple-300 italic"><VibeContentRenderer content={t.philosophyCore} /></div>
                                  <hr className="border-gray-700 my-3"/>
-                                <h4 className="text-lg font-semibold text-cyan-400 pt-1">Level Progression (+1 Vibe Perk):</h4>
+                                <h4 className="text-lg font-semibold text-brand-cyan pt-1">Level Progression (+1 Vibe Perk):</h4>
                                 <ul className="list-none space-y-2 pl-2 text-sm md:text-base">
                                     {/* Standard Levels */}
                                     {[t.philosophyLvl0_1, t.philosophyLvl1_2, t.philosophyLvl2_3, t.philosophyLvl3_4, t.philosophyLvl4_5, t.philosophyLvl5_6, t.philosophyLvl6_7, t.philosophyLvl8_10].map((levelContent, index) => (
@@ -325,7 +355,8 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                     {/* Meta Levels (11-15) with special styling */}
                                     {[t.philosophyLvl11, t.philosophyLvl12, t.philosophyLvl13, t.philosophyLvl14, t.philosophyLvl15].map((levelContent, index) => (
                                         <li key={`meta-lvl-${index}`}>
-                                            <div className="p-2 rounded-md border border-purple-600/40 bg-purple-900/20 my-1 shadow-inner shadow-purple-950/50">
+                                            {/* Use theme card styles */}
+                                            <div className="p-2 rounded-md border border-purple-600/40 bg-purple-900/20 my-1 shadow-inner shadow-purple-950/50 bg-dark-card/50">
                                                 <VibeContentRenderer content={levelContent} />
                                             </div>
                                         </li>
@@ -334,7 +365,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                 <hr className="border-gray-700 my-3"/>
                                 <div className="font-bold text-brand-green"><VibeContentRenderer content={t.philosophyEnd} /></div>
                                 <hr className="border-gray-700 my-4"/>
-                                <h4 className="text-lg font-semibold text-cyan-400 pt-2"><VibeContentRenderer content={t.stepsTitle} /></h4>
+                                <h4 className="text-lg font-semibold text-brand-cyan pt-2"><VibeContentRenderer content={t.stepsTitle} /></h4>
                                 <ol className="list-decimal list-inside text-sm space-y-1">
                                      <li><VibeContentRenderer content={"Настрой <FaCodeBranch title='Настройки' class='inline text-cyan-400'/>"} /></li>
                                      <li><VibeContentRenderer content={"Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>"} /></li>
@@ -350,7 +381,8 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                     {!showComponents && (
                         <section id="reveal-trigger" className="mb-12 w-full max-w-3xl text-center">
                             {(() => { debug("[Render] Rendering Reveal Button"); return null; })()}
-                            <Button onClick={handleShowComponents} className="bg-gradient-to-r from-green-500 via-cyan-500 to-purple-600 text-gray-900 font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:scale-105 transform transition duration-300 animate-bounce hover:animate-none ring-2 ring-offset-2 ring-offset-gray-950 ring-transparent hover:ring-cyan-300" size="lg">
+                             {/* Use theme button styles */}
+                            <Button onClick={handleShowComponents} className="bg-gradient-to-r from-brand-green via-brand-cyan to-brand-purple text-black font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:scale-105 transform transition duration-300 animate-bounce hover:animate-none ring-2 ring-offset-2 ring-offset-dark-bg ring-transparent hover:ring-brand-cyan" size="lg">
                                 <FaHandSparkles className="mr-2"/> <VibeContentRenderer content={t.readyButton} />
                             </Button>
                         </section>
@@ -363,7 +395,8 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                             <h2 className="text-3xl font-bold text-center text-brand-green mb-8 animate-pulse"><VibeContentRenderer content={t.componentsTitle} /></h2>
                              <section id="extractor" className="mb-12 w-full max-w-4xl">
                                {(() => { debug("[Render] Rendering RepoTxtFetcher Component Wrapper..."); return null; })()}
-                                 <Card className="bg-gray-900/80 border border-blue-700/50 shadow-lg backdrop-blur-sm">
+                                  {/* Use theme card styles */}
+                                 <Card className="bg-dark-card/80 border border-blue-700/50 shadow-lg backdrop-blur-sm">
                                      <CardContent className="p-4">
                                          <RepoTxtFetcher
                                              ref={fetcherRef}
@@ -377,8 +410,10 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
                              <section id="executor" className="mb-12 w-full max-w-4xl pb-16">
                                 {(() => { debug("[Render] Rendering AICodeAssistant Component Wrapper..."); return null; })()}
-                                 <Card className="bg-gray-900/80 border border-purple-700/50 shadow-lg backdrop-blur-sm">
+                                  {/* Use theme card styles */}
+                                 <Card className="bg-dark-card/80 border border-purple-700/50 shadow-lg backdrop-blur-sm">
                                      <CardContent className="p-4">
+                                         {/* Pass aiResponseInputRef explicitly if needed by AICodeAssistant, otherwise access via context */}
                                          <AICodeAssistant ref={assistantRef} kworkInputRefPassed={kworkInputRef} aiResponseInputRefPassed={pageContext.aiResponseInputRef} />
                                      </CardContent>
                                  </Card>
@@ -392,7 +427,8 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                      {showComponents && (
                          <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
                               {(() => { debug("[Render] Rendering Final CTA"); return null; })()}
-                              <div className="bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 p-6 rounded-lg shadow-lg animate-pulse border-2 border-white/50 prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 max-w-none">
+                               {/* Use theme gradient and text styles */}
+                              <div className="bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange p-6 rounded-lg shadow-lg animate-pulse border-2 border-white/50 prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 max-w-none">
                                  <h3 className="text-2xl font-bold text-white mb-3"><VibeContentRenderer content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
                                  <div className="text-white text-lg mb-4"> <VibeContentRenderer content={t.ctaDesc} /> </div>
                                  <div className="text-white text-xl font-semibold mb-4 bg-black/30 p-3 rounded"> <FaRocket className="inline mr-2 text-cyan-300 animate-pulse"/> <VibeContentRenderer content={t.ctaHotChick} /> <FaUserAstronaut className="inline ml-2 text-pink-300"/> </div>
@@ -402,12 +438,13 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                      )}
 
                     {/* --- FULL NAVIGATION ICONS --- */}
+                     {/* Use theme colors for nav buttons */}
                      <motion.nav className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40" animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}>
                          <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-gray-700/80 backdrop-blur-sm rounded-full hover:bg-gray-600 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-gray-200" /> </button>
-                         <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-purple-700/80 backdrop-blur-sm rounded-full hover:bg-purple-600 transition shadow-md" title={navTitleVibeLoop} aria-label={navTitleVibeLoop || "Scroll to Vibe Loop"} > <FaUpLong className="text-lg text-white" /> </button>
+                         <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-brand-purple/80 backdrop-blur-sm rounded-full hover:bg-brand-purple/70 transition shadow-md" title={navTitleVibeLoop} aria-label={navTitleVibeLoop || "Scroll to Vibe Loop"} > <FaUpLong className="text-lg text-white" /> </button>
                          {showComponents && ( <>
-                                <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-blue-700/80 backdrop-blur-sm rounded-full hover:bg-blue-600 transition shadow-md" title={navTitleGrabber} aria-label={navTitleGrabber || "Scroll to Grabber"} > <FaDownload className="text-lg text-white" /> </button>
-                                <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-indigo-700/80 backdrop-blur-sm rounded-full hover:bg-indigo-600 transition shadow-md" title={navTitleAssistant} aria-label={navTitleAssistant || "Scroll to Assistant"} > <FaRobot className="text-lg text-white" /> </button>
+                                <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-brand-blue/80 backdrop-blur-sm rounded-full hover:bg-brand-blue/70 transition shadow-md" title={navTitleGrabber} aria-label={navTitleGrabber || "Scroll to Grabber"} > <FaDownload className="text-lg text-white" /> </button>
+                                <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-brand-cyan/80 backdrop-blur-sm rounded-full hover:bg-brand-cyan/70 transition shadow-md" title={navTitleAssistant} aria-label={navTitleAssistant || "Scroll to Assistant"} > <FaRobot className="text-lg text-white" /> </button>
                          </> )}
                     </motion.nav>
 
@@ -437,7 +474,6 @@ function RepoXmlPageInternalContent() {
   return <ActualPageContent initialPath={path} initialIdea={idea} />;
 }
 
-
 // --- Layout Component ---
 function RepoXmlPageLayout() {
     const log = logger.log;
@@ -466,7 +502,8 @@ export default function RepoXmlPage() {
      log("[RepoXmlPage] START Render (Exported Component)");
     const fallbackLoadingLang = typeof navigator !== 'undefined' && navigator.language.startsWith('ru') ? 'ru' : 'en';
     const fallbackLoadingText = translations[fallbackLoadingLang]?.loading ?? translations.en.loading;
-    const fallbackLoading = ( <div className="flex justify-center items-center min-h-screen pt-20 bg-gray-950"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{fallbackLoadingText}</p> </div> );
+     // Use theme background for fallback loader
+    const fallbackLoading = ( <div className="flex justify-center items-center min-h-screen pt-20 bg-dark-bg"> <FaSpinner className="text-brand-green animate-spin text-3xl mr-4" /> <p className="text-brand-green animate-pulse text-xl font-mono">{fallbackLoadingText}</p> </div> );
 
     try {
         return (
