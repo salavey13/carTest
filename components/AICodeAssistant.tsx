@@ -206,18 +206,16 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     }, [imageReplaceTask]);
     
     // --- Imperative Handle ---
-    useImperativeHandle(ref, () => { // Explicit block and return
-        return {
-            handleParse: () => { handlers.handleParse(); },
-            selectAllParsedFiles: () => { handlers.handleSelectAllFiles(); },
-            handleCreatePR: () => { handlers.handleCreateOrUpdatePR(); },
-            setResponseValue: (val: string) => { setResponseValue(val); },
-            updateRepoUrl: (url: string) => { updateRepoUrl(url); },
-            handleDirectImageReplace: (task: ImageReplaceTask, files: FileNode[]) => {
-                return handlers.handleDirectImageReplace(task, files);
-            },
-        };
-    });
+    useImperativeHandle(ref, () => ({
+        handleParse: () => { handlers.handleParse(); },
+        selectAllParsedFiles: () => { handlers.handleSelectAllFiles(); },
+        handleCreatePR: () => { handlers.handleCreateOrUpdatePR(); },
+        setResponseValue: (val: string) => { setResponseValue(val); },
+        updateRepoUrl: (url: string) => { updateRepoUrl(url); },
+        handleDirectImageReplace: (task: ImageReplaceTask, files: FileNode[]) => {
+            return handlers.handleDirectImageReplace(task, files);
+        },
+    }), [handlers, setResponseValue, updateRepoUrl]); // Correct dependency array
     
     // --- Derived State for Rendering ---
     const effectiveIsParsing = contextIsParsing ?? hookIsParsing;
@@ -238,29 +236,28 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     
     // --- FINAL RENDER ---
     return (
-        <div id="executor" className="p-4 bg-card text-foreground font-mono rounded-xl shadow-[0_0_15px_hsl(var(--brand-green)/0.3)] relative overflow-hidden flex flex-col gap-4 border border-border"> {/* Adjusted background, text, shadow, border */}
+        <div id="executor" className="p-4 bg-card text-foreground font-mono rounded-xl shadow-[0_0_15px_hsl(var(--brand-green)/0.3)] relative overflow-hidden flex flex-col gap-4 border border-border">
             <header className="flex justify-between items-center gap-2 flex-wrap">
                  <div className="flex items-center gap-2">
-                     <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-brand-yellow text-shadow-[0_0_10px_hsl(var(--brand-yellow))]"> {/* Use theme color */}
+                     <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-brand-yellow text-shadow-[0_0_10px_hsl(var(--brand-yellow))]">
                          {showImageReplaceUI ? (imageTaskFailed ? "🖼️ Ошибка Замены Картинки" : "🖼️ Статус Замены Картинки") : "🤖 AI Code Assistant"}
                      </h1>
-                     {showStandardAssistantUI && ( <button className="cursor-help p-1" title={assistantTooltipText}> <FaCircleInfo className="text-brand-blue hover:text-brand-blue/80 transition" /> </button> )} {/* Use theme color */}
+                     {showStandardAssistantUI && ( <button className="cursor-help p-1" title={assistantTooltipText}> <FaCircleInfo className="text-brand-blue hover:text-brand-blue/80 transition" /> </button> )}
                  </div>
-                 <button id="settings-modal-trigger-assistant" onClick={() => { triggerToggleSettingsModal(); }} className="p-2 text-muted-foreground hover:text-brand-cyan transition rounded-full hover:bg-muted/50 disabled:opacity-50" disabled={isProcessingAny} title="Настройки URL / Token / Ветки / PRs" > <FaCodeBranch className="text-xl" /> </button> {/* Use theme colors */}
+                 <button id="settings-modal-trigger-assistant" onClick={() => { triggerToggleSettingsModal(); }} className="p-2 text-muted-foreground hover:text-brand-cyan transition rounded-full hover:bg-muted/50 disabled:opacity-50" disabled={isProcessingAny} title="Настройки URL / Token / Ветки / PRs" > <FaCodeBranch className="text-xl" /> </button>
              </header>
 
-            {/* --- Standard Assistant UI --- */}
             {showStandardAssistantUI && (
                  <>
                      <div>
-                          <p className="text-brand-yellow mb-2 text-xs md:text-sm min-h-[18px]"> {/* Use theme color */}
+                          <p className="text-brand-yellow mb-2 text-xs md:text-sm min-h-[18px]">
                               {isWaitingForAiResponse ? `⏳ Жду AI... (ID: ${currentAiRequestId?.substring(0,6)}...)` : isProcessingAny ? "⏳ Обработка..." : "2️⃣ Вставь ответ AI или жди. Затем '➡️'."}
                           </p>
                           <div className="relative group">
                               <textarea
                                  id="response-input"
                                  ref={aiResponseInputRefPassed}
-                                 className="w-full p-3 pr-16 bg-input rounded-lg border border-border focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan focus:outline-none transition shadow-inner text-sm min-h-[180px] resize-y simple-scrollbar" // Use theme input/border
+                                 className="w-full p-3 pr-16 bg-input rounded-lg border border-border focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan focus:outline-none transition shadow-inner text-sm min-h-[180px] resize-y simple-scrollbar"
                                  defaultValue={response}
                                  onChange={(e) => setResponseValue(e.target.value)}
                                  placeholder={isWaitingForAiResponse ? "AI думает..." : isProcessingAny ? "Ожидание..." : "Ответ AI здесь..."}
@@ -328,35 +325,34 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                         />
                          <button
                             onClick={() => { setIsImageModalOpen(true); }}
-                            className="flex items-center gap-2 px-3 py-2 bg-card rounded-full hover:bg-muted transition shadow-[0_0_12px_hsl(var(--brand-green)/0.3)] hover:ring-1 hover:ring-brand-cyan disabled:opacity-50 relative" // Use theme colors
+                            className="flex items-center gap-2 px-3 py-2 bg-card rounded-full hover:bg-muted transition shadow-[0_0_12px_hsl(var(--brand-green)/0.3)] hover:ring-1 hover:ring-brand-cyan disabled:opacity-50 relative"
                             disabled={isProcessingAny}
                             title="Загрузить/Связать Картинки (prompts_imgs.txt)"
                          >
-                             <FaImage className="text-muted-foreground" /> {/* Use theme color */}
-                             <span className="text-sm text-foreground">Картинки</span> {/* Use theme color */}
+                             <FaImage className="text-muted-foreground" />
+                             <span className="text-sm text-foreground">Картинки</span>
                              {componentParsedFiles.some(f => f.path === '/prompts_imgs.txt') && !isImageModalOpen && (
-                                <span className="absolute -top-1 -right-1 w-3 h-3 bg-brand-blue rounded-full border-2 border-card shadow-md animate-pulse"></span> {/* Use theme colors */}
+                                <span className="absolute -top-1 -right-1 w-3 h-3 bg-brand-blue rounded-full border-2 border-card shadow-md animate-pulse"></span>
                              )}
                          </button>
                     </div>
                  </>
             )}
 
-            {/* --- Image Replace UI --- */}
             {showImageReplaceUI && (
-                 <div className={clsx( // Use clsx for conditional classes
+                 <div className={clsx(
                      "flex flex-col items-center justify-center text-center p-6 bg-card/50 rounded-lg border border-dashed min-h-[200px]",
-                     imageTaskFailed ? 'border-destructive' : 'border-brand-blue' // Use theme colors
+                     imageTaskFailed ? 'border-destructive' : 'border-brand-blue'
                  )}>
-                     {assistantLoading ? <FaSpinner className="text-brand-purple text-4xl mb-4 animate-spin" /> // Use theme color
-                       : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? <FaSpinner className="text-brand-blue text-4xl mb-4 animate-spin" /> // Use theme color
-                       : imageTaskFailed ? <FaCircleXmark className="text-destructive text-4xl mb-4" /> // Use theme color
-                       : imageReplaceTask ? <FaImages className="text-brand-blue text-4xl mb-4" /> // Use theme color
-                       : <FaCheck className="text-brand-green text-4xl mb-4" /> // Use theme color
+                     {assistantLoading ? <FaSpinner className="text-brand-purple text-4xl mb-4 animate-spin" />
+                       : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? <FaSpinner className="text-brand-blue text-4xl mb-4 animate-spin" />
+                       : imageTaskFailed ? <FaCircleXmark className="text-destructive text-4xl mb-4" />
+                       : imageReplaceTask ? <FaImages className="text-brand-blue text-4xl mb-4" />
+                       : <FaCheck className="text-brand-green text-4xl mb-4" />
                      }
-                     <p className={clsx( // Use clsx
+                     <p className={clsx(
                          "text-lg font-semibold",
-                         imageTaskFailed ? 'text-destructive' : 'text-brand-blue' // Use theme colors
+                         imageTaskFailed ? 'text-destructive' : 'text-brand-blue'
                      )}>
                          {assistantLoading ? "Обработка Замены..."
                            : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Загрузка Файла..."
@@ -364,7 +360,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                            : imageReplaceTask ? "Задача Замены Активна"
                            : "Процесс Замены Завершен"}
                      </p>
-                     <p className="text-sm text-muted-foreground mt-2"> {/* Use theme color */}
+                     <p className="text-sm text-muted-foreground mt-2">
                           {assistantLoading ? "Меняю URL в файле и создаю/обновляю PR..."
                            : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Ожидание ответа от GitHub..."
                            : imageTaskFailed ? (imageReplaceError || "Произошла неизвестная ошибка.")
@@ -372,22 +368,21 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                            : "Задача выполнена или сброшена."}
                      </p>
                      {imageReplaceTask && (
-                         <div className="mt-3 text-xs text-muted-foreground break-all text-left bg-input/50 p-2 rounded max-w-full overflow-x-auto simple-scrollbar"> {/* Use theme colors */}
-                             <p><span className="font-semibold text-foreground">Файл:</span> {imageReplaceTask.targetPath}</p> {/* Use theme color */}
-                             <p><span className="font-semibold text-foreground">Старый URL:</span> {imageReplaceTask.oldUrl}</p> {/* Use theme color */}
-                             <p><span className="font-semibold text-foreground">Новый URL:</span> {imageReplaceTask.newUrl}</p> {/* Use theme color */}
+                         <div className="mt-3 text-xs text-muted-foreground break-all text-left bg-input/50 p-2 rounded max-w-full overflow-x-auto simple-scrollbar">
+                             <p><span className="font-semibold text-foreground">Файл:</span> {imageReplaceTask.targetPath}</p>
+                             <p><span className="font-semibold text-foreground">Старый URL:</span> {imageReplaceTask.oldUrl}</p>
+                             <p><span className="font-semibold text-foreground">Новый URL:</span> {imageReplaceTask.newUrl}</p>
                          </div>
                      )}
                      {imageTaskFailed && (
                           <button
                               onClick={handleResetImageError}
-                              className="mt-4 px-4 py-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs rounded-md transition" // Use theme button style
+                              className="mt-4 px-4 py-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs rounded-md transition"
                           > Сбросить Ошибку </button>
                       )}
                  </div>
              )}
 
-            {/* --- Modals --- */}
             <AnimatePresence>
                 {showStandardAssistantUI && showModal && (
                     <SwapModal isOpen={showModal} onClose={() => setShowModal(false)} onSwap={handlers.handleSwap} onSearch={handlers.handleSearch} initialMode={modalMode} />
