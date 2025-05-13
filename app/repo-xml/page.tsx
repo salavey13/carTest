@@ -20,8 +20,7 @@ import {
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaToolbox, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket,
     FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye,
-    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash, FaCommentDots,
-    FaHistory // Добавлена для иллюстрации отката, но если не используется, будет удалена ниже.
+    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash, FaCommentDots
 } from "react-icons/fa6";
 import Link from "next/link";
 import { motion } from 'framer-motion';
@@ -46,7 +45,7 @@ const translations = {
     philosophyTitle: "Your Vibe Path: The Inevitable Level Up (Tap)",
     philosophyVideoTitle: "Watch: The Level System Explained <FaVideo/>:",
     communityWisdomTitle: "Community Wisdom <FaUsers/>",
-    quote1: "Sam Altman on the dream: 'Getting the whole app after a prompt.' That's what we're building. Full app from a thought. <a href='https://youtube.com/clip/Ugkx1LAX6-gO4J8hC6HoHbg0_KMlBHcsKX3V' target='_blank' class='text-brand-blue hover:underline font-semibold'>(Clip <FaArrowUpRightFromSquare className='inline h-3 w-3 ml-px align-baseline'/>)</a>",
+    quote1: "Sam Altman on the dream: 'Getting the whole app after a prompt.' That's what we're building. Full app from a thought. <a href='https://youtube.com/clip/Ugkx1LAX6-gO4J8hC6HoHbg0_KMlBHcsKX3V' target='_blank' class='text-brand-blue hover:underline font-semibold'>(Clip <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a>",
     quote2: "Vibecoding? 'Yeah, he does.' From video idea to gamified app. Turning vision into interactive reality. <a href='https://youtube.com/clip/UgkxZVMHbEo2XwO-sayoxskH89zzrDdN6vsx' target='_blank' class='text-brand-blue hover:underline font-semibold'>(Clip <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a>",
     quote3: "Monetization: 'Sell outcomes, not just pickaxes.' Automated, 10x cheaper solutions. That's the real product. <a href='https://youtube.com/clip/UgkxvGYsRm3HezCgOyqszCbn5DfDDx7LixPE' target='_blank' class='text-brand-blue hover:underline font-semibold'>(Clip <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a>",
     ctaHotChickQuote: "Got the fire? Let's build something epic. Hit me up <strong>@SALAVEY13</strong> NOW!",
@@ -226,10 +225,27 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
         setIsCyberVibeVisible(newVisibility);
         setIsCommunityWisdomVisible(newVisibility);
         setIsPhilosophyStepsVisible(newVisibility);
-        // isPhilosophyDetailsOpen is controlled by its own summary click or scrollToSectionNav
-        // isCtaVisible is controlled by its own X button or handleShowComponents
-        log(`[Effect SectionsToggle] Info sections visibility set to: ${newVisibility}. CTA controlled separately: ${isCtaVisible}`);
-    }, [sectionsCollapsed, t]); // Removed showComponents and isCtaVisible from deps to simplify
+        // If expanding all, ensure philosophy details are open (as per user request for this specific section behavior)
+        // If collapsing all, philosophy details should also close if its parent is closing.
+        // This logic is now simpler as individual close buttons are gone from these sections.
+        if (newVisibility) { // Expanding all
+            // setIsPhilosophyDetailsOpen(true); // No, details should be user-controlled or via nav
+        } else { // Collapsing all
+            setIsPhilosophyDetailsOpen(false);
+        }
+
+        // CTA is not affected by master toggle IF components are shown.
+        // If components are NOT shown, and we are "expanding" (sectionsCollapsed=false), CTA should also show.
+        if (!showComponents && !sectionsCollapsed) {
+            setIsCtaVisible(true);
+        } else if (showComponents && !sectionsCollapsed) {
+            // If components are shown and we expand all, ensure CTA is visible if it was somehow hidden.
+            // This part might be redundant if CTA is only hidden by its own X.
+            // Let's simplify: master toggle does not affect CTA if components are shown.
+        }
+
+        log(`[Effect SectionsToggle] Info sections visibility target: ${newVisibility}.`);
+    }, [sectionsCollapsed, t, showComponents]); 
 
     const toggleAllSections = useCallback(() => {
         setSectionsCollapsed(prev => !prev);
@@ -272,28 +288,20 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
         }
         
         if (targetElement) {
-            if (id === 'intro' && (!isIntroVisible || sectionsCollapsed)) {
-                if(sectionsCollapsed) setSectionsCollapsed(false); 
-                else setIsIntroVisible(true); 
+            // If master toggle had collapsed sections, expand them before scrolling
+            if (sectionsCollapsed) {
+                setSectionsCollapsed(false); 
             }
-            if (id === 'cybervibe-section' && (!isCyberVibeVisible || sectionsCollapsed)) {
-                 if(sectionsCollapsed) setSectionsCollapsed(false);
-                 else setIsCyberVibeVisible(true);
-            }
-            if (id === 'community-wisdom-section' && (!isCommunityWisdomVisible || sectionsCollapsed)) {
-                 if(sectionsCollapsed) setSectionsCollapsed(false);
-                 else setIsCommunityWisdomVisible(true);
-            }
+            // Ensure specific sections are visible if they were individually closed (only CTA now)
+            // For info sections, sectionsCollapsed will handle it.
             if (id === 'philosophy-steps') {
-                if(!isPhilosophyStepsVisible || sectionsCollapsed) setIsPhilosophyStepsVisible(true);
-                if(sectionsCollapsed) setSectionsCollapsed(false);
-                setIsPhilosophyDetailsOpen(true); 
+                setIsPhilosophyDetailsOpen(true); // Always open details when navigating to philosophy
             }
             requestAnimationFrame(() => scroll(targetElement));
         } else {
             error(`[CB ScrollNav] Target element "${id}" not found.`);
         }
-    }, [showComponents, handleShowComponents, isIntroVisible, isCyberVibeVisible, isCommunityWisdomVisible, isPhilosophyStepsVisible, sectionsCollapsed, log, debug, error ]);
+    }, [showComponents, handleShowComponents, sectionsCollapsed, log, debug, error ]);
 
 
      if (isPageLoading) {
@@ -314,6 +322,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const navTitleAssistant = memoizedGetPlainText(t.navAssistant);
     const masterToggleTitle = sectionsCollapsed ? t.expandAll : t.collapseAll;
 
+    // CloseButton is now only used for CTA
     const CloseButton = ({ onClick, ariaLabel }: { onClick: () => void; ariaLabel: string }) => (
         <button
             onClick={onClick}
@@ -343,7 +352,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
                     {isIntroVisible && (
                         <section id="intro" className="mb-12 text-center max-w-3xl w-full relative">
-                            <CloseButton onClick={() => setIsIntroVisible(false)} ariaLabel="Close Intro Section" />
+                            {/* <CloseButton onClick={() => setIsIntroVisible(false)} ariaLabel="Close Intro Section" /> */}
                             <div className="flex justify-center mb-4"> <FaBolt className="w-16 h-16 text-brand-yellow text-shadow-[0_0_15px_hsl(var(--brand-yellow))] animate-pulse" /> </div>
                             <h1 className="text-4xl md:text-5xl font-orbitron font-bold text-brand-yellow text-shadow-[0_0_10px_hsl(var(--brand-yellow))] mb-4">
                                <VibeContentRenderer content={t.pageTitle} />
@@ -361,7 +370,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
                     {isCyberVibeVisible && (
                         <section id="cybervibe-section" className="mb-12 w-full max-w-3xl relative">
-                            <CloseButton onClick={() => setIsCyberVibeVisible(false)} ariaLabel="Close Vibe Loop Section" />
+                            {/* <CloseButton onClick={() => setIsCyberVibeVisible(false)} ariaLabel="Close Vibe Loop Section" /> */}
                             <Card className="bg-gradient-to-br from-purple-900/40 via-black/60 to-indigo-900/40 border border-purple-600/60 shadow-xl rounded-lg p-6 backdrop-blur-sm bg-dark-card/80">
                                  <CardHeader className="p-0 mb-4">
                                      <CardTitle className="text-2xl md:text-3xl font-bold text-center text-brand-purple flex items-center justify-center gap-2">
@@ -380,7 +389,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                     
                     {isCommunityWisdomVisible && (
                         <section id="community-wisdom-section" className="mb-12 w-full max-w-3xl relative">
-                            <CloseButton onClick={() => setIsCommunityWisdomVisible(false)} ariaLabel="Close Community Wisdom Section" />
+                            {/* <CloseButton onClick={() => setIsCommunityWisdomVisible(false)} ariaLabel="Close Community Wisdom Section" /> */}
                             <h3 className="text-2xl md:text-3xl font-orbitron text-brand-cyan mb-6 text-center flex items-center justify-center gap-2">
                                <VibeContentRenderer content={t.communityWisdomTitle} />
                             </h3>
@@ -411,7 +420,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
                     {isPhilosophyStepsVisible && (
                         <section id="philosophy-steps" className="mb-12 w-full max-w-3xl relative">
-                            <CloseButton onClick={() => setIsPhilosophyStepsVisible(false)} ariaLabel="Close Philosophy/Steps Section" />
+                            {/* <CloseButton onClick={() => setIsPhilosophyStepsVisible(false)} ariaLabel="Close Philosophy/Steps Section" /> */}
                             <details className="bg-dark-card/80 border border-border rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50" open={isPhilosophyDetailsOpen}>
                                 <summary 
                                     className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-card/50 rounded-t-lg transition-colors group"
