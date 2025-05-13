@@ -1,3 +1,4 @@
+// /app/repo-xml/page.tsx
 "use client";
 import React, { Suspense, useRef, useState, useEffect, ReactNode, useCallback, useMemo } from "react";
 import { useSearchParams } from 'next/navigation';
@@ -312,7 +313,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                             {/* Video 1 + Quote */}
                             <div>
                                 <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-cyan/50 shadow-lg">
-                                    <iframe className="w-full h-full" src="https://www.youtube.com/embed/ctcMA6chfDY?clip=Ugkx1LAX6-gO4J8hC6HoHbg0_KMlBHcsKX3V" title="YouTube: Sam Altman's Dream" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                                    <iframe className="w-full h-full" src="https://www.youtube.com/embed/ctcMA6chfDY?clip=Ugkx1LAX6-gO4J8hC6HoHbg0_KMlBHcsKX3V&clipt=1201" title="YouTube: Sam Altman's Dream" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                                 </div>
                                 <div className="mt-3 p-3 bg-dark-card/70 border-l-4 border-brand-cyan rounded-r-md prose prose-sm prose-invert text-muted-foreground max-w-none">
                                     <VibeContentRenderer content={t.quote1} />
@@ -322,7 +323,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                             {/* Video 2 + Quote */}
                             <div>
                                 <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-pink/50 shadow-lg">
-                                    <iframe className="w-full h-full" src="https://www.youtube.com/embed/dq8MhTFCs80?clip=UgkxZVMHbEo2XwO-sayoxskH89zzrDdN6vsx" title="YouTube: Do you Vibecode?" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                                    <iframe className="w-full h-full" src="https://www.youtube.com/embed/dq8MhTFCs80?clip=UgkxZVMHbEo2XwO-sayoxskH89zzrDdN6vsx&clipt=1197" title="YouTube: Do you Vibecode?" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                                 </div>
                                  <div className="mt-3 p-3 bg-dark-card/70 border-l-4 border-brand-pink rounded-r-md prose prose-sm prose-invert text-muted-foreground max-w-none">
                                     <VibeContentRenderer content={t.quote2} />
@@ -332,7 +333,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                             {/* Video 3 + Quote */}
                             <div>
                                 <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-yellow/50 shadow-lg">
-                                    <iframe className="w-full h-full" src="https://www.youtube.com/embed/xlQB_0Nzoog?clip=UgkxvGYsRm3HezCgOyqszCbn5DfDDx7LixPE" title="YouTube: Really F*cking EZ!" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
+                                    <iframe className="w-full h-full" src="https://www.youtube.com/embed/xlQB_0Nzoog?clip=UgkxvGYsRm3HezCgOyqszCbn5DfDDx7LixPE&clipt=743" title="YouTube: Really F*cking EZ!" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen></iframe>
                                 </div>
                                 <div className="mt-3 p-3 bg-dark-card/70 border-l-4 border-brand-yellow rounded-r-md prose prose-sm prose-invert text-muted-foreground max-w-none">
                                     <VibeContentRenderer content={t.quote3} />
@@ -341,7 +342,6 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                             </div>
                         </div>
                     </section>
-
 
                     <section id="philosophy-steps" className="mb-12 w-full max-w-3xl">
                         <details className="bg-dark-card/80 border border-border rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50">
