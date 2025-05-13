@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useMemo } from "react";
-import { debugLogger } from "@/lib/debugLogger";
+import { debugLogger } from "@/lib/debugLogger"; // Keep for specific, fine-grained client debugs if needed
 import { logger as globalLogger } from "@/lib/logger"; 
 import { createOrUpdateUser as dbCreateOrUpdateUser, fetchUserData as dbFetchUserData } from "@/hooks/supabase";
 import type { TelegramWebApp, WebAppUser, WebAppInitData } from "@/types/telegram";
@@ -28,17 +28,19 @@ const MOCK_USER: WebAppUser | null = process.env.NEXT_PUBLIC_USE_MOCK_USER === '
 } : null;
 
 if (MOCK_USER) {
-    globalLogger.warn("HOOK INIT: Using mock Telegram user for development. Ensure NEXT_PUBLIC_USE_MOCK_USER is 'false' or unset in production.");
+    globalLogger.warn("HOOK_TELEGRAM_INIT: Using MOCK Telegram user for development. Ensure NEXT_PUBLIC_USE_MOCK_USER is 'false' or unset in production.");
+} else {
+    globalLogger.info("HOOK_TELEGRAM_INIT: MOCK_USER is NOT active.");
 }
 
 async function validateTelegramAuthWithApi(initDataString: string): Promise<ValidatedUserData | null> {
-  globalLogger.log("[validateTelegramAuthWithApi] Attempting validation...");
+  globalLogger.log("[HOOK_TELEGRAM validateApi FN_ENTRY] Attempting validation via API.");
   if (!initDataString) {
-    globalLogger.warn("[validateTelegramAuthWithApi] FAILURE: initDataString is empty.");
+    globalLogger.warn("[HOOK_TELEGRAM validateApi FN_WARN] FAILURE: initDataString is empty. Cannot validate.");
     return null;
   }
   try {
-    globalLogger.log("[validateTelegramAuthWithApi] Calling Next.js API route '/api/validate-telegram-auth' with initData (first 50 chars):", initDataString.substring(0, 50));
+    globalLogger.log(`[HOOK_TELEGRAM validateApi FN_CALL] Calling API '/api/validate-telegram-auth'. initData (first 60 chars): "${initDataString.substring(0, 60)}..."`);
     const response = await fetch('/api/validate-telegram-auth', { 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -46,21 +48,23 @@ async function validateTelegramAuthWithApi(initDataString: string): Promise<Vali
     });
 
     const result = await response.json(); 
-    globalLogger.log("[validateTelegramAuthWithApi] API response status:", response.status, "Response body:", result);
+    globalLogger.log("[HOOK_TELEGRAM validateApi FN_RESPONSE] API Response Status:", response.status, "Parsed API Response Body:", result);
     
     if (!response.ok) { 
       const errorBody = result?.error || JSON.stringify(result) || response.statusText;
-      globalLogger.error(`[validateTelegramAuthWithApi] FAILURE: Validation API failed. Status: ${response.status}`, `Error: ${errorBody}`);
-      throw new Error(`Telegram data validation API failed: ${errorBody}`);
+      globalLogger.error(`[HOOK_TELEGRAM validateApi FN_ERROR] FAILURE: Validation API call failed. Status: ${response.status}`, `Error: ${errorBody}`);
+      // Do not throw here, let the main hook handle the null return and set error state.
+      return null;
     }
 
     if (result.isValid && result.user) {
-      globalLogger.info("[validateTelegramAuthWithApi] SUCCESS: Telegram data validated via API. User:", {id: result.user?.id, username: result.user?.username});
+      globalLogger.info("[HOOK_TELEGRAM validateApi FN_SUCCESS] SUCCESS: Telegram data validated via API. User ID:", result.user?.id, "Username:", result.user?.username);
       const tgUser = result.user as WebAppInitData['user'];
       if (!tgUser || typeof tgUser.id !== 'number') {
-          globalLogger.error("[validateTelegramAuthWithApi] CRITICAL FAILURE: Validated user data is malformed (missing or invalid id). User from API:", tgUser);
-          throw new Error("Validated user data is malformed (missing or invalid id).");
+          globalLogger.error("[HOOK_TELEGRAM validateApi FN_ERROR] CRITICAL FAILURE: Validated user data from API is malformed (missing or invalid id). User from API:", tgUser);
+          return null; // Malformed data is a failure.
       }
+      // Successfully validated and user data is present and seems correct
       return { 
           id: tgUser.id,
           first_name: tgUser.first_name,
@@ -74,14 +78,15 @@ async function validateTelegramAuthWithApi(initDataString: string): Promise<Vali
           allows_write_to_pm: tgUser.allows_write_to_pm,
       };
     } else if (result.isValid && !result.user) {
-        globalLogger.warn("[validateTelegramAuthWithApi] PARTIAL SUCCESS/WARNING: Validation successful via API but no user data returned. Hash bypass might be active with missing user param.", result);
-        return null; // Treat as not fully authenticated if user object isn't there
+        globalLogger.warn("[HOOK_TELEGRAM validateApi FN_WARN] PARTIAL SUCCESS/WARNING: API Validation successful (isValid:true) but NO user data returned. Hash bypass with missing user param on API side possible. Result:", result);
+        return null; // Treat as not fully authenticated if user object isn't there, even if API says "isValid".
     } else {
-      globalLogger.warn("[validateTelegramAuthWithApi] FAILURE: Validation unsuccessful or no user data returned from API. Result:", result);
+      // This means result.isValid was false, or some other unexpected structure
+      globalLogger.warn("[HOOK_TELEGRAM validateApi FN_WARN] FAILURE: API validation unsuccessful (isValid:false or missing) or no user data returned. Result:", result);
       return null;
     }
   } catch (error) {
-    globalLogger.error("[validateTelegramAuthWithApi] CRITICAL FAILURE: Error during API validation call or response processing:", error);
+    globalLogger.error("[HOOK_TELEGRAM validateApi FN_ERROR] CRITICAL FAILURE: Error during API validation call or response processing (e.g., network error, JSON parse error). Error:", error);
     return null;
   }
 }
@@ -98,56 +103,54 @@ export function useTelegram() {
 
   const handleAuthentication = useCallback(
     async (userToAuth: WebAppUser): Promise<AuthResult> => {
-      globalLogger.log(`[handleAuthentication] STEP 1: Started for user: ${userToAuth?.id}, Username: ${userToAuth?.username}`);
+      globalLogger.log(`[HOOK_TELEGRAM handleAuth FN_ENTRY] STEP 1: Auth process started for TG User ID: ${userToAuth?.id}, Username: ${userToAuth?.username}`);
       
       if (!userToAuth?.id || typeof userToAuth.id !== 'number') {
-         globalLogger.error("[handleAuthentication] CRITICAL FAILURE: Invalid user data: missing id or id is not a number. UserToAuth:", userToAuth);
-         throw new Error("Invalid user data: missing id or id is not a number.");
+         globalLogger.error("[HOOK_TELEGRAM handleAuth FN_ERROR] CRITICAL FAILURE: Invalid user data: missing id or id is not a number. UserToAuth:", userToAuth);
+         throw new Error("Invalid user data to authenticate: missing id or id is not a number.");
       }
       const userIdStr = userToAuth.id.toString();
-      globalLogger.log(`[handleAuthentication] STEP 2: User ID ${userIdStr} is valid. Proceeding to DB operations.`);
+      globalLogger.log(`[HOOK_TELEGRAM handleAuth FN_INFO] STEP 2: User ID ${userIdStr} is valid. Proceeding to DB operations.`);
 
       try {
-         globalLogger.log(`[handleAuthentication] STEP 3: Fetching user ${userIdStr} from DB...`);
+         globalLogger.log(`[HOOK_TELEGRAM handleAuth FN_INFO] STEP 3: Fetching user ${userIdStr} from DB...`);
          let userFromDb = await dbFetchUserData(userIdStr);
-         globalLogger.log(`[handleAuthentication] STEP 4: Fetched user ${userIdStr} from DB. User exists: ${!!userFromDb}. DB Record (if any):`, userFromDb);
+         globalLogger.log(`[HOOK_TELEGRAM handleAuth FN_INFO] STEP 4: Fetched user ${userIdStr} from DB. User exists in DB: ${!!userFromDb}. DB Record (if any):`, userFromDb ? {id: userFromDb.user_id, username: userFromDb.username, status: userFromDb.status} : null);
 
          if (!userFromDb) {
-            globalLogger.log(`[handleAuthentication] STEP 5A: User ${userIdStr} not found in DB. Attempting to create... User data for creation:`, userToAuth);
+            globalLogger.log(`[HOOK_TELEGRAM handleAuth FN_INFO] STEP 5A: User ${userIdStr} NOT found in DB. Attempting to CREATE... User data for creation:`, userToAuth);
             userFromDb = await dbCreateOrUpdateUser(userIdStr, userToAuth);
              if (!userFromDb) { 
-                 globalLogger.error(`[handleAuthentication] CRITICAL FAILURE: Failed to create user ${userIdStr} in DB (dbCreateOrUpdateUser returned null).`);
-                 throw new Error(`Failed to create user ${userIdStr} in database.`);
+                 globalLogger.error(`[HOOK_TELEGRAM handleAuth FN_ERROR] CRITICAL FAILURE: Failed to CREATE user ${userIdStr} in DB (dbCreateOrUpdateUser returned null).`);
+                 throw new Error(`Failed to create user ${userIdStr} in database during authentication.`);
              }
-             globalLogger.info(`[handleAuthentication] SUCCESS (New User): User ${userIdStr} (${userToAuth.username || 'N/A'}) created in DB. DB Record:`, userFromDb);
+             globalLogger.info(`[HOOK_TELEGRAM handleAuth FN_SUCCESS] SUCCESS (New User Created): User ${userIdStr} (${userToAuth.username || 'N/A'}) created in DB. DB Record:`, userFromDb ? {id: userFromDb.user_id, username: userFromDb.username, status: userFromDb.status} : null);
          } else {
-            globalLogger.log(`[handleAuthentication] STEP 5B: User ${userIdStr} found in DB. Checking if data needs update...`);
+            globalLogger.log(`[HOOK_TELEGRAM handleAuth FN_INFO] STEP 5B: User ${userIdStr} FOUND in DB. Checking if data needs update...`);
             const needsUpdate = (
                 userFromDb.username !== userToAuth.username ||
                 userFromDb.full_name !== `${userToAuth.first_name || ""} ${userToAuth.last_name || ""}`.trim() ||
                 userFromDb.avatar_url !== userToAuth.photo_url ||
                 userFromDb.language_code !== userToAuth.language_code
             );
-            globalLogger.log(`[handleAuthentication] STEP 6B: Needs update for ${userIdStr}? ${needsUpdate}. Comparing:`, {
-                dbUsername: userFromDb.username, tgUsername: userToAuth.username,
-                dbFullName: userFromDb.full_name, tgFullName: `${userToAuth.first_name || ""} ${userToAuth.last_name || ""}`.trim(),
-                dbAvatar: userFromDb.avatar_url, tgAvatar: userToAuth.photo_url,
-                dbLang: userFromDb.language_code, tgLang: userToAuth.language_code,
+            globalLogger.log(`[HOOK_TELEGRAM handleAuth FN_INFO] STEP 6B: Needs update for ${userIdStr}? ${needsUpdate}. Comparing:`, {
+                db: { u: userFromDb.username, f: userFromDb.full_name, a: userFromDb.avatar_url, l: userFromDb.language_code },
+                tg: { u: userToAuth.username, f: `${userToAuth.first_name || ""} ${userToAuth.last_name || ""}`.trim(), a: userToAuth.photo_url, l: userToAuth.language_code },
             });
 
             if(needsUpdate) {
-                globalLogger.log(`[handleAuthentication] STEP 7B: User ${userIdStr} data differs. Attempting to update... User data for update:`, userToAuth);
+                globalLogger.log(`[HOOK_TELEGRAM handleAuth FN_INFO] STEP 7B: User ${userIdStr} data differs. Attempting to UPDATE... User data for update:`, userToAuth);
                 userFromDb = await dbCreateOrUpdateUser(userIdStr, userToAuth);
                  if (!userFromDb) { 
-                     globalLogger.error(`[handleAuthentication] CRITICAL FAILURE: Failed to update user ${userIdStr} in DB (dbCreateOrUpdateUser returned null).`);
-                     throw new Error(`Failed to update user ${userIdStr} in database.`);
+                     globalLogger.error(`[HOOK_TELEGRAM handleAuth FN_ERROR] CRITICAL FAILURE: Failed to UPDATE user ${userIdStr} in DB (dbCreateOrUpdateUser returned null).`);
+                     throw new Error(`Failed to update user ${userIdStr} in database during authentication.`);
                  }
-                 globalLogger.info(`[handleAuthentication] SUCCESS (User Update): User ${userIdStr} (${userToAuth.username || 'N/A'}) updated in DB. DB Record:`, userFromDb);
+                 globalLogger.info(`[HOOK_TELEGRAM handleAuth FN_SUCCESS] SUCCESS (User Updated): User ${userIdStr} (${userToAuth.username || 'N/A'}) updated in DB. DB Record:`, userFromDb ? {id: userFromDb.user_id, username: userFromDb.username, status: userFromDb.status} : null);
             } else {
-                 globalLogger.log(`[handleAuthentication] STEP 7B (No Update): User ${userIdStr} data is up-to-date. No DB write needed.`);
+                 globalLogger.log(`[HOOK_TELEGRAM handleAuth FN_INFO] STEP 7B (No Update): User ${userIdStr} data is up-to-date. No DB write needed.`);
             }
          }
-         globalLogger.log(`[handleAuthentication] FINAL SUCCESS: Auth processed for user ${userIdStr}. Final DB User ID: ${userFromDb.user_id}, Username: ${userFromDb.username}`);
+         globalLogger.info(`[HOOK_TELEGRAM handleAuth FN_FINAL_SUCCESS] Auth & DB operations successful for user ${userIdStr}. Final DB User ID: ${userFromDb.user_id}, Username: ${userFromDb.username}`);
          return { 
             tgUserToSet: userToAuth, 
             dbUserToSet: userFromDb, 
@@ -155,8 +158,8 @@ export function useTelegram() {
         };
 
       } catch (err) {
-         globalLogger.error(`[handleAuthentication] CRITICAL FAILURE for user ${userToAuth.id} during DB operations or final return:`, err);
-         const authError = err instanceof Error ? err : new Error("Authentication failed due to an unknown error in handleAuthentication.");
+         globalLogger.error(`[HOOK_TELEGRAM handleAuth FN_ERROR] CRITICAL FAILURE for TG user ${userToAuth.id} during DB operations or final return step:`, err);
+         const authError = err instanceof Error ? err : new Error("Authentication failed due to an unknown error in handleAuthentication DB part.");
          throw authError; 
       }
     },
@@ -165,139 +168,157 @@ export function useTelegram() {
 
   useEffect(() => {
     let isMounted = true;
-    globalLogger.log("[useTelegram EFFECT START] Initializing Telegram integration. isMounted:", isMounted);
+    globalLogger.info("[HOOK_TELEGRAM EFFECT_MAIN_INIT] START. isMounted:", isMounted);
     
+    // Reset all relevant states at the beginning of each effect run
     setIsLoading(true);
     setIsAuthenticating(true);
     setError(null);
     setIsAuthenticated(false);
     setDbUser(null); 
     setTgUser(null);
-    setIsInTelegramContext(false);
-    globalLogger.log("[useTelegram EFFECT STATE RESET] All states reset to initial values.");
+    setIsInTelegramContext(false); // Assume not in TG context until proven otherwise
+    globalLogger.log("[HOOK_TELEGRAM EFFECT_MAIN_INIT] STEP 1: All relevant states reset to initial values.");
 
     const initialize = async () => {
-      globalLogger.log("[useTelegram initialize ASYNC FN START] Starting async initialization. isMounted:", isMounted);
+      globalLogger.log("[HOOK_TELEGRAM initialize ASYNC_FN_START] STEP 2: Starting async initialization. isMounted:", isMounted);
       if (!isMounted) {
-          globalLogger.warn("[useTelegram initialize ASYNC FN ABORT] Aborted: component unmounted before async logic could run fully.");
+          globalLogger.warn("[HOOK_TELEGRAM initialize ASYNC_FN_ABORT] Aborted: component unmounted before async logic could run fully.");
+          setIsAuthenticating(false); // Ensure this is false if we abort early
+          setIsLoading(false);
           return;
       }
       
       let authCandidate: WebAppUser | null = null;
-      let inTgContextReal = false;
+      let inTgContextReal = false; // Is there any Telegram.WebApp.initData at all?
       let tempTgWebApp: TelegramWebApp | null = null; 
 
       try { 
-        globalLogger.log("[useTelegram initialize TRY BLOCK START] Checking for window.Telegram.WebApp...");
+        globalLogger.log("[HOOK_TELEGRAM initialize TRY_BLOCK_START] STEP 3: Checking for window.Telegram.WebApp...");
         if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
           const telegram = (window as any).Telegram.WebApp;
+          tempTgWebApp = telegram; // Store for later use if needed outside this block
           if(isMounted) {
             setTgWebApp(telegram);
-            globalLogger.log("[useTelegram initialize] Telegram WebApp object found and set to state (tgWebApp).");
+            globalLogger.log("[HOOK_TELEGRAM initialize] STEP 3.1: Telegram WebApp object FOUND and set to state (tgWebApp).");
           } else {
-            globalLogger.warn("[useTelegram initialize] Telegram WebApp object found, but component unmounted before setTgWebApp could be called.");
+            globalLogger.warn("[HOOK_TELEGRAM initialize] STEP 3.1 (WARN): Telegram WebApp object found, but component unmounted before setTgWebApp could be called.");
           }
-          tempTgWebApp = telegram; 
-          inTgContextReal = !!telegram.initData; 
           
-          globalLogger.log("[useTelegram initialize] Telegram WebApp context detected.", {
-              initDataExists: !!telegram.initData,
+          inTgContextReal = !!telegram.initData && telegram.initData.length > 0; 
+          
+          globalLogger.log("[HOOK_TELEGRAM initialize] STEP 3.2: Telegram WebApp context details:", {
+              rawInitDataExists: inTgContextReal,
               initDataUnsafeUserExists: !!telegram.initDataUnsafe?.user,
               initDataUnsafeUserId: telegram.initDataUnsafe?.user?.id,
-              initDataStringFirst50: telegram.initData?.substring(0,50)
+              initDataStringFirst60: telegram.initData?.substring(0,60) || "N/A",
+              platform: telegram.platform
           });
           
-          if (isMounted) telegram.ready(); // Call ready() only if mounted to avoid errors.
+          if (isMounted) {
+            telegram.ready(); 
+            globalLogger.log("[HOOK_TELEGRAM initialize] STEP 3.3: Called telegram.ready()");
+          }
 
-          if (telegram.initData && inTgContextReal) {
-              globalLogger.log("[useTelegram initialize] Validating REAL Telegram initData via API...");
-              const validatedUser = await validateTelegramAuthWithApi(telegram.initData); 
-              if (validatedUser) {
-                  authCandidate = validatedUser;
-                  globalLogger.info(`[useTelegram initialize] REAL Telegram auth validated successfully via API. Candidate User ID: ${authCandidate.id}`);
+          if (inTgContextReal) { // initData is present and non-empty
+              globalLogger.log("[HOOK_TELEGRAM initialize] STEP 4A: REAL Telegram initData found. Validating via API...");
+              const validatedUserFromApi = await validateTelegramAuthWithApi(telegram.initData); 
+              if (validatedUserFromApi) {
+                  authCandidate = validatedUserFromApi;
+                  globalLogger.info(`[HOOK_TELEGRAM initialize] STEP 4A.1: REAL Telegram auth validated successfully via API. Auth Candidate User ID: ${authCandidate.id}`);
               } else {
-                  globalLogger.warn("[useTelegram initialize] REAL Telegram initData validation FAILED via API or returned no user.");
-                   if (isMounted && !error) { // Set error only if not already set
-                     const validationError = new Error("Telegram data validation failed. User data might be compromised or API issue.");
+                  globalLogger.warn("[HOOK_TELEGRAM initialize] STEP 4A.2: REAL Telegram initData validation FAILED via API or returned no user. Error will be set.");
+                   if (isMounted && !error) { 
+                     const validationError = new Error("Telegram data validation failed via API. User data might be compromised or API issue.");
                      setError(validationError);
-                     globalLogger.error("[useTelegram initialize] Set error state due to validation failure:", validationError.message);
+                     globalLogger.error("[HOOK_TELEGRAM initialize] Set error state due to API validation failure:", validationError.message);
                    }
               }
-          } else if (telegram.initDataUnsafe?.user?.id && process.env.NODE_ENV === 'development' && !inTgContextReal ) {
-             globalLogger.warn("[useTelegram initialize] Using initDataUnsafe.user as fallback (initData NOT present, DEV mode). THIS IS INSECURE and for DEV ONLY.");
+          } else if (telegram.initDataUnsafe?.user?.id && process.env.NODE_ENV === 'development') {
+             // This case means initData was empty or not present, but initDataUnsafe.user exists in DEV
+             globalLogger.warn("[HOOK_TELEGRAM initialize] STEP 4B: Using initDataUnsafe.user as fallback (REAL initData was missing/empty, DEV mode). INSECURE - DEV ONLY.");
              authCandidate = telegram.initDataUnsafe.user;
+             inTgContextReal = true; // Still consider it "in context" for dev if initDataUnsafe.user is used
           } else {
-            globalLogger.log("[useTelegram initialize] No REAL Telegram initData or not in DEV mode for unsafe fallback.");
+            globalLogger.log("[HOOK_TELEGRAM initialize] STEP 4C: No REAL Telegram initData (or it's empty) AND not in DEV mode for unsafe fallback, or initDataUnsafe.user missing.");
           }
         } else {
-          globalLogger.log("[useTelegram initialize] window.Telegram.WebApp not found. Not in Telegram context or script not loaded.");
+          globalLogger.log("[HOOK_TELEGRAM initialize] STEP 3 (FAIL): window.Telegram.WebApp not found. Not in Telegram context or script not loaded.");
         }
 
+        // Fallback to MOCK_USER if no candidate yet and MOCK_USER is enabled
         if (!authCandidate && MOCK_USER) {
-            globalLogger.warn(`[useTelegram initialize] NO Telegram auth candidate. Using MOCK_USER as NEXT_PUBLIC_USE_MOCK_USER is true. Mock User ID: ${MOCK_USER.id}`);
+            globalLogger.warn(`[HOOK_TELEGRAM initialize] STEP 5: NO auth candidate from Telegram. Using MOCK_USER as NEXT_PUBLIC_USE_MOCK_USER is true. Mock User ID: ${MOCK_USER.id}`);
             authCandidate = MOCK_USER;
-            inTgContextReal = false; // Explicitly false if we fall back to mock user
+            inTgContextReal = false; // MOCK_USER means we are NOT in a real TG context for auth purposes
         } else if (!authCandidate) {
-            globalLogger.log("[useTelegram initialize] No authCandidate from Telegram and MOCK_USER is disabled or not defined.");
+            globalLogger.log("[HOOK_TELEGRAM initialize] STEP 5 (SKIP): No authCandidate from Telegram and MOCK_USER is disabled or not defined.");
         }
         
+        // Determine final isInTelegramContext based on whether we used a real, validated TG user
         if (isMounted) { 
+          // finalInTgContext is true if:
+          // 1. We started with real initData (inTgContextReal was true at that point)
+          // 2. We have an authCandidate (meaning validation was successful or unsafe dev fallback gave a user)
+          // 3. That authCandidate is NOT the MOCK_USER (ensuring it's from Telegram)
           const finalInTgContext = inTgContextReal && !!authCandidate && authCandidate !== MOCK_USER;
           setIsInTelegramContext(finalInTgContext);
-          globalLogger.log(`[useTelegram initialize] Setting isInTelegramContext to: ${finalInTgContext}. (inTgContextReal: ${inTgContextReal}, authCandidateExists: ${!!authCandidate}, isNotMock: ${authCandidate !== MOCK_USER})`);
+          globalLogger.log(`[HOOK_TELEGRAM initialize] STEP 6: Setting final isInTelegramContext to: ${finalInTgContext}. Conditions: inTgContextRealWasInitially: ${inTgContextReal}, authCandidateExists: ${!!authCandidate}, authCandidateIsNotMock: ${authCandidate !== MOCK_USER}`);
         }
         
+        // If we have any authCandidate (from valid TG, unsafe dev TG, or Mock)
         if (authCandidate) {
-          globalLogger.log(`[useTelegram initialize] Auth Candidate found (ID: ${authCandidate.id}, Username: ${authCandidate.username}). Proceeding to handleAuthentication.`);
+          globalLogger.log(`[HOOK_TELEGRAM initialize] STEP 7: Auth Candidate found (ID: ${authCandidate.id}, Username: ${authCandidate.username}). Proceeding to handleAuthentication.`);
           try { 
-            const authData = await handleAuthentication(authCandidate);
+            const authData = await handleAuthentication(authCandidate); // This can throw
             if (isMounted) {
               setTgUser(authData.tgUserToSet);
               setDbUser(authData.dbUserToSet); 
               setIsAuthenticated(authData.isAuthenticatedToSet);
-              if(authData.isAuthenticatedToSet && error) { // Clear error if auth succeeds now
+              globalLogger.info(`[HOOK_TELEGRAM initialize] STEP 7.1 (SUCCESS): States SET after successful handleAuthentication. TG User ID: ${authData.tgUserToSet?.id}, DB User ID: ${authData.dbUserToSet?.user_id}, isAuthenticated: ${authData.isAuthenticatedToSet}`);
+              if(authData.isAuthenticatedToSet && error) { 
                   setError(null); 
-                  globalLogger.info(`[useTelegram initialize] Cleared previous error because authentication is now successful.`);
+                  globalLogger.info(`[HOOK_TELEGRAM initialize] STEP 7.2: Cleared previous error because authentication is now successful.`);
               }
-              globalLogger.info(`[useTelegram initialize] STATES SET after successful auth. TG User ID: ${authData.tgUserToSet?.id}, DB User ID: ${authData.dbUserToSet?.user_id}, isAuthenticated: ${authData.isAuthenticatedToSet}`);
             } else {
-              globalLogger.warn(`[useTelegram initialize] Component unmounted during/after handleAuthentication for ${authCandidate.id}. State updates aborted.`);
+              globalLogger.warn(`[HOOK_TELEGRAM initialize] STEP 7.1 (WARN): Component unmounted during/after handleAuthentication for ${authCandidate.id}. State updates aborted.`);
             }
           } catch (authProcessError: any) { 
-            globalLogger.error(`[useTelegram initialize] Error during handleAuthentication or subsequent state setting for ${authCandidate.id}:`, authProcessError);
+            globalLogger.error(`[HOOK_TELEGRAM initialize] STEP 7.3 (ERROR): Error DURING handleAuthentication or subsequent state setting for candidate ${authCandidate.id}:`, authProcessError.message, authProcessError.stack);
             if (isMounted) {
-              if(!error) setError(authProcessError); // Set error only if not already set
-              setTgUser(authCandidate); 
+              if(!error) setError(authProcessError); 
+              setTgUser(authCandidate); // Keep TG user for display even if DB/auth fails
               setDbUser(null);          
               setIsAuthenticated(false); 
-              globalLogger.warn(`[useTelegram initialize] Set states after FAILED auth. TG User: ${authCandidate.id} (kept for display), DB User: null, isAuthenticated: false`);
+              globalLogger.warn(`[HOOK_TELEGRAM initialize] STEP 7.4: Set states after FAILED handleAuthentication. TG User: ${authCandidate.id} (kept for display), DB User: null, isAuthenticated: false. Error state was set.`);
             }
           }
         } else { 
-           globalLogger.warn(`[useTelegram initialize] No authCandidate available (Telegram or Mock). Cannot proceed with authentication.`);
+           globalLogger.warn(`[HOOK_TELEGRAM initialize] STEP 7 (NO_CANDIDATE): No authCandidate available (from any source). Cannot proceed with authentication.`);
            if (isMounted) {
-             if (!error) { 
-               const noAuthCandidateError = new Error("No user data available for authentication (Not in Telegram, MOCK_USER disabled, or Telegram data invalid/validation_failed).");
+             if (!error) { // Only set error if one isn't already set (e.g. from API validation failure)
+               const noAuthCandidateError = new Error("No user data available for authentication. Not in Telegram, MOCK_USER disabled, or Telegram data invalid/validation_failed.");
                setError(noAuthCandidateError);
-               globalLogger.error("[useTelegram initialize] Set error state due to no auth candidate:", noAuthCandidateError.message);
+               globalLogger.error("[HOOK_TELEGRAM initialize] Set error state due to NO auth candidate:", noAuthCandidateError.message);
              }
             // Ensure these are null/false if no candidate
             setTgUser(null);
             setDbUser(null);
             setIsAuthenticated(false);
+            globalLogger.log("[HOOK_TELEGRAM initialize] States set to reflect NO authentication candidate.");
           }
         }
       } catch (outerError: any) { 
-        globalLogger.error("[useTelegram initialize] CRITICAL OUTER ERROR during initialization process:", outerError);
-        if (isMounted && !error) {
+        globalLogger.error("[HOOK_TELEGRAM initialize] STEP ERROR (OUTER_CATCH): CRITICAL OUTER ERROR during main initialization try_block:", outerError.message, outerError.stack);
+        if (isMounted && !error) { // Set error only if not already set
           setError(outerError);
         }
       } finally { 
         if (isMounted) {
           setIsAuthenticating(false); 
-          globalLogger.log("[useTelegram initialize ASYNC FN FINALLY] Auth process finished (setIsAuthenticating(false)). Final State Hint: isAuth:", isAuthenticated, "err:", error?.message);
+          globalLogger.info(`[HOOK_TELEGRAM initialize ASYNC_FN_FINALLY] STEP 8: isAuthenticating set to false. Final State Hint: isAuth: ${isAuthenticated}, TGUser: ${tgUser?.id}, DBUser: ${dbUser?.id}, Err: ${error?.message}`);
         } else {
-          globalLogger.warn("[useTelegram initialize ASYNC FN FINALLY] Component unmounted before finally block could set isAuthenticating to false.");
+          globalLogger.warn("[HOOK_TELEGRAM initialize ASYNC_FN_FINALLY] (WARN) Component unmounted before finally block could set isAuthenticating to false.");
         }
       }
     };
@@ -305,28 +326,28 @@ export function useTelegram() {
     initialize();
 
     return () => {
-      globalLogger.log("[useTelegram EFFECT CLEANUP] Main effect cleanup. Setting isMounted=false.");
+      globalLogger.info("[HOOK_TELEGRAM EFFECT_MAIN_INIT_CLEANUP] Cleanup. Setting isMounted=false.");
       isMounted = false;
     };
   }, [handleAuthentication]); 
 
   useEffect(() => {
     // This effect runs AFTER the main initialization (specifically after isAuthenticating becomes false)
-    if (!isAuthenticating) { 
-      setIsLoading(false); // Set isLoading to false once authentication process is fully complete (success or fail)
-      globalLogger.log(`[useTelegram EFFECT (isLoading)] isAuthenticating is false. Setting isLoading to false. Final hook state: TGUser: ${tgUser?.id}, DBUser: ${dbUser?.user_id}, isAuth: ${isAuthenticated}, inTG: ${isInTelegramContext}, Error: ${error?.message}`);
-    } else {
-      globalLogger.log(`[useTelegram EFFECT (isLoading)] isAuthenticating is still true. isLoading remains true.`);
+    globalLogger.log(`[HOOK_TELEGRAM EFFECT_ISLOADING_CHECK] isAuthenticating: ${isAuthenticating}, isLoading: ${isLoading}`);
+    if (!isAuthenticating && isLoading) { // Only change isLoading if it's currently true and auth finished
+      setIsLoading(false); 
+      globalLogger.info(`[HOOK_TELEGRAM EFFECT_ISLOADING_SET] isAuthenticating is false. Setting isLoading to false. Final Hook State Snapshot: TGUser: ${tgUser?.id}, DBUser: ${dbUser?.user_id}, isAuthenticated: ${isAuthenticated}, isInTGContext: ${isInTelegramContext}, Error: ${error?.message}`);
+    } else if (isAuthenticating && !isLoading) { // Should not happen if logic is correct, but as a safe guard
+        setIsLoading(true);
+        globalLogger.warn(`[HOOK_TELEGRAM EFFECT_ISLOADING_SET] isAuthenticating is true, but isLoading was false. Correcting isLoading to true.`);
     }
-  }, [isAuthenticating, tgUser, dbUser, isAuthenticated, isInTelegramContext, error]); // Added all relevant final-state dependencies
+  }, [isAuthenticating, isLoading, tgUser, dbUser, isAuthenticated, isInTelegramContext, error]);
 
   const isAdmin = useCallback(() => {
     if (!dbUser) {
-      // globalLogger.debug("[isAdmin Check] No dbUser, returning false.");
       return false;
     }
     const isAdminStatus = dbUser.status === "admin" || dbUser.role === "vprAdmin" || dbUser.role === "admin";
-    // globalLogger.debug(`[isAdmin Check] dbUser found. Status: ${dbUser.status}, Role: ${dbUser.role}. Determined isAdmin: ${isAdminStatus}`);
     return isAdminStatus;
   }, [dbUser]);
 
@@ -334,21 +355,19 @@ export function useTelegram() {
     <T extends (...args: any[]) => any>(methodName: keyof TelegramWebApp, ...args: Parameters<T>): ReturnType<T> | undefined => {
         if (tgWebApp && typeof tgWebApp[methodName] === 'function') {
             try {
-                 // debugLogger.log(`Safe Calling tgWebApp.${String(methodName)} with args:`, args);
                 return (tgWebApp[methodName] as T)(...args);
             } catch (callError) {
-                 globalLogger.error(`Error calling tgWebApp.${String(methodName)}:`, callError);
+                 globalLogger.error(`[HOOK_TELEGRAM safeWebAppCall] Error calling tgWebApp.${String(methodName)}:`, callError);
                  return undefined;
             }
         } else {
-            // globalLogger.warn(`Attempted to call tgWebApp.${String(methodName)} but WebApp context is not available or method is not a function.`);
             return undefined;
         }
     }, [tgWebApp] 
   );
 
   return useMemo(() => {
-    const baseData = {
+    const finalContextData = {
         tg: tgWebApp, 
         user: tgUser,
         dbUser,
@@ -372,8 +391,8 @@ export function useTelegram() {
         initDataUnsafe: tgWebApp?.initDataUnsafe,
         colorScheme: tgWebApp?.colorScheme ?? 'dark',
     };
-    // globalLogger.log("[useTelegram useMemo] Recalculated. isLoading:", isLoading, "isAuthenticating:", isAuthenticating, "isAuthenticated:", isAuthenticated, "error:", error?.message);
-    return baseData;
+    // globalLogger.log("[HOOK_TELEGRAM useMemo] Recalculated final context data. isLoading:", finalContextData.isLoading, "isAuthenticating:", finalContextData.isAuthenticating, "isAuthenticated:", finalContextData.isAuthenticated, "error:", finalContextData.error?.message);
+    return finalContextData;
   }, [
       tgWebApp, tgUser, dbUser, isInTelegramContext, isAuthenticated, isAuthenticating, isAdmin, 
       isLoading, error, safeWebAppCall
