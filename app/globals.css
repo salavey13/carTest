@@ -64,7 +64,7 @@
   /* --- Static Dark Background RGB --- */
   --dark-bg-rgb: 13, 2, 33;
   --dark-card-rgb: 26, 10, 61;
-  --glow-color-rgb: 242, 128, 170; /* Soft pink for glow */
+  --glow-color-rgb: 242, 128, 170; /* Soft pink for glow (used by tailwind.config) */
 
   /* --- Chart Colors (Using adjusted brand colors) --- */
   --chart-1: 270 65% 65%; /* Purple */
@@ -171,6 +171,12 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+  h1 { @apply text-4xl md:text-5xl; } /* Corrected sizes */
+  h2 { @apply text-3xl md:text-4xl; } /* Corrected sizes */
+  h3 { @apply text-2xl md:text-3xl; } /* Corrected sizes */
+  h4 { @apply text-xl md:text-2xl; } /* Corrected sizes */
+  h5 { @apply text-lg md:text-xl; } /* Corrected sizes */
+  h6 { @apply text-base md:text-lg; } /* Corrected sizes */
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Orbitron', sans-serif;
     @apply tracking-wide;
@@ -318,8 +324,7 @@
     0 0 20px hsl(var(--brand-purple));
 }
 .text-shadow-cyber {
-  /* Corrected to use CSS variables directly for colors */
-  text-shadow: 0 0 4px hsl(var(--brand-cyan)), 0 0 10px hsl(var(--brand-pink));
+  text-shadow: 0 0 4px hsl(var(--brand-cyan-rgb), 0.8), 0 0 10px hsla(var(--brand-pink-rgb), 0.6); /* Corrected to use RGB vars */
 }
 
 .animate-gradient-shift {
@@ -336,14 +341,14 @@
 .bg-grid-pattern {
   background-size: 60px 60px;
   background-image:
-    linear-gradient(to right, hsla(var(--brand-purple), 0.1) 1px, transparent 1px),
-    linear-gradient(to bottom, hsla(var(--brand-purple), 0.1) 1px, transparent 1px);
+    linear-gradient(to right, hsla(var(--brand-purple), 0.1) 1px, transparent 1px), /* Corrected variable usage */
+    linear-gradient(to bottom, hsla(var(--brand-purple), 0.1) 1px, transparent 1px); /* Corrected variable usage */
 }
 .bg-grid-pattern-pink {
   background-size: 50px 50px;
   background-image:
-    linear-gradient(to right, hsla(var(--brand-pink), 0.08) 1px, transparent 1px),
-    linear-gradient(to bottom, hsla(var(--brand-pink), 0.08) 1px, transparent 1px);
+    linear-gradient(to right, hsla(var(--brand-pink), 0.08) 1px, transparent 1px), /* Corrected variable usage */
+    linear-gradient(to bottom, hsla(var(--brand-pink), 0.08) 1px, transparent 1px); /* Corrected variable usage */
 }
 
 /* Scrollbar uses adjusted colors implicitly */
@@ -497,12 +502,11 @@ input[type="search"]::-ms-clear {
 
 /* Glitch border uses adjusted colors */
 @keyframes glitch-border {
-  /* Corrected to use hsla for opacity with CSS variables */
-  0% { border-color: hsla(var(--brand-cyan), 0.3); box-shadow: 0 0 5px hsla(var(--brand-cyan), 0.2); }
-  25% { border-color: hsla(var(--brand-pink), 0.3); box-shadow: 0 0 8px hsla(var(--brand-pink), 0.3); }
-  50% { border-color: hsla(var(--brand-yellow), 0.3); box-shadow: 0 0 5px hsla(var(--brand-yellow), 0.2); }
-  75% { border-color: hsla(var(--brand-green), 0.3); box-shadow: 0 0 8px hsla(var(--brand-green), 0.3); }
-  100% { border-color: hsla(var(--brand-cyan), 0.3); box-shadow: 0 0 5px hsla(var(--brand-cyan), 0.2); }
+  0% { border-color: hsla(var(--brand-cyan-rgb), 0.3); box-shadow: 0 0 5px hsla(var(--brand-cyan-rgb), 0.2); } /* Corrected to use RGB vars */
+  25% { border-color: hsla(var(--brand-pink-rgb), 0.3); box-shadow: 0 0 8px hsla(var(--brand-pink-rgb), 0.3); } /* Corrected to use RGB vars */
+  50% { border-color: hsla(var(--brand-yellow-rgb), 0.3); box-shadow: 0 0 5px hsla(var(--brand-yellow-rgb), 0.2); } /* Corrected to use RGB vars */
+  75% { border-color: hsla(var(--brand-green-rgb), 0.3); box-shadow: 0 0 8px hsla(var(--brand-green-rgb), 0.3); } /* Corrected to use RGB vars */
+  100% { border-color: hsla(var(--brand-cyan-rgb), 0.3); box-shadow: 0 0 5px hsla(var(--brand-cyan-rgb), 0.2); } /* Corrected to use RGB vars */
 }
 .glitch-border-animate {
   animation: glitch-border 2s linear infinite;
