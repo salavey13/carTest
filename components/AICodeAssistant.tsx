@@ -100,7 +100,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         pageContext,
         aiResponseInputRefPassed,
         kworkInputRefPassed,
-        setJustParsedFlagForScrollFix: setJustParsed, // Pass setter for scroll fix
+        setJustParsedFlagForScrollFix: setJustParsed, 
     });
     
     // --- Destructure handlers ---
@@ -141,14 +141,13 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const derivedRepoUrlForHooks = repoUrlStateLocal || repoUrlFromContext || "";
 
     // --- Effects ---
-    useEffect(() => { // Scroll fix: Focus textarea after parsing
+    useEffect(() => { 
         if (justParsed) {
             aiResponseInputRefPassed.current?.focus();
-            // Optional: aiResponseInputRefPassed.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            setJustParsed(false); // Reset the flag immediately
+            setJustParsed(false); 
             logger.log("[Effect justParsed] Focused AI response textarea to stabilize scroll.");
         }
-    }, [justParsed, aiResponseInputRefPassed]); // Depend only on the flag and the ref
+    }, [justParsed, aiResponseInputRefPassed]); 
 
     useEffect(() => { 
         logger.debug("[Effect Mount] AICodeAssistant Mounted");
@@ -162,7 +161,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             logger.info(`[Effect Mount] Triggering initial PRs for ${initialRepoUrl}`);
             triggerGetOpenPRs(initialRepoUrl);
         } else { logger.debug(`[Effect Mount] Skipping initial PRs (no valid URL yet)`); }
-    }, [triggerGetOpenPRs, repoUrlStateLocal, repoUrlFromContext, imageReplaceTask, pendingFlowDetails]); // Removed redundant dependencies
+    }, [triggerGetOpenPRs, repoUrlStateLocal, repoUrlFromContext, imageReplaceTask, pendingFlowDetails]); 
 
     useEffect(() => { 
         setFilesParsed(componentParsedFiles.length > 0);
@@ -207,16 +206,18 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     }, [imageReplaceTask]);
     
     // --- Imperative Handle ---
-    useImperativeHandle(ref, () => ({
-        handleParse: () => { handlers.handleParse(); },
-        selectAllParsedFiles: () => { handlers.handleSelectAllFiles(); },
-        handleCreatePR: () => { handlers.handleCreateOrUpdatePR(); },
-        setResponseValue: (val: string) => { setResponseValue(val); },
-        updateRepoUrl: (url: string) => { updateRepoUrl(url); },
-        handleDirectImageReplace: (task: ImageReplaceTask, files: FileNode[]) => {
-            return handlers.handleDirectImageReplace(task, files);
-        },
-    })); // FIX: Added explicit return {} for the hook.
+    useImperativeHandle(ref, () => { // Explicit block and return
+        return {
+            handleParse: () => { handlers.handleParse(); },
+            selectAllParsedFiles: () => { handlers.handleSelectAllFiles(); },
+            handleCreatePR: () => { handlers.handleCreateOrUpdatePR(); },
+            setResponseValue: (val: string) => { setResponseValue(val); },
+            updateRepoUrl: (url: string) => { updateRepoUrl(url); },
+            handleDirectImageReplace: (task: ImageReplaceTask, files: FileNode[]) => {
+                return handlers.handleDirectImageReplace(task, files);
+            },
+        };
+    });
     
     // --- Derived State for Rendering ---
     const effectiveIsParsing = contextIsParsing ?? hookIsParsing;

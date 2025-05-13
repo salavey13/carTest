@@ -16,8 +16,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import {
-  FaPalette, FaFont, FaToggleOn, FaSliders, FaSquare, FaSquareCheck, FaHandPointer, // Corrected FaSlidersH -> FaSliders, FaCheckSquare -> FaSquareCheck
-  FaKeyboard, FaIdCard, FaDiagramProject, FaTriangleExclamation, FaGears, FaPlus, FaStar, // Corrected FaExclamationTriangle -> FaTriangleExclamation
+  FaPalette, FaFont, FaToggleOn, FaSliders, FaSquare, FaSquareCheck, FaHandPointer, 
+  FaKeyboard, FaIdCard, FaDiagramProject, FaTriangleExclamation, FaGears, FaPlus, FaStar, 
   FaPaintbrush, FaCode, FaEyeSlash, FaLink, FaTrash, FaCopy, FaFloppyDisk, FaPaperPlane,
   FaMoon, FaSun, FaUser, FaCreditCard, FaLifeRing, FaGoogle, FaFontAwesome,
   FaSnowflake, FaBrain, FaBolt, FaRightFromBracket 
@@ -110,12 +110,12 @@ export default function StyleGuide() {
         <section>
           <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><FaFont /> Типографика</h2>
           <div className="space-y-4 bg-dark-card p-6 rounded-lg border border-border">
-            <h1 className="text-5xl font-orbitron">H1: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h1>
-            <h2 className="text-4xl font-orbitron">H2: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h2>
-            <h3 className="text-3xl font-orbitron">H3: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h3>
-            <h4 className="text-2xl font-orbitron">H4: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h4>
-            <h5 className="text-xl font-orbitron">H5: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h5>
-            <h6 className="text-lg font-orbitron">H6: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h6>
+            <h1 className="text-5xl md:text-6xl font-orbitron">H1: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h1>
+            <h2 className="text-4xl md:text-5xl font-orbitron">H2: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h2>
+            <h3 className="text-3xl md:text-4xl font-orbitron">H3: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h3>
+            <h4 className="text-2xl md:text-3xl font-orbitron">H4: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h4>
+            <h5 className="text-xl md:text-2xl font-orbitron">H5: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h5>
+            <h6 className="text-lg md:text-xl font-orbitron">H6: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h6>
             <p className="text-lg">Основной текст (Inter Regular, text-lg): The quick brown fox jumps over the lazy dog. Эталонная фраза, служащая для проверки правильности отображения шрифтов.</p>
             <p>Основной текст (Inter Regular, base): The quick brown fox jumps over the lazy dog. Эталонная фраза, служащая для проверки правильности отображения шрифтов.</p>
             <p className="text-sm">Маленький текст (Inter Regular, text-sm): The quick brown fox jumps over the lazy dog.</p>

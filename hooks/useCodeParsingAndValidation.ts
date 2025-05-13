@@ -31,7 +31,7 @@ export interface ValidationIssue {
     message: string;
     severity: 'error' | 'warning' | 'info';
     fixable: boolean; // Can be fixed automatically by the hook
-    restorable: boolean; // **REMOVED**: No longer used, handled by AI prompt.
+    restorable: boolean; 
     details?: Record<string, any>; // e.g., { lineNumber: 5 }
 }
 
@@ -43,10 +43,10 @@ export interface FileEntry {
 }
 
 // --- Constants ---
-const FILE_PATH_REGEX = /^(?:[\w-]+\/)*[\w-]+\.\w+/; // Basic path check
+const FILE_PATH_REGEX = /^(?:[\w-]+\/)*[\w-]+\.\w+/; 
 const USE_CLIENT_REGEX = /^\s*['"]use client['"]\s*;?\s*$/;
 const IMPORT_REACT_REGEX = /import\s+(?:React(?:,\s*{[^}]*})?|{[^}]*\s+React\s*,\s*[^}]*})\s+from\s+['"]react['"]/;
-const FA6_ICON_REGEX = /<Fa[A-Z][a-zA-Z0-9]+(?:\s+[^>]*?)?\s*\/?>/g; // Find potential Fa icons
+const FA6_ICON_REGEX = /<Fa[A-Z][a-zA-Z0-9]+(?:\s+[^>]*?)?\s*\/?>/g; 
 const SNEAKY_EMPTY_BLOCK_REGEX = /{[\s\n]*\/\*\s*\.{3}\s*\*\/\s*[\s\n]*}/g;
 const SKIPPED_CODE_MARKER_REGEX = /(\/\*\s*\.{3}\s*\*\/)|({\s*\/\*\s*\.{3}\s*\*\/\s*})|(\[\s*\/\*\s*\.{3}\s*\*\/\s*\])/;
 const SKIPPED_COMMENT_MARKER_REGEX = /^\s*\/\/\s*\.{3}\s*$/;
@@ -58,8 +58,8 @@ const fa6IconCorrectionMap: Record<string, string> = {
     FaBalanceScale: 'FaScaleBalanced',
     FaTools: 'FaToolbox',
     FaUserCog: 'FaUserGear',
-    FaSlidersH: 'FaSliders', // Corrected as per user request
-    FaCheckSquare: 'FaSquareCheck', // Corrected as per user request
+    FaSlidersH: 'FaSliders', 
+    FaCheckSquare: 'FaSquareCheck', 
     FaProjectDiagram: 'FaDiagramProject',
     FaCog: 'FaGear',
     FaUserCircle: 'FaCircleUser',
@@ -68,7 +68,7 @@ const fa6IconCorrectionMap: Record<string, string> = {
     FaRunning: 'FaPersonRunning',
     FaSadTear: 'FaFaceSadTear',
     FaSearchDollar: 'FaMagnifyingGlassDollar',
-    FaSignOutAlt: 'FaRightFromBracket', // Corrected as per user request in style-guide
+    FaSignOutAlt: 'FaRightFromBracket', 
 };
 const knownIncorrectFa6Names = Object.keys(fa6IconCorrectionMap);
 
@@ -87,9 +87,9 @@ const generateId = () => '_' + Math.random().toString(36).substring(2, 9);
 // --- Custom Hook ---
 export function useCodeParsingAndValidation() {
     logger.debug("[useCodeParsingAndValidation] Hook initialized");
-    const { success: toastSuccess, error: toastError, info: toastInfo, warning: toastWarning } = useAppToast(); // Use toast hook
+    const { success: toastSuccess, error: toastError, info: toastInfo, warning: toastWarning } = useAppToast(); 
     const [parsedFiles, setParsedFiles] = useState<FileEntry[]>([]);
-    const [rawDescription, setRawDescription] = useState<string>(""); // Store text outside code blocks
+    const [rawDescription, setRawDescription] = useState<string>(""); 
     const [validationStatus, setValidationStatus] = useState<ValidationStatus>('idle');
     const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
     const [isParsing, setIsParsing] = useState(false);
@@ -162,7 +162,6 @@ export function useCodeParsingAndValidation() {
             const fileId = file.id;
             const filePath = file.path;
 
-             // .. 1. Fa6 Icon Checks
               logger.debug(`[Validation Logic - ${filePath}] Checking for Fa6 icons...`);
              const fa6ImportRegex = /import\s+{([^}]+)}\s+from\s+['"]react-icons\/fa6['"];?/g;
              let fa6Match;
@@ -185,13 +184,12 @@ export function useCodeParsingAndValidation() {
                          issues.push({ id: generateId(), fileId, filePath, type: 'incorrectFa6IconName', message: `Некорректное имя иконки: '${iconName}'. Исправить на '${correctName}'?`, details: { lineNumber: importLineNumber, incorrectName: iconName, correctName: correctName, importStatement: fa6Match[0] }, fixable: true, severity: 'warning', restorable: false });
                      }
                      else if (!(iconName in Fa6Icons)) {
-                         logger.error(`[Validation Logic - ${filePath}] Found unknown/invalid Fa6 icon name: ${iconName}`);
+                         logger.warn(`[Validation Logic - ${filePath}] Found unknown/invalid Fa6 icon name: ${iconName}`); // Changed from error to warn
                          issues.push({ id: generateId(), fileId, filePath, type: 'unknownFa6IconName', message: `Неизвестная/несуществующая иконка Fa6: '${iconName}'. Проверьте имя или импортируйте из правильного пакета (например, 'react-icons/fa' вместо 'react-icons/fa6', или наоборот).`, details: { lineNumber: importLineNumber, unknownName: iconName, importStatement: fa6Match[0] }, fixable: false, severity: 'warning', restorable: false });
                      }
                  });
              }
 
-            // .. 2. "use client" Check
             logger.debug(`[Validation Logic - ${filePath}] Checking for "use client"...`);
             if (/\.(tsx|jsx)$/.test(filePath)) {
                 const isAppLayoutFile = /^app\/.*layout\.(tsx|jsx)$/.test(filePath);
@@ -219,26 +217,23 @@ export function useCodeParsingAndValidation() {
                 }
             }
 
-            // .. 3. Skipped Code Block Check ('/* ... */')
              logger.debug(`[Validation Logic - ${filePath}] Checking for skipped code blocks...`);
             for (let i = 0; i < lines.length; i++) {
                 if (SKIPPED_CODE_MARKER_REGEX.test(lines[i].trimStart())) {
                     logger.warn(`[Validation Logic - ${filePath}] Found skipped code block at line ${i + 1}`);
-                    issues.push({ id: generateId(), fileId, filePath, type: 'skippedCodeBlock', message: `Пропущен блок кода (строка ${i + 1}). Попросите AI восстановить.`, details: { markerLineContent: lines[i], lineNumber: i + 1 }, fixable: false, restorable: false, severity: 'warning' });
+                    issues.push({ id: generateId(), fileId, filePath, type: 'skippedCodeBlock', message: `Пропущен блок кода (строка ${i + 1}). Попросите AI восстановить.`, details: { markerLineContent: lines[i], lineNumber: i + 1 }, fixable: false, restorable: false, severity: 'warning' }); 
                 }
             }
 
-            // .. 4. Skipped Comment Check ('// ...')
              logger.debug(`[Validation Logic - ${filePath}] Checking for skipped comments (// ...)...`);
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i]; 
                 if (SKIPPED_COMMENT_MARKER_REGEX.test(line)) {
                      logger.warn(`[Validation Logic - ${filePath}] Found skipped comment marker at line ${i + 1}`);
-                     issues.push({ id: generateId(), fileId, filePath, type: 'skippedComment', message: `Пропущен комментарий '// ...' (строка ${i + 1}). Попросите AI восстановить.`, details: { lineNumber: i + 1 }, fixable: false, restorable: false, severity: 'warning' });
+                     issues.push({ id: generateId(), fileId, filePath, type: 'skippedComment', message: `Пропущен комментарий '// ...' (строка ${i + 1}). Попросите AI восстановить.`, details: { lineNumber: i + 1 }, fixable: false, restorable: false, severity: 'warning' }); 
                  }
             }
 
-            // .. 5. Import Checks
              logger.debug(`[Validation Logic - ${filePath}] Checking for missing imports...`);
             if (/\.(tsx|jsx)$/.test(filePath)) {
                 importChecks.forEach(check => {
@@ -252,7 +247,6 @@ export function useCodeParsingAndValidation() {
                 });
             }
 
-            // .. 6. Sneaky Empty Block Check 
             logger.debug(`[Validation Logic - ${filePath}] Checking for sneaky empty blocks...`);
             let sneakyMatch;
             while((sneakyMatch = SNEAKY_EMPTY_BLOCK_REGEX.exec(file.content)) !== null) {
@@ -264,7 +258,6 @@ export function useCodeParsingAndValidation() {
              logger.debug(`[Validation Logic] Finished validating file: ${filePath}. Issues found: ${issues.filter(i => i.filePath === filePath).length}`);
         } 
 
-        // .. Duplicate Path Check
         const pathCounts = new Map<string, number>();
         filesToValidate.forEach(file => {
              if (file.path && !file.path.startsWith('unnamed-')) {
@@ -347,7 +340,6 @@ export function useCodeParsingAndValidation() {
          }
     }, [parseFilesFromText, validateParsedFiles, rawDescription, toastInfo, toastError, logger]); 
 
-    // --- Auto-Fixing Logic ---
     const autoFixIssues = useCallback((filesToFix: FileEntry[], issuesToFix: ValidationIssue[]): FileEntry[] => {
          logger.info("[AutoFix Logic] Starting autoFixIssues...");
         let changesMadeCount = 0; const fixedMessages: string[] = [];
