@@ -20,7 +20,7 @@ import {
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaToolbox, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket,
     FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye,
-    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash
+    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash, FaCommentDots
 } from "react-icons/fa6";
 import Link from "next/link";
 import { motion } from 'framer-motion';
@@ -374,33 +374,26 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                <VibeContentRenderer content={t.communityWisdomTitle} />
                             </h3>
                             <div className="space-y-8">
-                                <div>
-                                    <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-cyan/50 shadow-lg">
-                                        <iframe className="w-full h-full" src={`https://www.youtube.com/embed/ctcMA6chfDY?start=1201&mute=1`} title="YouTube: Sam Altman's Dream" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                {[
+                                    { videoId: "ctcMA6chfDY", start: 1201, title: "YouTube: Sam Altman's Dream", quote: t.quote1, borderColor: "border-brand-cyan", inspiredBy: "- Inspired by Sam Altman" },
+                                    { videoId: "dq8MhTFCs80", start: 1197, title: "YouTube: Do you Vibecode?", quote: t.quote2, borderColor: "border-brand-pink", inspiredBy: "- Inspired by Vibe Master" },
+                                    { videoId: "xlQB_0Nzoog", start: 743, title: "YouTube: Really F*cking EZ!", quote: t.quote3, borderColor: "border-brand-yellow", inspiredBy: "- Inspired by Strategic Thinking" }
+                                ].map(item => (
+                                    <div key={item.videoId}>
+                                        <div className={`aspect-video w-full rounded-lg overflow-hidden border-2 ${item.borderColor}/50 shadow-lg`}>
+                                            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${item.videoId}?start=${item.start}&mute=1`} title={item.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                        </div>
+                                        <div className={`mt-3 p-3 bg-dark-card/70 border-l-4 ${item.borderColor} rounded-r-md text-muted-foreground max-w-none`}>
+                                            <div className="flex items-start">
+                                                <VibeContentRenderer content="::FaQuoteLeft className='text-current opacity-70 text-lg mr-2 shrink-0'::" />
+                                                <div className="prose prose-sm prose-invert max-w-none flex-grow">
+                                                    <VibeContentRenderer content={item.quote} />
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-right opacity-70 mt-1">{item.inspiredBy}</p>
+                                        </div>
                                     </div>
-                                    <div className="mt-3 p-3 bg-dark-card/70 border-l-4 border-brand-cyan rounded-r-md prose prose-sm prose-invert text-muted-foreground max-w-none">
-                                        <VibeContentRenderer content={t.quote1} />
-                                        <p className="text-xs text-right opacity-70 mt-1">- Inspired by Sam Altman</p>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-pink/50 shadow-lg">
-                                        <iframe className="w-full h-full" src={`https://www.youtube.com/embed/dq8MhTFCs80?start=1197&mute=1`} title="YouTube: Do you Vibecode?" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
-                                    </div>
-                                     <div className="mt-3 p-3 bg-dark-card/70 border-l-4 border-brand-pink rounded-r-md prose prose-sm prose-invert text-muted-foreground max-w-none">
-                                        <VibeContentRenderer content={t.quote2} />
-                                        <p className="text-xs text-right opacity-70 mt-1">- Inspired by Vibe Master</p>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-yellow/50 shadow-lg">
-                                        <iframe className="w-full h-full" src={`https://www.youtube.com/embed/xlQB_0Nzoog?start=743&mute=1`} title="YouTube: Really F*cking EZ!" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
-                                    </div>
-                                    <div className="mt-3 p-3 bg-dark-card/70 border-l-4 border-brand-yellow rounded-r-md prose prose-sm prose-invert text-muted-foreground max-w-none">
-                                        <VibeContentRenderer content={t.quote3} />
-                                        <p className="text-xs text-right opacity-70 mt-1">- Inspired by Strategic Thinking</p>
-                                    </div>
-                                </div>
+                                ))}
                             </div>
                         </section>
                     )}
@@ -492,7 +485,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                 {/* Middle Border Div */}
                                 <div className="p-1 rounded-lg bg-gradient-to-b from-orange-400 via-pink-400 to-purple-700">
                                     {/* Content Div */}
-                                    <div className="relative bg-gradient-to-b from-indigo-600 via-pink-600 to-orange-500 p-6 rounded-md prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 prose-a:text-brand-blue max-w-none">
+                                    <div className="relative bg-gradient-to-b from-indigo-600 via-pink-600 to-orange-500 p-6 rounded-md prose-strong:text-yellow-200 prose-a:text-brand-blue max-w-none">
                                         <button 
                                             onClick={() => setIsCtaVisible(false)} 
                                             className="absolute top-2 right-2 text-white/70 hover:text-white z-20 p-1 rounded-full hover:bg-black/50 transition-colors"
@@ -500,19 +493,26 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                         >
                                             <FaCircleXmark className="w-6 h-6" />
                                         </button>
-                                        <h3 className="text-2xl font-bold text-white mb-3"><VibeContentRenderer content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
-                                        <div className="text-white text-lg mb-4"> <VibeContentRenderer content={t.ctaDesc} /> </div>
+                                        <h3 className="text-2xl font-bold text-white mb-3 prose-invert"><VibeContentRenderer content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
+                                        <div className="text-white text-lg mb-4 prose-invert"> <VibeContentRenderer content={t.ctaDesc} /> </div>
                                         
                                         <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-orange-500/70 shadow-lg my-6">
                                             <iframe className="w-full h-full" src={`https://www.youtube.com/embed/qCkPM_f3V5c?autoplay=1&mute=0`} title="YouTube: GTA Vibe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                         </div>
-                                        <div className="mt-3 mb-4 p-3 bg-black/50 border-l-4 border-pink-500 rounded-r-md prose prose-sm prose-invert text-white max-w-none">
-                                            <VibeContentRenderer content={t.ctaHotChickQuote} />
+                                        
+                                        <div className="mt-3 mb-4 p-3 bg-black/50 border-l-4 border-pink-500 rounded-r-md text-white max-w-none">
+                                            <div className="flex items-center">
+                                                <VibeContentRenderer content="::FaQuoteLeft className='text-current opacity-80 text-xl mr-2 shrink-0'::" />
+                                                <div className="prose prose-sm prose-invert text-center flex-grow max-w-none">
+                                                    <VibeContentRenderer content={t.ctaHotChickQuote} />
+                                                </div>
+                                                <VibeContentRenderer content="::FaQuoteRight className='text-current opacity-80 text-xl ml-2 shrink-0'::" />
+                                            </div>
                                             <p className="text-xs text-right opacity-70 mt-1">- Vibe by @SALAVEY13</p>
                                         </div>
 
-                                        <div className="text-white text-xl font-semibold mb-4 bg-black/40 p-3 rounded"> <FaRocket className="inline mr-2 text-cyan-300 animate-pulse"/> <VibeContentRenderer content={t.ctaHotChick} /> <FaUserAstronaut className="inline ml-2 text-pink-300"/> </div>
-                                        <div className="text-slate-300 text-base"> <VibeContentRenderer content={t.ctaDude} /> </div>
+                                        
+                                        <div className="text-slate-300 text-base prose-invert"> <VibeContentRenderer content={t.ctaDude} /> </div>
                                     </div>
                                 </div>
                             </div>
