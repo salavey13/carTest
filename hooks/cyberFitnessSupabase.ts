@@ -132,13 +132,6 @@ const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | 
         lastActivityTimestamp: typeof existingProfile.lastActivityTimestamp === 'string' ? existingProfile.lastActivityTimestamp : defaultProfile.lastActivityTimestamp,
     };
   }
-  
-  // IMPORTANT: Removed the logic that resets achievements if userId matches MOCK_USER_ID.
-  // The "mock" nature should be determined by the actual session source (e.g., useTelegram),
-  // not by a simple ID match here. This function should reflect DB state or default.
-  // Mock behavior (like not persisting) should be handled during UPDATE if needed,
-  // or by using a truly separate mock data store/ID.
-
   return finalProfile;
 };
 
@@ -194,11 +187,8 @@ export const updateUserCyberFitnessProfile = async (
     return { success: false, error: "Admin client is not available for profile update." };
   }
 
-  // Determine if this is a mock user session (e.g. based on AppContext state, not just ID match)
-  // For simplicity, we'll assume for now that if NEXT_PUBLIC_USE_MOCK_USER is true, and ID matches, it's a mock session.
-  // A more robust way would be for useTelegram to tag the user object as mock.
   const isTrueMockSession = process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && MOCK_USER_ID_NUM !== null && userId === MOCK_USER_ID_NUM.toString();
-
+  logger.debug(`[CyberFitness UpdateProfile] isTrueMockSession: ${isTrueMockSession} (NEXT_PUBLIC_USE_MOCK_USER: ${process.env.NEXT_PUBLIC_USE_MOCK_USER}, MOCK_USER_ID_NUM: ${MOCK_USER_ID_NUM}, userId: ${userId})`);
 
   try {
     const { data: currentUserData, error: fetchError } = await supabaseAdmin
@@ -214,13 +204,7 @@ export const updateUserCyberFitnessProfile = async (
    
     const existingOverallMetadata = currentUserData?.metadata || {};
     let existingCyberFitnessProfile = getCyberFitnessProfile(userId, existingOverallMetadata);
-
-    // If it's a true mock session and we want to "reset" achievements for testing this particular update run:
-    // This means achievements are not cumulative for the mock user across different test runs of this function.
-    if (isTrueMockSession) {
-        logger.debug(`[CyberFitness UpdateProfile] True mock session for ${userId}. Achievements will be re-evaluated from scratch for this update.`);
-        existingCyberFitnessProfile.achievements = []; // Start fresh for this evaluation if it's a true mock interaction
-    }
+    logger.debug(`[CyberFitness UpdateProfile] Fetched existing profile for ${userId}. Achievements before this update: ${(existingCyberFitnessProfile.achievements || []).join(', ')}`);
 
 
     const newCyberFitnessProfile: CyberFitnessProfile = {
@@ -257,8 +241,7 @@ export const updateUserCyberFitnessProfile = async (
     if (typeof updates.totalBranchesUpdated === 'number') newCyberFitnessProfile.totalBranchesUpdated = (newCyberFitnessProfile.totalBranchesUpdated || 0) + updates.totalBranchesUpdated;
     
     const newlyUnlockedAchievements: Achievement[] = [];
-    // Crucial fix: Load from the potentially modified newCyberFitnessProfile.achievements (which might have been reset for true mock session)
-    let currentAchievementsSet = new Set(newCyberFitnessProfile.achievements || []); 
+    let currentAchievementsSet = new Set(newCyberFitnessProfile.achievements || []); // Operate on potentially already existing achievements
 
     for (const ach of ALL_ACHIEVEMENTS) {
         if (!currentAchievementsSet.has(ach.id) && ach.checkCondition(newCyberFitnessProfile)) {
@@ -270,6 +253,8 @@ export const updateUserCyberFitnessProfile = async (
         }
     }
     newCyberFitnessProfile.achievements = Array.from(currentAchievementsSet);
+    logger.debug(`[CyberFitness UpdateProfile] Achievements for ${userId} after evaluation: ${newCyberFitnessProfile.achievements.join(', ')}`);
+
 
     if (newlyUnlockedAchievements.length > 0) {
         logger.info(`[CyberFitness UpdateProfile] User ${userId} unlocked new achievements:`, newlyUnlockedAchievements.map(a => `${a.name} (+${a.kiloVibesAward || 0}KV)`));
