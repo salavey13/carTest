@@ -28,7 +28,7 @@ import VibeContentRenderer from '@/components/VibeContentRenderer';
 import * as repoUtils from "@/lib/repoUtils";
 import { cn } from "@/lib/utils";
 
-// --- I18N Translations (Full - No changes needed here, assuming they are correct) ---
+// --- I18N Translations ---
 const translations = {
   en: {
     loading: "Booting SUPERVIBE ENGINE...",
@@ -45,10 +45,10 @@ const translations = {
     philosophyTitle: "Your Vibe Path: The Inevitable Level Up (Tap)",
     philosophyVideoTitle: "Watch: The Level System Explained <FaVideo/>:",
     communityWisdomTitle: "Community Wisdom <FaUsers/>",
-    quote1: "::FaQuoteLeft:: Sam Altman on the dream: 'Getting the whole app after a prompt.' That's what we're building. Full app from a thought. <a href='https://youtube.com/clip/Ugkx1LAX6-gO4J8hC6HoHbg0_KMlBHcsKX3V' target='_blank' class='text-brand-blue hover:underline font-semibold'>(Clip <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a> ::FaQuoteRight::",
-    quote2: "::FaQuoteLeft:: Vibecoding? 'Yeah, he does.' From video idea to gamified app. Turning vision into interactive reality. <a href='https://youtube.com/clip/UgkxZVMHbEo2XwO-sayoxskH89zzrDdN6vsx' target='_blank' class='text-brand-blue hover:underline font-semibold'>(Clip <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a> ::FaQuoteRight::",
-    quote3: "::FaQuoteLeft:: Monetization: 'Sell outcomes, not just pickaxes.' Automated, 10x cheaper solutions. That's the real product. <a href='https://youtube.com/clip/UgkxvGYsRm3HezCgOyqszCbn5DfDDx7LixPE' target='_blank' class='text-brand-blue hover:underline font-semibold'>(Clip <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a> ::FaQuoteRight::",
-    ctaHotChickQuote: "::FaQuoteLeft:: Got the fire? Let's build something epic. Hit me up <strong>@SALAVEY13</strong> NOW! ::FaQuoteRight::",
+    quote1: "Sam Altman on the dream: 'Getting the whole app after a prompt.' That's what we're building. Full app from a thought. <a href='https://youtube.com/clip/Ugkx1LAX6-gO4J8hC6HoHbg0_KMlBHcsKX3V' target='_blank' class='text-brand-blue hover:underline font-semibold'>(Clip <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a>",
+    quote2: "Vibecoding? 'Yeah, he does.' From video idea to gamified app. Turning vision into interactive reality. <a href='https://youtube.com/clip/UgkxZVMHbEo2XwO-sayoxskH89zzrDdN6vsx' target='_blank' class='text-brand-blue hover:underline font-semibold'>(Clip <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a>",
+    quote3: "Monetization: 'Sell outcomes, not just pickaxes.' Automated, 10x cheaper solutions. That's the real product. <a href='https://youtube.com/clip/UgkxvGYsRm3HezCgOyqszCbn5DfDDx7LixPE' target='_blank' class='text-brand-blue hover:underline font-semibold'>(Clip <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a>",
+    ctaHotChickQuote: "Got the fire? Let's build something epic. Hit me up <strong>@SALAVEY13</strong> NOW!",
     philosophyCore: "The secret? <strong>You're not asking the bot for help, YOU are helping the BOT</strong>. Each level adds <strong>+1 Vibe Perk</strong>, one more click, one more skill to guide the AI. It's not a grind, it's evolution. You get lazy doing the old stuff, so you <em>automatically</em> level up. And there's <strong>NO GOING BACK!</strong>",
     philosophyLvl0_1: "<strong>Lv.0 -> 1 <FaBolt/> (Instant Win / Image Swap Flow):</strong> Fix a broken image. Copy URL -> Paste -> Upload new -> <strong>DONE</strong>. System auto-PRs. <strong>ANYONE</strong> can do this <em>NOW</em>. This is your entry point.",
     philosophyLvl1_2: "<strong>Lv.1 -> 2 <FaToolbox/> (+1 File/AI / Generic Idea Flow):</strong> Simple idea? Change text/button? Give AI the idea + 1 file context -> PR. <strong>DONE.</strong>",
@@ -99,10 +99,10 @@ const translations = {
     philosophyTitle: "Твой Путь Вайба: Неизбежный Level Up (Жми)",
     philosophyVideoTitle: "Смотри: Объяснение Системы Уровней <FaVideo/>:",
     communityWisdomTitle: "Мудрость Сообщества <FaUsers/>",
-    quote1: "::FaQuoteLeft:: Сэм Альтман о мечте: 'Получить целое приложение после промпта.' Это то, что мы строим. Целое приложение из мысли. <a href='https://youtube.com/clip/Ugkx1LAX6-gO4J8hC6HoHbg0_KMlBHcsKX3V' target='_blank' class='text-brand-blue hover:underline font-semibold'>(Альтман чухает фишку <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a> ::FaQuoteRight::",
-    quote2: "::FaQuoteLeft:: Вайбкодинг? 'Ага, он могёт.' От идеи видео до геймифицированного приложения. Превращение видения в интерактивную реальность. <a href='https://youtube.com/clip/UgkxZVMHbEo2XwO-sayoxskH89zzrDdN6vsx' target='_blank' class='text-brand-blue hover:underline font-semibold'>(I do vibe <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a> ::FaQuoteRight::",
-    quote3: "::FaQuoteLeft:: Монетизация: 'Продавай результаты, а не просто кирки.' Автоматизированные, в 10 раз дешевле решения. Вот настоящий продукт. <a href='https://youtube.com/clip/UgkxvGYsRm3HezCgOyqszCbn5DfDDx7LixPE' target='_blank' class='text-brand-blue hover:underline font-semibold'>('Fucking ez' <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a> ::FaQuoteRight::",
-    ctaHotChickQuote: "::FaQuoteLeft:: Есть искра? Давай замутим что-то эпичное. Пиши <strong>@SALAVEY13</strong> СЕЙЧАС! ::FaQuoteRight::",
+    quote1: "Сэм Альтман о мечте: 'Получить целое приложение после промпта.' Это то, что мы строим. Целое приложение из мысли. <a href='https://youtube.com/clip/Ugkx1LAX6-gO4J8hC6HoHbg0_KMlBHcsKX3V' target='_blank' class='text-brand-blue hover:underline font-semibold'>(Альтман чухает фишку <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a>",
+    quote2: "Вайбкодинг? 'Ага, он могёт.' От идеи видео до геймифицированного приложения. Превращение видения в интерактивную реальность. <a href='https://youtube.com/clip/UgkxZVMHbEo2XwO-sayoxskH89zzrDdN6vsx' target='_blank' class='text-brand-blue hover:underline font-semibold'>(I do vibe <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a>",
+    quote3: "Монетизация: 'Продавай результаты, а не просто кирки.' Автоматизированные, в 10 раз дешевле решения. Вот настоящий продукт. <a href='https://youtube.com/clip/UgkxvGYsRm3HezCgOyqszCbn5DfDDx7LixPE' target='_blank' class='text-brand-blue hover:underline font-semibold'>('Fucking ez' <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a>",
+    ctaHotChickQuote: "Есть искра? Давай замутим что-то эпичное. Пиши <strong>@SALAVEY13</strong> СЕЙЧАС!",
     philosophyCore: "Секрет? <strong>Не ты просишь бота помочь, а ТЫ помогаешь БОТУ</strong>. Каждый левел дает <strong>+1 Вайб Перк</strong>, +1 клик, +1 скилл, чтобы направлять AI. Это не гринд, это эволюция. Тебе становится лень делать старое, и ты <em>автоматически</em> апаешь левел. И <strong>НАЗАД ДОРОГИ НЕТ!</strong>",
     philosophyLvl0_1: "<strong>Лв.0 -> 1 <FaBolt/> (Мгновенный Вин / Image Swap Flow):</strong> Починить битую картинку. Скопируй URL -> Вставь -> Загрузи новую -> <strong>ГОТОВО</strong>. Это <strong>полный автомат</strong> - система сама создаст PR! <strong>ЛЮБОЙ</strong> может это <em>ПРЯМО СЕЙЧАС</em>. Твой вход в матрицу.",
     philosophyLvl1_2: "<strong>Лв.1 -> 2 <FaToolbox/> (Простая Идея / Generic Idea Flow):</strong> Простая идея? Текст/кнопку поменять? Дай AI идею + 1 файл контекста -> PR. <strong>ГОТОВО.</strong> Ты сказал - AI сделал.",
@@ -485,32 +485,40 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                          </>
                      )}
 
-                     {isCtaVisible && ( 
-                         <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
-                              <div className="relative bg-gradient-to-br from-dark-card via-[hsla(var(--brand-purple-rgb),0.2)] to-dark-card p-6 rounded-lg shadow-xl border-2 border-brand-purple/70 prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 prose-a:text-brand-blue max-w-none">
-                                 <button 
-                                    onClick={() => setIsCtaVisible(false)} 
-                                    className="absolute top-2 right-2 text-white/70 hover:text-white z-20 p-1 rounded-full hover:bg-black/30 transition-colors"
-                                    aria-label="Close CTA"
-                                  >
-                                    <FaCircleXmark className="w-6 h-6" />
-                                  </button>
-                                 <h3 className="text-2xl font-bold text-white mb-3"><VibeContentRenderer content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
-                                 <div className="text-light-text text-lg mb-4"> <VibeContentRenderer content={t.ctaDesc} /> </div>
-                                 
-                                <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-orange/70 shadow-lg my-6">
-                                    <iframe className="w-full h-full" src={`https://www.youtube.com/embed/qCkPM_f3V5c?autoplay=1&mute=0`} title="YouTube: GTA Vibe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
-                                </div>
-                                <div className="mt-3 mb-4 p-3 bg-dark-card/70 border-l-4 border-brand-pink rounded-r-md prose prose-sm prose-invert text-light-text max-w-none">
-                                    <VibeContentRenderer content={t.ctaHotChickQuote} />
-                                    <p className="text-xs text-right opacity-70 mt-1">- Vibe by @SALAVEY13</p>
-                                </div>
+                    {isCtaVisible && ( 
+                        <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
+                            {/* Outer Border Div */}
+                            <div className="relative p-1.5 rounded-xl bg-gradient-to-b from-blue-800 to-purple-700 shadow-2xl">
+                                {/* Middle Border Div */}
+                                <div className="p-1 rounded-lg bg-gradient-to-b from-orange-400 via-pink-400 to-purple-700">
+                                    {/* Content Div */}
+                                    <div className="relative bg-gradient-to-b from-indigo-600 via-pink-600 to-orange-500 p-6 rounded-md prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 prose-a:text-brand-blue max-w-none">
+                                        <button 
+                                            onClick={() => setIsCtaVisible(false)} 
+                                            className="absolute top-2 right-2 text-white/70 hover:text-white z-20 p-1 rounded-full hover:bg-black/50 transition-colors"
+                                            aria-label="Close CTA"
+                                        >
+                                            <FaCircleXmark className="w-6 h-6" />
+                                        </button>
+                                        <h3 className="text-2xl font-bold text-white mb-3"><VibeContentRenderer content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
+                                        <div className="text-white text-lg mb-4"> <VibeContentRenderer content={t.ctaDesc} /> </div>
+                                        
+                                        <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-orange-500/70 shadow-lg my-6">
+                                            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/qCkPM_f3V5c?autoplay=1&mute=0`} title="YouTube: GTA Vibe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                        </div>
+                                        <div className="mt-3 mb-4 p-3 bg-black/50 border-l-4 border-pink-500 rounded-r-md prose prose-sm prose-invert text-white max-w-none">
+                                            <VibeContentRenderer content={t.ctaHotChickQuote} />
+                                            <p className="text-xs text-right opacity-70 mt-1">- Vibe by @SALAVEY13</p>
+                                        </div>
 
-                                 <div className="text-white text-xl font-semibold mb-4 bg-black/30 p-3 rounded"> <FaRocket className="inline mr-2 text-cyan-300 animate-pulse"/> <VibeContentRenderer content={t.ctaHotChick} /> <FaUserAstronaut className="inline ml-2 text-pink-300"/> </div>
-                                 <div className="text-muted-foreground text-base"> <VibeContentRenderer content={t.ctaDude} /> </div>
-                             </div>
-                         </section>
-                     )}
+                                        <div className="text-white text-xl font-semibold mb-4 bg-black/40 p-3 rounded"> <FaRocket className="inline mr-2 text-cyan-300 animate-pulse"/> <VibeContentRenderer content={t.ctaHotChick} /> <FaUserAstronaut className="inline ml-2 text-pink-300"/> </div>
+                                        <div className="text-slate-300 text-base"> <VibeContentRenderer content={t.ctaDude} /> </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    )}
+
 
                      <motion.nav className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40" animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}>
                          <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-muted/80 backdrop-blur-sm rounded-full hover:bg-muted/60 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-foreground/80" /> </button>
