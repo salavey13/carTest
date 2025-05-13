@@ -303,7 +303,6 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const navTitleAssistant = memoizedGetPlainText(t.navAssistant);
     const masterToggleTitle = sectionsCollapsed ? t.expandAll : t.collapseAll;
 
-
     const CloseButton = ({ onClick, ariaLabel }: { onClick: () => void; ariaLabel: string }) => (
         <button
             onClick={onClick}
@@ -488,7 +487,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
                      {isCtaVisible && ( 
                          <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
-                              <div className="relative bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange p-6 rounded-lg shadow-lg animate-pulse border-2 border-white/50 prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 prose-a:text-brand-blue max-w-none">
+                              <div className="relative bg-gradient-to-br from-dark-card via-[hsla(var(--brand-purple-rgb),0.2)] to-dark-card p-6 rounded-lg shadow-xl border-2 border-brand-purple/70 prose prose-invert prose-p:my-2 prose-strong:text-yellow-200 prose-a:text-brand-blue max-w-none">
                                  <button 
                                     onClick={() => setIsCtaVisible(false)} 
                                     className="absolute top-2 right-2 text-white/70 hover:text-white z-20 p-1 rounded-full hover:bg-black/30 transition-colors"
@@ -497,12 +496,12 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                     <FaCircleXmark className="w-6 h-6" />
                                   </button>
                                  <h3 className="text-2xl font-bold text-white mb-3"><VibeContentRenderer content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
-                                 <div className="text-white text-lg mb-4"> <VibeContentRenderer content={t.ctaDesc} /> </div>
+                                 <div className="text-light-text text-lg mb-4"> <VibeContentRenderer content={t.ctaDesc} /> </div>
                                  
                                 <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-brand-orange/70 shadow-lg my-6">
                                     <iframe className="w-full h-full" src={`https://www.youtube.com/embed/qCkPM_f3V5c?autoplay=1&mute=0`} title="YouTube: GTA Vibe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                 </div>
-                                <div className="mt-3 mb-4 p-3 bg-black/40 border-l-4 border-brand-orange rounded-r-md prose prose-sm prose-invert text-white max-w-none">
+                                <div className="mt-3 mb-4 p-3 bg-dark-card/70 border-l-4 border-brand-pink rounded-r-md prose prose-sm prose-invert text-light-text max-w-none">
                                     <VibeContentRenderer content={t.ctaHotChickQuote} />
                                     <p className="text-xs text-right opacity-70 mt-1">- Vibe by @SALAVEY13</p>
                                 </div>
