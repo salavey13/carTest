@@ -372,14 +372,12 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
              dbUser?.id, addToastStable, assistantRef, fetcherRef, setFetchStatusStateStable, setAllFetchedFilesStateStable,
              setImageReplaceTaskStateStable, setAssistantLoadingStateStable, setPendingFlowDetailsStateStable,
              setKworkInputValueStateStable, scrollToSectionStable, 
-             // imageReplaceTaskStateRef, pendingFlowDetailsRef, // Refs are stable, not needed in dep array
          ]);
 
-        const triggerToggleSettingsModal = useCallback(() => {
+        const triggerToggleSettingsModal = useCallback(async () => {
             if (dbUser?.id) {
-                checkAndUnlockFeatureAchievement(dbUser.id, 'settings_opened')
-                    .then(res => res.newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description })))
-                    .catch(err => logger.error("Error logging settings_opened achievement:", err));
+                const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'settings_opened');
+                newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
             }
             setIsSettingsModalOpenState(prev => !prev);
         }, [dbUser?.id, addToastStable]);
@@ -448,14 +446,13 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const selectedFetcherFilesRef = useRef(selectedFetcherFilesState); useEffect(() => { selectedFetcherFilesRef.current = selectedFetcherFilesState; }, [selectedFetcherFilesState]);
         const allFetchedFilesRef = useRef(allFetchedFilesState); useEffect(() => { allFetchedFilesRef.current = allFetchedFilesState; }, [allFetchedFilesState]);
         
-        const triggerCopyKwork = useCallback((): boolean => { 
+        const triggerCopyKwork = useCallback(async (): Promise<boolean> => { 
             if (fetcherRef.current?.handleCopyToClipboard) { 
                 try { 
                     const success = fetcherRef.current.handleCopyToClipboard(undefined, true);
                     if (success && dbUser?.id) {
-                        checkAndUnlockFeatureAchievement(dbUser.id, 'system_prompt_copied')
-                            .then(res => res.newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description })))
-                            .catch(err => logger.error("Error logging system_prompt_copied achievement:", err));
+                        const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'system_prompt_copied');
+                        newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                     }
                     return success; 
                 } catch (e: any) { 
@@ -549,7 +546,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             if (fetcherRef.current?.handleAddImportantFiles) {
                 fetcherRef.current.handleAddImportantFiles();
                  if (dbUser?.id) {
-                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'usedSelectHighlighted'); // Re-using sharpshooter for "important" as it's similar concept
+                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'usedSelectHighlighted'); 
                     newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                  }
             }
@@ -582,18 +579,18 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const [currentStep, setCurrentStep] = useState<WorkflowStep>('idle');
         useEffect(() => {
             let calculatedStep: WorkflowStep = 'idle';
-            if (isPreCheckingState) { calculatedStep = 'fetching'; } // Show fetching while pre-checking
+            if (isPreCheckingState) { calculatedStep = 'fetching'; } 
             else if (fetchStatusState === 'loading' || fetchStatusState === 'retrying') { calculatedStep = 'fetching'; }
             else if (fetchStatusState === 'error' || fetchStatusState === 'failed_retries') { calculatedStep = 'fetch_failed'; }
             else if (filesFetchedState) {
-                if (imageReplaceTaskState) { // Special handling for image replace flow
+                if (imageReplaceTaskState) { 
                     const targetFileExists = allFetchedFilesState.some(f => f.path === imageReplaceTaskState.targetPath);
                     if (targetFileExists) {
                         calculatedStep = assistantLoadingState ? 'generating_ai_response' : 'files_fetched_image_replace';
                     } else {
-                        calculatedStep = 'fetch_failed'; // Target file for image replace not found
+                        calculatedStep = 'fetch_failed'; 
                     }
-                } else { // Standard flow
+                } else { 
                     if (isParsingState) calculatedStep = 'parsing_response';
                     else if (assistantLoadingState || aiActionLoadingState) calculatedStep = 'generating_ai_response';
                     else if (aiResponseHasContentState) { calculatedStep = filesParsedState ? 'pr_ready' : 'response_pasted'; }
@@ -611,7 +608,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
          const getXuinityMessageStable = useCallback((): string => {
              const localCurrentStep = currentStep; const localManualBranchName = manualBranchNameState; const localTargetBranchName = targetBranchNameState; const localImageReplaceTask = imageReplaceTaskState; const localFetchStatus = fetchStatusState; const localAllFilesLength = allFetchedFilesState.length; const localSelectedFetchSize = selectedFetcherFilesState.size; const localSelectedAssistSize = selectedAssistantFilesState.size; const localIsPreChecking = isPreCheckingState; const localPendingFlowDetails = pendingFlowDetailsState; const localFilesFetched = filesFetchedState; const localAssistantLoading = assistantLoadingState; 
              const effectiveBranch = localManualBranchName.trim() || localTargetBranchName || 'default';
-             if (localIsPreChecking) return `Проверяю наличие PR/ветки для '${localPendingFlowDetails?.targetPath.split('/').pop() ?? 'файла'}'...`;
+             if (localIsPreChecking && localPendingFlowDetails) return `Проверяю наличие PR/ветки для '${localPendingFlowDetails.targetPath.split('/').pop() ?? 'файла'}'...`;
              if (localImageReplaceTask) {
                  if (localFetchStatus === 'loading' || localFetchStatus === 'retrying') return `Гружу файл ${localImageReplaceTask.targetPath.split('/').pop()} из ветки ${effectiveBranch}...`;
                  if (localFetchStatus === 'error' || localFetchStatus === 'failed_retries') return "Твою ж! Ошибка загрузки файла. URL/ветка верные? Жми 'Попробовать Снова'.";
@@ -661,7 +658,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
 export const useRepoXmlPageContext = (): RepoXmlPageContextType => {
     const context = useContext(RepoXmlPageContext);
     if (context === undefined) { logger.fatal("useRepoXmlPageContext used outside RepoXmlPageProvider!"); throw new Error("useRepoXmlPageContext must be used within a RepoXmlPageProvider"); }
-    // Removed potentially noisy default value check for production
     return context as RepoXmlPageContextType;
 };
 
