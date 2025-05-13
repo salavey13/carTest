@@ -16,11 +16,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import {
-  FaPalette, FaFont, FaToggleOn, FaSlidersH, FaSquare, FaCheckSquare, FaMousePointer,
-  FaKeyboard, FaIdCard, FaProjectDiagram, FaExclamationTriangle, FaCogs, FaPlus, FaStar,
-  FaPaintBrush, FaCode, FaEyeSlash, FaLink, FaTrash, FaCopy, FaSave, FaPaperPlane,
-  FaMoon, FaSun // Added FaMoon, FaSun for theme toggle demo
-} from "react-icons/fa6"; // Use Fa6 consistently
+  FaPalette, FaFont, FaToggleOn, FaSlidersH, FaSquare, FaCheckSquare, FaHandPointer,
+  FaKeyboard, FaIdCard, FaDiagramProject, FaExclamationTriangle, FaGears, FaPlus, FaStar,
+  FaPaintbrush, FaCode, FaEyeSlash, FaLink, FaTrash, FaCopy, FaFloppyDisk, FaPaperPlane,
+  FaMoon, FaSun, FaUser, FaCreditCard, FaLifeRing, FaSignOutAlt, FaGoogle, FaFontAwesome,
+  FaSnowflake, FaBrain, FaBolt // Added missing icons used in examples
+} from "react-icons/fa6";
 import { cn } from "@/lib/utils";
 
 const ColorSwatch = ({ name, className, hex, hslVar }: { name: string, className: string, hex?: string, hslVar?: string }) => (
@@ -38,6 +39,7 @@ export default function StyleGuide() {
     <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pt-24 pb-16">
       <div className="container mx-auto space-y-16">
         <header className="text-center mb-12">
+           {/* Use text-shadow-neon utility */}
           <h1 className="text-5xl font-orbitron font-bold text-brand-pink text-shadow-neon mb-2 glitch" data-text="CYBERVIBE STYLE GUIDE">
             CYBERVIBE STYLE GUIDE
           </h1>
@@ -53,6 +55,7 @@ export default function StyleGuide() {
             <div>
               <h3 className="text-xl font-semibold mb-4 font-orbitron text-brand-yellow">Брендовые Цвета (HSL Vars)</h3>
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
+                 {/* Corrected class names to use HSL vars from theme */}
                 <ColorSwatch name="Purple" className="bg-brand-purple" hslVar="--brand-purple" />
                 <ColorSwatch name="Pink" className="bg-brand-pink" hslVar="--brand-pink" />
                 <ColorSwatch name="Cyan" className="bg-brand-cyan" hslVar="--brand-cyan" />
@@ -67,7 +70,7 @@ export default function StyleGuide() {
               <h3 className="text-xl font-semibold mb-4 font-orbitron text-brand-yellow">Основные Цвета UI (HSL Vars)</h3>
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
                 <ColorSwatch name="Background" className="bg-background" hslVar="--background" />
-                <ColorSwatch name="Foreground" className="bg-foreground" hslVar="--foreground" />
+                <ColorSwatch name="Foreground" className="bg-foreground border-destructive" hslVar="--foreground" /> {/* Added contrast border */}
                 <ColorSwatch name="Card" className="bg-card" hslVar="--card" />
                 <ColorSwatch name="Primary" className="bg-primary" hslVar="--primary" />
                 <ColorSwatch name="Secondary" className="bg-secondary" hslVar="--secondary" />
@@ -139,13 +142,15 @@ function greet(name: string) {
 
         {/* Buttons Section */}
         <section>
-          <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><FaMousePointer /> Кнопки</h2>
+          {/* Corrected Icon: FaMousePointer -> FaHandPointer */}
+          <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><FaHandPointer /> Кнопки</h2>
           <div className="space-y-4">
             <h3 className="text-xl font-semibold font-orbitron text-brand-yellow">Варианты</h3>
             <div className="flex flex-wrap gap-4 items-center">
+               {/* Corrected Icons: FaCogs -> FaGears, FaPaintBrush -> FaPaintbrush */}
               <Button variant="default">Primary <FaStar className="ml-2 h-3 w-3"/></Button>
-              <Button variant="secondary">Secondary <FaCogs className="ml-2 h-3 w-3"/></Button>
-              <Button variant="accent">Accent <FaPaintBrush className="ml-2 h-3 w-3"/></Button>
+              <Button variant="secondary">Secondary <FaGears className="ml-2 h-3 w-3"/></Button>
+              <Button variant="accent">Accent <FaPaintbrush className="ml-2 h-3 w-3"/></Button>
               <Button variant="destructive">Destructive <FaTrash className="ml-2 h-3 w-3"/></Button>
               <Button variant="outline">Outline <FaEyeSlash className="ml-2 h-3 w-3"/></Button>
               <Button variant="ghost">Ghost <FaCode className="ml-2 h-3 w-3"/></Button>
@@ -162,12 +167,14 @@ function greet(name: string) {
              <div className="flex flex-wrap gap-4 items-center">
               <Button variant="default">Normal</Button>
               <Button variant="default" className="hover:bg-primary/90">Hover (Simulated)</Button>
-              <Button variant="default" className="focus:ring-2 focus:ring-ring focus:ring-offset-2">Focus (Click Me)</Button>
+               {/* Corrected ring utilities to match config */}
+              <Button variant="default" className="focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background">Focus (Click Me)</Button>
               <Button variant="default" disabled>Disabled</Button>
             </div>
             <h3 className="text-xl font-semibold font-orbitron text-brand-yellow">С иконками</h3>
              <div className="flex flex-wrap gap-4 items-center">
-                <Button><FaSave className="mr-2 h-4 w-4" /> Save Changes</Button>
+                 {/* Corrected Icon: FaSave -> FaFloppyDisk */}
+                <Button><FaFloppyDisk className="mr-2 h-4 w-4" /> Save Changes</Button>
                 <Button variant="outline"><FaPaperPlane className="mr-2 h-4 w-4" /> Submit</Button>
                 <Button variant="destructive" size="icon"><FaTrash /></Button>
              </div>
@@ -186,7 +193,8 @@ function greet(name: string) {
               </div>
               <div>
                  <Label htmlFor="input-focus">Focus State</Label>
-                 <Input id="input-focus" placeholder="Focus on me" className="input-cyber focus:ring-2 focus:ring-brand-pink focus:border-brand-pink" />
+                 {/* Corrected focus ring */}
+                 <Input id="input-focus" placeholder="Focus on me" className="input-cyber focus:ring-2 focus:ring-ring focus:border-ring" />
               </div>
               <div>
                 <Label htmlFor="input-disabled">Disabled Input</Label>
@@ -196,6 +204,11 @@ function greet(name: string) {
                 <Label htmlFor="textarea-normal">Textarea</Label>
                 <Textarea id="textarea-normal" placeholder="Type long text here..." className="textarea-cyber" />
               </div>
+               <div>
+                 <Label htmlFor="textarea-focus">Textarea Focus</Label>
+                 {/* Corrected focus ring */}
+                 <Textarea id="textarea-focus" placeholder="Focus on textarea" className="textarea-cyber focus:ring-2 focus:ring-ring focus:border-ring" />
+               </div>
               <div>
                 <Label htmlFor="textarea-disabled">Disabled Textarea</Label>
                 <Textarea id="textarea-disabled" placeholder="Disabled textarea" className="textarea-cyber" disabled />
@@ -227,7 +240,8 @@ function greet(name: string) {
                  <Label htmlFor="switch-airplane">Airplane Mode</Label>
                </div>
                <div className="flex items-center space-x-2">
-                 <Switch id="switch-dark" defaultChecked className="data-[state=checked]:bg-brand-purple"/>
+                 {/* Use HSL var directly for switch color */}
+                 <Switch id="switch-dark" defaultChecked className="data-[state=checked]:bg-primary"/>
                  <Label htmlFor="switch-dark">Dark Mode <FaMoon className="inline ml-1"/></Label>
                </div>
               <div className="flex items-center space-x-2">
@@ -235,6 +249,7 @@ function greet(name: string) {
                   <Label htmlFor="switch-disabled">Disabled Switch</Label>
               </div>
                <h3 className="text-xl font-semibold font-orbitron text-brand-yellow mt-6">Slider</h3>
+               {/* Use HSL var for slider track */}
               <Slider defaultValue={[66]} max={100} step={1} className="[&>span:first-child]:bg-brand-pink"/>
               <Slider defaultValue={[33]} max={100} step={1} disabled />
             </div>
@@ -245,7 +260,7 @@ function greet(name: string) {
         <section>
           <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><FaIdCard /> Карточки</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card className="bg-dark-card border-brand-purple/50 shadow-lg shadow-brand-purple/10">
+            <Card className="bg-dark-card border-brand-purple/50 shadow-lg shadow-purple-glow"> {/* Use custom shadow */}
               <CardHeader>
                 <CardTitle className="font-orbitron text-brand-purple">Стандартная Карта</CardTitle>
                 <CardDescription className="font-mono">Базовый вид карточки</CardDescription>
@@ -257,13 +272,16 @@ function greet(name: string) {
                 <Button variant="secondary" size="sm">Действие</Button>
               </CardFooter>
             </Card>
-             <Card className="bg-card border-brand-pink/60 shadow-xl shadow-brand-pink/20 border-neon-glow">
+             {/* Use animate-neon-border-glow utility */}
+             <Card className="bg-card border-brand-pink/60 shadow-xl shadow-pink-glow animate-neon-border-glow">
               <CardHeader>
+                 {/* Use text-gradient utility */}
                 <CardTitle className="font-orbitron text-gradient">Карта с Эффектами</CardTitle>
                 <CardDescription className="font-mono text-muted-foreground">Применены neon-glow и text-gradient</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-glow text-sm">Этот контент светится. А рамка переливается!</p>
+                 {/* Use text-shadow-glow utility */}
+                <p className="text-shadow-glow text-sm">Этот контент светится. А рамка переливается!</p>
               </CardContent>
               <CardFooter className="flex justify-between">
                 <Button variant="link" size="sm" className="text-brand-cyan">Подробнее</Button>
@@ -287,15 +305,18 @@ function greet(name: string) {
 
          {/* Other UI Elements */}
         <section>
-          <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><FaProjectDiagram /> Другие Элементы</h2>
+           {/* Corrected Icon: FaProjectDiagram -> FaDiagramProject */}
+          <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><FaDiagramProject /> Другие Элементы</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              <div>
                 <h3 className="text-xl font-semibold font-orbitron text-brand-yellow mb-4">Dropdown Menu</h3>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                    <Button variant="outline">Открыть Меню <FaCogs className="ml-2 h-4 w-4"/></Button>
+                     {/* Corrected Icon: FaCogs -> FaGears */}
+                    <Button variant="outline">Открыть Меню <FaGears className="ml-2 h-4 w-4"/></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-56">
+                    {/* Added missing icon imports FaUser, FaCreditCard, FaLifeRing, FaSignOutAlt */}
                     <DropdownMenuItem><VibeContentRenderer content="::FaUser:: Профиль"/> </DropdownMenuItem>
                     <DropdownMenuItem><VibeContentRenderer content="::FaCreditCard:: Биллинг"/></DropdownMenuItem>
                     <DropdownMenuItem disabled><VibeContentRenderer content="::FaLifeRing:: Поддержка (Неактивно)"/></DropdownMenuItem>
@@ -307,6 +328,7 @@ function greet(name: string) {
                 <h3 className="text-xl font-semibold font-orbitron text-brand-yellow mb-4">Пример с VibeContentRenderer</h3>
                  <div className="bg-dark-card p-4 rounded-lg border border-border space-y-2">
                     <VibeContentRenderer content="Это **жирный** текст с иконкой ::FaStar color='gold':: и *курсивом*." className="text-sm"/>
+                     {/* Added missing icon imports FaGoogle, FaFontAwesome */}
                     <VibeContentRenderer content="Ссылка на [Google](https://google.com) ::FaGoogle:: и FontAwesome ::FaFontAwesome::" className="text-sm"/>
                     <VibeContentRenderer content="Ошибка: [?] Неизвестная иконка ::FaInvalidIcon::" className="text-sm text-red-500"/>
                  </div>
@@ -316,28 +338,32 @@ function greet(name: string) {
 
         {/* Effects & Utilities Section */}
         <section>
-          <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><FaPaintBrush /> Эффекты и Утилиты</h2>
+           {/* Corrected Icon: FaPaintBrush -> FaPaintbrush */}
+          <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><FaPaintbrush /> Эффекты и Утилиты</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              <div className="space-y-4">
                 <h3 className="text-xl font-semibold font-orbitron text-brand-yellow">Текстовые Эффекты</h3>
                  <p className="cyber-text text-lg" data-text="Cyber Text (.cyber-text)">Cyber Text (.cyber-text)</p>
                  <p className="text-lg text-gradient">Text Gradient (.text-gradient)</p>
-                 <p className="text-lg text-glow">Text Glow (.text-glow)</p>
-                 <p className="text-lg text-shadow-neon">Neon Shadow (.text-shadow-neon)</p>
-                 <p className="text-lg text-shadow-cyber">Cyber Shadow (.text-shadow-cyber)</p>
+                 <p className="text-lg text-shadow-glow animate-pulse">Text Glow (.text-shadow-glow)</p> {/* Used utility */}
+                 <p className="text-lg text-shadow-neon">Neon Shadow (.text-shadow-neon)</p> {/* Used utility */}
+                 <p className="text-lg text-shadow-cyber">Cyber Shadow (.text-shadow-cyber)</p> {/* Used utility */}
                  <p className="text-lg text-animated-gradient">Animated Gradient Text (.text-animated-gradient)</p>
                  <p className="text-lg glitch" data-text="Glitch Effect (.glitch)">Glitch Effect (.glitch)</p>
              </div>
              <div className="space-y-4">
                  <h3 className="text-xl font-semibold font-orbitron text-brand-yellow">Элементы с Эффектами</h3>
-                 <div className="p-4 rounded-lg border-2 border-neon-glow bg-card">
-                     Border Neon Glow (.border-neon-glow)
+                  {/* Use animate-neon-border-glow utility */}
+                 <div className="p-4 rounded-lg border-2 animate-neon-border-glow bg-card">
+                     Border Neon Glow (.animate-neon-border-glow)
                  </div>
+                   {/* Use shadow-glow utility */}
                   <div className="p-4 rounded-lg border border-brand-purple/50 bg-card shadow-glow">
-                     Shadow Glow (.shadow-glow on parent)
+                     Shadow Glow (.shadow-glow)
                  </div>
-                 <div className="p-4 rounded-lg border border-dashed border-border glitch-border-animate bg-card">
-                     Glitch Border (.glitch-border-animate)
+                  {/* Use animate-glitch-border utility */}
+                 <div className="p-4 rounded-lg border border-dashed border-border animate-glitch-border bg-card">
+                     Glitch Border (.animate-glitch-border)
                  </div>
                   <div className="h-24 rounded-lg bg-grid-pattern flex items-center justify-center text-sm text-brand-purple/70 border border-brand-purple/20">
                       Grid Pattern (.bg-grid-pattern)
