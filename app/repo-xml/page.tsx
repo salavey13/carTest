@@ -176,7 +176,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
     const { user } = useAppContext();
     const pageContext = useRepoXmlPageContext();
-    const { info: toastInfo } = useAppToast();
+    const { info: toastInfo, error: toastError } = useAppToast();
 
     const [lang, setLang] = useState<keyof typeof translations>('en');
     const [t, setT] = useState<typeof translations.en | null>(null);
@@ -187,10 +187,8 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const [isCyberVibeVisible, setIsCyberVibeVisible] = useState(true);
     const [isCommunityWisdomVisible, setIsCommunityWisdomVisible] = useState(true);
     const [isPhilosophyStepsVisible, setIsPhilosophyStepsVisible] = useState(true);
-    const [isPhilosophyDetailsOpen, setIsPhilosophyDetailsOpen] = useState(false); // Philosophy <details> initially closed
     const [isCtaVisible, setIsCtaVisible] = useState(true); 
     const [sectionsCollapsed, setSectionsCollapsed] = useState(false);
-
 
     if (!pageContext || typeof pageContext.addToast !== 'function') {
          error("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!");
@@ -219,56 +217,28 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
         log(`[ActualPageContent Effect] Loading check: translations=${!!t}, resulting isPageLoading=${!t}`);
     }, [t]);
 
-    // Effect to handle master toggle for info sections
-     useEffect(() => {
-        if (!t) return; 
+    const toggleAllSections = useCallback(() => {
+        setSectionsCollapsed(prev => !prev);
+    }, []);
+
+    useEffect(() => {
+        if (!t) return; // Don't run if translations are not loaded
         const newVisibility = !sectionsCollapsed;
         setIsIntroVisible(newVisibility);
         setIsCyberVibeVisible(newVisibility);
         setIsCommunityWisdomVisible(newVisibility);
         setIsPhilosophyStepsVisible(newVisibility);
-        // If expanding all, ensure philosophy details are open (as per user request for this specific section behavior)
-        // If collapsing all, philosophy details should also close if its parent is closing.
-        // This logic is now simpler as individual close buttons are gone from these sections.
-        if (newVisibility) { // Expanding all
-            // setIsPhilosophyDetailsOpen(true); // No, details should be user-controlled or via nav
-        } else { // Collapsing all
-            setIsPhilosophyDetailsOpen(false);
-        }
-
-        // CTA is not affected by master toggle IF components are shown.
-        // If components are NOT shown, and we are "expanding" (sectionsCollapsed=false), CTA should also show.
-        if (!showComponents && !sectionsCollapsed) {
-            setIsCtaVisible(true);
-        } else if (showComponents && !sectionsCollapsed) {
-            // If components are shown and we expand all, ensure CTA is visible if it was somehow hidden.
-            // This part might be redundant if CTA is only hidden by its own X.
-            // Let's simplify: master toggle does not affect CTA if components are shown.
-        }
-
-        log(`[Effect SectionsToggle] Info sections visibility target: ${newVisibility}.`);
-    }, [sectionsCollapsed, t, showComponents]); 
-
-    const toggleAllSections = useCallback(() => {
-        setSectionsCollapsed(prev => !prev);
-    }, []);
-    
-    const handleShowComponents = useCallback(() => {
-        log("[Button Click] handleShowComponents (Reveal)");
-        setShowComponents(true);
-        setIsCtaVisible(true); 
-    
-        if (sectionsCollapsed) {
-            setSectionsCollapsed(false); 
-        }
         
-        toastInfo("Компоненты загружены!", { duration: 1500 });
-        setTimeout(() => scrollToSectionNav('extractor'), 100);
-    }, [setShowComponents, toastInfo, log, scrollToSectionNav, sectionsCollapsed]);
+        
+            setIsCtaVisible(newVisibility);
+        
+        log(`[Effect SectionsToggle] Info sections visibility set to: ${newVisibility}. CTA controlled separately: ${isCtaVisible}`);
+    }, [sectionsCollapsed, t, showComponents, isCtaVisible]); 
 
     const memoizedGetPlainText = useCallback(getPlainText, []);
     const scrollToSectionNav = useCallback((id: string) => {
         debug(`[CB ScrollNav] Attempting scroll to: ${id}`);
+        const sectionsRequiringReveal = ['extractor', 'executor', 'cybervibe-section', 'philosophy-steps', 'community-wisdom-section'];
         const targetElement = document.getElementById(id);
         const headerOffset = 80; 
 
@@ -283,28 +253,34 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
             }
         };
 
-        if (!showComponents && ['extractor', 'executor'].includes(id)) {
+        if (sectionsRequiringReveal.includes(id) && !showComponents) {
             log(`[CB ScrollNav] Revealing components for "${id}"`);
-            handleShowComponents(); 
-            return; 
-        }
-        
-        if (targetElement) {
-            // If master toggle had collapsed sections, expand them before scrolling
-            if (sectionsCollapsed) {
-                setSectionsCollapsed(false); 
-            }
-            // Ensure specific sections are visible if they were individually closed (only CTA now)
-            // For info sections, sectionsCollapsed will handle it.
-            if (id === 'philosophy-steps') {
-                setIsPhilosophyDetailsOpen(true); // Always open details when navigating to philosophy
-            }
-            requestAnimationFrame(() => scroll(targetElement));
+            setShowComponents(true);
+            setIsCtaVisible(true); // Ensure CTA is visible when components are shown for the first time
+            requestAnimationFrame(() => {
+                const el = document.getElementById(id);
+                if (el) {
+                    scroll(el);
+                } else {
+                    error(`[CB ScrollNav] Target "${id}" not found after reveal and animation frame.`);
+                }
+            });
+        } else if (targetElement) {
+            scroll(targetElement);
         } else {
             error(`[CB ScrollNav] Target element "${id}" not found.`);
         }
-    }, [showComponents, handleShowComponents, sectionsCollapsed, log, debug, error ]);
+    }, [showComponents, setShowComponents, log, debug, error]);
 
+    const handleShowComponents = useCallback(() => {
+        log("[Button Click] handleShowComponents (Reveal)");
+        setShowComponents(true);
+        if (sectionsCollapsed) { // If user had previously collapsed all, expand them when showing components
+            setSectionsCollapsed(false);
+        }
+        toastInfo("Компоненты загружены!", { duration: 1500 });
+        setTimeout(() => scrollToSectionNav('extractor'), 100);
+    }, [setShowComponents, toastInfo, log, scrollToSectionNav, sectionsCollapsed]);
 
      if (isPageLoading) {
          log(`[Render] ActualPageContent: Rendering Loading State (Waiting for translations)`);
@@ -324,7 +300,6 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const navTitleAssistant = memoizedGetPlainText(t.navAssistant);
     const masterToggleTitle = sectionsCollapsed ? t.expandAll : t.collapseAll;
 
-    // CloseButton is now only used for CTA
     const CloseButton = ({ onClick, ariaLabel }: { onClick: () => void; ariaLabel: string }) => (
         <button
             onClick={onClick}
@@ -354,7 +329,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
                     {isIntroVisible && (
                         <section id="intro" className="mb-12 text-center max-w-3xl w-full relative">
-                            {/* <CloseButton onClick={() => setIsIntroVisible(false)} ariaLabel="Close Intro Section" /> */}
+                            <CloseButton onClick={() => setIsIntroVisible(false)} ariaLabel="Close Intro Section" />
                             <div className="flex justify-center mb-4"> <FaBolt className="w-16 h-16 text-brand-yellow text-shadow-[0_0_15px_hsl(var(--brand-yellow))] animate-pulse" /> </div>
                             <h1 className="text-4xl md:text-5xl font-orbitron font-bold text-brand-yellow text-shadow-[0_0_10px_hsl(var(--brand-yellow))] mb-4">
                                <VibeContentRenderer content={t.pageTitle} />
@@ -372,7 +347,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
                     {isCyberVibeVisible && (
                         <section id="cybervibe-section" className="mb-12 w-full max-w-3xl relative">
-                            {/* <CloseButton onClick={() => setIsCyberVibeVisible(false)} ariaLabel="Close Vibe Loop Section" /> */}
+                            <CloseButton onClick={() => setIsCyberVibeVisible(false)} ariaLabel="Close Vibe Loop Section" />
                             <Card className="bg-gradient-to-br from-purple-900/40 via-black/60 to-indigo-900/40 border border-purple-600/60 shadow-xl rounded-lg p-6 backdrop-blur-sm bg-dark-card/80">
                                  <CardHeader className="p-0 mb-4">
                                      <CardTitle className="text-2xl md:text-3xl font-bold text-center text-brand-purple flex items-center justify-center gap-2">
@@ -391,7 +366,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                     
                     {isCommunityWisdomVisible && (
                         <section id="community-wisdom-section" className="mb-12 w-full max-w-3xl relative">
-                            {/* <CloseButton onClick={() => setIsCommunityWisdomVisible(false)} ariaLabel="Close Community Wisdom Section" /> */}
+                            <CloseButton onClick={() => setIsCommunityWisdomVisible(false)} ariaLabel="Close Community Wisdom Section" />
                             <h3 className="text-2xl md:text-3xl font-orbitron text-brand-cyan mb-6 text-center flex items-center justify-center gap-2">
                                <VibeContentRenderer content={t.communityWisdomTitle} />
                             </h3>
@@ -403,7 +378,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                 ].map(item => (
                                     <div key={item.videoId}>
                                         <div className={`aspect-video w-full rounded-lg overflow-hidden border-2 ${item.borderColor}/50 shadow-lg`}>
-                                            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${item.videoId}?start=${item.start}`} title={item.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${item.videoId}?start=${item.start}&mute=1`} title={item.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                         </div>
                                         <div className={`mt-3 p-3 bg-dark-card/70 border-l-4 ${item.borderColor} rounded-r-md text-muted-foreground max-w-none`}>
                                             <div className="flex items-start">
@@ -411,6 +386,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                                 <div className="prose prose-sm prose-invert max-w-none flex-grow">
                                                     <VibeContentRenderer content={item.quote} />
                                                 </div>
+                                                <VibeContentRenderer content="::FaQuoteRight className='text-current opacity-70 text-lg mr-2 shrink-0'::" />
                                             </div>
                                             <p className="text-xs text-right opacity-70 mt-1">{item.inspiredBy}</p>
                                         </div>
@@ -422,20 +398,17 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
                     {isPhilosophyStepsVisible && (
                         <section id="philosophy-steps" className="mb-12 w-full max-w-3xl relative">
-                            {/* <CloseButton onClick={() => setIsPhilosophyStepsVisible(false)} ariaLabel="Close Philosophy/Steps Section" /> */}
-                            <details className="bg-dark-card/80 border border-border rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50" open={isPhilosophyDetailsOpen}>
-                                <summary 
-                                    className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-card/50 rounded-t-lg transition-colors group"
-                                    onClick={(e) => { e.preventDefault(); setIsPhilosophyDetailsOpen(prev => !prev); }}
-                                >
+                            <CloseButton onClick={() => setIsPhilosophyStepsVisible(false)} ariaLabel="Close Philosophy/Steps Section" />
+                            <details className="bg-dark-card/80 border border-border rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50" open={!sectionsCollapsed}>
+                                <summary className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-card/50 rounded-t-lg transition-colors group">
                                     <span className="flex items-center gap-2"><FaCodeBranch /> <VibeContentRenderer content={t.philosophyTitle} /></span>
-                                    <span className={`text-xs text-gray-500 transition-transform duration-300 ${isPhilosophyDetailsOpen ? "rotate-180" : ""}`}>▼</span>
+                                    <span className="text-xs text-gray-500 group-open:rotate-180 transition-transform duration-300">▼</span>
                                 </summary>
                                 <div className="px-6 pt-2 text-muted-foreground space-y-4 text-base prose prose-invert prose-p:my-2 prose-li:my-1 prose-strong:text-brand-yellow prose-em:text-brand-cyan prose-a:text-brand-blue max-w-none">
                                      <div className="my-4 not-prose">
                                          <h4 className="text-lg font-semibold text-brand-cyan mb-2"><VibeContentRenderer content={t.philosophyVideoTitle} /></h4>
                                          <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
-                                             <iframe className="w-full h-full" src="https://www.youtube.com/embed/imxzYWYKCyQ" title="YouTube video player - Vibe Level Explanation by Salavey13" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                             <iframe className="w-full h-full" src="https://www.youtube.com/embed/imxzYWYKCyQ?mute=1" title="YouTube video player - Vibe Level Explanation by Salavey13" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                          </div>
                                      </div>
                                     <hr className="border-border my-3"/>
@@ -478,7 +451,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                         </section>
                     )}
 
-                    {showComponents && ( 
+                    {showComponents && ( // Core components are always shown if showComponents is true
                          <>
                             <h2 className="text-3xl font-bold text-center text-brand-green mb-8 animate-pulse"><VibeContentRenderer content={t.componentsTitle} /></h2>
                              <section id="extractor" className="mb-12 w-full max-w-4xl">
@@ -505,28 +478,38 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
                     {isCtaVisible && ( 
                         <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
+                            {/* Outer Border Div */}
                             <div className="relative p-1.5 rounded-xl bg-gradient-to-b from-blue-800 to-purple-700 shadow-2xl">
+                                {/* Middle Border Div */}
                                 <div className="p-1 rounded-lg bg-gradient-to-b from-orange-400 via-pink-400 to-purple-700">
+                                    {/* Content Div */}
                                     <div className="relative bg-gradient-to-b from-indigo-600 via-pink-600 to-orange-500 p-6 rounded-md prose-strong:text-yellow-200 prose-a:text-brand-blue max-w-none">
-                                        <CloseButton onClick={() => setIsCtaVisible(false)} ariaLabel="Close CTA Section" />
+                                        <button 
+                                            onClick={() => setIsCtaVisible(false)} 
+                                            className="absolute top-2 right-2 text-white/70 hover:text-white z-20 p-1 rounded-full hover:bg-black/50 transition-colors"
+                                            aria-label="Close CTA"
+                                        >
+                                            <FaCircleXmark className="w-6 h-6" />
+                                        </button>
                                         <h3 className="text-2xl font-bold text-white mb-3 prose-invert"><VibeContentRenderer content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
                                         <div className="text-white text-lg mb-4 prose-invert"> <VibeContentRenderer content={t.ctaDesc} /> </div>
                                         
                                         <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-orange-500/70 shadow-lg my-6">
-                                            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/qCkPM_f3V5c`} title="YouTube: GTA Vibe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/qCkPM_f3V5c?autoplay=1&mute=0`} title="YouTube: GTA Vibe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                         </div>
                                         
                                         <div className="mt-3 mb-4 p-3 bg-black/50 border-l-4 border-pink-500 rounded-r-md text-white max-w-none">
                                             <div className="flex items-center">
                                                 <VibeContentRenderer content="::FaQuoteLeft className='text-current opacity-80 text-xl mr-2 shrink-0'::" />
                                                 <div className="prose prose-sm prose-invert text-center flex-grow max-w-none">
-                                                    <VibeContentRenderer content={t.ctaHotChick} />
+                                                    <VibeContentRenderer content={t.ctaHotChickQuote} />
                                                 </div>
                                                 <VibeContentRenderer content="::FaQuoteRight className='text-current opacity-80 text-xl ml-2 shrink-0'::" />
                                             </div>
                                             <p className="text-xs text-right opacity-70 mt-1">- Vibe by @SALAVEY13</p>
                                         </div>
-                                        <div className="text-white text-xl font-semibold mb-4 bg-black/40 p-3 rounded prose-invert"> <FaRocket className="inline mr-2 text-cyan-300 animate-pulse"/> <VibeContentRenderer content={t.ctaHotChickQuote} /> <FaUserAstronaut className="inline ml-2 text-pink-300"/> </div>
+
+                                        
                                         <div className="text-slate-300 text-base prose-invert"> <VibeContentRenderer content={t.ctaDude} /> </div>
                                     </div>
                                 </div>
@@ -538,7 +521,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                      <motion.nav className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40" animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}>
                          <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-muted/80 backdrop-blur-sm rounded-full hover:bg-muted/60 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-foreground/80" /> </button>
                          <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-brand-purple/80 backdrop-blur-sm rounded-full hover:bg-brand-purple/70 transition shadow-md" title={navTitleVibeLoop} aria-label={navTitleVibeLoop || "Scroll to Vibe Loop"} > <FaUpLong className="text-lg text-white" /> </button>
-                         {showComponents && ( 
+                         {showComponents && ( /* Navigation for components is always available if showComponents is true, regardless of sectionsCollapsed */
                             <>
                                 <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-brand-blue/80 backdrop-blur-sm rounded-full hover:bg-brand-blue/70 transition shadow-md" title={navTitleGrabber} aria-label={navTitleGrabber || "Scroll to Grabber"} > <FaDownload className="text-lg text-white" /> </button>
                                 <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-brand-cyan/80 backdrop-blur-sm rounded-full hover:bg-brand-cyan/70 transition shadow-md" title={navTitleAssistant} aria-label={navTitleAssistant || "Scroll to Assistant"} > <FaRobot className="text-lg text-white" /> </button>
