@@ -29,6 +29,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             dbUserStatus: telegramData.dbUser?.status,
             dbUserRole: telegramData.dbUser?.role,
             isAuthenticated: telegramData.isAuthenticated,
+            isInTelegramContext: telegramData.isInTelegramContext, // Added for mock user toast logic
             isMockUser: process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' 
         }
     );
@@ -78,7 +79,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let currentToastId: string | number | undefined;
     let loadingTimer: NodeJS.Timeout | null = null;
     const LOADING_TOAST_DELAY = 300;
-    let mockUserToastId: string | number | undefined;
+    // let mockUserToastId: string | number | undefined; // Not strictly needed if we don't dismiss it manually here
 
     if (contextValue.isLoading || contextValue.isAuthenticating) { 
        loadingTimer = setTimeout(() => {
@@ -91,17 +92,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (loadingTimer) clearTimeout(loadingTimer);
         toast.dismiss("auth-loading-toast");
 
-        if (process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && document.visibilityState === 'visible') {
+        // Show mock user toast only if MOCK_USER is true AND we are NOT in a real Telegram context
+        if (process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && !contextValue.isInTelegramContext && document.visibilityState === 'visible') {
              const existingMockToast = document.querySelector('[data-sonner-toast][data-toast-id="mock-user-info-toast"]');
              if (!existingMockToast) {
-                logger.info("[AppContext] Using MOCK_USER. Displaying info toast.");
-                mockUserToastId = toast.info("Внимание: используется тестовый пользователь!", {
+                logger.info("[AppContext] Using MOCK_USER outside of Telegram. Displaying info toast.");
+                /* mockUserToastId = */ toast.info("Внимание: используется тестовый пользователь!", { // Assigning to mockUserToastId is optional
                     description: "Данные могут не сохраняться или вести себя иначе, чем в Telegram.",
                     duration: 5000,
                     id: "mock-user-info-toast" 
                 });
              }
+        } else if (contextValue.isInTelegramContext) {
+             // If in real Telegram context, ensure any mock user toast is dismissed
+             toast.dismiss("mock-user-info-toast");
         }
+
 
         if (contextValue.isAuthenticated && !contextValue.error) {
              if (document.visibilityState === 'visible') {
@@ -121,9 +127,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (loadingTimer) {
             clearTimeout(loadingTimer);
         }
+        // Do not dismiss mock-user-info-toast here, as it might be needed across re-renders if conditions persist
     };
-  }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.isAuthenticating, contextValue.error]);
-
+  }, [contextValue.isAuthenticated, contextValue.isLoading, contextValue.isAuthenticating, contextValue.error, contextValue.isInTelegramContext]); // Added isInTelegramContext
 
   return <AppContext.Provider value={contextValue as AppContextData}>{children}</AppContext.Provider>;
 };
