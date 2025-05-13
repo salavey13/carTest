@@ -21,7 +21,7 @@ import {
     FaToolbox, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket,
     FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye,
     FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash,
-    FaUserNinja, FaVialCircleCheck
+    FaUserNinja, FaVialCircleCheck, FaUndo
 } from "react-icons/fa6";
 import Link from "next/link";
 import { motion } from 'framer-motion';
@@ -140,15 +140,6 @@ const translations = {
 };
 // --- End I18N ---
 
-interface SectionVisibility {
-  intro: boolean;
-  cyberVibe: boolean;
-  communityWisdom: boolean;
-  philosophySteps: boolean;
-  philosophyDetails: boolean; // For the <details> tag inside philosophySteps
-  cta: boolean;
-}
-
 // --- Fallback component for AutomationBuddy ---
 function LoadingBuddyFallback() {
     return ( <div className="fixed bottom-4 right-4 z-50 w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 animate-pulse" aria-hidden="true" ></div> );
@@ -190,17 +181,14 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const [t, setT] = useState<typeof translations.en | null>(null);
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
     
-    const initialVisibility: SectionVisibility = {
-      intro: true,
-      cyberVibe: true,
-      communityWisdom: true,
-      philosophySteps: true,
-      philosophyDetails: false, // Philosophy <details> initially closed
-      cta: true,
-    };
-    const [sectionsVisibility, setSectionsVisibility] = useState<SectionVisibility>(initialVisibility);
-    // sectionsCollapsed: true if master toggle wants to collapse info sections
-    const [sectionsCollapsed, setSectionsCollapsed] = useState(false); 
+    // State for sections visibility
+    const [isIntroVisible, setIsIntroVisible] = useState(true);
+    const [isCyberVibeVisible, setIsCyberVibeVisible] = useState(true);
+    const [isCommunityWisdomVisible, setIsCommunityWisdomVisible] = useState(true);
+    const [isPhilosophyStepsVisible, setIsPhilosophyStepsVisible] = useState(true);
+    const [isPhilosophyDetailsOpen, setIsPhilosophyDetailsOpen] = useState(false); // Philosophy <details> initially closed
+    const [isCtaVisible, setIsCtaVisible] = useState(true); 
+    const [sectionsCollapsed, setSectionsCollapsed] = useState(false);
 
 
     if (!pageContext || typeof pageContext.addToast !== 'function') {
@@ -229,39 +217,40 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
         setIsPageLoading(!t);
         log(`[ActualPageContent Effect] Loading check: translations=${!!t}, resulting isPageLoading=${!t}`);
     }, [t]);
-    
-    // Effect to handle master toggle for info sections
-    useEffect(() => {
-        if (!t) return; 
-        const newGlobalVisibility = !sectionsCollapsed;
-        setSectionsVisibility(prev => ({
-            ...prev, // Preserve CTA and PhilosophyDetails state
-            intro: newGlobalVisibility,
-            cyberVibe: newGlobalVisibility,
-            communityWisdom: newGlobalVisibility,
-            philosophySteps: newGlobalVisibility,
-            // philosophyDetails is controlled independently by its summary click
-            // CTA is also controlled independently by its own X button,
-            // unless showComponents is false, then it's hidden.
-        }));
-        log(`[Effect MasterToggle] Info sections visibility target: ${newGlobalVisibility}. sectionsCollapsed: ${sectionsCollapsed}`);
-    }, [sectionsCollapsed, t, log]);
-
 
     const toggleAllSections = useCallback(() => {
-        setSectionsCollapsed(prev => !prev);
-    }, []);
+        const newCollapsedState = !sectionsCollapsed;
+        setSectionsCollapsed(newCollapsedState);
+        // When using the master toggle, all sections follow this state
+        const newVisibility = !newCollapsedState;
+        setIsIntroVisible(newVisibility);
+        setIsCyberVibeVisible(newVisibility);
+        setIsCommunityWisdomVisible(newVisibility);
+        setIsPhilosophyStepsVisible(newVisibility);
+        // philosophyDetails is NOT directly controlled by master toggle, user controls it.
+        // CTA visibility is also NOT directly controlled here if components are shown.
+        if (showComponents && isCtaVisible !== newVisibility && newCollapsedState === false) {
+            // If expanding all and CTA was hidden, show it.
+            // If collapsing all, CTA is not affected by this button if components are shown.
+            setIsCtaVisible(true); 
+        }
+        log(`[CB MasterToggle] Info sections visibility set to: ${newVisibility}. SectionsCollapsed: ${newCollapsedState}`);
+    }, [sectionsCollapsed, showComponents, isCtaVisible, log]);
     
     const handleShowComponents = useCallback(() => {
         log("[Button Click] handleShowComponents (Reveal)");
         setShowComponents(true);
-        
-        // If master toggle had collapsed sections, expand them all (except philosophyDetails)
-        if (sectionsCollapsed) { 
-            setSectionsCollapsed(false); 
+        setIsCtaVisible(true); // Explicitly show CTA
+    
+        // If master toggle had collapsed sections, expand them
+        if (sectionsCollapsed) {
+            setSectionsCollapsed(false); // This will trigger the effect below to show all sections
+            setIsIntroVisible(true);
+            setIsCyberVibeVisible(true);
+            setIsCommunityWisdomVisible(true);
+            setIsPhilosophyStepsVisible(true);
+            // isPhilosophyDetailsOpen remains user-controlled
         }
-        // Always ensure CTA is visible when components are shown for the first time or explicitly
-        setSectionsVisibility(prev => ({ ...prev, cta: true }));
         
         toastInfo("Компоненты загружены!", { duration: 1500 });
         setTimeout(() => scrollToSectionNav('extractor'), 100);
@@ -291,19 +280,29 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
         }
         
         if (targetElement) {
-             // Ensure the parent section is visible if navigating via quick nav
-            if (id === 'intro' && sectionsCollapsed) setSectionsCollapsed(false);
-            if (id === 'cybervibe-section' && sectionsCollapsed) setSectionsCollapsed(false);
-            if (id === 'community-wisdom-section' && sectionsCollapsed) setSectionsCollapsed(false);
+            // Ensure the specific section is visible if it was individually closed OR master-closed
+            if (id === 'intro' && (!isIntroVisible || sectionsCollapsed)) {
+                setIsIntroVisible(true); 
+                if(sectionsCollapsed) setSectionsCollapsed(false);
+            }
+            if (id === 'cybervibe-section' && (!isCyberVibeVisible || sectionsCollapsed)) {
+                setIsCyberVibeVisible(true);
+                if(sectionsCollapsed) setSectionsCollapsed(false);
+            }
+            if (id === 'community-wisdom-section' && (!isCommunityWisdomVisible || sectionsCollapsed)) {
+                setIsCommunityWisdomVisible(true);
+                if(sectionsCollapsed) setSectionsCollapsed(false);
+            }
             if (id === 'philosophy-steps') {
-                 if (sectionsCollapsed) setSectionsCollapsed(false); // Show main section
-                 setSectionsVisibility(prev => ({ ...prev, philosophyDetails: true })); // Open details
+                if(!isPhilosophyStepsVisible || sectionsCollapsed) setIsPhilosophyStepsVisible(true);
+                if(sectionsCollapsed) setSectionsCollapsed(false);
+                setIsPhilosophyDetailsOpen(true); // Also open details
             }
             requestAnimationFrame(() => scroll(targetElement));
         } else {
             error(`[CB ScrollNav] Target element "${id}" not found.`);
         }
-    }, [showComponents, handleShowComponents, sectionsCollapsed, log, debug, error, setSectionsVisibility]);
+    }, [showComponents, handleShowComponents, isIntroVisible, isCyberVibeVisible, isCommunityWisdomVisible, isPhilosophyStepsVisible, sectionsCollapsed, log, debug, error ]);
 
 
      if (isPageLoading) {
@@ -324,6 +323,16 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const navTitleAssistant = memoizedGetPlainText(t.navAssistant);
     const masterToggleTitle = sectionsCollapsed ? t.expandAll : t.collapseAll;
 
+    const CloseButton = ({ onClick, ariaLabel }: { onClick: () => void; ariaLabel: string }) => (
+        <button
+            onClick={onClick}
+            className="absolute top-2 right-2 text-slate-400 hover:text-white z-20 p-1 rounded-full hover:bg-black/30 transition-colors"
+            aria-label={ariaLabel}
+        >
+            <FaCircleXmark className="w-5 h-5" />
+        </button>
+    );
+
     log("[ActualPageContent] Preparing to render JSX...");
 
     try {
@@ -341,9 +350,9 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                         {sectionsCollapsed ? <FaAnglesUp className="w-5 h-5" /> : <FaAnglesDown className="w-5 h-5" />}
                     </button>
 
-                    {sectionsVisibility.intro && (
+                    {isIntroVisible && (
                         <section id="intro" className="mb-12 text-center max-w-3xl w-full relative">
-                            {/* No individual close button for intro */}
+                            <CloseButton onClick={() => setIsIntroVisible(false)} ariaLabel="Close Intro Section" />
                             <div className="flex justify-center mb-4"> <FaBolt className="w-16 h-16 text-brand-yellow text-shadow-[0_0_15px_hsl(var(--brand-yellow))] animate-pulse" /> </div>
                             <h1 className="text-4xl md:text-5xl font-orbitron font-bold text-brand-yellow text-shadow-[0_0_10px_hsl(var(--brand-yellow))] mb-4">
                                <VibeContentRenderer content={t.pageTitle} />
@@ -359,9 +368,9 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                         </section>
                     )}
 
-                    {sectionsVisibility.cyberVibe && (
+                    {isCyberVibeVisible && (
                         <section id="cybervibe-section" className="mb-12 w-full max-w-3xl relative">
-                             {/* No individual close button for cyberVibe */}
+                            <CloseButton onClick={() => setIsCyberVibeVisible(false)} ariaLabel="Close Vibe Loop Section" />
                             <Card className="bg-gradient-to-br from-purple-900/40 via-black/60 to-indigo-900/40 border border-purple-600/60 shadow-xl rounded-lg p-6 backdrop-blur-sm bg-dark-card/80">
                                  <CardHeader className="p-0 mb-4">
                                      <CardTitle className="text-2xl md:text-3xl font-bold text-center text-brand-purple flex items-center justify-center gap-2">
@@ -378,9 +387,9 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                          </section>
                      )}
                     
-                    {sectionsVisibility.communityWisdom && (
+                    {isCommunityWisdomVisible && (
                         <section id="community-wisdom-section" className="mb-12 w-full max-w-3xl relative">
-                            {/* No individual close button for communityWisdom */}
+                            <CloseButton onClick={() => setIsCommunityWisdomVisible(false)} ariaLabel="Close Community Wisdom Section" />
                             <h3 className="text-2xl md:text-3xl font-orbitron text-brand-cyan mb-6 text-center flex items-center justify-center gap-2">
                                <VibeContentRenderer content={t.communityWisdomTitle} />
                             </h3>
@@ -409,16 +418,16 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                         </section>
                     )}
 
-                    {sectionsVisibility.philosophySteps && (
+                    {isPhilosophyStepsVisible && (
                         <section id="philosophy-steps" className="mb-12 w-full max-w-3xl relative">
-                             {/* No individual close button for philosophySteps */}
-                            <details className="bg-dark-card/80 border border-border rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50" open={sectionsVisibility.philosophyDetails}>
+                            <CloseButton onClick={() => setIsPhilosophyStepsVisible(false)} ariaLabel="Close Philosophy/Steps Section" />
+                            <details className="bg-dark-card/80 border border-border rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50" open={isPhilosophyDetailsOpen}>
                                 <summary 
                                     className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-card/50 rounded-t-lg transition-colors group"
-                                    onClick={(e) => { e.preventDefault(); setSectionsVisibility(prev => ({ ...prev, philosophyDetails: !prev.philosophyDetails })); }}
+                                    onClick={(e) => { e.preventDefault(); setIsPhilosophyDetailsOpen(prev => !prev); }}
                                 >
                                     <span className="flex items-center gap-2"><FaCodeBranch /> <VibeContentRenderer content={t.philosophyTitle} /></span>
-                                    <span className={`text-xs text-gray-500 transition-transform duration-300 ${sectionsVisibility.philosophyDetails ? "rotate-180" : ""}`}>▼</span>
+                                    <span className={`text-xs text-gray-500 transition-transform duration-300 ${isPhilosophyDetailsOpen ? "rotate-180" : ""}`}>▼</span>
                                 </summary>
                                 <div className="px-6 pt-2 text-muted-foreground space-y-4 text-base prose prose-invert prose-p:my-2 prose-li:my-1 prose-strong:text-brand-yellow prose-em:text-brand-cyan prose-a:text-brand-blue max-w-none">
                                      <div className="my-4 not-prose">
@@ -492,18 +501,12 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                          </>
                      )}
 
-                    {showComponents && sectionsVisibility.cta && ( 
+                    {isCtaVisible && ( 
                         <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
                             <div className="relative p-1.5 rounded-xl bg-gradient-to-b from-blue-800 to-purple-700 shadow-2xl">
                                 <div className="p-1 rounded-lg bg-gradient-to-b from-orange-400 via-pink-400 to-purple-700">
                                     <div className="relative bg-gradient-to-b from-indigo-600 via-pink-600 to-orange-500 p-6 rounded-md prose-strong:text-yellow-200 prose-a:text-brand-blue max-w-none">
-                                        <button 
-                                            onClick={() => setSectionsVisibility(prev => ({...prev, cta: false}))} 
-                                            className="absolute top-2 right-2 text-white/70 hover:text-white z-20 p-1 rounded-full hover:bg-black/50 transition-colors"
-                                            aria-label="Close CTA"
-                                        >
-                                            <FaCircleXmark className="w-6 h-6" />
-                                        </button>
+                                        <CloseButton onClick={() => setIsCtaVisible(false)} ariaLabel="Close CTA Section" />
                                         <h3 className="text-2xl font-bold text-white mb-3 prose-invert"><VibeContentRenderer content={t?.ctaTitle?.replace('{USERNAME}', userName) ?? ''} /></h3>
                                         <div className="text-white text-lg mb-4 prose-invert"> <VibeContentRenderer content={t.ctaDesc} /> </div>
                                         
@@ -521,7 +524,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                             </div>
                                             <p className="text-xs text-right opacity-70 mt-1">- Vibe by @SALAVEY13</p>
                                         </div>
-                                        <div className="text-white text-xl font-semibold mb-4 bg-black/40 p-3 rounded prose-invert"> <FaRocket className="inline mr-2 text-cyan-300 animate-pulse"/> Hit me up <FaUserAstronaut className="inline ml-2 text-pink-300"/> </div>
+                                        <div className="text-white text-xl font-semibold mb-4 bg-black/40 p-3 rounded prose-invert"> <FaRocket className="inline mr-2 text-cyan-300 animate-pulse"/> <VibeContentRenderer content={t.ctaHotChickQuote} /> <FaUserAstronaut className="inline ml-2 text-pink-300"/> </div>
                                         <div className="text-slate-300 text-base prose-invert"> <VibeContentRenderer content={t.ctaDude} /> </div>
                                     </div>
                                 </div>
