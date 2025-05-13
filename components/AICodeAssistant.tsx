@@ -100,7 +100,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         pageContext,
         aiResponseInputRefPassed,
         kworkInputRefPassed,
-        setJustParsedFlagForScrollFix: setJustParsed, // Pass setter for scroll fix
+        setJustParsedFlagForScrollFix: setJustParsed, 
     });
     
     // --- Destructure handlers ---
@@ -141,14 +141,13 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const derivedRepoUrlForHooks = repoUrlStateLocal || repoUrlFromContext || "";
 
     // --- Effects ---
-    useEffect(() => { // Scroll fix: Focus textarea after parsing
+    useEffect(() => { 
         if (justParsed) {
             aiResponseInputRefPassed.current?.focus();
-            // Optional: aiResponseInputRefPassed.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            setJustParsed(false); // Reset the flag immediately
+            setJustParsed(false); 
             logger.log("[Effect justParsed] Focused AI response textarea to stabilize scroll.");
         }
-    }, [justParsed, aiResponseInputRefPassed]); // Depend only on the flag and the ref
+    }, [justParsed, aiResponseInputRefPassed]); 
 
     useEffect(() => { 
         logger.debug("[Effect Mount] AICodeAssistant Mounted");
@@ -162,7 +161,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             logger.info(`[Effect Mount] Triggering initial PRs for ${initialRepoUrl}`);
             triggerGetOpenPRs(initialRepoUrl);
         } else { logger.debug(`[Effect Mount] Skipping initial PRs (no valid URL yet)`); }
-    }, [triggerGetOpenPRs, repoUrlStateLocal, repoUrlFromContext, imageReplaceTask, pendingFlowDetails]); // Removed redundant dependencies
+    }, [triggerGetOpenPRs, repoUrlStateLocal, repoUrlFromContext, imageReplaceTask, pendingFlowDetails]); 
 
     useEffect(() => { 
         setFilesParsed(componentParsedFiles.length > 0);
@@ -216,7 +215,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         handleDirectImageReplace: (task: ImageReplaceTask, files: FileNode[]) => {
             return handlers.handleDirectImageReplace(task, files);
         },
-    }), [handlers, setResponseValue, updateRepoUrl]); // handlers includes dependencies via useAICodeAssistantHandlers
+    }), [handlers, setResponseValue, updateRepoUrl]); // Correct dependency array
     
     // --- Derived State for Rendering ---
     const effectiveIsParsing = contextIsParsing ?? hookIsParsing;
@@ -237,27 +236,28 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     
     // --- FINAL RENDER ---
     return (
-        <div id="executor" className="p-4 bg-gray-900 text-white font-mono rounded-xl shadow-[0_0_15px_rgba(var(--brand-green-rgb),0.3)] relative overflow-hidden flex flex-col gap-4">
+        <div id="executor" className="p-4 bg-card text-foreground font-mono rounded-xl shadow-[0_0_15px_hsl(var(--brand-green)/0.3)] relative overflow-hidden flex flex-col gap-4 border border-border">
             <header className="flex justify-between items-center gap-2 flex-wrap">
                  <div className="flex items-center gap-2">
-                     <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#E1FF01] text-shadow-[0_0_10px_hsl(var(--brand-yellow))] animate-pulse">
+                     <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-brand-yellow text-shadow-[0_0_10px_hsl(var(--brand-yellow))]">
                          {showImageReplaceUI ? (imageTaskFailed ? "🖼️ Ошибка Замены Картинки" : "🖼️ Статус Замены Картинки") : "🤖 AI Code Assistant"}
                      </h1>
-                     {showStandardAssistantUI && ( <button className="cursor-help p-1" title={assistantTooltipText}> <FaCircleInfo className="text-blue-400 hover:text-blue-300 transition" /> </button> )}
+                     {showStandardAssistantUI && ( <button className="cursor-help p-1" title={assistantTooltipText}> <FaCircleInfo className="text-brand-blue hover:text-brand-blue/80 transition" /> </button> )}
                  </div>
-                 <button id="settings-modal-trigger-assistant" onClick={() => { triggerToggleSettingsModal(); }} className="p-2 text-gray-400 hover:text-cyan-400 transition rounded-full hover:bg-gray-700/50 disabled:opacity-50" disabled={isProcessingAny} title="Настройки URL / Token / Ветки / PRs" > <FaCodeBranch className="text-xl" /> </button>
+                 <button id="settings-modal-trigger-assistant" onClick={() => { triggerToggleSettingsModal(); }} className="p-2 text-muted-foreground hover:text-brand-cyan transition rounded-full hover:bg-muted/50 disabled:opacity-50" disabled={isProcessingAny} title="Настройки URL / Token / Ветки / PRs" > <FaCodeBranch className="text-xl" /> </button>
              </header>
 
-            {/* --- Standard Assistant UI --- */}
             {showStandardAssistantUI && (
                  <>
                      <div>
-                          <p className="text-yellow-400 mb-2 text-xs md:text-sm min-h-[18px]"> {isWaitingForAiResponse ? `⏳ Жду AI... (ID: ${currentAiRequestId?.substring(0,6)}...)` : isProcessingAny ? "⏳ Обработка..." : "2️⃣ Вставь ответ AI или жди. Затем '➡️'."} </p>
+                          <p className="text-brand-yellow mb-2 text-xs md:text-sm min-h-[18px]">
+                              {isWaitingForAiResponse ? `⏳ Жду AI... (ID: ${currentAiRequestId?.substring(0,6)}...)` : isProcessingAny ? "⏳ Обработка..." : "2️⃣ Вставь ответ AI или жди. Затем '➡️'."}
+                          </p>
                           <div className="relative group">
                               <textarea
                                  id="response-input"
                                  ref={aiResponseInputRefPassed}
-                                 className="w-full p-3 pr-16 bg-gray-800 rounded-lg border border-gray-700 focus:border-cyan-500 focus:outline-none transition shadow-[0_0_8px_rgba(var(--brand-green-rgb),0.3)] text-sm min-h-[180px] resize-y simple-scrollbar"
+                                 className="w-full p-3 pr-16 bg-input rounded-lg border border-border focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan focus:outline-none transition shadow-inner text-sm min-h-[180px] resize-y simple-scrollbar"
                                  defaultValue={response}
                                  onChange={(e) => setResponseValue(e.target.value)}
                                  placeholder={isWaitingForAiResponse ? "AI думает..." : isProcessingAny ? "Ожидание..." : "Ответ AI здесь..."}
@@ -281,7 +281,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                                   status={validationStatus}
                                   issues={validationIssues}
                                   onAutoFix={handlers.handleAutoFix}
-                                  onCopyPrompt={() => {}} // Placeholder, copy prompt logic might be elsewhere
                                   isFixDisabled={fixButtonDisabled}
                                />
                           </div>
@@ -326,37 +325,42 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                         />
                          <button
                             onClick={() => { setIsImageModalOpen(true); }}
-                            className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition shadow-[0_0_12px_rgba(var(--brand-green-rgb),0.3)] hover:ring-1 hover:ring-cyan-500 disabled:opacity-50 relative"
+                            className="flex items-center gap-2 px-3 py-2 bg-card rounded-full hover:bg-muted transition shadow-[0_0_12px_hsl(var(--brand-green)/0.3)] hover:ring-1 hover:ring-brand-cyan disabled:opacity-50 relative"
                             disabled={isProcessingAny}
                             title="Загрузить/Связать Картинки (prompts_imgs.txt)"
                          >
-                             <FaImage className="text-gray-400" />
-                             <span className="text-sm text-white">Картинки</span>
+                             <FaImage className="text-muted-foreground" />
+                             <span className="text-sm text-foreground">Картинки</span>
                              {componentParsedFiles.some(f => f.path === '/prompts_imgs.txt') && !isImageModalOpen && (
-                                <span className="absolute -top-1 -right-1 w-3 h-3 bg-indigo-500 rounded-full border-2 border-gray-800 shadow-md animate-pulse"></span>
+                                <span className="absolute -top-1 -right-1 w-3 h-3 bg-brand-blue rounded-full border-2 border-card shadow-md animate-pulse"></span>
                              )}
                          </button>
                     </div>
                  </>
             )}
 
-            {/* --- Image Replace UI --- */}
             {showImageReplaceUI && (
-                 <div className={`flex flex-col items-center justify-center text-center p-6 bg-gray-800/50 rounded-lg border border-dashed min-h-[200px] ${imageTaskFailed ? 'border-red-500' : 'border-blue-400'}`}>
-                     {assistantLoading ? <FaSpinner className="text-purple-400 text-4xl mb-4 animate-spin" />
-                       : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? <FaSpinner className="text-blue-400 text-4xl mb-4 animate-spin" />
-                       : imageTaskFailed ? <FaCircleXmark className="text-red-400 text-4xl mb-4" />
-                       : imageReplaceTask ? <FaImages className="text-blue-400 text-4xl mb-4" />
-                       : <FaCheck className="text-green-400 text-4xl mb-4" />
+                 <div className={clsx(
+                     "flex flex-col items-center justify-center text-center p-6 bg-card/50 rounded-lg border border-dashed min-h-[200px]",
+                     imageTaskFailed ? 'border-destructive' : 'border-brand-blue'
+                 )}>
+                     {assistantLoading ? <FaSpinner className="text-brand-purple text-4xl mb-4 animate-spin" />
+                       : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? <FaSpinner className="text-brand-blue text-4xl mb-4 animate-spin" />
+                       : imageTaskFailed ? <FaCircleXmark className="text-destructive text-4xl mb-4" />
+                       : imageReplaceTask ? <FaImages className="text-brand-blue text-4xl mb-4" />
+                       : <FaCheck className="text-brand-green text-4xl mb-4" />
                      }
-                     <p className={`text-lg font-semibold ${imageTaskFailed ? 'text-red-300' : 'text-blue-300'}`}>
+                     <p className={clsx(
+                         "text-lg font-semibold",
+                         imageTaskFailed ? 'text-destructive' : 'text-brand-blue'
+                     )}>
                          {assistantLoading ? "Обработка Замены..."
                            : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Загрузка Файла..."
                            : imageTaskFailed ? "Ошибка Замены Картинки"
                            : imageReplaceTask ? "Задача Замены Активна"
                            : "Процесс Замены Завершен"}
                      </p>
-                     <p className="text-sm text-gray-400 mt-2">
+                     <p className="text-sm text-muted-foreground mt-2">
                           {assistantLoading ? "Меняю URL в файле и создаю/обновляю PR..."
                            : (fetchStatus === 'loading' || fetchStatus === 'retrying') ? "Ожидание ответа от GitHub..."
                            : imageTaskFailed ? (imageReplaceError || "Произошла неизвестная ошибка.")
@@ -364,22 +368,21 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                            : "Задача выполнена или сброшена."}
                      </p>
                      {imageReplaceTask && (
-                         <div className="mt-3 text-xs text-gray-500 break-all text-left bg-gray-900/50 p-2 rounded max-w-full overflow-x-auto simple-scrollbar">
-                             <p><span className="font-semibold text-gray-400">Файл:</span> {imageReplaceTask.targetPath}</p>
-                             <p><span className="font-semibold text-gray-400">Старый URL:</span> {imageReplaceTask.oldUrl}</p>
-                             <p><span className="font-semibold text-gray-400">Новый URL:</span> {imageReplaceTask.newUrl}</p>
+                         <div className="mt-3 text-xs text-muted-foreground break-all text-left bg-input/50 p-2 rounded max-w-full overflow-x-auto simple-scrollbar">
+                             <p><span className="font-semibold text-foreground">Файл:</span> {imageReplaceTask.targetPath}</p>
+                             <p><span className="font-semibold text-foreground">Старый URL:</span> {imageReplaceTask.oldUrl}</p>
+                             <p><span className="font-semibold text-foreground">Новый URL:</span> {imageReplaceTask.newUrl}</p>
                          </div>
                      )}
                      {imageTaskFailed && (
                           <button
                               onClick={handleResetImageError}
-                              className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs rounded-md transition"
+                              className="mt-4 px-4 py-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs rounded-md transition"
                           > Сбросить Ошибку </button>
                       )}
                  </div>
              )}
 
-            {/* --- Modals --- */}
             <AnimatePresence>
                 {showStandardAssistantUI && showModal && (
                     <SwapModal isOpen={showModal} onClose={() => setShowModal(false)} onSwap={handlers.handleSwap} onSearch={handlers.handleSearch} initialMode={modalMode} />

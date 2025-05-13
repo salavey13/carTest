@@ -62,19 +62,18 @@ const RequestInput: React.FC<RequestInputProps> = ({
     return (
         <TooltipProvider>
             <div className="flex flex-col gap-3">
-                <div className="relative"> {/* Удален класс 'group' т.к. hover/focus эффекты для кнопок убраны */}
+                <div className="relative">
                     <Textarea
                         ref={kworkInputRef}
                         id="kworkInput"
                         value={kworkInputValue ?? ''} // Гарантируем строку здесь
                         onChange={(e) => onValueChange(e.target.value)}
-                        className="w-full p-3 pr-10 bg-gray-800 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none transition shadow-[0_0_8px_rgba(168,85,247,0.3)] text-sm min-h-[150px] resize-y simple-scrollbar"
+                        className="textarea-cyber" // Используем стиль из globals.css
                         placeholder="4. Напиши свой запрос к AI здесь ИЛИ добавь выбранные файлы как контекст ->"
                         spellCheck="false"
                         disabled={isActionDisabled}
                     />
                     {/* --- Блок кнопок утилиты --- */}
-                    {/* Удалены классы opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200 */}
                     <div className="absolute top-2 right-2 flex flex-col gap-1.5">
                         {/* НОВАЯ КНОПКА: Копировать Системный Промпт */}
                         <Tooltip delayDuration={100}>
@@ -84,32 +83,32 @@ const RequestInput: React.FC<RequestInputProps> = ({
                                     size="icon"
                                     onClick={handleCopySystemPrompt}
                                     disabled={isActionDisabled} // Дизейблим вместе с остальными
-                                    className="h-7 w-7 text-gray-400 hover:text-yellow-400 hover:bg-gray-700 disabled:opacity-50"
+                                    className="h-7 w-7 text-muted-foreground hover:text-brand-yellow hover:bg-muted disabled:opacity-50" // Theme colors
                                 >
                                     <FaWandMagicSparkles />
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent side="left" className="bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-1.5 rounded max-w-[200px]">Копировать СУПЕР-ПРОМПТ (вставь его боту перед запросом)</TooltipContent>
+                            <TooltipContent side="left" className="bg-popover text-popover-foreground border-border shadow-lg text-xs p-1.5 rounded max-w-[200px]">Копировать СУПЕР-ПРОМПТ (вставь его боту перед запросом)</TooltipContent>
                         </Tooltip>
 
                         {/* Копировать ТЕКУЩИЙ Запрос */}
                         <Tooltip delayDuration={100}>
                             <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={onCopyToClipboard} disabled={calculatedIsCopyDisabled} className="h-7 w-7 text-gray-400 hover:text-cyan-400 hover:bg-gray-700 disabled:opacity-50">
+                                <Button variant="ghost" size="icon" onClick={onCopyToClipboard} disabled={calculatedIsCopyDisabled} className="h-7 w-7 text-muted-foreground hover:text-brand-cyan hover:bg-muted disabled:opacity-50"> {/* Theme colors */}
                                     <FaCopy />
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent side="left" className="bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-1.5 rounded">Скопировать запрос</TooltipContent>
+                            <TooltipContent side="left" className="bg-popover text-popover-foreground border-border shadow-lg text-xs p-1.5 rounded">Скопировать запрос</TooltipContent>
                         </Tooltip>
 
                         {/* Очистить Все */}
                         <Tooltip delayDuration={100}>
                             <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={onClearAll} disabled={calculatedIsClearDisabled} className="h-7 w-7 text-gray-400 hover:text-red-500 hover:bg-gray-700 disabled:opacity-50">
+                                <Button variant="ghost" size="icon" onClick={onClearAll} disabled={calculatedIsClearDisabled} className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-muted disabled:opacity-50"> {/* Theme colors */}
                                     <FaBroom />
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent side="left" className="bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-1.5 rounded">Очистить все</TooltipContent>
+                            <TooltipContent side="left" className="bg-popover text-popover-foreground border-border shadow-lg text-xs p-1.5 rounded">Очистить все</TooltipContent>
                         </Tooltip>
                     </div>
                     {/* --- Конец блока кнопок --- */}
@@ -119,17 +118,17 @@ const RequestInput: React.FC<RequestInputProps> = ({
                      <Tooltip delayDuration={100}>
                         <TooltipTrigger asChild>
                             <Button
-                                variant="default"
+                                variant="default" // Use default primary style
                                 size="sm"
                                 onClick={onAddSelected}
                                 disabled={isAddSelectedDisabled || isActionDisabled}
-                                className="rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition-all disabled:opacity-50 px-4"
+                                className="rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50 px-4" // Use default button styling
                             >
                                 <FaPlus className="mr-2 h-4 w-4" />
                                 Добавить Выбранное ({selectedFetcherFilesCount})
                             </Button>
                         </TooltipTrigger>
-                        <TooltipContent side="bottom" className="bg-gray-800 text-gray-200 border-gray-700 shadow-lg text-xs p-1.5 rounded">
+                        <TooltipContent side="bottom" className="bg-popover text-popover-foreground border-border shadow-lg text-xs p-1.5 rounded">
                             Добавить выбранные файлы в запрос
                         </TooltipContent>
                     </Tooltip>

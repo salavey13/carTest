@@ -55,9 +55,9 @@ export const CharacterDisplay: React.FC<CharacterDisplayProps> = ({
                 transition={{ type: 'spring', stiffness: 300, damping: 15 }}
                 animate={profileJustLoaded ? {
                     scale: [1, 1.1, 1],
-                    boxShadow: ["0 0 12px rgba(0, 255, 157, 0.6)", "0 0 25px rgba(0, 255, 157, 0.9)", "0 0 12px rgba(0, 255, 157, 0.6)"]
+                    boxShadow: ["0 0 12px hsl(var(--brand-green)/0.6)", "0 0 25px hsl(var(--brand-green)/0.9)", "0 0 12px hsl(var(--brand-green)/0.6)"] // Use theme color
                 } : {}}
-                initial={{ scale: 1, boxShadow: "0 0 12px rgba(0, 255, 157, 0.6)" }}
+                initial={{ scale: 1, boxShadow: "0 0 12px hsl(var(--brand-green)/0.6)" }} // Use theme color
                 // Apply rounded-full directly here to ensure the container crops the glow
                 className="rounded-full"
             >
@@ -68,8 +68,8 @@ export const CharacterDisplay: React.FC<CharacterDisplayProps> = ({
                     width={120}
                     height={120}
                     priority
-                    // Ensure image itself is rounded
-                    className="rounded-full drop-shadow-[0_0_12px_rgba(0,255,157,0.6)] border-2 border-cyan-400/50"
+                    // Ensure image itself is rounded, use theme color for border
+                    className="rounded-full drop-shadow-[0_0_12px_hsl(var(--brand-green)/0.6)] border-2 border-brand-cyan/50"
                     unoptimized={!!githubProfile?.avatar_url}
                 />
             </motion.div>
@@ -82,7 +82,7 @@ export const CharacterDisplay: React.FC<CharacterDisplayProps> = ({
                     href={githubProfile.html_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-1 flex items-center justify-center text-xs text-cyan-400 hover:text-cyan-300 transition opacity-80 hover:opacity-100"
+                    className="mt-1 flex items-center justify-center text-xs text-brand-cyan hover:text-brand-cyan/80 transition opacity-80 hover:opacity-100" // Use theme color
                     title={`GitHub: ${githubProfile.login}`}
                 >
                     <FaGithub className="mr-1"/> {githubProfile.login}

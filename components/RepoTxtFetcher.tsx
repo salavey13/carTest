@@ -68,8 +68,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         imageReplaceTask,
         allFetchedFiles,
         assistantRef, updateRepoUrlInAssistant,
-        // getKworkInputValue, // Removed
-        // updateKworkInput, // Removed
     } = useRepoXmlPageContext();
     const { error: toastError, info: toastInfo } = useAppToast();
     logger.debug("[RepoTxtFetcher] Function Start");
@@ -97,28 +95,36 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     const importantFiles = useMemo(() => [
         // --- Структура и главная страница фичи ---
         "package.json", "app/layout.tsx",           // Общий layout важен
- "tailwind.config.ts",
-"app/globals.css",
-"app/style-guide/page.tsx",       
+        "tailwind.config.ts",
+        "app/globals.css",
+        "/app/repo-xml/page.tsx", // <-- Added this page itself
+        "/components/RepoTxtFetcher.tsx", // <-- Added this component
+        "/components/AICodeAssistant.tsx", // <-- Added this component
+        "/contexts/RepoXmlPageContext.tsx", // <-- Added context
+        "app/style-guide/page.tsx",       
         // --- Ключевой Контекст ---
-"contexts/AppContext.tsx",
+        "contexts/AppContext.tsx",
 
         // --- Основные Хуки для этой страницы ---
         "hooks/useAppToast.ts",
+        "hooks/useRepoFetcher.ts",
+        "hooks/useFileSelection.ts",
+        "hooks/useKworkInput.ts",
 
         "hooks/supabase.ts", // Часто нужен для работы с данными
 
         // --- Основные Экшены ---
         "app/actions.ts",
-"lib/debugLogger.ts",
+        "lib/debugLogger.ts",
 
         // --- Базовые Утилиты и Типы ---
-"components/VibeContentRenderer.tsx",
+        "components/VibeContentRenderer.tsx",
 
-"components/Header.tsx",        "types/database.types.ts", // Типы БД важны для экшенов
+        "components/Header.tsx",
+        "types/database.types.ts", // Типы БД важны для экшенов
 
         // --- Промпт (если AI должен понимать, как с ним работать) ---
-         //"components/repo/prompt.ts",
+         "components/repo/prompt.ts",
 
     ].filter(Boolean), []); // filter(Boolean) на случай, если какие-то файлы не существуют
     // --- КОНЕЦ ОБНОВЛЕННОГО СПИСКА ---
@@ -356,28 +362,29 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     // --- RENDER ---
     try {
         return (
-          <div id="extractor" className="w-full p-4 md:p-6 bg-gray-800/50 backdrop-blur-sm text-gray-200 font-mono rounded-xl shadow-[0_0_20px_rgba(0,255,157,0.2)] border border-gray-700/50 relative overflow-hidden">
+          <div id="extractor" className="w-full p-4 md:p-6 bg-card text-foreground font-mono rounded-xl shadow-[0_0_20px_hsl(var(--brand-green)/0.2)] border border-border relative overflow-hidden"> {/* Use theme colors */}
              {/* Header and Settings Toggle Button */}
              <div className="flex justify-between items-start mb-4 gap-4 flex-wrap">
                   {/* Title and Instructions */}
                   <div>
-                     <h2 className="text-xl md:text-2xl font-bold tracking-tight text-emerald-400 mb-2 flex items-center gap-2">
-                        {currentImageTask ? <FaImages className="text-blue-400" /> : <FaDownload className="text-purple-400" />}
-                        {currentImageTask ? "Задача: Замена Картинки" : "Кибер-Экстрактор Кода"}
+                     <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-2 flex items-center gap-2"> {/* Use theme colors */}
+                        {currentImageTask ? <FaImages className="text-brand-blue" /> : <FaDownload className="text-neon-lime" />}
+                        <span className={currentImageTask ? "text-brand-blue" : "text-brand-purple"}>
+                           {currentImageTask ? "Задача: Замена Картинки" : "Кибер-Экстрактор Кода"}
+                        </span>
                      </h2>
                       {!currentImageTask && (
-                         <div className="text-yellow-300/80 text-xs md:text-sm space-y-1 mb-2">
+                         <div className="text-brand-yellow/80 text-xs md:text-sm space-y-1 mb-2 prose prose-invert prose-p:my-1 prose-strong:text-brand-purple prose-span:font-normal prose-a:text-brand-blue max-w-none"> {/* Use theme colors */}
                             <VibeContentRenderer content={"1. Настрой <FaCodeBranch title='Настройки' class='inline text-cyan-400'/>."} />
-                            <VibeContentRenderer content={"2. Жми <span class='font-bold text-purple-400 mx-1'>\"Извлечь файлы\"</span>."} />
-                            <VibeContentRenderer content={"3. Выбери файлы или <span class='font-bold text-teal-400 mx-1'>связанные</span> / <span class='font-bold text-orange-400 mx-1'>важные</span>."} />
-                            {/* Removed brackets around icons */}
+                            <VibeContentRenderer content={"2. Жми <strong class='text-purple-400 mx-1'>\"Извлечь файлы\"</strong>."} />
+                            <VibeContentRenderer content={"3. Выбери файлы или <strong class='text-teal-400 mx-1'>связанные</strong> / <strong class='text-orange-400 mx-1'>важные</strong>."} />
                             <VibeContentRenderer content={"4. Опиши задачу ИЛИ добавь файлы <FaPlus title='Добавить выбранные в запрос' class='inline text-sm'/> / все <FaTree title='Добавить все файлы в запрос' class='inline text-sm'/>."} />
                             <VibeContentRenderer content={"5. Скопируй <FaCopy title='Скопировать запрос' class='inline text-sm mx-px'/> или передай дальше."} />
                         </div>
                       )}
                       {currentImageTask && (
-                          <p className="text-blue-300/80 text-xs md:text-sm mb-2">
-                              Авто-загрузка файла для замены: <code className="text-xs bg-gray-700 px-1 py-0.5 rounded">{currentImageTask.targetPath}</code>...
+                          <p className="text-brand-blue/80 text-xs md:text-sm mb-2"> {/* Use theme color */}
+                              Авто-загрузка файла для замены: <code className="text-xs bg-muted px-1 py-0.5 rounded">{currentImageTask.targetPath}</code>... {/* Use theme color */}
                           </p>
                       )}
                   </div>
@@ -390,9 +397,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                       title={isSettingsModalOpen ? "Скрыть настройки" : "Показать настройки"}
                       aria-label={isSettingsModalOpen ? "Скрыть настройки" : "Показать настройки"}
                       aria-expanded={isSettingsModalOpen}
-                      className="p-2 bg-gray-700/50 rounded-full hover:bg-gray-600/70 transition-colors flex-shrink-0 disabled:opacity-50"
+                      className="p-2 bg-muted/50 rounded-full hover:bg-muted/70 transition-colors flex-shrink-0 disabled:opacity-50" // Use theme colors
                   >
-                      {isSettingsModalOpen ? <FaAngleUp className="text-cyan-400 text-xl" /> : <FaCodeBranch className="text-cyan-400 text-xl" />}
+                      {isSettingsModalOpen ? <FaAngleUp className="text-brand-cyan text-xl" /> : <FaCodeBranch className="text-brand-cyan text-xl" />} {/* Use theme color */}
                   </motion.button>
               </div>
 
@@ -423,7 +430,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                           handleFetchManual(fetchStatus === 'failed_retries' || fetchStatus === 'error');
                        }}
                       disabled={isFetchDisabled}
-                      className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-white bg-gradient-to-r ${fetchStatus === 'failed_retries' || fetchStatus === 'error' ? 'from-red-600 to-orange-500 hover:from-red-700 hover:to-orange-600' : 'from-purple-600 to-cyan-500'} transition-all shadow-lg shadow-purple-500/30 hover:shadow-cyan-500/40 ${isFetchDisabled ? "opacity-60 cursor-not-allowed" : "hover:brightness-110 active:scale-[0.98]"}`}
+                      className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-primary-foreground bg-gradient-to-r ${fetchStatus === 'failed_retries' || fetchStatus === 'error' ? 'from-destructive to-orange-500 hover:from-destructive/90 hover:to-orange-600' : 'from-neon-lime to-brand-cyan'} transition-all shadow-lg shadow-purple-500/30 hover:shadow-cyan-500/40 ${isFetchDisabled ? "opacity-60 cursor-not-allowed" : "hover:brightness-110 active:scale-[0.98]"}`} // Use theme colors
                       whileHover={{ scale: isFetchDisabled ? 1 : 1.03 }}
                       whileTap={{ scale: isFetchDisabled ? 1 : 0.97 }}
                       title={`Извлечь файлы из ветки: ${effectiveBranchDisplay}${currentImageTask ? ' (для задачи замены картинки)' : ''}`}
@@ -435,36 +442,34 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
               </div>
 
              {/* Progress Bar and Status Messages */}
-             {/* NOTE: The logic for displaying the correct branch name ('effectiveBranchDisplay') was already correct here. */}
-             {/* If the displayed branch is wrong, the issue is likely in the SERVER ACTION not using the correct branch. */}
              {showProgressBar && (
                   <div className="mb-4 min-h-[40px]">
                       {(() => { logger.debug("[Render] Rendering ProgressBar (conditional)"); return null; })()}
                       <ProgressBar status={fetchStatus === 'failed_retries' ? 'error' : fetchStatus} progress={progress} />
-                      {isFetchLoading && <p className="text-cyan-300 text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? '(Повтор)' : ''}</p>}
-                      {isParsing && !currentImageTask && <p className="text-yellow-400 text-xs font-mono mt-1 text-center animate-pulse">Разбор ответа AI...</p>}
+                      {isFetchLoading && <p className="text-brand-cyan text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? '(Повтор)' : ''}</p>} {/* Use theme color */}
+                      {isParsing && !currentImageTask && <p className="text-brand-yellow text-xs font-mono mt-1 text-center animate-pulse">Разбор ответа AI...</p>} {/* Use theme color */}
                       {fetchStatus === 'success' && !currentImageTask && fetchedFiles.length > 0 && (
-                         <div className="text-center text-xs font-mono mt-1 text-green-400 flex items-center justify-center gap-1">
+                         <div className="text-center text-xs font-mono mt-1 text-brand-green flex items-center justify-center gap-1"> {/* Use theme color */}
                              <FaCircleCheck /> {`Успешно ${fetchedFiles.length} файлов из '${effectiveBranchDisplay}'. Выберите нужные.`}
                          </div>
                        )}
                        {fetchStatus === 'success' && !currentImageTask && fetchedFiles.length === 0 && (
-                          <div className="text-center text-xs font-mono mt-1 text-yellow-400 flex items-center justify-center gap-1">
+                          <div className="text-center text-xs font-mono mt-1 text-brand-yellow flex items-center justify-center gap-1"> {/* Use theme color */}
                               <FaCircleCheck /> {`Завершено успешно, но 0 файлов найдено в ветке '${effectiveBranchDisplay}'.`}
                           </div>
                        )}
                        {imageTaskTargetFileReady && (
-                          <div className="text-center text-xs font-mono mt-1 text-green-400 flex items-center justify-center gap-1">
+                          <div className="text-center text-xs font-mono mt-1 text-brand-green flex items-center justify-center gap-1"> {/* Use theme color */}
                               <FaCircleCheck /> {`Файл ${currentImageTask?.targetPath.split('/').pop()} загружен и готов.`}
                           </div>
                         )}
                         {(fetchStatus === 'error' || fetchStatus === 'failed_retries') && fetchError && (
-                           <div className="text-center text-xs font-mono mt-1 text-red-400 flex items-center justify-center gap-1">
+                           <div className="text-center text-xs font-mono mt-1 text-destructive flex items-center justify-center gap-1"> {/* Use theme color */}
                                <FaXmark /> {fetchError}
                            </div>
                         )}
                         {isWaitingForAiResponse && !currentImageTask && (
-                            <p className="text-blue-400 text-xs font-mono mt-1 text-center animate-pulse">
+                            <p className="text-brand-blue text-xs font-mono mt-1 text-center animate-pulse"> {/* Use theme color */}
                                  ⏳ Ожидание ответа от AI... (ID Запроса: {currentAiRequestId?.substring(0, 6)}...)
                             </p>
                          )}
@@ -529,20 +534,20 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
 
                  {/* --- Status Display (Image Task Mode) --- */}
                  {currentImageTask && filesFetched && (
-                      <div className={`md:col-span-1 flex flex-col items-center justify-center text-center p-4 bg-gray-700/30 rounded-lg border border-dashed ${imageTaskTargetFileReady ? 'border-blue-400' : (fetchStatus === 'error' || fetchStatus === 'failed_retries') ? 'border-red-500' : 'border-gray-600'} min-h-[200px]`}>
+                      <div className={`md:col-span-1 flex flex-col items-center justify-center text-center p-4 bg-card/30 rounded-lg border border-dashed ${imageTaskTargetFileReady ? 'border-brand-blue' : (fetchStatus === 'error' || fetchStatus === 'failed_retries') ? 'border-destructive' : 'border-muted'} min-h-[200px]`}> {/* Use theme colors */}
                            {(() => { logger.debug("[Render] Rendering Image Task Status Display", { imageTaskTargetFileReady, isFetchLoading, assistantLoading, fetchStatus }); return null; })()}
-                          {isFetchLoading ? <FaSpinner className="text-blue-400 text-3xl mb-3 animate-spin" />
-                           : assistantLoading ? <FaSpinner className="text-purple-400 text-3xl mb-3 animate-spin" />
-                           : imageTaskTargetFileReady ? <FaCircleCheck className="text-green-400 text-3xl mb-3" />
-                           : <FaXmark className="text-red-500 text-3xl mb-3" /> }
-                          <p className={`text-sm font-semibold ${imageTaskTargetFileReady ? 'text-blue-300' : 'text-red-400'}`}>
+                          {isFetchLoading ? <FaSpinner className="text-brand-blue text-3xl mb-3 animate-spin" />
+                           : assistantLoading ? <FaSpinner className="text-brand-purple text-3xl mb-3 animate-spin" />
+                           : imageTaskTargetFileReady ? <FaCircleCheck className="text-brand-green text-3xl mb-3" />
+                           : <FaXmark className="text-destructive text-3xl mb-3" /> }
+                          <p className={`text-sm font-semibold ${imageTaskTargetFileReady ? 'text-brand-blue' : 'text-destructive'}`}> {/* Use theme colors */}
                               {isFetchLoading ? "Загрузка файла..."
                                : assistantLoading ? "Обработка Ассистентом..."
                                : imageTaskTargetFileReady ? `Файл ${currentImageTask?.targetPath.split('/').pop()} готов.`
                                : fetchStatus === 'error' || fetchStatus === 'failed_retries' ? `Ошибка загрузки файла ${currentImageTask?.targetPath.split('/').pop()}.`
                                : `Файл ${currentImageTask?.targetPath.split('/').pop()} не найден!`}
                           </p>
-                          <p className="text-xs text-gray-400 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1"> {/* Use theme color */}
                                {isFetchLoading ? "Ожидание загрузки репозитория..."
                                : assistantLoading ? "Создание/обновление Pull Request..."
                                : imageTaskTargetFileReady ? "Файл передан Ассистенту для обработки."
