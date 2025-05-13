@@ -7,22 +7,23 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
   FaBrain, FaBell, FaBed, FaCalendarCheck, FaToolbox, FaEnvelope,
-  FaComments, FaShieldVirus, FaSliders, FaUserGear, FaQuestionCircle
-} from "react-icons/fa6"; 
-import Modal from "@/components/ui/Modal"; 
+  FaComments, FaShieldVirus, FaSliders, FaUserGear, FaCircleQuestion, // Corrected: FaQuestionCircle -> FaCircleQuestion
+  FaMoon
+} from "react-icons/fa6";
+import Modal from "@/components/ui/Modal";
 import { toast } from "sonner";
 import { useAppContext } from "@/contexts/AppContext";
-import { updateUserSettings } from "@/app/actions"; 
+import { updateUserSettings } from "@/app/actions";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { debugLogger as logger } from "@/lib/debugLogger";
-import { cn } from "@/lib/utils"; // <--- ДОБАВЛЕН ИМПОРТ
+import { cn } from "@/lib/utils";
 
 interface SettingConfig {
-  key: string; 
+  key: string;
   icon: React.ReactNode;
   title: string;
   description: string;
-  colorClass: string; 
+  colorClass: string;
 }
 
 const settingDefinitions: SettingConfig[] = [
@@ -41,10 +42,9 @@ const getDefaultSettings = (): SettingsProfile => {
   settingDefinitions.forEach(s => {
     defaults[s.key] = !(s.key === 'promotional_messages_enabled' || s.key === 'experimental_alpha_protocols');
   });
-  defaults['dark_mode_enabled'] = true; 
+  defaults['dark_mode_enabled'] = true;
   return defaults;
 };
-
 
 export default function SettingsPage() {
   const { dbUser, isLoading: isAppContextLoading, error: appContextError } = useAppContext();
@@ -62,7 +62,7 @@ export default function SettingsPage() {
       const mergedSettings = { ...defaultSettings, ...userSettings };
       setSettingsProfile(mergedSettings);
       logger.debug("[SettingsPage] Settings profile initialized:", mergedSettings);
-      
+
       if (typeof mergedSettings.dark_mode_enabled === 'boolean') {
         document.documentElement.classList.toggle('dark', mergedSettings.dark_mode_enabled);
       }
@@ -70,6 +70,7 @@ export default function SettingsPage() {
     } else if (!isAppContextLoading && !dbUser) {
       logger.warn("[SettingsPage] AppContext loaded, but no dbUser. Using default settings.");
       setSettingsProfile(getDefaultSettings());
+       document.documentElement.classList.toggle('dark', getDefaultSettings().dark_mode_enabled);
     }
      if(appContextError) {
       logger.error("[SettingsPage] AppContext error:", appContextError);
@@ -84,28 +85,36 @@ export default function SettingsPage() {
     }
 
     const newSettings = { ...settingsProfile, [settingKey]: value };
-    setSettingsProfile(newSettings); 
+    setSettingsProfile(newSettings);
 
     if (settingKey === 'dark_mode_enabled') {
       document.documentElement.classList.toggle('dark', value);
+      logger.log(`[SettingsPage] Dark mode toggled to: ${value}`);
     }
-    
+
     const settingDef = settingDefinitions.find(s => s.key === settingKey);
     const settingTitleForToast = settingDef ? settingDef.title : (settingKey === 'dark_mode_enabled' ? "Темная тема" : settingKey);
     const toastMessage = `Настройка "${settingTitleForToast}" ${value ? "включена" : "выключена"}`;
 
     setIsSaving(true);
     try {
-      const result = await updateUserSettings(dbUser.id, { settings_profile: newSettings });
+      const currentMetadata = dbUser.metadata || {};
+      const updatedMetadata = {
+          ...currentMetadata,
+          settings_profile: newSettings,
+      };
+
+      const result = await updateUserSettings(dbUser.id, updatedMetadata);
       if (result.success) {
         toast.success(toastMessage);
-        logger.log(`[SettingsPage] Setting ${settingKey} changed to ${value} and saved.`);
+        logger.log(`[SettingsPage] Setting ${settingKey} changed to ${value} and saved. Full new settings:`, newSettings);
       } else {
         toast.error(`Ошибка сохранения: ${result.error || "Неизвестная ошибка"}`);
         logger.error(`[SettingsPage] Failed to save setting ${settingKey}:`, result.error);
         setSettingsProfile(prev => ({ ...prev!, [settingKey]: !value }));
         if (settingKey === 'dark_mode_enabled') {
           document.documentElement.classList.toggle('dark', !value);
+          logger.log(`[SettingsPage] Reverted dark mode toggle to: ${!value}`);
         }
       }
     } catch (e) {
@@ -114,12 +123,12 @@ export default function SettingsPage() {
       setSettingsProfile(prev => ({ ...prev!, [settingKey]: !value }));
        if (settingKey === 'dark_mode_enabled') {
           document.documentElement.classList.toggle('dark', !value);
+          logger.log(`[SettingsPage] Reverted dark mode toggle on catch to: ${!value}`);
         }
     } finally {
       setIsSaving(false);
     }
-  }, [settingsProfile, dbUser?.id]);
-
+  }, [settingsProfile, dbUser]);
 
   const handleSendFeedback = async () => {
     if (!feedbackMessage.trim()) {
@@ -152,7 +161,7 @@ export default function SettingsPage() {
         transition={{ duration: 0.5 }}
         className="container mx-auto max-w-2xl"
       >
-        <Card className="bg-dark-card/80 backdrop-blur-md border border-brand-purple/50 shadow-xl shadow-brand-purple/20">
+        <Card className="bg-dark-card/80 backdrop-blur-md border border-brand-purple/50 shadow-xl shadow-purple-glow"> {/* Used custom shadow */}
           <CardHeader className="text-center p-6 border-b border-brand-purple/30">
             <FaUserGear className="text-5xl text-brand-purple mx-auto mb-3 drop-shadow-[0_0_10px_theme(colors.brand-purple)]" />
             <CardTitle className="text-3xl font-orbitron font-bold text-brand-purple cyber-text glitch" data-text="НЕЙРО-ИНТЕРФЕЙС">
@@ -176,30 +185,24 @@ export default function SettingsPage() {
                 isDisabled={isSaving}
               />
             ))}
-            
-             <div className="flex items-center justify-between p-3 bg-dark-bg/40 rounded-lg border border-gray-700 hover:border-brand-purple/50 transition-colors">
-              <Label htmlFor="dark-mode-switch" className="flex items-center text-md flex-grow cursor-pointer">
-                <span className="text-xl mr-3 text-brand-purple"><FaToolbox/></span>
-                <div>
-                    <VibeContentRenderer content="**Системная Тема (::FaMoon::):** Темный Интерфейс" className="font-orbitron text-light-text" />
-                    <p className="text-xs text-muted-foreground font-mono mt-0.5">Активация протокола 'Вечная Ночь' для комфорта глаз.</p>
-                </div>
-              </Label>
-              <Switch
-                id="dark-mode-switch"
-                checked={settingsProfile.dark_mode_enabled ?? true}
-                onCheckedChange={(value) => handleSettingChange('dark_mode_enabled', value)}
-                className="data-[state=checked]:bg-brand-purple flex-shrink-0"
-                disabled={isSaving}
-              />
-            </div>
 
+             <SettingToggle
+                 key="dark_mode_enabled"
+                 icon={<FaMoon className="text-brand-purple"/>}
+                 title="Системная Тема"
+                 description="Активация протокола 'Вечная Ночь' для комфорта глаз."
+                 isChecked={settingsProfile.dark_mode_enabled ?? true}
+                 onCheckedChange={(value) => handleSettingChange('dark_mode_enabled', value)}
+                 switchColorClass="data-[state=checked]:bg-brand-purple" // Or use primary color var
+                 isDisabled={isSaving}
+             />
 
             <div className="mt-8 pt-4 border-t border-brand-purple/20 text-center">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setIsFeedbackModalOpen(true)}
-                className="border-brand-pink text-brand-pink hover:bg-brand-pink/10 hover:text-brand-pink font-mono text-lg px-8 py-3 shadow-md hover:shadow-brand-pink/30 transition-all"
+                className="border-brand-pink text-brand-pink hover:bg-brand-pink/10 hover:text-brand-pink font-mono text-lg px-8 py-3 shadow-md hover:shadow-pink-glow transition-all" // Used custom shadow
+                disabled={isSaving}
               >
                 <FaComments className="mr-2" /> VIBE-ОТЗЫВ
               </Button>
@@ -214,7 +217,7 @@ export default function SettingsPage() {
         title="Форма Нейро-Обратной Связи"
         confirmText="Отправить Сигнал"
         onConfirm={handleSendFeedback}
-        icon={<FaQuestionCircle className="text-brand-pink" />} 
+        icon={<FaCircleQuestion className="text-brand-pink" />} // Corrected Icon
       >
         <p className="mb-3 font-mono text-sm text-muted-foreground">Твои мысли – топливо для эволюции VIBE OS. Делись идеями, сообщай о сбоях в Матрице.</p>
         <textarea
@@ -222,7 +225,7 @@ export default function SettingsPage() {
           onChange={(e) => setFeedbackMessage(e.target.value)}
           placeholder="Твой сигнал в ноосферу..."
           rows={5}
-          className="w-full p-3 rounded-md bg-input border border-border text-foreground focus:ring-2 focus:ring-brand-pink focus:border-brand-pink font-mono text-sm placeholder-muted-foreground/70"
+          className="w-full p-3 rounded-md bg-input border border-border text-foreground focus:ring-2 focus:ring-ring focus:border-ring font-mono text-sm placeholder-muted-foreground/70 textarea-cyber" // Applied theme class and correct focus
         />
       </Modal>
     </div>
@@ -240,21 +243,23 @@ interface SettingToggleProps {
 }
 
 const SettingToggle: React.FC<SettingToggleProps> = ({ icon, title, description, isChecked, onCheckedChange, switchColorClass, isDisabled }) => {
+  const uniqueId = `switch-${title.replace(/\s+/g, '-')}`;
   return (
     <div className="flex items-center justify-between p-3 bg-dark-bg/40 rounded-lg border border-gray-700 hover:border-brand-purple/50 transition-colors">
-      <Label htmlFor={`switch-${title.replace(/\s+/g, '-')}`} className="flex items-center text-md flex-grow cursor-pointer">
-        <span className="text-xl mr-3">{icon}</span>
-        <div>
+      <Label htmlFor={uniqueId} className="flex items-center text-md flex-grow cursor-pointer pr-4">
+        <span className="text-xl mr-3 flex-shrink-0">{icon}</span>
+        <div className="flex-grow">
           <VibeContentRenderer content={`**${title}**`} className="font-orbitron text-light-text" />
           <p className="text-xs text-muted-foreground font-mono mt-0.5">{description}</p>
         </div>
       </Label>
       <Switch
-        id={`switch-${title.replace(/\s+/g, '-')}`}
+        id={uniqueId}
         checked={isChecked}
         onCheckedChange={onCheckedChange}
         className={cn(switchColorClass, "flex-shrink-0")}
         disabled={isDisabled}
+        aria-label={title}
       />
     </div>
   );
