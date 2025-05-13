@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import {
-  FaPalette, FaFont, FaToggleOn, FaSlidersH, FaSquare, FaSquareCheck, FaHandPointer,
+  FaPalette, FaFont, FaToggleOn, FaSliders, FaSquare, FaSquareCheck, FaHandPointer,
   FaKeyboard, FaIdCard, FaDiagramProject, FaTriangleExclamation, FaGears, FaPlus, FaStar,
   FaPaintbrush, FaCode, FaEyeSlash, FaLink, FaTrash, FaCopy, FaFloppyDisk, FaPaperPlane,
   FaMoon, FaSun, FaUser, FaCreditCard, FaLifeRing, FaGoogle, FaFontAwesome,
