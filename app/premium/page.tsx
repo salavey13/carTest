@@ -3,8 +3,10 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FaStar, FaBrain, FaBolt, FaMicrochip, FaUsers, FaRocket, FaGem, FaNetworkWired, FaQuestionCircle } from "react-icons/fa"; // FaQuestionCircle is not Fa6
-import { FaHeadset, FaBookOpen, FaLockOpen } from "react-icons/fa6"; // FaQuestionCircle -> FaHeadset, FaBookOpen, FaLockOpen
+import {
+  FaStar, FaBrain, FaBolt, FaMicrochip, FaRocket, FaGem,
+  FaHeadset, FaBookOpen, FaLockOpen
+} from "react-icons/fa6";
 import { useAppContext } from "@/contexts/AppContext";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 
@@ -30,9 +32,10 @@ export default function PremiumPage() {
         transition={{ duration: 0.5 }}
         className="container mx-auto max-w-4xl"
       >
-        <Card className="bg-dark-card/90 backdrop-blur-md border border-brand-yellow/50 shadow-xl shadow-brand-yellow/20 overflow-hidden">
+        <Card className="bg-dark-card/90 backdrop-blur-md border border-brand-yellow/50 shadow-xl shadow-yellow-glow overflow-hidden"> {/* Used custom shadow */}
           <CardHeader className="text-center bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange p-8">
-            <FaStar className="text-5xl text-brand-yellow mx-auto mb-3 drop-shadow-[0_0_15px_theme(colors.brand-yellow)] animate-pulse" />
+             {/* Applied custom shadow utility */}
+            <FaStar className="text-5xl text-brand-yellow mx-auto mb-3 animate-pulse shadow-yellow-glow" />
             <CardTitle className="text-4xl font-orbitron font-bold text-white drop-shadow-md cyber-text glitch" data-text="COGNITIVE OS: PREMIUM">
               COGNITIVE OS: PREMIUM
             </CardTitle>
@@ -60,7 +63,7 @@ export default function PremiumPage() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.3, delay: index * 0.07 }}
-                  className="flex items-start space-x-4 p-4 bg-dark-bg/50 rounded-lg border border-brand-purple/30 hover:border-brand-cyan/70 transition-colors hover:shadow-md hover:shadow-brand-cyan/20"
+                  className="flex items-start space-x-4 p-4 bg-dark-bg/50 rounded-lg border border-brand-purple/30 hover:border-brand-cyan/70 transition-colors hover:shadow-md hover:shadow-glow-md" // Used theme shadow
                 >
                   <div className="text-3xl mt-1 flex-shrink-0 w-8 text-center">{feature.icon}</div>
                   <div>
@@ -74,7 +77,8 @@ export default function PremiumPage() {
             {!hasActivePremium && (
                 <div className="text-center mt-10">
                 <Link href="/buy-subscription" passHref legacyBehavior>
-                    <Button size="lg" className="bg-gradient-to-r from-brand-yellow to-brand-orange text-black hover:shadow-[0_0_20px_theme(colors.brand-yellow)] font-orbitron text-lg px-10 py-3 shadow-lg transform hover:scale-105 transition-all text-glow">
+                     {/* Used custom shadow */}
+                    <Button size="lg" className="bg-gradient-to-r from-brand-yellow to-brand-orange text-black hover:shadow-yellow-glow font-orbitron text-lg px-10 py-3 shadow-lg transform hover:scale-105 transition-all text-shadow-glow">
                     <FaGem className="mr-2" /> Активировать Премиум ОС
                     </Button>
                 </Link>

@@ -17,7 +17,7 @@ const cognitiveProtocols = [
     details: [
       "**ВЫГОДА:** Молниеносное завершение задач, генерация контента как из пулемета.",
       "**МЕХАНИКА:** 2x(40 мин чистейшего фокуса + 5 мин перезарядки). Безжалостно к прокрастинации.",
-      "**АРСЕНАЛ:** <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI-ассистент (Perplexity, ChatGPT), глушители реальности (наушники), таймер-контроллер.", 
+      "**АРСЕНАЛ:** ::FaAtom className='inline text-brand-purple mr-1 align-middle':: AI-ассистент (Perplexity, ChatGPT), глушители реальности (наушники), таймер-контроллер.", 
       "**ТОПЛИВО:** Кристальная вода, эликсир зеленого чая. Сахар – ЯД для кибер-воина."
     ],
     color: "border-brand-orange/50 bg-dark-card hover:shadow-brand-orange/20"
@@ -30,7 +30,7 @@ const cognitiveProtocols = [
     details: [
       "**ВЫГОДА:** Мгновенное расширение твоего Vibe-арсенала, доминация в новой нише.",
       "**МЕХАНИКА:** AI объясняет суть -> Ты практикуешь как одержимый -> Интервальное вбивание в мозг.",
-      "**АРСЕНАЛ:** <FaAtom className='inline text-brand-purple mr-1 align-middle'/> AI-сенсей для квизов и разжевывания (ChatGPT), Anki/Quizlet для нейронных связей, сверхсекретные туториалы.", 
+      "**АРСЕНАЛ:** ::FaAtom className='inline text-brand-purple mr-1 align-middle':: AI-сенсей для квизов и разжевывания (ChatGPT), Anki/Quizlet для нейронных связей, сверхсекретные туториалы.", 
       "**ТОПЛИВО:** Высокооктановые углеводы для процессора (гречка, овсянка, киноа)."
     ],
     color: "border-brand-yellow/50 bg-dark-card hover:shadow-brand-yellow/20"
@@ -49,24 +49,6 @@ const cognitiveProtocols = [
     color: "border-brand-cyan/50 bg-dark-card hover:shadow-brand-cyan/20"
   },
 ];
-
-// Helper function to split detail string for rendering
-const renderDetailWithInternalIcon = (detail: string) => {
-  const iconMatch = detail.match(/(<Fa\w+\s+className='[^']+'\s*\/>)/);
-  if (iconMatch && iconMatch.index !== undefined) {
-    const textBefore = detail.substring(0, iconMatch.index);
-    const iconTag = iconMatch[0];
-    const textAfter = detail.substring(iconMatch.index + iconTag.length);
-    return (
-      <>
-        {textBefore.trim() && <span className="mr-1">{textBefore.trim()}</span>}
-        <VibeContentRenderer content={iconTag} />
-        {textAfter.trim() && <span className="ml-1">{textAfter.trim()}</span>}
-      </>
-    );
-  }
-  return <span>{detail}</span>; // Fallback if no icon or unexpected format
-};
 
 
 export default function CognitiveFuelPage() {
@@ -115,7 +97,7 @@ export default function CognitiveFuelPage() {
                   {protocol.details.map((detail, index) => (
                     <li key={index} className="flex items-start">
                       <FaBolt className="text-xs mr-2 text-gray-400 flex-shrink-0 mt-[3px] align-middle" />
-                      {renderDetailWithInternalIcon(detail)}
+                      <VibeContentRenderer content={detail} />
                     </li>
                   ))}
                 </ul>
