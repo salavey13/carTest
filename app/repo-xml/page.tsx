@@ -20,7 +20,8 @@ import {
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaToolbox, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket,
     FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye,
-    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash, FaCommentDots
+    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash, FaCommentDots,
+    FaCheckDouble, FaLightbulb, FaPaintRoller
 } from "react-icons/fa6";
 import Link from "next/link";
 import { motion } from 'framer-motion';
@@ -45,7 +46,7 @@ const translations = {
     philosophyTitle: "Your Vibe Path: The Inevitable Level Up (Tap)",
     philosophyVideoTitle: "Watch: The Level System Explained <FaVideo/>:",
     communityWisdomTitle: "Community Wisdom <FaUsers/>",
-    quote1: "Sam Altman on the dream: 'Getting the whole app after a prompt.' That's what we're building. Full app from a thought. <a href='https://youtube.com/clip/Ugkx1LAX6-gO4J8hC6HoHbg0_KMlBHcsKX3V' target='_blank' class='text-brand-blue hover:underline font-semibold'>(Clip <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a>",
+    quote1: "Sam Altman on the dream: 'Getting the whole app after a prompt.' That's what we're building. Full app from a thought. <a href='https://youtube.com/clip/Ugkx1LAX6-gO4J8hC6HoHbg0_KMlBHcsKX3V' target='_blank' class='text-brand-blue hover:underline font-semibold'>(Clip <FaArrowUpRightFromSquare className='inline h-3 w-3 ml-px align-baseline'/>)</a>",
     quote2: "Vibecoding? 'Yeah, he does.' From video idea to gamified app. Turning vision into interactive reality. <a href='https://youtube.com/clip/UgkxZVMHbEo2XwO-sayoxskH89zzrDdN6vsx' target='_blank' class='text-brand-blue hover:underline font-semibold'>(Clip <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a>",
     quote3: "Monetization: 'Sell outcomes, not just pickaxes.' Automated, 10x cheaper solutions. That's the real product. <a href='https://youtube.com/clip/UgkxvGYsRm3HezCgOyqszCbn5DfDDx7LixPE' target='_blank' class='text-brand-blue hover:underline font-semibold'>(Clip <FaArrowUpRightFromSquare class='inline h-3 w-3 ml-px align-baseline'/>)</a>",
     ctaHotChickQuote: "Got the fire? Let's build something epic. Hit me up <strong>@SALAVEY13</strong> NOW!",
@@ -75,7 +76,6 @@ const translations = {
     componentsTitle: "Врубай Движки Вайба!",
     ctaTitle: "Ready to Level Up, {USERNAME}?",
     ctaDesc: "Seriously. Stop doubting. Start <strong>DOING</strong>. That first level is calling. Level up NOW!",
-    ctaHotChick: "Got the fire? Let's build something epic. Hit me up <strong>@SALAVEY13</strong> NOW!",
     ctaDude: "(Everyone else? Just f*cking try it. Level 1 is a button click away. You got this!)",
     navGrabber: "Grabber <FaDownload/>",
     navAssistant: "Assistant <FaRobot/>",
@@ -129,7 +129,6 @@ const translations = {
     componentsTitle: "Врубай Движки Вайба!",
     ctaTitle: "Готов(а) Апнуться, {USERNAME}?",
     ctaDesc: "Серьезно. Хватит сомневаться. Начни <strong>ДЕЛАТЬ</strong>. Первый левел зовет. Качайся СЕЙЧАС!",
-    ctaHotChick: "Есть искра? Давай замутим что-то эпичное. Пиши <strong>@SALAVEY13</strong> СЕЙЧАС!",
     ctaDude: "(Все остальные? Просто, бл*ть, попробуйте. Левел 1 - это клик мышки. У вас получится!)",
     navGrabber: "Граббер <FaDownload/>",
     navAssistant: "Ассистент <FaRobot/>",
@@ -187,8 +186,10 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const [isCyberVibeVisible, setIsCyberVibeVisible] = useState(true);
     const [isCommunityWisdomVisible, setIsCommunityWisdomVisible] = useState(true);
     const [isPhilosophyStepsVisible, setIsPhilosophyStepsVisible] = useState(true);
+    const [isPhilosophyDetailsOpen, setIsPhilosophyDetailsOpen] = useState(true);
     const [isCtaVisible, setIsCtaVisible] = useState(true); 
     const [sectionsCollapsed, setSectionsCollapsed] = useState(false);
+
 
     if (!pageContext || typeof pageContext.addToast !== 'function') {
          error("[ActualPageContent] CRITICAL: RepoXmlPageContext is missing or invalid!");
@@ -218,24 +219,39 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     }, [t]);
 
     const toggleAllSections = useCallback(() => {
-        setSectionsCollapsed(prev => !prev);
-    }, []);
-
-    useEffect(() => {
-        if (!t) return; // Don't run if translations are not loaded
-        const newVisibility = !sectionsCollapsed;
+        const newCollapsedState = !sectionsCollapsed;
+        setSectionsCollapsed(newCollapsedState);
+        // When using the master toggle, all sections follow this state
+        const newVisibility = !newCollapsedState;
         setIsIntroVisible(newVisibility);
         setIsCyberVibeVisible(newVisibility);
         setIsCommunityWisdomVisible(newVisibility);
         setIsPhilosophyStepsVisible(newVisibility);
-        
-        // Only toggle CTA if components are already shown, otherwise the "LET'S GO" button handles its reveal
-        // And CTA is not part of the "main components" that should stay visible always
-        if (showComponents) {
+        setIsPhilosophyDetailsOpen(newVisibility); 
+        if (showComponents) { // Only toggle CTA if components are already shown
             setIsCtaVisible(newVisibility);
         }
-        log(`[Effect SectionsToggle] Info sections visibility set to: ${newVisibility}. CTA controlled separately: ${isCtaVisible}`);
-    }, [sectionsCollapsed, t, showComponents, isCtaVisible]); 
+        log(`[CB MasterToggle] All sections visibility set to: ${newVisibility}. SectionsCollapsed: ${newCollapsedState}`);
+    }, [sectionsCollapsed, showComponents, log]);
+    
+    const handleShowComponents = useCallback(() => {
+        log("[Button Click] handleShowComponents (Reveal)");
+        setShowComponents(true);
+        setIsCtaVisible(true); // Explicitly show CTA
+    
+        // If master toggle had collapsed sections, expand them
+        if (sectionsCollapsed) {
+            setSectionsCollapsed(false); // This will trigger the effect below to show all sections
+            setIsIntroVisible(true);
+            setIsCyberVibeVisible(true);
+            setIsCommunityWisdomVisible(true);
+            setIsPhilosophyStepsVisible(true);
+            setIsPhilosophyDetailsOpen(true);
+        }
+        
+        toastInfo("Компоненты загружены!", { duration: 1500 });
+        setTimeout(() => scrollToSectionNav('extractor'), 100);
+    }, [setShowComponents, toastInfo, log, scrollToSectionNav, sectionsCollapsed]);
 
     const memoizedGetPlainText = useCallback(getPlainText, []);
     const scrollToSectionNav = useCallback((id: string) => {
@@ -257,33 +273,28 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
         if (sectionsRequiringReveal.includes(id) && !showComponents) {
             log(`[CB ScrollNav] Revealing components for "${id}"`);
-            setShowComponents(true);
-            setIsCtaVisible(true); // Ensure CTA is visible when components are shown for the first time
-            requestAnimationFrame(() => {
-                const el = document.getElementById(id);
-                if (el) {
-                    scroll(el);
-                } else {
-                    error(`[CB ScrollNav] Target "${id}" not found after reveal and animation frame.`);
-                }
-            });
-        } else if (targetElement) {
-            scroll(targetElement);
+            // Call handleShowComponents to ensure consistent state update
+            handleShowComponents(); 
+            // Scrolling will be handled by handleShowComponents's timeout
+            return; 
+        }
+        
+        if (targetElement) {
+            // Ensure the specific section is visible if it was individually closed
+            if (id === 'intro' && !isIntroVisible) setIsIntroVisible(true);
+            if (id === 'cybervibe-section' && !isCyberVibeVisible) setIsCyberVibeVisible(true);
+            if (id === 'community-wisdom-section' && !isCommunityWisdomVisible) setIsCommunityWisdomVisible(true);
+            if (id === 'philosophy-steps') {
+                if(!isPhilosophyStepsVisible) setIsPhilosophyStepsVisible(true);
+                if(!isPhilosophyDetailsOpen) setIsPhilosophyDetailsOpen(true);
+            }
+            // Add a slight delay for section visibility to update before scrolling
+            requestAnimationFrame(() => scroll(targetElement));
         } else {
             error(`[CB ScrollNav] Target element "${id}" not found.`);
         }
-    }, [showComponents, setShowComponents, log, debug, error]);
+    }, [showComponents, handleShowComponents, isIntroVisible, isCyberVibeVisible, isCommunityWisdomVisible, isPhilosophyStepsVisible, isPhilosophyDetailsOpen, log, debug, error]);
 
-    const handleShowComponents = useCallback(() => {
-        log("[Button Click] handleShowComponents (Reveal)");
-        setShowComponents(true);
-        setIsCtaVisible(true); // Explicitly show CTA when components are revealed
-        if (sectionsCollapsed) { // If user had previously collapsed all, expand them when showing components
-            setSectionsCollapsed(false);
-        }
-        toastInfo("Компоненты загружены!", { duration: 1500 });
-        setTimeout(() => scrollToSectionNav('extractor'), 100);
-    }, [setShowComponents, toastInfo, log, scrollToSectionNav, sectionsCollapsed]);
 
      if (isPageLoading) {
          log(`[Render] ActualPageContent: Rendering Loading State (Waiting for translations)`);
@@ -381,7 +392,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                 ].map(item => (
                                     <div key={item.videoId}>
                                         <div className={`aspect-video w-full rounded-lg overflow-hidden border-2 ${item.borderColor}/50 shadow-lg`}>
-                                            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${item.videoId}?start=${item.start}&mute=1`} title={item.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${item.videoId}?start=${item.start}`} title={item.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                         </div>
                                         <div className={`mt-3 p-3 bg-dark-card/70 border-l-4 ${item.borderColor} rounded-r-md text-muted-foreground max-w-none`}>
                                             <div className="flex items-start">
@@ -401,16 +412,19 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                     {isPhilosophyStepsVisible && (
                         <section id="philosophy-steps" className="mb-12 w-full max-w-3xl relative">
                             <CloseButton onClick={() => setIsPhilosophyStepsVisible(false)} ariaLabel="Close Philosophy/Steps Section" />
-                            <details className="bg-dark-card/80 border border-border rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50" open={!sectionsCollapsed}>
-                                <summary className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-card/50 rounded-t-lg transition-colors group">
+                            <details className="bg-dark-card/80 border border-border rounded-lg shadow-md backdrop-blur-sm transition-all duration-300 ease-in-out open:pb-4 open:shadow-lg open:border-indigo-500/50" open={isPhilosophyDetailsOpen}>
+                                <summary 
+                                    className="text-xl md:text-2xl font-semibold text-brand-green p-4 cursor-pointer list-none flex justify-between items-center hover:bg-card/50 rounded-t-lg transition-colors group"
+                                    onClick={(e) => { e.preventDefault(); setIsPhilosophyDetailsOpen(prev => !prev); }}
+                                >
                                     <span className="flex items-center gap-2"><FaCodeBranch /> <VibeContentRenderer content={t.philosophyTitle} /></span>
-                                    <span className="text-xs text-gray-500 group-open:rotate-180 transition-transform duration-300">▼</span>
+                                    <span className={`text-xs text-gray-500 transition-transform duration-300 ${isPhilosophyDetailsOpen ? "rotate-180" : ""}`}>▼</span>
                                 </summary>
                                 <div className="px-6 pt-2 text-muted-foreground space-y-4 text-base prose prose-invert prose-p:my-2 prose-li:my-1 prose-strong:text-brand-yellow prose-em:text-brand-cyan prose-a:text-brand-blue max-w-none">
                                      <div className="my-4 not-prose">
                                          <h4 className="text-lg font-semibold text-brand-cyan mb-2"><VibeContentRenderer content={t.philosophyVideoTitle} /></h4>
                                          <div className="aspect-video w-full rounded-lg overflow-hidden border border-cyan-700/50 shadow-lg">
-                                             <iframe className="w-full h-full" src="https://www.youtube.com/embed/imxzYWYKCyQ?mute=1" title="YouTube video player - Vibe Level Explanation by Salavey13" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                             <iframe className="w-full h-full" src="https://www.youtube.com/embed/imxzYWYKCyQ" title="YouTube video player - Vibe Level Explanation by Salavey13" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                          </div>
                                      </div>
                                     <hr className="border-border my-3"/>
@@ -497,7 +511,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                         <div className="text-white text-lg mb-4 prose-invert"> <VibeContentRenderer content={t.ctaDesc} /> </div>
                                         
                                         <div className="aspect-video w-full rounded-lg overflow-hidden border-2 border-orange-500/70 shadow-lg my-6">
-                                            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/qCkPM_f3V5c?autoplay=1&mute=0`} title="YouTube: GTA Vibe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/qCkPM_f3V5c`} title="YouTube: GTA Vibe" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
                                         </div>
                                         
                                         <div className="mt-3 mb-4 p-3 bg-black/50 border-l-4 border-pink-500 rounded-r-md text-white max-w-none">
@@ -510,8 +524,6 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                             </div>
                                             <p className="text-xs text-right opacity-70 mt-1">- Vibe by @SALAVEY13</p>
                                         </div>
-
-                                        
                                         <div className="text-slate-300 text-base prose-invert"> <VibeContentRenderer content={t.ctaDude} /> </div>
                                     </div>
                                 </div>
