@@ -367,7 +367,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                   {/* Title and Instructions */}
                   <div>
                      <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-2 flex items-center gap-2"> {/* Use theme colors */}
-                        {currentImageTask ? <FaImages className="text-brand-blue" /> : <FaDownload className="text-brand-purple" />}
+                        {currentImageTask ? <FaImages className="text-brand-blue" /> : <FaDownload className="text-orange-400" />}
                         <span className={currentImageTask ? "text-brand-blue" : "text-brand-purple"}>
                            {currentImageTask ? "Задача: Замена Картинки" : "Кибер-Экстрактор Кода"}
                         </span>
