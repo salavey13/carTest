@@ -38,7 +38,7 @@ const RequestInput: React.FC<RequestInputProps> = ({
 }) => {
     logger.debug("[RequestInput] START Render");
     const { success: toastSuccess, error: toastError } = useAppToast(); 
-    const { dbUser } = useAppContext(); 
+    // Removed dbUser from here as triggerCopyKwork (from context) handles CyberFitness
     const { triggerCopyKwork } = useRepoXmlPageContext(); 
 
     const kworkValueTrimmed = typeof kworkInputValue === 'string' ? kworkInputValue.trim() : '';
@@ -52,20 +52,21 @@ const RequestInput: React.FC<RequestInputProps> = ({
             navigator.clipboard.writeText(ULTIMATE_VIBE_MASTER_PROMPT);
             toastSuccess("✨ Системный промпт скопирован! Вставь его боту перед основным запросом.");
             logger.info("[RequestInput] Copied SYSTEM PROMPT to clipboard.");
-            // This specific action (copying system prompt) is handled by triggerCopyKwork in RepoXmlPageContext for CyberFitness
-            // No direct call to CyberFitness here to avoid duplication if triggerCopyKwork handles it.
-            // If triggerCopyKwork is ONLY for the main kwork text, then a CyberFitness call might be needed here.
-            // Assuming triggerCopyKwork is generic enough or RepoXmlPageContext handles this distinction.
-            // For now, we assume system prompt copy is a type of "kwork copied".
+            
+            // triggerCopyKwork is called, which should handle CyberFitness logging for 'system_prompt_copied'
+            // based on logic within RepoXmlPageContext.
             if (triggerCopyKwork) {
-                triggerCopyKwork(); // This will handle CyberFitness logging internally
+                logger.debug("[RequestInput handleCopySystemPrompt] Calling triggerCopyKwork from context.");
+                triggerCopyKwork(); 
+            } else {
+                logger.warn("[RequestInput handleCopySystemPrompt] triggerCopyKwork is not available from context.");
             }
 
         } catch (e) {
             logger.error("[RequestInput] System prompt clipboard write error:", e);
             toastError("Ошибка копирования системного промпта");
         }
-    }, [toastSuccess, toastError, triggerCopyKwork, dbUser?.id]); 
+    }, [toastSuccess, toastError, triggerCopyKwork]); 
 
     logger.debug("[RequestInput] Render setup complete.");
     return (

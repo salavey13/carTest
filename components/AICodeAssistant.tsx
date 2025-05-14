@@ -19,7 +19,7 @@ import { OpenPrList } from './assistant_components/OpenPrList';
 import { ToolsMenu } from './assistant_components/ToolsMenu';
 import { ImageToolsModal } from './assistant_components/ImageToolsModal';
 import { SwapModal } from './assistant_components/SwapModal';
-import { checkAndUnlockFeatureAchievement } from "@/hooks/cyberFitnessSupabase"; // For achievements
+import { checkAndUnlockFeatureAchievement } from "@/hooks/cyberFitnessSupabase"; 
 // UI & Utils
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -60,14 +60,14 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [componentParsedFiles, setComponentParsedFiles] = useState<ValidationFileEntry[]>([]);
     const [imageReplaceError, setImageReplaceError] = useState<string | null>(null);
-    const [justParsed, setJustParsed] = useState(false); // State to trigger scroll fix effect
+    const [justParsed, setJustParsed] = useState(false); 
 
     // --- Hooks ---
     const appContext = useAppContext();
     const codeParserHook = useCodeParsingAndValidation();
    
     // --- Destructure context ---
-    const { user, dbUser } = appContext; // Added dbUser for CyberFitness
+    const { user, dbUser } = appContext; 
     const {
         setHookParsedFiles, setValidationStatus, setValidationIssues,
         validationIssues, validationStatus, rawDescription,
@@ -102,7 +102,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         pageContext,
         aiResponseInputRefPassed,
         kworkInputRefPassed,
-        setJustParsedFlagForScrollFix: setJustParsed, // Pass the setter
+        setJustParsedFlagForScrollFix: setJustParsed, 
     });
     
     // --- Destructure handlers ---
@@ -192,17 +192,22 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     useEffect(() => { 
         const loadLinks = async () => {
-            if (!user?.id) { setCustomLinks([]); return; }
+            const userId = user?.id || dbUser?.user_id; // Prefer TG user id, fallback to DB user_id
+            if (!userId) { 
+                logger.debug("[Effect Custom Links] No user ID, skipping link load.");
+                setCustomLinks([]); 
+                return; 
+            }
             try {
-                logger.debug(`[Effect Custom Links] Attempting to fetch user metadata for userId: ${user.id}`);
-                const { data: userData, error: fetchError } = await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id).single();
+                logger.debug(`[Effect Custom Links] Attempting to fetch user metadata for userId: ${userId}`);
+                const { data: userData, error: fetchError } = await supabaseAdmin.from("users").select("metadata").eq("user_id", userId).single();
                 if (fetchError) { logger.error("[Effect Custom Links] Error fetching user metadata:", fetchError); toastError(`Ошибка загрузки ваших ссылок: ${fetchError.message}`); setCustomLinks([]); return; }
-                if (userData?.metadata?.customLinks && Array.isArray(userData.metadata.customLinks)) { setCustomLinks(userData.metadata.customLinks); logger.debug(`[Effect Custom Links] Loaded ${userData.metadata.customLinks.length} custom links.`); }
-                else { setCustomLinks([]); logger.debug("[Effect Custom Links] No custom links found or invalid format."); }
+                if (userData?.metadata?.customLinks && Array.isArray(userData.metadata.customLinks)) { setCustomLinks(userData.metadata.customLinks); logger.debug(`[Effect Custom Links] Loaded ${userData.metadata.customLinks.length} custom links for user ${userId}.`); }
+                else { setCustomLinks([]); logger.debug(`[Effect Custom Links] No custom links found or invalid format for user ${userId}.`); }
             } catch (e: any) { logger.error("[Effect Custom Links] Exception during fetch:", e); toastError(`Критическая ошибка при загрузке ссылок: ${e.message ?? 'Неизвестно'}`); setCustomLinks([]); }
         };
         loadLinks();
-    }, [user, toastError]); 
+    }, [user, dbUser, toastError]); // Depend on both user objects
 
     useEffect(() => { 
         imageReplaceTaskRef.current = imageReplaceTask;
@@ -237,7 +242,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const fixButtonDisabled = isProcessingAny || isWaitingForAiResponse || !!imageReplaceTask;
     const submitButtonDisabled = !canSubmitRegularPR || isProcessingAny || !!imageReplaceTask;
     
-    // --- Log at the end of render setup ---
     logger.debug("[AICodeAssistant] Render setup complete. isProcessingAny:", isProcessingAny);
 
     // --- FINAL RENDER ---
@@ -305,7 +309,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                         onSaveFiles={handlers.handleSaveFiles}
                         onDownloadZip={handlers.handleDownloadZip}
                         onSendToTelegram={handlers.handleSendToTelegram}
-                        isUserLoggedIn={!!user}
+                        isUserLoggedIn={!!user || !!dbUser}
                         isLoading={isProcessingAny}
                      />
 
@@ -335,12 +339,12 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                          <button
                             onClick={async () => {
                                 setIsImageModalOpen(true);
-                                if (dbUser?.id) {
-                                    logger.debug(`[AICodeAssistant] User ${dbUser.id} opened image modal. Attempting to log feature 'image_modal_opened'.`);
-                                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'image_modal_opened');
+                                if (dbUser?.user_id) {
+                                    logger.debug(`[AICodeAssistant] User ${dbUser.user_id} opened image modal. Attempting to log feature 'image_modal_opened'.`);
+                                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'image_modal_opened');
                                     newAchievements?.forEach(ach => addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                                 } else {
-                                    logger.warn("[AICodeAssistant] Cannot log 'image_modal_opened': dbUser.id is missing.");
+                                    logger.warn("[AICodeAssistant] Cannot log 'image_modal_opened': dbUser.user_id is missing.");
                                 }
                             }}
                             className="flex items-center gap-2 px-3 py-2 bg-card rounded-full hover:bg-muted transition shadow-[0_0_12px_hsl(var(--brand-green)/0.3)] hover:ring-1 hover:ring-brand-cyan disabled:opacity-50 relative"
