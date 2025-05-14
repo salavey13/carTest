@@ -1,4 +1,3 @@
-// /app/style-guide/page.tsx
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,7 +39,7 @@ export default function StyleGuide() {
     <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pt-24 pb-16">
       <div className="container mx-auto space-y-16">
         <header className="text-center mb-12">
-          <h1 className="text-5xl font-orbitron font-bold text-brand-pink text-shadow-neon mb-2 glitch" data-text="CYBERVIBE STYLE GUIDE">
+          <h1 className="text-5xl md:text-6xl text-gta-style-heading mb-2">
             CYBERVIBE STYLE GUIDE
           </h1>
           <p className="text-lg text-muted-foreground font-mono">
