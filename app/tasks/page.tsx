@@ -146,7 +146,8 @@ export default function TasksPage() {
       if (error) throw error;
       setTasks(tasks.filter(t => t.id !== id));
       toast.success("Директива удалена!");
-    } catch (error: any)      toast.error(`Ошибка удаления директивы: ${error.message}`);
+    } catch (error: any) { // Added missing opening curly brace
+      toast.error(`Ошибка удаления директивы: ${error.message}`);
       console.error("Delete task error:", error);
     }
   };
@@ -172,7 +173,7 @@ export default function TasksPage() {
     switch (status) {
       case "done": return <FaCircleCheck className="text-brand-green" />;
       case "in_progress": return <FaClock className="text-brand-yellow animate-pulse" />;
-      default: return <FaThList className="text-muted-foreground" />; // FaThList for "todo"
+      default: return <FaThList className="text-muted-foreground" />;
     }
   };
 
