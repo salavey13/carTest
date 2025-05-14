@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  FaYoutube, FaCircleCheck, FaClock, FaCalendarDays, FaPlus, FaPencil, FaTrash, FaDumbbell, FaExclamationTriangle, FaThList
+  FaYoutube, FaCircleCheck, FaClock, FaCalendarDays, FaPlus, FaPencil, FaTrash, FaDumbbell, FaExclamationTriangle, FaTasks // Changed FaThList to FaTasks
 } from "react-icons/fa6";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,7 +146,7 @@ export default function TasksPage() {
       if (error) throw error;
       setTasks(tasks.filter(t => t.id !== id));
       toast.success("Директива удалена!");
-    } catch (error: any) { // Added missing opening curly brace
+    } catch (error: any) { 
       toast.error(`Ошибка удаления директивы: ${error.message}`);
       console.error("Delete task error:", error);
     }
@@ -173,7 +173,7 @@ export default function TasksPage() {
     switch (status) {
       case "done": return <FaCircleCheck className="text-brand-green" />;
       case "in_progress": return <FaClock className="text-brand-yellow animate-pulse" />;
-      default: return <FaThList className="text-muted-foreground" />;
+      default: return <FaTasks className="text-muted-foreground" />; // Changed to FaTasks
     }
   };
 
