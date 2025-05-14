@@ -29,7 +29,7 @@ async function validateTelegramHash(initDataString: string): Promise<{ isValid: 
   logger.log(`[API_VALIDATE_HASH_FN_INFO] Client hash: ${hashFromClient}`);
 
   const keys = Array.from(params.keys())
-    .filter(key => key !== "hash")
+    .filter(key => key !== "hash" && key !== "signature")
     .sort();
 
   const dataCheckString = keys.map(key => `${key}=${params.get(key)}`).join('\n');
