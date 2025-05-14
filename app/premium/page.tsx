@@ -9,6 +9,7 @@ import {
 } from "react-icons/fa6";
 import { useAppContext } from "@/contexts/AppContext";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
+import { cn } from "@/lib/utils"; // Import cn
 
 export default function PremiumPage() {
   const { dbUser } = useAppContext();
@@ -34,7 +35,12 @@ export default function PremiumPage() {
       >
         <Card className="bg-dark-card/90 backdrop-blur-xl border border-brand-yellow/60 shadow-2xl shadow-yellow-glow overflow-hidden">
           <CardHeader className="text-center bg-gradient-to-r from-brand-purple/80 via-brand-pink/80 to-brand-orange/80 p-8 md:p-10">
-            <FaStar className="text-6xl text-brand-yellow mx-auto mb-4 animate-pulse drop-shadow-[0_0_15px_theme(colors.brand-yellow)]" />
+            <FaStar 
+              className={cn(
+                "text-6xl text-brand-yellow mx-auto mb-4 animate-pulse",
+                "[filter:drop-shadow(0_0_15px_hsl(var(--brand-yellow)))]" // Corrected drop shadow
+              )} 
+            />
             <CardTitle className="text-4xl md:text-5xl font-orbitron font-bold text-white drop-shadow-lg cyber-text glitch" data-text="COGNITIVE OS: PREMIUM">
               COGNITIVE OS: PREMIUM
             </CardTitle>
