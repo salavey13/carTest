@@ -19,6 +19,7 @@ import { OpenPrList } from './assistant_components/OpenPrList';
 import { ToolsMenu } from './assistant_components/ToolsMenu';
 import { ImageToolsModal } from './assistant_components/ImageToolsModal';
 import { SwapModal } from './assistant_components/SwapModal';
+import { checkAndUnlockFeatureAchievement } from "@/hooks/cyberFitnessSupabase"; 
 // UI & Utils
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -39,13 +40,13 @@ interface AICodeAssistantProps {
 
 // --- Main Component ---
 const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((props, ref) => {
-
+    logger.debug("[AICodeAssistant] START Render");
     // --- Props ---
     const { kworkInputRefPassed, aiResponseInputRefPassed } = props;
 
     // --- Get Context and Toast early ---
     const pageContext = useRepoXmlPageContext();
-    const { success: toastSuccess, error: toastError, info: toastInfo, warning: toastWarning } = useAppToast();
+    const { success: toastSuccess, error: toastError, info: toastInfo, warning: toastWarning, addToast } = useAppToast();
     
     // --- State ---
     const [response, setResponse] = useState<string>("");
@@ -59,14 +60,14 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [componentParsedFiles, setComponentParsedFiles] = useState<ValidationFileEntry[]>([]);
     const [imageReplaceError, setImageReplaceError] = useState<string | null>(null);
-    const [justParsed, setJustParsed] = useState(false); // State to trigger scroll fix effect
+    const [justParsed, setJustParsed] = useState(false); 
 
     // --- Hooks ---
     const appContext = useAppContext();
     const codeParserHook = useCodeParsingAndValidation();
    
     // --- Destructure context ---
-    const { user } = appContext;
+    const { user, dbUser } = appContext; 
     const {
         setHookParsedFiles, setValidationStatus, setValidationIssues,
         validationIssues, validationStatus, rawDescription,
@@ -191,16 +192,22 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
 
     useEffect(() => { 
         const loadLinks = async () => {
-            if (!user?.id) { setCustomLinks([]); return; }
+            const userId = user?.id || dbUser?.user_id; // Prefer TG user id, fallback to DB user_id
+            if (!userId) { 
+                logger.debug("[Effect Custom Links] No user ID, skipping link load.");
+                setCustomLinks([]); 
+                return; 
+            }
             try {
-                const { data: userData, error: fetchError } = await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id).single();
+                logger.debug(`[Effect Custom Links] Attempting to fetch user metadata for userId: ${userId}`);
+                const { data: userData, error: fetchError } = await supabaseAdmin.from("users").select("metadata").eq("user_id", userId).single();
                 if (fetchError) { logger.error("[Effect Custom Links] Error fetching user metadata:", fetchError); toastError(`Ошибка загрузки ваших ссылок: ${fetchError.message}`); setCustomLinks([]); return; }
-                if (userData?.metadata?.customLinks && Array.isArray(userData.metadata.customLinks)) { setCustomLinks(userData.metadata.customLinks); }
-                else { setCustomLinks([]); }
+                if (userData?.metadata?.customLinks && Array.isArray(userData.metadata.customLinks)) { setCustomLinks(userData.metadata.customLinks); logger.debug(`[Effect Custom Links] Loaded ${userData.metadata.customLinks.length} custom links for user ${userId}.`); }
+                else { setCustomLinks([]); logger.debug(`[Effect Custom Links] No custom links found or invalid format for user ${userId}.`); }
             } catch (e: any) { logger.error("[Effect Custom Links] Exception during fetch:", e); toastError(`Критическая ошибка при загрузке ссылок: ${e.message ?? 'Неизвестно'}`); setCustomLinks([]); }
         };
         loadLinks();
-    }, [user, toastError]); 
+    }, [user, dbUser, toastError]); // Depend on both user objects
 
     useEffect(() => { 
         imageReplaceTaskRef.current = imageReplaceTask;
@@ -216,7 +223,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         handleDirectImageReplace: (task: ImageReplaceTask, files: FileNode[]) => {
             return handlers.handleDirectImageReplace(task, files);
         },
-    }), [handlers, setResponseValue, updateRepoUrl]); // Correct dependency array
+    }), [handlers, setResponseValue, updateRepoUrl]);
     
     // --- Derived State for Rendering ---
     const effectiveIsParsing = contextIsParsing ?? hookIsParsing;
@@ -235,6 +242,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const fixButtonDisabled = isProcessingAny || isWaitingForAiResponse || !!imageReplaceTask;
     const submitButtonDisabled = !canSubmitRegularPR || isProcessingAny || !!imageReplaceTask;
     
+    logger.debug("[AICodeAssistant] Render setup complete. isProcessingAny:", isProcessingAny);
+
     // --- FINAL RENDER ---
     return (
         <div id="executor" className="p-4 bg-card text-foreground font-mono rounded-xl shadow-[0_0_15px_hsl(var(--brand-green)/0.3)] relative overflow-hidden flex flex-col gap-4 border border-border">
@@ -260,7 +269,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                                  ref={aiResponseInputRefPassed}
                                  className={cn(
                                     "w-full p-3 pr-16 bg-input rounded-lg border border-border focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan focus:outline-none transition shadow-inner text-sm resize-y simple-scrollbar",
-                                    "min-h-[360px]" // Увеличена высота
+                                    "min-h-[360px]"
                                  )}
                                  defaultValue={response}
                                  onChange={(e) => setResponseValue(e.target.value)}
@@ -300,7 +309,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                         onSaveFiles={handlers.handleSaveFiles}
                         onDownloadZip={handlers.handleDownloadZip}
                         onSendToTelegram={handlers.handleSendToTelegram}
-                        isUserLoggedIn={!!user}
+                        isUserLoggedIn={!!user || !!dbUser}
                         isLoading={isProcessingAny}
                      />
 
@@ -328,7 +337,16 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                            disabled={isProcessingAny}
                         />
                          <button
-                            onClick={() => { setIsImageModalOpen(true); }}
+                            onClick={async () => {
+                                setIsImageModalOpen(true);
+                                if (dbUser?.user_id) {
+                                    logger.debug(`[AICodeAssistant] User ${dbUser.user_id} opened image modal. Attempting to log feature 'image_modal_opened'.`);
+                                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'image_modal_opened');
+                                    newAchievements?.forEach(ach => addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
+                                } else {
+                                    logger.warn("[AICodeAssistant] Cannot log 'image_modal_opened': dbUser.user_id is missing.");
+                                }
+                            }}
                             className="flex items-center gap-2 px-3 py-2 bg-card rounded-full hover:bg-muted transition shadow-[0_0_12px_hsl(var(--brand-green)/0.3)] hover:ring-1 hover:ring-brand-cyan disabled:opacity-50 relative"
                             disabled={isProcessingAny}
                             title="Загрузить/Связать Картинки (prompts_imgs.txt)"
