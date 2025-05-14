@@ -7,7 +7,7 @@ import UserInfo from "@/components/user-info";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"; // <<--- IMPORT ADDED
 import { 
   FaGears, 
   FaScrewdriverWrench 
@@ -111,7 +111,6 @@ const translations: Record<string, Record<string, string>> = {
   }
 };
 
-// Updated color mapping to use theme definitions
 const colorVarMap: Record<string, string> = {
   purple: "var(--brand-purple-rgb)",
   blue: "var(--brand-blue-rgb)",
@@ -120,9 +119,9 @@ const colorVarMap: Record<string, string> = {
   green: "var(--brand-green-rgb)",
   pink: "var(--brand-pink-rgb)",
   cyan: "var(--brand-cyan-rgb)",
-  red: "var(--red-500-rgb)", // Assuming red-500 is defined in your theme or globals
+  red: "var(--red-500-rgb)", 
   orange: "var(--brand-orange-rgb)",
-  gray: "var(--gray-500-rgb)", // Assuming gray-500 is defined in your theme or globals
+  gray: "var(--gray-500-rgb)", 
 };
 
 const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> = {
@@ -133,10 +132,10 @@ const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> 
   green: "border-brand-green/60 hover:border-brand-green text-brand-green",
   pink: "border-brand-pink/60 hover:border-brand-pink text-brand-pink",
   cyan: "border-brand-cyan/60 hover:border-brand-cyan text-brand-cyan",
-  red: "border-destructive/60 hover:border-destructive text-destructive", // Use destructive from theme
+  red: "border-destructive/60 hover:border-destructive text-destructive", 
   orange: "border-brand-orange/60 hover:border-brand-orange text-brand-orange",
-  gray: "border-muted/60 hover:border-muted text-muted-foreground", // Use muted from theme
-  default: "border-border hover:border-primary/80 text-muted-foreground hover:text-primary" // Use theme defaults
+  gray: "border-muted/60 hover:border-muted text-muted-foreground", 
+  default: "border-border hover:border-primary/80 text-muted-foreground hover:text-primary" 
 };
 
 export default function Header() {
@@ -147,11 +146,6 @@ export default function Header() {
   const [searchTerm, setSearchTerm] = useState("");
   const pathname = usePathname();
   
-  // Логика скрытия хедера на '/finance-literacy-memo' УДАЛЕНА
-  // if (pathname === '/finance-literacy-memo') {
-  //   return null;
-  // }
-
   const initialLang = useMemo(() => (user?.language_code === 'ru' ? 'ru' : 'en'), [user?.language_code]);
   const [currentLang, setCurrentLang] = useState<'en' | 'ru'>(initialLang);
   
@@ -202,9 +196,9 @@ export default function Header() {
       const groupName = page.group || "Misc";
       if (groups[groupName]) { 
         groups[groupName].push(page);
-      } else if (groupName === "Admin Zone" && currentIsAdminReal) { // Ensure Admin Zone is created if not pre-created by filter logic
+      } else if (groupName === "Admin Zone" && currentIsAdminReal) { 
         groups[groupName] = [page];
-      } else if (groupName !== "Admin Zone") { // Catch-all for other groups not in groupOrder, though ideally all pages should have a group from groupOrder
+      } else if (groupName !== "Admin Zone") { 
         groups[groupName] = [page];
       }
     });
@@ -330,8 +324,8 @@ export default function Header() {
                                 page.isImportant 
                                   ? "bg-gradient-to-br from-purple-800/30 via-black/50 to-blue-800/30 col-span-1 sm:col-span-2 shadow-sm" 
                                   : "bg-dark-card/60 hover:bg-dark-card/80 col-span-1",
-                                tileBaseColorClass, // Use updated color classes
-                                shadowClass, // Use updated shadow class based on colorVarMap
+                                tileBaseColorClass, 
+                                shadowClass, 
                                 isCurrentPage ? `ring-2 ring-offset-2 ring-offset-black ${page.color === 'lime' || page.color === 'yellow' || page.color === 'orange' ? 'ring-black/70' : 'ring-white/90'}` : 'ring-transparent'
                               )}
                               title={page.translatedName}

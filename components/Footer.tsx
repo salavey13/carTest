@@ -7,14 +7,11 @@ import Link from "next/link";
 import { FaGithub, FaTelegram } from "react-icons/fa6"; 
 import { usePathname } from "next/navigation"; 
 
+// cn import is not used in this file based on the provided snippet, so no import { cn } from "@/lib/utils"; needed here.
+
 export default function Footer() {
   const { tg, isInTelegramContext } = useAppContext();
   const pathname = usePathname(); 
-
-  // Логика скрытия футера на '/finance-literacy-memo' УДАЛЕНА
-  // if (pathname === '/finance-literacy-memo') {
-  //   return null;
-  // }
 
   const handleShare = () => {
     const shareUrl = "https://t.me/share/url?url=" + encodeURIComponent("https://t.me/oneSitePlsBot/app") + "&text=" + encodeURIComponent("Зацени oneSitePls - твой AI-Dev ассистент в Telegram!");
