@@ -23,16 +23,16 @@ export interface DailyActivityRecord {
   date: string; 
   filesExtracted: number;
   tokensProcessed: number;
-  kworkRequestsSent?: number; 
-  prsCreated?: number;
-  branchesUpdated?: number;
+  kworkRequestsSent: number; // Changed from optional
+  prsCreated: number; // Changed from optional
+  branchesUpdated: number; // Changed from optional
 }
 
 export interface CyberFitnessProfile {
   level: number; 
   kiloVibes: number; 
-  focusTimeHours?: number; 
-  skillsLeveled?: number; 
+  focusTimeHours: number; // Kept optional as it's not directly incremented yet
+  skillsLeveled: number; // Kept optional, could be count of perks
   activeQuests: string[]; 
   completedQuests: string[]; 
   unlockedPerks: string[]; 
@@ -45,11 +45,11 @@ export interface CyberFitnessProfile {
   totalKworkRequestsSent: number; 
   totalPrsCreated: number; 
   totalBranchesUpdated: number; 
-  featuresUsed: Record<string, boolean | number>; 
+  featuresUsed: Record<string, boolean | number | string>; // Allow string for more complex feature states if needed
 }
 
 const CYBERFIT_METADATA_KEY = "cyberFitness";
-const MAX_DAILY_LOG_ENTRIES = 7;
+const MAX_DAILY_LOG_ENTRIES = 30; // Increased for better history
 
 export interface Achievement { 
     id: string;
@@ -58,20 +58,59 @@ export interface Achievement {
     icon: string; 
     checkCondition: (profile: CyberFitnessProfile) => boolean;
     kiloVibesAward?: number; 
+    isQuest?: boolean; // To differentiate quest completion achievements
 }
+
+// --- LEVEL DEFINITIONS ---
+const LEVEL_THRESHOLDS_KV = [0, 100, 300, 750, 1500, 3000, 6000, 10000, 17500, 30000, 50000, 75000, 100000]; // KV for L0, L1...L12
+const COGNITIVE_OS_VERSIONS = [
+    "v0.1 Genesis",         // Level 0
+    "v0.2 Neural Spark",    // Level 1
+    "v0.3 Code Apprentice", // Level 2
+    "v0.4 Vibe Engineer",   // Level 3
+    "v0.5 Logic Architect", // Level 4
+    "v0.6 Context Weaver",  // Level 5
+    "v0.7 Matrix Surfer",   // Level 6
+    "v0.8 Quantum Coder",   // Level 7
+    "v0.9 Singularity Pilot",// Level 8
+    "v1.0 Ascended Node",   // Level 9
+    "v1.1 Vibe Master",     // Level 10
+    "v1.2 Digital Demiurge",// Level 11
+    "vX.X Transcendent UI", // Level 12+
+];
+const PERKS_BY_LEVEL: Record<number, string[]> = {
+    1: ["Базовый Захват Файлов", "Контекст Одного Файла", "Авто-PR для Замены Изображений (Lv.1 Flow)"],
+    2: ["Многофайловый Контекст", "Парсинг Ответа AI", "Простые Идеи (Lv.2 Flow)"],
+    3: ["Создание PR", "Обновление Ветки", "Анализ Логов Ошибок (Lv.3 Flow)"],
+    4: ["Проактивная Проверка Логов Vercel", "Поиск Иконок FontAwesome", "Быстрые Ссылки Ассистента"],
+    5: ["Мультимодальный Ввод (Заглушки)", "Доступ к Инструментам Изображений", "Продвинутый Дебаггинг (Lv.4+ Flow)"],
+    6: ["Работа с Данными (SQL в Supabase UI)", "Расширенный Контекст (Дерево Файлов)"],
+    7: ["Кастомные Инструкции для AI (Скоро)", "Продвинутый Рефакторинг"],
+    8: ["Развертывание Собственного CyberVibe (Инструкции)", "Управление Токенами Ботов"],
+    9: ["Создание Собственных XTR Автоматизаций (Документация)"],
+    10: ["Полная Кастомизация Промптов AI", "Бета-Доступ к Новым Фичам"],
+    11: ["Интеграция с Внешними API (Продвинуто)"],
+    12: ["Менторство Новых Агентов (Скоро)", "Архитектор Платформы (Влияние на Roadmap)"],
+};
+// --- END LEVEL DEFINITIONS ---
 
 export const ALL_ACHIEVEMENTS: Achievement[] = [
     // --- General Achievements ---
-    { id: "first_blood", name: "Первая Кровь", description: "Первая залогированная активность в CyberFitness.", icon: "FaVial", kiloVibesAward: 10, checkCondition: (p) => (p.dailyActivityLog?.length ?? 0) > 0 || (p.totalFilesExtracted ?? 0) > 0 || (p.totalTokensProcessed ?? 0) > 0 || (p.totalKworkRequestsSent ?? 0) > 0 },
-    { id: "prompt_engineer_1", name: "Инженер Промптов I", description: "Отправлено 10 запросов к AI.", icon: "FaPaperPlane", kiloVibesAward: 50, checkCondition: (p) => (p.totalKworkRequestsSent ?? 0) >= 10 },
-    { id: "branch_master_1", name: "Мастер Ветвления I", description: "Обновлено 5 веток.", icon: "FaCodeBranch", kiloVibesAward: 75, checkCondition: (p) => (p.totalBranchesUpdated ?? 0) >= 5 },
-    { id: "pr_pioneer_1", name: "Пионер Pull Request'ов I", description: "Создано 3 PR.", icon: "FaGithub", kiloVibesAward: 100, checkCondition: (p) => (p.totalPrsCreated ?? 0) >= 3 },
+    { id: "first_blood", name: "Первая Кровь", description: "Первая залогированная активность в CyberFitness.", icon: "FaVial", kiloVibesAward: 10, checkCondition: (p) => (p.dailyActivityLog?.length ?? 0) > 0 || p.totalFilesExtracted > 0 || p.totalTokensProcessed > 0 || p.totalKworkRequestsSent > 0 },
+    { id: "prompt_engineer_1", name: "Инженер Промптов I", description: "Отправлено 10 запросов к AI.", icon: "FaPaperPlane", kiloVibesAward: 50, checkCondition: (p) => p.totalKworkRequestsSent >= 10 },
+    { id: "prompt_engineer_2", name: "Инженер Промптов II", description: "Отправлено 50 запросов к AI.", icon: "FaPaperPlane", kiloVibesAward: 150, checkCondition: (p) => p.totalKworkRequestsSent >= 50 },
+    { id: "branch_master_1", name: "Мастер Ветвления I", description: "Обновлено 5 веток.", icon: "FaCodeBranch", kiloVibesAward: 75, checkCondition: (p) => p.totalBranchesUpdated >= 5 },
+    { id: "branch_master_2", name: "Мастер Ветвления II", description: "Обновлено 25 веток.", icon: "FaCodeBranch", kiloVibesAward: 200, checkCondition: (p) => p.totalBranchesUpdated >= 25 },
+    { id: "pr_pioneer_1", name: "Пионер Pull Request'ов I", description: "Создано 3 PR.", icon: "FaGithub", kiloVibesAward: 100, checkCondition: (p) => p.totalPrsCreated >= 3 },
+    { id: "pr_pioneer_2", name: "Пионер Pull Request'ов II", description: "Создано 10 PR.", icon: "FaGithub", kiloVibesAward: 300, checkCondition: (p) => p.totalPrsCreated >= 10 },
     { id: "architect", name: "Архитектор Контекста", description: "Использована функция 'Добавить все файлы + дерево'.", icon: "FaTree", kiloVibesAward: 30, checkCondition: (p) => p.featuresUsed?.usedAddFullTree === true },
     { id: "sharpshooter", name: "Меткий Стрелок", description: "Использована функция 'Выбрать Связанные Файлы'.", icon: "FaCrosshairs", kiloVibesAward: 30, checkCondition: (p) => p.featuresUsed?.usedSelectHighlighted === true },
-    { id: "code_explorer_1", name: "Исследователь Кода I", description: "Добавлено 100 файлов в запросы к AI.", icon: "FaSearchengin", kiloVibesAward: 50, checkCondition: (p) => (p.totalFilesExtracted ?? 0) >= 100 },
-    { id: "ai_whisperer_1", name: "Заклинатель AI I", description: "Обработано 10,000 токенов AI.", icon: "FaRobot", kiloVibesAward: 50, checkCondition: (p) => (p.totalTokensProcessed ?? 0) >= 10000 },
-    { id: "kwork_context_pro_10", name: "Профи Контекста KWork (10+)", description: "Добавлено 10+ файлов в KWork за один раз.", icon: "FaPlus", kiloVibesAward: 50, checkCondition: (p) => (p.featuresUsed?.added10PlusFilesToKworkOnce === true )},
-    { id: "kwork_context_pro_20", name: "Гуру Контекста KWork (20+)", description: "Добавлено 20+ файлов в KWork за один раз.", icon: "FaPlus", kiloVibesAward: 100, checkCondition: (p) => (p.featuresUsed?.added20PlusFilesToKworkOnce === true )},
+    { id: "code_explorer_1", name: "Исследователь Кода I", description: "Добавлено 100 файлов в запросы к AI.", icon: "FaSearchengin", kiloVibesAward: 50, checkCondition: (p) => p.totalFilesExtracted >= 100 },
+    { id: "code_explorer_2", name: "Исследователь Кода II", description: "Добавлено 500 файлов в запросы к AI.", icon: "FaSearchengin", kiloVibesAward: 150, checkCondition: (p) => p.totalFilesExtracted >= 500 },
+    { id: "ai_whisperer_1", name: "Заклинатель AI I", description: "Обработано 10,000 токенов AI.", icon: "FaRobot", kiloVibesAward: 50, checkCondition: (p) => p.totalTokensProcessed >= 10000 },
+    { id: "ai_whisperer_2", name: "Заклинатель AI II", description: "Обработано 100,000 токенов AI.", icon: "FaRobot", kiloVibesAward: 200, checkCondition: (p) => p.totalTokensProcessed >= 100000 },
+    { id: "kwork_context_pro_10", name: "Профи Контекста KWork (10+)", description: "Добавлено 10+ файлов в KWork за один раз.", icon: "FaPlus", kiloVibesAward: 50, checkCondition: (p) => p.featuresUsed?.added10PlusFilesToKworkOnce === true },
+    { id: "kwork_context_pro_20", name: "Гуру Контекста KWork (20+)", description: "Добавлено 20+ файлов в KWork за один раз.", icon: "FaPlus", kiloVibesAward: 100, checkCondition: (p) => p.featuresUsed?.added20PlusFilesToKworkOnce === true },
     
     // --- Feature Usage Achievements ---
     { id: "sticky_chat_opened", name: "Первый Контакт с XUINITY", description: "Первое открытие StickyChat для быстрой помощи.", icon: "FaCommentDots", kiloVibesAward: 10, checkCondition: (p) => p.featuresUsed?.sticky_chat_opened === true },
@@ -86,21 +125,20 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
       description: "Продемонстрировал мастерство молниеносного мобильного ввода и навигации в стиле Mortal Kombat.", 
       icon: "FaMobileScreenButton", 
       kiloVibesAward: 75, 
-      checkCondition: () => false 
+      checkCondition: (p) => p.featuresUsed?.usedMobileFast === true // Assuming a new feature flag
     },
 
     // --- Quest Achievements - their checkCondition is false as they are awarded directly ---
-    { id: "initial_boot_sequence", name: "Квест: Пойман Сигнал!", description: "Успешно инициирован рабочий флоу через StickyChat или URL. +25 KiloVibes", icon: "FaBolt", checkCondition: () => false },
-    { id: "first_fetch_completed", name: "Квест: Первая Загрузка", description: "Успешно загружены файлы из репозитория. +75 KiloVibes", icon: "FaDownload", checkCondition: () => false },
-    { id: "first_parse_completed", name: "Квест: Первый Парсинг", description: "Успешно разобран ответ от AI. +150 KiloVibes", icon: "FaCode", checkCondition: () => false },
-    { id: "first_pr_created", name: "Квест: Первый PR", description: "Успешно создан Pull Request. +250 KiloVibes", icon: "FaGithub", checkCondition: () => false },
+    { id: "initial_boot_sequence", name: "Квест: Пойман Сигнал!", description: "Успешно инициирован рабочий флоу через StickyChat или URL. +25 KiloVibes", icon: "FaBolt", checkCondition: () => false, isQuest: true },
+    { id: "first_fetch_completed", name: "Квест: Первая Загрузка", description: "Успешно загружены файлы из репозитория. +75 KiloVibes", icon: "FaDownload", checkCondition: () => false, isQuest: true },
+    { id: "first_parse_completed", name: "Квест: Первый Парсинг", description: "Успешно разобран ответ от AI. +150 KiloVibes", icon: "FaCode", checkCondition: () => false, isQuest: true },
+    { id: "first_pr_created", name: "Квест: Первый PR", description: "Успешно создан Pull Request. +250 KiloVibes", icon: "FaGithub", checkCondition: () => false, isQuest: true },
 ];
 
-// Helper to get default profile structure
 const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({
     level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
     activeQuests: [], completedQuests: [], unlockedPerks: [],
-    cognitiveOSVersion: "v0.1 Genesis", lastActivityTimestamp: new Date(0).toISOString(), 
+    cognitiveOSVersion: COGNITIVE_OS_VERSIONS[0], lastActivityTimestamp: new Date(0).toISOString(), 
     dailyActivityLog: [], achievements: [],
     totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0,
     totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {},
@@ -115,7 +153,14 @@ const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | 
     finalProfile = {
         ...defaultProfile,
         ...existingProfile,
-        dailyActivityLog: Array.isArray(existingProfile.dailyActivityLog) ? existingProfile.dailyActivityLog : defaultProfile.dailyActivityLog,
+        dailyActivityLog: Array.isArray(existingProfile.dailyActivityLog) ? existingProfile.dailyActivityLog.map(log => ({ // Ensure all fields exist
+            date: log.date,
+            filesExtracted: log.filesExtracted || 0,
+            tokensProcessed: log.tokensProcessed || 0,
+            kworkRequestsSent: log.kworkRequestsSent || 0,
+            prsCreated: log.prsCreated || 0,
+            branchesUpdated: log.branchesUpdated || 0,
+        })) : defaultProfile.dailyActivityLog,
         achievements: Array.isArray(existingProfile.achievements) ? existingProfile.achievements : defaultProfile.achievements,
         activeQuests: Array.isArray(existingProfile.activeQuests) ? existingProfile.activeQuests : defaultProfile.activeQuests,
         completedQuests: Array.isArray(existingProfile.completedQuests) ? existingProfile.completedQuests : defaultProfile.completedQuests,
@@ -134,6 +179,14 @@ const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | 
         lastActivityTimestamp: typeof existingProfile.lastActivityTimestamp === 'string' ? existingProfile.lastActivityTimestamp : defaultProfile.lastActivityTimestamp,
     };
   }
+  // Ensure cognitiveOSVersion is valid or default
+  if (!COGNITIVE_OS_VERSIONS.includes(finalProfile.cognitiveOSVersion) && finalProfile.level < COGNITIVE_OS_VERSIONS.length) {
+      finalProfile.cognitiveOSVersion = COGNITIVE_OS_VERSIONS[finalProfile.level] || COGNITIVE_OS_VERSIONS[0];
+  } else if (finalProfile.level >= COGNITIVE_OS_VERSIONS.length) {
+      finalProfile.cognitiveOSVersion = COGNITIVE_OS_VERSIONS[COGNITIVE_OS_VERSIONS.length -1];
+  }
+
+
   return finalProfile;
 };
 
@@ -194,7 +247,7 @@ export const updateUserCyberFitnessProfile = async (
       lastActivityTimestamp: new Date().toISOString(), 
     };
 
-    if (updates.level !== undefined && typeof updates.level === 'number') newCyberFitnessProfile.level = updates.level;
+    // Apply direct updates from 'updates' object
     if (updates.kiloVibes !== undefined && typeof updates.kiloVibes === 'number') {
         newCyberFitnessProfile.kiloVibes = (newCyberFitnessProfile.kiloVibes || 0) + updates.kiloVibes; 
     }
@@ -204,7 +257,6 @@ export const updateUserCyberFitnessProfile = async (
     if (updates.skillsLeveled !== undefined && typeof updates.skillsLeveled === 'number') {
         newCyberFitnessProfile.skillsLeveled = (newCyberFitnessProfile.skillsLeveled || 0) + updates.skillsLeveled; 
     }
-
     if (updates.activeQuests && Array.isArray(updates.activeQuests)) newCyberFitnessProfile.activeQuests = Array.from(new Set([...(newCyberFitnessProfile.activeQuests || []), ...updates.activeQuests]));
     if (updates.completedQuests && Array.isArray(updates.completedQuests)) {
         newCyberFitnessProfile.completedQuests = Array.from(new Set([...(newCyberFitnessProfile.completedQuests || []), ...updates.completedQuests]));
@@ -224,15 +276,81 @@ export const updateUserCyberFitnessProfile = async (
     if (typeof updates.totalPrsCreated === 'number') newCyberFitnessProfile.totalPrsCreated = (newCyberFitnessProfile.totalPrsCreated || 0) + updates.totalPrsCreated;
     if (typeof updates.totalBranchesUpdated === 'number') newCyberFitnessProfile.totalBranchesUpdated = (newCyberFitnessProfile.totalBranchesUpdated || 0) + updates.totalBranchesUpdated;
     
+    // --- Leveling Logic ---
+    const previousLevel = newCyberFitnessProfile.level; // Use level from potentially updated profile
+    let newLevelCandidate = newCyberFitnessProfile.level;
+
+    for (let i = LEVEL_THRESHOLDS_KV.length - 1; i >= 0; i--) {
+        if (newCyberFitnessProfile.kiloVibes >= LEVEL_THRESHOLDS_KV[i]) {
+            newLevelCandidate = i;
+            break;
+        }
+    }
+     // If a specific level was passed in `updates`, ensure it's respected if higher
+     if (updates.level !== undefined && typeof updates.level === 'number' && updates.level > newLevelCandidate) {
+        newLevelCandidate = updates.level;
+    }
+    
     const newlyUnlockedAchievements: Achievement[] = [];
     let currentAchievementsSet = new Set(newCyberFitnessProfile.achievements || []);
 
+    if (newLevelCandidate > previousLevel) {
+        logger.info(`[CyberFitness UpdateProfile] LEVEL UP! User ${userId} from ${previousLevel} to ${newLevelCandidate}.`);
+        newCyberFitnessProfile.level = newLevelCandidate;
+        newCyberFitnessProfile.cognitiveOSVersion = COGNITIVE_OS_VERSIONS[newLevelCandidate] || `v${newLevelCandidate}.0 Custom`;
+        
+        const kvAwardForLevel = (newLevelCandidate - previousLevel) * 100; // Award for each level gained
+        if (kvAwardForLevel > 0) {
+            newCyberFitnessProfile.kiloVibes += kvAwardForLevel;
+            logger.info(`[CyberFitness UpdateProfile] Awarded ${kvAwardForLevel} KiloVibes for reaching level ${newLevelCandidate}. New total: ${newCyberFitnessProfile.kiloVibes}`);
+        }
+
+        for (let lvl = previousLevel + 1; lvl <= newLevelCandidate; lvl++) {
+            if (PERKS_BY_LEVEL[lvl]) {
+                const perksToUnlock = PERKS_BY_LEVEL[lvl];
+                const existingPerksSet = new Set(newCyberFitnessProfile.unlockedPerks || []);
+                perksToUnlock.forEach(perk => {
+                    if (!existingPerksSet.has(perk)) {
+                        newCyberFitnessProfile.unlockedPerks.push(perk);
+                        existingPerksSet.add(perk);
+                        logger.info(`[CyberFitness UpdateProfile] Unlocked perk: "${perk}" for level ${lvl}.`);
+                    }
+                });
+            }
+            // Dynamic Level Up Achievement
+            const levelUpAchievementId = `level_up_${lvl}`;
+            if (!currentAchievementsSet.has(levelUpAchievementId)) {
+                 const levelUpAch: Achievement = {
+                     id: levelUpAchievementId,
+                     name: `Достигнут Уровень ${lvl}!`,
+                     description: `Вы достигли ${lvl}-го уровня КиберФитнеса.`,
+                     icon: 'FaStar', 
+                     checkCondition: () => true, 
+                     kiloVibesAward: 50 * lvl 
+                 };
+                 // Add to ALL_ACHIEVEMENTS only if it's truly dynamic and not predefined
+                 if (!ALL_ACHIEVEMENTS.find(a => a.id === levelUpAch.id)) {
+                     ALL_ACHIEVEMENTS.push(levelUpAch); // Be cautious with modifying global ALL_ACHIEVEMENTS at runtime
+                 }
+                 currentAchievementsSet.add(levelUpAch.id);
+                 newlyUnlockedAchievements.push(levelUpAch);
+                 if (levelUpAch.kiloVibesAward) {
+                     newCyberFitnessProfile.kiloVibes += levelUpAch.kiloVibesAward;
+                 }
+                 logger.info(`[CyberFitness UpdateProfile] Unlocked dynamic achievement: '${levelUpAch.name}' (Lvl ${lvl})`);
+            }
+        }
+        newCyberFitnessProfile.skillsLeveled = newCyberFitnessProfile.unlockedPerks.length; // Update skillsLeveled
+    }
+    // --- End Leveling Logic ---
+
+    // --- Achievement Check (after KiloVibes and totals are updated, including from leveling) ---
     for (const ach of ALL_ACHIEVEMENTS) {
-        if (!currentAchievementsSet.has(ach.id) && ach.checkCondition(newCyberFitnessProfile)) {
+        if (!ach.isQuest && !currentAchievementsSet.has(ach.id) && ach.checkCondition(newCyberFitnessProfile)) { // Skip quest achievements here
             currentAchievementsSet.add(ach.id); 
             newlyUnlockedAchievements.push(ach);
             if (ach.kiloVibesAward && typeof ach.kiloVibesAward === 'number') { 
-                newCyberFitnessProfile.kiloVibes = (newCyberFitnessProfile.kiloVibes || 0) + ach.kiloVibesAward;
+                newCyberFitnessProfile.kiloVibes += ach.kiloVibesAward;
                 logger.debug(`[CyberFitness UpdateProfile] Awarded ${ach.kiloVibesAward} KiloVibes for achievement '${ach.name}'. New total: ${newCyberFitnessProfile.kiloVibes}`);
             }
         }
@@ -243,6 +361,7 @@ export const updateUserCyberFitnessProfile = async (
     if (newlyUnlockedAchievements.length > 0) {
         logger.info(`[CyberFitness UpdateProfile] User ${userId} unlocked new achievements:`, newlyUnlockedAchievements.map(a => `${a.name} (+${a.kiloVibesAward || 0}KV)`));
     }
+    // --- End Achievement Check ---
 
     const newOverallMetadata: UserMetadata = {
       ...existingOverallMetadata, 
@@ -296,7 +415,6 @@ export const logCyberFitnessAction = async (
     let currentProfile = profileResult.data || getDefaultCyberFitnessProfile(); 
     logger.debug(`[CyberFitness LogAction] Current profile for ${userId} before logging ${actionType}: KiloVibes=${currentProfile.kiloVibes}, totalFilesExtracted=${currentProfile.totalFilesExtracted}`);
 
-
     let dailyLog = currentProfile.dailyActivityLog ? [...currentProfile.dailyActivityLog] : [];
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     let todayEntry = dailyLog.find(entry => entry.date === todayStr);
@@ -318,7 +436,7 @@ export const logCyberFitnessAction = async (
 
     if (actionType === 'filesExtracted' && typeof countOrDetails === 'number') {
         todayEntry.filesExtracted += countOrDetails;
-        profileUpdates.totalFilesExtracted = countOrDetails; 
+        profileUpdates.totalFilesExtracted = countOrDetails; // This is a delta for this specific action
         if (countOrDetails >= 20 && !currentProfile.featuresUsed?.added20PlusFilesToKworkOnce) {
              profileUpdates.featuresUsed!.added20PlusFilesToKworkOnce = true; 
         } else if (countOrDetails >= 10 && !currentProfile.featuresUsed?.added10PlusFilesToKworkOnce) {
@@ -326,19 +444,19 @@ export const logCyberFitnessAction = async (
         }
     } else if (actionType === 'tokensProcessed' && typeof countOrDetails === 'number') {
         todayEntry.tokensProcessed += countOrDetails;
-        profileUpdates.totalTokensProcessed = countOrDetails; 
+        profileUpdates.totalTokensProcessed = countOrDetails; // Delta
     } else if (actionType === 'kworkRequestSent' && typeof countOrDetails === 'number') {
-        todayEntry.kworkRequestsSent = (todayEntry.kworkRequestsSent || 0) + countOrDetails; 
-        profileUpdates.totalKworkRequestsSent = countOrDetails; 
+        todayEntry.kworkRequestsSent += countOrDetails; 
+        profileUpdates.totalKworkRequestsSent = countOrDetails; // Delta
     } else if (actionType === 'prCreated' && typeof countOrDetails === 'number') {
-        todayEntry.prsCreated = (todayEntry.prsCreated || 0) + countOrDetails;
-        profileUpdates.totalPrsCreated = countOrDetails; 
+        todayEntry.prsCreated += countOrDetails;
+        profileUpdates.totalPrsCreated = countOrDetails; // Delta
     } else if (actionType === 'branchUpdated' && typeof countOrDetails === 'number') {
-        todayEntry.branchesUpdated = (todayEntry.branchesUpdated || 0) + countOrDetails;
-        profileUpdates.totalBranchesUpdated = countOrDetails; 
+        todayEntry.branchesUpdated += countOrDetails;
+        profileUpdates.totalBranchesUpdated = countOrDetails; // Delta
     } else if (actionType === 'featureUsed' && typeof countOrDetails === 'object' && countOrDetails.featureName) {
         const featureName = countOrDetails.featureName;
-        if (!profileUpdates.featuresUsed![featureName]) { // Only mark as true if not already true to prevent re-logging if that's not desired
+        if (!profileUpdates.featuresUsed![featureName]) { 
              profileUpdates.featuresUsed![featureName] = true;
              logger.debug(`[CyberFitness LogAction] Feature '${featureName}' marked as used for user ${userId}.`);
         } else {
@@ -360,7 +478,7 @@ export const logCyberFitnessAction = async (
       return { success: false, error: updateResult.error || "Failed to save updated profile." };
     }
 
-    const finalKiloVibes = updateResult.data?.metadata?.cyberFitness?.kiloVibes;
+    const finalKiloVibes = updateResult.data?.metadata?.[CYBERFIT_METADATA_KEY]?.kiloVibes; // Access through key
     logger.log(`[CyberFitness LogAction EXIT] Action '${actionType}' logged for ${userId}. Final KiloVibes: ${finalKiloVibes ?? 'N/A'}. New achievements:`, updateResult.newAchievements?.map(a => a.id));
     return { success: true, newAchievements: updateResult.newAchievements };
 
@@ -379,7 +497,7 @@ export const checkAndUnlockFeatureAchievement = async (
         logger.warn("[CyberFitness CheckFeatureAchievement] User ID and feature name required. Aborting.");
         return { success: false, error: "User ID and feature name required."};
     }
-    const result = await logCyberFitnessAction(userId, 'featureUsed', { featureName: String(featureName) }); // Ensure featureName is string
+    const result = await logCyberFitnessAction(userId, 'featureUsed', { featureName: String(featureName) }); 
     if(result.success){
         logger.log(`[CyberFitness CheckFeatureAchievement EXIT] Successfully logged feature '${featureName}'. New achievements: ${result.newAchievements?.map(a=>a.id) ?? 'None'}`);
     } else {
@@ -437,20 +555,12 @@ export const completeQuestAndUpdateProfile = async (
   };
   logger.debug(`[CyberFitness QuestComplete] Initial updates for quest ${questId}: KiloVibes delta = ${updates.kiloVibes}`);
 
-  if (newLevel !== undefined && typeof newLevel === 'number' && newLevel > (currentProfile.level || 0)) {
-    updates.level = newLevel; 
-    logger.log(`[CyberFitness QuestComplete] User ${userId} leveled up to ${newLevel}!`);
-  } else if (newLevel !== undefined) {
-    logger.log(`[CyberFitness QuestComplete] User ${userId} (Lvl ${currentProfile.level || 0}) completed quest for Lvl ${newLevel}. Level not changed as it's not higher.`);
-  }
-
-  if (newPerks && Array.isArray(newPerks) && newPerks.length > 0) {
-    updates.unlockedPerks = newPerks; 
-    logger.log(`[CyberFitness QuestComplete] User ${userId} granted perks:`, newPerks);
-  }
+  // Pass newLevel and newPerks directly to updateUserCyberFitnessProfile, it will handle logic
+  if (newLevel !== undefined) updates.level = newLevel;
+  if (newPerks) updates.unlockedPerks = newPerks;
   
   const result = await updateUserCyberFitnessProfile(userId, updates);
-  const finalKiloVibes = result.data?.metadata?.cyberFitness?.kiloVibes;
+  const finalKiloVibes = result.data?.metadata?.[CYBERFIT_METADATA_KEY]?.kiloVibes;
   logger.log(`[CyberFitness QuestComplete EXIT] Update result for quest ${questId}: Success: ${result.success}. Final KiloVibes: ${finalKiloVibes ?? 'N/A'}. New achievements: ${result.newAchievements?.map(a=>a.id) ?? 'None'}`);
   return result;
 };
@@ -481,5 +591,27 @@ export const getUserCyberLevel = async (userId: string): Promise<{ success: bool
 
 export const getAchievementDetails = (achievementId: string): Achievement | undefined => {
     if (!achievementId) return undefined;
-    return ALL_ACHIEVEMENTS.find(ach => ach.id === achievementId);
+    // Attempt to find in predefined list first
+    let achievement = ALL_ACHIEVEMENTS.find(ach => ach.id === achievementId);
+    if (achievement) return achievement;
+
+    // If not found, check if it's a dynamic level_up achievement
+    if (achievementId.startsWith("level_up_")) {
+        const levelMatch = achievementId.match(/^level_up_(\d+)$/);
+        if (levelMatch && levelMatch[1]) {
+            const level = parseInt(levelMatch[1], 10);
+            if (!isNaN(level)) {
+                return {
+                    id: achievementId,
+                    name: `Достигнут Уровень ${level}!`,
+                    description: `Вы достигли ${level}-го уровня КиберФитнеса.`,
+                    icon: 'FaStar',
+                    checkCondition: () => true, // It's already achieved
+                    kiloVibesAward: 0 // Award was given at time of unlock
+                };
+            }
+        }
+    }
+    logger.warn(`[CyberFitness getAchievementDetails] Achievement with ID "${achievementId}" not found in ALL_ACHIEVEMENTS or dynamic patterns.`);
+    return undefined;
 };
