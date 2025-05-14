@@ -210,7 +210,29 @@
 }
 
 @layer components {
-  /* .gta-vibe-text-effect removed as its styles are now in h1 base */
+  /* This class is now for the "VICE" part of the logo and Style Guide H1 */
+  .gta-vibe-text-effect {
+    font-family: 'Orbitron', sans-serif; /* Ensure Orbitron is applied if not inherited */
+    @apply tracking-wider uppercase; /* Ensure these are applied if not inherited */
+    background-image: linear-gradient(
+      to top, 
+      hsl(var(--brand-orange)), 
+      hsl(var(--brand-pink)) 50%, 
+      hsl(var(--brand-purple))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-fill-color: transparent;
+    text-shadow:
+      0px 2px 1px hsla(var(--brand-purple), 0.85), 
+      0px 2px 3px hsla(var(--brand-purple), 0.65),
+      0px 0px 5px hsla(var(--brand-pink), 0.75),   
+      0px 0px 10px hsla(var(--brand-pink), 0.55),
+      0px -2px 1px hsla(var(--brand-blue), 0.85),  
+      0px -2px 3px hsla(var(--brand-blue), 0.65);
+    user-select: none;
+  }
 
   .input-cyber {
     @apply bg-input border border-border text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm
@@ -226,28 +248,14 @@
              transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
   }
 
-  /* Specific class for Style Guide H1, as it needs font-orbitron explicitly applied */
+  /* This class is for the Style Guide H1 specifically if it needed variations, but now we use the one above.
+     If Style Guide H1 needs *only* the visual effect without Orbitron/tracking from here, it can use a more minimal class.
+     For now, it will use .gta-vibe-text-effect as well.
+  */
   .text-gta-style-heading-styleguide {
-    font-family: 'Orbitron', sans-serif; 
-    @apply tracking-wider uppercase; 
-    background-image: linear-gradient(
-      to top, 
-      hsl(var(--brand-orange)), 
-      hsl(var(--brand-pink)) 50%, 
-      hsl(var(--brand-purple))
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    text-fill-color: transparent;
-    text-shadow:
-      0px 2px 1px hsla(var(--brand-purple), 0.8),
-      0px 2px 3px hsla(var(--brand-purple), 0.6),
-      0px 0px 5px hsla(var(--brand-pink), 0.7),
-      0px 0px 10px hsla(var(--brand-pink), 0.5),
-      0px -2px 1px hsla(var(--brand-blue), 0.8),
-      0px -2px 3px hsla(var(--brand-blue), 0.6);
-    user-select: none;
+    /* This class will apply the .gta-vibe-text-effect styles. */
+    /* Specific overrides for Style Guide H1 can go here if needed, otherwise it uses .gta-vibe-text-effect */
+    @apply gta-vibe-text-effect; /* This ensures it gets the base GTA style */
   }
 }
 
