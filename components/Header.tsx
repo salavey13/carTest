@@ -34,23 +34,18 @@ interface PageInfo {
 }
 
 const allPages: PageInfo[] = [
-  // --- Core Vibe ---
   { path: "/", name: "Home", icon: FaBrain, group: "Core Vibe", isImportant: true, color: "cyan" },
   { path: "/repo-xml", name: "SUPERVIBE Studio", icon: FaWandMagicSparkles, group: "Core Vibe", isImportant: true, color: "purple", isHot: true },
   { path: "/selfdev", name: "SelfDev Path", icon: FaRoad, group: "Core Vibe", isImportant: true, color: "green" },
   { path: "/p-plan", name: "VIBE Plan", icon: FaUserNinja, group: "Core Vibe", isImportant: true, isHot: true, color: "yellow" },
   { path: "/game-plan", name: "Game Plan", icon: FaFilm, group: "Core Vibe", isImportant: true, color: "orange", isHot: true },
   { path: "/selfdev/gamified", name: "CyberDev OS", icon: FaGamepad, group: "Core Vibe", isImportant: true, color: "pink", isHot: true },
-  
-  // --- CyberFitness ---
   { path: "/profile", name: "Agent Profile", icon: FaCircleUser, group: "CyberFitness", color: "pink" },
   { path: "/buy-subscription", name: "OS Upgrades", icon: FaCreditCard, group: "CyberFitness", color: "green" },
   { path: "/premium", name: "Premium Modules", icon: FaStar, group: "CyberFitness", color: "yellow" }, 
   { path: "/nutrition", name: "Cognitive Fuel", icon: FaScrewdriverWrench, group: "CyberFitness", color: "orange"}, 
   { path: "/settings", name: "System Config", icon: FaGears, group: "CyberFitness", color: "blue" },  
   { path: "/partner", name: "Alliance Perks", icon: Users, group: "CyberFitness", color: "purple"}, 
-
-  // --- Content & Tools ---
   { path: "/jumpstart", name: "Jumpstart Kit", icon: FaRocket, group: "Content & Tools", isImportant: true, color: "lime" },
   { path: "/purpose-profit", name: "Purpose & Profit", icon: FaBookOpen, group: "Content & Tools", color: "purple" },
   { path: "/ai-work-future", name: "AI & Future of Work", icon: FaNetworkWired, group: "Content & Tools", color: "cyan" },
@@ -59,8 +54,6 @@ const allPages: PageInfo[] = [
   { path: "/style-guide", name: "Style Guide", icon: FaPalette, group: "Content & Tools", color: "gray" },
   { path: "/onesitepls", name: "oneSitePls Info", icon: FaCircleInfo, group: "Content & Tools", color: "gray" },
   { path: "/finance-literacy-memo", name: "Finance Literacy Memo", icon: FaDollarSign, group: "Content & Tools", color: "green"},
-  
-  // --- Misc & Old (can be hidden or moved to a "Legacy" group if needed) ---
   { path: "/cartest", name: "Cyber Garage", icon: FaCarOn, group: "Misc", color: "blue" },
   { path: "/botbusters", name: "Bot Busters", icon: FaRobot, group: "Misc", color: "blue"},
   { path: "/bullshitdetector", name: "BS Detector", icon: FaMagnifyingGlass, group: "Misc", color: "yellow" },
@@ -73,8 +66,6 @@ const allPages: PageInfo[] = [
   { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: Globe, group: "Misc", color: 'green' },
   { path: "/vpr/history/6/cheatsheet", name: "History Cheatsheet 6", icon: FaLandmarkDome, group: "Misc", color: 'yellow' },
   { path: "/vpr/biology/6/cheatsheet", name: "Biology Cheatsheet 6", icon: FaLeaf, group: "Misc", color: 'lime' },
-
-  // --- Admin Zone ---
   { path: "/admin", name: "Admin Panel", icon: FaUserShield, group: "Admin Zone", isAdminOnly: true, color: "red" },
   { path: "/advice-upload", name: "Upload Advice", icon: FaUpload, group: "Admin Zone", isAdminOnly: true, color: "red" },
   { path: "/shadow-fleet-admin", name: "Fleet Admin", icon: FaCarOn, group: "Admin Zone", isAdminOnly: true, color: "red" },
@@ -83,11 +74,7 @@ const allPages: PageInfo[] = [
 
 const groupOrder = ["Core Vibe", "CyberFitness", "Content & Tools", "Misc", "Admin Zone"];
 const groupIcons: Record<string, React.ComponentType<{className?: string}>> = {
-    "Core Vibe": Zap,
-    "CyberFitness": BookUser, 
-    "Content & Tools": Puzzle,
-    "Misc": Layers,
-    "Admin Zone": ShieldCheck,
+    "Core Vibe": Zap, "CyberFitness": BookUser, "Content & Tools": Puzzle, "Misc": Layers, "Admin Zone": ShieldCheck,
 };
 
 const translations: Record<string, Record<string, string>> = {
@@ -112,15 +99,9 @@ const translations: Record<string, Record<string, string>> = {
 };
 
 const colorVarMap: Record<string, string> = {
-  purple: "var(--brand-purple-rgb)",
-  blue: "var(--brand-blue-rgb)",
-  yellow: "var(--brand-yellow-rgb)",
-  lime: "var(--neon-lime-rgb)",
-  green: "var(--brand-green-rgb)",
-  pink: "var(--brand-pink-rgb)",
-  cyan: "var(--brand-cyan-rgb)",
-  red: "var(--red-500-rgb)", 
-  orange: "var(--brand-orange-rgb)",
+  purple: "var(--brand-purple-rgb)", blue: "var(--brand-blue-rgb)", yellow: "var(--brand-yellow-rgb)",
+  lime: "var(--neon-lime-rgb)", green: "var(--brand-green-rgb)", pink: "var(--brand-pink-rgb)",
+  cyan: "var(--brand-cyan-rgb)", red: "var(--red-500-rgb)", orange: "var(--brand-orange-rgb)",
   gray: "var(--gray-500-rgb)", 
 };
 
@@ -160,12 +141,19 @@ export default function Header() {
   const toggleLang = useCallback(() => setCurrentLang(prevLang => prevLang === 'en' ? 'ru' : 'en'), []);
 
   const currentLogoText = useMemo(() => {
-    const currentPage = allPages.find(p => p.path === pathname);
+    const page = allPages.find(p => p.path === pathname);
     if (pathname?.startsWith('/vpr')) return "VPR";
-    const baseName = currentPage?.name || "Home"; 
-    const translatedFirstName = t(baseName)?.split(' ')[0];
-    return translatedFirstName || baseName.split(' ')[0] || "VIBE";
+    if (page?.name) {
+        const firstWord = t(page.name).split(' ')[0];
+        if (firstWord.length <= 6) return firstWord.toUpperCase(); // Prioritize short first word
+        if (firstWord.length > 6 && page.name.length <= 6) return page.name.toUpperCase(); // Fallback to original short name
+    }
+    return "CYBERVICE"; // Default logo text
   }, [pathname, t]);
+  
+  const logoCyberPart = currentLogoText === "CYBERVICE" ? "CYBER" : currentLogoText;
+  const logoVicePart = currentLogoText === "CYBERVICE" ? "VICE" : "";
+
 
   const groupedAndFilteredPages = useMemo(() => {
     logger.debug("[Header] Recalculating groupedAndFilteredPages. appContextLoading:", appContextLoading, "isAdmin function exists:", typeof isAdmin === 'function');
@@ -186,21 +174,15 @@ export default function Header() {
 
     const groups: Record<string, PageInfo[]> = {};
     groupOrder.forEach(groupName => {
-        if (groupName === "Admin Zone" && !currentIsAdminReal) {
-            return; 
-        }
+        if (groupName === "Admin Zone" && !currentIsAdminReal) { return; }
         groups[groupName] = [];
     });
 
     filtered.forEach(page => {
       const groupName = page.group || "Misc";
-      if (groups[groupName]) { 
-        groups[groupName].push(page);
-      } else if (groupName === "Admin Zone" && currentIsAdminReal) { 
-        groups[groupName] = [page];
-      } else if (groupName !== "Admin Zone") { 
-        groups[groupName] = [page];
-      }
+      if (groups[groupName]) { groups[groupName].push(page); } 
+      else if (groupName === "Admin Zone" && currentIsAdminReal) { groups[groupName] = [page];} 
+      else if (groupName !== "Admin Zone") { groups[groupName] = [page];}
     });
     logger.debug("[Header] Final groups for nav:", Object.keys(groups).filter(gn => groups[gn]?.length > 0));
     return groups;
@@ -208,33 +190,15 @@ export default function Header() {
 
   const handleScroll = useCallback(() => {
     const currentScrollY = window.scrollY;
-    if (isNavOpen) {
-      if (!isHeaderVisible) setIsHeaderVisible(true);
-      setLastScrollY(currentScrollY); return;
-    }
-    if (currentScrollY > lastScrollY && currentScrollY > 60) {
-      if (isHeaderVisible) setIsHeaderVisible(false);
-    } else if (currentScrollY < lastScrollY || currentScrollY <= 60) {
-      if (!isHeaderVisible) setIsHeaderVisible(true);
-    }
+    if (isNavOpen) { if (!isHeaderVisible) setIsHeaderVisible(true); setLastScrollY(currentScrollY); return; }
+    if (currentScrollY > lastScrollY && currentScrollY > 60) { if (isHeaderVisible) setIsHeaderVisible(false); } 
+    else if (currentScrollY < lastScrollY || currentScrollY <= 60) { if (!isHeaderVisible) setIsHeaderVisible(true); }
     setLastScrollY(currentScrollY);
   }, [lastScrollY, isNavOpen, isHeaderVisible]);
 
-  useEffect(() => {
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [handleScroll]);
-
-  useEffect(() => {
-    if (isNavOpen) { setIsNavOpen(false); setSearchTerm(""); }
-  }, [pathname]); 
-
-  useEffect(() => {
-    const originalStyle = document.body.style.overflow;
-    if (isNavOpen) { document.body.style.overflow = 'hidden'; } 
-    else { document.body.style.overflow = originalStyle; }
-    return () => { document.body.style.overflow = originalStyle; };
-  }, [isNavOpen]);
+  useEffect(() => { window.addEventListener("scroll", handleScroll, { passive: true }); return () => window.removeEventListener("scroll", handleScroll); }, [handleScroll]);
+  useEffect(() => { if (isNavOpen) { setIsNavOpen(false); setSearchTerm(""); } }, [pathname]); 
+  useEffect(() => { const originalStyle = document.body.style.overflow; if (isNavOpen) { document.body.style.overflow = 'hidden'; } else { document.body.style.overflow = originalStyle; } return () => { document.body.style.overflow = originalStyle; }; }, [isNavOpen]);
 
   return (
     <>
@@ -247,12 +211,21 @@ export default function Header() {
             <Link 
               href="/" 
               className={cn(
-                "text-2xl md:text-3xl font-orbitron font-bold uppercase tracking-wider gta-vibe-text-effect glitch", // Added glitch back
-                "transition-all duration-300 hover:brightness-125"
+                "text-2xl md:text-3xl font-orbitron font-bold uppercase tracking-wider",
+                "transition-all duration-300 hover:brightness-125 flex items-baseline" // Added flex for inline spans
               )}
-              data-text={currentLogoText} // Added data-text for glitch
             >
-              {currentLogoText}
+              <span 
+                className="text-neon-lime glitch" 
+                data-text={logoCyberPart}
+              >
+                {logoCyberPart}
+              </span>
+              {logoVicePart && (
+                <span className="gta-vibe-text-effect">
+                  {logoVicePart}
+                </span>
+              )}
             </Link>
             <div className="flex items-center gap-2 md:gap-3">
               <button
@@ -338,7 +311,7 @@ export default function Header() {
                               title={page.translatedName}
                             >
                               {page.isHot && (
-                                <span title={t("Hot")} className="absolute top-1 right-1 text-base text-brand-orange animate-pulse" aria-label={t("Hot")}> {/* Updated hot icon color */}
+                                <span title={t("Hot")} className="absolute top-1 right-1 text-base text-brand-orange animate-pulse" aria-label={t("Hot")}>
                                   <FaFire/>
                                 </span>
                               )}
