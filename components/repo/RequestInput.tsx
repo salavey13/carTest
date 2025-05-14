@@ -1,19 +1,18 @@
 "use client";
-import React, { useCallback } from "react"; // Добавлен useCallback
+import React, { useCallback } from "react"; 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-// Добавлена FaWandMagicSparkles
 import { FaCopy, FaBroom, FaPlus, FaWandMagicSparkles } from "react-icons/fa6";
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAppToast } from "@/hooks/useAppToast"; // Импортируем хук для тостов
-import { ULTIMATE_VIBE_MASTER_PROMPT } from "./prompt"; // Импортируем сам промпт
-import { debugLogger as logger } from "@/lib/debugLogger"; // Импортируем логгер
+import { useAppToast } from "@/hooks/useAppToast"; 
+import { ULTIMATE_VIBE_MASTER_PROMPT } from "./prompt"; 
+import { debugLogger as logger } from "@/lib/debugLogger"; 
 
 interface RequestInputProps {
     kworkInputRef: React.RefObject<HTMLTextAreaElement>;
-    kworkInputValue: string | undefined; // Допускаем undefined
+    kworkInputValue: string | undefined; 
     onValueChange: (value: string) => void;
-    onCopyToClipboard: () => void; // Оставляем для копирования *текущего* запроса
+    onCopyToClipboard: () => void; 
     onClearAll: () => void;
     onAddSelected: () => void;
     isAddSelectedDisabled: boolean;
@@ -34,20 +33,14 @@ const RequestInput: React.FC<RequestInputProps> = ({
     isActionDisabled = false,
     filesFetched = false,
 }) => {
-    const { success: toastSuccess, error: toastError } = useAppToast(); // Получаем функции тостов
+    const { success: toastSuccess, error: toastError } = useAppToast(); 
 
-    // --- Безопасное вычисление зависимых состояний ---
-    // Используем typeof для проверки и trim(), если это строка, иначе пустая строка
     const kworkValueTrimmed = typeof kworkInputValue === 'string' ? kworkInputValue.trim() : '';
     const hasContent = kworkValueTrimmed.length > 0;
 
-    // Кнопка копирования активна, если есть контент и действия не заблокированы
     const calculatedIsCopyDisabled = !hasContent || isActionDisabled;
-    // Кнопка очистки активна, если есть контент ИЛИ выбраны файлы ИЛИ файлы были загружены (чтобы можно было очистить даже пустой инпут после загрузки), и действия не заблокированы
     const calculatedIsClearDisabled = (!hasContent && selectedFetcherFilesCount === 0 && !filesFetched) || isActionDisabled;
-    // --- Конец безопасного вычисления ---
 
-    // --- НОВЫЙ ОБРАБОТЧИК для копирования системного промпта ---
     const handleCopySystemPrompt = useCallback(() => {
         try {
             navigator.clipboard.writeText(ULTIMATE_VIBE_MASTER_PROMPT);
@@ -57,7 +50,7 @@ const RequestInput: React.FC<RequestInputProps> = ({
             logger.error("[RequestInput] System prompt clipboard write error:", e);
             toastError("Ошибка копирования системного промпта");
         }
-    }, [toastSuccess, toastError, logger]); // Зависимости только от тостов и логгера
+    }, [toastSuccess, toastError]); // Removed logger from deps as it's stable
 
     return (
         <TooltipProvider>
@@ -66,24 +59,22 @@ const RequestInput: React.FC<RequestInputProps> = ({
                     <Textarea
                         ref={kworkInputRef}
                         id="kworkInput"
-                        value={kworkInputValue ?? ''} // Гарантируем строку здесь
+                        value={kworkInputValue ?? ''} 
                         onChange={(e) => onValueChange(e.target.value)}
-                        className="textarea-cyber" // Используем стиль из globals.css
+                        className="textarea-cyber" 
                         placeholder="4. Напиши свой запрос к AI здесь ИЛИ добавь выбранные файлы как контекст ->"
                         spellCheck="false"
                         disabled={isActionDisabled}
                     />
-                    {/* --- Блок кнопок утилиты --- */}
                     <div className="absolute top-2 right-2 flex flex-col gap-1.5">
-                        {/* НОВАЯ КНОПКА: Копировать Системный Промпт */}
                         <Tooltip delayDuration={100}>
                             <TooltipTrigger asChild>
                                 <Button
                                     variant="ghost"
                                     size="icon"
                                     onClick={handleCopySystemPrompt}
-                                    disabled={isActionDisabled} // Дизейблим вместе с остальными
-                                    className="h-7 w-7 text-muted-foreground hover:text-brand-yellow hover:bg-muted disabled:opacity-50" // Theme colors
+                                    disabled={isActionDisabled} 
+                                    className="h-7 w-7 text-muted-foreground hover:text-brand-yellow hover:bg-muted disabled:opacity-50" 
                                 >
                                     <FaWandMagicSparkles />
                                 </Button>
@@ -91,38 +82,34 @@ const RequestInput: React.FC<RequestInputProps> = ({
                             <TooltipContent side="left" className="bg-popover text-popover-foreground border-border shadow-lg text-xs p-1.5 rounded max-w-[200px]">Копировать СУПЕР-ПРОМПТ (вставь его боту перед запросом)</TooltipContent>
                         </Tooltip>
 
-                        {/* Копировать ТЕКУЩИЙ Запрос */}
                         <Tooltip delayDuration={100}>
                             <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={onCopyToClipboard} disabled={calculatedIsCopyDisabled} className="h-7 w-7 text-muted-foreground hover:text-brand-cyan hover:bg-muted disabled:opacity-50"> {/* Theme colors */}
+                                <Button variant="ghost" size="icon" onClick={onCopyToClipboard} disabled={calculatedIsCopyDisabled} className="h-7 w-7 text-muted-foreground hover:text-brand-cyan hover:bg-muted disabled:opacity-50"> 
                                     <FaCopy />
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent side="left" className="bg-popover text-popover-foreground border-border shadow-lg text-xs p-1.5 rounded">Скопировать запрос</TooltipContent>
                         </Tooltip>
 
-                        {/* Очистить Все */}
                         <Tooltip delayDuration={100}>
                             <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" onClick={onClearAll} disabled={calculatedIsClearDisabled} className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-muted disabled:opacity-50"> {/* Theme colors */}
+                                <Button variant="ghost" size="icon" onClick={onClearAll} disabled={calculatedIsClearDisabled} className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-muted disabled:opacity-50"> 
                                     <FaBroom />
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent side="left" className="bg-popover text-popover-foreground border-border shadow-lg text-xs p-1.5 rounded">Очистить все</TooltipContent>
                         </Tooltip>
                     </div>
-                    {/* --- Конец блока кнопок --- */}
                 </div>
                  <div className="flex flex-wrap justify-end gap-3">
-                     {/* Добавить Выбранное */}
                      <Tooltip delayDuration={100}>
                         <TooltipTrigger asChild>
                             <Button
-                                variant="default" // Use default primary style
+                                variant="default" 
                                 size="sm"
                                 onClick={onAddSelected}
                                 disabled={isAddSelectedDisabled || isActionDisabled}
-                                className="rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50 px-4" // Use default button styling
+                                className="rounded-full shadow-md hover:shadow-lg transition-all disabled:opacity-50 px-4" 
                             >
                                 <FaPlus className="mr-2 h-4 w-4" />
                                 Добавить Выбранное ({selectedFetcherFilesCount})

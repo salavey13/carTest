@@ -2,53 +2,45 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaCodeBranch, FaList, FaCheck, FaSquareArrowUpRight, FaArrowsRotate } from 'react-icons/fa6'; // Updated icons
-import { SimplePullRequest } from '@/contexts/RepoXmlPageContext'; // Import type
-import { Tooltip } from '@/components/ui/tooltip';
+import { FaCodeBranch, FaList, FaCheck, FaSquareArrowUpRight, FaArrowsRotate } from 'react-icons/fa6'; 
+import { SimplePullRequest } from '@/contexts/RepoXmlPageContext'; 
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'; // Corrected Tooltip import
 
 interface SettingsModalProps {
     isOpen: boolean;
-    // onClose: () => void; // Removed, closure handled by context toggle
     repoUrl: string;
     setRepoUrl: (url: string) => void;
     token: string;
     setToken: (token: string) => void;
     manualBranchName: string;
     setManualBranchName: (name: string) => void;
-    currentTargetBranch: string | null; // Effective target branch from context
-    // PR Selection Props
+    currentTargetBranch: string | null; 
     openPrs: SimplePullRequest[];
     loadingPrs: boolean;
-    onSelectPrBranch: (branchName: string | null) => void; // Callback for selection
-    onLoadPrs: () => void; // Callback to trigger PR loading
-
-    loading: boolean; // General loading (fetch)
+    onSelectPrBranch: (branchName: string | null) => void; 
+    onLoadPrs: () => void; 
+    loading: boolean; 
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
     isOpen,
-    // onClose,
     repoUrl,
     setRepoUrl,
     token,
     setToken,
     manualBranchName,
     setManualBranchName,
-    currentTargetBranch, // This now reflects the *effective* target branch
-    // PR Props
+    currentTargetBranch, 
     openPrs,
     loadingPrs,
     onSelectPrBranch,
     onLoadPrs,
-    loading, // General loading
+    loading, 
 }) => {
 
     const getTargetBranchDisplay = () => {
-        // Display relies on the `currentTargetBranch` passed from context,
-        // which should already factor in manual input vs PR selection.
         if (currentTargetBranch) {
-            // Basic middle truncation attempt for display only
-            const maxLen = 40; // Adjust max length as needed
+            const maxLen = 40; 
             if (currentTargetBranch.length > maxLen) {
                 const start = currentTargetBranch.substring(0, maxLen / 2 - 2);
                 const end = currentTargetBranch.substring(currentTargetBranch.length - maxLen / 2 + 2);
@@ -59,18 +51,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         return "Current Target: Default Branch";
     };
 
-    // Determine if the "Default" button should be marked as active
-    // Active if no PR is selected AND manual input is empty.
-    const isDefaultBranchActive = !currentTargetBranch && !manualBranchName.trim(); // Check manual input too
+    const isDefaultBranchActive = !currentTargetBranch && !manualBranchName.trim(); 
 
-    // Determine if a specific PR's branch is the active target
     const isPrBranchActive = (prBranch: string) => {
-         // Active if current target matches PR branch AND manual input is empty
          return currentTargetBranch === prBranch && !manualBranchName.trim();
     };
 
 
     return (
+      <TooltipProvider> {/* Added TooltipProvider Wrapper */}
         <AnimatePresence>
             {isOpen && (
                 <motion.div
@@ -78,13 +67,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     animate={{ height: 'auto', opacity: 1, marginTop: '0.75rem' }}
                     exit={{ height: 0, opacity: 0, marginTop: 0 }}
                     transition={{ duration: 0.3 }}
-                    className="overflow-hidden mb-4 border border-purple-700 rounded-lg p-4 bg-gray-800 shadow-xl z-20 relative" // Kept rounded-lg for modal container
+                    className="overflow-hidden mb-4 border border-purple-700 rounded-lg p-4 bg-gray-800 shadow-xl z-20 relative" 
                 >
                     <h3 className="text-lg font-semibold text-purple-300 mb-4">Настройки и Выбор Ветки</h3>
 
-                    <div className="flex flex-col gap-5"> {/* Increased gap */}
+                    <div className="flex flex-col gap-5"> 
 
-                         {/* Current Target Branch Display */}
                         <div className="flex items-center gap-2 text-sm text-gray-300 bg-gray-900/50 p-2 rounded-md border border-gray-700">
                             <FaCodeBranch className="text-cyan-400 flex-shrink-0" />
                             <span className="font-semibold text-cyan-300 truncate" title={`Full Target: ${currentTargetBranch || 'Default'}`}>
@@ -92,29 +80,34 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             </span>
                         </div>
 
-                        {/* --- PR Selection Section --- */}
-                        <div className="border border-gray-700 p-3 rounded-lg bg-gray-800/50"> {/* Kept rounded-lg */}
+                        <div className="border border-gray-700 p-3 rounded-lg bg-gray-800/50"> 
                             <div className="flex justify-between items-center mb-2">
                                 <h4 className="text-base font-semibold text-purple-300 flex items-center gap-2">
                                     Выберите PR для извлечения/обновления ветки:
                                 </h4>
                                 <div className="flex items-center gap-2">
-                                    <Tooltip text="Использовать ветку по умолчанию" >
+                                    <Tooltip delayDuration={100}>
+                                      <TooltipTrigger asChild>
                                         <button
-                                           onClick={() => { setManualBranchName(''); onSelectPrBranch(null); }} // Clear manual input when selecting default
+                                           onClick={() => { setManualBranchName(''); onSelectPrBranch(null); }} 
                                            disabled={loading || loadingPrs}
-                                           className={`text-xs px-3 py-1 rounded ${ // Kept rounded
+                                           className={`text-xs px-3 py-1 rounded ${ 
                                                isDefaultBranchActive
                                                ? 'bg-purple-600 ring-2 ring-purple-400 font-semibold'
                                                : 'bg-gray-600 hover:bg-gray-500'} transition text-white disabled:opacity-50`}
                                          >
                                            Default
                                         </button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Использовать ветку по умолчанию</TooltipContent>
                                      </Tooltip>
-                                     <Tooltip text="Обновить список PR" >
+                                     <Tooltip delayDuration={100}>
+                                      <TooltipTrigger asChild>
                                           <button onClick={onLoadPrs} disabled={loading || loadingPrs || !repoUrl.includes('github.com')} className="p-1 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition">
                                               {loadingPrs ? <FaArrowsRotate className="animate-spin"/> : <FaList />}
                                           </button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Обновить список PR</TooltipContent>
                                      </Tooltip>
                                 </div>
                             </div>
@@ -123,24 +116,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                    {openPrs.map((pr) => (
                                         <li key={pr.id}>
                                             <button
-                                                onClick={() => { setManualBranchName(''); onSelectPrBranch(pr.head.ref); }} // Clear manual input when selecting PR
+                                                onClick={() => { setManualBranchName(''); onSelectPrBranch(pr.head.ref); }} 
                                                 disabled={loading || loadingPrs}
-                                                className={`w-full flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1 p-2 rounded text-left text-sm transition ${ // Kept rounded, added flex-wrap
-                                                    isPrBranchActive(pr.head.ref) // Check if this PR branch is active
+                                                className={`w-full flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1 p-2 rounded text-left text-sm transition ${ 
+                                                    isPrBranchActive(pr.head.ref) 
                                                     ? 'bg-purple-700/80 ring-2 ring-purple-400 shadow-md'
                                                     : 'bg-gray-700/50 hover:bg-gray-600/70 disabled:opacity-50'
                                                 }`}
                                                 title={`Select branch: ${pr.head.ref}\nPR: ${pr.title}`}
                                             >
-                                                {/* Left Side: Check, PR #, Title */}
-                                                <div className="flex items-center gap-2 flex-grow min-w-0 basis-3/5 sm:basis-auto"> {/* Allow grow/shrink */}
+                                                <div className="flex items-center gap-2 flex-grow min-w-0 basis-3/5 sm:basis-auto"> 
                                                      {isPrBranchActive(pr.head.ref) && <FaCheck className="text-green-400 flex-shrink-0" />}
                                                      <span className="text-purple-300 font-medium flex-shrink-0">#{pr.number}:</span>
                                                      <span className="text-gray-200 truncate" title={pr.title}>{pr.title}</span>
                                                 </div>
-                                                {/* Right Side: Branch Name, GitHub Link */}
-                                                <div className="flex items-center gap-2 flex-shrink-0 min-w-0 basis-2/5 sm:basis-auto justify-end w-full sm:w-auto"> {/* Allow shrink, basis for wrap */}
-                                                     <span className="text-xs text-gray-400 ml-auto truncate" title={`Branch: ${pr.head.ref}`}> {/* Added ml-auto to push right, truncate */}
+                                                <div className="flex items-center gap-2 flex-shrink-0 min-w-0 basis-2/5 sm:basis-auto justify-end w-full sm:w-auto"> 
+                                                     <span className="text-xs text-gray-400 ml-auto truncate" title={`Branch: ${pr.head.ref}`}> 
                                                          ({pr.head.ref})
                                                      </span>
                                                       <a href={pr.html_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-gray-500 hover:text-blue-400 flex-shrink-0" title="Open PR on GitHub">
@@ -157,22 +148,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                 </p>
                             )}
                         </div>
-                        {/* --- End PR Selection Section --- */}
 
 
-                        {/* Repo URL Input */}
                         <div>
                             <label htmlFor="settings-repo-url" className="block text-sm font-medium mb-1 text-cyan-300">URL репозитория GitHub</label>
-                            <input id="settings-repo-url" type="text" value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} className="w-full p-3 bg-gray-700 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none transition shadow-inner text-sm text-white placeholder-gray-400 disabled:opacity-50" placeholder="https://github.com/username/repository" disabled={loading || loadingPrs} aria-label="URL репозитория GitHub" /> {/* Kept rounded-lg */}
+                            <input id="settings-repo-url" type="text" value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} className="w-full p-3 bg-gray-700 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none transition shadow-inner text-sm text-white placeholder-gray-400 disabled:opacity-50" placeholder="https://github.com/username/repository" disabled={loading || loadingPrs} aria-label="URL репозитория GitHub" /> 
                         </div>
 
-                        {/* GitHub Token Input */}
                         <div>
                             <label htmlFor="settings-token" className="block text-sm font-medium mb-1 text-cyan-300">Токен GitHub <span className="text-gray-400">(опционально)</span></label>
-                            <input id="settings-token" type="password" value={token} onChange={(e) => setToken(e.target.value)} className="w-full p-3 bg-gray-700 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none transition shadow-inner text-sm text-white placeholder-gray-400 disabled:opacity-50" placeholder="Personal Access Token" disabled={loading || loadingPrs} aria-label="Токен GitHub" /> {/* Kept rounded-lg */}
+                            <input id="settings-token" type="password" value={token} onChange={(e) => setToken(e.target.value)} className="w-full p-3 bg-gray-700 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none transition shadow-inner text-sm text-white placeholder-gray-400 disabled:opacity-50" placeholder="Personal Access Token" disabled={loading || loadingPrs} aria-label="Токен GitHub" /> 
                         </div>
 
-                        {/* Manual Branch Name Input */}
                         <div>
                             <label htmlFor="settings-manual-branch" className="block text-sm font-medium mb-1 text-cyan-300">
                                 Имя ветки вручную <span className="text-gray-400">(переопределяет выбор PR)</span>
@@ -183,12 +170,11 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                 value={manualBranchName}
                                 onChange={(e) => {
                                     setManualBranchName(e.target.value);
-                                    // If user types something, deselect any active PR branch implicitly
                                     if (e.target.value.trim()) {
-                                        onSelectPrBranch(null); // Or signal context differently if needed
+                                        onSelectPrBranch(null); 
                                     }
                                 }}
-                                className="w-full p-3 bg-gray-700 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none transition shadow-inner text-sm text-white placeholder-gray-400 disabled:opacity-50" // Kept rounded-lg
+                                className="w-full p-3 bg-gray-700 rounded-lg border border-gray-600 focus:border-cyan-500 focus:outline-none transition shadow-inner text-sm text-white placeholder-gray-400 disabled:opacity-50" 
                                 placeholder="main, dev, feature/..."
                                 disabled={loading || loadingPrs}
                                 aria-label="Имя ветки вручную"
@@ -199,6 +185,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 </motion.div>
             )}
         </AnimatePresence>
+      </TooltipProvider>
     );
 };
 

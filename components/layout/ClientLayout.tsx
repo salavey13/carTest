@@ -26,11 +26,9 @@ function LoadingChatButtonFallback() {
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  // logger.debug(`[ClientLayout] Current pathname: ${pathname}`);
-
-  // Paths where BottomNavigation should be visible
-  const pathsToShowBottomNavForExactMatch = ["/", "/repo-xml"]; // Exact matches
-  const pathsToShowBottomNavForStartsWith = ["/selfdev/gamified", "/p-plan", "/profile"]; // StartsWith matches
+  
+  const pathsToShowBottomNavForExactMatch = ["/", "/repo-xml"]; 
+  const pathsToShowBottomNavForStartsWith = ["/selfdev/gamified", "/p-plan", "/profile"]; 
 
   const isExactMatch = pathsToShowBottomNavForExactMatch.includes(pathname);
   const isStartsWithMatch = pathsToShowBottomNavForStartsWith.some(p => pathname.startsWith(p));
@@ -38,14 +36,15 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const showBottomNav = isExactMatch || isStartsWithMatch;
   logger.debug(`[ClientLayout] showBottomNav for "${pathname}" evaluated to: ${showBottomNav} (Exact: ${isExactMatch}, StartsWith: ${isStartsWithMatch})`);
 
-
   return (
     <ErrorOverlayProvider>
       <AppProvider>
         <TooltipProvider>
           <ErrorBoundaryForOverlay>
             <Header />
-            <main className={`flex-1 ${showBottomNav ? 'pb-20 sm:pb-0' : ''}`}> 
+            {/* Apply pb-20 (height of bottom nav) only if showBottomNav is true */}
+            {/* On sm screens and up, pb-0 because bottom nav is likely hidden or different */}
+            <main className={cn("flex-1", showBottomNav ? "pb-20 sm:pb-0" : "")}>
               {children}
             </main>
             {showBottomNav && <BottomNavigation pathname={pathname} />}

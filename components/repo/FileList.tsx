@@ -1,12 +1,10 @@
 "use client";
 
 import React from 'react';
-// Added FaListCheck and FaSquareXmark for new buttons
 import { FaSquareCheck, FaRegSquare, FaPlus, FaCodeBranch, FaStar, FaHighlighter, FaKey, FaTree, FaFileLines, FaListCheck, FaSquareXmark } from 'react-icons/fa6';
-import { FileNode, ImportCategory } from '../RepoTxtFetcher';
+import { FileNode, ImportCategory } from '@/contexts/RepoXmlPageContext'; // Changed import source
 import { motion, AnimatePresence } from 'framer-motion';
 
-// Interface defining the props expected by FileList
 interface FileListProps {
     id: string;
     files: FileNode[];
@@ -21,23 +19,18 @@ interface FileListProps {
     onAddImportant: () => void;
     onAddTree: () => void;
     onSelectHighlighted: () => void;
-    // --- NEW PROPS for bulk actions ---
     onSelectAll: () => void;
     onDeselectAll: () => void;
-    // --- End NEW PROPS ---
 }
 
-// Helper to get the display name (filename) from a full path
 const getDisplayName = (path: string) => path.split("/").pop() || path;
-
-// Helper to group files by their parent folder
 const groupFilesByFolder = (files: FileNode[]) => { const g: { folder: string; files: FileNode[] }[] = []; const fm: { [key: string]: FileNode[] } = {}; files.forEach((f) => { const fo = f.path.includes('/') ? f.path.substring(0, f.path.lastIndexOf("/")) : "/"; if (!fm[fo]) fm[fo] = []; fm[fo].push(f); }); const sF = Object.keys(fm).sort((a, b) => { if (a === '/') return -1; if (b === '/') return 1; return a.localeCompare(b); }); sF.forEach(fo => { fm[fo].sort((a, b) => getDisplayName(a.path).localeCompare(getDisplayName(b.path))); g.push({ folder: fo, files: fm[fo] }); }); return g; };
 
 
-const FileList: React.FC<FileListProps> = React.memo(({ // Memoize the component
+const FileList: React.FC<FileListProps> = React.memo(({ 
     id, files, selectedFiles, primaryHighlightedPath, secondaryHighlightedPaths, importantFiles,
     isLoading, isActionDisabled, toggleFileSelection, onAddSelected, onAddImportant,
-    onAddTree, onSelectHighlighted, onSelectAll, onDeselectAll, // Destructure new props
+    onAddTree, onSelectHighlighted, onSelectAll, onDeselectAll, 
 }) => {
 
     const groupedFiles = React.useMemo(() => groupFilesByFolder(files), [files]);
@@ -63,10 +56,8 @@ const FileList: React.FC<FileListProps> = React.memo(({ // Memoize the component
                  <motion.button onClick={onAddSelected} disabled={selectedCount === 0 || isActionDisabled} className={`flex items-center justify-center gap-1 px-2.5 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-indigo-600 to-purple-500 transition-all shadow-md shadow-purple-500/30 ${(selectedCount === 0 || isActionDisabled) ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-indigo-500/40'}`} whileHover={{ scale: (selectedCount === 0 || isActionDisabled) ? 1 : 1.03 }} whileTap={{ scale: (selectedCount === 0 || isActionDisabled) ? 1 : 0.97 }}> <FaFileLines /> Добавить ({selectedCount}) </motion.button>
                  <motion.button onClick={onAddImportant} disabled={isActionDisabled} className={`flex items-center justify-center gap-1 px-2.5 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-blue-600 to-cyan-500 transition-all shadow-md shadow-cyan-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-teal-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }}> <FaKey /> Важные </motion.button>
                  <motion.button onClick={onAddTree} disabled={allFilesCount === 0 || isActionDisabled} className={`flex items-center justify-center gap-1 px-2.5 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-red-600 to-orange-500 transition-all shadow-md shadow-orange-500/30 ${isActionDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-red-500/40'}`} whileHover={{ scale: isActionDisabled ? 1 : 1.03 }} whileTap={{ scale: isActionDisabled ? 1 : 0.97 }}> <FaTree /> Дерево </motion.button>
-                 {/* --- NEW Buttons --- */}
                  <motion.button onClick={onSelectAll} disabled={!canSelectAll || isActionDisabled} className={`flex items-center justify-center gap-1 px-2.5 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-green-600 to-emerald-500 transition-all shadow-md shadow-emerald-500/30 ${(!canSelectAll || isActionDisabled) ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-green-500/40'}`} whileHover={{ scale: (!canSelectAll || isActionDisabled) ? 1 : 1.03 }} whileTap={{ scale: (!canSelectAll || isActionDisabled) ? 1 : 0.97 }} title="Выбрать все файлы"> <FaListCheck /> Все </motion.button>
                  <motion.button onClick={onDeselectAll} disabled={!canDeselectAll || isActionDisabled} className={`flex items-center justify-center gap-1 px-2.5 py-1 rounded-full font-semibold text-white bg-gradient-to-r from-gray-600 to-slate-500 transition-all shadow-md shadow-slate-500/30 ${(!canDeselectAll || isActionDisabled) ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-gray-500/40'}`} whileHover={{ scale: (!canDeselectAll || isActionDisabled) ? 1 : 1.03 }} whileTap={{ scale: (!canDeselectAll || isActionDisabled) ? 1 : 0.97 }} title="Снять выбор со всех"> <FaSquareXmark /> Ничего </motion.button>
-                 {/* --- End NEW Buttons --- */}
              </div>
             {isLoading && ( <div className="flex justify-center items-center flex-grow"><p className="text-gray-400 animate-pulse text-sm">Загрузка...</p></div> )}
             {!isLoading && files.length === 0 && ( <div className="flex justify-center items-center flex-grow"><p className="text-gray-400 text-sm">Файлы не найдены.</p></div> )}

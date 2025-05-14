@@ -23,7 +23,7 @@ import {
 } from "@/contexts/RepoXmlPageContext";
 import { debugLogger as logger } from '@/lib/debugLogger';
 import { useAppToast } from "@/hooks/useAppToast";
-import useInactivityTimer from "@/hooks/useInactivityTimer"; // Import the new hook
+import useInactivityTimer from "@/hooks/useInactivityTimer"; 
 
 // --- Constants & Types ---
 const INACTIVITY_TIMEOUT_MS = 60000; // 1 minute
@@ -45,7 +45,6 @@ interface Suggestion {
 // --- Animation Variants ---
 const containerVariants = { hidden: { opacity: 0, x: 300 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 120, damping: 15, when: "beforeChildren", staggerChildren: 0.08, }, }, exit: { opacity: 0, x: 300, transition: { duration: 0.3 } }, };
 const childVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", bounce: 0.4 } }, exit: { opacity: 0, transition: { duration: 0.2 } }, };
-// Simplified FAB animation
 const fabVariants = {
     hidden: { scale: 0, opacity: 0, rotate: 45 },
     visible: {
@@ -61,19 +60,16 @@ const notificationVariants = { hidden: { scale: 0, opacity: 0 }, visible: { scal
 // --- Main Component ---
 const AutomationBuddy: React.FC = () => {
     logger.log("[AutomationBuddy] START Render");
-    // --- State ---
     const [isMounted, setIsMounted] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
-    const hasOpenedDueToInactivityRef = useRef(false); // Tracks if opened by inactivity this session
+    const hasOpenedDueToInactivityRef = useRef(false); 
     const [hasNewSuggestions, setHasNewSuggestions] = useState(false);
     const previousSuggestionIds = useRef<Set<string>>(new Set());
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
 
-    // --- Hooks ---
     const searchParams = useSearchParams(); 
     const { error: toastError } = useAppToast();
 
-    // --- Context ---
     const context = useRepoXmlPageContext();
     const {
         currentStep, fetchStatus, repoUrlEntered, filesFetched,
@@ -90,25 +86,22 @@ const AutomationBuddy: React.FC = () => {
     } = context;
     logger.debug(`[AutomationBuddy] Context State Read: currentStep=${currentStep}, fetchStatus=${fetchStatus}, imageTask=${!!imageReplaceTask}, showComponents=${showComponents}`);
 
-    // --- Effects ---
     useEffect(() => { setIsMounted(true); logger.debug("[AutomationBuddy Effect] Mounted"); }, []);
 
-    // --- Inactivity Timer ---
     useInactivityTimer(
         INACTIVITY_TIMEOUT_MS,
-        () => { // onInactive
+        () => { 
             if (isMounted && !isOpen && !hasOpenedDueToInactivityRef.current) {
                 logger.log("[AutomationBuddy] Inactivity detected, auto-opening.");
                 setIsOpen(true);
                 hasOpenedDueToInactivityRef.current = true;
-                setHasNewSuggestions(false); // Clear notification when auto-opening
+                setHasNewSuggestions(false); 
             }
         },
-        undefined, // onActive (optional)
+        undefined, 
         "AutomationBuddy"
     );
     
-    // --- Get Active Message ---
     const activeMessage = useMemo(() => {
         logger.debug(`[AutomationBuddy Memo] Calculating activeMessage.`);
         if (!isMounted) return "Загрузка Бадди...";
@@ -121,7 +114,6 @@ const AutomationBuddy: React.FC = () => {
         return "Ошибка получения статуса...";
     }, [isMounted, getXuinityMessage]);
 
-    // --- Calculate Suggestions ---
     useEffect(() => {
         logger.debug("[AutomationBuddy Effect] Calculating suggestions START");
         if (!isMounted || typeof triggerFetch !== 'function') {
@@ -249,7 +241,7 @@ const AutomationBuddy: React.FC = () => {
 
     }, [ 
         isMounted, currentStep, fetchStatus, repoUrlEntered, filesFetched,
-        selectedFetcherFiles, kworkInputHasContent, kworkInputValue,
+        selectedFetcherFiles, kworkInputHasContent, kworkInputValue, // kworkInputValue added
         aiResponseHasContent, filesParsed, selectedAssistantFiles,
         assistantLoading, aiActionLoading, loadingPrs, targetBranchName, manualBranchName,
         isSettingsModalOpen, isParsing, currentAiRequestId, imageReplaceTask, allFetchedFiles,
@@ -257,10 +249,9 @@ const AutomationBuddy: React.FC = () => {
         triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork,
         triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR,
         triggerToggleSettingsModal, scrollToSection, triggerClearKworkInput,
-        logger
+        logger // Removed context setters as they should be stable
     ]);
 
-    // --- Suggestion Change Detection ---
     useEffect(() => {
         if (!isMounted || isOpen) { if (isOpen) logger.debug("[AutomationBuddy Effect] Suggestion Change - Resetting notification (buddy open)"); setHasNewSuggestions(false); return; }
         const currentIds = new Set(suggestions.map(s => s.id)); const prevIds = previousSuggestionIds.current;
@@ -269,13 +260,9 @@ const AutomationBuddy: React.FC = () => {
         previousSuggestionIds.current = currentIds;
     }, [isMounted, suggestions, isOpen, logger]);
 
-    // Removed old auto-open timer logic, now handled by useInactivityTimer
-
-    // --- Handle Escape Key ---
     const handleEscKey = useCallback((e:KeyboardEvent) => { if(e.key==='Escape'&&isOpen) { logger.debug("[AutomationBuddy CB] Escape key pressed, closing."); setIsOpen(false);} }, [isOpen, logger]);
     useEffect(() => { document.addEventListener('keydown',handleEscKey); return()=>{document.removeEventListener('keydown',handleEscKey);}; }, [handleEscKey]);
 
-    // --- Event Handlers ---
     const handleSuggestionClick = (suggestion: Suggestion) => {
         if(suggestion.disabled){ logger.debug(`[Buddy Click] Suggestion ${suggestion.id} clicked but disabled.`); return; }
         logger.info(`[Buddy Click] Suggestion clicked: ${suggestion.id}`);
@@ -293,15 +280,14 @@ const AutomationBuddy: React.FC = () => {
         logger.info(`[Buddy Click] FAB clicked. Current state: ${isOpen ? 'Open' : 'Closed'}`);
         const newIsOpenState = !isOpen;
         setIsOpen(newIsOpenState);
-        if (newIsOpenState) { // If opening
-            hasOpenedDueToInactivityRef.current = true; // Manual open should prevent inactivity open for this session
+        if (newIsOpenState) { 
+            hasOpenedDueToInactivityRef.current = true; 
             setHasNewSuggestions(false);
-        } else { // If closing
+        } else { 
             requestAnimationFrame(() => document.body.focus());
         }
     };
 
-    // --- Render Logic ---
     if (!isMounted) return null;
 
     logger.debug(`[AutomationBuddy Render] Final render. isOpen=${isOpen}, hasNewSuggestions=${hasNewSuggestions}`);
@@ -320,7 +306,6 @@ const AutomationBuddy: React.FC = () => {
                         </motion.div>
                     </motion.div>
                 ) : (
-                    // Adjusted FAB position: more bottom padding
                     <div className="fixed bottom-12 right-4 z-50">
                         <motion.div variants={fabVariants} initial="hidden" animate="visible" exit="exit" className="relative">
                              <FloatingActionButton onClick={handleFabClick} icon={<FaAngrycreative className="text-xl" />} className="bg-gradient-to-br from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white shadow-lg hover:shadow-xl rounded-full" aria-label="Open Automation Buddy" />

@@ -42,7 +42,7 @@ export function CharacterForm({ character }: CharacterFormProps) {
       }
     };
     checkAndInsertDefaults();
-  }, []);
+  }, []); // Removed defaultCharacters from dependency array as it's constant
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +51,7 @@ export function CharacterForm({ character }: CharacterFormProps) {
     try {
       let imageUrl = formData.image_url;
       if (imageFile) {
-        const bucketName = "character-images";
+        const bucketName = "character-images"; // Ensure this bucket exists and is public
         const { data: buckets, error: bucketError } = await supabaseAdmin.storage.listBuckets();
         if (bucketError) throw bucketError;
         if (!buckets.some((b) => b.name === bucketName)) {

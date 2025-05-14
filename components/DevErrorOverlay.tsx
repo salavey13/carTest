@@ -106,7 +106,7 @@ const getLevelColor = (level: LogLevel | ToastRecord['type']): string => {
 
 // --- Main Overlay Component ---
 const DevErrorOverlay: React.FC = () => {
-  logger.debug("[DevErrorOverlay] START Render"); // Use debug
+  logger.debug("[DevErrorOverlay] START Render"); 
 
   const [internalRenderError, setInternalRenderError] = useState<Error | null>(null);
   const [logHistory, setLogHistory] = useState<ReadonlyArray<LogRecord>>([]);
@@ -132,7 +132,7 @@ const DevErrorOverlay: React.FC = () => {
 
 
   useEffect(() => {
-      if (contextAvailable) { logger.debug("[DevErrorOverlay Effect] Context access successful."); } // Use debug
+      if (contextAvailable) { logger.debug("[DevErrorOverlay Effect] Context access successful."); } 
       else { logger.warn("[DevErrorOverlay Effect] Context access returned fallback or missing function."); }
   }, [contextAvailable]);
 
@@ -174,14 +174,12 @@ const DevErrorOverlay: React.FC = () => {
           } catch (e: any) { logger.error("[DevErrorOverlay] Error getting/formatting stack trace:", e); return `${t.stackTraceError}: ${e?.message ?? 'Unknown'}`; }
       };
 
-       // --- Helper to prepare data with TRUNCATION for GitHub URL ---
       const prepareIssueAndCopyDataSafe = (logLimit = 10, toastLimit = 5, maxLogChars = 1000, maxToastChars = 300, maxStackLines = 7) => {
           logger.debug("[DevErrorOverlay] prepareIssueAndCopyDataSafe START");
           try {
-             const safeErrorInfo = errorInfo as ErrorInfo; // Assuming errorInfo is not null here
+             const safeErrorInfo = errorInfo as ErrorInfo; 
              const errorType = safeErrorInfo.type?.toUpperCase() || 'UNKNOWN';
              const message = safeErrorInfo.message || t.unknownError;
-             // Get slightly shorter stack for body
              const shortStackForBody = getTruncatedStackTrace(safeErrorInfo.error, maxStackLines);
              const componentStackInfo = safeErrorInfo.componentStack ? `\n\n**Component Stack (truncated):**\n\`\`\`\n${safeErrorInfo.componentStack.substring(0, 300)}\n\`\`\`` : '';
              const source = safeErrorInfo.source ? `${safeErrorInfo.source}${typeof safeErrorInfo.lineno === 'number' ? ':' + safeErrorInfo.lineno : ''}` : 'N/A';
@@ -191,8 +189,6 @@ const DevErrorOverlay: React.FC = () => {
              const issueTitle = encodeURIComponent(issueTitleOptions[Math.floor(Math.random() * issueTitleOptions.length)]);
              logger.debug(`[DevErrorOverlay] Issue Details: Type=${errorType}, Source=${source}, Title=${decodeURIComponent(issueTitle)}`);
 
-
-             // --- Truncate Logs and Toasts for GitHub URL ---
              const formatHistoryForUrl = (history: any[], limit: number, maxChars: number, type: 'log' | 'toast') => {
                  logger.debug(`[DevErrorOverlay] Formatting history for URL: type=${type}, count=${history?.length ?? 0}, limit=${limit}, maxChars=${maxChars}`);
                  if (!history || history.length === 0) return type === 'log' ? t.noRecentLogs : t.noRecentToasts;
@@ -200,7 +196,6 @@ const DevErrorOverlay: React.FC = () => {
                  const limitedHistory = history.slice().reverse().slice(0, limit);
                  const formattedLines: string[] = [];
                  for (const item of limitedHistory) {
-                     // Add extra checks for item properties
                      const itemType = item?.type || (type === 'log' ? item?.level : 'unknown');
                      const itemTimestamp = item?.timestamp ? new Date(item.timestamp).toLocaleTimeString('ru-RU',{hour12:false}) : 'N/A';
                      const prefix = type === 'log' ? `[${(itemType || 'UNKNOWN').toUpperCase()}] ${itemTimestamp} |` : `[${(itemType || 'UNKNOWN').toUpperCase()}]`;
@@ -208,7 +203,7 @@ const DevErrorOverlay: React.FC = () => {
                      const line = `${prefix} ${itemMsg}`;
                      if (charCount + line.length > maxChars) { logger.debug(`[DevErrorOverlay] History URL limit reached for ${type}.`); break; }
                      formattedLines.push(`- ${line}`);
-                     charCount += line.length + 1; // +1 for newline
+                     charCount += line.length + 1; 
                  }
                   if (history.length > limit || charCount >= maxChars) {
                       formattedLines.push("- ...(еще больше записей опущено)...");
@@ -217,20 +212,16 @@ const DevErrorOverlay: React.FC = () => {
                  return formattedLines.join('\n');
               };
 
-
              const formattedLogHistoryForUrl = formatHistoryForUrl(logHistory, logLimit, maxLogChars, 'log');
              const formattedToastHistoryForUrl = formatHistoryForUrl(toastHistory, toastLimit, maxToastChars, 'toast');
-             // --- End Truncation for URL ---
 
              const issueBodyContent = `**Тип Ошибки:** ${errorType}\n**Сообщение:** ${message}\n**Источник:** ${source}\n\n**Стек (начало):**\n\`\`\`\n${shortStackForBody}\n\`\`\`${componentStackInfo}\n\n**Последние События (Логи):**\n${formattedLogHistoryForUrl}\n\n**Недавние Уведомления (Тосты):**\n${formattedToastHistoryForUrl}\n\n**Контекст/Шаги:**\n[Опиши, что ты делал(а), когда это случилось]\n`;
              const issueBody = encodeURIComponent(issueBodyContent);
              const gitHubIssueUrl = `https://github.com/${repoOrg}/${repoName}/issues/new?title=${issueTitle}&body=${issueBody}`;
 
-             // --- Prepare FULL history for Copy Prompt (less strict limits) ---
-             const fullFormattedLogHistory = formatHistoryForUrl(logHistory, 50, 8000, 'log'); // More logs for copy
-             const fullFormattedToastHistory = formatHistoryForUrl(toastHistory, 20, 2000, 'toast'); // More toasts for copy
-             const fullStackTrace = getTruncatedStackTrace(safeErrorInfo.error, 30); // More stack lines for copy
-             // --- End Full history prep ---
+             const fullFormattedLogHistory = formatHistoryForUrl(logHistory, 50, 8000, 'log'); 
+             const fullFormattedToastHistory = formatHistoryForUrl(toastHistory, 20, 2000, 'toast'); 
+             const fullStackTrace = getTruncatedStackTrace(safeErrorInfo.error, 30); 
 
              const copyPrompt = `Йоу! Поймал ошибку в ${repoName}, помоги разгрести!\n\nОшибка (${errorType}) Источник: ${source}\n${message}\n\nСтек (начало):\n\`\`\`\n${fullStackTrace}\n\`\`\`${componentStackInfo}\n\nПоследние События (Логи):\n${fullFormattedLogHistory}\n\nНедавние уведомления (Тосты):\n${fullFormattedToastHistory}\n\nЗадача: Проанализируй ошибку, стек, логи и уведомления. Предложи исправления кода или объясни причину.`;
              logger.info("[DevErrorOverlay] Prepared GitHub URL and Copy Prompt.", { ghUrlLength: gitHubIssueUrl.length, promptLength: copyPrompt.length });
@@ -262,29 +253,24 @@ const DevErrorOverlay: React.FC = () => {
          }
       };
 
-      // --- Safe Render Helper ---
       const RenderSection: React.FC<{ title: string; children: () => React.ReactNode }> = ({ title, children }) => {
           try { return <>{children()}</>; }
           catch (e: any) { logger.error(`[DevErrorOverlay] Error rendering section "${title}":`, e); setInternalRenderError(new Error(`Failed to render section "${title}": ${e.message}`)); return <div className="text-red-500 p-2 bg-red-900/30 rounded">Ошибка рендера секции: {title}</div>; }
       };
 
-      // --- JSX Return ---
       return (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-hidden"
           role="alertdialog" aria-modal="true" aria-labelledby="error-overlay-title" aria-describedby="error-overlay-description"
         >
-          {/* Main Content Container */}
           <div className="bg-gradient-to-br from-gray-900 via-indigo-950 to-black border border-cyan-500/30 rounded-lg shadow-2xl p-4 md:p-6 max-w-4xl w-full max-h-[95vh] flex flex-col text-gray-200 glitch-border-animate">
 
-            {/* Header */}
              <RenderSection title="Header">
                  {() => (
                      <div className="flex items-center justify-between mb-4 flex-shrink-0">
                        <h2 id="error-overlay-title" className="text-xl md:text-2xl font-bold text-cyan-300 flex items-center gap-2 glitch-text-shadow">
                           <FaTriangleExclamation className="text-yellow-400" /> {t.systemFailureTitle}
                        </h2>
-                       {/* Moved Close button to header for better UX */}
                        <button
                          onClick={handleClose}
                          className="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-md text-xs font-semibold transition shadow hover:shadow-md"
@@ -296,9 +282,7 @@ const DevErrorOverlay: React.FC = () => {
                  )}
             </RenderSection>
 
-            {/* Body (Scrollable Area) */}
             <div id="error-overlay-description" className="flex-grow overflow-y-auto simple-scrollbar pr-2 space-y-3 mb-4">
-                 {/* Error Message */}
                  <RenderSection title="Message">
                       {() => {
                           let messageText = t.unknownError;
@@ -308,7 +292,6 @@ const DevErrorOverlay: React.FC = () => {
                       }}
                  </RenderSection>
 
-                 {/* Source Info */}
                  <RenderSection title="Source">
                       {() => {
                           try {
@@ -318,7 +301,6 @@ const DevErrorOverlay: React.FC = () => {
                       }}
                  </RenderSection>
 
-                 {/* --- Moved Advice/Action Section Higher --- */}
                  <RenderSection title="Advice">
                       {() => (<div className="my-4 p-4 bg-gradient-to-r from-blue-900/30 via-indigo-900/40 to-purple-900/30 border border-blue-600/50 rounded text-blue-100 text-xs md:text-sm space-y-3 shadow-md">
                            <p className="font-semibold text-lg text-blue-200">{t.adviceTitle}</p>
@@ -337,11 +319,7 @@ const DevErrorOverlay: React.FC = () => {
                            </div>
                          </div>)}
                  </RenderSection>
-                 {/* --- End Moved Advice Section --- */}
-
                  <hr className="border-gray-700/50 my-3"/>
-
-                 {/* Stack Trace (Default Collapsed) */}
                  <RenderSection title="StackTrace">
                       {() => (<details className="bg-black/30 p-3 rounded border border-gray-700/50" open={false}>
                             <summary className="cursor-pointer text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors"> {t.stackTraceLabel} </summary>
@@ -350,7 +328,6 @@ const DevErrorOverlay: React.FC = () => {
                        </details>)}
                  </RenderSection>
 
-                 {/* Logs Section (Default Collapsed) */}
                  <RenderSection title="RecentLogs">
                      {() => (<details className="bg-black/40 p-3 rounded border border-gray-600/60" open={false}>
                           <summary className="cursor-pointer text-sm font-medium text-gray-300 hover:text-white transition-colors"> {t.recentLogsTitle} ({logHistory.length}) </summary>
@@ -369,8 +346,6 @@ const DevErrorOverlay: React.FC = () => {
                           ) : (<p className="mt-2 text-xs text-gray-500">{t.noRecentLogs}</p>)}
                         </details>)}
                  </RenderSection>
-
-                 {/* Toasts Section (Default Collapsed) */}
                  <RenderSection title="RecentToasts">
                      {() => (<details className="bg-black/30 p-3 rounded border border-gray-700/50" open={false}>
                           <summary className="cursor-pointer text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors"> {t.recentToastsTitle} ({toastHistory.length}) </summary>
@@ -386,24 +361,17 @@ const DevErrorOverlay: React.FC = () => {
                           ) : (<p className="mt-2 text-xs text-gray-500">{t.noRecentToasts}</p>)}
                         </details>)}
                  </RenderSection>
-
-            </div> {/* End Scrollable Body */}
-
-            {/* Footer - Close button moved to header */}
-            {/* <RenderSection title="Footer"> ... </RenderSection> */}
-
-          </div> {/* End Main Content Container */}
-        </div> // End Modal Root
+            </div> 
+          </div> 
+        </div> 
       );
-      // --- End JSX Return ---
-
   } catch (renderError: any) {
       const fatalMsg = "[DevErrorOverlay] CRITICAL: Failed during main UI render execution!";
       logger.fatal(fatalMsg, renderError);
       setInternalRenderError(renderError);
-      return null; // Fallback will be rendered on next cycle
+      return null; 
   } finally {
-       logger.debug("[DevErrorOverlay] END Render"); // Use debug
+       logger.debug("[DevErrorOverlay] END Render"); 
   }
 };
 

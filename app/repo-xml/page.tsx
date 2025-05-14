@@ -20,7 +20,10 @@ import {
     FaAtom, FaBrain, FaCodeBranch, FaPlus, FaCopy, FaSpinner, FaBolt,
     FaToolbox, FaCode, FaVideo, FaDatabase, FaBug, FaMicrophone, FaLink, FaServer, FaRocket,
     FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart, FaTree, FaEye,
-    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaVideoSlash, FaCommentDots
+    FaUsers, FaQuoteLeft, FaQuoteRight, FaCircleXmark, FaAnglesDown, FaAnglesUp, FaCommentDots
+    // FaVideoSlash was removed as it's not used here, and it was in the original list.
+    // I will keep it if it was intended to be added/used. Looking at the diff, it was present. Re-add.
+    , FaVideoSlash 
 } from "react-icons/fa6";
 import Link from "next/link";
 import { motion } from 'framer-motion';
@@ -150,23 +153,27 @@ function LoadingBuddyFallback() {
 const getPlainText = (htmlString: string | null | undefined): string => {
     if (typeof htmlString !== 'string' || !htmlString) { return ''; }
     try {
+        // More robust icon stripping, handling attributes and self-closing
         let text = htmlString.replace(/<Fa[A-Z][a-zA-Z0-9]+(?:\s+[^>]*?)?\s*\/?>/g, ''); 
+        // Strip ::FaIcon:: syntax more reliably
         text = text.replace(/::(Fa[A-Z][a-zA-Z0-9]+.*?)::/g, ''); 
-        text = text.replace(/\[\?\]/g, '');
-        text = text.replace(/\[ICON ERR!\]/g, '');
+        // Strip custom markers if needed
+        text = text.replace(/\[\?\]/g, ''); // Example: custom help marker
+        text = text.replace(/\[ICON ERR!\]/g, ''); // Example: icon error marker
+        // Generic HTML tag stripping (last resort)
         text = text.replace(/<[^>]*>/g, ''); 
         return text.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim();
     } catch (e) {
         console.error("[getPlainText] Error stripping HTML for title:", e, "Input:", htmlString);
+        // Fallback to simpler stripping if regex fails for some reason
         return htmlString.replace(/<[^>]*>/g, '').trim();
     }
 };
 
 // --- ActualPageContent Component ---
-// Removed initialPath and initialIdea from props
 interface ActualPageContentProps {}
 
-function ActualPageContent({}: ActualPageContentProps) { // Props removed
+function ActualPageContent({}: ActualPageContentProps) {
     const log = logger.log;
     const debug = logger.debug;
     const error = logger.error;
@@ -181,7 +188,6 @@ function ActualPageContent({}: ActualPageContentProps) { // Props removed
     const [t, setT] = useState<typeof translations.en | null>(null);
     const [isPageLoading, setIsPageLoading] = useState<boolean>(true);
     
-    // State for sections visibility
     const [isIntroVisible, setIsIntroVisible] = useState(true);
     const [isCyberVibeVisible, setIsCyberVibeVisible] = useState(true);
     const [isCommunityWisdomVisible, setIsCommunityWisdomVisible] = useState(true);
@@ -197,7 +203,7 @@ function ActualPageContent({}: ActualPageContentProps) { // Props removed
     const {
         fetcherRef, assistantRef, kworkInputRef,
         showComponents, setShowComponents,
-        urlPathToHighlight, // Get value from context
+        urlPathToHighlight, 
     } = pageContext;
 
     useEffect(() => {
@@ -209,33 +215,42 @@ function ActualPageContent({}: ActualPageContentProps) { // Props removed
       const newTranslations = translations[resolvedLang] ?? translations.en;
       setT(newTranslations);
       log(`[Effect Lang] Language set to: ${resolvedLang}. Translations loaded.`);
-    }, [user]);
+    }, [user, log, debug]); // Added log, debug
 
     useEffect(() => {
         log("[ActualPageContent Effect] Loading status check.");
         setIsPageLoading(!t);
         log(`[ActualPageContent Effect] Loading check: translations=${!!t}, resulting isPageLoading=${!t}`);
-    }, [t]);
+    }, [t, log]);
 
     const toggleAllSections = useCallback(() => {
         setSectionsCollapsed(prev => !prev);
     }, []);
 
     useEffect(() => {
-        if (!t) return; // Don't run if translations are not loaded
+        if (!t) return; 
         const newVisibility = !sectionsCollapsed;
         setIsIntroVisible(newVisibility);
         setIsCyberVibeVisible(newVisibility);
         setIsCommunityWisdomVisible(newVisibility);
         setIsPhilosophyStepsVisible(newVisibility);
-        
-        
-            setIsCtaVisible(newVisibility);
-        
-        log(`[Effect SectionsToggle] Info sections visibility set to: ${newVisibility}. CTA controlled separately: ${isCtaVisible}`);
-    }, [sectionsCollapsed, t, showComponents, isCtaVisible]); 
+        // CTA visibility is handled separately and should remain true if components are shown,
+        // unless explicitly closed by the user.
+        // Only collapse CTA if sectionsCollapsed is true AND components are NOT shown.
+        if (sectionsCollapsed && !showComponents) {
+             setIsCtaVisible(false);
+        } else if (!sectionsCollapsed && showComponents) { // Expand CTA if expanding all and components are shown
+             setIsCtaVisible(true);
+        }
+        // If components are shown, CTA should default to visible unless user closed it.
+        // This means if newVisibility is true (expanding), CTA should also be true.
+        // if (newVisibility) setIsCtaVisible(true); // Simpler logic for CTA tied to main sections for now.
+
+        log(`[Effect SectionsToggle] Info sections visibility set to: ${newVisibility}. CTA visibility: ${isCtaVisible}`);
+    }, [sectionsCollapsed, t, showComponents, isCtaVisible, log]); 
 
     const memoizedGetPlainText = useCallback(getPlainText, []);
+
     const scrollToSectionNav = useCallback((id: string) => {
         debug(`[CB ScrollNav] Attempting scroll to: ${id}`);
         const sectionsRequiringReveal = ['extractor', 'executor', 'cybervibe-section', 'philosophy-steps', 'community-wisdom-section'];
@@ -256,7 +271,7 @@ function ActualPageContent({}: ActualPageContentProps) { // Props removed
         if (sectionsRequiringReveal.includes(id) && !showComponents) {
             log(`[CB ScrollNav] Revealing components for "${id}"`);
             setShowComponents(true);
-            setIsCtaVisible(true); // Ensure CTA is visible when components are shown for the first time
+            // setIsCtaVisible(true); // Ensure CTA is visible if components are revealed
             requestAnimationFrame(() => {
                 const el = document.getElementById(id);
                 if (el) {
@@ -275,7 +290,8 @@ function ActualPageContent({}: ActualPageContentProps) { // Props removed
     const handleShowComponents = useCallback(() => {
         log("[Button Click] handleShowComponents (Reveal)");
         setShowComponents(true);
-        if (sectionsCollapsed) { // If user had previously collapsed all, expand them when showing components
+        setIsCtaVisible(true); // Explicitly show CTA when components are revealed
+        if (sectionsCollapsed) { 
             setSectionsCollapsed(false);
         }
         toastInfo("Компоненты загружены!", { duration: 1500 });
@@ -316,7 +332,7 @@ function ActualPageContent({}: ActualPageContentProps) { // Props removed
        return (
             <>
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-                <div className="min-h-screen bg-dark-bg p-4 sm:p-6 pt-24 text-light-text flex flex-col items-center relative overflow-y-auto">
+                <div className="min-h-screen bg-dark-bg p-4 sm:p-6 pt-24 text-light-text flex flex-col items-center relative overflow-y-auto"> {/* Changed to overflow-y-auto for main scroll */}
                     
                     <button
                         onClick={toggleAllSections}
@@ -386,7 +402,7 @@ function ActualPageContent({}: ActualPageContentProps) { // Props removed
                                                 <div className="prose prose-sm prose-invert max-w-none flex-grow">
                                                     <VibeContentRenderer content={item.quote} />
                                                 </div>
-                                                <VibeContentRenderer content="::FaQuoteRight className='text-current opacity-70 text-lg mr-2 shrink-0'::" />
+                                                <VibeContentRenderer content="::FaQuoteRight className='text-current opacity-70 text-lg ml-2 shrink-0'::" /> {/* Changed mr-2 to ml-2 */}
                                             </div>
                                             <p className="text-xs text-right opacity-70 mt-1">{item.inspiredBy}</p>
                                         </div>
@@ -451,7 +467,7 @@ function ActualPageContent({}: ActualPageContentProps) { // Props removed
                         </section>
                     )}
 
-                    {showComponents && ( // Core components are always shown if showComponents is true
+                    {showComponents && ( 
                          <>
                             <h2 className="text-3xl font-bold text-center text-brand-green mb-8 animate-pulse"><VibeContentRenderer content={t.componentsTitle} /></h2>
                              <section id="extractor" className="mb-12 w-full max-w-4xl">
@@ -459,8 +475,8 @@ function ActualPageContent({}: ActualPageContentProps) { // Props removed
                                      <CardContent className="p-4">
                                          <RepoTxtFetcher
                                              ref={fetcherRef}
-                                             highlightedPathProp={urlPathToHighlight} // Use value from context
-                                             // ideaProp is no longer needed here as kworkInputValue in context is set
+                                             highlightedPathProp={urlPathToHighlight} 
+                                             ideaProp={null} // idea is now fully managed by context kworkInputValue
                                          />
                                      </CardContent>
                                  </Card>
@@ -478,11 +494,8 @@ function ActualPageContent({}: ActualPageContentProps) { // Props removed
 
                     {isCtaVisible && ( 
                         <section id="cta-final" className="w-full max-w-3xl mt-4 mb-12 text-center">
-                            {/* Outer Border Div */}
                             <div className="relative p-1.5 rounded-xl bg-gradient-to-b from-blue-800 to-purple-700 shadow-2xl">
-                                {/* Middle Border Div */}
                                 <div className="p-1 rounded-lg bg-gradient-to-b from-orange-400 via-pink-400 to-purple-700">
-                                    {/* Content Div */}
                                     <div className="relative bg-gradient-to-b from-indigo-600 via-pink-600 to-orange-500 p-6 rounded-md prose-strong:text-yellow-200 prose-a:text-brand-blue max-w-none">
                                         <button 
                                             onClick={() => setIsCtaVisible(false)} 
@@ -504,12 +517,10 @@ function ActualPageContent({}: ActualPageContentProps) { // Props removed
                                                 <div className="prose prose-sm prose-invert text-center flex-grow max-w-none">
                                                     <VibeContentRenderer content={t.ctaHotChickQuote} />
                                                 </div>
-                                                <VibeContentRenderer content="::FaQuoteRight className='text-current opacity-80 text-xl ml-2 shrink-0'::" />
+                                                <VibeContentRenderer content="::FaQuoteRight className='text-current opacity-80 text-xl ml-2 shrink-0'::" /> {/* Changed mr-2 to ml-2 */}
                                             </div>
                                             <p className="text-xs text-right opacity-70 mt-1">- Vibe by @SALAVEY13</p>
                                         </div>
-
-                                        
                                         <div className="text-slate-300 text-base prose-invert"> <VibeContentRenderer content={t.ctaDude} /> </div>
                                     </div>
                                 </div>
@@ -517,10 +528,17 @@ function ActualPageContent({}: ActualPageContentProps) { // Props removed
                         </section>
                     )}
 
-                     <motion.nav className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40" animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}>
+                     <motion.nav 
+                        className="fixed right-2 sm:right-3 top-1/2 transform -translate-y-1/2 flex flex-col space-y-3 z-40" 
+                        initial={{ opacity: 0, x: 50 }}
+                        animate={{ opacity: 1, x: 0, transition: { delay: 0.5, type: "spring", stiffness: 100 } }}
+                        // Removed repeating animation for a cleaner look
+                        // animate={{ scale: [1, 1.03, 1] }} 
+                        // transition={{ duration: 2.0, repeat: Infinity, repeatType: 'reverse', ease: "easeInOut" }}
+                     >
                          <button onClick={() => scrollToSectionNav("intro")} className="p-2 bg-muted/80 backdrop-blur-sm rounded-full hover:bg-muted/60 transition shadow-md" title={navTitleIntro} aria-label={navTitleIntro || "Scroll to Intro"} > <FaCircleInfo className="text-lg text-foreground/80" /> </button>
                          <button onClick={() => scrollToSectionNav("cybervibe-section")} className="p-2 bg-brand-purple/80 backdrop-blur-sm rounded-full hover:bg-brand-purple/70 transition shadow-md" title={navTitleVibeLoop} aria-label={navTitleVibeLoop || "Scroll to Vibe Loop"} > <FaUpLong className="text-lg text-white" /> </button>
-                         {showComponents && ( /* Navigation for components is always available if showComponents is true, regardless of sectionsCollapsed */
+                         {showComponents && ( 
                             <>
                                 <button onClick={() => scrollToSectionNav("extractor")} className="p-2 bg-brand-blue/80 backdrop-blur-sm rounded-full hover:bg-brand-blue/70 transition shadow-md" title={navTitleGrabber} aria-label={navTitleGrabber || "Scroll to Grabber"} > <FaDownload className="text-lg text-white" /> </button>
                                 <button onClick={() => scrollToSectionNav("executor")} className="p-2 bg-brand-cyan/80 backdrop-blur-sm rounded-full hover:bg-brand-cyan/70 transition shadow-md" title={navTitleAssistant} aria-label={navTitleAssistant || "Scroll to Assistant"} > <FaRobot className="text-lg text-white" /> </button>
@@ -544,13 +562,12 @@ function ActualPageContent({}: ActualPageContentProps) { // Props removed
 
 function RepoXmlPageInternalContent() {
   const searchParams = useSearchParams();
-  const context = useRepoXmlPageContext(); // Get context
+  const context = useRepoXmlPageContext(); 
   const path = searchParams.get('path');
   const idea = searchParams.get('idea');
   
   logger.log(`[RepoXmlPageInternalContent] Extracted from URL - path: ${path}, idea: ${idea ? idea.substring(0,30)+'...' : null}`);
 
-  // Effect to set URL params into context
   useEffect(() => {
     if (context) {
         logger.debug(`[RepoXmlPageInternalContent Effect] Setting URL params to context. Path: ${path}, Idea: ${idea}`);
@@ -560,14 +577,13 @@ function RepoXmlPageInternalContent() {
             logger.warn("[RepoXmlPageInternalContent Effect] setUrlPathToHighlight is not a function on context.");
         }
         if (typeof context.setKworkInputValue === 'function') {
-            context.setKworkInputValue(idea || ''); // Ensure string value
+            context.setKworkInputValue(idea || ''); 
         } else {
             logger.warn("[RepoXmlPageInternalContent Effect] setKworkInputValue is not a function on context.");
         }
     }
   }, [path, idea, context]);
 
-  // ActualPageContent no longer takes initialPath/initialIdea as props
   return <ActualPageContent />;
 }
 

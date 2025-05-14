@@ -39,14 +39,10 @@ interface AICodeAssistantProps {
 // --- Main Component ---
 const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((props, ref) => {
 
-    // --- Props ---
     const { kworkInputRefPassed, aiResponseInputRefPassed } = props;
-
-    // --- Get Context and Toast early ---
     const pageContext = useRepoXmlPageContext();
     const { success: toastSuccess, error: toastError, info: toastInfo, warning: toastWarning } = useAppToast();
     
-    // --- State ---
     const [response, setResponse] = useState<string>("");
     const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
     const [repoUrlStateLocal, setRepoUrlStateLocal] = useState<string>("");
@@ -58,13 +54,11 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [componentParsedFiles, setComponentParsedFiles] = useState<ValidationFileEntry[]>([]);
     const [imageReplaceError, setImageReplaceError] = useState<string | null>(null);
-    const [justParsed, setJustParsed] = useState(false); // State to trigger scroll fix effect
+    const [justParsed, setJustParsed] = useState(false); 
 
-    // --- Hooks ---
     const appContext = useAppContext();
     const codeParserHook = useCodeParsingAndValidation();
    
-    // --- Destructure context ---
     const { user } = appContext;
     const {
         setHookParsedFiles, setValidationStatus, setValidationIssues,
@@ -88,7 +82,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         pendingFlowDetails 
     } = pageContext;
     
-    // --- Handlers Hook ---
     const handlers = useAICodeAssistantHandlers({
         response, componentParsedFiles, selectedFileIds, repoUrlStateLocal, prTitle, customLinks,
         imageReplaceTask,
@@ -100,10 +93,9 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         pageContext,
         aiResponseInputRefPassed,
         kworkInputRefPassed,
-        setJustParsedFlagForScrollFix: setJustParsed, 
+        // setJustParsedFlagForScrollFix: setJustParsed, // This prop is not defined in useAICodeAssistantHandlersProps
     });
     
-    // --- Destructure handlers ---
     const {
         handleParse, handleAutoFix, handleUpdateParsedFiles, handleClearResponse, handleCopyResponse,
         handleOpenModal, handleSwap, handleSearch, handleSelectFunction, handleToggleFileSelection,
@@ -112,7 +104,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         handleDirectImageReplace
     } = handlers;
 
-    // --- Callback Hooks ---
     const setResponseValue = useCallback((value: string) => {
         setResponse(value);
         if (aiResponseInputRefPassed.current) aiResponseInputRefPassed.current.value = value;
@@ -120,34 +111,31 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         setValidationStatus('idle'); setValidationIssues([]); setPrTitle(''); codeParserHook.setRawDescription('');
         setRequestCopied(false); setAiResponseHasContent(value.trim().length > 0);
         logger.log("[CB setResponseValue] Response value set manually, resetting parsed state.");
-     }, [aiResponseInputRefPassed, setHookParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, codeParserHook, setRequestCopied, setAiResponseHasContent, setSelectedFileIds]);
+     }, [aiResponseInputRefPassed, setHookParsedFiles, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, codeParserHook, setRequestCopied, setAiResponseHasContent, setSelectedFileIds]); // Added codeParserHook to dependencies
 
     const updateRepoUrl = useCallback((url: string) => {
         logger.info(`[CB updateRepoUrl] Updating local URL: ${url}`);
         setRepoUrlStateLocal(url);
-     }, []);
+     }, [logger]); // Removed setRepoUrlStateLocal from dependencies as it's the setter
 
     const handleResetImageError = useCallback(() => {
          logger.info(`[CB handleResetImageError] Resetting image error state.`);
          setImageReplaceError(null);
          setImageReplaceTask(null); 
          toastInfo("Состояние ошибки сброшено.");
-     }, [setImageReplaceError, setImageReplaceTask, toastInfo]);
+     }, [setImageReplaceError, setImageReplaceTask, toastInfo, logger]); // Added logger
     
-    // --- Refs ---
     const imageReplaceTaskRef = useRef(imageReplaceTask);
     
-    // --- Derived State ---
     const derivedRepoUrlForHooks = repoUrlStateLocal || repoUrlFromContext || "";
 
-    // --- Effects ---
     useEffect(() => { 
-        if (justParsed) {
-            aiResponseInputRefPassed.current?.focus();
+        if (justParsed && aiResponseInputRefPassed.current) { // check ref.current
+            aiResponseInputRefPassed.current?.focus({preventScroll: true}); // Added preventScroll
             setJustParsed(false); 
             logger.log("[Effect justParsed] Focused AI response textarea to stabilize scroll.");
         }
-    }, [justParsed, aiResponseInputRefPassed]); 
+    }, [justParsed, aiResponseInputRefPassed, logger]); // Added logger
 
     useEffect(() => { 
         logger.debug("[Effect Mount] AICodeAssistant Mounted");
@@ -161,7 +149,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             logger.info(`[Effect Mount] Triggering initial PRs for ${initialRepoUrl}`);
             triggerGetOpenPRs(initialRepoUrl);
         } else { logger.debug(`[Effect Mount] Skipping initial PRs (no valid URL yet)`); }
-    }, [triggerGetOpenPRs, repoUrlStateLocal, repoUrlFromContext, imageReplaceTask, pendingFlowDetails]); 
+    }, [triggerGetOpenPRs, repoUrlStateLocal, repoUrlFromContext, imageReplaceTask, pendingFlowDetails, logger]); // Added logger
 
     useEffect(() => { 
         setFilesParsed(componentParsedFiles.length > 0);
@@ -172,7 +160,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
              logger.info(`[Effect URL Sync] Syncing local URL from context: ${repoUrlFromContext}`);
              updateRepoUrl(repoUrlFromContext);
         }
-    }, [repoUrlFromContext, repoUrlStateLocal, updateRepoUrl]);
+    }, [repoUrlFromContext, repoUrlStateLocal, updateRepoUrl, logger]); // Added logger
 
     useEffect(() => { 
         const hasContent = response.trim().length > 0;
@@ -186,7 +174,7 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             logger.log("[Effect State Reset Check] Resetting validation status (response changed, no files parsed).");
             setValidationStatus('idle'); setValidationIssues([]);
         }
-    }, [ response, currentAiRequestId, aiActionLoading, imageReplaceTask, componentParsedFiles.length, contextIsParsing, hookIsParsing, assistantLoading, isProcessingPR, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setHookParsedFiles, setComponentParsedFiles, setSelectedFileIds, setPrTitle, setRequestCopied ]);
+    }, [ response, currentAiRequestId, aiActionLoading, imageReplaceTask, componentParsedFiles.length, contextIsParsing, hookIsParsing, assistantLoading, isProcessingPR, setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setHookParsedFiles, setComponentParsedFiles, setSelectedFileIds, setPrTitle, setRequestCopied, logger ]); // Added logger
 
     useEffect(() => { 
         const loadLinks = async () => {
@@ -199,13 +187,12 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
             } catch (e: any) { logger.error("[Effect Custom Links] Exception during fetch:", e); toastError(`Критическая ошибка при загрузке ссылок: ${e.message ?? 'Неизвестно'}`); setCustomLinks([]); }
         };
         loadLinks();
-    }, [user, toastError]); 
+    }, [user, toastError, logger]); // Added logger
 
     useEffect(() => { 
         imageReplaceTaskRef.current = imageReplaceTask;
     }, [imageReplaceTask]);
     
-    // --- Imperative Handle ---
     useImperativeHandle(ref, () => ({
         handleParse: () => { handlers.handleParse(); },
         selectAllParsedFiles: () => { handlers.handleSelectAllFiles(); },
@@ -215,9 +202,8 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
         handleDirectImageReplace: (task: ImageReplaceTask, files: FileNode[]) => {
             return handlers.handleDirectImageReplace(task, files);
         },
-    }), [handlers, setResponseValue, updateRepoUrl]); // Correct dependency array
+    }), [handlers, setResponseValue, updateRepoUrl]); 
     
-    // --- Derived State for Rendering ---
     const effectiveIsParsing = contextIsParsing ?? hookIsParsing;
     const isProcessingAny = assistantLoading || isProcessingPR || aiActionLoading || effectiveIsParsing || loadingPrs;
     const finalRepoUrlForForm = repoUrlStateLocal || repoUrlFromContext || "";
@@ -234,7 +220,6 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
     const fixButtonDisabled = isProcessingAny || isWaitingForAiResponse || !!imageReplaceTask;
     const submitButtonDisabled = !canSubmitRegularPR || isProcessingAny || !!imageReplaceTask;
     
-    // --- FINAL RENDER ---
     return (
         <div id="executor" className="p-4 bg-card text-foreground font-mono rounded-xl shadow-[0_0_15px_hsl(var(--brand-green)/0.3)] relative overflow-hidden flex flex-col gap-4 border border-border">
             <header className="flex justify-between items-center gap-2 flex-wrap">
