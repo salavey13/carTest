@@ -14,14 +14,14 @@ import {
   FaCommentDots, FaGears, FaBroom, FaScroll, FaImages, FaKiwiBird, FaMobileScreenButton
 } from "react-icons/fa6";
 import { useState, useEffect } from "react";
-import Modal from "@/components/ui/Modal";
+import Modal from "@/components/ui/Modal"; // Ensure this is correctly styled or uses ShadCN Dialog
 import { toast } from "sonner";
 import {
   fetchUserCyberFitnessProfile,
   CyberFitnessProfile,
-  getAchievementDetails, // Ensure this is imported
-  Achievement, // Ensure this type is imported
-  ALL_ACHIEVEMENTS // If you need to iterate all possible ones, though profile has achieved ones
+  getAchievementDetails,
+  Achievement,
+  ALL_ACHIEVEMENTS 
 } from "@/hooks/cyberFitnessSupabase";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts';
@@ -29,6 +29,7 @@ import VibeContentRenderer from "@/components/VibeContentRenderer";
 import Link from "next/link";
 import { format } from 'date-fns'; 
 import { ru } from 'date-fns/locale'; 
+import { cn } from "@/lib/utils";
 
 const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png";
 const DEFAULT_WEEKLY_ACTIVITY = Array.from({ length: 7 }).map((_, i) => {
@@ -147,10 +148,10 @@ export default function ProfilePage() {
   if (isLoadingDisplay && !cyberProfile) { 
     return (
       <div className="min-h-screen bg-dark-bg flex flex-col items-center justify-center p-4 text-center">
-        <FaSpinner className="text-5xl text-brand-cyan animate-spin mb-6" />
-        <p className="text-brand-cyan font-orbitron text-xl animate-pulse tracking-widest">
+        <FaSpinner className="text-6xl text-brand-cyan animate-spin mb-8" />
+        <h1 className="text-2xl font-orbitron text-brand-cyan animate-pulse tracking-wider">
           ДЕШИФРОВКА ПРОФИЛЯ АГЕНТА...
-        </p>
+        </h1>
       </div>
     );
   }
@@ -168,12 +169,12 @@ export default function ProfilePage() {
   const kiloVibes = safeCyberProfile.kiloVibes;
   const cognitiveOS = safeCyberProfile.cognitiveOSVersion;
   const unlockedPerks = safeCyberProfile.unlockedPerks;
-  const achievements = safeCyberProfile.achievements; // Array of achievement IDs
+  const achievements = safeCyberProfile.achievements;
   const focusTime = safeCyberProfile.focusTimeHours || 0;
   
   const displayWeeklyActivity = safeCyberProfile.dailyActivityLog && safeCyberProfile.dailyActivityLog.length > 0
     ? safeCyberProfile.dailyActivityLog.map(log => {
-        const date = new Date(log.date + "T00:00:00Z"); // Ensure date is parsed as UTC
+        const date = new Date(log.date + "T00:00:00Z"); 
         return {
             name: format(date, 'EE', { locale: ru }).toUpperCase(),
             value: (log.filesExtracted * 50) + (log.tokensProcessed * 0.1) + (log.kworkRequestsSent || 0) * 10 + (log.prsCreated || 0) * 200 + (log.branchesUpdated || 0) * 100,
@@ -188,31 +189,31 @@ export default function ProfilePage() {
     : DEFAULT_WEEKLY_ACTIVITY;
 
   const stats = [
-    { label: "KiloVibes", value: kiloVibes.toLocaleString(), icon: <FaBolt className="text-brand-yellow" /> },
-    { label: "Deep Work (ч)", value: focusTime, icon: <FaBrain className="text-brand-pink" /> },
-    { label: "Достижений", value: achievements.length, icon: <FaStar className="text-neon-lime" /> },
-    { label: "Запросов к AI", value: safeCyberProfile.totalKworkRequestsSent, icon: <FaPaperPlane className="text-brand-cyan" /> },
-    { label: "PR Создано", value: safeCyberProfile.totalPrsCreated, icon: <FaGithub className="text-light-text" /> },
-    { label: "Веток Обновлено", value: safeCyberProfile.totalBranchesUpdated, icon: <FaCodeBranch className="text-brand-purple" /> },
-    { label: "Извлечено Файлов (в KWork)", value: safeCyberProfile.totalFilesExtracted, icon: <FaPlus className="text-brand-green" /> },
-    { label: "Токенов AI (обработано)", value: (safeCyberProfile.totalTokensProcessed).toLocaleString(), icon: <FaRobot className="text-brand-pink" /> },
+    { label: "KiloVibes", value: kiloVibes.toLocaleString(), icon: <FaBolt className="text-brand-yellow text-3xl" /> },
+    { label: "Deep Work (ч)", value: focusTime, icon: <FaBrain className="text-brand-pink text-3xl" /> },
+    { label: "Достижений", value: achievements.length, icon: <FaStar className="text-neon-lime text-3xl" /> },
+    { label: "Запросов к AI", value: safeCyberProfile.totalKworkRequestsSent, icon: <FaPaperPlane className="text-brand-cyan text-3xl" /> },
+    { label: "PR Создано", value: safeCyberProfile.totalPrsCreated, icon: <FaGithub className="text-light-text text-3xl" /> },
+    { label: "Веток Обновлено", value: safeCyberProfile.totalBranchesUpdated, icon: <FaCodeBranch className="text-brand-purple text-3xl" /> },
+    { label: "Извлечено Файлов", value: safeCyberProfile.totalFilesExtracted, icon: <FaPlus className="text-brand-green text-3xl" /> },
+    { label: "Токенов AI", value: (safeCyberProfile.totalTokensProcessed).toLocaleString(), icon: <FaRobot className="text-brand-pink text-3xl" /> },
   ];
 
   const handleLogout = () => {
-    toast.info("Функция выхода из системы в разработке.");
+    toast.info("Функция выхода из системы в разработке. CyberVibe OS тебя не отпустит так просто!");
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-bg to-dark-card text-light-text p-4 pt-24 pb-16">
+    <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pt-24 pb-16">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="container mx-auto max-w-2xl"
+        className="container mx-auto max-w-3xl" 
       >
-        <Card className="bg-dark-card/90 backdrop-blur-md border border-brand-purple/50 shadow-xl">
-          <CardHeader className="text-center p-6 border-b border-brand-purple/30">
-            <div className="relative w-28 h-28 mx-auto mb-4 rounded-full overflow-hidden border-4 border-brand-pink shadow-[0_0_15px_theme(colors.brand-pink)]">
+        <Card className="bg-dark-card/90 backdrop-blur-xl border border-brand-purple/60 shadow-2xl shadow-purple-glow">
+          <CardHeader className="text-center p-6 md:p-8 border-b border-brand-purple/40">
+            <div className="relative w-32 h-32 md:w-36 md:h-36 mx-auto mb-5 rounded-full overflow-hidden border-4 border-brand-pink shadow-[0_0_20px_rgba(var(--brand-pink-rgb),0.7)] transition-all duration-300 hover:shadow-[0_0_30px_rgba(var(--brand-pink-rgb),0.9)] hover:scale-105">
               <Image
                 src={avatarUrl}
                 alt={`${userName}'s Cybernetic Avatar`}
@@ -220,57 +221,59 @@ export default function ProfilePage() {
                 style={{objectFit:"cover"}} 
                 className="transform hover:scale-110 transition-transform duration-300"
                 priority
+                sizes="(max-width: 768px) 128px, 144px"
               />
             </div>
-            <CardTitle className="text-3xl font-orbitron font-bold text-brand-cyan cyber-text glitch" data-text={userName}>
-              {userName}
+            <CardTitle className="text-4xl font-orbitron font-bold text-brand-cyan cyber-text glitch" data-text={userName.toUpperCase()}>
+              {userName.toUpperCase()}
             </CardTitle>
-            <CardDescription className="text-muted-foreground font-mono text-sm">
+            <CardDescription className="text-muted-foreground font-mono text-md mt-1">
               @{userHandle}
             </CardDescription>
-            <div className="mt-2 text-xs font-mono text-brand-yellow">
+            <div className="mt-3 text-sm font-mono text-brand-yellow text-shadow-sm shadow-yellow-500/50">
               Level: {currentLevel} | Cognitive OS: {cognitiveOS}
             </div>
           </CardHeader>
 
-          <CardContent className="space-y-6 p-6">
+          <CardContent className="space-y-8 p-6 md:p-8">
             <section>
-              <h2 className="text-xl font-orbitron text-brand-pink mb-3 flex items-center">
-                <FaChartLine className="mr-2"/>Кибер-Метрики Агента
+              <h2 className="text-2xl font-orbitron text-brand-pink mb-4 flex items-center gap-2 text-shadow-neon">
+                <FaChartLine />Кибер-Метрики Агента
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {stats.map((stat) => (
-                  <Card key={stat.label} className="bg-dark-bg/70 p-3 text-center border border-brand-cyan/30 hover:shadow-brand-cyan/20 hover:shadow-md transition-shadow rounded-lg">
-                    <div className="text-2xl mb-1 mx-auto">{stat.icon}</div>
-                    <p className="text-xl font-orbitron font-bold text-light-text">{stat.value}</p>
-                    <p className="text-[0.6rem] text-muted-foreground font-mono uppercase leading-tight">{stat.label}</p>
+                  <Card key={stat.label} className="bg-dark-bg/80 p-4 text-center border border-brand-cyan/40 hover:shadow-brand-cyan/30 hover:shadow-lg transition-all duration-300 rounded-lg hover:border-brand-cyan/70 hover:-translate-y-1">
+                    <div className="mb-2 mx-auto">{stat.icon}</div>
+                    <p className="text-2xl font-orbitron font-bold text-light-text">{stat.value}</p>
+                    <p className="text-xs text-muted-foreground font-mono uppercase tracking-tight leading-tight">{stat.label}</p>
                   </Card>
                 ))}
               </div>
             </section>
 
             <section>
-                <h2 className="text-xl font-orbitron text-brand-green mb-3 flex items-center">
-                    <FaListCheck className="mr-2" />Недельная Активность (Vibe Points)
+                <h2 className="text-2xl font-orbitron text-brand-green mb-4 flex items-center gap-2 text-shadow-neon">
+                    <FaListCheck />Недельная Активность (Vibe Points)
                 </h2>
-                <Card className="bg-dark-bg/70 p-3 border border-brand-green/30 rounded-lg">
-                    <div className="h-[120px] w-full">
+                <Card className="bg-dark-bg/80 p-4 border border-brand-green/40 rounded-lg shadow-md">
+                    <div className="h-[150px] w-full"> 
                         <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={displayWeeklyActivity} margin={{ top: 10, right: 0, left: 0, bottom: 0 }}>
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} dy={5}/>
+                        <BarChart data={displayWeeklyActivity} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}> 
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} dy={5}/>
                             <YAxis hide={true} domain={[0, 'dataMax + 100']} />
                             <RechartsTooltip
-                                cursor={{ fill: 'hsla(var(--brand-purple), 0.1)' }}
+                                cursor={{ fill: 'hsla(var(--brand-purple), 0.15)' }}
                                 contentStyle={{
-                                    backgroundColor: 'rgba(13, 2, 33, 0.85)', 
+                                    backgroundColor: 'hsla(var(--dark-card-rgb), 0.9)', 
                                     borderColor: 'hsl(var(--brand-purple))',
                                     borderRadius: '0.5rem',
                                     color: 'hsl(var(--light-text))',
-                                    fontSize: '0.75rem',
+                                    fontSize: '0.8rem', 
                                     fontFamily: 'monospace',
+                                    boxShadow: '0 0 10px hsla(var(--brand-purple), 0.3)'
                                 }}
                                 itemStyle={{ color: 'hsl(var(--brand-yellow))' }}
-                                labelStyle={{ color: 'hsl(var(--brand-cyan))', fontWeight: 'bold' }}
+                                labelStyle={{ color: 'hsl(var(--brand-cyan))', fontWeight: 'bold', marginBottom: '4px' }}
                                 formatter={(value: number, name, props) => {
                                     const payload = props.payload as typeof displayWeeklyActivity[0];
                                     const details = [];
@@ -282,9 +285,9 @@ export default function ProfilePage() {
                                     return [`${value.toFixed(0)} VP`, details.join(', ') || 'Простой'];
                                 }}
                             />
-                            <Bar dataKey="value" radius={[3, 3, 0, 0]} barSize={20} minPointSize={3}>
+                            <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={25} minPointSize={3}>
                             {displayWeeklyActivity.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} fillOpacity={0.9}/>
+                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} className="transition-opacity duration-200 hover:opacity-80" />
                             ))}
                             </Bar>
                         </BarChart>
@@ -294,10 +297,10 @@ export default function ProfilePage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-orbitron text-brand-yellow mb-3 flex items-center">
-                <FaWandMagicSparkles className="mr-2"/>Разблокированные Перки
+              <h2 className="text-2xl font-orbitron text-brand-yellow mb-4 flex items-center gap-2 text-shadow-neon">
+                <FaWandMagicSparkles />Разблокированные Перки
               </h2>
-              <div className="p-4 bg-dark-bg/70 rounded-lg border border-brand-yellow/30 space-y-2">
+              <div className="p-4 bg-dark-bg/80 rounded-lg border border-brand-yellow/40 space-y-2 shadow-md">
                 {unlockedPerks.length > 0 ? (
                   unlockedPerks.slice(0, 3).map((perk, index) => (
                     <div key={index} className="flex items-center text-sm text-light-text font-mono">
@@ -305,10 +308,10 @@ export default function ProfilePage() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-muted-foreground font-mono">Нет активных перков. Время прокачиваться!</p>
+                  <p className="text-sm text-muted-foreground font-mono">Нет активных перков. Время прокачиваться, Агент!</p>
                 )}
                 {(unlockedPerks.length > 3 || unlockedPerks.length === 0) && (
-                  <Button variant="link" size="sm" className="text-brand-yellow p-0 h-auto font-mono text-xs" onClick={() => setIsPerksModalOpen(true)}>
+                  <Button variant="link" size="sm" className="text-brand-yellow p-0 h-auto font-mono text-xs hover:text-yellow-300" onClick={() => setIsPerksModalOpen(true)}>
                     {unlockedPerks.length > 3 ? `Показать все (${unlockedPerks.length})` : "Узнать о Перках"} <FaChevronRight className="ml-1 w-3 h-3"/>
                   </Button>
                 )}
@@ -316,10 +319,10 @@ export default function ProfilePage() {
             </section>
 
             <section>
-              <h2 className="text-xl font-orbitron text-neon-lime mb-3 flex items-center">
-                <FaStar className="mr-2"/>Достижения Агента
+              <h2 className="text-2xl font-orbitron text-neon-lime mb-4 flex items-center gap-2 text-shadow-neon">
+                <FaStar />Достижения Агента
               </h2>
-              <div className="p-4 bg-dark-bg/70 rounded-lg border border-neon-lime/30 space-y-2">
+              <div className="p-4 bg-dark-bg/80 rounded-lg border border-neon-lime/40 space-y-2 shadow-md">
                 {achievements.length > 0 ? (
                   achievements.slice(0, 3).map((achId) => {
                     const achievement = getAchievementDetails(achId);
@@ -330,27 +333,27 @@ export default function ProfilePage() {
                     );
                   })
                 ) : (
-                  <p className="text-sm text-muted-foreground font-mono">Зал славы пока пуст. Верши великие дела!</p>
+                  <p className="text-sm text-muted-foreground font-mono">Зал славы пока пуст. Верши великие дела, Кибер-Воин!</p>
                 )}
                 {(achievements.length > 3 || achievements.length === 0) && (
-                   <Button variant="link" size="sm" className="text-neon-lime p-0 h-auto font-mono text-xs" onClick={() => setIsAchievementsModalOpen(true)}>
+                   <Button variant="link" size="sm" className="text-neon-lime p-0 h-auto font-mono text-xs hover:text-lime-300" onClick={() => setIsAchievementsModalOpen(true)}>
                      {achievements.length > 3 ? `Показать все (${achievements.length})` : "Мои Достижения"} <FaChevronRight className="ml-1 w-3 h-3"/>
                    </Button>
                 )}
               </div>
             </section>
 
-            <section className="flex flex-col sm:flex-row gap-3 mt-6">
+            <section className="flex flex-col sm:flex-row gap-4 mt-8">
               <Button 
                 onClick={() => setIsEditModalOpen(true)}
-                className="flex-1 bg-brand-cyan text-black hover:bg-brand-cyan/80 font-orbitron shadow-md hover:shadow-brand-cyan/40 transition-all"
+                className="flex-1 bg-brand-cyan text-black hover:bg-brand-cyan/80 font-orbitron shadow-lg hover:shadow-brand-cyan/50 transition-all py-3 text-base"
               >
-                <FaPenToSquare className="mr-2" /> Изменить Профиль Агента
+                <FaPenToSquare className="mr-2" /> Изменить Профиль
               </Button>
               <Button 
                 onClick={handleLogout}
                 variant="outline" 
-                className="flex-1 border-brand-red text-brand-red hover:bg-brand-red/20 hover:text-white font-orbitron shadow-md hover:shadow-brand-red/40 transition-all"
+                className="flex-1 border-brand-red text-brand-red hover:bg-brand-red/20 hover:text-white font-orbitron shadow-lg hover:shadow-brand-red/50 transition-all py-3 text-base"
               >
                 <FaRightFromBracket className="mr-2" /> Деавторизация
               </Button>
@@ -368,6 +371,10 @@ export default function ProfilePage() {
           toast.info("Функция редактирования профиля в разработке.");
           setIsEditModalOpen(false);
         }}
+        dialogClassName="bg-dark-card border-brand-purple text-light-text"
+        titleClassName="text-brand-cyan"
+        confirmButtonClassName="bg-brand-green hover:bg-brand-green/80 text-black"
+        cancelButtonClassName="text-muted-foreground hover:bg-muted/50"
       >
         <p className="font-mono text-sm text-muted-foreground">Здесь будет форма для изменения вашего отображаемого имени, аватара, и других настроек CyberFitness.</p>
         <p className="mt-2 text-xs text-brand-yellow font-mono animate-pulse">Интерфейс модификации личности временно недоступен...</p>
@@ -379,22 +386,25 @@ export default function ProfilePage() {
         title="Арсенал Перков"
         showConfirmButton={false}
         cancelText="Закрыть Капсулу"
+        dialogClassName="bg-dark-card border-brand-yellow text-light-text"
+        titleClassName="text-brand-yellow"
+        cancelButtonClassName="text-muted-foreground hover:bg-muted/50"
       >
-        <div className="max-h-60 overflow-y-auto simple-scrollbar pr-2">
+        <div className="max-h-72 overflow-y-auto simple-scrollbar pr-2">
             {unlockedPerks.length > 0 ? (
-                <ul className="list-none space-y-2">
+                <ul className="list-none space-y-2.5">
                 {unlockedPerks.map((perk, index) => (
-                    <li key={index} className="flex items-center p-2 bg-dark-bg rounded-md border border-brand-purple/50">
-                        <FaShieldHalved className="text-brand-purple mr-3 text-lg"/>
-                        <VibeContentRenderer content={perk} />
+                    <li key={index} className="flex items-center p-3 bg-dark-bg/70 rounded-md border border-brand-purple/60 shadow-sm hover:border-brand-purple transition-colors">
+                        <FaShieldHalved className="text-brand-purple mr-3 text-xl flex-shrink-0"/>
+                        <VibeContentRenderer content={perk} className="text-sm" />
                     </li>
                 ))}
                 </ul>
             ) : (
-                <p className="font-mono text-sm text-muted-foreground">Банк перков пуст. Отправляйся в <Link href="/selfdev/gamified" className="text-brand-green hover:underline" onClick={() => setIsPerksModalOpen(false)}>CyberDev OS</Link> за апгрейдами!</p>
+                <p className="font-mono text-sm text-muted-foreground p-4 text-center">Банк перков пуст. Отправляйся в <Link href="/selfdev/gamified" className="text-brand-green hover:underline font-semibold" onClick={() => setIsPerksModalOpen(false)}>CyberDev OS</Link> за апгрейдами!</p>
             )}
         </div>
-        <p className="mt-3 text-xs text-brand-yellow font-mono animate-pulse">Синхронизация с банком перков...</p>
+        <p className="mt-4 text-xs text-brand-yellow font-mono animate-pulse text-center">Синхронизация с банком перков завершена...</p>
       </Modal>
 
       <Modal
@@ -403,14 +413,17 @@ export default function ProfilePage() {
         title="Зал Славы Агента"
         showConfirmButton={false}
         cancelText="Закрыть Витрину"
+        dialogClassName="bg-dark-card border-neon-lime text-light-text"
+        titleClassName="text-neon-lime"
+        cancelButtonClassName="text-muted-foreground hover:bg-muted/50"
       >
-        <div className="max-h-80 overflow-y-auto simple-scrollbar pr-2 space-y-3">
+        <div className="max-h-96 overflow-y-auto simple-scrollbar pr-2 space-y-3">
             {achievements.length > 0 ? (
                 achievements.map((achId) => {
                     const achievement = getAchievementDetails(achId);
                     if (!achievement) return <div key={achId} className="p-3 bg-dark-bg/70 border border-muted rounded-lg text-sm text-muted-foreground">Неизвестное достижение: {achId}</div>;
                     return (
-                        <div key={achievement.id} className="p-3 bg-dark-bg/70 border border-neon-lime/50 rounded-lg transform hover:scale-[1.02] transition-transform">
+                        <div key={achievement.id} className="p-3.5 bg-dark-bg/70 border border-neon-lime/60 rounded-lg transform hover:scale-[1.02] transition-transform duration-200 ease-out hover:shadow-md hover:shadow-neon-lime/30">
                             <div className="flex items-center mb-1">
                                 <span className="text-2xl mr-3">{getAchievementIconComponent(achievement.icon)}</span>
                                 <h4 className="text-md font-orbitron font-semibold text-neon-lime">{achievement.name}</h4>
