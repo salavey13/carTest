@@ -8,6 +8,7 @@ import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/comp
 import { useAppToast } from "@/hooks/useAppToast"; // Импортируем хук для тостов
 import { ULTIMATE_VIBE_MASTER_PROMPT } from "./prompt"; // Импортируем сам промпт
 import { debugLogger as logger } from "@/lib/debugLogger"; // Импортируем логгер
+import { cn } from "@/lib/utils";
 
 interface RequestInputProps {
     kworkInputRef: React.RefObject<HTMLTextAreaElement>;
@@ -68,7 +69,10 @@ const RequestInput: React.FC<RequestInputProps> = ({
                         id="kworkInput"
                         value={kworkInputValue ?? ''} // Гарантируем строку здесь
                         onChange={(e) => onValueChange(e.target.value)}
-                        className="textarea-cyber" // Используем стиль из globals.css
+                        className={cn(
+                            "textarea-cyber", // Используем стиль из globals.css
+                            "min-h-[200px] simple-scrollbar" // Увеличена высота и добавлен кастомный скроллбар
+                        )}
                         placeholder="4. Напиши свой запрос к AI здесь ИЛИ добавь выбранные файлы как контекст ->"
                         spellCheck="false"
                         disabled={isActionDisabled}
