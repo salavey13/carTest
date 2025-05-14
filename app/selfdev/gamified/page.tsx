@@ -14,7 +14,7 @@ import {
 } from "react-icons/fa6";
 import {
   FaGlasses, FaBrain, FaTriangleExclamation, FaPlay, FaForward,
-  FaPuzzlePiece, FaGears, FaRoad, FaQuestionCircle, FaEye, FaBullseye, FaRulerCombined,
+  FaPuzzlePiece, FaGears, FaRoad, FaCircleQuestion, FaEye, FaBullseye, FaRulerCombined,
   FaArrowsSpin, FaDumbbell, FaGamepad, FaLightbulb, FaRobot, FaRocket, FaBookOpen,
   FaBolt, FaToolbox, FaCode, FaBug, FaLink, FaMicrophone, FaVideo, FaDatabase, FaServer,
   FaMagnifyingGlass, FaMemory, FaKeyboard, FaBriefcase, FaMagnifyingGlassChart,
@@ -139,14 +139,14 @@ const sections = [
     titleEn: "The 4 Phases of Your Life's Game Levels",
     titleRu: "4 Фазы Уровней Твоей Жизненной Игры",
     pointsEn: [
-      "<strong class='text-gray-400'>Level 1: Limbo <FaQuestionCircle className='inline mx-1'/></strong> - You don't know what to do or what you want. Feeling lost, stuck.",
+      "<strong class='text-gray-400'>Level 1: Limbo <FaCircleQuestion className='inline mx-1'/></strong> - You don't know what to do or what you want. Feeling lost, stuck.",
       "<strong class='text-brand-cyan'>Level 2: Vision <FaEye className='inline mx-1'/></strong> - An image for the future forms. You start acting on a new path, momentum builds.",
       "<strong class='text-brand-green'>Level 3: Flow <FaPlay className='inline mx-1'/></strong> - You're deeply engaged, can't pull yourself away from the goal.",
       "<strong class='text-brand-orange'>Level 4: Resistance <FaTriangleExclamation className='inline mx-1'/></strong> - Exponential progress plateaus. You cling to past success, avoiding the next 'Limbo'.",
       "Most get trapped in Limbo because they're trained to follow scripts and wait for external certainty, interpreting 'feeling lost' as a bad sign instead of a <strong class='font-semibold text-brand-yellow'>necessary starting point</strong>.",
     ],
     pointsRu: [
-      "<strong class='text-gray-400'>Уровень 1: Лимбо <FaQuestionCircle className='inline mx-1'/></strong> - Ты не знаешь, что делать или чего хочешь. Чувство потерянности, застоя.",
+      "<strong class='text-gray-400'>Уровень 1: Лимбо <FaCircleQuestion className='inline mx-1'/></strong> - Ты не знаешь, что делать или чего хочешь. Чувство потерянности, застоя.",
       "<strong class='text-brand-cyan'>Уровень 2: Видение <FaEye className='inline mx-1'/></strong> - Формируется образ будущего. Ты начинаешь действовать на новом пути, набирается импульс.",
       "<strong class='text-brand-green'>Уровень 3: Поток <FaPlay className='inline mx-1'/></strong> - Ты глубоко вовлечен, не можешь оторваться от цели.",
       "<strong class='text-brand-orange'>Уровень 4: Сопротивление <FaTriangleExclamation className='inline mx-1'/></strong> - Экспоненциальный прогресс замедляется. Ты цепляешься за прошлый успех, избегая следующего 'Лимбо'.",
