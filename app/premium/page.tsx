@@ -9,7 +9,7 @@ import {
 } from "react-icons/fa6";
 import { useAppContext } from "@/contexts/AppContext";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
-import { cn } from "@/lib/utils"; // Import cn
+import { cn } from "@/lib/utils"; 
 
 export default function PremiumPage() {
   const { dbUser } = useAppContext();
@@ -38,7 +38,8 @@ export default function PremiumPage() {
             <FaStar 
               className={cn(
                 "text-6xl text-brand-yellow mx-auto mb-4 animate-pulse",
-                "[filter:drop-shadow(0_0_15px_hsl(var(--brand-yellow)))]" // Corrected drop shadow
+                // Using arbitrary value with CSS variable for drop-shadow
+                "[filter:drop-shadow(0_0_15px_hsl(var(--brand-yellow)))]" 
               )} 
             />
             <CardTitle className="text-4xl md:text-5xl font-orbitron font-bold text-white drop-shadow-lg cyber-text glitch" data-text="COGNITIVE OS: PREMIUM">
