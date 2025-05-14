@@ -148,15 +148,15 @@ const StickyChatButton: React.FC = () => {
             setLogsCopied(true);
             setTimeout(() => setLogsCopied(false), 2000); 
 
-            if (dbUser?.id) {
-                logger.debug(`[StickyChatButton] Attempting to log 'copy_logs_used' for user ${dbUser.id}.`);
-                const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id.toString(), 'copy_logs_used');
+            if (dbUser?.user_id) {
+                logger.debug(`[StickyChatButton handleCopyLogs] Attempting to log 'copy_logs_used' for user ${dbUser.user_id}.`);
+                const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'copy_logs_used');
                 newAchievements?.forEach(ach => {
-                    addToast(`🏆 Достижение: ${ach.name}!`, "success", 5000, { description: ach.description });
-                    logger.info(`[StickyChatButton] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.id}`);
+                    addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
+                    logger.info(`[StickyChatButton handleCopyLogs] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`);
                 });
             } else {
-                logger.warn("[StickyChatButton] Cannot log 'copy_logs_used': dbUser.id is missing.");
+                logger.warn("[StickyChatButton handleCopyLogs] Cannot log 'copy_logs_used': dbUser.user_id is missing.");
             }
 
         } catch (err: any) {
@@ -164,7 +164,7 @@ const StickyChatButton: React.FC = () => {
             logger.error("[StickyChatButton] HasBeenPlanter: Copy logs FAILED.", { plannedAction, error: err?.message ?? err });
             toastError(`Не удалось скопировать логи: ${err?.message ?? 'Unknown error'}`);
         }
-    }, [toastSuccess, toastError, toastInfo, dbUser?.id, addToast]);
+    }, [toastSuccess, toastError, toastInfo, dbUser?.user_id, addToast]);
 
     const suggestions = useMemo((): Suggestion[] => {
         const baseSuggestions: Suggestion[] = []; const isToolPage = currentPath === '/repo-xml'; const cleanPath = currentPath.split('?')[0]; const trimmedCustomIdea = customIdea.trim(); const hasCustomIdea = trimmedCustomIdea.length > 0 && !potentialOldImageUrl;
@@ -257,15 +257,15 @@ const StickyChatButton: React.FC = () => {
             setCustomIdea(""); 
             setPotentialOldImageUrl(null); 
             setLogsCopied(false); 
-            if(dbUser?.id){
-                logger.debug(`[StickyChatButton] User ${dbUser.id} opened chat. Attempting to log feature 'sticky_chat_opened'.`);
-                const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id.toString(), 'sticky_chat_opened');
+            if(dbUser?.user_id){ // Corrected to user_id
+                logger.debug(`[StickyChatButton handleFabClick] User ${dbUser.user_id} opened chat. Attempting to log feature 'sticky_chat_opened'.`);
+                const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'sticky_chat_opened');
                 newAchievements?.forEach(ach => {
                     addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
-                    logger.info(`[StickyChatButton] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.id}`);
+                    logger.info(`[StickyChatButton handleFabClick] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`);
                 });
             } else {
-                logger.warn("[StickyChatButton] Cannot log 'sticky_chat_opened': dbUser.id is missing.");
+                logger.warn("[StickyChatButton handleFabClick] Cannot log 'sticky_chat_opened': dbUser.user_id is missing.");
             }
         } else { 
             setShowReplaceTool(false); 
