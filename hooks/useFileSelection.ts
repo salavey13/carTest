@@ -86,10 +86,14 @@ export const useFileSelection = ({
         toastSuccess(`Выбрано ${filesToSelect.size} связанных файлов.`);
         
         if (dbUser?.id) {
+            logger.debug(`[File Selection] Attempting to log 'usedSelectHighlighted' for user ${dbUser.id}.`);
             const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id.toString(), 'usedSelectHighlighted');
             newAchievements?.forEach(ach => {
-                addToast(`🏆 Достижение: ${ach.name}!`, "success", 5000, { description: ach.description });
+                addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
+                logger.info(`[File Selection] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.id}`);
             });
+        } else {
+            logger.warn("[File Selection] Cannot log 'usedSelectHighlighted': dbUser.id is missing.");
         }
 
     }, [ primaryHighlightedPath, secondaryHighlightedPaths, files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser?.id, addToast ]);
