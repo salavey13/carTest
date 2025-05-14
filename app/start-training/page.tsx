@@ -3,8 +3,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-// Ensure all icons are from Fa6
-import { FaPlay, FaPause, FaForward, FaStop, FaFlagCheckered, FaDumbbell } from "react-icons/fa6";
+import { FaPlay, FaPause, FaForward, FaFlagCheckered, FaDumbbell } from "react-icons/fa6";
 import { toast } from "sonner";
 
 export default function StartTrainingPage() {
@@ -23,7 +22,6 @@ export default function StartTrainingPage() {
     } else if (timer === 0 && isActive) {
       setIsActive(false);
       toast.success(`Тренировка "${currentExercise}" завершена!`);
-      // TODO: Add logic for next exercise or workout completion (e.g., update CyberFitness profile)
     }
     return () => {
       if (interval) clearInterval(interval);
@@ -37,38 +35,28 @@ export default function StartTrainingPage() {
   };
 
   const handleStartPause = () => {
-    if (!isActive) { // Start
+    if (!isActive) { 
         setIsActive(true);
         setIsPaused(false);
         toast.info(`Начали упражнение: ${currentExercise}`);
-    } else { // Pause/Resume
+    } else { 
         setIsPaused(!isPaused);
         toast.info(isPaused ? `Пауза: ${currentExercise}`: `Продолжаем: ${currentExercise}`);
     }
   };
 
   const handleNext = () => {
-    // Placeholder for next exercise logic
     toast.info("Переход к следующему упражнению (в разработке).");
-    // Example logic (needs proper state management):
-    // const nextUp = "Планка"; // Determine next exercise
-    // setCurrentExercise(nextExercise);
-    // setNextExercise(nextUp);
-    // setTimer(60); // Set timer for plank
-    // setIsActive(true);
-    // setIsPaused(false);
   };
 
   const handleComplete = () => {
     setIsActive(false);
     setIsPaused(false);
-    setTimer(0); // Visually show completion
+    setTimer(0); 
     toast.success("Тренировка полностью завершена!");
-    // TODO: Add logic for saving progress, updating CyberFitness profile, etc.
   };
 
   return (
-    // Applied theme background and text colors
     <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pt-24 flex items-center justify-center">
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
@@ -76,46 +64,44 @@ export default function StartTrainingPage() {
         transition={{ duration: 0.5 }}
         className="w-full max-w-md"
       >
-         {/* Applied theme card styles */}
-        <Card className="bg-dark-card/80 backdrop-blur-md border border-brand-green/50 shadow-xl shadow-green-glow text-center"> {/* Used custom shadow */}
-          <CardHeader>
-            <FaDumbbell className="text-5xl text-brand-green mx-auto mb-3 drop-shadow-lg" />
-            <CardTitle className="text-3xl font-bold text-brand-green cyber-text">
-              Ваша Тренировка
+        <Card className="bg-dark-card/90 backdrop-blur-xl border border-brand-green/60 shadow-2xl shadow-green-glow text-center"> 
+          <CardHeader className="p-6 md:p-8 border-b border-brand-green/40">
+            <FaDumbbell className="text-6xl text-brand-green mx-auto mb-4 drop-shadow-[0_0_15px_theme(colors.brand-green)]" />
+            <CardTitle className="text-3xl md:text-4xl font-orbitron font-bold text-brand-green cyber-text glitch" data-text="VIBE ТРЕНИРОВКА">
+              VIBE ТРЕНИРОВКА
             </CardTitle>
           </CardHeader>
 
-          <CardContent className="space-y-8 p-6">
+          <CardContent className="space-y-8 p-6 md:p-8">
             <section>
-              <h2 className="text-2xl font-semibold text-foreground mb-2">{currentExercise}</h2>
-              <p className="text-7xl font-mono font-bold text-brand-pink my-6 tracking-wider drop-shadow-lg text-shadow-neon"> {/* Applied text shadow */}
+              <h2 className="text-2xl font-orbitron font-semibold text-light-text mb-2">{currentExercise}</h2>
+              <p className="text-7xl md:text-8xl font-mono font-bold text-brand-pink my-6 tracking-wider drop-shadow-lg text-shadow-neon"> 
                 {formatTime(timer)}
               </p>
-              <p className="text-muted-foreground">Следующее: {nextExercise}</p>
+              <p className="text-muted-foreground font-mono">Следующее: {nextExercise}</p>
             </section>
 
             <section className="grid grid-cols-2 gap-4">
-              {/* Applied theme button variants and styles */}
               <Button
                 onClick={handleStartPause}
-                size="lg" // Make main button larger
-                className="col-span-2 bg-brand-green text-black hover:bg-brand-green/80 font-mono text-lg py-3 shadow-md hover:shadow-lg"
+                size="lg" 
+                className="col-span-2 bg-gradient-to-r from-brand-green to-neon-lime text-black hover:brightness-110 font-orbitron text-lg py-3.5 shadow-lg hover:shadow-brand-green/50 transform hover:scale-105 transition-all duration-300"
               >
-                {isActive && !isPaused ? <FaPause className="mr-2" /> : <FaPlay className="mr-2" />}
+                {isActive && !isPaused ? <FaPause className="mr-2.5" /> : <FaPlay className="mr-2.5" />}
                 {isActive && !isPaused ? "Пауза" : isActive && isPaused ? "Продолжить" : "Старт"}
               </Button>
               <Button
                 onClick={handleNext}
                 variant="outline"
-                className="border-brand-blue text-brand-blue hover:bg-brand-blue/10 hover:text-white font-mono py-3"
-                disabled={!isActive} // Disable if not active
+                className="border-brand-blue text-brand-blue hover:bg-brand-blue/20 hover:text-white font-orbitron py-3 text-base shadow-md hover:shadow-brand-blue/30 transform hover:scale-105 transition-all duration-300"
+                disabled={!isActive} 
               >
                 <FaForward className="mr-2" /> Далее
               </Button>
               <Button
                 onClick={handleComplete}
-                variant="destructive" // Use destructive for completion/stop
-                className="font-mono py-3"
+                variant="destructive" 
+                className="bg-brand-red hover:bg-brand-red/80 text-destructive-foreground font-orbitron py-3 text-base shadow-md hover:shadow-brand-red/40 transform hover:scale-105 transition-all duration-300"
                 disabled={!isActive && timer === 120}
               >
                 <FaFlagCheckered className="mr-2" /> Завершить

@@ -9,6 +9,7 @@ import {
 } from "react-icons/fa6";
 import { useAppContext } from "@/contexts/AppContext";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
+import { cn } from "@/lib/utils"; 
 
 export default function PremiumPage() {
   const { dbUser } = useAppContext();
@@ -32,26 +33,31 @@ export default function PremiumPage() {
         transition={{ duration: 0.5 }}
         className="container mx-auto max-w-4xl"
       >
-        <Card className="bg-dark-card/90 backdrop-blur-md border border-brand-yellow/50 shadow-xl shadow-yellow-glow overflow-hidden"> {/* Used custom shadow */}
-          <CardHeader className="text-center bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange p-8">
-             {/* Applied custom shadow utility */}
-            <FaStar className="text-5xl text-brand-yellow mx-auto mb-3 animate-pulse shadow-yellow-glow" />
-            <CardTitle className="text-4xl font-orbitron font-bold text-white drop-shadow-md cyber-text glitch" data-text="COGNITIVE OS: PREMIUM">
+        <Card className="bg-dark-card/90 backdrop-blur-xl border border-brand-yellow/60 shadow-2xl shadow-yellow-glow overflow-hidden">
+          <CardHeader className="text-center bg-gradient-to-r from-brand-purple/80 via-brand-pink/80 to-brand-orange/80 p-8 md:p-10">
+            <FaStar 
+              className={cn(
+                "text-6xl text-brand-yellow mx-auto mb-4 animate-pulse",
+                // Using arbitrary value with CSS variable for drop-shadow
+                "[filter:drop-shadow(0_0_15px_hsl(var(--brand-yellow)))]" 
+              )} 
+            />
+            <CardTitle className="text-4xl md:text-5xl font-orbitron font-bold text-white drop-shadow-lg cyber-text glitch" data-text="COGNITIVE OS: PREMIUM">
               COGNITIVE OS: PREMIUM
             </CardTitle>
-            <p className="text-lg text-yellow-200 font-mono mt-1">
+            <p className="text-lg text-yellow-200 font-mono mt-2">
               Разблокируй свой максимальный нейро-потенциал!
             </p>
           </CardHeader>
 
           <CardContent className="p-6 md:p-8 space-y-8">
             {hasActivePremium ? (
-                <div className="text-center p-6 bg-brand-green/10 border border-brand-green rounded-lg">
-                    <h2 className="text-2xl font-orbitron font-semibold text-brand-green mb-2">ПРЕМИУМ ПРОТОКОЛЫ АКТИВИРОВАНЫ!</h2>
-                    <p className="text-muted-foreground font-mono">Ты уже используешь все мощности CyberVibe OS. Твой путь к сингулярности открыт!</p>
+                <div className="text-center p-6 bg-brand-green/20 border-2 border-dashed border-brand-green/70 rounded-lg shadow-md">
+                    <h2 className="text-2xl font-orbitron font-semibold text-brand-green mb-2 text-shadow-cyber">ПРЕМИУМ ПРОТОКОЛЫ АКТИВИРОВАНЫ!</h2>
+                    <p className="text-muted-foreground font-mono">Ты уже используешь все мощности CyberVibe OS. Твой путь к сингулярности открыт, Агент!</p>
                 </div>
             ) : (
-                <p className="text-center text-lg text-muted-foreground font-mono">
+                <p className="text-center text-lg text-light-text/90 font-mono">
                 Получи доступ к эксклюзивным инструментам и протоколам CyberVibe, которые ускорят твою эволюцию и помогут достичь мастерства в цифровой реальности.
                 </p>
             )}
@@ -63,7 +69,7 @@ export default function PremiumPage() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.3, delay: index * 0.07 }}
-                  className="flex items-start space-x-4 p-4 bg-dark-bg/50 rounded-lg border border-brand-purple/30 hover:border-brand-cyan/70 transition-colors hover:shadow-md hover:shadow-glow-md" // Used theme shadow
+                  className="flex items-start space-x-4 p-4 bg-dark-bg/60 rounded-lg border border-brand-purple/40 hover:border-brand-cyan/70 transition-colors duration-300 hover:shadow-lg hover:shadow-brand-cyan/20 transform hover:-translate-y-1"
                 >
                   <div className="text-3xl mt-1 flex-shrink-0 w-8 text-center">{feature.icon}</div>
                   <div>
@@ -77,9 +83,12 @@ export default function PremiumPage() {
             {!hasActivePremium && (
                 <div className="text-center mt-10">
                 <Link href="/buy-subscription" passHref legacyBehavior>
-                     {/* Used custom shadow */}
-                    <Button size="lg" className="bg-gradient-to-r from-brand-yellow to-brand-orange text-black hover:shadow-yellow-glow font-orbitron text-lg px-10 py-3 shadow-lg transform hover:scale-105 transition-all text-shadow-glow">
-                    <FaGem className="mr-2" /> Активировать Премиум ОС
+                    <Button 
+                        size="lg" 
+                        className="bg-gradient-to-r from-brand-yellow to-brand-orange text-black hover:shadow-yellow-glow font-orbitron text-lg px-10 py-3 shadow-lg transform hover:scale-105 transition-all duration-300 ease-out hover:brightness-110"
+                        aria-label="Активировать Премиум ОС"
+                    >
+                    <FaGem className="mr-2.5" /> АКТИВИРОВАТЬ ПРЕМИУМ ОС
                     </Button>
                 </Link>
                 </div>

@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
   FaBrain, FaBell, FaBed, FaCalendarCheck, FaToolbox, FaEnvelope,
-  FaComments, FaShieldVirus, FaSliders, FaUserGear, FaCircleQuestion, // Corrected: FaQuestionCircle -> FaCircleQuestion
+  FaComments, FaShieldVirus, FaSliders, FaUserGear, FaCircleQuestion, 
   FaMoon
 } from "react-icons/fa6";
 import Modal from "@/components/ui/Modal";
@@ -17,6 +17,7 @@ import { updateUserSettings } from "@/app/actions";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { cn } from "@/lib/utils";
+import { Textarea } from "@/components/ui/textarea"; // Added Textarea import
 
 interface SettingConfig {
   key: string;
@@ -145,9 +146,9 @@ export default function SettingsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-dark-bg p-4">
         <div className="flex flex-col items-center">
-            <FaSliders className="text-5xl text-brand-purple animate-pulse mb-4" />
-            <p className="text-brand-purple animate-pulse font-orbitron">КАЛИБРОВКА НЕЙРО-ИНТЕРФЕЙСА...</p>
-            {pageError && <p className="text-red-500 mt-2">{pageError}</p>}
+            <FaSliders className="text-6xl text-brand-purple animate-pulse mb-6" />
+            <h1 className="text-2xl text-brand-purple animate-pulse font-orbitron tracking-wider">КАЛИБРОВКА НЕЙРО-ИНТЕРФЕЙСА...</h1>
+            {pageError && <p className="text-red-500 mt-2 font-mono">{pageError}</p>}
         </div>
       </div>
     );
@@ -161,18 +162,18 @@ export default function SettingsPage() {
         transition={{ duration: 0.5 }}
         className="container mx-auto max-w-2xl"
       >
-        <Card className="bg-dark-card/80 backdrop-blur-md border border-brand-purple/50 shadow-xl shadow-purple-glow"> {/* Used custom shadow */}
-          <CardHeader className="text-center p-6 border-b border-brand-purple/30">
-            <FaUserGear className="text-5xl text-brand-purple mx-auto mb-3 drop-shadow-[0_0_10px_theme(colors.brand-purple)]" />
-            <CardTitle className="text-3xl font-orbitron font-bold text-brand-purple cyber-text glitch" data-text="НЕЙРО-ИНТЕРФЕЙС">
+        <Card className="bg-dark-card/90 backdrop-blur-xl border border-brand-purple/60 shadow-2xl shadow-purple-glow"> 
+          <CardHeader className="text-center p-6 md:p-8 border-b border-brand-purple/40">
+            <FaUserGear className="text-6xl text-brand-purple mx-auto mb-4 drop-shadow-[0_0_10px_theme(colors.brand-purple)]" />
+            <CardTitle className="text-3xl md:text-4xl font-orbitron font-bold text-brand-purple cyber-text glitch" data-text="НЕЙРО-ИНТЕРФЕЙС">
               НЕЙРО-ИНТЕРФЕЙС
             </CardTitle>
-            <CardDescription className="text-muted-foreground font-mono mt-1">
+            <CardDescription className="text-muted-foreground font-mono mt-1 text-sm md:text-base">
               Тонкая настройка твоего VIBE OS для пиковой производительности.
             </CardDescription>
           </CardHeader>
 
-          <CardContent className="space-y-5 p-6">
+          <CardContent className="space-y-6 p-6 md:p-8">
             {settingDefinitions.map((setting) => (
               <SettingToggle
                 key={setting.key}
@@ -193,18 +194,18 @@ export default function SettingsPage() {
                  description="Активация протокола 'Вечная Ночь' для комфорта глаз."
                  isChecked={settingsProfile.dark_mode_enabled ?? true}
                  onCheckedChange={(value) => handleSettingChange('dark_mode_enabled', value)}
-                 switchColorClass="data-[state=checked]:bg-brand-purple" // Or use primary color var
+                 switchColorClass="data-[state=checked]:bg-brand-purple" 
                  isDisabled={isSaving}
              />
 
-            <div className="mt-8 pt-4 border-t border-brand-purple/20 text-center">
+            <div className="mt-10 pt-6 border-t border-brand-purple/30 text-center">
               <Button
                 variant="outline"
                 onClick={() => setIsFeedbackModalOpen(true)}
-                className="border-brand-pink text-brand-pink hover:bg-brand-pink/10 hover:text-brand-pink font-mono text-lg px-8 py-3 shadow-md hover:shadow-pink-glow transition-all" // Used custom shadow
+                className="border-brand-pink text-brand-pink hover:bg-brand-pink/20 hover:text-white font-orbitron text-lg px-8 py-3 shadow-lg hover:shadow-pink-glow transition-all duration-300 transform hover:scale-105" 
                 disabled={isSaving}
               >
-                <FaComments className="mr-2" /> VIBE-ОТЗЫВ
+                <FaComments className="mr-2.5" /> VIBE-ОТЗЫВ
               </Button>
             </div>
           </CardContent>
@@ -217,15 +218,19 @@ export default function SettingsPage() {
         title="Форма Нейро-Обратной Связи"
         confirmText="Отправить Сигнал"
         onConfirm={handleSendFeedback}
-        icon={<FaCircleQuestion className="text-brand-pink" />} // Corrected Icon
+        icon={<FaCircleQuestion className="text-brand-pink" />} 
+        dialogClassName="bg-dark-card border-brand-pink text-light-text"
+        titleClassName="text-brand-pink"
+        confirmButtonClassName="bg-brand-pink hover:bg-brand-pink/80 text-black"
+        cancelButtonClassName="text-muted-foreground hover:bg-muted/50"
       >
         <p className="mb-3 font-mono text-sm text-muted-foreground">Твои мысли – топливо для эволюции VIBE OS. Делись идеями, сообщай о сбоях в Матрице.</p>
-        <textarea
+        <Textarea
           value={feedbackMessage}
           onChange={(e) => setFeedbackMessage(e.target.value)}
           placeholder="Твой сигнал в ноосферу..."
           rows={5}
-          className="w-full p-3 rounded-md bg-input border border-border text-foreground focus:ring-2 focus:ring-ring focus:border-ring font-mono text-sm placeholder-muted-foreground/70 textarea-cyber" // Applied theme class and correct focus
+          className="w-full p-3 rounded-md bg-input border border-border text-foreground focus:ring-2 focus:ring-ring focus:border-ring font-mono text-sm placeholder-muted-foreground/70 textarea-cyber simple-scrollbar" 
         />
       </Modal>
     </div>
@@ -245,12 +250,16 @@ interface SettingToggleProps {
 const SettingToggle: React.FC<SettingToggleProps> = ({ icon, title, description, isChecked, onCheckedChange, switchColorClass, isDisabled }) => {
   const uniqueId = `switch-${title.replace(/\s+/g, '-')}`;
   return (
-    <div className="flex items-center justify-between p-3 bg-dark-bg/40 rounded-lg border border-gray-700 hover:border-brand-purple/50 transition-colors">
-      <Label htmlFor={uniqueId} className="flex items-center text-md flex-grow cursor-pointer pr-4">
-        <span className="text-xl mr-3 flex-shrink-0">{icon}</span>
+    <div className={cn(
+        "flex items-center justify-between p-3.5 bg-dark-bg/50 rounded-lg border border-gray-700/70 hover:border-brand-purple/60 transition-all duration-200 ease-out shadow-md hover:shadow-lg",
+        isDisabled && "opacity-70 cursor-not-allowed"
+      )}
+    >
+      <Label htmlFor={uniqueId} className={cn("flex items-center text-md flex-grow pr-4", isDisabled ? "cursor-not-allowed" : "cursor-pointer")}>
+        <span className="text-2xl mr-3.5 flex-shrink-0 w-7 text-center">{icon}</span>
         <div className="flex-grow">
-          <VibeContentRenderer content={`**${title}**`} className="font-orbitron text-light-text" />
-          <p className="text-xs text-muted-foreground font-mono mt-0.5">{description}</p>
+          <VibeContentRenderer content={`**${title}**`} className="font-orbitron text-light-text text-base" />
+          <p className="text-xs text-muted-foreground font-mono mt-1">{description}</p>
         </div>
       </Label>
       <Switch

@@ -34,23 +34,18 @@ interface PageInfo {
 }
 
 const allPages: PageInfo[] = [
-  // --- Core Vibe ---
   { path: "/", name: "Home", icon: FaBrain, group: "Core Vibe", isImportant: true, color: "cyan" },
   { path: "/repo-xml", name: "SUPERVIBE Studio", icon: FaWandMagicSparkles, group: "Core Vibe", isImportant: true, color: "purple", isHot: true },
   { path: "/selfdev", name: "SelfDev Path", icon: FaRoad, group: "Core Vibe", isImportant: true, color: "green" },
   { path: "/p-plan", name: "VIBE Plan", icon: FaUserNinja, group: "Core Vibe", isImportant: true, isHot: true, color: "yellow" },
   { path: "/game-plan", name: "Game Plan", icon: FaFilm, group: "Core Vibe", isImportant: true, color: "orange", isHot: true },
   { path: "/selfdev/gamified", name: "CyberDev OS", icon: FaGamepad, group: "Core Vibe", isImportant: true, color: "pink", isHot: true },
-  
-  // --- CyberFitness ---
   { path: "/profile", name: "Agent Profile", icon: FaCircleUser, group: "CyberFitness", color: "pink" },
   { path: "/buy-subscription", name: "OS Upgrades", icon: FaCreditCard, group: "CyberFitness", color: "green" },
   { path: "/premium", name: "Premium Modules", icon: FaStar, group: "CyberFitness", color: "yellow" }, 
   { path: "/nutrition", name: "Cognitive Fuel", icon: FaScrewdriverWrench, group: "CyberFitness", color: "orange"}, 
   { path: "/settings", name: "System Config", icon: FaGears, group: "CyberFitness", color: "blue" },  
   { path: "/partner", name: "Alliance Perks", icon: Users, group: "CyberFitness", color: "purple"}, 
-
-  // --- Content & Tools ---
   { path: "/jumpstart", name: "Jumpstart Kit", icon: FaRocket, group: "Content & Tools", isImportant: true, color: "lime" },
   { path: "/purpose-profit", name: "Purpose & Profit", icon: FaBookOpen, group: "Content & Tools", color: "purple" },
   { path: "/ai-work-future", name: "AI & Future of Work", icon: FaNetworkWired, group: "Content & Tools", color: "cyan" },
@@ -59,8 +54,6 @@ const allPages: PageInfo[] = [
   { path: "/style-guide", name: "Style Guide", icon: FaPalette, group: "Content & Tools", color: "gray" },
   { path: "/onesitepls", name: "oneSitePls Info", icon: FaCircleInfo, group: "Content & Tools", color: "gray" },
   { path: "/finance-literacy-memo", name: "Finance Literacy Memo", icon: FaDollarSign, group: "Content & Tools", color: "green"},
-  
-  // --- Misc & Old (can be hidden or moved to a "Legacy" group if needed) ---
   { path: "/cartest", name: "Cyber Garage", icon: FaCarOn, group: "Misc", color: "blue" },
   { path: "/botbusters", name: "Bot Busters", icon: FaRobot, group: "Misc", color: "blue"},
   { path: "/bullshitdetector", name: "BS Detector", icon: FaMagnifyingGlass, group: "Misc", color: "yellow" },
@@ -73,8 +66,6 @@ const allPages: PageInfo[] = [
   { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: Globe, group: "Misc", color: 'green' },
   { path: "/vpr/history/6/cheatsheet", name: "History Cheatsheet 6", icon: FaLandmarkDome, group: "Misc", color: 'yellow' },
   { path: "/vpr/biology/6/cheatsheet", name: "Biology Cheatsheet 6", icon: FaLeaf, group: "Misc", color: 'lime' },
-
-  // --- Admin Zone ---
   { path: "/admin", name: "Admin Panel", icon: FaUserShield, group: "Admin Zone", isAdminOnly: true, color: "red" },
   { path: "/advice-upload", name: "Upload Advice", icon: FaUpload, group: "Admin Zone", isAdminOnly: true, color: "red" },
   { path: "/shadow-fleet-admin", name: "Fleet Admin", icon: FaCarOn, group: "Admin Zone", isAdminOnly: true, color: "red" },
@@ -83,11 +74,7 @@ const allPages: PageInfo[] = [
 
 const groupOrder = ["Core Vibe", "CyberFitness", "Content & Tools", "Misc", "Admin Zone"];
 const groupIcons: Record<string, React.ComponentType<{className?: string}>> = {
-    "Core Vibe": Zap,
-    "CyberFitness": BookUser, 
-    "Content & Tools": Puzzle,
-    "Misc": Layers,
-    "Admin Zone": ShieldCheck,
+    "Core Vibe": Zap, "CyberFitness": BookUser, "Content & Tools": Puzzle, "Misc": Layers, "Admin Zone": ShieldCheck,
 };
 
 const translations: Record<string, Record<string, string>> = {
@@ -111,32 +98,25 @@ const translations: Record<string, Record<string, string>> = {
   }
 };
 
-// Updated color mapping to use theme definitions
 const colorVarMap: Record<string, string> = {
-  purple: "var(--brand-purple-rgb)",
-  blue: "var(--brand-blue-rgb)",
-  yellow: "var(--brand-yellow-rgb)",
-  lime: "var(--neon-lime-rgb)",
-  green: "var(--brand-green-rgb)",
-  pink: "var(--brand-pink-rgb)",
-  cyan: "var(--brand-cyan-rgb)",
-  red: "var(--red-500-rgb)", // Assuming red-500 is defined in your theme or globals
-  orange: "var(--brand-orange-rgb)",
-  gray: "var(--gray-500-rgb)", // Assuming gray-500 is defined in your theme or globals
+  purple: "var(--brand-purple-rgb)", blue: "var(--brand-blue-rgb)", yellow: "var(--brand-yellow-rgb)",
+  lime: "var(--neon-lime-rgb)", green: "var(--brand-green-rgb)", pink: "var(--brand-pink-rgb)",
+  cyan: "var(--brand-cyan-rgb)", red: "var(--red-500-rgb)", orange: "var(--brand-orange-rgb)",
+  gray: "var(--gray-500-rgb)", 
 };
 
 const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> = {
-  purple: "border-brand-purple/60 hover:border-brand-purple text-brand-purple",
-  blue: "border-brand-blue/60 hover:border-brand-blue text-brand-blue",
-  yellow: "border-brand-yellow/60 hover:border-brand-yellow text-brand-yellow",
-  lime: "border-neon-lime/60 hover:border-neon-lime text-neon-lime",
-  green: "border-brand-green/60 hover:border-brand-green text-brand-green",
-  pink: "border-brand-pink/60 hover:border-brand-pink text-brand-pink",
-  cyan: "border-brand-cyan/60 hover:border-brand-cyan text-brand-cyan",
-  red: "border-destructive/60 hover:border-destructive text-destructive", // Use destructive from theme
-  orange: "border-brand-orange/60 hover:border-brand-orange text-brand-orange",
-  gray: "border-muted/60 hover:border-muted text-muted-foreground", // Use muted from theme
-  default: "border-border hover:border-primary/80 text-muted-foreground hover:text-primary" // Use theme defaults
+  purple: "border-brand-purple/70 hover:border-brand-purple text-brand-purple",
+  blue: "border-brand-blue/70 hover:border-brand-blue text-brand-blue",
+  yellow: "border-brand-yellow/70 hover:border-brand-yellow text-brand-yellow",
+  lime: "border-neon-lime/70 hover:border-neon-lime text-neon-lime",
+  green: "border-brand-green/70 hover:border-brand-green text-brand-green",
+  pink: "border-brand-pink/70 hover:border-brand-pink text-brand-pink",
+  cyan: "border-brand-cyan/70 hover:border-brand-cyan text-brand-cyan",
+  red: "border-destructive/70 hover:border-destructive text-destructive", 
+  orange: "border-brand-orange/70 hover:border-brand-orange text-brand-orange",
+  gray: "border-muted/70 hover:border-muted text-muted-foreground", 
+  default: "border-border hover:border-primary/80 text-muted-foreground hover:text-primary" 
 };
 
 export default function Header() {
@@ -147,11 +127,6 @@ export default function Header() {
   const [searchTerm, setSearchTerm] = useState("");
   const pathname = usePathname();
   
-  // Логика скрытия хедера на '/finance-literacy-memo' УДАЛЕНА
-  // if (pathname === '/finance-literacy-memo') {
-  //   return null;
-  // }
-
   const initialLang = useMemo(() => (user?.language_code === 'ru' ? 'ru' : 'en'), [user?.language_code]);
   const [currentLang, setCurrentLang] = useState<'en' | 'ru'>(initialLang);
   
@@ -166,12 +141,19 @@ export default function Header() {
   const toggleLang = useCallback(() => setCurrentLang(prevLang => prevLang === 'en' ? 'ru' : 'en'), []);
 
   const currentLogoText = useMemo(() => {
-    const currentPage = allPages.find(p => p.path === pathname);
+    const page = allPages.find(p => p.path === pathname);
     if (pathname?.startsWith('/vpr')) return "VPR";
-    const baseName = currentPage?.name || "Home"; 
-    const translatedFirstName = t(baseName)?.split(' ')[0];
-    return translatedFirstName || baseName.split(' ')[0] || "VIBE";
+    if (page?.name) {
+        const firstWord = t(page.name).split(' ')[0];
+        if (firstWord.length <= 6) return firstWord.toUpperCase(); // Prioritize short first word
+        if (firstWord.length > 6 && page.name.length <= 6) return page.name.toUpperCase(); // Fallback to original short name
+    }
+    return "CYBERVICE"; // Default logo text
   }, [pathname, t]);
+  
+  const logoCyberPart = currentLogoText === "CYBERVICE" ? "CYBER" : currentLogoText;
+  const logoVicePart = currentLogoText === "CYBERVICE" ? "VICE" : "";
+
 
   const groupedAndFilteredPages = useMemo(() => {
     logger.debug("[Header] Recalculating groupedAndFilteredPages. appContextLoading:", appContextLoading, "isAdmin function exists:", typeof isAdmin === 'function');
@@ -192,21 +174,15 @@ export default function Header() {
 
     const groups: Record<string, PageInfo[]> = {};
     groupOrder.forEach(groupName => {
-        if (groupName === "Admin Zone" && !currentIsAdminReal) {
-            return; 
-        }
+        if (groupName === "Admin Zone" && !currentIsAdminReal) { return; }
         groups[groupName] = [];
     });
 
     filtered.forEach(page => {
       const groupName = page.group || "Misc";
-      if (groups[groupName]) { 
-        groups[groupName].push(page);
-      } else if (groupName === "Admin Zone" && currentIsAdminReal) { // Ensure Admin Zone is created if not pre-created by filter logic
-        groups[groupName] = [page];
-      } else if (groupName !== "Admin Zone") { // Catch-all for other groups not in groupOrder, though ideally all pages should have a group from groupOrder
-        groups[groupName] = [page];
-      }
+      if (groups[groupName]) { groups[groupName].push(page); } 
+      else if (groupName === "Admin Zone" && currentIsAdminReal) { groups[groupName] = [page];} 
+      else if (groupName !== "Admin Zone") { groups[groupName] = [page];}
     });
     logger.debug("[Header] Final groups for nav:", Object.keys(groups).filter(gn => groups[gn]?.length > 0));
     return groups;
@@ -214,33 +190,15 @@ export default function Header() {
 
   const handleScroll = useCallback(() => {
     const currentScrollY = window.scrollY;
-    if (isNavOpen) {
-      if (!isHeaderVisible) setIsHeaderVisible(true);
-      setLastScrollY(currentScrollY); return;
-    }
-    if (currentScrollY > lastScrollY && currentScrollY > 60) {
-      if (isHeaderVisible) setIsHeaderVisible(false);
-    } else if (currentScrollY < lastScrollY || currentScrollY <= 60) {
-      if (!isHeaderVisible) setIsHeaderVisible(true);
-    }
+    if (isNavOpen) { if (!isHeaderVisible) setIsHeaderVisible(true); setLastScrollY(currentScrollY); return; }
+    if (currentScrollY > lastScrollY && currentScrollY > 60) { if (isHeaderVisible) setIsHeaderVisible(false); } 
+    else if (currentScrollY < lastScrollY || currentScrollY <= 60) { if (!isHeaderVisible) setIsHeaderVisible(true); }
     setLastScrollY(currentScrollY);
   }, [lastScrollY, isNavOpen, isHeaderVisible]);
 
-  useEffect(() => {
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [handleScroll]);
-
-  useEffect(() => {
-    if (isNavOpen) { setIsNavOpen(false); setSearchTerm(""); }
-  }, [pathname]); 
-
-  useEffect(() => {
-    const originalStyle = document.body.style.overflow;
-    if (isNavOpen) { document.body.style.overflow = 'hidden'; } 
-    else { document.body.style.overflow = originalStyle; }
-    return () => { document.body.style.overflow = originalStyle; };
-  }, [isNavOpen]);
+  useEffect(() => { window.addEventListener("scroll", handleScroll, { passive: true }); return () => window.removeEventListener("scroll", handleScroll); }, [handleScroll]);
+  useEffect(() => { if (isNavOpen) { setIsNavOpen(false); setSearchTerm(""); } }, [pathname]); 
+  useEffect(() => { const originalStyle = document.body.style.overflow; if (isNavOpen) { document.body.style.overflow = 'hidden'; } else { document.body.style.overflow = originalStyle; } return () => { document.body.style.overflow = originalStyle; }; }, [isNavOpen]);
 
   return (
     <>
@@ -250,8 +208,24 @@ export default function Header() {
       >
         <div className="container mx-auto px-4 py-2.5 sm:py-3">
           <div className="flex items-center justify-between">
-            <Link href="/" className="text-2xl md:text-3xl font-orbitron font-bold text-brand-purple cyber-text glitch hover:text-glow transition-all duration-300 hover:brightness-125" data-text={currentLogoText}>
-              {currentLogoText}
+            <Link 
+              href="/" 
+              className={cn(
+                "text-2xl md:text-3xl font-orbitron font-bold uppercase tracking-wider",
+                "transition-all duration-300 hover:brightness-125 flex items-baseline" // Added flex for inline spans
+              )}
+            >
+              <span 
+                className="text-neon-lime glitch" 
+                data-text={logoCyberPart}
+              >
+                {logoCyberPart}
+              </span>
+              {logoVicePart && (
+                <span className="gta-vibe-text-effect">
+                  {logoVicePart}
+                </span>
+              )}
             </Link>
             <div className="flex items-center gap-2 md:gap-3">
               <button
@@ -318,42 +292,42 @@ export default function Header() {
                           const isCurrentPage = page.path === pathname;
                           const tileBaseColorClass = tileColorClasses[page.color || 'default'];
                           const rgbVar = colorVarMap[page.color || 'default'];
-                          const shadowClass = rgbVar ? `hover:shadow-[0_0_10px_rgba(${rgbVar},0.3)]` : 'hover:shadow-lg';
+                          const tileShadow = rgbVar ? `hover:shadow-[0_0_12px_2px_rgba(${rgbVar},0.4)]` : 'hover:shadow-xl';
                           
                           return (
                             <Link
                               key={page.path} href={page.path}
                               onClick={() => setIsNavOpen(false)}
                               className={cn(
-                                "group relative flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 aspect-square text-center hover:scale-[1.01] hover:-translate-y-px",
+                                "group relative flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 aspect-square text-center hover:scale-[1.02] hover:-translate-y-0.5 shadow-md hover:shadow-lg",
                                 "p-1.5", 
                                 page.isImportant 
-                                  ? "bg-gradient-to-br from-purple-800/30 via-black/50 to-blue-800/30 col-span-1 sm:col-span-2 shadow-sm" 
-                                  : "bg-dark-card/60 hover:bg-dark-card/80 col-span-1",
-                                tileBaseColorClass, // Use updated color classes
-                                shadowClass, // Use updated shadow class based on colorVarMap
-                                isCurrentPage ? `ring-2 ring-offset-2 ring-offset-black ${page.color === 'lime' || page.color === 'yellow' || page.color === 'orange' ? 'ring-black/70' : 'ring-white/90'}` : 'ring-transparent'
+                                  ? "bg-gradient-to-br from-purple-800/40 via-black/60 to-blue-800/40 col-span-1 sm:col-span-2 shadow-lg hover:shadow-xl" 
+                                  : "bg-dark-card/70 hover:bg-dark-card/90 col-span-1",
+                                tileBaseColorClass, 
+                                tileShadow, 
+                                isCurrentPage ? `ring-2 ring-offset-2 ring-offset-black ${page.color === 'lime' || page.color === 'yellow' || page.color === 'orange' ? 'ring-black/80' : 'ring-white/90'}` : 'ring-transparent'
                               )}
                               title={page.translatedName}
                             >
                               {page.isHot && (
-                                <span title={t("Hot")} className="absolute top-1 right-1 text-sm text-brand-red animate-pulse" aria-label={t("Hot")}>
+                                <span title={t("Hot")} className="absolute top-1 right-1 text-base text-brand-orange animate-pulse" aria-label={t("Hot")}>
                                   <FaFire/>
                                 </span>
                               )}
                               {PageIcon && (
                                 <PageIcon className={cn(
-                                  "transition-transform duration-200 group-hover:scale-105 mb-1", 
+                                  "transition-transform duration-200 group-hover:scale-110 mb-1.5", 
                                   page.isImportant 
-                                      ? "h-6 w-6 sm:h-7 sm:w-7" 
-                                      : "h-5 w-5 sm:h-6 sm:w-6" 
+                                      ? "h-7 w-7 sm:h-8 sm:w-8" 
+                                      : "h-6 w-6 sm:h-7 sm:w-7" 
                                 )} />
                               )}
                               <span className={cn(
                                 "font-orbitron font-medium transition-colors leading-tight text-center block",
                                 page.isImportant 
-                                    ? "text-white text-sm md:text-base" 
-                                    : "text-gray-300 group-hover:text-inherit text-xs md:text-sm" 
+                                    ? "text-white text-[0.9rem] md:text-base" 
+                                    : "text-light-text/90 group-hover:text-white text-xs md:text-sm" 
                               )}>
                                 {page.translatedName}
                               </span>

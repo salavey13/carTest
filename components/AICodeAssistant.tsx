@@ -28,6 +28,7 @@ import {
 } from "react-icons/fa6";
 import clsx from "clsx";
 import { debugLogger as logger } from "@/lib/debugLogger";
+import { cn } from "@/lib/utils";
 
 // Interfaces
 interface FileEntry extends ValidationFileEntry {}
@@ -257,7 +258,10 @@ const AICodeAssistant = forwardRef<AICodeAssistantRef, AICodeAssistantProps>((pr
                               <textarea
                                  id="response-input"
                                  ref={aiResponseInputRefPassed}
-                                 className="w-full p-3 pr-16 bg-input rounded-lg border border-border focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan focus:outline-none transition shadow-inner text-sm min-h-[180px] resize-y simple-scrollbar"
+                                 className={cn(
+                                    "w-full p-3 pr-16 bg-input rounded-lg border border-border focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan focus:outline-none transition shadow-inner text-sm resize-y simple-scrollbar",
+                                    "min-h-[360px]" // Увеличена высота
+                                 )}
                                  defaultValue={response}
                                  onChange={(e) => setResponseValue(e.target.value)}
                                  placeholder={isWaitingForAiResponse ? "AI думает..." : isProcessingAny ? "Ожидание..." : "Ответ AI здесь..."}
