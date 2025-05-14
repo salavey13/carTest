@@ -111,7 +111,6 @@ const translations: Record<string, Record<string, string>> = {
   }
 };
 
-// Updated color mapping to use theme definitions
 const colorVarMap: Record<string, string> = {
   purple: "var(--brand-purple-rgb)",
   blue: "var(--brand-blue-rgb)",
@@ -120,23 +119,23 @@ const colorVarMap: Record<string, string> = {
   green: "var(--brand-green-rgb)",
   pink: "var(--brand-pink-rgb)",
   cyan: "var(--brand-cyan-rgb)",
-  red: "var(--red-500-rgb)", // Assuming red-500 is defined in your theme or globals
+  red: "var(--red-500-rgb)", 
   orange: "var(--brand-orange-rgb)",
-  gray: "var(--gray-500-rgb)", // Assuming gray-500 is defined in your theme or globals
+  gray: "var(--gray-500-rgb)", 
 };
 
 const tileColorClasses: Record<Required<PageInfo>['color'] | 'default', string> = {
-  purple: "border-brand-purple/60 hover:border-brand-purple text-brand-purple",
-  blue: "border-brand-blue/60 hover:border-brand-blue text-brand-blue",
-  yellow: "border-brand-yellow/60 hover:border-brand-yellow text-brand-yellow",
-  lime: "border-neon-lime/60 hover:border-neon-lime text-neon-lime",
-  green: "border-brand-green/60 hover:border-brand-green text-brand-green",
-  pink: "border-brand-pink/60 hover:border-brand-pink text-brand-pink",
-  cyan: "border-brand-cyan/60 hover:border-brand-cyan text-brand-cyan",
-  red: "border-destructive/60 hover:border-destructive text-destructive", // Use destructive from theme
-  orange: "border-brand-orange/60 hover:border-brand-orange text-brand-orange",
-  gray: "border-muted/60 hover:border-muted text-muted-foreground", // Use muted from theme
-  default: "border-border hover:border-primary/80 text-muted-foreground hover:text-primary" // Use theme defaults
+  purple: "border-brand-purple/70 hover:border-brand-purple text-brand-purple",
+  blue: "border-brand-blue/70 hover:border-brand-blue text-brand-blue",
+  yellow: "border-brand-yellow/70 hover:border-brand-yellow text-brand-yellow",
+  lime: "border-neon-lime/70 hover:border-neon-lime text-neon-lime",
+  green: "border-brand-green/70 hover:border-brand-green text-brand-green",
+  pink: "border-brand-pink/70 hover:border-brand-pink text-brand-pink",
+  cyan: "border-brand-cyan/70 hover:border-brand-cyan text-brand-cyan",
+  red: "border-destructive/70 hover:border-destructive text-destructive", 
+  orange: "border-brand-orange/70 hover:border-brand-orange text-brand-orange",
+  gray: "border-muted/70 hover:border-muted text-muted-foreground", 
+  default: "border-border hover:border-primary/80 text-muted-foreground hover:text-primary" 
 };
 
 export default function Header() {
@@ -197,9 +196,9 @@ export default function Header() {
       const groupName = page.group || "Misc";
       if (groups[groupName]) { 
         groups[groupName].push(page);
-      } else if (groupName === "Admin Zone" && currentIsAdminReal) { // Ensure Admin Zone is created if not pre-created by filter logic
+      } else if (groupName === "Admin Zone" && currentIsAdminReal) { 
         groups[groupName] = [page];
-      } else if (groupName !== "Admin Zone") { // Catch-all for other groups not in groupOrder, though ideally all pages should have a group from groupOrder
+      } else if (groupName !== "Admin Zone") { 
         groups[groupName] = [page];
       }
     });
@@ -248,9 +247,10 @@ export default function Header() {
             <Link 
               href="/" 
               className={cn(
-                "text-2xl md:text-3xl font-orbitron font-bold uppercase tracking-wider gta-vibe-text-effect",
+                "text-2xl md:text-3xl font-orbitron font-bold uppercase tracking-wider gta-vibe-text-effect glitch", // Added glitch back
                 "transition-all duration-300 hover:brightness-125"
               )}
+              data-text={currentLogoText} // Added data-text for glitch
             >
               {currentLogoText}
             </Link>
@@ -319,42 +319,42 @@ export default function Header() {
                           const isCurrentPage = page.path === pathname;
                           const tileBaseColorClass = tileColorClasses[page.color || 'default'];
                           const rgbVar = colorVarMap[page.color || 'default'];
-                          const shadowClass = rgbVar ? `hover:shadow-[0_0_10px_rgba(${rgbVar},0.3)]` : 'hover:shadow-lg';
+                          const tileShadow = rgbVar ? `hover:shadow-[0_0_12px_2px_rgba(${rgbVar},0.4)]` : 'hover:shadow-xl';
                           
                           return (
                             <Link
                               key={page.path} href={page.path}
                               onClick={() => setIsNavOpen(false)}
                               className={cn(
-                                "group relative flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 aspect-square text-center hover:scale-[1.01] hover:-translate-y-px",
+                                "group relative flex flex-col items-center justify-center rounded-lg border-2 transition-all duration-200 aspect-square text-center hover:scale-[1.02] hover:-translate-y-0.5 shadow-md hover:shadow-lg",
                                 "p-1.5", 
                                 page.isImportant 
-                                  ? "bg-gradient-to-br from-purple-800/30 via-black/50 to-blue-800/30 col-span-1 sm:col-span-2 shadow-sm" 
-                                  : "bg-dark-card/60 hover:bg-dark-card/80 col-span-1",
-                                tileBaseColorClass, // Use updated color classes
-                                shadowClass, // Use updated shadow class based on colorVarMap
-                                isCurrentPage ? `ring-2 ring-offset-2 ring-offset-black ${page.color === 'lime' || page.color === 'yellow' || page.color === 'orange' ? 'ring-black/70' : 'ring-white/90'}` : 'ring-transparent'
+                                  ? "bg-gradient-to-br from-purple-800/40 via-black/60 to-blue-800/40 col-span-1 sm:col-span-2 shadow-lg hover:shadow-xl" 
+                                  : "bg-dark-card/70 hover:bg-dark-card/90 col-span-1",
+                                tileBaseColorClass, 
+                                tileShadow, 
+                                isCurrentPage ? `ring-2 ring-offset-2 ring-offset-black ${page.color === 'lime' || page.color === 'yellow' || page.color === 'orange' ? 'ring-black/80' : 'ring-white/90'}` : 'ring-transparent'
                               )}
                               title={page.translatedName}
                             >
                               {page.isHot && (
-                                <span title={t("Hot")} className="absolute top-1 right-1 text-sm text-brand-red animate-pulse" aria-label={t("Hot")}>
+                                <span title={t("Hot")} className="absolute top-1 right-1 text-base text-brand-orange animate-pulse" aria-label={t("Hot")}> {/* Updated hot icon color */}
                                   <FaFire/>
                                 </span>
                               )}
                               {PageIcon && (
                                 <PageIcon className={cn(
-                                  "transition-transform duration-200 group-hover:scale-105 mb-1", 
+                                  "transition-transform duration-200 group-hover:scale-110 mb-1.5", 
                                   page.isImportant 
-                                      ? "h-6 w-6 sm:h-7 sm:w-7" 
-                                      : "h-5 w-5 sm:h-6 sm:w-6" 
+                                      ? "h-7 w-7 sm:h-8 sm:w-8" 
+                                      : "h-6 w-6 sm:h-7 sm:w-7" 
                                 )} />
                               )}
                               <span className={cn(
                                 "font-orbitron font-medium transition-colors leading-tight text-center block",
                                 page.isImportant 
-                                    ? "text-white text-sm md:text-base" 
-                                    : "text-gray-300 group-hover:text-inherit text-xs md:text-sm" 
+                                    ? "text-white text-[0.9rem] md:text-base" 
+                                    : "text-light-text/90 group-hover:text-white text-xs md:text-sm" 
                               )}>
                                 {page.translatedName}
                               </span>
