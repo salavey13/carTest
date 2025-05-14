@@ -1,25 +1,26 @@
 "use client";
 import { useState, useEffect } from "react";
-import { User, Bot, Trophy, Car, Lock } from "lucide-react"; 
+import { User, Bot, LogIn } from "lucide-react"; // AlertTriangle removed
 import Image from "next/image";
-import Link from "next/link"; // Import Link
+import Link from "next/link";
 import { useAppContext } from "@/contexts/AppContext";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { debugLogger as logger } from "@/lib/debugLogger";
+import { Button } from "@/components/ui/button"; 
+import { VibeContentRenderer } from "@/components/VibeContentRenderer"; // Added VibeContentRenderer
 
 export default function UserInfo() {
   const { dbUser, user, isInTelegramContext, isLoading, error } = useAppContext();
   const [isFirstLoad, setIsFirstLoad] = useState(true);
-  // const [isModalOpen, setIsModalOpen] = useState(false); // Modal logic can be removed or kept for future use
 
   useEffect(() => {
-    if (!isLoading && (dbUser || user)) setIsFirstLoad(false);
-  }, [isLoading, dbUser, user]);
+    if (!isLoading && (dbUser || user || error)) setIsFirstLoad(false);
+  }, [isLoading, dbUser, user, error]);
 
-  if (isLoading) {
+  if (isLoading && isFirstLoad) { 
     return (
-      <div className="w-11 h-11 bg-muted rounded-full animate-pulse shadow-[0_0_15px_rgba(var(--brand-orange-rgb),0.3)]" />
+      <div className="w-11 h-11 bg-muted/50 rounded-full animate-pulse shadow-[0_0_15px_rgba(var(--brand-orange-rgb),0.3)]" />
     );
   }
 
@@ -28,18 +29,34 @@ export default function UserInfo() {
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="text-destructive font-mono text-sm animate-[neon_2s_infinite]"
+        className="flex flex-col items-center gap-1"
       >
-        Auth Error!
+        <div className="flex items-center gap-2 p-2 bg-destructive/80 text-destructive-foreground rounded-md border border-destructive shadow-lg animate-pulse">
+            <VibeContentRenderer content="::FaTriangleExclamation::" className="h-5 w-5" />
+            <span className="font-mono text-xs">Auth Error!</span>
+        </div>
+        <Button asChild variant="outline" size="sm" className="text-xs border-destructive/50 text-destructive-foreground/80 hover:bg-destructive/70 hover:text-destructive-foreground">
+            <Link href="/profile">Войти/Регистрация</Link>
+        </Button>
       </motion.div>
     );
   }
 
-  const effectiveUser = dbUser || user; // Prefer dbUser if available
+  const effectiveUser = dbUser || user;
 
   if (!effectiveUser) {
-    return ( // Render as a button if no user, linking to /profile (which might handle auth redirect or guest view)
-      <Button asChild variant="ghost" className="p-2 rounded-full text-primary hover:text-primary/80 bg-muted/20 hover:bg-muted/40 transition-all shadow-[0_0_10px_rgba(var(--brand-orange-rgb),0.3)]">
+    return ( 
+      <Button 
+        asChild 
+        variant="ghost" 
+        className={cn(
+            "p-2 rounded-full transition-all",
+            "bg-gradient-to-br from-brand-purple/30 via-brand-pink/30 to-brand-orange/30",
+            "hover:from-brand-purple/50 hover:via-brand-pink/50 hover:to-brand-orange/50",
+            "text-light-text hover:text-white",
+            "shadow-[0_0_10px_rgba(var(--brand-pink-rgb),0.4)] hover:shadow-[0_0_15px_rgba(var(--brand-pink-rgb),0.6)]"
+        )}
+        >
         <Link href="/profile" aria-label="Профиль пользователя">
           <User className="h-6 w-6" />
         </Link>
@@ -48,47 +65,48 @@ export default function UserInfo() {
   }
 
   const displayName = effectiveUser.username || effectiveUser.full_name || effectiveUser.first_name || "Агент";
-  const avatarUrl = dbUser?.avatar_url || user?.photo_url; // dbUser might have a custom avatar
+  const avatarUrl = dbUser?.avatar_url || user?.photo_url;
   const isMock = 'is_bot' in effectiveUser ? effectiveUser.is_bot : (effectiveUser.id === 413553377 && process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true');
-
 
   return (
     <Link href="/profile" passHref legacyBehavior>
-      <motion.a // Changed to motion.a for Link compatibility
-        className="relative flex items-center gap-2 p-1 rounded-full hover:bg-gray-800/50 transition-all duration-200 cursor-pointer"
+      <motion.a 
+        className="relative flex items-center gap-2 p-1 rounded-full hover:bg-dark-card/70 transition-all duration-200 cursor-pointer group"
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5 }}
         aria-label={`Профиль пользователя ${displayName}`}
       >
         <div
-          className="relative group w-9 h-9 sm:w-10 sm:h-10"
-          // onClick={() => setIsModalOpen(true)} // Removed direct modal open, link handles navigation
+          className="relative w-9 h-9 sm:w-10 sm:h-10"
         >
           {avatarUrl ? (
-            <div className="relative w-full h-full rounded-full overflow-hidden border-2 border-primary shadow-[0_0_12px_rgba(var(--brand-orange-rgb),0.5)] group-hover:scale-105 transition-transform duration-300">
+            <div className="relative w-full h-full rounded-full overflow-hidden border-2 border-brand-pink/80 shadow-[0_0_12px_rgba(var(--brand-pink-rgb),0.6)] group-hover:scale-105 group-hover:shadow-[0_0_18px_rgba(var(--brand-pink-rgb),0.7)] transition-all duration-300">
               <Image
                 src={avatarUrl}
                 alt={`Аватар ${displayName}`}
-                layout="fill"
-                objectFit="cover" 
+                fill
+                style={{objectFit:"cover"}} 
                 className="rounded-full" 
               />
             </div>
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center text-primary-foreground font-mono text-base sm:text-lg shadow-[0_0_15px_rgba(var(--brand-orange-rgb),0.5)] group-hover:scale-105 transition-transform duration-300">
+            <div className="w-full h-full bg-gradient-to-br from-brand-purple via-brand-pink to-brand-orange rounded-full flex items-center justify-center text-white font-mono text-base sm:text-lg shadow-[0_0_15px_rgba(var(--brand-pink-rgb),0.6)] group-hover:scale-105 group-hover:shadow-[0_0_20px_rgba(var(--brand-pink-rgb),0.7)] transition-all duration-300">
               {getInitials(displayName)}
             </div>
           )}
           {isInTelegramContext && (
-            <span className="absolute -top-0.5 -right-0.5 bg-accent text-accent-foreground text-[9px] px-1 rounded-full shadow-sm">TG</span>
+            <span className="absolute -top-0.5 -right-0.5 bg-brand-blue text-white text-[10px] px-1.5 py-0.5 rounded-full shadow-md border-2 border-dark-bg">TG</span>
           )}
           {isMock && (
-            <Bot className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 text-accent shadow-[0_0_6px_rgba(var(--brand-yellow-rgb),0.5)]" />
+            <Bot className="absolute -bottom-1 -right-1 h-4 w-4 text-brand-yellow shadow-[0_0_8px_rgba(var(--brand-yellow-rgb),0.7)] bg-dark-bg/50 p-0.5 rounded-full" />
           )}
         </div>
 
-        <span className="hidden md:block text-primary font-mono text-sm truncate max-w-[120px] text-glow">
+        <span className={cn(
+            "hidden md:block text-light-text font-mono text-sm truncate max-w-[120px]",
+            "text-shadow-cyber group-hover:text-shadow-neon transition-all duration-300" 
+        )}>
           {isFirstLoad ? (
             Array.from(displayName).map((char, i) => (
               <motion.span
