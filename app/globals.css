@@ -181,8 +181,7 @@
   h5 { @apply text-lg md:text-xl; } 
   h6 { @apply text-base md:text-lg; } 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Orbitron', sans-serif; /* Orbitron default for all headings */
-    /* @apply tracking-wide; removed as Orbitron is wide by default and h1 gets wider */
+    font-family: 'Orbitron', sans-serif; 
   }
   section {
     scroll-margin-top: 96px; 
@@ -229,11 +228,9 @@
              transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
   }
 
-  /* Specific class for Style Guide H1, as it uses @apply font-orbitron which is not a direct utility */
   .text-gta-style-heading-styleguide {
-    font-family: 'Orbitron', sans-serif; /* Direct font application */
-    @apply tracking-wider uppercase; /* Apply other utilities */
-    /* Gradient and shadow styles */
+    font-family: 'Orbitron', sans-serif; 
+    @apply tracking-wider uppercase; 
     background-image: linear-gradient(
       to top, 
       hsl(var(--brand-orange)), 
@@ -319,7 +316,10 @@
   @apply bg-muted/50;
 }
 .bottom-nav-item:focus {
-  @apply bg-muted/40 ring-1 ring-brand-cyan;
+  @apply bg-muted/40; /* Apply background */
+  outline: 2px solid transparent; /* For accessibility consistency */
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px hsl(var(--brand-cyan)); /* Simulate ring-1 with brand-cyan color */
 }
 .active-bottom-link {
   @apply bg-card/70; 
