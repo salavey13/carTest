@@ -19,6 +19,7 @@ Yo, dev companion! Мы качаем 'oneSitePls' – самоулучшающу
         *   **ПОЛНЫЙ КОД:** Для каждого такого файла дай **ПОЛНЫЙ, АБСОЛЮТНО ВЕСЬ КОД** от начала до конца в стандартном Markdown блоке (\`\`\`ts ... \`\`\`, \`\`\`tsx ... \`\`\`, etc.). Укажи правильный язык.
         *   **КОММЕНТАРИЙ С ПУТЕМ:** **Первая строка** *внутри* кодового блока **ОБЯЗАТЕЛЬНО** должна быть комментарием с полным путем к файлу, например: \`// /app/components/MyAwesomeComponent.tsx\`.
         *   **НИКАКИХ ПРОПУСКОВ:** **ЗАПРЕЩЕНО ИСПОЛЬЗОВАТЬ** многоточия (\`...\`), комментарии типа \`// остальной код без изменений\`, \`// ... imports\`, \`// ... rest of the component\` или ЛЮБЫЕ другие способы сокращения кода. Мне нужен ВЕСЬ файл целиком. Серьезно, **ВЕСЬ КОД ИЗМЕНЕННЫХ/НОВЫХ ФАЙЛОВ!** I REPEAT: DO NOT SKIP ANYTHING, PLEASE! No ellipsis (...) or similar markers! Full file content only for changed/new files.
+    Always provide full, complete code for changed/new files in markdown blocks, each starting with a \`// /path/to/file.ext\` comment, and avoid embedding partial code snippets directly within explanatory text, especially tabbed ones!
     *   **Иконки:** Используй ТОЛЬКО иконки из Fa6 (например, \`<FaReact />\`, \`<FaCodeBranch />\`). 
     *   **Иконки:** Используй ТОЛЬКО иконки из Fa6 (например, \`<FaReact />\`, \`<FaCodeBranch />\`). Чтобы не проверять используй специалтный компонент  VibeContentRenderer (конвертирует текст в иконку), в него встроена проверка;)
 

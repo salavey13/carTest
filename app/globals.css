@@ -1,4 +1,3 @@
-/* /app/globals.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -52,7 +51,6 @@
   --ring: 270 65% 70%;            /* Slightly lighter purple for focus rings */
 
   /* --- RGB Versions for Shadows/Gradients (Update these based on final HSL) --- */
-  /* Use an online converter (e.g., hsl(270, 65%, 65%) to rgb) */
   --brand-purple-rgb: 165, 110, 220; 
   --brand-pink-rgb: 242, 128, 170;
   --brand-cyan-rgb: 102, 204, 204;
@@ -64,7 +62,7 @@
 
   /* --- Static Dark Background RGB --- */
   --dark-bg-rgb: 13, 2, 33;
-  --dark-card-rgb: 26, 10, 61;
+  --dark-card-rgb: 26, 10, 61; /* Equivalent to hsl(var(--card)) */
   --glow-color-rgb: 242, 128, 170; /* Soft pink for glow (used by tailwind.config) */
 
   /* --- Chart Colors (Using adjusted brand colors) --- */
@@ -164,7 +162,7 @@
 
 @layer base {
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground; 
     font-family: 'Inter', sans-serif;
     margin: 0;
     padding: 0;
@@ -172,37 +170,113 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  h1 { @apply text-4xl md:text-5xl; } /* Corrected sizes */
-  h2 { @apply text-3xl md:text-4xl; } /* Corrected sizes */
-  h3 { @apply text-2xl md:text-3xl; } /* Corrected sizes */
-  h4 { @apply text-xl md:text-2xl; } /* Corrected sizes */
-  h5 { @apply text-lg md:text-xl; } /* Corrected sizes */
-  h6 { @apply text-base md:text-lg; } /* Corrected sizes */
+  h1 { 
+    @apply text-4xl md:text-5xl; 
+    @apply uppercase tracking-wider; 
+    /* Copied styles from .gta-vibe-text-effect directly here */
+    background-image: linear-gradient(
+      to top, 
+      hsl(var(--brand-orange)), 
+      hsl(var(--brand-pink)) 50%, 
+      hsl(var(--brand-purple))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-fill-color: transparent;
+    text-shadow:
+      0px 2px 1px hsla(var(--brand-purple), 0.85), 
+      0px 2px 3px hsla(var(--brand-purple), 0.65),
+      0px 0px 5px hsla(var(--brand-pink), 0.75),   
+      0px 0px 10px hsla(var(--brand-pink), 0.55),
+      0px -2px 1px hsla(var(--brand-blue), 0.85),  
+      0px -2px 3px hsla(var(--brand-blue), 0.65);
+    user-select: none;
+  }
+  h2 { @apply text-3xl md:text-4xl; } 
+  h3 { @apply text-2xl md:text-3xl; } 
+  h4 { @apply text-xl md:text-2xl; } 
+  h5 { @apply text-lg md:text-xl; } 
+  h6 { @apply text-base md:text-lg; } 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Orbitron', sans-serif;
-    @apply tracking-wide;
+    font-family: 'Orbitron', sans-serif; 
   }
   section {
-    scroll-margin-top: 96px; /* Adjust if header height changes */
+    scroll-margin-top: 96px; 
   }
   *, *::before, *::after {
     box-sizing: border-box;
   }
 }
 
-/* === Styles moved from /app/page.tsx (No changes needed here for color palette) === */
+@layer components {
+  /* This class is now for the "VICE" part of the logo and Style Guide H1 */
+  .gta-vibe-text-effect {
+    font-family: 'Orbitron', sans-serif; /* Ensure Orbitron is applied if not inherited */
+    @apply tracking-wider uppercase; /* Ensure these are applied if not inherited */
+    background-image: linear-gradient(
+      to top, 
+      hsl(var(--brand-orange)), 
+      hsl(var(--brand-pink)) 50%, 
+      hsl(var(--brand-purple))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-fill-color: transparent;
+    text-shadow:
+      0px 2px 1px hsla(var(--brand-purple), 0.85), 
+      0px 2px 3px hsla(var(--brand-purple), 0.65),
+      0px 0px 5px hsla(var(--brand-pink), 0.75),   
+      0px 0px 10px hsla(var(--brand-pink), 0.55),
+      0px -2px 1px hsla(var(--brand-blue), 0.85),  
+      0px -2px 3px hsla(var(--brand-blue), 0.65);
+    user-select: none;
+  }
 
-/* Homepage Wrapper */
+  .input-cyber {
+    @apply bg-input border border-border text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm
+           focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring
+           transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
+  }
+  .input-cyber:disabled {
+      @apply opacity-50 cursor-not-allowed;
+  }
+  .textarea-cyber {
+      @apply bg-input border border-border text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm min-h-[80px]
+             focus:outline-none focus:ring-2 focus:ring-ring focus:border-ring
+             transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
+  }
+
+  /* This class is for the Style Guide H1 specifically if it needed variations, but now we use the one above.
+     If Style Guide H1 needs *only* the visual effect without Orbitron/tracking from here, it can use a more minimal class.
+     For now, it will use .gta-vibe-text-effect as well.
+  */
+  .text-gta-style-heading-styleguide {
+    /* This class will apply the .gta-vibe-text-effect styles. */
+    /* Specific overrides for Style Guide H1 can go here if needed, otherwise it uses .gta-vibe-text-effect */
+    @apply gta-vibe-text-effect; /* This ensures it gets the base GTA style */
+  }
+}
+
+/* Moved custom utilities to be after @tailwind utilities */
+@layer utilities {
+  .text-shadow-brand-yellow {
+    text-shadow: 0 0 15px hsl(var(--brand-yellow)); 
+  }
+  .filter-drop-shadow-brand-yellow { 
+    filter: drop-shadow(0 0 15px hsl(var(--brand-yellow)));
+  }
+}
+
+
+/* === Styles moved from /app/page.tsx === */
 .homepage-wrapper {
   @apply min-h-screen bg-dark-bg text-foreground relative overflow-x-hidden pt-20 pb-28;
 }
-
-/* Homepage Background Effects Container */
 .homepage-bg-effects-container {
   @apply absolute inset-0 z-0 overflow-hidden pointer-events-none;
 }
-
-/* Homepage Background Pulse Animations (Using adjusted brand colors implicitly) */
 .homepage-bg-pulse-fast {
   @apply absolute top-[-15%] left-[-15%] w-3/5 h-3/5 bg-brand-purple/20 rounded-full blur-[150px] opacity-50;
   animation: bg_pulse_fast 8s cubic-bezier(0.4,0,0.6,1) infinite;
@@ -211,20 +285,18 @@
   @apply absolute bottom-[-25%] right-[-25%] w-4/5 h-4/5 bg-brand-pink/15 rounded-full blur-[180px] opacity-40;
   animation: bg_pulse_slow 10s cubic-bezier(0.4,0,0.6,1) infinite 1s;
 }
-@keyframes bg_pulse_fast { /* Corresponds to animate-[pulse_8s_cubic-bezier(0.4,0,0.6,1)_infinite] */
+@keyframes bg_pulse_fast { 
   0%, 100% { opacity: 0.5; transform: scale(1); }
   50% { opacity: 0.3; transform: scale(1.05); }
 }
-@keyframes bg_pulse_slow { /* Corresponds to animate-[pulse_10s_cubic-bezier(0.4,0,0.6,1)_infinite_1s] */
+@keyframes bg_pulse_slow { 
   0%, 100% { opacity: 0.4; transform: scale(1); }
   50% { opacity: 0.25; transform: scale(1.03); }
 }
-
-/* Loading Spinner on Homepage (Using adjusted brand colors implicitly) */
 .loading-spinner-cyber {
   border-width: 4px;
-  border-radius: 9999px; /* equivalent to rounded-full */
-  --tw-border-opacity: 0.5; /* from border-opacity-50 */
+  border-radius: 9999px; 
+  --tw-border-opacity: 0.5; 
   border-top-color: hsla(var(--brand-cyan), var(--tw-border-opacity));
   border-left-color: hsla(var(--brand-pink), var(--tw-border-opacity));
   border-right-color: hsla(var(--brand-pink), var(--tw-border-opacity));
@@ -232,30 +304,22 @@
   border-style: solid;
   box-shadow: 0 0 25px hsl(var(--brand-cyan)), 0 0 15px hsl(var(--brand-pink));
 }
-
-/* Avatar on Homepage (Using adjusted brand colors implicitly) */
 .avatar-cyber {
   @apply rounded-full border-2 border-brand-pink/80 object-cover;
-  box-shadow: 0 0 10px hsla(var(--brand-pink), 0.5); /* Use hsla for opacity with CSS var */
+  box-shadow: 0 0 10px hsla(var(--brand-pink), 0.5); 
 }
-
-/* Featured Quest Card on Homepage (Using adjusted brand colors implicitly) */
 .featured-quest-card {
   @apply bg-dark-card/90 backdrop-blur-md border border-brand-purple/50 shadow-xl overflow-hidden transition-all duration-300;
 }
 .featured-quest-card:hover {
-  @apply border-brand-pink/70;
+  @apply border-brand-pink/70 shadow-brand-pink/30;
 }
 .featured-quest-image-overlay {
   @apply absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none;
 }
-
-/* Activity Card on Homepage (Using adjusted brand colors implicitly) */
 .activity-card-cyber {
   @apply bg-gradient-to-br from-brand-pink/95 via-pink-600/90 to-purple-600/90 backdrop-blur-sm border border-brand-pink/70 shadow-2xl shadow-brand-pink/30 text-black rounded-xl md:rounded-2xl;
 }
-
-/* Bottom Navigation on Homepage (Using adjusted brand colors implicitly) */
 .bottom-nav-cyber {
   @apply fixed bottom-0 left-0 right-0 bg-dark-bg/90 backdrop-blur-xl border-t-2 border-brand-purple/60 z-40 py-1.5 px-1;
   box-shadow: 0 -8px 30px rgba(0,0,0,0.5);
@@ -264,24 +328,23 @@
   @apply flex flex-col items-center h-auto px-0.5 py-1 sm:px-1.5 rounded-md transition-colors;
 }
 .bottom-nav-item:hover {
-  @apply bg-slate-700/60;
+  @apply bg-muted/30;
 }
 .bottom-nav-item:active {
-  @apply bg-slate-600/70;
+  @apply bg-muted/50;
 }
 .bottom-nav-item:focus {
-  @apply bg-slate-700/70;
+  @apply bg-muted/40; 
+  outline: 2px solid transparent; 
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px hsl(var(--brand-cyan)); 
 }
-
-/* Active state for non-central bottom navigation items */
 .active-bottom-link {
-  @apply bg-slate-800/50; /* Subtle background for the active button container */
+  @apply bg-card/70; 
 }
-/* Glow effect for the text/icon color of the active non-central link */
 .current-nav-glow {
   text-shadow: 0 0 6px currentColor, 0 0 10px currentColor;
 }
-
 .bottom-nav-item-central {
   @apply text-black rounded-full w-14 h-14 sm:w-16 sm:h-16 shadow-lg transform hover:scale-110 active:scale-95 transition-transform -translate-y-3 sm:-translate-y-4 border-4 border-dark-bg;
 }
@@ -291,7 +354,6 @@
 .bottom-nav-item-central:focus {
   @apply ring-4 ring-brand-pink/50;
 }
-
 /* === End of Styles moved from /app/page.tsx === */
 
 .repo-xml-content-wrapper {
@@ -299,7 +361,6 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
-
 @media (max-width: 767px) {
   .repo-xml-content-wrapper {
     min-width: 1024px;
@@ -309,252 +370,65 @@
   }
 }
 
-@keyframes ticker {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
-}
-.animate-ticker {
-  animation: ticker 20s linear infinite;
-}
+@keyframes ticker {0% { transform: translateX(100%); } 100% { transform: translateX(-100%); }}
+.animate-ticker { animation: ticker 20s linear infinite; }
 
-.text-shadow-neon {
-  text-shadow:
-    0 0 5px hsl(var(--brand-pink)),
-    0 0 10px hsl(var(--brand-pink)),
-    0 0 15px hsl(var(--brand-purple)),
-    0 0 20px hsl(var(--brand-purple));
-}
-.text-shadow-cyber {
-  text-shadow: 0 0 4px rgba(var(--brand-cyan-rgb), 0.8), 0 0 10px rgba(var(--brand-pink-rgb), 0.6); /* Corrected to use rgba */
-}
+.text-shadow-neon { text-shadow: 0 0 5px hsl(var(--brand-pink)), 0 0 10px hsl(var(--brand-pink)), 0 0 15px hsl(var(--brand-purple)), 0 0 20px hsl(var(--brand-purple));}
+.text-shadow-cyber { text-shadow: 0 0 4px rgba(var(--brand-cyan-rgb), 0.8), 0 0 10px rgba(var(--brand-pink-rgb), 0.6); }
 
-.animate-gradient-shift {
-  animation: gradientShift 10s infinite linear;
-}
+.animate-gradient-shift { animation: gradientShift 10s infinite linear; }
+@keyframes gradientShift { 0% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } 100% { background-position: 0% 0%; }}
 
-@keyframes gradientShift {
-  0% { background-position: 0% 0%; }
-  50% { background-position: 100% 100%; }
-  100% { background-position: 0% 0%; }
-}
+.bg-grid-pattern { background-size: 60px 60px; background-image: linear-gradient(to right, hsla(var(--brand-purple), 0.1) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--brand-purple), 0.1) 1px, transparent 1px); }
+.bg-grid-pattern-pink { background-size: 50px 50px; background-image: linear-gradient(to right, hsla(var(--brand-pink), 0.08) 1px, transparent 1px), linear-gradient(to bottom, hsla(var(--brand-pink), 0.08) 1px, transparent 1px); }
 
-/* Grid patterns use adjusted colors implicitly */
-.bg-grid-pattern {
-  background-size: 60px 60px;
-  background-image:
-    linear-gradient(to right, hsla(var(--brand-purple), 0.1) 1px, transparent 1px), /* Corrected variable usage */
-    linear-gradient(to bottom, hsla(var(--brand-purple), 0.1) 1px, transparent 1px); /* Corrected variable usage */
-}
-.bg-grid-pattern-pink {
-  background-size: 50px 50px;
-  background-image:
-    linear-gradient(to right, hsla(var(--brand-pink), 0.08) 1px, transparent 1px), /* Corrected variable usage */
-    linear-gradient(to bottom, hsla(var(--brand-pink), 0.08) 1px, transparent 1px); /* Corrected variable usage */
-}
+.simple-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+.simple-scrollbar::-webkit-scrollbar-track { background: hsla(var(--dark-card-rgb), 0.5); }
+.simple-scrollbar::-webkit-scrollbar-thumb { background-color: hsla(var(--brand-purple), 0.7); border-radius: 4px; border: 1px solid hsla(var(--brand-pink), 0.3); }
+.simple-scrollbar::-webkit-scrollbar-thumb:hover { background-color: hsla(var(--brand-pink), 0.8); }
+.simple-scrollbar { scrollbar-width: thin; scrollbar-color: hsla(var(--brand-purple), 0.7) hsla(var(--dark-card-rgb), 0.5); }
 
-/* Scrollbar uses adjusted colors implicitly */
-.simple-scrollbar::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-.simple-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.simple-scrollbar::-webkit-scrollbar-thumb {
-  background-color: hsla(var(--brand-purple), 0.6);
-  border-radius: 4px;
-  border: 1px solid hsla(var(--brand-pink), 0.4);
-}
-.simple-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: hsla(var(--brand-pink), 0.7);
-}
-.simple-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: hsla(var(--brand-purple), 0.6) transparent;
-}
+.cyber-text { font-family: "Orbitron", sans-serif; text-transform: uppercase; letter-spacing: 0.1em; color: hsl(var(--brand-cyan)); text-shadow: 0 0 3px hsla(var(--brand-cyan), 0.7), 0 0 5px hsla(var(--brand-cyan), 0.5), 0 0 8px hsla(var(--brand-pink), 0.6); }
+.cyber-text.glitch-heavy { text-shadow: 0.05em 0 0 hsla(var(--brand-pink), 0.75), -0.025em -0.025em 0 hsla(var(--brand-green), 0.75), -0.01em 0.025em 0 hsla(var(--brand-cyan), 0.75); }
 
-/* Cyber text uses adjusted colors implicitly */
-.cyber-text {
-  font-family: "Orbitron", sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: hsl(var(--brand-cyan)); /* Use adjusted CSS var */
-  text-shadow:
-    0 0 3px hsla(var(--brand-cyan), 0.7),
-    0 0 5px hsla(var(--brand-cyan), 0.5),
-    0 0 8px hsla(var(--brand-pink), 0.6);
-}
-.cyber-text.glitch-heavy {
-    text-shadow:
-        0.05em 0 0 hsla(var(--brand-pink), 0.75),
-        -0.025em -0.025em 0 hsla(var(--brand-green), 0.75),
-        -0.01em 0.025em 0 hsla(var(--brand-cyan), 0.75);
-}
-
-/* Glitch uses adjusted colors implicitly */
-@keyframes glitch {
-  0% { text-shadow: 0.05em 0 0 hsla(var(--brand-pink), 0.75), -0.05em -0.025em 0 hsla(var(--brand-green), 0.75), -0.025em 0.05em 0 hsla(var(--brand-cyan), 0.75); }
-  14% { text-shadow: 0.05em 0 0 hsla(var(--brand-pink), 0.75), -0.05em -0.025em 0 hsla(var(--brand-green), 0.75), -0.025em 0.05em 0 hsla(var(--brand-cyan), 0.75); }
-  15% { text-shadow: -0.05em -0.025em 0 hsla(var(--brand-pink), 0.75), 0.025em 0.025em 0 hsla(var(--brand-green), 0.75), -0.05em -0.05em 0 hsla(var(--brand-cyan), 0.75); }
-  49% { text-shadow: -0.05em -0.025em 0 hsla(var(--brand-pink), 0.75), 0.025em 0.025em 0 hsla(var(--brand-green), 0.75), -0.05em -0.05em 0 hsla(var(--brand-cyan), 0.75); }
-  50% { text-shadow: 0.025em 0.05em 0 hsla(var(--brand-pink), 0.75), 0.05em 0 0 hsla(var(--brand-green), 0.75), 0 -0.05em 0 hsla(var(--brand-cyan), 0.75); }
-  99% { text-shadow: 0.025em 0.05em 0 hsla(var(--brand-pink), 0.75), 0.05em 0 0 hsla(var(--brand-green), 0.75), 0 -0.05em 0 hsla(var(--brand-cyan), 0.75); }
-  100% { text-shadow: -0.025em 0 0 hsla(var(--brand-pink), 0.75), -0.025em -0.025em 0 hsla(var(--brand-green), 0.75), -0.025em -0.05em 0 hsla(var(--brand-cyan), 0.75); }
-}
-
-.glitch {
-  position: relative;
-  animation: glitch 1s linear infinite;
-}
-
-.glitch::before,
-.glitch::after {
-  content: attr(data-text);
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  background: inherit;
-  overflow: hidden;
-  clip: rect(0, 900px, 0, 0);
-}
-
-.glitch::before {
-  left: 2px;
-  text-shadow: -1px 0 hsla(var(--brand-purple), 0.7);
-  animation: glitch-anim-1 2s infinite linear alternate-reverse;
-}
-
-.glitch::after {
-  left: -2px;
-  text-shadow: -1px 0 hsla(var(--brand-cyan), 0.7);
-  animation: glitch-anim-2 2s infinite linear alternate-reverse;
-}
-
+@keyframes glitch { 0% { text-shadow: 0.05em 0 0 hsla(var(--brand-pink), 0.75), -0.05em -0.025em 0 hsla(var(--brand-green), 0.75), -0.025em 0.05em 0 hsla(var(--brand-cyan), 0.75); } 14% { text-shadow: 0.05em 0 0 hsla(var(--brand-pink), 0.75), -0.05em -0.025em 0 hsla(var(--brand-green), 0.75), -0.025em 0.05em 0 hsla(var(--brand-cyan), 0.75); } 15% { text-shadow: -0.05em -0.025em 0 hsla(var(--brand-pink), 0.75), 0.025em 0.025em 0 hsla(var(--brand-green), 0.75), -0.05em -0.05em 0 hsla(var(--brand-cyan), 0.75); } 49% { text-shadow: -0.05em -0.025em 0 hsla(var(--brand-pink), 0.75), 0.025em 0.025em 0 hsla(var(--brand-green), 0.75), -0.05em -0.05em 0 hsla(var(--brand-cyan), 0.75); } 50% { text-shadow: 0.025em 0.05em 0 hsla(var(--brand-pink), 0.75), 0.05em 0 0 hsla(var(--brand-green), 0.75), 0 -0.05em 0 hsla(var(--brand-cyan), 0.75); } 99% { text-shadow: 0.025em 0.05em 0 hsla(var(--brand-pink), 0.75), 0.05em 0 0 hsla(var(--brand-green), 0.75), 0 -0.05em 0 hsla(var(--brand-cyan), 0.75); } 100% { text-shadow: -0.025em 0 0 hsla(var(--brand-pink), 0.75), -0.025em -0.025em 0 hsla(var(--brand-green), 0.75), -0.025em -0.05em 0 hsla(var(--brand-cyan), 0.75); }}
+.glitch { position: relative; animation: glitch 1s linear infinite; }
+.glitch::before, .glitch::after { content: attr(data-text); position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: inherit; overflow: hidden; clip: rect(0, 900px, 0, 0); }
+.glitch::before { left: 2px; text-shadow: -1px 0 hsla(var(--brand-purple), 0.7); animation: glitch-anim-1 2s infinite linear alternate-reverse; }
+.glitch::after { left: -2px; text-shadow: -1px 0 hsla(var(--brand-cyan), 0.7); animation: glitch-anim-2 2s infinite linear alternate-reverse; }
 @keyframes glitch-anim-1 { 0% { clip: rect(44px, 9999px, 49px, 0); } 5% { clip: rect(5px, 9999px, 100px, 0); } 10% { clip: rect(13px, 9999px, 60px, 0); } 15% { clip: rect(80px, 9999px, 40px, 0); } 20% { clip: rect(22px, 9999px, 75px, 0); } 25% { clip: rect(90px, 9999px, 15px, 0); } 30% { clip: rect(50px, 9999px, 88px, 0); } 35% { clip: rect(10px, 9999px, 45px, 0); } 40% { clip: rect(70px, 9999px, 30px, 0); } 45% { clip: rect(25px, 9999px, 95px, 0); } 50% { clip: rect(60px, 9999px, 20px, 0); } 55% { clip: rect(5px, 9999px, 55px, 0); } 60% { clip: rect(75px, 9999px, 35px, 0); } 65% { clip: rect(18px, 9999px, 80px, 0); } 70% { clip: rect(85px, 9999px, 22px, 0); } 75% { clip: rect(40px, 9999px, 65px, 0); } 80% { clip: rect(3px, 9999px, 90px, 0); } 85% { clip: rect(68px, 9999px, 28px, 0); } 90% { clip: rect(33px, 9999px, 77px, 0); } 95% { clip: rect(98px, 9999px, 10px, 0); } 100% { clip: rect(52px, 9999px, 58px, 0); } }
 @keyframes glitch-anim-2 { 0% { clip: rect(6px, 9999px, 94px, 0); } 5% { clip: rect(88px, 9999px, 12px, 0); } 10% { clip: rect(38px, 9999px, 68px, 0); } 15% { clip: rect(20px, 9999px, 85px, 0); } 20% { clip: rect(72px, 9999px, 18px, 0); } 25% { clip: rect(10px, 9999px, 90px, 0); } 30% { clip: rect(58px, 9999px, 32px, 0); } 35% { clip: rect(80px, 9999px, 8px, 0); } 40% { clip: rect(28px, 9999px, 78px, 0); } 45% { clip: rect(42px, 9999px, 52px, 0); } 50% { clip: rect(92px, 9999px, 25px, 0); } 55% { clip: rect(15px, 9999px, 82px, 0); } 60% { clip: rect(62px, 9999px, 42px, 0); } 65% { clip: rect(4px, 9999px, 70px, 0); } 70% { clip: rect(77px, 9999px, 10px, 0); } 75% { clip: rect(22px, 9999px, 88px, 0); } 80% { clip: rect(50px, 9999px, 48px, 0); } 85% { clip: rect(95px, 9999px, 38px, 0); } 90% { clip: rect(30px, 9999px, 60px, 0); } 95% { clip: rect(65px, 9999px, 15px, 0); } 100% { clip: rect(8px, 9999px, 98px, 0); } }
 
-/* Text gradient uses adjusted colors */
-.text-gradient {
-  background: linear-gradient(to right, hsl(var(--brand-pink)), hsl(var(--brand-cyan)), hsl(var(--brand-orange)));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
+.text-gradient { background: linear-gradient(to right, hsl(var(--brand-pink)), hsl(var(--brand-cyan)), hsl(var(--brand-orange))); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+@keyframes glow { 0% { text-shadow: 0 0 5px hsla(var(--brand-pink), 0.5); } 50% { text-shadow: 0 0 20px hsla(var(--brand-pink), 0.8), 0 0 30px hsla(var(--brand-purple), 0.5); } 100% { text-shadow: 0 0 5px hsla(var(--brand-pink), 0.5); }}
+.text-glow { animation: glow 2.5s infinite ease-in-out; }
 
-/* Text glow uses adjusted colors */
-@keyframes glow {
-  0% { text-shadow: 0 0 5px hsla(var(--brand-pink), 0.5); }
-  50% { text-shadow: 0 0 20px hsla(var(--brand-pink), 0.8), 0 0 30px hsla(var(--brand-purple), 0.5); }
-  100% { text-shadow: 0 0 5px hsla(var(--brand-pink), 0.5); }
-}
-.text-glow {
-  animation: glow 2.5s infinite ease-in-out;
-}
+@keyframes pulse-slow { 0%, 100% { opacity: 0.8; transform: scale(1); } 50% { opacity: 1; transform: scale(1.02); }}
+.animate-pulse-slow { animation: pulse-slow 3s infinite ease-in-out; }
 
-@keyframes pulse-slow {
-  0%, 100% { opacity: 0.8; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.02); }
-}
-.animate-pulse-slow {
-  animation: pulse-slow 3s infinite ease-in-out;
-}
+input[type="search"]::-webkit-search-cancel-button, input[type="search"]::-ms-clear { display: none; }
+.comic-bubble { position: relative; background: hsl(var(--card)); border: 2px solid hsl(var(--brand-pink)); border-radius: 15px; color: hsl(var(--foreground));}
 
-input[type="search"]::-webkit-search-cancel-button,
-input[type="search"]::-ms-clear {
-  display: none;
-}
+@keyframes neon-border-glow { 0%, 100% { border-color: hsla(var(--brand-cyan), 0.7); box-shadow: 0 0 5px hsla(var(--brand-cyan), 0.5), 0 0 10px hsla(var(--brand-cyan), 0.3); } 50% { border-color: hsla(var(--brand-pink), 0.7); box-shadow: 0 0 8px hsla(var(--brand-pink), 0.5), 0 0 15px hsla(var(--brand-pink), 0.3), 0 0 5px hsla(var(--brand-purple), 0.2); }}
+.border-neon-glow { animation: neon-border-glow 2.5s infinite alternate; }
 
-.comic-bubble {
-  position: relative;
-  background: hsl(var(--card)); /* Use adjusted CSS var */
-  border: 2px solid hsl(var(--brand-pink));
-  border-radius: 15px;
-  color: hsl(var(--foreground));
-}
+@keyframes drift { 0% { background-position: 0 0; } 100% { background-position: 200px 200px; }}
 
-/* Neon border uses adjusted colors */
-@keyframes neon-border-glow {
-  0%, 100% {
-    border-color: hsla(var(--brand-cyan), 0.7);
-    box-shadow: 0 0 5px hsla(var(--brand-cyan), 0.5), 0 0 10px hsla(var(--brand-cyan), 0.3);
-  }
-  50% {
-    border-color: hsla(var(--brand-pink), 0.7);
-    box-shadow: 0 0 8px hsla(var(--brand-pink), 0.5), 0 0 15px hsla(var(--brand-pink), 0.3), 0 0 5px hsla(var(--brand-purple), 0.2);
-  }
-}
-.border-neon-glow {
-  animation: neon-border-glow 2.5s infinite alternate;
-}
+.shadow-glow { box-shadow: 0 0 10px hsla(var(--brand-cyan), 0.5); }
+.shadow-glow:hover { box-shadow: 0 0 15px hsla(var(--brand-cyan), 0.7), 0 0 5px hsla(var(--brand-pink), 0.3); }
+.shadow-yellow-glow { box-shadow: 0 0 15px hsla(var(--brand-yellow-rgb), 0.4), 0 0 30px hsla(var(--brand-yellow-rgb), 0.2); }
+.hover\:shadow-yellow-glow:hover { box-shadow: 0 0 20px hsla(var(--brand-yellow-rgb), 0.6), 0 0 40px hsla(var(--brand-yellow-rgb), 0.3); }
+.shadow-purple-glow { box-shadow: 0 0 15px hsla(var(--brand-purple-rgb), 0.4), 0 0 30px hsla(var(--brand-purple-rgb), 0.2); }
+.shadow-green-glow { box-shadow: 0 0 15px hsla(var(--brand-green-rgb), 0.4), 0 0 30px hsla(var(--brand-green-rgb), 0.2); }
+.shadow-pink-glow { box-shadow: 0 0 15px hsla(var(--brand-pink-rgb), 0.4), 0 0 30px hsla(var(--brand-pink-rgb), 0.2); }
+.shadow-blue-glow { box-shadow: 0 0 15px hsla(var(--brand-blue-rgb), 0.4), 0 0 30px hsla(var(--brand-blue-rgb), 0.2); }
+.shadow-cyan-glow { box-shadow: 0 0 15px hsla(var(--brand-cyan-rgb), 0.4), 0 0 30px hsla(var(--brand-cyan-rgb), 0.2); }
+.shadow-orange-glow { box-shadow: 0 0 15px hsla(var(--brand-orange-rgb), 0.4), 0 0 30px hsla(var(--brand-orange-rgb), 0.2); }
 
-@keyframes drift {
-  0% { background-position: 0 0; }
-  100% { background-position: 200px 200px; }
-}
+@keyframes glitch-border { 0% { border-color: rgba(var(--brand-cyan-rgb), 0.3); box-shadow: 0 0 5px rgba(var(--brand-cyan-rgb), 0.2), inset 0 0 3px rgba(var(--brand-cyan-rgb), 0.1); }  25% { border-color: rgba(var(--brand-pink-rgb), 0.3); box-shadow: 0 0 8px rgba(var(--brand-pink-rgb), 0.3), inset 0 0 3px rgba(var(--brand-pink-rgb), 0.1); }  50% { border-color: rgba(var(--brand-yellow-rgb), 0.3); box-shadow: 0 0 5px rgba(var(--brand-yellow-rgb), 0.2), inset 0 0 3px rgba(var(--brand-yellow-rgb), 0.1); }  75% { border-color: rgba(var(--brand-green-rgb), 0.3); box-shadow: 0 0 8px rgba(var(--brand-green-rgb), 0.3), inset 0 0 3px rgba(var(--brand-green-rgb), 0.1); }  100% { border-color: rgba(var(--brand-cyan-rgb), 0.3); box-shadow: 0 0 5px rgba(var(--brand-cyan-rgb), 0.2), inset 0 0 3px rgba(var(--brand-cyan-rgb), 0.1); }}
+.glitch-border-animate { animation: glitch-border 2s linear infinite; }
 
-/* Shadow glow uses adjusted colors */
-.shadow-glow {
-  box-shadow: 0 0 10px hsla(var(--brand-cyan), 0.5);
-}
-.shadow-glow:hover {
-  box-shadow: 0 0 15px hsla(var(--brand-cyan), 0.7), 0 0 5px hsla(var(--brand-pink), 0.3);
-}
-
-/* Glitch border uses adjusted colors */
-@keyframes glitch-border {
-  0% { border-color: rgba(var(--brand-cyan-rgb), 0.3); box-shadow: 0 0 5px rgba(var(--brand-cyan-rgb), 0.2); } /* Corrected to use rgba */
-  25% { border-color: rgba(var(--brand-pink-rgb), 0.3); box-shadow: 0 0 8px rgba(var(--brand-pink-rgb), 0.3); } /* Corrected to use rgba */
-  50% { border-color: rgba(var(--brand-yellow-rgb), 0.3); box-shadow: 0 0 5px rgba(var(--brand-yellow-rgb), 0.2); } /* Corrected to use rgba */
-  75% { border-color: rgba(var(--brand-green-rgb), 0.3); box-shadow: 0 0 8px rgba(var(--brand-green-rgb), 0.3); } /* Corrected to use rgba */
-  100% { border-color: rgba(var(--brand-cyan-rgb), 0.3); box-shadow: 0 0 5px rgba(var(--brand-cyan-rgb), 0.2); } /* Corrected to use rgba */
-}
-.glitch-border-animate {
-  animation: glitch-border 2s linear infinite;
-}
-
-/* Highlight scroll uses adjusted colors */
-.highlight-scroll {
-  transition: outline 0.5s ease-out;
-  outline: 2px solid hsla(var(--brand-green), 0.7);
-  outline-offset: 2px;
-  box-shadow: 0 0 15px hsla(var(--brand-green), 0.5);
-}
-
-/* Animated gradient uses adjusted colors */
-.text-animated-gradient {
-  @apply text-transparent bg-clip-text bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange;
-  /* Ensure brand-purple, brand-pink, brand-orange are valid Tailwind colors or use CSS vars */
-  /* Example if using CSS vars: from-[hsl(var(--brand-purple))] via-[hsl(var(--brand-pink))] to-[hsl(var(--brand-orange))] */
-  background-size: 200% auto;
-  animation: gradient-text-flow 3s linear infinite;
-}
-
-@keyframes gradient-text-flow {
-  to {
-    background-position: 200% center;
-  }
-}
-
-/* Input/Textarea components use adjusted variables */
-@layer components {
-  .input-cyber {
-    @apply bg-dark-card border border-brand-purple/50 text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm
-           focus:outline-none focus:ring-2 focus:ring-brand-pink focus:border-brand-pink
-           transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
-  }
-  .input-cyber:disabled {
-      @apply opacity-50 cursor-not-allowed;
-  }
-  .textarea-cyber {
-      @apply bg-dark-card border border-brand-purple/50 text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm min-h-[80px]
-             focus:outline-none focus:ring-2 focus:ring-brand-pink focus:border-brand-pink
-             transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
-  }
-}
-
-/* Animation for wiggle effect */
-@keyframes wiggle {
-  0%, 100% { transform: rotate(-3deg); }
-  50% { transform: rotate(3deg); }
-}
+.highlight-scroll { transition: outline 0.5s ease-out; outline: 2px solid hsla(var(--brand-green), 0.7); outline-offset: 2px; box-shadow: 0 0 15px hsla(var(--brand-green), 0.5); }
+.text-animated-gradient { @apply text-transparent bg-clip-text bg-gradient-to-r from-brand-purple via-brand-pink to-brand-orange; background-size: 200% auto; animation: gradient-text-flow 3s linear infinite; }
+@keyframes gradient-text-flow { to { background-position: 200% center; }}
+@keyframes wiggle { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); }}

@@ -5,17 +5,19 @@ import { supabaseAdmin } from "@/hooks/supabase";
 import { toast } from "sonner";
 import Link from "next/link";
 import { motion } from "framer-motion";
-// Corrected and added Fa6 icons
 import {
-  FaYoutube, FaCircleCheck, FaClock, FaCalendarDays, FaPlus, FaPencil, FaTrash, FaDumbbell
+  FaYoutube, FaCircleCheck, FaClock, FaCalendarDays, FaPlus, FaPencil, FaTrash, FaDumbbell 
+  // FaExclamationTriangle and FaThList removed
 } from "react-icons/fa6";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Label } from "@/components/ui/label"; // Added missing Label import
+import { Label } from "@/components/ui/label"; 
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { VibeContentRenderer } from "@/components/VibeContentRenderer"; // Added VibeContentRenderer
 
-// --- notifyYtTeam function (unchanged) ---
 const notifyYtTeam = async (message: string) => {
   try {
     const { data: ytTeamMembers, error } = await supabaseAdmin
@@ -26,7 +28,6 @@ const notifyYtTeam = async (message: string) => {
     if (error) throw error;
     for (const member of ytTeamMembers) {
       console.log(`Notifying ${member.user_id}: ${message}`);
-      // TODO: Implement actual Telegram notification logic here
     }
   } catch (error) {
     console.error("Error notifying ytTeam:", error);
@@ -54,13 +55,13 @@ export default function TasksPage() {
             .select("*")
             .order("created_at", { ascending: false });
           if (error) {
-            toast.error("Failed to load tasks");
+            toast.error("Ошибка загрузки директив");
             console.error("Task fetch error:", error);
           } else {
             setTasks(data || []);
           }
       } catch(e) {
-          toast.error("An unexpected error occurred while fetching tasks.");
+          toast.error("Непредвиденная ошибка при загрузке директив.");
           console.error("Task fetch exception:", e);
       } finally {
          setLoading(false);
@@ -69,14 +70,12 @@ export default function TasksPage() {
     fetchTasks();
   }, []);
 
-  // --- handleCreateTask, handleUpdateTask, handleDeleteTask (unchanged) ---
-    const handleCreateTask = async (e: React.FormEvent) => {
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAdmin) {
-      toast.error("Only admins can create tasks");
+    if (!isAdmin()) {
+      toast.error("Только Администраторы могут создавать директивы");
       return;
     }
-
     try {
       const taskData = {
         title: newTask.title,
@@ -84,23 +83,21 @@ export default function TasksPage() {
         status: "todo",
         deadline: newTask.deadline || null,
         priority: newTask.priority,
-        assigned_to: user?.id.toString(), // Assuming user ID is string or number
+        assigned_to: user?.id.toString(), 
         created_at: new Date().toISOString(),
       };
-
       const { data: task, error } = await supabaseAdmin
         .from("tasks")
         .insert(taskData)
         .select()
         .single();
       if (error) throw error;
-
       setTasks([task, ...tasks]);
       setNewTask({ title: "", description: "", deadline: "", priority: "medium" });
-      toast.success("Task created!");
-      await notifyYtTeam(`New task: ${task.title}`);
+      toast.success("Директива создана!");
+      await notifyYtTeam(`Новая директива: ${task.title}`);
     } catch (error: any) {
-      toast.error(`Failed to create task: ${error.message}`);
+      toast.error(`Ошибка создания директивы: ${error.message}`);
       console.error("Create task error:", error);
     }
   };
@@ -108,14 +105,17 @@ export default function TasksPage() {
   const handleUpdateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTask) return;
-
+    if (!isAdmin()) {
+      toast.error("Только Администраторы могут изменять директивы");
+      return;
+    }
     try {
       const { data: task, error } = await supabaseAdmin
         .from("tasks")
         .update({
           title: editingTask.title,
           description: editingTask.description,
-          deadline: editingTask.deadline || null, // Ensure null if empty
+          deadline: editingTask.deadline || null, 
           priority: editingTask.priority,
           status: editingTask.status
         })
@@ -123,269 +123,193 @@ export default function TasksPage() {
         .select()
         .single();
       if (error) throw error;
-
       setTasks(tasks.map(t => t.id === task.id ? task : t));
-      setEditingTask(null); // Close edit form
-      toast.success("Task updated!");
+      setEditingTask(null); 
+      toast.success("Директива обновлена!");
     } catch (error: any) {
-      toast.error(`Failed to update task: ${error.message}`);
+      toast.error(`Ошибка обновления директивы: ${error.message}`);
       console.error("Update task error:", error);
     }
   };
 
   const handleDeleteTask = async (id: string) => {
-     if (!window.confirm("Are you sure you want to delete this task?")) {
+     if (!window.confirm("Вы уверены, что хотите удалить эту директиву?")) {
        return;
      }
+     if (!isAdmin()) {
+      toast.error("Только Администраторы могут удалять директивы");
+      return;
+    }
     try {
       const { error } = await supabaseAdmin
         .from("tasks")
         .delete()
         .eq("id", id);
       if (error) throw error;
-
       setTasks(tasks.filter(t => t.id !== id));
-      toast.success("Task deleted!");
-    } catch (error: any) {
-      toast.error(`Failed to delete task: ${error.message}`);
+      toast.success("Директива удалена!");
+    } catch (error: any) { 
+      toast.error(`Ошибка удаления директивы: ${error.message}`);
       console.error("Delete task error:", error);
     }
   };
 
-
-  const getPriorityClasses = (priority: string) => {
+  const getPriorityClasses = (priority: string): string => {
     switch (priority) {
-      case "high": return "bg-destructive/80 border-destructive text-destructive-foreground";
-      case "medium": return "bg-brand-yellow/80 border-brand-yellow text-accent-foreground";
-      case "low": return "bg-brand-green/80 border-brand-green text-black";
-      default: return "bg-muted border-border text-muted-foreground";
+      case "high": return "border-l-4 border-destructive bg-destructive/10";
+      case "medium": return "border-l-4 border-brand-yellow bg-brand-yellow/10";
+      case "low": return "border-l-4 border-brand-green bg-brand-green/10";
+      default: return "border-l-4 border-muted bg-muted/10";
+    }
+  };
+  const getPriorityBadgeClasses = (priority: string): string => {
+     switch (priority) {
+      case "high": return "bg-destructive text-destructive-foreground";
+      case "medium": return "bg-brand-yellow text-black";
+      case "low": return "bg-brand-green text-black";
+      default: return "bg-muted text-muted-foreground";
     }
   };
 
-  // Corrected Icon: FaCheckCircle -> FaCircleCheck
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string): React.ReactNode => {
     switch (status) {
-      case "done": return <FaCircleCheck className="text-brand-green" />;
-      case "in_progress": return <FaClock className="text-brand-yellow animate-pulse" />;
-      default: return <FaClock className="text-muted-foreground" />;
+      case "done": return <VibeContentRenderer content="::FaCircleCheck color=hsl(var(--brand-green))::" />;
+      case "in_progress": return <VibeContentRenderer content="::FaClock color=hsl(var(--brand-yellow)) className='animate-pulse'::" />;
+      default: return <VibeContentRenderer content="::FaListUl color=hsl(var(--muted-foreground))::" />; // Using FaListUl via VibeRenderer
     }
   };
 
   return (
-    <div className="pt-24 p-4 bg-dark-bg text-light-text min-h-screen">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4">
-          <h1 className="text-3xl font-orbitron font-bold text-light-text flex items-center gap-2 cyber-text" data-text="YouTube Tasks">
-            <FaYoutube className="text-red-500 text-4xl" /> YouTube Tasks
+    <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pt-24 pb-16">
+      <div className="container mx-auto max-w-4xl">
+        <header className="flex flex-col sm:flex-row items-center justify-between mb-10 gap-4">
+          <h1 className="text-4xl md:text-5xl font-orbitron font-bold flex items-center gap-3 text-shadow-cyber" data-text="YT DIRECTIVES">
+            <FaYoutube className="text-red-500 text-5xl drop-shadow-[0_0_8px_theme(colors.red.500)]" /> YT DIRECTIVES
           </h1>
-          <div className="flex gap-3">
-            {/* Added Training Button */}
-            <Button asChild variant="outline" className="border-brand-green text-brand-green hover:bg-brand-green/10 hover:text-brand-green">
-                <Link href="/start-training"><FaDumbbell className="mr-2 h-4 w-4" /> Начать Тренировку</Link>
+          <div className="flex flex-wrap gap-3 justify-center sm:justify-end">
+            <Button asChild variant="outline" className="border-brand-green text-brand-green hover:bg-brand-green/20 hover:text-white shadow-md hover:shadow-brand-green/30 transition-all">
+                <Link href="/start-training"><FaDumbbell className="mr-2 h-4 w-4" /> Тренировка</Link>
             </Button>
-            <Button asChild variant="secondary">
-              <Link href="/yt">Characters</Link>
+            <Button asChild variant="secondary" className="bg-brand-blue text-black hover:bg-brand-blue/80 shadow-md hover:shadow-brand-blue/30 transition-all">
+              <Link href="/yt">Персонажи YT</Link>
             </Button>
-            <Button asChild variant="outline" className="border-brand-purple text-brand-purple hover:bg-brand-purple/10 hover:text-brand-purple">
-              <Link href="/youtubeAdmin">Admin Panel</Link>
-            </Button>
+            {isAdmin() && (
+              <Button asChild variant="outline" className="border-brand-purple text-brand-purple hover:bg-brand-purple/20 hover:text-white shadow-md hover:shadow-brand-purple/30 transition-all">
+                <Link href="/youtubeAdmin">Админ YT</Link>
+              </Button>
+            )}
           </div>
-        </div>
+        </header>
 
-        {/* Form Section */}
-        {isAdmin && (
+        {isAdmin() && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="mb-8 bg-dark-card p-6 rounded-lg shadow-lg border border-border"
+            className="mb-8 bg-dark-card/80 backdrop-blur-md p-6 rounded-xl shadow-xl border border-brand-purple/50"
           >
-            <h2 className="text-xl font-semibold text-light-text mb-4 font-orbitron">
-              {editingTask ? "Edit Directive" : "Create New Directive"}
+            <h2 className="text-2xl font-orbitron text-brand-purple mb-4">
+              {editingTask ? "Изменить Директиву" : "Новая Директива"}
             </h2>
             <form onSubmit={editingTask ? handleUpdateTask : handleCreateTask} className="space-y-4">
               <div>
-                {/* Using Label component */}
-                <Label htmlFor="task-title" className="block text-muted-foreground mb-1">Title</Label>
+                <Label htmlFor="task-title" className="block text-muted-foreground mb-1.5 font-mono text-sm">Заголовок</Label>
                 <Input
-                  id="task-title"
-                  type="text"
+                  id="task-title" type="text"
                   value={editingTask?.title || newTask.title}
-                  onChange={(e) => editingTask
-                    ? setEditingTask({...editingTask, title: e.target.value})
-                    : setNewTask({...newTask, title: e.target.value})
-                  }
-                  className="input-cyber"
-                  required
-                  placeholder="Directive Title..."
+                  onChange={(e) => editingTask ? setEditingTask({...editingTask, title: e.target.value}) : setNewTask({...newTask, title: e.target.value})}
+                  className="input-cyber" required placeholder="Название директивы..."
                 />
               </div>
               <div>
-                 {/* Using Label component */}
-                <Label htmlFor="task-desc" className="block text-muted-foreground mb-1">Description</Label>
+                <Label htmlFor="task-desc" className="block text-muted-foreground mb-1.5 font-mono text-sm">Описание</Label>
                 <Textarea
                   id="task-desc"
                   value={editingTask?.description || newTask.description}
-                  onChange={(e) => editingTask
-                    ? setEditingTask({...editingTask, description: e.target.value})
-                    : setNewTask({...newTask, description: e.target.value})
-                  }
-                  className="textarea-cyber"
-                  rows={3}
-                  placeholder="Details and objectives..."
+                  onChange={(e) => editingTask ? setEditingTask({...editingTask, description: e.target.value}) : setNewTask({...newTask, description: e.target.value})}
+                  className="textarea-cyber simple-scrollbar" rows={3} placeholder="Детали и цели..."
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                   {/* Using Label component */}
-                  <Label htmlFor="task-deadline" className="block text-muted-foreground mb-1">Deadline</Label>
+                  <Label htmlFor="task-deadline" className="block text-muted-foreground mb-1.5 font-mono text-sm">Дедлайн</Label>
                   <Input
-                    id="task-deadline"
-                    type="date"
+                    id="task-deadline" type="date"
                     value={editingTask?.deadline || newTask.deadline}
-                     onChange={(e) => {
-                       const value = e.target.value;
-                       if (editingTask) {
-                         setEditingTask({...editingTask, deadline: value });
-                       } else {
-                         setNewTask({...newTask, deadline: value });
-                       }
-                     }}
+                    onChange={(e) => editingTask ? setEditingTask({...editingTask, deadline: e.target.value}) : setNewTask({...newTask, deadline: e.target.value})}
                     className="input-cyber"
                   />
                 </div>
                 <div>
-                   {/* Using Label component */}
-                  <Label htmlFor="task-priority" className="block text-muted-foreground mb-1">Priority</Label>
-                   <Select
-                     value={editingTask?.priority || newTask.priority}
-                     onValueChange={(value) => editingTask
-                       ? setEditingTask({...editingTask, priority: value})
-                       : setNewTask({...newTask, priority: value})
-                     }
-                   >
-                    <SelectTrigger id="task-priority" className="input-cyber">
-                      <SelectValue placeholder="Select Priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="low">Low</SelectItem>
-                    </SelectContent>
+                  <Label htmlFor="task-priority" className="block text-muted-foreground mb-1.5 font-mono text-sm">Приоритет</Label>
+                   <Select value={editingTask?.priority || newTask.priority} onValueChange={(value) => editingTask ? setEditingTask({...editingTask, priority: value}) : setNewTask({...newTask, priority: value})}>
+                    <SelectTrigger id="task-priority" className="input-cyber"><SelectValue placeholder="Выберите приоритет" /></SelectTrigger>
+                    <SelectContent><SelectItem value="high">Высокий</SelectItem><SelectItem value="medium">Средний</SelectItem><SelectItem value="low">Низкий</SelectItem></SelectContent>
                   </Select>
                 </div>
               </div>
               {editingTask && (
                 <div>
-                   {/* Using Label component */}
-                  <Label htmlFor="task-status" className="block text-muted-foreground mb-1">Status</Label>
-                   <Select
-                      value={editingTask.status}
-                      onValueChange={(value) => setEditingTask({...editingTask, status: value})}
-                   >
-                     <SelectTrigger id="task-status" className="input-cyber">
-                       <SelectValue placeholder="Select Status" />
-                     </SelectTrigger>
-                     <SelectContent>
-                       <SelectItem value="todo">To Do</SelectItem>
-                       <SelectItem value="in_progress">In Progress</SelectItem>
-                       <SelectItem value="done">Done</SelectItem>
-                     </SelectContent>
+                  <Label htmlFor="task-status" className="block text-muted-foreground mb-1.5 font-mono text-sm">Статус</Label>
+                   <Select value={editingTask.status} onValueChange={(value) => setEditingTask({...editingTask, status: value})}>
+                     <SelectTrigger id="task-status" className="input-cyber"><SelectValue placeholder="Выберите статус" /></SelectTrigger>
+                     <SelectContent><SelectItem value="todo">К выполнению</SelectItem><SelectItem value="in_progress">В процессе</SelectItem><SelectItem value="done">Выполнено</SelectItem></SelectContent>
                    </Select>
                 </div>
               )}
-              <div className="flex justify-end gap-3 mt-4">
-                {editingTask && (
-                  <Button
-                    type="button"
-                    onClick={() => setEditingTask(null)}
-                    variant="ghost"
-                  >
-                    Cancel
-                  </Button>
-                )}
-                <Button type="submit" variant="default">
-                  <FaPlus className="mr-2 h-4 w-4" /> {editingTask ? "Update Task" : "Add Task"}
+              <div className="flex justify-end gap-3 mt-6">
+                {editingTask && (<Button type="button" onClick={() => setEditingTask(null)} variant="ghost" className="text-muted-foreground hover:text-light-text">Отмена</Button>)}
+                <Button type="submit" variant="default" className="bg-brand-green text-black hover:bg-brand-green/80 shadow-md hover:shadow-brand-green/40">
+                  <FaPlus className="mr-2 h-4 w-4" /> {editingTask ? "Обновить" : "Добавить"}
                 </Button>
               </div>
             </form>
           </motion.div>
         )}
 
-        {/* Task List Section */}
         {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-blue"></div>
+          <div className="flex justify-center items-center py-12 flex-col gap-4">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-brand-blue"></div>
+            <p className="text-brand-blue font-orbitron text-lg animate-pulse">ЗАГРУЗКА ДИРЕКТИВ...</p>
           </div>
         ) : tasks.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <FaYoutube className="mx-auto text-5xl mb-4 opacity-50" />
-            <p>No directives found. Create the first one!</p>
+          <div className="text-center py-16 text-muted-foreground bg-dark-card/50 rounded-xl border border-border p-8">
+            <FaYoutube className="mx-auto text-7xl mb-6 opacity-30 text-brand-red" />
+            <p className="text-xl font-orbitron">ДИРЕКТИВЫ НЕ ОБНАРУЖЕНЫ</p>
+            <p className="font-mono mt-2">Создайте первую директиву для YT-команды.</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {tasks.map((task) => (
               <motion.div
-                key={task.id}
-                layout
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
+                key={task.id} layout
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.3 }}
-                className="bg-dark-card rounded-lg shadow-md overflow-hidden border border-border"
+                className={cn("bg-dark-card/90 backdrop-blur-sm rounded-lg shadow-lg overflow-hidden border hover:border-brand-purple/70 transition-colors duration-300", getPriorityClasses(task.priority))}
               >
-                 <div className={`px-4 py-2 border-b border-border ${getPriorityClasses(task.priority)}`}>
-                   <div className="flex justify-between items-center">
-                     <h3 className="text-lg font-semibold font-orbitron">{task.title}</h3>
-                     <div className="flex gap-2">
-                       {isAdmin && (
+                <CardHeader className="px-5 py-3 border-b border-border/50">
+                   <div className="flex justify-between items-start">
+                     <CardTitle className="text-lg font-orbitron text-light-text flex-grow mr-2">{task.title}</CardTitle>
+                     <div className="flex gap-2 flex-shrink-0">
+                       {isAdmin() && (
                          <>
-                           <Button
-                             variant="ghost" size="icon"
-                             onClick={() => setEditingTask(task)}
-                             className="text-light-text hover:bg-white/10 h-7 w-7"
-                             aria-label="Edit Task"
-                           >
-                             <FaPencil className="h-4 w-4" />
-                           </Button>
-                           <Button
-                              variant="ghost" size="icon"
-                              onClick={() => handleDeleteTask(task.id)}
-                              className="text-destructive hover:bg-destructive/20 hover:text-destructive h-7 w-7"
-                              aria-label="Delete Task"
-                           >
-                             <FaTrash className="h-4 w-4" />
-                           </Button>
+                           <Button variant="ghost" size="icon" onClick={() => setEditingTask(task)} className="text-brand-cyan hover:bg-brand-cyan/20 h-8 w-8" aria-label="Edit Task"><FaPencil className="h-4 w-4" /></Button>
+                           <Button variant="ghost" size="icon" onClick={() => handleDeleteTask(task.id)} className="text-brand-red hover:bg-brand-red/20 h-8 w-8" aria-label="Delete Task"><FaTrash className="h-4 w-4" /></Button>
                          </>
                        )}
+                       <span className={cn("px-2 py-0.5 text-xs font-semibold rounded-full", getPriorityBadgeClasses(task.priority))}>{task.priority}</span>
                      </div>
                    </div>
-                 </div>
-                <div className="p-4">
-                  <p className="text-light-text mb-4 text-sm">{task.description || <span className="italic text-muted-foreground">No description provided.</span>}</p>
+                </CardHeader>
+                <CardContent className="p-5">
+                  <p className="text-light-text/90 mb-4 text-sm leading-relaxed">{task.description || <span className="italic text-muted-foreground">Описание отсутствует.</span>}</p>
                   <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground font-mono items-center">
-                    <div className="flex items-center gap-1.5">
-                      {getStatusIcon(task.status)}
-                      <span className="capitalize">{task.status.replace("_", " ")}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <FaCalendarDays />
-                      <span>{task.deadline ? new Date(task.deadline + "T00:00:00Z").toLocaleDateString() : "No deadline"}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="capitalize">Priority: <span className="font-semibold">{task.priority}</span></span>
-                    </div>
-                    {task.assigned_to && (
-                       <div className="flex items-center gap-1.5">
-                         <span>Assigned: {task.assigned_to}</span>
-                       </div>
-                    )}
-                     <div className="flex items-center gap-1.5">
-                         <FaClock className="h-3 w-3"/>
-                         <span>Created: {new Date(task.created_at).toLocaleDateString()}</span>
-                     </div>
+                    <div className="flex items-center gap-1.5" title={`Статус: ${task.status.replace("_", " ")}`}>{getStatusIcon(task.status)} <span className="capitalize">{task.status.replace("_", " ")}</span></div>
+                    <div className="flex items-center gap-1.5" title="Дедлайн"><FaCalendarDays /> <span>{task.deadline ? new Date(task.deadline + "T00:00:00Z").toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit', year:'numeric'}) : "Без дедлайна"}</span></div>
+                    {task.assigned_to && (<div className="flex items-center gap-1.5"><span>Назначено: {task.assigned_to}</span></div>)}
+                    <div className="flex items-center gap-1.5" title="Создано"><FaClock className="h-3 w-3"/> <span>{new Date(task.created_at).toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit', year:'numeric'})}</span></div>
                   </div>
-                </div>
+                </CardContent>
               </motion.div>
             ))}
           </div>
