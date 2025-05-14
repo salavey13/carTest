@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  FaYoutube, FaCircleCheck, FaClock, FaCalendarDays, FaPlus, FaPencil, FaTrash, FaDumbbell, FaTriangleExclamation, FaList // Changed FaThList to FaList
+  FaYoutube, FaCircleCheck, FaClock, FaCalendarDays, FaPlus, FaPencil, FaTrash, FaDumbbell 
+  // FaExclamationTriangle and FaThList removed
 } from "react-icons/fa6";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Label } from "@/components/ui/label"; 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { VibeContentRenderer } from "@/components/VibeContentRenderer"; // Added VibeContentRenderer
 
 const notifyYtTeam = async (message: string) => {
   try {
@@ -171,9 +173,9 @@ export default function TasksPage() {
 
   const getStatusIcon = (status: string): React.ReactNode => {
     switch (status) {
-      case "done": return <FaCircleCheck className="text-brand-green" />;
-      case "in_progress": return <FaClock className="text-brand-yellow animate-pulse" />;
-      default: return <FaList className="text-muted-foreground" />; // Changed to FaList
+      case "done": return <VibeContentRenderer content="::FaCircleCheck color=hsl(var(--brand-green))::" />;
+      case "in_progress": return <VibeContentRenderer content="::FaClock color=hsl(var(--brand-yellow)) className='animate-pulse'::" />;
+      default: return <VibeContentRenderer content="::FaListUl color=hsl(var(--muted-foreground))::" />; // Using FaListUl via VibeRenderer
     }
   };
 
