@@ -18,9 +18,9 @@ import {
     FileEntry as ValidationFileEntry,
     ValidationStatus
 } from '@/hooks/useCodeParsingAndValidation';
+// Removed createGitHubPullRequest import, using context trigger
 import {
-    createGitHubPullRequest,
-    updateBranch,
+    updateBranch, // Keep for updating existing branches
     getOpenPullRequests 
 } from '@/app/actions_github/actions'; 
 import { sendTelegramDocument, notifyAdmin } from '@/app/actions';
@@ -89,12 +89,16 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         setJustParsedFlagForScrollFix,
     } = props;
 
-    const { user, dbUser } = appContext; // Added dbUser
+    const { user, dbUser } = appContext; 
     const {
         setHookParsedFiles, setValidationStatus, setValidationIssues, parseAndValidateResponse, autoFixIssues, validationIssues, validationStatus, rawDescription, setRawDescription
     } = codeParserHook;
     const {
-        contextOpenPrs, targetBranchName, repoUrlFromContext, setAssistantLoading, triggerGetOpenPRs, triggerUpdateBranch, setFilesParsed, setSelectedAssistantFiles, setContextIsParsing, setRequestCopied, selectedAssistantFiles, setAiResponseHasContent, allFetchedFiles, addToast 
+        contextOpenPrs, targetBranchName, repoUrlFromContext, setAssistantLoading, triggerGetOpenPRs, 
+        triggerUpdateBranch, 
+        triggerCreateNewPR,  
+        setFilesParsed, setSelectedAssistantFiles, setContextIsParsing, setRequestCopied, 
+        selectedAssistantFiles, setAiResponseHasContent, allFetchedFiles, addToast 
     } = pageContext;
 
     const repoUrlForForm = repoUrlStateLocal || repoUrlFromContext || "";
@@ -126,7 +130,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             setValidationStatus(parseValidationIssues.length > 0 ? (parseValidationIssues.some(i => i.severity === 'error') ? 'error' : 'warning') : 'success');
             setValidationIssues(parseValidationIssues);
             setRawDescription(parsedRawDesc); 
-            setJustParsedFlagForScrollFix(true); // Trigger scroll fix
+            setJustParsedFlagForScrollFix(true); 
 
             toast.success(`Разбор завершен. Найдено ${newlyParsedFiles.length} блоков кода. Проблем: ${parseValidationIssues.length}. Выбрано: ${initialSelection.size}`);
         } catch (error: any) {
@@ -495,7 +499,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             }
             const branchToTarget = prToUpdate?.head?.ref || targetBranchName; 
 
-            if (branchToTarget) {
+            if (branchToTarget) { // Updating an existing branch (or a branch from an existing PR)
                  logger.log(`[Handler CreateOrUpdatePR] Updating branch '${branchToTarget}'. PR#: ${prToUpdate?.number ?? 'N/A'}`);
                  const updateResult = await triggerUpdateBranch( repoUrlForForm, filesToCommit, fullCommitMessage, branchToTarget, prToUpdate?.number, finalDescription );
                  if (updateResult.success) {
@@ -508,19 +512,30 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
                     if(updateResult.newAchievements) prResultAchievements.push(...updateResult.newAchievements);
                  } else { 
                     logger.error(`[Handler CreateOrUpdatePR] Update Branch Failed via Context: ${updateResult.error}`); 
+                    toast.error(`Ошибка обновления ветки: ${updateResult.error || "?"}`, { id: toastId });
                  }
-             } else {
+             } else { // Creating a NEW PR (and implicitly a new branch)
                  logger.log(`[Handler CreateOrUpdatePR] Creating new PR with title '${prTitle.trim()}'.`);
                  toast.info("Создание нового PR...", { id: toastId }); 
-                 // This now calls the context triggerUpdateBranch which handles CyberFitness logging internally
-                 const result = await triggerUpdateBranch(repoUrlForForm, filesToCommit, fullCommitMessage, `feat/ai-${Date.now()}`, null, finalDescription);
-                 if (result.success) { // Assuming triggerUpdateBranch returns PR URL in a data field or similar
-                      toast.success(`PR создан! (Проверьте GitHub)`, { id: toastId, duration: 5000 }); // Modified success message
+                 const newBranchName = `feat/ai-${Date.now()}`; 
+                 
+                 // Call the context's triggerCreateNewPR function
+                 const result = await pageContext.triggerCreateNewPR(
+                     repoUrlForForm,
+                     filesToCommit,
+                     prTitle.trim(), 
+                     finalDescription,
+                     fullCommitMessage,
+                     newBranchName
+                 );
+
+                 if (result.success) { 
+                      toast.success(`PR #${result.prNumber} (${result.prUrl}) создан!`, { id: toastId, duration: 5000 }); 
                       await triggerGetOpenPRs(repoUrlForForm); 
-                      logger.log(`[Handler CreateOrUpdatePR] New PR created.`);
+                      logger.log(`[Handler CreateOrUpdatePR] New PR created: ${result.prUrl}`);
                        if(result.newAchievements) prResultAchievements.push(...result.newAchievements);
                  } else { 
-                     logger.error("[Handler CreateOrUpdatePR] PR Creation Failed via triggerUpdateBranch:", result.error); 
+                     logger.error("[Handler CreateOrUpdatePR] PR Creation Failed via triggerCreateNewPR:", result.error); 
                      toast.error("Ошибка создания PR: " + (result.error || "?"), { id: toastId }); 
                 }
              }
@@ -532,7 +547,11 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         }
         finally { setIsProcessingPR(false); setAssistantLoading(false); logger.log("[Handler CreateOrUpdatePR] Finished."); }
      }, [
-         componentParsedFiles, selectedAssistantFiles, repoUrlForForm, prTitle, rawDescription, response, validationIssues, targetBranchName, contextOpenPrs, triggerUpdateBranch, setAssistantLoading, triggerGetOpenPRs, imageReplaceTask, setIsProcessingPR, addToast
+         componentParsedFiles, selectedAssistantFiles, repoUrlForForm, prTitle, rawDescription, response, 
+         validationIssues, targetBranchName, contextOpenPrs, 
+         triggerUpdateBranch, 
+         pageContext.triggerCreateNewPR, // Using pageContext to access triggerCreateNewPR
+         setAssistantLoading, triggerGetOpenPRs, imageReplaceTask, setIsProcessingPR, addToast
      ]);
 
     const handleDirectImageReplace = useCallback(async (task: ImageReplaceTask, currentAllFiles: FileNode[]): Promise<{ success: boolean; error?: string }> => {
@@ -579,7 +598,6 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
               const commitSubject = `chore: Update image ${task.targetPath.split('/').pop()}`;
               const commitBody = `Replaced image: ${task.oldUrl}\nWith new image: ${task.newUrl}\n\nFile: ${task.targetPath}`;
               const fullCommitMessage = `${commitSubject}\n\n${commitBody}`;
-              const prTitleText = `${commitSubject} via CyberVibe`;
               const prDescription = `Automatic image replacement request via CyberVibe Studio.\n\n**Details:**\n- File: \`${task.targetPath}\`\n- Old URL: ${task.oldUrl}\n- New URL: ${task.newUrl}`;
 
               logger.debug("[Handler DirectImageReplace] Checking for existing PRs...");
@@ -589,21 +607,22 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
                   const expectedPrTitlePrefix = `chore: Update image`;
                   prToUpdate = openPrsResult.pullRequests.find(pr =>
                       pr?.title?.startsWith(expectedPrTitlePrefix) &&
-                      pr?.title?.includes(task.targetPath.split('/').pop() ?? task.targetPath) && // Match filename
+                      pr?.title?.includes(task.targetPath.split('/').pop() ?? task.targetPath) && 
                       pr?.head?.ref
                   ) ?? null;
                    logger.debug(`[Handler DirectImageReplace] Found ${openPrsResult.pullRequests.length} PRs. Matching PR for ${task.targetPath.split('/').pop()}: ${!!prToUpdate}`);
               } else if (!openPrsResult.success) {
                   logger.warn("[Handler DirectImageReplace] Failed to get open PRs:", openPrsResult.error);
               }
-
-              // Use triggerUpdateBranch from context, which includes CyberFitness logic
+                            
+              const branchNameToUse = prToUpdate?.head?.ref || `fix/img-${task.targetPath.split('/').pop()?.replace(/[\W_]+/g, "-") ?? Date.now()}`;
+              
               const updateResult = await triggerUpdateBranch(
                   repoUrlForForm,
                   filesToCommit,
                   fullCommitMessage,
-                  prToUpdate?.head?.ref || `fix/img-${task.targetPath.split('/').pop()?.replace(/[\W_]+/g, "-") ?? Date.now()}`, // Generate new branch name if no PR
-                  prToUpdate?.number, // Pass PR number if updating
+                  branchNameToUse,
+                  prToUpdate?.number, 
                   prDescription
               );
 
@@ -614,9 +633,9 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
               
               const successMessage = prToUpdate
                     ? `PR #${prToUpdate.number} (ветка '${prToUpdate.head.ref}') успешно обновлен для замены картинки!`
-                    : `PR для замены картинки успешно создан!`;
+                    : `Ветка '${branchNameToUse}' для замены картинки успешно обновлена/создана!`;
               toast.success(successMessage, { id: toastId, duration: 5000 });
-              logger.info(`[Handler DirectImageReplace] Image replace PR/branch update successful.`);
+              logger.info(`[Handler DirectImageReplace] Image replace branch update successful for branch '${branchNameToUse}'.`);
               await triggerGetOpenPRs(repoUrlForForm); 
               success = true; 
               setImageReplaceTask(null); 
