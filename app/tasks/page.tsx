@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  FaYoutube, FaCircleCheck, FaClock, FaCalendarDays, FaPlus, FaPencil, FaTrash, FaDumbbell, FaExclamationTriangle, FaTasks // Changed FaThList to FaTasks
+  FaYoutube, FaCircleCheck, FaClock, FaCalendarDays, FaPlus, FaPencil, FaTrash, FaDumbbell, FaTriangleExclamation, FaTasks // Changed FaThList to FaTasks
 } from "react-icons/fa6";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
