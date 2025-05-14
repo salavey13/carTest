@@ -8,7 +8,7 @@ import { useAppToast } from '@/hooks/useAppToast';
 export interface FileNode { path: string; content: string; }
 export interface SimplePullRequest { id: number; number: number; title: string; html_url: string; user: { login: string | null; avatar_url: string | null } | null; head: { ref: string }; base: { ref: string }; updated_at: string; }
 import { debugLogger as logger } from '@/lib/debugLogger';
-import { getOpenPullRequests, updateBranch, checkExistingPrBranch } from '@/app/actions_github/actions';
+import { getOpenPullRequests, updateBranch, checkExistingPrBranch, createGitHubPullRequest } from '@/app/actions_github/actions'; // Added createGitHubPullRequest
 import type { RepoTxtFetcherRef } from '@/components/RepoTxtFetcher';
 import type { AICodeAssistantRef } from '@/components/AICodeAssistant';
 import * as repoUtils from "@/lib/repoUtils";
@@ -95,8 +95,9 @@ interface RepoXmlPageContextType {
     triggerAskAi: () => Promise<{ success: boolean; requestId?: string; error?: string }>;
     triggerParseResponse: () => Promise<void>;
     triggerSelectAllParsed: () => void;
-    triggerCreateOrUpdatePR: () => Promise<void>;
+    triggerCreateOrUpdatePR: () => Promise<void>; // This will remain, and Assistant will call it. Assistant decides which specific trigger to use.
     triggerUpdateBranch: ( repoUrl: string, filesToCommit: { path: string; content: string }[], commitMessage: string, branch: string, prNumber?: number | null, prDescription?: string ) => Promise<{ success: boolean; error?: string; newAchievements?: Achievement[] }>;
+    triggerCreateNewPR: ( repoUrl: string, filesToCommit: FileNode[], prTitle: string, prDescription: string, commitMessage: string, newBranchName: string ) => Promise<{ success: boolean; error?: string; prUrl?: string; prNumber?: number; branch?: string; newAchievements?: Achievement[] }>; // Added this
     triggerGetOpenPRs: (repoUrl: string) => Promise<void>;
     updateRepoUrlInAssistant: (url: string) => void;
     getXuinityMessage: () => string;
@@ -152,6 +153,7 @@ const defaultContextValue: Partial<RepoXmlPageContextType> = {
     triggerSelectAllParsed: () => { logger.warn("triggerSelectAllParsed called on default context value"); },
     triggerCreateOrUpdatePR: async () => { logger.warn("triggerCreateOrUpdatePR called on default context value"); },
     triggerUpdateBranch: async () => { logger.warn("triggerUpdateBranch called on default context value"); return { success: false, error: "Context not ready" }; },
+    triggerCreateNewPR: async () => { logger.warn("triggerCreateNewPR called on default context value"); return { success: false, error: "Context not ready"}; },
     triggerGetOpenPRs: async () => { logger.warn("triggerGetOpenPRs called on default context value"); },
     updateRepoUrlInAssistant: () => { logger.warn("updateRepoUrlInAssistant called on default context value"); },
     getXuinityMessage: () => "Initializing...",
@@ -371,7 +373,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         }, [ 
              dbUser?.id, addToastStable, assistantRef, fetcherRef, setFetchStatusStateStable, setAllFetchedFilesStateStable,
              setImageReplaceTaskStateStable, setAssistantLoadingStateStable, setPendingFlowDetailsStateStable,
-             setKworkInputValueStateStable, scrollToSectionStable, 
+             setKworkInputValueStateStable, scrollToSectionStable, logger
          ]);
 
         const triggerToggleSettingsModal = useCallback(async () => {
@@ -427,7 +429,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                 logger.log(`${flowLogPrefix} Context: Proceeding to triggerFetch with branch: ${branchToFetch}`);
                 await triggerFetch(false, branchToFetch);
             }
-        }, [ dbUser?.id, addToastStable, setTargetBranchNameStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setManualBranchNameStateStable, setFetchStatusStateStable, triggerFetch ]);
+        }, [ dbUser?.id, addToastStable, setTargetBranchNameStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setManualBranchNameStateStable, setFetchStatusStateStable, triggerFetch, logger ]);
         
         const triggerSelectHighlighted = useCallback(async () => {
             logger.log(`[DEBUG][CONTEXT] triggerSelectHighlighted called. Ref ready: ${!!fetcherRef.current?.selectHighlightedFiles}`);
@@ -440,7 +442,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     }
                 } catch (e: any) { logger.error("Error calling fetcherRef.selectHighlightedFiles:", e); addToastStable(`Ошибка выбора связанных файлов: ${e?.message ?? 'Неизвестно'}`, "error"); }
             } else { logger.error("triggerSelectHighlighted: fetcherRef is not set."); }
-        }, [addToastStable, fetcherRef, dbUser?.id]); 
+        }, [addToastStable, fetcherRef, dbUser?.id, logger]); 
 
         const triggerAddSelectedToKwork = useCallback(async (clearSelection = false) => { const currentSelected = selectedFetcherFilesRef.current; const currentAllFiles = allFetchedFilesRef.current; if (fetcherRef.current?.handleAddSelected) { if (currentSelected.size === 0) { addToastStable("Сначала выберите файлы в Экстракторе!", "warning"); return; } try { await fetcherRef.current.handleAddSelected(currentSelected, currentAllFiles); if (clearSelection) { setSelectedFetcherFilesStateStable(new Set()); } } catch (e: any) { addToastStable(`Ошибка добавления файлов: ${e?.message ?? 'Неизвестно'}`, "error"); } } else { addToastStable("Ошибка: Компонент Экстрактора недоступен.", "error"); } }, [addToastStable, setSelectedFetcherFilesStateStable, fetcherRef]);
         const selectedFetcherFilesRef = useRef(selectedFetcherFilesState); useEffect(() => { selectedFetcherFilesRef.current = selectedFetcherFilesState; }, [selectedFetcherFilesState]);
@@ -490,6 +492,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         
         const triggerSelectAllParsed = useCallback(() => { if (assistantRef.current?.selectAllParsedFiles) { try { assistantRef.current.selectAllParsedFiles(); } catch (e: any) { addToastStable(`Ошибка выбора всех файлов: ${e?.message ?? 'Неизвестно'}`, "error"); } } else { addToastStable("Ошибка выбора: Компонент Ассистента недоступен.", "error");} }, [addToastStable, assistantRef]);
         
+        // This will remain. AICodeAssistant's handleCreatePR will call this, 
+        // and then this context function will decide whether to call triggerUpdateBranch or triggerCreateNewPR.
+        // However, the direct call to triggerUpdateBranch or triggerCreateNewPR should happen in AICodeAssistant's handlers.
+        // This function should be simplified or removed if AICodeAssistant calls the specific triggers directly.
+        // For now, let's assume AICodeAssistant calls this, and this is a pass-through/delegator.
         const triggerCreateOrUpdatePR = useCallback(async () => { 
             if (assistantRef.current?.handleCreatePR) { 
                 try { 
@@ -516,7 +523,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                         const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.id, action, 1);
                         if(actionAch) combinedAchievements.push(...actionAch);
 
-                        if (!prNumber) { 
+                        // This 'prCreated' quest logic should ideally move to where a new PR is confirmed.
+                        // If triggerUpdateBranch is ONLY for updating existing branches, this block is fine.
+                        // If it's also for creating a new branch AND PR (which is the current flawed logic), this is okay too, but the overall flow is wrong.
+                        // The FIX involves triggerCreateNewPR handling this specific CyberFitness logic for NEW PRs.
+                        if (!prNumber && action === 'prCreated') {  // More specific condition based on the action intent
                             const questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_pr_created', 250, 3); 
                             if(questResult.success && questResult.data?.metadata?.cyberFitness?.level === 3) {
                                 addToastStable("🚀 Квест 'Первый PR' выполнен! Level 3 достигнут!", "success", 4000);
@@ -538,7 +549,57 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             } finally { 
                 setAssistantLoadingStateStable(false); 
             } 
-        }, [addToastStable, triggerGetOpenPRsStable, setAssistantLoadingStateStable, dbUser?.id]);
+        }, [addToastStable, triggerGetOpenPRsStable, setAssistantLoadingStateStable, dbUser?.id, logger]);
+
+        const triggerCreateNewPRStable = useCallback(async (
+            repoUrlParam: string, 
+            filesToCommit: FileNode[], 
+            prTitleParam: string, 
+            prDescriptionParam: string, 
+            commitMessageParam: string, 
+            newBranchNameParam: string
+        ): Promise<{ success: boolean; error?: string; prUrl?: string; prNumber?: number; branch?: string; newAchievements?: Achievement[] }> => {
+            setAssistantLoadingStateStable(true);
+            let combinedAchievements: Achievement[] = [];
+            try {
+                logger.info(`[Context triggerCreateNewPRStable] Called for repo: ${repoUrlParam}, branch: ${newBranchNameParam}`);
+                const result = await createGitHubPullRequest(
+                    repoUrlParam,
+                    filesToCommit,
+                    prTitleParam,
+                    prDescriptionParam,
+                    commitMessageParam,
+                    newBranchNameParam
+                );
+    
+                if (result.success) {
+                    triggerGetOpenPRsStable(repoUrlParam).catch(err => logger.error("Failed to refresh PRs after new PR creation:", err));
+                    if (dbUser?.id) {
+                        const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.id, 'prCreated', 1);
+                        if(actionAch) combinedAchievements.push(...actionAch);
+                        
+                        const questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_pr_created', 250, 3);
+                        if(questResult.success && questResult.data?.metadata?.cyberFitness?.level === 3) {
+                            addToastStable("🚀 Квест 'Первый PR' выполнен! Level 3 достигнут!", "success", 4000);
+                        } else if (questResult.success) {
+                            addToastStable("🚀 Квест 'Первый PR' выполнен!", "success", 4000);
+                        }
+                        if(questResult.newAchievements) combinedAchievements.push(...questResult.newAchievements);
+                    }
+                    combinedAchievements.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
+                    return { ...result, newAchievements: combinedAchievements };
+                } else {
+                    addToastStable(`Ошибка создания PR: ${result.error}`, 'error', 5000);
+                    return { ...result, newAchievements: combinedAchievements };
+                }
+            } catch (e: any) {
+                addToastStable(`Крит. ошибка создания PR: ${e.message}`, "error", 5000);
+                return { success: false, error: e.message, newAchievements: combinedAchievements };
+            } finally {
+                setAssistantLoadingStateStable(false);
+            }
+        }, [addToastStable, triggerGetOpenPRsStable, setAssistantLoadingStateStable, dbUser?.id, logger]);
+
 
         const updateRepoUrlInAssistantStable = useCallback((url: string) => { if (assistantRef.current?.updateRepoUrl) { try { assistantRef.current.updateRepoUrl(url); } catch (e: any) { logger.error(`Error calling assistantRef.updateRepoUrl: ${e?.message ?? 'Неизвестно'}`); } } }, [assistantRef]);
         
@@ -575,7 +636,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             }
         }, [fetcherRef, dbUser?.id, addToastStable]);
 
-
         const [currentStep, setCurrentStep] = useState<WorkflowStep>('idle');
         useEffect(() => {
             let calculatedStep: WorkflowStep = 'idle';
@@ -602,8 +662,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             }
             else { calculatedStep = repoUrlEnteredState ? 'ready_to_fetch' : 'idle'; }
             
-            setCurrentStep(prevStep => { if (prevStep !== calculatedStep) { return calculatedStep; } return prevStep; });
-        }, [ fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState, filesParsedState, requestCopiedState, primaryHighlightPathState, secondaryHighlightPathsState, selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, allFetchedFilesState, assistantLoadingState, repoUrlEnteredState, isPreCheckingState ]);
+            setCurrentStep(prevStep => { if (prevStep !== calculatedStep) { logger.log(`[WorkflowStep Change] From ${prevStep} to ${calculatedStep}`); return calculatedStep; } return prevStep; });
+        }, [ fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState, filesParsedState, requestCopiedState, primaryHighlightPathState, secondaryHighlightPathsState, selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, allFetchedFilesState, assistantLoadingState, repoUrlEnteredState, isPreCheckingState, logger ]);
 
          const getXuinityMessageStable = useCallback((): string => {
              const localCurrentStep = currentStep; const localManualBranchName = manualBranchNameState; const localTargetBranchName = targetBranchNameState; const localImageReplaceTask = imageReplaceTaskState; const localFetchStatus = fetchStatusState; const localAllFilesLength = allFetchedFilesState.length; const localSelectedFetchSize = selectedFetcherFilesState.size; const localSelectedAssistSize = selectedAssistantFilesState.size; const localIsPreChecking = isPreCheckingState; const localPendingFlowDetails = pendingFlowDetailsState; const localFilesFetched = filesFetchedState; const localAssistantLoading = assistantLoadingState; 
@@ -637,13 +697,21 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const contextValue = useMemo((): RepoXmlPageContextType => ({
             fetchStatus: fetchStatusState, repoUrlEntered: repoUrlEnteredState, filesFetched: filesFetchedState, kworkInputHasContent: kworkInputHasContentState, requestCopied: requestCopiedState, aiResponseHasContent: aiResponseHasContentState, filesParsed: filesParsedState, assistantLoading: assistantLoadingState, aiActionLoading: aiActionLoadingState, loadingPrs: loadingPrsState, isSettingsModalOpen: isSettingsModalOpenState, isParsing: isParsingState, isPreChecking: isPreCheckingState, showComponents: showComponentsState, selectedFetcherFiles: selectedFetcherFilesState, selectedAssistantFiles: selectedAssistantFilesState, targetBranchName: targetBranchNameState, manualBranchName: manualBranchNameState, openPrs: openPrsState, currentAiRequestId: currentAiRequestIdState, imageReplaceTask: imageReplaceTaskState, allFetchedFiles: allFetchedFilesState, currentStep, repoUrl: repoUrlState, primaryHighlightedPath: primaryHighlightPathState, secondaryHighlightedPaths: secondaryHighlightPathsState, targetPrData: targetPrDataState, pendingFlowDetails: pendingFlowDetailsState, kworkInputValue: kworkInputValueState,
             setFetchStatus: setFetchStatusStateStable, setRepoUrlEntered: setRepoUrlEnteredStateStable, handleSetFilesFetched: handleSetFilesFetchedStable, setSelectedFetcherFiles: setSelectedFetcherFilesStateStable, setKworkInputHasContent: setKworkInputHasContentStateStable, setRequestCopied: setRequestCopiedStateStable, setAiResponseHasContent: setAiResponseHasContentStateStable, setFilesParsed: setFilesParsedStateStable, setSelectedAssistantFiles: setSelectedAssistantFilesStateStable, setAssistantLoading: setAssistantLoadingStateStable, setAiActionLoading: setAiActionLoadingStateStable, setLoadingPrs: setLoadingPrsStateStable, setTargetBranchName: setTargetBranchNameStateStable, setManualBranchName: setManualBranchNameStateStable, setOpenPrs: setOpenPrsStateStable, setIsParsing: setIsParsingStateStable, setContextIsParsing: setIsParsingStateStable, setCurrentAiRequestId: setCurrentAiRequestIdStateStable, setImageReplaceTask: setImageReplaceTaskStateStable, setRepoUrl: setRepoUrlStateStable, setTargetPrData: setTargetPrDataStable, setIsPreChecking: setIsPreCheckingStateStable, setPendingFlowDetails: setPendingFlowDetailsStateStable, setShowComponents: setShowComponentsStateStable, setKworkInputValue: setKworkInputValueStateStable,
-            triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR, triggerUpdateBranch: triggerUpdateBranchStable, triggerGetOpenPRs: triggerGetOpenPRsStable, updateRepoUrlInAssistant: updateRepoUrlInAssistantStable, getXuinityMessage: getXuinityMessageStable, scrollToSection: scrollToSectionStable, triggerAddImportantToKwork: triggerAddImportantToKworkStable, triggerAddTreeToKwork: triggerAddTreeToKworkStable, triggerSelectAllFetcherFiles: triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFiles: triggerDeselectAllFetcherFilesStable, triggerClearKworkInput: triggerClearKworkInputStable,
+            triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, 
+            triggerCreateOrUpdatePR, // Keep this general trigger if AICodeAssistant still uses it
+            triggerUpdateBranch: triggerUpdateBranchStable, 
+            triggerCreateNewPR: triggerCreateNewPRStable, // <<< ADDED THE NEW TRIGGER HERE
+            triggerGetOpenPRs: triggerGetOpenPRsStable, updateRepoUrlInAssistant: updateRepoUrlInAssistantStable, getXuinityMessage: getXuinityMessageStable, scrollToSection: scrollToSectionStable, triggerAddImportantToKwork: triggerAddImportantToKworkStable, triggerAddTreeToKwork: triggerAddTreeToKworkStable, triggerSelectAllFetcherFiles: triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFiles: triggerDeselectAllFetcherFilesStable, triggerClearKworkInput: triggerClearKworkInputStable,
             kworkInputRef, aiResponseInputRef, fetcherRef, assistantRef,
             addToast: addToastStable,
         }), [
             fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, isPreCheckingState, showComponentsState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, secondaryHighlightPathsState, targetPrDataState, pendingFlowDetailsState, kworkInputValueState,
             setFetchStatusStateStable, setRepoUrlEnteredStateStable, handleSetFilesFetchedStable, setSelectedFetcherFilesStateStable, setKworkInputHasContentStateStable, setRequestCopiedStateStable, setAiResponseHasContentStateStable, setFilesParsedStateStable, setSelectedAssistantFilesStateStable, setAssistantLoadingStateStable, setAiActionLoadingStateStable, setLoadingPrsStateStable, setTargetBranchNameStateStable, setManualBranchNameStateStable, setOpenPrsStateStable, setIsParsingStateStable, setCurrentAiRequestIdStateStable, setImageReplaceTaskStateStable, setRepoUrlStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setShowComponentsStateStable, setKworkInputValueStateStable,
-            triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, triggerCreateOrUpdatePR, triggerUpdateBranchStable, triggerGetOpenPRsStable, updateRepoUrlInAssistantStable, getXuinityMessageStable, scrollToSectionStable, triggerAddImportantToKworkStable, triggerAddTreeToKworkStable, triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFilesStable, triggerClearKworkInputStable,
+            triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, 
+            triggerCreateOrUpdatePR, // Keep
+            triggerUpdateBranchStable, 
+            triggerCreateNewPRStable, // <<< ADDED
+            triggerGetOpenPRsStable, updateRepoUrlInAssistantStable, getXuinityMessageStable, scrollToSectionStable, triggerAddImportantToKworkStable, triggerAddTreeToKworkStable, triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFilesStable, triggerClearKworkInputStable,
             addToastStable,
         ]);
 
@@ -658,6 +726,17 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
 export const useRepoXmlPageContext = (): RepoXmlPageContextType => {
     const context = useContext(RepoXmlPageContext);
     if (context === undefined) { logger.fatal("useRepoXmlPageContext used outside RepoXmlPageProvider!"); throw new Error("useRepoXmlPageContext must be used within a RepoXmlPageProvider"); }
+    // Ensure the returned context always includes triggerCreateNewPR
+    if (typeof context.triggerCreateNewPR !== 'function') {
+        logger.error("CRITICAL: triggerCreateNewPR is missing from context. Providing a NO-OP fallback.");
+        return {
+            ...context,
+            triggerCreateNewPR: async () => { 
+                logger.error("Fallback triggerCreateNewPR called. THIS IS A BUG IN CONTEXT SETUP.");
+                return { success: false, error: "Context function triggerCreateNewPR not properly initialized." };
+            }
+        } as RepoXmlPageContextType;
+    }
     return context as RepoXmlPageContextType;
 };
 
