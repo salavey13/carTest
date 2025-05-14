@@ -1,5 +1,6 @@
 "use client"; 
 import { supabaseAdmin } from './supabase'; 
+import { updateUserMetadata as genericUpdateUserMetadata } from './supabase'; // Added import
 import type { Database } from "@/types/database.types";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { format } from 'date-fns';
@@ -182,15 +183,19 @@ export const updateUserCyberFitnessProfile = async (
     logger.warn("[CyberFitness UpdateProfile] User ID is required.");
     return { success: false, error: "User ID is required." };
   }
-  if (!supabaseAdmin) {
-    logger.error("[CyberFitness UpdateProfile] Admin client is not available.");
-    return { success: false, error: "Admin client is not available for profile update." };
+  // SupabaseAdmin might still be needed for fetching, but genericUpdateUserMetadata uses authenticated client.
+  // Let's keep the check for supabaseAdmin for fetch, or rely on genericUpdateUserMetadata to fail if its own client setup fails.
+  // The primary change is the *update* mechanism.
+  if (!supabaseAdmin && !genericUpdateUserMetadata) { // Check if either is available for the whole process
+    logger.error("[CyberFitness UpdateProfile] Admin client or genericUpdateUserMetadata is not available.");
+    return { success: false, error: "Client or update function is not available for profile update." };
   }
 
   const isTrueMockSession = process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && MOCK_USER_ID_NUM !== null && userId === MOCK_USER_ID_NUM.toString();
   logger.debug(`[CyberFitness UpdateProfile] isTrueMockSession: ${isTrueMockSession} (NEXT_PUBLIC_USE_MOCK_USER: ${process.env.NEXT_PUBLIC_USE_MOCK_USER}, MOCK_USER_ID_NUM: ${MOCK_USER_ID_NUM}, userId: ${userId})`);
 
   try {
+    // Fetching current metadata can still use supabaseAdmin for robust server-side read
     const { data: currentUserData, error: fetchError } = await supabaseAdmin
       .from("users")
       .select("metadata")
@@ -205,7 +210,6 @@ export const updateUserCyberFitnessProfile = async (
     const existingOverallMetadata = currentUserData?.metadata || {};
     let existingCyberFitnessProfile = getCyberFitnessProfile(userId, existingOverallMetadata);
     logger.debug(`[CyberFitness UpdateProfile] Fetched existing profile for ${userId}. Achievements before this update: ${(existingCyberFitnessProfile.achievements || []).join(', ')}`);
-
 
     const newCyberFitnessProfile: CyberFitnessProfile = {
       ...existingCyberFitnessProfile, 
@@ -241,7 +245,7 @@ export const updateUserCyberFitnessProfile = async (
     if (typeof updates.totalBranchesUpdated === 'number') newCyberFitnessProfile.totalBranchesUpdated = (newCyberFitnessProfile.totalBranchesUpdated || 0) + updates.totalBranchesUpdated;
     
     const newlyUnlockedAchievements: Achievement[] = [];
-    let currentAchievementsSet = new Set(newCyberFitnessProfile.achievements || []); // Operate on potentially already existing achievements
+    let currentAchievementsSet = new Set(newCyberFitnessProfile.achievements || []);
 
     for (const ach of ALL_ACHIEVEMENTS) {
         if (!currentAchievementsSet.has(ach.id) && ach.checkCondition(newCyberFitnessProfile)) {
@@ -255,7 +259,6 @@ export const updateUserCyberFitnessProfile = async (
     newCyberFitnessProfile.achievements = Array.from(currentAchievementsSet);
     logger.debug(`[CyberFitness UpdateProfile] Achievements for ${userId} after evaluation: ${newCyberFitnessProfile.achievements.join(', ')}`);
 
-
     if (newlyUnlockedAchievements.length > 0) {
         logger.info(`[CyberFitness UpdateProfile] User ${userId} unlocked new achievements:`, newlyUnlockedAchievements.map(a => `${a.name} (+${a.kiloVibesAward || 0}KV)`));
     }
@@ -265,27 +268,30 @@ export const updateUserCyberFitnessProfile = async (
       [CYBERFIT_METADATA_KEY]: newCyberFitnessProfile, 
     };
         
-    const { data: updatedUser, error: updateError } = await supabaseAdmin
-      .from("users")
-      .update({ metadata: newOverallMetadata, updated_at: new Date().toISOString() }) 
-      .eq("user_id", userId)
-      .select("*, metadata") 
-      .single(); 
+    // Use genericUpdateUserMetadata instead of direct supabaseAdmin.update
+    const { success: updateSuccess, data: updatedUser, error: updateErrorStr } = await genericUpdateUserMetadata(userId, newOverallMetadata);
 
-    if (updateError) {
-      logger.error(`[CyberFitness UpdateProfile] Error saving updated profile for ${userId} using admin client:`, updateError);
-      throw updateError; 
+    if (!updateSuccess || !updatedUser) {
+      logger.error(`[CyberFitness UpdateProfile] Error saving updated profile for ${userId} using genericUpdateUserMetadata:`, updateErrorStr);
+      // Throw an error that the catch block can handle, consistent with previous error object structure if possible
+      // For now, a simple Error object with the message.
+      const e = new Error(updateErrorStr || `Failed to update metadata for user ${userId} via genericUpdateUserMetadata`);
+      // Add code property if updateErrorStr is actually a Supabase error object with a code
+      // if (typeof updateErrorStr === 'object' && updateErrorStr !== null && 'code' in updateErrorStr) {
+      //   (e as any).code = (updateErrorStr as any).code;
+      // }
+      throw e;
     }
-    if (!updatedUser) {
-      logger.error(`[CyberFitness UpdateProfile] User ${userId} not found after update attempt (should not happen if user was fetched or created).`);
-      return { success: false, error: `User ${userId} not found after profile update attempt.` };
-    }
+    // The 'updatedUser' from genericUpdateUserMetadata already contains the full user object with updated metadata.
+    // It also handles setting 'updated_at'.
 
     logger.log(`[CyberFitness UpdateProfile EXIT] Successfully updated profile for ${userId}. New KiloVibes: ${newCyberFitnessProfile.kiloVibes}, Level: ${newCyberFitnessProfile.level}`);
     return { success: true, data: updatedUser, newAchievements: newlyUnlockedAchievements };
   } catch (e: any) {
     logger.error(`[CyberFitness UpdateProfile CATCH] Exception for ${userId}:`, e);
-    return { success: false, error: e.message || "Failed to update CyberFitness profile." };
+    // Ensure the error returned is a string
+    const errorMessage = (e instanceof Error ? e.message : String(e)) || "Failed to update CyberFitness profile.";
+    return { success: false, error: errorMessage };
   }
 };
 
