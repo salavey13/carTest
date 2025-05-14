@@ -39,7 +39,8 @@ export default function StyleGuide() {
     <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pt-24 pb-16">
       <div className="container mx-auto space-y-16">
         <header className="text-center mb-12">
-          <h1 className="text-5xl md:text-6xl text-gta-style-heading mb-2">
+          {/* Updated H1: Removed text-gta-style-heading as it's now default for H1 */}
+          <h1 className="text-5xl md:text-6xl mb-2"> 
             CYBERVIBE STYLE GUIDE
           </h1>
           <p className="text-lg text-muted-foreground font-mono">

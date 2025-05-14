@@ -147,11 +147,6 @@ export default function Header() {
   const [searchTerm, setSearchTerm] = useState("");
   const pathname = usePathname();
   
-  // Логика скрытия хедера на '/finance-literacy-memo' УДАЛЕНА
-  // if (pathname === '/finance-literacy-memo') {
-  //   return null;
-  // }
-
   const initialLang = useMemo(() => (user?.language_code === 'ru' ? 'ru' : 'en'), [user?.language_code]);
   const [currentLang, setCurrentLang] = useState<'en' | 'ru'>(initialLang);
   
@@ -250,7 +245,13 @@ export default function Header() {
       >
         <div className="container mx-auto px-4 py-2.5 sm:py-3">
           <div className="flex items-center justify-between">
-            <Link href="/" className="text-2xl md:text-3xl font-orbitron font-bold text-brand-purple cyber-text glitch hover:text-glow transition-all duration-300 hover:brightness-125" data-text={currentLogoText}>
+            <Link 
+              href="/" 
+              className={cn(
+                "text-2xl md:text-3xl font-orbitron font-bold uppercase tracking-wider gta-vibe-text-effect",
+                "transition-all duration-300 hover:brightness-125"
+              )}
+            >
               {currentLogoText}
             </Link>
             <div className="flex items-center gap-2 md:gap-3">

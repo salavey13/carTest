@@ -171,15 +171,20 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  h1 { @apply text-4xl md:text-5xl; } /* Corrected sizes */
-  h2 { @apply text-3xl md:text-4xl; } /* Corrected sizes */
-  h3 { @apply text-2xl md:text-3xl; } /* Corrected sizes */
-  h4 { @apply text-xl md:text-2xl; } /* Corrected sizes */
-  h5 { @apply text-lg md:text-xl; } /* Corrected sizes */
-  h6 { @apply text-base md:text-lg; } /* Corrected sizes */
+  /* Updated H1 default style */
+  h1 { 
+    @apply text-4xl md:text-5xl; /* Default H1 size */
+    @apply uppercase tracking-wider; /* From GTA style */
+    @apply gta-vibe-text-effect; /* Apply the GTA visual effect class */
+  }
+  h2 { @apply text-3xl md:text-4xl; } 
+  h3 { @apply text-2xl md:text-3xl; } 
+  h4 { @apply text-xl md:text-2xl; } 
+  h5 { @apply text-lg md:text-xl; } 
+  h6 { @apply text-base md:text-lg; } 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Orbitron', sans-serif;
-    @apply tracking-wide;
+    @apply tracking-wide; /* Base tracking, h1 gets 'tracking-wider' */
   }
   section {
     scroll-margin-top: 96px; /* Adjust if header height changes */
@@ -188,6 +193,57 @@
     box-sizing: border-box;
   }
 }
+
+/* Component layer for shared complex styles */
+@layer components {
+  /* GTA Vibe Text Effect (used by H1 default and Header logo) */
+  .gta-vibe-text-effect {
+    /* font-orbitron, tracking-wider, uppercase are applied by H1 default or directly on elements */
+    /* Text Fill: Vertical gradient Orange (bottom) -> Pink -> Purple (top) */
+    background-image: linear-gradient(
+      to top, 
+      hsl(var(--brand-orange)), 
+      hsl(var(--brand-pink)) 50%, 
+      hsl(var(--brand-purple))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-fill-color: transparent;
+    
+    /* Simulated Gradient Stroke: Purple (bottom) -> Pink (middle) -> Blue (top) */
+    text-shadow:
+      /* Bottom stroke part (Purple) */
+      0px 2px 1px hsla(var(--brand-purple), 0.8),
+      0px 2px 3px hsla(var(--brand-purple), 0.6),
+
+      /* Middle stroke part (Pink) */
+      0px 0px 5px hsla(var(--brand-pink), 0.7),
+      0px 0px 10px hsla(var(--brand-pink), 0.5),
+
+      /* Top stroke part (Blue - using brand-blue HSL var) */
+      0px -2px 1px hsla(var(--brand-blue), 0.8),
+      0px -2px 3px hsla(var(--brand-blue), 0.6);
+      
+    user-select: none;
+  }
+
+  /* Input/Textarea components use adjusted variables */
+  .input-cyber {
+    @apply bg-dark-card border border-brand-purple/50 text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm
+           focus:outline-none focus:ring-2 focus:ring-brand-pink focus:border-brand-pink
+           transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
+  }
+  .input-cyber:disabled {
+      @apply opacity-50 cursor-not-allowed;
+  }
+  .textarea-cyber {
+      @apply bg-dark-card border border-brand-purple/50 text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm min-h-[80px]
+             focus:outline-none focus:ring-2 focus:ring-brand-pink focus:border-brand-pink
+             transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
+  }
+}
+
 
 /* === Styles moved from /app/page.tsx (No changes needed here for color palette) === */
 
@@ -532,61 +588,6 @@ input[type="search"]::-ms-clear {
 @keyframes gradient-text-flow {
   to {
     background-position: 200% center;
-  }
-}
-
-/* Input/Textarea components use adjusted variables */
-@layer components {
-  .input-cyber {
-    @apply bg-dark-card border border-brand-purple/50 text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm
-           focus:outline-none focus:ring-2 focus:ring-brand-pink focus:border-brand-pink
-           transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
-  }
-  .input-cyber:disabled {
-      @apply opacity-50 cursor-not-allowed;
-  }
-  .textarea-cyber {
-      @apply bg-dark-card border border-brand-purple/50 text-foreground placeholder-muted-foreground/70 rounded-md px-3 py-2 text-sm min-h-[80px]
-             focus:outline-none focus:ring-2 focus:ring-brand-pink focus:border-brand-pink
-             transition-all duration-200 ease-in-out shadow-inner shadow-black/30;
-  }
-
-  /* GTA Style Heading for Style Guide H1 */
-  .text-gta-style-heading {
-    @apply font-orbitron tracking-wider uppercase; /* Base font style (size set in component) */
-    
-    /* Text Fill: Vertical gradient Orange (bottom) -> Pink -> Purple (top) */
-    background-image: linear-gradient(
-      to top, 
-      hsl(var(--brand-orange)), 
-      hsl(var(--brand-pink)) 50%, 
-      hsl(var(--brand-purple))
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    text-fill-color: transparent;
-    
-    /* Simulated Gradient Stroke: Purple (bottom) -> Pink (middle) -> Blue (top) */
-    /* This is an approximation using multiple text-shadows. */
-    text-shadow:
-      /* Bottom stroke part (Purple) - multiple shadows for thickness and softness */
-      0px 2px 1px hsla(var(--brand-purple), 0.8),
-      0px 2px 3px hsla(var(--brand-purple), 0.6),
-
-      /* Middle stroke part (Pink) - acts as a connector and general glow */
-      0px 0px 5px hsla(var(--brand-pink), 0.7),
-      0px 0px 10px hsla(var(--brand-pink), 0.5), /* Softer, wider glow */
-
-      /* Top stroke part (Blue - using brand-blue HSL var) */
-      0px -2px 1px hsla(var(--brand-blue), 0.8),
-      0px -2px 3px hsla(var(--brand-blue), 0.6),
-
-      /* Optional: a very thin, almost black sharp shadow to define letters before colored glow */
-      /* 0 0 0.5px rgba(0,0,0,0.7); */
-
-      /* Ensure text is not selectable if it causes visual artifacts with background-clip */
-      user-select: none;
   }
 }
 
