@@ -1,3 +1,4 @@
+// /components/stickyChat_components/SuggestionList.tsx
 "use client";
 
 import React from 'react';
@@ -66,7 +67,7 @@ export const SuggestionList: React.FC<SuggestionListProps> = ({
                                 >
                                     {/* Button content */}
                                     {suggestion.icon || <FaPaperPlane className="mr-1.5" />}
-                                    <span className="flex-grow">{suggestion.text}</span>
+                                    <span className="flex-grow ml-1.5">{suggestion.text}</span>
                                 </motion.button>
                             </TooltipTrigger>
                             {suggestion.tooltip && (
