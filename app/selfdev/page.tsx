@@ -1,4 +1,3 @@
-// /app/selfdev/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -102,8 +101,8 @@ export default function SelfDevLandingPage() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span>
-                          <div className="aspect-video w-full h-auto overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-pink-900/30">
-                            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s101.png" alt="Старый путь (ловушка) против Нового пути (свобода)" width={800} height={450} className="w-full h-full object-contain" loading="lazy" />
+                          <div className="w-full overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-pink-900/30">
+                            <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s101.png" alt="Старый путь (ловушка) против Нового пути (свобода)" width={800} height={450} className="w-full h-auto object-contain" loading="lazy" />
                           </div>
                         </span>
                       </TooltipTrigger>
@@ -125,8 +124,8 @@ export default function SelfDevLandingPage() {
                     <Tooltip>
                        <TooltipTrigger asChild>
                          <span>
-                           <div className="aspect-video w-full h-auto overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-blue-900/30">
-                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s201.png" alt="Майнд-карта: Построение бизнеса вокруг себя" width={800} height={450} className="w-full h-full object-contain" loading="lazy" />
+                           <div className="w-full overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-blue-900/30">
+                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s201.png" alt="Майнд-карта: Построение бизнеса вокруг себя" width={800} height={450} className="w-full h-auto object-contain" loading="lazy" />
                            </div>
                          </span>
                        </TooltipTrigger>
@@ -148,9 +147,8 @@ export default function SelfDevLandingPage() {
                      <Tooltip>
                        <TooltipTrigger asChild>
                          <span>
-                           <div className="aspect-video w-full h-auto overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-cyan-900/30">
-                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250511_223650-b874485f-4d99-4c4e-973e-603cf8b6b78a.jpg" alt="AI как усилитель человеческих возможностей" width={800} height={450} className="w-full h-full object-contain" loading="lazy" />
-
+                           <div className="w-full overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-cyan-900/30">
+                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250511_223650-b874485f-4d99-4c4e-973e-603cf8b6b78a.jpg" alt="AI как усилитель человеческих возможностей" width={800} height={450} className="w-full h-auto object-contain" loading="lazy" />
                            </div>
                          </span>
                        </TooltipTrigger>
@@ -185,25 +183,25 @@ export default function SelfDevLandingPage() {
                      <div className="p-5 bg-gray-800/60 border border-yellow-600/50 rounded-xl shadow-lg shadow-yellow-900/20">
                        <h3 className="flex items-center text-lg font-semibold text-yellow-400 mb-3"><span className="text-2xl mr-3">1</span><FaMagnifyingGlass className="mr-2"/> Проверка Реальной Боли</h3>
                        <p className="text-sm text-gray-300 mb-4">Скорми AI (Perplexity, ChatGPT) треды Reddit, форумы, отзывы по твоей теме. <strong className="text-yellow-300">Задача:</strong> найти повторяющиеся жалобы, неудовлетворенность. <strong className="text-brand-yellow">Вердикт:</strong> Нет четкой боли = УБИТЬ ИДЕЮ.</p>
-                       <Tooltip> <TooltipTrigger asChild><span><div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-700/40 cursor-help border border-yellow-700/30"><Image src="/placeholders/validation-problem.png" alt="AI ищет боль пользователей" width={400} height={225} className="w-full h-full object-cover opacity-60 hover:opacity-90 transition-opacity" loading="lazy"/></div></span></TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-yellow-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['validation-problem.png']}</p></TooltipContent> </Tooltip>
+                       <Tooltip> <TooltipTrigger asChild><span><div className="w-full overflow-hidden rounded-md bg-gray-700/40 cursor-help border border-yellow-700/30"><Image src="/placeholders/validation-problem.png" alt="AI ищет боль пользователей" width={400} height={225} className="w-full h-auto object-cover opacity-60 hover:opacity-90 transition-opacity" loading="lazy"/></div></span></TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-yellow-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['validation-problem.png']}</p></TooltipContent> </Tooltip>
                      </div>
                       {/* Step 2 */}
                      <div className="p-5 bg-gray-800/60 border border-yellow-600/50 rounded-xl shadow-lg shadow-yellow-900/20">
                        <h3 className="flex items-center text-lg font-semibold text-yellow-400 mb-3"><span className="text-2xl mr-3">2</span><FaChartLine className="mr-2"/> Оценка Объема Рынка</h3>
                        <p className="text-sm text-gray-300 mb-4">Боль есть? Отлично. Теперь: <strong className="text-yellow-300">достаточно ли людей</strong> готовы платить за решение? AI анализирует Google Trends, объем поиска, TAM. <strong className="text-brand-yellow">Вердикт:</strong> Рынок микроскопический = УБИТЬ ИДЕЮ.</p>
-                       <Tooltip> <TooltipTrigger asChild><span><div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-700/40 cursor-help border border-yellow-700/30"><Image src="/placeholders/validation-market.png" alt="AI анализирует размер рынка" width={400} height={225} className="w-full h-full object-cover opacity-60 hover:opacity-90 transition-opacity" loading="lazy"/></div></span></TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-yellow-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['validation-market.png']}</p></TooltipContent> </Tooltip>
+                       <Tooltip> <TooltipTrigger asChild><span><div className="w-full overflow-hidden rounded-md bg-gray-700/40 cursor-help border border-yellow-700/30"><Image src="/placeholders/validation-market.png" alt="AI анализирует размер рынка" width={400} height={225} className="w-full h-auto object-cover opacity-60 hover:opacity-90 transition-opacity" loading="lazy"/></div></span></TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-yellow-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['validation-market.png']}</p></TooltipContent> </Tooltip>
                      </div>
                       {/* Step 3 */}
                      <div className="p-5 bg-gray-800/60 border border-yellow-600/50 rounded-xl shadow-lg shadow-yellow-900/20">
                        <h3 className="flex items-center text-lg font-semibold text-yellow-400 mb-3"><span className="text-2xl mr-3">3</span><FaEye className="mr-2"/> Анализ Конкурентов</h3>
                        <p className="text-sm text-gray-300 mb-4">Скорми AI сайты, цены, отзывы <strong className="text-yellow-300">топ-5 конкурентов</strong>. <strong className="text-yellow-300">Задача:</strong> найти их слабые места, неудовлетворенные потребности клиентов, возможности для тебя. <strong className="text-brand-yellow">Вердикт:</strong> Нет явного УТП = УБИТЬ ИДЕЮ.</p>
-                       <Tooltip> <TooltipTrigger asChild><span><div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-700/40 cursor-help border border-yellow-700/30"><Image src="/placeholders/validation-competitors.png" alt="AI анализирует конкурентов" width={400} height={225} className="w-full h-full object-cover opacity-60 hover:opacity-90 transition-opacity" loading="lazy"/></div></span></TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-yellow-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['validation-competitors.png']}</p></TooltipContent> </Tooltip>
+                       <Tooltip> <TooltipTrigger asChild><span><div className="w-full overflow-hidden rounded-md bg-gray-700/40 cursor-help border border-yellow-700/30"><Image src="/placeholders/validation-competitors.png" alt="AI анализирует конкурентов" width={400} height={225} className="w-full h-auto object-cover opacity-60 hover:opacity-90 transition-opacity" loading="lazy"/></div></span></TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-yellow-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['validation-competitors.png']}</p></TooltipContent> </Tooltip>
                      </div>
                      {/* Step 4 */}
                      <div className="p-5 bg-gray-800/60 border border-yellow-600/50 rounded-xl shadow-lg shadow-yellow-900/20">
                        <h3 className="flex items-center text-lg font-semibold text-yellow-400 mb-3"><span className="text-2xl mr-3">4</span><FaRegLightbulb className="mr-2"/> MVP Тест ('Fake Door')</h3>
                        <p className="text-sm text-gray-300 mb-4"><strong className="text-brand-yellow">Не строй продукт!</strong> Используй AI, чтобы <strong className="text-yellow-300">за 1 час</strong> создать лендинг, описывающий твое решение как <strong className="text-yellow-300">уже готовое</strong>. Запусти трафик, собирай email/предоплаты. <strong className="text-brand-yellow">Вердикт:</strong> Нет интереса = УБИТЬ ИДЕЮ.</p>
-                       <Tooltip> <TooltipTrigger asChild><span><div className="aspect-video w-full h-auto overflow-hidden rounded-md bg-gray-700/40 cursor-help border border-yellow-700/30"><Image src="/placeholders/validation-mvp.png" alt="AI создает 'fake door' MVP" width={400} height={225} className="w-full h-full object-cover opacity-60 hover:opacity-90 transition-opacity" loading="lazy"/></div></span></TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-yellow-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['validation-mvp.png']}</p></TooltipContent> </Tooltip>
+                       <Tooltip> <TooltipTrigger asChild><span><div className="w-full overflow-hidden rounded-md bg-gray-700/40 cursor-help border border-yellow-700/30"><Image src="/placeholders/validation-mvp.png" alt="AI создает 'fake door' MVP" width={400} height={225} className="w-full h-auto object-cover opacity-60 hover:opacity-90 transition-opacity" loading="lazy"/></div></span></TooltipTrigger> <TooltipContent side="bottom" className="max-w-[250px] bg-gray-950 border border-yellow-600/60 text-white p-2"><p className="text-xs">{tooltipDescriptions['validation-mvp.png']}</p></TooltipContent> </Tooltip>
                      </div>
                    </div>
                    <p className="text-gray-300 text-base md:text-lg leading-relaxed mt-8 text-center">
@@ -224,8 +222,8 @@ export default function SelfDevLandingPage() {
                      <Tooltip>
                        <TooltipTrigger asChild>
                          <span>
-                           <div className="aspect-video w-full h-auto overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-lime-900/30">
-                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s801.png" alt="Персонализация аутрича с помощью AI" width={800} height={450} className="w-full h-full object-contain" loading="lazy" />
+                           <div className="w-full overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-lime-900/30">
+                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s801.png" alt="Персонализация аутрича с помощью AI" width={800} height={450} className="w-full h-auto object-contain" loading="lazy" />
                            </div>
                          </span>
                        </TooltipTrigger>
@@ -254,8 +252,8 @@ export default function SelfDevLandingPage() {
                      <Tooltip>
                        <TooltipTrigger asChild>
                          <span>
-                           <div className="aspect-video w-full h-auto overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-orange-900/30">
-                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/4-9a800381-390b-4153-a1a8-dae1f8850088.png" alt="Эволюция предложений с ростом аудитории" width={800} height={450} className="w-full h-full object-contain" loading="lazy" />
+                           <div className="w-full overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-orange-900/30">
+                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/4-9a800381-390b-4153-a1a8-dae1f8850088.png" alt="Эволюция предложений с ростом аудитории" width={800} height={450} className="w-full h-auto object-contain" loading="lazy" />
                            </div>
                          </span>
                        </TooltipTrigger>
@@ -284,8 +282,8 @@ export default function SelfDevLandingPage() {
                      <Tooltip>
                        <TooltipTrigger asChild>
                          <span>
-                           <div className="aspect-video w-full h-auto overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-purple-900/30">
-                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s501.png" alt="Процесс Интеллектуальной Имитации" width={800} height={450} className="w-full h-full object-contain" loading="lazy" />
+                           <div className="w-full overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-purple-900/30">
+                             <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about/s501.png" alt="Процесс Интеллектуальной Имитации" width={800} height={450} className="w-full h-auto object-contain" loading="lazy" />
                            </div>
                          </span>
                        </TooltipTrigger>
@@ -323,8 +321,8 @@ export default function SelfDevLandingPage() {
                      <Tooltip>
                         <TooltipTrigger asChild>
                           <span>
-                            <div className="aspect-video w-full h-auto overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-green-900/30">
-                              <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about//6-f7ea171b-8d11-4ca0-bb81-1b4965ea03ad.png" alt="Фундаментальный контент как основа доверия" width={800} height={450} className="w-full h-full object-contain" loading="lazy" />
+                            <div className="w-full overflow-hidden rounded-lg bg-gray-800/60 cursor-help shadow-inner shadow-green-900/30">
+                              <Image src="https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about//6-f7ea171b-8d11-4ca0-bb81-1b4965ea03ad.png" alt="Фундаментальный контент как основа доверия" width={800} height={450} className="w-full h-auto object-contain" loading="lazy" />
                             </div>
                           </span>
                         </TooltipTrigger>
