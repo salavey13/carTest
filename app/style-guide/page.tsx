@@ -39,12 +39,11 @@ export default function StyleGuide() {
     <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pt-24 pb-16">
       <div className="container mx-auto space-y-16">
         <header className="text-center mb-12">
-          {/* Main H1 now uses the specific class for Style Guide page, plus glitch */}
           <h1 
             className={cn(
               "text-5xl md:text-6xl font-bold mb-2",
               "text-gta-style-heading-styleguide", // Specific GTA style for this page's H1
-              "glitch" // Keep glitch effect
+              "glitch" 
             )}
             data-text="CYBERVIBE STYLE GUIDE"
           >
@@ -114,11 +113,9 @@ export default function StyleGuide() {
           </div>
         </section>
 
-        {/* Typography Section - H1 here will use default GTA style */}
         <section>
           <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><FaFont /> Типографика</h2>
           <div className="space-y-4 bg-dark-card p-6 rounded-lg border border-border">
-            {/* This H1 will use the default GTA style from globals.css */}
             <h1 className="text-5xl md:text-6xl font-bold">H1: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h1>
             <h2 className="text-4xl md:text-5xl font-orbitron">H2: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h2>
             <h3 className="text-3xl md:text-4xl font-orbitron">H3: Orbitron Заголовок - The quick brown fox jumps over the lazy dog</h3>
@@ -134,7 +131,7 @@ export default function StyleGuide() {
               Блок цитаты: "Stay hungry. Stay foolish." - Steve Jobs
             </blockquote>
             <code className="bg-muted px-1 py-0.5 rounded text-sm font-mono">inline code snippet</code>
-            <pre className="bg-muted p-4 rounded-md overflow-x-auto simple-scrollbar"> {/* Added simple-scrollbar to pre for consistency */}
+            <pre className="bg-muted p-4 rounded-md overflow-x-auto simple-scrollbar"> 
               <code className="text-sm font-mono">
                 {`// Code Block Example
 function greet(name: string) {
@@ -147,7 +144,6 @@ function greet(name: string) {
           </div>
         </section>
 
-        {/* Buttons Section */}
         <section>
           <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><FaHandPointer /> Кнопки</h2>
           <div className="space-y-4">
@@ -184,7 +180,6 @@ function greet(name: string) {
           </div>
         </section>
 
-        {/* Forms Section */}
         <section>
           <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><FaKeyboard /> Элементы Форм</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -204,15 +199,15 @@ function greet(name: string) {
               </div>
               <div>
                 <Label htmlFor="textarea-normal">Textarea</Label>
-                <Textarea id="textarea-normal" placeholder="Type long text here..." className="textarea-cyber simple-scrollbar" /> {/* Added simple-scrollbar */}
+                <Textarea id="textarea-normal" placeholder="Type long text here..." className="textarea-cyber simple-scrollbar" /> 
               </div>
                <div>
                  <Label htmlFor="textarea-focus">Textarea Focus</Label>
-                 <Textarea id="textarea-focus" placeholder="Focus on textarea" className="textarea-cyber simple-scrollbar focus:ring-2 focus:ring-ring focus:border-ring" /> {/* Added simple-scrollbar */}
+                 <Textarea id="textarea-focus" placeholder="Focus on textarea" className="textarea-cyber simple-scrollbar focus:ring-2 focus:ring-ring focus:border-ring" /> 
                </div>
               <div>
                 <Label htmlFor="textarea-disabled">Disabled Textarea</Label>
-                <Textarea id="textarea-disabled" placeholder="Disabled textarea" className="textarea-cyber simple-scrollbar" disabled /> {/* Added simple-scrollbar */}
+                <Textarea id="textarea-disabled" placeholder="Disabled textarea" className="textarea-cyber simple-scrollbar" disabled /> 
               </div>
             </div>
             <div className="space-y-4">
@@ -255,7 +250,6 @@ function greet(name: string) {
           </div>
         </section>
 
-        {/* Card Section */}
         <section>
           <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><FaIdCard /> Карточки</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -299,7 +293,6 @@ function greet(name: string) {
           </div>
         </section>
 
-         {/* Other UI Elements */}
         <section>
           <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><FaDiagramProject /> Другие Элементы</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -328,7 +321,6 @@ function greet(name: string) {
           </div>
         </section>
 
-        {/* Effects & Utilities Section */}
         <section>
           <h2 className="text-3xl font-orbitron mb-6 text-brand-cyan cyber-text flex items-center gap-2"><FaPaintbrush /> Эффекты и Утилиты</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -359,7 +351,7 @@ function greet(name: string) {
                   <div className="h-24 rounded-lg bg-grid-pattern-pink flex items-center justify-center text-sm text-brand-pink/70 border border-brand-pink/20">
                       Pink Grid Pattern (.bg-grid-pattern-pink)
                   </div>
-                 <div className="h-24 overflow-y-scroll simple-scrollbar border border-border rounded p-2 text-xs"> {/* Scrollbar example */}
+                 <div className="h-24 overflow-y-auto simple-scrollbar border border-border rounded p-2 text-xs"> 
                     <h4 className="font-bold mb-1">Custom Scrollbar (.simple-scrollbar)</h4>
                     Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
                  </div>
