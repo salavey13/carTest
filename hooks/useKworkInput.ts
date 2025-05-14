@@ -186,7 +186,7 @@ export const useKworkInput = ({
     }, [
         selectedFetcherFiles, allFetchedFiles, imageReplaceTaskActive, toastSuccess, toastWarning,
         kworkInputValue, setKworkInputValue, 
-        scrollToSection, dbUser?.id, addToast
+        scrollToSection, dbUser?.id, addToast, logger // Added logger to dependency array
     ]);
 
     const handleCopyToClipboard = useCallback(async (textToCopy?: string, shouldScroll = true): Promise<boolean> => { 
@@ -225,7 +225,7 @@ export const useKworkInput = ({
             toastError("Ошибка копирования в буфер обмена");
             return false;
         }
-    }, [kworkInputValue, toastSuccess, toastWarning, toastError, setRequestCopied, scrollToSection, dbUser?.id, addToast]); 
+    }, [kworkInputValue, toastSuccess, toastWarning, toastError, setRequestCopied, scrollToSection, dbUser?.id, addToast, logger]); // Added logger
 
     const handleClearAll = useCallback(() => {
         if (imageReplaceTaskActive) {
@@ -245,7 +245,7 @@ export const useKworkInput = ({
     }, [
         imageReplaceTaskActive, setSelectedFetcherFiles, setKworkInputValue, 
         setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setRequestCopied,
-        toastSuccess, toastWarning, kworkInputRef
+        toastSuccess, toastWarning, kworkInputRef, logger // Added logger
     ]);
 
      const handleAddFullTree = useCallback(async () => {
@@ -262,10 +262,11 @@ export const useKworkInput = ({
 
          logger.info(`[Kwork Input] Adding full file tree structure and content for ${files.length} files to input...`);
          
-         const treeStructure = "Структура дерева файлов временно недоступна (generateTreeStructure отсутствует)."; 
+         
+         const treeStructure = `Структура дерева файлов для ${files.length} файлов:\n${files.map(f => `- /${f.path}`).join('\n')}`; // Simple placeholder tree
 
          const structureMarker = "Структура файлов проекта:";
-         const newStructureSection = `${structureMarker}\n\`\`\`\n${treeStructure.trim()}\n\`\`\``;
+         const newGeneratedTreeBlock = `${structureMarker}\n\`\`\`\n${treeStructure.trim()}\n\`\`\``;
          
          let filesAddedCount = 0;
          const fileBlocksContent = files.map(file => {
@@ -282,68 +283,52 @@ export const useKworkInput = ({
          }).join("\n\n// ---- FILE SEPARATOR ----\n\n");
 
         const codeContextMarker = "Контекст кода для анализа:";
-        const newCodeContextSection = `${codeContextMarker}\n\n${fileBlocksContent}`;
+        const newGeneratedFileContentsBlock = `${codeContextMarker}\n\n${fileBlocksContent}`;
         
-        const currentKworkValue = kworkInputValue || "";
-        let finalKworkValue = "";
+        let tempText = kworkInputValue || "";
 
-        const idxCurrentStructure = currentKworkValue.indexOf(structureMarker);
-        const idxCurrentCode = currentKworkValue.indexOf(codeContextMarker);
+        // Regex to match the whole structure block including content in ```
+        const oldStructureRegex = new RegExp(
+            structureMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + 
+            "\\s*```[\\s\\S]*?```", 
+            "im"
+        );
 
-        let textBefore = "";
-        let textAfter = currentKworkValue; 
-
-        if (idxCurrentStructure !== -1) {
-            const oldStructureBlockRegex = new RegExp(structureMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "\\s*```([\\s\\S]*?)```", "im");
-            const match = oldStructureBlockRegex.exec(currentKworkValue);
-            if (match && match.index === idxCurrentStructure) {
-                textBefore = currentKworkValue.substring(0, idxCurrentStructure);
-                textAfter = currentKworkValue.substring(idxCurrentStructure + match[0].length);
-            } else { 
-                textBefore = currentKworkValue;
-                textAfter = "";
-            }
-        } else { 
-           textAfter = currentKworkValue;
-        }
+        // Regex for code context: from marker until either a structure marker or end of string.
+        const oldCodeDataContextRegex = new RegExp(
+            codeContextMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + 
+            "([\\s\\S]*?)" + // Non-greedy match for the content
+            "(?=" + // Positive lookahead for:
+                "(^" + // Start of a line
+                    structureMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + // Escaped structure marker
+                    "\\s*```" + // Followed by ```
+                ")" +
+                "|$" + // OR end of string
+            ")",
+            "im"
+        );
         
-        finalKworkValue = textBefore.trimEnd() + (textBefore.trimEnd() ? "\n\n" : "") + newStructureSection.trimEnd();
+        // 1. Remove any existing structure block
+        logger.debug("[Kwork Input AddFullTree] Removing old structure block if present.");
+        tempText = tempText.replace(oldStructureRegex, "").trim();
         
-        const currentContentUpToStructure = finalKworkValue; 
-        const remainingTextAfterStructure = textAfter.trimStart(); 
+        // 2. Remove any existing code data block (from the text that already had structure removed)
+        logger.debug("[Kwork Input AddFullTree] Removing old code data block if present.");
+        tempText = tempText.replace(oldCodeDataContextRegex, "").trim();
 
-        if (idxCurrentCode !== -1 && idxCurrentCode > (idxCurrentStructure + (idxCurrentStructure !== -1 ? newStructureSection.length : 0) ) ) {
-            logger.warn("[Kwork Input] Add Tree: Old code context was after structure. Appending new code context after new structure.");
-            finalKworkValue = currentContentUpToStructure.trimEnd() + (remainingTextAfterStructure ? "\n\n" + remainingTextAfterStructure : "") + "\n\n" + newCodeContextSection.trimEnd();
-        } else if (idxCurrentCode !== -1 && idxCurrentCode < idxCurrentStructure) {
-            const oldCodeBlockRegex = new RegExp(codeContextMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "([\\s\\S]*?)(?=" + structureMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "|$)","im");
-            const codeMatch = oldCodeBlockRegex.exec(currentKworkValue); 
-            if (codeMatch && codeMatch.index === idxCurrentCode) {
-                 const textBeforeCode = currentKworkValue.substring(0, idxCurrentCode);
-                 finalKworkValue = textBeforeCode.trimEnd() + (textBeforeCode.trimEnd() ? "\n\n" : "") + newCodeContextSection.trimEnd() + "\n\n" + newStructureSection.trimEnd() + (remainingTextAfterStructure ? "\n\n" + remainingTextAfterStructure : "");
-                 logger.debug("[Kwork Input] Add Tree: Replaced code context (before structure) and then added/replaced structure.");
-            } else {
-                 logger.warn("[Kwork Input] Add Tree: Code marker found but not a proper block before structure. Appending new code context after new structure.");
-                 finalKworkValue = currentContentUpToStructure.trimEnd() + (remainingTextAfterStructure ? "\n\n" + remainingTextAfterStructure : "") + "\n\n" + newCodeContextSection.trimEnd();
-            }
-        } else if (idxCurrentCode !== -1) { 
-             const oldCodeBlockRegex = new RegExp(codeContextMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "([\\s\\S]*?)$","im"); 
-             const codeMatch = oldCodeBlockRegex.exec(currentKworkValue);
-             if(codeMatch && codeMatch.index === idxCurrentCode) {
-                const textBeforeCode = currentKworkValue.substring(0, idxCurrentCode);
-                finalKworkValue = textBeforeCode.trimEnd() + (textBeforeCode.trimEnd() ? "\n\n" : "") + newStructureSection.trimEnd() + "\n\n" + newCodeContextSection.trimEnd();
-                logger.debug("[Kwork Input] Add Tree: Replaced code context (no structure or structure was first), then added structure.");
-             } else {
-                finalKworkValue = currentContentUpToStructure.trimEnd() + (remainingTextAfterStructure ? "\n\n" + remainingTextAfterStructure : "") + "\n\n" + newCodeContextSection.trimEnd();
-                logger.warn("[Kwork Input] Add Tree: Code marker found but not proper block. Appending new code context after new structure.");
-             }
+        // 3. Assemble the new string with remaining text (preamble) + new structure + new code data
+        const finalAssembly = [];
+        if (tempText) { // If there's any remaining user text (preamble)
+            finalAssembly.push(tempText);
+            logger.debug("[Kwork Input AddFullTree] Preserving preamble text:", tempText.substring(0, 100) + "...");
         }
-         else { 
-            finalKworkValue = currentContentUpToStructure.trimEnd() + (remainingTextAfterStructure ? "\n\n" + remainingTextAfterStructure : "") + "\n\n" + newCodeContextSection.trimEnd();
-            logger.debug("[Kwork Input] Add Tree: No code context found. Appending new structure then new code context.");
-        }
+        finalAssembly.push(newGeneratedTreeBlock);
+        logger.debug("[Kwork Input AddFullTree] Adding new structure block.");
+        finalAssembly.push(newGeneratedFileContentsBlock);
+        logger.debug("[Kwork Input AddFullTree] Adding new file contents block.");
+        
+        const finalKworkValue = finalAssembly.join("\n\n").replace(/\n{3,}/g, '\n\n').trim();
 
-        finalKworkValue = finalKworkValue.replace(/\n{3,}/g, '\n\n').trim();
         setKworkInputValue(finalKworkValue);
         toastSuccess(`Структура проекта и ${filesAddedCount} файлов (${files.length} всего) добавлены в запрос.`);
         
@@ -365,7 +350,7 @@ export const useKworkInput = ({
              logger.warn("[useKworkInput AddFullTree] Cannot log CyberFitness actions: dbUser.id is missing.");
         }
         scrollToSection('kworkInput'); 
-     }, [files, imageReplaceTaskActive, kworkInputValue, setKworkInputValue, toastSuccess, toastWarning, scrollToSection, dbUser?.id, addToast]); 
+     }, [files, imageReplaceTaskActive, kworkInputValue, setKworkInputValue, toastSuccess, toastWarning, scrollToSection, dbUser?.id, addToast, logger]); // Added logger
 
      logger.debug("[useKworkInput] Hook setup complete.");
     return {
