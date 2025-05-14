@@ -1,4 +1,3 @@
-// /app/repo-xml/page.tsx
 "use client";
 import React, { Suspense, useRef, useState, useEffect, ReactNode, useCallback, useMemo } from "react";
 import { useSearchParams } from 'next/navigation';
@@ -164,11 +163,10 @@ const getPlainText = (htmlString: string | null | undefined): string => {
 };
 
 // --- ActualPageContent Component ---
-interface ActualPageContentProps {
-  initialPath: string | null;
-  initialIdea: string | null;
-}
-function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps) {
+// Removed initialPath and initialIdea from props
+interface ActualPageContentProps {}
+
+function ActualPageContent({}: ActualPageContentProps) { // Props removed
     const log = logger.log;
     const debug = logger.debug;
     const error = logger.error;
@@ -199,6 +197,7 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
     const {
         fetcherRef, assistantRef, kworkInputRef,
         showComponents, setShowComponents,
+        urlPathToHighlight, // Get value from context
     } = pageContext;
 
     useEffect(() => {
@@ -460,8 +459,8 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
                                      <CardContent className="p-4">
                                          <RepoTxtFetcher
                                              ref={fetcherRef}
-                                             highlightedPathProp={initialPath}
-                                             ideaProp={initialIdea}
+                                             highlightedPathProp={urlPathToHighlight} // Use value from context
+                                             // ideaProp is no longer needed here as kworkInputValue in context is set
                                          />
                                      </CardContent>
                                  </Card>
@@ -545,10 +544,31 @@ function ActualPageContent({ initialPath, initialIdea }: ActualPageContentProps)
 
 function RepoXmlPageInternalContent() {
   const searchParams = useSearchParams();
+  const context = useRepoXmlPageContext(); // Get context
   const path = searchParams.get('path');
   const idea = searchParams.get('idea');
+  
   logger.log(`[RepoXmlPageInternalContent] Extracted from URL - path: ${path}, idea: ${idea ? idea.substring(0,30)+'...' : null}`);
-  return <ActualPageContent initialPath={path} initialIdea={idea} />;
+
+  // Effect to set URL params into context
+  useEffect(() => {
+    if (context) {
+        logger.debug(`[RepoXmlPageInternalContent Effect] Setting URL params to context. Path: ${path}, Idea: ${idea}`);
+        if (typeof context.setUrlPathToHighlight === 'function') {
+            context.setUrlPathToHighlight(path);
+        } else {
+            logger.warn("[RepoXmlPageInternalContent Effect] setUrlPathToHighlight is not a function on context.");
+        }
+        if (typeof context.setKworkInputValue === 'function') {
+            context.setKworkInputValue(idea || ''); // Ensure string value
+        } else {
+            logger.warn("[RepoXmlPageInternalContent Effect] setKworkInputValue is not a function on context.");
+        }
+    }
+  }, [path, idea, context]);
+
+  // ActualPageContent no longer takes initialPath/initialIdea as props
+  return <ActualPageContent />;
 }
 
 function RepoXmlPageLayout() {
