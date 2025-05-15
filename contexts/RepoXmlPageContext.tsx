@@ -326,7 +326,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     addToastStable(`Ошибка Задачи Изображения: Не удалось загрузить файлы.`, 'error', 5000);
                     setImageReplaceTaskStateStable(null); setAssistantLoadingStateStable(false);
                 }
-                if (currentPendingFlow?.type === 'ImageSwap') { setPendingFlowDetailsStateStable(null); } // Clear pending if it was for this image swap
+                if (currentPendingFlow?.type === 'ImageSwap') { setPendingFlowDetailsStateStable(null); } 
             } else if (currentPendingFlow?.type === 'ErrorFix' && fetched) { 
                  const targetFileExists = allFiles.some(f => f.path === currentPendingFlow.targetPath);
                  if (targetFileExists) {
@@ -433,14 +433,15 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             let branchToFetch: string | null = null;
             let branchNameToSeek = potentialBranchNameProvided;
 
+            // For ImageSwap (always new branch/PR strategy):
+            // We will always fetch from the default branch to get the latest version of the file.
+            // The new unique branch will be created later by handleDirectImageReplace.
             if (flowType === 'ImageSwap') {
-                // For ImageSwap, always assume a new branch creation scenario initially for fetching file from default.
-                // The actual branch name for PR will be determined in handleDirectImageReplace.
-                // No need to checkExistingPrBranch here for ImageSwap based on the new "always new PR" requirement.
-                branchNameToSeek = ""; // Ensure we don't accidentally use a potential branch for fetching
-                logger.log(`${flowLogPrefix} Context: ImageSwap flow. Will fetch from default branch for initial content.`);
+                logger.log(`${flowLogPrefix} Context: ImageSwap flow. Always fetching from default branch.`);
                 branchToFetch = null; 
-            } else if (branchNameToSeek) { // For ErrorFix or other flows with a specific branch
+            } 
+            // For ErrorFix or other flows with a potential specific branch:
+            else if (branchNameToSeek) { 
                 try { 
                     const checkResult = await checkExistingPrBranch(repoUrlToCheck, branchNameToSeek);
                     if (checkResult.success && checkResult.data?.exists && checkResult.data?.branchName) {
@@ -462,7 +463,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     logger.error(`${flowLogPrefix} Context: Exception in checkExistingPrBranch for "${branchNameToSeek}":`, err);
                     branchToFetch = null; 
                 }
-            } else { 
+            } else { // Default for non-ImageSwap flows without a specific branch name
                  logger.log(`${flowLogPrefix} Context: No specific branch name to seek. Will fetch from default branch.`);
                  branchToFetch = null;
             }
@@ -734,7 +735,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             kworkInputRef, aiResponseInputRef, fetcherRef, assistantRef,
             addToast: addToastStable,
         }), [
-            fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, isPreCheckingState, showComponentsState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, secondaryHighlightPathsState, targetPrDataState, pendingFlowDetailsState, kworkInputValueState,
+            fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, isPreCheckingState, showComponentsState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, secondaryHighlightedPathsState, targetPrDataState, pendingFlowDetailsState, kworkInputValueState,
             setFetchStatusStateStable, setRepoUrlEnteredStateStable, handleSetFilesFetchedStable, setSelectedFetcherFilesStateStable, setKworkInputHasContentStateStable, setRequestCopiedStateStable, setAiResponseHasContentStateStable, setFilesParsedStateStable, setSelectedAssistantFilesStateStable, setAssistantLoadingStateStable, setAiActionLoadingStateStable, setLoadingPrsStateStable, setTargetBranchNameStateStable, setManualBranchNameStateStable, setOpenPrsStateStable, setIsParsingStateStable, setCurrentAiRequestIdStateStable, setImageReplaceTaskStateStable, setRepoUrlStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setShowComponentsStateStable, setKworkInputValueStateStable,
             triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, 
             triggerCreateOrUpdatePR, 
