@@ -1,162 +1,136 @@
-// /components/RepoTxtFetcher.tsx
 "use client";
 
-import React, { useState, useEffect, useImperativeHandle, forwardRef, useMemo, useCallback } from "react";
+import React, {
+  useRef,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useImperativeHandle,
+  forwardRef,
+  MutableRefObject,
+} from "react";
 import {
-    FaAngleDown, FaAngleUp,
-    FaDownload, FaArrowsRotate, FaCircleCheck, FaXmark, FaCopy,
-    FaBroom, FaCodeBranch, FaPlus, FaSpinner, FaTree, FaImages
-} from "react-icons/fa6";
-import { motion } from "framer-motion";
-
-// --- Core & Context ---
-import {
-    useRepoXmlPageContext,
-    RepoTxtFetcherRef,
-    FileNode,
-    ImportCategory,
-    ImageReplaceTask,
-    SimplePullRequest,
-    FetchStatus
+  useRepoXmlPageContext,
+  RepoTxtFetcherRef,
+  FileNode,
+  ImportCategory,
+  FetchStatus,
+  ImageReplaceTask // Added for parsing ideaProp
 } from "@/contexts/RepoXmlPageContext";
-import { debugLogger as logger } from "@/lib/debugLogger";
-
-// --- Hooks & Utils ---
-import * as repoUtils from "@/lib/repoUtils";
+import { useAppContext } from "@/contexts/AppContext";
 import { useRepoFetcher } from "@/hooks/useRepoFetcher";
 import { useFileSelection } from "@/hooks/useFileSelection";
-import { useKworkInput } from "@/hooks/useKworkInput"; // Используем исправленный хук
+import { useKworkInput } from "@/hooks/useKworkInput";
 import { useAppToast } from "@/hooks/useAppToast";
+import { debugLogger as logger } from "@/lib/debugLogger";
+import * as repoUtils from "@/lib/repoUtils";
 
-// --- Sub-components ---
-import SettingsModal from "./repo/SettingsModal";
-import FileList from "./repo/FileList";
-import SelectedFilesPreview from "./repo/SelectedFilesPreview";
-import RequestInput from "./repo/RequestInput";
-import ProgressBar from "./repo/ProgressBar";
-import VibeContentRenderer from '@/components/VibeContentRenderer';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ProgressBar } from "@/components/ui/progressbar"; // Assuming you have this
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  FaDownload, FaPaperPlane, FaMagic, FaExclamationTriangle, FaCheckCircle, FaInfoCircle,
+  FaTrash, FaCopy, FaList, FaSitemap, FaSearch, FaCogs, FaCodeBranch,
+  FaLink, FaPlus, FaTree, FaTimesCircle, FaFolderOpen, FaFileCode, FaFileImage, FaQuestionCircle, FaFilter
+} from "react-icons/fa";
+import { FaMagnifyingGlass, FaXmark } from "react-icons/fa6";
 
-// --- Component Props ---
+import { SettingsModal } from "./fetcher_components/SettingsModal";
+import { FileList } from "./fetcher_components/FileList";
+import { RequestInput } from "./fetcher_components/RequestInput";
+import { SelectedFilesPreview } from "./fetcher_components/SelectedFilesPreview";
+import { ImportantFilesList } from "./fetcher_components/ImportantFilesList";
+
+
 interface RepoTxtFetcherProps {
-    highlightedPathProp: string | null;
-    ideaProp: string | null;
+  highlightedPathProp: string | null;
+  ideaProp: string | null;
 }
 
-// --- Component Definition ---
-const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
-    highlightedPathProp,
-    ideaProp
-}, ref) => {
-    logger.log("[RepoTxtFetcher] START Render");
-
-    // === Context ===
-    const { addToast: addToastContext,
-        fetchStatus, setFetchStatus, // Added setFetchStatus
-        filesFetched,
-        repoUrl: repoUrlFromContext, setRepoUrl: setRepoUrlInContext, repoUrlEntered,
-        selectedFetcherFiles,
-        kworkInputHasContent, // Keep reading this boolean flag if needed for quick checks
-        kworkInputValue,      // <<< GET state value
-        setKworkInputValue,   // <<< GET state setter
-        kworkInputRef,
-        loadingPrs,
-        assistantLoading, isParsing, aiActionLoading,
-        targetBranchName, setTargetBranchName, manualBranchName, setManualBranchName, openPrs,
-        setLoadingPrs, triggerGetOpenPRs,
-        isSettingsModalOpen, triggerToggleSettingsModal, scrollToSection,
-        currentAiRequestId,
-        imageReplaceTask,
-        allFetchedFiles,
-        assistantRef, updateRepoUrlInAssistant,
-    } = useRepoXmlPageContext();
-    const { error: toastError, info: toastInfo } = useAppToast();
+const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(
+  (props, ref) => {
     logger.debug("[RepoTxtFetcher] Function Start");
+    const { highlightedPathProp, ideaProp } = props;
 
-    // === Basic Component State ===
-    const [token, setToken] = useState<string>("");
-    const [prevEffectiveBranch, setPrevEffectiveBranch] = useState<string | null>(null); // For branch change detection
+    const {
+      fetchStatus,
+      setFetchStatus,
+      repoUrl,
+      setRepoUrl,
+      selectedFetcherFiles,
+      setSelectedFetcherFiles,
+      kworkInputRef,
+      kworkInputValue,
+      setKworkInputValue,
+      setKworkInputHasContent,
+      setRequestCopied,
+      handleSetFilesFetched,
+      openPrs,
+      setOpenPrs,
+      targetBranchName,
+      setTargetBranchName,
+      manualBranchName,
+      setManualBranchName,
+      isSettingsModalOpen,
+      triggerToggleSettingsModal,
+      assistantLoading,
+      isParsing,
+      aiActionLoading,
+      loadingPrs,
+      setLoadingPrs,
+      triggerGetOpenPRs,
+      imageReplaceTask: contextImageReplaceTask, // Get from context
+      setImageReplaceTask, // To set image task from ideaProp
+      triggerPreCheckAndFetch, // To initiate flows from ideaProp
+      repoUrlEntered,
+      filesFetched,
+      allFetchedFiles,
+      setAiResponseHasContent,
+      setFilesParsed,
+      setSelectedAssistantFiles,
+      scrollToSection,
+    } = useRepoXmlPageContext();
+    
+    const { user, dbUser } = useAppContext();
+    const { success: toastSuccess, error: toastError, info: toastInfo } = useAppToast();
+
+    const [localToken, setLocalToken] = useState<string>("");
+    const [showImportantFiles, setShowImportantFiles] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [filterActive, setFilterActive] = useState(false);
+    
     logger.debug("[RepoTxtFetcher] After useState");
+    logger.debug("[RepoTxtFetcher] Received props:", { highlightedPathProp, ideaProp });
 
-    // === Context ===
-    const repoUrl = repoUrlFromContext;
-    const handleRepoUrlChange = setRepoUrlInContext;
+    const importantFilesConfig = useMemo(() => repoUtils.getImportantFilesConfig(repoUrl), [repoUrl]);
 
-    // === URL Params & Derived State ---
-    const highlightedPathFromUrl = highlightedPathProp ?? "";
-    const ideaFromUrl = ideaProp ?? "";
-    logger.debug(`[RepoTxtFetcher] Received props: highlightedPathProp='${highlightedPathFromUrl}', ideaProp='${ideaFromUrl ? ideaFromUrl.substring(0,30)+'...' : null}'`);
-
-    const autoFetch = useMemo(() =>
-        !!imageReplaceTask ||
-        (!!highlightedPathFromUrl || !!ideaFromUrl)
-    , [imageReplaceTask, highlightedPathFromUrl, ideaFromUrl]);
-
-    // --- ОБНОВЛЕННЫЙ и УРЕЗАННЫЙ СПИСОК ВАЖНЫХ ФАЙЛОВ ---
-    const importantFiles = useMemo(() => [
-        // --- Структура и главная страница фичи ---
-        "package.json", "app/layout.tsx",           // Общий layout важен
-        "tailwind.config.ts",
-        "app/globals.css",
-        "/app/repo-xml/page.tsx", // <-- Added this page itself
-        "/components/RepoTxtFetcher.tsx", // <-- Added this component
-        "/components/AICodeAssistant.tsx", // <-- Added this component
-        "/contexts/RepoXmlPageContext.tsx", // <-- Added context
-        "app/style-guide/page.tsx",       
-        // --- Ключевой Контекст ---
-        "contexts/AppContext.tsx",
-
-        // --- Основные Хуки для этой страницы ---
-        "hooks/useAppToast.ts",
-        "hooks/useRepoFetcher.ts",
-        "hooks/useFileSelection.ts",
-        "hooks/useKworkInput.ts",
-
-        "hooks/supabase.ts", // Часто нужен для работы с данными
-
-        // --- Основные Экшены ---
-        "app/actions.ts",
-        "lib/debugLogger.ts",
-
-        // --- Базовые Утилиты и Типы ---
-        "components/VibeContentRenderer.tsx",
-
-        "components/Header.tsx",
-        "types/database.types.ts", // Типы БД важны для экшенов
-
-        // --- Промпт (если AI должен понимать, как с ним работать) ---
-         "components/repo/prompt.ts",
-
-    ].filter(Boolean), []); // filter(Boolean) на случай, если какие-то файлы не существуют
-    // --- КОНЕЦ ОБНОВЛЕННОГО СПИСКА ---
-
-    const effectiveBranchDisplay = useMemo(() => targetBranchName || manualBranchName || "default", [targetBranchName, manualBranchName]);
-
-    logger.debug("[RepoTxtFetcher] After Derived State/Memo");
-
-    // === Custom Hooks ===
-    logger.debug("[RepoTxtFetcher] Before useRepoFetcher Hook");
     const {
         files: fetchedFiles,
         progress,
-        error: fetchError,
-        primaryHighlightedPath,
-        secondaryHighlightedPaths,
+        error: fetcherError,
+        primaryHighlightedPath: hookPrimaryHighlightedPath,
+        secondaryHighlightedPaths: hookSecondaryHighlightedPaths,
         handleFetchManual,
         isLoading: isFetchLoading,
-        isFetchDisabled
+        isFetchDisabled: isActionDisabled,
     } = useRepoFetcher({
-        repoUrl, token, targetBranchName, manualBranchName, imageReplaceTask,
-        highlightedPathFromUrl,
-        importantFiles, // Передаем обновленный список
-        autoFetch,
-        ideaFromUrl,
-        isSettingsModalOpen,
-        repoUrlEntered, assistantLoading, isParsing, aiActionLoading,
-        loadingPrs,
+        repoUrl, token: localToken, targetBranchName, manualBranchName,
+        imageReplaceTask: contextImageReplaceTask, // Pass context image task to fetcher
+        highlightedPathFromUrl: highlightedPathProp || "",
+        importantFiles: importantFilesConfig.map(f => f.path),
+        autoFetch: !!(highlightedPathProp && !ideaProp), // Auto-fetch if path provided and no specific idea
+        ideaFromUrl: ideaProp || "",
+        isSettingsModalOpen, repoUrlEntered, assistantLoading, isParsing, aiActionLoading, loadingPrs,
     });
     logger.debug("[RepoTxtFetcher] After useRepoFetcher Hook");
 
-    logger.debug("[RepoTxtFetcher] Before useFileSelection Hook");
     const {
         toggleFileSelection,
         selectHighlightedFiles,
@@ -165,406 +139,266 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         handleDeselectAll,
     } = useFileSelection({
         files: fetchedFiles,
-        primaryHighlightedPath,
-        secondaryHighlightedPaths,
-        importantFiles, // Передаем обновленный список
-        imageReplaceTaskActive: !!imageReplaceTask,
+        primaryHighlightedPath: hookPrimaryHighlightedPath,
+        secondaryHighlightedPaths: hookSecondaryHighlightedPaths,
+        importantFiles: importantFilesConfig.map(f => f.path),
+        imageReplaceTaskActive: !!contextImageReplaceTask, // Use context task
     });
-    logger.debug("[RepoTxtFetcher] After useFileSelection Hook");
+     logger.debug("[RepoTxtFetcher] After useFileSelection Hook");
 
-    logger.debug("[RepoTxtFetcher] Before useKworkInput Hook");
     const {
         handleAddSelected,
         handleCopyToClipboard,
         handleClearAll,
-        handleAddFullTree, // Используем уже исправленную версию
+        handleAddFullTree,
     } = useKworkInput({
         selectedFetcherFiles,
-        allFetchedFiles,
-        imageReplaceTaskActive: !!imageReplaceTask,
-        files: fetchedFiles, // Передаем текущий список файлов для handleAddFullTree
+        allFetchedFiles: fetchedFiles,
+        imageReplaceTaskActive: !!contextImageReplaceTask, // Use context task
+        files: fetchedFiles,
     });
     logger.debug("[RepoTxtFetcher] After useKworkInput Hook");
+    
+    const pathFromUrl = highlightedPathProp;
+    const ideaFromUrl = ideaProp;
 
-    // === Effects ===
+    // EFFECT TO HANDLE ideaProp on mount/change (ImageReplace or ErrorFix)
     useEffect(() => {
-        logger.debug("[Effect URL Sync] RepoTxtFetcher: Syncing Assistant URL START");
-        if (assistantRef?.current?.updateRepoUrl) {
-             logger.debug(`[Effect URL Sync] Attempting assistantRef.updateRepoUrl with URL: ${repoUrl}. Type: ${typeof assistantRef.current.updateRepoUrl}`);
-             updateRepoUrlInAssistant(repoUrl);
-        } else {
-             logger.warn("[Effect URL Sync] assistantRef or updateRepoUrl not ready yet");
-        }
-         logger.debug("[Effect URL Sync] RepoTxtFetcher: Syncing Assistant URL END");
-    }, [repoUrl, updateRepoUrlInAssistant, assistantRef]);
+        logger.debug(`[RepoTxtFetcher Effect ideaProp] ideaProp changed or component mounted. ideaProp: '${ideaFromUrl}', pathFromUrl: '${pathFromUrl}'`);
+        if (ideaFromUrl && pathFromUrl && repoUrl.includes("github.com")) { // Ensure repoUrl is also valid
+            if (ideaFromUrl.startsWith("ImageReplace|")) {
+                logger.info("[RepoTxtFetcher Effect ideaProp] Detected ImageReplace flow from ideaProp.");
+                const parts = ideaFromUrl.split("|");
+                const oldUrlPart = parts.find(p => p.startsWith("OldURL="));
+                const newUrlPart = parts.find(p => p.startsWith("NewURL="));
 
-    useEffect(() => {
-        logger.debug("[Effect Scroll] RepoTxtFetcher Check");
-        if (fetchStatus !== 'success' || !!imageReplaceTask || autoFetch) {
-             logger.debug("[Effect Scroll] SKIPPED (wrong status/mode/auto)", { fetchStatus, imageReplaceTask, autoFetch });
-             return;
-        }
-        let cleanupScroll = () => {}; // Initialize cleanup function
+                if (oldUrlPart && newUrlPart) {
+                    const oldUrl = decodeURIComponent(oldUrlPart.substring("OldURL=".length));
+                    const newUrl = decodeURIComponent(newUrlPart.substring("NewURL=".length));
+                    
+                    logger.log("[RepoTxtFetcher Effect ideaProp] Parsed ImageReplace details:", { targetPath: pathFromUrl, oldUrl, newUrl });
+                    
+                    // Use triggerPreCheckAndFetch for ImageSwap
+                    const branchNameToUse = manualBranchName || targetBranchName || ''; 
+                    triggerPreCheckAndFetch(
+                        repoUrl,
+                        branchNameToUse,
+                        'ImageSwap',
+                        { oldUrl, newUrl }, // Pass details for ImageSwap
+                        pathFromUrl
+                    ).then(() => {
+                        logger.log("[RepoTxtFetcher Effect ideaProp] triggerPreCheckAndFetch for ImageSwap completed via ideaProp.");
+                    }).catch(err => {
+                        logger.error("[RepoTxtFetcher Effect ideaProp] Error calling triggerPreCheckAndFetch for ImageSwap via ideaProp:", err);
+                         // Fallback if triggerPreCheckAndFetch fails before setting image task
+                         setImageReplaceTask({ targetPath: pathFromUrl, oldUrl, newUrl });
+                    });
+                } else {
+                    logger.warn("[RepoTxtFetcher Effect ideaProp] Could not parse OldURL/NewUrl from ImageReplace ideaProp.");
+                }
+            } else if (ideaFromUrl.startsWith("ErrorFix|")) {
+                logger.info("[RepoTxtFetcher Effect ideaProp] Detected ErrorFix flow from ideaProp.");
+                 try {
+                    const detailsString = ideaFromUrl.substring("ErrorFix|".length);
+                    const parsedDetails = JSON.parse(decodeURIComponent(detailsString)); // Assuming details are JSON stringified
+                     logger.log("[RepoTxtFetcher Effect ideaProp] Parsed ErrorFix details:", parsedDetails);
 
-        const scrollToFile = (path: string, block: ScrollLogicalPosition = "center") => {
-             const el = document.getElementById(`file-${path}`);
-             if (el) {
-                 logger.info(`[Effect Scroll] Scrolling to file: ${path}`);
-                 el.scrollIntoView({ behavior: "smooth", block: block });
-                 el.classList.add('highlight-scroll');
-                 const removeClassTimer = setTimeout(() => {
-                     if (document.getElementById(`file-${path}`)) { // Check element still exists
-                        el.classList.remove('highlight-scroll');
-                     } else {
-                        logger.warn(`[Effect Scroll Timeout] Element file-${path} no longer exists for removing highlight.`);
-                     }
-                 }, 2500);
-                 return () => clearTimeout(removeClassTimer); // Return cleanup specific to this scroll
-             } else {
-                logger.warn(`[Effect Scroll] scrollToFile: Element not found for ${path}`);
-                toastInfo(`Не удалось найти элемент файла для прокрутки: ${path}`);
-                return () => {}; // Return empty cleanup if element not found
-             }
-        };
-
-        if (primaryHighlightedPath) {
-             logger.debug(`[Effect Scroll] Found primary highlight ${primaryHighlightedPath}, scheduling scroll.`);
-             const timer = setTimeout(() => {
-                 cleanupScroll = scrollToFile(primaryHighlightedPath);
-             }, 300);
-             // Combined cleanup: clear outer timer and run inner cleanup
-             return () => { clearTimeout(timer); cleanupScroll(); };
-        } else if (fetchedFiles.length > 0) {
-             logger.debug("[Effect Scroll] No primary highlight, scrolling to file list container.");
-             const cleanupDirectScroll = scrollToSection('file-list-container'); // Assuming returns cleanup if needed
-             // Cast the potential cleanup function from scrollToSection to the expected type
-             return cleanupDirectScroll as (() => void) | undefined;
-        } else {
-            logger.debug("[Effect Scroll] No primary highlight and no fetched files, doing nothing.");
-            return () => {};
-        }
-    }, [fetchStatus, primaryHighlightedPath, imageReplaceTask, autoFetch, fetchedFiles.length, scrollToSection, toastInfo, logger]);
-
-    useEffect(() => {
-        if (prevEffectiveBranch && prevEffectiveBranch !== effectiveBranchDisplay) {
-            // Branch has changed
-            if (fetchStatus === 'success') {
-                logger.info(`[RepoTxtFetcher Branch Change] Effective branch changed from '${prevEffectiveBranch}' to '${effectiveBranchDisplay}'. Resetting fetchStatus from 'success' to 'idle'.`);
-                setFetchStatus('idle');
-            } else if (fetchStatus !== 'idle' && fetchStatus !== 'loading' && fetchStatus !== 'retrying') {
-                // If branch changed and status is some other terminal state (e.g. error from old branch), also reset to idle
-                 logger.info(`[RepoTxtFetcher Branch Change] Effective branch changed from '${prevEffectiveBranch}' to '${effectiveBranchDisplay}'. Resetting fetchStatus from '${fetchStatus}' to 'idle'.`);
-                 setFetchStatus('idle');
+                    const branchNameToUse = manualBranchName || targetBranchName || '';
+                     triggerPreCheckAndFetch(
+                         repoUrl,
+                         branchNameToUse,
+                         'ErrorFix',
+                         parsedDetails,
+                         pathFromUrl
+                     ).then(() => {
+                         logger.log("[RepoTxtFetcher Effect ideaProp] triggerPreCheckAndFetch for ErrorFix completed via ideaProp.");
+                     }).catch(err => {
+                         logger.error("[RepoTxtFetcher Effect ideaProp] Error calling triggerPreCheckAndFetch for ErrorFix via ideaProp:", err);
+                     });
+                 } catch (e) {
+                     logger.error("[RepoTxtFetcher Effect ideaProp] Failed to parse ErrorFix details from ideaProp:", e);
+                 }
+            } else {
+                 logger.log(`[RepoTxtFetcher Effect ideaProp] ideaProp ("${ideaFromUrl}") is present but not for ImageReplace or ErrorFix. Generic idea flow will be handled by RepoXmlPage if applicable or manual input.`);
             }
+        } else {
+             logger.debug(`[RepoTxtFetcher Effect ideaProp] Skipping flow trigger: ideaFromUrl='${ideaFromUrl}', pathFromUrl='${pathFromUrl}', repoUrl='${repoUrl}'`);
         }
-        setPrevEffectiveBranch(effectiveBranchDisplay);
-    }, [effectiveBranchDisplay, fetchStatus, setFetchStatus, prevEffectiveBranch, logger]);
+    }, [ideaFromUrl, pathFromUrl, repoUrl, manualBranchName, targetBranchName, triggerPreCheckAndFetch, setImageReplaceTask]);
 
-    // === Imperative Handle ===
-    logger.debug("[RepoTxtFetcher] Before useImperativeHandle");
+
     useImperativeHandle(ref, () => ({
-        handleFetch: (isManualRetry?: boolean, branchNameToFetchOverride?: string | null, taskForEarlyCheck?: ImageReplaceTask | null) => {
-            logger.debug(`[Imperative] handleFetch called.`);
-            // Pass override, but task/flow info is now read from context inside handleFetchManual
-            return handleFetchManual(isManualRetry, branchNameToFetchOverride);
+        handleFetch: async (isRetry = false, branchNameToFetchOverride?: string | null, imageTaskForThisFetch?: ImageReplaceTask) => {
+            // If an imageTaskForThisFetch is provided, ensure it's set in context *before* fetching
+            if (imageTaskForThisFetch) {
+                logger.log("[RepoTxtFetcher ImperativeHandle handleFetch] Explicit imageTaskForThisFetch provided, setting it in context.", imageTaskForThisFetch);
+                setImageReplaceTask(imageTaskForThisFetch);
+            }
+            // handleFetchManual in useRepoFetcher will use the imageReplaceTask from context (via its props)
+            await handleFetchManual(isRetry, branchNameToFetchOverride);
         },
-        selectHighlightedFiles: () => {
-             logger.debug(`[Imperative] selectHighlightedFiles called.`);
-             selectHighlightedFiles();
+        selectHighlightedFiles,
+        handleAddSelected: (selectedPathsOverride?: Set<string>, allFilesOverride?: FileNode[]) => {
+            // This local handleAddSelected might not be needed if useKworkInput's version is sufficient
+            // For now, assuming useKworkInput's handleAddSelected is the primary one.
+            // If specific logic is needed here, it can be implemented.
+            // This is mostly a pass-through to the hook's more complex version.
+            logger.debug("[RepoTxtFetcher ImperativeHandle] handleAddSelected called. Delegating to useKworkInput.");
+            return handleAddSelected(); // Call from useKworkInput
         },
-        handleAddSelected: (filesToAdd: Set<string>, allFiles: FileNode[]) => {
-            logger.debug(`[Imperative] handleAddSelected called.`);
-            handleAddSelected(); // Вызываем локальный обработчик (из useKworkInput)
-            return Promise.resolve();
-        },
-        handleCopyToClipboard: (text?: string, scroll?: boolean) => {
-             logger.debug(`[Imperative] handleCopyToClipboard called.`);
-             return handleCopyToClipboard(text, scroll); // Вызываем локальный обработчик
-        },
-        clearAll: () => {
-             logger.debug(`[Imperative] clearAll called.`);
-             handleClearAll(); // Вызываем локальный обработчик
-        },
-        getKworkInputValue: () => {
-             logger.debug(`[Imperative] getKworkInputValue called.`);
-             return kworkInputValue;
-        },
-        handleAddImportantFiles: () => {
-             logger.debug(`[Imperative] handleAddImportantFiles called.`);
-             handleAddImportantFiles(); // Вызываем локальный обработчик (из useFileSelection)
-        },
-        handleAddFullTree: () => {
-             logger.debug(`[Imperative] handleAddFullTree called.`);
-             handleAddFullTree(); // Вызываем локальный обработчик (из useKworkInput)
-        },
-        selectAllFiles: () => {
-             logger.debug(`[Imperative] selectAllFiles called.`);
-             handleSelectAll(); // Вызываем локальный обработчик (из useFileSelection)
-        },
-        deselectAllFiles: () => {
-            logger.debug(`[Imperative] deselectAllFiles called.`);
-            handleDeselectAll(); // Вызываем локальный обработчик (из useFileSelection)
-        },
-    }), [
-        handleFetchManual, selectHighlightedFiles, handleAddSelected, handleCopyToClipboard, handleClearAll,
-        kworkInputValue, // Need state value for getter
-        imageReplaceTask, handleAddImportantFiles, handleAddFullTree, handleSelectAll, handleDeselectAll, logger // Added logger
-    ]);
-    logger.debug("[RepoTxtFetcher] After useImperativeHandle");
+        handleCopyToClipboard,
+        clearAll: handleClearAll,
+        handleAddImportantFiles,
+        handleAddFullTree,
+        selectAllFiles: handleSelectAll,
+        deselectAllFiles: handleDeselectAll,
+    }));
+     logger.debug("[RepoTxtFetcher] After useImperativeHandle");
 
-    // --- Local Event Handlers ---
-     const handleManualBranchChange = useCallback((branch: string) => {
-          logger.info(`[CB ManualBranchChange] Setting manual branch: ${branch}`);
-          setManualBranchName(branch);
-          if (targetBranchName) {
-            logger.info(`[CB ManualBranchChange] Clearing targetBranchName`);
-            setTargetBranchName(null);
-          }
-     }, [setManualBranchName, targetBranchName, setTargetBranchName, logger]);
-
-      const handleSelectPrBranch = useCallback((branch: string | null) => {
-          logger.info(`[CB SelectPrBranch] Setting target branch: ${branch}`);
-          setTargetBranchName(branch);
-          if (branch) {
-              logger.info(`[CB SelectPrBranch] Clearing manualBranchName`);
-              setManualBranchName("");
-          }
-      }, [setTargetBranchName, setManualBranchName, logger]);
-
-      const handleLoadPrs = useCallback(() => {
-          logger.info(`[CB LoadPrs] Triggering PR load for URL: ${repoUrl}`);
-          if (repoUrl) {
-              triggerGetOpenPRs(repoUrl);
-          } else {
-              toastError("Введите URL репозитория для загрузки PR.");
-              logger.warn("[CB LoadPrs] Cannot load PRs, repo URL is empty.");
-          }
-      }, [repoUrl, triggerGetOpenPRs, toastError, logger]);
-
-    // --- Derived States for Rendering ---
-    logger.debug("[RepoTxtFetcher] Calculate Derived State");
-    const currentImageTask = imageReplaceTask;
-    const showProgressBar = fetchStatus !== 'idle';
-    const isActionDisabled = isFetchLoading || loadingPrs || aiActionLoading || assistantLoading || isParsing || !!currentImageTask;
-    // Ensure kworkInputValue is treated as a string for trim()
-    const kworkValueForCheck = kworkInputValue ?? ''; // Safeguard here for derivation
-    const isCopyDisabled = !kworkValueForCheck.trim() || isActionDisabled;
-    const isClearDisabled = (!kworkValueForCheck.trim() && selectedFetcherFiles.size === 0 && !filesFetched) || isActionDisabled;
-    const isAddSelectedDisabled = selectedFetcherFiles.size === 0 || isActionDisabled;
-    // const effectiveBranchDisplay = targetBranchName || manualBranchName || "default"; // Now a useMemo
-    const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
-    const imageTaskTargetFileReady = currentImageTask && fetchStatus === 'success' && fetchedFiles.some(f => f.path === currentImageTask.targetPath);
-    logger.debug(`[Render State] isActionDisabled=${isActionDisabled}, isFetchLoading=${isFetchLoading}, showProgressBar=${showProgressBar}`);
-
-    // --- Log before return ---
-    logger.debug("[RepoTxtFetcher] Preparing to render JSX...");
-
-    // --- RENDER ---
-    try {
-        return (
-          <div id="extractor" className="w-full p-4 md:p-6 bg-card text-foreground font-mono rounded-xl shadow-[0_0_20px_hsl(var(--brand-green)/0.2)] border border-border relative overflow-hidden"> {/* Use theme colors */}
-             {/* Header and Settings Toggle Button */}
-             <div className="flex justify-between items-start mb-4 gap-4 flex-wrap">
-                  {/* Title and Instructions */}
-                  <div>
-                     <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-2 flex items-center gap-2"> {/* Use theme colors */}
-                        {currentImageTask ? <FaImages className="text-brand-blue" /> : <FaDownload className="text-neon-lime" />}
-                        <span className={currentImageTask ? "text-brand-blue" : "text-brand-purple"}>
-                           {currentImageTask ? "Задача: Замена Картинки" : "Кибер-Экстрактор Кода"}
-                        </span>
-                     </h2>
-                      {!currentImageTask && (
-                         <div className="text-brand-yellow/80 text-xs md:text-sm space-y-1 mb-2 prose prose-invert prose-p:my-1 prose-strong:text-brand-purple prose-span:font-normal prose-a:text-brand-blue max-w-none"> {/* Use theme colors */}
-                            <VibeContentRenderer content={"1. Настрой <FaCodeBranch title='Настройки' class='inline text-cyan-400'/>."} />
-                            <VibeContentRenderer content={"2. Жми <strong class='text-purple-400 mx-1'>\"Извлечь файлы\"</strong>."} />
-                            <VibeContentRenderer content={"3. Выбери файлы или <strong class='text-teal-400 mx-1'>связанные</strong> / <strong class='text-orange-400 mx-1'>важные</strong>."} />
-                            <VibeContentRenderer content={"4. Опиши задачу ИЛИ добавь файлы <FaPlus title='Добавить выбранные в запрос' class='inline text-sm'/> / все <FaTree title='Добавить все файлы в запрос' class='inline text-sm'/>."} />
-                            <VibeContentRenderer content={"5. Скопируй <FaCopy title='Скопировать запрос' class='inline text-sm mx-px'/> или передай дальше."} />
-                        </div>
-                      )}
-                      {currentImageTask && (
-                          <p className="text-brand-blue/80 text-xs md:text-sm mb-2"> {/* Use theme color */}
-                              Авто-загрузка файла для замены: <code className="text-xs bg-muted px-1 py-0.5 rounded">{currentImageTask.targetPath}</code>... {/* Use theme color */}
-                          </p>
-                      )}
-                  </div>
-                  {/* Settings Toggle Button */}
-                  <motion.button
-                      onClick={() => { logger.debug("[Click] Settings Toggle Button Click"); triggerToggleSettingsModal(); }}
-                      disabled={isFetchLoading || assistantLoading || isParsing}
-                      whileHover={{ scale: (isFetchLoading || assistantLoading || isParsing) ? 1 : 1.1, rotate: isSettingsModalOpen ? 10 : -10 }}
-                      whileTap={{ scale: (isFetchLoading || assistantLoading || isParsing) ? 1 : 0.95 }}
-                      title={isSettingsModalOpen ? "Скрыть настройки" : "Показать настройки"}
-                      aria-label={isSettingsModalOpen ? "Скрыть настройки" : "Показать настройки"}
-                      aria-expanded={isSettingsModalOpen}
-                      className="p-2 bg-muted/50 rounded-full hover:bg-muted/70 transition-colors flex-shrink-0 disabled:opacity-50" // Use theme colors
-                  >
-                      {isSettingsModalOpen ? <FaAngleUp className="text-brand-cyan text-xl" /> : <FaCodeBranch className="text-brand-cyan text-xl" />} {/* Use theme color */}
-                  </motion.button>
-              </div>
-
-             {/* Settings Modal */}
-             {(() => { logger.debug("[Render] Rendering SettingsModal (conditional)"); return null; })()}
-             <SettingsModal
-                  isOpen={isSettingsModalOpen}
-                  repoUrl={repoUrl}
-                  setRepoUrl={handleRepoUrlChange}
-                  token={token}
-                  setToken={setToken}
-                  manualBranchName={manualBranchName}
-                  setManualBranchName={handleManualBranchChange}
-                  currentTargetBranch={targetBranchName}
-                  openPrs={openPrs}
-                  loadingPrs={loadingPrs}
-                  onSelectPrBranch={handleSelectPrBranch}
-                  onLoadPrs={handleLoadPrs}
-                  loading={isFetchLoading || loadingPrs || assistantLoading || aiActionLoading || isParsing}
-              />
-
-             {/* Fetch Button */}
-             <div className="mb-4 flex justify-center">
-                  <motion.button
-                      onClick={() => {
-                          logger.info("[Click] Fetch Button Clicked");
-                          // Call handleFetchManual without task/flow args - it reads context now
-                          handleFetchManual(fetchStatus === 'failed_retries' || fetchStatus === 'error');
-                       }}
-                      disabled={isFetchDisabled}
-                      className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-primary-foreground bg-gradient-to-r ${fetchStatus === 'failed_retries' || fetchStatus === 'error' ? 'from-destructive to-orange-500 hover:from-destructive/90 hover:to-orange-600' : 'from-neon-lime to-brand-cyan'} transition-all shadow-lg shadow-purple-500/30 hover:shadow-cyan-500/40 ${isFetchDisabled ? "opacity-60 cursor-not-allowed" : "hover:brightness-110 active:scale-[0.98]"}`} // Use theme colors
-                      whileHover={{ scale: isFetchDisabled ? 1 : 1.03 }}
-                      whileTap={{ scale: isFetchDisabled ? 1 : 0.97 }}
-                      title={`Извлечь файлы из ветки: ${effectiveBranchDisplay}${currentImageTask ? ' (для задачи замены картинки)' : ''}`}
-                  >
-                       {isFetchLoading ? <FaSpinner className="animate-spin" /> : (fetchStatus === 'failed_retries' || fetchStatus === 'error' ? <FaArrowsRotate /> : currentImageTask ? <FaImages /> : <FaDownload />)}
-                       {fetchStatus === 'retrying' ? "Повтор запроса..." : isFetchLoading ? "Загрузка..." : (fetchStatus === 'failed_retries' || fetchStatus === 'error' ? "Попробовать снова" : currentImageTask ? "Загрузить файл" : "Извлечь файлы")}
-                       <span className="text-xs opacity-80 hidden sm:inline">({effectiveBranchDisplay})</span>
-                  </motion.button>
-              </div>
-
-             {/* Progress Bar and Status Messages */}
-             {showProgressBar && (
-                  <div className="mb-4 min-h-[40px]">
-                      {(() => { logger.debug("[Render] Rendering ProgressBar (conditional)"); return null; })()}
-                      <ProgressBar status={fetchStatus === 'failed_retries' ? 'error' : fetchStatus} progress={progress} />
-                      {isFetchLoading && <p className="text-brand-cyan text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? '(Повтор)' : ''}</p>} {/* Use theme color */}
-                      {isParsing && !currentImageTask && <p className="text-brand-yellow text-xs font-mono mt-1 text-center animate-pulse">Разбор ответа AI...</p>} {/* Use theme color */}
-                      {fetchStatus === 'success' && !currentImageTask && fetchedFiles.length > 0 && (
-                         <div className="text-center text-xs font-mono mt-1 text-brand-green flex items-center justify-center gap-1"> {/* Use theme color */}
-                             <FaCircleCheck /> {`Успешно ${fetchedFiles.length} файлов из '${effectiveBranchDisplay}'. Выберите нужные.`}
-                         </div>
-                       )}
-                       {fetchStatus === 'success' && !currentImageTask && fetchedFiles.length === 0 && (
-                          <div className="text-center text-xs font-mono mt-1 text-brand-yellow flex items-center justify-center gap-1"> {/* Use theme color */}
-                              <FaCircleCheck /> {`Завершено успешно, но 0 файлов найдено в ветке '${effectiveBranchDisplay}'.`}
-                          </div>
-                       )}
-                       {imageTaskTargetFileReady && (
-                          <div className="text-center text-xs font-mono mt-1 text-brand-green flex items-center justify-center gap-1"> {/* Use theme color */}
-                              <FaCircleCheck /> {`Файл ${currentImageTask?.targetPath.split('/').pop()} загружен и готов.`}
-                          </div>
-                        )}
-                        {(fetchStatus === 'error' || fetchStatus === 'failed_retries') && fetchError && (
-                           <div className="text-center text-xs font-mono mt-1 text-destructive flex items-center justify-center gap-1"> {/* Use theme color */}
-                               <FaXmark /> {fetchError}
-                           </div>
-                        )}
-                        {isWaitingForAiResponse && !currentImageTask && (
-                            <p className="text-brand-blue text-xs font-mono mt-1 text-center animate-pulse"> {/* Use theme color */}
-                                 ⏳ Ожидание ответа от AI... (ID Запроса: {currentAiRequestId?.substring(0, 6)}...)
-                            </p>
-                         )}
-                  </div>
-              )}
-
-             {/* Main Content Area: File List / Kwork Input / Image Task Status */}
-             <div className={`grid grid-cols-1 ${ (fetchedFiles.length > 0 && !currentImageTask) ? 'md:grid-cols-2' : ''} gap-4 md:gap-6`}>
-                 {/* --- Column 1: File List & Preview (Standard Mode) --- */}
-                 {!currentImageTask && (isFetchLoading || fetchedFiles.length > 0) && (
-                     <div className={`flex flex-col gap-4 ${ (fetchedFiles.length > 0 || (kworkValueForCheck ?? '').trim().length > 0) ? '' : 'md:col-span-2'}`}> {/* Adjusted visibility condition */}
-                         {(() => { logger.debug("[Render] Rendering SelectedFilesPreview (conditional)"); return null; })()}
-                         <SelectedFilesPreview
-                             selectedFiles={selectedFetcherFiles}
-                             allFiles={fetchedFiles} // Pass current fetched files for preview
-                             getLanguage={repoUtils.getLanguage}
-                         />
-                         {(() => { logger.debug("[Render] Rendering FileList (conditional)"); return null; })()}
-                         <FileList
-                             id="file-list-container"
-                             files={fetchedFiles}
-                             selectedFiles={selectedFetcherFiles}
-                             primaryHighlightedPath={primaryHighlightedPath}
-                             secondaryHighlightedPaths={secondaryHighlightedPaths}
-                             importantFiles={importantFiles} // Передаем обновленный список
-                             isLoading={isFetchLoading}
-                             isActionDisabled={isActionDisabled}
-                             toggleFileSelection={toggleFileSelection}
-                             onAddImportant={handleAddImportantFiles}
-                             onSelectHighlighted={selectHighlightedFiles}
-                             onSelectAll={handleSelectAll}
-                             onDeselectAll={handleDeselectAll}
-                             onAddSelected={handleAddSelected} // Pass hook handler
-                             onAddTree={handleAddFullTree}     // Pass hook handler (исправленная версия)
-                          />
-                      </div>
-                 )}
-
-                 {/* --- Column 2: Kwork Input (Standard Mode) --- */}
-                  {/* Show input if files fetched OR if input already has content (even if fetch fails later) */}
-                 {!currentImageTask && (fetchedFiles.length > 0 || (kworkValueForCheck ?? '').trim().length > 0) && (
-                      <div id="kwork-input-section" className="flex flex-col gap-3">
-                          {(() => { logger.debug("[Render] Rendering RequestInput (conditional)"); return null; })()}
-                          {/* LOGGING: Pass the safeguarded value */}
-                          {(() => { logger.debug(`[Render] Passing kworkInputValue to RequestInput: '${(kworkInputValue ?? '').substring(0,50)}...'`); return null; })()}
-                          <RequestInput
-                              kworkInputRef={kworkInputRef} // Pass ref for focus/imperative actions
-                              kworkInputValue={kworkInputValue ?? ''} // <<< SAFEGUARDED VALUE PASSED
-                              onValueChange={setKworkInputValue} // Pass state setter
-                              onCopyToClipboard={() => { logger.debug("[Input Action] Copy Click"); handleCopyToClipboard(undefined, true); }}
-                              onClearAll={() => { logger.debug("[Input Action] Clear Click"); handleClearAll(); }}
-                              onAddSelected={() => { logger.debug("[Input Action] AddSelected Click"); handleAddSelected(); }}
-                              isCopyDisabled={isCopyDisabled} // Use derived state
-                              isClearDisabled={isClearDisabled} // Use derived state
-                              isAddSelectedDisabled={isAddSelectedDisabled} // Use derived state
-                              selectedFetcherFilesCount={selectedFetcherFiles.size}
-                              filesFetched={filesFetched} // Pass filesFetched status
-                              isActionDisabled={isActionDisabled} // Pass general action disable flag
-                          />
-                      </div>
-                 )}
-
-                 {/* --- Status Display (Image Task Mode) --- */}
-                 {currentImageTask && filesFetched && (
-                      <div className={`md:col-span-1 flex flex-col items-center justify-center text-center p-4 bg-card/30 rounded-lg border border-dashed ${imageTaskTargetFileReady ? 'border-brand-blue' : (fetchStatus === 'error' || fetchStatus === 'failed_retries') ? 'border-destructive' : 'border-muted'} min-h-[200px]`}> {/* Use theme colors */}
-                           {(() => { logger.debug("[Render] Rendering Image Task Status Display", { imageTaskTargetFileReady, isFetchLoading, assistantLoading, fetchStatus }); return null; })()}
-                          {isFetchLoading ? <FaSpinner className="text-brand-blue text-3xl mb-3 animate-spin" />
-                           : assistantLoading ? <FaSpinner className="text-brand-purple text-3xl mb-3 animate-spin" />
-                           : imageTaskTargetFileReady ? <FaCircleCheck className="text-brand-green text-3xl mb-3" />
-                           : <FaXmark className="text-destructive text-3xl mb-3" /> }
-                          <p className={`text-sm font-semibold ${imageTaskTargetFileReady ? 'text-brand-blue' : 'text-destructive'}`}> {/* Use theme colors */}
-                              {isFetchLoading ? "Загрузка файла..."
-                               : assistantLoading ? "Обработка Ассистентом..."
-                               : imageTaskTargetFileReady ? `Файл ${currentImageTask?.targetPath.split('/').pop()} готов.`
-                               : fetchStatus === 'error' || fetchStatus === 'failed_retries' ? `Ошибка загрузки файла ${currentImageTask?.targetPath.split('/').pop()}.`
-                               : `Файл ${currentImageTask?.targetPath.split('/').pop()} не найден!`}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1"> {/* Use theme color */}
-                               {isFetchLoading ? "Ожидание загрузки репозитория..."
-                               : assistantLoading ? "Создание/обновление Pull Request..."
-                               : imageTaskTargetFileReady ? "Файл передан Ассистенту для обработки."
-                               : fetchStatus === 'error' || fetchStatus === 'failed_retries' ? "Проверьте URL, токен, имя ветки или права доступа."
-                               : "Проверьте правильность пути к файлу и выбранную ветку."}
-                          </p>
-                      </div>
-                 )}
-            </div> {/* End Grid */}
-          </div> // End Extractor Root
+    const filteredFiles = useMemo(() => {
+        if (!searchTerm.trim()) return fetchedFiles;
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        return fetchedFiles.filter(file => 
+            file.path.toLowerCase().includes(lowerSearchTerm) || 
+            (filterActive && file.content?.toLowerCase().includes(lowerSearchTerm))
         );
-    } catch (renderError: any) {
-        logger.fatal("[RepoTxtFetcher] CRITICAL RENDER ERROR:", renderError);
-        return <div className="text-red-500 p-4">Критическая ошибка рендеринга Экстрактора: {renderError.message}</div>;
-    } finally {
-        logger.log("[RepoTxtFetcher] END Render");
-    }
-});
-RepoTxtFetcher.displayName = 'RepoTxtFetcher';
+    }, [fetchedFiles, searchTerm, filterActive]);
+    
+    logger.debug("[RepoTxtFetcher] Calculate Derived State");
+    const showProgressBar = fetchStatus === "loading" || fetchStatus === "retrying" || (fetchStatus === "success" && progress < 100) || (fetchStatus === "error" && progress > 0);
+    logger.debug("[Render State]", { isActionDisabled, isFetchLoading, showProgressBar });
+    
+    logger.debug("[RepoTxtFetcher] Preparing to render JSX...");
+    return (
+        <div className="flex flex-col gap-4 md:gap-6">
+            {isSettingsModalOpen && (
+                <SettingsModal
+                    repoUrl={repoUrl}
+                    setRepoUrl={setRepoUrl}
+                    token={localToken}
+                    setToken={setLocalToken}
+                    manualBranchName={manualBranchName}
+                    setManualBranchName={setManualBranchName}
+                    targetBranchName={targetBranchName}
+                    setTargetBranchName={setTargetBranchName}
+                    openPrs={openPrs}
+                    isLoadingPrs={loadingPrs}
+                    onRefreshPRs={() => triggerGetOpenPRs(repoUrl)}
+                />
+            )}
+            
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
+                <div className="flex-grow">
+                    <label htmlFor="repoUrlInputFetcher" className="block text-xs font-medium text-muted-foreground mb-1">
+                        GitHub Репозиторий (URL)
+                    </label>
+                    <Input
+                        id="repoUrlInputFetcher"
+                        type="url"
+                        value={repoUrl}
+                        onChange={(e) => setRepoUrl(e.target.value)}
+                        placeholder="https://github.com/user/repo"
+                        className="bg-input border-border focus:border-brand-cyan"
+                        disabled={isActionDisabled && fetchStatus !== 'idle'}
+                    />
+                </div>
+                <Button
+                    onClick={() => handleFetchManual(false, manualBranchName || targetBranchName || null)}
+                    disabled={isActionDisabled || !repoUrlEntered}
+                    className="w-full sm:w-auto bg-gradient-to-r from-brand-purple via-brand-pink to-brand-yellow text-background font-semibold hover:opacity-90 transition-opacity shadow-md hover:shadow-lg px-6 py-2.5 text-sm"
+                    title={isActionDisabled ? "Действие заблокировано" : "Извлечь файлы из указанной ветки"}
+                >
+                    {isFetchLoading ? <FaSpinner className="animate-spin mr-2" /> : <FaDownload className="mr-2" />}
+                    Извлечь файлы
+                </Button>
+            </div>
+
+            {showProgressBar && <ProgressBar value={progress} error={fetchStatus === "error"} />}
+            {fetcherError && <p className="text-destructive text-xs text-center py-1">{fetcherError}</p>}
+            
+            {contextImageReplaceTask && (
+                <div className="p-3 my-2 border-2 border-dashed border-yellow-500 bg-yellow-900/20 rounded-lg text-yellow-200 text-sm shadow-lg">
+                    <p className="font-semibold flex items-center gap-2"><FaFileImage className="text-yellow-400"/> Режим Авто-Замены Изображения:</p>
+                    <ul className="list-disc list-inside pl-2 mt-1 text-xs">
+                        <li>Целевой файл: <code className="bg-yellow-700/50 px-1 rounded">{contextImageReplaceTask.targetPath}</code></li>
+                        <li>Система автоматически загрузит этот файл, затем передаст задачу Ассистенту для замены URL и создания PR.</li>
+                    </ul>
+                </div>
+            )}
+
+
+            {fetchedFiles.length > 0 && !contextImageReplaceTask && (
+                <>
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-3 flex-wrap">
+                        <div className="flex gap-2 flex-wrap">
+                             <Button onClick={selectHighlightedFiles} variant="outline" size="sm" disabled={isActionDisabled || (!hookPrimaryHighlightedPath && Object.values(hookSecondaryHighlightedPaths).every(arr => arr.length === 0))}> <FaLink className="mr-1.5"/> Связанные </Button>
+                             <Button onClick={handleAddImportantFiles} variant="outline" size="sm" disabled={isActionDisabled || importantFilesConfig.length === 0}> <FaStar className="mr-1.5"/> Важные</Button>
+                             <Button onClick={handleAddFullTree} variant="outline" size="sm" disabled={isActionDisabled}><FaTree className="mr-1.5"/> Всё Дерево</Button>
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
+                             <Button onClick={() => handleAddSelected()} variant="default" size="sm" className="bg-brand-green hover:bg-brand-green/90 text-black" disabled={isActionDisabled || selectedFetcherFiles.size === 0}> <FaPlus className="mr-1.5"/> Доб. в Запрос </Button>
+                        </div>
+                    </div>
+                    
+                    <SelectedFilesPreview selectedFiles={selectedFetcherFiles} files={fetchedFiles} onRemove={toggleFileSelection} />
+
+                    <div className="relative">
+                        <Input
+                            type="text"
+                            placeholder={`Поиск по ${fetchedFiles.length} файлам... (Ctrl+F)`}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-8 pr-16 bg-input border-border focus:border-brand-cyan"
+                        />
+                        <FaMagnifyingGlass className="absolute left-2.5 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                        {searchTerm && (
+                             <Button variant="ghost" size="icon" className="absolute right-9 top-1/2 transform -translate-y-1/2 h-7 w-7" onClick={() => setSearchTerm('')}> <FaXmark /> </Button>
+                        )}
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant={filterActive ? "secondary" : "ghost"} size="icon" className="absolute right-0 top-1/2 transform -translate-y-1/2 h-9 w-9 mr-px" onClick={() => setFilterActive(p => !p)}>
+                                    <FaFilter className={cn(filterActive && "text-brand-cyan")}/>
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent><p>Искать также по содержимому файлов</p></TooltipContent>
+                        </Tooltip>
+                    </div>
+
+                    <FileList
+                        files={filteredFiles}
+                        selectedFiles={selectedFetcherFiles}
+                        onFileSelect={toggleFileSelection}
+                        primaryHighlightedPath={hookPrimaryHighlightedPath}
+                        secondaryHighlightedPathsFlat={Object.values(hookSecondaryHighlightedPaths).flat()}
+                        importantFilesPaths={importantFilesConfig.map(f => f.path)}
+                        searchTerm={searchTerm}
+                        onSelectAll={handleSelectAll}
+                        onDeselectAll={handleDeselectAll}
+                    />
+                </>
+            )}
+            
+            {fetchedFiles.length === 0 && fetchStatus === 'success' && !contextImageReplaceTask && (
+                <div className="text-center py-8 text-muted-foreground">
+                    <FaFolderOpen className="mx-auto text-4xl mb-2"/>
+                    <p>Файлы не загружены. Попробуйте другой URL или ветку.</p>
+                </div>
+            )}
+
+            {!contextImageReplaceTask && (
+                 <RequestInput
+                    kworkInputRef={kworkInputRef}
+                    kworkInputValue={kworkInputValue}
+                    setKworkInputValue={setKworkInputValue}
+                    isLoading={isActionDisabled}
+                    onCopy={handleCopyToClipboard}
+                    onClear={handleClearAll}
+                 />
+            )}
+
+        </div>
+    );
+  }
+);
+RepoTxtFetcher.displayName = "RepoTxtFetcher";
 export default RepoTxtFetcher;
