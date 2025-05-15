@@ -178,7 +178,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const [repoUrlEnteredState, setRepoUrlEnteredState] = useState<boolean>(false);
         const [filesFetchedState, setFilesFetchedState] = useState<boolean>(false);
         const [primaryHighlightPathState, setPrimaryHighlightPathState] = useState<string | null>(null);
-        const [secondaryHighlightPathsState, setSecondaryHighlightPathsState] = useState<Record<ImportCategory, string[]>>({ component: [], context: [], hook: [], lib: [], other: [] });
+        const [secondaryHighlightPathsStateInternal, setSecondaryHighlightPathsStateInternal] = useState<Record<ImportCategory, string[]>>({ component: [], context: [], hook: [], lib: [], other: [] });
         const [selectedFetcherFilesState, setSelectedFetcherFilesState] = useState<Set<string>>(new Set());
         const [kworkInputHasContentState, setKworkInputHasContentState] = useState<boolean>(false);
         const [kworkInputValueState, setKworkInputValueState] = useState<string>('');
@@ -286,7 +286,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             if (fetched) { setAllFetchedFilesStateStable(allFiles ?? []); }
             else { setAllFetchedFilesStateStable([]); }
             setPrimaryHighlightPathState(primaryHighlight);
-            setSecondaryHighlightPathsState(secondaryHighlights ?? { component: [], context: [], hook: [], lib: [], other: [] });
+            setSecondaryHighlightPathsStateInternal(secondaryHighlights ?? { component: [], context: [], hook: [], lib: [], other: [] }); // Use internal setter
             let finalFetchStatus: FetchStatus = 'idle'; 
             
             let questCompleted = false;
@@ -374,7 +374,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         }, [ 
              dbUser?.user_id, addToastStable, assistantRef, fetcherRef, setFetchStatusStateStable, setAllFetchedFilesStateStable,
              setImageReplaceTaskStateStable, setAssistantLoadingStateStable, setPendingFlowDetailsStateStable,
-             setKworkInputValueStateStable, scrollToSectionStable, logger
+             setKworkInputValueStateStable, scrollToSectionStable, logger, setSecondaryHighlightPathsStateInternal
          ]);
 
         const triggerToggleSettingsModal = useCallback(async () => {
@@ -433,14 +433,10 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             let branchToFetch: string | null = null;
             let branchNameToSeek = potentialBranchNameProvided;
 
-            // For ImageSwap (always new branch/PR strategy):
-            // We will always fetch from the default branch to get the latest version of the file.
-            // The new unique branch will be created later by handleDirectImageReplace.
             if (flowType === 'ImageSwap') {
                 logger.log(`${flowLogPrefix} Context: ImageSwap flow. Always fetching from default branch.`);
                 branchToFetch = null; 
             } 
-            // For ErrorFix or other flows with a potential specific branch:
             else if (branchNameToSeek) { 
                 try { 
                     const checkResult = await checkExistingPrBranch(repoUrlToCheck, branchNameToSeek);
@@ -463,7 +459,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     logger.error(`${flowLogPrefix} Context: Exception in checkExistingPrBranch for "${branchNameToSeek}":`, err);
                     branchToFetch = null; 
                 }
-            } else { // Default for non-ImageSwap flows without a specific branch name
+            } else { 
                  logger.log(`${flowLogPrefix} Context: No specific branch name to seek. Will fetch from default branch.`);
                  branchToFetch = null;
             }
@@ -685,14 +681,21 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     else if (aiResponseHasContentState) { calculatedStep = filesParsedState ? 'pr_ready' : 'response_pasted'; }
                     else if (kworkInputHasContentState) { calculatedStep = requestCopiedState ? 'request_copied' : 'request_written'; }
                     else if (selectedFetcherFilesState.size > 0) { calculatedStep = 'files_selected'; }
-                    else if (primaryHighlightPathState || Object.values(secondaryHighlightPathsState).some(arr => arr.length > 0)) { calculatedStep = 'files_fetched_highlights'; }
+                    // Используем secondaryHighlightPathsStateInternal для корректной зависимости
+                    else if (primaryHighlightPathState || Object.values(secondaryHighlightPathsStateInternal).some(arr => arr.length > 0)) { calculatedStep = 'files_fetched_highlights'; }
                     else { calculatedStep = 'files_fetched'; }
                 }
             }
             else { calculatedStep = repoUrlEnteredState ? 'ready_to_fetch' : 'idle'; }
             
             setCurrentStep(prevStep => { if (prevStep !== calculatedStep) { logger.log(`[WorkflowStep Change] From ${prevStep} to ${calculatedStep}`); return calculatedStep; } return prevStep; });
-        }, [ fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState, filesParsedState, requestCopiedState, primaryHighlightPathState, secondaryHighlightPathsState, selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, allFetchedFilesState, assistantLoadingState, repoUrlEnteredState, isPreCheckingState, logger ]);
+        }, [ 
+            fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState, 
+            filesParsedState, requestCopiedState, primaryHighlightPathState, 
+            secondaryHighlightPathsStateInternal, // <- Изменено здесь
+            selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, 
+            allFetchedFilesState, assistantLoadingState, repoUrlEnteredState, isPreCheckingState, logger 
+        ]);
 
          const getXuinityMessageStable = useCallback((): string => {
              const localCurrentStep = currentStep; const localManualBranchName = manualBranchNameState; const localTargetBranchName = targetBranchNameState; const localImageReplaceTask = imageReplaceTaskState; const localFetchStatus = fetchStatusState; const localAllFilesLength = allFetchedFilesState.length; const localSelectedFetchSize = selectedFetcherFilesState.size; const localSelectedAssistSize = selectedAssistantFilesState.size; const localIsPreChecking = isPreCheckingState; const localPendingFlowDetails = pendingFlowDetailsState; const localFilesFetched = filesFetchedState; const localAssistantLoading = assistantLoadingState; 
@@ -725,7 +728,9 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
           }, [ currentStep, manualBranchNameState, targetBranchNameState, imageReplaceTaskState, fetchStatusState, allFetchedFilesState, filesFetchedState, assistantLoadingState, selectedFetcherFilesState.size, selectedAssistantFilesState.size, isPreCheckingState, pendingFlowDetailsState ]);
 
         const contextValue = useMemo((): RepoXmlPageContextType => ({
-            fetchStatus: fetchStatusState, repoUrlEntered: repoUrlEnteredState, filesFetched: filesFetchedState, kworkInputHasContent: kworkInputHasContentState, requestCopied: requestCopiedState, aiResponseHasContent: aiResponseHasContentState, filesParsed: filesParsedState, assistantLoading: assistantLoadingState, aiActionLoading: aiActionLoadingState, loadingPrs: loadingPrsState, isSettingsModalOpen: isSettingsModalOpenState, isParsing: isParsingState, isPreChecking: isPreCheckingState, showComponents: showComponentsState, selectedFetcherFiles: selectedFetcherFilesState, selectedAssistantFiles: selectedAssistantFilesState, targetBranchName: targetBranchNameState, manualBranchName: manualBranchNameState, openPrs: openPrsState, currentAiRequestId: currentAiRequestIdState, imageReplaceTask: imageReplaceTaskState, allFetchedFiles: allFetchedFilesState, currentStep, repoUrl: repoUrlState, primaryHighlightedPath: primaryHighlightPathState, secondaryHighlightedPaths: secondaryHighlightPathsState, targetPrData: targetPrDataState, pendingFlowDetails: pendingFlowDetailsState, kworkInputValue: kworkInputValueState,
+            fetchStatus: fetchStatusState, repoUrlEntered: repoUrlEnteredState, filesFetched: filesFetchedState, kworkInputHasContent: kworkInputHasContentState, requestCopied: requestCopiedState, aiResponseHasContent: aiResponseHasContentState, filesParsed: filesParsedState, assistantLoading: assistantLoadingState, aiActionLoading: aiActionLoadingState, loadingPrs: loadingPrsState, isSettingsModalOpen: isSettingsModalOpenState, isParsing: isParsingState, isPreChecking: isPreCheckingState, showComponents: showComponentsState, selectedFetcherFiles: selectedFetcherFilesState, selectedAssistantFiles: selectedAssistantFilesState, targetBranchName: targetBranchNameState, manualBranchName: manualBranchNameState, openPrs: openPrsState, currentAiRequestId: currentAiRequestIdState, imageReplaceTask: imageReplaceTaskState, allFetchedFiles: allFetchedFilesState, currentStep, repoUrl: repoUrlState, primaryHighlightedPath: primaryHighlightPathState, 
+            secondaryHighlightedPaths: secondaryHighlightPathsStateInternal, // Используем внутреннее состояние
+            targetPrData: targetPrDataState, pendingFlowDetails: pendingFlowDetailsState, kworkInputValue: kworkInputValueState,
             setFetchStatus: setFetchStatusStateStable, setRepoUrlEntered: setRepoUrlEnteredStateStable, handleSetFilesFetched: handleSetFilesFetchedStable, setSelectedFetcherFiles: setSelectedFetcherFilesStateStable, setKworkInputHasContent: setKworkInputHasContentStateStable, setRequestCopied: setRequestCopiedStateStable, setAiResponseHasContent: setAiResponseHasContentStateStable, setFilesParsed: setFilesParsedStateStable, setSelectedAssistantFiles: setSelectedAssistantFilesStateStable, setAssistantLoading: setAssistantLoadingStateStable, setAiActionLoading: setAiActionLoadingStateStable, setLoadingPrs: setLoadingPrsStateStable, setTargetBranchName: setTargetBranchNameStateStable, setManualBranchName: setManualBranchNameStateStable, setOpenPrs: setOpenPrsStateStable, setIsParsing: setIsParsingStateStable, setContextIsParsing: setIsParsingStateStable, setCurrentAiRequestId: setCurrentAiRequestIdStateStable, setImageReplaceTask: setImageReplaceTaskStateStable, setRepoUrl: setRepoUrlStateStable, setTargetPrData: setTargetPrDataStable, setIsPreChecking: setIsPreCheckingStateStable, setPendingFlowDetails: setPendingFlowDetailsStateStable, setShowComponents: setShowComponentsStateStable, setKworkInputValue: setKworkInputValueStateStable,
             triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, 
             triggerCreateOrUpdatePR, 
@@ -735,7 +740,9 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             kworkInputRef, aiResponseInputRef, fetcherRef, assistantRef,
             addToast: addToastStable,
         }), [
-            fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, isPreCheckingState, showComponentsState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, secondaryHighlightedPathsState, targetPrDataState, pendingFlowDetailsState, kworkInputValueState,
+            fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, isPreCheckingState, showComponentsState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, 
+            secondaryHighlightPathsStateInternal, // Используем внутреннее состояние
+            targetPrDataState, pendingFlowDetailsState, kworkInputValueState,
             setFetchStatusStateStable, setRepoUrlEnteredStateStable, handleSetFilesFetchedStable, setSelectedFetcherFilesStateStable, setKworkInputHasContentStateStable, setRequestCopiedStateStable, setAiResponseHasContentStateStable, setFilesParsedStateStable, setSelectedAssistantFilesStateStable, setAssistantLoadingStateStable, setAiActionLoadingStateStable, setLoadingPrsStateStable, setTargetBranchNameStateStable, setManualBranchNameStateStable, setOpenPrsStateStable, setIsParsingStateStable, setCurrentAiRequestIdStateStable, setImageReplaceTaskStateStable, setRepoUrlStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setShowComponentsStateStable, setKworkInputValueStateStable,
             triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, 
             triggerCreateOrUpdatePR, 
@@ -748,7 +755,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         return ( <RepoXmlPageContext.Provider value={contextValue}> {children} </RepoXmlPageContext.Provider> );
 
     } catch (providerError: any) {
-        console.error("[RepoXmlPageProvider] CRITICAL INITIALIZATION ERROR:", providerError);
+        logger.fatal("[RepoXmlPageProvider] CRITICAL INITIALIZATION ERROR:", providerError);
+        // Fallback UI or re-throw if this component should not handle the error itself
         return <div className="fixed inset-0 flex items-center justify-center bg-red-900 text-white p-4 z-[9999]">Критическая ошибка инициализации провайдера страницы: {providerError.message}</div>;
     }
 };
