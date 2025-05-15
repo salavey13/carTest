@@ -1,12 +1,12 @@
 "use client";
 
-import type React from "react";
+import type React from "react"; // Removed useEffect as it's not directly used here
 import { Suspense } from 'react';
 import { usePathname } from 'next/navigation';
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import StickyChatButton from "@/components/StickyChatButton";
-import { AppProvider } from "@/contexts/AppContext";
+import { AppProvider, useAppContext } from "@/contexts/AppContext"; // useAppContext needed for dbUser check
 import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext";
@@ -14,6 +14,11 @@ import ErrorBoundaryForOverlay from "@/components/ErrorBoundaryForOverlay";
 import DevErrorOverlay from "@/components/DevErrorOverlay";
 import BottomNavigation from "@/components/layout/BottomNavigation";
 import { debugLogger as logger } from "@/lib/debugLogger"; 
+import { useFocusTimeTracker } from '@/hooks/useFocusTimeTracker'; // Import the new hook
+// Analytics and Speed Insights should be top-level if possible, or ensure they don't break if user is not logged in.
+import { Analytics } from "@vercel/analytics/react"
+import { SpeedInsights } from "@vercel/speed-insights/next"
+
 
 function LoadingChatButtonFallback() {
   return (
@@ -23,6 +28,21 @@ function LoadingChatButtonFallback() {
     ></div>
   );
 }
+
+// Inner component to access useAppContext for useFocusTimeTracker
+function FocusTrackingInitializer() {
+  const { dbUser, isAuthenticated } = useAppContext();
+  
+  useFocusTimeTracker({
+    inactiveTimeout: 60 * 1000, // 1 minute of inactivity
+    componentName: "GlobalAppFocusTracker",
+    // Enable only if the user is authenticated and dbUser (with user_id) is available
+    enabled: !!(isAuthenticated && dbUser?.user_id), 
+  });
+  
+  return null; // This component doesn't render anything itself
+}
+
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -38,10 +58,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   const showBottomNav = isExactMatch || isStartsWithMatch;
   logger.debug(`[ClientLayout] showBottomNav for "${pathname}" evaluated to: ${showBottomNav} (Exact: ${isExactMatch}, StartsWith: ${isStartsWithMatch})`);
 
-
   return (
     <ErrorOverlayProvider>
-      <AppProvider>
+      <AppProvider> {/* AppProvider provides useAppContext */}
+        <FocusTrackingInitializer /> {/* Initialize focus tracking here */}
         <TooltipProvider>
           <ErrorBoundaryForOverlay>
             <Header />
@@ -71,6 +91,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           />
           <DevErrorOverlay />
         </TooltipProvider>
+        <Analytics />
+        <SpeedInsights />
       </AppProvider>
     </ErrorOverlayProvider>
   );
