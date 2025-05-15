@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useCallback, useMemo } from 'react';
-import { useAppToast } from '@/hooks/useAppToast'; // Use toast hook
-import { debugLogger as logger } from '@/lib/debugLogger'; // Use logger
-import { detectFilePaths, getFileExtension } from '@/lib/codeUtils';
+import { useAppToast } from '@/hooks/useAppToast'; 
+import { debugLogger as logger } from '@/lib/debugLogger'; 
+import { getFileExtension } from '@/lib/codeUtils'; // getFileExtension is in codeUtils
 import * as Fa6Icons from "react-icons/fa6"; 
 
 // --- Types ---
@@ -17,26 +17,26 @@ export type IssueType =
   | 'invalidExtension'
   | 'useClientMissing'
   | 'importReactMissing'
-  | 'skippedComment' // Found '// ...' - Marker requiring AI restoration
-  | 'skippedCodeBlock' // Found '/* ... */' - Marker requiring AI restoration
-  | 'sneakyEmptyBlock' // Found '{ /* ... */ }'
-  | 'incorrectFa6IconName' // Known incorrect Fa6 name
-  | 'unknownFa6IconName'; // Unknown Fa6 name
+  | 'skippedComment' 
+  | 'skippedCodeBlock' 
+  | 'sneakyEmptyBlock' 
+  | 'incorrectFa6IconName' 
+  | 'unknownFa6IconName';
 
 export interface ValidationIssue {
     id: string;
-    fileId: string; // Link to the specific file entry
-    filePath: string; // Store path for easier grouping/display
+    fileId: string; 
+    filePath: string; 
     type: IssueType;
     message: string;
     severity: 'error' | 'warning' | 'info';
-    fixable: boolean; // Can be fixed automatically by the hook
+    fixable: boolean; 
     restorable: boolean; 
-    details?: Record<string, any>; // e.g., { lineNumber: 5 }
+    details?: Record<string, any>; 
 }
 
 export interface FileEntry {
-    id: string; // Unique ID for React key prop, e.g., path + index
+    id: string; 
     path: string;
     content: string;
     extension: string | null;
@@ -51,7 +51,6 @@ const SNEAKY_EMPTY_BLOCK_REGEX = /{[\s\n]*\/\*\s*\.{3}\s*\*\/\s*[\s\n]*}/g;
 const SKIPPED_CODE_MARKER_REGEX = /(\/\*\s*\.{3}\s*\*\/)|({\s*\/\*\s*\.{3}\s*\*\/\s*})|(\[\s*\/\*\s*\.{3}\s*\*\/\s*\])/;
 const SKIPPED_COMMENT_MARKER_REGEX = /^\s*\/\/\s*\.{3}\s*$/;
 
-// Map for known Fa6 corrections
 const fa6IconCorrectionMap: Record<string, string> = {
     FaExclamationTriangle: 'FaTriangleExclamation',
     FaBalanceScale: 'FaScaleBalanced',
@@ -78,12 +77,12 @@ const importChecks = [
 ];
 const clientHookPatterns = /(useState|useEffect|useRef|useContext|useReducer|useCallback|useMemo|useLayoutEffect|useImperativeHandle|useDebugValue)\s*\(/;
 
-// Updated regex to better handle paths starting with '.' or containing '.' in directory names
-const pathCommentRegex = /^\s*(?:\/\/|\/\*|--|#)\s*([.\w\-\/\.\[\]]+?\.\w+)/;
+// Regex to capture file paths, potentially starting with '.', in comments or as 'File: path'
+// Allows for paths like .github/workflows/file.yml or normal paths.
+const pathCommentRegex = /^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([./\w-]+(?:[/\\][.\w-]+)*\.\w+)/;
 
 const generateId = () => '_' + Math.random().toString(36).substring(2, 9);
 
-// --- Custom Hook ---
 export function useCodeParsingAndValidation() {
     logger.debug("[useCodeParsingAndValidation] Hook initialized");
     const { success: toastSuccess, error: toastError, info: toastInfo, warning: toastWarning } = useAppToast(); 
@@ -99,8 +98,10 @@ export function useCodeParsingAndValidation() {
         const parseErrors: ValidationIssue[] = [];
         let lastIndex = 0;
         const descriptionParts: string[] = [];
-        // Updated regex to allow paths starting with a dot or containing dots in directory names
-        const codeBlockRegex = /(?:(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([.\w\-\/\.\[\]]+?\.\w+)\s*(?:\*\/)?\s*$)\n*)?^\s*```(\w+)?\n([\s\S]*?)\n^\s*```(?:\n*(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([.\w\-\/\.\[\]]+?\.\w+)\s*(?:\*\/)?\s*$))?/gm;
+        // Regex to capture file path possibly before or after code block.
+        // Path can start with '.' (e.g., .github/workflows/...) or be a standard path.
+        const codeBlockRegex = /(?:(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([./\w-]+(?:[/\\][.\w-]+)*\.\w+)\s*(?:\*\/)?\s*$)\n*)?^\s*```(\w+)?\n([\s\S]*?)\n^\s*```(?:\n*(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([./\w-]+(?:[/\\][.\w-]+)*\.\w+)\s*(?:\*\/)?\s*$))?/gm;
+
         let match;
         let fileCounter = 0;
 
@@ -115,7 +116,7 @@ export function useCodeParsingAndValidation() {
             let path = (match[1] || match[4] || `unnamed-${fileCounter}`).trim();
             let content = match[3].trim();
             let lang = match[2] || '';
-            let extension = getFileExtension(path) || lang || 'txt'; // Use helper for extension
+            let extension = getFileExtension(path) || lang || 'txt'; 
 
             if (path.startsWith('unnamed-')) {
                 const lines = content.split('\n');
@@ -125,12 +126,18 @@ export function useCodeParsingAndValidation() {
                     if (pathMatch && pathMatch[1]) {
                         path = pathMatch[1].trim();
                         content = lines.slice(1).join('\n').trim();
-                        extension = getFileExtension(path) || lang || 'txt'; // Use helper
+                        extension = getFileExtension(path) || lang || 'txt';
                          logger.debug(`[Parse Logic] Extracted path "${path}" from comment.`);
                     }
                 }
             }
-            if (path !== '/') path = path.replace(/^[\/\\]+/, '');
+            
+            // Normalize path: remove leading slashes for consistency, unless it's the root path itself.
+            if (path !== '/' && (path.startsWith('/') || path.startsWith('\\'))) {
+                path = path.substring(1);
+            }
+            // For paths like '.github/workflows/main.yml', ensure it doesn't become 'github/workflows/main.yml'
+            // This is generally fine as leading '.' is significant.
 
             if (/^\s*```/m.test(content)) {
                  const fileId = generateId();
@@ -146,7 +153,6 @@ export function useCodeParsingAndValidation() {
         return { files, description, parseErrors };
     }, [logger]); 
 
-    // --- Validation Logic ---
     const validateParsedFiles = useCallback(async (filesToValidate: FileEntry[]): Promise<ValidationIssue[]> => {
         logger.debug("[Validation Logic] Starting validateParsedFiles");
         setValidationStatus('validating');
