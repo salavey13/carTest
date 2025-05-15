@@ -62,6 +62,7 @@ export interface Achievement {
     isQuest?: boolean; 
     isRepeatable?: boolean; 
     unlocksPerks?: string[]; 
+    isDynamic?: boolean; // For achievements not in ALL_ACHIEVEMENTS, like mastered schematics
 }
 
 // --- LEVEL DEFINITIONS ---
@@ -121,7 +122,7 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
       kiloVibesAward: 75, 
       checkCondition: (p) => p.featuresUsed?.usedMobileFast === true 
     },
-    { id: "autofix_used", name: "Кибер-Хирург", description: "Первое использование авто-исправления ошибок в коде.", icon: "FaUserDoctor", kiloVibesAward: 20, checkCondition: (p) => p.featuresUsed?.autofix_used === true }, // Corrected icon
+    { id: "autofix_used", name: "Кибер-Хирург", description: "Первое использование авто-исправления ошибок в коде.", icon: "FaUserDoctor", kiloVibesAward: 20, checkCondition: (p) => p.featuresUsed?.autofix_used === true },
     { id: "deep_work_logged", name: "Погружение в Матрицу", description: "Залогировано первое время глубокой работы.", icon: "FaBrain", kiloVibesAward: 20, checkCondition: (p) => (p.focusTimeHours || 0) > 0},
 
     // --- Integration Achievements ---
@@ -219,22 +220,147 @@ export const fetchUserCyberFitnessProfile = async (userId: string): Promise<{ su
   }
 };
 
+// Type for schematic properties passed to logSchematicCompleted
+interface SchematicCompletionDetails {
+    prerequisites: string[];
+    kiloVibesAward?: number;
+    unlocksPerk?: string;
+    schematicName: string;
+    schematicIcon: string;
+}
+
+export const logSchematicCompleted = async (
+    userId: string,
+    schematicId: string,
+    details: SchematicCompletionDetails
+): Promise<{ 
+    success: boolean; 
+    error?: string; 
+    alreadyCompleted?: boolean; 
+    newAchievements?: Achievement[]; 
+    newPerks?: string[];
+    kiloVibesAwarded?: number;
+}> => {
+    logger.log(`[CyberFitness SchematicComplete ENTRY] User: ${userId}, Schematic: ${schematicId}, Details:`, details);
+    if (!userId || !schematicId) {
+        logger.warn("[CyberFitness SchematicComplete] User ID and Schematic ID required.");
+        return { success: false, error: "User ID and Schematic ID required." };
+    }
+
+    try {
+        const profileResult = await fetchUserCyberFitnessProfile(userId);
+        if (!profileResult.success || !profileResult.data) {
+            logger.error(`[CyberFitness SchematicComplete] Failed to fetch profile for ${userId}. Error: ${profileResult.error}`);
+            return { success: false, error: "Не удалось загрузить профиль Агента." };
+        }
+        const currentProfile = profileResult.data;
+
+        // 1. Check if already completed
+        const completedFeatureKey = `schematic_completed_${schematicId}`;
+        if (currentProfile.featuresUsed[completedFeatureKey] === true) {
+            logger.info(`[CyberFitness SchematicComplete] Schematic ${schematicId} already completed by user ${userId}.`);
+            return { success: true, alreadyCompleted: true };
+        }
+
+        // 2. Check prerequisites
+        let allPrerequisitesMet = true;
+        const missingPrerequisites: string[] = [];
+        if (details.prerequisites && details.prerequisites.length > 0) {
+            details.prerequisites.forEach(prereq => {
+                const [type, value] = prereq.split(':');
+                let currentMet = false;
+                if (type === 'level' && currentProfile.level >= parseInt(value, 10)) currentMet = true;
+                else if (type === 'achievement' && currentProfile.achievements.includes(value)) currentMet = true;
+                else if (type === 'perk' && currentProfile.unlockedPerks.includes(value)) currentMet = true;
+                else if (type === 'featureUsed' && currentProfile.featuresUsed[value]) currentMet = true;
+                else if (type === 'quest' && currentProfile.completedQuests.includes(value)) currentMet = true;
+                
+                if (!currentMet) {
+                    allPrerequisitesMet = false;
+                    missingPrerequisites.push(prereq);
+                }
+            });
+        }
+
+        if (!allPrerequisitesMet) {
+            const missingDetails = missingPrerequisites.map(pr => {
+                const [type, value] = pr.split(':');
+                if (type === 'level') return `Уровень ${value}`;
+                if (type === 'achievement') return `Ачивка "${getAchievementDetails(value)?.name || value}"`;
+                if (type === 'perk') return `Перк "${value}"`;
+                if (type === 'quest') return `Квест "${getAchievementDetails(value)?.name || value}"`;
+                return pr;
+            }).join(', ');
+            logger.warn(`[CyberFitness SchematicComplete] Prerequisites not met for ${schematicId}. Missing: ${missingDetails}`);
+            return { success: false, error: `Требования не выполнены: ${missingDetails}.` };
+        }
+
+        // 3. Awarding Logic
+        const profileUpdates: Partial<CyberFitnessProfile> = {
+            featuresUsed: { ...currentProfile.featuresUsed, [completedFeatureKey]: true },
+        };
+        let awardedKV = 0;
+        let newPerksUnlocked: string[] = [];
+
+        if (details.kiloVibesAward && details.kiloVibesAward > 0) {
+            profileUpdates.kiloVibes = details.kiloVibesAward;
+            awardedKV = details.kiloVibesAward;
+        }
+
+        if (details.unlocksPerk && !currentProfile.unlockedPerks.includes(details.unlocksPerk)) {
+            profileUpdates.unlockedPerks = [details.unlocksPerk];
+            newPerksUnlocked.push(details.unlocksPerk);
+        }
+        
+        // Construct dynamic achievement for mastering this schematic
+        const masteredAchievementId = `mastered_schematic_${schematicId}`;
+        const masteredAchievement: Achievement = {
+            id: masteredAchievementId,
+            name: `Схема '${details.schematicName}' Освоена!`,
+            description: `Вы успешно применили и освоили схему '${details.schematicName}'.`,
+            icon: details.schematicIcon,
+            kiloVibesAward: Math.round((details.kiloVibesAward || 50) * 0.2), // e.g., 20% of schematic KV as bonus
+            checkCondition: () => true, // Will be added directly
+            isDynamic: true,
+        };
+        
+        // Pass this dynamic achievement to updateUserCyberFitnessProfile to handle its addition.
+        // It won't be in ALL_ACHIEVEMENTS, so updateUserCyberFitnessProfile needs to handle these.
+        (profileUpdates as any).dynamicAchievementsToAdd = [masteredAchievement];
+
+
+        const updateResult = await updateUserCyberFitnessProfile(userId, profileUpdates);
+        if (!updateResult.success) {
+            logger.error(`[CyberFitness SchematicComplete] Failed to update profile for ${userId} after schematic completion. Error: ${updateResult.error}`);
+            return { success: false, error: "Ошибка сохранения прогресса схемы." };
+        }
+        
+        logger.log(`[CyberFitness SchematicComplete EXIT] Schematic ${schematicId} completed by ${userId}. KV Awarded: ${awardedKV}. Perks: ${newPerksUnlocked.join(',')}. Dynamic Ach: ${masteredAchievement.name}`);
+        return { 
+            success: true, 
+            newAchievements: updateResult.newAchievements, // This will include the dynamic one if handled by updateUserCyberFitnessProfile
+            newPerks: newPerksUnlocked,
+            kiloVibesAwarded: awardedKV
+        };
+
+    } catch (e: any) {
+        logger.error(`[CyberFitness SchematicComplete CATCH] Exception for ${userId}, schematic ${schematicId}:`, e);
+        return { success: false, error: e.message || "Неожиданная ошибка при освоении схемы." };
+    }
+};
+
+
 export const updateUserCyberFitnessProfile = async (
   userId: string,
-  updates: Partial<CyberFitnessProfile>
+  updates: Partial<CyberFitnessProfile> & { dynamicAchievementsToAdd?: Achievement[] } // Added dynamicAchievementsToAdd
 ): Promise<{ success: boolean; data?: DbUser; error?: string; newAchievements?: Achievement[] }> => {
   logger.log(`[CyberFitness UpdateProfile ENTRY] User: ${userId}, Updates Summary:`, {
       keys: Object.keys(updates),
       kiloVibesDelta: updates.kiloVibes,
       levelUpdate: updates.level,
-      totalFilesExtractedDelta: updates.totalFilesExtracted,
-      totalTokensProcessedDelta: updates.totalTokensProcessed,
-      totalKworkRequestsSentDelta: updates.totalKworkRequestsSent,
-      totalPrsCreatedDelta: updates.totalPrsCreated,
-      totalBranchesUpdatedDelta: updates.totalBranchesUpdated,
       featuresUsedUpdates: updates.featuresUsed ? Object.keys(updates.featuresUsed) : [],
-      completedQuests: updates.completedQuests,
-      unlockedPerks: updates.unlockedPerks
+      dynamicAchievementsToAdd: updates.dynamicAchievementsToAdd?.map(a => a.id),
+      // ... (other loggable fields)
   });
 
   if (!userId) {
@@ -252,7 +378,7 @@ export const updateUserCyberFitnessProfile = async (
     }
    
     const existingOverallMetadata = userData?.metadata || {};
-    let existingCyberFitnessProfileData = getCyberFitnessProfile(userId, existingOverallMetadata); // Renamed to avoid confusion with `newCyberFitnessProfile`
+    let existingCyberFitnessProfileData = getCyberFitnessProfile(userId, existingOverallMetadata);
     logger.debug(`[CyberFitness UpdateProfile] Profile for ${userId} BEFORE this update cycle: Level=${existingCyberFitnessProfileData.level}, KV=${existingCyberFitnessProfileData.kiloVibes}, Ach=${existingCyberFitnessProfileData.achievements.length}, Perks=${existingCyberFitnessProfileData.unlockedPerks.length}`);
 
     const newCyberFitnessProfile: CyberFitnessProfile = {
@@ -275,7 +401,11 @@ export const updateUserCyberFitnessProfile = async (
         newCyberFitnessProfile.activeQuests = newCyberFitnessProfile.activeQuests.filter(q => !updates.completedQuests!.includes(q));
     }
     if (updates.unlockedPerks && Array.isArray(updates.unlockedPerks)) {
-        newCyberFitnessProfile.unlockedPerks = Array.from(new Set([...newCyberFitnessProfile.unlockedPerks, ...updates.unlockedPerks]));
+        // Ensure perks from updates are unique and added to existing ones
+        const perksToAddSet = new Set(updates.unlockedPerks);
+        const existingPerksSet = new Set(newCyberFitnessProfile.unlockedPerks || []);
+        perksToAddSet.forEach(perk => existingPerksSet.add(perk));
+        newCyberFitnessProfile.unlockedPerks = Array.from(existingPerksSet);
     }
     
     if (updates.dailyActivityLog && Array.isArray(updates.dailyActivityLog)) newCyberFitnessProfile.dailyActivityLog = updates.dailyActivityLog; 
@@ -338,7 +468,7 @@ export const updateUserCyberFitnessProfile = async (
                  const levelUpAch: Achievement = {
                      id: levelUpAchievementId, name: `Достигнут Уровень ${lvl}!`,
                      description: `Вы достигли ${lvl}-го уровня КиберФитнеса! Новые перки и возможности открыты.`,
-                     icon: 'FaStar', checkCondition: () => true, kiloVibesAward: 25 * lvl 
+                     icon: 'FaStar', checkCondition: () => true, kiloVibesAward: 25 * lvl, isDynamic: true,
                  };
                  currentAchievementsSet.add(levelUpAch.id);
                  newlyUnlockedAchievements.push(levelUpAch);
@@ -350,27 +480,52 @@ export const updateUserCyberFitnessProfile = async (
             logger.info(`[CyberFitness UpdateProfile] Total new perks unlocked from leveling: ${Array.from(perksActuallyAddedThisUpdateSet).join(', ')}`);
         }
     }
-    // Merge perks from direct updates if any, ensuring uniqueness
+    // Ensure perks from direct updates are merged again after leveling logic (in case some were also level perks)
     if (updates.unlockedPerks && Array.isArray(updates.unlockedPerks)) {
+        const perksToAddSet = new Set(updates.unlockedPerks);
         const existingPerksSet = new Set(newCyberFitnessProfile.unlockedPerks || []);
-        updates.unlockedPerks.forEach(perk => {
+        perksToAddSet.forEach(perk => {
             if (!existingPerksSet.has(perk)) {
-                newCyberFitnessProfile.unlockedPerks.push(perk);
-                existingPerksSet.add(perk);
-                logger.info(`[CyberFitness UpdateProfile] Unlocked specific perk from 'updates' object: "${perk}".`);
+                newCyberFitnessProfile.unlockedPerks.push(perk); // Add if not already present
+                logger.info(`[CyberFitness UpdateProfile] Unlocked specific perk from 'updates' object (post-leveling check): "${perk}".`);
             }
         });
     }
-    newCyberFitnessProfile.skillsLeveled = newCyberFitnessProfile.unlockedPerks.length;
+    newCyberFitnessProfile.skillsLeveled = new Set(newCyberFitnessProfile.unlockedPerks || []).size; // Ensure skillsLeveled reflects unique count
     
-    // If OS version was explicitly passed in updates, it overrides the level-based one
     if (updates.cognitiveOSVersion && typeof updates.cognitiveOSVersion === 'string' && updates.cognitiveOSVersion !== newCyberFitnessProfile.cognitiveOSVersion) {
         newCyberFitnessProfile.cognitiveOSVersion = updates.cognitiveOSVersion;
         logger.info(`[CyberFitness UpdateProfile] CognitiveOSVersion explicitly set to: ${updates.cognitiveOSVersion}`);
     }
     // --- End Leveling Logic ---
 
-    // --- Achievement Check (after KiloVibes and totals are updated, including from leveling) ---
+    // --- Achievement Check (including dynamic ones) ---
+    // Add dynamic achievements passed from other functions (like logSchematicCompleted)
+    if (updates.dynamicAchievementsToAdd && Array.isArray(updates.dynamicAchievementsToAdd)) {
+        updates.dynamicAchievementsToAdd.forEach(dynamicAch => {
+            if (!currentAchievementsSet.has(dynamicAch.id)) {
+                currentAchievementsSet.add(dynamicAch.id);
+                newlyUnlockedAchievements.push(dynamicAch);
+                if (dynamicAch.kiloVibesAward) {
+                    newCyberFitnessProfile.kiloVibes += dynamicAch.kiloVibesAward;
+                }
+                 logger.info(`[CyberFitness UpdateProfile] Added dynamic achievement: '${dynamicAch.name}'`);
+                 if(dynamicAch.unlocksPerks && dynamicAch.unlocksPerks.length > 0){
+                    const existingPerksSet = new Set(newCyberFitnessProfile.unlockedPerks || []);
+                    dynamicAch.unlocksPerks.forEach(perk => {
+                        if(!existingPerksSet.has(perk)){
+                            newCyberFitnessProfile.unlockedPerks.push(perk);
+                            existingPerksSet.add(perk);
+                            logger.info(`[CyberFitness UpdateProfile] Perk "${perk}" unlocked by dynamic achievement "${dynamicAch.name}".`);
+                        }
+                    });
+                    newCyberFitnessProfile.skillsLeveled = new Set(newCyberFitnessProfile.unlockedPerks || []).size;
+                }
+            }
+        });
+    }
+
+    // Check predefined achievements from ALL_ACHIEVEMENTS
     for (const ach of ALL_ACHIEVEMENTS) {
         if (!ach.isQuest && !currentAchievementsSet.has(ach.id) && ach.checkCondition(newCyberFitnessProfile)) { 
             currentAchievementsSet.add(ach.id); 
@@ -388,7 +543,7 @@ export const updateUserCyberFitnessProfile = async (
                         logger.info(`[CyberFitness UpdateProfile] Perk "${perk}" unlocked by achievement "${ach.name}".`);
                     }
                 });
-                newCyberFitnessProfile.skillsLeveled = newCyberFitnessProfile.unlockedPerks.length;
+                newCyberFitnessProfile.skillsLeveled = new Set(newCyberFitnessProfile.unlockedPerks || []).size;
             }
         }
     }
@@ -396,7 +551,7 @@ export const updateUserCyberFitnessProfile = async (
     logger.debug(`[CyberFitness UpdateProfile] Achievements for ${userId} after ALL evaluations: ${newCyberFitnessProfile.achievements.join(', ')}. KiloVibes after ALL awards: ${newCyberFitnessProfile.kiloVibes}`);
 
     if (newlyUnlockedAchievements.length > 0) {
-        logger.info(`[CyberFitness UpdateProfile] User ${userId} unlocked new achievements (incl. dynamic level ups):`, newlyUnlockedAchievements.map(a => `${a.name} (${a.id}, +${a.kiloVibesAward || 0}KV)`));
+        logger.info(`[CyberFitness UpdateProfile] User ${userId} unlocked new achievements (incl. dynamic):`, newlyUnlockedAchievements.map(a => `${a.name} (${a.id}, +${a.kiloVibesAward || 0}KV)`));
     }
     // --- End Achievement Check ---
 
@@ -453,7 +608,6 @@ export const logCyberFitnessAction = async (
     }
     
     let currentProfile = profileResult.data || getDefaultCyberFitnessProfile(); 
-    // logger.debug(`[CyberFitness LogAction] Current profile for ${userId} before logging ${actionType}: KV=${currentProfile.kiloVibes}, Lvl=${currentProfile.level}`);
 
     let dailyLog = currentProfile.dailyActivityLog ? [...currentProfile.dailyActivityLog] : [];
     const todayStr = format(new Date(), 'yyyy-MM-dd');
@@ -462,7 +616,7 @@ export const logCyberFitnessAction = async (
     if (!todayEntry) {
       todayEntry = { date: todayStr, filesExtracted: 0, tokensProcessed: 0, kworkRequestsSent: 0, prsCreated: 0, branchesUpdated: 0, focusTimeMinutes: 0 };
       dailyLog.push(todayEntry);
-    } else { // Ensure all fields are initialized for an existing day entry
+    } else { 
        todayEntry.filesExtracted = todayEntry.filesExtracted || 0;
        todayEntry.tokensProcessed = todayEntry.tokensProcessed || 0;
        todayEntry.kworkRequestsSent = todayEntry.kworkRequestsSent || 0;
@@ -506,9 +660,8 @@ export const logCyberFitnessAction = async (
         const featureValue = countOrDetails.featureValue !== undefined ? countOrDetails.featureValue : true;
         if (typeof featureName === 'string' && profileUpdates.featuresUsed![featureName] !== featureValue) { 
              profileUpdates.featuresUsed![featureName] = featureValue;
-             // --- BUG FIX: Use currentProfile, not existingCyberFitnessProfile ---
-             if (featureValue === true && !currentProfile.featuresUsed?.[featureName]) {
-                 kiloVibesFromAction += 5; // Standard KV award for using a new feature
+             if (featureValue === true && !currentProfile.featuresUsed?.[featureName]) { // Check against currentProfile before update
+                 kiloVibesFromAction += 5; 
              }
              logger.debug(`[CyberFitness LogAction] Feature '${featureName}' usage updated to ${featureValue} for user ${userId}.`);
         } else if (typeof featureName === 'string') {
@@ -583,7 +736,7 @@ export const completeQuestAndUpdateProfile = async (
   questId: string,
   kiloVibesAwarded: number,
   newLevel?: number, 
-  newPerksFromQuest?: string[] // Renamed for clarity
+  newPerksFromQuest?: string[] 
 ): Promise<{ success: boolean; data?: DbUser; error?: string; newAchievements?: Achievement[] }> => {
   logger.log(`[CyberFitness QuestComplete ENTRY] User: ${userId}, Quest: ${questId}, KV: ${kiloVibesAwarded}, TargetLvl?: ${newLevel}, QuestPerks?:`, newPerksFromQuest);
    if (!userId) {
@@ -599,7 +752,6 @@ export const completeQuestAndUpdateProfile = async (
     return { success: false, error: currentProfileResult.error || "Failed to fetch current profile before quest completion." };
   }
   const currentProfile = currentProfileResult.data || getDefaultCyberFitnessProfile();
-  // logger.debug(`[CyberFitness QuestComplete] Current profile for ${userId}: QuestsDone=${currentProfile.completedQuests.join(',')}, KV=${currentProfile.kiloVibes}`);
 
   const questDefinition = ALL_ACHIEVEMENTS.find(ach => ach.id === questId && ach.isQuest);
   if (!questDefinition) {
@@ -623,9 +775,8 @@ export const completeQuestAndUpdateProfile = async (
         }
     }
     if (shouldUpdateForPerksOnly) {
-        // If quest already complete but new perks are being awarded (e.g. retroactive), still give KV if any.
         if (kiloVibesAwarded > 0) updatesForPerks.kiloVibes = kiloVibesAwarded; 
-        if (newLevel !== undefined) updatesForPerks.level = newLevel; // Allow level override if specified
+        if (newLevel !== undefined) updatesForPerks.level = newLevel; 
         return updateUserCyberFitnessProfile(userId, updatesForPerks); 
     }
     logger.log(`[CyberFitness QuestComplete] Quest ${questId} already done and no new perks from this call for user ${userId}. No update needed.`);
@@ -635,7 +786,7 @@ export const completeQuestAndUpdateProfile = async (
   const updates: Partial<CyberFitnessProfile> = {
     kiloVibes: kiloVibesAwarded > 0 ? kiloVibesAwarded : 0, 
     completedQuests: [questId], 
-    activeQuests: currentProfile.activeQuests.filter(aq => aq !== questId), // Remove from active
+    activeQuests: currentProfile.activeQuests.filter(aq => aq !== questId), 
   };
   logger.debug(`[CyberFitness QuestComplete] Initial updates for quest ${questId}: KiloVibes delta = ${updates.kiloVibes}`);
 
@@ -674,9 +825,11 @@ export const getUserCyberLevel = async (userId: string): Promise<{ success: bool
 
 export const getAchievementDetails = (achievementId: string): Achievement | undefined => {
     if (!achievementId) return undefined;
+    // First check predefined achievements
     let achievement = ALL_ACHIEVEMENTS.find(ach => ach.id === achievementId);
     if (achievement) return achievement;
 
+    // Then check for dynamic "level_up_X" pattern
     if (achievementId.startsWith("level_up_")) {
         const levelMatch = achievementId.match(/^level_up_(\d+)$/);
         if (levelMatch && levelMatch[1]) {
@@ -688,11 +841,30 @@ export const getAchievementDetails = (achievementId: string): Achievement | unde
                     description: `Вы достигли ${level}-го уровня КиберФитнеса. Новые перки и возможности открыты.`,
                     icon: 'FaStar',
                     checkCondition: () => true, 
-                    kiloVibesAward: 0 
+                    kiloVibesAward: 0, // KV is awarded by leveling logic itself
+                    isDynamic: true,
                 };
             }
         }
     }
+    // Then check for dynamic "mastered_schematic_X" pattern
+    if (achievementId.startsWith("mastered_schematic_")) {
+        // We don't have the full schematic list here easily, 
+        // so we return a generic structure. The UI or calling context would have more details.
+        // For profile page display, this might be enough, or it might need the original schematic name/icon.
+        // This part might need refinement if schematic details are crucial for display from ID alone.
+        const schematicNamePart = achievementId.substring("mastered_schematic_".length).replace(/_/g, ' ');
+        return {
+            id: achievementId,
+            name: `Схема '${schematicNamePart}' Освоена!`,
+            description: `Вы успешно применили и освоили схему '${schematicNamePart}'.`,
+            icon: 'FaTasks', // Default icon for mastered schematics
+            checkCondition: () => true,
+            kiloVibesAward: 0, // KV awarded by logSchematicCompleted
+            isDynamic: true,
+        };
+    }
+
     logger.warn(`[CyberFitness getAchievementDetails] Achievement with ID "${achievementId}" not found in ALL_ACHIEVEMENTS or dynamic patterns.`);
     return undefined;
 };
