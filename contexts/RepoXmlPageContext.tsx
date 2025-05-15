@@ -8,7 +8,7 @@ import { useAppToast } from '@/hooks/useAppToast';
 export interface FileNode { path: string; content: string; }
 export interface SimplePullRequest { id: number; number: number; title: string; html_url: string; user: { login: string | null; avatar_url: string | null } | null; head: { ref: string }; base: { ref: string }; updated_at: string; }
 import { debugLogger as logger } from '@/lib/debugLogger';
-import { getOpenPullRequests, updateBranch, checkExistingPrBranch, createGitHubPullRequest } from '@/app/actions_github/actions'; // Added createGitHubPullRequest
+import { getOpenPullRequests, updateBranch, checkExistingPrBranch, createGitHubPullRequest } from '@/app/actions_github/actions'; 
 import type { RepoTxtFetcherRef } from '@/components/RepoTxtFetcher';
 import type { AICodeAssistantRef } from '@/components/AICodeAssistant';
 import * as repoUtils from "@/lib/repoUtils";
@@ -17,7 +17,8 @@ import {
     checkAndUnlockFeatureAchievement, 
     completeQuestAndUpdateProfile, 
     logCyberFitnessAction, 
-    Achievement 
+    Achievement,
+    PERKS_BY_LEVEL 
 } from '@/hooks/cyberFitnessSupabase'; 
 
 export type ImportCategory = 'component' | 'context' | 'hook' | 'lib' | 'other';
@@ -95,9 +96,9 @@ interface RepoXmlPageContextType {
     triggerAskAi: () => Promise<{ success: boolean; requestId?: string; error?: string }>;
     triggerParseResponse: () => Promise<void>;
     triggerSelectAllParsed: () => void;
-    triggerCreateOrUpdatePR: () => Promise<void>; // This will remain, and Assistant will call it. Assistant decides which specific trigger to use.
+    triggerCreateOrUpdatePR: () => Promise<void>; 
     triggerUpdateBranch: ( repoUrl: string, filesToCommit: { path: string; content: string }[], commitMessage: string, branch: string, prNumber?: number | null, prDescription?: string ) => Promise<{ success: boolean; error?: string; newAchievements?: Achievement[] }>;
-    triggerCreateNewPR: ( repoUrl: string, filesToCommit: FileNode[], prTitle: string, prDescription: string, commitMessage: string, newBranchName: string ) => Promise<{ success: boolean; error?: string; prUrl?: string; prNumber?: number; branch?: string; newAchievements?: Achievement[] }>; // Added this
+    triggerCreateNewPR: ( repoUrl: string, filesToCommit: FileNode[], prTitle: string, prDescription: string, commitMessage: string, newBranchName: string ) => Promise<{ success: boolean; error?: string; prUrl?: string; prNumber?: number; branch?: string; newAchievements?: Achievement[] }>;
     triggerGetOpenPRs: (repoUrl: string) => Promise<void>;
     updateRepoUrlInAssistant: (url: string) => void;
     getXuinityMessage: () => string;
@@ -177,7 +178,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const [repoUrlEnteredState, setRepoUrlEnteredState] = useState<boolean>(false);
         const [filesFetchedState, setFilesFetchedState] = useState<boolean>(false);
         const [primaryHighlightPathState, setPrimaryHighlightPathState] = useState<string | null>(null);
-        const [secondaryHighlightPathsState, setSecondaryHighlightPathsState] = useState<Record<ImportCategory, string[]>>({ component: [], context: [], hook: [], lib: [], other: [] });
+        const [secondaryHighlightPathsStateInternal, setSecondaryHighlightPathsStateInternal] = useState<Record<ImportCategory, string[]>>({ component: [], context: [], hook: [], lib: [], other: [] });
         const [selectedFetcherFilesState, setSelectedFetcherFilesState] = useState<Set<string>>(new Set());
         const [kworkInputHasContentState, setKworkInputHasContentState] = useState<boolean>(false);
         const [kworkInputValueState, setKworkInputValueState] = useState<string>('');
@@ -285,13 +286,13 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             if (fetched) { setAllFetchedFilesStateStable(allFiles ?? []); }
             else { setAllFetchedFilesStateStable([]); }
             setPrimaryHighlightPathState(primaryHighlight);
-            setSecondaryHighlightPathsState(secondaryHighlights ?? { component: [], context: [], hook: [], lib: [], other: [] });
+            setSecondaryHighlightPathsStateInternal(secondaryHighlights ?? { component: [], context: [], hook: [], lib: [], other: [] }); // Use internal setter
             let finalFetchStatus: FetchStatus = 'idle'; 
             
             let questCompleted = false;
             let questResult: Awaited<ReturnType<typeof completeQuestAndUpdateProfile>> | null = null;
 
-            if (currentTask) { // Image Swap Flow
+            if (currentTask) { 
                 if (fetched) {
                     const targetFileExists = (allFiles ?? []).some(f => f.path === currentTask.targetPath);
                     if (!targetFileExists) {
@@ -306,8 +307,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                                .then(async ({ success: replaceSuccess, error: replaceError }) => {
                                    if (!replaceSuccess) {
                                        addToastStable(`Ошибка замены/PR: ${replaceError || 'Неизвестно'}`, 'error');
-                                   } else if (dbUser?.id) {
-                                       questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_fetch_completed', 75, 1); 
+                                   } else if (dbUser?.user_id) { 
+                                       questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1); 
                                        questCompleted = true;
                                    }
                                    setImageReplaceTaskStateStable(null); 
@@ -325,8 +326,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     addToastStable(`Ошибка Задачи Изображения: Не удалось загрузить файлы.`, 'error', 5000);
                     setImageReplaceTaskStateStable(null); setAssistantLoadingStateStable(false);
                 }
-                if (currentPendingFlow) { setPendingFlowDetailsStateStable(null); }
-            } else if (currentPendingFlow?.type === 'ErrorFix' && fetched) { // Error Fix Flow
+                if (currentPendingFlow?.type === 'ImageSwap') { setPendingFlowDetailsStateStable(null); } 
+            } else if (currentPendingFlow?.type === 'ErrorFix' && fetched) { 
                  const targetFileExists = allFiles.some(f => f.path === currentPendingFlow.targetPath);
                  if (targetFileExists) {
                      const { Message, Stack, Logs, Source } = currentPendingFlow.details;
@@ -337,8 +338,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                          setTimeout(async () => { 
                              try {
                                  fetcherRef.current?.handleAddSelected?.(new Set([currentPendingFlow.targetPath]), allFiles);
-                                 if (dbUser?.id) {
-                                      questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_fetch_completed', 75, 1); 
+                                 if (dbUser?.user_id) { 
+                                      questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1); 
                                       questCompleted = true;
                                  }
                                  scrollToSectionStable('executor');
@@ -351,12 +352,12 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                      finalFetchStatus = 'error'; 
                      setPendingFlowDetailsStateStable(null); 
                  }
-            } else { // Standard fetch without special flow
+            } else { 
                   if (fetched && currentPendingFlow) setPendingFlowDetailsStateStable(null);
                   if (fetched && imageReplaceTaskStateRef.current) setImageReplaceTaskStateStable(null);
                   finalFetchStatus = fetched ? 'success' : 'error';
-                  if (fetched && !currentTask && !currentPendingFlow && dbUser?.id) {
-                        questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_fetch_completed', 75, 1);
+                  if (fetched && !currentTask && !currentPendingFlow && dbUser?.user_id) { 
+                        questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1);
                         questCompleted = true;
                   }
             }
@@ -371,33 +372,58 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             }
            setFetchStatusStateStable(finalFetchStatus);
         }, [ 
-             dbUser?.id, addToastStable, assistantRef, fetcherRef, setFetchStatusStateStable, setAllFetchedFilesStateStable,
+             dbUser?.user_id, addToastStable, assistantRef, fetcherRef, setFetchStatusStateStable, setAllFetchedFilesStateStable,
              setImageReplaceTaskStateStable, setAssistantLoadingStateStable, setPendingFlowDetailsStateStable,
-             setKworkInputValueStateStable, scrollToSectionStable, logger
+             setKworkInputValueStateStable, scrollToSectionStable, logger, setSecondaryHighlightPathsStateInternal
          ]);
 
         const triggerToggleSettingsModal = useCallback(async () => {
-            if (dbUser?.id) {
-                const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'settings_opened');
+            if (dbUser?.user_id) { 
+                const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'settings_opened');
                 newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
             }
             setIsSettingsModalOpenState(prev => !prev);
-        }, [dbUser?.id, addToastStable]);
+        }, [dbUser?.user_id, addToastStable]);
 
         const triggerFetch = useCallback(async (isRetry = false, branch?: string | null) => { if (fetcherRef.current?.handleFetch) { try { await fetcherRef.current.handleFetch(isRetry, branch, imageReplaceTaskStateRef.current); } catch (e: any) { addToastStable(`Крит. ошибка запуска извлечения: ${e?.message ?? 'Неизвестно'}`, "error", 5000); setFetchStatusStateStable('error'); } } else { addToastStable("Ошибка: Не удалось запустить извлечение (ref).", "error"); } }, [addToastStable, setFetchStatusStateStable, fetcherRef]);
         
-        const triggerPreCheckAndFetch = useCallback(async ( repoUrlToCheck: string, potentialBranchName: string, flowType: 'ImageSwap' | 'ErrorFix', flowDetails: any, targetPath: string ) => {
+        const triggerPreCheckAndFetch = useCallback(async ( repoUrlToCheck: string, potentialBranchNameProvided: string, flowType: 'ImageSwap' | 'ErrorFix', flowDetails: any, targetPath: string ) => {
             const flowLogPrefix = flowType === 'ImageSwap' ? '[Flow 1 - Image Swap]' : '[Flow 3 - Error Fix]';
-            logger.log(`${flowLogPrefix} Context: triggerPreCheckAndFetch. URL: ${repoUrlToCheck}, Branch: ${potentialBranchName}, Target: ${targetPath}`);
+            logger.log(`${flowLogPrefix} Context: triggerPreCheckAndFetch. URL: ${repoUrlToCheck}, PotentialBranch: ${potentialBranchNameProvided}, Target: ${targetPath}, Details:`, flowDetails);
             setIsPreCheckingStateStable(true); 
-            setPendingFlowDetailsStateStable({ type: flowType, details: flowDetails, targetPath }); 
+            
+            if (flowType === 'ImageSwap') {
+                if (!flowDetails?.oldUrl || !flowDetails?.newUrl) {
+                    logger.error(`${flowLogPrefix} Context: Missing oldUrl or newUrl in flowDetails for ImageSwap. Aborting.`);
+                    addToastStable("Ошибка: Недостаточно данных для замены изображения (oldUrl/newUrl).", 'error', 5000);
+                    setIsPreCheckingStateStable(false);
+                    setFetchStatusStateStable('error');
+                    return;
+                }
+                setImageReplaceTaskStateStable({ 
+                    targetPath, 
+                    oldUrl: flowDetails.oldUrl, 
+                    newUrl: flowDetails.newUrl 
+                });
+                setPendingFlowDetailsStateStable(null);
+                logger.log(`${flowLogPrefix} Context: imageReplaceTaskState set directly for ImageSwap.`);
+            } else if (flowType === 'ErrorFix') {
+                setPendingFlowDetailsStateStable({ type: flowType, details: flowDetails, targetPath });
+                setImageReplaceTaskStateStable(null);
+                logger.log(`${flowLogPrefix} Context: pendingFlowDetailsState set for ErrorFix.`);
+            } else {
+                setPendingFlowDetailsStateStable(null);
+                setImageReplaceTaskStateStable(null);
+                logger.log(`${flowLogPrefix} Context: Unknown or generic flow type. Clearing image/pending details.`);
+            }
+            
             setTargetPrDataStable(null); 
             setTargetBranchNameStateStable(null); 
             setManualBranchNameStateStable(''); 
             setFetchStatusStateStable('loading');
             
-            if (dbUser?.id) { 
-                const questResult = await completeQuestAndUpdateProfile(dbUser.id, 'initial_boot_sequence', 25);
+            if (dbUser?.user_id) { 
+                const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'initial_boot_sequence', 25);
                 if (questResult.success) {
                     addToastStable("🛰️ Квест 'Пойман Сигнал': +25 KiloVibes!", "success", 3000);
                 }
@@ -405,44 +431,60 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             }
 
             let branchToFetch: string | null = null;
-            try { 
-                const checkResult = await checkExistingPrBranch(repoUrlToCheck, potentialBranchName);
-                if (checkResult.success && checkResult.data?.exists && checkResult.data?.branchName) {
-                    const prSourceBranch = checkResult.data.branchName; 
-                    setTargetBranchNameStateStable(prSourceBranch); setTargetPrDataStable({ number: checkResult.data.prNumber!, url: checkResult.data.prUrl! }); branchToFetch = prSourceBranch;
-                     logger.log(`${flowLogPrefix} Context: Found existing PR/branch: ${prSourceBranch}. PR #${checkResult.data.prNumber}`);
-                } else if (checkResult.success) {
-                    logger.log(`${flowLogPrefix} Context: No existing PR/branch found for "${potentialBranchName}". Will use default branch.`);
-                    branchToFetch = null; 
-                } else {
-                     addToastStable(`Не удалось проверить PR для ${potentialBranchName}. Используется ветка по умолчанию.`, 'warning');
-                     logger.warn(`${flowLogPrefix} Context: checkExistingPrBranch failed. Error: ${checkResult.error}`);
-                     branchToFetch = null; 
-                }
-            } catch (err: any) {
-                addToastStable(`Критическая ошибка проверки PR: ${err.message}`, 'error');
-                logger.error(`${flowLogPrefix} Context: Exception in checkExistingPrBranch:`, err);
+            let branchNameToSeek = potentialBranchNameProvided;
+
+            if (flowType === 'ImageSwap') {
+                logger.log(`${flowLogPrefix} Context: ImageSwap flow. Always fetching from default branch.`);
                 branchToFetch = null; 
+            } 
+            else if (branchNameToSeek) { 
+                try { 
+                    const checkResult = await checkExistingPrBranch(repoUrlToCheck, branchNameToSeek);
+                    if (checkResult.success && checkResult.data?.exists && checkResult.data?.branchName) {
+                        const prSourceBranch = checkResult.data.branchName; 
+                        setTargetBranchNameStateStable(prSourceBranch); 
+                        setTargetPrDataStable({ number: checkResult.data.prNumber!, url: checkResult.data.prUrl! }); 
+                        branchToFetch = prSourceBranch;
+                         logger.log(`${flowLogPrefix} Context: Found existing PR/branch: ${prSourceBranch}. PR #${checkResult.data.prNumber}. Will fetch from this branch.`);
+                    } else if (checkResult.success) {
+                        logger.log(`${flowLogPrefix} Context: No existing PR/branch found for "${branchNameToSeek}". Will use default branch for initial fetch.`);
+                        branchToFetch = null; 
+                    } else {
+                         addToastStable(`Не удалось проверить PR для ${branchNameToSeek}. Используется ветка по умолчанию.`, 'warning');
+                         logger.warn(`${flowLogPrefix} Context: checkExistingPrBranch failed for "${branchNameToSeek}". Error: ${checkResult.error}`);
+                         branchToFetch = null; 
+                    }
+                } catch (err: any) {
+                    addToastStable(`Критическая ошибка проверки PR: ${err.message}`, 'error');
+                    logger.error(`${flowLogPrefix} Context: Exception in checkExistingPrBranch for "${branchNameToSeek}":`, err);
+                    branchToFetch = null; 
+                }
+            } else { 
+                 logger.log(`${flowLogPrefix} Context: No specific branch name to seek. Will fetch from default branch.`);
+                 branchToFetch = null;
             }
-            finally {
-                setIsPreCheckingStateStable(false);
-                logger.log(`${flowLogPrefix} Context: Proceeding to triggerFetch with branch: ${branchToFetch}`);
-                await triggerFetch(false, branchToFetch);
-            }
-        }, [ dbUser?.id, addToastStable, setTargetBranchNameStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setManualBranchNameStateStable, setFetchStatusStateStable, triggerFetch, logger ]);
+            
+            setIsPreCheckingStateStable(false);
+            logger.log(`${flowLogPrefix} Context: Proceeding to triggerFetch with branch: ${branchToFetch}`);
+            await triggerFetch(false, branchToFetch); 
+        }, [ 
+            dbUser?.user_id, addToastStable, setTargetBranchNameStateStable, setTargetPrDataStable, 
+            setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setImageReplaceTaskStateStable, 
+            setManualBranchNameStateStable, setFetchStatusStateStable, triggerFetch, logger 
+        ]);
         
         const triggerSelectHighlighted = useCallback(async () => {
             logger.log(`[DEBUG][CONTEXT] triggerSelectHighlighted called. Ref ready: ${!!fetcherRef.current?.selectHighlightedFiles}`);
             if (fetcherRef.current?.selectHighlightedFiles) {
                 try {
                     fetcherRef.current.selectHighlightedFiles();
-                    if (dbUser?.id) { 
-                        const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'usedSelectHighlighted');
+                    if (dbUser?.user_id) { 
+                        const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'usedSelectHighlighted');
                         newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                     }
                 } catch (e: any) { logger.error("Error calling fetcherRef.selectHighlightedFiles:", e); addToastStable(`Ошибка выбора связанных файлов: ${e?.message ?? 'Неизвестно'}`, "error"); }
             } else { logger.error("triggerSelectHighlighted: fetcherRef is not set."); }
-        }, [addToastStable, fetcherRef, dbUser?.id, logger]); 
+        }, [addToastStable, fetcherRef, dbUser?.user_id, logger]); 
 
         const triggerAddSelectedToKwork = useCallback(async (clearSelection = false) => { const currentSelected = selectedFetcherFilesRef.current; const currentAllFiles = allFetchedFilesRef.current; if (fetcherRef.current?.handleAddSelected) { if (currentSelected.size === 0) { addToastStable("Сначала выберите файлы в Экстракторе!", "warning"); return; } try { await fetcherRef.current.handleAddSelected(currentSelected, currentAllFiles); if (clearSelection) { setSelectedFetcherFilesStateStable(new Set()); } } catch (e: any) { addToastStable(`Ошибка добавления файлов: ${e?.message ?? 'Неизвестно'}`, "error"); } } else { addToastStable("Ошибка: Компонент Экстрактора недоступен.", "error"); } }, [addToastStable, setSelectedFetcherFilesStateStable, fetcherRef]);
         const selectedFetcherFilesRef = useRef(selectedFetcherFilesState); useEffect(() => { selectedFetcherFilesRef.current = selectedFetcherFilesState; }, [selectedFetcherFilesState]);
@@ -452,8 +494,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             if (fetcherRef.current?.handleCopyToClipboard) { 
                 try { 
                     const success = fetcherRef.current.handleCopyToClipboard(undefined, true);
-                    if (success && dbUser?.id) {
-                        const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'system_prompt_copied');
+                    if (success && dbUser?.user_id) { 
+                        const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'system_prompt_copied');
                         newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                     }
                     return success; 
@@ -465,7 +507,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                 addToastStable("Ошибка копирования: Компонент Экстрактора недоступен.", "error"); 
                 return false; 
             } 
-        }, [addToastStable, fetcherRef, dbUser?.id]);
+        }, [addToastStable, fetcherRef, dbUser?.user_id]);
 
         const triggerAskAi = useCallback(async () => { addToastStable("Скопируйте запрос и вставьте в AI.", "info"); return { success: false, error: "Ask AI button disabled" }; }, [addToastStable]);
         
@@ -473,8 +515,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             if (assistantRef.current?.handleParse) { 
                 try { 
                     await assistantRef.current.handleParse(); 
-                    if (dbUser?.id) {
-                         const questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_parse_completed', 150, 2); 
+                    if (dbUser?.user_id) { 
+                         const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_parse_completed', 150, 2); 
                          if (questResult.success && questResult.data?.metadata?.cyberFitness?.level === 2) {
                              addToastStable("🚀 Квест 'Первый Парсинг' выполнен! Level 2 достигнут!", "success", 4000);
                          } else if (questResult.success) {
@@ -488,15 +530,10 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             } else { 
                 addToastStable("Ошибка разбора: Компонент Ассистента недоступен.", "error");
             } 
-        }, [addToastStable, assistantRef, dbUser?.id]);
+        }, [addToastStable, assistantRef, dbUser?.user_id]);
         
         const triggerSelectAllParsed = useCallback(() => { if (assistantRef.current?.selectAllParsedFiles) { try { assistantRef.current.selectAllParsedFiles(); } catch (e: any) { addToastStable(`Ошибка выбора всех файлов: ${e?.message ?? 'Неизвестно'}`, "error"); } } else { addToastStable("Ошибка выбора: Компонент Ассистента недоступен.", "error");} }, [addToastStable, assistantRef]);
         
-        // This will remain. AICodeAssistant's handleCreatePR will call this, 
-        // and then this context function will decide whether to call triggerUpdateBranch or triggerCreateNewPR.
-        // However, the direct call to triggerUpdateBranch or triggerCreateNewPR should happen in AICodeAssistant's handlers.
-        // This function should be simplified or removed if AICodeAssistant calls the specific triggers directly.
-        // For now, let's assume AICodeAssistant calls this, and this is a pass-through/delegator.
         const triggerCreateOrUpdatePR = useCallback(async () => { 
             if (assistantRef.current?.handleCreatePR) { 
                 try { 
@@ -518,25 +555,14 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                 const result = await updateBranch(repoUrlParam, filesToCommit, commitMessage, branch, prNumber ?? undefined, prDescription); 
                 if (result.success) { 
                     triggerGetOpenPRsStable(repoUrlParam).catch(err => logger.error("Failed to refresh PRs after branch update:", err));
-                    if (dbUser?.id) {
-                        const action = prNumber ? 'branchUpdated' : 'prCreated'; 
-                        const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.id, action, 1);
-                        if(actionAch) combinedAchievements.push(...actionAch);
-
-                        // This 'prCreated' quest logic should ideally move to where a new PR is confirmed.
-                        // If triggerUpdateBranch is ONLY for updating existing branches, this block is fine.
-                        // If it's also for creating a new branch AND PR (which is the current flawed logic), this is okay too, but the overall flow is wrong.
-                        // The FIX involves triggerCreateNewPR handling this specific CyberFitness logic for NEW PRs.
-                        if (!prNumber && action === 'prCreated') {  // More specific condition based on the action intent
-                            const questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_pr_created', 250, 3); 
-                            if(questResult.success && questResult.data?.metadata?.cyberFitness?.level === 3) {
-                                addToastStable("🚀 Квест 'Первый PR' выполнен! Level 3 достигнут!", "success", 4000);
-                            } else if (questResult.success) {
-                                addToastStable("🚀 Квест 'Первый PR' выполнен!", "success", 4000);
-                            }
-                            if(questResult.newAchievements) combinedAchievements.push(...questResult.newAchievements);
+                    if (dbUser?.user_id) {
+                        if (prNumber) { 
+                            const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.user_id, 'branchUpdated', 1);
+                            if(actionAch) combinedAchievements.push(...actionAch);
+                            logger.info(`[CyberFitness] Logged 'branchUpdated' for PR #${prNumber} update. User: ${dbUser.user_id}`);
+                        } else {
+                            logger.info(`[CyberFitness] Branch '${branch}' updated (no PR number). Action will be logged by PR creation or specific flow. User: ${dbUser.user_id}`);
                         }
-                         combinedAchievements.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                     }
                     return { success: true, newAchievements: combinedAchievements }; 
                 } else { 
@@ -549,7 +575,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             } finally { 
                 setAssistantLoadingStateStable(false); 
             } 
-        }, [addToastStable, triggerGetOpenPRsStable, setAssistantLoadingStateStable, dbUser?.id, logger]);
+        }, [addToastStable, triggerGetOpenPRsStable, setAssistantLoadingStateStable, dbUser?.user_id, logger]);
 
         const triggerCreateNewPRStable = useCallback(async (
             repoUrlParam: string, 
@@ -572,13 +598,14 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     newBranchNameParam
                 );
     
-                if (result.success) {
+                if (result.success && result.prNumber) { 
                     triggerGetOpenPRsStable(repoUrlParam).catch(err => logger.error("Failed to refresh PRs after new PR creation:", err));
-                    if (dbUser?.id) {
-                        const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.id, 'prCreated', 1);
+                    if (dbUser?.user_id) { 
+                        const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.user_id, 'prCreated', 1);
                         if(actionAch) combinedAchievements.push(...actionAch);
+                        logger.info(`[CyberFitness] Logged 'prCreated' for PR #${result.prNumber}. User: ${dbUser.user_id}`);
                         
-                        const questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_pr_created', 250, 3);
+                        const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_pr_created', 250, 3, PERKS_BY_LEVEL[3]);
                         if(questResult.success && questResult.data?.metadata?.cyberFitness?.level === 3) {
                             addToastStable("🚀 Квест 'Первый PR' выполнен! Level 3 достигнут!", "success", 4000);
                         } else if (questResult.success) {
@@ -586,7 +613,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                         }
                         if(questResult.newAchievements) combinedAchievements.push(...questResult.newAchievements);
                     }
-                    combinedAchievements.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                     return { ...result, newAchievements: combinedAchievements };
                 } else {
                     addToastStable(`Ошибка создания PR: ${result.error}`, 'error', 5000);
@@ -598,30 +624,29 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             } finally {
                 setAssistantLoadingStateStable(false);
             }
-        }, [addToastStable, triggerGetOpenPRsStable, setAssistantLoadingStateStable, dbUser?.id, logger]);
-
+        }, [addToastStable, triggerGetOpenPRsStable, setAssistantLoadingStateStable, dbUser?.user_id, logger]);
 
         const updateRepoUrlInAssistantStable = useCallback((url: string) => { if (assistantRef.current?.updateRepoUrl) { try { assistantRef.current.updateRepoUrl(url); } catch (e: any) { logger.error(`Error calling assistantRef.updateRepoUrl: ${e?.message ?? 'Неизвестно'}`); } } }, [assistantRef]);
         
         const triggerAddImportantToKworkStable = useCallback(async () => {
             if (fetcherRef.current?.handleAddImportantFiles) {
                 fetcherRef.current.handleAddImportantFiles();
-                 if (dbUser?.id) {
-                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'usedSelectHighlighted'); 
+                 if (dbUser?.user_id) { 
+                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'usedSelectHighlighted'); 
                     newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                  }
             }
-        }, [fetcherRef, dbUser?.id, addToastStable]);
+        }, [fetcherRef, dbUser?.user_id, addToastStable]);
         
         const triggerAddTreeToKworkStable = useCallback(async () => {
              if (fetcherRef.current?.handleAddFullTree) {
                  fetcherRef.current.handleAddFullTree();
-                 if (dbUser?.id) {
-                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'usedAddFullTree');
+                 if (dbUser?.user_id) { 
+                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'usedAddFullTree');
                     newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                  }
              }
-        }, [fetcherRef, dbUser?.id, addToastStable]);
+        }, [fetcherRef, dbUser?.user_id, addToastStable]);
 
         const triggerSelectAllFetcherFilesStable = useCallback(() => { fetcherRef.current?.selectAllFiles?.(); }, [fetcherRef]);
         const triggerDeselectAllFetcherFilesStable = useCallback(() => { fetcherRef.current?.deselectAllFiles?.(); }, [fetcherRef]);
@@ -629,12 +654,12 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const triggerClearKworkInputStable = useCallback(async () => {
             if (fetcherRef.current?.clearAll) {
                 fetcherRef.current.clearAll();
-                if (dbUser?.id) {
-                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'kwork_cleared');
+                if (dbUser?.user_id) { 
+                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'kwork_cleared');
                     newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                 }
             }
-        }, [fetcherRef, dbUser?.id, addToastStable]);
+        }, [fetcherRef, dbUser?.user_id, addToastStable]);
 
         const [currentStep, setCurrentStep] = useState<WorkflowStep>('idle');
         useEffect(() => {
@@ -656,19 +681,27 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     else if (aiResponseHasContentState) { calculatedStep = filesParsedState ? 'pr_ready' : 'response_pasted'; }
                     else if (kworkInputHasContentState) { calculatedStep = requestCopiedState ? 'request_copied' : 'request_written'; }
                     else if (selectedFetcherFilesState.size > 0) { calculatedStep = 'files_selected'; }
-                    else if (primaryHighlightPathState || Object.values(secondaryHighlightPathsState).some(arr => arr.length > 0)) { calculatedStep = 'files_fetched_highlights'; }
+                    // Используем secondaryHighlightPathsStateInternal для корректной зависимости
+                    else if (primaryHighlightPathState || Object.values(secondaryHighlightPathsStateInternal).some(arr => arr.length > 0)) { calculatedStep = 'files_fetched_highlights'; }
                     else { calculatedStep = 'files_fetched'; }
                 }
             }
             else { calculatedStep = repoUrlEnteredState ? 'ready_to_fetch' : 'idle'; }
             
             setCurrentStep(prevStep => { if (prevStep !== calculatedStep) { logger.log(`[WorkflowStep Change] From ${prevStep} to ${calculatedStep}`); return calculatedStep; } return prevStep; });
-        }, [ fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState, filesParsedState, requestCopiedState, primaryHighlightPathState, secondaryHighlightPathsState, selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, allFetchedFilesState, assistantLoadingState, repoUrlEnteredState, isPreCheckingState, logger ]);
+        }, [ 
+            fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState, 
+            filesParsedState, requestCopiedState, primaryHighlightPathState, 
+            secondaryHighlightPathsStateInternal, // <- Изменено здесь
+            selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, 
+            allFetchedFilesState, assistantLoadingState, repoUrlEnteredState, isPreCheckingState, logger 
+        ]);
 
          const getXuinityMessageStable = useCallback((): string => {
              const localCurrentStep = currentStep; const localManualBranchName = manualBranchNameState; const localTargetBranchName = targetBranchNameState; const localImageReplaceTask = imageReplaceTaskState; const localFetchStatus = fetchStatusState; const localAllFilesLength = allFetchedFilesState.length; const localSelectedFetchSize = selectedFetcherFilesState.size; const localSelectedAssistSize = selectedAssistantFilesState.size; const localIsPreChecking = isPreCheckingState; const localPendingFlowDetails = pendingFlowDetailsState; const localFilesFetched = filesFetchedState; const localAssistantLoading = assistantLoadingState; 
              const effectiveBranch = localManualBranchName.trim() || localTargetBranchName || 'default';
              if (localIsPreChecking && localPendingFlowDetails) return `Проверяю наличие PR/ветки для '${localPendingFlowDetails.targetPath.split('/').pop() ?? 'файла'}'...`;
+              if (localIsPreChecking && localImageReplaceTask) return `Проверяю наличие PR/ветки для замены картинки '${localImageReplaceTask.targetPath.split('/').pop() ?? 'файла'}'...`;
              if (localImageReplaceTask) {
                  if (localFetchStatus === 'loading' || localFetchStatus === 'retrying') return `Гружу файл ${localImageReplaceTask.targetPath.split('/').pop()} из ветки ${effectiveBranch}...`;
                  if (localFetchStatus === 'error' || localFetchStatus === 'failed_retries') return "Твою ж! Ошибка загрузки файла. URL/ветка верные? Жми 'Попробовать Снова'.";
@@ -695,22 +728,26 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
           }, [ currentStep, manualBranchNameState, targetBranchNameState, imageReplaceTaskState, fetchStatusState, allFetchedFilesState, filesFetchedState, assistantLoadingState, selectedFetcherFilesState.size, selectedAssistantFilesState.size, isPreCheckingState, pendingFlowDetailsState ]);
 
         const contextValue = useMemo((): RepoXmlPageContextType => ({
-            fetchStatus: fetchStatusState, repoUrlEntered: repoUrlEnteredState, filesFetched: filesFetchedState, kworkInputHasContent: kworkInputHasContentState, requestCopied: requestCopiedState, aiResponseHasContent: aiResponseHasContentState, filesParsed: filesParsedState, assistantLoading: assistantLoadingState, aiActionLoading: aiActionLoadingState, loadingPrs: loadingPrsState, isSettingsModalOpen: isSettingsModalOpenState, isParsing: isParsingState, isPreChecking: isPreCheckingState, showComponents: showComponentsState, selectedFetcherFiles: selectedFetcherFilesState, selectedAssistantFiles: selectedAssistantFilesState, targetBranchName: targetBranchNameState, manualBranchName: manualBranchNameState, openPrs: openPrsState, currentAiRequestId: currentAiRequestIdState, imageReplaceTask: imageReplaceTaskState, allFetchedFiles: allFetchedFilesState, currentStep, repoUrl: repoUrlState, primaryHighlightedPath: primaryHighlightPathState, secondaryHighlightedPaths: secondaryHighlightPathsState, targetPrData: targetPrDataState, pendingFlowDetails: pendingFlowDetailsState, kworkInputValue: kworkInputValueState,
+            fetchStatus: fetchStatusState, repoUrlEntered: repoUrlEnteredState, filesFetched: filesFetchedState, kworkInputHasContent: kworkInputHasContentState, requestCopied: requestCopiedState, aiResponseHasContent: aiResponseHasContentState, filesParsed: filesParsedState, assistantLoading: assistantLoadingState, aiActionLoading: aiActionLoadingState, loadingPrs: loadingPrsState, isSettingsModalOpen: isSettingsModalOpenState, isParsing: isParsingState, isPreChecking: isPreCheckingState, showComponents: showComponentsState, selectedFetcherFiles: selectedFetcherFilesState, selectedAssistantFiles: selectedAssistantFilesState, targetBranchName: targetBranchNameState, manualBranchName: manualBranchNameState, openPrs: openPrsState, currentAiRequestId: currentAiRequestIdState, imageReplaceTask: imageReplaceTaskState, allFetchedFiles: allFetchedFilesState, currentStep, repoUrl: repoUrlState, primaryHighlightedPath: primaryHighlightPathState, 
+            secondaryHighlightedPaths: secondaryHighlightPathsStateInternal, // Используем внутреннее состояние
+            targetPrData: targetPrDataState, pendingFlowDetails: pendingFlowDetailsState, kworkInputValue: kworkInputValueState,
             setFetchStatus: setFetchStatusStateStable, setRepoUrlEntered: setRepoUrlEnteredStateStable, handleSetFilesFetched: handleSetFilesFetchedStable, setSelectedFetcherFiles: setSelectedFetcherFilesStateStable, setKworkInputHasContent: setKworkInputHasContentStateStable, setRequestCopied: setRequestCopiedStateStable, setAiResponseHasContent: setAiResponseHasContentStateStable, setFilesParsed: setFilesParsedStateStable, setSelectedAssistantFiles: setSelectedAssistantFilesStateStable, setAssistantLoading: setAssistantLoadingStateStable, setAiActionLoading: setAiActionLoadingStateStable, setLoadingPrs: setLoadingPrsStateStable, setTargetBranchName: setTargetBranchNameStateStable, setManualBranchName: setManualBranchNameStateStable, setOpenPrs: setOpenPrsStateStable, setIsParsing: setIsParsingStateStable, setContextIsParsing: setIsParsingStateStable, setCurrentAiRequestId: setCurrentAiRequestIdStateStable, setImageReplaceTask: setImageReplaceTaskStateStable, setRepoUrl: setRepoUrlStateStable, setTargetPrData: setTargetPrDataStable, setIsPreChecking: setIsPreCheckingStateStable, setPendingFlowDetails: setPendingFlowDetailsStateStable, setShowComponents: setShowComponentsStateStable, setKworkInputValue: setKworkInputValueStateStable,
             triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, 
-            triggerCreateOrUpdatePR, // Keep this general trigger if AICodeAssistant still uses it
+            triggerCreateOrUpdatePR, 
             triggerUpdateBranch: triggerUpdateBranchStable, 
-            triggerCreateNewPR: triggerCreateNewPRStable, // <<< ADDED THE NEW TRIGGER HERE
+            triggerCreateNewPR: triggerCreateNewPRStable, 
             triggerGetOpenPRs: triggerGetOpenPRsStable, updateRepoUrlInAssistant: updateRepoUrlInAssistantStable, getXuinityMessage: getXuinityMessageStable, scrollToSection: scrollToSectionStable, triggerAddImportantToKwork: triggerAddImportantToKworkStable, triggerAddTreeToKwork: triggerAddTreeToKworkStable, triggerSelectAllFetcherFiles: triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFiles: triggerDeselectAllFetcherFilesStable, triggerClearKworkInput: triggerClearKworkInputStable,
             kworkInputRef, aiResponseInputRef, fetcherRef, assistantRef,
             addToast: addToastStable,
         }), [
-            fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, isPreCheckingState, showComponentsState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, secondaryHighlightPathsState, targetPrDataState, pendingFlowDetailsState, kworkInputValueState,
+            fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, isPreCheckingState, showComponentsState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, 
+            secondaryHighlightPathsStateInternal, // Используем внутреннее состояние
+            targetPrDataState, pendingFlowDetailsState, kworkInputValueState,
             setFetchStatusStateStable, setRepoUrlEnteredStateStable, handleSetFilesFetchedStable, setSelectedFetcherFilesStateStable, setKworkInputHasContentStateStable, setRequestCopiedStateStable, setAiResponseHasContentStateStable, setFilesParsedStateStable, setSelectedAssistantFilesStateStable, setAssistantLoadingStateStable, setAiActionLoadingStateStable, setLoadingPrsStateStable, setTargetBranchNameStateStable, setManualBranchNameStateStable, setOpenPrsStateStable, setIsParsingStateStable, setCurrentAiRequestIdStateStable, setImageReplaceTaskStateStable, setRepoUrlStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setShowComponentsStateStable, setKworkInputValueStateStable,
             triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, 
-            triggerCreateOrUpdatePR, // Keep
+            triggerCreateOrUpdatePR, 
             triggerUpdateBranchStable, 
-            triggerCreateNewPRStable, // <<< ADDED
+            triggerCreateNewPRStable, 
             triggerGetOpenPRsStable, updateRepoUrlInAssistantStable, getXuinityMessageStable, scrollToSectionStable, triggerAddImportantToKworkStable, triggerAddTreeToKworkStable, triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFilesStable, triggerClearKworkInputStable,
             addToastStable,
         ]);
@@ -718,7 +755,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         return ( <RepoXmlPageContext.Provider value={contextValue}> {children} </RepoXmlPageContext.Provider> );
 
     } catch (providerError: any) {
-        console.error("[RepoXmlPageProvider] CRITICAL INITIALIZATION ERROR:", providerError);
+        logger.fatal("[RepoXmlPageProvider] CRITICAL INITIALIZATION ERROR:", providerError);
+        // Fallback UI or re-throw if this component should not handle the error itself
         return <div className="fixed inset-0 flex items-center justify-center bg-red-900 text-white p-4 z-[9999]">Критическая ошибка инициализации провайдера страницы: {providerError.message}</div>;
     }
 };
@@ -726,7 +764,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
 export const useRepoXmlPageContext = (): RepoXmlPageContextType => {
     const context = useContext(RepoXmlPageContext);
     if (context === undefined) { logger.fatal("useRepoXmlPageContext used outside RepoXmlPageProvider!"); throw new Error("useRepoXmlPageContext must be used within a RepoXmlPageProvider"); }
-    // Ensure the returned context always includes triggerCreateNewPR
     if (typeof context.triggerCreateNewPR !== 'function') {
         logger.error("CRITICAL: triggerCreateNewPR is missing from context. Providing a NO-OP fallback.");
         return {
