@@ -1,4 +1,3 @@
-// /components/assistant_components/handlers.ts
 "use client";
 
 import { useCallback } from 'react';
@@ -650,6 +649,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
           logger.error("[Handler DirectImageReplace] Error during process:", err);
           toast.error(`Ошибка: ${errorMsg}`, { id: toastId, duration: 6000 });
           setImageReplaceError(errorMsg); 
+          setImageReplaceTask(null); // Clear task on error
           success = false;
       } finally {
           setAssistantLoading(false); setIsProcessingPR(false);
