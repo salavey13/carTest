@@ -4,13 +4,12 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox"; // For integrations
-import { Label } from "@/components/ui/label";     // For integrations
+import { Checkbox } from "@/components/ui/checkbox"; 
+import { Label } from "@/components/ui/label";     
 
-// Icons are now primarily rendered via VibeContentRenderer
-import { FaSpinner, FaLock } from "react-icons/fa6"; // Keep for loading states & lock icon
+import { FaSpinner, FaLock } from "react-icons/fa6"; 
 
-import { useState, useEffect, useCallback } from "react"; // Added useCallback
+import { useState, useEffect, useCallback } from "react"; 
 import Modal from "@/components/ui/Modal"; 
 import { toast } from "sonner";
 import {
@@ -18,9 +17,9 @@ import {
   CyberFitnessProfile,
   getAchievementDetails,
   Achievement,
-  ALL_ACHIEVEMENTS, // Import ALL_ACHIEVEMENTS to list them all
-  checkAndUnlockFeatureAchievement, // For integrations
-  logCyberFitnessAction // For integrations
+  ALL_ACHIEVEMENTS, 
+  checkAndUnlockFeatureAchievement, 
+  logCyberFitnessAction 
 } from "@/hooks/cyberFitnessSupabase";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts';
@@ -55,7 +54,6 @@ const CHART_COLORS = [
   'hsl(var(--neon-lime))'
 ];
 
-// Tooltip for the chart remains the same, it's already good.
 const CustomTooltipContent = ({ active, payload, label }: any) => {
     if (active && payload && payload.length && payload[0].payload) {
       const data: DailyActivityRecord & { value: number } = payload[0].payload; 
@@ -84,7 +82,11 @@ const CustomTooltipContent = ({ active, payload, label }: any) => {
 
 export default function ProfilePage() {
   const appContext = useAppContext();
-  const { user: telegramUser, dbUser, isLoading: appLoading, isAuthenticating, error: appContextError, addToast } = appContext; 
+  const { user: telegramUser, dbUser, isLoading: appLoading, isAuthenticating, error: appContextError } = appContext; 
+  // Using addToast directly from appContext for simplicity if it's added there, otherwise keep useAppToast
+  const { addToast } = useAppContext(); // Or: const { addToast } = useAppToast();
+
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPerksModalOpen, setIsPerksModalOpen] = useState(false);
   const [isAchievementsModalOpen, setIsAchievementsModalOpen] = useState(false);
@@ -92,7 +94,6 @@ export default function ProfilePage() {
   const [cyberProfile, setCyberProfile] = useState<CyberFitnessProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState<boolean>(true);
 
-  // State for integrations checkboxes
   const [integrations, setIntegrations] = useState({
     github: false,
     vercel: false,
@@ -119,7 +120,6 @@ export default function ProfilePage() {
             const result = await fetchUserCyberFitnessProfile(dbUser.user_id);
             if (result.success && result.data) {
               setCyberProfile(result.data);
-              // Initialize integrations checkboxes based on loaded profile
               setIntegrations({
                 github: result.data.featuresUsed?.integration_github === true,
                 vercel: result.data.featuresUsed?.integration_vercel === true,
@@ -143,42 +143,43 @@ export default function ProfilePage() {
     loadProfile();
   }, [dbUser, appLoading, isAuthenticating, appContextError]); 
 
-  const handleIntegrationChange = useCallback(async (integrationName: keyof typeof integrations, isChecked: boolean) => {
-    if (!dbUser?.user_id || !cyberProfile) return;
-
-    const featureKey = `integration_${integrationName}`;
-    if (cyberProfile.featuresUsed[featureKey] === true && isChecked) {
-        // Already marked and trying to check again (shouldn't happen with controlled checkbox but good to have)
+  const handleIntegrationChange = useCallback(async (integrationKey: keyof typeof integrations, isChecked: boolean) => {
+    if (!dbUser?.user_id || !cyberProfile) {
+        toast.error("Профиль пользователя не загружен для обновления интеграций.");
         return;
     }
-    
-    setIntegrations(prev => ({ ...prev, [integrationName]: isChecked }));
+
+    const featureName = `integration_${integrationKey}_connected`; // e.g., integration_github_connected
+
+    // Optimistic UI update
+    setIntegrations(prev => ({ ...prev, [integrationKey]: isChecked }));
 
     if (isChecked) { // Only log and award when checking it on
-        toast.info(`Интеграция '${integrationName}' отмечена! Идет обновление профиля...`);
-        const { newAchievements, error } = await checkAndUnlockFeatureAchievement(dbUser.user_id, featureKey, true);
-        if (error) {
-            toast.error(`Ошибка обновления статуса интеграции: ${error}`);
-            // Revert UI optimistic update on error
-            setIntegrations(prev => ({ ...prev, [integrationName]: false }));
+        toast.info(`Отметка интеграции с ${integrationKey}...`);
+        const result = await checkAndUnlockFeatureAchievement(dbUser.user_id, featureName, true);
+        if (result.error) {
+            toast.error(`Ошибка обновления статуса для ${integrationKey}: ${result.error}`);
+            setIntegrations(prev => ({ ...prev, [integrationKey]: false })); // Revert UI
         } else {
-            toast.success(`Статус интеграции '${integrationName}' обновлен!`);
-            if (newAchievements) {
-                newAchievements.forEach(ach => {
-                    if (addToast) addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
-                });
-            }
-            // Re-fetch profile to get latest KiloVibes and level after achievement
-            const updatedProfile = await fetchUserCyberFitnessProfile(dbUser.user_id);
-            if (updatedProfile.success && updatedProfile.data) {
-                setCyberProfile(updatedProfile.data);
+            toast.success(`Интеграция с ${integrationKey} отмечена!`);
+            result.newAchievements?.forEach(ach => {
+                if (addToast) addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
+            });
+            // Re-fetch profile to reflect KV/level changes from new achievements
+            const updatedProfileResult = await fetchUserCyberFitnessProfile(dbUser.user_id);
+            if (updatedProfileResult.success && updatedProfileResult.data) {
+                setCyberProfile(updatedProfileResult.data);
             }
         }
     } else {
-        // Optionally handle unchecking if it should revert achievements/KV (more complex)
-        // For now, unchecking is just a UI state change and doesn't affect backend once marked true.
-        // To make it revertable, featuresUsed would need to store the *timestamp* or a more complex object.
-         logger.info(`[ProfilePage] Integration '${integrationName}' unchecked. No backend update for unchecking.`);
+        // If unchecking, we might want to update the featureUsed flag to false in Supabase.
+        // This depends on whether "un-integrating" should be an action.
+        // For now, let's assume unchecking only updates local UI and doesn't remove achievements/KV.
+        // To make it truly revertable, CyberFitness logic would need to handle negative KV or achievement removal.
+        logger.info(`[ProfilePage] Integration '${integrationKey}' unchecked UI only.`);
+        // To update backend for unchecking:
+        // await checkAndUnlockFeatureAchievement(dbUser.user_id, featureName, false); 
+        // toast.info(`Интеграция с ${integrationKey} снята.`);
     }
   }, [dbUser, cyberProfile, addToast]);
 
@@ -196,13 +197,22 @@ export default function ProfilePage() {
     );
   }
 
-  const safeCyberProfile = cyberProfile ?? getDefaultCyberFitnessProfile(); // Use helper for default
+  const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({ // Helper for safe access
+    level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
+    activeQuests: ["initial_boot_sequence"], completedQuests: [], unlockedPerks: [],
+    cognitiveOSVersion: "v0.1 Error/Guest", lastActivityTimestamp: new Date(0).toISOString(), 
+    dailyActivityLog: [], achievements: [],
+    totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0,
+    totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {},
+  });
+
+  const safeCyberProfile = cyberProfile ?? getDefaultCyberFitnessProfile();
 
   const currentLevel = safeCyberProfile.level;
   const kiloVibes = safeCyberProfile.kiloVibes;
   const cognitiveOS = safeCyberProfile.cognitiveOSVersion;
   const unlockedPerks = safeCyberProfile.unlockedPerks;
-  const achievements = safeCyberProfile.achievements; // These are IDs
+  const userAchievements = safeCyberProfile.achievements; // IDs of unlocked achievements
   const focusTime = parseFloat((safeCyberProfile.focusTimeHours || 0).toFixed(1));
   
   const displayWeeklyActivity = DEFAULT_WEEKLY_ACTIVITY_TEMPLATE.map(templateDay => {
@@ -233,7 +243,7 @@ export default function ProfilePage() {
   const stats = [
     { label: "KiloVibes", value: kiloVibes.toLocaleString(), icon: "::FaBolt className='text-brand-yellow text-3xl'::", tooltip: "Общее количество очков энергии Агента." },
     { label: "Deep Work (ч)", value: focusTime.toLocaleString(), icon: "::FaBrain className='text-brand-pink text-3xl'::", tooltip: "Суммарное время глубокой сфокусированной работы." },
-    { label: "Достижения", value: achievements.length, icon: "::FaStar className='text-neon-lime text-3xl'::", tooltip: "Количество разблокированных уникальных достижений." },
+    { label: "Достижения", value: userAchievements.length, icon: "::FaStar className='text-neon-lime text-3xl'::", tooltip: "Количество разблокированных уникальных достижений." },
     { label: "AI Запросы", value: safeCyberProfile.totalKworkRequestsSent.toLocaleString(), icon: "::FaPaperPlane className='text-brand-cyan text-3xl'::", tooltip: "Всего отправлено запросов к AI ассистентам." },
     { label: "PR Создано", value: safeCyberProfile.totalPrsCreated.toLocaleString(), icon: "::FaGithub className='text-light-text text-3xl'::", tooltip: "Всего создано Pull Request'ов через студию." },
     { label: "Веток Обновлено", value: safeCyberProfile.totalBranchesUpdated.toLocaleString(), icon: "::FaCodeBranch className='text-brand-purple text-3xl'::", tooltip: "Всего обновлено веток в репозиториях." },
@@ -279,14 +289,14 @@ export default function ProfilePage() {
             <CardDescription className="text-muted-foreground font-mono text-md mt-1">
               @{userHandle}
             </CardDescription>
-            <div className="mt-3 text-sm font-mono text-brand-yellow"> {/* Removed text-shadow-sm */}
+            <div className="mt-3 text-sm font-mono text-brand-yellow">
               Level: {currentLevel} | Cognitive OS: {cognitiveOS}
             </div>
           </CardHeader>
 
           <CardContent className="space-y-8 p-6 md:p-8">
             <section>
-              <h2 className="text-2xl font-orbitron text-brand-pink mb-4 flex items-center gap-2"> {/* Removed text-shadow-neon */}
+              <h2 className="text-2xl font-orbitron text-brand-pink mb-4 flex items-center gap-2"> 
                 <VibeContentRenderer content="::FaChartLine::" />Кибер-Метрики Агента
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -301,7 +311,7 @@ export default function ProfilePage() {
             </section>
 
             <section>
-                <h2 className="text-2xl font-orbitron text-brand-green mb-4 flex items-center gap-2"> {/* Removed text-shadow-neon */}
+                <h2 className="text-2xl font-orbitron text-brand-green mb-4 flex items-center gap-2"> 
                     <VibeContentRenderer content="::FaListCheck::" />Недельная Активность (Vibe Points)
                 </h2>
                 <Card className="bg-dark-bg/80 p-4 border border-brand-green/40 rounded-lg shadow-md">
@@ -326,12 +336,12 @@ export default function ProfilePage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-orbitron text-brand-yellow mb-4 flex items-center gap-2"> {/* Removed text-shadow-neon */}
+              <h2 className="text-2xl font-orbitron text-brand-yellow mb-4 flex items-center gap-2"> 
                 <VibeContentRenderer content="::FaWandMagicSparkles::" />Разблокированные Перки ({unlockedPerks.length})
               </h2>
               <div className="p-4 bg-dark-bg/80 rounded-lg border border-brand-yellow/40 space-y-2 shadow-md">
                 {unlockedPerks.length > 0 ? (
-                  unlockedPerks.slice(0, 5).map((perk, index) => ( // Show up to 5, rest in modal
+                  unlockedPerks.slice(0, 5).map((perk, index) => ( 
                     <div key={index} className="flex items-center text-sm text-light-text font-mono">
                       <VibeContentRenderer content="::FaBolt className='text-brand-yellow mr-2 text-xs'::" /> {perk}
                     </div>
@@ -348,19 +358,19 @@ export default function ProfilePage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-orbitron text-neon-lime mb-4 flex items-center gap-2"> {/* Removed text-shadow-neon */}
-                <VibeContentRenderer content="::FaStar::" />Достижения Агента ({achievements.length} / {allPossibleAchievements.length})
+              <h2 className="text-2xl font-orbitron text-neon-lime mb-4 flex items-center gap-2"> 
+                <VibeContentRenderer content="::FaStar::" />Достижения Агента ({userAchievements.length} / {allPossibleAchievements.length})
               </h2>
               <div className="p-4 bg-dark-bg/80 rounded-lg border border-neon-lime/40 space-y-2 shadow-md">
                 {allPossibleAchievements.length > 0 ? (
-                  allPossibleAchievements.slice(0,5).map((ach) => { // Show preview of all possible, up to 5
-                    const isUnlocked = achievements.includes(ach.id);
+                  allPossibleAchievements.slice(0,5).map((ach) => { 
+                    const isUnlocked = userAchievements.includes(ach.id);
                     return (
                       <div key={ach.id} 
                            className={cn("flex items-center text-sm font-mono transition-opacity", isUnlocked ? "text-light-text" : "text-muted-foreground opacity-60")} 
                            title={ach.description + (isUnlocked ? " (Разблокировано)" : " (Заблокировано)")}
                       >
-                         <span className={cn("mr-2 w-4 h-4 flex items-center justify-center", isUnlocked ? "" : "grayscale")}>
+                         <span className={cn("mr-2 w-4 h-4 flex items-center justify-center", isUnlocked ? "" : "filter grayscale")}>
                              <VibeContentRenderer content={`::${ach.icon || 'FaMedal'}::`} />
                          </span>
                          <span>{ach.name}</span>
@@ -372,12 +382,11 @@ export default function ProfilePage() {
                   <p className="text-sm text-muted-foreground font-mono">Список достижений загружается...</p>
                 )}
                  <Button variant="link" size="sm" className="text-neon-lime p-0 h-auto font-mono text-xs hover:text-lime-300 mt-1" onClick={() => setIsAchievementsModalOpen(true)}>
-                    {`Все Достижения (${achievements.length}/${allPossibleAchievements.length})`} <VibeContentRenderer content="::FaChevronRight className='ml-1 w-3 h-3'::" />
+                    {`Все Достижения (${userAchievements.length}/${allPossibleAchievements.length})`} <VibeContentRenderer content="::FaChevronRight className='ml-1 w-3 h-3'::" />
                  </Button>
               </div>
             </section>
 
-            {/* Fake Doors Section - Integrations with Checkboxes */}
             <section>
                 <h2 className="text-2xl font-orbitron text-brand-blue mb-4 flex items-center gap-2"> 
                     <VibeContentRenderer content="::FaPlug::" /> Мои Интеграции
@@ -385,10 +394,10 @@ export default function ProfilePage() {
                 <Card className="bg-dark-bg/70 border-brand-blue/30 p-4 space-y-3">
                     <p className="text-xs text-muted-foreground font-mono mb-3">Отметьте сервисы, с которыми вы успешно настроили интеграцию или имеете аккаунт для работы в CyberVibe Studio.</p>
                     {[
-                        {id: "github", label: "GitHub (Токен для PR/веток)", icon: "FaGithub"},
-                        {id: "vercel", label: "Vercel (Деплой проектов)", icon: "FaBolt"}, // Using FaBolt as a generic Vercel-like icon
-                        {id: "supabase", label: "Supabase (База данных & Auth)", icon: "FaDatabase"},
-                        {id: "aiStudio", label: "AI Studio (OpenAI/Gemini/Claude)", icon: "FaRobot"},
+                        {id: "github", label: "GitHub (Токен для PR/веток)", icon: "FaGithub", achievementId: "integration_github_connected"},
+                        {id: "vercel", label: "Vercel (Деплой проектов)", icon: "FaBolt", achievementId: "integration_vercel_connected"},
+                        {id: "supabase", label: "Supabase (База данных & Auth)", icon: "FaDatabase", achievementId: "integration_supabase_connected"},
+                        {id: "aiStudio", label: "AI Studio (OpenAI/Gemini/Claude)", icon: "FaRobot", achievementId: "integration_aistudio_connected"},
                     ].map(item => (
                         <div key={item.id} className="flex items-center space-x-2">
                             <Checkbox 
@@ -405,9 +414,8 @@ export default function ProfilePage() {
                 </Card>
             </section>
 
-             {/* Other Fake Doors */}
             <section>
-                <h2 className="text-2xl font-orbitron text-brand-purple mb-4 flex items-center gap-2"> {/* Corrected Icon - was <facogs> */}
+                <h2 className="text-2xl font-orbitron text-brand-purple mb-4 flex items-center gap-2"> 
                     <VibeContentRenderer content="::FaGears::" /> Системные Модули (Скоро)
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -467,7 +475,7 @@ export default function ProfilePage() {
         cancelButtonClassName="text-muted-foreground hover:bg-muted/50"
       >
         <p className="font-mono text-sm text-muted-foreground">Здесь будет форма для изменения вашего отображаемого имени, аватара, и других настроек CyberFitness.</p>
-        <p className="mt-2 text-xs text-brand-yellow font-mono">Интерфейс модификации личности временно недоступен...</p> {/* Removed animate-pulse */}
+        <p className="mt-2 text-xs text-brand-yellow font-mono">Интерфейс модификации личности временно недоступен...</p> 
       </Modal>
 
       <Modal
@@ -486,7 +494,7 @@ export default function ProfilePage() {
                 {unlockedPerks.map((perk, index) => (
                     <li key={index} className="flex items-center p-3 bg-dark-bg/70 rounded-md border border-brand-purple/60 shadow-sm hover:border-brand-purple transition-colors">
                         <VibeContentRenderer content="::FaShieldHalved className='text-brand-purple mr-3 text-xl flex-shrink-0'::" />
-                        <span className="text-sm">{perk}</span> {/* Changed from VCR for plain text perk */}
+                        <span className="text-sm">{perk}</span>
                     </li>
                 ))}
                 </ul>
@@ -494,13 +502,13 @@ export default function ProfilePage() {
                 <p className="font-mono text-sm text-muted-foreground p-4 text-center">Банк перков пуст. Отправляйся в <Link href="/selfdev/gamified" className="text-brand-green hover:underline font-semibold" onClick={() => setIsPerksModalOpen(false)}>CyberDev OS</Link> за апгрейдами!</p>
             )}
         </div>
-        <p className="mt-4 text-xs text-brand-yellow font-mono text-center">Синхронизация с банком перков завершена...</p> {/* Removed animate-pulse */}
+        <p className="mt-4 text-xs text-brand-yellow font-mono text-center">Синхронизация с банком перков завершена...</p> 
       </Modal>
 
       <Modal
         isOpen={isAchievementsModalOpen}
         onClose={() => setIsAchievementsModalOpen(false)}
-        title="Зал Славы Агента"
+        title={`Зал Славы Агента (${userAchievements.length}/${allPossibleAchievements.length})`}
         showConfirmButton={false}
         cancelText="Закрыть Витрину"
         dialogClassName="bg-dark-card border-neon-lime text-light-text"
@@ -510,16 +518,16 @@ export default function ProfilePage() {
         <div className="max-h-96 overflow-y-auto simple-scrollbar pr-2 space-y-3">
             {allPossibleAchievements.length > 0 ? (
                 allPossibleAchievements.map((achievement) => {
-                    const isUnlocked = achievements.includes(achievement.id);
+                    const isUnlocked = userAchievements.includes(achievement.id);
                     return (
                         <div key={achievement.id} className={cn(
                             "p-3.5 bg-dark-bg/70 border rounded-lg transform transition-all duration-200 ease-out",
-                            isUnlocked ? "border-neon-lime/60 hover:scale-[1.02] hover:shadow-md hover:shadow-neon-lime/30" : "border-muted/30 opacity-60 grayscale"
+                            isUnlocked ? "border-neon-lime/60 hover:scale-[1.02] hover:shadow-md hover:shadow-neon-lime/30" : "border-muted/30 opacity-60 grayscale-[70%]"
                             )}
                         >
                             <div className="flex items-center mb-1">
-                                <span className={cn("text-2xl mr-3", !isUnlocked && "filter grayscale")}>
-                                    <VibeContentRenderer content={`::${achievement.icon || 'FaMedal'}::`} />
+                                <span className={cn("text-2xl mr-3")}>
+                                    <VibeContentRenderer content={`::${achievement.icon || 'FaMedal'} className='${isUnlocked ? '' : 'opacity-50'}'::`} />
                                 </span>
                                 <h4 className={cn("text-md font-orbitron font-semibold", isUnlocked ? "text-neon-lime" : "text-muted-foreground")}>{achievement.name}</h4>
                                 {!isUnlocked && <FaLock className="ml-auto text-xs text-gray-500" />}
@@ -532,7 +540,7 @@ export default function ProfilePage() {
                  <p className="font-mono text-sm text-muted-foreground text-center py-4">Список достижений пуст.</p>
             )}
         </div>
-         <p className="mt-3 text-xs text-brand-yellow font-mono text-center">Каждая строка кода, каждый коммит — шаг к величию...</p> {/* Removed animate-pulse */}
+         <p className="mt-3 text-xs text-brand-yellow font-mono text-center">Каждая строка кода, каждый коммит — шаг к величию...</p> 
       </Modal>
     </div>
   );
