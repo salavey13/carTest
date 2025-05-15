@@ -1,4 +1,3 @@
-// /hooks/useFocusTimeTracker.ts
 "use client";
 
 import { useEffect, useRef, useCallback } from 'react';
@@ -6,7 +5,7 @@ import { useDebouncedCallback } from 'use-debounce';
 import { useAppContext } from '@/contexts/AppContext';
 import { logCyberFitnessAction } from './cyberFitnessSupabase';
 import useInactivityTimer from './useInactivityTimer';
-import { debugLogger as logger } from '@/lib/debugLogger';
+import er as logger } from '@/lib/debugLogger';
 
 const MIN_FOCUS_SESSION_MS = 30 * 1000; // 30 seconds to count as a focus block
 const FOCUS_LOG_INTERVAL_MS = 5 * 60 * 1000; // Log accumulated focus time every 5 minutes if continuously active
