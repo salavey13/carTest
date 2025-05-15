@@ -1,7 +1,12 @@
 import { useCallback } from "react";
 import { useRepoXmlPageContext, FileNode } from "@/contexts/RepoXmlPageContext";
 import { useAppContext } from "@/contexts/AppContext";
-import { logCyberFitnessAction, checkAndUnlockFeatureAchievement, Achievement } from "@/hooks/cyberFitnessSupabase";
+import { 
+    logCyberFitnessAction, 
+    checkAndUnlockFeatureAchievement, 
+    Achievement,
+    TOKEN_ESTIMATION_FACTOR // Import the factor
+} from "@/hooks/cyberFitnessSupabase";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppToast } from "@/hooks/useAppToast";
 
@@ -92,6 +97,9 @@ export const useKworkInput = ({
         logger.info(`[Kwork Input] Adding ${selectedFetcherFiles.size} selected files to input...`);
         
         let filesAddedCount = 0;
+        let totalCharsAdded = 0;
+        const filesContentForLogging: string[] = [];
+
         const fileBlocksContent = Array.from(selectedFetcherFiles).map(path => {
             const fileNode = allFetchedFiles.find(f => f.path === path);
             let contentToDisplay: string;
@@ -102,6 +110,8 @@ export const useKworkInput = ({
             } else if (typeof fileNode.content === 'string') {
                 contentToDisplay = fileNode.content;
                 filesAddedCount++;
+                totalCharsAdded += fileNode.content.length;
+                filesContentForLogging.push(fileNode.content); // Store for token estimation
             } else if (fileNode.content === null) {
                 contentToDisplay = `// Info: Content for /${path} is null (e.g., empty file).`;
                 logger.info(`[Kwork Input] Content for file /${path} is null during AddSelected.`);
@@ -167,17 +177,35 @@ export const useKworkInput = ({
         toastSuccess(`${filesAddedCount} файлов добавлено в запрос.`);
         
         if (dbUser?.id && filesAddedCount > 0) {
-            logger.debug(`[useKworkInput AddSelected] Attempting to log 'filesExtracted' (${filesAddedCount}) for user ${dbUser.id}.`);
-            const logResult = await logCyberFitnessAction(dbUser.id.toString(), 'filesExtracted', filesAddedCount);
-            if (logResult.success) {
+            logger.debug(`[useKworkInput AddSelected] Logging CyberFitness actions for user ${dbUser.id}. Files: ${filesAddedCount}, Chars: ${totalCharsAdded}`);
+            const achievementsToDisplay: Achievement[] = [];
+
+            const filesExtractedResult = await logCyberFitnessAction(dbUser.id.toString(), 'filesExtracted', filesAddedCount);
+            if (filesExtractedResult.success) {
                 logger.log(`[useKworkInput AddSelected] CyberFitness: ${filesAddedCount} filesExtracted logged.`);
-                logResult.newAchievements?.forEach(ach => {
-                    addToast(`🏆 Достижение: ${ach.name}!`, "success", 5000, { description: ach.description });
-                    logger.info(`[useKworkInput AddSelected] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.id}`);
-                });
+                if(filesExtractedResult.newAchievements) achievementsToDisplay.push(...filesExtractedResult.newAchievements);
             } else {
-                logger.warn(`[useKworkInput AddSelected] CyberFitness: filesExtracted logging failed: ${logResult.error}`);
+                logger.warn(`[useKworkInput AddSelected] CyberFitness: filesExtracted logging failed: ${filesExtractedResult.error}`);
             }
+
+            const estimatedTokens = Math.round(totalCharsAdded / TOKEN_ESTIMATION_FACTOR);
+            if (estimatedTokens > 0) {
+                const tokensProcessedResult = await logCyberFitnessAction(dbUser.id.toString(), 'tokensProcessed', estimatedTokens);
+                if (tokensProcessedResult.success) {
+                    logger.log(`[useKworkInput AddSelected] CyberFitness: ${estimatedTokens} tokensProcessed logged.`);
+                     if(tokensProcessedResult.newAchievements) achievementsToDisplay.push(...tokensProcessedResult.newAchievements);
+                } else {
+                    logger.warn(`[useKworkInput AddSelected] CyberFitness: tokensProcessed logging failed: ${tokensProcessedResult.error}`);
+                }
+            }
+            // Deduplicate achievements before toasting
+            const uniqueAchievements = Array.from(new Set(achievementsToDisplay.map(a => a.id)))
+                                           .map(id => achievementsToDisplay.find(a => a.id === id)!);
+            uniqueAchievements.forEach(ach => {
+                addToast(`🏆 Достижение: ${ach.name}!`, "success", 5000, { description: ach.description });
+                logger.info(`[useKworkInput AddSelected] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.id}`);
+            });
+
         } else if (filesAddedCount > 0) {
              logger.warn("[useKworkInput AddSelected] Cannot log 'filesExtracted': dbUser.id is missing.");
         }
@@ -186,7 +214,7 @@ export const useKworkInput = ({
     }, [
         selectedFetcherFiles, allFetchedFiles, imageReplaceTaskActive, toastSuccess, toastWarning,
         kworkInputValue, setKworkInputValue, 
-        scrollToSection, dbUser?.id, addToast, logger // Added logger to dependency array
+        scrollToSection, dbUser?.id, addToast, logger 
     ]);
 
     const handleCopyToClipboard = useCallback(async (textToCopy?: string, shouldScroll = true): Promise<boolean> => { 
@@ -225,7 +253,7 @@ export const useKworkInput = ({
             toastError("Ошибка копирования в буфер обмена");
             return false;
         }
-    }, [kworkInputValue, toastSuccess, toastWarning, toastError, setRequestCopied, scrollToSection, dbUser?.id, addToast, logger]); // Added logger
+    }, [kworkInputValue, toastSuccess, toastWarning, toastError, setRequestCopied, scrollToSection, dbUser?.id, addToast, logger]); 
 
     const handleClearAll = useCallback(() => {
         if (imageReplaceTaskActive) {
@@ -245,7 +273,7 @@ export const useKworkInput = ({
     }, [
         imageReplaceTaskActive, setSelectedFetcherFiles, setKworkInputValue, 
         setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles, setRequestCopied,
-        toastSuccess, toastWarning, kworkInputRef, logger // Added logger
+        toastSuccess, toastWarning, kworkInputRef, logger 
     ]);
 
      const handleAddFullTree = useCallback(async () => {
@@ -262,18 +290,20 @@ export const useKworkInput = ({
 
          logger.info(`[Kwork Input] Adding full file tree structure and content for ${files.length} files to input...`);
          
-         
-         const treeStructure = `Структура дерева файлов для ${files.length} файлов:\n${files.map(f => `- /${f.path}`).join('\n')}`; // Simple placeholder tree
+         const treeStructure = `Структура дерева файлов для ${files.length} файлов:\n${files.map(f => `- /${f.path}`).join('\n')}`; 
 
          const structureMarker = "Структура файлов проекта:";
          const newGeneratedTreeBlock = `${structureMarker}\n\`\`\`\n${treeStructure.trim()}\n\`\`\``;
          
          let filesAddedCount = 0;
+         let totalCharsAdded = 0;
+
          const fileBlocksContent = files.map(file => {
              let contentToDisplay: string;
              if (typeof file.content === 'string' && file.content.trim()) {
                  contentToDisplay = file.content;
                  filesAddedCount++;
+                 totalCharsAdded += file.content.length;
              } else {
                  contentToDisplay = `// Файл /${file.path} пуст или содержит только комментарии.`;
              }
@@ -287,38 +317,31 @@ export const useKworkInput = ({
         
         let tempText = kworkInputValue || "";
 
-        // Regex to match the whole structure block including content in ```
         const oldStructureRegex = new RegExp(
             structureMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + 
             "\\s*```[\\s\\S]*?```", 
             "im"
         );
-
-        // Regex for code context: from marker until either a structure marker or end of string.
         const oldCodeDataContextRegex = new RegExp(
             codeContextMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + 
-            "([\\s\\S]*?)" + // Non-greedy match for the content
-            "(?=" + // Positive lookahead for:
-                "(^" + // Start of a line
-                    structureMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + // Escaped structure marker
-                    "\\s*```" + // Followed by ```
+            "([\\s\\S]*?)" + 
+            "(?=" + 
+                "(^" + 
+                    structureMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + 
+                    "\\s*```" + 
                 ")" +
-                "|$" + // OR end of string
+                "|$" + 
             ")",
             "im"
         );
         
-        // 1. Remove any existing structure block
         logger.debug("[Kwork Input AddFullTree] Removing old structure block if present.");
         tempText = tempText.replace(oldStructureRegex, "").trim();
-        
-        // 2. Remove any existing code data block (from the text that already had structure removed)
         logger.debug("[Kwork Input AddFullTree] Removing old code data block if present.");
         tempText = tempText.replace(oldCodeDataContextRegex, "").trim();
 
-        // 3. Assemble the new string with remaining text (preamble) + new structure + new code data
         const finalAssembly = [];
-        if (tempText) { // If there's any remaining user text (preamble)
+        if (tempText) { 
             finalAssembly.push(tempText);
             logger.debug("[Kwork Input AddFullTree] Preserving preamble text:", tempText.substring(0, 100) + "...");
         }
@@ -333,16 +356,34 @@ export const useKworkInput = ({
         toastSuccess(`Структура проекта и ${filesAddedCount} файлов (${files.length} всего) добавлены в запрос.`);
         
         if (dbUser?.id) {
-            logger.debug(`[useKworkInput AddFullTree] Attempting to log actions for user ${dbUser.id}. Files added: ${filesAddedCount}`);
+            logger.debug(`[useKworkInput AddFullTree] Logging CyberFitness actions for user ${dbUser.id}. Files: ${filesAddedCount}, Chars: ${totalCharsAdded}`);
             const achievementsToDisplay: Achievement[] = [];
-            if (filesAddedCount > 0) {
-                const { newAchievements: logAch } = await logCyberFitnessAction(dbUser.id.toString(), 'filesExtracted', filesAddedCount);
-                if(logAch) achievementsToDisplay.push(...logAch);
+
+            if (filesAddedCount > 0) { // Only log if actual files were added (not just tree)
+                const filesExtractedResult = await logCyberFitnessAction(dbUser.id.toString(), 'filesExtracted', filesAddedCount);
+                if (filesExtractedResult.success && filesExtractedResult.newAchievements) {
+                    achievementsToDisplay.push(...filesExtractedResult.newAchievements);
+                } else if (!filesExtractedResult.success) {
+                    logger.warn(`[useKworkInput AddFullTree] CyberFitness: filesExtracted logging failed: ${filesExtractedResult.error}`);
+                }
             }
+            
+            const estimatedTokens = Math.round(totalCharsAdded / TOKEN_ESTIMATION_FACTOR);
+            if (estimatedTokens > 0) {
+                const tokensProcessedResult = await logCyberFitnessAction(dbUser.id.toString(), 'tokensProcessed', estimatedTokens);
+                if (tokensProcessedResult.success && tokensProcessedResult.newAchievements) {
+                    achievementsToDisplay.push(...tokensProcessedResult.newAchievements);
+                } else if (!tokensProcessedResult.success) {
+                    logger.warn(`[useKworkInput AddFullTree] CyberFitness: tokensProcessed logging failed: ${tokensProcessedResult.error}`);
+                }
+            }
+            
             const { newAchievements: featureAch } = await checkAndUnlockFeatureAchievement(dbUser.id.toString(), 'usedAddFullTree');
             if(featureAch) achievementsToDisplay.push(...featureAch);
 
-            achievementsToDisplay.forEach(ach => {
+            const uniqueAchievements = Array.from(new Set(achievementsToDisplay.map(a => a.id)))
+                                           .map(id => achievementsToDisplay.find(a => a.id === id)!);
+            uniqueAchievements.forEach(ach => {
                 addToast(`🏆 Достижение: ${ach.name}!`, "success", 5000, { description: ach.description });
                 logger.info(`[useKworkInput AddFullTree] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.id}`);
             });
@@ -350,7 +391,7 @@ export const useKworkInput = ({
              logger.warn("[useKworkInput AddFullTree] Cannot log CyberFitness actions: dbUser.id is missing.");
         }
         scrollToSection('kworkInput'); 
-     }, [files, imageReplaceTaskActive, kworkInputValue, setKworkInputValue, toastSuccess, toastWarning, scrollToSection, dbUser?.id, addToast, logger]); // Added logger
+     }, [files, imageReplaceTaskActive, kworkInputValue, setKworkInputValue, toastSuccess, toastWarning, scrollToSection, dbUser?.id, addToast, logger]); 
 
      logger.debug("[useKworkInput] Hook setup complete.");
     return {
