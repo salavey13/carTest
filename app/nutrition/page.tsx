@@ -1,33 +1,38 @@
 "use client";
+ // <<< ADDED THIS DIRECTIVE
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 // Icons are now rendered via VibeContentRenderer
-import { useState } from "react";
+import { useState, useEffect } from "react"; // useEffect is now fine with "use client"
 import Modal from "@/components/ui/Modal"; 
 import { toast } from "sonner";
 import VibeContentRenderer from "@/components/VibeContentRenderer";
-import { useAppContext } from "@/contexts/AppContext"; // For checking prerequisites later
-import { CyberFitnessProfile, fetchUserCyberFitnessProfile } from "@/hooks/cyberFitnessSupabase"; // For checking prerequisites
+import { useAppContext } from "@/contexts/AppContext"; 
+import { 
+    CyberFitnessProfile, 
+    fetchUserCyberFitnessProfile, 
+    getAchievementDetails // For potential future use if schematics depend on achievements
+} from "@/hooks/cyberFitnessSupabase"; 
 import { debugLogger as logger } from "@/lib/debugLogger";
 
 interface SchematicDetail {
-  label: string;
-  content: string;
-  icon?: string; // Fa6 icon name string e.g. "FaAtom"
+  label: string; 
+  content: string; 
+  icon?: string; 
 }
 
 interface VibeSchematic {
   id: string;
   name: string;
-  icon: string; // Fa6 icon name string e.g. "FaBolt"
+  icon: string; 
   description: string;
   details: SchematicDetail[];
-  prerequisites: string[]; // e.g., ["level:3", "achievement:first_parse_completed"]
+  prerequisites: string[]; 
   outcome: string;
   unlocksPerk?: string;
-  color: string; // Tailwind classes for border/bg
-  shadow: string; // Tailwind class for shadow
+  color: string; 
+  shadow: string; 
 }
 
 
@@ -76,14 +81,14 @@ const vibeSchematics: VibeSchematic[] = [
       { label: "АРСЕНАЛ", content: "Приложение для медитации (Calm, Headspace), священный манускрипт (блокнот) или цифровые скрижали.", icon: "FaBook"},
       { label: "ТОПЛИВО", content: "Эликсир травяного чая, орехи мудрости.", icon: "FaMugHot"},
     ],
-    prerequisites: [], // Available to all
+    prerequisites: [], 
     outcome: "Повышенная креативность, снижение умственного напряжения.",
     color: "border-brand-cyan/60 bg-dark-card/70 hover:shadow-brand-cyan/30",
     shadow: "shadow-brand-cyan/20"
   },
 ];
 
-export default function VibeSchematicsPage() {
+export default function VibeSchematicsPage() { // Renamed component
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isSuggestModalOpen, setIsSuggestModalOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
@@ -107,7 +112,7 @@ export default function VibeSchematicsPage() {
   };
 
   const checkPrerequisites = (schematic: VibeSchematic): { met: boolean; missing: string[] } => {
-    if (!currentUserProfile) return { met: false, missing: ["Загрузка профиля..."] }; // Default to locked if profile not loaded
+    if (!currentUserProfile) return { met: false, missing: ["Загрузка профиля..."] }; 
 
     const missingPrerequisites: string[] = [];
     let allMet = true;
@@ -129,7 +134,7 @@ export default function VibeSchematicsPage() {
         allMet = false;
         if (type === 'level') missingPrerequisites.push(`Требуется Уровень ${value}`);
         else if (type === 'achievement') {
-            const ach = getAchievementDetails(value);
+            const ach = getAchievementDetails(value); // Assumes getAchievementDetails is available
             missingPrerequisites.push(`Нужно достижение: "${ach?.name || value}"`);
         }
         else if (type === 'perk') missingPrerequisites.push(`Нужен перк: "${value}"`);
@@ -215,13 +220,13 @@ export default function VibeSchematicsPage() {
             
             <section className="flex flex-col sm:flex-row gap-4 justify-center pt-8 border-t border-brand-green/30 mt-8">
               <Button onClick={() => { setIsSaveModalOpen(true); }} className="bg-gradient-to-r from-brand-green to-neon-lime text-black hover:brightness-110 font-orbitron flex-1 py-3 text-base transform hover:scale-105 transition-all shadow-lg hover:shadow-brand-green/40 flex items-center justify-center">
-                <VibeContentRenderer content="::FaFloppyDisk className='mr-2.5 align-middle text-lg'::" /> <span>СОХРАНИТЬ МОЙ СТЕК!</span>
+                <VibeContentRenderer content="::FaFloppyDisk className='mr-2.5 align-middle text-lg'::" /> <span className="ml-2">СОХРАНИТЬ МОЙ СТЕК!</span>
               </Button>
               <Button onClick={() => { setIsSuggestModalOpen(true); }} variant="outline" className="border-brand-cyan text-brand-cyan hover:bg-brand-cyan/20 hover:text-white font-orbitron flex-1 py-3 text-base transform hover:scale-105 transition-all shadow-lg hover:shadow-brand-cyan/30 flex items-center justify-center">
-                <VibeContentRenderer content="::FaCirclePlus className='mr-2.5 align-middle text-lg'::" /> <span>ПРЕДЛОЖИТЬ СХЕМУ</span>
+                <VibeContentRenderer content="::FaCirclePlus className='mr-2.5 align-middle text-lg'::" /> <span className="ml-2">ПРЕДЛОЖИТЬ СХЕМУ</span>
               </Button>
               <Button onClick={() => { setIsLogModalOpen(true); }} variant="outline" className="border-brand-purple text-brand-purple hover:bg-brand-purple/20 hover:text-white font-orbitron flex-1 py-3 text-base transform hover:scale-105 transition-all shadow-lg hover:shadow-brand-purple/30 flex items-center justify-center">
-                <VibeContentRenderer content="::FaListCheck className='mr-2.5 align-middle text-lg'::" /> <span>ЛОГИРОВАТЬ АКТИВНОСТЬ</span>
+                <VibeContentRenderer content="::FaListCheck className='mr-2.5 align-middle text-lg'::" /> <span className="ml-2">ЛОГИРОВАТЬ АКТИВНОСТЬ</span>
               </Button>
             </section>
           </CardContent>
