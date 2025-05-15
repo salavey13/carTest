@@ -89,7 +89,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         setJustParsedFlagForScrollFix,
     } = props;
 
-    const { user, dbUser } = appContext; 
+    const { user, dbUser } = appContext; // user is WebAppUser (TG id is number), dbUser is Supabase user (user_id is string)
     const {
         setHookParsedFiles, setValidationStatus, setValidationIssues, parseAndValidateResponse, autoFixIssues, validationIssues, validationStatus, rawDescription, setRawDescription
     } = codeParserHook;
@@ -364,26 +364,27 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
      }, [setSelectedAssistantFiles, imageReplaceTask, setSelectedFileIds]);
 
     const handleSaveFiles = useCallback(async () => {
-        if (!user || imageReplaceTask) { toast.warn(imageReplaceTask ? "Сохранение недоступно для картинок." : "Требуется авторизация.", { id: "save-auth-warn" }); return; }
+        // Use dbUser.user_id (string) for Supabase interactions
+        if (!dbUser?.user_id || imageReplaceTask) { toast.warn(imageReplaceTask ? "Сохранение недоступно для картинок." : "Требуется авторизация.", { id: "save-auth-warn" }); return; }
         const filesToSave = componentParsedFiles.filter(f => selectedFileIds.has(f.id) && f.content.trim()); 
         if (filesToSave.length === 0) { toast.warn("Нет выбранных непустых файлов для сохранения."); return; }
-        logger.log(`[Handler SaveFiles] Saving ${filesToSave.length} non-empty files for user ${user.id}...`);
+        logger.log(`[Handler SaveFiles] Saving ${filesToSave.length} non-empty files for user_id ${dbUser.user_id}...`);
         setIsProcessingPR(true); const toastId = toast.loading(`Сохранение ${filesToSave.length} файлов...`);
         try {
             const filesData = filesToSave.map(f => ({ p: f.path, c: f.content, e: f.extension || '?' }));
-            const { data: existingData, error: fetchError } = await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id).single();
+            const { data: existingData, error: fetchError } = await supabaseAdmin.from("users").select("metadata").eq("user_id", dbUser.user_id).single();
             if (fetchError && fetchError.code !== 'PGRST116') throw fetchError; 
             const existingGeneratedFiles = existingData?.metadata?.generated_files || [];
             const newPathsSet = new Set(filesData.map(f => f.p));
             const filteredExisting = existingGeneratedFiles.filter((f: any) => f?.path && !newPathsSet.has(f.path));
             const newFilesFormatted = filesData.map(f => ({ path: f.p, code: f.c, extension: f.e }));
             const mergedFiles = [ ...filteredExisting, ...newFilesFormatted ];
-            const { error: upsertError } = await supabaseAdmin.from("users").upsert({ user_id: user.id, metadata: { ...(existingData?.metadata || {}), generated_files: mergedFiles } }, { onConflict: 'user_id' });
+            const { error: upsertError } = await supabaseAdmin.from("users").upsert({ user_id: dbUser.user_id, metadata: { ...(existingData?.metadata || {}), generated_files: mergedFiles } }, { onConflict: 'user_id' });
             if (upsertError) throw upsertError;
             toast.success(`${filesToSave.length} файлов сохранено/обновлено в вашем профиле.`, { id: toastId });
         } catch (err: any) { logger.error("[Handler SaveFiles] Save error:", err); toast.error(`Ошибка сохранения файлов: ${err?.message ?? 'Неизвестная ошибка'}`, { id: toastId }); }
         finally { setIsProcessingPR(false); }
-     }, [user, componentParsedFiles, selectedFileIds, imageReplaceTask, setIsProcessingPR]);
+     }, [dbUser?.user_id, componentParsedFiles, selectedFileIds, imageReplaceTask, setIsProcessingPR]); // Depends on dbUser.user_id
 
     const handleDownloadZip = useCallback(async () => {
         if (imageReplaceTask) { toast.warn("Скачивание недоступно для картинок."); return; }
@@ -405,21 +406,24 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
      }, [componentParsedFiles, selectedFileIds, imageReplaceTask, setIsProcessingPR]);
 
     const handleSendToTelegram = useCallback(async (file: ValidationFileEntry) => {
-        if (!user?.id || imageReplaceTask) { toast.warn(imageReplaceTask ? "Отправка недоступна для картинок." : "Требуется авторизация.", { id: "tg-send-auth-warn" }); return; }
+        if (!user?.id || imageReplaceTask) { // user.id is the Telegram ID (number)
+            toast.warn(imageReplaceTask ? "Отправка недоступна для картинок." : "Требуется авторизация.", { id: "tg-send-auth-warn" }); return; 
+        }
         if (!file || !file.path || !file.content?.trim()) { toast.warn("Невозможно отправить пустой файл."); return; }
-        logger.log(`[Handler SendToTelegram] Sending file ${file.path} to TG user ${user.id}`);
+        logger.log(`[Handler SendToTelegram] Sending file ${file.path} to TG user ${user.id}`); 
         setIsProcessingPR(true); const toastId = toast.loading(`Отправка ${file.path.split('/').pop()} в Telegram...`);
         try {
             const fileName = file.path.split("/").pop() || `file_${Date.now()}.txt`; 
-            const result = await sendTelegramDocument(String(user.id), file.content, fileName);
+            const result = await sendTelegramDocument(String(user.id), file.content, fileName); // sendTelegramDocument expects string chat_id
             if (!result.success) throw new Error(result.error ?? "Telegram Send Error");
             toast.success(`Файл "${fileName}" отправлен в ваш Telegram.`, { id: toastId });
         } catch (err: any) { logger.error("[Handler SendToTelegram] Send error:", err); toast.error(`Ошибка отправки в TG: ${err.message}`, { id: toastId }); }
         finally { setIsProcessingPR(false); }
-     }, [user, imageReplaceTask, setIsProcessingPR]);
+     }, [user, imageReplaceTask, setIsProcessingPR]); // Depends on user (TG user)
 
     const handleAddCustomLink = useCallback(async () => {
-        if (!user || imageReplaceTask) { toast.warn(imageReplaceTask ? "Недоступно для картинок." : "Требуется авторизация.", { id: "addlink-auth-warn" }); return; }
+        // Use dbUser.user_id (string) for Supabase interactions
+        if (!dbUser?.user_id || imageReplaceTask) { toast.warn(imageReplaceTask ? "Недоступно для картинок." : "Требуется авторизация.", { id: "addlink-auth-warn" }); return; }
         let name, url;
         try {
              name = prompt("Название ссылки:"); if (!name || !name.trim()) return;
@@ -434,14 +438,14 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         setCustomLinks(updatedLinks); 
         const toastId = toast.loading("Сохранение ссылки...");
         try {
-            const { data: existingData, error: fetchError } = await supabaseAdmin.from("users").select("metadata").eq("user_id", user.id).single();
+            const { data: existingData, error: fetchError } = await supabaseAdmin.from("users").select("metadata").eq("user_id", dbUser.user_id).single();
             if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
             const currentMetadata = existingData?.metadata || {};
-            const { error: upsertError } = await supabaseAdmin.from("users").upsert({ user_id: user.id, metadata: { ...currentMetadata, customLinks: updatedLinks } }, { onConflict: 'user_id' });
+            const { error: upsertError } = await supabaseAdmin.from("users").upsert({ user_id: dbUser.user_id, metadata: { ...currentMetadata, customLinks: updatedLinks } }, { onConflict: 'user_id' });
             if (upsertError) throw upsertError;
             toast.success(`Ссылка "${name}" добавлена.`, { id: toastId });
         } catch (e: any) { logger.error("[Handler AddCustomLink] Save error:", e); toast.error(`Ошибка сохранения ссылки: ${e?.message ?? 'Неизвестная ошибка'}`, { id: toastId }); setCustomLinks(customLinks); }
-     }, [customLinks, user, imageReplaceTask, setCustomLinks]);
+     }, [customLinks, dbUser?.user_id, imageReplaceTask, setCustomLinks]); // Depends on dbUser.user_id
 
     const handleCreateOrUpdatePR = useCallback(async (): Promise<void> => {
         if (imageReplaceTask) { toast.warn("Недоступно во время замены картинки."); return; }

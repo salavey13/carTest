@@ -202,7 +202,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const [pendingFlowDetailsState, setPendingFlowDetailsState] = useState<PendingFlowDetails | null>(null);
         const [showComponentsState, setShowComponentsState] = useState<boolean>(true);
         
-        const { dbUser } = useAppContext(); 
+        const { dbUser } = useAppContext(); // dbUser.user_id is string (Supabase Auth ID)
 
         const fetcherRef = useRef<RepoTxtFetcherRef | null>(null);
         const assistantRef = useRef<AICodeAssistantRef | null>(null);
@@ -306,8 +306,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                                .then(async ({ success: replaceSuccess, error: replaceError }) => {
                                    if (!replaceSuccess) {
                                        addToastStable(`Ошибка замены/PR: ${replaceError || 'Неизвестно'}`, 'error');
-                                   } else if (dbUser?.id) {
-                                       questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_fetch_completed', 75, 1); 
+                                   } else if (dbUser?.user_id) { // Use string user_id for Supabase
+                                       questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1); 
                                        questCompleted = true;
                                    }
                                    setImageReplaceTaskStateStable(null); 
@@ -337,8 +337,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                          setTimeout(async () => { 
                              try {
                                  fetcherRef.current?.handleAddSelected?.(new Set([currentPendingFlow.targetPath]), allFiles);
-                                 if (dbUser?.id) {
-                                      questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_fetch_completed', 75, 1); 
+                                 if (dbUser?.user_id) { // Use string user_id for Supabase
+                                      questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1); 
                                       questCompleted = true;
                                  }
                                  scrollToSectionStable('executor');
@@ -355,8 +355,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                   if (fetched && currentPendingFlow) setPendingFlowDetailsStateStable(null);
                   if (fetched && imageReplaceTaskStateRef.current) setImageReplaceTaskStateStable(null);
                   finalFetchStatus = fetched ? 'success' : 'error';
-                  if (fetched && !currentTask && !currentPendingFlow && dbUser?.id) {
-                        questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_fetch_completed', 75, 1);
+                  if (fetched && !currentTask && !currentPendingFlow && dbUser?.user_id) { // Use string user_id for Supabase
+                        questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1);
                         questCompleted = true;
                   }
             }
@@ -371,33 +371,60 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             }
            setFetchStatusStateStable(finalFetchStatus);
         }, [ 
-             dbUser?.id, addToastStable, assistantRef, fetcherRef, setFetchStatusStateStable, setAllFetchedFilesStateStable,
+             dbUser?.user_id, addToastStable, assistantRef, fetcherRef, setFetchStatusStateStable, setAllFetchedFilesStateStable,
              setImageReplaceTaskStateStable, setAssistantLoadingStateStable, setPendingFlowDetailsStateStable,
              setKworkInputValueStateStable, scrollToSectionStable, logger
          ]);
 
         const triggerToggleSettingsModal = useCallback(async () => {
-            if (dbUser?.id) {
-                const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'settings_opened');
+            if (dbUser?.user_id) { // Use string user_id for Supabase
+                const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'settings_opened');
                 newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
             }
             setIsSettingsModalOpenState(prev => !prev);
-        }, [dbUser?.id, addToastStable]);
+        }, [dbUser?.user_id, addToastStable]);
 
         const triggerFetch = useCallback(async (isRetry = false, branch?: string | null) => { if (fetcherRef.current?.handleFetch) { try { await fetcherRef.current.handleFetch(isRetry, branch, imageReplaceTaskStateRef.current); } catch (e: any) { addToastStable(`Крит. ошибка запуска извлечения: ${e?.message ?? 'Неизвестно'}`, "error", 5000); setFetchStatusStateStable('error'); } } else { addToastStable("Ошибка: Не удалось запустить извлечение (ref).", "error"); } }, [addToastStable, setFetchStatusStateStable, fetcherRef]);
         
         const triggerPreCheckAndFetch = useCallback(async ( repoUrlToCheck: string, potentialBranchName: string, flowType: 'ImageSwap' | 'ErrorFix', flowDetails: any, targetPath: string ) => {
             const flowLogPrefix = flowType === 'ImageSwap' ? '[Flow 1 - Image Swap]' : '[Flow 3 - Error Fix]';
-            logger.log(`${flowLogPrefix} Context: triggerPreCheckAndFetch. URL: ${repoUrlToCheck}, Branch: ${potentialBranchName}, Target: ${targetPath}`);
+            logger.log(`${flowLogPrefix} Context: triggerPreCheckAndFetch. URL: ${repoUrlToCheck}, Branch: ${potentialBranchName}, Target: ${targetPath}, Details:`, flowDetails);
             setIsPreCheckingStateStable(true); 
-            setPendingFlowDetailsStateStable({ type: flowType, details: flowDetails, targetPath }); 
+            
+            // Specific handling for ImageSwap: set imageReplaceTaskState directly
+            if (flowType === 'ImageSwap') {
+                if (!flowDetails?.oldUrl || !flowDetails?.newUrl) {
+                    logger.error(`${flowLogPrefix} Context: Missing oldUrl or newUrl in flowDetails for ImageSwap. Aborting.`);
+                    addToastStable("Ошибка: Недостаточно данных для замены изображения (oldUrl/newUrl).", 'error', 5000);
+                    setIsPreCheckingStateStable(false);
+                    setFetchStatusStateStable('error'); // Or appropriate status
+                    return;
+                }
+                setImageReplaceTaskStateStable({ 
+                    targetPath, 
+                    oldUrl: flowDetails.oldUrl, 
+                    newUrl: flowDetails.newUrl 
+                });
+                setPendingFlowDetailsStateStable(null); // Clear pending flow, as imageReplaceTaskState is now primary for this
+                logger.log(`${flowLogPrefix} Context: imageReplaceTaskState set directly for ImageSwap.`);
+            } else if (flowType === 'ErrorFix') {
+                setPendingFlowDetailsStateStable({ type: flowType, details: flowDetails, targetPath });
+                setImageReplaceTaskStateStable(null); // Ensure image task is cleared for other flows
+                logger.log(`${flowLogPrefix} Context: pendingFlowDetailsState set for ErrorFix.`);
+            } else {
+                // Handle other potential flow types or default to clearing both
+                setPendingFlowDetailsStateStable(null);
+                setImageReplaceTaskStateStable(null);
+                logger.log(`${flowLogPrefix} Context: Unknown or generic flow type. Clearing image/pending details.`);
+            }
+            
             setTargetPrDataStable(null); 
             setTargetBranchNameStateStable(null); 
             setManualBranchNameStateStable(''); 
             setFetchStatusStateStable('loading');
             
-            if (dbUser?.id) { 
-                const questResult = await completeQuestAndUpdateProfile(dbUser.id, 'initial_boot_sequence', 25);
+            if (dbUser?.user_id) { // Use string user_id for Supabase
+                const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'initial_boot_sequence', 25);
                 if (questResult.success) {
                     addToastStable("🛰️ Квест 'Пойман Сигнал': +25 KiloVibes!", "success", 3000);
                 }
@@ -427,22 +454,26 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             finally {
                 setIsPreCheckingStateStable(false);
                 logger.log(`${flowLogPrefix} Context: Proceeding to triggerFetch with branch: ${branchToFetch}`);
-                await triggerFetch(false, branchToFetch);
+                await triggerFetch(false, branchToFetch); // triggerFetch uses imageReplaceTaskStateRef
             }
-        }, [ dbUser?.id, addToastStable, setTargetBranchNameStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setManualBranchNameStateStable, setFetchStatusStateStable, triggerFetch, logger ]);
+        }, [ 
+            dbUser?.user_id, addToastStable, setTargetBranchNameStateStable, setTargetPrDataStable, 
+            setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setImageReplaceTaskStateStable, 
+            setManualBranchNameStateStable, setFetchStatusStateStable, triggerFetch, logger 
+        ]);
         
         const triggerSelectHighlighted = useCallback(async () => {
             logger.log(`[DEBUG][CONTEXT] triggerSelectHighlighted called. Ref ready: ${!!fetcherRef.current?.selectHighlightedFiles}`);
             if (fetcherRef.current?.selectHighlightedFiles) {
                 try {
                     fetcherRef.current.selectHighlightedFiles();
-                    if (dbUser?.id) { 
-                        const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'usedSelectHighlighted');
+                    if (dbUser?.user_id) { // Use string user_id for Supabase
+                        const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'usedSelectHighlighted');
                         newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                     }
                 } catch (e: any) { logger.error("Error calling fetcherRef.selectHighlightedFiles:", e); addToastStable(`Ошибка выбора связанных файлов: ${e?.message ?? 'Неизвестно'}`, "error"); }
             } else { logger.error("triggerSelectHighlighted: fetcherRef is not set."); }
-        }, [addToastStable, fetcherRef, dbUser?.id, logger]); 
+        }, [addToastStable, fetcherRef, dbUser?.user_id, logger]); 
 
         const triggerAddSelectedToKwork = useCallback(async (clearSelection = false) => { const currentSelected = selectedFetcherFilesRef.current; const currentAllFiles = allFetchedFilesRef.current; if (fetcherRef.current?.handleAddSelected) { if (currentSelected.size === 0) { addToastStable("Сначала выберите файлы в Экстракторе!", "warning"); return; } try { await fetcherRef.current.handleAddSelected(currentSelected, currentAllFiles); if (clearSelection) { setSelectedFetcherFilesStateStable(new Set()); } } catch (e: any) { addToastStable(`Ошибка добавления файлов: ${e?.message ?? 'Неизвестно'}`, "error"); } } else { addToastStable("Ошибка: Компонент Экстрактора недоступен.", "error"); } }, [addToastStable, setSelectedFetcherFilesStateStable, fetcherRef]);
         const selectedFetcherFilesRef = useRef(selectedFetcherFilesState); useEffect(() => { selectedFetcherFilesRef.current = selectedFetcherFilesState; }, [selectedFetcherFilesState]);
@@ -452,8 +483,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             if (fetcherRef.current?.handleCopyToClipboard) { 
                 try { 
                     const success = fetcherRef.current.handleCopyToClipboard(undefined, true);
-                    if (success && dbUser?.id) {
-                        const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'system_prompt_copied');
+                    if (success && dbUser?.user_id) { // Use string user_id for Supabase
+                        const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'system_prompt_copied');
                         newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                     }
                     return success; 
@@ -465,7 +496,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                 addToastStable("Ошибка копирования: Компонент Экстрактора недоступен.", "error"); 
                 return false; 
             } 
-        }, [addToastStable, fetcherRef, dbUser?.id]);
+        }, [addToastStable, fetcherRef, dbUser?.user_id]);
 
         const triggerAskAi = useCallback(async () => { addToastStable("Скопируйте запрос и вставьте в AI.", "info"); return { success: false, error: "Ask AI button disabled" }; }, [addToastStable]);
         
@@ -473,8 +504,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             if (assistantRef.current?.handleParse) { 
                 try { 
                     await assistantRef.current.handleParse(); 
-                    if (dbUser?.id) {
-                         const questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_parse_completed', 150, 2); 
+                    if (dbUser?.user_id) { // Use string user_id for Supabase
+                         const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_parse_completed', 150, 2); 
                          if (questResult.success && questResult.data?.metadata?.cyberFitness?.level === 2) {
                              addToastStable("🚀 Квест 'Первый Парсинг' выполнен! Level 2 достигнут!", "success", 4000);
                          } else if (questResult.success) {
@@ -488,7 +519,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             } else { 
                 addToastStable("Ошибка разбора: Компонент Ассистента недоступен.", "error");
             } 
-        }, [addToastStable, assistantRef, dbUser?.id]);
+        }, [addToastStable, assistantRef, dbUser?.user_id]);
         
         const triggerSelectAllParsed = useCallback(() => { if (assistantRef.current?.selectAllParsedFiles) { try { assistantRef.current.selectAllParsedFiles(); } catch (e: any) { addToastStable(`Ошибка выбора всех файлов: ${e?.message ?? 'Неизвестно'}`, "error"); } } else { addToastStable("Ошибка выбора: Компонент Ассистента недоступен.", "error");} }, [addToastStable, assistantRef]);
         
@@ -518,9 +549,9 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                 const result = await updateBranch(repoUrlParam, filesToCommit, commitMessage, branch, prNumber ?? undefined, prDescription); 
                 if (result.success) { 
                     triggerGetOpenPRsStable(repoUrlParam).catch(err => logger.error("Failed to refresh PRs after branch update:", err));
-                    if (dbUser?.id) {
+                    if (dbUser?.user_id) { // Use string user_id for Supabase
                         const action = prNumber ? 'branchUpdated' : 'prCreated'; 
-                        const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.id, action, 1);
+                        const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.user_id, action, 1);
                         if(actionAch) combinedAchievements.push(...actionAch);
 
                         // This 'prCreated' quest logic should ideally move to where a new PR is confirmed.
@@ -528,7 +559,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                         // If it's also for creating a new branch AND PR (which is the current flawed logic), this is okay too, but the overall flow is wrong.
                         // The FIX involves triggerCreateNewPR handling this specific CyberFitness logic for NEW PRs.
                         if (!prNumber && action === 'prCreated') {  // More specific condition based on the action intent
-                            const questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_pr_created', 250, 3); 
+                            const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_pr_created', 250, 3); 
                             if(questResult.success && questResult.data?.metadata?.cyberFitness?.level === 3) {
                                 addToastStable("🚀 Квест 'Первый PR' выполнен! Level 3 достигнут!", "success", 4000);
                             } else if (questResult.success) {
@@ -549,7 +580,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             } finally { 
                 setAssistantLoadingStateStable(false); 
             } 
-        }, [addToastStable, triggerGetOpenPRsStable, setAssistantLoadingStateStable, dbUser?.id, logger]);
+        }, [addToastStable, triggerGetOpenPRsStable, setAssistantLoadingStateStable, dbUser?.user_id, logger]);
 
         const triggerCreateNewPRStable = useCallback(async (
             repoUrlParam: string, 
@@ -574,11 +605,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
     
                 if (result.success) {
                     triggerGetOpenPRsStable(repoUrlParam).catch(err => logger.error("Failed to refresh PRs after new PR creation:", err));
-                    if (dbUser?.id) {
-                        const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.id, 'prCreated', 1);
+                    if (dbUser?.user_id) { // Use string user_id for Supabase
+                        const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.user_id, 'prCreated', 1);
                         if(actionAch) combinedAchievements.push(...actionAch);
                         
-                        const questResult = await completeQuestAndUpdateProfile(dbUser.id, 'first_pr_created', 250, 3);
+                        const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_pr_created', 250, 3);
                         if(questResult.success && questResult.data?.metadata?.cyberFitness?.level === 3) {
                             addToastStable("🚀 Квест 'Первый PR' выполнен! Level 3 достигнут!", "success", 4000);
                         } else if (questResult.success) {
@@ -598,30 +629,29 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             } finally {
                 setAssistantLoadingStateStable(false);
             }
-        }, [addToastStable, triggerGetOpenPRsStable, setAssistantLoadingStateStable, dbUser?.id, logger]);
-
+        }, [addToastStable, triggerGetOpenPRsStable, setAssistantLoadingStateStable, dbUser?.user_id, logger]);
 
         const updateRepoUrlInAssistantStable = useCallback((url: string) => { if (assistantRef.current?.updateRepoUrl) { try { assistantRef.current.updateRepoUrl(url); } catch (e: any) { logger.error(`Error calling assistantRef.updateRepoUrl: ${e?.message ?? 'Неизвестно'}`); } } }, [assistantRef]);
         
         const triggerAddImportantToKworkStable = useCallback(async () => {
             if (fetcherRef.current?.handleAddImportantFiles) {
                 fetcherRef.current.handleAddImportantFiles();
-                 if (dbUser?.id) {
-                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'usedSelectHighlighted'); 
+                 if (dbUser?.user_id) { // Use string user_id for Supabase
+                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'usedSelectHighlighted'); 
                     newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                  }
             }
-        }, [fetcherRef, dbUser?.id, addToastStable]);
+        }, [fetcherRef, dbUser?.user_id, addToastStable]);
         
         const triggerAddTreeToKworkStable = useCallback(async () => {
              if (fetcherRef.current?.handleAddFullTree) {
                  fetcherRef.current.handleAddFullTree();
-                 if (dbUser?.id) {
-                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'usedAddFullTree');
+                 if (dbUser?.user_id) { // Use string user_id for Supabase
+                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'usedAddFullTree');
                     newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                  }
              }
-        }, [fetcherRef, dbUser?.id, addToastStable]);
+        }, [fetcherRef, dbUser?.user_id, addToastStable]);
 
         const triggerSelectAllFetcherFilesStable = useCallback(() => { fetcherRef.current?.selectAllFiles?.(); }, [fetcherRef]);
         const triggerDeselectAllFetcherFilesStable = useCallback(() => { fetcherRef.current?.deselectAllFiles?.(); }, [fetcherRef]);
@@ -629,12 +659,12 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const triggerClearKworkInputStable = useCallback(async () => {
             if (fetcherRef.current?.clearAll) {
                 fetcherRef.current.clearAll();
-                if (dbUser?.id) {
-                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.id, 'kwork_cleared');
+                if (dbUser?.user_id) { // Use string user_id for Supabase
+                    const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'kwork_cleared');
                     newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                 }
             }
-        }, [fetcherRef, dbUser?.id, addToastStable]);
+        }, [fetcherRef, dbUser?.user_id, addToastStable]);
 
         const [currentStep, setCurrentStep] = useState<WorkflowStep>('idle');
         useEffect(() => {
