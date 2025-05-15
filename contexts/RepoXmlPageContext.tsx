@@ -17,7 +17,8 @@ import {
     checkAndUnlockFeatureAchievement, 
     completeQuestAndUpdateProfile, 
     logCyberFitnessAction, 
-    Achievement 
+    Achievement,
+    PERKS_BY_LEVEL // Импортируем, если используется в completeQuestAndUpdateProfile для first_pr_created
 } from '@/hooks/cyberFitnessSupabase'; 
 
 export type ImportCategory = 'component' | 'context' | 'hook' | 'lib' | 'other';
@@ -95,9 +96,9 @@ interface RepoXmlPageContextType {
     triggerAskAi: () => Promise<{ success: boolean; requestId?: string; error?: string }>;
     triggerParseResponse: () => Promise<void>;
     triggerSelectAllParsed: () => void;
-    triggerCreateOrUpdatePR: () => Promise<void>; // This will remain, and Assistant will call it. Assistant decides which specific trigger to use.
+    triggerCreateOrUpdatePR: () => Promise<void>; 
     triggerUpdateBranch: ( repoUrl: string, filesToCommit: { path: string; content: string }[], commitMessage: string, branch: string, prNumber?: number | null, prDescription?: string ) => Promise<{ success: boolean; error?: string; newAchievements?: Achievement[] }>;
-    triggerCreateNewPR: ( repoUrl: string, filesToCommit: FileNode[], prTitle: string, prDescription: string, commitMessage: string, newBranchName: string ) => Promise<{ success: boolean; error?: string; prUrl?: string; prNumber?: number; branch?: string; newAchievements?: Achievement[] }>; // Added this
+    triggerCreateNewPR: ( repoUrl: string, filesToCommit: FileNode[], prTitle: string, prDescription: string, commitMessage: string, newBranchName: string ) => Promise<{ success: boolean; error?: string; prUrl?: string; prNumber?: number; branch?: string; newAchievements?: Achievement[] }>;
     triggerGetOpenPRs: (repoUrl: string) => Promise<void>;
     updateRepoUrlInAssistant: (url: string) => void;
     getXuinityMessage: () => string;
@@ -202,7 +203,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const [pendingFlowDetailsState, setPendingFlowDetailsState] = useState<PendingFlowDetails | null>(null);
         const [showComponentsState, setShowComponentsState] = useState<boolean>(true);
         
-        const { dbUser } = useAppContext(); // dbUser.user_id is string (Supabase Auth ID)
+        const { dbUser } = useAppContext(); 
 
         const fetcherRef = useRef<RepoTxtFetcherRef | null>(null);
         const assistantRef = useRef<AICodeAssistantRef | null>(null);
@@ -544,17 +545,16 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                 const result = await updateBranch(repoUrlParam, filesToCommit, commitMessage, branch, prNumber ?? undefined, prDescription); 
                 if (result.success) { 
                     triggerGetOpenPRsStable(repoUrlParam).catch(err => logger.error("Failed to refresh PRs after branch update:", err));
-                    if (dbUser?.user_id) { // Use string user_id for Supabase
+                    if (dbUser?.user_id) {
                         // Если prNumber передан, это обновление существующего PR (значит, ветка уже была)
-                        // Если prNumber не передан, это может быть первый коммит в новую ветку (перед созданием PR) или просто обновление ветки.
-                        // Логируем 'branchUpdated' только если это явное обновление PR.
                         if (prNumber) { 
                             const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.user_id, 'branchUpdated', 1);
                             if(actionAch) combinedAchievements.push(...actionAch);
                             logger.info(`[CyberFitness] Logged 'branchUpdated' for PR #${prNumber} update. User: ${dbUser.user_id}`);
                         } else {
-                            logger.info(`[CyberFitness] Branch '${branch}' updated (no PR number provided). Not logging 'branchUpdated' or 'prCreated' here. User: ${dbUser.user_id}`);
-                            // Не логируем 'prCreated' здесь, это произойдет в triggerCreateNewPRStable
+                            // Это может быть первый коммит в новую ветку (перед созданием PR) или просто обновление ветки без PR.
+                            // НЕ логируем 'prCreated' или 'branchUpdated' здесь, чтобы избежать дублирования или преждевременного начисления.
+                            logger.info(`[CyberFitness] Branch '${branch}' updated (no PR number). Action will be logged by PR creation or specific flow. User: ${dbUser.user_id}`);
                         }
                     }
                     return { success: true, newAchievements: combinedAchievements }; 
@@ -717,9 +717,9 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             fetchStatus: fetchStatusState, repoUrlEntered: repoUrlEnteredState, filesFetched: filesFetchedState, kworkInputHasContent: kworkInputHasContentState, requestCopied: requestCopiedState, aiResponseHasContent: aiResponseHasContentState, filesParsed: filesParsedState, assistantLoading: assistantLoadingState, aiActionLoading: aiActionLoadingState, loadingPrs: loadingPrsState, isSettingsModalOpen: isSettingsModalOpenState, isParsing: isParsingState, isPreChecking: isPreCheckingState, showComponents: showComponentsState, selectedFetcherFiles: selectedFetcherFilesState, selectedAssistantFiles: selectedAssistantFilesState, targetBranchName: targetBranchNameState, manualBranchName: manualBranchNameState, openPrs: openPrsState, currentAiRequestId: currentAiRequestIdState, imageReplaceTask: imageReplaceTaskState, allFetchedFiles: allFetchedFilesState, currentStep, repoUrl: repoUrlState, primaryHighlightedPath: primaryHighlightPathState, secondaryHighlightedPaths: secondaryHighlightPathsState, targetPrData: targetPrDataState, pendingFlowDetails: pendingFlowDetailsState, kworkInputValue: kworkInputValueState,
             setFetchStatus: setFetchStatusStateStable, setRepoUrlEntered: setRepoUrlEnteredStateStable, handleSetFilesFetched: handleSetFilesFetchedStable, setSelectedFetcherFiles: setSelectedFetcherFilesStateStable, setKworkInputHasContent: setKworkInputHasContentStateStable, setRequestCopied: setRequestCopiedStateStable, setAiResponseHasContent: setAiResponseHasContentStateStable, setFilesParsed: setFilesParsedStateStable, setSelectedAssistantFiles: setSelectedAssistantFilesStateStable, setAssistantLoading: setAssistantLoadingStateStable, setAiActionLoading: setAiActionLoadingStateStable, setLoadingPrs: setLoadingPrsStateStable, setTargetBranchName: setTargetBranchNameStateStable, setManualBranchName: setManualBranchNameStateStable, setOpenPrs: setOpenPrsStateStable, setIsParsing: setIsParsingStateStable, setContextIsParsing: setIsParsingStateStable, setCurrentAiRequestId: setCurrentAiRequestIdStateStable, setImageReplaceTask: setImageReplaceTaskStateStable, setRepoUrl: setRepoUrlStateStable, setTargetPrData: setTargetPrDataStable, setIsPreChecking: setIsPreCheckingStateStable, setPendingFlowDetails: setPendingFlowDetailsStateStable, setShowComponents: setShowComponentsStateStable, setKworkInputValue: setKworkInputValueStateStable,
             triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, 
-            triggerCreateOrUpdatePR, // Keep this general trigger if AICodeAssistant still uses it
+            triggerCreateOrUpdatePR, 
             triggerUpdateBranch: triggerUpdateBranchStable, 
-            triggerCreateNewPR: triggerCreateNewPRStable, // <<< ADDED THE NEW TRIGGER HERE
+            triggerCreateNewPR: triggerCreateNewPRStable, 
             triggerGetOpenPRs: triggerGetOpenPRsStable, updateRepoUrlInAssistant: updateRepoUrlInAssistantStable, getXuinityMessage: getXuinityMessageStable, scrollToSection: scrollToSectionStable, triggerAddImportantToKwork: triggerAddImportantToKworkStable, triggerAddTreeToKwork: triggerAddTreeToKworkStable, triggerSelectAllFetcherFiles: triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFiles: triggerDeselectAllFetcherFilesStable, triggerClearKworkInput: triggerClearKworkInputStable,
             kworkInputRef, aiResponseInputRef, fetcherRef, assistantRef,
             addToast: addToastStable,
@@ -727,9 +727,9 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, isPreCheckingState, showComponentsState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, secondaryHighlightPathsState, targetPrDataState, pendingFlowDetailsState, kworkInputValueState,
             setFetchStatusStateStable, setRepoUrlEnteredStateStable, handleSetFilesFetchedStable, setSelectedFetcherFilesStateStable, setKworkInputHasContentStateStable, setRequestCopiedStateStable, setAiResponseHasContentStateStable, setFilesParsedStateStable, setSelectedAssistantFilesStateStable, setAssistantLoadingStateStable, setAiActionLoadingStateStable, setLoadingPrsStateStable, setTargetBranchNameStateStable, setManualBranchNameStateStable, setOpenPrsStateStable, setIsParsingStateStable, setCurrentAiRequestIdStateStable, setImageReplaceTaskStateStable, setRepoUrlStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setShowComponentsStateStable, setKworkInputValueStateStable,
             triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, 
-            triggerCreateOrUpdatePR, // Keep
+            triggerCreateOrUpdatePR, 
             triggerUpdateBranchStable, 
-            triggerCreateNewPRStable, // <<< ADDED
+            triggerCreateNewPRStable, 
             triggerGetOpenPRsStable, updateRepoUrlInAssistantStable, getXuinityMessageStable, scrollToSectionStable, triggerAddImportantToKworkStable, triggerAddTreeToKworkStable, triggerSelectAllFetcherFilesStable, triggerDeselectAllFetcherFilesStable, triggerClearKworkInputStable,
             addToastStable,
         ]);
@@ -745,7 +745,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
 export const useRepoXmlPageContext = (): RepoXmlPageContextType => {
     const context = useContext(RepoXmlPageContext);
     if (context === undefined) { logger.fatal("useRepoXmlPageContext used outside RepoXmlPageProvider!"); throw new Error("useRepoXmlPageContext must be used within a RepoXmlPageProvider"); }
-    // Ensure the returned context always includes triggerCreateNewPR
     if (typeof context.triggerCreateNewPR !== 'function') {
         logger.error("CRITICAL: triggerCreateNewPR is missing from context. Providing a NO-OP fallback.");
         return {
