@@ -1,3 +1,4 @@
+// /components/RepoTxtFetcher.tsx
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useMemo, useCallback } from "react";
@@ -17,7 +18,7 @@ import {
 import { debugLogger as logger } from "@/lib/debugLogger";
 
 // --- Hooks & Utils ---
-import *import * as repoUtils from "@/lib/repoUtils";
+import * as repoUtils from "@/lib/repoUtils";
 import { useRepoFetcher } from "@/hooks/useRepoFetcher";
 import { useFileSelection } from "@/hooks/useFileSelection";
 import { useKworkInput } from "@/hooks/useKworkInput";
@@ -239,7 +240,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              logger.debug(`[RepoTxtFetcher Effect ideaProp] Skipping flow trigger due to missing params: ideaFromUrl='${ideaFromUrl}', highlightedPathFromUrl='${highlightedPathFromUrl}', repoUrl='${repoUrl}'`);
         }
     }, [ideaFromUrl, highlightedPathFromUrl, repoUrl, manualBranchName, targetBranchName, triggerPreCheckAndFetch, setImageReplaceTask, logger]);
-
 
     useEffect(() => {
         logger.debug("[Effect URL Sync] RepoTxtFetcher: Syncing Assistant URL START (Restored Original with ideaProp handler)");
