@@ -15,11 +15,12 @@ import { toast } from "sonner";
 import {
   fetchUserCyberFitnessProfile,
   CyberFitnessProfile,
+  // No longer need DailyActivityRecord here if chart is removed or uses profile.dailyActivityLog directly
   getAchievementDetails,
   Achievement,
   ALL_ACHIEVEMENTS, 
   checkAndUnlockFeatureAchievement, 
-  logCyberFitnessAction 
+  // logCyberFitnessAction // Only if still used directly on this page
 } from "@/hooks/cyberFitnessSupabase";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts';
@@ -31,7 +32,22 @@ import { cn } from "@/lib/utils";
 
 const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png";
 
-const DEFAULT_WEEKLY_ACTIVITY_TEMPLATE = Array.from({ length: 7 }).map((_, i) => {
+// Local DailyActivityRecord for the chart tooltip
+interface DailyActivityRecordForChart {
+  date: string;
+  filesExtracted: number;
+  tokensProcessed: number;
+  kworkRequestsSent: number;
+  prsCreated: number;
+  branchesUpdated: number;
+  focusTimeMinutes?: number;
+  value: number; // For chart bar height (Vibe Points)
+  name: string; // For XAxis (day name)
+  label: string; // For default label if needed
+}
+
+
+const DEFAULT_WEEKLY_ACTIVITY_TEMPLATE: Array<DailyActivityRecordForChart> = Array.from({ length: 7 }).map((_, i) => {
     const dayOfWeek = startOfWeek(new Date(), { weekStartsOn: 1 }); 
     const date = addDays(dayOfWeek, i);
     return {
@@ -56,7 +72,7 @@ const CHART_COLORS = [
 
 const CustomTooltipContent = ({ active, payload, label }: any) => {
     if (active && payload && payload.length && payload[0].payload) {
-      const data: DailyActivityRecord & { value: number } = payload[0].payload; 
+      const data: DailyActivityRecordForChart = payload[0].payload; 
       return (
         <div className="bg-dark-card/95 backdrop-blur-sm text-light-text p-3 rounded-lg border border-brand-purple/50 shadow-xl text-xs font-mono max-w-[200px] sm:max-w-xs">
           <p className="font-bold text-brand-cyan mb-1.5">День: {label} <span className="text-muted-foreground text-2xs">({format(new Date(data.date + "T00:00:00Z"), 'dd MMM', {locale: ru})})</span></p>
@@ -83,9 +99,7 @@ const CustomTooltipContent = ({ active, payload, label }: any) => {
 export default function ProfilePage() {
   const appContext = useAppContext();
   const { user: telegramUser, dbUser, isLoading: appLoading, isAuthenticating, error: appContextError } = appContext; 
-  // Using addToast directly from appContext for simplicity if it's added there, otherwise keep useAppToast
-  const { addToast } = useAppContext(); // Or: const { addToast } = useAppToast();
-
+  const { addToast } = useAppContext(); 
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPerksModalOpen, setIsPerksModalOpen] = useState(false);
@@ -105,84 +119,80 @@ export default function ProfilePage() {
   const userHandle = dbUser?.username || telegramUser?.username || 'cyberspace_operative';
   const avatarUrl = dbUser?.avatar_url || telegramUser?.photo_url || PLACEHOLDER_AVATAR;
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      if (appLoading || isAuthenticating) {
-        setProfileLoading(true); 
-        return;
-      }
+  const fetchProfileData = useCallback(async () => {
+    if (appLoading || isAuthenticating) {
       setProfileLoading(true); 
-      try {
-          if (appContextError) {
-            logger.error(`[ProfilePage] Error from AppContext: ${appContextError.message}. Defaulting.`);
-             setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: ["investigate_anomaly"], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 System Anomaly", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
-          } else if (dbUser?.user_id) {
-            const result = await fetchUserCyberFitnessProfile(dbUser.user_id);
-            if (result.success && result.data) {
-              setCyberProfile(result.data);
-              setIntegrations({
-                github: result.data.featuresUsed?.integration_github === true,
-                vercel: result.data.featuresUsed?.integration_vercel === true,
-                supabase: result.data.featuresUsed?.integration_supabase === true,
-                aiStudio: result.data.featuresUsed?.integration_aistudio === true,
-              });
-            } else {
-              logger.warn(`[ProfilePage] Failed to load profile for ${dbUser.user_id}. Error: ${result.error}. Defaulting.`);
-              setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Alpha Error", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
-            }
+      return;
+    }
+    setProfileLoading(true); 
+    try {
+        if (appContextError) {
+          logger.error(`[ProfilePage] Error from AppContext: ${appContextError.message}. Defaulting.`);
+           setCyberProfile(getDefaultCyberFitnessProfile()); // Use helper
+           setIntegrations({ github: false, vercel: false, supabase: false, aiStudio: false });
+        } else if (dbUser?.user_id) {
+          const result = await fetchUserCyberFitnessProfile(dbUser.user_id);
+          if (result.success && result.data) {
+            setCyberProfile(result.data);
+            setIntegrations({ // Ensure this is set from fresh data
+              github: result.data.featuresUsed?.integration_github_connected === true,
+              vercel: result.data.featuresUsed?.integration_vercel_connected === true,
+              supabase: result.data.featuresUsed?.integration_supabase_connected === true,
+              aiStudio: result.data.featuresUsed?.integration_aistudio_connected === true,
+            });
           } else {
-            setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: ["initial_boot_sequence"], completedQuests: [], unlockedPerks: ["Basic Interface"], achievements: [], cognitiveOSVersion: "v0.1 Guest Mode", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
+            logger.warn(`[ProfilePage] Failed to load profile for ${dbUser.user_id}. Error: ${result.error}. Defaulting.`);
+            setCyberProfile(getDefaultCyberFitnessProfile());
+            setIntegrations({ github: false, vercel: false, supabase: false, aiStudio: false });
           }
-      } catch(e) {
-         logger.error(`[ProfilePage] Exception during profile loading:`, e);
-         setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: ["investigate_anomaly"], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Load Exception", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
-      } finally {
-        setProfileLoading(false); 
-      }
-    };
-    loadProfile();
-  }, [dbUser, appLoading, isAuthenticating, appContextError]); 
+        } else {
+          logger.info("[ProfilePage] No dbUser.user_id, using guest profile.");
+          setCyberProfile(getDefaultCyberFitnessProfile());
+          setIntegrations({ github: false, vercel: false, supabase: false, aiStudio: false });
+        }
+    } catch(e: any) {
+       logger.error(`[ProfilePage] Exception during profile loading:`, e);
+       setCyberProfile(getDefaultCyberFitnessProfile());
+       setIntegrations({ github: false, vercel: false, supabase: false, aiStudio: false });
+    } finally {
+      setProfileLoading(false); 
+    }
+  }, [dbUser?.user_id, appLoading, isAuthenticating, appContextError]); // dbUser.user_id to re-fetch if it changes
+
+  useEffect(() => {
+    fetchProfileData();
+  }, [fetchProfileData]); 
 
   const handleIntegrationChange = useCallback(async (integrationKey: keyof typeof integrations, isChecked: boolean) => {
-    if (!dbUser?.user_id || !cyberProfile) {
+    if (!dbUser?.user_id) { // Removed !cyberProfile check, as we re-fetch anyway
         toast.error("Профиль пользователя не загружен для обновления интеграций.");
         return;
     }
 
-    const featureName = `integration_${integrationKey}_connected`; // e.g., integration_github_connected
+    const featureName = `integration_${integrationKey}_connected`; 
 
-    // Optimistic UI update
+    // Optimistic UI update - still useful for immediate feedback
     setIntegrations(prev => ({ ...prev, [integrationKey]: isChecked }));
+    const operationToastId = toast.loading(`${isChecked ? "Отметка" : "Снятие отметки"} интеграции с ${integrationKey}...`);
 
-    if (isChecked) { // Only log and award when checking it on
-        toast.info(`Отметка интеграции с ${integrationKey}...`);
-        const result = await checkAndUnlockFeatureAchievement(dbUser.user_id, featureName, true);
-        if (result.error) {
-            toast.error(`Ошибка обновления статуса для ${integrationKey}: ${result.error}`);
-            setIntegrations(prev => ({ ...prev, [integrationKey]: false })); // Revert UI
-        } else {
-            toast.success(`Интеграция с ${integrationKey} отмечена!`);
-            result.newAchievements?.forEach(ach => {
+    // Backend update
+    const result = await checkAndUnlockFeatureAchievement(dbUser.user_id, featureName, isChecked);
+    
+    if (result.error) {
+        toast.error(`Ошибка обновления статуса для ${integrationKey}: ${result.error}`, { id: operationToastId });
+        // Revert optimistic UI if backend failed
+        setIntegrations(prev => ({ ...prev, [integrationKey]: !isChecked })); 
+    } else {
+        toast.success(`Интеграция с ${integrationKey} ${isChecked ? "отмечена" : "снята"}!`, { id: operationToastId });
+        if (isChecked && result.newAchievements?.length) {
+             result.newAchievements.forEach(ach => {
                 if (addToast) addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
             });
-            // Re-fetch profile to reflect KV/level changes from new achievements
-            const updatedProfileResult = await fetchUserCyberFitnessProfile(dbUser.user_id);
-            if (updatedProfileResult.success && updatedProfileResult.data) {
-                setCyberProfile(updatedProfileResult.data);
-            }
         }
-    } else {
-        // If unchecking, we might want to update the featureUsed flag to false in Supabase.
-        // This depends on whether "un-integrating" should be an action.
-        // For now, let's assume unchecking only updates local UI and doesn't remove achievements/KV.
-        // To make it truly revertable, CyberFitness logic would need to handle negative KV or achievement removal.
-        logger.info(`[ProfilePage] Integration '${integrationKey}' unchecked UI only.`);
-        // To update backend for unchecking:
-        // await checkAndUnlockFeatureAchievement(dbUser.user_id, featureName, false); 
-        // toast.info(`Интеграция с ${integrationKey} снята.`);
+        // Re-fetch profile to reflect ALL changes (KV, level, featuresUsed for checkbox state)
+        await fetchProfileData();
     }
-  }, [dbUser, cyberProfile, addToast]);
-
+  }, [dbUser?.user_id, addToast, fetchProfileData]);
 
   const isLoadingDisplay = appLoading || isAuthenticating || profileLoading;
 
@@ -197,7 +207,8 @@ export default function ProfilePage() {
     );
   }
 
-  const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({ // Helper for safe access
+  // Helper function to get a default profile, moved outside component if it doesn't depend on component's state/props
+  const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({ 
     level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
     activeQuests: ["initial_boot_sequence"], completedQuests: [], unlockedPerks: [],
     cognitiveOSVersion: "v0.1 Error/Guest", lastActivityTimestamp: new Date(0).toISOString(), 
@@ -212,10 +223,10 @@ export default function ProfilePage() {
   const kiloVibes = safeCyberProfile.kiloVibes;
   const cognitiveOS = safeCyberProfile.cognitiveOSVersion;
   const unlockedPerks = safeCyberProfile.unlockedPerks;
-  const userAchievements = safeCyberProfile.achievements; // IDs of unlocked achievements
+  const userAchievements = safeCyberProfile.achievements; 
   const focusTime = parseFloat((safeCyberProfile.focusTimeHours || 0).toFixed(1));
   
-  const displayWeeklyActivity = DEFAULT_WEEKLY_ACTIVITY_TEMPLATE.map(templateDay => {
+  const displayWeeklyActivity: DailyActivityRecordForChart[] = DEFAULT_WEEKLY_ACTIVITY_TEMPLATE.map(templateDay => {
     const logEntry = safeCyberProfile.dailyActivityLog?.find(log => log.date === templateDay.date);
     if (logEntry) {
         const vibePoints = 
@@ -259,7 +270,21 @@ export default function ProfilePage() {
     toast.info(`Функция "${featureName}" находится в активной разработке и скоро будет доступна!`);
   };
 
-  const allPossibleAchievements = ALL_ACHIEVEMENTS.filter(ach => !ach.isQuest && !ach.id.startsWith("level_up_"));
+  // Filter out dynamic achievements like level_up_X and mastered_schematic_X for the "possible" pool
+  const allPossibleNonDynamicAchievements = ALL_ACHIEVEMENTS.filter(ach => !ach.isQuest && !ach.isDynamic);
+  
+  // Get full details for all achievements the user has unlocked, including dynamic ones
+  const allUnlockedAchievementDetails = userAchievements
+    .map(id => getAchievementDetails(id))
+    .filter((ach): ach is Achievement => !!ach);
+
+  // Create a combined list for display: all possible non-dynamic ones + any dynamic ones the user has that aren't in the base list
+  const allDisplayableAchievements = [...allPossibleNonDynamicAchievements];
+  allUnlockedAchievementDetails.forEach(unlockedAch => {
+      if (unlockedAch.isDynamic && !allDisplayableAchievements.find(dispAch => dispAch.id === unlockedAch.id)) {
+          allDisplayableAchievements.push(unlockedAch);
+      }
+  });
 
 
   return (
@@ -359,11 +384,11 @@ export default function ProfilePage() {
 
             <section>
               <h2 className="text-2xl font-orbitron text-neon-lime mb-4 flex items-center gap-2"> 
-                <VibeContentRenderer content="::FaStar::" />Достижения Агента ({userAchievements.length} / {allPossibleAchievements.length})
+                <VibeContentRenderer content="::FaStar::" />Достижения Агента ({userAchievements.length} / {allDisplayableAchievements.length})
               </h2>
               <div className="p-4 bg-dark-bg/80 rounded-lg border border-neon-lime/40 space-y-2 shadow-md">
-                {allPossibleAchievements.length > 0 ? (
-                  allPossibleAchievements.slice(0,5).map((ach) => { 
+                {allDisplayableAchievements.length > 0 ? (
+                  allDisplayableAchievements.slice(0,5).map((ach) => { 
                     const isUnlocked = userAchievements.includes(ach.id);
                     return (
                       <div key={ach.id} 
@@ -382,7 +407,7 @@ export default function ProfilePage() {
                   <p className="text-sm text-muted-foreground font-mono">Список достижений загружается...</p>
                 )}
                  <Button variant="link" size="sm" className="text-neon-lime p-0 h-auto font-mono text-xs hover:text-lime-300 mt-1" onClick={() => setIsAchievementsModalOpen(true)}>
-                    {`Все Достижения (${userAchievements.length}/${allPossibleAchievements.length})`} <VibeContentRenderer content="::FaChevronRight className='ml-1 w-3 h-3'::" />
+                    {`Все Достижения (${userAchievements.length}/${allDisplayableAchievements.length})`} <VibeContentRenderer content="::FaChevronRight className='ml-1 w-3 h-3'::" />
                  </Button>
               </div>
             </section>
@@ -394,10 +419,10 @@ export default function ProfilePage() {
                 <Card className="bg-dark-bg/70 border-brand-blue/30 p-4 space-y-3">
                     <p className="text-xs text-muted-foreground font-mono mb-3">Отметьте сервисы, с которыми вы успешно настроили интеграцию или имеете аккаунт для работы в CyberVibe Studio.</p>
                     {[
-                        {id: "github", label: "GitHub (Токен для PR/веток)", icon: "FaGithub", achievementId: "integration_github_connected"},
-                        {id: "vercel", label: "Vercel (Деплой проектов)", icon: "FaBolt", achievementId: "integration_vercel_connected"},
-                        {id: "supabase", label: "Supabase (База данных & Auth)", icon: "FaDatabase", achievementId: "integration_supabase_connected"},
-                        {id: "aiStudio", label: "AI Studio (OpenAI/Gemini/Claude)", icon: "FaRobot", achievementId: "integration_aistudio_connected"},
+                        {id: "github", label: "GitHub (Токен для PR/веток)", icon: "FaGithub"},
+                        {id: "vercel", label: "Vercel (Деплой проектов)", icon: "FaBolt"},
+                        {id: "supabase", label: "Supabase (База данных & Auth)", icon: "FaDatabase"},
+                        {id: "aiStudio", label: "AI Studio (OpenAI/Gemini/Claude)", icon: "FaRobot"},
                     ].map(item => (
                         <div key={item.id} className="flex items-center space-x-2">
                             <Checkbox 
@@ -439,7 +464,6 @@ export default function ProfilePage() {
                     </Card>
                 </div>
             </section>
-
 
             <section className="flex flex-col sm:flex-row gap-4 mt-8">
               <Button 
@@ -508,7 +532,7 @@ export default function ProfilePage() {
       <Modal
         isOpen={isAchievementsModalOpen}
         onClose={() => setIsAchievementsModalOpen(false)}
-        title={`Зал Славы Агента (${userAchievements.length}/${allPossibleAchievements.length})`}
+        title={`Зал Славы Агента (${userAchievements.length}/${allDisplayableAchievements.length})`}
         showConfirmButton={false}
         cancelText="Закрыть Витрину"
         dialogClassName="bg-dark-card border-neon-lime text-light-text"
@@ -516,8 +540,16 @@ export default function ProfilePage() {
         cancelButtonClassName="text-muted-foreground hover:bg-muted/50"
       >
         <div className="max-h-96 overflow-y-auto simple-scrollbar pr-2 space-y-3">
-            {allPossibleAchievements.length > 0 ? (
-                allPossibleAchievements.map((achievement) => {
+            {allDisplayableAchievements.length > 0 ? (
+                allDisplayableAchievements
+                  .sort((a,b) => { 
+                      const aUnlocked = userAchievements.includes(a.id);
+                      const bUnlocked = userAchievements.includes(b.id);
+                      if (aUnlocked && !bUnlocked) return -1;
+                      if (!aUnlocked && bUnlocked) return 1;
+                      return a.name.localeCompare(b.name);
+                  })
+                  .map((achievement) => {
                     const isUnlocked = userAchievements.includes(achievement.id);
                     return (
                         <div key={achievement.id} className={cn(
@@ -533,6 +565,9 @@ export default function ProfilePage() {
                                 {!isUnlocked && <FaLock className="ml-auto text-xs text-gray-500" />}
                             </div>
                             <p className="text-xs text-muted-foreground font-mono ml-9">{achievement.description}</p>
+                             {achievement.kiloVibesAward && isUnlocked && (
+                                <p className="text-xs text-brand-yellow font-mono ml-9 mt-1">+ {achievement.kiloVibesAward.toLocaleString()} KiloVibes</p>
+                             )}
                         </div>
                     );
                 })
