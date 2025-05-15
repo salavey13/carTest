@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useImperativeHandle, forwardRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useImperativeHandle, forwardRef, useMemo, useCallback, useRef } from "react"; // Добавлен useRef
 // Импорты Fa6 иконок удалены, используется VibeContentRenderer
 import { motion } from "framer-motion";
 
@@ -234,10 +234,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                     logger.error("[RepoTxtFetcher Effect ideaProp] Error calling triggerPreCheckAndFetch for ImageSwap via ideaProp:", err);
                     setImageReplaceTask({ targetPath: highlightedPathFromUrl, oldUrl, newUrl }); // Fallback
                 }).finally(() => {
-                    // Conditional reset of ref if task didn't "stick" in context.
-                    // This logic might need refinement if partial processing is possible.
-                    // For now, rely on context state (imageReplaceTask, pendingFlowDetails) for primary guard.
-                    // If a task is fully cleared from context, this ref allows it to be re-triggered by ideaProp.
                     if (ideaProcessingRef.current === ideaSignature && !imageReplaceTask && !(pendingFlowDetails?.type === 'ImageSwap' && pendingFlowDetails.targetPath === highlightedPathFromUrl)) {
                         ideaProcessingRef.current = null;
                     }
@@ -253,13 +249,13 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                 
                 if (pendingFlowDetails?.type === 'ErrorFix' &&
                     pendingFlowDetails.targetPath === highlightedPathFromUrl &&
-                    JSON.stringify(pendingFlowDetails.details) === JSON.stringify(parsedDetails)) { // Basic details comparison
+                    JSON.stringify(pendingFlowDetails.details) === JSON.stringify(parsedDetails)) { 
                     logger.info("[RepoTxtFetcher Effect ideaProp] ErrorFix task from ideaProp matches active context pending flow. Skipping re-trigger.");
                     return;
                 }
                 
                 logger.log("[RepoTxtFetcher Effect ideaProp] Parsed ErrorFix details, proceeding to trigger:", parsedDetails);
-                ideaProcessingRef.current = ideaSignature; // Mark as processing
+                ideaProcessingRef.current = ideaSignature; 
                 const branchNameToUse = manualBranchName || targetBranchName || '';
                  triggerPreCheckAndFetch(
                      repoUrl,
@@ -285,7 +281,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     }, [
         ideaFromUrl, highlightedPathFromUrl, repoUrl, manualBranchName, targetBranchName, 
         triggerPreCheckAndFetch, setImageReplaceTask, logger, 
-        imageReplaceTask, pendingFlowDetails, isPreChecking // Added new context states
+        imageReplaceTask, pendingFlowDetails, isPreChecking 
     ]);
 
     useEffect(() => {
@@ -362,7 +358,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     useImperativeHandle(ref, () => ({
         handleFetch: (isManualRetry?: boolean, branchNameToFetchOverride?: string | null, taskForEarlyCheck?: ImageReplaceTask | null) => {
             logger.debug(`[Imperative] handleFetch called. (Restored Original with ideaProp handler)`);
-            // taskForEarlyCheck is not directly used here as handleFetchManual gets it from ref. Current logic should be fine.
             return handleFetchManual(isManualRetry, branchNameToFetchOverride);
         },
         selectHighlightedFiles: () => {
