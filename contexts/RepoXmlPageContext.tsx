@@ -523,11 +523,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         
         const triggerSelectAllParsed = useCallback(() => { if (assistantRef.current?.selectAllParsedFiles) { try { assistantRef.current.selectAllParsedFiles(); } catch (e: any) { addToastStable(`Ошибка выбора всех файлов: ${e?.message ?? 'Неизвестно'}`, "error"); } } else { addToastStable("Ошибка выбора: Компонент Ассистента недоступен.", "error");} }, [addToastStable, assistantRef]);
         
-        // This will remain. AICodeAssistant's handleCreatePR will call this, 
-        // and then this context function will decide whether to call triggerUpdateBranch or triggerCreateNewPR.
-        // However, the direct call to triggerUpdateBranch or triggerCreateNewPR should happen in AICodeAssistant's handlers.
-        // This function should be simplified or removed if AICodeAssistant calls the specific triggers directly.
-        // For now, let's assume AICodeAssistant calls this, and this is a pass-through/delegator.
         const triggerCreateOrUpdatePR = useCallback(async () => { 
             if (assistantRef.current?.handleCreatePR) { 
                 try { 
@@ -550,24 +545,17 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                 if (result.success) { 
                     triggerGetOpenPRsStable(repoUrlParam).catch(err => logger.error("Failed to refresh PRs after branch update:", err));
                     if (dbUser?.user_id) { // Use string user_id for Supabase
-                        const action = prNumber ? 'branchUpdated' : 'prCreated'; 
-                        const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.user_id, action, 1);
-                        if(actionAch) combinedAchievements.push(...actionAch);
-
-                        // This 'prCreated' quest logic should ideally move to where a new PR is confirmed.
-                        // If triggerUpdateBranch is ONLY for updating existing branches, this block is fine.
-                        // If it's also for creating a new branch AND PR (which is the current flawed logic), this is okay too, but the overall flow is wrong.
-                        // The FIX involves triggerCreateNewPR handling this specific CyberFitness logic for NEW PRs.
-                        if (!prNumber && action === 'prCreated') {  // More specific condition based on the action intent
-                            const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_pr_created', 250, 3); 
-                            if(questResult.success && questResult.data?.metadata?.cyberFitness?.level === 3) {
-                                addToastStable("🚀 Квест 'Первый PR' выполнен! Level 3 достигнут!", "success", 4000);
-                            } else if (questResult.success) {
-                                addToastStable("🚀 Квест 'Первый PR' выполнен!", "success", 4000);
-                            }
-                            if(questResult.newAchievements) combinedAchievements.push(...questResult.newAchievements);
+                        // Если prNumber передан, это обновление существующего PR (значит, ветка уже была)
+                        // Если prNumber не передан, это может быть первый коммит в новую ветку (перед созданием PR) или просто обновление ветки.
+                        // Логируем 'branchUpdated' только если это явное обновление PR.
+                        if (prNumber) { 
+                            const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.user_id, 'branchUpdated', 1);
+                            if(actionAch) combinedAchievements.push(...actionAch);
+                            logger.info(`[CyberFitness] Logged 'branchUpdated' for PR #${prNumber} update. User: ${dbUser.user_id}`);
+                        } else {
+                            logger.info(`[CyberFitness] Branch '${branch}' updated (no PR number provided). Not logging 'branchUpdated' or 'prCreated' here. User: ${dbUser.user_id}`);
+                            // Не логируем 'prCreated' здесь, это произойдет в triggerCreateNewPRStable
                         }
-                         combinedAchievements.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                     }
                     return { success: true, newAchievements: combinedAchievements }; 
                 } else { 
@@ -603,13 +591,14 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     newBranchNameParam
                 );
     
-                if (result.success) {
+                if (result.success && result.prNumber) { // Убедимся, что prNumber есть
                     triggerGetOpenPRsStable(repoUrlParam).catch(err => logger.error("Failed to refresh PRs after new PR creation:", err));
-                    if (dbUser?.user_id) { // Use string user_id for Supabase
+                    if (dbUser?.user_id) { 
                         const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.user_id, 'prCreated', 1);
                         if(actionAch) combinedAchievements.push(...actionAch);
+                        logger.info(`[CyberFitness] Logged 'prCreated' for PR #${result.prNumber}. User: ${dbUser.user_id}`);
                         
-                        const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_pr_created', 250, 3);
+                        const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_pr_created', 250, 3, PERKS_BY_LEVEL[3]);
                         if(questResult.success && questResult.data?.metadata?.cyberFitness?.level === 3) {
                             addToastStable("🚀 Квест 'Первый PR' выполнен! Level 3 достигнут!", "success", 4000);
                         } else if (questResult.success) {
@@ -617,7 +606,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                         }
                         if(questResult.newAchievements) combinedAchievements.push(...questResult.newAchievements);
                     }
-                    combinedAchievements.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                     return { ...result, newAchievements: combinedAchievements };
                 } else {
                     addToastStable(`Ошибка создания PR: ${result.error}`, 'error', 5000);

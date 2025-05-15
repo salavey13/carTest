@@ -1,3 +1,4 @@
+// /components/assistant_components/handlers.ts
 "use client";
 
 import { useCallback } from 'react';
@@ -364,7 +365,6 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
      }, [setSelectedAssistantFiles, imageReplaceTask, setSelectedFileIds]);
 
     const handleSaveFiles = useCallback(async () => {
-        // Use dbUser.user_id (string) for Supabase interactions
         if (!dbUser?.user_id || imageReplaceTask) { toast.warn(imageReplaceTask ? "Сохранение недоступно для картинок." : "Требуется авторизация.", { id: "save-auth-warn" }); return; }
         const filesToSave = componentParsedFiles.filter(f => selectedFileIds.has(f.id) && f.content.trim()); 
         if (filesToSave.length === 0) { toast.warn("Нет выбранных непустых файлов для сохранения."); return; }
@@ -406,7 +406,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
      }, [componentParsedFiles, selectedFileIds, imageReplaceTask, setIsProcessingPR]);
 
     const handleSendToTelegram = useCallback(async (file: ValidationFileEntry) => {
-        if (!user?.id || imageReplaceTask) { // user.id is the Telegram ID (number)
+        if (!user?.id || imageReplaceTask) { 
             toast.warn(imageReplaceTask ? "Отправка недоступна для картинок." : "Требуется авторизация.", { id: "tg-send-auth-warn" }); return; 
         }
         if (!file || !file.path || !file.content?.trim()) { toast.warn("Невозможно отправить пустой файл."); return; }
@@ -414,15 +414,14 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         setIsProcessingPR(true); const toastId = toast.loading(`Отправка ${file.path.split('/').pop()} в Telegram...`);
         try {
             const fileName = file.path.split("/").pop() || `file_${Date.now()}.txt`; 
-            const result = await sendTelegramDocument(String(user.id), file.content, fileName); // sendTelegramDocument expects string chat_id
+            const result = await sendTelegramDocument(String(user.id), file.content, fileName); 
             if (!result.success) throw new Error(result.error ?? "Telegram Send Error");
             toast.success(`Файл "${fileName}" отправлен в ваш Telegram.`, { id: toastId });
         } catch (err: any) { logger.error("[Handler SendToTelegram] Send error:", err); toast.error(`Ошибка отправки в TG: ${err.message}`, { id: toastId }); }
         finally { setIsProcessingPR(false); }
-     }, [user, imageReplaceTask, setIsProcessingPR]); // Depends on user (TG user)
+     }, [user, imageReplaceTask, setIsProcessingPR]); 
 
     const handleAddCustomLink = useCallback(async () => {
-        // Use dbUser.user_id (string) for Supabase interactions
         if (!dbUser?.user_id || imageReplaceTask) { toast.warn(imageReplaceTask ? "Недоступно для картинок." : "Требуется авторизация.", { id: "addlink-auth-warn" }); return; }
         let name, url;
         try {
@@ -445,7 +444,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             if (upsertError) throw upsertError;
             toast.success(`Ссылка "${name}" добавлена.`, { id: toastId });
         } catch (e: any) { logger.error("[Handler AddCustomLink] Save error:", e); toast.error(`Ошибка сохранения ссылки: ${e?.message ?? 'Неизвестная ошибка'}`, { id: toastId }); setCustomLinks(customLinks); }
-     }, [customLinks, dbUser?.user_id, imageReplaceTask, setCustomLinks]); // Depends on dbUser.user_id
+     }, [customLinks, dbUser?.user_id, imageReplaceTask, setCustomLinks]); 
 
     const handleCreateOrUpdatePR = useCallback(async (): Promise<void> => {
         if (imageReplaceTask) { toast.warn("Недоступно во время замены картинки."); return; }
@@ -483,6 +482,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         logger.log("[Handler CreateOrUpdatePR] Initiating PR/Update process.");
         const actionType = targetBranchName ? 'обновления ветки' : 'создания PR';
         const toastId = toast.loading(`Запуск ${actionType}...`);
+        
         let prResultAchievements: Achievement[] = [];
 
         try {
@@ -503,7 +503,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             }
             const branchToTarget = prToUpdate?.head?.ref || targetBranchName; 
 
-            if (branchToTarget) { // Updating an existing branch (or a branch from an existing PR)
+            if (branchToTarget) { 
                  logger.log(`[Handler CreateOrUpdatePR] Updating branch '${branchToTarget}'. PR#: ${prToUpdate?.number ?? 'N/A'}`);
                  const updateResult = await triggerUpdateBranch( repoUrlForForm, filesToCommit, fullCommitMessage, branchToTarget, prToUpdate?.number, finalDescription );
                  if (updateResult.success) {
@@ -518,13 +518,12 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
                     logger.error(`[Handler CreateOrUpdatePR] Update Branch Failed via Context: ${updateResult.error}`); 
                     toast.error(`Ошибка обновления ветки: ${updateResult.error || "?"}`, { id: toastId });
                  }
-             } else { // Creating a NEW PR (and implicitly a new branch)
+             } else { 
                  logger.log(`[Handler CreateOrUpdatePR] Creating new PR with title '${prTitle.trim()}'.`);
                  toast.info("Создание нового PR...", { id: toastId }); 
                  const newBranchName = `feat/ai-${Date.now()}`; 
                  
-                 // Call the context's triggerCreateNewPR function
-                 const result = await pageContext.triggerCreateNewPR(
+                 const result = await triggerCreateNewPR( // Directly call context's triggerCreateNewPR
                      repoUrlForForm,
                      filesToCommit,
                      prTitle.trim(), 
@@ -533,7 +532,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
                      newBranchName
                  );
 
-                 if (result.success) { 
+                 if (result.success && result.prNumber) { 
                       toast.success(`PR #${result.prNumber} (${result.prUrl}) создан!`, { id: toastId, duration: 5000 }); 
                       await triggerGetOpenPRs(repoUrlForForm); 
                       logger.log(`[Handler CreateOrUpdatePR] New PR created: ${result.prUrl}`);
@@ -554,7 +553,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
          componentParsedFiles, selectedAssistantFiles, repoUrlForForm, prTitle, rawDescription, response, 
          validationIssues, targetBranchName, contextOpenPrs, 
          triggerUpdateBranch, 
-         pageContext.triggerCreateNewPR, // Using pageContext to access triggerCreateNewPR
+         triggerCreateNewPR, // Using context's triggerCreateNewPR
          setAssistantLoading, triggerGetOpenPRs, imageReplaceTask, setIsProcessingPR, addToast
      ]);
 
