@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { useAppContext } from "@/contexts/AppContext";
 import { motion } from "framer-motion";
-// Icons are now primarily rendered via VibeContentRenderer
-import { FaSpinner } from "react-icons/fa6"; // Keep for explicit loading state
+// Icons for direct use (e.g., loading spinner)
+import { FaSpinner } from "react-icons/fa6"; 
 
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import VibeContentRenderer from "@/components/VibeContentRenderer";
 import {
   fetchUserCyberFitnessProfile,
   CyberFitnessProfile,
-  // DailyActivity, // Not directly used if chart data is constructed from profile
+  DailyActivityRecord, // Import the correct type
 } from "@/hooks/cyberFitnessSupabase";
 import { format, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -32,12 +32,14 @@ const CHART_COLORS = [
   'hsl(var(--brand-orange))'
 ];
 
-const DEFAULT_WEEKLY_ACTIVITY_TEMPLATE = Array.from({ length: 7 }).map((_, i) => {
-   const day = startOfWeek(new Date(), { weekStartsOn: 1 }); 
-   const date = addDays(day, i);
+// Updated template to include all metrics for the tooltip
+const DEFAULT_WEEKLY_ACTIVITY_TEMPLATE: Array<DailyActivityRecord & { name: string; value: number; label: string }> = 
+  Array.from({ length: 7 }).map((_, i) => {
+   const dayOfWeek = startOfWeek(new Date(), { weekStartsOn: 1 }); 
+   const date = addDays(dayOfWeek, i);
    return {
-     name: format(date, 'EEE', { locale: ru }).substring(0, 2).toUpperCase(),
-     value: 0,
+     name: format(date, 'EEE', { locale: ru }).substring(0, 2).toUpperCase(), // ПН, ВТ etc.
+     value: 0, // This will be total Vibe Points for the bar height
      label: '0 VP', 
      date: format(date, 'yyyy-MM-dd'), 
      filesExtracted: 0,
@@ -61,20 +63,22 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.5, ease: "easeOut" } },
 };
 
-// Custom Tooltip for Recharts (already uses VibeContentRenderer correctly)
+// Enhanced Custom Tooltip for Recharts
 const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
+  if (active && payload && payload.length && payload[0].payload) {
+    const data: DailyActivityRecord & { value: number } = payload[0].payload; // Full daily data object
     return (
-      <div className="bg-dark-card/90 text-light-text p-2 rounded border border-border text-xs font-mono shadow-lg backdrop-blur-sm">
-        <p className="font-semibold text-brand-cyan mb-1">{`День: ${label} (${format(new Date(data.date), 'dd MMM', {locale: ru})})`}</p>
-        <p><VibeContentRenderer content="::FaBolt::" /> Очки Вайба: {payload[0].value.toFixed(0)}</p>
-        {data.focusTimeMinutes > 0 && <p><VibeContentRenderer content="::FaBrain::" /> Фокус: {data.focusTimeMinutes} мин</p>}
-        {data.kworkRequestsSent > 0 && <p><VibeContentRenderer content="::FaPaperPlane::" /> AI Запросы: {data.kworkRequestsSent}</p>}
-        {data.filesExtracted > 0 && <p><VibeContentRenderer content="::FaDownload::" /> Файлов извлечено: {data.filesExtracted}</p>}
-        {data.tokensProcessed > 0 && <p><VibeContentRenderer content="::FaRobot::" /> Токенов AI: {data.tokensProcessed.toLocaleString()}</p>}
-        {data.prsCreated > 0 && <p><VibeContentRenderer content="::FaGithub::" /> PR создано: {data.prsCreated}</p>}
-        {data.branchesUpdated > 0 && <p><VibeContentRenderer content="::FaCodeBranch::" /> Веток обновлено: {data.branchesUpdated}</p>}
+      <div className="bg-dark-card/95 backdrop-blur-sm text-light-text p-3 rounded-lg border border-brand-purple/50 shadow-xl text-xs font-mono">
+        <p className="font-bold text-brand-cyan mb-1.5">День: {label} ({format(new Date(data.date + "T00:00:00Z"), 'dd MMM', {locale: ru})})</p>
+        <p className="mb-1"><VibeContentRenderer content="::FaBolt::" /> <span className="font-semibold">Vibe Points:</span> {data.value.toFixed(0)}</p>
+        <div className="space-y-0.5 mt-1 border-t border-brand-purple/20 pt-1">
+            {data.focusTimeMinutes > 0 && <p><VibeContentRenderer content="::FaBrain::" /> Фокус: {data.focusTimeMinutes} мин</p>}
+            {data.kworkRequestsSent > 0 && <p><VibeContentRenderer content="::FaPaperPlane::" /> AI Запросы: {data.kworkRequestsSent}</p>}
+            {data.filesExtracted > 0 && <p><VibeContentRenderer content="::FaDownload::" /> Файлов в контекст: {data.filesExtracted}</p>}
+            {data.tokensProcessed > 0 && <p><VibeContentRenderer content="::FaRobot::" /> Токенов AI: {data.tokensProcessed.toLocaleString()}</p>}
+            {data.prsCreated > 0 && <p><VibeContentRenderer content="::FaGithub::" /> PR создано: {data.prsCreated}</p>}
+            {data.branchesUpdated > 0 && <p><VibeContentRenderer content="::FaCodeBranch::" /> Веток обновлено: {data.branchesUpdated}</p>}
+        </div>
       </div>
     );
   }
@@ -90,9 +94,9 @@ export default function Home() {
 
   useEffect(() => {
     const loadProfile = async () => {
-      logger.log(`[HomePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticating: ${isAuthenticating}, dbUser.user_id: ${dbUser?.user_id}, appContextError: ${appContextError?.message}`);
+      // logger.log(`[HomePage] loadProfile triggered. appLoading: ${appLoading}, isAuthenticating: ${isAuthenticating}, dbUser.user_id: ${dbUser?.user_id}, appContextError: ${appContextError?.message}`);
       if (appLoading || isAuthenticating) {
-        logger.log(`[HomePage] AppContext is still loading or authenticating. Waiting to fetch profile.`);
+        // logger.log(`[HomePage] AppContext is still loading or authenticating. Waiting to fetch profile.`);
         setProfileLoading(true); 
         return;
       }
@@ -103,17 +107,17 @@ export default function Home() {
             logger.error(`[HomePage] Error from AppContext: ${appContextError.message}. Cannot load profile. Defaulting to guest state.`);
              setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: ["investigate_anomaly"], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 System Anomaly", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
           } else if (dbUser?.user_id) {
-            logger.log(`[HomePage] Context resolved, fetching profile for user: ${dbUser.user_id}`);
+            // logger.log(`[HomePage] Context resolved, fetching profile for user: ${dbUser.user_id}`);
             const result = await fetchUserCyberFitnessProfile(dbUser.user_id);
             if (result.success && result.data) {
               setCyberProfile(result.data);
-              logger.log(`[HomePage] Profile loaded for ${dbUser.user_id}:`, result.data);
+              // logger.log(`[HomePage] Profile loaded for ${dbUser.user_id}:`, result.data);
             } else {
               logger.warn(`[HomePage] Failed to load profile for ${dbUser.user_id}. Error: ${result.error}. Defaulting to Alpha Error state.`);
               setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: [], completedQuests: [], unlockedPerks: [], achievements: [], cognitiveOSVersion: "v0.1 Alpha Error", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
             }
           } else {
-            logger.log(`[HomePage] Context resolved, no error, but no dbUser.user_id. Using guest profile.`);
+            // logger.log(`[HomePage] Context resolved, no error, but no dbUser.user_id. Using guest profile.`);
             setCyberProfile({ level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0, activeQuests: ["initial_boot_sequence"], completedQuests: [], unlockedPerks: ["Basic Interface"], achievements: [], cognitiveOSVersion: "v0.1 Guest Mode", lastActivityTimestamp: new Date(0).toISOString(), dailyActivityLog: [], totalFilesExtracted: 0, totalTokensProcessed: 0, totalKworkRequestsSent: 0, totalPrsCreated: 0, totalBranchesUpdated: 0, featuresUsed: {} });
           }
       } catch(e) {
@@ -155,7 +159,7 @@ export default function Home() {
   if (isLoading && !cyberProfile) { 
       return (
          <div className="min-h-screen bg-dark-bg flex flex-col items-center justify-center p-4 text-center"> 
-            <VibeContentRenderer content="::FaBrain className='text-5xl text-brand-pink animate-pulse mb-6'::" />
+            <FaSpinner className="text-5xl text-brand-pink animate-spin mb-6" />
             <p className="text-brand-pink font-orbitron text-xl animate-pulse tracking-widest">
               ЗАГРУЗКА ИНТЕРФЕЙСА АГЕНТА...
             </p>
@@ -163,22 +167,24 @@ export default function Home() {
       );
   }
 
-  const chartReadyWeeklyActivity = DEFAULT_WEEKLY_ACTIVITY_TEMPLATE.map(defaultDay => {
+  const chartReadyWeeklyActivity = DEFAULT_WEEKLY_ACTIVITY_TEMPLATE.map(templateDay => {
     const logEntry = cyberProfile?.dailyActivityLog?.find(
-      log => format(new Date(log.date + "T00:00:00Z"), 'yyyy-MM-dd') === defaultDay.date
+      log => log.date === templateDay.date
     );
     if (logEntry) {
+        // Calculate Vibe Points for the bar height
         const vibePoints = 
             (logEntry.filesExtracted * 0.1) +       
             (logEntry.tokensProcessed * 0.001) +   
             (logEntry.kworkRequestsSent * 5) +      
             (logEntry.prsCreated * 50) +           
-            (logEntry.branchesUpdated * 20) +      
+            (logEntry.branchesUpdated * 20) +       
             ((logEntry.focusTimeMinutes || 0) * 0.5); 
         return {
-            ...defaultDay, // Keep name and date from template
-            value: vibePoints,
-            label: `${vibePoints.toFixed(0)} VP`,
+            ...templateDay, // Keep name and date from template
+            value: vibePoints, // Total Vibe Points for the bar
+            label: `${vibePoints.toFixed(0)} VP`, // Label for the bar (optional, tooltip is primary)
+            // Pass through all individual metrics for the tooltip
             filesExtracted: logEntry.filesExtracted,
             tokensProcessed: logEntry.tokensProcessed,
             kworkRequestsSent: logEntry.kworkRequestsSent,
@@ -187,7 +193,7 @@ export default function Home() {
             focusTimeMinutes: logEntry.focusTimeMinutes || 0,
         };
     }
-    return defaultDay; 
+    return templateDay; // Return template day if no log entry for that specific day
 });
 
 
