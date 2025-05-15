@@ -4,70 +4,73 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import {
-  FaBrain, FaBolt, FaChartLine, FaWandMagicSparkles,
-  FaPenToSquare, 
-  FaRightFromBracket,
-  FaChevronRight, FaSpinner, 
-  FaListCheck, 
-  FaShieldHalved, FaStar, FaMedal, FaPaperPlane, FaCodeBranch, FaGithub, FaTree, FaCrosshairs, FaSearchengin, FaRobot, FaVial, FaPlus, FaDownload, FaCode,
-  FaCommentDots, FaGears, FaBroom, FaScroll, FaImages, FaKiwiBird, FaMobileScreenButton
-} from "react-icons/fa6";
+// Icons are now primarily rendered via VibeContentRenderer
+// Keep direct imports only if absolutely necessary for specific, non-dynamic cases.
+import { FaSpinner } from "react-icons/fa6"; // Keep for loading states if not using VibeContentRenderer there
+
 import { useState, useEffect } from "react";
-import Modal from "@/components/ui/Modal"; // Ensure this is correctly styled or uses ShadCN Dialog
+import Modal from "@/components/ui/Modal"; 
 import { toast } from "sonner";
 import {
   fetchUserCyberFitnessProfile,
   CyberFitnessProfile,
   getAchievementDetails,
   Achievement,
-  ALL_ACHIEVEMENTS 
 } from "@/hooks/cyberFitnessSupabase";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip as RechartsTooltip } from 'recharts';
 import VibeContentRenderer from "@/components/VibeContentRenderer";
 import Link from "next/link";
-import { format } from 'date-fns'; 
+import { format, startOfWeek, addDays } from 'date-fns'; 
 import { ru } from 'date-fns/locale'; 
 import { cn } from "@/lib/utils";
 
 const PLACEHOLDER_AVATAR = "/placeholders/cyber-agent-avatar.png";
-const DEFAULT_WEEKLY_ACTIVITY = Array.from({ length: 7 }).map((_, i) => {
-    const day = format(new Date(new Date().setDate(new Date().getDate() - 6 + i)), 'EE', { locale: ru });
-    return { name: day.toUpperCase(), value: 0, label: 'System Idle', filesExtracted: 0, tokensProcessed: 0 };
+
+const DEFAULT_WEEKLY_ACTIVITY_TEMPLATE = Array.from({ length: 7 }).map((_, i) => {
+    const day = startOfWeek(new Date(), { weekStartsOn: 1 }); 
+    const date = addDays(day, i);
+    return {
+      name: format(date, 'EE', { locale: ru }).toUpperCase().substring(0, 2),
+      value: 0,
+      label: '0', 
+      date: format(date, 'yyyy-MM-dd'), 
+      filesExtracted: 0,
+      tokensProcessed: 0,
+      kworkRequestsSent: 0,
+      prsCreated: 0,
+      branchesUpdated: 0,
+      focusTimeMinutes: 0,
+    };
 });
+
 const CHART_COLORS = [
   'hsl(var(--brand-cyan))', 'hsl(var(--brand-pink))', 'hsl(var(--brand-yellow))',
   'hsl(var(--brand-green))', 'hsl(var(--brand-orange))', 'hsl(var(--brand-purple))',
   'hsl(var(--neon-lime))'
 ];
 
-const getAchievementIconComponent = (iconName: string | undefined): React.ReactNode => {
-    if (!iconName) return <FaMedal className="text-brand-yellow" />;
-    const iconsMap: Record<string, React.ReactElement> = {
-        "FaVial": <FaVial className="text-brand-green" />,
-        "FaPaperPlane": <FaPaperPlane className="text-brand-cyan" />,
-        "FaCodeBranch": <FaCodeBranch className="text-brand-purple" />,
-        "FaGithub": <FaGithub className="text-light-text" />, 
-        "FaTree": <FaTree className="text-brand-green" />,
-        "FaCrosshairs": <FaCrosshairs className="text-red-500" />, 
-        "FaSearchengin": <FaSearchengin className="text-brand-blue" />,
-        "FaRobot": <FaRobot className="text-brand-pink" />,
-        "FaStar": <FaStar className="text-brand-yellow" />,
-        "FaPlus": <FaPlus className="text-neon-lime" />, 
-        "FaBolt": <FaBolt className="text-orange-500" />, 
-        "FaDownload": <FaDownload className="text-blue-400" />,
-        "FaCode": <FaCode className="text-purple-400" />,
-        "FaCommentDots": <FaCommentDots className="text-teal-400" />,
-        "FaGears": <FaGears className="text-gray-400" />,
-        "FaBroom": <FaBroom className="text-orange-400" />,
-        "FaScroll": <FaScroll className="text-yellow-600" />,
-        "FaImages": <FaImages className="text-indigo-400" />,
-        "FaKiwiBird": <FaKiwiBird className="text-lime-500" />,
-        "FaMobileScreenButton": <FaMobileScreenButton className="text-brand-cyan" />,
-    };
-    return iconsMap[iconName] || <FaMedal className="text-brand-yellow" />; // Default icon
-};
+// getAchievementIconComponent is no longer needed here as VCR handles icons
+// const getAchievementIconComponent = (iconName: string | undefined): React.ReactNode => { ... }
+
+const CustomTooltipContent = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload; 
+      return (
+        <div className="bg-dark-card/95 backdrop-blur-sm text-light-text p-3 rounded-lg border border-brand-purple/50 shadow-xl text-xs font-mono">
+          <p className="font-bold text-brand-cyan mb-1">День: {label} ({format(new Date(data.date), 'dd MMM', {locale: ru})})</p>
+          <p><VibeContentRenderer content="::FaBolt::" /> Очки Вайба: {payload[0].value.toFixed(0)}</p>
+          {data.focusTimeMinutes > 0 && <p><VibeContentRenderer content="::FaBrain::" /> Фокус: {data.focusTimeMinutes} мин</p>}
+          {data.kworkRequestsSent > 0 && <p><VibeContentRenderer content="::FaPaperPlane::" /> AI Запросы: {data.kworkRequestsSent}</p>}
+          {data.filesExtracted > 0 && <p><VibeContentRenderer content="::FaDownload::" /> Файлов извлечено: {data.filesExtracted}</p>}
+          {data.tokensProcessed > 0 && <p><VibeContentRenderer content="::FaRobot::" /> Токенов AI: {data.tokensProcessed.toLocaleString()}</p>}
+          {data.prsCreated > 0 && <p><VibeContentRenderer content="::FaGithub::" /> PR создано: {data.prsCreated}</p>}
+          {data.branchesUpdated > 0 && <p><VibeContentRenderer content="::FaCodeBranch::" /> Веток обновлено: {data.branchesUpdated}</p>}
+        </div>
+      );
+    }
+    return null;
+  };
 
 export default function ProfilePage() {
   const appContext = useAppContext();
@@ -170,38 +173,53 @@ export default function ProfilePage() {
   const cognitiveOS = safeCyberProfile.cognitiveOSVersion;
   const unlockedPerks = safeCyberProfile.unlockedPerks;
   const achievements = safeCyberProfile.achievements;
-  const focusTime = safeCyberProfile.focusTimeHours || 0;
+  const focusTime = parseFloat(safeCyberProfile.focusTimeHours.toFixed(1)) || 0;
   
-  const displayWeeklyActivity = safeCyberProfile.dailyActivityLog && safeCyberProfile.dailyActivityLog.length > 0
-    ? safeCyberProfile.dailyActivityLog.map(log => {
-        const date = new Date(log.date + "T00:00:00Z"); 
-        return {
-            name: format(date, 'EE', { locale: ru }).toUpperCase(),
-            value: (log.filesExtracted * 50) + (log.tokensProcessed * 0.1) + (log.kworkRequestsSent || 0) * 10 + (log.prsCreated || 0) * 200 + (log.branchesUpdated || 0) * 100,
-            label: `${log.filesExtracted}f, ${log.tokensProcessed}t, ${log.kworkRequestsSent || 0}req`,
-            filesExtracted: log.filesExtracted,
-            tokensProcessed: log.tokensProcessed,
-            kworkRequestsSent: log.kworkRequestsSent || 0,
-            prsCreated: log.prsCreated || 0,
-            branchesUpdated: log.branchesUpdated || 0,
-        };
-      }).slice(-7) 
-    : DEFAULT_WEEKLY_ACTIVITY;
+  const displayWeeklyActivity = DEFAULT_WEEKLY_ACTIVITY_TEMPLATE.map(templateDay => {
+    const logEntry = safeCyberProfile.dailyActivityLog?.find(log => log.date === templateDay.date);
+    if (logEntry) {
+      const vibePoints = 
+        (logEntry.filesExtracted * 0.1) +       
+        (logEntry.tokensProcessed * 0.001) +    
+        (logEntry.kworkRequestsSent * 5) +      
+        (logEntry.prsCreated * 50) +            
+        (logEntry.branchesUpdated * 20) +       
+        ((logEntry.focusTimeMinutes || 0) * 0.5); 
+      return {
+        ...templateDay,
+        value: vibePoints,
+        label: `${vibePoints.toFixed(0)} VP`,
+        filesExtracted: logEntry.filesExtracted,
+        tokensProcessed: logEntry.tokensProcessed,
+        kworkRequestsSent: logEntry.kworkRequestsSent,
+        prsCreated: logEntry.prsCreated,
+        branchesUpdated: logEntry.branchesUpdated,
+        focusTimeMinutes: logEntry.focusTimeMinutes || 0,
+      };
+    }
+    return templateDay; 
+  });
+
 
   const stats = [
-    { label: "KiloVibes", value: kiloVibes.toLocaleString(), icon: <FaBolt className="text-brand-yellow text-3xl" /> },
-    { label: "Deep Work (ч)", value: focusTime, icon: <FaBrain className="text-brand-pink text-3xl" /> },
-    { label: "Достижений", value: achievements.length, icon: <FaStar className="text-neon-lime text-3xl" /> },
-    { label: "Запросов к AI", value: safeCyberProfile.totalKworkRequestsSent, icon: <FaPaperPlane className="text-brand-cyan text-3xl" /> },
-    { label: "PR Создано", value: safeCyberProfile.totalPrsCreated, icon: <FaGithub className="text-light-text text-3xl" /> },
-    { label: "Веток Обновлено", value: safeCyberProfile.totalBranchesUpdated, icon: <FaCodeBranch className="text-brand-purple text-3xl" /> },
-    { label: "Извлечено Файлов", value: safeCyberProfile.totalFilesExtracted, icon: <FaPlus className="text-brand-green text-3xl" /> },
-    { label: "Токенов AI", value: (safeCyberProfile.totalTokensProcessed).toLocaleString(), icon: <FaRobot className="text-brand-pink text-3xl" /> },
+    { label: "KiloVibes", value: kiloVibes.toLocaleString(), icon: "::FaBolt className='text-brand-yellow text-3xl'::", tooltip: "Общее количество очков энергии Агента." },
+    { label: "Deep Work (ч)", value: focusTime.toLocaleString(), icon: "::FaBrain className='text-brand-pink text-3xl'::", tooltip: "Суммарное время глубокой сфокусированной работы." },
+    { label: "Достижения", value: achievements.length, icon: "::FaStar className='text-neon-lime text-3xl'::", tooltip: "Количество разблокированных уникальных достижений." },
+    { label: "AI Запросы", value: safeCyberProfile.totalKworkRequestsSent.toLocaleString(), icon: "::FaPaperPlane className='text-brand-cyan text-3xl'::", tooltip: "Всего отправлено запросов к AI ассистентам." },
+    { label: "PR Создано", value: safeCyberProfile.totalPrsCreated.toLocaleString(), icon: "::FaGithub className='text-light-text text-3xl'::", tooltip: "Всего создано Pull Request'ов через студию." },
+    { label: "Веток Обновлено", value: safeCyberProfile.totalBranchesUpdated.toLocaleString(), icon: "::FaCodeBranch className='text-brand-purple text-3xl'::", tooltip: "Всего обновлено веток в репозиториях." },
+    { label: "Файлов в Контекст", value: safeCyberProfile.totalFilesExtracted.toLocaleString(), icon: "::FaDownload className='text-brand-green text-3xl'::", tooltip: "Всего файлов добавлено в контекст для AI." },
+    { label: "Токенов AI", value: (safeCyberProfile.totalTokensProcessed).toLocaleString(), icon: "::FaRobot className='text-brand-pink text-3xl'::", tooltip: "Примерное количество токенов, обработанных AI на основе ваших запросов." },
   ];
 
   const handleLogout = () => {
     toast.info("Функция выхода из системы в разработке. CyberVibe OS тебя не отпустит так просто!");
   };
+  
+  const handleFakeDoorClick = (featureName: string) => {
+    toast.info(`Функция "${featureName}" находится в активной разработке и скоро будет доступна!`);
+  };
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pt-24 pb-16">
@@ -238,13 +256,13 @@ export default function ProfilePage() {
           <CardContent className="space-y-8 p-6 md:p-8">
             <section>
               <h2 className="text-2xl font-orbitron text-brand-pink mb-4 flex items-center gap-2 text-shadow-neon">
-                <FaChartLine />Кибер-Метрики Агента
+                <VibeContentRenderer content="::FaChartLine::" />Кибер-Метрики Агента
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {stats.map((stat) => (
-                  <Card key={stat.label} className="bg-dark-bg/80 p-4 text-center border border-brand-cyan/40 hover:shadow-brand-cyan/30 hover:shadow-lg transition-all duration-300 rounded-lg hover:border-brand-cyan/70 hover:-translate-y-1">
-                    <div className="mb-2 mx-auto">{stat.icon}</div>
-                    <p className="text-2xl font-orbitron font-bold text-light-text">{stat.value}</p>
+                  <Card key={stat.label} className="bg-dark-bg/80 p-3 sm:p-4 text-center border border-brand-cyan/40 hover:shadow-brand-cyan/30 hover:shadow-lg transition-all duration-300 rounded-lg hover:border-brand-cyan/70 hover:-translate-y-1 cursor-help" title={stat.tooltip}>
+                    <div className="mb-1.5 sm:mb-2 mx-auto text-2xl sm:text-3xl"><VibeContentRenderer content={stat.icon} /></div>
+                    <p className="text-xl sm:text-2xl font-orbitron font-bold text-light-text">{stat.value}</p>
                     <p className="text-xs text-muted-foreground font-mono uppercase tracking-tight leading-tight">{stat.label}</p>
                   </Card>
                 ))}
@@ -253,7 +271,7 @@ export default function ProfilePage() {
 
             <section>
                 <h2 className="text-2xl font-orbitron text-brand-green mb-4 flex items-center gap-2 text-shadow-neon">
-                    <FaListCheck />Недельная Активность (Vibe Points)
+                    <VibeContentRenderer content="::FaListCheck::" />Недельная Активность (Vibe Points)
                 </h2>
                 <Card className="bg-dark-bg/80 p-4 border border-brand-green/40 rounded-lg shadow-md">
                     <div className="h-[150px] w-full"> 
@@ -263,27 +281,7 @@ export default function ProfilePage() {
                             <YAxis hide={true} domain={[0, 'dataMax + 100']} />
                             <RechartsTooltip
                                 cursor={{ fill: 'hsla(var(--brand-purple), 0.15)' }}
-                                contentStyle={{
-                                    backgroundColor: 'hsla(var(--dark-card-rgb), 0.9)', 
-                                    borderColor: 'hsl(var(--brand-purple))',
-                                    borderRadius: '0.5rem',
-                                    color: 'hsl(var(--light-text))',
-                                    fontSize: '0.8rem', 
-                                    fontFamily: 'monospace',
-                                    boxShadow: '0 0 10px hsla(var(--brand-purple), 0.3)'
-                                }}
-                                itemStyle={{ color: 'hsl(var(--brand-yellow))' }}
-                                labelStyle={{ color: 'hsl(var(--brand-cyan))', fontWeight: 'bold', marginBottom: '4px' }}
-                                formatter={(value: number, name, props) => {
-                                    const payload = props.payload as typeof displayWeeklyActivity[0];
-                                    const details = [];
-                                    if (payload.filesExtracted > 0) details.push(`${payload.filesExtracted}f`);
-                                    if (payload.tokensProcessed > 0) details.push(`${payload.tokensProcessed}t`);
-                                    if (payload.kworkRequestsSent > 0) details.push(`${payload.kworkRequestsSent}req`);
-                                    if (payload.prsCreated > 0) details.push(`${payload.prsCreated}PR`);
-                                    if (payload.branchesUpdated > 0) details.push(`${payload.branchesUpdated}Br`);
-                                    return [`${value.toFixed(0)} VP`, details.join(', ') || 'Простой'];
-                                }}
+                                content={<CustomTooltipContent />}
                             />
                             <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={25} minPointSize={3}>
                             {displayWeeklyActivity.map((entry, index) => (
@@ -298,13 +296,13 @@ export default function ProfilePage() {
 
             <section>
               <h2 className="text-2xl font-orbitron text-brand-yellow mb-4 flex items-center gap-2 text-shadow-neon">
-                <FaWandMagicSparkles />Разблокированные Перки
+                <VibeContentRenderer content="::FaWandMagicSparkles::" />Разблокированные Перки ({unlockedPerks.length})
               </h2>
               <div className="p-4 bg-dark-bg/80 rounded-lg border border-brand-yellow/40 space-y-2 shadow-md">
                 {unlockedPerks.length > 0 ? (
                   unlockedPerks.slice(0, 3).map((perk, index) => (
                     <div key={index} className="flex items-center text-sm text-light-text font-mono">
-                      <FaBolt className="text-brand-yellow mr-2 text-xs" /> {perk}
+                      <VibeContentRenderer content="::FaBolt className='text-brand-yellow mr-2 text-xs'::" /> {perk}
                     </div>
                   ))
                 ) : (
@@ -312,7 +310,7 @@ export default function ProfilePage() {
                 )}
                 {(unlockedPerks.length > 3 || unlockedPerks.length === 0) && (
                   <Button variant="link" size="sm" className="text-brand-yellow p-0 h-auto font-mono text-xs hover:text-yellow-300" onClick={() => setIsPerksModalOpen(true)}>
-                    {unlockedPerks.length > 3 ? `Показать все (${unlockedPerks.length})` : "Узнать о Перках"} <FaChevronRight className="ml-1 w-3 h-3"/>
+                    {unlockedPerks.length > 3 ? `Показать все (${unlockedPerks.length})` : "Узнать о Перках"} <VibeContentRenderer content="::FaChevronRight className='ml-1 w-3 h-3'::" />
                   </Button>
                 )}
               </div>
@@ -320,7 +318,7 @@ export default function ProfilePage() {
 
             <section>
               <h2 className="text-2xl font-orbitron text-neon-lime mb-4 flex items-center gap-2 text-shadow-neon">
-                <FaStar />Достижения Агента
+                <VibeContentRenderer content="::FaStar::" />Достижения Агента ({achievements.length})
               </h2>
               <div className="p-4 bg-dark-bg/80 rounded-lg border border-neon-lime/40 space-y-2 shadow-md">
                 {achievements.length > 0 ? (
@@ -328,7 +326,10 @@ export default function ProfilePage() {
                     const achievement = getAchievementDetails(achId);
                     return (
                       <div key={achId} className="flex items-center text-sm text-light-text font-mono" title={achievement?.description}>
-                        {getAchievementIconComponent(achievement?.icon)} <span className="ml-2">{achievement?.name || achId}</span>
+                         <span className="mr-2 w-4 h-4 flex items-center justify-center">
+                             <VibeContentRenderer content={`::${achievement?.icon || 'FaMedal'} className='text-brand-yellow'::`} />
+                         </span>
+                         <span>{achievement?.name || achId}</span>
                       </div>
                     );
                   })
@@ -337,25 +338,62 @@ export default function ProfilePage() {
                 )}
                 {(achievements.length > 3 || achievements.length === 0) && (
                    <Button variant="link" size="sm" className="text-neon-lime p-0 h-auto font-mono text-xs hover:text-lime-300" onClick={() => setIsAchievementsModalOpen(true)}>
-                     {achievements.length > 3 ? `Показать все (${achievements.length})` : "Мои Достижения"} <FaChevronRight className="ml-1 w-3 h-3"/>
+                     {achievements.length > 3 ? `Показать все (${achievements.length})` : "Мои Достижения"} <VibeContentRenderer content="::FaChevronRight className='ml-1 w-3 h-3'::" />
                    </Button>
                 )}
               </div>
             </section>
 
+            {/* Fake Doors Section */}
+            <section>
+                <h2 className="text-2xl font-orbitron text-brand-blue mb-4 flex items-center gap-2 text-shadow-neon">
+                    <VibeContentRenderer content="::FaCogs::" /> Системные Модули (Скоро)
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="bg-dark-bg/70 border-brand-blue/30 hover:border-brand-blue/60 transition-colors">
+                        <CardHeader>
+                            <CardTitle className="text-brand-blue text-lg font-orbitron flex items-center gap-2"><VibeContentRenderer content="::FaPlug::" /> Мои Интеграции</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-xs text-muted-foreground font-mono mb-3">Подключение к GitHub, Vercel, Telegram Apps и другим сервисам.</p>
+                            <Button variant="outline" className="border-brand-blue/50 text-brand-blue/80 hover:bg-brand-blue/10 hover:text-brand-blue w-full text-xs" onClick={() => handleFakeDoorClick("Управление Интеграциями")}>Управлять (WIP)</Button>
+                        </CardContent>
+                    </Card>
+                     <Card className="bg-dark-bg/70 border-brand-blue/30 hover:border-brand-blue/60 transition-colors">
+                        <CardHeader>
+                            <CardTitle className="text-brand-blue text-lg font-orbitron flex items-center gap-2"><VibeContentRenderer content="::FaUserAstronaut::" /> Мои XTR Автоматизации</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-xs text-muted-foreground font-mono mb-3">Создание и управление кастомными сценариями автоматизации CyberVibe.</p>
+                             <Button variant="outline" className="border-brand-blue/50 text-brand-blue/80 hover:bg-brand-blue/10 hover:text-brand-blue w-full text-xs" onClick={() => handleFakeDoorClick("Конструктор XTR")}>Конструктор XTR (WIP)</Button>
+                        </CardContent>
+                    </Card>
+                     <Card className="bg-dark-bg/70 border-brand-blue/30 hover:border-brand-blue/60 transition-colors md:col-span-2">
+                        <CardHeader>
+                            <CardTitle className="text-brand-blue text-lg font-orbitron flex items-center gap-2"><VibeContentRenderer content="::FaChartPie::" /> Статистика Продуктивности</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-xs text-muted-foreground font-mono mb-3">Детальные графики вашей активности, эффективности и прогресса по скиллам.</p>
+                            <Button variant="outline" className="border-brand-blue/50 text-brand-blue/80 hover:bg-brand-blue/10 hover:text-brand-blue w-full text-xs" onClick={() => handleFakeDoorClick("Дашборд Продуктивности")}>Открыть Дашборд (WIP)</Button>
+                        </CardContent>
+                    </Card>
+                </div>
+            </section>
+
+
             <section className="flex flex-col sm:flex-row gap-4 mt-8">
               <Button 
                 onClick={() => setIsEditModalOpen(true)}
-                className="flex-1 bg-brand-cyan text-black hover:bg-brand-cyan/80 font-orbitron shadow-lg hover:shadow-brand-cyan/50 transition-all py-3 text-base"
+                className="flex-1 bg-brand-cyan text-black hover:bg-brand-cyan/80 font-orbitron shadow-lg hover:shadow-brand-cyan/50 transition-all py-3 text-base flex items-center justify-center"
               >
-                <FaPenToSquare className="mr-2" /> Изменить Профиль
+                <VibeContentRenderer content="::FaPenToSquare::" /><span className="ml-2">Изменить Профиль</span>
               </Button>
               <Button 
                 onClick={handleLogout}
                 variant="outline" 
-                className="flex-1 border-brand-red text-brand-red hover:bg-brand-red/20 hover:text-white font-orbitron shadow-lg hover:shadow-brand-red/50 transition-all py-3 text-base"
+                className="flex-1 border-brand-red text-brand-red hover:bg-brand-red/20 hover:text-white font-orbitron shadow-lg hover:shadow-brand-red/50 transition-all py-3 text-base flex items-center justify-center"
               >
-                <FaRightFromBracket className="mr-2" /> Деавторизация
+                <VibeContentRenderer content="::FaRightFromBracket::" /><span className="ml-2">Деавторизация</span>
               </Button>
             </section>
           </CardContent>
@@ -368,7 +406,7 @@ export default function ProfilePage() {
         title="Редактирование Профиля Агента"
         confirmText="Сохранить Изменения"
         onConfirm={() => {
-          toast.info("Функция редактирования профиля в разработке.");
+          handleFakeDoorClick("Сохранение изменений профиля");
           setIsEditModalOpen(false);
         }}
         dialogClassName="bg-dark-card border-brand-purple text-light-text"
@@ -395,8 +433,8 @@ export default function ProfilePage() {
                 <ul className="list-none space-y-2.5">
                 {unlockedPerks.map((perk, index) => (
                     <li key={index} className="flex items-center p-3 bg-dark-bg/70 rounded-md border border-brand-purple/60 shadow-sm hover:border-brand-purple transition-colors">
-                        <FaShieldHalved className="text-brand-purple mr-3 text-xl flex-shrink-0"/>
-                        <VibeContentRenderer content={perk} className="text-sm" />
+                        <VibeContentRenderer content="::FaShieldHalved className='text-brand-purple mr-3 text-xl flex-shrink-0'::" />
+                        <VibeContentRenderer content={perk} className="text-sm" /> {/* Perk text itself */}
                     </li>
                 ))}
                 </ul>
@@ -425,7 +463,9 @@ export default function ProfilePage() {
                     return (
                         <div key={achievement.id} className="p-3.5 bg-dark-bg/70 border border-neon-lime/60 rounded-lg transform hover:scale-[1.02] transition-transform duration-200 ease-out hover:shadow-md hover:shadow-neon-lime/30">
                             <div className="flex items-center mb-1">
-                                <span className="text-2xl mr-3">{getAchievementIconComponent(achievement.icon)}</span>
+                                <span className="text-2xl mr-3">
+                                    <VibeContentRenderer content={`::${achievement.icon || 'FaMedal'}::`} />
+                                </span>
                                 <h4 className="text-md font-orbitron font-semibold text-neon-lime">{achievement.name}</h4>
                             </div>
                             <p className="text-xs text-muted-foreground font-mono ml-9">{achievement.description}</p>
