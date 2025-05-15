@@ -75,7 +75,7 @@ const StickyChatButton: React.FC = () => {
     // --- Hooks ---
     const currentPath = usePathname(); 
     const router = useRouter(); 
-    const { user: appContextUser, isLoading: isAppLoading, dbUser } = useAppContext(); 
+    const { user: appContextUser, isLoading: isAppLoading, dbUser } = useAppContext(); // appContextUser.id is TG ID (number), dbUser.user_id is Supabase Auth ID (string)
     const { success: toastSuccess, error: toastError, info: toastInfo, addToast } = useAppToast();
 
     const enableInactivityOpen = currentPath !== '/repo-xml';
@@ -148,7 +148,7 @@ const StickyChatButton: React.FC = () => {
             setLogsCopied(true);
             setTimeout(() => setLogsCopied(false), 2000); 
 
-            if (dbUser?.user_id) {
+            if (dbUser?.user_id) { // Use dbUser.user_id (string) for Supabase
                 logger.debug(`[StickyChatButton handleCopyLogs] Attempting to log 'copy_logs_used' for user ${dbUser.user_id}.`);
                 const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'copy_logs_used');
                 newAchievements?.forEach(ach => {
@@ -257,7 +257,7 @@ const StickyChatButton: React.FC = () => {
             setCustomIdea(""); 
             setPotentialOldImageUrl(null); 
             setLogsCopied(false); 
-            if(dbUser?.user_id){ // Corrected to user_id
+            if(dbUser?.user_id){ // Use dbUser.user_id (string) for Supabase
                 logger.debug(`[StickyChatButton handleFabClick] User ${dbUser.user_id} opened chat. Attempting to log feature 'sticky_chat_opened'.`);
                 const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'sticky_chat_opened');
                 newAchievements?.forEach(ach => {
