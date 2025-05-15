@@ -97,7 +97,7 @@ const vibeSchematics: VibeSchematic[] = [
     id: "error_fix_pro",
     name: "Схема 'БАГ-ХАНТЕР ПРО'",
     icon: "FaBugSlash",
-    description: "Мастерски устраняй ошибки, используя логи и контекст для точного удара по багам.",
+    description: "Мастерски устраняй ошибки, используя логи и контекст для точного удара по багам. Совет: Оверлей ошибок (Ctrl+Shift+E) покажет детали!",
     details: [
       { label: "ВЫГОДА", content: "Быстрое и эффективное исправление ошибок, повышение стабильности кода.", icon: "FaShieldHalved" },
       { label: "МЕХАНИКА", content: "Запускай ErrorFix Flow из Оверлея Ошибок -> Внимательно изучай логи в KWork -> Предоставляй AI максимально точный контекст (1-3 файла).", icon: "FaToolbox" },
@@ -115,7 +115,7 @@ const vibeSchematics: VibeSchematic[] = [
     id: "contextual_code_gen",
     name: "Схема 'КОНТЕКСТНЫЙ ГЕНЕЗИС'",
     icon: "FaMagicWandSparkles", 
-    description: "Генерируй новый код и фичи, предоставляя AI обширный и релевантный контекст.",
+    description: "Генерируй новый код и фичи, предоставляя AI обширный и релевантный контекст. Используй StickyChat (::FaCommentDots::) для быстрого добавления файлов.",
     details: [
       { label: "ВЫГОДА", content: "Создание сложных компонентов или новой функциональности с пониманием AI зависимостей.", icon: "FaLightbulb" },
       { label: "МЕХАНИКА", content: "Используй 'Выбрать Связанные Файлы' -> 'Добавить все файлы + дерево' -> Точно формулируй задачу для AI.", icon: "FaToolbox" },
@@ -152,11 +152,11 @@ const vibeSchematics: VibeSchematic[] = [
     id: "image_guru",
     name: "Схема 'ВИЗУАЛЬНЫЙ АЛХИМИК'",
     icon: "FaImage", 
-    description: "Мастерски управляй изображениями: от замены битых ссылок до генерации плейсхолдеров и загрузки новых ассетов.",
+    description: "Мастерски управляй изображениями: от замены битых ссылок до генерации плейсхолдеров и загрузки новых ассетов. Этот флоу уже автоматизирован через StickyChat!",
     details: [
       { label: "ВЫГОДА", content: "Всегда актуальные и рабочие изображения в проекте, эстетичный UI.", icon: "FaPalette" },
-      { label: "МЕХАНИКА", content: "Используй ImageReplace Flow (Lv.1) для быстрых фиксов. Для новых картинок – Модальное Окно Картинок в Ассистенте -> prompts_imgs.txt -> AI генерит ссылки.", icon: "FaToolbox"},
-      { label: "АРСЕНАЛ", content: "AutomationBuddy, StickyChat, AI Assistant (Image Tools), prompts_imgs.txt.", icon: "FaImages"},
+      { label: "МЕХАНИКА", content: "Введи URL битой картинки в StickyChat -> Выбери 'Заменить Картинку' -> Загрузи новую или вставь URL -> Студия создаст авто-PR.", icon: "FaToolbox"},
+      { label: "АРСЕНАЛ", content: "StickyChat (ImageReplaceTool), AI Assistant (Image Upload), prompts_imgs.txt.", icon: "FaImages"},
       { label: "ТРЕБУЕТ", content: "Ачивка 'Визуальный Коннект', Перк 'Авто-PR для Замены Изображений'.", icon: "FaLink"}
     ],
     prerequisites: ["level:2", "featureUsed:image_modal_opened", "perk:Авто-PR для Замены Изображений"],
@@ -170,11 +170,11 @@ const vibeSchematics: VibeSchematic[] = [
     id: "icon_fixer_pro",
     name: "Схема 'ЛОВЕЦ ИКОНОК ПРО'",
     icon: "FaCrosshairs", 
-    description: "Найди и исправь пропавшие или некорректные иконки FontAwesome, используя логи VibeContentRenderer и AI-помощника.",
+    description: "Найди и исправь пропавшие или некорректные иконки FontAwesome. Совет: Используй StickyChat (::FaCommentDots::) для быстрого доступа к файлам, если нужно править код вручную, или Оверлей Ошибок для логов.",
     details: [
-      { label: "АНАЛИЗ", content: "Скопируй логи (ачивка 'Диагност') -> Найди предупреждение VCR об `<неизвестной_иконке>`.", icon: "FaClipboardList"},
+      { label: "АНАЛИЗ", content: "Скопируй логи (ачивка 'Диагност') из консоли браузера или Оверлея Ошибок (Ctrl+Shift+E) -> Найди предупреждение VCR об `<неизвестной_иконке>`.", icon: "FaClipboardList"},
       { label: "ПОИСК", content: "Используй ::FaSearch className='inline':: FontAwesome Search (перк 'Самостоятельный Поиск Иконок FontAwesome') для подбора корректного имени.", icon: "FaSearch"},
-      { label: "ЗАМЕНА", content: "Внеси правку в код вручную или через 'Magic Swap' / 'Search/Replace' в AI Assistant (фича 'settings_opened' для доступа).", icon: "FaTools"}
+      { label: "ЗАМЕНА", content: "Внеси правку в код вручную или через 'Magic Swap' / 'Search/Replace' в AI Assistant (фича 'settings_opened' для доступа к этим инструментам).", icon: "FaTools"}
     ],
     prerequisites: ["level:4", "achievement:copy_logs_used", "perk:Самостоятельный Поиск Иконок FontAwesome", "featureUsed:settings_opened"],
     outcome: "Все иконки на месте, UI сияет! + Чистая консоль.",
@@ -198,18 +198,28 @@ export default function VibeSchematicsPage() {
   const fetchProfile = useCallback(async () => {
     if (dbUser?.user_id) {
       setIsLoadingProfile(true);
-      const result = await fetchUserCyberFitnessProfile(dbUser.user_id);
-      if (result.success && result.data) {
-        setCurrentUserProfile(result.data);
-      } else {
-        logger.warn("[VibeSchematicsPage] Failed to fetch user profile.", { error: result.error });
+      try {
+        const result = await fetchUserCyberFitnessProfile(dbUser.user_id);
+        if (result.success && result.data) {
+          setCurrentUserProfile(result.data);
+        } else {
+          logger.warn("[VibeSchematicsPage] Failed to fetch user profile.", { error: result.error });
+          toast.error("Ошибка загрузки профиля Агента. Попробуйте снова."); // Toast on explicit failure
+        }
+      } catch (error) {
+        logger.error("[VibeSchematicsPage] Exception fetching profile:", error);
+        toast.error("Критическая ошибка при загрузке профиля.");
+      } finally {
+        setIsLoadingProfile(false);
       }
-      setIsLoadingProfile(false);
     } else {
         setCurrentUserProfile(null); 
         setIsLoadingProfile(false);
+        if (dbUser === null) { // Only show if we know there's no user, not just initially undefined
+             logger.info("[VibeSchematicsPage] No authenticated user. Schematics unavailable.");
+        }
     }
-  }, [dbUser?.user_id]); // Dependency on dbUser.user_id
+  }, [dbUser?.user_id]); // Switched dbUser to dbUser.user_id
 
   useEffect(() => {
     fetchProfile();
@@ -218,10 +228,9 @@ export default function VibeSchematicsPage() {
   const handleActivateSchematic = useCallback(async (schematic: VibeSchematic) => {
     if (!dbUser?.user_id) {
         toast.error("Профиль Агента не авторизован. Попробуйте обновить страницу.");
-        setActivatingSchematicId(null); // Reset loading state on early exit
-        return;
+        return; // No need to reset activatingSchematicId if it wasn't set
     }
-    if (activatingSchematicId === schematic.id) return; 
+    if (activatingSchematicId) return; // Already processing one
 
     setActivatingSchematicId(schematic.id);
     const activationToastId = toast.loading(`Активация схемы "${schematic.name}"...`);
@@ -251,7 +260,7 @@ export default function VibeSchematicsPage() {
                 if (result.newAchievements && result.newAchievements.length > 0) { rewards.push(...result.newAchievements.map(a => `Ачивка: ${a.name}`)); }
                 rewardDescription = rewards.length > 0 ? `Разблокировано: ${rewards.join(', ')}` : "Продолжайте в том же духе!";
                 
-                toast.success(message, { id: activationToastId, description: rewardDescription, duration: 7000 });
+                addToast(message, "success", 7000, { id: activationToastId, description: rewardDescription }); // Use addToast from context
                 await fetchProfile(); 
             }
         } else {
@@ -261,9 +270,9 @@ export default function VibeSchematicsPage() {
         logger.error(`[VibeSchematicsPage] Critical error activating schematic ${schematic.id}:`, error);
         toast.error(`Критическая ошибка: ${error.message || 'Неизвестно'}`, { id: activationToastId, duration: 6000 });
     } finally {
-        setActivatingSchematicId(null);
+        setActivatingSchematicId(null); // Reset loading state here
     }
-  }, [dbUser?.user_id, activatingSchematicId, fetchProfile, addToast]); // addToast was missing from dep array for `toast` usage
+  }, [dbUser?.user_id, activatingSchematicId, fetchProfile, addToast]);
 
   const checkPrerequisites = useCallback((schematic: VibeSchematic, profile: CyberFitnessProfile | null): { met: boolean; missing: string[] } => {
     if (!profile) return { met: false, missing: ["Загрузка профиля..."] }; 
@@ -323,7 +332,7 @@ export default function VibeSchematicsPage() {
                     <p className="mt-2 font-mono text-muted-foreground">Загрузка данных Агента...</p>
                 </div>
             )}
-            {!isLoadingProfile && !currentUserProfile && dbUser && (
+            {!isLoadingProfile && !currentUserProfile && dbUser && ( // Profile fetch failed for logged in user
                  <div className="text-center py-10">
                     <VibeContentRenderer content="::FaExclamationTriangle className='text-4xl text-brand-red mx-auto'::" />
                     <p className="mt-2 font-mono text-muted-foreground">Не удалось загрузить профиль Агента. Попробуйте обновить страницу.</p>
@@ -332,7 +341,7 @@ export default function VibeSchematicsPage() {
                     </Button>
                 </div>
             )}
-            {!isLoadingProfile && !dbUser && (
+            {!isLoadingProfile && !dbUser && ( // No user logged in
                  <div className="text-center py-10">
                     <VibeContentRenderer content="::FaUserSecret className='text-4xl text-brand-blue mx-auto'::" />
                     <p className="mt-2 font-mono text-muted-foreground">Для доступа к Схемам Вайба необходима Авторизация.</p>
@@ -350,16 +359,9 @@ export default function VibeSchematicsPage() {
 
               let statusLabel = "ЗАГРУЗКА...";
               let statusColor = "bg-muted/80 text-muted-foreground";
-              if (isCompleted) {
-                  statusLabel = "ОСВОЕНО";
-                  statusColor = "bg-brand-green/90 text-black";
-              } else if (prereqStatus.met) {
-                  statusLabel = "ДОСТУПНО";
-                  statusColor = "bg-brand-cyan/80 text-black";
-              } else {
-                  statusLabel = "ЗАБЛОКИРОВАНО";
-                  statusColor = "bg-destructive/80 text-destructive-foreground";
-              }
+              if (isCompleted) { statusLabel = "ОСВОЕНО"; statusColor = "bg-brand-green/90 text-black"; }
+              else if (prereqStatus.met) { statusLabel = "ДОСТУПНО"; statusColor = "bg-brand-cyan/80 text-black"; }
+              else { statusLabel = "ЗАБЛОКИРОВАНО"; statusColor = "bg-destructive/80 text-destructive-foreground"; }
               
               return (
               <motion.section 
@@ -405,7 +407,7 @@ export default function VibeSchematicsPage() {
                     <Button 
                         size="sm" 
                         className={`mt-4 w-full font-orbitron text-sm py-2 ${canActivate ? 'bg-gradient-to-r from-brand-cyan to-brand-blue text-white hover:brightness-110' : 'bg-muted text-muted-foreground hover:bg-muted cursor-not-allowed'}`}
-                        onClick={() => handleActivateSchematic(schematic)} // No need for extra checks here, button disabled state handles it
+                        onClick={() => handleActivateSchematic(schematic)}
                         disabled={!canActivate || isActivatingThis}
                     >
                        {isActivatingThis ? <VibeContentRenderer content="::FaSpinner className='animate-spin mr-2'::" /> : <VibeContentRenderer content="::FaBolt::" />}
