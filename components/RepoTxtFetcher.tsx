@@ -1,4 +1,3 @@
-// /components/RepoTxtFetcher.tsx
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useMemo, useCallback } from "react";
@@ -63,12 +62,13 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         triggerGetOpenPRs,
         isSettingsModalOpen, triggerToggleSettingsModal, scrollToSection,
         currentAiRequestId,
-        imageReplaceTask,
+        imageReplaceTask, // Renamed from imageReplaceTaskState
         allFetchedFiles, 
         assistantRef, updateRepoUrlInAssistant,
-        // Добавлены для useEffect обработки ideaProp
         triggerPreCheckAndFetch, 
-        setImageReplaceTask,
+        setImageReplaceTask, // Renamed from setImageReplaceTaskState
+        isPreChecking, // Added from context
+        pendingFlowDetails, // Added from context for checks
     } = useRepoXmlPageContext();
     const { error: toastError, info: toastInfo } = useAppToast();
     logger.debug("[RepoTxtFetcher] After Context Destructuring (Restored Original with ideaProp handler)");
@@ -76,19 +76,20 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     // === Basic Component State ===
     const [token, setToken] = useState<string>("");
     const [prevEffectiveBranch, setPrevEffectiveBranch] = useState<string | null>(null);
+    const ideaProcessingRef = useRef<string | null>(null); // Ref to prevent rapid re-trigger
     logger.debug("[RepoTxtFetcher] After useState (Restored Original with ideaProp handler)");
 
     // === Context values re-assignment ===
-    const repoUrl = repoUrlFromContext; // Используется в useEffect для ideaProp
+    const repoUrl = repoUrlFromContext; 
     const handleRepoUrlChange = setRepoUrlInContext;
 
     // === URL Params & Derived State ---
-    const highlightedPathFromUrl = highlightedPathProp ?? ""; // Используется в useEffect для ideaProp
-    const ideaFromUrl = ideaProp ?? ""; // Используется в useEffect для ideaProp
+    const highlightedPathFromUrl = highlightedPathProp ?? ""; 
+    const ideaFromUrl = ideaProp ?? ""; 
     logger.debug(`[RepoTxtFetcher] Received props: highlightedPathProp='${highlightedPathFromUrl}', ideaProp='${ideaFromUrl ? ideaFromUrl.substring(0,30)+'...' : 'null'}' (Restored Original with ideaProp handler)`);
 
     const autoFetch = useMemo(() =>
-        !!imageReplaceTask ||
+        !!imageReplaceTask || // Use direct context state
         (!!highlightedPathFromUrl || !!ideaFromUrl)
     , [imageReplaceTask, highlightedPathFromUrl, ideaFromUrl]);
 
@@ -175,71 +176,117 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     logger.debug("[RepoTxtFetcher] After useKworkInput Hook (Restored Original with ideaProp handler)");
 
     // === Effects ===
-
-    // EFFECT TO HANDLE ideaProp on mount/change (Восстановлен и адаптирован)
     useEffect(() => {
-        logger.debug(`[RepoTxtFetcher Effect ideaProp] ideaProp changed or component mounted. ideaProp: '${ideaFromUrl}', highlightedPathFromUrl: '${highlightedPathFromUrl}'`);
-        // Убедимся, что есть repoUrl, иначе triggerPreCheckAndFetch не сработает корректно
-        if (ideaFromUrl && highlightedPathFromUrl && repoUrl && repoUrl.includes("github.com")) { // Добавлена проверка repoUrl
-            if (ideaFromUrl.startsWith("ImageReplace|")) {
-                logger.info("[RepoTxtFetcher Effect ideaProp] Detected ImageReplace flow from ideaProp.");
-                const parts = ideaFromUrl.split("|");
-                const oldUrlPart = parts.find(p => p.startsWith("OldURL="));
-                const newUrlPart = parts.find(p => p.startsWith("NewURL="));
-
-                if (oldUrlPart && newUrlPart) {
-                    const oldUrl = decodeURIComponent(oldUrlPart.substring("OldURL=".length));
-                    const newUrl = decodeURIComponent(newUrlPart.substring("NewURL=".length));
-                    
-                    logger.log("[RepoTxtFetcher Effect ideaProp] Parsed ImageReplace details:", { targetPath: highlightedPathFromUrl, oldUrl, newUrl });
-                    
-                    const branchNameToUse = manualBranchName || targetBranchName || ''; 
-                    triggerPreCheckAndFetch(
-                        repoUrl,
-                        branchNameToUse,
-                        'ImageSwap',
-                        { oldUrl, newUrl }, 
-                        highlightedPathFromUrl
-                    ).then(() => {
-                        logger.log("[RepoTxtFetcher Effect ideaProp] triggerPreCheckAndFetch for ImageSwap completed via ideaProp.");
-                    }).catch(err => {
-                        logger.error("[RepoTxtFetcher Effect ideaProp] Error calling triggerPreCheckAndFetch for ImageSwap via ideaProp:", err);
-                         // Fallback: set image replace task if preCheck fails, so UI might still reflect it
-                         setImageReplaceTask({ targetPath: highlightedPathFromUrl, oldUrl, newUrl });
-                    });
-                } else {
-                    logger.warn("[RepoTxtFetcher Effect ideaProp] Could not parse OldURL/NewUrl from ImageReplace ideaProp.");
-                }
-            } else if (ideaFromUrl.startsWith("ErrorFix|")) {
-                logger.info("[RepoTxtFetcher Effect ideaProp] Detected ErrorFix flow from ideaProp.");
-                 try {
-                    const detailsString = ideaFromUrl.substring("ErrorFix|".length);
-                    const parsedDetails = JSON.parse(decodeURIComponent(detailsString)); // Предполагается, что детали - это JSON-строка
-                     logger.log("[RepoTxtFetcher Effect ideaProp] Parsed ErrorFix details:", parsedDetails);
-
-                    const branchNameToUse = manualBranchName || targetBranchName || '';
-                     triggerPreCheckAndFetch(
-                         repoUrl,
-                         branchNameToUse,
-                         'ErrorFix',
-                         parsedDetails, // Передаем распарсенные детали
-                         highlightedPathFromUrl
-                     ).then(() => {
-                         logger.log("[RepoTxtFetcher Effect ideaProp] triggerPreCheckAndFetch for ErrorFix completed via ideaProp.");
-                     }).catch(err => {
-                         logger.error("[RepoTxtFetcher Effect ideaProp] Error calling triggerPreCheckAndFetch for ErrorFix via ideaProp:", err);
-                         // Здесь можно добавить обработку ошибки, например, вывод тоста
-                     });
-                 } catch (e) {
-                     logger.error("[RepoTxtFetcher Effect ideaProp] Failed to parse ErrorFix details from ideaProp:", e);
-                 }
-            } else {
-                 logger.log(`[RepoTxtFetcher Effect ideaProp] ideaProp ("${ideaFromUrl}") is present but not for ImageReplace or ErrorFix.`);
-            }
-        } else {
-             logger.debug(`[RepoTxtFetcher Effect ideaProp] Skipping flow trigger due to missing params: ideaFromUrl='${ideaFromUrl}', highlightedPathFromUrl='${highlightedPathFromUrl}', repoUrl='${repoUrl}'`);
+        logger.debug(`[RepoTxtFetcher Effect ideaProp] Evaluating. ideaProp: '${ideaFromUrl ? ideaFromUrl.substring(0,30)+'...' : 'null'}', currentImageTask: ${!!imageReplaceTask}, currentPendingFlow: ${!!pendingFlowDetails}, isPreChecking: ${isPreChecking}`);
+        
+        if (isPreChecking) {
+            logger.info("[RepoTxtFetcher Effect ideaProp] Skipping: isPreChecking is true.");
+            return;
         }
-    }, [ideaFromUrl, highlightedPathFromUrl, repoUrl, manualBranchName, targetBranchName, triggerPreCheckAndFetch, setImageReplaceTask, logger]);
+
+        if (!ideaFromUrl || !highlightedPathFromUrl || !repoUrl || !repoUrl.includes("github.com")) {
+            logger.debug(`[RepoTxtFetcher Effect ideaProp] Skipping: Missing essential params.`);
+            return;
+        }
+        
+        const ideaSignature = `${ideaFromUrl}|${highlightedPathFromUrl}`;
+        if (ideaProcessingRef.current === ideaSignature && (imageReplaceTask || pendingFlowDetails)) {
+             logger.info(`[RepoTxtFetcher Effect ideaProp] Task for signature "${ideaSignature}" already processed or active in context. Skipping re-trigger from ideaProcessingRef.`);
+             return;
+        }
+
+        if (ideaFromUrl.startsWith("ImageReplace|")) {
+            const parts = ideaFromUrl.split("|");
+            const oldUrlPart = parts.find(p => p.startsWith("OldURL="));
+            const newUrlPart = parts.find(p => p.startsWith("NewURL="));
+
+            if (oldUrlPart && newUrlPart) {
+                const oldUrl = decodeURIComponent(oldUrlPart.substring("OldURL=".length));
+                const newUrl = decodeURIComponent(newUrlPart.substring("NewURL=".length));
+                
+                if (imageReplaceTask &&
+                    imageReplaceTask.targetPath === highlightedPathFromUrl &&
+                    imageReplaceTask.oldUrl === oldUrl &&
+                    imageReplaceTask.newUrl === newUrl) {
+                    logger.info("[RepoTxtFetcher Effect ideaProp] ImageReplace task from ideaProp matches active context task. Skipping re-trigger.");
+                    return;
+                }
+                if (pendingFlowDetails?.type === 'ImageSwap' &&
+                    pendingFlowDetails.targetPath === highlightedPathFromUrl &&
+                    pendingFlowDetails.details?.oldUrl === oldUrl &&
+                    pendingFlowDetails.details?.newUrl === newUrl) {
+                    logger.info("[RepoTxtFetcher Effect ideaProp] ImageReplace task (as pending flow) from ideaProp matches active context pending flow. Skipping re-trigger.");
+                    return;
+                }
+                
+                logger.info("[RepoTxtFetcher Effect ideaProp] Detected ImageReplace flow from ideaProp. Proceeding to trigger.");
+                ideaProcessingRef.current = ideaSignature; // Mark as processing
+                const branchNameToUse = manualBranchName || targetBranchName || ''; 
+                triggerPreCheckAndFetch(
+                    repoUrl,
+                    branchNameToUse,
+                    'ImageSwap',
+                    { oldUrl, newUrl }, 
+                    highlightedPathFromUrl
+                ).then(() => {
+                    logger.log("[RepoTxtFetcher Effect ideaProp] triggerPreCheckAndFetch for ImageSwap completed via ideaProp.");
+                }).catch(err => {
+                    logger.error("[RepoTxtFetcher Effect ideaProp] Error calling triggerPreCheckAndFetch for ImageSwap via ideaProp:", err);
+                    setImageReplaceTask({ targetPath: highlightedPathFromUrl, oldUrl, newUrl }); // Fallback
+                }).finally(() => {
+                    // Conditional reset of ref if task didn't "stick" in context.
+                    // This logic might need refinement if partial processing is possible.
+                    // For now, rely on context state (imageReplaceTask, pendingFlowDetails) for primary guard.
+                    // If a task is fully cleared from context, this ref allows it to be re-triggered by ideaProp.
+                    if (ideaProcessingRef.current === ideaSignature && !imageReplaceTask && !(pendingFlowDetails?.type === 'ImageSwap' && pendingFlowDetails.targetPath === highlightedPathFromUrl)) {
+                        ideaProcessingRef.current = null;
+                    }
+                });
+            } else {
+                logger.warn("[RepoTxtFetcher Effect ideaProp] Could not parse OldURL/NewUrl from ImageReplace ideaProp.");
+            }
+        } else if (ideaFromUrl.startsWith("ErrorFix|")) {
+            logger.info("[RepoTxtFetcher Effect ideaProp] Detected ErrorFix flow from ideaProp.");
+             try {
+                const detailsString = ideaFromUrl.substring("ErrorFix|".length);
+                const parsedDetails = JSON.parse(decodeURIComponent(detailsString)); 
+                
+                if (pendingFlowDetails?.type === 'ErrorFix' &&
+                    pendingFlowDetails.targetPath === highlightedPathFromUrl &&
+                    JSON.stringify(pendingFlowDetails.details) === JSON.stringify(parsedDetails)) { // Basic details comparison
+                    logger.info("[RepoTxtFetcher Effect ideaProp] ErrorFix task from ideaProp matches active context pending flow. Skipping re-trigger.");
+                    return;
+                }
+                
+                logger.log("[RepoTxtFetcher Effect ideaProp] Parsed ErrorFix details, proceeding to trigger:", parsedDetails);
+                ideaProcessingRef.current = ideaSignature; // Mark as processing
+                const branchNameToUse = manualBranchName || targetBranchName || '';
+                 triggerPreCheckAndFetch(
+                     repoUrl,
+                     branchNameToUse,
+                     'ErrorFix',
+                     parsedDetails, 
+                     highlightedPathFromUrl
+                 ).then(() => {
+                     logger.log("[RepoTxtFetcher Effect ideaProp] triggerPreCheckAndFetch for ErrorFix completed via ideaProp.");
+                 }).catch(err => {
+                     logger.error("[RepoTxtFetcher Effect ideaProp] Error calling triggerPreCheckAndFetch for ErrorFix via ideaProp:", err);
+                 }).finally(() => {
+                    if (ideaProcessingRef.current === ideaSignature && !(pendingFlowDetails?.type === 'ErrorFix' && pendingFlowDetails.targetPath === highlightedPathFromUrl) ) {
+                        ideaProcessingRef.current = null;
+                    }
+                 });
+             } catch (e) {
+                 logger.error("[RepoTxtFetcher Effect ideaProp] Failed to parse ErrorFix details from ideaProp:", e);
+             }
+        } else {
+             logger.log(`[RepoTxtFetcher Effect ideaProp] ideaProp ("${ideaFromUrl ? ideaFromUrl.substring(0,30) : ''}") is present but not for ImageReplace or ErrorFix.`);
+        }
+    }, [
+        ideaFromUrl, highlightedPathFromUrl, repoUrl, manualBranchName, targetBranchName, 
+        triggerPreCheckAndFetch, setImageReplaceTask, logger, 
+        imageReplaceTask, pendingFlowDetails, isPreChecking // Added new context states
+    ]);
 
     useEffect(() => {
         logger.debug("[Effect URL Sync] RepoTxtFetcher: Syncing Assistant URL START (Restored Original with ideaProp handler)");
@@ -315,6 +362,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     useImperativeHandle(ref, () => ({
         handleFetch: (isManualRetry?: boolean, branchNameToFetchOverride?: string | null, taskForEarlyCheck?: ImageReplaceTask | null) => {
             logger.debug(`[Imperative] handleFetch called. (Restored Original with ideaProp handler)`);
+            // taskForEarlyCheck is not directly used here as handleFetchManual gets it from ref. Current logic should be fine.
             return handleFetchManual(isManualRetry, branchNameToFetchOverride);
         },
         selectHighlightedFiles: () => {
@@ -451,7 +499,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
 
              <SettingsModal
                   isOpen={isSettingsModalOpen}
-                  repoUrl={repoUrlFromContext} // Pass repoUrlFromContext directly, as repoUrl might be stale if effect changes it.
+                  repoUrl={repoUrlFromContext} 
                   setRepoUrl={handleRepoUrlChange}
                   token={token}
                   setToken={setToken}
