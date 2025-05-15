@@ -121,9 +121,14 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
       kiloVibesAward: 75, 
       checkCondition: (p) => p.featuresUsed?.usedMobileFast === true 
     },
-    { id: "autofix_used", name: "Кибер-Хирург", description: "Первое использование авто-исправления ошибок в коде.", icon: "FaUserMd", kiloVibesAward: 20, checkCondition: (p) => p.featuresUsed?.autofix_used === true },
+    { id: "autofix_used", name: "Кибер-Хирург", description: "Первое использование авто-исправления ошибок в коде.", icon: "FaUserDoctor", kiloVibesAward: 20, checkCondition: (p) => p.featuresUsed?.autofix_used === true }, // Corrected icon
     { id: "deep_work_logged", name: "Погружение в Матрицу", description: "Залогировано первое время глубокой работы.", icon: "FaBrain", kiloVibesAward: 20, checkCondition: (p) => (p.focusTimeHours || 0) > 0},
 
+    // --- Integration Achievements ---
+    { id: "integration_github_connected", name: "GitHub Синхронизирован", description: "Интеграция с GitHub подтверждена.", icon: "FaGithub", kiloVibesAward: 25, checkCondition: (p) => p.featuresUsed?.integration_github_connected === true },
+    { id: "integration_vercel_connected", name: "Vercel Подключен", description: "Интеграция с Vercel подтверждена.", icon: "FaBolt", kiloVibesAward: 25, checkCondition: (p) => p.featuresUsed?.integration_vercel_connected === true },
+    { id: "integration_supabase_connected", name: "Supabase Интегрирован", description: "Интеграция с Supabase подтверждена.", icon: "FaDatabase", kiloVibesAward: 25, checkCondition: (p) => p.featuresUsed?.integration_supabase_connected === true },
+    { id: "integration_aistudio_connected", name: "AI Studio Активен", description: "Интеграция с AI Studio (OpenAI/Gemini/Claude) подтверждена.", icon: "FaRobot", kiloVibesAward: 25, checkCondition: (p) => p.featuresUsed?.integration_aistudio_connected === true },
 
     // --- Quest Completion Achievements (Awarded directly, checkCondition is false) ---
     { id: "initial_boot_sequence", name: "Квест: Пойман Сигнал!", description: "Успешно инициирован рабочий флоу. +25 KiloVibes", icon: "FaBolt", checkCondition: () => false, isQuest: true, unlocksPerks: ["Доступ к СуперВайб Студии"] },
@@ -247,11 +252,11 @@ export const updateUserCyberFitnessProfile = async (
     }
    
     const existingOverallMetadata = userData?.metadata || {};
-    let existingCyberFitnessProfile = getCyberFitnessProfile(userId, existingOverallMetadata);
-    logger.debug(`[CyberFitness UpdateProfile] Profile for ${userId} BEFORE this update cycle: Level=${existingCyberFitnessProfile.level}, KV=${existingCyberFitnessProfile.kiloVibes}, Ach=${existingCyberFitnessProfile.achievements.length}, Perks=${existingCyberFitnessProfile.unlockedPerks.length}`);
+    let existingCyberFitnessProfileData = getCyberFitnessProfile(userId, existingOverallMetadata); // Renamed to avoid confusion with `newCyberFitnessProfile`
+    logger.debug(`[CyberFitness UpdateProfile] Profile for ${userId} BEFORE this update cycle: Level=${existingCyberFitnessProfileData.level}, KV=${existingCyberFitnessProfileData.kiloVibes}, Ach=${existingCyberFitnessProfileData.achievements.length}, Perks=${existingCyberFitnessProfileData.unlockedPerks.length}`);
 
     const newCyberFitnessProfile: CyberFitnessProfile = {
-      ...existingCyberFitnessProfile, 
+      ...existingCyberFitnessProfileData, 
       lastActivityTimestamp: new Date().toISOString(), 
     };
 
@@ -364,7 +369,6 @@ export const updateUserCyberFitnessProfile = async (
         logger.info(`[CyberFitness UpdateProfile] CognitiveOSVersion explicitly set to: ${updates.cognitiveOSVersion}`);
     }
     // --- End Leveling Logic ---
-
 
     // --- Achievement Check (after KiloVibes and totals are updated, including from leveling) ---
     for (const ach of ALL_ACHIEVEMENTS) {
@@ -502,8 +506,9 @@ export const logCyberFitnessAction = async (
         const featureValue = countOrDetails.featureValue !== undefined ? countOrDetails.featureValue : true;
         if (typeof featureName === 'string' && profileUpdates.featuresUsed![featureName] !== featureValue) { 
              profileUpdates.featuresUsed![featureName] = featureValue;
-             if (featureValue === true && !existingCyberFitnessProfile.featuresUsed?.[featureName]) {
-                 kiloVibesFromAction += 5; 
+             // --- BUG FIX: Use currentProfile, not existingCyberFitnessProfile ---
+             if (featureValue === true && !currentProfile.featuresUsed?.[featureName]) {
+                 kiloVibesFromAction += 5; // Standard KV award for using a new feature
              }
              logger.debug(`[CyberFitness LogAction] Feature '${featureName}' usage updated to ${featureValue} for user ${userId}.`);
         } else if (typeof featureName === 'string') {
