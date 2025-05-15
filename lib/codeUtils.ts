@@ -115,3 +115,47 @@ export const extractFunctionName = (line: string): string | null => {
 
     return null;
 };
+
+/**
+ * Extracts the file extension from a path string.
+ * @param filePath The path to the file.
+ * @returns The file extension (e.g., "tsx", "js") or an empty string if no extension is found.
+ */
+export const getFileExtension = (filePath: string): string => {
+    if (!filePath || typeof filePath !== 'string') return '';
+    const lastDotIndex = filePath.lastIndexOf('.');
+    if (lastDotIndex === -1 || lastDotIndex === 0 || lastDotIndex === filePath.length - 1) {
+        // No dot, dot is at the beginning (hidden file without extension), or dot is at the end
+        return '';
+    }
+    return filePath.substring(lastDotIndex + 1).toLowerCase();
+};
+
+/**
+ * Detects potential file paths mentioned in a text, typically in comments or AI descriptions.
+ * This is a heuristic and might not be 100% accurate.
+ * @param text The text to search for file paths.
+ * @returns An array of detected file path strings.
+ */
+export const detectFilePaths = (text: string): string[] => {
+    const paths = new Set<string>();
+    // Regex to find typical file paths, including those starting with './', '../', '@/', or just a name.
+    // It also looks for paths ending with common extensions.
+    // And paths that might be in comments like // path/to/file.tsx or /* path/to/file.tsx */
+    const pathRegex = /(?:\/\/|\/\*|\b(?:File(?::)?|Path(?::)?)\s*)?([@./\w-]+(?:[/\\][.\w-]+)+\.(?:tsx|ts|js|jsx|css|scss|json|md|py|html|yml|yaml|env|toml|xml|sh|sql|java|kt|go|rb|php|swift|c|cpp|h|hpp))/gi;
+    let match;
+    while ((match = pathRegex.exec(text)) !== null) {
+        // Normalize path: replace backslashes, remove leading/trailing junk
+        let normalizedPath = match[1].replace(/\\/g, '/').trim();
+        // Remove potential leading comment markers if they were accidentally included by a greedy part of regex
+        normalizedPath = normalizedPath.replace(/^(\/\/|\/\*|#|--)\s*/, '');
+        // Remove trailing comment markers
+        normalizedPath = normalizedPath.replace(/\s*\*\/$/, '').trim();
+        
+        // Basic validation to avoid overly generic matches
+        if (normalizedPath.includes('.') && normalizedPath.length > 3) { 
+            paths.add(normalizedPath);
+        }
+    }
+    return Array.from(paths);
+};

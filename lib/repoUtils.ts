@@ -12,7 +12,7 @@ export const getLanguage = (path: string): string => {
         case 'js': case 'jsx': return 'javascript';
         case 'py': return 'python';
         case 'css': return 'css';
-        case 'scss': case 'sass': return 'scss'; // Added scss/sass
+        case 'scss': case 'sass': return 'scss'; 
         case 'html': return 'html';
         case 'json': return 'json';
         case 'md': return 'markdown';
@@ -23,10 +23,10 @@ export const getLanguage = (path: string): string => {
         case 'java': return 'java';
         case 'cs': return 'csharp';
         case 'sh': return 'bash';
-        case 'yml': case 'yaml': return 'yaml';
-        case 'toml': return 'toml'; // Added toml
-        case 'xml': return 'xml'; // Added xml
-        case 'env': return 'bash'; // Treat .env like bash for highlighting
+        case 'yml': case 'yaml': return 'yaml'; // Added yml
+        case 'toml': return 'toml'; 
+        case 'xml': return 'xml'; 
+        case 'env': return 'bash'; 
         default: return 'plaintext';
     }
 };
@@ -101,7 +101,7 @@ export const resolveImportPath = (
 ): string | null => {
     const allPaths = allFileNodes.map(f => f.path);
     // Standard extensions to check, order might matter slightly
-    const standardExtensions = ['.ts', '.tsx', '.js', '.jsx', '.json', '.css', '.scss', '.sql', '.md'];
+    const standardExtensions = ['.ts', '.tsx', '.js', '.jsx', '.json', '.css', '.scss', '.sql', '.md', '.yml', '.yaml']; // Added yml/yaml
 
     // --- Internal Helper: tryPath ---
     // Tries to find a matching file path for a base path, checking extensions and index files.
@@ -142,7 +142,7 @@ export const resolveImportPath = (
             if (resolved) return resolved;
         }
         // Fallback check for specific common root directories if not found directly under app/ or root
-        const commonRootDirs = ['components/', 'lib/', 'utils/', 'hooks/', 'contexts/', 'styles/', 'services/'];
+        const commonRootDirs = ['components/', 'lib/', 'utils/', 'hooks/', 'contexts/', 'styles/', 'services/', '.github/']; // Added .github
          for (const rootDir of commonRootDirs) {
              if (pathSegment.startsWith(rootDir)) {
                   // Try resolving assuming the alias points directly to these roots
@@ -180,7 +180,7 @@ export const resolveImportPath = (
     // We prioritize common source directories within the project structure.
     else {
         // Check common source roots relative to the project root (no 'src/' assumed)
-        const commonSourceRoots = ['lib/', 'utils/', 'components/', 'hooks/', 'contexts/', 'styles/', 'services/'];
+        const commonSourceRoots = ['lib/', 'utils/', 'components/', 'hooks/', 'contexts/', 'styles/', 'services/', '.github/']; // Added .github
         for (const base of commonSourceRoots) {
             const resolved = tryPath(base + importPath);
             if (resolved) return resolved;
@@ -200,10 +200,8 @@ export const resolveImportPath = (
     const resolvedFromRoot = tryPath(importPath);
     if (resolvedFromRoot) return resolvedFromRoot;
 
-
     return null; // Path couldn't be resolved within the known project files using these heuristics
 };
-
 
 /**
  * Finds the corresponding file path (e.g., app/about/page.tsx) for a given Next.js route path (e.g., /about).
@@ -290,12 +288,10 @@ export const getPageFilePath = (
         }
     }
 
-
     // --- Final Fallback (less likely for standard Next.js routing) ---
     // Check if the routePath directly matches a file path (e.g., if routePath was "app/some/file.tsx")
     if (allPaths.includes(routePath)) return routePath;
     // No src/ check needed
-
 
     return null; // No matching page file found
 };
@@ -315,7 +311,7 @@ export const getPageFilePath = (
       .replace(/^lib\//, '')
       .replace(/^hooks\//, '')
       .replace(/^contexts\//, '')
-      .replace(/\.(ts|tsx|js|jsx|css|scss|md|json|png|jpg|jpeg|gif|svg|webp)$/, '');
+      .replace(/\.(ts|tsx|js|jsx|css|scss|md|json|png|jpg|jpeg|gif|svg|webp|yml|yaml)$/, ''); // Added yml/yaml
 
     // Replace slashes and special characters with hyphens, convert to lowercase
     name = name
@@ -333,6 +329,7 @@ export const getPageFilePath = (
     if (name.includes('refactor')) prefix = 'refactor';
     if (name.includes('style') || name.includes('ui')) prefix = 'style';
     if (name.includes('docs')) prefix = 'docs';
+    if (name.startsWith('github-workflows')) prefix = 'ci'; // For .github/workflows
 
     // Limit length to avoid overly long branch names
     const maxLength = 40;
@@ -341,6 +338,8 @@ export const getPageFilePath = (
       // Ensure it doesn't end with a hyphen after truncation
       name = name.replace(/-$/, '');
     }
+    
+    if (!name) name = "update"; // Final fallback if name became empty after truncation
 
     return `${prefix}/${name}`;
   };

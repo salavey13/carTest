@@ -51,7 +51,6 @@ const SNEAKY_EMPTY_BLOCK_REGEX = /{[\s\n]*\/\*\s*\.{3}\s*\*\/\s*[\s\n]*}/g;
 const SKIPPED_CODE_MARKER_REGEX = /(\/\*\s*\.{3}\s*\*\/)|({\s*\/\*\s*\.{3}\s*\*\/\s*})|(\[\s*\/\*\s*\.{3}\s*\*\/\s*\])/;
 const SKIPPED_COMMENT_MARKER_REGEX = /^\s*\/\/\s*\.{3}\s*$/;
 
-
 // Map for known Fa6 corrections
 const fa6IconCorrectionMap: Record<string, string> = {
     FaExclamationTriangle: 'FaTriangleExclamation',
@@ -72,7 +71,6 @@ const fa6IconCorrectionMap: Record<string, string> = {
 };
 const knownIncorrectFa6Names = Object.keys(fa6IconCorrectionMap);
 
-
 const importChecks = [
     { name: 'motion', usageRegex: /<motion\./, importRegex: /import .* from ['"]framer-motion['"]/, importStatement: `import { motion } from "framer-motion";` },
     { name: 'clsx', usageRegex: /clsx\(/, importRegex: /import clsx from ['"]clsx['"]/, importStatement: `import clsx from "clsx";` },
@@ -80,7 +78,8 @@ const importChecks = [
 ];
 const clientHookPatterns = /(useState|useEffect|useRef|useContext|useReducer|useCallback|useMemo|useLayoutEffect|useImperativeHandle|useDebugValue)\s*\(/;
 
-const pathCommentRegex = /^\s*(?:\/\/|\/\*|--|#)\s*([\w\-\/\.\[\]]+?\.\w+)/;
+// Updated regex to better handle paths starting with '.' or containing '.' in directory names
+const pathCommentRegex = /^\s*(?:\/\/|\/\*|--|#)\s*([.\w\-\/\.\[\]]+?\.\w+)/;
 
 const generateId = () => '_' + Math.random().toString(36).substring(2, 9);
 
@@ -100,7 +99,8 @@ export function useCodeParsingAndValidation() {
         const parseErrors: ValidationIssue[] = [];
         let lastIndex = 0;
         const descriptionParts: string[] = [];
-        const codeBlockRegex = /(?:(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([\w\-\/\.\[\]]+?\.\w+)\s*(?:\*\/)?\s*$)\n*)?^\s*```(\w+)?\n([\s\S]*?)\n^\s*```(?:\n*(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([\w\-\/\.\[\]]+?\.\w+)\s*(?:\*\/)?\s*$))?/gm;
+        // Updated regex to allow paths starting with a dot or containing dots in directory names
+        const codeBlockRegex = /(?:(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([.\w\-\/\.\[\]]+?\.\w+)\s*(?:\*\/)?\s*$)\n*)?^\s*```(\w+)?\n([\s\S]*?)\n^\s*```(?:\n*(?:^\s*(?:\/\/|\/\*|--|#)\s*(?:File:\s*)?([.\w\-\/\.\[\]]+?\.\w+)\s*(?:\*\/)?\s*$))?/gm;
         let match;
         let fileCounter = 0;
 
@@ -115,7 +115,7 @@ export function useCodeParsingAndValidation() {
             let path = (match[1] || match[4] || `unnamed-${fileCounter}`).trim();
             let content = match[3].trim();
             let lang = match[2] || '';
-            let extension = path.split('.').pop()?.toLowerCase() || lang || 'txt';
+            let extension = getFileExtension(path) || lang || 'txt'; // Use helper for extension
 
             if (path.startsWith('unnamed-')) {
                 const lines = content.split('\n');
@@ -125,7 +125,7 @@ export function useCodeParsingAndValidation() {
                     if (pathMatch && pathMatch[1]) {
                         path = pathMatch[1].trim();
                         content = lines.slice(1).join('\n').trim();
-                        extension = path.split('.').pop()?.toLowerCase() || lang || 'txt';
+                        extension = getFileExtension(path) || lang || 'txt'; // Use helper
                          logger.debug(`[Parse Logic] Extracted path "${path}" from comment.`);
                     }
                 }
@@ -184,7 +184,7 @@ export function useCodeParsingAndValidation() {
                          issues.push({ id: generateId(), fileId, filePath, type: 'incorrectFa6IconName', message: `Некорректное имя иконки: '${iconName}'. Исправить на '${correctName}'?`, details: { lineNumber: importLineNumber, incorrectName: iconName, correctName: correctName, importStatement: fa6Match[0] }, fixable: true, severity: 'warning', restorable: false });
                      }
                      else if (!(iconName in Fa6Icons)) {
-                         logger.warn(`[Validation Logic - ${filePath}] Found unknown/invalid Fa6 icon name: ${iconName}`); // Changed from error to warn
+                         logger.warn(`[Validation Logic - ${filePath}] Found unknown/invalid Fa6 icon name: ${iconName}`); 
                          issues.push({ id: generateId(), fileId, filePath, type: 'unknownFa6IconName', message: `Неизвестная/несуществующая иконка Fa6: '${iconName}'. Проверьте имя или импортируйте из правильного пакета (например, 'react-icons/fa' вместо 'react-icons/fa6', или наоборот).`, details: { lineNumber: importLineNumber, unknownName: iconName, importStatement: fa6Match[0] }, fixable: false, severity: 'warning', restorable: false });
                      }
                  });
