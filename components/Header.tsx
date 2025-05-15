@@ -1,30 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { LayoutGrid, X, Search, Globe, Layers, Zap, Puzzle, BookUser, Settings2, ShieldCheck, Users, Star as LucideStar } from "lucide-react"; 
+import { LayoutGrid, X, Search, Globe, Layers, Zap, Puzzle, BookUser, Settings2, ShieldCheck, Users, Star as LucideStar, DraftingCompass } from "lucide-react"; // Added DraftingCompass
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import UserInfo from "@/components/user-info";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { useAppContext } from "@/contexts/AppContext";
 import { cn } from "@/lib/utils";
+// Removed direct Fa6 imports if VibeContentRenderer is used for nav icons,
+// but keeping them here as `allPages` still defines them directly.
+// For nav items, we will eventually pass icon *names* to VibeContentRenderer.
 import { 
   FaGears, 
-  FaScrewdriverWrench 
-} from "react-icons/fa6"; 
-import {
+  FaScrewdriverWrench,
   FaDumbbell, FaCircleUser, FaWandMagicSparkles, FaRocket, FaRoad, FaBookOpen,
   FaBrain, FaRobot, FaMagnifyingGlass, FaGift, FaUserShield, FaCarOn,
   FaYoutube, FaFileInvoiceDollar, FaCreditCard, FaHeart, FaPalette,
   FaCircleInfo, FaListCheck, FaNetworkWired, FaRegLightbulb, FaUpload,
-  FaUserNinja, FaLandmarkDome, FaLeaf, FaFire, FaChartLine, FaDollarSign, FaShieldVirus, FaStar, FaGamepad, FaFilm, FaPiggyBank
+  FaUserNinja, FaLandmarkDome, FaLeaf, FaFire, FaChartLine, FaDollarSign, FaShieldVirus, FaStar, FaGamepad, FaFilm, FaPiggyBank,
+  FaTools // Added FaTools as an alternative for Schematics
 } from "react-icons/fa6";
 import { debugLogger as logger } from "@/lib/debugLogger";
+import VibeContentRenderer from "@/components/VibeContentRenderer"; // Import VCR
 
 interface PageInfo {
   path: string;
   name: string;
-  icon?: React.ComponentType<{ className?: string }>;
+  icon?: React.ComponentType<{ className?: string }> | string; // Allow string for VCR
   isImportant?: boolean;
   isAdminOnly?: boolean;
   isHot?: boolean;
@@ -34,53 +37,64 @@ interface PageInfo {
 }
 
 const allPages: PageInfo[] = [
-  { path: "/", name: "Home", icon: FaBrain, group: "Core Vibe", isImportant: true, color: "cyan" },
-  { path: "/repo-xml", name: "SUPERVIBE Studio", icon: FaWandMagicSparkles, group: "Core Vibe", isImportant: true, color: "purple", isHot: true },
-  { path: "/selfdev", name: "SelfDev Path", icon: FaRoad, group: "Core Vibe", isImportant: true, color: "green" },
-  { path: "/p-plan", name: "VIBE Plan", icon: FaUserNinja, group: "Core Vibe", isImportant: true, isHot: true, color: "yellow" },
-  { path: "/game-plan", name: "Game Plan", icon: FaFilm, group: "Core Vibe", isImportant: true, color: "orange", isHot: true },
-  { path: "/selfdev/gamified", name: "CyberDev OS", icon: FaGamepad, group: "Core Vibe", isImportant: true, color: "pink", isHot: true },
-  { path: "/profile", name: "Agent Profile", icon: FaCircleUser, group: "CyberFitness", color: "pink" },
-  { path: "/buy-subscription", name: "OS Upgrades", icon: FaCreditCard, group: "CyberFitness", color: "green" },
-  { path: "/premium", name: "Premium Modules", icon: FaStar, group: "CyberFitness", color: "yellow" }, 
-  { path: "/nutrition", name: "Cognitive Fuel", icon: FaScrewdriverWrench, group: "CyberFitness", color: "orange"}, 
-  { path: "/settings", name: "System Config", icon: FaGears, group: "CyberFitness", color: "blue" },  
-  { path: "/partner", name: "Alliance Perks", icon: Users, group: "CyberFitness", color: "purple"}, 
-  { path: "/jumpstart", name: "Jumpstart Kit", icon: FaRocket, group: "Content & Tools", isImportant: true, color: "lime" },
-  { path: "/purpose-profit", name: "Purpose & Profit", icon: FaBookOpen, group: "Content & Tools", color: "purple" },
-  { path: "/ai-work-future", name: "AI & Future of Work", icon: FaNetworkWired, group: "Content & Tools", color: "cyan" },
-  { path: "/advice", name: "Advice Archive", icon: FaRegLightbulb, group: "Content & Tools", color: "orange" },
-  { path: "/expmind", name: "Experimental Mindset", icon: FaBrain, group: "Content & Tools", color: "pink" },
-  { path: "/style-guide", name: "Style Guide", icon: FaPalette, group: "Content & Tools", color: "gray" },
-  { path: "/onesitepls", name: "oneSitePls Info", icon: FaCircleInfo, group: "Content & Tools", color: "gray" },
-  { path: "/finance-literacy-memo", name: "Finance Literacy Memo", icon: FaDollarSign, group: "Content & Tools", color: "green"},
-  { path: "/cartest", name: "Cyber Garage", icon: FaCarOn, group: "Misc", color: "blue" },
-  { path: "/botbusters", name: "Bot Busters", icon: FaRobot, group: "Misc", color: "blue"},
-  { path: "/bullshitdetector", name: "BS Detector", icon: FaMagnifyingGlass, group: "Misc", color: "yellow" },
-  { path: "/wheel-of-fortune", name: "Wheel of Fortune", icon: FaGift, group: "Misc", color: "lime" },
-  { path: "/invoices", name: "My Invoices", icon: FaFileInvoiceDollar, group: "Misc", color: "green" },
-  { path: "/donate", name: "Donate", icon: FaHeart, group: "Misc", color: "red" },
-  { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: FaListCheck, group: "Misc", color: "gray" },
-  { path: "/rent-car", name: "Rent a Car", icon: FaCarOn, group: "Misc", color: "yellow" },
-  { path: "/vpr-tests", name: "VPR Tests", icon: FaListCheck, group: "Misc", color: 'pink' },
-  { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: Globe, group: "Misc", color: 'green' },
-  { path: "/vpr/history/6/cheatsheet", name: "History Cheatsheet 6", icon: FaLandmarkDome, group: "Misc", color: 'yellow' },
-  { path: "/vpr/biology/6/cheatsheet", name: "Biology Cheatsheet 6", icon: FaLeaf, group: "Misc", color: 'lime' },
-  { path: "/admin", name: "Admin Panel", icon: FaUserShield, group: "Admin Zone", isAdminOnly: true, color: "red" },
-  { path: "/advice-upload", name: "Upload Advice", icon: FaUpload, group: "Admin Zone", isAdminOnly: true, color: "red" },
-  { path: "/shadow-fleet-admin", name: "Fleet Admin", icon: FaCarOn, group: "Admin Zone", isAdminOnly: true, color: "red" },
-  { path: "/youtubeAdmin", name: "YT Admin", icon: FaYoutube, group: "Admin Zone", isAdminOnly: true, color: "red" },
+  { path: "/", name: "Home", icon: "FaBrain", group: "Core Vibe", isImportant: true, color: "cyan" },
+  { path: "/repo-xml", name: "SUPERVIBE Studio", icon: "FaWandMagicSparkles", group: "Core Vibe", isImportant: true, color: "purple", isHot: true },
+  { path: "/selfdev", name: "SelfDev Path", icon: "FaRoad", group: "Core Vibe", isImportant: true, color: "green" },
+  { path: "/p-plan", name: "VIBE Plan", icon: "FaUserNinja", group: "Core Vibe", isImportant: true, isHot: true, color: "yellow" },
+  { path: "/game-plan", name: "Game Plan", icon: "FaFilm", group: "Core Vibe", isImportant: true, color: "orange", isHot: true },
+  { path: "/selfdev/gamified", name: "CyberDev OS", icon: "FaGamepad", group: "Core Vibe", isImportant: true, color: "pink", isHot: true },
+  
+  { path: "/profile", name: "Agent Profile", icon: "FaCircleUser", group: "CyberFitness", color: "pink" },
+  { path: "/buy-subscription", name: "OS Upgrades", icon: "FaCreditCard", group: "CyberFitness", color: "green" },
+  { path: "/premium", name: "Premium Modules", icon: "FaStar", group: "CyberFitness", color: "yellow" }, 
+  { path: "/nutrition", name: "Vibe Schematics", icon: "FaTools", group: "CyberFitness", color: "orange"}, // CHANGED name and icon
+  { path: "/settings", name: "System Config", icon: "FaGears", group: "CyberFitness", color: "blue" },  
+  { path: "/partner", name: "Alliance Perks", icon: Users, group: "CyberFitness", color: "purple"}, // Lucide icon here
+  
+  { path: "/jumpstart", name: "Jumpstart Kit", icon: "FaRocket", group: "Content & Tools", isImportant: true, color: "lime" },
+  { path: "/purpose-profit", name: "Purpose & Profit", icon: "FaBookOpen", group: "Content & Tools", color: "purple" },
+  { path: "/ai-work-future", name: "AI & Future of Work", icon: "FaNetworkWired", group: "Content & Tools", color: "cyan" },
+  { path: "/advice", name: "Advice Archive", icon: "FaRegLightbulb", group: "Content & Tools", color: "orange" },
+  { path: "/expmind", name: "Experimental Mindset", icon: "FaBrain", group: "Content & Tools", color: "pink" },
+  { path: "/style-guide", name: "Style Guide", icon: "FaPalette", group: "Content & Tools", color: "gray" },
+  { path: "/onesitepls", name: "oneSitePls Info", icon: "FaCircleInfo", group: "Content & Tools", color: "gray" },
+  { path: "/finance-literacy-memo", name: "Finance Literacy Memo", icon: "FaDollarSign", group: "Content & Tools", color: "green"},
+  
+  { path: "/cartest", name: "Cyber Garage", icon: "FaCarOn", group: "Misc", color: "blue" },
+  { path: "/botbusters", name: "Bot Busters", icon: "FaRobot", group: "Misc", color: "blue"},
+  { path: "/bullshitdetector", name: "BS Detector", icon: "FaMagnifyingGlass", group: "Misc", color: "yellow" },
+  { path: "/wheel-of-fortune", name: "Wheel of Fortune", icon: "FaGift", group: "Misc", color: "lime" },
+  { path: "/invoices", name: "My Invoices", icon: "FaFileInvoiceDollar", group: "Misc", color: "green" },
+  { path: "/donate", name: "Donate", icon: "FaHeart", group: "Misc", color: "red" },
+  { path: "/onesiteplsinstructions", name: "oneSitePls How-To", icon: "FaListCheck", group: "Misc", color: "gray" },
+  { path: "/rent-car", name: "Rent a Car", icon: "FaCarOn", group: "Misc", color: "yellow" },
+  { path: "/vpr-tests", name: "VPR Tests", icon: "FaListCheck", group: "Misc", color: 'pink' },
+  { path: "/vpr/geography/6/cheatsheet", name: "Geo Cheatsheet 6", icon: Globe, group: "Misc", color: 'green' }, // Lucide
+  { path: "/vpr/history/6/cheatsheet", name: "History Cheatsheet 6", icon: "FaLandmarkDome", group: "Misc", color: 'yellow' },
+  { path: "/vpr/biology/6/cheatsheet", name: "Biology Cheatsheet 6", icon: "FaLeaf", group: "Misc", color: 'lime' },
+  
+  { path: "/admin", name: "Admin Panel", icon: "FaUserShield", group: "Admin Zone", isAdminOnly: true, color: "red" },
+  { path: "/advice-upload", name: "Upload Advice", icon: "FaUpload", group: "Admin Zone", isAdminOnly: true, color: "red" },
+  { path: "/shadow-fleet-admin", name: "Fleet Admin", icon: "FaCarOn", group: "Admin Zone", isAdminOnly: true, color: "red" },
+  { path: "/youtubeAdmin", name: "YT Admin", icon: "FaYoutube", group: "Admin Zone", isAdminOnly: true, color: "red" },
 ];
 
 const groupOrder = ["Core Vibe", "CyberFitness", "Content & Tools", "Misc", "Admin Zone"];
-const groupIcons: Record<string, React.ComponentType<{className?: string}>> = {
-    "Core Vibe": Zap, "CyberFitness": BookUser, "Content & Tools": Puzzle, "Misc": Layers, "Admin Zone": ShieldCheck,
+// Using string names for Fa6 icons for groupIcons now
+const groupIcons: Record<string, string> = {
+    "Core Vibe": "FaZap", // Changed from Zap (lucide) to FaZap for VCR
+    "CyberFitness": "FaBookUser", 
+    "Content & Tools": "FaPuzzlePiece", // Changed from Puzzle (lucide) to FaPuzzlePiece
+    "Misc": "FaLayers", 
+    "Admin Zone": "FaShieldCheck",
 };
 
 const translations: Record<string, Record<string, string>> = {
   en: {
     "Home": "Home", "SUPERVIBE Studio": "SUPERVIBE Studio", "SelfDev Path": "SelfDev Path", "VIBE Plan": "VIBE Plan", "Game Plan": "Game Plan", "CyberDev OS": "CyberDev OS", 
-    "Agent Profile": "Agent Profile", "OS Upgrades": "OS Upgrades", "Premium Modules": "Premium Modules", "Cognitive Fuel": "Cognitive Fuel", "System Config": "System Config", "Alliance Perks": "Alliance Perks",
+    "Agent Profile": "Agent Profile", "OS Upgrades": "OS Upgrades", "Premium Modules": "Premium Modules", 
+    "Vibe Schematics": "Vibe Schematics", // CHANGED
+    "System Config": "System Config", "Alliance Perks": "Alliance Perks",
     "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Purpose & Profit", "AI & Future of Work": "AI & Future of Work", "Advice Archive": "Advice Archive", "Experimental Mindset": "Experimental Mindset", "Style Guide": "Style Guide", "oneSitePls Info": "oneSitePls Info", "Finance Literacy Memo": "Finance Literacy Memo",
     "Cyber Garage": "Cyber Garage", "Bot Busters": "Bot Busters", "BS Detector": "BS Detector", "Wheel of Fortune": "Wheel of Fortune", "My Invoices": "My Invoices", "Donate": "Donate", "oneSitePls How-To": "oneSitePls How-To", "Rent a Car": "Rent a Car", "VPR Tests": "VPR Tests", "Geo Cheatsheet 6": "Geo Cheatsheet 6", "History Cheatsheet 6": "History Cheatsheet 6", "Biology Cheatsheet 6": "Biology Cheatsheet 6",
     "Admin Panel": "Admin Panel", "Upload Advice": "Upload Advice", "Fleet Admin": "Fleet Admin", "YT Admin": "YT Admin", "Fix13min": "Fix13min", "About Me": "About Me", "Subscribe": "Subscribe",
@@ -89,7 +103,9 @@ const translations: Record<string, Record<string, string>> = {
   },
   ru: {
     "Home": "Главная", "SUPERVIBE Studio": "SUPERVIBE Studio", "SelfDev Path": "Путь SelfDev", "VIBE Plan": "VIBE План", "Game Plan": "Гейм План", "CyberDev OS": "CyberDev OS",
-    "Agent Profile": "Профиль Агента", "OS Upgrades": "Апгрейды ОС", "Premium Modules": "Премиум Модули", "Cognitive Fuel": "Когнитивное Топливо", "System Config": "Настройки Системы", "Alliance Perks": "Бонусы Альянса",
+    "Agent Profile": "Профиль Агента", "OS Upgrades": "Апгрейды ОС", "Premium Modules": "Премиум Модули", 
+    "Vibe Schematics": "Схемы Вайба", // CHANGED
+    "System Config": "Настройки Системы", "Alliance Perks": "Бонусы Альянса",
     "Jumpstart Kit": "Jumpstart Kit", "Purpose & Profit": "Цель и Прибыль", "AI & Future of Work": "AI и Будущее Работы", "Advice Archive": "Архив Советов", "Experimental Mindset": "Эксперим. Мышление", "Style Guide": "Гайд по Стилю", "oneSitePls Info": "Инфо oneSitePls", "Finance Literacy Memo": "Памятка Фин. Грамотности",
     "Cyber Garage": "Кибер Гараж", "Bot Busters": "Охотники за Ботами", "BS Detector": "BS Детектор", "Wheel of Fortune": "Колесо Фортуны", "My Invoices": "Мои Счета", "Donate": "Поддержать", "oneSitePls How-To": "Как юзать oneSitePls", "Rent a Car": "Аренда Авто", "VPR Tests": "ВПР Тесты", "Geo Cheatsheet 6": "Шпаргалка Гео 6", "History Cheatsheet 6": "Шпаргалка Ист 6", "Biology Cheatsheet 6": "Шпаргалка Био 6",
     "Admin Panel": "Админ Панель", "Upload Advice": "Загрузить Совет", "Fleet Admin": "Админ Автопарка", "YT Admin": "Админ YT", "Fix13min": "Fix13min", "About Me": "Обо мне", "Subscribe": "Подписаться",
@@ -144,16 +160,16 @@ export default function Header() {
     const page = allPages.find(p => p.path === pathname);
     if (pathname?.startsWith('/vpr')) return "VPR";
     if (page?.name) {
-        const firstWord = t(page.name).split(' ')[0];
-        if (firstWord.length <= 6) return firstWord.toUpperCase(); // Prioritize short first word
-        if (firstWord.length > 6 && page.name.length <= 6) return page.name.toUpperCase(); // Fallback to original short name
+        const translatedPageName = t(page.name);
+        const firstWord = translatedPageName.split(' ')[0];
+        if (firstWord.length <= 6) return firstWord.toUpperCase(); 
+        if (page.name.length <= 6) return page.name.toUpperCase(); 
     }
-    return "CYBERVICE"; // Default logo text
+    return "CYBERVICE"; 
   }, [pathname, t]);
   
   const logoCyberPart = currentLogoText === "CYBERVICE" ? "CYBER" : currentLogoText;
   const logoVicePart = currentLogoText === "CYBERVICE" ? "VICE" : "";
-
 
   const groupedAndFilteredPages = useMemo(() => {
     logger.debug("[Header] Recalculating groupedAndFilteredPages. appContextLoading:", appContextLoading, "isAdmin function exists:", typeof isAdmin === 'function');
@@ -174,7 +190,9 @@ export default function Header() {
 
     const groups: Record<string, PageInfo[]> = {};
     groupOrder.forEach(groupName => {
-        if (groupName === "Admin Zone" && !currentIsAdminReal) { return; }
+        if (groupName === "Admin Zone" && !currentIsAdminReal && !appContextLoading) { // Ensure admin zone is hidden if not admin and context loaded
+            return; 
+        }
         groups[groupName] = [];
     });
 
@@ -200,6 +218,16 @@ export default function Header() {
   useEffect(() => { if (isNavOpen) { setIsNavOpen(false); setSearchTerm(""); } }, [pathname]); 
   useEffect(() => { const originalStyle = document.body.style.overflow; if (isNavOpen) { document.body.style.overflow = 'hidden'; } else { document.body.style.overflow = originalStyle; } return () => { document.body.style.overflow = originalStyle; }; }, [isNavOpen]);
 
+  const RenderIcon = ({ icon, className }: { icon?: string | React.ComponentType<{ className?: string }>; className?: string }) => {
+    if (!icon) return null;
+    if (typeof icon === 'string') {
+      return <VibeContentRenderer content={`::${icon} className='${className || ''}'::`} />;
+    }
+    // If it's a component (like Lucide icons)
+    const IconComponent = icon;
+    return <IconComponent className={className} />;
+  };
+
   return (
     <>
       <motion.header
@@ -212,7 +240,7 @@ export default function Header() {
               href="/" 
               className={cn(
                 "text-2xl md:text-3xl font-orbitron font-bold uppercase tracking-wider",
-                "transition-all duration-300 hover:brightness-125 flex items-baseline" // Added flex for inline spans
+                "transition-all duration-300 hover:brightness-125 flex items-baseline" 
               )}
             >
               <span 
@@ -278,17 +306,16 @@ export default function Header() {
                   const pagesInGroup = groupedAndFilteredPages[groupName];
                   if (!pagesInGroup || pagesInGroup.length === 0) return null; 
                   
-                  const GroupIcon = groupIcons[groupName];
+                  const groupIconName = groupIcons[groupName];
 
                   return (
                     <div key={groupName}>
                       <h3 className="text-lg font-orbitron text-brand-purple mb-3 flex items-center gap-2">
-                        {GroupIcon && <GroupIcon className="w-6 h-6 opacity-80" />} 
+                        {groupIconName && <RenderIcon icon={groupIconName} className="w-6 h-6 opacity-80" />} 
                         {t(groupName)}
                       </h3>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-2.5">
                         {pagesInGroup.map((page) => {
-                          const PageIcon = page.icon;
                           const isCurrentPage = page.path === pathname;
                           const tileBaseColorClass = tileColorClasses[page.color || 'default'];
                           const rgbVar = colorVarMap[page.color || 'default'];
@@ -312,16 +339,19 @@ export default function Header() {
                             >
                               {page.isHot && (
                                 <span title={t("Hot")} className="absolute top-1 right-1 text-base text-brand-orange animate-pulse" aria-label={t("Hot")}>
-                                  <FaFire/>
+                                  <VibeContentRenderer content="::FaFire::" />
                                 </span>
                               )}
-                              {PageIcon && (
-                                <PageIcon className={cn(
-                                  "transition-transform duration-200 group-hover:scale-110 mb-1.5", 
-                                  page.isImportant 
-                                      ? "h-7 w-7 sm:h-8 sm:w-8" 
-                                      : "h-6 w-6 sm:h-7 sm:w-7" 
-                                )} />
+                              {page.icon && (
+                                <RenderIcon 
+                                    icon={page.icon} 
+                                    className={cn(
+                                        "transition-transform duration-200 group-hover:scale-110 mb-1.5", 
+                                        page.isImportant 
+                                            ? "h-7 w-7 sm:h-8 sm:w-8" 
+                                            : "h-6 w-6 sm:h-7 sm:w-7" 
+                                    )}
+                                />
                               )}
                               <span className={cn(
                                 "font-orbitron font-medium transition-colors leading-tight text-center block",
