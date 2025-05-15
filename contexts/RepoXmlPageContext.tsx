@@ -8,7 +8,7 @@ import { useAppToast } from '@/hooks/useAppToast';
 export interface FileNode { path: string; content: string; }
 export interface SimplePullRequest { id: number; number: number; title: string; html_url: string; user: { login: string | null; avatar_url: string | null } | null; head: { ref: string }; base: { ref: string }; updated_at: string; }
 import { debugLogger as logger } from '@/lib/debugLogger';
-import { getOpenPullRequests, updateBranch, checkExistingPrBranch, createGitHubPullRequest } from '@/app/actions_github/actions'; // Added createGitHubPullRequest
+import { getOpenPullRequests, updateBranch, checkExistingPrBranch, createGitHubPullRequest } from '@/app/actions_github/actions'; 
 import type { RepoTxtFetcherRef } from '@/components/RepoTxtFetcher';
 import type { AICodeAssistantRef } from '@/components/AICodeAssistant';
 import * as repoUtils from "@/lib/repoUtils";
@@ -18,7 +18,7 @@ import {
     completeQuestAndUpdateProfile, 
     logCyberFitnessAction, 
     Achievement,
-    PERKS_BY_LEVEL // Импортируем, если используется в completeQuestAndUpdateProfile для first_pr_created
+    PERKS_BY_LEVEL 
 } from '@/hooks/cyberFitnessSupabase'; 
 
 export type ImportCategory = 'component' | 'context' | 'hook' | 'lib' | 'other';
@@ -292,7 +292,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             let questCompleted = false;
             let questResult: Awaited<ReturnType<typeof completeQuestAndUpdateProfile>> | null = null;
 
-            if (currentTask) { // Image Swap Flow
+            if (currentTask) { 
                 if (fetched) {
                     const targetFileExists = (allFiles ?? []).some(f => f.path === currentTask.targetPath);
                     if (!targetFileExists) {
@@ -307,7 +307,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                                .then(async ({ success: replaceSuccess, error: replaceError }) => {
                                    if (!replaceSuccess) {
                                        addToastStable(`Ошибка замены/PR: ${replaceError || 'Неизвестно'}`, 'error');
-                                   } else if (dbUser?.user_id) { // Use string user_id for Supabase
+                                   } else if (dbUser?.user_id) { 
                                        questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1); 
                                        questCompleted = true;
                                    }
@@ -326,8 +326,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     addToastStable(`Ошибка Задачи Изображения: Не удалось загрузить файлы.`, 'error', 5000);
                     setImageReplaceTaskStateStable(null); setAssistantLoadingStateStable(false);
                 }
-                if (currentPendingFlow) { setPendingFlowDetailsStateStable(null); }
-            } else if (currentPendingFlow?.type === 'ErrorFix' && fetched) { // Error Fix Flow
+                if (currentPendingFlow?.type === 'ImageSwap') { setPendingFlowDetailsStateStable(null); } // Clear pending if it was for this image swap
+            } else if (currentPendingFlow?.type === 'ErrorFix' && fetched) { 
                  const targetFileExists = allFiles.some(f => f.path === currentPendingFlow.targetPath);
                  if (targetFileExists) {
                      const { Message, Stack, Logs, Source } = currentPendingFlow.details;
@@ -338,7 +338,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                          setTimeout(async () => { 
                              try {
                                  fetcherRef.current?.handleAddSelected?.(new Set([currentPendingFlow.targetPath]), allFiles);
-                                 if (dbUser?.user_id) { // Use string user_id for Supabase
+                                 if (dbUser?.user_id) { 
                                       questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1); 
                                       questCompleted = true;
                                  }
@@ -352,11 +352,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                      finalFetchStatus = 'error'; 
                      setPendingFlowDetailsStateStable(null); 
                  }
-            } else { // Standard fetch without special flow
+            } else { 
                   if (fetched && currentPendingFlow) setPendingFlowDetailsStateStable(null);
                   if (fetched && imageReplaceTaskStateRef.current) setImageReplaceTaskStateStable(null);
                   finalFetchStatus = fetched ? 'success' : 'error';
-                  if (fetched && !currentTask && !currentPendingFlow && dbUser?.user_id) { // Use string user_id for Supabase
+                  if (fetched && !currentTask && !currentPendingFlow && dbUser?.user_id) { 
                         questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1);
                         questCompleted = true;
                   }
@@ -378,7 +378,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
          ]);
 
         const triggerToggleSettingsModal = useCallback(async () => {
-            if (dbUser?.user_id) { // Use string user_id for Supabase
+            if (dbUser?.user_id) { 
                 const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'settings_opened');
                 newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
             }
@@ -387,18 +387,17 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
 
         const triggerFetch = useCallback(async (isRetry = false, branch?: string | null) => { if (fetcherRef.current?.handleFetch) { try { await fetcherRef.current.handleFetch(isRetry, branch, imageReplaceTaskStateRef.current); } catch (e: any) { addToastStable(`Крит. ошибка запуска извлечения: ${e?.message ?? 'Неизвестно'}`, "error", 5000); setFetchStatusStateStable('error'); } } else { addToastStable("Ошибка: Не удалось запустить извлечение (ref).", "error"); } }, [addToastStable, setFetchStatusStateStable, fetcherRef]);
         
-        const triggerPreCheckAndFetch = useCallback(async ( repoUrlToCheck: string, potentialBranchName: string, flowType: 'ImageSwap' | 'ErrorFix', flowDetails: any, targetPath: string ) => {
+        const triggerPreCheckAndFetch = useCallback(async ( repoUrlToCheck: string, potentialBranchNameProvided: string, flowType: 'ImageSwap' | 'ErrorFix', flowDetails: any, targetPath: string ) => {
             const flowLogPrefix = flowType === 'ImageSwap' ? '[Flow 1 - Image Swap]' : '[Flow 3 - Error Fix]';
-            logger.log(`${flowLogPrefix} Context: triggerPreCheckAndFetch. URL: ${repoUrlToCheck}, Branch: ${potentialBranchName}, Target: ${targetPath}, Details:`, flowDetails);
+            logger.log(`${flowLogPrefix} Context: triggerPreCheckAndFetch. URL: ${repoUrlToCheck}, PotentialBranch: ${potentialBranchNameProvided}, Target: ${targetPath}, Details:`, flowDetails);
             setIsPreCheckingStateStable(true); 
             
-            // Specific handling for ImageSwap: set imageReplaceTaskState directly
             if (flowType === 'ImageSwap') {
                 if (!flowDetails?.oldUrl || !flowDetails?.newUrl) {
                     logger.error(`${flowLogPrefix} Context: Missing oldUrl or newUrl in flowDetails for ImageSwap. Aborting.`);
                     addToastStable("Ошибка: Недостаточно данных для замены изображения (oldUrl/newUrl).", 'error', 5000);
                     setIsPreCheckingStateStable(false);
-                    setFetchStatusStateStable('error'); // Or appropriate status
+                    setFetchStatusStateStable('error');
                     return;
                 }
                 setImageReplaceTaskStateStable({ 
@@ -406,14 +405,13 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     oldUrl: flowDetails.oldUrl, 
                     newUrl: flowDetails.newUrl 
                 });
-                setPendingFlowDetailsStateStable(null); // Clear pending flow, as imageReplaceTaskState is now primary for this
+                setPendingFlowDetailsStateStable(null);
                 logger.log(`${flowLogPrefix} Context: imageReplaceTaskState set directly for ImageSwap.`);
             } else if (flowType === 'ErrorFix') {
                 setPendingFlowDetailsStateStable({ type: flowType, details: flowDetails, targetPath });
-                setImageReplaceTaskStateStable(null); // Ensure image task is cleared for other flows
+                setImageReplaceTaskStateStable(null);
                 logger.log(`${flowLogPrefix} Context: pendingFlowDetailsState set for ErrorFix.`);
             } else {
-                // Handle other potential flow types or default to clearing both
                 setPendingFlowDetailsStateStable(null);
                 setImageReplaceTaskStateStable(null);
                 logger.log(`${flowLogPrefix} Context: Unknown or generic flow type. Clearing image/pending details.`);
@@ -424,7 +422,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             setManualBranchNameStateStable(''); 
             setFetchStatusStateStable('loading');
             
-            if (dbUser?.user_id) { // Use string user_id for Supabase
+            if (dbUser?.user_id) { 
                 const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'initial_boot_sequence', 25);
                 if (questResult.success) {
                     addToastStable("🛰️ Квест 'Пойман Сигнал': +25 KiloVibes!", "success", 3000);
@@ -433,30 +431,45 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             }
 
             let branchToFetch: string | null = null;
-            try { 
-                const checkResult = await checkExistingPrBranch(repoUrlToCheck, potentialBranchName);
-                if (checkResult.success && checkResult.data?.exists && checkResult.data?.branchName) {
-                    const prSourceBranch = checkResult.data.branchName; 
-                    setTargetBranchNameStateStable(prSourceBranch); setTargetPrDataStable({ number: checkResult.data.prNumber!, url: checkResult.data.prUrl! }); branchToFetch = prSourceBranch;
-                     logger.log(`${flowLogPrefix} Context: Found existing PR/branch: ${prSourceBranch}. PR #${checkResult.data.prNumber}`);
-                } else if (checkResult.success) {
-                    logger.log(`${flowLogPrefix} Context: No existing PR/branch found for "${potentialBranchName}". Will use default branch.`);
-                    branchToFetch = null; 
-                } else {
-                     addToastStable(`Не удалось проверить PR для ${potentialBranchName}. Используется ветка по умолчанию.`, 'warning');
-                     logger.warn(`${flowLogPrefix} Context: checkExistingPrBranch failed. Error: ${checkResult.error}`);
-                     branchToFetch = null; 
-                }
-            } catch (err: any) {
-                addToastStable(`Критическая ошибка проверки PR: ${err.message}`, 'error');
-                logger.error(`${flowLogPrefix} Context: Exception in checkExistingPrBranch:`, err);
+            let branchNameToSeek = potentialBranchNameProvided;
+
+            if (flowType === 'ImageSwap') {
+                // For ImageSwap, always assume a new branch creation scenario initially for fetching file from default.
+                // The actual branch name for PR will be determined in handleDirectImageReplace.
+                // No need to checkExistingPrBranch here for ImageSwap based on the new "always new PR" requirement.
+                branchNameToSeek = ""; // Ensure we don't accidentally use a potential branch for fetching
+                logger.log(`${flowLogPrefix} Context: ImageSwap flow. Will fetch from default branch for initial content.`);
                 branchToFetch = null; 
+            } else if (branchNameToSeek) { // For ErrorFix or other flows with a specific branch
+                try { 
+                    const checkResult = await checkExistingPrBranch(repoUrlToCheck, branchNameToSeek);
+                    if (checkResult.success && checkResult.data?.exists && checkResult.data?.branchName) {
+                        const prSourceBranch = checkResult.data.branchName; 
+                        setTargetBranchNameStateStable(prSourceBranch); 
+                        setTargetPrDataStable({ number: checkResult.data.prNumber!, url: checkResult.data.prUrl! }); 
+                        branchToFetch = prSourceBranch;
+                         logger.log(`${flowLogPrefix} Context: Found existing PR/branch: ${prSourceBranch}. PR #${checkResult.data.prNumber}. Will fetch from this branch.`);
+                    } else if (checkResult.success) {
+                        logger.log(`${flowLogPrefix} Context: No existing PR/branch found for "${branchNameToSeek}". Will use default branch for initial fetch.`);
+                        branchToFetch = null; 
+                    } else {
+                         addToastStable(`Не удалось проверить PR для ${branchNameToSeek}. Используется ветка по умолчанию.`, 'warning');
+                         logger.warn(`${flowLogPrefix} Context: checkExistingPrBranch failed for "${branchNameToSeek}". Error: ${checkResult.error}`);
+                         branchToFetch = null; 
+                    }
+                } catch (err: any) {
+                    addToastStable(`Критическая ошибка проверки PR: ${err.message}`, 'error');
+                    logger.error(`${flowLogPrefix} Context: Exception in checkExistingPrBranch for "${branchNameToSeek}":`, err);
+                    branchToFetch = null; 
+                }
+            } else { 
+                 logger.log(`${flowLogPrefix} Context: No specific branch name to seek. Will fetch from default branch.`);
+                 branchToFetch = null;
             }
-            finally {
-                setIsPreCheckingStateStable(false);
-                logger.log(`${flowLogPrefix} Context: Proceeding to triggerFetch with branch: ${branchToFetch}`);
-                await triggerFetch(false, branchToFetch); // triggerFetch uses imageReplaceTaskStateRef
-            }
+            
+            setIsPreCheckingStateStable(false);
+            logger.log(`${flowLogPrefix} Context: Proceeding to triggerFetch with branch: ${branchToFetch}`);
+            await triggerFetch(false, branchToFetch); 
         }, [ 
             dbUser?.user_id, addToastStable, setTargetBranchNameStateStable, setTargetPrDataStable, 
             setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setImageReplaceTaskStateStable, 
@@ -468,7 +481,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             if (fetcherRef.current?.selectHighlightedFiles) {
                 try {
                     fetcherRef.current.selectHighlightedFiles();
-                    if (dbUser?.user_id) { // Use string user_id for Supabase
+                    if (dbUser?.user_id) { 
                         const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'usedSelectHighlighted');
                         newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                     }
@@ -484,7 +497,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             if (fetcherRef.current?.handleCopyToClipboard) { 
                 try { 
                     const success = fetcherRef.current.handleCopyToClipboard(undefined, true);
-                    if (success && dbUser?.user_id) { // Use string user_id for Supabase
+                    if (success && dbUser?.user_id) { 
                         const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'system_prompt_copied');
                         newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                     }
@@ -505,7 +518,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             if (assistantRef.current?.handleParse) { 
                 try { 
                     await assistantRef.current.handleParse(); 
-                    if (dbUser?.user_id) { // Use string user_id for Supabase
+                    if (dbUser?.user_id) { 
                          const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_parse_completed', 150, 2); 
                          if (questResult.success && questResult.data?.metadata?.cyberFitness?.level === 2) {
                              addToastStable("🚀 Квест 'Первый Парсинг' выполнен! Level 2 достигнут!", "success", 4000);
@@ -546,14 +559,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                 if (result.success) { 
                     triggerGetOpenPRsStable(repoUrlParam).catch(err => logger.error("Failed to refresh PRs after branch update:", err));
                     if (dbUser?.user_id) {
-                        // Если prNumber передан, это обновление существующего PR (значит, ветка уже была)
                         if (prNumber) { 
                             const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.user_id, 'branchUpdated', 1);
                             if(actionAch) combinedAchievements.push(...actionAch);
                             logger.info(`[CyberFitness] Logged 'branchUpdated' for PR #${prNumber} update. User: ${dbUser.user_id}`);
                         } else {
-                            // Это может быть первый коммит в новую ветку (перед созданием PR) или просто обновление ветки без PR.
-                            // НЕ логируем 'prCreated' или 'branchUpdated' здесь, чтобы избежать дублирования или преждевременного начисления.
                             logger.info(`[CyberFitness] Branch '${branch}' updated (no PR number). Action will be logged by PR creation or specific flow. User: ${dbUser.user_id}`);
                         }
                     }
@@ -591,7 +601,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     newBranchNameParam
                 );
     
-                if (result.success && result.prNumber) { // Убедимся, что prNumber есть
+                if (result.success && result.prNumber) { 
                     triggerGetOpenPRsStable(repoUrlParam).catch(err => logger.error("Failed to refresh PRs after new PR creation:", err));
                     if (dbUser?.user_id) { 
                         const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.user_id, 'prCreated', 1);
@@ -624,7 +634,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const triggerAddImportantToKworkStable = useCallback(async () => {
             if (fetcherRef.current?.handleAddImportantFiles) {
                 fetcherRef.current.handleAddImportantFiles();
-                 if (dbUser?.user_id) { // Use string user_id for Supabase
+                 if (dbUser?.user_id) { 
                     const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'usedSelectHighlighted'); 
                     newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                  }
@@ -634,7 +644,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const triggerAddTreeToKworkStable = useCallback(async () => {
              if (fetcherRef.current?.handleAddFullTree) {
                  fetcherRef.current.handleAddFullTree();
-                 if (dbUser?.user_id) { // Use string user_id for Supabase
+                 if (dbUser?.user_id) { 
                     const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'usedAddFullTree');
                     newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                  }
@@ -647,7 +657,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const triggerClearKworkInputStable = useCallback(async () => {
             if (fetcherRef.current?.clearAll) {
                 fetcherRef.current.clearAll();
-                if (dbUser?.user_id) { // Use string user_id for Supabase
+                if (dbUser?.user_id) { 
                     const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'kwork_cleared');
                     newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
                 }
