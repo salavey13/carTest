@@ -369,7 +369,8 @@ export const updateUserCyberFitnessProfile = async (
         newCyberFitnessProfile.kiloVibes += updates.kiloVibes; 
     }
     if (updates.focusTimeHours !== undefined && typeof updates.focusTimeHours === 'number') {
-        newCyberFitnessProfile.focusTimeHours += updates.focusTimeHours; 
+        // Correctly increment total focusTimeHours
+        newCyberFitnessProfile.focusTimeHours = (existingCyberFitnessProfileData.focusTimeHours || 0) + updates.focusTimeHours; 
     }
     if (updates.activeQuests && Array.isArray(updates.activeQuests)) {
         newCyberFitnessProfile.activeQuests = Array.from(new Set([...newCyberFitnessProfile.activeQuests, ...updates.activeQuests]));
@@ -390,6 +391,7 @@ export const updateUserCyberFitnessProfile = async (
         newCyberFitnessProfile.featuresUsed = {...newCyberFitnessProfile.featuresUsed, ...updates.featuresUsed};
     }
     
+    // Correctly increment total counts
     if (typeof updates.totalFilesExtracted === 'number') newCyberFitnessProfile.totalFilesExtracted = (existingCyberFitnessProfileData.totalFilesExtracted || 0) + updates.totalFilesExtracted;
     if (typeof updates.totalTokensProcessed === 'number') newCyberFitnessProfile.totalTokensProcessed = (existingCyberFitnessProfileData.totalTokensProcessed || 0) + updates.totalTokensProcessed;
     if (typeof updates.totalKworkRequestsSent === 'number') newCyberFitnessProfile.totalKworkRequestsSent = (existingCyberFitnessProfileData.totalKworkRequestsSent || 0) + updates.totalKworkRequestsSent;
