@@ -384,7 +384,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             toast.success(`${filesToSave.length} файлов сохранено/обновлено в вашем профиле.`, { id: toastId });
         } catch (err: any) { logger.error("[Handler SaveFiles] Save error:", err); toast.error(`Ошибка сохранения файлов: ${err?.message ?? 'Неизвестная ошибка'}`, { id: toastId }); }
         finally { setIsProcessingPR(false); }
-     }, [dbUser?.user_id, componentParsedFiles, selectedFileIds, imageReplaceTask, setIsProcessingPR]); // Depends on dbUser.user_id
+     }, [dbUser?.user_id, componentParsedFiles, selectedFileIds, imageReplaceTask, setIsProcessingPR]); 
 
     const handleDownloadZip = useCallback(async () => {
         if (imageReplaceTask) { toast.warn("Скачивание недоступно для картинок."); return; }
