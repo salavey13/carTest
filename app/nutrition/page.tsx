@@ -40,6 +40,7 @@ interface VibeSchematic {
 }
 
 const vibeSchematics: VibeSchematic[] = [
+  // ... (previous schematics remain the same)
   {
     id: "deep_work_sprint",
     name: "Схема 'ТУРБО-МОЗГ'",
@@ -170,10 +171,10 @@ const vibeSchematics: VibeSchematic[] = [
     id: "icon_fixer_pro",
     name: "Схема 'ЛОВЕЦ ИКОНОК ПРО'",
     icon: "FaCrosshairs", 
-    description: "Найди и исправь пропавшие или некорректные иконки FontAwesome. Совет: Используй StickyChat (::FaCommentDots::) для быстрого доступа к файлам, если нужно править код вручную, или Оверлей Ошибок для логов.",
+    description: "Найди и исправь пропавшие или некорректные иконки FontAwesome. Совет: Используй StickyChat (::FaCommentDots::) для быстрого доступа к файлам, если нужно править код вручную, или Оверлей Ошибок (Ctrl+Shift+E) для логов.",
     details: [
-      { label: "АНАЛИЗ", content: "Скопируй логи (ачивка 'Диагност') из консоли браузера или Оверлея Ошибок (Ctrl+Shift+E) -> Найди предупреждение VCR об `<неизвестной_иконке>`.", icon: "FaClipboardList"},
-      { label: "ПОИСК", content: "Используй ::FaSearch className='inline':: FontAwesome Search (перк 'Самостоятельный Поиск Иконок FontAwesome') для подбора корректного имени.", icon: "FaSearch"},
+      { label: "АНАЛИЗ", content: "Скопируй логи (ачивка 'Диагност') из консоли браузера или Оверлея Ошибок -> Найди предупреждение VCR об `<неизвестной_иконке>`.", icon: "FaClipboardList"},
+      { label: "ПОИСК", content: "Используй ::FaMagnifyingGlass className='inline':: FontAwesome Search (перк 'Самостоятельный Поиск Иконок FontAwesome') для подбора корректного имени.", icon: "FaSearch"}, // Corrected Icon
       { label: "ЗАМЕНА", content: "Внеси правку в код вручную или через 'Magic Swap' / 'Search/Replace' в AI Assistant (фича 'settings_opened' для доступа к этим инструментам).", icon: "FaTools"}
     ],
     prerequisites: ["level:4", "achievement:copy_logs_used", "perk:Самостоятельный Поиск Иконок FontAwesome", "featureUsed:settings_opened"],
@@ -193,33 +194,36 @@ export default function VibeSchematicsPage() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [activatingSchematicId, setActivatingSchematicId] = useState<string | null>(null);
 
-  const { dbUser, addToast } = useAppContext();
+  const { dbUser, addToast } = useAppContext(); // addToast is already from context
 
   const fetchProfile = useCallback(async () => {
     if (dbUser?.user_id) {
       setIsLoadingProfile(true);
+      logger.debug("[VibeSchematicsPage] fetchProfile: Fetching...");
       try {
         const result = await fetchUserCyberFitnessProfile(dbUser.user_id);
         if (result.success && result.data) {
           setCurrentUserProfile(result.data);
+          logger.debug("[VibeSchematicsPage] fetchProfile: Success.", { level: result.data.level, kv: result.data.kiloVibes });
         } else {
-          logger.warn("[VibeSchematicsPage] Failed to fetch user profile.", { error: result.error });
-          toast.error("Ошибка загрузки профиля Агента. Попробуйте снова."); // Toast on explicit failure
+          logger.warn("[VibeSchematicsPage] fetchProfile: Failed.", { error: result.error });
+          toast.error("Ошибка загрузки профиля Агента. Попробуйте снова.");
         }
       } catch (error) {
-        logger.error("[VibeSchematicsPage] Exception fetching profile:", error);
+        logger.error("[VibeSchematicsPage] fetchProfile: Exception.", error);
         toast.error("Критическая ошибка при загрузке профиля.");
       } finally {
         setIsLoadingProfile(false);
+        logger.debug("[VibeSchematicsPage] fetchProfile: Finished.");
       }
     } else {
         setCurrentUserProfile(null); 
         setIsLoadingProfile(false);
-        if (dbUser === null) { // Only show if we know there's no user, not just initially undefined
+        if (dbUser === null) { 
              logger.info("[VibeSchematicsPage] No authenticated user. Schematics unavailable.");
         }
     }
-  }, [dbUser?.user_id]); // Switched dbUser to dbUser.user_id
+  }, [dbUser?.user_id, toast]); // Added toast to dependencies as it's used inside
 
   useEffect(() => {
     fetchProfile();
@@ -228,9 +232,12 @@ export default function VibeSchematicsPage() {
   const handleActivateSchematic = useCallback(async (schematic: VibeSchematic) => {
     if (!dbUser?.user_id) {
         toast.error("Профиль Агента не авторизован. Попробуйте обновить страницу.");
-        return; // No need to reset activatingSchematicId if it wasn't set
+        return; 
     }
-    if (activatingSchematicId) return; // Already processing one
+    if (activatingSchematicId) {
+        logger.warn(`[VibeSchematicsPage] Activation for ${activatingSchematicId} already in progress. Ignoring request for ${schematic.id}`);
+        return; 
+    }
 
     setActivatingSchematicId(schematic.id);
     const activationToastId = toast.loading(`Активация схемы "${schematic.name}"...`);
@@ -260,8 +267,10 @@ export default function VibeSchematicsPage() {
                 if (result.newAchievements && result.newAchievements.length > 0) { rewards.push(...result.newAchievements.map(a => `Ачивка: ${a.name}`)); }
                 rewardDescription = rewards.length > 0 ? `Разблокировано: ${rewards.join(', ')}` : "Продолжайте в том же духе!";
                 
-                addToast(message, "success", 7000, { id: activationToastId, description: rewardDescription }); // Use addToast from context
+                addToast(message, "success", 7000, { id: activationToastId, description: rewardDescription });
+                logger.debug(`[VibeSchematicsPage] Schematic ${schematic.id} completed. Attempting to re-fetch profile.`);
                 await fetchProfile(); 
+                logger.debug(`[VibeSchematicsPage] Profile re-fetched after schematic ${schematic.id} completion.`);
             }
         } else {
             toast.error(result.error || `Ошибка активации схемы "${schematic.name}".`, { id: activationToastId, duration: 6000 });
@@ -270,9 +279,9 @@ export default function VibeSchematicsPage() {
         logger.error(`[VibeSchematicsPage] Critical error activating schematic ${schematic.id}:`, error);
         toast.error(`Критическая ошибка: ${error.message || 'Неизвестно'}`, { id: activationToastId, duration: 6000 });
     } finally {
-        setActivatingSchematicId(null); // Reset loading state here
+        setActivatingSchematicId(null); 
     }
-  }, [dbUser?.user_id, activatingSchematicId, fetchProfile, addToast]);
+  }, [dbUser?.user_id, activatingSchematicId, fetchProfile, addToast]); // addToast from context
 
   const checkPrerequisites = useCallback((schematic: VibeSchematic, profile: CyberFitnessProfile | null): { met: boolean; missing: string[] } => {
     if (!profile) return { met: false, missing: ["Загрузка профиля..."] }; 
@@ -306,6 +315,8 @@ export default function VibeSchematicsPage() {
     toast.info(`Функция "${actionName}" в разработке в лаборатории CyberVibe.`);
   };
 
+  // ... (rest of the VibeSchematicsPage component, including JSX, remains the same as previous version)
+  // ... (make sure to include the full return() with JSX from the previous response)
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-bg via-black to-dark-card text-light-text p-4 pt-24 pb-10">
       <motion.div
@@ -332,7 +343,7 @@ export default function VibeSchematicsPage() {
                     <p className="mt-2 font-mono text-muted-foreground">Загрузка данных Агента...</p>
                 </div>
             )}
-            {!isLoadingProfile && !currentUserProfile && dbUser && ( // Profile fetch failed for logged in user
+            {!isLoadingProfile && !currentUserProfile && dbUser && ( 
                  <div className="text-center py-10">
                     <VibeContentRenderer content="::FaExclamationTriangle className='text-4xl text-brand-red mx-auto'::" />
                     <p className="mt-2 font-mono text-muted-foreground">Не удалось загрузить профиль Агента. Попробуйте обновить страницу.</p>
@@ -341,7 +352,7 @@ export default function VibeSchematicsPage() {
                     </Button>
                 </div>
             )}
-            {!isLoadingProfile && !dbUser && ( // No user logged in
+            {!isLoadingProfile && !dbUser && ( 
                  <div className="text-center py-10">
                     <VibeContentRenderer content="::FaUserSecret className='text-4xl text-brand-blue mx-auto'::" />
                     <p className="mt-2 font-mono text-muted-foreground">Для доступа к Схемам Вайба необходима Авторизация.</p>
@@ -381,7 +392,7 @@ export default function VibeSchematicsPage() {
                         {statusLabel}
                     </span>
                 </div>
-                <p className="text-sm text-muted-foreground mb-3 font-mono">{schematic.description}</p>
+                <p className="text-sm text-muted-foreground mb-3 font-mono whitespace-pre-line">{schematic.description}</p>
                 
                 {schematic.details.map((detail, index) => (
                     <div key={index} className="mb-2.5">
