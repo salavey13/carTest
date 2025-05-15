@@ -65,13 +65,13 @@ export interface Achievement {
     isDynamic?: boolean; 
 }
 
-const LEVEL_THRESHOLDS_KV = [0, 50, 150, 400, 800, 1500, 2800, 5000, 8000, 12000, 17000, 23000, 30000, 40000, 50000]; 
+const LEVEL_THRESHOLDS_KV = [0, 50, 150, 400, 800, 1500, 2800, 5000, 8000, 12000, 17000, 23000, 30000, 40000, 50000, 75000, 100000]; // Extended
 const COGNITIVE_OS_VERSIONS = [
     "v0.1 Genesis", "v0.2 Neural Spark", "v0.3 Code Apprentice", "v0.4 Vibe Engineer", 
     "v0.5 Logic Architect", "v0.6 Context Weaver", "v0.7 Matrix Surfer", "v0.8 Quantum Coder", 
     "v0.9 Singularity Pilot", "v1.0 Ascended Node", "v1.1 Vibe Master", "v1.2 Digital Demiurge",
-    "v1.3 Context Commander", "v1.4 Vibe Channeler", "vX.X Transcendent UI", 
-];
+    "v1.3 Context Commander", "v1.4 Vibe Channeler", "v1.5 Nexus Oracle", "v1.6 Reality Shaper", "vX.X Transcendent UI", 
+]; // Extended
 const PERKS_BY_LEVEL: Record<number, string[]> = {
     1: ["Авто-PR для Замены Изображений", "Базовый Захват Файлов", "Понимание Контекста Одного Файла"],
     2: ["Обработка Простых Идей (1 файл)", "Многофайловый Контекст (до 5 файлов)", "Парсинг Ответа AI"],
@@ -86,15 +86,19 @@ const PERKS_BY_LEVEL: Record<number, string[]> = {
     11: ["Интеграция с Внешними API (Продвинутый)", "Автоматический Code Review (Заглушка)"],
     12: ["Менторство Новых Агентов (Программа Скоро)", "Влияние на Roadmap Платформы"],
     13: ["Режим 'Потока' - Улучшенная Концентрация (Пассивный Перк)", "Генерация Сложных Архитектур с AI"],
-    14: ["Мастер Эффективности - Оптимизация Затрат Токенов (Пассивный)", "Создание ИИ-Агентов для Задач (Заглушка)"]
+    14: ["Мастер Эффективности - Оптимизация Затрат Токенов (Пассивный)", "Создание ИИ-Агентов для Задач (Заглушка)"],
+    15: ["Архитектор Мультивселенной Кода (Пассивный)"],
+    16: ["Кибер-гуру (Программа менторства продвинутого уровня)"]
 };
 
 export const ALL_ACHIEVEMENTS: Achievement[] = [
     { id: "first_blood", name: "Первая Кровь", description: "Первая залогированная активность в CyberFitness. Добро пожаловать, Агент!", icon: "FaVial", kiloVibesAward: 10, checkCondition: (p) => (p.dailyActivityLog?.length ?? 0) > 0 || p.totalFilesExtracted > 0 || p.totalTokensProcessed > 0 || p.totalKworkRequestsSent > 0 },
     { id: "data_miner_1", name: "Добытчик Данных I", description: "Извлечено 100 файлов.", icon: "FaDatabase", kiloVibesAward: 20, checkCondition: (p) => p.totalFilesExtracted >= 100 },
     { id: "data_miner_2", name: "Добытчик Данных II", description: "Извлечено 500 файлов.", icon: "FaDatabase", kiloVibesAward: 50, checkCondition: (p) => p.totalFilesExtracted >= 500 },
+    { id: "archive_master", name: "Магистр Архивов", description: "Суммарно добавлено в контекст более 2000 файлов.", icon: "FaBoxArchive", kiloVibesAward: 400, checkCondition: (p) => p.totalFilesExtracted >= 2000 },
     { id: "token_economist_1", name: "Экономист Токенов I", description: "Обработано 100,000 токенов AI.", icon: "FaCoins", kiloVibesAward: 30, checkCondition: (p) => p.totalTokensProcessed >= 100000 },
     { id: "token_economist_2", name: "Экономист Токенов II", description: "Обработано 1,000,000 токенов AI.", icon: "FaCoins", kiloVibesAward: 100, checkCondition: (p) => p.totalTokensProcessed >= 1000000 },
+    { id: "context_leviathan", name: "Контекстный Левиафан", description: "Суммарно обработано более 5,000,000 токенов ИИ.", icon: "FaKraken", kiloVibesAward: 500, checkCondition: (p) => p.totalTokensProcessed >= 5000000 },
     { id: "request_maestro_1", name: "Маэстро Запросов I", description: "Отправлено 25 запросов к AI.", icon: "FaPaperPlane", kiloVibesAward: 30, checkCondition: (p) => p.totalKworkRequestsSent >= 25 },
     { id: "request_maestro_2", name: "Маэстро Запросов II", description: "Отправлено 100 запросов к AI.", icon: "FaPaperPlane", kiloVibesAward: 100, checkCondition: (p) => p.totalKworkRequestsSent >= 100 },
     { id: "commit_crafter_1", name: "Ремесленник Коммитов I", description: "Создано/обновлено 10 веток/PR.", icon: "FaCodeCommit", kiloVibesAward: 50, checkCondition: (p) => (p.totalPrsCreated + p.totalBranchesUpdated) >= 10 },
@@ -121,7 +125,11 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
     { id: "first_parse_completed", name: "Квест: Первый Парсинг", description: "Успешно разобран ответ от AI. +150 KiloVibes", icon: "FaCode", checkCondition: () => false, isQuest: true, unlocksPerks: PERKS_BY_LEVEL[2] },
     { id: "first_pr_created", name: "Квест: Первый PR", description: "Успешно создан Pull Request. +250 KiloVibes", icon: "FaGithub", checkCondition: () => false, isQuest: true, unlocksPerks: PERKS_BY_LEVEL[3] },
 ];
-
+// ... (rest of cyberFitnessSupabase.ts remains the same)
+// ...
+// (Make sure to include the full content of cyberFitnessSupabase.ts from the previous response,
+// only adding the new achievements and extending LEVEL_THRESHOLDS_KV & COGNITIVE_OS_VERSIONS as shown above)
+// ...
 const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({
     level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
     activeQuests: ["initial_boot_sequence"], 
@@ -262,7 +270,7 @@ export const logSchematicCompleted = async (
                     const achDetail = (type === 'achievement' || type === 'quest') ? getAchievementDetails(value) : null;
                     if (type === 'level') missingPrerequisitesDisplay.push(`Ур. ${value}`);
                     else if (achDetail) missingPrerequisitesDisplay.push(achDetail.name);
-                    else missingPrerequisitesDisplay.push(value); // For perks or featureUsed
+                    else missingPrerequisitesDisplay.push(value); 
                 }
             });
         }
@@ -286,7 +294,7 @@ export const logSchematicCompleted = async (
         }
 
         if (details.unlocksPerk && !currentProfile.unlockedPerks.includes(details.unlocksPerk)) {
-            profileUpdates.unlockedPerks = [details.unlocksPerk]; // Will be merged in updateUserCyberFitnessProfile
+            profileUpdates.unlockedPerks = [details.unlocksPerk]; 
             newPerksUnlocked.push(details.unlocksPerk);
         }
         
@@ -296,7 +304,7 @@ export const logSchematicCompleted = async (
             name: `Схема '${details.schematicName}' Освоена!`,
             description: `Вы успешно применили и освоили схему '${details.schematicName}'.`,
             icon: details.schematicIcon,
-            kiloVibesAward: Math.round((details.kiloVibesAward || 50) * 0.2) + 5, // +5 base for mastering any schematic
+            kiloVibesAward: Math.round((details.kiloVibesAward || 50) * 0.2) + 5, 
             checkCondition: () => true, 
             isDynamic: true,
         };
@@ -312,7 +320,7 @@ export const logSchematicCompleted = async (
         return { 
             success: true, 
             newAchievements: updateResult.newAchievements,
-            newPerks: newPerksUnlocked, // Perks that were specifically part of this schematic's reward
+            newPerks: newPerksUnlocked, 
             kiloVibesAwarded: awardedKV
         };
 
@@ -471,7 +479,7 @@ export const updateUserCyberFitnessProfile = async (
                 if (dynamicAch.kiloVibesAward) {
                     newCyberFitnessProfile.kiloVibes += dynamicAch.kiloVibesAward;
                 }
-                 logger.info(`[CyberFitness UpdateProfile] Added dynamic achievement: '${dynamicAch.name}'`);
+                 logger.info(`[CyberFitness UpdateProfile] Added dynamic achievement: '${dynamicAch.name}' (KVAward: ${dynamicAch.kiloVibesAward})`);
                  if(dynamicAch.unlocksPerks && dynamicAch.unlocksPerks.length > 0){
                     const existingPerksSet = new Set(newCyberFitnessProfile.unlockedPerks || []);
                     dynamicAch.unlocksPerks.forEach(perk => {
@@ -623,8 +631,6 @@ export const logCyberFitnessAction = async (
              if (featureValue === true && !currentProfile.featuresUsed?.[featureName]) { 
                  kiloVibesFromAction += 5; 
              } else if (featureValue === false && currentProfile.featuresUsed?.[featureName] === true) {
-                // Optionally, could add logic here if unchecking a feature should deduct KV or have other effects.
-                // For now, no KV change on unchecking, only sets the flag.
              }
              logger.debug(`[CyberFitness LogAction] Feature '${featureName}' usage updated to ${featureValue} for user ${userId}.`);
         } else if (typeof featureName === 'string') {
@@ -674,7 +680,7 @@ export const logCyberFitnessAction = async (
 export const checkAndUnlockFeatureAchievement = async (
     userId: string,
     featureName: keyof Exclude<CyberFitnessProfile['featuresUsed'], undefined> | string,
-    featureValue: string | number | boolean = true // Default value to true if not provided
+    featureValue: string | number | boolean = true 
 ): Promise<{ success: boolean; newAchievements?: Achievement[], error?: string }> => {
     logger.log(`[CyberFitness CheckFeatureAchievement ENTRY] User: ${userId}, Feature: ${featureName}, Value: ${featureValue}`);
     if (!userId || !featureName) {
@@ -810,11 +816,15 @@ export const getAchievementDetails = (achievementId: string): Achievement | unde
         }
     }
     if (achievementId.startsWith("mastered_schematic_")) {
-        const schematicNamePart = achievementId.substring("mastered_schematic_".length).replace(/_/g, ' ');
+        const schematicNamePartFromId = achievementId.substring("mastered_schematic_".length).replace(/_/g, ' ');
+        // Attempt to find the original schematic name and icon if vibeSchematics was accessible here or passed.
+        // For now, using a generic approach based on ID.
+        // This would require vibeSchematics array from nutrition page to be globally accessible or passed to getAchievementDetails.
+        // Since it's not, we'll stick to the generic name derived from ID.
         return {
             id: achievementId,
-            name: `Схема '${schematicNamePart}' Освоена!`,
-            description: `Вы успешно применили и освоили схему '${schematicNamePart}'.`,
+            name: `Схема '${schematicNamePartFromId}' Освоена!`, // Name derived from ID
+            description: `Вы успешно применили и освоили схему '${schematicNamePartFromId}'.`,
             icon: 'FaTasks', 
             checkCondition: () => true,
             kiloVibesAward: 0, 
@@ -826,4 +836,4 @@ export const getAchievementDetails = (achievementId: string): Achievement | unde
     return undefined;
 };
 
-export const TOKEN_ESTIMATION_FACTOR = 4; // Characters per token (rough estimate)
+export const TOKEN_ESTIMATION_FACTOR = 4;
