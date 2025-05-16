@@ -88,7 +88,7 @@ export const IconReplaceTool: React.FC<IconReplaceToolProps> = ({ oldIconNameInp
             <div className="text-xs text-gray-400">
                 Искать иконки: {' '}
                 <Link href="https://react-icons.github.io/react-icons/search/#q=Fa" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">
-                    React Icons (Fa6) <VibeContentRenderer content="::FaArrowUpRightFromSquare className='h-2.5 w-2.5':" />
+                    React Icons (Fa6) <VibeContentRenderer content="::FaArrowUpRightFromSquare className='h-2.5 w-2.5'::" />
                 </Link>
             </div>
             
@@ -99,7 +99,7 @@ export const IconReplaceTool: React.FC<IconReplaceToolProps> = ({ oldIconNameInp
                      <TooltipProvider delayDuration={100}>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <button type="button" className="ml-1 text-gray-500 hover:text-gray-300"><VibeContentRenderer content="::FaInfoCircle::" /></button>
+                                <button type="button" className="ml-1 text-gray-500 hover:text-gray-300"><VibeContentRenderer content="::FaCircleInfo::" /></button>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="bg-popover text-popover-foreground border-border shadow-lg text-xs p-1.5 rounded max-w-[250px]">
                                 <p>Напр: `className='text-red-500 mr-2' size={20}`</p>
@@ -134,8 +134,8 @@ export const IconReplaceTool: React.FC<IconReplaceToolProps> = ({ oldIconNameInp
                     size="sm"
                     className="text-xs bg-cyan-600 hover:bg-cyan-500"
                 >
-                    <VibeContentRenderer content="::FaPaperPlane className='mr-1.5 text-xs':F" />
-                    Заменить Иконку
+                    <VibeContentRenderer content="::FaPaperPlane className='mr-1.5 text-xs'::" />
+                    <span className="ml-1">Заменить Иконку</span>
                 </Button>
             </div>
         </motion.div>
