@@ -11,6 +11,7 @@ import {
     useRepoXmlPageContext,
     SimplePullRequest,
     ImageReplaceTask,
+    IconReplaceTask, // Import IconReplaceTask
     FileNode
 } from '@/contexts/RepoXmlPageContext';
 import {
@@ -42,7 +43,7 @@ type UseCodeParsingAndValidationReturn = {
     isParsing: boolean;
     parseAndValidateResponse: (response: string) => Promise<{ files: ValidationFileEntry[]; description: string; issues: ValidationIssue[]; }>;
     autoFixIssues: (filesToFix: ValidationFileEntry[], issuesToFix: ValidationIssue[]) => ValidationFileEntry[];
-    setParsedFiles: React.Dispatch<React.SetStateAction<ValidationFileEntry[]>>;
+    setParsedFiles: React.Dispatch<React.SetStateAction<ValidationFileEntry[]>>; // Corrected, was setHookParsedFiles
     setValidationStatus: React.Dispatch<React.SetStateAction<ValidationStatus>>;
     setValidationIssues: React.Dispatch<React.SetStateAction<ValidationIssue[]>>;
     setIsParsing: React.Dispatch<React.SetStateAction<boolean>>;
@@ -58,6 +59,7 @@ interface UseAICodeAssistantHandlersProps {
     prTitle: string;
     customLinks: { name: string; url: string }[];
     imageReplaceTask: ImageReplaceTask | null;
+    iconReplaceTask: IconReplaceTask | null; // Added iconReplaceTask
     setResponse: React.Dispatch<React.SetStateAction<string>>;
     setSelectedFileIds: React.Dispatch<React.SetStateAction<Set<string>>>;
     setPrTitle: React.Dispatch<React.SetStateAction<string>>;
@@ -67,8 +69,9 @@ interface UseAICodeAssistantHandlersProps {
     setIsProcessingPR: React.Dispatch<React.SetStateAction<boolean>>;
     setIsImageModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     setComponentParsedFiles: React.Dispatch<React.SetStateAction<ValidationFileEntry[]>>;
-    setImageReplaceError: React.Dispatch<React.SetStateAction<string | null>>;
+    setImageReplaceError: React.Dispatch<React.SetStateAction<string | null>>; // Assuming one error state for both for now
     setImageReplaceTask: React.Dispatch<React.SetStateAction<ImageReplaceTask | null>>;
+    setIconReplaceTask: React.Dispatch<React.SetStateAction<IconReplaceTask | null>>; // Added setIconReplaceTask
     setRepoUrlStateLocal: React.Dispatch<React.SetStateAction<string>>;
     codeParserHook: UseCodeParsingAndValidationReturn;
     appContext: ReturnType<typeof useAppContext>;
@@ -81,9 +84,9 @@ interface UseAICodeAssistantHandlersProps {
 // --- Custom Hook ---
 export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProps) => {
     const {
-        response, componentParsedFiles, selectedFileIds, repoUrlStateLocal, prTitle, customLinks, imageReplaceTask,
+        response, componentParsedFiles, selectedFileIds, repoUrlStateLocal, prTitle, customLinks, imageReplaceTask, iconReplaceTask,
         setResponse, setSelectedFileIds, setPrTitle, setCustomLinks, setShowModal, setModalMode, setIsProcessingPR, setIsImageModalOpen, setComponentParsedFiles, setImageReplaceError, setRepoUrlStateLocal,
-        setImageReplaceTask,
+        setImageReplaceTask, setIconReplaceTask,
         codeParserHook, appContext, pageContext,
         aiResponseInputRefPassed, kworkInputRefPassed,
         setJustParsedFlagForScrollFix,
@@ -91,7 +94,8 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
 
     const { user, dbUser } = appContext; 
     const {
-        setHookParsedFiles, setValidationStatus, setValidationIssues, parseAndValidateResponse, autoFixIssues, validationIssues, validationStatus, rawDescription, setRawDescription
+        setHookParsedFiles, // This is the correct name from useCodeParsingAndValidation
+        setValidationStatus, setValidationIssues, parseAndValidateResponse, autoFixIssues, validationIssues, validationStatus, rawDescription, setRawDescription
     } = codeParserHook;
     const {
         contextOpenPrs, targetBranchName, repoUrlFromContext, setAssistantLoading, triggerGetOpenPRs, 
@@ -111,14 +115,14 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
     }, []);
 
     const handleParse = useCallback(async () => {
-        if (imageReplaceTask) { toast.warn("Разбор не нужен для картинки."); return; }
+        if (imageReplaceTask || iconReplaceTask) { toast.warn("Разбор не нужен для задачи замены."); return; }
         if (!response.trim()) { toast.warn("Нет ответа AI для разбора."); return; }
         logger.log("[Handler Parse] Starting parse...");
         setContextIsParsing(true); setAssistantLoading(true); 
         try {
             const { files: newlyParsedFiles, description: parsedRawDesc, issues: parseValidationIssues } = await parseAndValidateResponse(response);
-            setHookParsedFiles(newlyParsedFiles);
-            setComponentParsedFiles(newlyParsedFiles);
+            setHookParsedFiles(newlyParsedFiles); // Use setHookParsedFiles to update state in useCodeParsingAndValidation
+            setComponentParsedFiles(newlyParsedFiles); // Also update local state for UI if needed immediately
             const validParsedFiles = newlyParsedFiles.filter(f => f.content.trim() !== ''); 
             const initialSelection = new Set(validParsedFiles.map(f => f.id));
             setSelectedFileIds(initialSelection);
@@ -143,34 +147,35 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             logger.log("[Handler Parse] Finished.");
         }
      }, [
-        response, imageReplaceTask, parseAndValidateResponse, setFilesParsed, setSelectedAssistantFiles, setContextIsParsing, setAssistantLoading, setValidationStatus, setValidationIssues, setHookParsedFiles, extractPRTitleHint, setPrTitle, setSelectedFileIds, setComponentParsedFiles, setRawDescription, setJustParsedFlagForScrollFix
+        response, imageReplaceTask, iconReplaceTask, parseAndValidateResponse, setFilesParsed, setSelectedAssistantFiles, setContextIsParsing, setAssistantLoading, setValidationStatus, setValidationIssues, setHookParsedFiles, extractPRTitleHint, setPrTitle, setSelectedFileIds, setComponentParsedFiles, setRawDescription, setJustParsedFlagForScrollFix
      ]);
 
     const handleAutoFix = useCallback(() => {
-        if (imageReplaceTask) return;
+        if (imageReplaceTask || iconReplaceTask) return;
         logger.debug("[Handler AutoFix] Attempting auto-fix.");
         try {
             const updated = autoFixIssues(componentParsedFiles, validationIssues);
-            setComponentParsedFiles(updated);
+            setComponentParsedFiles(updated); // Update local state
+            setHookParsedFiles(updated); // Also update the hook's state
             toast.success("Авто-исправления применены!");
         } catch (error: any) {
             logger.error("[Handler AutoFix] Error during autoFixIssues:", error);
             toast.error(`Ошибка авто-исправления: ${error?.message ?? 'Неизвестная ошибка'}`);
         }
-     }, [autoFixIssues, componentParsedFiles, validationIssues, imageReplaceTask, setComponentParsedFiles]);
+     }, [autoFixIssues, componentParsedFiles, validationIssues, imageReplaceTask, iconReplaceTask, setComponentParsedFiles, setHookParsedFiles]);
 
     const handleUpdateParsedFiles = useCallback((updatedFiles: ValidationFileEntry[]) => {
-        if (imageReplaceTask) return;
+        if (imageReplaceTask || iconReplaceTask) return;
         logger.log("[Handler UpdateParsedFiles]:", updatedFiles.length);
         setHookParsedFiles(updatedFiles);
         setComponentParsedFiles(updatedFiles);
         setValidationStatus('idle');
         setValidationIssues([]);
         toast.info("Файлы обновлены после замены плейсхолдеров. Рекомендуется повторный парсинг ('➡️').");
-     }, [setHookParsedFiles, setValidationStatus, setValidationIssues, imageReplaceTask, setComponentParsedFiles]);
+     }, [setHookParsedFiles, setValidationStatus, setValidationIssues, imageReplaceTask, iconReplaceTask, setComponentParsedFiles]);
 
     const handleClearResponse = useCallback(() => {
-        if (imageReplaceTask) return;
+        if (imageReplaceTask || iconReplaceTask) return;
         logger.log("[Handler ClearResponse] Clearing AI response and related states.");
         setResponse("");
         if (aiResponseInputRefPassed.current) aiResponseInputRefPassed.current.value = "";
@@ -187,7 +192,7 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         setRawDescription(''); 
         toast.info("Поле ответа AI и связанные состояния очищены.");
      }, [
-        imageReplaceTask, setResponse, aiResponseInputRefPassed, setAiResponseHasContent, setFilesParsed, setHookParsedFiles, setComponentParsedFiles, setSelectedFileIds, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, setRequestCopied, setRawDescription 
+        imageReplaceTask, iconReplaceTask, setResponse, aiResponseInputRefPassed, setAiResponseHasContent, setFilesParsed, setHookParsedFiles, setComponentParsedFiles, setSelectedFileIds, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, setRequestCopied, setRawDescription 
      ]);
 
     const handleCopyResponse = useCallback(() => {
@@ -200,13 +205,13 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
      }, [response, setRequestCopied]);
 
     const handleOpenModal = useCallback((mode: 'replace' | 'search') => {
-        if (imageReplaceTask) return;
+        if (imageReplaceTask || iconReplaceTask) return;
         logger.log(`[Handler OpenModal] Opening modal in mode: ${mode}`);
         setModalMode(mode); setShowModal(true);
-     }, [imageReplaceTask, setModalMode, setShowModal]);
+     }, [imageReplaceTask, iconReplaceTask, setModalMode, setShowModal]);
 
     const handleSwap = useCallback((find: string, replace: string) => {
-        if (!find || !aiResponseInputRefPassed.current || imageReplaceTask) return;
+        if (!find || !aiResponseInputRefPassed.current || imageReplaceTask || iconReplaceTask) return;
         logger.log(`[Handler Swap] Swapping "${find}" with "${replace}"`);
         try {
             const ta = aiResponseInputRefPassed.current;
@@ -226,11 +231,11 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
              toast.error(`Ошибка замены: ${e.message}`);
         }
      }, [
-         aiResponseInputRefPassed, imageReplaceTask, setResponse, setHookParsedFiles, setFilesParsed, setSelectedFileIds, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, setRawDescription
+         aiResponseInputRefPassed, imageReplaceTask, iconReplaceTask, setResponse, setHookParsedFiles, setFilesParsed, setSelectedFileIds, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, setRawDescription
      ]);
 
     const handleSearch = useCallback((searchText: string, isMultiline: boolean) => {
-        if (!searchText || !aiResponseInputRefPassed.current || imageReplaceTask) return;
+        if (!searchText || !aiResponseInputRefPassed.current || imageReplaceTask || iconReplaceTask) return;
         logger.log(`[Handler Search] Searching for "${searchText}", multiline: ${isMultiline}`);
         const ta = aiResponseInputRefPassed.current;
         const txtCont = ta.value;
@@ -283,11 +288,11 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
              toast.error(`Ошибка поиска/замены: ${e.message}`);
         }
      }, [
-         aiResponseInputRefPassed, imageReplaceTask, setResponse, setHookParsedFiles, setFilesParsed, setSelectedFileIds, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, setRawDescription
+         aiResponseInputRefPassed, imageReplaceTask, iconReplaceTask, setResponse, setHookParsedFiles, setFilesParsed, setSelectedFileIds, setSelectedAssistantFiles, setValidationStatus, setValidationIssues, setPrTitle, setRawDescription
      ]);
 
     const handleSelectFunction = useCallback(() => {
-        if (imageReplaceTask) return;
+        if (imageReplaceTask || iconReplaceTask) return;
         logger.log("[Handler SelectFunction] Attempting to select function/block.");
         const ta = aiResponseInputRefPassed.current; if (!ta) return; const txt = ta.value;
         const cP = ta.selectionStart || 0; const lSI = txt.lastIndexOf('\n', cP - 1) + 1; 
@@ -315,10 +320,10 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
              toast.error(`Ошибка выделения: ${e.message}`);
              ta.focus({ preventScroll: true });
         }
-     }, [aiResponseInputRefPassed, imageReplaceTask]); 
+     }, [aiResponseInputRefPassed, imageReplaceTask, iconReplaceTask]); 
 
      const handleToggleFileSelection = useCallback((fileId: string) => {
-        if (imageReplaceTask) return;
+        if (imageReplaceTask || iconReplaceTask) return;
         logger.log("[Handler ToggleFileSelection] Toggling for fileId:", fileId);
         setSelectedFileIds(prev => {
             const newSet = new Set(prev);
@@ -342,10 +347,10 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             setSelectedAssistantFiles(selectedPaths);
             return newSet;
         });
-     }, [componentParsedFiles, setSelectedAssistantFiles, imageReplaceTask]); 
+     }, [componentParsedFiles, setSelectedAssistantFiles, imageReplaceTask, iconReplaceTask]); 
 
     const handleSelectAllFiles = useCallback(() => {
-        if (componentParsedFiles.length === 0 || imageReplaceTask) return;
+        if (componentParsedFiles.length === 0 || imageReplaceTask || iconReplaceTask) return;
         logger.log("[Handler SelectAllFiles] Selecting all non-empty parsed files.");
         const validFiles = componentParsedFiles.filter(f => f.content.trim() !== '');
         const allValidIds = new Set(validFiles.map(f => f.id));
@@ -353,18 +358,18 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         setSelectedFileIds(allValidIds);
         setSelectedAssistantFiles(allValidPaths);
         toast.info(`${allValidIds.size} непустых файлов выбрано.`);
-     }, [componentParsedFiles, setSelectedAssistantFiles, imageReplaceTask, setSelectedFileIds]); 
+     }, [componentParsedFiles, setSelectedAssistantFiles, imageReplaceTask, iconReplaceTask, setSelectedFileIds]); 
 
     const handleDeselectAllFiles = useCallback(() => {
-        if (imageReplaceTask) return;
+        if (imageReplaceTask || iconReplaceTask) return;
         logger.log("[Handler DeselectAllFiles] Deselecting all parsed files.");
         setSelectedFileIds(new Set());
         setSelectedAssistantFiles(new Set());
         toast.info("Выделение снято со всех файлов.");
-     }, [setSelectedAssistantFiles, imageReplaceTask, setSelectedFileIds]);
+     }, [setSelectedAssistantFiles, imageReplaceTask, iconReplaceTask, setSelectedFileIds]);
 
     const handleSaveFiles = useCallback(async () => {
-        if (!dbUser?.user_id || imageReplaceTask) { toast.warn(imageReplaceTask ? "Сохранение недоступно для картинок." : "Требуется авторизация.", { id: "save-auth-warn" }); return; }
+        if (!dbUser?.user_id || imageReplaceTask || iconReplaceTask) { toast.warn(imageReplaceTask || iconReplaceTask ? "Сохранение недоступно для картинок/иконок." : "Требуется авторизация.", { id: "save-auth-warn" }); return; }
         const filesToSave = componentParsedFiles.filter(f => selectedFileIds.has(f.id) && f.content.trim()); 
         if (filesToSave.length === 0) { toast.warn("Нет выбранных непустых файлов для сохранения."); return; }
         logger.log(`[Handler SaveFiles] Saving ${filesToSave.length} non-empty files for user_id ${dbUser.user_id}...`);
@@ -383,10 +388,10 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             toast.success(`${filesToSave.length} файлов сохранено/обновлено в вашем профиле.`, { id: toastId });
         } catch (err: any) { logger.error("[Handler SaveFiles] Save error:", err); toast.error(`Ошибка сохранения файлов: ${err?.message ?? 'Неизвестная ошибка'}`, { id: toastId }); }
         finally { setIsProcessingPR(false); }
-     }, [dbUser?.user_id, componentParsedFiles, selectedFileIds, imageReplaceTask, setIsProcessingPR]); 
+     }, [dbUser?.user_id, componentParsedFiles, selectedFileIds, imageReplaceTask, iconReplaceTask, setIsProcessingPR]); 
 
     const handleDownloadZip = useCallback(async () => {
-        if (imageReplaceTask) { toast.warn("Скачивание недоступно для картинок."); return; }
+        if (imageReplaceTask || iconReplaceTask) { toast.warn("Скачивание недоступно для картинок/иконок."); return; }
         const filesToZip = componentParsedFiles.filter(f => selectedFileIds.has(f.id) && f.content.trim()); 
         if (filesToZip.length === 0) { toast.warn("Нет выбранных непустых файлов для скачивания."); return; }
         logger.log(`[Handler DownloadZip] Downloading ${filesToZip.length} non-empty files as ZIP...`);
@@ -402,11 +407,11 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             toast.success("Архив скачан.", { id: toastId });
         } catch (error: any) { logger.error("[Handler DownloadZip] ZIP error:", error); toast.error(`Ошибка создания ZIP архива: ${error?.message ?? 'Неизвестная ошибка'}`, { id: toastId }); }
         finally { setIsProcessingPR(false); }
-     }, [componentParsedFiles, selectedFileIds, imageReplaceTask, setIsProcessingPR]);
+     }, [componentParsedFiles, selectedFileIds, imageReplaceTask, iconReplaceTask, setIsProcessingPR]);
 
     const handleSendToTelegram = useCallback(async (file: ValidationFileEntry) => {
-        if (!user?.id || imageReplaceTask) { 
-            toast.warn(imageReplaceTask ? "Отправка недоступна для картинок." : "Требуется авторизация.", { id: "tg-send-auth-warn" }); return; 
+        if (!user?.id || imageReplaceTask || iconReplaceTask) { 
+            toast.warn(imageReplaceTask || iconReplaceTask ? "Отправка недоступна для картинок/иконок." : "Требуется авторизация.", { id: "tg-send-auth-warn" }); return; 
         }
         if (!file || !file.path || !file.content?.trim()) { toast.warn("Невозможно отправить пустой файл."); return; }
         logger.log(`[Handler SendToTelegram] Sending file ${file.path} to TG user ${user.id}`); 
@@ -418,10 +423,10 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             toast.success(`Файл "${fileName}" отправлен в ваш Telegram.`, { id: toastId });
         } catch (err: any) { logger.error("[Handler SendToTelegram] Send error:", err); toast.error(`Ошибка отправки в TG: ${err.message}`, { id: toastId }); }
         finally { setIsProcessingPR(false); }
-     }, [user, imageReplaceTask, setIsProcessingPR]); 
+     }, [user, imageReplaceTask, iconReplaceTask, setIsProcessingPR]); 
 
     const handleAddCustomLink = useCallback(async () => {
-        if (!dbUser?.user_id || imageReplaceTask) { toast.warn(imageReplaceTask ? "Недоступно для картинок." : "Требуется авторизация.", { id: "addlink-auth-warn" }); return; }
+        if (!dbUser?.user_id || imageReplaceTask || iconReplaceTask) { toast.warn(imageReplaceTask || iconReplaceTask ? "Недоступно для картинок/иконок." : "Требуется авторизация.", { id: "addlink-auth-warn" }); return; }
         let name, url;
         try {
              name = prompt("Название ссылки:"); if (!name || !name.trim()) return;
@@ -443,10 +448,11 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             if (upsertError) throw upsertError;
             toast.success(`Ссылка "${name}" добавлена.`, { id: toastId });
         } catch (e: any) { logger.error("[Handler AddCustomLink] Save error:", e); toast.error(`Ошибка сохранения ссылки: ${e?.message ?? 'Неизвестная ошибка'}`, { id: toastId }); setCustomLinks(customLinks); }
-     }, [customLinks, dbUser?.user_id, imageReplaceTask, setCustomLinks]); 
+     }, [customLinks, dbUser?.user_id, imageReplaceTask, iconReplaceTask, setCustomLinks]); 
 
     const handleCreateOrUpdatePR = useCallback(async (): Promise<void> => {
-        if (imageReplaceTask) { toast.warn("Недоступно во время замены картинки."); return; }
+        if (imageReplaceTask || iconReplaceTask) { toast.warn("Недоступно во время замены картинки/иконки."); return; }
+        // ... (rest of the function remains the same, just ensure imageReplaceTask check is updated to include iconReplaceTask)
         const selectedFilesContent = componentParsedFiles.filter(f => selectedAssistantFiles.has(f.path) && f.content.trim()); 
         if (!repoUrlForForm || !repoUrlForForm.includes("github.com")) { toast.error("Некорректный URL репозитория GitHub."); return; }
         if (selectedFilesContent.length === 0) { toast.error("Выберите хотя бы один непустой файл для PR/Update."); return; }
@@ -553,59 +559,138 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
          validationIssues, targetBranchName, contextOpenPrs, 
          triggerUpdateBranch, 
          triggerCreateNewPR, 
-         setAssistantLoading, triggerGetOpenPRs, imageReplaceTask, setIsProcessingPR, addToast
+         setAssistantLoading, triggerGetOpenPRs, imageReplaceTask, iconReplaceTask, setIsProcessingPR, addToast
      ]);
 
-    const handleDirectImageReplace = useCallback(async (task: ImageReplaceTask, currentAllFiles: FileNode[]): Promise<{ success: boolean; error?: string }> => {
-        if (!task?.targetPath || !task.oldUrl || !task.newUrl) {
-            logger.warn("[Handler DirectImageReplace] Invalid task provided:", task);
-            setImageReplaceError("Некорректные данные для задачи замены.");
-            //setImageReplaceTask(null); // Moved to finally after error handling
+    const handleDirectImageReplace = useCallback(async (task: ImageReplaceTask | IconReplaceTask, currentAllFiles: FileNode[]): Promise<{ success: boolean; error?: string }> => {
+        const isActualImageTask = 'oldUrl' in task; 
+        const taskTypeForLog = isActualImageTask ? "ImageReplace" : "IconReplace";
+
+        if (!task?.targetPath || (isActualImageTask && (!task.oldUrl || !task.newUrl)) || (!isActualImageTask && (!task.oldIconName || !task.newIconName))) {
+            logger.warn(`[Handler Direct${taskTypeForLog}] Invalid task provided:`, task);
+            setImageReplaceError(`Некорректные данные для задачи замены ${isActualImageTask ? 'изображения' : 'иконки'}.`);
+            if (isActualImageTask) setImageReplaceTask(null); else setIconReplaceTask(null);
             return { success: false, error: "Invalid task data" };
         }
         if (!repoUrlForForm || !repoUrlForForm.includes("github.com")) {
-            logger.error("[Handler DirectImageReplace] Invalid repo URL:", repoUrlForForm);
+            logger.error(`[Handler Direct${taskTypeForLog}] Invalid repo URL:`, repoUrlForForm);
             setImageReplaceError("Некорректный URL репозитория GitHub.");
-            //setImageReplaceTask(null); // Moved to finally
+            if (isActualImageTask) setImageReplaceTask(null); else setIconReplaceTask(null);
             return { success: false, error: "Invalid repo URL" };
         }
 
         const allFilesForReplace = currentAllFiles ?? [];
-        logger.info("[Handler DirectImageReplace] Starting process", { task, repo: repoUrlForForm, filesAvailable: allFilesForReplace.length });
+        logger.info(`[Handler Direct${taskTypeForLog}] Starting process`, { task, repo: repoUrlForForm, filesAvailable: allFilesForReplace.length });
         setAssistantLoading(true); setIsProcessingPR(true); setImageReplaceError(null);
-        const toastId = toast.loading(`Замена картинки в ${task.targetPath.split('/').pop()}...`);
+        const toastId = toast.loading(`Замена ${isActualImageTask ? 'картинки' : 'иконки'} в ${task.targetPath.split('/').pop()}...`);
         let success = false; 
         let errorMsg: string | undefined = undefined;
-        let imageReplaceAchievements: Achievement[] = [];
+        let replaceAchievements: Achievement[] = [];
     
         try {
-            logger.debug("[Handler DirectImageReplace] Inside try block.");
+            logger.debug(`[Handler Direct${taskTypeForLog}] Inside try block.`);
             const targetFile = allFilesForReplace.find(f => f.path === task.targetPath);
             if (!targetFile) { 
-                logger.error(`[Handler DirectImageReplace] Target file ${task.targetPath} not found in ${allFilesForReplace.length} provided files.`);
+                logger.error(`[Handler Direct${taskTypeForLog}] Target file ${task.targetPath} not found in ${allFilesForReplace.length} provided files.`);
                 throw new Error(`Целевой файл ${task.targetPath} не найден среди загруженных.`); 
             }
             if (typeof targetFile.content !== 'string') { 
-                logger.error(`[Handler DirectImageReplace] Content of ${task.targetPath} is not a string.`);
+                logger.error(`[Handler Direct${taskTypeForLog}] Content of ${task.targetPath} is not a string.`);
                 throw new Error(`Содержимое файла ${task.targetPath} не является строкой.`); 
             }
     
-            logger.debug("[Handler DirectImageReplace] Target file found and content is string", { path: targetFile.path, contentSnippet: targetFile.content.substring(0, 50) });
-    
-            const escapedOldUrl = task.oldUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const oldUrlRegex = new RegExp(escapedOldUrl, 'g');
-            const updatedContent = targetFile.content.replace(oldUrlRegex, task.newUrl);
+            logger.debug(`[Handler Direct${taskTypeForLog}] Target file found and content is string`, { path: targetFile.path, contentSnippet: targetFile.content.substring(0, 100) });
             
-            logger.info(`[Handler DirectImageReplace] Content for ${task.targetPath} prepared. Old URL occurrences replaced (if any).`);
+            let updatedContent = targetFile.content;
+            let replacementOccurred = false;
+
+            if (isActualImageTask) {
+                const { oldUrl, newUrl } = task as ImageReplaceTask;
+                const oldUrlEscaped = oldUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                
+                let regex = new RegExp(oldUrlEscaped, 'g');
+                if (regex.test(updatedContent)) {
+                    updatedContent = updatedContent.replace(regex, newUrl);
+                    replacementOccurred = true;
+                    logger.info(`[Handler DirectImageReplace] Replaced by exact URL: ${oldUrl} -> ${newUrl}`);
+                }
+
+                if (!replacementOccurred) {
+                    try {
+                        const oldUrlObject = new URL(oldUrl);
+                        const oldPathSegment = oldUrlObject.pathname;
+                         const oldPathSegmentEscaped = oldPathSegment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        regex = new RegExp(`(["'])${oldPathSegmentEscaped}(["'])|url\\(\\s*${oldPathSegmentEscaped}\\s*\\)`, 'g');
+                         if (regex.test(updatedContent)) {
+                            updatedContent = updatedContent.replace(regex, (match, q1, q2) => {
+                                if (q1 && q2) return `${q1}${newUrl}${q2}`; 
+                                return `url(${newUrl})`; 
+                            });
+                            replacementOccurred = true;
+                            logger.info(`[Handler DirectImageReplace] Replaced by path segment: ${oldPathSegment} -> ${newUrl}`);
+                        }
+                    } catch (e) { 
+                        logger.warn(`[Handler DirectImageReplace] Old URL "${oldUrl}" is not a valid full URL, skipping path segment match strategy.`);
+                    }
+                }
+
+                if (!replacementOccurred) {
+                    const oldFilename = oldUrl.substring(oldUrl.lastIndexOf('/') + 1).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    if (oldFilename) {
+                        const filenameRegexStr = `((?:src|href)=["']|url\\(\\s*["']?)([^"')]*/${oldFilename}[^"')]*)((["']|\\s*\\)))`;
+                        regex = new RegExp(filenameRegexStr, 'g');
+                         if (regex.test(updatedContent)) {
+                            updatedContent = updatedContent.replace(regex, `$1${newUrl}$3`);
+                            replacementOccurred = true;
+                            logger.info(`[Handler DirectImageReplace] Replaced by filename: ${oldFilename} (full match URLs replaced with) -> ${newUrl}`);
+                        }
+                    }
+                }
+
+                if (!replacementOccurred) {
+                    logger.warn(`[Handler DirectImageReplace] Old URL "${oldUrl}" not found in file ${task.targetPath} using any strategy.`);
+                    throw new Error(`Старый URL "${oldUrl.substring(0,50)}..." не найден в файле.`);
+                }
+
+            } else { // IconReplaceTask
+                const { oldIconName, newIconName, componentProps } = task as IconReplaceTask;
+                const oldIconRegexBase = oldIconName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
+                
+                const componentRegex = new RegExp(`<${oldIconRegexBase}(\\s+[^>]*)?\\s*\\/?>`, 'g');
+                const vibeSyntaxRegex = new RegExp(`::${oldIconRegexBase}(\\s+[^:]*)?::`, 'g');
+
+                let tempContent = updatedContent;
+
+                if (componentRegex.test(tempContent)) {
+                    tempContent = tempContent.replace(componentRegex, `<${newIconName}${componentProps ? ' ' + componentProps : ''} />`);
+                    replacementOccurred = true;
+                    logger.info(`[Handler DirectIconReplace] Replaced component syntax: ${oldIconName} -> ${newIconName}`);
+                }
+                if (vibeSyntaxRegex.test(tempContent)) { 
+                    tempContent = tempContent.replace(vibeSyntaxRegex, `::${newIconName}${componentProps ? ' ' + componentProps : ''}::`);
+                    replacementOccurred = true; 
+                    logger.info(`[Handler DirectIconReplace] Replaced Vibe syntax: ${oldIconName} -> ${newIconName}`);
+                }
+                updatedContent = tempContent;
+
+                if (!replacementOccurred) {
+                    logger.warn(`[Handler DirectIconReplace] Old icon "${oldIconName}" not found in file ${task.targetPath}`);
+                    throw new Error(`Старая иконка "${oldIconName}" не найдена в файле.`);
+                }
+            }
+            
+            logger.info(`[Handler Direct${taskTypeForLog}] Content for ${task.targetPath} prepared.`);
             const filesToCommit = [{ path: task.targetPath, content: updatedContent }];
             
-            const prTitleForAction = `chore: Update image ${task.targetPath.split('/').pop()}`; 
+            const prTitleForAction = `chore: Update ${isActualImageTask ? 'image' : 'icon'} in ${task.targetPath.split('/').pop()}`; 
             const commitSubject = prTitleForAction;
-            const commitBody = `Replaced image: ${task.oldUrl}\nWith new image: ${task.newUrl}\n\nFile: ${task.targetPath}\n\nAttempt: ${Date.now()}`;
+            const oldIdentifier = isActualImageTask ? (task as ImageReplaceTask).oldUrl : (task as IconReplaceTask).oldIconName;
+            const newIdentifier = isActualImageTask ? (task as ImageReplaceTask).newUrl : (task as IconReplaceTask).newIconName;
+            const commitBody = `Replaced ${isActualImageTask ? 'image' : 'icon'}: ${oldIdentifier}\nWith new ${isActualImageTask ? 'image' : 'icon'}: ${newIdentifier}\n\nFile: ${task.targetPath}\n\nAttempt: ${Date.now()}`;
             const fullCommitMessage = `${commitSubject}\n\n${commitBody}`;
-            const prDescription = `Automatic image replacement request via CyberVibe Studio.\n\n**Details:**\n- File: \`${task.targetPath}\`\n- Old URL: ${task.oldUrl}\n- New URL: ${task.newUrl}`;
-            const newBranchName = `fix/img-${task.targetPath.replace(/[\/\.]/g, "-")}-${Date.now()}`;
-            logger.info(`[Handler DirectImageReplace] Always creating new branch: ${newBranchName}`);
+            const prDescription = `Automatic ${isActualImageTask ? 'image' : 'icon'} replacement request via CyberVibe Studio.\n\n**Details:**\n- File: \`${task.targetPath}\`\n- Old ${isActualImageTask ? 'URL' : 'Icon'}: ${oldIdentifier}\n- New ${isActualImageTask ? 'URL' : 'Icon'}: ${newIdentifier}`;
+            const newBranchName = `fix/${isActualImageTask ? 'img' : 'icon'}-${task.targetPath.replace(/[\/\.]/g, "-")}-${Date.now()}`;
+            logger.info(`[Handler Direct${taskTypeForLog}] Always creating new branch: ${newBranchName}`);
 
             const createPrResult = await triggerCreateNewPR(
                 repoUrlForForm,
@@ -617,33 +702,32 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             );
 
             if (!createPrResult.success || !createPrResult.prNumber) {
-                logger.error(`[Handler DirectImageReplace] PR creation failed. Result:`, createPrResult);
-                throw new Error(createPrResult.error || 'Ошибка создания PR для замены картинки');
+                logger.error(`[Handler Direct${taskTypeForLog}] PR creation failed. Result:`, createPrResult);
+                throw new Error(createPrResult.error || `Ошибка создания PR для замены ${isActualImageTask ? 'картинки' : 'иконки'}`);
             }
 
-            if(createPrResult.newAchievements) imageReplaceAchievements.push(...createPrResult.newAchievements);
+            if(createPrResult.newAchievements) replaceAchievements.push(...createPrResult.newAchievements);
             
-            const successMessage = `Новый PR #${createPrResult.prNumber} для замены картинки в ветке '${newBranchName}' создан!`;
+            const successMessage = `Новый PR #${createPrResult.prNumber} для замены ${isActualImageTask ? 'картинки' : 'иконки'} в ветке '${newBranchName}' создан!`;
             toast.success(successMessage, { id: toastId, duration: 8000 });
-            logger.info(`[Handler DirectImageReplace] New PR for image replace successful: ${createPrResult.prUrl}`);
+            logger.info(`[Handler Direct${taskTypeForLog}] New PR for replace successful: ${createPrResult.prUrl}`);
             
             await triggerGetOpenPRs(repoUrlForForm); 
             success = true; 
             
         } catch (err: any) {
-            errorMsg = err?.message || "Неизвестная ошибка при замене картинки.";
-            // This log is important as it shows the caught error
-            logger.error("[Handler DirectImageReplace] Error during process:", err); 
+            errorMsg = err?.message || `Неизвестная ошибка при замене ${isActualImageTask ? 'картинки' : 'иконки'}.`;
+            logger.error(`[Handler Direct${taskTypeForLog}] Error during process:`, err); 
             toast.error(`Ошибка: ${errorMsg}`, { id: toastId, duration: 6000 });
             setImageReplaceError(errorMsg); 
             success = false;
         } finally {
             setAssistantLoading(false); 
             setIsProcessingPR(false);
-            setImageReplaceTask(null); // Ensure task is cleared regardless of outcome
-            logger.info(`[Handler DirectImageReplace] Finally block. Success: ${success}. ImageReplaceTask set to null.`);
-            if (success && imageReplaceAchievements.length > 0) {
-                 imageReplaceAchievements.forEach(ach => addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
+            if (isActualImageTask) setImageReplaceTask(null); else setIconReplaceTask(null);
+            logger.info(`[Handler Direct${taskTypeForLog}] Finally block. Success: ${success}. Task cleared.`);
+            if (success && replaceAchievements.length > 0) {
+                 replaceAchievements.forEach(ach => addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
             }
         }
         return { success, error: errorMsg }; 
@@ -651,9 +735,9 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         repoUrlForForm, setAssistantLoading, setIsProcessingPR, setImageReplaceError,
         triggerCreateNewPR, 
         triggerGetOpenPRs,
-        setImageReplaceTask, addToast // Ensure addToast is stable or included if it changes
+        setImageReplaceTask, setIconReplaceTask, addToast
     ]);
-
+    
     return {
         handleParse, handleAutoFix, handleUpdateParsedFiles, handleClearResponse, handleCopyResponse,
         handleOpenModal, handleSwap, handleSearch, handleSelectFunction, handleToggleFileSelection,
