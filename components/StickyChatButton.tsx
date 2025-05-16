@@ -16,7 +16,7 @@ import { SpeechBubble } from "@/components/stickyChat_components/SpeechBubble";
 import { CharacterDisplay } from "@/components/stickyChat_components/CharacterDisplay";
 import { SuggestionList } from "@/components/stickyChat_components/SuggestionList";
 import { ImageReplaceTool } from "@/components/stickyChat_components/ImageReplaceTool";
-import { IconReplaceTool } from "@/components/stickyChat_components/IconReplaceTool"; // New Import
+import { IconReplaceTool } from "@/components/stickyChat_components/IconReplaceTool";
 import { toast } from "sonner";
 
 // Import Context & Actions
@@ -33,7 +33,7 @@ const CHARACTER_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1
 const CHARACTER_ALT_TEXT = "Xuinity Assistant";
 const HIRE_ME_TEXT = "Найми меня! ✨";
 const REPLACE_IMAGE_ID = "replace-image-trigger";
-const REPLACE_ICON_ID = "replace-icon-trigger"; // New ID
+const REPLACE_ICON_ID = "replace-icon-trigger"; 
 const ADD_NEW_ID = "add-new"; 
 const HIRE_ME_ID = "hire-me";
 const COPY_LOGS_ID = "copy-logs"; 
@@ -63,8 +63,7 @@ const isImageUrl = (url: string): boolean => { if (!url || !isValidUrl(url)) { r
 const isIconNameInput = (input: string): boolean => {
     if (!input) return false;
     const trimmed = input.trim();
-    // Simple check: starts with Fa or fa, and is likely a single word or two words like "FaBeer" or "fa-beer" (though we prefer PascalCase for Fa)
-    return /^(Fa[A-Z0-9][a-zA-Z0-9]*|fa-[a-z0-9-]+)$/.test(trimmed) && !trimmed.includes(" ");
+    return /^(Fa[A-Z0-9][a-zA-Z0-9]*|fa-[a-z0-9-]+)$/i.test(trimmed) && !trimmed.includes(" ") && trimmed.length > 2;
 };
 
 
@@ -81,7 +80,7 @@ const StickyChatButton: React.FC = () => {
     const [customIdea, setCustomIdea] = useState<string>(""); 
     const [potentialOldImageUrl, setPotentialOldImageUrl] = useState<string | null>(null); 
     const [showReplaceTool, setShowReplaceTool] = useState<boolean>(false);
-    const [showIconReplaceTool, setShowIconReplaceTool] = useState<boolean>(false); // New state
+    const [showIconReplaceTool, setShowIconReplaceTool] = useState<boolean>(false); 
     const [logsCopied, setLogsCopied] = useState(false); 
     
     // --- Hooks ---
@@ -188,7 +187,7 @@ const StickyChatButton: React.FC = () => {
         if (!isToolPage) {
             if (hasGenericCustomIdea) { 
                 baseSuggestions.push({ id: ADD_NEW_ID, text: "Передать Идею в Студию 🚀", link: "/repo-xml", icon: <FaFileImport className="mr-1.5 text-green-400"/>, tooltip: `Передать идею "${trimmedCustomIdea.substring(0, 30)}..." и контекст страницы в Студию` }); 
-            } else if (!potentialOldImageUrl && !isLikelyIconInput) { // Only show "Create New" if no specific input type detected
+            } else if (!potentialOldImageUrl && !isLikelyIconInput) { 
                 baseSuggestions.push({ id: ADD_NEW_ID, text: "Создать Новое с Нуля ✨", link: "/repo-xml", icon: <FaWandMagicSparkles className="mr-1.5" />, tooltip: "Перейти в СуперВайб Студию без контекста" }); 
             }
         }
@@ -258,15 +257,12 @@ const StickyChatButton: React.FC = () => {
         if (trimmedIdea && isImageUrl(trimmedIdea)) { 
             logger.debug(`[Flow 1 - Image Swap] StickyChatButton: Detected image URL in input: ${trimmedIdea}`); 
             setPotentialOldImageUrl(trimmedIdea); 
-            setShowIconReplaceTool(false); // Ensure icon tool is hidden if image URL detected
-        } else if (!isIconNameInput(trimmedIdea)) { // Only clear if not an icon input
+            setShowIconReplaceTool(false); 
+        } else if (!isIconNameInput(trimmedIdea)) { 
             if(potentialOldImageUrl) logger.debug(`[StickyChatButton Effect CustomIdea] Input changed (not image URL, not icon), clearing potential image URL.`); 
             setPotentialOldImageUrl(null); 
             if (showReplaceTool) { setShowReplaceTool(false); } 
         }
-        // If it IS an icon name input, potentialOldImageUrl might be null already, or we let it be handled by suggestions
-        // If it's not an image URL, and not an icon, and showReplaceTool was true, it will be hidden by this.
-
     }, [customIdea, showReplaceTool, potentialOldImageUrl]); 
 
     const handleSuggestionClick = (suggestion: Suggestion) => {
@@ -311,14 +307,14 @@ const StickyChatButton: React.FC = () => {
         let ideaParts = [`IconSwap`];
         ideaParts.push(`OldIconName=${encodeURIComponent(details.oldIconName)}`);
         ideaParts.push(`NewIconName=${encodeURIComponent(details.newIconName)}`);
-        if (details.componentProps) {
+        if (details.componentProps) { // This part is simplified for now
             ideaParts.push(`ComponentProps=${encodeURIComponent(details.componentProps)}`);
         }
         const structuredIdea = ideaParts.join('|');
         
         const cleanPath = currentPath.split('?')[0]; 
         let targetPath = cleanPath === "/" ? "app/page.tsx" : `app${cleanPath}`; 
-        if (!targetPath.match(/\.(tsx|jsx|js|ts|md)$/)) { // Added md for icons in markdown
+        if (!targetPath.match(/\.(tsx|jsx|js|ts|md)$/)) { 
             targetPath = targetPath.endsWith('/') ? targetPath + 'page.tsx' : targetPath + '/page.tsx'; 
         } 
         if (!targetPath.startsWith('app/')) targetPath = 'app/' + targetPath; 
@@ -332,7 +328,7 @@ const StickyChatButton: React.FC = () => {
         setShowIconReplaceTool(false);
     };
 
-    const handleCancelReplace = () => { logger.debug("[Flow 1 - Image/Icon Swap] StickyChatButton: Replace cancelled."); setShowReplaceTool(false); setShowIconReplaceTool(false); }; 
+    const handleCancelReplace = () => { logger.debug("[Flow 1/X - Image/Icon Swap] StickyChatButton: Replace cancelled."); setShowReplaceTool(false); setShowIconReplaceTool(false); }; 
     const handleOverlayClick = () => { logger.debug("[StickyChatButton] Overlay clicked, closing."); setIsOpen(false); setShowReplaceTool(false); setShowIconReplaceTool(false); requestAnimationFrame(() => document.body.focus()); }; 
     const handleDialogClick = (e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
     const handleFabClick = async () => { 
