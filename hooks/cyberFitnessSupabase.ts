@@ -558,18 +558,23 @@ export const logCyberFitnessAction = async (
     return { success: false, error: "User ID (string) is required." };
   }
   
-  if (typeof countOrDetails === 'number') {
-      if (countOrDetails < 0 && actionType !== 'tokensProcessed') { 
-         logger.warn(`[CyberFitness LogAction] Negative count (${countOrDetails}) for '${actionType}'. Correcting to 0.`);
-         countOrDetails = 0; 
+  // Validate countOrDetails structure for specific action types
+  if (actionType === 'featureUsed') {
+      if (typeof countOrDetails !== 'object' || countOrDetails === null || !('featureName' in countOrDetails) || typeof (countOrDetails as any).featureName !== 'string') {
+          logger.warn(`[CyberFitness LogAction] Invalid countOrDetails for 'featureUsed'. Expected {featureName: string, featureValue?: any}. Received:`, countOrDetails);
+          return { success: false, error: `Invalid data for action ${actionType}. Expected {featureName: string}.` };
       }
-  } else if (actionType === 'featureUsed' && (typeof countOrDetails !== 'object' || !('featureName' in countOrDetails))) {
-       logger.warn(`[CyberFitness LogAction] Invalid countOrDetails for 'featureUsed'. Expected {featureName: string, featureValue?: any}. Received:`, countOrDetails);
-       return { success: false, error: `Invalid data for action ${actionType}.` };
-  } else if (actionType === 'focusTimeAdded' && (typeof countOrDetails !== 'object' || !('minutes' in countOrDetails) || typeof countOrDetails.minutes !== 'number')) {
-      logger.warn(`[CyberFitness LogAction] Invalid countOrDetails for 'focusTimeAdded'. Expected {minutes: number}. Received:`, countOrDetails);
-      return { success: false, error: `Invalid data for action ${actionType}.` };
+  } else if (actionType === 'focusTimeAdded') {
+      if (typeof countOrDetails !== 'object' || countOrDetails === null || !('minutes'in countOrDetails) || typeof (countOrDetails as any).minutes !== 'number') {
+          logger.warn(`[CyberFitness LogAction] Invalid countOrDetails for 'focusTimeAdded'. Expected {minutes: number}. Received:`, countOrDetails);
+          return { success: false, error: `Invalid data for action ${actionType}. Expected {minutes: number}.` };
+      }
+  } else if (typeof countOrDetails !== 'number') {
+      // All other action types currently expect a number
+      logger.warn(`[CyberFitness LogAction] Action '${actionType}' expects a numeric count. Received:`, countOrDetails);
+      return { success: false, error: `Action '${actionType}' expects a numeric count.` };
   }
+
 
   try {
     const profileResult = await fetchUserCyberFitnessProfile(userId); // userId is string
@@ -602,56 +607,67 @@ export const logCyberFitnessAction = async (
     let kiloVibesFromAction = 0;
 
     if (actionType === 'filesExtracted' && typeof countOrDetails === 'number') {
-        todayEntry.filesExtracted += countOrDetails;
-        profileUpdates.totalFilesExtracted = countOrDetails; // This will be added to existing in updateUserCyberFitnessProfile
-        kiloVibesFromAction += countOrDetails * 0.1; 
-        if (countOrDetails >= 20 && !currentProfile.featuresUsed?.added20PlusFilesToKworkOnce) {
+        let count = countOrDetails;
+        if (count < 0) { logger.warn(`[CF LogAction] Negative filesExtracted count (${count}). Correcting to 0.`); count = 0; }
+        todayEntry.filesExtracted += count;
+        profileUpdates.totalFilesExtracted = count; 
+        kiloVibesFromAction += count * 0.1; 
+        if (count >= 20 && !currentProfile.featuresUsed?.added20PlusFilesToKworkOnce) {
              profileUpdates.featuresUsed!.added20PlusFilesToKworkOnce = true; 
-        } else if (countOrDetails >= 10 && !currentProfile.featuresUsed?.added10PlusFilesToKworkOnce) {
+        } else if (count >= 10 && !currentProfile.featuresUsed?.added10PlusFilesToKworkOnce) {
             profileUpdates.featuresUsed!.added10PlusFilesToKworkOnce = true;
         }
     } else if (actionType === 'tokensProcessed' && typeof countOrDetails === 'number') {
-        todayEntry.tokensProcessed += countOrDetails;
-        profileUpdates.totalTokensProcessed = countOrDetails; // This will be added to existing in updateUserCyberFitnessProfile
+        todayEntry.tokensProcessed += countOrDetails; // Negative allowed
+        profileUpdates.totalTokensProcessed = countOrDetails; 
         kiloVibesFromAction += countOrDetails * 0.001; 
     } else if (actionType === 'kworkRequestSent' && typeof countOrDetails === 'number') {
-        todayEntry.kworkRequestsSent += countOrDetails; 
-        profileUpdates.totalKworkRequestsSent = countOrDetails; // This will be added to existing in updateUserCyberFitnessProfile
-        kiloVibesFromAction += countOrDetails * 5; 
+        let count = countOrDetails;
+        if (count < 0) { logger.warn(`[CF LogAction] Negative kworkRequestSent count (${count}). Correcting to 0.`); count = 0; }
+        todayEntry.kworkRequestsSent += count; 
+        profileUpdates.totalKworkRequestsSent = count; 
+        kiloVibesFromAction += count * 5; 
     } else if (actionType === 'prCreated' && typeof countOrDetails === 'number') {
-        todayEntry.prsCreated += countOrDetails;
-        profileUpdates.totalPrsCreated = countOrDetails; // This will be added to existing in updateUserCyberFitnessProfile
-        kiloVibesFromAction += countOrDetails * 50; 
+        let count = countOrDetails;
+        if (count <= 0) { logger.warn(`[CF LogAction] Non-positive prCreated count (${count}). Correcting to 1.`); count = 1; }
+        else if (count !== 1) { logger.warn(`[CF LogAction] Unusual prCreated count (${count}). Using provided count for KiloVibes and totals, but daily log will sum correctly.`);}
+        todayEntry.prsCreated += count; // Daily log should sum actuals if batching ever happens
+        profileUpdates.totalPrsCreated = count; 
+        kiloVibesFromAction += count * 50; 
     } else if (actionType === 'branchUpdated' && typeof countOrDetails === 'number') {
-        todayEntry.branchesUpdated += countOrDetails;
-        profileUpdates.totalBranchesUpdated = countOrDetails; // This will be added to existing in updateUserCyberFitnessProfile
-        kiloVibesFromAction += countOrDetails * 20; 
+        let count = countOrDetails;
+        if (count <= 0) { logger.warn(`[CF LogAction] Non-positive branchUpdated count (${count}). Correcting to 1.`); count = 1; }
+        else if (count !== 1) { logger.warn(`[CF LogAction] Unusual branchUpdated count (${count}). Using provided count for KiloVibes and totals, but daily log will sum correctly.`);}
+        todayEntry.branchesUpdated += count; // Daily log should sum actuals
+        profileUpdates.totalBranchesUpdated = count; 
+        kiloVibesFromAction += count * 20; 
     } else if (actionType === 'featureUsed' && typeof countOrDetails === 'object' && 'featureName' in countOrDetails) {
-        const featureName = countOrDetails.featureName;
-        const featureValue = countOrDetails.featureValue !== undefined ? countOrDetails.featureValue : true;
-        if (typeof featureName === 'string' && currentProfile.featuresUsed?.[featureName] !== featureValue) { 
+        const featureDetails = countOrDetails as { featureName: string; featureValue?: string | number | boolean };
+        const featureName = featureDetails.featureName;
+        const featureValue = featureDetails.featureValue !== undefined ? featureDetails.featureValue : true;
+
+        if (currentProfile.featuresUsed?.[featureName] !== featureValue) { 
              profileUpdates.featuresUsed![featureName] = featureValue;
              if (featureValue === true && !currentProfile.featuresUsed?.[featureName]) { 
                  kiloVibesFromAction += 5; 
-             } else if (featureValue === false && currentProfile.featuresUsed?.[featureName] === true) {
              }
              logger.debug(`[CyberFitness LogAction] Feature '${featureName}' usage updated to ${featureValue} for user ${userId}.`);
-        } else if (typeof featureName === 'string') {
-            logger.debug(`[CyberFitness LogAction] Feature '${featureName}' was already set to ${featureValue} for user ${userId}. No change to featuresUsed, KV unchanged for this action.`);
         } else {
-            logger.warn(`[CyberFitness LogAction] Invalid featureName in countOrDetails for 'featureUsed':`, countOrDetails);
+            logger.debug(`[CyberFitness LogAction] Feature '${featureName}' was already set to ${featureValue} for user ${userId}. No change to featuresUsed, KV unchanged for this action.`);
         }
     } else if (actionType === 'focusTimeAdded' && typeof countOrDetails === 'object' && 'minutes' in countOrDetails) {
-        const minutes = countOrDetails.minutes;
-        if (typeof minutes === 'number' && minutes > 0) {
-            profileUpdates.focusTimeHours = minutes / 60; // This will be added to existing in updateUserCyberFitnessProfile
+        const focusDetails = countOrDetails as { minutes: number };
+        const minutes = focusDetails.minutes;
+        if (minutes > 0) {
+            profileUpdates.focusTimeHours = minutes / 60; 
             todayEntry.focusTimeMinutes = (todayEntry.focusTimeMinutes || 0) + minutes;
             kiloVibesFromAction += minutes * 0.5; 
             logger.debug(`[CyberFitness LogAction] Logged ${minutes} minutes of focus time for user ${userId}.`);
-        } else {
-            logger.warn(`[CyberFitness LogAction] Invalid minutes for 'focusTimeAdded':`, minutes);
+        } else if (minutes < 0) {
+            logger.warn(`[CyberFitness LogAction] Negative minutes for 'focusTimeAdded': ${minutes}. Ignoring.`);
         }
     }
+
 
     if (kiloVibesFromAction > 0) {
         profileUpdates.kiloVibes = kiloVibesFromAction;
@@ -663,7 +679,7 @@ export const logCyberFitnessAction = async (
     }
     profileUpdates.dailyActivityLog = dailyLog;
 
-    const updateResult = await updateUserCyberFitnessProfile(userId, profileUpdates); // userId is string
+    const updateResult = await updateUserCyberFitnessProfile(userId, profileUpdates); 
     
     if (!updateResult.success) {
       logger.error(`[CyberFitness LogAction] Failed to save profile for ${userId} after logging ${actionType}. Error: ${updateResult.error}`);
