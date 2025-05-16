@@ -24,9 +24,11 @@ import {
 export type ImportCategory = 'component' | 'context' | 'hook' | 'lib' | 'other';
 export type FetchStatus = 'idle' | 'loading' | 'success' | 'error' | 'retrying' | 'failed_retries';
 export type WorkflowStep = | 'idle' | 'ready_to_fetch' | 'fetching' | 'fetch_failed' | 'files_fetched' | 'files_fetched_highlights' | 'files_fetched_image_replace' | 'files_selected' | 'request_written' | 'request_copied' | 'generating_ai_response' | 'response_pasted' | 'parsing_response' | 'pr_ready';
-export interface ImageReplaceTask { targetPath: string; oldUrl: string; newUrl: string; }
+export interface ImageReplaceTask { targetPath: string; oldUrl: string; newUrl: string; } // Used for actual image URL replacement
+export interface IconReplaceTask { targetPath: string; oldIconName: string; newIconName: string; componentProps?: string; } // Used for icon component replacement
+
 export interface PendingFlowDetails {
-    type: 'ImageSwap' | 'ErrorFix';
+    type: 'ImageSwap' | 'ErrorFix' | 'IconSwap'; // Added IconSwap
     targetPath: string;
     details: any; 
 }
@@ -53,7 +55,8 @@ interface RepoXmlPageContextType {
     manualBranchName: string;
     openPrs: SimplePullRequest[];
     currentAiRequestId: string | null;
-    imageReplaceTask: ImageReplaceTask | null;
+    imageReplaceTask: ImageReplaceTask | null; // For actual images
+    iconReplaceTask: IconReplaceTask | null;   // For icons
     allFetchedFiles: FileNode[];
     currentStep: WorkflowStep;
     repoUrl: string;
@@ -81,6 +84,7 @@ interface RepoXmlPageContextType {
     setContextIsParsing: React.Dispatch<React.SetStateAction<boolean>>;
     setCurrentAiRequestId: React.Dispatch<React.SetStateAction<string | null>>;
     setImageReplaceTask: React.Dispatch<React.SetStateAction<ImageReplaceTask | null>>;
+    setIconReplaceTask: React.Dispatch<React.SetStateAction<IconReplaceTask | null>>; // Setter for icon task
     setRepoUrl: React.Dispatch<React.SetStateAction<string>>;
     setTargetPrData: React.Dispatch<React.SetStateAction<TargetPrData | null>>;
     setIsPreChecking: React.Dispatch<React.SetStateAction<boolean>>;
@@ -88,7 +92,7 @@ interface RepoXmlPageContextType {
     setShowComponents: React.Dispatch<React.SetStateAction<boolean>>;
     setKworkInputValue: (value: string | undefined | ((prevState: string) => string | undefined)) => void;
     triggerToggleSettingsModal: () => void;
-    triggerPreCheckAndFetch: (repoUrlToCheck: string, potentialBranchName: string, flowType: 'ImageSwap' | 'ErrorFix', flowDetails: any, targetPath: string) => Promise<void>;
+    triggerPreCheckAndFetch: (repoUrlToCheck: string, potentialBranchName: string, flowType: PendingFlowDetails['type'], flowDetails: any, targetPath: string) => Promise<void>;
     triggerFetch: (isRetry?: boolean, branch?: string | null) => Promise<void>;
     triggerSelectHighlighted: () => void;
     triggerAddSelectedToKwork: (clearSelection?: boolean) => Promise<void>;
@@ -116,7 +120,7 @@ interface RepoXmlPageContextType {
 }
 
 const defaultContextValue: Partial<RepoXmlPageContextType> = {
-    fetchStatus: 'idle', repoUrlEntered: false, filesFetched: false, selectedFetcherFiles: new Set(), kworkInputHasContent: false, requestCopied: false, aiResponseHasContent: false, filesParsed: false, selectedAssistantFiles: new Set(), assistantLoading: false, aiActionLoading: false, loadingPrs: false, targetBranchName: null, manualBranchName: '', openPrs: [], isSettingsModalOpen: false, isParsing: false, currentAiRequestId: null, imageReplaceTask: null, allFetchedFiles: [], currentStep: 'idle', repoUrl: "https://github.com/salavey13/carTest", primaryHighlightedPath: null, secondaryHighlightedPaths: { component: [], context: [], hook: [], lib: [], other: [] }, targetPrData: null, isPreChecking: false, pendingFlowDetails: null, showComponents: true,
+    fetchStatus: 'idle', repoUrlEntered: false, filesFetched: false, selectedFetcherFiles: new Set(), kworkInputHasContent: false, requestCopied: false, aiResponseHasContent: false, filesParsed: false, selectedAssistantFiles: new Set(), assistantLoading: false, aiActionLoading: false, loadingPrs: false, targetBranchName: null, manualBranchName: '', openPrs: [], isSettingsModalOpen: false, isParsing: false, currentAiRequestId: null, imageReplaceTask: null, iconReplaceTask: null, allFetchedFiles: [], currentStep: 'idle', repoUrl: "https://github.com/salavey13/carTest", primaryHighlightedPath: null, secondaryHighlightedPaths: { component: [], context: [], hook: [], lib: [], other: [] }, targetPrData: null, isPreChecking: false, pendingFlowDetails: null, showComponents: true,
     kworkInputValue: '',
     setFetchStatus: () => { logger.warn("setFetchStatus called on default context value"); },
     setRepoUrlEntered: () => { logger.warn("setRepoUrlEntered called on default context value"); },
@@ -137,6 +141,7 @@ const defaultContextValue: Partial<RepoXmlPageContextType> = {
     setContextIsParsing: () => { logger.warn("setContextIsParsing called on default context value"); },
     setCurrentAiRequestId: () => { logger.warn("setCurrentAiRequestId called on default context value"); },
     setImageReplaceTask: () => { logger.warn("setImageReplaceTask called on default context value"); },
+    setIconReplaceTask: () => { logger.warn("setIconReplaceTask called on default context value"); },
     setRepoUrl: () => { logger.warn("setRepoUrl called on default context value"); },
     setTargetPrData: () => { logger.warn("setTargetPrData called on default context value"); },
     setIsPreChecking: () => { logger.warn("setIsPreChecking called on default context value"); },
@@ -196,6 +201,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const [isParsingState, setIsParsingState] = useState<boolean>(false);
         const [currentAiRequestIdState, setCurrentAiRequestIdState] = useState<string | null>(null);
         const [imageReplaceTaskState, setImageReplaceTaskState] = useState<ImageReplaceTask | null>(null);
+        const [iconReplaceTaskState, setIconReplaceTaskState] = useState<IconReplaceTask | null>(null); // New state for icons
         const [allFetchedFilesState, setAllFetchedFilesState] = useState<FileNode[]>([]);
         const [repoUrlState, setRepoUrlState] = useState<string>(defaultContextValue.repoUrl ?? '');
         const [targetPrDataState, setTargetPrDataState] = useState<TargetPrData | null>(null);
@@ -210,6 +216,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const kworkInputRef = useRef<HTMLTextAreaElement | null>(null);
         const aiResponseInputRef = useRef<HTMLTextAreaElement | null>(null);
         const imageReplaceTaskStateRef = useRef(imageReplaceTaskState); 
+        const iconReplaceTaskStateRef = useRef(iconReplaceTaskState); // Ref for icon task
         const pendingFlowDetailsRef = useRef(pendingFlowDetailsState); 
         const repoUrlStateRef = useRef(repoUrlState); 
         
@@ -246,6 +253,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const setIsParsingStateStable = useCallback((parsing: boolean | ((prevState: boolean) => boolean)) => setIsParsingState(parsing), []);
         const setCurrentAiRequestIdStateStable = useCallback((id: string | null | ((prevState: string | null) => string | null)) => setCurrentAiRequestIdState(id), []);
         const setImageReplaceTaskStateStable = useCallback((task: ImageReplaceTask | null | ((prevState: ImageReplaceTask | null) => ImageReplaceTask | null)) => setImageReplaceTaskState(task), []);
+        const setIconReplaceTaskStateStable = useCallback((task: IconReplaceTask | null | ((prevState: IconReplaceTask | null) => IconReplaceTask | null)) => setIconReplaceTaskState(task), []); // Setter for icon task
         const setAllFetchedFilesStateStable = useCallback((files: FileNode[] | ((prevState: FileNode[]) => FileNode[])) => setAllFetchedFilesState(files), []);
         const setRepoUrlStateStable = useCallback((url: string | ((prevState: string) => string)) => setRepoUrlState(url), []);
         const setTargetPrDataStable = useCallback((data: TargetPrData | null | ((prevState: TargetPrData | null) => TargetPrData | null)) => setTargetPrDataState(data), []);
@@ -254,6 +262,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         const setShowComponentsStateStable = useCallback((show: boolean | ((prevState: boolean) => boolean)) => setShowComponentsState(show), []);
 
         useEffect(() => { imageReplaceTaskStateRef.current = imageReplaceTaskState; }, [imageReplaceTaskState]);
+        useEffect(() => { iconReplaceTaskStateRef.current = iconReplaceTaskState; }, [iconReplaceTaskState]); // Effect for icon task
         useEffect(() => { pendingFlowDetailsRef.current = pendingFlowDetailsState; }, [pendingFlowDetailsState]);
         useEffect(() => { repoUrlStateRef.current = repoUrlState; }, [repoUrlState]);
         useEffect(() => { setRepoUrlEnteredStateStable(repoUrlState.trim().length > 0 && repoUrlState.includes("github.com")); }, [repoUrlState, setRepoUrlEnteredStateStable]);
@@ -278,65 +287,92 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             primaryHighlight: string | null,
             secondaryHighlights: Record<ImportCategory, string[]>
         ) => {
-            const currentTask = imageReplaceTaskStateRef.current; 
+            const currentImgTask = imageReplaceTaskStateRef.current; 
+            const currentIconTask = iconReplaceTaskStateRef.current; // Check icon task too
             const currentPendingFlow = pendingFlowDetailsRef.current; 
-            const flowLogPrefix = currentTask ? '[Flow 1 - Image Swap]' : (currentPendingFlow?.type === 'ErrorFix' ? '[Flow 3 - Error Fix]' : '[Flow 2 - Generic Idea]');
+            
+            const flowLogPrefix = currentImgTask ? '[Flow 1 - Image Swap]' 
+                                : currentIconTask ? '[Flow X - Icon Swap]' // Log for Icon Swap
+                                : (currentPendingFlow?.type === 'ErrorFix' ? '[Flow 3 - Error Fix]' 
+                                : '[Flow 2 - Generic Idea]');
+            
             logger.debug(`${flowLogPrefix} Context: handleSetFilesFetchedStable. fetched=${fetched}, allFiles=${allFiles?.length}, primary=${primaryHighlight}`);
             setFilesFetchedState(fetched);
             if (fetched) { setAllFetchedFilesStateStable(allFiles ?? []); }
             else { setAllFetchedFilesStateStable([]); }
             setPrimaryHighlightPathState(primaryHighlight);
-            setSecondaryHighlightPathsStateInternal(secondaryHighlights ?? { component: [], context: [], hook: [], lib: [], other: [] }); // Use internal setter
+            setSecondaryHighlightPathsStateInternal(secondaryHighlights ?? { component: [], context: [], hook: [], lib: [], other: [] });
             let finalFetchStatus: FetchStatus = 'idle'; 
             
             let questCompleted = false;
             let questResult: Awaited<ReturnType<typeof completeQuestAndUpdateProfile>> | null = null;
 
-            if (currentTask) { 
+            // Priority to ImageReplaceTask if both somehow active (should not happen)
+            const activeVisualTask = currentImgTask || currentIconTask;
+            const isVisualSwapFlow = !!activeVisualTask;
+
+            if (isVisualSwapFlow && activeVisualTask) { // Check activeVisualTask to satisfy TypeScript
+                const taskToProcess = activeVisualTask; // Use a new const for type narrowing
+                const taskType = currentImgTask ? 'ImageSwap' : 'IconSwap';
+                
                 if (fetched) {
-                    const targetFileExists = (allFiles ?? []).some(f => f.path === currentTask.targetPath);
+                    const targetFileExists = (allFiles ?? []).some(f => f.path === taskToProcess.targetPath);
                     if (!targetFileExists) {
                        finalFetchStatus = 'error'; 
-                       addToastStable(`Ошибка Задачи Изображения: Целевой файл ${currentTask.targetPath} не найден!`, 'error', 5000);
-                       // setImageReplaceTaskStateStable(null); // Don't clear task yet, let user retry fetch. Error state in assistant will show this.
+                       addToastStable(`Ошибка Задачи ${taskType === 'ImageSwap' ? 'Изображения' : 'Иконки'}: Целевой файл ${taskToProcess.targetPath} не найден!`, 'error', 5000);
                        setAssistantLoadingStateStable(false);
                     } else {
                        finalFetchStatus = 'success'; 
-                       if (assistantRef.current?.handleDirectImageReplace) {
+                       if (assistantRef.current?.handleDirectImageReplace) { // Assuming same handler for now
                            setAssistantLoadingStateStable(true);
-                           assistantRef.current.handleDirectImageReplace(currentTask, allFiles ?? [])
+                           // For IconSwap, details might be different (oldIconName, newIconName)
+                           // Handler would need to adapt or have a separate path.
+                           // For now, using currentImgTask structure for ImageReplaceTask type in handler
+                           const actualTaskForHandler: ImageReplaceTask = taskType === 'ImageSwap' && currentImgTask
+                               ? currentImgTask
+                               : { // Construct a compatible ImageReplaceTask if it's an IconReplaceTask
+                                   targetPath: taskToProcess.targetPath,
+                                   oldUrl: (taskToProcess as IconReplaceTask).oldIconName, // Cast and use relevant field
+                                   newUrl: (taskToProcess as IconReplaceTask).newIconName  // Cast and use relevant field
+                                 };
+
+                           assistantRef.current.handleDirectImageReplace(actualTaskForHandler, allFiles ?? [])
                                .then(async ({ success: replaceSuccess, error: replaceError }) => {
                                    if (!replaceSuccess) {
-                                       addToastStable(`Ошибка замены/PR: ${replaceError || 'Неизвестно'}`, 'error');
+                                       addToastStable(`Ошибка замены/PR (${taskType}): ${replaceError || 'Неизвестно'}`, 'error');
                                    } else if (dbUser?.user_id) { 
                                        questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1); 
                                        questCompleted = true;
                                    }
                                })
                                .catch(replaceError => { 
-                                   addToastStable(`Проблема при вызове замены изображения: ${replaceError?.message ?? 'Неизвестно'}`, 'error', 6000); 
+                                   addToastStable(`Проблема при вызове замены (${taskType}): ${replaceError?.message ?? 'Неизвестно'}`, 'error', 6000); 
                                 })
                                .finally(() => { 
                                    setAssistantLoadingStateStable(false); 
-                                   setImageReplaceTaskStateStable(null); // Ensure task is cleared after operation
-                                   logger.info(`${flowLogPrefix} Context: ImageReplaceTask cleared in handleSetFilesFetchedStable finally block.`);
+                                   if (taskType === 'ImageSwap') setImageReplaceTaskStateStable(null);
+                                   if (taskType === 'IconSwap') setIconReplaceTaskStateStable(null);
+                                   logger.info(`${flowLogPrefix} Context: ${taskType} task cleared in handleSetFilesFetchedStable finally block.`);
                                });
                        } else {
-                            addToastStable(`КРИТИЧЕСКАЯ ПРОБЛЕМА: Не удалось вызвать замену изображения.`, 'error', 7000);
+                            addToastStable(`КРИТИЧЕСКАЯ ПРОБЛЕМА: Не удалось вызвать замену (${taskType}).`, 'error', 7000);
                             finalFetchStatus = 'error'; 
-                            setImageReplaceTaskStateStable(null); // Clear here if ref is bad
+                            if (taskType === 'ImageSwap') setImageReplaceTaskStateStable(null);
+                            if (taskType === 'IconSwap') setIconReplaceTaskStateStable(null);
                             setAssistantLoadingStateStable(false);
                        }
                     }
                 } else { // files not fetched
                     finalFetchStatus = 'error'; 
-                    addToastStable(`Ошибка Задачи Изображения: Не удалось загрузить файлы.`, 'error', 5000);
-                    // setImageReplaceTaskStateStable(null); // Let user retry fetch
+                    addToastStable(`Ошибка Задачи ${taskType === 'ImageSwap' ? 'Изображения' : 'Иконки'}: Не удалось загрузить файлы.`, 'error', 5000);
                     setAssistantLoadingStateStable(false);
                 }
-                if (currentPendingFlow?.type === 'ImageSwap' && currentTask) { 
+                if (currentPendingFlow?.type === 'ImageSwap' && currentImgTask) { 
                     setPendingFlowDetailsStateStable(null); 
                 } 
+                if (currentPendingFlow?.type === 'IconSwap' && currentIconTask) {
+                    setPendingFlowDetailsStateStable(null);
+                }
             } else if (currentPendingFlow?.type === 'ErrorFix' && fetched) { 
                  const targetFileExists = allFiles.some(f => f.path === currentPendingFlow.targetPath);
                  if (targetFileExists) {
@@ -365,7 +401,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             } else { 
                   if (fetched && currentPendingFlow) setPendingFlowDetailsStateStable(null);
                   finalFetchStatus = fetched ? 'success' : 'error';
-                  if (fetched && !currentTask && !currentPendingFlow && dbUser?.user_id) { 
+                  if (fetched && !currentImgTask && !currentIconTask && !currentPendingFlow && dbUser?.user_id) { 
                         questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1);
                         questCompleted = true;
                   }
@@ -382,7 +418,8 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
            setFetchStatusStateStable(finalFetchStatus);
         }, [ 
              dbUser?.user_id, addToastStable, assistantRef, fetcherRef, setFetchStatusStateStable, setAllFetchedFilesStateStable,
-             setImageReplaceTaskStateStable, setAssistantLoadingStateStable, setPendingFlowDetailsStateStable,
+             setImageReplaceTaskStateStable, setIconReplaceTaskStateStable, 
+             setAssistantLoadingStateStable, setPendingFlowDetailsStateStable,
              setKworkInputValueStateStable, scrollToSectionStable, logger, setSecondaryHighlightPathsStateInternal
          ]);
 
@@ -394,36 +431,54 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             setIsSettingsModalOpenState(prev => !prev);
         }, [dbUser?.user_id, addToastStable]);
 
-        const triggerFetch = useCallback(async (isRetry = false, branch?: string | null) => { if (fetcherRef.current?.handleFetch) { try { await fetcherRef.current.handleFetch(isRetry, branch, imageReplaceTaskStateRef.current); } catch (e: any) { addToastStable(`Крит. ошибка запуска извлечения: ${e?.message ?? 'Неизвестно'}`, "error", 5000); setFetchStatusStateStable('error'); } } else { addToastStable("Ошибка: Не удалось запустить извлечение (ref).", "error"); } }, [addToastStable, setFetchStatusStateStable, fetcherRef]);
+        const triggerFetch = useCallback(async (isRetry = false, branch?: string | null) => { 
+            const activeTask = imageReplaceTaskStateRef.current || iconReplaceTaskStateRef.current; // Prioritize image task if both (should not happen)
+            if (fetcherRef.current?.handleFetch) { 
+                try { 
+                    // Pass the active task to handleFetch if it exists
+                    await fetcherRef.current.handleFetch(isRetry, branch, activeTask as ImageReplaceTask | null); // Cast as ImageReplaceTask is okay as structure is similar for fetch
+                } catch (e: any) { 
+                    addToastStable(`Крит. ошибка запуска извлечения: ${e?.message ?? 'Неизвестно'}`, "error", 5000); 
+                    setFetchStatusStateStable('error'); 
+                } 
+            } else { 
+                addToastStable("Ошибка: Не удалось запустить извлечение (ref).", "error"); 
+            } 
+        }, [addToastStable, setFetchStatusStateStable, fetcherRef]);
         
-        const triggerPreCheckAndFetch = useCallback(async ( repoUrlToCheck: string, potentialBranchNameProvided: string, flowType: 'ImageSwap' | 'ErrorFix', flowDetails: any, targetPath: string ) => {
-            const flowLogPrefix = flowType === 'ImageSwap' ? '[Flow 1 - Image Swap]' : '[Flow 3 - Error Fix]';
+        const triggerPreCheckAndFetch = useCallback(async ( repoUrlToCheck: string, potentialBranchNameProvided: string, flowType: PendingFlowDetails['type'], flowDetails: any, targetPath: string ) => {
+            const flowLogPrefix = `[Flow - ${flowType}]`;
             logger.log(`${flowLogPrefix} Context: triggerPreCheckAndFetch. URL: ${repoUrlToCheck}, PotentialBranch: ${potentialBranchNameProvided}, Target: ${targetPath}, Details:`, flowDetails);
             setIsPreCheckingStateStable(true); 
             
             if (flowType === 'ImageSwap') {
                 if (!flowDetails?.oldUrl || !flowDetails?.newUrl) {
-                    logger.error(`${flowLogPrefix} Context: Missing oldUrl or newUrl in flowDetails for ImageSwap. Aborting.`);
+                    logger.error(`${flowLogPrefix} Context: Missing oldUrl or newUrl for ImageSwap. Aborting.`);
                     addToastStable("Ошибка: Недостаточно данных для замены изображения (oldUrl/newUrl).", 'error', 5000);
-                    setIsPreCheckingStateStable(false);
-                    setFetchStatusStateStable('error'); // Set error if critical data missing
-                    return;
+                    setIsPreCheckingStateStable(false); setFetchStatusStateStable('error'); return;
                 }
-                setImageReplaceTaskStateStable({ 
-                    targetPath, 
-                    oldUrl: flowDetails.oldUrl, 
-                    newUrl: flowDetails.newUrl 
-                });
-                setPendingFlowDetailsStateStable(null); // Clear pending if it was also an ImageSwap to avoid conflict
-                logger.log(`${flowLogPrefix} Context: imageReplaceTaskState set directly for ImageSwap. Cleared pendingFlowDetails.`);
+                setImageReplaceTaskStateStable({ targetPath, oldUrl: flowDetails.oldUrl, newUrl: flowDetails.newUrl });
+                setIconReplaceTaskStateStable(null); // Clear other visual task
+                setPendingFlowDetailsStateStable(null);
+                logger.log(`${flowLogPrefix} Context: imageReplaceTaskState set. Cleared icon/pending details.`);
+            } else if (flowType === 'IconSwap') {
+                if (!flowDetails?.oldIconName || !flowDetails?.newIconName) {
+                    logger.error(`${flowLogPrefix} Context: Missing oldIconName or newIconName for IconSwap. Aborting.`);
+                    addToastStable("Ошибка: Недостаточно данных для замены иконки (oldIconName/newIconName).", 'error', 5000);
+                    setIsPreCheckingStateStable(false); setFetchStatusStateStable('error'); return;
+                }
+                setIconReplaceTaskStateStable({ targetPath, oldIconName: flowDetails.oldIconName, newIconName: flowDetails.newIconName, componentProps: flowDetails.componentProps });
+                setImageReplaceTaskStateStable(null); // Clear other visual task
+                setPendingFlowDetailsStateStable(null);
+                logger.log(`${flowLogPrefix} Context: iconReplaceTaskState set. Cleared image/pending details.`);
             } else if (flowType === 'ErrorFix') {
                 setPendingFlowDetailsStateStable({ type: flowType, details: flowDetails, targetPath });
-                setImageReplaceTaskStateStable(null); // Clear image task if it was active
-                logger.log(`${flowLogPrefix} Context: pendingFlowDetailsState set for ErrorFix. Cleared imageReplaceTask.`);
-            } else { // Generic or unknown flow
-                setPendingFlowDetailsStateStable(null);
-                setImageReplaceTaskStateStable(null);
-                logger.log(`${flowLogPrefix} Context: Unknown or generic flow type. Clearing image/pending details.`);
+                setImageReplaceTaskStateStable(null); 
+                setIconReplaceTaskStateStable(null);
+                logger.log(`${flowLogPrefix} Context: pendingFlowDetailsState set for ErrorFix. Cleared visual tasks.`);
+            } else { 
+                setPendingFlowDetailsStateStable(null); setImageReplaceTaskStateStable(null); setIconReplaceTaskStateStable(null);
+                logger.log(`${flowLogPrefix} Context: Unknown or generic flow type. Clearing all specific task details.`);
             }
             
             setTargetPrDataStable(null); 
@@ -432,17 +487,15 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
 
             if (dbUser?.user_id) { 
                 const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'initial_boot_sequence', 25);
-                if (questResult.success) {
-                    addToastStable("🛰️ Квест 'Пойман Сигнал': +25 KiloVibes!", "success", 3000);
-                }
-                 questResult.newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
+                if (questResult.success) addToastStable("🛰️ Квест 'Пойман Сигнал': +25 KiloVibes!", "success", 3000);
+                questResult.newAchievements?.forEach(ach => addToastStable(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
             }
 
             let branchToFetch: string | null = null;
             let branchNameToSeek = potentialBranchNameProvided;
 
-            if (flowType === 'ImageSwap') {
-                logger.log(`${flowLogPrefix} Context: ImageSwap flow. Always fetching from default branch (null).`);
+            if (flowType === 'ImageSwap' || flowType === 'IconSwap') { // Both visual swaps fetch from default
+                logger.log(`${flowLogPrefix} Context: Visual Swap flow. Always fetching from default branch (null).`);
                 branchToFetch = null; 
             } 
             else if (branchNameToSeek) { 
@@ -477,7 +530,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             await triggerFetch(false, branchToFetch); 
         }, [ 
             dbUser?.user_id, addToastStable, setTargetBranchNameStateStable, setTargetPrDataStable, 
-            setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setImageReplaceTaskStateStable, 
+            setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setImageReplaceTaskStateStable, setIconReplaceTaskStateStable,
             setManualBranchNameStateStable, setFetchStatusStateStable, triggerFetch, logger 
         ]);
         
@@ -676,10 +729,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             else if (fetchStatusState === 'loading' || fetchStatusState === 'retrying') { calculatedStep = 'fetching'; }
             else if (fetchStatusState === 'error' || fetchStatusState === 'failed_retries') { calculatedStep = 'fetch_failed'; }
             else if (filesFetchedState) {
-                if (imageReplaceTaskState) { 
-                    const targetFileExists = allFetchedFilesState.some(f => f.path === imageReplaceTaskState.targetPath);
+                if (imageReplaceTaskState || iconReplaceTaskState) { // Check both visual tasks
+                    const activeVisualTask = imageReplaceTaskState || iconReplaceTaskState;
+                    const targetFileExists = activeVisualTask && allFetchedFilesState.some(f => f.path === activeVisualTask.targetPath);
                     if (targetFileExists) {
-                        calculatedStep = assistantLoadingState ? 'generating_ai_response' : 'files_fetched_image_replace';
+                        calculatedStep = assistantLoadingState ? 'generating_ai_response' : 'files_fetched_image_replace'; // files_fetched_image_replace can cover both for now
                     } else {
                         calculatedStep = 'fetch_failed'; 
                     }
@@ -700,23 +754,42 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             fetchStatusState, filesFetchedState, kworkInputHasContentState, aiResponseHasContentState, 
             filesParsedState, requestCopiedState, primaryHighlightPathState, 
             secondaryHighlightPathsStateInternal, 
-            selectedFetcherFilesState, aiActionLoadingState, isParsingState, imageReplaceTaskState, 
+            selectedFetcherFilesState, aiActionLoadingState, isParsingState, 
+            imageReplaceTaskState, iconReplaceTaskState, // Added iconReplaceTaskState
             allFetchedFilesState, assistantLoadingState, repoUrlEnteredState, isPreCheckingState, logger 
         ]);
 
          const getXuinityMessageStable = useCallback((): string => {
-             const localCurrentStep = currentStep; const localManualBranchName = manualBranchNameState; const localTargetBranchName = targetBranchNameState; const localImageReplaceTask = imageReplaceTaskState; const localFetchStatus = fetchStatusState; const localAllFilesLength = allFetchedFilesState.length; const localSelectedFetchSize = selectedFetcherFilesState.size; const localSelectedAssistSize = selectedAssistantFilesState.size; const localIsPreChecking = isPreCheckingState; const localPendingFlowDetails = pendingFlowDetailsState; const localFilesFetched = filesFetchedState; const localAssistantLoading = assistantLoadingState; 
+             const localCurrentStep = currentStep; 
+             const localManualBranchName = manualBranchNameState; 
+             const localTargetBranchName = targetBranchNameState; 
+             const localImageReplaceTask = imageReplaceTaskState;
+             const localIconReplaceTask = iconReplaceTaskState; // Get icon task state
+             const localFetchStatus = fetchStatusState; 
+             const localAllFilesLength = allFetchedFilesState.length; 
+             const localSelectedFetchSize = selectedFetcherFilesState.size; 
+             const localSelectedAssistSize = selectedAssistantFilesState.size; 
+             const localIsPreChecking = isPreCheckingState; 
+             const localPendingFlowDetails = pendingFlowDetailsState; 
+             const localFilesFetched = filesFetchedState; 
+             const localAssistantLoading = assistantLoadingState; 
+             
              const effectiveBranch = localManualBranchName.trim() || localTargetBranchName || 'default';
+             const activeVisualTask = localImageReplaceTask || localIconReplaceTask;
+             const visualTaskType = localImageReplaceTask ? 'картинки' : (localIconReplaceTask ? 'иконки' : '');
+
              if (localIsPreChecking && localPendingFlowDetails) return `Проверяю наличие PR/ветки для '${localPendingFlowDetails.targetPath.split('/').pop() ?? 'файла'}'...`;
-              if (localIsPreChecking && localImageReplaceTask) return `Проверяю наличие PR/ветки для замены картинки '${localImageReplaceTask.targetPath.split('/').pop() ?? 'файла'}'...`;
-             if (localImageReplaceTask) {
-                 if (localFetchStatus === 'loading' || localFetchStatus === 'retrying') return `Гружу файл ${localImageReplaceTask.targetPath.split('/').pop()} из ветки ${effectiveBranch}...`;
-                 if (localFetchStatus === 'error' || localFetchStatus === 'failed_retries') return "Твою ж! Ошибка загрузки файла. URL/ветка верные? Жми 'Попробовать Снова'.";
-                 const targetFileExists = allFetchedFilesState?.some(f => f.path === localImageReplaceTask.targetPath);
-                 if (localFetchStatus === 'success' && !targetFileExists && localFilesFetched) return "Файл для замены НЕ НАЙДЕН в репе! Проверь путь/ветку!";
-                 if (localFetchStatus === 'success' && targetFileExists) { if (localAssistantLoading) return "Меняю картинку и делаю авто-PR... Магия!"; return "Файл на месте! Ассистент сейчас сам всё заменит и запушит PR. Level 1 пройден!"; }
-                 return "Готовлю авто-замену картинки (Level 1)...";
+              if (localIsPreChecking && activeVisualTask) return `Проверяю наличие PR/ветки для замены ${visualTaskType} '${activeVisualTask.targetPath.split('/').pop() ?? 'файла'}'...`;
+             
+             if (activeVisualTask) {
+                 if (localFetchStatus === 'loading' || localFetchStatus === 'retrying') return `Гружу файл ${activeVisualTask.targetPath.split('/').pop()} из ветки ${effectiveBranch} для замены ${visualTaskType}...`;
+                 if (localFetchStatus === 'error' || localFetchStatus === 'failed_retries') return `Твою ж! Ошибка загрузки файла для ${visualTaskType}. URL/ветка верные? Жми 'Попробовать Снова'.`;
+                 const targetFileExists = allFetchedFilesState?.some(f => f.path === activeVisualTask.targetPath);
+                 if (localFetchStatus === 'success' && !targetFileExists && localFilesFetched) return `Файл для замены ${visualTaskType} НЕ НАЙДЕН в репе! Проверь путь/ветку!`;
+                 if (localFetchStatus === 'success' && targetFileExists) { if (localAssistantLoading) return `Меняю ${visualTaskType} и делаю авто-PR... Магия!`; return `Файл на месте! Ассистент сейчас сам всё заменит и запушит PR. Level 1 пройден! (${visualTaskType})`; }
+                 return `Готовлю авто-замену ${visualTaskType} (Level 1)...`;
              }
+
              switch (localCurrentStep) {
                  case 'idle': return "Готов качать Vibe! Введи URL репы GitHub или покажи мне на странице, что чинить/делать.";
                  case 'ready_to_fetch': return `Репа есть. Жми 'Извлечь Файлы' из '${effectiveBranch}', чтобы я дал контекст AI.`;
@@ -732,13 +805,19 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                  case 'pr_ready': const actionText = localTargetBranchName ? 'обновления ветки' : 'создания PR'; if (localSelectedAssistSize === 0) return "Код разобран и проверен! Теперь выбери файлы, которые пойдут в коммит."; return `Код разобран! Выбрано ${localSelectedAssistSize} файлов для ${actionText}. Проверь код в ассистенте (ошибки/варнинги?). Жми кнопку PR/Update!`;
                  default: return "Вайб неопределен... Что будем делать?";
              }
-          }, [ currentStep, manualBranchNameState, targetBranchNameState, imageReplaceTaskState, fetchStatusState, allFetchedFilesState, filesFetchedState, assistantLoadingState, selectedFetcherFilesState.size, selectedAssistantFilesState.size, isPreCheckingState, pendingFlowDetailsState ]);
+          }, [ 
+              currentStep, manualBranchNameState, targetBranchNameState, 
+              imageReplaceTaskState, iconReplaceTaskState, // Added icon task
+              fetchStatusState, allFetchedFilesState, filesFetchedState, assistantLoadingState, 
+              selectedFetcherFilesState.size, selectedAssistantFilesState.size, 
+              isPreCheckingState, pendingFlowDetailsState 
+            ]);
 
         const contextValue = useMemo((): RepoXmlPageContextType => ({
-            fetchStatus: fetchStatusState, repoUrlEntered: repoUrlEnteredState, filesFetched: filesFetchedState, kworkInputHasContent: kworkInputHasContentState, requestCopied: requestCopiedState, aiResponseHasContent: aiResponseHasContentState, filesParsed: filesParsedState, assistantLoading: assistantLoadingState, aiActionLoading: aiActionLoadingState, loadingPrs: loadingPrsState, isSettingsModalOpen: isSettingsModalOpenState, isParsing: isParsingState, isPreChecking: isPreCheckingState, showComponents: showComponentsState, selectedFetcherFiles: selectedFetcherFilesState, selectedAssistantFiles: selectedAssistantFilesState, targetBranchName: targetBranchNameState, manualBranchName: manualBranchNameState, openPrs: openPrsState, currentAiRequestId: currentAiRequestIdState, imageReplaceTask: imageReplaceTaskState, allFetchedFiles: allFetchedFilesState, currentStep, repoUrl: repoUrlState, primaryHighlightedPath: primaryHighlightPathState, 
+            fetchStatus: fetchStatusState, repoUrlEntered: repoUrlEnteredState, filesFetched: filesFetchedState, kworkInputHasContent: kworkInputHasContentState, requestCopied: requestCopiedState, aiResponseHasContent: aiResponseHasContentState, filesParsed: filesParsedState, assistantLoading: assistantLoadingState, aiActionLoading: aiActionLoadingState, loadingPrs: loadingPrsState, isSettingsModalOpen: isSettingsModalOpenState, isParsing: isParsingState, isPreChecking: isPreCheckingState, showComponents: showComponentsState, selectedFetcherFiles: selectedFetcherFilesState, selectedAssistantFiles: selectedAssistantFilesState, targetBranchName: targetBranchNameState, manualBranchName: manualBranchNameState, openPrs: openPrsState, currentAiRequestId: currentAiRequestIdState, imageReplaceTask: imageReplaceTaskState, iconReplaceTask: iconReplaceTaskState, allFetchedFiles: allFetchedFilesState, currentStep, repoUrl: repoUrlState, primaryHighlightedPath: primaryHighlightPathState, 
             secondaryHighlightedPaths: secondaryHighlightPathsStateInternal, 
             targetPrData: targetPrDataState, pendingFlowDetails: pendingFlowDetailsState, kworkInputValue: kworkInputValueState,
-            setFetchStatus: setFetchStatusStateStable, setRepoUrlEntered: setRepoUrlEnteredStateStable, handleSetFilesFetched: handleSetFilesFetchedStable, setSelectedFetcherFiles: setSelectedFetcherFilesStateStable, setKworkInputHasContent: setKworkInputHasContentStateStable, setRequestCopied: setRequestCopiedStateStable, setAiResponseHasContent: setAiResponseHasContentStateStable, setFilesParsed: setFilesParsedStateStable, setSelectedAssistantFiles: setSelectedAssistantFilesStateStable, setAssistantLoading: setAssistantLoadingStateStable, setAiActionLoading: setAiActionLoadingStateStable, setLoadingPrs: setLoadingPrsStateStable, setTargetBranchName: setTargetBranchNameStateStable, setManualBranchName: setManualBranchNameStateStable, setOpenPrs: setOpenPrsStateStable, setIsParsing: setIsParsingStateStable, setContextIsParsing: setIsParsingStateStable, setCurrentAiRequestId: setCurrentAiRequestIdStateStable, setImageReplaceTask: setImageReplaceTaskStateStable, setRepoUrl: setRepoUrlStateStable, setTargetPrData: setTargetPrDataStable, setIsPreChecking: setIsPreCheckingStateStable, setPendingFlowDetails: setPendingFlowDetailsStateStable, setShowComponents: setShowComponentsStateStable, setKworkInputValue: setKworkInputValueStateStable,
+            setFetchStatus: setFetchStatusStateStable, setRepoUrlEntered: setRepoUrlEnteredStateStable, handleSetFilesFetched: handleSetFilesFetchedStable, setSelectedFetcherFiles: setSelectedFetcherFilesStateStable, setKworkInputHasContent: setKworkInputHasContentStateStable, setRequestCopied: setRequestCopiedStateStable, setAiResponseHasContent: setAiResponseHasContentStateStable, setFilesParsed: setFilesParsedStateStable, setSelectedAssistantFiles: setSelectedAssistantFilesStateStable, setAssistantLoading: setAssistantLoadingStateStable, setAiActionLoading: setAiActionLoadingStateStable, setLoadingPrs: setLoadingPrsStateStable, setTargetBranchName: setTargetBranchNameStateStable, setManualBranchName: setManualBranchNameStateStable, setOpenPrs: setOpenPrsStateStable, setIsParsing: setIsParsingStateStable, setContextIsParsing: setIsParsingStateStable, setCurrentAiRequestId: setCurrentAiRequestIdStateStable, setImageReplaceTask: setImageReplaceTaskStateStable, setIconReplaceTask: setIconReplaceTaskStateStable, setRepoUrl: setRepoUrlStateStable, setTargetPrData: setTargetPrDataStable, setIsPreChecking: setIsPreCheckingStateStable, setPendingFlowDetails: setPendingFlowDetailsStateStable, setShowComponents: setShowComponentsStateStable, setKworkInputValue: setKworkInputValueStateStable,
             triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, 
             triggerCreateOrUpdatePR, 
             triggerUpdateBranch: triggerUpdateBranchStable, 
@@ -747,10 +826,10 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             kworkInputRef, aiResponseInputRef, fetcherRef, assistantRef,
             addToast: addToastStable,
         }), [
-            fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, isPreCheckingState, showComponentsState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, 
+            fetchStatusState, repoUrlEnteredState, filesFetchedState, kworkInputHasContentState, requestCopiedState, aiResponseHasContentState, filesParsedState, assistantLoadingState, aiActionLoadingState, loadingPrsState, isSettingsModalOpenState, isParsingState, isPreCheckingState, showComponentsState, selectedFetcherFilesState, selectedAssistantFilesState, targetBranchNameState, manualBranchNameState, openPrsState, currentAiRequestIdState, imageReplaceTaskState, iconReplaceTaskState, allFetchedFilesState, currentStep, repoUrlState, primaryHighlightPathState, 
             secondaryHighlightPathsStateInternal, 
             targetPrDataState, pendingFlowDetailsState, kworkInputValueState,
-            setFetchStatusStateStable, setRepoUrlEnteredStateStable, handleSetFilesFetchedStable, setSelectedFetcherFilesStateStable, setKworkInputHasContentStateStable, setRequestCopiedStateStable, setAiResponseHasContentStateStable, setFilesParsedStateStable, setSelectedAssistantFilesStateStable, setAssistantLoadingStateStable, setAiActionLoadingStateStable, setLoadingPrsStateStable, setTargetBranchNameStateStable, setManualBranchNameStateStable, setOpenPrsStateStable, setIsParsingStateStable, setCurrentAiRequestIdStateStable, setImageReplaceTaskStateStable, setRepoUrlStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setShowComponentsStateStable, setKworkInputValueStateStable,
+            setFetchStatusStateStable, setRepoUrlEnteredStateStable, handleSetFilesFetchedStable, setSelectedFetcherFilesStateStable, setKworkInputHasContentStateStable, setRequestCopiedStateStable, setAiResponseHasContentStateStable, setFilesParsedStateStable, setSelectedAssistantFilesStateStable, setAssistantLoadingStateStable, setAiActionLoadingStateStable, setLoadingPrsStateStable, setTargetBranchNameStateStable, setManualBranchNameStateStable, setOpenPrsStateStable, setIsParsingStateStable, setCurrentAiRequestIdStateStable, setImageReplaceTaskStateStable, setIconReplaceTaskStateStable, setRepoUrlStateStable, setTargetPrDataStable, setIsPreCheckingStateStable, setPendingFlowDetailsStateStable, setShowComponentsStateStable, setKworkInputValueStateStable,
             triggerToggleSettingsModal, triggerPreCheckAndFetch, triggerFetch, triggerSelectHighlighted, triggerAddSelectedToKwork, triggerCopyKwork, triggerAskAi, triggerParseResponse, triggerSelectAllParsed, 
             triggerCreateOrUpdatePR, 
             triggerUpdateBranchStable, 
@@ -784,4 +863,4 @@ export const useRepoXmlPageContext = (): RepoXmlPageContextType => {
     return context as RepoXmlPageContextType;
 };
 
-export type { FileNode, SimplePullRequest, RepoTxtFetcherRef, AICodeAssistantRef, ImportCategory, FetchStatus, WorkflowStep, ImageReplaceTask, RepoXmlPageContextType, PendingFlowDetails, TargetPrData };
+export type { FileNode, SimplePullRequest, RepoTxtFetcherRef, AICodeAssistantRef, ImportCategory, FetchStatus, WorkflowStep, ImageReplaceTask, IconReplaceTask, RepoXmlPageContextType, PendingFlowDetails, TargetPrData };
