@@ -9,13 +9,15 @@ type DbUser = Database["public"]["Tables"]["users"]["Row"];
 type UserMetadata = DbUser['metadata'];
 
 const MOCK_USER_ID_STR_ENV = process.env.NEXT_PUBLIC_MOCK_USER_ID || "413553377";
-let MOCK_USER_ID_NUM: number | null = null;
+let MOCK_USER_ID_NUM: number | null = null; // This is the Telegram ID (number)
+let MOCK_USER_ID_FOR_DB_STR: string | null = null; // This will be the string version for DB
 if (process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true') {
     const parsedId = parseInt(MOCK_USER_ID_STR_ENV, 10);
     if (!isNaN(parsedId)) {
         MOCK_USER_ID_NUM = parsedId;
+        MOCK_USER_ID_FOR_DB_STR = MOCK_USER_ID_STR_ENV; // Use the string directly for DB user_id
     } else {
-        logger.error(`[CyberFitness] Invalid NEXT_PUBLIC_MOCK_USER_ID: "${MOCK_USER_ID_STR_ENV}". Must be a number.`);
+        logger.error(`[CyberFitness] Invalid NEXT_PUBLIC_MOCK_USER_ID: "${MOCK_USER_ID_STR_ENV}". Must be a number string.`);
     }
 }
 
@@ -125,11 +127,7 @@ export const ALL_ACHIEVEMENTS: Achievement[] = [
     { id: "first_parse_completed", name: "Квест: Первый Парсинг", description: "Успешно разобран ответ от AI. +150 KiloVibes", icon: "FaCode", checkCondition: () => false, isQuest: true, unlocksPerks: PERKS_BY_LEVEL[2] },
     { id: "first_pr_created", name: "Квест: Первый PR", description: "Успешно создан Pull Request. +250 KiloVibes", icon: "FaGithub", checkCondition: () => false, isQuest: true, unlocksPerks: PERKS_BY_LEVEL[3] },
 ];
-// ... (rest of cyberFitnessSupabase.ts remains the same)
-// ...
-// (Make sure to include the full content of cyberFitnessSupabase.ts from the previous response,
-// only adding the new achievements and extending LEVEL_THRESHOLDS_KV & COGNITIVE_OS_VERSIONS as shown above)
-// ...
+
 const getDefaultCyberFitnessProfile = (): CyberFitnessProfile => ({
     level: 0, kiloVibes: 0, focusTimeHours: 0, skillsLeveled: 0,
     activeQuests: ["initial_boot_sequence"], 
@@ -181,19 +179,19 @@ const getCyberFitnessProfile = (userId: string | null, metadata: UserMetadata | 
   finalProfile.cognitiveOSVersion = COGNITIVE_OS_VERSIONS[currentLevel] || COGNITIVE_OS_VERSIONS[COGNITIVE_OS_VERSIONS.length -1] || defaultProfile.cognitiveOSVersion;
   finalProfile.skillsLeveled = new Set(finalProfile.unlockedPerks || []).size;
 
-
   return finalProfile;
 };
 
+// userId here is the Supabase user_id (string)
 export const fetchUserCyberFitnessProfile = async (userId: string): Promise<{ success: boolean; data?: CyberFitnessProfile; error?: string }> => {
-  logger.log(`[CyberFitness FetchProfile ENTRY] Attempting to fetch profile for user: ${userId}`);
+  logger.log(`[CyberFitness FetchProfile ENTRY] Attempting to fetch profile for user_id: ${userId}`);
   if (!userId) {
-    logger.warn("[CyberFitness FetchProfile] User ID is missing. Cannot fetch profile.");
-    return { success: false, error: "User ID is required.", data: getDefaultCyberFitnessProfile() };
+    logger.warn("[CyberFitness FetchProfile] User ID (string) is missing. Cannot fetch profile.");
+    return { success: false, error: "User ID (string) is required.", data: getDefaultCyberFitnessProfile() };
   }
   
   try {
-    const userData = await genericFetchUserData(userId);
+    const userData = await genericFetchUserData(userId); // genericFetchUserData expects string user_id
 
     if (!userData) {
         logger.warn(`[CyberFitness FetchProfile] User ${userId} not found via genericFetchUserData. Returning default profile. Will create metadata on first update.`);
@@ -221,6 +219,7 @@ interface SchematicCompletionDetails {
     schematicIcon: string;
 }
 
+// userId here is the Supabase user_id (string)
 export const logSchematicCompleted = async (
     userId: string,
     schematicId: string,
@@ -233,10 +232,10 @@ export const logSchematicCompleted = async (
     newPerks?: string[];
     kiloVibesAwarded?: number;
 }> => {
-    logger.log(`[CyberFitness SchematicComplete ENTRY] User: ${userId}, Schematic: ${schematicId}, Details:`, details);
+    logger.log(`[CyberFitness SchematicComplete ENTRY] User_id: ${userId}, Schematic: ${schematicId}, Details:`, details);
     if (!userId || !schematicId) {
-        logger.warn("[CyberFitness SchematicComplete] User ID and Schematic ID required.");
-        return { success: false, error: "User ID and Schematic ID required." };
+        logger.warn("[CyberFitness SchematicComplete] User ID (string) and Schematic ID required.");
+        return { success: false, error: "User ID (string) and Schematic ID required." };
     }
 
     try {
@@ -310,7 +309,7 @@ export const logSchematicCompleted = async (
         };
         profileUpdates.dynamicAchievementsToAdd!.push(masteredAchievement);
 
-        const updateResult = await updateUserCyberFitnessProfile(userId, profileUpdates);
+        const updateResult = await updateUserCyberFitnessProfile(userId, profileUpdates); // userId is string
         if (!updateResult.success) {
             logger.error(`[CyberFitness SchematicComplete] Failed to update profile for ${userId} after schematic ${schematicId} completion. Error: ${updateResult.error}`);
             return { success: false, error: updateResult.error || "Ошибка сохранения прогресса схемы." };
@@ -330,11 +329,12 @@ export const logSchematicCompleted = async (
     }
 };
 
+// userId here is the Supabase user_id (string)
 export const updateUserCyberFitnessProfile = async (
   userId: string,
   updates: Partial<CyberFitnessProfile> & { dynamicAchievementsToAdd?: Achievement[] } 
 ): Promise<{ success: boolean; data?: DbUser; error?: string; newAchievements?: Achievement[] }> => {
-  logger.log(`[CyberFitness UpdateProfile ENTRY] User: ${userId}, Updates Summary:`, {
+  logger.log(`[CyberFitness UpdateProfile ENTRY] User_id: ${userId}, Updates Summary:`, {
       keys: Object.keys(updates),
       kiloVibesDelta: updates.kiloVibes,
       levelUpdate: updates.level,
@@ -343,11 +343,11 @@ export const updateUserCyberFitnessProfile = async (
   });
 
   if (!userId) {
-    logger.warn("[CyberFitness UpdateProfile] User ID is missing. Cannot update profile.");
-    return { success: false, error: "User ID is required." };
+    logger.warn("[CyberFitness UpdateProfile] User ID (string) is missing. Cannot update profile.");
+    return { success: false, error: "User ID (string) is required." };
   }
 
-  const isTrueMockSession = process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && MOCK_USER_ID_NUM !== null && userId === MOCK_USER_ID_NUM.toString();
+  const isTrueMockSession = process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && MOCK_USER_ID_FOR_DB_STR !== null && userId === MOCK_USER_ID_FOR_DB_STR;
 
   try {
     const userData = await genericFetchUserData(userId); 
@@ -369,7 +369,8 @@ export const updateUserCyberFitnessProfile = async (
         newCyberFitnessProfile.kiloVibes += updates.kiloVibes; 
     }
     if (updates.focusTimeHours !== undefined && typeof updates.focusTimeHours === 'number') {
-        newCyberFitnessProfile.focusTimeHours += updates.focusTimeHours; 
+        // Correctly increment total focusTimeHours
+        newCyberFitnessProfile.focusTimeHours = (existingCyberFitnessProfileData.focusTimeHours || 0) + updates.focusTimeHours; 
     }
     if (updates.activeQuests && Array.isArray(updates.activeQuests)) {
         newCyberFitnessProfile.activeQuests = Array.from(new Set([...newCyberFitnessProfile.activeQuests, ...updates.activeQuests]));
@@ -390,11 +391,12 @@ export const updateUserCyberFitnessProfile = async (
         newCyberFitnessProfile.featuresUsed = {...newCyberFitnessProfile.featuresUsed, ...updates.featuresUsed};
     }
     
-    if (typeof updates.totalFilesExtracted === 'number') newCyberFitnessProfile.totalFilesExtracted += updates.totalFilesExtracted;
-    if (typeof updates.totalTokensProcessed === 'number') newCyberFitnessProfile.totalTokensProcessed += updates.totalTokensProcessed;
-    if (typeof updates.totalKworkRequestsSent === 'number') newCyberFitnessProfile.totalKworkRequestsSent += updates.totalKworkRequestsSent;
-    if (typeof updates.totalPrsCreated === 'number') newCyberFitnessProfile.totalPrsCreated += updates.totalPrsCreated;
-    if (typeof updates.totalBranchesUpdated === 'number') newCyberFitnessProfile.totalBranchesUpdated += updates.totalBranchesUpdated;
+    // Correctly increment total counts
+    if (typeof updates.totalFilesExtracted === 'number') newCyberFitnessProfile.totalFilesExtracted = (existingCyberFitnessProfileData.totalFilesExtracted || 0) + updates.totalFilesExtracted;
+    if (typeof updates.totalTokensProcessed === 'number') newCyberFitnessProfile.totalTokensProcessed = (existingCyberFitnessProfileData.totalTokensProcessed || 0) + updates.totalTokensProcessed;
+    if (typeof updates.totalKworkRequestsSent === 'number') newCyberFitnessProfile.totalKworkRequestsSent = (existingCyberFitnessProfileData.totalKworkRequestsSent || 0) + updates.totalKworkRequestsSent;
+    if (typeof updates.totalPrsCreated === 'number') newCyberFitnessProfile.totalPrsCreated = (existingCyberFitnessProfileData.totalPrsCreated || 0) + updates.totalPrsCreated;
+    if (typeof updates.totalBranchesUpdated === 'number') newCyberFitnessProfile.totalBranchesUpdated = (existingCyberFitnessProfileData.totalBranchesUpdated || 0) + updates.totalBranchesUpdated;
     
     const previousLevel = newCyberFitnessProfile.level; 
     let newLevelCandidate = previousLevel;
@@ -528,7 +530,7 @@ export const updateUserCyberFitnessProfile = async (
       [CYBERFIT_METADATA_KEY]: newCyberFitnessProfile, 
     };
         
-    const { success: updateSuccess, data: updatedUser, error: updateError } = await genericUpdateUserMetadata(userId, newOverallMetadata);
+    const { success: updateSuccess, data: updatedUser, error: updateError } = await genericUpdateUserMetadata(userId, newOverallMetadata); // userId is string
 
     if (!updateSuccess || !updatedUser) {
       logger.error(`[CyberFitness UpdateProfile] Error saving updated profile for ${userId} using genericUpdateUserMetadata:`, updateError);
@@ -544,15 +546,16 @@ export const updateUserCyberFitnessProfile = async (
   }
 };
 
+// userId here is the Supabase user_id (string)
 export const logCyberFitnessAction = async (
   userId: string,
   actionType: 'filesExtracted' | 'tokensProcessed' | 'kworkRequestSent' | 'prCreated' | 'branchUpdated' | 'featureUsed' | 'focusTimeAdded',
   countOrDetails: number | { featureName: string; featureValue?: string | number | boolean } | { minutes: number } 
 ): Promise<{ success: boolean; error?: string; newAchievements?: Achievement[] }> => {
-  logger.log(`[CyberFitness LogAction ENTRY] User: ${userId}, Action: ${actionType}, Value/Details:`, countOrDetails);
+  logger.log(`[CyberFitness LogAction ENTRY] User_id: ${userId}, Action: ${actionType}, Value/Details:`, countOrDetails);
   if (!userId) {
-    logger.warn("[CyberFitness LogAction] User ID is missing. Cannot log action.");
-    return { success: false, error: "User ID is required." };
+    logger.warn("[CyberFitness LogAction] User ID (string) is missing. Cannot log action.");
+    return { success: false, error: "User ID (string) is required." };
   }
   
   if (typeof countOrDetails === 'number') {
@@ -569,7 +572,7 @@ export const logCyberFitnessAction = async (
   }
 
   try {
-    const profileResult = await fetchUserCyberFitnessProfile(userId);
+    const profileResult = await fetchUserCyberFitnessProfile(userId); // userId is string
     if (!profileResult.success && !profileResult.data?.hasOwnProperty('level')) { 
       logger.error(`[CyberFitness LogAction] Failed to get profile data for ${userId} and no default profile returned. Error: ${profileResult.error}`);
       return { success: false, error: profileResult.error || "Failed to get current profile data." };
@@ -600,7 +603,7 @@ export const logCyberFitnessAction = async (
 
     if (actionType === 'filesExtracted' && typeof countOrDetails === 'number') {
         todayEntry.filesExtracted += countOrDetails;
-        profileUpdates.totalFilesExtracted = countOrDetails; 
+        profileUpdates.totalFilesExtracted = countOrDetails; // This will be added to existing in updateUserCyberFitnessProfile
         kiloVibesFromAction += countOrDetails * 0.1; 
         if (countOrDetails >= 20 && !currentProfile.featuresUsed?.added20PlusFilesToKworkOnce) {
              profileUpdates.featuresUsed!.added20PlusFilesToKworkOnce = true; 
@@ -609,19 +612,19 @@ export const logCyberFitnessAction = async (
         }
     } else if (actionType === 'tokensProcessed' && typeof countOrDetails === 'number') {
         todayEntry.tokensProcessed += countOrDetails;
-        profileUpdates.totalTokensProcessed = countOrDetails; 
+        profileUpdates.totalTokensProcessed = countOrDetails; // This will be added to existing in updateUserCyberFitnessProfile
         kiloVibesFromAction += countOrDetails * 0.001; 
     } else if (actionType === 'kworkRequestSent' && typeof countOrDetails === 'number') {
         todayEntry.kworkRequestsSent += countOrDetails; 
-        profileUpdates.totalKworkRequestsSent = countOrDetails; 
+        profileUpdates.totalKworkRequestsSent = countOrDetails; // This will be added to existing in updateUserCyberFitnessProfile
         kiloVibesFromAction += countOrDetails * 5; 
     } else if (actionType === 'prCreated' && typeof countOrDetails === 'number') {
         todayEntry.prsCreated += countOrDetails;
-        profileUpdates.totalPrsCreated = countOrDetails; 
+        profileUpdates.totalPrsCreated = countOrDetails; // This will be added to existing in updateUserCyberFitnessProfile
         kiloVibesFromAction += countOrDetails * 50; 
     } else if (actionType === 'branchUpdated' && typeof countOrDetails === 'number') {
         todayEntry.branchesUpdated += countOrDetails;
-        profileUpdates.totalBranchesUpdated = countOrDetails; 
+        profileUpdates.totalBranchesUpdated = countOrDetails; // This will be added to existing in updateUserCyberFitnessProfile
         kiloVibesFromAction += countOrDetails * 20; 
     } else if (actionType === 'featureUsed' && typeof countOrDetails === 'object' && 'featureName' in countOrDetails) {
         const featureName = countOrDetails.featureName;
@@ -641,7 +644,7 @@ export const logCyberFitnessAction = async (
     } else if (actionType === 'focusTimeAdded' && typeof countOrDetails === 'object' && 'minutes' in countOrDetails) {
         const minutes = countOrDetails.minutes;
         if (typeof minutes === 'number' && minutes > 0) {
-            profileUpdates.focusTimeHours = minutes / 60; 
+            profileUpdates.focusTimeHours = minutes / 60; // This will be added to existing in updateUserCyberFitnessProfile
             todayEntry.focusTimeMinutes = (todayEntry.focusTimeMinutes || 0) + minutes;
             kiloVibesFromAction += minutes * 0.5; 
             logger.debug(`[CyberFitness LogAction] Logged ${minutes} minutes of focus time for user ${userId}.`);
@@ -660,7 +663,7 @@ export const logCyberFitnessAction = async (
     }
     profileUpdates.dailyActivityLog = dailyLog;
 
-    const updateResult = await updateUserCyberFitnessProfile(userId, profileUpdates);
+    const updateResult = await updateUserCyberFitnessProfile(userId, profileUpdates); // userId is string
     
     if (!updateResult.success) {
       logger.error(`[CyberFitness LogAction] Failed to save profile for ${userId} after logging ${actionType}. Error: ${updateResult.error}`);
@@ -677,22 +680,23 @@ export const logCyberFitnessAction = async (
   }
 };
 
+// userId here is the Supabase user_id (string)
 export const checkAndUnlockFeatureAchievement = async (
     userId: string,
     featureName: keyof Exclude<CyberFitnessProfile['featuresUsed'], undefined> | string,
     featureValue: string | number | boolean = true 
 ): Promise<{ success: boolean; newAchievements?: Achievement[], error?: string }> => {
-    logger.log(`[CyberFitness CheckFeatureAchievement ENTRY] User: ${userId}, Feature: ${featureName}, Value: ${featureValue}`);
+    logger.log(`[CyberFitness CheckFeatureAchievement ENTRY] User_id: ${userId}, Feature: ${featureName}, Value: ${featureValue}`);
     if (!userId || !featureName) {
-        logger.warn("[CyberFitness CheckFeatureAchievement] User ID and feature name required. Aborting.");
-        return { success: false, error: "User ID and feature name required."};
+        logger.warn("[CyberFitness CheckFeatureAchievement] User ID (string) and feature name required. Aborting.");
+        return { success: false, error: "User ID (string) and feature name required."};
     }
     const details: { featureName: string; featureValue?: string | number | boolean } = { 
         featureName: String(featureName),
         featureValue: featureValue 
     };
     
-    const result = await logCyberFitnessAction(userId, 'featureUsed', details); 
+    const result = await logCyberFitnessAction(userId, 'featureUsed', details); // userId is string
     if(result.success){
         logger.log(`[CyberFitness CheckFeatureAchievement EXIT] Logged feature '${featureName}'. New ach: ${result.newAchievements?.length || 0}`);
     } else {
@@ -701,6 +705,7 @@ export const checkAndUnlockFeatureAchievement = async (
     return result;
 };
 
+// userId here is the Supabase user_id (string)
 export const completeQuestAndUpdateProfile = async (
   userId: string,
   questId: string,
@@ -708,15 +713,15 @@ export const completeQuestAndUpdateProfile = async (
   newLevel?: number, 
   newPerksFromQuest?: string[] 
 ): Promise<{ success: boolean; data?: DbUser; error?: string; newAchievements?: Achievement[] }> => {
-  logger.log(`[CyberFitness QuestComplete ENTRY] User: ${userId}, Quest: ${questId}, KV: ${kiloVibesAwarded}, TargetLvl?: ${newLevel}, QuestPerks?:`, newPerksFromQuest);
+  logger.log(`[CyberFitness QuestComplete ENTRY] User_id: ${userId}, Quest: ${questId}, KV: ${kiloVibesAwarded}, TargetLvl?: ${newLevel}, QuestPerks?:`, newPerksFromQuest);
    if (!userId) {
-    logger.warn("[CyberFitness QuestComplete] User ID is missing. Cannot complete quest.");
-    return { success: false, error: "User ID is required." };
+    logger.warn("[CyberFitness QuestComplete] User ID (string) is missing. Cannot complete quest.");
+    return { success: false, error: "User ID (string) is required." };
   }
 
-  const isTrueMockSession = process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && MOCK_USER_ID_NUM !== null && userId === MOCK_USER_ID_NUM.toString();
+  const isTrueMockSession = process.env.NEXT_PUBLIC_USE_MOCK_USER === 'true' && MOCK_USER_ID_FOR_DB_STR !== null && userId === MOCK_USER_ID_FOR_DB_STR;
 
-  const currentProfileResult = await fetchUserCyberFitnessProfile(userId);
+  const currentProfileResult = await fetchUserCyberFitnessProfile(userId); // userId is string
   if (!currentProfileResult.success && !currentProfileResult.data?.hasOwnProperty('level')) {
     logger.error(`[CyberFitness QuestComplete] Failed to fetch profile for ${userId}. Error: ${currentProfileResult.error}`);
     return { success: false, error: currentProfileResult.error || "Failed to fetch current profile before quest completion." };
@@ -747,7 +752,7 @@ export const completeQuestAndUpdateProfile = async (
     if (shouldUpdateForPerksOnly) {
         if (kiloVibesAwarded > 0) updatesForPerks.kiloVibes = kiloVibesAwarded; 
         if (newLevel !== undefined) updatesForPerks.level = newLevel; 
-        return updateUserCyberFitnessProfile(userId, updatesForPerks); 
+        return updateUserCyberFitnessProfile(userId, updatesForPerks); // userId is string
     }
     logger.log(`[CyberFitness QuestComplete] Quest ${questId} already done and no new perks from this call for user ${userId}. No update needed.`);
     return { success: true, data: undefined, newAchievements: [] }; 
@@ -763,28 +768,30 @@ export const completeQuestAndUpdateProfile = async (
   if (newLevel !== undefined) updates.level = newLevel; 
   if (effectivePerksToAward.length > 0) updates.unlockedPerks = effectivePerksToAward; 
   
-  const result = await updateUserCyberFitnessProfile(userId, updates);
+  const result = await updateUserCyberFitnessProfile(userId, updates); // userId is string
   const finalKiloVibes = result.data?.metadata?.[CYBERFIT_METADATA_KEY]?.kiloVibes;
   logger.log(`[CyberFitness QuestComplete EXIT] Update result for quest ${questId}: Success: ${result.success}. Final KV: ${finalKiloVibes ?? 'N/A'}. New ach: ${result.newAchievements?.length || 0}`);
   return result;
 };
 
+// userId here is the Supabase user_id (string)
 export const setCognitiveOSVersion = async (userId: string, version: string): Promise<{ success: boolean; data?: DbUser; error?: string; newAchievements?: Achievement[] }> => {
   logger.log(`[CyberFitness OSVersion] Setting Cognitive OS version for ${userId} to: ${version}`);
   if (!userId || typeof version !== 'string') {
-      logger.warn("[CyberFitness OSVersion] User ID or version string is invalid. Aborting.");
-      return { success: false, error: "User ID and valid version string required." };
+      logger.warn("[CyberFitness OSVersion] User ID (string) or version string is invalid. Aborting.");
+      return { success: false, error: "User ID (string) and valid version string required." };
   }
-  return updateUserCyberFitnessProfile(userId, { cognitiveOSVersion: version });
+  return updateUserCyberFitnessProfile(userId, { cognitiveOSVersion: version }); // userId is string
 };
 
+// userId here is the Supabase user_id (string)
 export const getUserCyberLevel = async (userId: string): Promise<{ success: boolean; level?: number; error?: string }> => {
-  logger.log(`[CyberFitness GetLevel ENTRY] Getting level for user: ${userId}`);
+  logger.log(`[CyberFitness GetLevel ENTRY] Getting level for user_id: ${userId}`);
    if (!userId) {
-    logger.warn("[CyberFitness GetLevel] User ID is missing. Cannot get level.");
-    return { success: false, level: 0, error: "User ID is required." };
+    logger.warn("[CyberFitness GetLevel] User ID (string) is missing. Cannot get level.");
+    return { success: false, level: 0, error: "User ID (string) is required." };
   }
-  const profileResult = await fetchUserCyberFitnessProfile(userId);
+  const profileResult = await fetchUserCyberFitnessProfile(userId); // userId is string
   if (!profileResult.success || typeof profileResult.data?.level !== 'number') { 
     logger.warn(`[CyberFitness GetLevel] Failed to get level for ${userId}. Success: ${profileResult.success}, Error: ${profileResult.error}, Level: ${profileResult.data?.level}`);
     return { success: false, level: 0, error: profileResult.error || "Level not found or profile fetch failed" };
@@ -837,3 +844,5 @@ export const getAchievementDetails = (achievementId: string): Achievement | unde
 };
 
 export const TOKEN_ESTIMATION_FACTOR = 4;
+
+export { PERKS_BY_LEVEL }; // Export PERKS_BY_LEVEL

@@ -6,8 +6,7 @@ import { createInvoice } from "@/hooks/supabase";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { FaBrain, FaBolt, FaMicrochip, FaRocket, FaUserNinja, FaStar, FaShieldHalved, FaInfinity, FaUsers } from "react-icons/fa6"; 
-import VibeContentRenderer from "@/components/VibeContentRenderer";
+import VibeContentRenderer from "@/components/VibeContentRenderer"; // Added import
 
 const SUBSCRIPTION_PLANS = [
   {
@@ -21,7 +20,7 @@ const SUBSCRIPTION_PLANS = [
       "<FaMicrochip className='text-brand-green mr-2 align-middle text-xl'/> Ограниченный банк промптов",
     ],
     color: "from-gray-700/50 to-gray-800/50 border-gray-600",
-    icon: <FaBrain className="inline mr-2 text-brand-cyan" />, // This icon is for the plan card header, not features list
+    iconString: "::FaBrain className='inline mr-2 text-brand-cyan'::",
     cta: "Текущий Уровень",
   },
   {
@@ -37,7 +36,7 @@ const SUBSCRIPTION_PLANS = [
       "<FaShieldHalved className='text-brand-blue mr-2 align-middle text-xl'/> Стандартная AI-поддержка",
     ],
     color: "from-brand-blue/80 to-brand-cyan/80 border-brand-blue",
-    icon: <FaMicrochip className="inline mr-2 text-brand-blue" />,
+    iconString: "::FaMicrochip className='inline mr-2 text-brand-blue'::",
     cta: "Апгрейд до EPU"
   },
   {
@@ -53,10 +52,28 @@ const SUBSCRIPTION_PLANS = [
       "<FaStar className='text-neon-lime mr-2 align-middle text-xl'/> Эксклюзивные Vibe Perks & Альфа-дропы",
     ],
     color: "from-brand-purple/80 to-brand-pink/80 border-brand-purple",
-    icon: <FaBolt className="inline mr-2 text-brand-yellow" />,
+    iconString: "::FaBolt className='inline mr-2 text-brand-yellow'::",
     cta: "Активировать QBI"
   },
 ];
+
+const parseFeatureString = (feature: string): { iconVibeContent: string | null, textContent: string } => {
+    const featureMatch = feature.match(/^(<Fa\w+(?:\s+[^>]*?)?\s*\/?>)(.*)$/);
+    if (featureMatch) {
+        const iconHtmlTag = featureMatch[1];
+        const text = featureMatch[2].trim();
+        const iconTagParts = iconHtmlTag.match(/^<(Fa\w+)((?:\s+[^>]*?)?)\s*\/>$/);
+        if (iconTagParts) {
+            const iconName = iconTagParts[1];
+            const attributes = iconTagParts[2] ? iconTagParts[2].trim() : '';
+            return {
+                iconVibeContent: `::${iconName}${attributes ? ' ' + attributes : ''}::`,
+                textContent: text
+            };
+        }
+    }
+    return { iconVibeContent: null, textContent: feature };
+};
 
 export default function BuySubscriptionPage() {
   const { user, isInTelegramContext, dbUser } = useAppContext();
@@ -114,10 +131,11 @@ export default function BuySubscriptionPage() {
         throw new Error(invoiceCreateResult.error || "Не удалось создать запись о счете в CyberVibe БД");
       }
       
-      // Clean feature text for invoice description
-      const cleanFeaturesForInvoice = selectedSubscription.features.map((f: string) => 
-        f.replace(/<Fa\w+\s*className='[^']*'\s*\/>\s*/, '').trim()
-      ).join(', ');
+      const cleanFeaturesForInvoice = selectedSubscription.features.map((feature: string) => {
+         const { textContent } = parseFeatureString(feature);
+         return textContent;
+      }).join(', ');
+
 
       const response = await sendTelegramInvoice(
         user.id.toString(),
@@ -164,14 +182,22 @@ export default function BuySubscriptionPage() {
           
           {activeSubscriptionId !== "basic_neural_net" && (
             <div className={`mb-10 p-6 rounded-xl border ${activePlan.color.split(' ').pop()} shadow-inner bg-gradient-to-br ${activePlan.color} text-center`}>
-                <h3 className="text-3xl font-orbitron font-semibold text-light-text mb-3 flex items-center justify-center">{activePlan.icon} {activePlan.name}</h3>
+                <h3 className="text-3xl font-orbitron font-semibold text-light-text mb-3 flex items-center justify-center">
+                  <VibeContentRenderer content={activePlan.iconString} /> <span className="ml-2">{activePlan.name}</span>
+                </h3>
                 <p className="text-xl font-bold text-white mb-3 font-mono">{activePlan.xtrPrice} / цикл</p>
                 <ul className="space-y-1.5 mb-4 text-left max-w-md mx-auto text-sm">
-                    {activePlan.features.map((feature: string, i: number) => (
-                      <li key={i} className="text-gray-200 font-mono"> {/* Removed flex, VibeContentRenderer will handle inline icon */}
-                        <VibeContentRenderer content={feature} />
-                      </li>
-                    ))}
+                    {activePlan.features.map((featureString: string, i: number) => {
+                      const { iconVibeContent, textContent } = parseFeatureString(featureString);
+                      return (
+                        <li key={i} className="text-gray-200 font-mono flex items-center">
+                          {iconVibeContent && <VibeContentRenderer content={iconVibeContent} />}
+                          <span> {/* Wrapper for text, icon's own classname (e.g. mr-2) will handle spacing */}
+                            {textContent}
+                          </span>
+                        </li>
+                      );
+                    })}
                 </ul>
                 <p className="text-sm text-gray-100 font-mono">Статус ОС: <span className="text-brand-green font-bold">Оптимальный</span>. Новые горизонты открыты!</p>
             </div>
@@ -188,14 +214,22 @@ export default function BuySubscriptionPage() {
                 className={`p-5 md:p-6 rounded-xl border shadow-xl flex flex-col justify-between bg-gradient-to-br ${sub.color} ${sub.id === "basic_neural_net" ? 'opacity-70 cursor-not-allowed' : ''} transition-all duration-300`}
               >
                 <div>
-                  <h3 className="text-2xl font-orbitron font-semibold text-light-text mb-3 flex items-center">{sub.icon} {sub.name}</h3>
+                  <h3 className="text-2xl font-orbitron font-semibold text-light-text mb-3 flex items-center">
+                    <VibeContentRenderer content={sub.iconString} /> <span className="ml-2">{sub.name}</span>
+                  </h3>
                   <p className="text-3xl font-bold text-white mb-4 font-mono">{sub.xtrPrice}</p>
                   <ul className="space-y-1.5 mb-6 text-xs">
-                    {sub.features.map((feature, i) => (
-                      <li key={i} className="text-gray-200 font-mono">
-                        <VibeContentRenderer content={feature} />
-                      </li>
-                    ))}
+                    {sub.features.map((featureString, i) => {
+                      const { iconVibeContent, textContent } = parseFeatureString(featureString);
+                      return (
+                        <li key={i} className="text-gray-200 font-mono flex items-center">
+                           {iconVibeContent && <VibeContentRenderer content={iconVibeContent} />}
+                           <span>
+                             {textContent}
+                           </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
                 <Button

@@ -56,7 +56,6 @@ export const useFocusTimeTracker = ({
         { leading: false, trailing: true }
     );
 
-
     const handleBecameInactive = useCallback(() => {
         if (activityStartTimeRef.current) {
             const sessionDuration = Date.now() - activityStartTimeRef.current;
@@ -121,7 +120,9 @@ export const useFocusTimeTracker = ({
                 }
             } else if (document.visibilityState === 'visible') {
                 logger.log(`[FocusTimeTracker - ${componentName}] Tab became visible. Activity session can restart on interaction.`);
-                activityStartTimeRef.current = null; 
+                // Don't immediately restart timer here, let onActive from useInactivityTimer handle it
+                // to ensure there's actual user interaction.
+                // activityStartTimeRef.current = null; // Resetting here might be redundant if onActive handles it
             }
         };
         

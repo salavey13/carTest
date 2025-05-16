@@ -1,12 +1,12 @@
 "use client";
 
-import type React from "react"; // Removed useEffect as it's not directly used here
+import type React from "react"; 
 import { Suspense } from 'react';
 import { usePathname } from 'next/navigation';
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import StickyChatButton from "@/components/StickyChatButton";
-import { AppProvider, useAppContext } from "@/contexts/AppContext"; // useAppContext needed for dbUser check
+import { AppProvider, useAppContext } from "@/contexts/AppContext"; 
 import { Toaster as SonnerToaster } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorOverlayProvider } from "@/contexts/ErrorOverlayContext";
@@ -14,11 +14,9 @@ import ErrorBoundaryForOverlay from "@/components/ErrorBoundaryForOverlay";
 import DevErrorOverlay from "@/components/DevErrorOverlay";
 import BottomNavigation from "@/components/layout/BottomNavigation";
 import { debugLogger as logger } from "@/lib/debugLogger"; 
-import { useFocusTimeTracker } from '@/hooks/useFocusTimeTracker'; // Import the new hook
-// Analytics and Speed Insights should be top-level if possible, or ensure they don't break if user is not logged in.
+import { useFocusTimeTracker } from '@/hooks/useFocusTimeTracker'; 
 import { Analytics } from "@vercel/analytics/react"
 import { SpeedInsights } from "@vercel/speed-insights/next"
-
 
 function LoadingChatButtonFallback() {
   return (
@@ -29,28 +27,23 @@ function LoadingChatButtonFallback() {
   );
 }
 
-// Inner component to access useAppContext for useFocusTimeTracker
 function FocusTrackingInitializer() {
   const { dbUser, isAuthenticated } = useAppContext();
   
   useFocusTimeTracker({
-    inactiveTimeout: 60 * 1000, // 1 minute of inactivity
+    inactiveTimeout: 60 * 1000, 
     componentName: "GlobalAppFocusTracker",
-    // Enable only if the user is authenticated and dbUser (with user_id) is available
     enabled: !!(isAuthenticated && dbUser?.user_id), 
   });
   
-  return null; // This component doesn't render anything itself
+  return null; 
 }
-
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  // logger.debug(`[ClientLayout] Current pathname: ${pathname}`);
 
-  // Paths where BottomNavigation should be visible
-  const pathsToShowBottomNavForExactMatch = ["/", "/repo-xml"]; // Exact matches
-  const pathsToShowBottomNavForStartsWith = ["/selfdev/gamified", "/p-plan", "/profile"]; // StartsWith matches
+  const pathsToShowBottomNavForExactMatch = ["/", "/repo-xml"]; 
+  const pathsToShowBottomNavForStartsWith = ["/selfdev/gamified", "/p-plan", "/profile"]; 
 
   const isExactMatch = pathsToShowBottomNavForExactMatch.includes(pathname);
   const isStartsWithMatch = pathsToShowBottomNavForStartsWith.some(p => pathname.startsWith(p));
@@ -60,8 +53,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   return (
     <ErrorOverlayProvider>
-      <AppProvider> {/* AppProvider provides useAppContext */}
-        <FocusTrackingInitializer /> {/* Initialize focus tracking here */}
+      <AppProvider> 
+        <FocusTrackingInitializer /> 
         <TooltipProvider>
           <ErrorBoundaryForOverlay>
             <Header />

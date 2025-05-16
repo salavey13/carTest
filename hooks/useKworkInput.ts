@@ -176,11 +176,11 @@ export const useKworkInput = ({
         setKworkInputValue(finalKworkValue);
         toastSuccess(`${filesAddedCount} файлов добавлено в запрос.`);
         
-        if (dbUser?.user_id && filesAddedCount > 0) { // Corrected to dbUser.user_id
+        if (dbUser?.user_id && filesAddedCount > 0) { 
             logger.debug(`[useKworkInput AddSelected] Logging CyberFitness actions for user ${dbUser.user_id}. Files: ${filesAddedCount}, Chars: ${totalCharsAdded}`);
             const achievementsToDisplay: Achievement[] = [];
 
-            const filesExtractedResult = await logCyberFitnessAction(dbUser.user_id.toString(), 'filesExtracted', filesAddedCount); // Corrected
+            const filesExtractedResult = await logCyberFitnessAction(dbUser.user_id, 'filesExtracted', filesAddedCount); 
             if (filesExtractedResult.success) {
                 logger.log(`[useKworkInput AddSelected] CyberFitness: ${filesAddedCount} filesExtracted logged.`);
                 if(filesExtractedResult.newAchievements) achievementsToDisplay.push(...filesExtractedResult.newAchievements);
@@ -190,7 +190,7 @@ export const useKworkInput = ({
 
             const estimatedTokens = Math.round(totalCharsAdded / TOKEN_ESTIMATION_FACTOR);
             if (estimatedTokens > 0) {
-                const tokensProcessedResult = await logCyberFitnessAction(dbUser.user_id.toString(), 'tokensProcessed', estimatedTokens); // Corrected
+                const tokensProcessedResult = await logCyberFitnessAction(dbUser.user_id, 'tokensProcessed', estimatedTokens); 
                 if (tokensProcessedResult.success) {
                     logger.log(`[useKworkInput AddSelected] CyberFitness: ${estimatedTokens} tokensProcessed logged.`);
                      if(tokensProcessedResult.newAchievements) achievementsToDisplay.push(...tokensProcessedResult.newAchievements);
@@ -203,7 +203,7 @@ export const useKworkInput = ({
                                            .map(id => achievementsToDisplay.find(a => a.id === id)!);
             uniqueAchievements.forEach(ach => {
                 addToast(`🏆 Достижение: ${ach.name}!`, "success", 5000, { description: ach.description });
-                logger.info(`[useKworkInput AddSelected] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`); // Corrected
+                logger.info(`[useKworkInput AddSelected] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`); 
             });
 
         } else if (filesAddedCount > 0) {
@@ -214,7 +214,7 @@ export const useKworkInput = ({
     }, [
         selectedFetcherFiles, allFetchedFiles, imageReplaceTaskActive, toastSuccess, toastWarning,
         kworkInputValue, setKworkInputValue, 
-        scrollToSection, dbUser, addToast, logger // dbUser is now a dependency
+        scrollToSection, dbUser, addToast, logger 
     ]);
 
     const handleCopyToClipboard = useCallback(async (textToCopy?: string, shouldScroll = true): Promise<boolean> => { 
@@ -230,14 +230,14 @@ export const useKworkInput = ({
             setRequestCopied(true);
             logger.info("[Kwork Input] Copied request to clipboard.");
             
-            if (dbUser?.user_id) { // Corrected
+            if (dbUser?.user_id) { 
                 logger.debug(`[useKworkInput CopyToClipboard] Attempting to log 'kworkRequestSent' for user ${dbUser.user_id}.`);
-                const logResult = await logCyberFitnessAction(dbUser.user_id.toString(), 'kworkRequestSent', 1); // Corrected
+                const logResult = await logCyberFitnessAction(dbUser.user_id, 'kworkRequestSent', 1); 
                 if (logResult.success) {
                     logger.log(`[useKworkInput CopyToClipboard] CyberFitness: kworkRequestSent logged.`);
                     logResult.newAchievements?.forEach(ach => {
                         addToast(`🏆 Достижение: ${ach.name}!`, "success", 5000, { description: ach.description });
-                         logger.info(`[useKworkInput CopyToClipboard] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`); // Corrected
+                         logger.info(`[useKworkInput CopyToClipboard] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`); 
                     });
                 } else {
                      logger.warn(`[useKworkInput CopyToClipboard] CyberFitness: kworkRequestSent logging failed: ${logResult.error}`);
@@ -253,7 +253,7 @@ export const useKworkInput = ({
             toastError("Ошибка копирования в буфер обмена");
             return false;
         }
-    }, [kworkInputValue, toastSuccess, toastWarning, toastError, setRequestCopied, scrollToSection, dbUser, addToast, logger]); // dbUser is now a dependency
+    }, [kworkInputValue, toastSuccess, toastWarning, toastError, setRequestCopied, scrollToSection, dbUser, addToast, logger]); 
 
     const handleClearAll = useCallback(() => {
         if (imageReplaceTaskActive) {
@@ -355,12 +355,12 @@ export const useKworkInput = ({
         setKworkInputValue(finalKworkValue);
         toastSuccess(`Структура проекта и ${filesAddedCount} файлов (${files.length} всего) добавлены в запрос.`);
         
-        if (dbUser?.user_id) { // Corrected
-            logger.debug(`[useKworkInput AddFullTree] Logging CyberFitness actions for user ${dbUser.user_id}. Files: ${filesAddedCount}, Chars: ${totalCharsAdded}`); // Corrected
+        if (dbUser?.user_id) { 
+            logger.debug(`[useKworkInput AddFullTree] Logging CyberFitness actions for user ${dbUser.user_id}. Files: ${filesAddedCount}, Chars: ${totalCharsAdded}`); 
             const achievementsToDisplay: Achievement[] = [];
 
             if (filesAddedCount > 0) { 
-                const filesExtractedResult = await logCyberFitnessAction(dbUser.user_id.toString(), 'filesExtracted', filesAddedCount); // Corrected
+                const filesExtractedResult = await logCyberFitnessAction(dbUser.user_id, 'filesExtracted', filesAddedCount); 
                 if (filesExtractedResult.success && filesExtractedResult.newAchievements) {
                     achievementsToDisplay.push(...filesExtractedResult.newAchievements);
                 } else if (!filesExtractedResult.success) {
@@ -370,7 +370,7 @@ export const useKworkInput = ({
             
             const estimatedTokens = Math.round(totalCharsAdded / TOKEN_ESTIMATION_FACTOR);
             if (estimatedTokens > 0) {
-                const tokensProcessedResult = await logCyberFitnessAction(dbUser.user_id.toString(), 'tokensProcessed', estimatedTokens); // Corrected
+                const tokensProcessedResult = await logCyberFitnessAction(dbUser.user_id, 'tokensProcessed', estimatedTokens); 
                 if (tokensProcessedResult.success && tokensProcessedResult.newAchievements) {
                     achievementsToDisplay.push(...tokensProcessedResult.newAchievements);
                 } else if (!tokensProcessedResult.success) {
@@ -378,20 +378,20 @@ export const useKworkInput = ({
                 }
             }
             
-            const { newAchievements: featureAch } = await checkAndUnlockFeatureAchievement(dbUser.user_id.toString(), 'usedAddFullTree'); // Corrected
+            const { newAchievements: featureAch } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'usedAddFullTree'); 
             if(featureAch) achievementsToDisplay.push(...featureAch);
 
             const uniqueAchievements = Array.from(new Set(achievementsToDisplay.map(a => a.id)))
                                            .map(id => achievementsToDisplay.find(a => a.id === id)!);
             uniqueAchievements.forEach(ach => {
                 addToast(`🏆 Достижение: ${ach.name}!`, "success", 5000, { description: ach.description });
-                logger.info(`[useKworkInput AddFullTree] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`); // Corrected
+                logger.info(`[useKworkInput AddFullTree] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`); 
             });
         } else {
              logger.warn("[useKworkInput AddFullTree] Cannot log CyberFitness actions: dbUser.user_id is missing.");
         }
         scrollToSection('kworkInput'); 
-     }, [files, imageReplaceTaskActive, kworkInputValue, setKworkInputValue, toastSuccess, toastWarning, scrollToSection, dbUser, addToast, logger]); // dbUser dependency
+     }, [files, imageReplaceTaskActive, kworkInputValue, setKworkInputValue, toastSuccess, toastWarning, scrollToSection, dbUser, addToast, logger]); 
 
      logger.debug("[useKworkInput] Hook setup complete.");
     return {

@@ -7,7 +7,7 @@ import {
     FaStar, FaArrowRight, FaWandMagicSparkles, FaHighlighter, FaGithub,
     FaDownload, FaCode, FaBrain, FaRocket, FaEye, FaCircleInfo, FaKeyboard,
     FaPaperPlane, FaLightbulb, FaImages, FaSquareArrowUpRight, FaFileImport,
-    FaClipboardList, FaCircleCheck, FaCommentDots 
+    FaClipboardList, FaCircleCheck, FaCommentDots, FaIcons
 } from "react-icons/fa6";
 
 // Import Subcomponents
@@ -16,6 +16,7 @@ import { SpeechBubble } from "@/components/stickyChat_components/SpeechBubble";
 import { CharacterDisplay } from "@/components/stickyChat_components/CharacterDisplay";
 import { SuggestionList } from "@/components/stickyChat_components/SuggestionList";
 import { ImageReplaceTool } from "@/components/stickyChat_components/ImageReplaceTool";
+import { IconReplaceTool } from "@/components/stickyChat_components/IconReplaceTool";
 import { toast } from "sonner";
 
 // Import Context & Actions
@@ -32,12 +33,15 @@ const CHARACTER_IMAGE_URL = "https://inmctohsodgdohamhzag.supabase.co/storage/v1
 const CHARACTER_ALT_TEXT = "Xuinity Assistant";
 const HIRE_ME_TEXT = "Найми меня! ✨";
 const REPLACE_IMAGE_ID = "replace-image-trigger";
+const REPLACE_ICON_ID = "replace-icon-trigger"; 
 const ADD_NEW_ID = "add-new"; 
 const HIRE_ME_ID = "hire-me";
 const COPY_LOGS_ID = "copy-logs"; 
 
 interface Suggestion { id: string; text: string; link?: string; action?: () => void; icon?: React.ReactNode; isHireMe?: boolean; isFixAction?: boolean; isImageReplaceAction?: boolean; disabled?: boolean; tooltip?: string; }
 interface GitHubProfile { login: string; avatar_url: string; html_url: string; name?: string | null; }
+interface IconReplaceDetails { oldIconName: string; newIconName: string; componentProps?: string; }
+
 
 // --- Animation Variants ---
 const containerVariants = { hidden: { opacity: 0, x: -300 }, visible: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 120, damping: 15, when: "beforeChildren", staggerChildren: 0.08, }, }, exit: { opacity: 0, x: -300, transition: { duration: 0.3 } }, };
@@ -56,6 +60,12 @@ const fabVariants = {
 // --- Helper Functions ---
 const isValidUrl = (url: string): boolean => { if (!url) return false; try { const parsed = new URL(url); return ['http:', 'https:'].includes(parsed.protocol); } catch (_) { return false; } };
 const isImageUrl = (url: string): boolean => { if (!url || !isValidUrl(url)) { return false; } const knownImageServiceHosts = ['placehold.co', 'via.placeholder.com', 'picsum.photos', 'dummyimage.com', 'source.unsplash.com']; const imageFormatSegmentsOrExt = /\.(png|jpg|jpeg|gif|webp|svg)$|\/(png|jpg|jpeg|gif|webp|svg)([\/?#]|$)/i; try { const parsedUrl = new URL(url); const pathnameLower = parsedUrl.pathname.toLowerCase(); const hostnameLower = parsedUrl.hostname.toLowerCase(); if (imageFormatSegmentsOrExt.test(pathnameLower)) { return true; } if (knownImageServiceHosts.some(host => hostnameLower.endsWith(host))) { return parsedUrl.pathname !== '/'; } if (hostnameLower.includes('githubusercontent.com') && pathnameLower.includes('/u/')) { return true; } if (hostnameLower.includes('googleusercontent.com') && pathnameLower.includes('/a/')) { return true; } return false; } catch (e) { console.error("[StickyChatButton] Error parsing URL in isImageUrl:", e); return false; } };
+const isIconNameInput = (input: string): boolean => {
+    if (!input) return false;
+    const trimmed = input.trim();
+    return /^(Fa[A-Z0-9][a-zA-Z0-9]*|fa-[a-z0-9-]+)$/i.test(trimmed) && !trimmed.includes(" ") && trimmed.length > 2;
+};
+
 
 // --- Main Component (Orchestrator) ---
 const StickyChatButton: React.FC = () => {
@@ -70,6 +80,7 @@ const StickyChatButton: React.FC = () => {
     const [customIdea, setCustomIdea] = useState<string>(""); 
     const [potentialOldImageUrl, setPotentialOldImageUrl] = useState<string | null>(null); 
     const [showReplaceTool, setShowReplaceTool] = useState<boolean>(false);
+    const [showIconReplaceTool, setShowIconReplaceTool] = useState<boolean>(false); 
     const [logsCopied, setLogsCopied] = useState(false); 
     
     // --- Hooks ---
@@ -148,7 +159,7 @@ const StickyChatButton: React.FC = () => {
             setLogsCopied(true);
             setTimeout(() => setLogsCopied(false), 2000); 
 
-            if (dbUser?.user_id) {
+            if (dbUser?.user_id) { 
                 logger.debug(`[StickyChatButton handleCopyLogs] Attempting to log 'copy_logs_used' for user ${dbUser.user_id}.`);
                 const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'copy_logs_used');
                 newAchievements?.forEach(ach => {
@@ -167,26 +178,68 @@ const StickyChatButton: React.FC = () => {
     }, [toastSuccess, toastError, toastInfo, dbUser?.user_id, addToast]);
 
     const suggestions = useMemo((): Suggestion[] => {
-        const baseSuggestions: Suggestion[] = []; const isToolPage = currentPath === '/repo-xml'; const cleanPath = currentPath.split('?')[0]; const trimmedCustomIdea = customIdea.trim(); const hasCustomIdea = trimmedCustomIdea.length > 0 && !potentialOldImageUrl;
+        const baseSuggestions: Suggestion[] = []; 
+        const isToolPage = currentPath === '/repo-xml'; 
+        const trimmedCustomIdea = customIdea.trim(); 
+        const isLikelyIconInput = isIconNameInput(trimmedCustomIdea);
+        const hasGenericCustomIdea = trimmedCustomIdea.length > 0 && !potentialOldImageUrl && !isLikelyIconInput;
+
         if (!isToolPage) {
-            if (hasCustomIdea) { baseSuggestions.push({ id: ADD_NEW_ID, text: "Передать Идею в Студию 🚀", link: "/repo-xml", icon: <FaFileImport className="mr-1.5 text-green-400"/>, tooltip: `Передать идею "${trimmedCustomIdea.substring(0, 30)}..." и контекст страницы в Студию` }); }
-            else { baseSuggestions.push({ id: ADD_NEW_ID, text: "Создать Новое с Нуля ✨", link: "/repo-xml", icon: <FaWandMagicSparkles className="mr-1.5" />, tooltip: "Перейти в СуперВайб Студию без контекста" }); }
+            if (hasGenericCustomIdea) { 
+                baseSuggestions.push({ id: ADD_NEW_ID, text: "Передать Идею в Студию 🚀", link: "/repo-xml", icon: <FaFileImport className="mr-1.5 text-green-400"/>, tooltip: `Передать идею "${trimmedCustomIdea.substring(0, 30)}..." и контекст страницы в Студию` }); 
+            } else if (!potentialOldImageUrl && !isLikelyIconInput) { 
+                baseSuggestions.push({ id: ADD_NEW_ID, text: "Создать Новое с Нуля ✨", link: "/repo-xml", icon: <FaWandMagicSparkles className="mr-1.5" />, tooltip: "Перейти в СуперВайб Студию без контекста" }); 
+            }
         }
+        
         baseSuggestions.push({ id: HIRE_ME_ID, text: HIRE_ME_TEXT, link: "/selfdev", isHireMe: true, icon: <FaStar className="mr-1.5" />, tooltip: "Узнать о SelfDev пути и заказать консультацию" });
-        if (potentialOldImageUrl && !isToolPage && !showReplaceTool) { baseSuggestions.unshift({ id: REPLACE_IMAGE_ID, text: "Заменить Картинку? 🖼️", action: () => { logger.debug("[Flow 1 - Image Swap] StickyChatButton: Replace Image suggestion clicked."); setShowReplaceTool(true); }, icon: <FaImages className="mr-1.5 text-blue-400" />, tooltip: `Начать процесс замены картинки: ${potentialOldImageUrl.substring(0, 30)}...` }); } 
+        
+        if (potentialOldImageUrl && !isToolPage && !showReplaceTool && !showIconReplaceTool) { 
+            baseSuggestions.unshift({ id: REPLACE_IMAGE_ID, text: "Заменить Картинку? 🖼️", action: () => { logger.debug("[Flow 1 - Image Swap] StickyChatButton: Replace Image suggestion clicked."); setShowReplaceTool(true); setShowIconReplaceTool(false); }, icon: <FaImages className="mr-1.5 text-blue-400" />, tooltip: `Начать процесс замены картинки: ${potentialOldImageUrl.substring(0, 30)}...` }); 
+        } else if (isLikelyIconInput && !isToolPage && !showIconReplaceTool && !showReplaceTool) {
+            baseSuggestions.unshift({ id: REPLACE_ICON_ID, text: "Заменить Иконку? 🎨", action: () => { logger.debug("[Flow X - Icon Swap] StickyChatButton: Replace Icon suggestion clicked."); setShowIconReplaceTool(true); setShowReplaceTool(false); }, icon: <FaIcons className="mr-1.5 text-purple-400" />, tooltip: `Начать процесс замены иконки, начиная с: ${trimmedCustomIdea}`});
+        }
+        
         baseSuggestions.push({ id: COPY_LOGS_ID, text: logsCopied ? "Логи скопированы!" : "Скопировать Логи", action: handleCopyLogs, icon: logsCopied ? <FaCircleCheck className="mr-1.5 text-green-400"/> : <FaClipboardList className="mr-1.5" />, tooltip: "Скопировать историю системных логов в буфер обмена для отладки" });
         return baseSuggestions;
-    }, [currentPath, potentialOldImageUrl, showReplaceTool, customIdea, logsCopied, handleCopyLogs]);
+    }, [currentPath, potentialOldImageUrl, showReplaceTool, showIconReplaceTool, customIdea, logsCopied, handleCopyLogs]);
 
     useEffect(() => {
         logger.debug(`[StickyChatButton Effect ActiveMessage] isAppLoading: ${isAppLoading}, githubLoading: ${githubLoading}`);
-        if (isAppLoading || githubLoading) { let loadingMsg = "Подключаюсь..."; if (githubLoading) loadingMsg = `Ищу твой профиль GitHub... 🧐`; setActiveMessage(loadingMsg); return; } let userIdentifier = githubProfile?.name || appContextUser?.first_name || appContextUser?.username || null; const baseGreeting = userIdentifier ? `Здарова, ${userIdentifier}!` : "Эй, Кодер!"; const justLoadedProfile = prevGithubLoading && !githubLoading && githubProfile; const cleanPath = currentPath.split('?')[0]; const isToolPage = cleanPath === '/repo-xml'; let message = "";
-        if (isToolPage) { message = `${baseGreeting} Ты в СуперВайб Студии! ✨ Используй Бадди справа для помощи.`; }
-        else { const pageName = cleanPath === '/' ? 'главную' : `страницу (${cleanPath})`; if (showReplaceTool) { message = `Окей, ${userIdentifier || 'дружок'}, давай заменим картинку! 👇`; } else if (potentialOldImageUrl) { message = `${baseGreeting} Заметил URL картинки. Хочешь заменить её?`; } else if (customIdea.trim().length > 0) { message = `${baseGreeting} Вижу твою идею! Жми "Передать Идею в Студию", чтобы начать магию. ✨`; } else if (justLoadedProfile) { message = `ВОУ, ${userIdentifier}! ✨ Нашел твой GitHub! Хочешь ${pageName} прокачать? 😉 Или введи идею/URL картинки!`; } else if (githubProfile) { message = `${baseGreeting} Рад видеть твой GitHub! ${pageName.charAt(0).toUpperCase() + pageName.slice(1)} будем править? Или введи идею/URL картинки.`; } else { message = `${baseGreeting} GitHub не найден... Не важно! ${pageName.charAt(0).toUpperCase() + pageName.slice(1)} будем улучшать? 😉 Или введи идею/URL картинки!`; } }
-        setActiveMessage(message);
-    }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading, prevGithubLoading, currentPath, potentialOldImageUrl, showReplaceTool, customIdea]);
+        if (isAppLoading || githubLoading) { let loadingMsg = "Подключаюсь..."; if (githubLoading) loadingMsg = `Ищу твой профиль GitHub... 🧐`; setActiveMessage(loadingMsg); return; } 
+        let userIdentifier = githubProfile?.name || appContextUser?.first_name || appContextUser?.username || null; 
+        const baseGreeting = userIdentifier ? `Здарова, ${userIdentifier}!` : "Эй, Кодер!"; 
+        const justLoadedProfile = prevGithubLoading && !githubLoading && githubProfile; 
+        const cleanPath = currentPath.split('?')[0]; 
+        const isToolPage = cleanPath === '/repo-xml'; 
+        let message = "";
 
-    const handleEscKey = useCallback((event: KeyboardEvent) => { if (event.key === 'Escape' && isOpen) { logger.debug("[StickyChatButton] Escape key pressed, closing."); setIsOpen(false); setShowReplaceTool(false); } }, [isOpen]);
+        if (isToolPage) { 
+            message = `${baseGreeting} Ты в СуперВайб Студии! ✨ Используй Бадди справа для помощи.`; 
+        } else { 
+            const pageName = cleanPath === '/' ? 'главную' : `страницу (${cleanPath})`; 
+            if (showReplaceTool) { 
+                message = `Окей, ${userIdentifier || 'дружок'}, давай заменим картинку! 👇`; 
+            } else if (showIconReplaceTool) {
+                message = `Отлично, ${userIdentifier || 'агент'}. Какую иконку на какую меняем? 🎨`;
+            } else if (potentialOldImageUrl) { 
+                message = `${baseGreeting} Заметил URL картинки. Хочешь заменить её?`; 
+            } else if (isIconNameInput(customIdea.trim())) {
+                 message = `${baseGreeting} Вижу имя иконки! Хочешь её заменить?`;
+            } else if (customIdea.trim().length > 0) { 
+                message = `${baseGreeting} Вижу твою идею! Жми "Передать Идею в Студию", чтобы начать магию. ✨`; 
+            } else if (justLoadedProfile) { 
+                message = `ВОУ, ${userIdentifier}! ✨ Нашел твой GitHub! Хочешь ${pageName} прокачать? 😉 Или введи идею/URL картинки/имя иконки!`; 
+            } else if (githubProfile) { 
+                message = `${baseGreeting} Рад видеть твой GitHub! ${pageName.charAt(0).toUpperCase() + pageName.slice(1)} будем править? Или введи идею/URL картинки/имя иконки.`; 
+            } else { 
+                message = `${baseGreeting} GitHub не найден... Не важно! ${pageName.charAt(0).toUpperCase() + pageName.slice(1)} будем улучшать? 😉 Или введи идею/URL картинки/имя иконки!`; 
+            } 
+        }
+        setActiveMessage(message);
+    }, [isOpen, isAppLoading, appContextUser, githubProfile, githubLoading, prevGithubLoading, currentPath, potentialOldImageUrl, showReplaceTool, showIconReplaceTool, customIdea]);
+
+    const handleEscKey = useCallback((event: KeyboardEvent) => { if (event.key === 'Escape' && isOpen) { logger.debug("[StickyChatButton] Escape key pressed, closing."); setIsOpen(false); setShowReplaceTool(false); setShowIconReplaceTool(false); } }, [isOpen]);
     useEffect(() => { if (isOpen) { document.addEventListener('keydown', handleEscKey); } else { document.removeEventListener('keydown', handleEscKey); } return () => { document.removeEventListener('keydown', handleEscKey); }; }, [isOpen, handleEscKey]);
     
     useEffect(() => { 
@@ -194,6 +247,7 @@ const StickyChatButton: React.FC = () => {
         setCustomIdea(""); 
         setPotentialOldImageUrl(null); 
         setShowReplaceTool(false); 
+        setShowIconReplaceTool(false);
         hasOpenedDueToInactivityRef.current = false; 
         setLogsCopied(false); 
     }, [currentPath]);
@@ -203,11 +257,12 @@ const StickyChatButton: React.FC = () => {
         if (trimmedIdea && isImageUrl(trimmedIdea)) { 
             logger.debug(`[Flow 1 - Image Swap] StickyChatButton: Detected image URL in input: ${trimmedIdea}`); 
             setPotentialOldImageUrl(trimmedIdea); 
-        } else { 
-            if(potentialOldImageUrl) logger.debug(`[StickyChatButton Effect CustomIdea] Input changed, clearing potential image URL.`); 
+            setShowIconReplaceTool(false); 
+        } else if (!isIconNameInput(trimmedIdea)) { 
+            if(potentialOldImageUrl) logger.debug(`[StickyChatButton Effect CustomIdea] Input changed (not image URL, not icon), clearing potential image URL.`); 
             setPotentialOldImageUrl(null); 
             if (showReplaceTool) { setShowReplaceTool(false); } 
-        } 
+        }
     }, [customIdea, showReplaceTool, potentialOldImageUrl]); 
 
     const handleSuggestionClick = (suggestion: Suggestion) => {
@@ -215,8 +270,9 @@ const StickyChatButton: React.FC = () => {
         logger.info("[StickyChatButton] Suggestion Clicked:", { id: suggestion.id, text: suggestion.text }); 
         if (suggestion.action) { suggestion.action(); }
         else if (suggestion.link) {
-            let finalLink = suggestion.link; const trimmedCustomIdea = customIdea.trim();
-            const isGenericIdeaFlow = trimmedCustomIdea && !potentialOldImageUrl && suggestion.id !== HIRE_ME_ID && suggestion.link === '/repo-xml';
+            let finalLink = suggestion.link; 
+            const trimmedCustomIdea = customIdea.trim();
+            const isGenericIdeaFlow = trimmedCustomIdea && !potentialOldImageUrl && !isIconNameInput(trimmedCustomIdea) && suggestion.id !== HIRE_ME_ID && suggestion.link === '/repo-xml';
 
             if (isGenericIdeaFlow) {
                  const cleanPath = currentPath.split('?')[0]; let targetPath = cleanPath === "/" ? "app/page.tsx" : `app${cleanPath}`; if (!targetPath.match(/\.(tsx|jsx|js|ts)$/)) { targetPath = targetPath.endsWith('/') ? targetPath + 'page.tsx' : targetPath + '/page.tsx'; } if (!targetPath.startsWith('app/')) targetPath = 'app/' + targetPath;
@@ -231,10 +287,11 @@ const StickyChatButton: React.FC = () => {
             }
             router.push(finalLink); setIsOpen(false);
         }
-        if (suggestion.id !== REPLACE_IMAGE_ID && suggestion.id !== COPY_LOGS_ID) {
+        if (suggestion.id !== REPLACE_IMAGE_ID && suggestion.id !== REPLACE_ICON_ID && suggestion.id !== COPY_LOGS_ID) {
             setIsOpen(false);
         }
     };
+
     const handleReplaceConfirmed = (newImageUrl: string) => {
         if (!potentialOldImageUrl) { logger.error("[Flow 1 - Image Swap] StickyChatButton: handleReplaceConfirmed called but old URL is missing!"); toastError("Ошибка: Старый URL не найден."); return; } 
         logger.info("[Flow 1 - Image Swap] StickyChatButton: Replace confirmed.", { oldUrl: potentialOldImageUrl, newUrl: newImageUrl }); 
@@ -242,10 +299,37 @@ const StickyChatButton: React.FC = () => {
         const cleanPath = currentPath.split('?')[0]; let targetPath = cleanPath === "/" ? "app/page.tsx" : `app${cleanPath}`; if (!targetPath.match(/\.(tsx|jsx|js|ts)$/)) { targetPath = targetPath.endsWith('/') ? targetPath + 'page.tsx' : targetPath + '/page.tsx'; } if (!targetPath.startsWith('app/')) targetPath = 'app/' + targetPath; const encodedTargetPath = encodeURIComponent(targetPath);
         const redirectUrl = `/repo-xml?path=${encodedTargetPath}&idea=${structuredIdea}`; 
         logger.info(`[Flow 1 - Image Swap] StickyChatButton: Constructed redirect URL: ${redirectUrl}`); 
-        toastInfo("🚀 Перехожу в Студию для замены..."); router.push(redirectUrl); setIsOpen(false); setShowReplaceTool(false);
+        toastInfo("🚀 Перехожу в Студию для замены картинки..."); router.push(redirectUrl); setIsOpen(false); setShowReplaceTool(false);
     };
-    const handleCancelReplace = () => { logger.debug("[Flow 1 - Image Swap] StickyChatButton: Replace cancelled."); setShowReplaceTool(false); }; 
-    const handleOverlayClick = () => { logger.debug("[StickyChatButton] Overlay clicked, closing."); setIsOpen(false); setShowReplaceTool(false); requestAnimationFrame(() => document.body.focus()); }; 
+
+    const handleIconReplaceConfirmed = (details: IconReplaceDetails) => {
+        logger.info("[Flow X - Icon Swap] StickyChatButton: Icon Replace confirmed.", details);
+        let ideaParts = [`IconSwap`];
+        ideaParts.push(`OldIconName=${encodeURIComponent(details.oldIconName)}`);
+        ideaParts.push(`NewIconName=${encodeURIComponent(details.newIconName)}`);
+        if (details.componentProps) { // This part is simplified for now
+            ideaParts.push(`ComponentProps=${encodeURIComponent(details.componentProps)}`);
+        }
+        const structuredIdea = ideaParts.join('|');
+        
+        const cleanPath = currentPath.split('?')[0]; 
+        let targetPath = cleanPath === "/" ? "app/page.tsx" : `app${cleanPath}`; 
+        if (!targetPath.match(/\.(tsx|jsx|js|ts|md)$/)) { 
+            targetPath = targetPath.endsWith('/') ? targetPath + 'page.tsx' : targetPath + '/page.tsx'; 
+        } 
+        if (!targetPath.startsWith('app/')) targetPath = 'app/' + targetPath; 
+        
+        const encodedTargetPath = encodeURIComponent(targetPath);
+        const redirectUrl = `/repo-xml?path=${encodedTargetPath}&idea=${structuredIdea}`; 
+        logger.info(`[Flow X - Icon Swap] StickyChatButton: Constructed redirect URL for icon swap: ${redirectUrl}`); 
+        toastInfo("🚀 Перехожу в Студию для замены иконки..."); 
+        router.push(redirectUrl); 
+        setIsOpen(false); 
+        setShowIconReplaceTool(false);
+    };
+
+    const handleCancelReplace = () => { logger.debug("[Flow 1/X - Image/Icon Swap] StickyChatButton: Replace cancelled."); setShowReplaceTool(false); setShowIconReplaceTool(false); }; 
+    const handleOverlayClick = () => { logger.debug("[StickyChatButton] Overlay clicked, closing."); setIsOpen(false); setShowReplaceTool(false); setShowIconReplaceTool(false); requestAnimationFrame(() => document.body.focus()); }; 
     const handleDialogClick = (e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
     const handleFabClick = async () => { 
         const newIsOpenState = !isOpen;
@@ -254,10 +338,11 @@ const StickyChatButton: React.FC = () => {
         if (newIsOpenState) { 
             hasOpenedDueToInactivityRef.current = true; 
             setShowReplaceTool(false); 
+            setShowIconReplaceTool(false);
             setCustomIdea(""); 
             setPotentialOldImageUrl(null); 
             setLogsCopied(false); 
-            if(dbUser?.user_id){ // Corrected to user_id
+            if(dbUser?.user_id){ 
                 logger.debug(`[StickyChatButton handleFabClick] User ${dbUser.user_id} opened chat. Attempting to log feature 'sticky_chat_opened'.`);
                 const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'sticky_chat_opened');
                 newAchievements?.forEach(ach => {
@@ -269,12 +354,13 @@ const StickyChatButton: React.FC = () => {
             }
         } else { 
             setShowReplaceTool(false); 
+            setShowIconReplaceTool(false);
             requestAnimationFrame(() => document.body.focus()); 
         }
     }; 
 
-    const showInputArea = isOpen && !showReplaceTool && currentPath !== '/repo-xml';
-    logger.debug("[StickyChatButton] Rendering...", { isOpen, showInputArea, showReplaceTool, potentialOldImageUrl }); 
+    const showInputArea = isOpen && !showReplaceTool && !showIconReplaceTool && currentPath !== '/repo-xml';
+    logger.debug("[StickyChatButton] Rendering...", { isOpen, showInputArea, showReplaceTool, showIconReplaceTool, potentialOldImageUrl }); 
 
     return (
         <AnimatePresence>
@@ -286,8 +372,10 @@ const StickyChatButton: React.FC = () => {
                         <div className="flex flex-col sm:flex-row items-center sm:items-end w-full gap-4 mt-2">
                             <CharacterDisplay githubProfile={githubProfile} characterImageUrl={CHARACTER_IMAGE_URL} characterAltText={CHARACTER_ALT_TEXT} variants={childVariants} />
                             <div className="flex flex-col items-center sm:items-start gap-2 w-full">
-                                {showReplaceTool && potentialOldImageUrl ? ( <ImageReplaceTool oldImageUrl={potentialOldImageUrl} onReplaceConfirmed={handleReplaceConfirmed} onCancel={handleCancelReplace} /> ) : (
-                                    <> {showInputArea && ( <motion.div variants={childVariants} className="w-full"> <label htmlFor="custom-idea-input" className="block text-xs font-medium mb-1 text-gray-300 flex items-center"> <FaLightbulb className="text-yellow-400 mr-1.5 text-sm" /> Введи идею / URL картинки: </label> <textarea id="custom-idea-input" rows={2} value={customIdea} onChange={(e) => setCustomIdea(e.target.value)} className="w-full p-2 text-sm bg-gray-700/80 backdrop-blur-sm border border-gray-600/50 rounded-md focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-white placeholder-gray-400 simple-scrollbar resize-none" placeholder="Напр: 'Добавь кнопку Х' или https://..." /> </motion.div> )} <SuggestionList suggestions={suggestions} onSuggestionClick={handleSuggestionClick} listVariants={childVariants} itemVariants={childVariants} className="items-center sm:items-start" /> </>
+                                {showReplaceTool && potentialOldImageUrl ? ( <ImageReplaceTool oldImageUrl={potentialOldImageUrl} onReplaceConfirmed={handleReplaceConfirmed} onCancel={handleCancelReplace} /> ) 
+                                : showIconReplaceTool ? ( <IconReplaceTool oldIconNameInput={isIconNameInput(customIdea.trim()) ? customIdea.trim() : ""} onReplaceConfirmed={handleIconReplaceConfirmed} onCancel={handleCancelReplace} />) 
+                                : (
+                                    <> {showInputArea && ( <motion.div variants={childVariants} className="w-full"> <label htmlFor="custom-idea-input" className="block text-xs font-medium mb-1 text-gray-300 flex items-center"> <FaLightbulb className="text-yellow-400 mr-1.5 text-sm" /> Введи идею / URL картинки / Имя иконки:</label> <textarea id="custom-idea-input" rows={2} value={customIdea} onChange={(e) => setCustomIdea(e.target.value)} className="w-full p-2 text-sm bg-gray-700/80 backdrop-blur-sm border border-gray-600/50 rounded-md focus:ring-1 focus:ring-blue-400 focus:border-blue-400 outline-none text-white placeholder-gray-400 simple-scrollbar resize-none" placeholder="Напр: 'Добавь кнопку Х', https://..., FaBeer" /> </motion.div> )} <SuggestionList suggestions={suggestions} onSuggestionClick={handleSuggestionClick} listVariants={childVariants} itemVariants={childVariants} className="items-center sm:items-start" /> </>
                                 )}
                             </div>
                         </div>
