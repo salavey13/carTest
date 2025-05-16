@@ -2,13 +2,12 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FaUpload, FaPaperPlane, FaSpinner } from 'react-icons/fa6';
+// FaUpload, FaPaperPlane, FaSpinner are imported directly as VibeContentRenderer will handle them via string syntax
 import { toast } from 'sonner';
-// .. ИСПОЛЬЗУЕМ ЭКШЕН uploadBatchImages, КАК В МОДАЛКЕ
 import { uploadBatchImages } from '@/app/actions';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button'; // Добавил Button
-import VibeContentRenderer from '@/components/VibeContentRenderer'; // Для иконок
+import { Button } from '@/components/ui/button';
+import VibeContentRenderer from '@/components/VibeContentRenderer';
 
 // --- Helper Function ---
 const isValidUrl = (url: string): boolean => {
@@ -116,7 +115,7 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
                         htmlFor="image-upload-input-tool"
                         className={`cursor-pointer flex items-center justify-center w-full h-full ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
-                        <VibeContentRenderer content={uploadedFile ? "::FaCircleCheck className='text-green-400 text-sm':" : "::FaUpload className='text-gray-300 text-sm':"} />
+                        <VibeContentRenderer content={uploadedFile ? "::FaCircleCheck className='text-green-400 text-sm'::" : "::FaUpload className='text-gray-300 text-sm'::"} />
                     </label>
                 </Button>
                 <input
@@ -141,7 +140,7 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
                     disabled={isUploading || !!uploadedFile}
                 />
             </div>
-             {isUploading && <p className="text-xs text-blue-300 animate-pulse text-center"><FaSpinner className="animate-spin inline mr-1"/>Загрузка файла...</p>}
+             {isUploading && <p className="text-xs text-blue-300 animate-pulse text-center"><VibeContentRenderer content="::FaSpinner className='animate-spin inline mr-1'::" />Загрузка файла...</p>}
              {uploadedUrl && <p className="text-xs text-green-400 break-all">Загружен: <span title={uploadedUrl}>{uploadedUrl.substring(0, 40)}...</span></p>}
             <div className="flex justify-end gap-2 mt-2">
                 <Button
@@ -159,8 +158,8 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
                     size="sm"
                     className="text-xs bg-blue-600 hover:bg-blue-500"
                 >
-                     <VibeContentRenderer content="::FaPaperPlane className='mr-1.5 text-xs':F" />
-                    Заменить
+                     <VibeContentRenderer content="::FaPaperPlane className='mr-1.5 text-xs'::" />
+                     <span className="ml-1">Заменить</span>
                 </Button>
             </div>
         </motion.div>
