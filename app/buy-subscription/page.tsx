@@ -6,8 +6,7 @@ import { createInvoice } from "@/hooks/supabase";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-// FaUserNinja, FaStar, FaShieldHalved, FaInfinity, FaUsers were already imported.
-// VibeContentRenderer already imported.
+import VibeContentRenderer from "@/components/VibeContentRenderer"; // Added import
 
 const SUBSCRIPTION_PLANS = [
   {
@@ -21,7 +20,7 @@ const SUBSCRIPTION_PLANS = [
       "<FaMicrochip className='text-brand-green mr-2 align-middle text-xl'/> Ограниченный банк промптов",
     ],
     color: "from-gray-700/50 to-gray-800/50 border-gray-600",
-    iconString: "::FaBrain className='inline mr-2 text-brand-cyan'::", // Changed to VibeContentRenderer compatible string for header
+    iconString: "::FaBrain className='inline mr-2 text-brand-cyan'::",
     cta: "Текущий Уровень",
   },
   {
@@ -58,18 +57,11 @@ const SUBSCRIPTION_PLANS = [
   },
 ];
 
-// Helper function to parse feature strings
 const parseFeatureString = (feature: string): { iconVibeContent: string | null, textContent: string } => {
-    // Regex to capture the HTML-like icon tag and the subsequent text
-    // Example: "<FaBrain className='text-brand-cyan mr-2 align-middle text-xl'/> Доступ к CyberDev OS (Lvl 0-1)"
     const featureMatch = feature.match(/^(<Fa\w+(?:\s+[^>]*?)?\s*\/?>)(.*)$/);
-    
     if (featureMatch) {
-        const iconHtmlTag = featureMatch[1]; // e.g., "<FaBrain className='...text-xl'/>"
-        const text = featureMatch[2].trim();   // e.g., "Доступ к CyberDev OS (Lvl 0-1)"
-
-        // Convert HTML-like icon tag to VibeContentRenderer's ::...:: syntax
-        // e.g., from "<FaBrain class='.../>" to "::FaBrain class='...'::"
+        const iconHtmlTag = featureMatch[1];
+        const text = featureMatch[2].trim();
         const iconTagParts = iconHtmlTag.match(/^<(Fa\w+)((?:\s+[^>]*?)?)\s*\/>$/);
         if (iconTagParts) {
             const iconName = iconTagParts[1];
@@ -80,10 +72,8 @@ const parseFeatureString = (feature: string): { iconVibeContent: string | null, 
             };
         }
     }
-    // Fallback if no icon tag is found at the beginning, or if parsing fails
     return { iconVibeContent: null, textContent: feature };
 };
-
 
 export default function BuySubscriptionPage() {
   const { user, isInTelegramContext, dbUser } = useAppContext();
@@ -142,7 +132,7 @@ export default function BuySubscriptionPage() {
       }
       
       const cleanFeaturesForInvoice = selectedSubscription.features.map((feature: string) => {
-         const { textContent } = parseFeatureString(feature); // Use helper to get clean text
+         const { textContent } = parseFeatureString(feature);
          return textContent;
       }).join(', ');
 
@@ -193,7 +183,7 @@ export default function BuySubscriptionPage() {
           {activeSubscriptionId !== "basic_neural_net" && (
             <div className={`mb-10 p-6 rounded-xl border ${activePlan.color.split(' ').pop()} shadow-inner bg-gradient-to-br ${activePlan.color} text-center`}>
                 <h3 className="text-3xl font-orbitron font-semibold text-light-text mb-3 flex items-center justify-center">
-                  <VibeContentRenderer content={activePlan.iconString} /> {activePlan.name}
+                  <VibeContentRenderer content={activePlan.iconString} /> <span className="ml-2">{activePlan.name}</span>
                 </h3>
                 <p className="text-xl font-bold text-white mb-3 font-mono">{activePlan.xtrPrice} / цикл</p>
                 <ul className="space-y-1.5 mb-4 text-left max-w-md mx-auto text-sm">
@@ -202,7 +192,7 @@ export default function BuySubscriptionPage() {
                       return (
                         <li key={i} className="text-gray-200 font-mono flex items-center">
                           {iconVibeContent && <VibeContentRenderer content={iconVibeContent} />}
-                          <span className={iconVibeContent ? "ml-0" : ""}>{/* Removed ml-2 as icon's own class handles margin */}
+                          <span> {/* Wrapper for text, icon's own classname (e.g. mr-2) will handle spacing */}
                             {textContent}
                           </span>
                         </li>
@@ -225,7 +215,7 @@ export default function BuySubscriptionPage() {
               >
                 <div>
                   <h3 className="text-2xl font-orbitron font-semibold text-light-text mb-3 flex items-center">
-                    <VibeContentRenderer content={sub.iconString} /> {sub.name}
+                    <VibeContentRenderer content={sub.iconString} /> <span className="ml-2">{sub.name}</span>
                   </h3>
                   <p className="text-3xl font-bold text-white mb-4 font-mono">{sub.xtrPrice}</p>
                   <ul className="space-y-1.5 mb-6 text-xs">
@@ -234,7 +224,7 @@ export default function BuySubscriptionPage() {
                       return (
                         <li key={i} className="text-gray-200 font-mono flex items-center">
                            {iconVibeContent && <VibeContentRenderer content={iconVibeContent} />}
-                           <span className={iconVibeContent ? "ml-0" : ""}>{/* Removed ml-2, icon class handles margin */}
+                           <span>
                              {textContent}
                            </span>
                         </li>

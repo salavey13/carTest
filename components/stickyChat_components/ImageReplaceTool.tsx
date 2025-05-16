@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-// FaUpload, FaPaperPlane, FaSpinner are imported directly as VibeContentRenderer will handle them via string syntax
+
 import { toast } from 'sonner';
 import { uploadBatchImages } from '@/app/actions';
 import { Input } from '@/components/ui/input';
