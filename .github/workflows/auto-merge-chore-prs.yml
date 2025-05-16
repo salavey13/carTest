@@ -1,0 +1,35 @@
+name: Auto Merge Chore PRs
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write # Required for merge and branch deletion capabilities by the action
+
+    # Condition to run the job:
+    # 1. The PR author must be 'salavey13'.
+    # 2. The PR title must start with 'Chore: Update image' OR 'Chore: Update icon'.
+    # 3. The PR must not be a draft.
+    # 4. The PR must be open.
+    if: >
+      github.event.pull_request.user.login == 'salavey13' &&
+      (
+        startsWith(github.event.pull_request.title, 'Chore: Update image') ||
+        startsWith(github.event.pull_request.title, 'Chore: Update icon')
+      ) &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.state == 'open'
+
+    steps:
+      - name: Enable Auto-Merge for PR and Auto-Delete Branch
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          merge-method: squash # Other options: 'merge', 'rebase'
+          delete-branch-after-merge: true # Automatically delete the head branch after merge
