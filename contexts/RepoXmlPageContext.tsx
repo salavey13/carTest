@@ -1,4 +1,3 @@
-// /contexts/RepoXmlPageContext.tsx
 "use client";
 
 import React, {
@@ -324,20 +323,10 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                        setAssistantLoadingStateStable(false);
                     } else {
                        finalFetchStatus = 'success'; 
-                       if (assistantRef.current?.handleDirectImageReplace) { // Assuming same handler for now
+                       if (assistantRef.current?.handleDirectImageReplace) { 
                            setAssistantLoadingStateStable(true);
-                           // For IconSwap, details might be different (oldIconName, newIconName)
-                           // Handler would need to adapt or have a separate path.
-                           // For now, using currentImgTask structure for ImageReplaceTask type in handler
-                           const actualTaskForHandler: ImageReplaceTask = taskType === 'ImageSwap' && currentImgTask
-                               ? currentImgTask
-                               : { // Construct a compatible ImageReplaceTask if it's an IconReplaceTask
-                                   targetPath: taskToProcess.targetPath,
-                                   oldUrl: (taskToProcess as IconReplaceTask).oldIconName, // Cast and use relevant field
-                                   newUrl: (taskToProcess as IconReplaceTask).newIconName  // Cast and use relevant field
-                                 };
-
-                           assistantRef.current.handleDirectImageReplace(actualTaskForHandler, allFiles ?? [])
+                           
+                           assistantRef.current.handleDirectImageReplace(taskToProcess, allFiles ?? []) // Pass the correct task type
                                .then(async ({ success: replaceSuccess, error: replaceError }) => {
                                    if (!replaceSuccess) {
                                        addToastStable(`Ошибка замены/PR (${taskType}): ${replaceError || 'Неизвестно'}`, 'error');
@@ -433,11 +422,10 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
         }, [dbUser?.user_id, addToastStable]);
 
         const triggerFetch = useCallback(async (isRetry = false, branch?: string | null) => { 
-            const activeTask = imageReplaceTaskStateRef.current || iconReplaceTaskStateRef.current; // Prioritize image task if both (should not happen)
+            const activeTask = imageReplaceTaskStateRef.current || iconReplaceTaskStateRef.current;
             if (fetcherRef.current?.handleFetch) { 
                 try { 
-                    // Pass the active task to handleFetch if it exists
-                    await fetcherRef.current.handleFetch(isRetry, branch, activeTask as ImageReplaceTask | null); // Cast as ImageReplaceTask is okay as structure is similar for fetch
+                    await fetcherRef.current.handleFetch(isRetry, branch, activeTask); 
                 } catch (e: any) { 
                     addToastStable(`Крит. ошибка запуска извлечения: ${e?.message ?? 'Неизвестно'}`, "error", 5000); 
                     setFetchStatusStateStable('error'); 
@@ -459,7 +447,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     setIsPreCheckingStateStable(false); setFetchStatusStateStable('error'); return;
                 }
                 setImageReplaceTaskStateStable({ targetPath, oldUrl: flowDetails.oldUrl, newUrl: flowDetails.newUrl });
-                setIconReplaceTaskStateStable(null); // Clear other visual task
+                setIconReplaceTaskStateStable(null); 
                 setPendingFlowDetailsStateStable(null);
                 logger.log(`${flowLogPrefix} Context: imageReplaceTaskState set. Cleared icon/pending details.`);
             } else if (flowType === 'IconSwap') {
@@ -469,7 +457,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     setIsPreCheckingStateStable(false); setFetchStatusStateStable('error'); return;
                 }
                 setIconReplaceTaskStateStable({ targetPath, oldIconName: flowDetails.oldIconName, newIconName: flowDetails.newIconName, componentProps: flowDetails.componentProps });
-                setImageReplaceTaskStateStable(null); // Clear other visual task
+                setImageReplaceTaskStateStable(null); 
                 setPendingFlowDetailsStateStable(null);
                 logger.log(`${flowLogPrefix} Context: iconReplaceTaskState set. Cleared image/pending details.`);
             } else if (flowType === 'ErrorFix') {
@@ -495,7 +483,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             let branchToFetch: string | null = null;
             let branchNameToSeek = potentialBranchNameProvided;
 
-            if (flowType === 'ImageSwap' || flowType === 'IconSwap') { // Both visual swaps fetch from default
+            if (flowType === 'ImageSwap' || flowType === 'IconSwap') { 
                 logger.log(`${flowLogPrefix} Context: Visual Swap flow. Always fetching from default branch (null).`);
                 branchToFetch = null; 
             } 
@@ -618,12 +606,14 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                 if (result.success) { 
                     triggerGetOpenPRsStable(repoUrlParam).catch(err => logger.error("Failed to refresh PRs after branch update:", err));
                     if (dbUser?.user_id) {
-                        if (prNumber) { 
-                            const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.user_id, 'branchUpdated', 1);
-                            if(actionAch) combinedAchievements.push(...actionAch);
-                            logger.info(`[CyberFitness] Logged 'branchUpdated' for PR #${prNumber} update. User: ${dbUser.user_id}`);
+                        // Log 'branchUpdated' unconditionally on successful branch update.
+                        const { newAchievements: actionAch } = await logCyberFitnessAction(dbUser.user_id, 'branchUpdated', 1);
+                        if(actionAch) combinedAchievements.push(...actionAch);
+                        
+                        if (prNumber) {
+                            logger.info(`[CyberFitness] Logged 'branchUpdated' for update to PR #${prNumber}'s branch '${branch}'. User: ${dbUser.user_id}`);
                         } else {
-                            logger.info(`[CyberFitness] Branch '${branch}' updated (no PR number). Action will be logged by PR creation or specific flow. User: ${dbUser.user_id}`);
+                            logger.info(`[CyberFitness] Logged 'branchUpdated' for update to branch '${branch}' (no specific PR number provided to this function). User: ${dbUser.user_id}`);
                         }
                     }
                     return { success: true, newAchievements: combinedAchievements }; 
@@ -730,11 +720,11 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             else if (fetchStatusState === 'loading' || fetchStatusState === 'retrying') { calculatedStep = 'fetching'; }
             else if (fetchStatusState === 'error' || fetchStatusState === 'failed_retries') { calculatedStep = 'fetch_failed'; }
             else if (filesFetchedState) {
-                if (imageReplaceTaskState || iconReplaceTaskState) { // Check both visual tasks
+                if (imageReplaceTaskState || iconReplaceTaskState) { 
                     const activeVisualTask = imageReplaceTaskState || iconReplaceTaskState;
                     const targetFileExists = activeVisualTask && allFetchedFilesState.some(f => f.path === activeVisualTask.targetPath);
                     if (targetFileExists) {
-                        calculatedStep = assistantLoadingState ? 'generating_ai_response' : 'files_fetched_image_replace'; // files_fetched_image_replace can cover both for now
+                        calculatedStep = assistantLoadingState ? 'generating_ai_response' : 'files_fetched_image_replace'; 
                     } else {
                         calculatedStep = 'fetch_failed'; 
                     }
@@ -756,7 +746,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             filesParsedState, requestCopiedState, primaryHighlightPathState, 
             secondaryHighlightPathsStateInternal, 
             selectedFetcherFilesState, aiActionLoadingState, isParsingState, 
-            imageReplaceTaskState, iconReplaceTaskState, // Added iconReplaceTaskState
+            imageReplaceTaskState, iconReplaceTaskState, 
             allFetchedFilesState, assistantLoadingState, repoUrlEnteredState, isPreCheckingState, logger 
         ]);
 
@@ -765,7 +755,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
              const localManualBranchName = manualBranchNameState; 
              const localTargetBranchName = targetBranchNameState; 
              const localImageReplaceTask = imageReplaceTaskState;
-             const localIconReplaceTask = iconReplaceTaskState; // Get icon task state
+             const localIconReplaceTask = iconReplaceTaskState; 
              const localFetchStatus = fetchStatusState; 
              const localAllFilesLength = allFetchedFilesState.length; 
              const localSelectedFetchSize = selectedFetcherFilesState.size; 
@@ -808,7 +798,7 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
              }
           }, [ 
               currentStep, manualBranchNameState, targetBranchNameState, 
-              imageReplaceTaskState, iconReplaceTaskState, // Added icon task
+              imageReplaceTaskState, iconReplaceTaskState, 
               fetchStatusState, allFetchedFilesState, filesFetchedState, assistantLoadingState, 
               selectedFetcherFilesState.size, selectedAssistantFilesState.size, 
               isPreCheckingState, pendingFlowDetailsState 
