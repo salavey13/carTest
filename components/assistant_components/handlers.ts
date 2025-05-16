@@ -560,55 +560,50 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
         if (!task?.targetPath || !task.oldUrl || !task.newUrl) {
             logger.warn("[Handler DirectImageReplace] Invalid task provided:", task);
             setImageReplaceError("Некорректные данные для задачи замены.");
+            //setImageReplaceTask(null); // Moved to finally after error handling
             return { success: false, error: "Invalid task data" };
         }
         if (!repoUrlForForm || !repoUrlForForm.includes("github.com")) {
             logger.error("[Handler DirectImageReplace] Invalid repo URL:", repoUrlForForm);
             setImageReplaceError("Некорректный URL репозитория GitHub.");
+            //setImageReplaceTask(null); // Moved to finally
             return { success: false, error: "Invalid repo URL" };
         }
+
         const allFilesForReplace = currentAllFiles ?? [];
-        logger.info("[Handler DirectImageReplace] Starting process", { task, repo: repoUrlForForm });
+        logger.info("[Handler DirectImageReplace] Starting process", { task, repo: repoUrlForForm, filesAvailable: allFilesForReplace.length });
         setAssistantLoading(true); setIsProcessingPR(true); setImageReplaceError(null);
         const toastId = toast.loading(`Замена картинки в ${task.targetPath.split('/').pop()}...`);
-        let success = false; let errorMsg: string | undefined = undefined;
+        let success = false; 
+        let errorMsg: string | undefined = undefined;
         let imageReplaceAchievements: Achievement[] = [];
     
         try {
+            logger.debug("[Handler DirectImageReplace] Inside try block.");
             const targetFile = allFilesForReplace.find(f => f.path === task.targetPath);
-            if (!targetFile) { throw new Error(`Целевой файл ${task.targetPath} не найден среди загруженных.`); }
-            if (typeof targetFile.content !== 'string') { throw new Error(`Содержимое файла ${task.targetPath} не является строкой.`); }
+            if (!targetFile) { 
+                logger.error(`[Handler DirectImageReplace] Target file ${task.targetPath} not found in ${allFilesForReplace.length} provided files.`);
+                throw new Error(`Целевой файл ${task.targetPath} не найден среди загруженных.`); 
+            }
+            if (typeof targetFile.content !== 'string') { 
+                logger.error(`[Handler DirectImageReplace] Content of ${task.targetPath} is not a string.`);
+                throw new Error(`Содержимое файла ${task.targetPath} не является строкой.`); 
+            }
     
-            logger.debug("[Handler DirectImageReplace] Target file found", { path: targetFile.path });
+            logger.debug("[Handler DirectImageReplace] Target file found and content is string", { path: targetFile.path, contentSnippet: targetFile.content.substring(0, 50) });
     
             const escapedOldUrl = task.oldUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const oldUrlRegex = new RegExp(escapedOldUrl, 'g');
-    
-            // No warning if old URL not found, just proceed with new content
-            // if (!oldUrlRegex.test(targetFile.content)) {
-            //     logger.warn(`[Handler DirectImageReplace] Old URL "${task.oldUrl}" not found in file ${task.targetPath}. Proceeding anyway.`);
-            // }
-    
             const updatedContent = targetFile.content.replace(oldUrlRegex, task.newUrl);
             
-            // Even if content is unchanged (e.g. old URL not found, but new URL is same as old),
-            // We might still want to create/update the PR to ensure the branch exists with the latest file state.
-            // However, for the "always new branch" logic, we always proceed to create.
-            
-            logger.info(`[Handler DirectImageReplace] Content for ${task.targetPath} prepared (might be unchanged if old URL not found).`);
+            logger.info(`[Handler DirectImageReplace] Content for ${task.targetPath} prepared. Old URL occurrences replaced (if any).`);
             const filesToCommit = [{ path: task.targetPath, content: updatedContent }];
             
-            // For "always new branch", PR title should reflect it's a new attempt.
-            // Using a timestamp or a counter might be good for uniqueness if GitHub reuses PR numbers for identical branch names after deletion.
-            // For simplicity with auto-merge, let's keep the title consistent for the ACTION, but branch name unique.
             const prTitleForAction = `chore: Update image ${task.targetPath.split('/').pop()}`; 
             const commitSubject = prTitleForAction;
-
             const commitBody = `Replaced image: ${task.oldUrl}\nWith new image: ${task.newUrl}\n\nFile: ${task.targetPath}\n\nAttempt: ${Date.now()}`;
             const fullCommitMessage = `${commitSubject}\n\n${commitBody}`;
             const prDescription = `Automatic image replacement request via CyberVibe Studio.\n\n**Details:**\n- File: \`${task.targetPath}\`\n- Old URL: ${task.oldUrl}\n- New URL: ${task.newUrl}`;
-            
-            // ALWAYS CREATE NEW BRANCH FOR IMAGE SWAP
             const newBranchName = `fix/img-${task.targetPath.replace(/[\/\.]/g, "-")}-${Date.now()}`;
             logger.info(`[Handler DirectImageReplace] Always creating new branch: ${newBranchName}`);
 
@@ -622,8 +617,10 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             );
 
             if (!createPrResult.success || !createPrResult.prNumber) {
+                logger.error(`[Handler DirectImageReplace] PR creation failed. Result:`, createPrResult);
                 throw new Error(createPrResult.error || 'Ошибка создания PR для замены картинки');
             }
+
             if(createPrResult.newAchievements) imageReplaceAchievements.push(...createPrResult.newAchievements);
             
             const successMessage = `Новый PR #${createPrResult.prNumber} для замены картинки в ветке '${newBranchName}' создан!`;
@@ -632,27 +629,29 @@ export const useAICodeAssistantHandlers = (props: UseAICodeAssistantHandlersProp
             
             await triggerGetOpenPRs(repoUrlForForm); 
             success = true; 
-            setImageReplaceTask(null); 
             
-            imageReplaceAchievements.forEach(ach => addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
-    
         } catch (err: any) {
             errorMsg = err?.message || "Неизвестная ошибка при замене картинки.";
-            logger.error("[Handler DirectImageReplace] Error during process:", err);
+            // This log is important as it shows the caught error
+            logger.error("[Handler DirectImageReplace] Error during process:", err); 
             toast.error(`Ошибка: ${errorMsg}`, { id: toastId, duration: 6000 });
             setImageReplaceError(errorMsg); 
-            setImageReplaceTask(null); 
             success = false;
         } finally {
-            setAssistantLoading(false); setIsProcessingPR(false);
-            logger.info(`[Handler DirectImageReplace] Finally block. Success: ${success}`);
+            setAssistantLoading(false); 
+            setIsProcessingPR(false);
+            setImageReplaceTask(null); // Ensure task is cleared regardless of outcome
+            logger.info(`[Handler DirectImageReplace] Finally block. Success: ${success}. ImageReplaceTask set to null.`);
+            if (success && imageReplaceAchievements.length > 0) {
+                 imageReplaceAchievements.forEach(ach => addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description }));
+            }
         }
         return { success, error: errorMsg }; 
     }, [
         repoUrlForForm, setAssistantLoading, setIsProcessingPR, setImageReplaceError,
-        triggerCreateNewPR, // Changed from triggerUpdateBranch
+        triggerCreateNewPR, 
         triggerGetOpenPRs,
-        setImageReplaceTask, addToast
+        setImageReplaceTask, addToast // Ensure addToast is stable or included if it changes
     ]);
 
     return {
