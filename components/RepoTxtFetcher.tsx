@@ -190,9 +190,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         }
         
         const ideaSignature = `${ideaFromUrl}|${highlightedPathFromUrl}`;
-        // If this exact ideaSignature is already being processed (marked in ideaProcessingRef.current)
-        // AND there's an active imageReplaceTask or pendingFlowDetails in the context,
-        // it means the context reflects the active processing of this idea. So, we skip to avoid re-triggering.
         if (ideaProcessingRef.current === ideaSignature && (imageReplaceTask || pendingFlowDetails)) {
              logger.info(`[RepoTxtFetcher Effect ideaProp] Task for signature "${ideaSignature}" already processed or active in context. Skipping re-trigger.`);
              return;
@@ -207,8 +204,6 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                 const oldUrl = decodeURIComponent(oldUrlPart.substring("OldURL=".length));
                 const newUrl = decodeURIComponent(newUrlPart.substring("NewURL=".length));
                 
-                // Check if the current idea from props matches an *active* task in the context.
-                // If so, we don't need to re-trigger the pre-check.
                 if (imageReplaceTask &&
                     imageReplaceTask.targetPath === highlightedPathFromUrl &&
                     imageReplaceTask.oldUrl === oldUrl &&
@@ -225,7 +220,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                 }
                 
                 logger.info("[RepoTxtFetcher Effect ideaProp] Detected ImageReplace flow from ideaProp. Proceeding to trigger.");
-                ideaProcessingRef.current = ideaSignature; // Mark as processing
+                ideaProcessingRef.current = ideaSignature; 
                 const branchNameToUse = manualBranchName || targetBranchName || ''; 
                 triggerPreCheckAndFetch(
                     repoUrl,
@@ -237,16 +232,12 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                     logger.log("[RepoTxtFetcher Effect ideaProp] triggerPreCheckAndFetch for ImageSwap completed via ideaProp.");
                 }).catch(err => {
                     logger.error("[RepoTxtFetcher Effect ideaProp] Error calling triggerPreCheckAndFetch for ImageSwap via ideaProp:", err);
-                    // Potentially set a fallback image task if pre-check fails, though context should handle this better.
-                    // setImageReplaceTask({ targetPath: highlightedPathFromUrl, oldUrl, newUrl }); // Consider if this fallback is still needed
                 }).finally(() => {
-                    // Clear processing ref ONLY if the idea was processed AND there's no active task/pending flow for it.
-                    // This prevents re-triggering if the flow was completed or properly cancelled.
                     if (ideaProcessingRef.current === ideaSignature && !imageReplaceTask && !(pendingFlowDetails?.type === 'ImageSwap' && pendingFlowDetails.targetPath === highlightedPathFromUrl)) {
-                        logger.log(`[RepoTxtFetcher Effect ideaProp] Clearing ideaProcessingRef for ${ideaSignature} as no active task/pending flow exists.`);
+                        logger.log(`[RepoTxtFetcher Effect ideaProp] Clearing ideaProcessingRef for ${ideaSignature} as no active task/pending flow exists for ImageSwap.`);
                         ideaProcessingRef.current = null;
                     } else if (ideaProcessingRef.current === ideaSignature) {
-                        logger.log(`[RepoTxtFetcher Effect ideaProp] NOT clearing ideaProcessingRef for ${ideaSignature} as task/pending flow IS active.`);
+                        logger.log(`[RepoTxtFetcher Effect ideaProp] NOT clearing ideaProcessingRef for ${ideaSignature} as task/pending flow IS active for ImageSwap.`);
                     }
                 });
             } else {
@@ -280,17 +271,20 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                      logger.error("[RepoTxtFetcher Effect ideaProp] Error calling triggerPreCheckAndFetch for ErrorFix via ideaProp:", err);
                  }).finally(() => {
                     if (ideaProcessingRef.current === ideaSignature && !(pendingFlowDetails?.type === 'ErrorFix' && pendingFlowDetails.targetPath === highlightedPathFromUrl) ) {
-                        logger.log(`[RepoTxtFetcher Effect ideaProp] Clearing ideaProcessingRef for ${ideaSignature} as no active pending flow exists.`);
+                        logger.log(`[RepoTxtFetcher Effect ideaProp] Clearing ideaProcessingRef for ${ideaSignature} as no active pending flow exists for ErrorFix.`);
                         ideaProcessingRef.current = null;
                     } else if (ideaProcessingRef.current === ideaSignature) {
-                         logger.log(`[RepoTxtFetcher Effect ideaProp] NOT clearing ideaProcessingRef for ${ideaSignature} as pending flow IS active.`);
+                         logger.log(`[RepoTxtFetcher Effect ideaProp] NOT clearing ideaProcessingRef for ${ideaSignature} as pending flow IS active for ErrorFix.`);
                     }
                  });
              } catch (e) {
                  logger.error("[RepoTxtFetcher Effect ideaProp] Failed to parse ErrorFix details from ideaProp:", e);
              }
         } else {
-             logger.log(`[RepoTxtFetcher Effect ideaProp] ideaProp ("${ideaFromUrl ? ideaFromUrl.substring(0,30) : ''}") is present but not for ImageReplace or ErrorFix.`);
+             logger.log(`[RepoTxtFetcher Effect ideaProp] ideaProp ("${ideaFromUrl ? ideaFromUrl.substring(0,30) : ''}") is present but not for ImageReplace or ErrorFix. Clearing ideaProcessingRef if it matches.`);
+             if (ideaProcessingRef.current === ideaSignature) {
+                ideaProcessingRef.current = null;
+             }
         }
     }, [
         ideaFromUrl, highlightedPathFromUrl, repoUrl, manualBranchName, targetBranchName, 

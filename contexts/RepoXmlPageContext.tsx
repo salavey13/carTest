@@ -312,15 +312,14 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                                        questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1); 
                                        questCompleted = true;
                                    }
-                                   //setImageReplaceTaskStateStable(null); // Task is cleared inside handleDirectImageReplace finally block
                                })
                                .catch(replaceError => { 
                                    addToastStable(`Проблема при вызове замены изображения: ${replaceError?.message ?? 'Неизвестно'}`, 'error', 6000); 
-                                   //setImageReplaceTaskStateStable(null); // Task is cleared inside handleDirectImageReplace finally block
                                 })
                                .finally(() => { 
                                    setAssistantLoadingStateStable(false); 
-                                   // setImageReplaceTask is now handled by the handler itself
+                                   setImageReplaceTaskStateStable(null); // Ensure task is cleared after operation
+                                   logger.info(`${flowLogPrefix} Context: ImageReplaceTask cleared in handleSetFilesFetchedStable finally block.`);
                                });
                        } else {
                             addToastStable(`КРИТИЧЕСКАЯ ПРОБЛЕМА: Не удалось вызвать замену изображения.`, 'error', 7000);
@@ -335,7 +334,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     // setImageReplaceTaskStateStable(null); // Let user retry fetch
                     setAssistantLoadingStateStable(false);
                 }
-                // Only clear pending flow if it was an ImageSwap flow AND image task was processed
                 if (currentPendingFlow?.type === 'ImageSwap' && currentTask) { 
                     setPendingFlowDetailsStateStable(null); 
                 } 
@@ -366,7 +364,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                  }
             } else { 
                   if (fetched && currentPendingFlow) setPendingFlowDetailsStateStable(null);
-                  // if (fetched && imageReplaceTaskStateRef.current) setImageReplaceTaskStateStable(null); // No, imageReplaceTask handled above
                   finalFetchStatus = fetched ? 'success' : 'error';
                   if (fetched && !currentTask && !currentPendingFlow && dbUser?.user_id) { 
                         questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'first_fetch_completed', 75, 1);
@@ -432,7 +429,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
             setTargetPrDataStable(null); 
             setTargetBranchNameStateStable(null); 
             setManualBranchNameStateStable(''); 
-            // setFetchStatusStateStable('loading'); // Removed, let triggerFetch handle it
 
             if (dbUser?.user_id) { 
                 const questResult = await completeQuestAndUpdateProfile(dbUser.user_id, 'initial_boot_sequence', 25);
@@ -693,7 +689,6 @@ export const RepoXmlPageProvider: React.FC<{ children: ReactNode; }> = ({ childr
                     else if (aiResponseHasContentState) { calculatedStep = filesParsedState ? 'pr_ready' : 'response_pasted'; }
                     else if (kworkInputHasContentState) { calculatedStep = requestCopiedState ? 'request_copied' : 'request_written'; }
                     else if (selectedFetcherFilesState.size > 0) { calculatedStep = 'files_selected'; }
-                    // Используем secondaryHighlightPathsStateInternal для корректной зависимости
                     else if (primaryHighlightPathState || Object.values(secondaryHighlightPathsStateInternal).some(arr => arr.length > 0)) { calculatedStep = 'files_fetched_highlights'; }
                     else { calculatedStep = 'files_fetched'; }
                 }
