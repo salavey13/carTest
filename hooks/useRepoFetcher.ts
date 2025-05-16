@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { fetchRepoContents, getOpenPullRequests } from "@/app/actions_github/actions";
+import { fetchRepoContents } from "@/app/actions_github/actions"; // getOpenPullRequests removed as it's not used here
 import {
-    useRepoXmlPageContext, FetchStatus, SimplePullRequest, ImageReplaceTask, FileNode,
-    ImportCategory, PendingFlowDetails
+    useRepoXmlPageContext, FetchStatus, FileNode,
+    ImportCategory, ImageReplaceTask, IconReplaceTask, // Added IconReplaceTask for type checking
+    PendingFlowDetails
 } from "@/contexts/RepoXmlPageContext";
 import { debugLogger as logger } from "@/lib/debugLogger";
 import * as repoUtils from "@/lib/repoUtils";
@@ -14,10 +15,10 @@ interface UseRepoFetcherProps {
     token: string;
     targetBranchName: string | null;
     manualBranchName: string;
-    imageReplaceTask: ImageReplaceTask | null; 
+    imageReplaceTask: ImageReplaceTask | null; // This can be ImageReplaceTask or IconReplaceTask passed as ImageReplaceTask
     highlightedPathFromUrl: string;
     importantFiles: string[];
-    autoFetch: boolean;
+    // autoFetch: boolean; // Removed autoFetch
     ideaFromUrl: string;
     isSettingsModalOpen: boolean;
     repoUrlEntered: boolean;
@@ -43,16 +44,15 @@ interface UseRepoFetcherReturn {
 
 export const useRepoFetcher = ({
     repoUrl, token, targetBranchName, manualBranchName, imageReplaceTask, 
-    highlightedPathFromUrl, importantFiles, autoFetch, ideaFromUrl, isSettingsModalOpen,
+    highlightedPathFromUrl, importantFiles, /* autoFetch, */ ideaFromUrl, isSettingsModalOpen, // autoFetch removed
     repoUrlEntered, loadingPrs, assistantLoading, isParsing, aiActionLoading,
 }: UseRepoFetcherProps): UseRepoFetcherReturn => {
     const {
         fetchStatus, setFetchStatus, handleSetFilesFetched, setSelectedFetcherFiles,
-        setRequestCopied, setLoadingPrs, setOpenPrs, setTargetBranchName: setContextTargetBranch,
+        setRequestCopied, 
         triggerToggleSettingsModal, setKworkInputValue,
         setAiResponseHasContent, setFilesParsed, setSelectedAssistantFiles,
-        targetPrData,
-        pendingFlowDetails 
+        pendingFlowDetails, iconReplaceTask // Get iconReplaceTask from context if needed for differentiation
     } = useRepoXmlPageContext();
     const { success: toastSuccess, error: toastError, info: toastInfo, warning: toastWarning, loading: toastLoading } = useAppToast();
 
@@ -64,16 +64,18 @@ export const useRepoFetcher = ({
 
     const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const isFetchInitiatedRef = useRef(false);
-    const isAutoFetchingRef = useRef(false);
+    // isAutoFetchingRef removed as autoFetch is removed
     const fetchStatusRef = useRef(fetchStatus);
-    const imageReplaceTaskRef = useRef(imageReplaceTask);
+    const activeVisualTaskRef = useRef(imageReplaceTask || (iconReplaceTask as unknown as ImageReplaceTask | null)); // Store the active task
     const pendingFlowDetailsRef = useRef(pendingFlowDetails);
 
     useEffect(() => {
         return () => { if (progressIntervalRef.current) { clearInterval(progressIntervalRef.current); } };
     }, []);
     useEffect(() => { fetchStatusRef.current = fetchStatus; }, [fetchStatus]);
-    useEffect(() => { imageReplaceTaskRef.current = imageReplaceTask; }, [imageReplaceTask]);
+    useEffect(() => { 
+        activeVisualTaskRef.current = imageReplaceTask || (iconReplaceTask as unknown as ImageReplaceTask | null);
+     }, [imageReplaceTask, iconReplaceTask]);
     useEffect(() => { pendingFlowDetailsRef.current = pendingFlowDetails; }, [pendingFlowDetails]);
 
     const stopProgressSimulation = useCallback(() => { if (progressIntervalRef.current) { clearInterval(progressIntervalRef.current); progressIntervalRef.current = null; } }, []);
@@ -86,15 +88,22 @@ export const useRepoFetcher = ({
         const finalBranchToFetch = branchNameToFetchOverride !== undefined ? branchNameToFetchOverride : (targetBranchName ?? manualBranchName) || null;
         const effectiveBranchDisplay = finalBranchToFetch || 'default';
         
-        // --- Read current flow/task info DIRECTLY from refs ---
         const currentFlowContext = pendingFlowDetailsRef.current; 
-        const currentImageTaskContext = imageReplaceTaskRef.current; 
-        const isImageFlow = currentFlowContext?.type === 'ImageSwap' || !!currentImageTaskContext;
+        const currentActiveVisualTask = activeVisualTaskRef.current;
+        const isActualImageTask = currentActiveVisualTask && 'oldUrl' in currentActiveVisualTask; // Check if it's ImageReplaceTask
+        
+        const isVisualFlow = !!currentActiveVisualTask;
         const isErrorFixFlow = currentFlowContext?.type === 'ErrorFix';
-        const isDedicatedFlow = isImageFlow || isErrorFixFlow;
-        const currentTargetPath = isImageFlow ? (currentFlowContext?.targetPath || currentImageTaskContext?.targetPath) : (isErrorFixFlow ? currentFlowContext?.targetPath : null);
+        const isDedicatedFlow = isVisualFlow || isErrorFixFlow;
 
-        logger.debug(`[useRepoFetcher handleFetchManual] Args: isRetry=${isManualRetry}, branch=${effectiveBranchDisplay}, isDedicatedFlow=${isDedicatedFlow}, flowType=${currentFlowContext?.type}, directImageTask=${!!currentImageTaskContext}, targetPath=${currentTargetPath}`);
+        let currentTargetPath: string | null = null;
+        if (currentActiveVisualTask) {
+            currentTargetPath = currentActiveVisualTask.targetPath;
+        } else if (isErrorFixFlow && currentFlowContext) {
+            currentTargetPath = currentFlowContext.targetPath;
+        }
+        
+        logger.debug(`[useRepoFetcher handleFetchManual] Args: isRetry=${isManualRetry}, branch=${effectiveBranchDisplay}, isDedicatedFlow=${isDedicatedFlow}, visualFlowType=${isVisualFlow ? (isActualImageTask ? 'Image' : 'Icon') : 'None'}, errorFixFlow=${isErrorFixFlow}, targetPath=${currentTargetPath}`);
 
         if (isFetchInitiatedRef.current && (fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying') && !isManualRetry) { return; }
         if (!repoUrl.trim()) { setError("URL репозитория не указан."); triggerToggleSettingsModal(); return; }
@@ -103,7 +112,7 @@ export const useRepoFetcher = ({
         setFetchStatus('loading'); setError(null); setFiles([]); setPrimaryHighlightedPathState(null); setSecondaryHighlightedPathsState({ component: [], context: [], hook: [], lib: [], other: [] }); setSelectedFetcherFiles(new Set());
         isFetchInitiatedRef.current = true;
         if (!isDedicatedFlow) { setRequestCopied(false); setAiResponseHasContent(false); setFilesParsed(false); setSelectedAssistantFiles(new Set()); setKworkInputValue(""); }
-        else if (isImageFlow) { setKworkInputValue(""); }
+        else if (isVisualFlow) { setKworkInputValue(""); }
 
         const fetchToastId = toastLoading(`Запрос файлов из ветки (${effectiveBranchDisplay})...`, { duration: 15000 });
         startProgressSimulation(13);
@@ -120,11 +129,17 @@ export const useRepoFetcher = ({
                 fetchAttemptSucceeded = true; fetchedFilesData = fetchResult.files;
                 const allPaths = fetchedFilesData.map(f => f.path);
 
-                if ((isImageFlow || isErrorFixFlow) && currentTargetPath) {
-                    const flowName = isImageFlow ? "Image Flow" : "Error Fix";
+                if ((isVisualFlow || isErrorFixFlow) && currentTargetPath) {
+                    const flowName = isVisualFlow ? (isActualImageTask ? "Image Flow" : "Icon Flow") : "Error Fix";
                     primaryHighlightPathInternal = currentTargetPath;
-                    if (!allPaths.includes(primaryHighlightPathInternal)) { const errorMsg = `Файл (${primaryHighlightPathInternal}) не найден в ветке ${effectiveBranchDisplay}.`; setError(errorMsg); toastError(errorMsg, { id: fetchToastId }); fetchAttemptSucceeded = false; }
-                    else { const successMsg = isImageFlow ? `Файл для замены (${primaryHighlightPathInternal.split('/').pop()}) загружен.` : `Файл для исправления (${primaryHighlightPathInternal.split('/').pop()}) загружен.`; toastSuccess(successMsg, { id: fetchToastId }); if (isErrorFixFlow) filesToAutoSelect.add(primaryHighlightPathInternal); }
+                    if (!allPaths.includes(primaryHighlightPathInternal)) { 
+                        const errorMsg = `Файл (${primaryHighlightPathInternal}) для '${flowName}' не найден в ветке ${effectiveBranchDisplay}.`; 
+                        setError(errorMsg); toastError(errorMsg, { id: fetchToastId }); fetchAttemptSucceeded = false; 
+                    } else { 
+                        const successMsg = `Файл для '${flowName}' (${primaryHighlightPathInternal.split('/').pop()}) загружен.`; 
+                        toastSuccess(successMsg, { id: fetchToastId }); 
+                        if (isErrorFixFlow) filesToAutoSelect.add(primaryHighlightPathInternal); 
+                    }
                     secondaryHighlightPathsDataInternal = { component: [], context: [], hook: [], lib: [], other: [] };
                  } else { 
                      primaryHighlightPathInternal = null; secondaryHighlightPathsDataInternal = { component: [], context: [], hook: [], lib: [], other: [] }; filesToAutoSelect = new Set();
@@ -141,7 +156,7 @@ export const useRepoFetcher = ({
                              } else { primaryHighlightPathInternal = null; toastError(`Ошибка: Данные для файла (${highlightedPathFromUrl}) не найдены.`, { id: fetchToastId }); }
                          } else { toastWarning(`Файл страницы для URL (${highlightedPathFromUrl}) не найден.`, { id: fetchToastId }); }
                      }
-                     let addedImportantCount = 0; importantFiles.forEach(p => { if (allPaths.includes(p) && !filesToAutoSelect.has(p)) { filesToAutoSelect.add(p); addedImportantCount++; } });
+                     importantFiles.forEach(p => { if (allPaths.includes(p) && !filesToAutoSelect.has(p)) { filesToAutoSelect.add(p); } });
                      if (filesToAutoSelect.size > 0) { const numSecondary = Object.values(secondaryHighlightPathsDataInternal).flat().filter(p => p !== primaryHighlightPathInternal && !importantFiles.includes(p)).length; const numImportant = filesToAutoSelect.size - (primaryHighlightPathInternal ? 1 : 0) - numSecondary; let msg = `✅ Авто-выбор: `; const parts = []; if (primaryHighlightPathInternal) parts.push(`1 стр.`); if (numSecondary > 0) parts.push(`${numSecondary} связ.`); if (numImportant > 0) parts.push(`${numImportant} важн.`); msg += parts.join(', ') + ` (${filesToAutoSelect.size} всего).`; toastSuccess(msg, { id: fetchToastId }); }
                      else if (primaryHighlightPathInternal === null && highlightedPathFromUrl) { toastSuccess(`Извлечено ${fetchedFilesData.length} файлов из ${effectiveBranchDisplay}! (Целевой URL файл не найден)`, { id: fetchToastId }); }
                      else if (fetchAttemptSucceeded) { toastSuccess(`Извлечено ${fetchedFilesData.length} файлов из ${effectiveBranchDisplay}!`, { id: fetchToastId }); }
@@ -178,22 +193,13 @@ export const useRepoFetcher = ({
         setError, setFiles, setPrimaryHighlightedPathState, setSecondaryHighlightedPathsState,
         startProgressSimulation, stopProgressSimulation,
         toastSuccess, toastError, toastInfo, toastWarning, toastLoading,
+        // No direct dependency on imageReplaceTask or iconReplaceTask from context here, 
+        // as their current values are read via refs (activeVisualTaskRef, pendingFlowDetailsRef)
+        // to avoid re-triggering this whole callback when they change during its execution.
     ]);
 
-    useEffect(() => {
-        if (!repoUrlEntered || isAutoFetchingRef.current || fetchStatusRef.current === 'loading' || fetchStatusRef.current === 'retrying' || !autoFetch) { return; }
-        const timerId = setTimeout(() => {
-            const currentContextStatus = fetchStatusRef.current;
-            const canTriggerFetchNow = (currentContextStatus === 'idle' || currentContextStatus === 'failed_retries' || currentContextStatus === 'error');
-            if (canTriggerFetchNow && !isAutoFetchingRef.current) {
-                isAutoFetchingRef.current = true;
-                handleFetchManual(false, null)
-                    .catch(err => { logger.error(`[Effect Auto-Fetch Timer] handleFetchManual CATCH:`, err); })
-                    .finally(() => { setTimeout(() => { isAutoFetchingRef.current = false; }, 200); });
-            }
-        }, 500);
-        return () => { clearTimeout(timerId); };
-    }, [ repoUrlEntered, autoFetch, handleFetchManual ]);
+    // useEffect for autoFetch based on URL params is removed
+    // The ideaProp useEffect in RepoTxtFetcher.tsx now handles the initial trigger
 
     const isLoading = fetchStatus === 'loading' || fetchStatus === 'retrying';
     const isFetchDisabled = isLoading || loadingPrs || !repoUrlEntered || assistantLoading || isParsing || aiActionLoading;

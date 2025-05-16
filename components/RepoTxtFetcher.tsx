@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useImperativeHandle, forwardRef, useMemo, useCallback, useRef } from "react"; // Добавлен useRef
-// Импорты Fa6 иконок удалены, используется VibeContentRenderer
+import React, { useState, useEffect, useImperativeHandle, forwardRef, useMemo, useCallback, useRef } from "react"; 
 import { motion } from "framer-motion";
 
 // --- Core & Context ---
@@ -11,8 +10,10 @@ import {
     FileNode,
     ImportCategory, 
     ImageReplaceTask,
+    IconReplaceTask, 
     SimplePullRequest, 
-    FetchStatus 
+    FetchStatus,
+    PendingFlowDetails // Ensure PendingFlowDetails is imported
 } from "@/contexts/RepoXmlPageContext";
 import { debugLogger as logger } from "@/lib/debugLogger";
 
@@ -42,9 +43,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     highlightedPathProp,
     ideaProp
 }, ref) => {
-    logger.log("[RepoTxtFetcher] START Render (Restored Original with ideaProp handler)");
+    logger.log("[RepoTxtFetcher] START Render");
 
-    // === Context ===
+    const context = useRepoXmlPageContext();
     const { 
         addToast: addToastContext, 
         fetchStatus, setFetchStatus,
@@ -58,42 +59,38 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         loadingPrs,
         assistantLoading, isParsing, aiActionLoading,
         targetBranchName, setTargetBranchName, manualBranchName, setManualBranchName, openPrs,
-        setLoadingPrs, 
         triggerGetOpenPRs,
         isSettingsModalOpen, triggerToggleSettingsModal, scrollToSection,
         currentAiRequestId,
         imageReplaceTask, 
+        iconReplaceTask,
         allFetchedFiles, 
         assistantRef, updateRepoUrlInAssistant,
         triggerPreCheckAndFetch, 
         setImageReplaceTask, 
+        setIconReplaceTask,
         isPreChecking, 
         pendingFlowDetails, 
-    } = useRepoXmlPageContext();
+    } = context;
     const { error: toastError, info: toastInfo } = useAppToast();
-    logger.debug("[RepoTxtFetcher] After Context Destructuring (Restored Original with ideaProp handler)");
+    logger.debug("[RepoTxtFetcher] After Context Destructuring");
 
-    // === Basic Component State ===
     const [token, setToken] = useState<string>("");
     const [prevEffectiveBranch, setPrevEffectiveBranch] = useState<string | null>(null);
-    const ideaProcessingRef = useRef<string | null>(null); 
-    logger.debug("[RepoTxtFetcher] After useState (Restored Original with ideaProp handler)");
+    const initialIdeaProcessedRef = useRef(false);
+    const lastProcessedIdeaSignatureRef = useRef<string | null>(null);
 
-    // === Context values re-assignment ===
+    logger.debug("[RepoTxtFetcher] After useState");
+
     const repoUrl = repoUrlFromContext; 
     const handleRepoUrlChange = setRepoUrlInContext;
 
-    // === URL Params & Derived State ---
     const highlightedPathFromUrl = highlightedPathProp ?? ""; 
     const ideaFromUrl = ideaProp ?? ""; 
-    logger.debug(`[RepoTxtFetcher] Received props: highlightedPathProp='${highlightedPathFromUrl}', ideaProp='${ideaFromUrl ? ideaFromUrl.substring(0,30)+'...' : 'null'}' (Restored Original with ideaProp handler)`);
+    logger.debug(`[RepoTxtFetcher] Props: highlightedPath='${highlightedPathFromUrl}', idea='${ideaFromUrl ? ideaFromUrl.substring(0,30)+'...' : 'null'}'`);
 
-    const autoFetch = useMemo(() =>
-        !!imageReplaceTask || 
-        (!!highlightedPathFromUrl || !!ideaFromUrl)
-    , [imageReplaceTask, highlightedPathFromUrl, ideaFromUrl]);
+    // autoFetch memo removed as per strategy to fix loop
 
-    // --- СПИСОК ВАЖНЫХ ФАЙЛОВ ИЗ "ORIGINAL" ---
     const importantFiles = useMemo(() => [
         "package.json", "app/layout.tsx",
         "tailwind.config.ts",
@@ -116,14 +113,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         "types/database.types.ts", 
         "components/repo/prompt.ts",
     ].filter(Boolean), []);
-    // --- КОНЕЦ СПИСКА ВАЖНЫХ ФАЙЛОВ ---
 
     const effectiveBranchDisplay = useMemo(() => targetBranchName || manualBranchName || "default", [targetBranchName, manualBranchName]);
 
-    logger.debug("[RepoTxtFetcher] After Derived State/Memo (Restored Original with ideaProp handler)");
-
-    // === Custom Hooks ===
-    logger.debug("[RepoTxtFetcher] Before useRepoFetcher Hook (Restored Original with ideaProp handler)");
     const {
         files: fetchedFiles,
         progress,
@@ -134,18 +126,17 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         isLoading: isFetchLoading,
         isFetchDisabled
     } = useRepoFetcher({
-        repoUrl, token, targetBranchName, manualBranchName, imageReplaceTask,
+        repoUrl, token, targetBranchName, manualBranchName, 
+        imageReplaceTask: imageReplaceTask || (iconReplaceTask as unknown as ImageReplaceTask | null),
         highlightedPathFromUrl,
         importantFiles, 
-        autoFetch,
-        ideaFromUrl,
+        // autoFetch: false, // Explicitly false or remove prop if hook updated
+        ideaFromUrl, // Still needed for useRepoFetcher's internal logic if any
         isSettingsModalOpen,
         repoUrlEntered, assistantLoading, isParsing, aiActionLoading,
         loadingPrs,
     });
-    logger.debug("[RepoTxtFetcher] After useRepoFetcher Hook (Restored Original with ideaProp handler)");
 
-    logger.debug("[RepoTxtFetcher] Before useFileSelection Hook (Restored Original with ideaProp handler)");
     const {
         toggleFileSelection,
         selectHighlightedFiles,
@@ -157,11 +148,9 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         primaryHighlightedPath,
         secondaryHighlightedPaths,
         importantFiles, 
-        imageReplaceTaskActive: !!imageReplaceTask,
+        imageReplaceTaskActive: !!imageReplaceTask || !!iconReplaceTask,
     });
-    logger.debug("[RepoTxtFetcher] After useFileSelection Hook (Restored Original with ideaProp handler)");
 
-    logger.debug("[RepoTxtFetcher] Before useKworkInput Hook (Restored Original with ideaProp handler)");
     const {
         handleAddSelected,
         handleCopyToClipboard,
@@ -170,239 +159,238 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
     } = useKworkInput({
         selectedFetcherFiles,
         allFetchedFiles,
-        imageReplaceTaskActive: !!imageReplaceTask,
+        imageReplaceTaskActive: !!imageReplaceTask || !!iconReplaceTask,
         files: fetchedFiles, 
     });
-    logger.debug("[RepoTxtFetcher] After useKworkInput Hook (Restored Original with ideaProp handler)");
 
-    // === Effects ===
     useEffect(() => {
-        logger.debug(`[RepoTxtFetcher Effect ideaProp] Evaluating. ideaProp: '${ideaFromUrl ? ideaFromUrl.substring(0,30)+'...' : 'null'}', currentImageTask: ${!!imageReplaceTask}, currentPendingFlow: ${!!pendingFlowDetails}, isPreChecking: ${isPreChecking}`);
+        const logPrefix = "[RepoTxtFetcher Effect ideaProp]";
+        const currentIdeaSignature = `${ideaFromUrl}|${highlightedPathFromUrl}`;
+
+        logger.debug(`${logPrefix} Evaluating. ideaSignature: '${currentIdeaSignature}', lastProcessed: '${lastProcessedIdeaSignatureRef.current}', initialIdeaProcessed: ${initialIdeaProcessedRef.current}, isPreChecking: ${isPreChecking}, repoUrlValid: ${!!repoUrl && repoUrl.includes("github.com")}`);
+        
+        if (!ideaFromUrl || !highlightedPathFromUrl) {
+            if (initialIdeaProcessedRef.current) {
+                logger.debug(`${logPrefix} No idea/path from props, resetting initialIdeaProcessedRef & lastProcessedIdeaSignatureRef.`);
+                initialIdeaProcessedRef.current = false;
+                lastProcessedIdeaSignatureRef.current = null;
+            }
+            logger.debug(`${logPrefix} Skipping: No ideaFromUrl or highlightedPathFromUrl.`);
+            return;
+        }
+
+        if (initialIdeaProcessedRef.current && lastProcessedIdeaSignatureRef.current === currentIdeaSignature) {
+            logger.info(`${logPrefix} Skipping: Idea signature '${currentIdeaSignature}' has already been processed by this component instance.`);
+            return;
+        }
+        
+        if (!repoUrl || !repoUrl.includes("github.com")) {
+            logger.debug(`${logPrefix} Skipping: Repo URL not valid or not GitHub.`);
+            return;
+        }
         
         if (isPreChecking) {
-            logger.info("[RepoTxtFetcher Effect ideaProp] Skipping: isPreChecking is true.");
+            logger.info(`${logPrefix} Skipping: isPreChecking is true. Waiting for pre-check to complete.`);
             return;
         }
 
-        if (!ideaFromUrl || !highlightedPathFromUrl || !repoUrl || !repoUrl.includes("github.com")) {
-            logger.debug(`[RepoTxtFetcher Effect ideaProp] Skipping: Missing essential params for ideaProp processing.`);
-            return;
-        }
-        
-        const ideaSignature = `${ideaFromUrl}|${highlightedPathFromUrl}`;
-        if (ideaProcessingRef.current === ideaSignature && (imageReplaceTask || pendingFlowDetails)) {
-             logger.info(`[RepoTxtFetcher Effect ideaProp] Task for signature "${ideaSignature}" already processed or active in context. Skipping re-trigger.`);
-             return;
-        }
+        let flowTypeToAction: PendingFlowDetails['type'] | null = null;
+        let detailsToProcess: any = null;
+        let taskMatchesActiveContext = false;
 
         if (ideaFromUrl.startsWith("ImageReplace|")) {
             const parts = ideaFromUrl.split("|");
-            const oldUrlPart = parts.find(p => p.startsWith("OldURL="));
-            const newUrlPart = parts.find(p => p.startsWith("NewURL="));
-
-            if (oldUrlPart && newUrlPart) {
-                const oldUrl = decodeURIComponent(oldUrlPart.substring("OldURL=".length));
-                const newUrl = decodeURIComponent(newUrlPart.substring("NewURL=".length));
-                
-                if (imageReplaceTask &&
-                    imageReplaceTask.targetPath === highlightedPathFromUrl &&
-                    imageReplaceTask.oldUrl === oldUrl &&
-                    imageReplaceTask.newUrl === newUrl) {
-                    logger.info("[RepoTxtFetcher Effect ideaProp] ImageReplace task from ideaProp matches active context task. Skipping re-trigger.");
-                    return;
+            const oldUrl = decodeURIComponent(parts.find(p => p.startsWith("OldURL="))?.substring("OldURL=".length) || "");
+            const newUrl = decodeURIComponent(parts.find(p => p.startsWith("NewURL="))?.substring("NewURL=".length) || "");
+            if (oldUrl && newUrl) {
+                if ((imageReplaceTask && imageReplaceTask.targetPath === highlightedPathFromUrl && imageReplaceTask.oldUrl === oldUrl && imageReplaceTask.newUrl === newUrl) ||
+                    (pendingFlowDetails?.type === 'ImageSwap' && pendingFlowDetails.targetPath === highlightedPathFromUrl && pendingFlowDetails.details?.oldUrl === oldUrl && pendingFlowDetails.details?.newUrl === newUrl)) {
+                    taskMatchesActiveContext = true;
+                } else {
+                    flowTypeToAction = 'ImageSwap';
+                    detailsToProcess = { oldUrl, newUrl };
                 }
-                if (pendingFlowDetails?.type === 'ImageSwap' &&
-                    pendingFlowDetails.targetPath === highlightedPathFromUrl &&
-                    pendingFlowDetails.details?.oldUrl === oldUrl &&
-                    pendingFlowDetails.details?.newUrl === newUrl) {
-                    logger.info("[RepoTxtFetcher Effect ideaProp] ImageReplace task (as pending flow) from ideaProp matches active context pending flow. Skipping re-trigger.");
-                    return;
+            } else { logger.warn(`${logPrefix} Could not parse OldURL/NewUrl from ImageReplace ideaProp.`); }
+        } else if (ideaFromUrl.startsWith("IconSwap|")) {
+            const parts = ideaFromUrl.split("|");
+            const oldIconName = decodeURIComponent(parts.find(p => p.startsWith("OldIconName="))?.substring("OldIconName=".length) || "");
+            const newIconName = decodeURIComponent(parts.find(p => p.startsWith("NewIconName="))?.substring("NewIconName=".length) || "");
+            const componentProps = decodeURIComponent(parts.find(p => p.startsWith("ComponentProps="))?.substring("ComponentProps=".length) || "");
+            if (oldIconName && newIconName) {
+                 if ((iconReplaceTask && iconReplaceTask.targetPath === highlightedPathFromUrl && iconReplaceTask.oldIconName === oldIconName && iconReplaceTask.newIconName === newIconName) ||
+                    (pendingFlowDetails?.type === 'IconSwap' && pendingFlowDetails.targetPath === highlightedPathFromUrl && pendingFlowDetails.details?.oldIconName === oldIconName && pendingFlowDetails.details?.newIconName === newIconName)) {
+                    taskMatchesActiveContext = true;
+                } else {
+                    flowTypeToAction = 'IconSwap';
+                    detailsToProcess = { oldIconName, newIconName, componentProps: componentProps || undefined };
                 }
-                
-                logger.info("[RepoTxtFetcher Effect ideaProp] Detected ImageReplace flow from ideaProp. Proceeding to trigger.");
-                ideaProcessingRef.current = ideaSignature; 
-                const branchNameToUse = manualBranchName || targetBranchName || ''; 
-                triggerPreCheckAndFetch(
-                    repoUrl,
-                    branchNameToUse,
-                    'ImageSwap',
-                    { oldUrl, newUrl }, 
-                    highlightedPathFromUrl
-                ).then(() => {
-                    logger.log("[RepoTxtFetcher Effect ideaProp] triggerPreCheckAndFetch for ImageSwap completed via ideaProp.");
-                }).catch(err => {
-                    logger.error("[RepoTxtFetcher Effect ideaProp] Error calling triggerPreCheckAndFetch for ImageSwap via ideaProp:", err);
-                }).finally(() => {
-                    if (ideaProcessingRef.current === ideaSignature && !imageReplaceTask && !(pendingFlowDetails?.type === 'ImageSwap' && pendingFlowDetails.targetPath === highlightedPathFromUrl)) {
-                        logger.log(`[RepoTxtFetcher Effect ideaProp] Clearing ideaProcessingRef for ${ideaSignature} as no active task/pending flow exists for ImageSwap.`);
-                        ideaProcessingRef.current = null;
-                    } else if (ideaProcessingRef.current === ideaSignature) {
-                        logger.log(`[RepoTxtFetcher Effect ideaProp] NOT clearing ideaProcessingRef for ${ideaSignature} as task/pending flow IS active for ImageSwap.`);
-                    }
-                });
-            } else {
-                logger.warn("[RepoTxtFetcher Effect ideaProp] Could not parse OldURL/NewUrl from ImageReplace ideaProp.");
-            }
+            } else { logger.warn(`${logPrefix} Could not parse OldIconName/NewIconName from IconSwap ideaProp.`); }
         } else if (ideaFromUrl.startsWith("ErrorFix|")) {
-            logger.info("[RepoTxtFetcher Effect ideaProp] Detected ErrorFix flow from ideaProp.");
-             try {
+            try {
                 const detailsString = ideaFromUrl.substring("ErrorFix|".length);
-                const parsedDetails = JSON.parse(decodeURIComponent(detailsString)); 
-                
-                if (pendingFlowDetails?.type === 'ErrorFix' &&
-                    pendingFlowDetails.targetPath === highlightedPathFromUrl &&
-                    JSON.stringify(pendingFlowDetails.details) === JSON.stringify(parsedDetails)) { 
-                    logger.info("[RepoTxtFetcher Effect ideaProp] ErrorFix task from ideaProp matches active context pending flow. Skipping re-trigger.");
-                    return;
+                const parsedDetailsFromUrl = JSON.parse(decodeURIComponent(detailsString));
+                if (pendingFlowDetails?.type === 'ErrorFix' && pendingFlowDetails.targetPath === highlightedPathFromUrl && JSON.stringify(pendingFlowDetails.details) === JSON.stringify(parsedDetailsFromUrl)) {
+                    taskMatchesActiveContext = true;
+                } else {
+                    flowTypeToAction = 'ErrorFix';
+                    detailsToProcess = parsedDetailsFromUrl;
                 }
-                
-                logger.log("[RepoTxtFetcher Effect ideaProp] Parsed ErrorFix details, proceeding to trigger:", parsedDetails);
-                ideaProcessingRef.current = ideaSignature; 
-                const branchNameToUse = manualBranchName || targetBranchName || '';
-                 triggerPreCheckAndFetch(
-                     repoUrl,
-                     branchNameToUse,
-                     'ErrorFix',
-                     parsedDetails, 
-                     highlightedPathFromUrl
-                 ).then(() => {
-                     logger.log("[RepoTxtFetcher Effect ideaProp] triggerPreCheckAndFetch for ErrorFix completed via ideaProp.");
-                 }).catch(err => {
-                     logger.error("[RepoTxtFetcher Effect ideaProp] Error calling triggerPreCheckAndFetch for ErrorFix via ideaProp:", err);
-                 }).finally(() => {
-                    if (ideaProcessingRef.current === ideaSignature && !(pendingFlowDetails?.type === 'ErrorFix' && pendingFlowDetails.targetPath === highlightedPathFromUrl) ) {
-                        logger.log(`[RepoTxtFetcher Effect ideaProp] Clearing ideaProcessingRef for ${ideaSignature} as no active pending flow exists for ErrorFix.`);
-                        ideaProcessingRef.current = null;
-                    } else if (ideaProcessingRef.current === ideaSignature) {
-                         logger.log(`[RepoTxtFetcher Effect ideaProp] NOT clearing ideaProcessingRef for ${ideaSignature} as pending flow IS active for ErrorFix.`);
-                    }
-                 });
-             } catch (e) {
-                 logger.error("[RepoTxtFetcher Effect ideaProp] Failed to parse ErrorFix details from ideaProp:", e);
-             }
-        } else {
-             logger.log(`[RepoTxtFetcher Effect ideaProp] ideaProp ("${ideaFromUrl ? ideaFromUrl.substring(0,30) : ''}") is present but not for ImageReplace or ErrorFix. Clearing ideaProcessingRef if it matches.`);
-             if (ideaProcessingRef.current === ideaSignature) {
-                ideaProcessingRef.current = null;
-             }
+            } catch (e) { logger.error(`${logPrefix} Failed to parse ErrorFix details from ideaProp:`, e); }
+        }
+
+        if (taskMatchesActiveContext) {
+            logger.info(`${logPrefix} Task from ideaProp signature '${currentIdeaSignature}' matches an active context task/flow. Skipping re-trigger and marking as processed.`);
+            initialIdeaProcessedRef.current = true; 
+            lastProcessedIdeaSignatureRef.current = currentIdeaSignature;
+            return;
+        }
+
+        if (flowTypeToAction && detailsToProcess) {
+            logger.info(`${logPrefix} Triggering PreCheckAndFetch for ${flowTypeToAction} with signature '${currentIdeaSignature}'.`);
+            initialIdeaProcessedRef.current = true; 
+            lastProcessedIdeaSignatureRef.current = currentIdeaSignature;
+            const branchNameToUse = manualBranchName || targetBranchName || '';
+            
+            triggerPreCheckAndFetch(
+                repoUrl,
+                branchNameToUse,
+                flowTypeToAction,
+                detailsToProcess,
+                highlightedPathFromUrl
+            ).then(() => {
+                logger.log(`${logPrefix} triggerPreCheckAndFetch for ${flowTypeToAction} completed successfully via ideaProp.`);
+            }).catch(err => {
+                logger.error(`${logPrefix} Error during triggerPreCheckAndFetch for ${flowTypeToAction} via ideaProp:`, err);
+                initialIdeaProcessedRef.current = false; // Allow retry if trigger itself failed
+                lastProcessedIdeaSignatureRef.current = null;
+            });
+        } else if (ideaFromUrl) {
+             logger.warn(`${logPrefix} ideaProp ("${ideaFromUrl.substring(0,30)}...") did not match a known flow pattern or failed to parse. No auto-trigger. Marking as processed to avoid loop.`);
+             initialIdeaProcessedRef.current = true;
+             lastProcessedIdeaSignatureRef.current = currentIdeaSignature;
         }
     }, [
         ideaFromUrl, highlightedPathFromUrl, repoUrl, manualBranchName, targetBranchName, 
-        triggerPreCheckAndFetch, setImageReplaceTask, logger, 
-        imageReplaceTask, pendingFlowDetails, isPreChecking 
+        triggerPreCheckAndFetch, 
+        imageReplaceTask, iconReplaceTask, pendingFlowDetails,
+        isPreChecking, 
     ]);
 
     useEffect(() => {
-        logger.debug("[Effect URL Sync] RepoTxtFetcher: Syncing Assistant URL START (Restored Original with ideaProp handler)");
-        if (assistantRef?.current?.updateRepoUrl) {
-             logger.debug(`[Effect URL Sync] Attempting assistantRef.updateRepoUrl with URL: ${repoUrl}. Type: ${typeof assistantRef.current.updateRepoUrl}`);
-             updateRepoUrlInAssistant(repoUrl);
-        } else {
-             logger.warn("[Effect URL Sync] assistantRef or updateRepoUrl not ready yet (Restored Original with ideaProp handler)");
-        }
-         logger.debug("[Effect URL Sync] RepoTxtFetcher: Syncing Assistant URL END (Restored Original with ideaProp handler)");
-    }, [repoUrl, updateRepoUrlInAssistant, assistantRef]);
-    
-    useEffect(() => {
-        logger.debug("[Effect Scroll] RepoTxtFetcher Check (Restored Original with ideaProp handler)");
-        if (fetchStatus !== 'success' || !!imageReplaceTask || autoFetch) {
-             logger.debug("[Effect Scroll] SKIPPED (wrong status/mode/auto) (Restored Original with ideaProp handler)", { fetchStatus, imageReplaceTask, autoFetch });
+        const isAutomatedFlowActive = !!imageReplaceTask || !!iconReplaceTask || !!pendingFlowDetails;
+        logger.debug("[Effect Scroll] RepoTxtFetcher Check", { fetchStatus, isAutomatedFlowActive, primaryHighlightedPath });
+        if (fetchStatus !== 'success' || isAutomatedFlowActive) {
+             logger.debug("[Effect Scroll] SKIPPED (wrong status or automated flow active)", { fetchStatus, isAutomatedFlowActive });
              return;
         }
+        // ... (rest of scroll logic as before) ...
         let cleanupScroll = () => {}; 
-
         const scrollToFile = (path: string, block: ScrollLogicalPosition = "center") => {
              const el = document.getElementById(`file-${path}`);
              if (el) {
-                 logger.info(`[Effect Scroll] Scrolling to file: ${path} (Restored Original with ideaProp handler)`);
+                 logger.info(`[Effect Scroll] Scrolling to file: ${path}`);
                  el.scrollIntoView({ behavior: "smooth", block: block });
                  el.classList.add('highlight-scroll');
                  const removeClassTimer = setTimeout(() => {
                      if (document.getElementById(`file-${path}`)) { 
                         el.classList.remove('highlight-scroll');
                      } else {
-                        logger.warn(`[Effect Scroll Timeout] Element file-${path} no longer exists for removing highlight. (Restored Original with ideaProp handler)`);
+                        logger.warn(`[Effect Scroll Timeout] Element file-${path} no longer exists for removing highlight.`);
                      }
                  }, 2500);
                  return () => clearTimeout(removeClassTimer); 
              } else {
-                logger.warn(`[Effect Scroll] scrollToFile: Element not found for ${path} (Restored Original with ideaProp handler)`);
+                logger.warn(`[Effect Scroll] scrollToFile: Element not found for ${path}`);
                 toastInfo(`Не удалось найти элемент файла для прокрутки: ${path}`);
                 return () => {}; 
              }
         };
 
         if (primaryHighlightedPath) {
-             logger.debug(`[Effect Scroll] Found primary highlight ${primaryHighlightedPath}, scheduling scroll. (Restored Original with ideaProp handler)`);
+             logger.debug(`[Effect Scroll] Found primary highlight ${primaryHighlightedPath}, scheduling scroll.`);
              const timer = setTimeout(() => {
                  cleanupScroll = scrollToFile(primaryHighlightedPath);
              }, 300);
              return () => { clearTimeout(timer); cleanupScroll(); };
         } else if (fetchedFiles.length > 0) {
-             logger.debug("[Effect Scroll] No primary highlight, scrolling to file list container. (Restored Original with ideaProp handler)");
+             logger.debug("[Effect Scroll] No primary highlight, scrolling to file list container.");
              const cleanupDirectScroll = scrollToSection('file-list-container'); 
              return cleanupDirectScroll as (() => void) | undefined;
         } else {
-            logger.debug("[Effect Scroll] No primary highlight and no fetched files, doing nothing. (Restored Original with ideaProp handler)");
+            logger.debug("[Effect Scroll] No primary highlight and no fetched files, doing nothing.");
             return () => {};
         }
-    }, [fetchStatus, primaryHighlightedPath, imageReplaceTask, autoFetch, fetchedFiles.length, scrollToSection, toastInfo, logger]);
+    }, [fetchStatus, primaryHighlightedPath, imageReplaceTask, iconReplaceTask, pendingFlowDetails, fetchedFiles.length, scrollToSection, toastInfo, logger]);
 
+    // ... (rest of the component, including useImperativeHandle, local handlers, derived states for rendering, and JSX)
+    // No changes to useImperativeHandle and other callbacks from the provided correct version.
+    // The JSX rendering logic for currentVisualTask would also remain the same.
+
+    // ... (Previous correct useImperativeHandle, local handlers, derived states, and JSX rendering logic)
+     useEffect(() => {
+        logger.debug("[Effect URL Sync] RepoTxtFetcher: Syncing Assistant URL START");
+        if (assistantRef?.current?.updateRepoUrl) {
+             logger.debug(`[Effect URL Sync] Attempting assistantRef.updateRepoUrl with URL: ${repoUrl}.`);
+             updateRepoUrlInAssistant(repoUrl);
+        } else {
+             logger.warn("[Effect URL Sync] assistantRef or updateRepoUrl not ready yet");
+        }
+         logger.debug("[Effect URL Sync] RepoTxtFetcher: Syncing Assistant URL END");
+    }, [repoUrl, updateRepoUrlInAssistant, assistantRef]);
+    
     useEffect(() => {
         if (prevEffectiveBranch && prevEffectiveBranch !== effectiveBranchDisplay) {
             if (fetchStatus === 'success') {
-                logger.info(`[RepoTxtFetcher Branch Change] Effective branch changed from '${prevEffectiveBranch}' to '${effectiveBranchDisplay}'. Resetting fetchStatus from 'success' to 'idle'. (Restored Original with ideaProp handler)`);
+                logger.info(`[RepoTxtFetcher Branch Change] Effective branch changed from '${prevEffectiveBranch}' to '${effectiveBranchDisplay}'. Resetting fetchStatus from 'success' to 'idle'.`);
                 setFetchStatus('idle');
             } else if (fetchStatus !== 'idle' && fetchStatus !== 'loading' && fetchStatus !== 'retrying') {
-                 logger.info(`[RepoTxtFetcher Branch Change] Effective branch changed from '${prevEffectiveBranch}' to '${effectiveBranchDisplay}'. Resetting fetchStatus from '${fetchStatus}' to 'idle'. (Restored Original with ideaProp handler)`);
+                 logger.info(`[RepoTxtFetcher Branch Change] Effective branch changed from '${prevEffectiveBranch}' to '${effectiveBranchDisplay}'. Resetting fetchStatus from '${fetchStatus}' to 'idle'.`);
                  setFetchStatus('idle');
             }
         }
         setPrevEffectiveBranch(effectiveBranchDisplay);
     }, [effectiveBranchDisplay, fetchStatus, setFetchStatus, prevEffectiveBranch, logger]);
 
-    // === Imperative Handle ===
-    logger.debug("[RepoTxtFetcher] Before useImperativeHandle (Restored Original with ideaProp handler)");
     useImperativeHandle(ref, () => ({
         handleFetch: (isManualRetry?: boolean, branchNameToFetchOverride?: string | null, taskForEarlyCheck?: ImageReplaceTask | null) => {
-            logger.debug(`[Imperative] handleFetch called. (Restored Original with ideaProp handler)`);
+            logger.debug(`[Imperative] handleFetch called.`);
             return handleFetchManual(isManualRetry, branchNameToFetchOverride);
         },
         selectHighlightedFiles: () => {
-             logger.debug(`[Imperative] selectHighlightedFiles called. (Restored Original with ideaProp handler)`);
+             logger.debug(`[Imperative] selectHighlightedFiles called.`);
              selectHighlightedFiles();
         },
         handleAddSelected: (filesToAdd?: Set<string>, allFiles?: FileNode[]) => {
-            logger.debug(`[Imperative] handleAddSelected called. (Restored Original with ideaProp handler)`);
+            logger.debug(`[Imperative] handleAddSelected called.`);
             handleAddSelected(); 
             return Promise.resolve(); 
         },
         handleCopyToClipboard: (text?: string, scroll?: boolean) => {
-             logger.debug(`[Imperative] handleCopyToClipboard called. (Restored Original with ideaProp handler)`);
+             logger.debug(`[Imperative] handleCopyToClipboard called.`);
              return handleCopyToClipboard(text, scroll); 
         },
         clearAll: () => {
-             logger.debug(`[Imperative] clearAll called. (Restored Original with ideaProp handler)`);
+             logger.debug(`[Imperative] clearAll called.`);
              handleClearAll(); 
         },
         getKworkInputValue: () => { 
-             logger.debug(`[Imperative] getKworkInputValue called. (Restored Original with ideaProp handler)`);
+             logger.debug(`[Imperative] getKworkInputValue called.`);
              return kworkInputValue;
         },
         handleAddImportantFiles: () => {
-             logger.debug(`[Imperative] handleAddImportantFiles called. (Restored Original with ideaProp handler)`);
+             logger.debug(`[Imperative] handleAddImportantFiles called.`);
              handleAddImportantFiles(); 
         },
         handleAddFullTree: () => {
-             logger.debug(`[Imperative] handleAddFullTree called. (Restored Original with ideaProp handler)`);
+             logger.debug(`[Imperative] handleAddFullTree called.`);
              handleAddFullTree(); 
         },
         selectAllFiles: () => {
-             logger.debug(`[Imperative] selectAllFiles called. (Restored Original with ideaProp handler)`);
+             logger.debug(`[Imperative] selectAllFiles called.`);
              handleSelectAll(); 
         },
         deselectAllFiles: () => {
-            logger.debug(`[Imperative] deselectAllFiles called. (Restored Original with ideaProp handler)`);
+            logger.debug(`[Imperative] deselectAllFiles called.`);
             handleDeselectAll(); 
         },
     }), [
@@ -410,51 +398,47 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
         kworkInputValue, 
         handleAddImportantFiles, handleAddFullTree, handleSelectAll, handleDeselectAll, logger 
     ]);
-    logger.debug("[RepoTxtFetcher] After useImperativeHandle (Restored Original with ideaProp handler)");
 
-    // --- Local Event Handlers ---
      const handleManualBranchChange = useCallback((branch: string) => {
-          logger.info(`[CB ManualBranchChange] Setting manual branch: ${branch} (Restored Original with ideaProp handler)`);
+          logger.info(`[CB ManualBranchChange] Setting manual branch: ${branch}`);
           setManualBranchName(branch);
           if (targetBranchName) {
-            logger.info(`[CB ManualBranchChange] Clearing targetBranchName (Restored Original with ideaProp handler)`);
+            logger.info(`[CB ManualBranchChange] Clearing targetBranchName`);
             setTargetBranchName(null);
           }
      }, [setManualBranchName, targetBranchName, setTargetBranchName, logger]);
 
       const handleSelectPrBranch = useCallback((branch: string | null) => {
-          logger.info(`[CB SelectPrBranch] Setting target branch: ${branch} (Restored Original with ideaProp handler)`);
+          logger.info(`[CB SelectPrBranch] Setting target branch: ${branch}`);
           setTargetBranchName(branch);
           if (branch) {
-              logger.info(`[CB SelectPrBranch] Clearing manualBranchName (Restored Original with ideaProp handler)`);
+              logger.info(`[CB SelectPrBranch] Clearing manualBranchName`);
               setManualBranchName("");
           }
       }, [setTargetBranchName, setManualBranchName, logger]);
 
       const handleLoadPrs = useCallback(() => {
-          logger.info(`[CB LoadPrs] Triggering PR load for URL: ${repoUrl} (Restored Original with ideaProp handler)`);
+          logger.info(`[CB LoadPrs] Triggering PR load for URL: ${repoUrl}`);
           if (repoUrl) {
               triggerGetOpenPRs(repoUrl);
           } else {
               toastError("Введите URL репозитория для загрузки PR.");
-              logger.warn("[CB LoadPrs] Cannot load PRs, repo URL is empty. (Restored Original with ideaProp handler)");
+              logger.warn("[CB LoadPrs] Cannot load PRs, repo URL is empty.");
           }
       }, [repoUrl, triggerGetOpenPRs, toastError, logger]);
 
-    // --- Derived States for Rendering ---
-    logger.debug("[RepoTxtFetcher] Calculate Derived State (Restored Original with ideaProp handler)");
-    const currentImageTask = imageReplaceTask;
+    const currentVisualTask = imageReplaceTask || iconReplaceTask; 
     const showProgressBar = fetchStatus !== 'idle';
-    const isActionDisabled = isFetchDisabled || loadingPrs || aiActionLoading || assistantLoading || isParsing || !!currentImageTask;
+    const isActionDisabled = isFetchDisabled || loadingPrs || aiActionLoading || assistantLoading || isParsing || !!currentVisualTask;
     const kworkValueForCheck = kworkInputValue ?? '';
     const isCopyDisabled = !kworkValueForCheck.trim() || isActionDisabled;
     const isClearDisabled = (!kworkValueForCheck.trim() && selectedFetcherFiles.size === 0 && !filesFetched) || isActionDisabled;
     const isAddSelectedDisabled = selectedFetcherFiles.size === 0 || isActionDisabled;
     const isWaitingForAiResponse = aiActionLoading && !!currentAiRequestId;
-    const imageTaskTargetFileReady = currentImageTask && fetchStatus === 'success' && fetchedFiles.some(f => f.path === currentImageTask.targetPath);
-    logger.debug(`[Render State] isActionDisabled=${isActionDisabled}, isFetchLoading=${isFetchLoading}, showProgressBar=${showProgressBar} (Restored Original with ideaProp handler)`);
+    const visualTaskTargetFileReady = currentVisualTask && fetchStatus === 'success' && fetchedFiles.some(f => f.path === currentVisualTask.targetPath);
+    logger.debug(`[Render State] isActionDisabled=${isActionDisabled}, isFetchLoading=${isFetchLoading}, showProgressBar=${showProgressBar}`);
 
-    logger.debug("[RepoTxtFetcher] Preparing to render JSX... (Restored Original with ideaProp handler)");
+    logger.debug("[RepoTxtFetcher] Preparing to render JSX...");
 
     try {
         return (
@@ -462,14 +446,14 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              <div className="flex justify-between items-start mb-4 gap-4 flex-wrap">
                   <div>
                      <h2 className="text-xl md:text-2xl font-bold tracking-tight mb-2 flex items-center gap-2">
-                        {currentImageTask 
-                            ? <VibeContentRenderer content='::FaImages className="text-brand-blue"::' /> 
+                        {currentVisualTask 
+                            ? <VibeContentRenderer content={imageReplaceTask ? '::FaImages className="text-brand-blue"::' : '::FaIcons className="text-brand-purple"::'} /> 
                             : <VibeContentRenderer content='::FaDownload className="text-neon-lime"::' />}
-                        <span className={currentImageTask ? "text-brand-blue" : "text-brand-purple"}>
-                           {currentImageTask ? "Задача: Замена Картинки" : "Кибер-Экстрактор Кода"}
+                        <span className={currentVisualTask ? (imageReplaceTask ? "text-brand-blue" : "text-brand-purple") : "text-brand-purple"}>
+                           {currentVisualTask ? (imageReplaceTask ? "Задача: Замена Картинки" : "Задача: Замена Иконки") : "Кибер-Экстрактор Кода"}
                         </span>
                      </h2>
-                      {!currentImageTask && (
+                      {!currentVisualTask && (
                          <div className="text-brand-yellow/80 text-xs md:text-sm space-y-1 mb-2 prose prose-invert prose-p:my-1 prose-strong:text-brand-purple prose-span:font-normal prose-a:text-brand-blue max-w-none">
                             <VibeContentRenderer content={"1. Настрой <FaCodeBranch title='Настройки' class='inline text-cyan-400'/>."} />
                             <VibeContentRenderer content={"2. Жми <strong class='text-purple-400 mx-1'>\"Извлечь файлы\"</strong>."} />
@@ -478,14 +462,14 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                             <VibeContentRenderer content={"5. Скопируй <FaCopy title='Скопировать запрос' class='inline text-sm mx-px'/> или передай дальше."} />
                          </div>
                       )}
-                      {currentImageTask && (
-                          <p className="text-brand-blue/80 text-xs md:text-sm mb-2">
-                              Авто-загрузка файла для замены: <code className="text-xs bg-muted px-1 py-0.5 rounded">{currentImageTask.targetPath}</code>...
+                      {currentVisualTask && (
+                          <p className={`${imageReplaceTask ? "text-brand-blue/80" : "text-brand-purple/80"} text-xs md:text-sm mb-2`}>
+                              Авто-загрузка файла для замены: <code className="text-xs bg-muted px-1 py-0.5 rounded">{currentVisualTask.targetPath}</code>...
                           </p>
                       )}
                   </div>
                   <motion.button
-                      onClick={() => { logger.debug("[Click] Settings Toggle Button Click (Restored Original with ideaProp handler)"); triggerToggleSettingsModal(); }}
+                      onClick={() => { logger.debug("[Click] Settings Toggle Button Click"); triggerToggleSettingsModal(); }}
                       disabled={isFetchLoading || assistantLoading || isParsing}
                       whileHover={{ scale: (isFetchLoading || assistantLoading || isParsing) ? 1 : 1.1, rotate: isSettingsModalOpen ? 10 : -10 }}
                       whileTap={{ scale: (isFetchLoading || assistantLoading || isParsing) ? 1 : 0.95 }}
@@ -519,23 +503,23 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
              <div className="mb-4 flex justify-center">
                   <motion.button
                       onClick={() => {
-                          logger.info("[Click] Fetch Button Clicked (Restored Original with ideaProp handler)");
+                          logger.info("[Click] Fetch Button Clicked");
                           handleFetchManual(fetchStatus === 'failed_retries' || fetchStatus === 'error');
                        }}
                       disabled={isFetchDisabled} 
                       className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold text-base text-primary-foreground bg-gradient-to-r ${fetchStatus === 'failed_retries' || fetchStatus === 'error' ? 'from-destructive to-orange-500 hover:from-destructive/90 hover:to-orange-600' : 'from-neon-lime to-brand-cyan'} transition-all shadow-lg shadow-purple-500/30 hover:shadow-cyan-500/40 ${isFetchDisabled ? "opacity-60 cursor-not-allowed" : "hover:brightness-110 active:scale-[0.98]"}`}
                       whileHover={{ scale: isFetchDisabled ? 1 : 1.03 }}
                       whileTap={{ scale: isFetchDisabled ? 1 : 0.97 }}
-                      title={`Извлечь файлы из ветки: ${effectiveBranchDisplay}${currentImageTask ? ' (для задачи замены картинки)' : ''}`}
+                      title={`Извлечь файлы из ветки: ${effectiveBranchDisplay}${currentVisualTask ? ` (для задачи замены ${imageReplaceTask ? 'картинки' : 'иконки'})` : ''}`}
                   >
                        {isFetchLoading 
                            ? <VibeContentRenderer content='::FaSpinner className="animate-spin"::' /> 
                            : (fetchStatus === 'failed_retries' || fetchStatus === 'error' 
                                ? <VibeContentRenderer content="::FaArrowsRotate::" /> 
-                               : currentImageTask 
-                                   ? <VibeContentRenderer content="::FaImages::" /> 
+                               : currentVisualTask 
+                                   ? <VibeContentRenderer content={imageReplaceTask ? "::FaImages::" : "::FaIcons::"} /> 
                                    : <VibeContentRenderer content="::FaDownload::" />)}
-                       {fetchStatus === 'retrying' ? "Повтор запроса..." : isFetchLoading ? "Загрузка..." : (fetchStatus === 'failed_retries' || fetchStatus === 'error' ? "Попробовать снова" : currentImageTask ? "Загрузить файл" : "Извлечь файлы")}
+                       {fetchStatus === 'retrying' ? "Повтор запроса..." : isFetchLoading ? "Загрузка..." : (fetchStatus === 'failed_retries' || fetchStatus === 'error' ? "Попробовать снова" : currentVisualTask ? "Загрузить файл" : "Извлечь файлы")}
                        <span className="text-xs opacity-80 hidden sm:inline">({effectiveBranchDisplay})</span>
                   </motion.button>
               </div>
@@ -544,20 +528,20 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                   <div className="mb-4 min-h-[40px]">
                       <ProgressBar status={fetchStatus === 'failed_retries' ? 'error' : fetchStatus} progress={progress} />
                       {isFetchLoading && <p className="text-brand-cyan text-xs font-mono mt-1 text-center animate-pulse">Извлечение ({effectiveBranchDisplay}): {Math.round(progress)}% {fetchStatus === 'retrying' ? '(Повтор)' : ''}</p>}
-                      {isParsing && !currentImageTask && <p className="text-brand-yellow text-xs font-mono mt-1 text-center animate-pulse">Разбор ответа AI...</p>}
-                      {fetchStatus === 'success' && !currentImageTask && fetchedFiles.length > 0 && (
+                      {isParsing && !currentVisualTask && <p className="text-brand-yellow text-xs font-mono mt-1 text-center animate-pulse">Разбор ответа AI...</p>}
+                      {fetchStatus === 'success' && !currentVisualTask && fetchedFiles.length > 0 && (
                          <div className="text-center text-xs font-mono mt-1 text-brand-green flex items-center justify-center gap-1">
                              <VibeContentRenderer content="::FaCircleCheck::" /> {`Успешно ${fetchedFiles.length} файлов из '${effectiveBranchDisplay}'. Выберите нужные.`}
                          </div>
                        )}
-                       {fetchStatus === 'success' && !currentImageTask && fetchedFiles.length === 0 && (
+                       {fetchStatus === 'success' && !currentVisualTask && fetchedFiles.length === 0 && (
                           <div className="text-center text-xs font-mono mt-1 text-brand-yellow flex items-center justify-center gap-1">
                               <VibeContentRenderer content="::FaCircleCheck::" /> {`Завершено успешно, но 0 файлов найдено в ветке '${effectiveBranchDisplay}'.`}
                           </div>
                        )}
-                       {imageTaskTargetFileReady && (
-                          <div className="text-center text-xs font-mono mt-1 text-brand-green flex items-center justify-center gap-1">
-                              <VibeContentRenderer content="::FaCircleCheck::" /> {`Файл ${currentImageTask?.targetPath.split('/').pop()} загружен и готов.`}
+                       {visualTaskTargetFileReady && (
+                          <div className={`text-center text-xs font-mono mt-1 ${imageReplaceTask ? "text-brand-green" : "text-brand-purple"} flex items-center justify-center gap-1`}>
+                              <VibeContentRenderer content="::FaCircleCheck::" /> {`Файл ${currentVisualTask?.targetPath.split('/').pop()} загружен и готов.`}
                           </div>
                         )}
                         {(fetchStatus === 'error' || fetchStatus === 'failed_retries') && fetchError && (
@@ -565,7 +549,7 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                                <VibeContentRenderer content="::FaXmark::" /> {fetchError}
                            </div>
                         )}
-                        {isWaitingForAiResponse && !currentImageTask && (
+                        {isWaitingForAiResponse && !currentVisualTask && (
                             <p className="text-brand-blue text-xs font-mono mt-1 text-center animate-pulse">
                                  ⏳ Ожидание ответа от AI... (ID Запроса: {currentAiRequestId?.substring(0, 6)}...)
                             </p>
@@ -573,8 +557,8 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                   </div>
               )}
 
-             <div className={`grid grid-cols-1 ${ (fetchedFiles.length > 0 && !currentImageTask) ? 'md:grid-cols-2' : ''} gap-4 md:gap-6`}>
-                 {!currentImageTask && (isFetchLoading || fetchedFiles.length > 0) && (
+             <div className={`grid grid-cols-1 ${ (fetchedFiles.length > 0 && !currentVisualTask) ? 'md:grid-cols-2' : ''} gap-4 md:gap-6`}>
+                 {!currentVisualTask && (isFetchLoading || fetchedFiles.length > 0) && (
                      <div className={`flex flex-col gap-4 ${ (fetchedFiles.length > 0 || kworkValueForCheck.trim().length > 0) ? '' : 'md:col-span-2'}`}>
                          <SelectedFilesPreview
                              selectedFiles={selectedFetcherFiles}
@@ -601,15 +585,15 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                       </div>
                  )}
 
-                 {!currentImageTask && (fetchedFiles.length > 0 || kworkValueForCheck.trim().length > 0) && (
+                 {!currentVisualTask && (fetchedFiles.length > 0 || kworkValueForCheck.trim().length > 0) && (
                       <div id="kwork-input-section" className="flex flex-col gap-3">
                           <RequestInput
                               kworkInputRef={kworkInputRef} 
                               kworkInputValue={kworkInputValue ?? ''} 
                               onValueChange={setKworkInputValue} 
-                              onCopyToClipboard={() => { logger.debug("[Input Action] Copy Click (Restored Original with ideaProp handler)"); handleCopyToClipboard(undefined, true); }}
-                              onClearAll={() => { logger.debug("[Input Action] Clear Click (Restored Original with ideaProp handler)"); handleClearAll(); }}
-                              onAddSelected={() => { logger.debug("[Input Action] AddSelected Click (Restored Original with ideaProp handler)"); handleAddSelected(); }}
+                              onCopyToClipboard={() => { logger.debug("[Input Action] Copy Click"); handleCopyToClipboard(undefined, true); }}
+                              onClearAll={() => { logger.debug("[Input Action] Clear Click"); handleClearAll(); }}
+                              onAddSelected={() => { logger.debug("[Input Action] AddSelected Click"); handleAddSelected(); }}
                               isCopyDisabled={isCopyDisabled} 
                               isClearDisabled={isClearDisabled} 
                               isAddSelectedDisabled={isAddSelectedDisabled} 
@@ -620,26 +604,26 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
                       </div>
                  )}
 
-                 {currentImageTask && filesFetched && ( 
-                      <div className={`md:col-span-1 flex flex-col items-center justify-center text-center p-4 bg-card/30 rounded-lg border border-dashed ${imageTaskTargetFileReady ? 'border-brand-blue' : (fetchStatus === 'error' || fetchStatus === 'failed_retries') ? 'border-destructive' : 'border-muted'} min-h-[200px]`}>
+                 {currentVisualTask && filesFetched && ( 
+                      <div className={`md:col-span-1 flex flex-col items-center justify-center text-center p-4 bg-card/30 rounded-lg border border-dashed ${visualTaskTargetFileReady ? (imageReplaceTask ? 'border-brand-blue' : 'border-brand-purple') : (fetchStatus === 'error' || fetchStatus === 'failed_retries') ? 'border-destructive' : 'border-muted'} min-h-[200px]`}>
                           {isFetchLoading 
                             ? <VibeContentRenderer content='::FaSpinner className="text-brand-blue text-3xl mb-3 animate-spin"::' />
                            : assistantLoading 
                             ? <VibeContentRenderer content='::FaSpinner className="text-brand-purple text-3xl mb-3 animate-spin"::' />
-                           : imageTaskTargetFileReady 
+                           : visualTaskTargetFileReady 
                             ? <VibeContentRenderer content='::FaCircleCheck className="text-brand-green text-3xl mb-3"::' />
                            : <VibeContentRenderer content='::FaXmark className="text-destructive text-3xl mb-3"::' /> }
-                          <p className={`text-sm font-semibold ${imageTaskTargetFileReady ? 'text-brand-blue' : 'text-destructive'}`}>
+                          <p className={`text-sm font-semibold ${visualTaskTargetFileReady ? (imageReplaceTask ? 'text-brand-blue' : 'text-brand-purple') : 'text-destructive'}`}>
                               {isFetchLoading ? "Загрузка файла..."
                                : assistantLoading ? "Обработка Ассистентом..."
-                               : imageTaskTargetFileReady ? `Файл ${currentImageTask?.targetPath.split('/').pop()} готов.`
-                               : fetchStatus === 'error' || fetchStatus === 'failed_retries' ? `Ошибка загрузки файла ${currentImageTask?.targetPath.split('/').pop()}.`
-                               : `Файл ${currentImageTask?.targetPath.split('/').pop()} не найден!`}
+                               : visualTaskTargetFileReady ? `Файл ${currentVisualTask?.targetPath.split('/').pop()} готов.`
+                               : fetchStatus === 'error' || fetchStatus === 'failed_retries' ? `Ошибка загрузки файла ${currentVisualTask?.targetPath.split('/').pop()}.`
+                               : `Файл ${currentVisualTask?.targetPath.split('/').pop()} не найден!`}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
                                {isFetchLoading ? "Ожидание загрузки репозитория..."
                                : assistantLoading ? "Создание/обновление Pull Request..."
-                               : imageTaskTargetFileReady ? "Файл передан Ассистенту для обработки."
+                               : visualTaskTargetFileReady ? "Файл передан Ассистенту для обработки."
                                : fetchStatus === 'error' || fetchStatus === 'failed_retries' ? "Проверьте URL, токен, имя ветки или права доступа."
                                : "Проверьте правильность пути к файлу и выбранную ветку."}
                           </p>
@@ -649,10 +633,10 @@ const RepoTxtFetcher = forwardRef<RepoTxtFetcherRef, RepoTxtFetcherProps>(({
           </div> 
         );
     } catch (renderError: any) {
-        logger.fatal("[RepoTxtFetcher] CRITICAL RENDER ERROR (Restored Original with ideaProp handler):", renderError);
+        logger.fatal("[RepoTxtFetcher] CRITICAL RENDER ERROR:", renderError);
         return <div className="text-red-500 p-4">Критическая ошибка рендеринга Экстрактора: {renderError.message}</div>;
     } finally {
-        logger.log("[RepoTxtFetcher] END Render (Restored Original with ideaProp handler)");
+        logger.log("[RepoTxtFetcher] END Render");
     }
 });
 RepoTxtFetcher.displayName = 'RepoTxtFetcher';

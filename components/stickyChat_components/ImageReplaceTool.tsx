@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-
 import { toast } from 'sonner';
 import { uploadBatchImages } from '@/app/actions';
 import { Input } from '@/components/ui/input';
@@ -156,10 +155,10 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
                     onClick={handleConfirm}
                     disabled={!canConfirm}
                     size="sm"
-                    className="text-xs bg-blue-600 hover:bg-blue-500"
+                    className="text-xs bg-blue-600 hover:bg-blue-500 flex items-center" // Added flex items-center
                 >
                      <VibeContentRenderer content="::FaPaperPlane className='mr-1.5 text-xs'::" />
-                     <span className="ml-1">Заменить</span>
+                     <span>Заменить</span> {/* Wrapped text in a span */}
                 </Button>
             </div>
         </motion.div>

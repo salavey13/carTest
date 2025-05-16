@@ -91,33 +91,6 @@ export const IconReplaceTool: React.FC<IconReplaceToolProps> = ({ oldIconNameInp
                     React Icons (Fa6) <VibeContentRenderer content="::FaArrowUpRightFromSquare className='h-2.5 w-2.5'::" />
                 </Link>
             </div>
-            
-            {/* Props input removed for simplicity
-            <div>
-                <label htmlFor="icon-props-input" className="block text-xs text-gray-400 mb-0.5">
-                    Пропсы новой иконки (опционально)
-                     <TooltipProvider delayDuration={100}>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <button type="button" className="ml-1 text-gray-500 hover:text-gray-300"><VibeContentRenderer content="::FaCircleInfo::" /></button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="bg-popover text-popover-foreground border-border shadow-lg text-xs p-1.5 rounded max-w-[250px]">
-                                <p>Напр: `className='text-red-500 mr-2' size={20}`</p>
-                                <p>Будет применено к новому компоненту иконки.</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                </label>
-                <Input
-                    id="icon-props-input"
-                    type="text"
-                    value={propsString}
-                    onChange={(e) => setPropsString(e.target.value)}
-                    placeholder="className='text-green-500' size={16}"
-                    className="w-full p-1.5 text-xs h-8 bg-gray-600 border-gray-500 placeholder-gray-400/70 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-white"
-                />
-            </div>
-            */}
 
             <div className="flex justify-end gap-2 mt-2">
                 <Button
@@ -132,10 +105,10 @@ export const IconReplaceTool: React.FC<IconReplaceToolProps> = ({ oldIconNameInp
                     onClick={handleConfirm}
                     disabled={!canConfirm}
                     size="sm"
-                    className="text-xs bg-cyan-600 hover:bg-cyan-500"
+                    className="text-xs bg-cyan-600 hover:bg-cyan-500 flex items-center" // Added flex items-center
                 >
                     <VibeContentRenderer content="::FaPaperPlane className='mr-1.5 text-xs'::" />
-                    <span className="ml-1">Заменить Иконку</span>
+                    <span>Заменить Иконку</span> {/* Wrapped text in a span */}
                 </Button>
             </div>
         </motion.div>
