@@ -192,7 +192,7 @@ const GamePlanPage = () => {
         },
         {
           type: "image_display",
-          imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/carpix/IMG_20250512_004454-ece6f952-104b-413e-af01-b77c4c4f4f28.jpg",
+          imageUrl: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/about//Screenshot_2025-05-12-23-37-45-233_app.rvx.android.youtube-e05a5638-c468-4be3-b6a8-86d072adc08a.jpg",
           altText: "Визуализация для Акта V: АРХИТЕКТОР. Фигура с видом на сложный цифровой городской пейзаж."
         }
       ]
