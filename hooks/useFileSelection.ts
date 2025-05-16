@@ -31,7 +31,7 @@ export const useFileSelection = ({
 }: UseFileSelectionProps): UseFileSelectionReturn => {
     logger.debug("[useFileSelection] Hook initialized");
     const { success: toastSuccess, warning: toastWarning, addToast } = useAppToast(); 
-    const { dbUser } = useAppContext(); // dbUser contains user_id for Supabase
+    const { dbUser } = useAppContext(); 
 
     const {
         setSelectedFetcherFiles, 
@@ -85,20 +85,20 @@ export const useFileSelection = ({
         setSelectedFetcherFiles(filesToSelect); 
         toastSuccess(`Выбрано ${filesToSelect.size} связанных файлов.`);
         
-        if (dbUser?.user_id) { // Corrected to dbUser.user_id
+        if (dbUser?.user_id) { 
             logger.debug(`[File Selection] Attempting to log 'usedSelectHighlighted' for user ${dbUser.user_id}.`);
-            const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id.toString(), 'usedSelectHighlighted'); // Corrected
+            const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'usedSelectHighlighted'); 
             newAchievements?.forEach(ach => {
                 addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
-                logger.info(`[File Selection] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`); // Corrected
+                logger.info(`[File Selection] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`); 
             });
         } else {
             logger.warn("[File Selection] Cannot log 'usedSelectHighlighted': dbUser.user_id is missing.");
         }
 
-    }, [ primaryHighlightedPath, secondaryHighlightedPaths, files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast ]); // dbUser added to dependencies
+    }, [ primaryHighlightedPath, secondaryHighlightedPaths, files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast ]); 
 
-    const handleAddImportantFiles = useCallback(async () => { // Made async as checkAndUnlockFeatureAchievement is async
+    const handleAddImportantFiles = useCallback(async () => { 
         if (imageReplaceTaskActive) {
              logger.warn("[File Selection] Add Important skipped: Image replace task active.");
              toastWarning("Выбор файлов недоступен во время задачи замены картинки.");
@@ -122,21 +122,20 @@ export const useFileSelection = ({
         }); 
         toastSuccess(`Добавлено ${availableImportant.length} важных файлов к выделению.`);
 
-        // Log feature usage for adding important files
-        if (dbUser?.user_id) { // Corrected
+        if (dbUser?.user_id) { 
             logger.debug(`[File Selection] Attempting to log 'usedAddImportantFiles' for user ${dbUser.user_id}.`);
-            const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id.toString(), 'usedAddImportantFiles'); // Corrected, assuming 'usedAddImportantFiles' is a new achievement ID
+            const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'usedAddImportantFiles'); 
             newAchievements?.forEach(ach => {
                 addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
-                logger.info(`[File Selection] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`); // Corrected
+                logger.info(`[File Selection] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`); 
             });
         } else {
             logger.warn("[File Selection] Cannot log 'usedAddImportantFiles': dbUser.user_id is missing.");
         }
 
-    }, [importantFiles, files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast]); // dbUser added
+    }, [importantFiles, files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast]); 
 
-    const handleSelectAll = useCallback(async () => { // Made async
+    const handleSelectAll = useCallback(async () => { 
         if (imageReplaceTaskActive) {
              logger.warn("[File Selection] Select All skipped: Image replace task active.");
              toastWarning("Выбор файлов недоступен во время задачи замены картинки.");
@@ -152,19 +151,19 @@ export const useFileSelection = ({
         setSelectedFetcherFiles(allPaths); 
         toastSuccess(`Выбраны все ${allPaths.size} файлов.`);
 
-        if (dbUser?.user_id) { // Corrected
+        if (dbUser?.user_id) { 
             logger.debug(`[File Selection] Attempting to log 'usedSelectAllFetcherFiles' for user ${dbUser.user_id}.`);
-            const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id.toString(), 'usedSelectAllFetcherFiles'); // Corrected, assuming new achievement ID
+            const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'usedSelectAllFetcherFiles'); 
             newAchievements?.forEach(ach => {
                 addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
-                logger.info(`[File Selection] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`); // Corrected
+                logger.info(`[File Selection] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`); 
             });
         } else {
             logger.warn("[File Selection] Cannot log 'usedSelectAllFetcherFiles': dbUser.user_id is missing.");
         }
-    }, [files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast]); // dbUser added
+    }, [files, setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast]); 
 
-    const handleDeselectAll = useCallback(async () => { // Made async
+    const handleDeselectAll = useCallback(async () => { 
         if (imageReplaceTaskActive) {
              logger.warn("[File Selection] Deselect All skipped: Image replace task active.");
              toastWarning("Выбор файлов недоступен во время задачи замены картинки.");
@@ -174,17 +173,17 @@ export const useFileSelection = ({
         setSelectedFetcherFiles(new Set()); 
         toastSuccess("Выделение снято со всех файлов.");
 
-        if (dbUser?.user_id) { // Corrected
+        if (dbUser?.user_id) { 
             logger.debug(`[File Selection] Attempting to log 'usedDeselectAllFetcherFiles' for user ${dbUser.user_id}.`);
-            const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id.toString(), 'usedDeselectAllFetcherFiles'); // Corrected, assuming new achievement ID
+            const { newAchievements } = await checkAndUnlockFeatureAchievement(dbUser.user_id, 'usedDeselectAllFetcherFiles'); 
             newAchievements?.forEach(ach => {
                 addToast(`🏆 Ачивка: ${ach.name}!`, "success", 5000, { description: ach.description });
-                logger.info(`[File Selection] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`); // Corrected
+                logger.info(`[File Selection] CyberFitness: Unlocked achievement '${ach.name}' for user ${dbUser.user_id}`); 
             });
         } else {
             logger.warn("[File Selection] Cannot log 'usedDeselectAllFetcherFiles': dbUser.user_id is missing.");
         }
-    }, [setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast]); // dbUser added
+    }, [setSelectedFetcherFiles, toastSuccess, toastWarning, imageReplaceTaskActive, logger, dbUser, addToast]); 
 
      logger.debug("[useFileSelection] Hook setup complete.");
     return {

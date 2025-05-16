@@ -17,9 +17,8 @@ function preprocessIconSyntaxInternal(content: string): string {
     return content.replace(
         /::(Fa\w+)((?:\s+\w+(?:=(?:(["'])(?:(?!\3).)*\3|\w+)))*)\s*::/g,
         (_match, iconName, attributesString) => {
-            // Ensure attributesString is not undefined and trim it
             const attrs = attributesString ? attributesString.trim() : '';
-            return `<${iconName}${attrs ? ' ' + attrs : ''} />`;
+            return `<${iconName}${attrs ? ' ' + attrs : ''}></${iconName}>`; // Changed to closing tag for parser
         }
     );
 }
@@ -67,17 +66,14 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
             
             if (iconToRender) {
                 const IconComponent = Fa6Icons[iconToRender];
-                const { className, style, title, ...restProps } = mutableAttribs; // Capture title
+                const { className, style, title, ...restProps } = mutableAttribs; 
                 const finalProps: Record<string, any> = {
                     ...restProps, 
                     className: `${className || ''} inline align-baseline mx-px`.trim(),
                     style: style,
-                    title: title // Pass title if present
+                    title: title 
                 };
-                // react-icons components generally do not take children in the HTML sense.
-                // Passing `children` here might be unintended if the source was e.g. <FaIcon>Text</FaIcon>.
-                // Standard usage is self-closing <FaIcon />.
-                return React.createElement(IconComponent, finalProps);
+                return React.createElement(IconComponent, finalProps); // Icons are self-closing
             } else if (lowerCaseName.startsWith('fa') && !isValidFa6Icon(nodeName) && !iconNameMap[lowerCaseName]) {
                 logger.warn(`[VCR] Unknown Fa Icon Tag or unmapped: <${nodeName}> (lc: ${lowerCaseName})`);
                 return <span title={`Unknown/Unmapped Fa Icon: ${nodeName}`} className="text-orange-500 font-bold">{`[?] Неизвестная иконка <${nodeName}>`}</span>;
@@ -89,19 +85,15 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                 const isInternal = hrefVal && typeof hrefVal === 'string' && (hrefVal.startsWith('/') || hrefVal.startsWith('#'));
                 
                 let linkClassName = mutableAttribs.className || '';
-                // Avoid adding mx-1 px-0.5 if it's already part of a prose structure or specific styling
-                // For now, let's keep it simple and apply it generally, can be refined later if needed.
                 mutableAttribs.className = `${linkClassName} mx-1 px-0.5`.trim(); 
 
                 if (isInternal && !mutableAttribs.target && hrefVal) {
-                    // Use all attributes for Link component
                     return <Link {...mutableAttribs} href={hrefVal as string}>{children}</Link>;
                 }
                 return React.createElement('a', mutableAttribs, children);
             }
             
             // --- Standard HTML Elements Styling & Passing Children ---
-            // These stylings are additive and should not break parsing.
             if (lowerCaseName === 'strong') {
                 mutableAttribs.className = `${mutableAttribs.className || ''} font-semibold text-brand-yellow`.trim();
             }
@@ -130,12 +122,9 @@ const simplifiedParserOptions: HTMLReactParserOptions = {
                  mutableAttribs.className = `${mutableAttribs.className || ''} border-border my-4`.trim();
             }
 
-            // Default: reconstruct the element with its attributes and children
             return React.createElement(nodeName, mutableAttribs, children);
         }
         
-        // Fallback for any other node types not handled above (e.g., doctype, processing instructions)
-        // Returning undefined lets html-react-parser decide or skip.
         return undefined; 
     },
 };
@@ -151,17 +140,14 @@ export const VibeContentRenderer: React.FC<VibeContentRendererProps> = React.mem
     }
     try {
       let processedContent = String(content);
-      // Apply simple markdown first, then preprocess icons to convert ::FaIcon:: to <FaIcon /> tags
       processedContent = applySimpleMarkdown(processedContent);
       processedContent = preprocessIconSyntaxInternal(processedContent);
       
-      // Now parse the HTML string (which includes <FaIcon /> tags and simple markdown tags)
       const parsedContent = parse(processedContent, simplifiedParserOptions); 
       
       if (className) {
         return <div className={className}>{parsedContent}</div>;
       }
-      // Return as a fragment if no className wrapper is needed
       return <>{parsedContent}</>;
 
     } catch (error) {

@@ -2,14 +2,13 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FaUpload, FaPaperPlane, FaSpinner } from 'react-icons/fa6';
 import { toast } from 'sonner';
-// .. ИСПОЛЬЗУЕМ ЭКШЕН uploadBatchImages, КАК В МОДАЛКЕ
 import { uploadBatchImages } from '@/app/actions';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import VibeContentRenderer from '@/components/VibeContentRenderer';
 
 // --- Helper Function ---
-// (Assume this is defined or imported from lib/utils)
 const isValidUrl = (url: string): boolean => {
   if (!url) return false;
   try {
@@ -20,7 +19,7 @@ const isValidUrl = (url: string): boolean => {
   }
 };
 
-// Animation variant (assuming childVariants is defined in StickyChatButton)
+// Animation variant
 const childVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", bounce: 0.4 } }, exit: { opacity: 0, transition: { duration: 0.2 } }, };
 
 // --- Props Interface ---
@@ -41,9 +40,9 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
         const file = event.target.files?.[0];
         if (file) {
             setUploadedFile(file);
-            setNewImageUrlInput(""); // Clear URL input if file is selected
-            setUploadedUrl(null); // Clear previously uploaded URL
-            handleUpload(file); // Trigger upload immediately
+            setNewImageUrlInput(""); 
+            setUploadedUrl(null); 
+            handleUpload(file); 
         }
     };
 
@@ -53,34 +52,29 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
         setUploadedUrl(null);
         toast.info("Загрузка картинки...");
 
-        // --- ИСПОЛЬЗУЕМ uploadBatchImages ---
         const formData = new FormData();
-        // !!! ВАЖНО: Убедись, что бакет 'about' существует и публичен, или используй другой бакет !!!
-        const bucketName = "about"; // TODO: Make this configurable or pass as prop?
+        const bucketName = "about"; 
         formData.append("bucketName", bucketName);
-        formData.append("files", file); // Добавляем один файл
+        formData.append("files", file); 
 
         try {
-            const result = await uploadBatchImages(formData); // Вызываем Batch экшен
+            const result = await uploadBatchImages(formData); 
 
-            // Обрабатываем результат batch экшена (ожидаем один файл в ответе)
             if (result.success && result.data && result.data.length > 0 && result.data[0].url) {
                 const uploadedUrlResult = result.data[0].url;
                 setUploadedUrl(uploadedUrlResult);
                 toast.success("Картинка загружена!");
             } else {
-                // Обработка ошибки из batch экшена
                 const errorMsg = result.error || result.failed?.[0]?.error || "Не удалось загрузить картинку.";
                 throw new Error(errorMsg);
             }
         } catch (error) {
             console.error("Upload failed:", error);
             toast.error(error instanceof Error ? error.message : "Ошибка загрузки.");
-            setUploadedFile(null); // Clear file selection on error
+            setUploadedFile(null); 
         } finally {
             setIsUploading(false);
         }
-        // --- КОНЕЦ ИСПОЛЬЗОВАНИЯ uploadBatchImages ---
     };
 
     const handleConfirm = () => {
@@ -97,10 +91,10 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
     return (
         <motion.div
             variants={childVariants}
-            className="w-full mt-2 p-3 pb-16 bg-gray-700/80 backdrop-blur-sm border border-blue-500/50 rounded-lg shadow-lg flex flex-col gap-3"
+            className="w-full mt-2 p-3 bg-gray-700/80 backdrop-blur-sm border border-blue-500/50 rounded-lg shadow-lg flex flex-col gap-3"
         >
             <p className="text-xs text-gray-300">Заменить эту картинку:</p>
-            <input
+            <Input
                 type="text"
                 readOnly
                 value={oldImageUrl}
@@ -109,14 +103,20 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
             />
             <p className="text-xs text-gray-300">Новой картинкой:</p>
             <div className="flex items-center gap-2">
-                <label
-                    htmlFor="image-upload-input-tool"
-                    className={`flex-shrink-0 p-2 rounded border transition-colors cursor-pointer ${
-                        uploadedFile ? 'bg-green-600 border-green-500' : 'bg-gray-600 border-gray-500 hover:bg-gray-500'
-                    } ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                 >
-                    <FaUpload className={`text-sm ${uploadedFile ? 'text-white' : 'text-gray-300'}`} />
-                </label>
+                <Button
+                    variant="outline"
+                    size="icon"
+                    asChild
+                    disabled={isUploading}
+                    className={`h-8 w-8 flex-shrink-0 ${uploadedFile ? 'border-green-500 hover:bg-green-600/20' : 'border-gray-500 hover:bg-gray-600/20'}`}
+                >
+                    <label
+                        htmlFor="image-upload-input-tool"
+                        className={`cursor-pointer flex items-center justify-center w-full h-full ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                        <VibeContentRenderer content={uploadedFile ? "::FaCircleCheck className='text-green-400 text-sm'::" : "::FaUpload className='text-gray-300 text-sm'::"} />
+                    </label>
+                </Button>
                 <input
                     id="image-upload-input-tool"
                     type="file"
@@ -139,27 +139,30 @@ export const ImageReplaceTool: React.FC<ImageReplaceToolProps> = ({ oldImageUrl,
                     disabled={isUploading || !!uploadedFile}
                 />
             </div>
-             {isUploading && <p className="text-xs text-blue-300 animate-pulse text-center"><FaSpinner className="animate-spin inline mr-1"/>Загрузка файла...</p>}
+             {isUploading && <p className="text-xs text-blue-300 animate-pulse text-center"><VibeContentRenderer content="::FaSpinner className='animate-spin inline mr-1'::" />Загрузка файла...</p>}
              {uploadedUrl && <p className="text-xs text-green-400 break-all">Загружен: <span title={uploadedUrl}>{uploadedUrl.substring(0, 40)}...</span></p>}
             <div className="flex justify-end gap-2 mt-2">
-                <button
+                <Button
                     onClick={onCancel}
-                    className="px-3 py-1 text-xs bg-gray-500 hover:bg-gray-400 text-white rounded transition"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
                     disabled={isUploading}
                 >
                     Отмена
-                </button>
-                <button
+                </Button>
+                <Button
                     onClick={handleConfirm}
                     disabled={!canConfirm}
-                    className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    size="sm"
+                    className="text-xs bg-blue-600 hover:bg-blue-500 flex items-center" // Added flex items-center
                 >
-                    Заменить
-                </button>
+                     <VibeContentRenderer content="::FaPaperPlane className='mr-1.5 text-xs'::" />
+                     <span>Заменить</span> {/* Wrapped text in a span */}
+                </Button>
             </div>
         </motion.div>
     );
 };
 
-// Default export for easy import
 export default ImageReplaceTool;

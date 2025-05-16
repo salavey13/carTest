@@ -10,8 +10,6 @@ const useInactivityTimer = (
     const [isCurrentlyInactive, setIsCurrentlyInactive] = useState(false);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     
-    // Using refs for callbacks to avoid them as dependencies in useCallback/useEffect
-    // ensuring that resetTimer and useEffect don't re-run unnecessarily often.
     const onInactiveRef = useRef(onInactive);
     const onActiveRef = useRef(onActive);
 
@@ -45,7 +43,7 @@ const useInactivityTimer = (
                 }
             }, inactiveTimeout);
         }
-    }, [inactiveTimeout, isCurrentlyInactive, componentName]); // isCurrentlyInactive is important here
+    }, [inactiveTimeout, isCurrentlyInactive, componentName]); 
 
     useEffect(() => {
         const events: Array<keyof WindowEventMap> = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
@@ -56,7 +54,7 @@ const useInactivityTimer = (
 
         if (inactiveTimeout > 0) {
             logger.log(`[useInactivityTimer - ${componentName}] Initializing timer with ${inactiveTimeout}ms.`);
-            resetTimer(); // Start the timer on mount
+            resetTimer(); 
 
             events.forEach(event => window.addEventListener(event, handleActivity, { passive: true }));
         } else {
