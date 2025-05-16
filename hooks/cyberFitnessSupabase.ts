@@ -844,3 +844,5 @@ export const getAchievementDetails = (achievementId: string): Achievement | unde
 };
 
 export const TOKEN_ESTIMATION_FACTOR = 4;
+
+export { PERKS_BY_LEVEL }; // Export PERKS_BY_LEVEL
