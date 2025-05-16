@@ -218,6 +218,13 @@ export function useTelegram() {
           if (isMounted) {
             telegram.ready(); 
             globalLogger.log("[HOOK_TELEGRAM initialize] STEP 3.3: Called telegram.ready()");
+
+            // If in a real Telegram context (initData is present), expand the Web App.
+            // This typically disables the swipe-down-to-minimize gesture.
+            if (inTgContextReal && telegram.expand) {
+                telegram.expand();
+                globalLogger.info("[HOOK_TELEGRAM initialize] STEP 3.3.1: Called telegram.expand() to maximize Web App and potentially disable swipe-down gesture.");
+            }
           }
 
           if (inTgContextReal) { // initData is present and non-empty
