@@ -2,17 +2,18 @@
 
 import React, { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { FaArrowsToCircle, FaPaperPlane, FaCircleInfo } from 'react-icons/fa6';
+
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import VibeContentRenderer from '@/components/VibeContentRenderer';
+import Link from 'next/link';
 
 const childVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", bounce: 0.4 } }, exit: { opacity: 0, transition: { duration: 0.2 } }, };
 
 interface IconReplaceToolProps {
-    oldIconNameInput?: string; // Optional, if we can pre-fill it
+    oldIconNameInput?: string; 
     onReplaceConfirmed: (details: { oldIconName: string; newIconName: string; componentProps?: string }) => void;
     onCancel: () => void;
 }
@@ -20,22 +21,35 @@ interface IconReplaceToolProps {
 export const IconReplaceTool: React.FC<IconReplaceToolProps> = ({ oldIconNameInput = "", onReplaceConfirmed, onCancel }) => {
     const [oldIcon, setOldIcon] = useState(oldIconNameInput);
     const [newIcon, setNewIcon] = useState("");
-    const [propsString, setPropsString] = useState("");
+    // Props string removed for simplicity for now
+    // const [propsString, setPropsString] = useState("");
+
+    const normalizeIconName = (name: string): string => {
+        let n = name.trim();
+        if (n.toLowerCase().startsWith("fa-")) {
+            // Convert fa-kebab-case to FaPascalCase
+            return "Fa" + n.substring(3).split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('');
+        }
+        if (n.length > 0 && !n.startsWith("Fa")) {
+            return "Fa" + n.charAt(0).toUpperCase() + n.slice(1);
+        }
+        return n;
+    };
 
     const handleConfirm = useCallback(() => {
-        const trimmedOld = oldIcon.trim();
-        const trimmedNew = newIcon.trim();
+        const normalizedOldIcon = normalizeIconName(oldIcon);
+        const normalizedNewIcon = normalizeIconName(newIcon);
 
-        if (!trimmedOld || !trimmedNew) {
-            toast.error("Укажите имя старой и новой иконки (например, FaBeer).");
+        if (!normalizedOldIcon || !normalizedNewIcon) {
+            toast.error("Укажите имя старой и новой иконки (например, FaBeer или beer).");
             return;
         }
-        if (!trimmedOld.match(/^Fa[A-Z0-9][a-zA-Z0-9]*$/) || !trimmedNew.match(/^Fa[A-Z0-9][a-zA-Z0-9]*$/)) {
-            toast.warning("Имя иконки должно быть в PascalCase и начинаться с 'Fa' (например, FaBeer).");
-            // Allow proceeding, VCR will handle unknown icons later if names are truly bad
+        // Basic check, VibeContentRenderer will handle actual validation
+        if (!normalizedOldIcon.startsWith("Fa") || !normalizedNewIcon.startsWith("Fa")) {
+             toast.warning("Имя иконки должно быть в PascalCase и начинаться с 'Fa' (например, FaBeer). Попробую нормализовать...");
         }
-        onReplaceConfirmed({ oldIconName: trimmedOld, newIconName: trimmedNew, componentProps: propsString.trim() || undefined });
-    }, [oldIcon, newIcon, propsString, onReplaceConfirmed]);
+        onReplaceConfirmed({ oldIconName: normalizedOldIcon, newIconName: normalizedNewIcon });
+    }, [oldIcon, newIcon, onReplaceConfirmed]);
 
     const canConfirm = oldIcon.trim().length > 0 && newIcon.trim().length > 0;
 
@@ -45,11 +59,11 @@ export const IconReplaceTool: React.FC<IconReplaceToolProps> = ({ oldIconNameInp
             className="w-full mt-2 p-3 pb-4 bg-gray-700/80 backdrop-blur-sm border border-cyan-500/50 rounded-lg shadow-lg flex flex-col gap-3"
         >
             <p className="text-xs text-gray-300 font-semibold flex items-center gap-1">
-                <VibeContentRenderer content="::FaArrowsToCircle::" /> Замена Иконки
+                <VibeContentRenderer content="::FaExchangeAlt::" /> Замена Иконки (Fa6)
             </p>
             
             <div>
-                <label htmlFor="old-icon-input" className="block text-xs text-gray-400 mb-0.5">Старая иконка (напр. FaBeer):</label>
+                <label htmlFor="old-icon-input" className="block text-xs text-gray-400 mb-0.5">Старая иконка (напр. FaBeer или beer):</label>
                 <Input
                     id="old-icon-input"
                     type="text"
@@ -61,7 +75,7 @@ export const IconReplaceTool: React.FC<IconReplaceToolProps> = ({ oldIconNameInp
             </div>
 
             <div>
-                <label htmlFor="new-icon-input" className="block text-xs text-gray-400 mb-0.5">Новая иконка (напр. FaCoffee):</label>
+                <label htmlFor="new-icon-input" className="block text-xs text-gray-400 mb-0.5">Новая иконка (напр. FaCoffee или coffee):</label>
                 <Input
                     id="new-icon-input"
                     type="text"
@@ -71,14 +85,21 @@ export const IconReplaceTool: React.FC<IconReplaceToolProps> = ({ oldIconNameInp
                     className="w-full p-1.5 text-xs h-8 bg-gray-600 border-gray-500 placeholder-gray-400 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-white"
                 />
             </div>
+            <div className="text-xs text-gray-400">
+                Искать иконки: {' '}
+                <Link href="https://react-icons.github.io/react-icons/search/#q=Fa" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">
+                    React Icons (Fa6) <VibeContentRenderer content="::FaArrowUpRightFromSquare className='h-2.5 w-2.5':" />
+                </Link>
+            </div>
             
+            {/* Props input removed for simplicity
             <div>
                 <label htmlFor="icon-props-input" className="block text-xs text-gray-400 mb-0.5">
                     Пропсы новой иконки (опционально)
                      <TooltipProvider delayDuration={100}>
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <button type="button" className="ml-1 text-gray-500 hover:text-gray-300"><FaCircleInfo /></button>
+                                <button type="button" className="ml-1 text-gray-500 hover:text-gray-300"><VibeContentRenderer content="::FaInfoCircle::" /></button>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="bg-popover text-popover-foreground border-border shadow-lg text-xs p-1.5 rounded max-w-[250px]">
                                 <p>Напр: `className='text-red-500 mr-2' size={20}`</p>
@@ -96,6 +117,7 @@ export const IconReplaceTool: React.FC<IconReplaceToolProps> = ({ oldIconNameInp
                     className="w-full p-1.5 text-xs h-8 bg-gray-600 border-gray-500 placeholder-gray-400/70 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 text-white"
                 />
             </div>
+            */}
 
             <div className="flex justify-end gap-2 mt-2">
                 <Button
