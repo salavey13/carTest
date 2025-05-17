@@ -1,3 +1,4 @@
+// /lib/iconNameMap.ts
 import type * as Fa6Icons from "react-icons/fa6";
 
 export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
@@ -12,7 +13,7 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   falandmineon: "FaLandMineOn",
   fascrewdriverwrench: "FaScrewdriverWrench",
   fasmilewink: "FaSmileWink",
-  fatriangleexclamation: "FaTriangleExclamation", // Corrected as per user's statement
+  fatriangleexclamation: "FaTriangleExclamation", 
   facrosshairs: "FaCrosshairs",
   fabookmedical: "FaBookMedical",
   fashieldhalved: "FaShieldHalved",
@@ -157,8 +158,9 @@ export const iconNameMap: { [key: string]: keyof typeof Fa6Icons } = {
   faangrycreative: "FaAngrycreative", 
   fapoo: "FaPoo",
   falist: "FaList",
-  faexclamation: "FaTriangleExclamation", // Changed to FaTriangleExclamation as per user feedback
+  faexclamation: "FaTriangleExclamation", // User confirmed FaTriangleExclamation is correct for the icon they mean.
   
   fafilelines: "FaFileLines",
-  faimage: "FaImage", // Added for AICodeAssistant
+  faimage: "FaImage", 
+  fatasks: "FaTasks", // Added as per usage in cyberFitnessSupabase (getAchievementDetails)
 };

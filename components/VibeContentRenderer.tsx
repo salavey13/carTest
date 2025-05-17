@@ -17,18 +17,10 @@ const VibeContentRenderer: React.FC<VibeContentRendererProps> = ({ content, debu
   const renderableParts: (JSX.Element | string)[] = [];
   let lastIndex = 0;
 
-  // Regex to capture:
-  // 1. Icon alias (e.g., FaBeer, fadownload)
-  // 2. The rest of the string within :: :: which might contain attributes (optional)
   const iconRegex = /::([A-Za-z][a-zA-Z0-9]*)((?:\s+[^:]*)*)::/g;
   // match[1] = alias (e.g., "fadownload" or "FaBeer")
   // match[2] = raw attributes string (e.g., " className='text-neon-lime'" or "" or " title='Hi'")
-  // The `(?:\s+[^:]*)*` part:
-  //   (?:         - non-capturing group for the whole attribute part
-  //     \s+       - one or more spaces (attributes must be space-separated from alias)
-  //     [^:]*     - zero or more characters that are not colons (the attributes themselves)
-  //   )*          - this whole group can appear zero or more times (allows for no attributes)
-
+  
   let match;
   while ((match = iconRegex.exec(content)) !== null) {
     const plainText = content.substring(lastIndex, match.index);
@@ -38,7 +30,7 @@ const VibeContentRenderer: React.FC<VibeContentRendererProps> = ({ content, debu
 
     const fullMatch = match[0];
     const iconAlias = match[1].toLowerCase(); 
-    const rawAttributesString = (match[2] || ""); // Ensure it's a string, even if empty or undefined
+    const rawAttributesString = (match[2] || ""); 
 
     logger.debug(`[${debugContext}] Matched icon tag: ${fullMatch} | Alias: ${iconAlias} | Raw Attributes: '${rawAttributesString}'`);
 
@@ -46,7 +38,7 @@ const VibeContentRenderer: React.FC<VibeContentRendererProps> = ({ content, debu
 
     if (IconComponent) {
       const props: any = {};
-      const trimmedAttributesString = rawAttributesString.trim(); // Trim spaces for reliable parsing
+      const trimmedAttributesString = rawAttributesString.trim(); 
 
       if (trimmedAttributesString) {
         const attrRegex = /(className|title|style)\s*=\s*(?:'([^']*)'|"([^"]*)"|({[^}]*?}))/g;
