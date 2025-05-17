@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import ScrollControlledVideoPlayer from '@/components/ScrollControlledVideoPlayer';
@@ -47,8 +47,53 @@ const imageSwapTutorialTranslations = {
     ],
     nextLevelTitle: "::FaPlayCircle:: Новый Уровень Разблокирован!",
     nextLevelText: "Основы у тебя в кармане, Агент! Готов применить эти навыки в реальном бою? <Link href='/repo-xml?flow=imageSwap' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> ждет твоих команд.",
-    tryLiveButton: "::FaWandMagicSparkles:: Попробовать в Студии"
+    tryLiveButton: "::FaWandMagicSparkles:: Попробовать в Студии",
+    toggleButtonToWtf: "::FaBrain:: Переключить на WTF-инструкцию",
+    toggleButtonToNormal: "::FaBookOpen:: Вернуться к нормальной инструкции",
   },
+  wtf: {
+    pageTitle: "Замена Картинок для Чайников",
+    pageSubtitle: "Просто, как дважды два. Следуй видосам! ::FaThumbsUp::",
+    videos: [
+      {
+        id: 1,
+        title: "Шаг 1: Скопируй Старый Адрес",
+        description: "Найди в коде СТАРУЮ картинку. Скопируй её АДРЕС (URL). Это просто!",
+        src: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//1_copy_image_link.mp4",
+        icon: "FaLink",
+        color: "brand-pink"
+      },
+      {
+        id: 2,
+        title: "Шаг 2: Загрузи Новую, Скопируй Адрес",
+        description: "Загрузи НОВУЮ картинку (куда-нибудь, где есть ссылка). Скопируй её АДРЕС (URL).",
+        src: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//2_upload_new_image.mp4",
+        icon: "FaUpload",
+        color: "brand-blue"
+      },
+      {
+        id: 3,
+        title: "Шаг 3: Студия Сделает Магию",
+        description: "Иди в SUPERVIBE Studio. Вставь СТАРЫЙ адрес, потом НОВЫЙ. Наш AI всё сделает сам и подготовит PR.",
+        src: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//3_sitback_and_relax_its_swappin.mp4",
+        icon: "FaWandMagicSparkles",
+        color: "brand-purple"
+      },
+      {
+        id: 4,
+        title: "Шаг 4: Готово! Проверь PR",
+        description: "PR создан! Просто проверь и смерджи. Картинка заменена! Ты молодец!",
+        src: "https://inmctohsodgdohamhzag.supabase.co/storage/v1/object/public/tutorial-1-img-swap//4_profit_check.mp4",
+        icon: "FaCheckDouble",
+        color: "brand-green"
+      }
+    ],
+    nextLevelTitle: "::FaAward:: Мастер Пикселей!",
+    nextLevelText: "Теперь ты меняешь картинки как босс! Готов к реальным задачам? <Link href='/repo-xml?flow=imageSwap' class='text-brand-blue hover:underline font-semibold'>SUPERVIBE Studio</Link> заряжена.",
+    tryLiveButton: "::FaWandMagicSparkles:: В Студию!",
+    toggleButtonToWtf: "::FaBrain:: Переключить на WTF-инструкцию",
+    toggleButtonToNormal: "::FaBookOpen:: Вернуться к нормальной инструкции",
+  }
 };
 
 const colorClasses: Record<string, { text: string; border: string; shadow: string }> = {
@@ -59,8 +104,14 @@ const colorClasses: Record<string, { text: string; border: string; shadow: strin
 };
 
 export default function ImageSwapTutorialPage() {
-  const lang = 'ru'; 
-  const t = imageSwapTutorialTranslations[lang];
+  const [currentMode, setCurrentMode] = useState<'ru' | 'wtf'>('ru');
+  const t = imageSwapTutorialTranslations[currentMode];
+
+  const toggleMode = () => {
+    setCurrentMode(prevMode => prevMode === 'ru' ? 'wtf' : 'ru');
+  };
+
+  const stepsToRender = currentMode === 'wtf' ? imageSwapTutorialTranslations.wtf.videos : imageSwapTutorialTranslations.ru.videos;
 
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 text-gray-200 pt-24 pb-20 overflow-x-hidden">
@@ -74,17 +125,24 @@ export default function ImageSwapTutorialPage() {
       ></div>
 
       <div className="container mx-auto px-4">
-        <header className="text-center mb-12 md:mb-20">
+        <header className="text-center mb-12 md:mb-16">
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-orbitron font-bold text-brand-green cyber-text glitch mb-4" data-text={t.pageTitle}>
             <VibeContentRenderer content={t.pageTitle} />
           </h1>
           <p className="text-md sm:text-lg md:text-xl text-gray-300 font-mono max-w-3xl mx-auto">
             <VibeContentRenderer content={t.pageSubtitle} />
           </p>
+          <Button 
+            onClick={toggleMode} 
+            variant="outline" 
+            className="mt-6 bg-card/50 border-brand-cyan/50 hover:bg-brand-cyan/10 hover:text-brand-cyan text-brand-cyan/90 transition-all duration-200 text-sm px-4 py-2"
+          >
+            <VibeContentRenderer content={currentMode === 'ru' ? t.toggleButtonToWtf : t.toggleButtonToNormal} />
+          </Button>
         </header>
 
         <div className="space-y-16 md:space-y-24">
-          {t.videos.map((video, index) => {
+          {stepsToRender.map((video, index) => {
             const stepColor = colorClasses[video.color] || colorClasses["brand-purple"];
             return (
               <section key={video.id} className={cn(index > 0 && "border-t border-gray-700/50 pt-12 md:pt-16")}>
