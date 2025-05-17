@@ -25,6 +25,9 @@ const NextLevelTeaser: React.FC<NextLevelTeaserProps> = ({
   const borderColorClass = `border-${mainColorClassKey}/30`;
   const buttonBgClass = `bg-${mainColorClassKey}`;
   const buttonHoverBgClass = `hover:bg-${mainColorClassKey}/80`;
+  // For shadows, you might need to have predefined shadow classes in globals.css or tailwind.config.js
+  // e.g., shadow-brand-green-glow. For now, using a generic shadow.
+  // This assumes that Tailwind JIT can pick up `shadow-brand-green/30` if `brand-green` is a defined color.
   const buttonShadowClass = `shadow-lg hover:shadow-xl shadow-${mainColorClassKey}/30 hover:shadow-${mainColorClassKey}/50`;
 
 
